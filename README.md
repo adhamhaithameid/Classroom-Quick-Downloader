@@ -1,36 +1,54 @@
 # Classroom Quick Downloader
 
-Adds a **Download** button next to Google Classroom attachments so you can save files instantly without opening Drive previews.
-
 ## Features
-- One-click direct download for Drive-backed attachments (PDF, Docs, Sheets, Slides, images, audio, video, Office files, etc.)
-- Works across Classroom’s SPA pages using a `MutationObserver`
-- Material-style elevated button (icon + label), no duplicates, no extra permissions
 
-## How It Works
-- Detects attachment anchors linking to `drive.google.com`
-- Extracts the Drive **file ID** via RegExp (`/\/d\/([a-zA-Z0-9_-]+)/` or `?id=...`)
-- Builds a direct URL: `https://drive.google.com/uc?export=download&id=FILE_ID`
-- Injects a lightweight button that triggers immediate download
+* **One-click downloads** for Google Classroom attachments — skips Drive preview.
+* **Material-style blue pill** (“Download”) with **inline SVG icon** (no broken images).
+* **Smart de-duplication**: injects a single pill per file per post/card (even if multiple links exist).
+* **Dynamic placement**: inserts after the filename; if the row is cramped (e.g., *Your work*), the pill automatically **moves to its own row below**, and moves back inline when space allows.
+* **SPA-resilient**: survives route changes, lazy loads, and DOM re-renders (MutationObserver + route hooks + periodic light rescan).
+* **No config, no extra permissions** — just works on `https://classroom.google.com/*`.
 
-## Installation (Developer Mode)
-1. Download/clone this folder: `classroom-quick-downloader/`
-2. Visit `chrome://extensions` in Chrome
-3. Enable **Developer mode**
-4. Click **Load unpacked** and select the folder
-5. Open `https://classroom.google.com/` and look for the **Download** button near attachments
+## File Tree
 
-## Folder Structure
+```
 classroom-quick-downloader/
 ├── manifest.json
-├── content.js
+├── icons.js          # inline SVG icon helper (CSP-proof; exposes CQD_ICONS)
+├── content.js        # main logic: detect, extract ID, inject pill, dynamic placement
 └── icons/
-└── icon128.png
+    ├── icon48.png    # (optional) toolbar icon
+    └── icon128.png   # toolbar icon referenced by manifest
+```
 
-## Notes
-- No additional permissions required for basic direct-download behavior.
-- If some files require authenticated fetch, you can later add host permissions for Drive and switch to a `fetch → blob` flow.
+## Installation
+
+1. Open Chrome and go to `chrome://extensions/`.
+2. Enable **Developer mode** (top-right).
+3. Click **Load unpacked** and select the `classroom-quick-downloader` folder.
+4. Open or refresh `https://classroom.google.com/`.
+
+## How It Works
+
+* **Detect**: Scans Classroom posts/tiles for attachment elements (`a`, `[role="link"]`), skipping thumbnail-only links.
+* **Extract File ID**: Parses Drive IDs from:
+
+  * `/file/d/<FILE_ID>/…`
+  * `?id=<FILE_ID>`
+  * ID-like values found in attributes or embedded JSON blobs on the element.
+* **Inject Pill**: Creates a Material-style **Download** pill (button + inline SVG icon) right after the filename link.
+* **Direct Download**: Builds `https://drive.google.com/uc?export=download&id=<FILE_ID>` and triggers it immediately on click.
+* **Stay Visible**: A layout watchdog (ResizeObserver) checks for overflow/no-wrap rows. If the pill is clipped, it **moves to a dedicated row below** the file; if space returns, it goes **back inline**.
+* **Resilience**: MutationObserver + `history.pushState/replaceState` hooks + a light periodic rescan keep pills present across SPA navigation and DOM churn.
+
+## Privacy
+
+* Runs entirely **client-side** as a content script on `classroom.google.com`.
+* **No data collection**, tracking, analytics, or external network calls.
+* **No additional permissions** beyond the content script match.
+* Downloads are initiated directly from Google Drive URLs; the extension does not proxy or inspect file contents.
 
 ## License
-This project is licensed under the Creative Commons Attribution-NonCommercial 4.0 License.
-Commercial use is not allowed without my explicit written permission.
+
+This project is licensed under the **Creative Commons Attribution-NonCommercial 4.0 License**.
+Commercial use is **not** allowed without my explicit written permission.

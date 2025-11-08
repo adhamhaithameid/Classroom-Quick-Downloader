@@ -1,123 +1,120 @@
-// content.js
+// Classroom Quick Downloader — dynamic blue pill with inline SVG icons (CSP-proof),
+// smart de-duplication, and auto-repositioning so it's always visible.
 
-// ====== CONFIG ======
-const BUTTON_CLASS = "classroom-quick-download-btn";
-const BUTTON_LABEL = "Download";
+/* ===================== CONFIG ===================== */
+const BTN = "cqd-btn";          // pill button
+const BTN_WRAP = "cqd-wrap";    // inline wrapper next to filename
+const ROW = "cqd-row";          // fallback row below tight containers
+const SIZE_DEFAULT = "md";      // "sm" | "md" | "lg"
+const ICON_PX_BY_SIZE = { sm: 16, md: 20, lg: 28 }; // CSS pixels for SVG
 
-// Run ASAP
+/* ===================== BOOT ===================== */
+const injectedByRoot = new WeakMap(); // de-dupe: Set<fileId> per “post/card” root
+
 init();
 
 function init() {
-  // Inject base styles once
-  injectButtonStyles();
+  injectStyles();
 
-  // First pass on current DOM
-  processDriveLinks(document);
+  // Multiple passes to beat SPA races
+  runAll(document);
+  requestIdleCallback(() => runAll(document), { timeout: 1500 });
+  setTimeout(() => runAll(document), 800);
 
-  // Observe for future nodes (SPA changes)
-  const observer = new MutationObserver((mutations) => {
-    for (const m of mutations) {
-      if (m.type === "childList" && (m.addedNodes?.length || m.removedNodes?.length)) {
-        processDriveLinks(document);
-      }
-    }
-  });
+  // Observe DOM updates
+  const mo = new MutationObserver(() => runAll(document));
+  mo.observe(document.documentElement || document.body, { childList: true, subtree: true });
 
-  observer.observe(document.body, {
-    childList: true,
-    subtree: true
-  });
+  // React to navigation changes
+  hookLocationChanges(() => runAll(document));
+  window.addEventListener("popstate", () => runAll(document));
+  window.addEventListener("hashchange", () => runAll(document));
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) runAll(document); });
+
+  // Keep-alive (cheap)
+  setInterval(() => {
+    if (!document.getElementById("cqd-style")) injectStyles();
+    runAll(document);
+  }, 2000);
 }
 
-/**
- * Find all Drive links inside Classroom UI and attach buttons if not present.
- */
-function processDriveLinks(root) {
-  // Google Classroom uses different layouts for attachments; generally links are <a>
-  // This finds: <a href="https://drive.google.com/...">
-  const links = root.querySelectorAll('a[href*="drive.google.com"]:not(.' + BUTTON_CLASS + ')');
-
-  links.forEach((link) => {
-    // Some links are icons/thumbnails, some are text
-    const driveUrl = link.getAttribute("href");
-    if (!driveUrl) return;
-
-    const fileId = extractDriveFileId(driveUrl);
-    if (!fileId) return;
-
-    // Make sure we haven't already placed a button near this link
-    const alreadyHasBtn =
-      link.parentElement &&
-      link.parentElement.querySelector("." + BUTTON_CLASS);
-    if (alreadyHasBtn) return;
-
-    const downloadUrl = buildDownloadUrl(fileId);
-    const btn = createDownloadButton(downloadUrl);
-
-    // Try to put the button next to the link (Classroom usually uses flex rows)
-    // Priority: parent → link after → fallback append
-    if (link.parentElement) {
-      // If the parent is inline-like, just append
-      link.parentElement.style.display = link.parentElement.style.display || "flex";
-      link.parentElement.style.alignItems = "center";
-      link.parentElement.appendChild(btn);
-    } else {
-      // worst case: put after link
-      link.insertAdjacentElement("afterend", btn);
-    }
-  });
+/* ===================== MAIN PASS ===================== */
+function runAll(root) {
+  try { processListContext(root); } catch {}
 }
 
-/**
- * Extracts Drive file ID from several common URL patterns.
- * Supports:
- *  - https://drive.google.com/file/d/FILE_ID/view?...
- *  - https://drive.google.com/open?id=FILE_ID
- *  - https://drive.google.com/uc?id=FILE_ID&export=download
- *  - Anything containing `/d/FILE_ID/`
- */
-function extractDriveFileId(url) {
-  try {
-    // 1) /file/d/FILE_ID/
-    const fileDlRe = /\/d\/([a-zA-Z0-9_-]+)/;
-    const m1 = url.match(fileDlRe);
-    if (m1 && m1[1]) return m1[1];
+/* =============== LIST VIEW (outside the file) =============== */
+/** Attach one pill per Drive file per post/card root.
+ *  Prefer the filename link (skip thumbnail-only links). */
+function processListContext(root) {
+  const candidates = root.querySelectorAll(
+    'a:not([data-cqd-scanned="1"]), [role="link"]:not([data-cqd-scanned="1"])'
+  );
 
-    // 2) ?id=FILE_ID
-    const u = new URL(url);
-    const idParam = u.searchParams.get("id");
-    if (idParam) return idParam;
+  for (const el of candidates) {
+    if (!el.isConnected) continue;
 
-    // 3) sometimes Classroom gives share URLs like .../uc?export=view&id=...
-    const altId = u.searchParams.get("file_id");
-    if (altId) return altId;
+    if (isImageOnlyLink(el)) continue; // we prefer the text filename link
 
-    return null;
-  } catch (e) {
-    return null;
+    const fileId =
+      getFileIdFromElement(el) ||
+      extractDriveFileId(el.getAttribute && el.getAttribute("href"));
+
+    if (!fileId) continue;
+
+    const card = findPostRoot(el);
+    if (!card) continue;
+
+    // Per-card de-dupe for this fileId
+    if (card.querySelector(`.${BTN_WRAP}[data-cqd-file-id="${fileId}"]`) ||
+        card.querySelector(`.${ROW}[data-cqd-file-id="${fileId}"]`)) {
+      el.setAttribute("data-cqd-scanned", "1");
+      continue;
+    }
+    let set = injectedByRoot.get(card);
+    if (!set) { set = new Set(); injectedByRoot.set(card, set); }
+    if (set.has(fileId)) { el.setAttribute("data-cqd-scanned", "1"); continue; }
+
+    // Build pill + inline insertion
+    const wrap = document.createElement("span");
+    wrap.className = BTN_WRAP;
+    wrap.dataset.cqdFileId = fileId;
+    wrap.style.display = "inline-flex";
+    wrap.style.verticalAlign = "middle";
+    wrap.style.marginLeft = "8px";
+    wrap.style.flexShrink = "0";
+
+    const btn = createDownloadButton(buildDownloadUrl(fileId), SIZE_DEFAULT);
+    wrap.appendChild(btn);
+
+    el.insertAdjacentElement("afterend", wrap);
+
+    // Ensure the pill stays visible in tight rows (“Your work”)
+    ensureVisiblePlacement({ linkEl: el, wrap, card, fileId });
+
+    set.add(fileId);
+    el.setAttribute("data-cqd-scanned", "1");
   }
 }
 
-/**
- * Build direct download URL
- */
-function buildDownloadUrl(fileId) {
-  return `https://drive.google.com/uc?export=download&id=${fileId}`;
-}
-
-/**
- * Create the actual button element
- */
-function createDownloadButton(downloadUrl) {
+/* =============== BUTTON FACTORY (inline SVG) =============== */
+function createDownloadButton(downloadUrl, size = "md") {
   const btn = document.createElement("button");
   btn.type = "button";
-  btn.className = BUTTON_CLASS;
-  btn.innerHTML = `
-    <span class="cqd-icon" aria-hidden="true">
-      ${getDownloadSvg()}
-    </span>
-    <span class="cqd-label">${BUTTON_LABEL}</span>
-  `;
+  btn.className = `${BTN} ${BTN}--${size}`;
+
+  // Inline SVG icon (CSP-proof). Size chosen by pill size.
+  const px = ICON_PX_BY_SIZE[size] || ICON_PX_BY_SIZE.md;
+  const svg = (window.CQD_ICONS && window.CQD_ICONS.createDownloadIcon)
+    ? window.CQD_ICONS.createDownloadIcon(px)
+    : fallbackSvg(px);
+  btn.appendChild(svg);
+
+  const label = document.createElement("span");
+  label.className = "cqd-label";
+  label.textContent = "Download";
+
+  btn.appendChild(label);
 
   btn.addEventListener("click", (e) => {
     e.preventDefault();
@@ -128,97 +125,219 @@ function createDownloadButton(downloadUrl) {
   return btn;
 }
 
-/**
- * Try to trigger a download in the simplest way.
- * If this ever fails for some classroom-specific resource,
- * you can swap to fetchDownload(downloadUrl);
- */
+// If for some reason icons.js didn’t load, we still draw a simple fallback icon.
+function fallbackSvg(size) {
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("width", String(size));
+  svg.setAttribute("height", String(size));
+  svg.style.fill = "currentColor";
+  svg.style.display = "inline-block";
+  svg.style.verticalAlign = "middle";
+  const p1 = document.createElementNS(ns, "path");
+  p1.setAttribute("d", "M5 20h14v-2H5v2z");
+  const p2 = document.createElementNS(ns, "path");
+  p2.setAttribute("d", "M12 4a1 1 0 0 1 1 1v8.59l2.3-2.3a1 1 0 1 1 1.4 1.42l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 0 1 1.4-1.42l2.3 2.3V5a1 1 0 0 1 1-1z");
+  svg.append(p1, p2);
+  return svg;
+}
+
+/* =============== DYNAMIC VISIBILITY / REPOSITIONING =============== */
+function ensureVisiblePlacement({ linkEl, wrap, card, fileId }) {
+  const container = linkEl.parentElement || linkEl;
+  const blockBelow = findBlockRow(linkEl);
+
+  const ro = new ResizeObserver(check);
+  ro.observe(container);
+  window.addEventListener("resize", check);
+  setTimeout(check, 0);
+  setTimeout(check, 250);
+
+  function isClipped() {
+    const btnRect = wrap.getBoundingClientRect();
+    const parRect = container.getBoundingClientRect?.() || { left: 0, right: 1e9, width: 1e9 };
+    if (btnRect.width < 8 || btnRect.height < 8) return true;
+
+    const cs = getComputedStyle(container);
+    const noWrap = cs.whiteSpace === "nowrap" || (cs.display.includes("flex") && cs.flexWrap === "nowrap");
+    const hidesOverflow = cs.overflowX === "hidden" || cs.overflow === "hidden";
+
+    if ((noWrap || hidesOverflow) && btnRect.right > parRect.right - 2) return true;
+    return false;
+  }
+
+  function moveToRow() {
+    if (wrap.closest(`.${ROW}`)) return;
+    const row = document.createElement("div");
+    row.className = ROW;
+    row.dataset.cqdFileId = fileId;
+    row.style.display = "flex";
+    row.style.alignItems = "center";
+    row.style.gap = "8px";
+    row.style.margin = "6px 0 0 0";
+    row.appendChild(wrap);
+    (blockBelow || container).insertAdjacentElement("afterend", row);
+  }
+
+  function moveInline() {
+    if (!wrap.closest(`.${ROW}`)) return;
+    linkEl.insertAdjacentElement("afterend", wrap);
+    const orphanRow = linkEl.nextElementSibling?.nextElementSibling;
+    if (orphanRow && orphanRow.classList?.contains(ROW) && orphanRow.children.length === 0) {
+      orphanRow.remove();
+    }
+  }
+
+  function check() {
+    try { isClipped() ? moveToRow() : moveInline(); } catch {}
+  }
+}
+
+/* =============== DOWNLOAD + ID HELPERS =============== */
 function triggerDownload(downloadUrl) {
-  // Technique 1: hidden <a download>
   const a = document.createElement("a");
   a.href = downloadUrl;
-  a.target = "_blank"; // sometimes needed for Drive
+  a.target = "_blank";
   a.rel = "noopener";
-  // We *could* set a.download = '' but for Drive this is not always honored
   document.body.appendChild(a);
   a.click();
   a.remove();
 }
 
-/**
- * If you encounter files that need authenticated fetch, use this instead.
- * Kept here for future expansion.
- */
-/*
-async function fetchDownload(downloadUrl) {
-  try {
-    const res = await fetch(downloadUrl, { credentials: "include" });
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "file"; // we don't know name, could be improved
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  } catch (err) {
-    console.error("[Classroom Quick Downloader] fetch download failed:", err);
-    window.open(downloadUrl, "_blank");
-  }
+function buildDownloadUrl(fileId) {
+  return `https://drive.google.com/uc?export=download&id=${fileId}`;
 }
-*/
 
-/**
- * Inject styles for our button so it looks like a lightweight Material button.
- */
-function injectButtonStyles() {
+function extractDriveFileId(url) {
+  if (!url) return null;
+  try {
+    const m1 = url.match(/\/d\/([A-Za-z0-9_-]{20,})/);
+    if (m1 && m1[1]) return m1[1];
+    const u = new URL(url, location.href);
+    const idParam = u.searchParams.get("id");
+    if (idParam && /[A-Za-z0-9_-]{20,}/.test(idParam)) return idParam;
+    const idLike = (url.match(/[?&]id=([A-Za-z0-9_-]{20,})/) || [])[1];
+    if (idLike) return idLike;
+  } catch {}
+  return null;
+}
+
+function getFileIdFromElement(el) {
+  if (!el) return null;
+
+  const href = el.getAttribute?.("href");
+  const fromHref = extractDriveFileId(href || "");
+  if (fromHref) return fromHref;
+
+  if (el.attributes) {
+    for (const attr of el.attributes) {
+      const val = attr.value || "";
+      if (!val) continue;
+
+      const embedD = val.match(/\/d\/([A-Za-z0-9_-]{20,})/);
+      if (embedD && embedD[1]) return embedD[1];
+
+      const embedQ = (val.match(/[?&]id=([A-Za-z0-9_-]{20,})/) || [])[1];
+      if (embedQ) return embedQ;
+
+      const jsonId = (val.match(/"id"\s*:\s*"([A-Za-z0-9_-]{20,})"/) || [])[1];
+      if (jsonId) return jsonId;
+
+      if (attr.name.toLowerCase().includes("id")) {
+        const direct = (val.match(/[A-Za-z0-9_-]{20,}/) || [])[0];
+        if (direct) return direct;
+      }
+    }
+  }
+
+  const a = el.querySelector?.("a[href]");
+  if (a) return extractDriveFileId(a.getAttribute("href") || "");
+
+  return null;
+}
+
+/* =============== HEURISTICS & HELPERS =============== */
+function isImageOnlyLink(el) {
+  const hasImg = !!el.querySelector?.("img, svg");
+  const txt = (el.textContent || "").trim();
+  return hasImg && txt.length < 3;
+}
+
+function findPostRoot(el) {
+  return (
+    el.closest('article') ||
+    el.closest('c-wiz') ||
+    el.closest('[role="listitem"]') ||
+    el.closest('[data-stream-item], [jscontroller], [data-item-id]') ||
+    el.closest('section') ||
+    document.body
+  );
+}
+
+function findBlockRow(el) {
+  return (
+    el.closest('[role="listitem"]') ||
+    el.closest('[class*="row"], [class*="Row"]') ||
+    el.closest('div')
+  );
+}
+
+/* =============== STYLES =============== */
+function injectStyles() {
   if (document.getElementById("cqd-style")) return;
   const style = document.createElement("style");
   style.id = "cqd-style";
   style.textContent = `
-    .${BUTTON_CLASS} {
+    .${BTN} {
+      --cqd-bg: #1a73e8;          /* Google Blue 600 */
+      --cqd-bg-hover: #1765cc;
+      --cqd-text: #ffffff;
+      --cqd-shadow: 0 1px 2px rgba(0,0,0,0.20);
+      --cqd-shadow-hover: 0 3px 6px rgba(0,0,0,0.22);
+
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      background: #fff;
-      color: #1967d2; /* Google Classroom-ish blue */
-      border: 1px solid rgba(25, 103, 210, 0.2);
-      border-radius: 6px;
-      padding: 4px 10px 4px 8px;
-      font-size: 0.78rem;
+      gap: 8px;
+      background: var(--cqd-bg);
+      color: var(--cqd-text);
+      border: none;
+      border-radius: 9999px; /* pill */
+      padding: 6px 12px;
+      font-size: 13px;
       line-height: 1.4;
       cursor: pointer;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.15);
-      transition: background 0.15s ease, box-shadow 0.15s ease;
       white-space: nowrap;
+      box-shadow: var(--cqd-shadow);
+      transition: box-shadow 140ms ease, background 140ms ease, transform 40ms ease;
+      flex: 0 0 auto;
     }
-    .${BUTTON_CLASS}:hover {
-      background: rgba(25, 103, 210, 0.06);
-      box-shadow: 0 2px 4px rgba(0,0,0,0.15);
-    }
-    .${BUTTON_CLASS} .cqd-icon {
-      display: flex;
-      width: 16px;
-      height: 16px;
-    }
-    .${BUTTON_CLASS} svg {
-      width: 16px;
-      height: 16px;
-      fill: currentColor;
-    }
+    .${BTN}:hover { background: var(--cqd-bg-hover); box-shadow: var(--cqd-shadow-hover); }
+    .${BTN}:active { transform: translateY(0.5px); }
+    .${BTN}:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(26,115,232,0.35); }
+
+    .${BTN} .cqd-label { letter-spacing: .2px; }
+
+    /* Fallback row (below tight containers) */
+    .${ROW} { width: 100%; }
   `;
   document.head.appendChild(style);
 }
 
-/**
- * Simple inline SVG for "download"
- */
-function getDownloadSvg() {
-  // Material-like download icon
-  return `
-    <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
-      <path d="M5 20h14v-2H5v2zm7-18-5.5 5.5 1.42 1.42L11 7.83V16h2V7.83l3.08 3.09 1.42-1.42L12 2z"></path>
-    </svg>
-  `;
+/* =============== SPA ROUTE HOOK =============== */
+function hookLocationChanges(onChange) {
+  const fire = () => { try { onChange(); } catch {} };
+  const push = history.pushState;
+  const replace = history.replaceState;
+
+  history.pushState = function() {
+    const ret = push.apply(this, arguments);
+    fire();
+    return ret;
+  };
+  history.replaceState = function() {
+    const ret = replace.apply(this, arguments);
+    fire();
+    return ret;
+  };
 }
