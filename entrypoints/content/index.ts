@@ -1,41 +1,23 @@
 // filepath: entrypoints/content.ts
-// Classroom Quick Downloader - content script (single-file buttons only)
-//
-// - Runs only on classroom.google.com
-// - Injects Material-style download buttons on attachments
-// - Each button has states: idle → loading → success/error → back to idle
-//   * idle: circle + download icon
-//   * loading: pill + spinner + "Downloading…"
-//   * success: pill + ✅ + green background
-//   * error: pill + ❌ + red background
-
 const CLASSROOM_URL_PATTERN = /^https:\/\/classroom\.google\.com\//;
 
-/**
- * Material-style download icon (arrow down onto a bar),
- * delivered via data: URL to satisfy "icon from URL" requirement.
- */
-const ICON_SVG_RAW = `
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white">
-  <path d="M5 20h14v-2H5v2z"/>
-  <path d="M11 4v8.17L8.41 9.59 7 11l5 5 5-5-1.41-1.41L13 12.17V4h-2z"/>
-</svg>
-`.trim();
+import {
+  DOWNLOAD_ICON_SVG_URL,
+  SUCCESS_ICON_SVG_URL,
+  ERROR_ICON_SVG_URL,
+} from './icons';
 
-const ICON_SVG_URL = `data:image/svg+xml;utf8,${encodeURIComponent(ICON_SVG_RAW)}`;
+import { injectStyles } from './styles';
 
-const STYLE_ID = 'cqd-style';
+
 const INJECTED_ATTR = 'data-cqd-injected';
 const RESCAN_INTERVAL_MS = 2000;
 const RESCAN_DEBOUNCE_MS = 250;
 
-// Spinner diameter (in pixels) — tweak this to control loader size
-const SPINNER_SIZE_PX = 16;
-
 // Loading / feedback durations (ms)
 const LOADING_MIN_MS = 600;
-const FEEDBACK_SUCCESS_MS = 1500;
-const FEEDBACK_ERROR_MS = 1400;
+const FEEDBACK_SUCCESS_MS = 2000;
+const FEEDBACK_ERROR_MS = 4000;
 
 const DRIVE_ANCHOR_SELECTOR =
   'a[href*="https://drive.google.com"], a[href*="//drive.google.com"], a[href*="classroom.google.com/drive"]';
@@ -69,212 +51,6 @@ function isGoogleClassroom(): boolean {
   if (location.hostname !== 'classroom.google.com') return false;
   return CLASSROOM_URL_PATTERN.test(location.href);
 }
-
-/* -----------------------------------------------------
- * Style Injection
- * ---------------------------------------------------*/
-
-function injectStyles(): void {
-  if (typeof document === 'undefined') return;
-  if (document.getElementById(STYLE_ID)) return;
-
-  const style = document.createElement('style');
-  style.id = STYLE_ID;
-  style.textContent = `
-    /* SINGLE ATTACHMENT BUTTONS (circle -> pill on hover) */
-    .cqd-download-btn {
-      position: absolute;
-      top: 50%;
-      right: 8px;
-      z-index: 5;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      height: 40px;
-      width: 40px;
-      max-width: calc(100% - 16px);
-      border-radius: 9999px;
-      border: none;
-      padding: 0;
-      background-color: #1a73e8;
-      color: #ffffff;
-      box-shadow: 0 4px 10px rgba(15, 23, 42, 0.22);
-      cursor: pointer;
-      transform: translateY(-50%) scale(1);
-      will-change: transform, box-shadow, width, border-radius, padding-inline;
-      transition:
-        width 220ms cubic-bezier(0.2, 0, 0, 1),
-        padding-inline 220ms cubic-bezier(0.2, 0, 0, 1),
-        border-radius 220ms cubic-bezier(0.2, 0, 0, 1),
-        box-shadow 220ms cubic-bezier(0.2, 0, 0, 1),
-        transform 220ms cubic-bezier(0.2, 0, 0, 1),
-        background-color 220ms cubic-bezier(0.2, 0, 0, 1);
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      font-size: 13px;
-      white-space: nowrap;
-      overflow: hidden;
-    }
-
-    .cqd-download-btn:hover {
-      width: 120px;
-      padding-inline: 12px;
-      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.30);
-      justify-content: flex-start;
-      transform: translateY(calc(-50% - 1px)) scale(1.04);
-      border-radius: 20px;
-    }
-
-    .cqd-download-btn:focus-visible {
-      outline: 2px solid #ffffff;
-      outline-offset: 2px;
-    }
-
-    .cqd-download-btn:active {
-      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.3);
-      transform: translateY(-50%) scale(0.97);
-    }
-
-    .cqd-download-btn .cqd-label {
-      opacity: 0;
-      margin-left: 0;
-      max-width: 0;
-      overflow: hidden;
-      transition:
-        opacity 200ms cubic-bezier(0.2, 0, 0, 1),
-        max-width 200ms cubic-bezier(0.2, 0, 0, 1),
-        margin-left 200ms cubic-bezier(0.2, 0, 0, 1);
-    }
-
-    .cqd-download-btn:hover .cqd-label {
-      opacity: 1;
-      max-width: 100px;
-      margin-left: 6px;
-    }
-
-    .cqd-download-btn .cqd-icon-wrapper {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-    }
-
-    .cqd-download-icon {
-      display: block;
-      width: 24px;
-      height: 24px;
-      background-image: url("${ICON_SVG_URL}");
-      background-repeat: no-repeat;
-      background-position: center;
-      background-size: 24px 24px;
-      filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.35));
-      flex-shrink: 0;
-      transform-origin: center;
-      transition:
-        width 200ms cubic-bezier(0.2, 0, 0, 1),
-        height 200ms cubic-bezier(0.2, 0, 0, 1),
-        border-width 200ms cubic-bezier(0.2, 0, 0, 1);
-    }
-
-    .cqd-icon-small {
-      width: 16px;
-      height: 16px;
-      background-size: 16px 16px;
-    }
-
-    .cqd-icon-medium {
-      width: 24px;
-      height: 24px;
-      background-size: 24px 24px;
-    }
-
-    .cqd-icon-large {
-      width: 32px;
-      height: 32px;
-      background-size: 32px 32px;
-    }
-
-    /* PILL STATES (loading / success / error) */
-    .cqd-download-btn.cqd-loading,
-    .cqd-download-btn.cqd-success,
-    .cqd-download-btn.cqd-error {
-      width: 140px;
-      padding-inline: 12px;
-      border-radius: 20px;
-      justify-content: flex-start;
-      box-shadow: 0 8px 22px rgba(15, 23, 42, 0.30);
-      cursor: default;
-    }
-
-    .cqd-download-btn.cqd-loading .cqd-label,
-    .cqd-download-btn.cqd-success .cqd-label,
-    .cqd-download-btn.cqd-error .cqd-label {
-      opacity: 1;
-      max-width: 110px;
-      margin-left: 8px;
-    }
-
-    .cqd-download-btn.cqd-loading:hover,
-    .cqd-download-btn.cqd-success:hover,
-    .cqd-download-btn.cqd-error:hover {
-      width: 140px;
-      padding-inline: 12px;
-      border-radius: 20px;
-      transform: translateY(-50%) scale(1);
-      box-shadow: 0 8px 22px rgba(15, 23, 42, 0.30);
-    }
-
-    .cqd-download-btn.cqd-loading:active,
-    .cqd-download-btn.cqd-success:active,
-    .cqd-download-btn.cqd-error:active {
-      transform: translateY(-50%) scale(1);
-      box-shadow: 0 8px 22px rgba(15, 23, 42, 0.30);
-    }
-
-    /* Material-like circular spinner: arc on a circle, rotating.
-       The diameter is controlled by SPINNER_SIZE_PX. */
-    .cqd-spinner {
-      background-image: none;
-      border-radius: 9999px;
-      width: ${SPINNER_SIZE_PX}px;
-      height: ${SPINNER_SIZE_PX}px;
-      border-style: solid;
-      border-width: 3px;
-      border-color: rgba(255, 255, 255, 0.22);
-      border-top-color: #ffffff;
-      border-right-color: #ffffff;
-      box-shadow: none;
-      animation: cqd-spin 0.9s linear infinite;
-    }
-
-    @keyframes cqd-spin {
-      from { transform: rotate(0deg); }
-      to { transform: rotate(360deg); }
-    }
-
-    /* Success / error icons using emoji, no background image */
-    .cqd-icon-check,
-    .cqd-icon-cross {
-      background-image: none;
-      width: 18px;
-      height: 18px;
-      box-shadow: none;
-      font-size: 16px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .cqd-icon-cross {
-      font-size: 15px;
-    }
-  `.trim();
-
-  (document.head || document.documentElement).appendChild(style);
-}
-
-/* -----------------------------------------------------
- * Scanning / Observers
- * ---------------------------------------------------*/
 
 function scheduleScan(): void {
   if (scanTimeoutId !== null) {
@@ -514,15 +290,19 @@ function setButtonState(button: HTMLButtonElement, state: ButtonState): void {
 
   // Reset all state classes / styles
   button.classList.remove('cqd-loading', 'cqd-success', 'cqd-error');
-  icon.classList.remove('cqd-spinner', 'cqd-icon-check', 'cqd-icon-cross');
+  icon.classList.remove('cqd-spinner');
   icon.textContent = '';
   button.disabled = false;
   button.style.backgroundColor = '#1a73e8';
   label.textContent = 'Download';
 
+  // Default: download icon
+  icon.style.backgroundImage = `url("${DOWNLOAD_ICON_SVG_URL}")`;
+  icon.style.backgroundSize = '20px 20px';
+
   switch (state) {
     case 'idle':
-      // default circle + download icon via background-image
+      // default circle + download icon
       break;
 
     case 'loading':
@@ -530,22 +310,24 @@ function setButtonState(button: HTMLButtonElement, state: ButtonState): void {
       button.disabled = true;
       label.textContent = 'Downloading…';
       icon.classList.add('cqd-spinner');
+      // Spinner uses border; hide background image to avoid visual clash
+      icon.style.backgroundImage = 'none';
       break;
 
     case 'success':
       button.classList.add('cqd-success');
       button.style.backgroundColor = '#188038'; // Google green
       label.textContent = 'Downloaded';
-      icon.classList.add('cqd-icon-check');
-      icon.textContent = '✅';
+      icon.style.backgroundImage = `url("${SUCCESS_ICON_SVG_URL}")`;
+      icon.style.backgroundSize = '20px 20px';
       break;
 
     case 'error':
       button.classList.add('cqd-error');
-      button.style.backgroundColor = '#d93025'; // bright red
+      button.style.backgroundColor = '#e05952'; // bright red
       label.textContent = 'Error';
-      icon.classList.add('cqd-icon-cross');
-      icon.textContent = '❌';
+      icon.style.backgroundImage = `url("${ERROR_ICON_SVG_URL}")`;
+      icon.style.backgroundSize = '20px 20px';
       break;
   }
 }
@@ -633,7 +415,7 @@ function downloadFile(rawUrl: string): Promise<boolean> {
 
   const finalUrl = toDownloadUrl(rawUrl);
 
-  // Offline? we know this will likely fail.
+  // Offline? this will likely fail; just show error state.
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
     return Promise.resolve(false);
   }
@@ -659,10 +441,10 @@ function downloadFile(rawUrl: string): Promise<boolean> {
             const err = chrome.runtime.lastError;
             if (err) {
               console.warn('[CQD] sendMessage error:', err.message);
-              fallbackAnchorDownload(finalUrl);
               if (!resolved) {
                 resolved = true;
-                resolve(true);
+                // ❌ No fallback tab any more – just error state
+                resolve(false);
               }
               return;
             }
@@ -671,10 +453,9 @@ function downloadFile(rawUrl: string): Promise<boolean> {
               if (response?.error) {
                 console.warn('[CQD] background download error:', response.error);
               }
-              fallbackAnchorDownload(finalUrl);
               if (!resolved) {
                 resolved = true;
-                resolve(true);
+                resolve(false);
               }
               return;
             }
@@ -686,26 +467,25 @@ function downloadFile(rawUrl: string): Promise<boolean> {
           },
         );
 
-        // Safety timeout: if background never responds, fallback + resolve.
+        // Safety timeout in case the service worker dies / never responds
         window.setTimeout(() => {
           if (!resolved) {
-            fallbackAnchorDownload(finalUrl);
+            console.warn('[CQD] background download timed out');
             resolved = true;
-            resolve(true);
+            resolve(false);
           }
         }, 4000);
       } catch (e) {
         console.warn('[CQD] sendMessage threw:', e);
-        fallbackAnchorDownload(finalUrl);
-        if (!resolved) resolve(true);
+        if (!resolved) resolve(false);
       }
     });
   }
 
-  // No background available: just open anchor in new tab; treat as success.
-  fallbackAnchorDownload(finalUrl);
-  return Promise.resolve(true);
+  // No background available: treat as error (no tabs opened).
+  return Promise.resolve(false);
 }
+
 
 /**
  * Fallback: synthetic anchor click (may open tab, but still downloads).
