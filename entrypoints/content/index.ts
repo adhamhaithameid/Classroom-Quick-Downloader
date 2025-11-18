@@ -1,41 +1,22 @@
-// filepath: entrypoints/content.ts
-// Classroom Quick Downloader - content script (single-file buttons only)
-//
-// - Runs only on classroom.google.com
-// - Injects Material-style download buttons on attachments
-// - Each button has states: idle → loading → success/error → back to idle
-//   * idle: circle + download icon
-//   * loading: pill + spinner + "Downloading…"
-//   * success: pill + ✅ + green background
-//   * error: pill + ❌ + red background
-
+// filepath: entrypoints/index.ts
 const CLASSROOM_URL_PATTERN = /^https:\/\/classroom\.google\.com\//;
 
-/**
- * Material-style download icon (arrow down onto a bar),
- * delivered via data: URL to satisfy "icon from URL" requirement.
- */
-const ICON_SVG_RAW = `
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white">
-  <path d="M5 20h14v-2H5v2z"/>
-  <path d="M11 4v8.17L8.41 9.59 7 11l5 5 5-5-1.41-1.41L13 12.17V4h-2z"/>
-</svg>
-`.trim();
+import {
+  DOWNLOAD_ICON_SVG_URL,
+  SUCCESS_ICON_SVG_URL,
+  ERROR_ICON_SVG_URL,
+} from './icons';
 
-const ICON_SVG_URL = `data:image/svg+xml;utf8,${encodeURIComponent(ICON_SVG_RAW)}`;
+import { injectStyles } from './styles';
 
-const STYLE_ID = 'cqd-style';
 const INJECTED_ATTR = 'data-cqd-injected';
 const RESCAN_INTERVAL_MS = 2000;
 const RESCAN_DEBOUNCE_MS = 250;
 
-// Spinner diameter (in pixels) — tweak this to control loader size
-const SPINNER_SIZE_PX = 16;
-
 // Loading / feedback durations (ms)
 const LOADING_MIN_MS = 600;
-const FEEDBACK_SUCCESS_MS = 1500;
-const FEEDBACK_ERROR_MS = 1400;
+const FEEDBACK_SUCCESS_MS = 2000;
+const FEEDBACK_ERROR_MS = 4000;
 
 const DRIVE_ANCHOR_SELECTOR =
   'a[href*="https://drive.google.com"], a[href*="//drive.google.com"], a[href*="classroom.google.com/drive"]';
@@ -60,6 +41,24 @@ let observer: MutationObserver | null = null;
 
 type ButtonState = 'idle' | 'loading' | 'success' | 'error';
 
+type FileMeta = {
+  name?: string;
+  ext?: string;
+  kind?: string;
+};
+
+type PendingButton = {
+  button: HTMLButtonElement;
+  requestId: string;
+  fileMeta?: FileMeta;
+  startedAt: number;
+};
+
+type DownloadStatus = 'complete' | 'interrupted' | 'blocked_html';
+
+const pendingButtons = new Map<string, PendingButton>();
+let nextRequestSeq = 1;
+
 /* -----------------------------------------------------
  * Environment / Page Checks
  * ---------------------------------------------------*/
@@ -68,208 +67,6 @@ function isGoogleClassroom(): boolean {
   if (typeof location === 'undefined') return false;
   if (location.hostname !== 'classroom.google.com') return false;
   return CLASSROOM_URL_PATTERN.test(location.href);
-}
-
-/* -----------------------------------------------------
- * Style Injection
- * ---------------------------------------------------*/
-
-function injectStyles(): void {
-  if (typeof document === 'undefined') return;
-  if (document.getElementById(STYLE_ID)) return;
-
-  const style = document.createElement('style');
-  style.id = STYLE_ID;
-  style.textContent = `
-    /* SINGLE ATTACHMENT BUTTONS (circle -> pill on hover) */
-    .cqd-download-btn {
-      position: absolute;
-      top: 50%;
-      right: 8px;
-      z-index: 5;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      height: 40px;
-      width: 40px;
-      max-width: calc(100% - 16px);
-      border-radius: 9999px;
-      border: none;
-      padding: 0;
-      background-color: #1a73e8;
-      color: #ffffff;
-      box-shadow: 0 4px 10px rgba(15, 23, 42, 0.22);
-      cursor: pointer;
-      transform: translateY(-50%) scale(1);
-      will-change: transform, box-shadow, width, border-radius, padding-inline;
-      transition:
-        width 220ms cubic-bezier(0.2, 0, 0, 1),
-        padding-inline 220ms cubic-bezier(0.2, 0, 0, 1),
-        border-radius 220ms cubic-bezier(0.2, 0, 0, 1),
-        box-shadow 220ms cubic-bezier(0.2, 0, 0, 1),
-        transform 220ms cubic-bezier(0.2, 0, 0, 1),
-        background-color 220ms cubic-bezier(0.2, 0, 0, 1);
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      font-size: 13px;
-      white-space: nowrap;
-      overflow: hidden;
-    }
-
-    .cqd-download-btn:hover {
-      width: 120px;
-      padding-inline: 12px;
-      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.30);
-      justify-content: flex-start;
-      transform: translateY(calc(-50% - 1px)) scale(1.04);
-      border-radius: 20px;
-    }
-
-    .cqd-download-btn:focus-visible {
-      outline: 2px solid #ffffff;
-      outline-offset: 2px;
-    }
-
-    .cqd-download-btn:active {
-      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.3);
-      transform: translateY(-50%) scale(0.97);
-    }
-
-    .cqd-download-btn .cqd-label {
-      opacity: 0;
-      margin-left: 0;
-      max-width: 0;
-      overflow: hidden;
-      transition:
-        opacity 200ms cubic-bezier(0.2, 0, 0, 1),
-        max-width 200ms cubic-bezier(0.2, 0, 0, 1),
-        margin-left 200ms cubic-bezier(0.2, 0, 0, 1);
-    }
-
-    .cqd-download-btn:hover .cqd-label {
-      opacity: 1;
-      max-width: 100px;
-      margin-left: 6px;
-    }
-
-    .cqd-download-btn .cqd-icon-wrapper {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-    }
-
-    .cqd-download-icon {
-      display: block;
-      width: 24px;
-      height: 24px;
-      background-image: url("${ICON_SVG_URL}");
-      background-repeat: no-repeat;
-      background-position: center;
-      background-size: 24px 24px;
-      filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.35));
-      flex-shrink: 0;
-      transform-origin: center;
-      transition:
-        width 200ms cubic-bezier(0.2, 0, 0, 1),
-        height 200ms cubic-bezier(0.2, 0, 0, 1),
-        border-width 200ms cubic-bezier(0.2, 0, 0, 1);
-    }
-
-    .cqd-icon-small {
-      width: 16px;
-      height: 16px;
-      background-size: 16px 16px;
-    }
-
-    .cqd-icon-medium {
-      width: 24px;
-      height: 24px;
-      background-size: 24px 24px;
-    }
-
-    .cqd-icon-large {
-      width: 32px;
-      height: 32px;
-      background-size: 32px 32px;
-    }
-
-    /* PILL STATES (loading / success / error) */
-    .cqd-download-btn.cqd-loading,
-    .cqd-download-btn.cqd-success,
-    .cqd-download-btn.cqd-error {
-      width: 140px;
-      padding-inline: 12px;
-      border-radius: 20px;
-      justify-content: flex-start;
-      box-shadow: 0 8px 22px rgba(15, 23, 42, 0.30);
-      cursor: default;
-    }
-
-    .cqd-download-btn.cqd-loading .cqd-label,
-    .cqd-download-btn.cqd-success .cqd-label,
-    .cqd-download-btn.cqd-error .cqd-label {
-      opacity: 1;
-      max-width: 110px;
-      margin-left: 8px;
-    }
-
-    .cqd-download-btn.cqd-loading:hover,
-    .cqd-download-btn.cqd-success:hover,
-    .cqd-download-btn.cqd-error:hover {
-      width: 140px;
-      padding-inline: 12px;
-      border-radius: 20px;
-      transform: translateY(-50%) scale(1);
-      box-shadow: 0 8px 22px rgba(15, 23, 42, 0.30);
-    }
-
-    .cqd-download-btn.cqd-loading:active,
-    .cqd-download-btn.cqd-success:active,
-    .cqd-download-btn.cqd-error:active {
-      transform: translateY(-50%) scale(1);
-      box-shadow: 0 8px 22px rgba(15, 23, 42, 0.30);
-    }
-
-    /* Material-like circular spinner: arc on a circle, rotating.
-       The diameter is controlled by SPINNER_SIZE_PX. */
-    .cqd-spinner {
-      background-image: none;
-      border-radius: 9999px;
-      width: ${SPINNER_SIZE_PX}px;
-      height: ${SPINNER_SIZE_PX}px;
-      border-style: solid;
-      border-width: 3px;
-      border-color: rgba(255, 255, 255, 0.22);
-      border-top-color: #ffffff;
-      border-right-color: #ffffff;
-      box-shadow: none;
-      animation: cqd-spin 0.9s linear infinite;
-    }
-
-    @keyframes cqd-spin {
-      from { transform: rotate(0deg); }
-      to { transform: rotate(360deg); }
-    }
-
-    /* Success / error icons using emoji, no background image */
-    .cqd-icon-check,
-    .cqd-icon-cross {
-      background-image: none;
-      width: 18px;
-      height: 18px;
-      box-shadow: none;
-      font-size: 16px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .cqd-icon-cross {
-      font-size: 15px;
-    }
-  `.trim();
-
-  (document.head || document.documentElement).appendChild(style);
 }
 
 /* -----------------------------------------------------
@@ -475,6 +272,70 @@ function toDownloadUrl(originalUrl: string, depth = 0): string {
 }
 
 /* -----------------------------------------------------
+ * File metadata extraction (from DOM)
+ * ---------------------------------------------------*/
+
+function extractFileMeta(container: HTMLElement, url: string): FileMeta {
+  let name: string | undefined;
+
+  const tooltip =
+    container.getAttribute('data-tooltip') ||
+    container.getAttribute('aria-label') ||
+    container.getAttribute('title');
+
+  if (tooltip && tooltip.trim()) {
+    name = tooltip.trim();
+  } else {
+    const text = (container.textContent || '').trim();
+    if (text) {
+      const firstLine = text.split('\n')[0].trim();
+      if (firstLine) name = firstLine;
+    }
+  }
+
+  if (!name) {
+    try {
+      const u = new URL(url);
+      name = decodeURIComponent(u.pathname.split('/').pop() || '');
+    } catch {
+      // ignore
+    }
+  }
+
+  let ext: string | undefined;
+  if (name) {
+    const m = name.match(/\.([a-zA-Z0-9]{1,6})$/);
+    if (m) ext = m[1].toLowerCase();
+  }
+
+  if (!ext) {
+    try {
+      const u = new URL(url);
+      const path = u.pathname;
+      const m2 = path.match(/\.([a-zA-Z0-9]{1,6})$/);
+      if (m2) ext = m2[1].toLowerCase();
+    } catch {
+      // ignore
+    }
+  }
+
+  let kind: string | undefined;
+  if (ext) {
+    if (['pdf'].includes(ext)) kind = 'pdf';
+    else if (['doc', 'docx'].includes(ext)) kind = 'doc';
+    else if (['xls', 'xlsx', 'csv'].includes(ext)) kind = 'sheet';
+    else if (['ppt', 'pptx'].includes(ext)) kind = 'slide';
+    else if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) kind = 'image';
+    else if (['zip', 'rar', '7z'].includes(ext)) kind = 'archive';
+    else if (['mp4', 'mov', 'mkv', 'avi'].includes(ext)) kind = 'video';
+    else if (['html', 'htm'].includes(ext)) kind = 'html';
+    else kind = 'other';
+  }
+
+  return { name, ext, kind };
+}
+
+/* -----------------------------------------------------
  * Button injection
  * ---------------------------------------------------*/
 
@@ -486,7 +347,9 @@ function injectButtonIntoAttachment(container: HTMLElement, url: string): void {
     container.style.position = 'relative';
   }
 
-  const button = createDownloadButton(url);
+  const directUrl = toDownloadUrl(url);
+  const fileMeta = extractFileMeta(container, directUrl);
+  const button = createDownloadButton(container, directUrl, fileMeta);
 
   const iconEl = button.querySelector<HTMLElement>('.cqd-download-icon');
   if (iconEl) {
@@ -507,22 +370,31 @@ function getButtonState(button: HTMLButtonElement): ButtonState {
   return 'idle';
 }
 
-function setButtonState(button: HTMLButtonElement, state: ButtonState): void {
+function setButtonState(
+  button: HTMLButtonElement,
+  state: ButtonState,
+  options?: { userMessage?: string },
+): void {
   const icon = button.querySelector<HTMLElement>('.cqd-download-icon');
   const label = button.querySelector<HTMLSpanElement>('.cqd-label');
-  if (!icon || !label) return;
+  const errorDetail = button.querySelector<HTMLSpanElement>('.cqd-error-detail');
+  if (!icon || !label || !errorDetail) return;
 
   // Reset all state classes / styles
   button.classList.remove('cqd-loading', 'cqd-success', 'cqd-error');
-  icon.classList.remove('cqd-spinner', 'cqd-icon-check', 'cqd-icon-cross');
+  icon.classList.remove('cqd-spinner');
   icon.textContent = '';
   button.disabled = false;
   button.style.backgroundColor = '#1a73e8';
   label.textContent = 'Download';
+  errorDetail.textContent = '';
+
+  // Default: download icon
+  icon.style.backgroundImage = `url("${DOWNLOAD_ICON_SVG_URL}")`;
+  icon.style.backgroundSize = '20px 20px';
 
   switch (state) {
     case 'idle':
-      // default circle + download icon via background-image
       break;
 
     case 'loading':
@@ -530,22 +402,26 @@ function setButtonState(button: HTMLButtonElement, state: ButtonState): void {
       button.disabled = true;
       label.textContent = 'Downloading…';
       icon.classList.add('cqd-spinner');
+      icon.style.backgroundImage = 'none';
       break;
 
     case 'success':
       button.classList.add('cqd-success');
       button.style.backgroundColor = '#188038'; // Google green
       label.textContent = 'Downloaded';
-      icon.classList.add('cqd-icon-check');
-      icon.textContent = '✅';
+      icon.style.backgroundImage = `url("${SUCCESS_ICON_SVG_URL}")`;
+      icon.style.backgroundSize = '20px 20px';
       break;
 
     case 'error':
       button.classList.add('cqd-error');
-      button.style.backgroundColor = '#d93025'; // bright red
+      button.style.backgroundColor = '#e05952';
       label.textContent = 'Error';
-      icon.classList.add('cqd-icon-cross');
-      icon.textContent = '❌';
+      icon.style.backgroundImage = `url("${ERROR_ICON_SVG_URL}")`;
+      icon.style.backgroundSize = '20px 20px';
+      errorDetail.textContent =
+        options?.userMessage ||
+        'Something went wrong while downloading this file.';
       break;
   }
 }
@@ -554,7 +430,11 @@ function setButtonState(button: HTMLButtonElement, state: ButtonState): void {
  * Button factory
  * ---------------------------------------------------*/
 
-function createDownloadButton(url: string): HTMLButtonElement {
+function createDownloadButton(
+  _container: HTMLElement,
+  url: string,
+  fileMeta: FileMeta,
+): HTMLButtonElement {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'cqd-download-btn';
@@ -573,20 +453,25 @@ function createDownloadButton(url: string): HTMLButtonElement {
   label.className = 'cqd-label';
   label.textContent = 'Download';
 
+  const errorDetail = document.createElement('span');
+  errorDetail.className = 'cqd-error-detail';
+  errorDetail.textContent = '';
+
   button.appendChild(iconWrapper);
   button.appendChild(label);
+  button.appendChild(errorDetail);
 
   button.addEventListener('click', async (event) => {
     event.preventDefault();
     event.stopPropagation();
-    await handleSingleDownloadClick(button, url);
+    await handleSingleDownloadClick(button, url, fileMeta);
   });
 
   button.addEventListener('auxclick', async (event) => {
     if (event.button !== 1) return; // middle-click only
     event.preventDefault();
     event.stopPropagation();
-    await handleSingleDownloadClick(button, url);
+    await handleSingleDownloadClick(button, url, fileMeta);
   });
 
   return button;
@@ -599,132 +484,191 @@ function createDownloadButton(url: string): HTMLButtonElement {
 async function handleSingleDownloadClick(
   button: HTMLButtonElement,
   url: string,
+  fileMeta: FileMeta,
 ): Promise<void> {
   if (!url) return;
-  if (getButtonState(button) === 'loading') return;
+
+  // 🔒 Only start download from the IDLE state
+  const currentState = getButtonState(button);
+  if (currentState !== 'idle') return;
+
+  const requestId = `cqd-${Date.now()}-${nextRequestSeq++}`;
+  const startedAt = Date.now();
 
   setButtonState(button, 'loading');
-  const start = Date.now();
 
-  const ok = await downloadFile(url);
+  const startResult = await startBackgroundDownload(requestId, url, fileMeta);
 
-  const elapsed = Date.now() - start;
-  if (elapsed < LOADING_MIN_MS) {
-    await delay(LOADING_MIN_MS - elapsed);
+  if (!startResult.ok) {
+    await ensureMinLoading(startedAt);
+    await showErrorState(button, startResult.userMessage);
+    return;
   }
 
-  if (ok) {
-    setButtonState(button, 'success');
-    await delay(FEEDBACK_SUCCESS_MS);
-  } else {
-    setButtonState(button, 'error');
-    await delay(FEEDBACK_ERROR_MS);
-  }
+  // Track this button until background tells us the final status
+  pendingButtons.set(requestId, {
+    button,
+    requestId,
+    fileMeta,
+    startedAt,
+  });
+}
 
-  setButtonState(button, 'idle');
+function startBackgroundDownload(
+  requestId: string,
+  url: string,
+  fileMeta: FileMeta,
+): Promise<{ ok: boolean; userMessage?: string }> {
+  const finalUrl = toDownloadUrl(url);
+
+  return new Promise((resolve) => {
+    if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) {
+      resolve({
+        ok: false,
+        userMessage:
+          'The extension runtime is not available. Try reloading the extension.',
+      });
+      return;
+    }
+
+    try {
+      chrome.runtime.sendMessage(
+        {
+          type: 'CQD_DOWNLOAD',
+          url: finalUrl,
+          requestId,
+          fileMeta,
+        },
+        (response?: {
+          started?: boolean;
+          requestId?: string;
+          userMessage?: string;
+        }) => {
+          const err = chrome.runtime.lastError;
+          if (err) {
+            console.warn('[CQD] sendMessage error:', err.message);
+            resolve({
+              ok: false,
+              userMessage:
+                'Quick Downloader could not talk to its background process. Try reloading the extension.',
+            });
+            return;
+          }
+
+          if (!response || response.started === false) {
+            resolve({
+              ok: false,
+              userMessage:
+                response?.userMessage ||
+                'Could not start the download for this file.',
+            });
+            return;
+          }
+
+          resolve({ ok: true });
+        },
+      );
+    } catch (e) {
+      console.warn('[CQD] sendMessage threw:', e);
+      resolve({
+        ok: false,
+        userMessage:
+          'Something went wrong before starting the download. Please try again.',
+      });
+    }
+  });
 }
 
 /* -----------------------------------------------------
- * Download logic (background + fallback)
+ * Handle download status messages from background
  * ---------------------------------------------------*/
 
-function downloadFile(rawUrl: string): Promise<boolean> {
-  if (!rawUrl || !/^https?:\/\//i.test(rawUrl)) return Promise.resolve(false);
+function setupDownloadStatusListener(): void {
+  if (typeof chrome === 'undefined' || !chrome.runtime?.onMessage) return;
 
-  const finalUrl = toDownloadUrl(rawUrl);
+  chrome.runtime.onMessage.addListener((message, _sender, _sendResponse) => {
+    if (!message || message.type !== 'CQD_DOWNLOAD_STATUS') return;
 
-  // Offline? we know this will likely fail.
-  if (typeof navigator !== 'undefined' && !navigator.onLine) {
-    return Promise.resolve(false);
-  }
+    const {
+      requestId,
+      status,
+      userMessage,
+    }: {
+      requestId: string;
+      status: DownloadStatus;
+      userMessage?: string;
+    } = message;
 
-  // If we somehow still have auth_warmup at this point, treat as failure.
-  if (/https:\/\/drive\.google\.com\/auth_warmup/.test(finalUrl)) {
-    return Promise.resolve(false);
-  }
+    const pending = pendingButtons.get(requestId);
+    if (!pending) return;
 
-  const hasChromeRuntime =
-    typeof chrome !== 'undefined' &&
-    !!chrome.runtime &&
-    typeof chrome.runtime.sendMessage === 'function';
-
-  if (hasChromeRuntime) {
-    return new Promise<boolean>((resolve) => {
-      let resolved = false;
-
-      try {
-        chrome.runtime.sendMessage(
-          { type: 'CQD_DOWNLOAD', url: finalUrl },
-          (response?: { ok?: boolean; error?: string }) => {
-            const err = chrome.runtime.lastError;
-            if (err) {
-              console.warn('[CQD] sendMessage error:', err.message);
-              fallbackAnchorDownload(finalUrl);
-              if (!resolved) {
-                resolved = true;
-                resolve(true);
-              }
-              return;
-            }
-
-            if (!response || response.ok === false) {
-              if (response?.error) {
-                console.warn('[CQD] background download error:', response.error);
-              }
-              fallbackAnchorDownload(finalUrl);
-              if (!resolved) {
-                resolved = true;
-                resolve(true);
-              }
-              return;
-            }
-
-            if (!resolved) {
-              resolved = true;
-              resolve(true);
-            }
-          },
-        );
-
-        // Safety timeout: if background never responds, fallback + resolve.
-        window.setTimeout(() => {
-          if (!resolved) {
-            fallbackAnchorDownload(finalUrl);
-            resolved = true;
-            resolve(true);
-          }
-        }, 4000);
-      } catch (e) {
-        console.warn('[CQD] sendMessage threw:', e);
-        fallbackAnchorDownload(finalUrl);
-        if (!resolved) resolve(true);
-      }
-    });
-  }
-
-  // No background available: just open anchor in new tab; treat as success.
-  fallbackAnchorDownload(finalUrl);
-  return Promise.resolve(true);
+    void handleDownloadStatusForButton(pending, status, userMessage);
+  });
 }
 
-/**
- * Fallback: synthetic anchor click (may open tab, but still downloads).
- */
-function fallbackAnchorDownload(url: string): void {
-  if (typeof document === 'undefined') return;
+async function handleDownloadStatusForButton(
+  pending: PendingButton,
+  status: DownloadStatus,
+  userMessage?: string,
+): Promise<void> {
+  const { button, startedAt, requestId } = pending;
 
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.target = '_blank';
-  anchor.rel = 'noopener noreferrer';
-  anchor.style.display = 'none';
+  await ensureMinLoading(startedAt);
 
-  document.body.appendChild(anchor);
-  anchor.click();
+  if (status === 'complete') {
+    setButtonState(button, 'success');
+    await delay(FEEDBACK_SUCCESS_MS);
+    setButtonState(button, 'idle');
+  } else {
+    await showErrorState(button, userMessage);
+  }
 
-  window.setTimeout(() => {
-    anchor.remove();
-  }, 0);
+  pendingButtons.delete(requestId);
+}
+
+/* -----------------------------------------------------
+ * Error state that respects hover (message stays while hovering)
+ * ---------------------------------------------------*/
+
+async function showErrorState(
+  button: HTMLButtonElement,
+  userMessage?: string,
+): Promise<void> {
+  setButtonState(button, 'error', { userMessage });
+
+  const earliestReset = Date.now() + FEEDBACK_ERROR_MS;
+
+  while (true) {
+    await delay(200);
+
+    if (getButtonState(button) !== 'error') {
+      // State was changed externally
+      return;
+    }
+
+    const now = Date.now();
+    if (now < earliestReset) {
+      continue;
+    }
+
+    // If still hovering, keep showing the error squircle
+    const hovered = button.matches(':hover');
+    if (!hovered) {
+      setButtonState(button, 'idle');
+      return;
+    }
+  }
+}
+
+/* -----------------------------------------------------
+ * Utils
+ * ---------------------------------------------------*/
+
+async function ensureMinLoading(startedAt: number): Promise<void> {
+  const elapsed = Date.now() - startedAt;
+  if (elapsed < LOADING_MIN_MS) {
+    await delay(LOADING_MIN_MS - elapsed);
+  }
 }
 
 function delay(ms: number): Promise<void> {
@@ -738,6 +682,7 @@ function delay(ms: number): Promise<void> {
 function initContentScript(): void {
   if (!isGoogleClassroom()) return;
   injectStyles();
+  setupDownloadStatusListener();
   setupObservers();
 }
 
