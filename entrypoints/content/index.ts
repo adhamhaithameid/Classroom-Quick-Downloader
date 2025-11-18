@@ -391,7 +391,7 @@ function setButtonState(
 
   // Default: download icon
   icon.style.backgroundImage = `url("${DOWNLOAD_ICON_SVG_URL}")`;
-  icon.style.backgroundSize = '20px 20px';
+  icon.style.backgroundSize = '';
 
   switch (state) {
     case 'idle':
