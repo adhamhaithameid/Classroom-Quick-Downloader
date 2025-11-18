@@ -1,4 +1,4 @@
-// filepath: entrypoints/content.ts
+// filepath: entrypoints/index.ts
 const CLASSROOM_URL_PATTERN = /^https:\/\/classroom\.google\.com\//;
 
 import {
@@ -8,7 +8,6 @@ import {
 } from './icons';
 
 import { injectStyles } from './styles';
-
 
 const INJECTED_ATTR = 'data-cqd-injected';
 const RESCAN_INTERVAL_MS = 2000;
@@ -42,6 +41,24 @@ let observer: MutationObserver | null = null;
 
 type ButtonState = 'idle' | 'loading' | 'success' | 'error';
 
+type FileMeta = {
+  name?: string;
+  ext?: string;
+  kind?: string;
+};
+
+type PendingButton = {
+  button: HTMLButtonElement;
+  requestId: string;
+  fileMeta?: FileMeta;
+  startedAt: number;
+};
+
+type DownloadStatus = 'complete' | 'interrupted' | 'blocked_html';
+
+const pendingButtons = new Map<string, PendingButton>();
+let nextRequestSeq = 1;
+
 /* -----------------------------------------------------
  * Environment / Page Checks
  * ---------------------------------------------------*/
@@ -51,6 +68,10 @@ function isGoogleClassroom(): boolean {
   if (location.hostname !== 'classroom.google.com') return false;
   return CLASSROOM_URL_PATTERN.test(location.href);
 }
+
+/* -----------------------------------------------------
+ * Scanning / Observers
+ * ---------------------------------------------------*/
 
 function scheduleScan(): void {
   if (scanTimeoutId !== null) {
@@ -251,6 +272,70 @@ function toDownloadUrl(originalUrl: string, depth = 0): string {
 }
 
 /* -----------------------------------------------------
+ * File metadata extraction (from DOM)
+ * ---------------------------------------------------*/
+
+function extractFileMeta(container: HTMLElement, url: string): FileMeta {
+  let name: string | undefined;
+
+  const tooltip =
+    container.getAttribute('data-tooltip') ||
+    container.getAttribute('aria-label') ||
+    container.getAttribute('title');
+
+  if (tooltip && tooltip.trim()) {
+    name = tooltip.trim();
+  } else {
+    const text = (container.textContent || '').trim();
+    if (text) {
+      const firstLine = text.split('\n')[0].trim();
+      if (firstLine) name = firstLine;
+    }
+  }
+
+  if (!name) {
+    try {
+      const u = new URL(url);
+      name = decodeURIComponent(u.pathname.split('/').pop() || '');
+    } catch {
+      // ignore
+    }
+  }
+
+  let ext: string | undefined;
+  if (name) {
+    const m = name.match(/\.([a-zA-Z0-9]{1,6})$/);
+    if (m) ext = m[1].toLowerCase();
+  }
+
+  if (!ext) {
+    try {
+      const u = new URL(url);
+      const path = u.pathname;
+      const m2 = path.match(/\.([a-zA-Z0-9]{1,6})$/);
+      if (m2) ext = m2[1].toLowerCase();
+    } catch {
+      // ignore
+    }
+  }
+
+  let kind: string | undefined;
+  if (ext) {
+    if (['pdf'].includes(ext)) kind = 'pdf';
+    else if (['doc', 'docx'].includes(ext)) kind = 'doc';
+    else if (['xls', 'xlsx', 'csv'].includes(ext)) kind = 'sheet';
+    else if (['ppt', 'pptx'].includes(ext)) kind = 'slide';
+    else if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) kind = 'image';
+    else if (['zip', 'rar', '7z'].includes(ext)) kind = 'archive';
+    else if (['mp4', 'mov', 'mkv', 'avi'].includes(ext)) kind = 'video';
+    else if (['html', 'htm'].includes(ext)) kind = 'html';
+    else kind = 'other';
+  }
+
+  return { name, ext, kind };
+}
+
+/* -----------------------------------------------------
  * Button injection
  * ---------------------------------------------------*/
 
@@ -262,7 +347,9 @@ function injectButtonIntoAttachment(container: HTMLElement, url: string): void {
     container.style.position = 'relative';
   }
 
-  const button = createDownloadButton(url);
+  const directUrl = toDownloadUrl(url);
+  const fileMeta = extractFileMeta(container, directUrl);
+  const button = createDownloadButton(container, directUrl, fileMeta);
 
   const iconEl = button.querySelector<HTMLElement>('.cqd-download-icon');
   if (iconEl) {
@@ -283,10 +370,15 @@ function getButtonState(button: HTMLButtonElement): ButtonState {
   return 'idle';
 }
 
-function setButtonState(button: HTMLButtonElement, state: ButtonState): void {
+function setButtonState(
+  button: HTMLButtonElement,
+  state: ButtonState,
+  options?: { userMessage?: string },
+): void {
   const icon = button.querySelector<HTMLElement>('.cqd-download-icon');
   const label = button.querySelector<HTMLSpanElement>('.cqd-label');
-  if (!icon || !label) return;
+  const errorDetail = button.querySelector<HTMLSpanElement>('.cqd-error-detail');
+  if (!icon || !label || !errorDetail) return;
 
   // Reset all state classes / styles
   button.classList.remove('cqd-loading', 'cqd-success', 'cqd-error');
@@ -295,6 +387,7 @@ function setButtonState(button: HTMLButtonElement, state: ButtonState): void {
   button.disabled = false;
   button.style.backgroundColor = '#1a73e8';
   label.textContent = 'Download';
+  errorDetail.textContent = '';
 
   // Default: download icon
   icon.style.backgroundImage = `url("${DOWNLOAD_ICON_SVG_URL}")`;
@@ -302,7 +395,6 @@ function setButtonState(button: HTMLButtonElement, state: ButtonState): void {
 
   switch (state) {
     case 'idle':
-      // default circle + download icon
       break;
 
     case 'loading':
@@ -310,7 +402,6 @@ function setButtonState(button: HTMLButtonElement, state: ButtonState): void {
       button.disabled = true;
       label.textContent = 'Downloading…';
       icon.classList.add('cqd-spinner');
-      // Spinner uses border; hide background image to avoid visual clash
       icon.style.backgroundImage = 'none';
       break;
 
@@ -324,10 +415,13 @@ function setButtonState(button: HTMLButtonElement, state: ButtonState): void {
 
     case 'error':
       button.classList.add('cqd-error');
-      button.style.backgroundColor = '#e05952'; // bright red
+      button.style.backgroundColor = '#e05952';
       label.textContent = 'Error';
       icon.style.backgroundImage = `url("${ERROR_ICON_SVG_URL}")`;
       icon.style.backgroundSize = '20px 20px';
+      errorDetail.textContent =
+        options?.userMessage ||
+        'Something went wrong while downloading this file.';
       break;
   }
 }
@@ -336,7 +430,11 @@ function setButtonState(button: HTMLButtonElement, state: ButtonState): void {
  * Button factory
  * ---------------------------------------------------*/
 
-function createDownloadButton(url: string): HTMLButtonElement {
+function createDownloadButton(
+  _container: HTMLElement,
+  url: string,
+  fileMeta: FileMeta,
+): HTMLButtonElement {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'cqd-download-btn';
@@ -355,20 +453,25 @@ function createDownloadButton(url: string): HTMLButtonElement {
   label.className = 'cqd-label';
   label.textContent = 'Download';
 
+  const errorDetail = document.createElement('span');
+  errorDetail.className = 'cqd-error-detail';
+  errorDetail.textContent = '';
+
   button.appendChild(iconWrapper);
   button.appendChild(label);
+  button.appendChild(errorDetail);
 
   button.addEventListener('click', async (event) => {
     event.preventDefault();
     event.stopPropagation();
-    await handleSingleDownloadClick(button, url);
+    await handleSingleDownloadClick(button, url, fileMeta);
   });
 
   button.addEventListener('auxclick', async (event) => {
     if (event.button !== 1) return; // middle-click only
     event.preventDefault();
     event.stopPropagation();
-    await handleSingleDownloadClick(button, url);
+    await handleSingleDownloadClick(button, url, fileMeta);
   });
 
   return button;
@@ -381,130 +484,191 @@ function createDownloadButton(url: string): HTMLButtonElement {
 async function handleSingleDownloadClick(
   button: HTMLButtonElement,
   url: string,
+  fileMeta: FileMeta,
 ): Promise<void> {
   if (!url) return;
-  if (getButtonState(button) === 'loading') return;
+
+  // 🔒 Only start download from the IDLE state
+  const currentState = getButtonState(button);
+  if (currentState !== 'idle') return;
+
+  const requestId = `cqd-${Date.now()}-${nextRequestSeq++}`;
+  const startedAt = Date.now();
 
   setButtonState(button, 'loading');
-  const start = Date.now();
 
-  const ok = await downloadFile(url);
+  const startResult = await startBackgroundDownload(requestId, url, fileMeta);
 
-  const elapsed = Date.now() - start;
-  if (elapsed < LOADING_MIN_MS) {
-    await delay(LOADING_MIN_MS - elapsed);
+  if (!startResult.ok) {
+    await ensureMinLoading(startedAt);
+    await showErrorState(button, startResult.userMessage);
+    return;
   }
 
-  if (ok) {
-    setButtonState(button, 'success');
-    await delay(FEEDBACK_SUCCESS_MS);
-  } else {
-    setButtonState(button, 'error');
-    await delay(FEEDBACK_ERROR_MS);
-  }
+  // Track this button until background tells us the final status
+  pendingButtons.set(requestId, {
+    button,
+    requestId,
+    fileMeta,
+    startedAt,
+  });
+}
 
-  setButtonState(button, 'idle');
+function startBackgroundDownload(
+  requestId: string,
+  url: string,
+  fileMeta: FileMeta,
+): Promise<{ ok: boolean; userMessage?: string }> {
+  const finalUrl = toDownloadUrl(url);
+
+  return new Promise((resolve) => {
+    if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) {
+      resolve({
+        ok: false,
+        userMessage:
+          'The extension runtime is not available. Try reloading the extension.',
+      });
+      return;
+    }
+
+    try {
+      chrome.runtime.sendMessage(
+        {
+          type: 'CQD_DOWNLOAD',
+          url: finalUrl,
+          requestId,
+          fileMeta,
+        },
+        (response?: {
+          started?: boolean;
+          requestId?: string;
+          userMessage?: string;
+        }) => {
+          const err = chrome.runtime.lastError;
+          if (err) {
+            console.warn('[CQD] sendMessage error:', err.message);
+            resolve({
+              ok: false,
+              userMessage:
+                'Quick Downloader could not talk to its background process. Try reloading the extension.',
+            });
+            return;
+          }
+
+          if (!response || response.started === false) {
+            resolve({
+              ok: false,
+              userMessage:
+                response?.userMessage ||
+                'Could not start the download for this file.',
+            });
+            return;
+          }
+
+          resolve({ ok: true });
+        },
+      );
+    } catch (e) {
+      console.warn('[CQD] sendMessage threw:', e);
+      resolve({
+        ok: false,
+        userMessage:
+          'Something went wrong before starting the download. Please try again.',
+      });
+    }
+  });
 }
 
 /* -----------------------------------------------------
- * Download logic (background + fallback)
+ * Handle download status messages from background
  * ---------------------------------------------------*/
 
-function downloadFile(rawUrl: string): Promise<boolean> {
-  if (!rawUrl || !/^https?:\/\//i.test(rawUrl)) return Promise.resolve(false);
+function setupDownloadStatusListener(): void {
+  if (typeof chrome === 'undefined' || !chrome.runtime?.onMessage) return;
 
-  const finalUrl = toDownloadUrl(rawUrl);
+  chrome.runtime.onMessage.addListener((message, _sender, _sendResponse) => {
+    if (!message || message.type !== 'CQD_DOWNLOAD_STATUS') return;
 
-  // Offline? this will likely fail; just show error state.
-  if (typeof navigator !== 'undefined' && !navigator.onLine) {
-    return Promise.resolve(false);
-  }
+    const {
+      requestId,
+      status,
+      userMessage,
+    }: {
+      requestId: string;
+      status: DownloadStatus;
+      userMessage?: string;
+    } = message;
 
-  // If we somehow still have auth_warmup at this point, treat as failure.
-  if (/https:\/\/drive\.google\.com\/auth_warmup/.test(finalUrl)) {
-    return Promise.resolve(false);
-  }
+    const pending = pendingButtons.get(requestId);
+    if (!pending) return;
 
-  const hasChromeRuntime =
-    typeof chrome !== 'undefined' &&
-    !!chrome.runtime &&
-    typeof chrome.runtime.sendMessage === 'function';
-
-  if (hasChromeRuntime) {
-    return new Promise<boolean>((resolve) => {
-      let resolved = false;
-
-      try {
-        chrome.runtime.sendMessage(
-          { type: 'CQD_DOWNLOAD', url: finalUrl },
-          (response?: { ok?: boolean; error?: string }) => {
-            const err = chrome.runtime.lastError;
-            if (err) {
-              console.warn('[CQD] sendMessage error:', err.message);
-              if (!resolved) {
-                resolved = true;
-                // ❌ No fallback tab any more – just error state
-                resolve(false);
-              }
-              return;
-            }
-
-            if (!response || response.ok === false) {
-              if (response?.error) {
-                console.warn('[CQD] background download error:', response.error);
-              }
-              if (!resolved) {
-                resolved = true;
-                resolve(false);
-              }
-              return;
-            }
-
-            if (!resolved) {
-              resolved = true;
-              resolve(true);
-            }
-          },
-        );
-
-        // Safety timeout in case the service worker dies / never responds
-        window.setTimeout(() => {
-          if (!resolved) {
-            console.warn('[CQD] background download timed out');
-            resolved = true;
-            resolve(false);
-          }
-        }, 4000);
-      } catch (e) {
-        console.warn('[CQD] sendMessage threw:', e);
-        if (!resolved) resolve(false);
-      }
-    });
-  }
-
-  // No background available: treat as error (no tabs opened).
-  return Promise.resolve(false);
+    void handleDownloadStatusForButton(pending, status, userMessage);
+  });
 }
 
+async function handleDownloadStatusForButton(
+  pending: PendingButton,
+  status: DownloadStatus,
+  userMessage?: string,
+): Promise<void> {
+  const { button, startedAt, requestId } = pending;
 
-/**
- * Fallback: synthetic anchor click (may open tab, but still downloads).
- */
-function fallbackAnchorDownload(url: string): void {
-  if (typeof document === 'undefined') return;
+  await ensureMinLoading(startedAt);
 
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.target = '_blank';
-  anchor.rel = 'noopener noreferrer';
-  anchor.style.display = 'none';
+  if (status === 'complete') {
+    setButtonState(button, 'success');
+    await delay(FEEDBACK_SUCCESS_MS);
+    setButtonState(button, 'idle');
+  } else {
+    await showErrorState(button, userMessage);
+  }
 
-  document.body.appendChild(anchor);
-  anchor.click();
+  pendingButtons.delete(requestId);
+}
 
-  window.setTimeout(() => {
-    anchor.remove();
-  }, 0);
+/* -----------------------------------------------------
+ * Error state that respects hover (message stays while hovering)
+ * ---------------------------------------------------*/
+
+async function showErrorState(
+  button: HTMLButtonElement,
+  userMessage?: string,
+): Promise<void> {
+  setButtonState(button, 'error', { userMessage });
+
+  const earliestReset = Date.now() + FEEDBACK_ERROR_MS;
+
+  while (true) {
+    await delay(200);
+
+    if (getButtonState(button) !== 'error') {
+      // State was changed externally
+      return;
+    }
+
+    const now = Date.now();
+    if (now < earliestReset) {
+      continue;
+    }
+
+    // If still hovering, keep showing the error squircle
+    const hovered = button.matches(':hover');
+    if (!hovered) {
+      setButtonState(button, 'idle');
+      return;
+    }
+  }
+}
+
+/* -----------------------------------------------------
+ * Utils
+ * ---------------------------------------------------*/
+
+async function ensureMinLoading(startedAt: number): Promise<void> {
+  const elapsed = Date.now() - startedAt;
+  if (elapsed < LOADING_MIN_MS) {
+    await delay(LOADING_MIN_MS - elapsed);
+  }
 }
 
 function delay(ms: number): Promise<void> {
@@ -518,6 +682,7 @@ function delay(ms: number): Promise<void> {
 function initContentScript(): void {
   if (!isGoogleClassroom()) return;
   injectStyles();
+  setupDownloadStatusListener();
   setupObservers();
 }
 
