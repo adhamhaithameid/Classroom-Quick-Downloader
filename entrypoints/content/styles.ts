@@ -34,14 +34,13 @@ export function injectStyles(): void {
       box-shadow: 0 0px 10px rgba(15, 23, 42, 0.22);
       cursor: pointer;
       transform: translateY(-50%) scale(1);
-      will-change: transform, box-shadow, width, border-radius, padding-inline, height;
+      will-change: transform, box-shadow, width, border-radius, padding-inline;
       transition:
         width ${TRANSITION_MS}ms cubic-bezier(0.2, 0, 0, 1),
         padding-inline ${TRANSITION_MS}ms cubic-bezier(0.2, 0, 0, 1),
         border-radius ${TRANSITION_MS}ms cubic-bezier(0.2, 0, 0, 1),
         box-shadow ${TRANSITION_MS}ms cubic-bezier(0.2, 0, 0, 1),
         transform ${TRANSITION_MS}ms cubic-bezier(0.2, 0, 0, 1),
-        height ${TRANSITION_MS}ms cubic-bezier(0.2, 0, 0, 1),
         background-color ${TRANSITION_MS}ms cubic-bezier(0.2, 0, 0, 1);
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       font-size: 13px;
@@ -139,7 +138,8 @@ export function injectStyles(): void {
       width: 150px;
     }
 
-    .cqd-download-btn.cqd-success{
+    .cqd-download-btn.cqd-success {
+      width: 140px;
       background-color: #34a853;
       box-shadow: 0 12px 28px rgba(24, 128, 56, 0.40);
     }
@@ -148,10 +148,17 @@ export function injectStyles(): void {
       width: 90px;
       box-shadow: 0 12px 28px rgba(224, 89, 82, 0.40);
       background-color: #e05952;
-    }
 
-    .cqd-download-btn.cqd-success {
-      width: 140px;
+      /* smooth pill -> squircle */
+      transition:
+        width ${TRANSITION_MS}ms cubic-bezier(0.2, 0, 0, 1),
+        padding-inline ${TRANSITION_MS}ms cubic-bezier(0.2, 0, 0, 1),
+        padding-top ${TRANSITION_MS}ms cubic-bezier(0.2, 0, 0, 1),
+        padding-bottom ${TRANSITION_MS}ms cubic-bezier(0.2, 0, 0, 1),
+        border-radius ${TRANSITION_MS}ms cubic-bezier(0.2, 0, 0, 1),
+        box-shadow ${TRANSITION_MS}ms cubic-bezier(0.2, 0, 0, 1),
+        background-color ${TRANSITION_MS}ms cubic-bezier(0.2, 0, 0, 1),
+        transform ${TRANSITION_MS}ms cubic-bezier(0.2, 0, 0, 1);
     }
 
     /* loading + success keep the max-width animation */
@@ -184,16 +191,18 @@ export function injectStyles(): void {
 
     /* --- ERROR STATE --- */
 
-    /* 🔑 Force the error label to ignore the "hidden" max-width rules */
+    /* Error idle: show "Error" label fully */
     .cqd-download-btn.cqd-error .cqd-label {
       opacity: 1;
       margin-left: 8px;
-      max-width: none;
-      overflow: visible;
+      max-width: 110px;
+      overflow: hidden;
       flex: 1 1 auto;
+      transition:
+        opacity ${TRANSITION_MS}ms cubic-bezier(0.2, 0, 0, 1);
     }
 
-    /* Error detail text INSIDE the pill (hidden until hover) */
+    /* Error detail text (hidden but ready to fade in) */
     .cqd-error-detail {
       display: block;
       font-size: 13px;
@@ -201,13 +210,13 @@ export function injectStyles(): void {
       line-height: 1.3;
       margin-left: 0;
       margin-top: 0;
-      max-height: 0;
       opacity: 0;
       overflow: hidden;
       white-space: normal;
+      transform: translateY(4px);
       transition:
         opacity ${TRANSITION_MS}ms cubic-bezier(0.2, 0, 0, 1),
-        max-height ${TRANSITION_MS}ms cubic-bezier(0.2, 0, 0, 1),
+        transform ${TRANSITION_MS}ms cubic-bezier(0.2, 0, 0, 1),
         margin-top ${TRANSITION_MS}ms cubic-bezier(0.2, 0, 0, 1),
         margin-left ${TRANSITION_MS}ms cubic-bezier(0.2, 0, 0, 1);
     }
@@ -215,31 +224,26 @@ export function injectStyles(): void {
     /* On error hover: pill -> taller rounded square with full message */
     .cqd-download-btn.cqd-error:hover {
       width: 220px;
-      height: auto;
+      height: auto;      /* allow it to grow vertically */
       padding-top: 8px;
       padding-bottom: 8px;
-      border-radius: 18px; /* rounded square */
+      border-radius: 18px;
       align-items: center;
       white-space: normal;
       gap: 0;
       box-shadow: 0 12px 28px rgba(224, 89, 82, 0.60);
     }
 
-    /* KEEP "Error" label visible even on hover */
+    /* Cross-fade label → detail (no hard blink) */
     .cqd-download-btn.cqd-error:hover .cqd-label {
       opacity: 0;
-      margin-left: 0;
-      max-width: 0;
-      flex: 0 0 auto;
-      overflow: hidden;
     }
 
-    /* Show the real error text while hovering */
     .cqd-download-btn.cqd-error:hover .cqd-error-detail {
       opacity: 1;
-      max-height: 300px;
       margin-top: 4px;
-      margin-left: 0px;
+      margin-left: 0;
+      transform: translateY(0);
     }
 
     /* Spinner: circular arc on a circle, rotating. */

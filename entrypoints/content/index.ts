@@ -488,7 +488,7 @@ async function handleSingleDownloadClick(
 ): Promise<void> {
   if (!url) return;
 
-  // 🔒 Only start download from the IDLE state
+  // Only start download from the IDLE state
   const currentState = getButtonState(button);
   if (currentState !== 'idle') return;
 
