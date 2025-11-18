@@ -13,7 +13,7 @@ const INJECTED_ATTR = 'data-cqd-injected';
 const RESCAN_INTERVAL_MS = 2000;
 const RESCAN_DEBOUNCE_MS = 250;
 
-// Loading / feedback durations (ms)
+// Feedback durations (ms)
 const LOADING_MIN_MS = 600;
 const FEEDBACK_SUCCESS_MS = 2000;
 const FEEDBACK_ERROR_MS = 4000;
@@ -101,7 +101,9 @@ function setupObservers(): void {
 
   observer = new MutationObserver((mutations) => {
     const hasChildListChange = mutations.some(
-      (m) => m.type === 'childList' && (m.addedNodes.length > 0 || m.removedNodes.length > 0),
+      (m) =>
+        m.type === 'childList' &&
+        (m.addedNodes.length > 0 || m.removedNodes.length > 0),
     );
     if (hasChildListChange) {
       scheduleScan();
@@ -117,13 +119,9 @@ function setupObservers(): void {
   scheduleScan();
 }
 
-/**
- * Main scan: inject single-file buttons.
- */
 function scanForAttachments(): void {
   if (!isGoogleClassroom()) return;
   if (typeof document === 'undefined') return;
-
   injectSingleFileButtons();
 }
 
@@ -132,7 +130,6 @@ function scanForAttachments(): void {
  * ---------------------------------------------------*/
 
 function injectSingleFileButtons(): void {
-  // Anchors with Drive URLs
   const anchors = Array.from(
     document.querySelectorAll<HTMLAnchorElement>(DRIVE_ANCHOR_SELECTOR),
   );
@@ -152,7 +149,6 @@ function injectSingleFileButtons(): void {
     injectButtonIntoAttachment(container, url);
   }
 
-  // Elements with Drive metadata
   const metaElements = Array.from(
     document.querySelectorAll<HTMLElement>(
       '[data-drive-id], [data-id][data-item-id], [data-id][data-tooltip]',
@@ -193,10 +189,13 @@ function findDriveUrl(element: HTMLElement): string | null {
     if (href) return href;
   }
 
-  const driveId = element.getAttribute('data-drive-id') || element.getAttribute('data-id');
+  const driveId =
+    element.getAttribute('data-drive-id') || element.getAttribute('data-id');
   if (driveId) {
     const anchorWithId =
-      document.querySelector<HTMLAnchorElement>(`a[data-drive-id="${driveId}"]`) ||
+      document.querySelector<HTMLAnchorElement>(
+        `a[data-drive-id="${driveId}"]`,
+      ) ||
       document.querySelector<HTMLAnchorElement>(`a[data-id="${driveId}"]`) ||
       document.querySelector<HTMLAnchorElement>(`a[href*="${driveId}"]`);
 
@@ -205,16 +204,14 @@ function findDriveUrl(element: HTMLElement): string | null {
       if (href) return href;
     }
 
-    // Fallback: best-effort direct download URL from Drive ID
-    return `https://drive.google.com/uc?export=download&id=${encodeURIComponent(driveId)}`;
+    return `https://drive.google.com/uc?export=download&id=${encodeURIComponent(
+      driveId,
+    )}`;
   }
 
   return null;
 }
 
-/**
- * Convert any view / classroom-proxy URL to a direct download URL when possible.
- */
 function toDownloadUrl(originalUrl: string, depth = 0): string {
   if (depth > 3) return originalUrl;
 
@@ -224,14 +221,14 @@ function toDownloadUrl(originalUrl: string, depth = 0): string {
     const pathname = parsed.pathname;
 
     if (hostname === 'drive.google.com') {
-      // auth_warmup unwrapping
       if (pathname.startsWith('/auth_warmup')) {
         const cont = parsed.searchParams.get('continue');
         if (cont) return toDownloadUrl(cont, depth + 1);
-
         const id = parsed.searchParams.get('id');
         if (id) {
-          return `https://drive.google.com/uc?export=download&id=${encodeURIComponent(id)}`;
+          return `https://drive.google.com/uc?export=download&id=${encodeURIComponent(
+            id,
+          )}`;
         }
         return originalUrl;
       }
@@ -239,13 +236,17 @@ function toDownloadUrl(originalUrl: string, depth = 0): string {
       const fileMatch = pathname.match(/^\/file\/d\/([^/]+)/);
       if (fileMatch) {
         const id = fileMatch[1];
-        return `https://drive.google.com/uc?export=download&id=${encodeURIComponent(id)}`;
+        return `https://drive.google.com/uc?export=download&id=${encodeURIComponent(
+          id,
+        )}`;
       }
 
       if (pathname === '/open') {
         const id = parsed.searchParams.get('id');
         if (id) {
-          return `https://drive.google.com/uc?export=download&id=${encodeURIComponent(id)}`;
+          return `https://drive.google.com/uc?export=download&id=${encodeURIComponent(
+            id,
+          )}`;
         }
       }
 
@@ -261,7 +262,9 @@ function toDownloadUrl(originalUrl: string, depth = 0): string {
         parsed.searchParams.get('resourceId') ||
         parsed.searchParams.get('fileId');
       if (id) {
-        return `https://drive.google.com/uc?export=download&id=${encodeURIComponent(id)}`;
+        return `https://drive.google.com/uc?export=download&id=${encodeURIComponent(
+          id,
+        )}`;
       }
     }
 
@@ -274,6 +277,73 @@ function toDownloadUrl(originalUrl: string, depth = 0): string {
 /* -----------------------------------------------------
  * File metadata extraction (from DOM)
  * ---------------------------------------------------*/
+
+// Cleans filenames like "file.pdfPDF" -> "file.pdf"
+function cleanAttachmentName(rawName: string): string {
+  if (!rawName) return '';
+  let name = rawName.trim();
+
+  const extensions = [
+    'pdf',
+    'mp4',
+    'mov',
+    'avi',
+    'mkv',
+    'jpg',
+    'jpeg',
+    'png',
+    'docx',
+    'doc',
+    'xlsx',
+    'xls',
+    'pptx',
+    'ppt',
+    'zip',
+    'rar',
+    'txt',
+    'csv',
+    'html',
+  ];
+
+  const lower = name.toLowerCase();
+
+  for (const ext of extensions) {
+    const pattern = `.${ext}${ext}`; // e.g. .pdfpdf
+    if (lower.endsWith(pattern)) {
+      return name.slice(0, -ext.length).trim();
+    }
+
+    if (lower.endsWith(`.${ext}`)) {
+      return name;
+    }
+
+    if (lower.endsWith(`.${ext}${ext}`)) {
+      return name.slice(0, -ext.length);
+    }
+  }
+
+  const commonLabels = [
+    'PDF',
+    'Video',
+    'Image',
+    'Audio',
+    'Text',
+    'Word',
+    'Excel',
+    'PowerPoint',
+    'Archive',
+  ];
+  for (const label of commonLabels) {
+    if (name.endsWith(label)) {
+      const withoutLabel = name.slice(0, -label.length).trim();
+      if (/\.[a-z0-9]{2,5}$/i.test(withoutLabel)) {
+        return withoutLabel;
+      }
+    }
+  }
+
+  return name;
+}
 
 function extractFileMeta(container: HTMLElement, url: string): FileMeta {
   let name: string | undefined;
@@ -288,18 +358,30 @@ function extractFileMeta(container: HTMLElement, url: string): FileMeta {
   } else {
     const text = (container.textContent || '').trim();
     if (text) {
-      const firstLine = text.split('\n')[0].trim();
-      if (firstLine) name = firstLine;
+      const lines = text
+        .split('\n')
+        .map((l) => l.trim())
+        .filter(Boolean);
+      if (lines.length > 0) {
+        name = lines[0];
+      }
     }
   }
 
   if (!name) {
     try {
       const u = new URL(url);
-      name = decodeURIComponent(u.pathname.split('/').pop() || '');
+      const pathName = decodeURIComponent(u.pathname.split('/').pop() || '');
+      if (pathName && pathName.includes('.')) {
+        name = pathName;
+      }
     } catch {
       // ignore
     }
+  }
+
+  if (name) {
+    name = cleanAttachmentName(name);
   }
 
   let ext: string | undefined;
@@ -325,7 +407,8 @@ function extractFileMeta(container: HTMLElement, url: string): FileMeta {
     else if (['doc', 'docx'].includes(ext)) kind = 'doc';
     else if (['xls', 'xlsx', 'csv'].includes(ext)) kind = 'sheet';
     else if (['ppt', 'pptx'].includes(ext)) kind = 'slide';
-    else if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) kind = 'image';
+    else if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext))
+      kind = 'image';
     else if (['zip', 'rar', '7z'].includes(ext)) kind = 'archive';
     else if (['mp4', 'mov', 'mkv', 'avi'].includes(ext)) kind = 'video';
     else if (['html', 'htm'].includes(ext)) kind = 'html';
@@ -377,7 +460,9 @@ function setButtonState(
 ): void {
   const icon = button.querySelector<HTMLElement>('.cqd-download-icon');
   const label = button.querySelector<HTMLSpanElement>('.cqd-label');
-  const errorDetail = button.querySelector<HTMLSpanElement>('.cqd-error-detail');
+  const errorDetail = button.querySelector<HTMLSpanElement>(
+    '.cqd-error-detail',
+  );
   if (!icon || !label || !errorDetail) return;
 
   // Reset all state classes / styles
@@ -391,7 +476,7 @@ function setButtonState(
 
   // Default: download icon
   icon.style.backgroundImage = `url("${DOWNLOAD_ICON_SVG_URL}")`;
-  icon.style.backgroundSize = '20px 20px';
+  icon.style.backgroundSize = '';
 
   switch (state) {
     case 'idle':
@@ -478,7 +563,7 @@ function createDownloadButton(
 }
 
 /* -----------------------------------------------------
- * Single download flow with states
+ * Single download flow with IMMEDIATE success/error
  * ---------------------------------------------------*/
 
 async function handleSingleDownloadClick(
@@ -488,7 +573,6 @@ async function handleSingleDownloadClick(
 ): Promise<void> {
   if (!url) return;
 
-  // 🔒 Only start download from the IDLE state
   const currentState = getButtonState(button);
   if (currentState !== 'idle') return;
 
@@ -499,19 +583,22 @@ async function handleSingleDownloadClick(
 
   const startResult = await startBackgroundDownload(requestId, url, fileMeta);
 
+  // We still keep a tiny spinner time for visual smoothness
+  await ensureMinLoading(startedAt);
+
   if (!startResult.ok) {
-    await ensureMinLoading(startedAt);
     await showErrorState(button, startResult.userMessage);
     return;
   }
 
-  // Track this button until background tells us the final status
-  pendingButtons.set(requestId, {
-    button,
-    requestId,
-    fileMeta,
-    startedAt,
-  });
+  // ✅ IMMEDIATE SUCCESS: browser accepted the download
+  setButtonState(button, 'success');
+
+  // Optionally return to idle so the user can click again
+  await delay(FEEDBACK_SUCCESS_MS);
+  if (getButtonState(button) === 'success') {
+    setButtonState(button, 'idle');
+  }
 }
 
 function startBackgroundDownload(
@@ -525,8 +612,7 @@ function startBackgroundDownload(
     if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) {
       resolve({
         ok: false,
-        userMessage:
-          'The extension runtime is not available. Try reloading the extension.',
+        userMessage: 'The extension runtime is not available. Reload page.',
       });
       return;
     }
@@ -549,8 +635,7 @@ function startBackgroundDownload(
             console.warn('[CQD] sendMessage error:', err.message);
             resolve({
               ok: false,
-              userMessage:
-                'Quick Downloader could not talk to its background process. Try reloading the extension.',
+              userMessage: 'Connection to extension failed.',
             });
             return;
           }
@@ -559,12 +644,12 @@ function startBackgroundDownload(
             resolve({
               ok: false,
               userMessage:
-                response?.userMessage ||
-                'Could not start the download for this file.',
+                response?.userMessage || 'Could not start the download.',
             });
             return;
           }
 
+          // ✅ Browser accepted the download
           resolve({ ok: true });
         },
       );
@@ -572,8 +657,7 @@ function startBackgroundDownload(
       console.warn('[CQD] sendMessage threw:', e);
       resolve({
         ok: false,
-        userMessage:
-          'Something went wrong before starting the download. Please try again.',
+        userMessage: 'Extension communication error.',
       });
     }
   });
@@ -581,6 +665,8 @@ function startBackgroundDownload(
 
 /* -----------------------------------------------------
  * Handle download status messages from background
+ * (Now effectively unused, but kept in case you want
+ *  to react to special statuses later.)
  * ---------------------------------------------------*/
 
 function setupDownloadStatusListener(): void {
@@ -602,6 +688,8 @@ function setupDownloadStatusListener(): void {
     const pending = pendingButtons.get(requestId);
     if (!pending) return;
 
+    // With the new flow we don't actually populate pendingButtons,
+    // so this won't run. Left here for possible future use.
     void handleDownloadStatusForButton(pending, status, userMessage);
   });
 }
@@ -626,10 +714,6 @@ async function handleDownloadStatusForButton(
   pendingButtons.delete(requestId);
 }
 
-/* -----------------------------------------------------
- * Error state that respects hover (message stays while hovering)
- * ---------------------------------------------------*/
-
 async function showErrorState(
   button: HTMLButtonElement,
   userMessage?: string,
@@ -642,7 +726,6 @@ async function showErrorState(
     await delay(200);
 
     if (getButtonState(button) !== 'error') {
-      // State was changed externally
       return;
     }
 
@@ -651,7 +734,6 @@ async function showErrorState(
       continue;
     }
 
-    // If still hovering, keep showing the error squircle
     const hovered = button.matches(':hover');
     if (!hovered) {
       setButtonState(button, 'idle');
@@ -659,10 +741,6 @@ async function showErrorState(
     }
   }
 }
-
-/* -----------------------------------------------------
- * Utils
- * ---------------------------------------------------*/
 
 async function ensureMinLoading(startedAt: number): Promise<void> {
   const elapsed = Date.now() - startedAt;
@@ -682,7 +760,7 @@ function delay(ms: number): Promise<void> {
 function initContentScript(): void {
   if (!isGoogleClassroom()) return;
   injectStyles();
-  setupDownloadStatusListener();
+  setupDownloadStatusListener(); // harmless now; no pendingButtons
   setupObservers();
 }
 

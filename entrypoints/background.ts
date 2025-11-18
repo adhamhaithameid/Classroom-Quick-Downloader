@@ -1,4 +1,5 @@
 // filepath: entrypoints/background.ts
+
 type FileMetaMsg = {
   name?: string;
   ext?: string;
@@ -16,178 +17,182 @@ type DownloadStatus = 'complete' | 'interrupted' | 'blocked_html';
 
 const pendingByRequestId = new Map<string, PendingDownload>();
 const pendingByDownloadId = new Map<number, PendingDownload>();
+const pendingByUrl = new Map<string, PendingDownload>();
 
 export default defineBackground(() => {
-  console.log('[CQD] Background ready');
+  console.log('[CQD] Background ready - Immediate Success Mode');
 
   /* ---------------------------------------------
-   * downloads.onDeterminingFilename
-   *  -> block unexpected HTML and optionally
-   *     try to auto-resolve Drive "Download anyway"
+   * 1. Handle bypass success (auto-close helper tab)
+   * -------------------------------------------*/
+  chrome.runtime.onMessage.addListener((message, sender) => {
+    if (message?.type === 'CQD_BYPASS_SUCCESS' && sender.tab?.id != null) {
+      const tabId = sender.tab.id;
+      setTimeout(() => {
+        // MV3 style callback (no .catch)
+        chrome.tabs.remove(tabId, () => {
+          void chrome.runtime.lastError;
+        });
+      }, 5000);
+    }
+  });
+
+  /* ---------------------------------------------
+   * 2. downloads.onDeterminingFilename
+   *    -> HTML vs expected file type
    * -------------------------------------------*/
   chrome.downloads.onDeterminingFilename.addListener((item, suggest) => {
-    const pending = pendingByDownloadId.get(item.id);
+    let pending = pendingByDownloadId.get(item.id);
+    if (!pending) {
+      pending =
+        pendingByUrl.get(item.url) ??
+        pendingByUrl.get(item.finalUrl || item.url);
+    }
+
     if (!pending) {
       suggest();
       return;
     }
 
-    const mime = item.mime || '';
+    const actualMime = (item.mime || '').toLowerCase();
+    const actualExt = getFilenameExt(item.filename);
+    const expectedKind = pending.fileMeta?.kind;
     const expectedExt = pending.fileMeta?.ext?.toLowerCase();
-    const host = safeHostname(item.url);
 
-    // We only care about Google Drive / Classroom HTML weirdness
-    const isGoogleHost =
-      host === 'drive.google.com' || host === 'classroom.google.com';
+    const looksLikeHtml =
+      actualMime.includes('html') ||
+      actualExt === 'html' ||
+      actualExt === 'htm';
 
-    if (
-      isGoogleHost &&
-      mime.toLowerCase().startsWith('text/html') &&
-      expectedExt &&
-      expectedExt !== 'html' &&
-      expectedExt !== 'htm'
-    ) {
-      // Cancel this HTML download; try to resolve a real file URL.
+    const userWantedHtml =
+      expectedKind === 'html' ||
+      expectedExt === 'html' ||
+      expectedExt === 'htm';
+
+    // If Drive returned an HTML page but we expected a binary file
+    if (looksLikeHtml && !userWantedHtml) {
+      console.log('[CQD] HTML (virus / interstitial) detected. Opening background tab.');
+
       chrome.downloads.cancel(item.id, () => {
-        void (async () => {
-          const resolved = await tryResolveDriveVirusInterstitial(item.url);
-
-          if (resolved?.ok) {
-            chrome.downloads.download(
-              {
-                url: resolved.finalUrl,
-                saveAs: false,
-                conflictAction: 'uniquify',
-              },
-              (newId) => {
-                const err = chrome.runtime.lastError;
-                if (err || newId == null) {
-                  const msg =
-                    'Google returned a web page instead of the file, and Quick Downloader could not bypass it.';
-                  sendStatusToTab(
-                    pending,
-                    'blocked_html',
-                    msg,
-                    'BLOCKED_HTML',
-                  );
-                  pendingByRequestId.delete(pending.requestId);
-                  pendingByDownloadId.delete(item.id);
-                  return;
-                }
-
-                // Re-bind this pending download to the new id
-                pendingByDownloadId.delete(item.id);
-                pendingByDownloadId.set(newId, pending);
-              },
-            );
-          } else {
-            const msg =
-              'Google returned a web page instead of the file. Open the attachment once in a normal tab (to login or click "Download anyway"), then try again.';
-            sendStatusToTab(pending, 'blocked_html', msg, 'BLOCKED_HTML');
-            pendingByRequestId.delete(pending.requestId);
-            pendingByDownloadId.delete(item.id);
-          }
-        })();
+        chrome.tabs.create(
+          {
+            url: item.finalUrl || item.url,
+            active: false, // <- user stays on Classroom
+          },
+          () => {
+            // We don't touch the UI here; it already went "success"
+            cleanup(pending!, item.id);
+          },
+        );
       });
-
-      suggest({ filename: item.filename });
       return;
     }
 
-    // Normal path – just accept Chrome’s filename choice
-    suggest({ filename: item.filename });
+    // Normal filename handling
+    if (pending.fileMeta?.name) {
+      suggest({ filename: pending.fileMeta.name, conflictAction: 'uniquify' });
+    } else {
+      suggest({ conflictAction: 'uniquify' });
+    }
   });
 
   /* ---------------------------------------------
-   * downloads.onChanged
-   *  -> completion / network / auth errors
+   * 3. downloads.onChanged
+   *    -> cleanup only, no UI changes
    * -------------------------------------------*/
   chrome.downloads.onChanged.addListener((delta) => {
     const pending = pendingByDownloadId.get(delta.id);
     if (!pending) return;
 
-    if (delta.state && delta.state.current === 'complete') {
-      sendStatusToTab(pending, 'complete');
-      pendingByDownloadId.delete(delta.id);
-      pendingByRequestId.delete(pending.requestId);
-      return;
-    }
-
-    if (delta.state && delta.state.current === 'interrupted') {
-      const errCode = delta.error?.current || 'UNKNOWN';
-      const userMessage = userMessageForDownloadError(errCode, pending);
-      sendStatusToTab(pending, 'interrupted', userMessage, errCode);
-      pendingByDownloadId.delete(delta.id);
-      pendingByRequestId.delete(pending.requestId);
+    if (
+      (delta.state && delta.state.current === 'complete') ||
+      (delta.state && delta.state.current === 'interrupted')
+    ) {
+      cleanup(pending, delta.id);
     }
   });
 
   /* ---------------------------------------------
-   * runtime.onMessage: CQD_DOWNLOAD
-   *  -> start download via chrome.downloads
+   * 4. runtime.onMessage: CQD_DOWNLOAD
+   *    -> IMMEDIATE success/error
    * -------------------------------------------*/
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (!message || message.type !== 'CQD_DOWNLOAD') {
-      return;
-    }
+    if (!message || message.type !== 'CQD_DOWNLOAD') return;
 
-    const rawUrl = typeof message.url === 'string' ? message.url : null;
     const requestId =
       typeof message.requestId === 'string'
         ? message.requestId
         : `req-${Date.now()}`;
+    const rawUrl = typeof message.url === 'string' ? message.url : null;
     const fileMeta: FileMetaMsg | undefined = message.fileMeta;
 
     if (!rawUrl) {
+      // immediate error: no URL at all
+      sendStatusToTab(
+        {
+          requestId,
+          url: '',
+          fileMeta,
+          tabId: sender.tab?.id,
+        },
+        'interrupted',
+        'No valid link found.',
+        'NO_URL',
+      );
       sendResponse?.({
         started: false,
         requestId,
-        userMessage: 'This attachment does not have a valid download link.',
+        userMessage: 'No valid link found.',
       });
       return;
     }
 
-    if (!chrome.downloads || typeof chrome.downloads.download !== 'function') {
-      sendResponse?.({
-        started: false,
-        requestId,
-        userMessage:
-          'Your browser does not allow background downloads for this extension.',
-      });
-      return;
-    }
+    const pending: PendingDownload = {
+      requestId,
+      url: rawUrl,
+      fileMeta,
+      tabId: sender.tab?.id,
+    };
 
-    const tabId = sender.tab?.id;
-    const url = rawUrl;
+    pendingByRequestId.set(requestId, pending);
+    pendingByUrl.set(rawUrl, pending);
 
     chrome.downloads.download(
       {
-        url,
+        url: rawUrl,
         saveAs: false,
         conflictAction: 'uniquify',
       },
       (downloadId) => {
         const err = chrome.runtime.lastError;
-        if (err || downloadId === undefined || downloadId === null) {
-          console.warn('[CQD] downloads.download error:', err?.message);
+
+        // ❌ Immediate error: browser refused to start download
+        if (err || !downloadId) {
+          console.warn('[CQD] downloads.download failed:', err?.message);
+
+          sendStatusToTab(
+            pending,
+            'interrupted',
+            'Browser could not start the download.',
+            'START_FAILED',
+          );
+
+          cleanup(pending);
+
           sendResponse?.({
             started: false,
             requestId,
-            userMessage:
-              'The browser could not start the download. Try again or open the attachment normally.',
+            userMessage: 'Browser blocked download start.',
           });
           return;
         }
 
-        const pending: PendingDownload = {
-          requestId,
-          url,
-          fileMeta,
-          tabId,
-        };
-
-        pendingByRequestId.set(requestId, pending);
+        // ✅ Immediate success: browser accepted the download
+        console.log('[CQD] Download started:', downloadId);
         pendingByDownloadId.set(downloadId, pending);
+
+        // Tell the UI: "Success" RIGHT NOW
+        sendStatusToTab(pending, 'complete');
 
         sendResponse?.({
           started: true,
@@ -197,7 +202,7 @@ export default defineBackground(() => {
       },
     );
 
-    return true; // keep channel open for async sendResponse
+    return true; // async response
   });
 });
 
@@ -205,80 +210,18 @@ export default defineBackground(() => {
  * Helpers
  * ---------------------------------------------------*/
 
-function safeHostname(url: string): string | undefined {
-  try {
-    return new URL(url).hostname;
-  } catch {
-    return undefined;
+function cleanup(pending: PendingDownload, downloadId?: number) {
+  pendingByRequestId.delete(pending.requestId);
+  pendingByUrl.delete(pending.url);
+  if (downloadId != null) {
+    pendingByDownloadId.delete(downloadId);
   }
 }
 
-async function tryResolveDriveVirusInterstitial(
-  url: string,
-): Promise<{ ok: true; finalUrl: string } | { ok: false } | null> {
-  const host = safeHostname(url);
-  if (host !== 'drive.google.com') return null;
-
-  try {
-    const res = await fetch(url, {
-      method: 'GET',
-      redirect: 'follow',
-      credentials: 'include',
-    });
-
-    const finalHost = safeHostname(res.url || url);
-    if (finalHost !== 'drive.google.com') {
-      return { ok: false };
-    }
-
-    const text = await res.text();
-
-    // Look for the "Download anyway" confirm link
-    const match =
-      text.match(/href="(\/uc\?[^"]*?export=download[^"]*?confirm=[^"]*?id=[^"]+?)"/) ||
-      text.match(
-        /href="(https:\/\/drive\.google\.com\/uc\?[^"]*?export=download[^"]*?confirm=[^"]*?id=[^"]+?)"/,
-      );
-
-    if (!match) {
-      return { ok: false };
-    }
-
-    const confirmUrl = new URL(
-      match[1],
-      'https://drive.google.com',
-    ).toString();
-
-    return { ok: true, finalUrl: confirmUrl };
-  } catch (e) {
-    console.warn('[CQD] tryResolveDriveVirusInterstitial failed:', e);
-    return { ok: false };
-  }
-}
-
-function userMessageForDownloadError(
-  errorCode: string,
-  pending: PendingDownload,
-): string {
-  const displayName = pending.fileMeta?.name
-    ? `"${pending.fileMeta.name}"`
-    : 'this file';
-
-  switch (errorCode) {
-    case 'NETWORK_FAILED':
-    case 'NETWORK_TIMEOUT':
-    case 'NETWORK_DISCONNECTED':
-      return `Your internet connection dropped or Google could not be reached while downloading ${displayName}. Try again.`;
-    case 'SERVER_FORBIDDEN':
-    case 'SERVER_UNAUTHORIZED':
-      return `Google says you do not have permission to download ${displayName}. Open it once normally or request access, then try again.`;
-    case 'USER_CANCELED':
-      return 'You cancelled this download from the browser.';
-    case 'INSUFFICIENT_SPACE':
-      return 'Your device does not have enough space to finish this download.';
-    default:
-      return 'The download was interrupted by the browser. Try again or open the attachment normally in a tab.';
-  }
+function getFilenameExt(filename?: string): string | undefined {
+  if (!filename) return undefined;
+  const m = filename.match(/\.([a-zA-Z0-9]{1,6})$/);
+  return m ? m[1].toLowerCase() : undefined;
 }
 
 function sendStatusToTab(
@@ -297,7 +240,7 @@ function sendStatusToTab(
       errorCode,
       userMessage,
     });
-  } catch (e) {
-    console.warn('[CQD] sendStatusToTab failed:', e);
+  } catch {
+    // ignore
   }
 }
