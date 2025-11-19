@@ -12,8 +12,6 @@ import { injectStyles } from './styles';
 const INJECTED_ATTR = 'data-cqd-injected';
 const RESCAN_INTERVAL_MS = 2000;
 const RESCAN_DEBOUNCE_MS = 250;
-
-// Feedback durations (ms)
 const LOADING_MIN_MS = 600;
 const FEEDBACK_SUCCESS_MS = 2000;
 const FEEDBACK_ERROR_MS = 4000;
@@ -22,11 +20,11 @@ const DRIVE_ANCHOR_SELECTOR =
   'a[href*="https://drive.google.com"], a[href*="//drive.google.com"], a[href*="classroom.google.com/drive"]';
 
 const ATTACHMENT_CONTAINER_SELECTOR = [
-  '.KlRXdf', // common attachment card
-  '.z3vRcc', // chip-like attachment
-  '.VfPpkd-aPP78e', // Material card wrapper
-  '[data-drive-id]', // Drive attachment
-  '[data-id][data-item-id]', // metadata blocks
+  '.KlRXdf',
+  '.z3vRcc',
+  '.VfPpkd-aPP78e',
+  '[data-drive-id]',
+  '[data-id][data-item-id]',
 ].join(', ');
 
 const DRIVE_URL_PATTERNS: RegExp[] = [
@@ -54,10 +52,8 @@ type PendingButton = {
   startedAt: number;
 };
 
-type DownloadStatus = 'complete' | 'interrupted' | 'blocked_html';
-
-const pendingButtons = new Map<string, PendingButton>();
 let nextRequestSeq = 1;
+const pendingButtons = new Map<string, PendingButton>();
 
 /* -----------------------------------------------------
  * Environment / Page Checks
@@ -85,43 +81,25 @@ function scheduleScan(): void {
 
 function setupObservers(): void {
   if (typeof document === 'undefined') return;
-
   if (!document.body) {
-    window.addEventListener(
-      'DOMContentLoaded',
-      () => {
-        setupObservers();
-      },
-      { once: true },
-    );
+    window.addEventListener('DOMContentLoaded', () => setupObservers(), { once: true });
     return;
   }
-
   if (observer) return;
 
   observer = new MutationObserver((mutations) => {
     const hasChildListChange = mutations.some(
-      (m) =>
-        m.type === 'childList' &&
-        (m.addedNodes.length > 0 || m.removedNodes.length > 0),
+      (m) => m.type === 'childList' && (m.addedNodes.length > 0 || m.removedNodes.length > 0),
     );
-    if (hasChildListChange) {
-      scheduleScan();
-    }
+    if (hasChildListChange) scheduleScan();
   });
-
   observer.observe(document.body, { childList: true, subtree: true });
-
-  window.setInterval(() => {
-    scheduleScan();
-  }, RESCAN_INTERVAL_MS);
-
+  window.setInterval(() => scheduleScan(), RESCAN_INTERVAL_MS);
   scheduleScan();
 }
 
 function scanForAttachments(): void {
   if (!isGoogleClassroom()) return;
-  if (typeof document === 'undefined') return;
   injectSingleFileButtons();
 }
 
@@ -130,22 +108,15 @@ function scanForAttachments(): void {
  * ---------------------------------------------------*/
 
 function injectSingleFileButtons(): void {
-  const anchors = Array.from(
-    document.querySelectorAll<HTMLAnchorElement>(DRIVE_ANCHOR_SELECTOR),
-  );
-
+  const anchors = Array.from(document.querySelectorAll<HTMLAnchorElement>(DRIVE_ANCHOR_SELECTOR));
   for (const anchor of anchors) {
     const url = extractDriveUrlFromAnchor(anchor);
     if (!url) continue;
-
     const container =
       (anchor.closest(ATTACHMENT_CONTAINER_SELECTOR) as HTMLElement | null) ||
       anchor.parentElement ||
       anchor;
-
-    if (!container) continue;
-    if (hasInjectedButton(container)) continue;
-
+    if (!container || hasInjectedButton(container)) continue;
     injectButtonIntoAttachment(container, url);
   }
 
@@ -154,12 +125,10 @@ function injectSingleFileButtons(): void {
       '[data-drive-id], [data-id][data-item-id], [data-id][data-tooltip]',
     ),
   );
-
   for (const el of metaElements) {
     if (hasInjectedButton(el)) continue;
     const url = findDriveUrl(el);
     if (!url) continue;
-
     injectButtonIntoAttachment(el, url);
   }
 }
@@ -175,8 +144,7 @@ function hasInjectedButton(container: HTMLElement): boolean {
 function extractDriveUrlFromAnchor(anchor: HTMLAnchorElement): string | null {
   const href = anchor.href;
   if (!href) return null;
-  const isDriveUrl = DRIVE_URL_PATTERNS.some((re) => re.test(href));
-  return isDriveUrl ? href : null;
+  return DRIVE_URL_PATTERNS.some((re) => re.test(href)) ? href : null;
 }
 
 function findDriveUrl(element: HTMLElement): string | null {
@@ -189,85 +157,37 @@ function findDriveUrl(element: HTMLElement): string | null {
     if (href) return href;
   }
 
-  const driveId =
-    element.getAttribute('data-drive-id') || element.getAttribute('data-id');
+  const driveId = element.getAttribute('data-drive-id') || element.getAttribute('data-id');
   if (driveId) {
-    const anchorWithId =
-      document.querySelector<HTMLAnchorElement>(
-        `a[data-drive-id="${driveId}"]`,
-      ) ||
-      document.querySelector<HTMLAnchorElement>(`a[data-id="${driveId}"]`) ||
-      document.querySelector<HTMLAnchorElement>(`a[href*="${driveId}"]`);
-
-    if (anchorWithId) {
-      const href = extractDriveUrlFromAnchor(anchorWithId);
-      if (href) return href;
-    }
-
-    return `https://drive.google.com/uc?export=download&id=${encodeURIComponent(
-      driveId,
-    )}`;
+    return `https://drive.google.com/uc?export=download&id=${encodeURIComponent(driveId)}`;
   }
-
   return null;
 }
 
 function toDownloadUrl(originalUrl: string, depth = 0): string {
   if (depth > 3) return originalUrl;
-
   try {
     const parsed = new URL(originalUrl, location.href);
-    const hostname = parsed.hostname;
-    const pathname = parsed.pathname;
-
-    if (hostname === 'drive.google.com') {
-      if (pathname.startsWith('/auth_warmup')) {
+    if (parsed.hostname === 'drive.google.com') {
+      if (parsed.pathname.startsWith('/auth_warmup')) {
         const cont = parsed.searchParams.get('continue');
         if (cont) return toDownloadUrl(cont, depth + 1);
         const id = parsed.searchParams.get('id');
-        if (id) {
-          return `https://drive.google.com/uc?export=download&id=${encodeURIComponent(
-            id,
-          )}`;
-        }
-        return originalUrl;
+        return id ? `https://drive.google.com/uc?export=download&id=${id}` : originalUrl;
       }
-
-      const fileMatch = pathname.match(/^\/file\/d\/([^/]+)/);
+      const fileMatch = parsed.pathname.match(/^\/file\/d\/([^/]+)/);
       if (fileMatch) {
-        const id = fileMatch[1];
-        return `https://drive.google.com/uc?export=download&id=${encodeURIComponent(
-          id,
-        )}`;
+        return `https://drive.google.com/uc?export=download&id=${fileMatch[1]}`;
       }
-
-      if (pathname === '/open') {
-        const id = parsed.searchParams.get('id');
-        if (id) {
-          return `https://drive.google.com/uc?export=download&id=${encodeURIComponent(
-            id,
-          )}`;
-        }
-      }
-
-      if (pathname === '/uc') {
+      if (parsed.pathname === '/open' || parsed.pathname === '/uc') {
         parsed.searchParams.set('export', 'download');
         return parsed.toString();
       }
     }
-
-    if (hostname === 'classroom.google.com' && pathname.startsWith('/drive')) {
-      const id =
-        parsed.searchParams.get('id') ||
-        parsed.searchParams.get('resourceId') ||
-        parsed.searchParams.get('fileId');
-      if (id) {
-        return `https://drive.google.com/uc?export=download&id=${encodeURIComponent(
-          id,
-        )}`;
-      }
+    if (parsed.hostname === 'classroom.google.com' && parsed.pathname.startsWith('/drive')) {
+       const id = parsed.searchParams.get('id') || parsed.searchParams.get('resourceId') || parsed.searchParams.get('fileId');
+       if (id) return `https://drive.google.com/uc?export=download&id=${id}`;
     }
-
     return originalUrl;
   } catch {
     return originalUrl;
@@ -275,71 +195,61 @@ function toDownloadUrl(originalUrl: string, depth = 0): string {
 }
 
 /* -----------------------------------------------------
- * File metadata extraction (from DOM)
+ * File metadata extraction (Universal Support)
  * ---------------------------------------------------*/
 
-// Cleans filenames like "file.pdfPDF" -> "file.pdf"
+/**
+ * 🚀 FIXED CLEANER: Handles Name + Name + Label
+ * Order of operations:
+ * 1. Remove garbage labels ("Microsoft Excel", "Binary", "Unknown")
+ * 2. THEN check for full string duplication ("init.phpinit.php")
+ * 3. THEN check for suffix duplication ("file.pdfPDF")
+ */
 function cleanAttachmentName(rawName: string): string {
   if (!rawName) return '';
   let name = rawName.trim();
 
-  const extensions = [
-    'pdf',
-    'mp4',
-    'mov',
-    'avi',
-    'mkv',
-    'jpg',
-    'jpeg',
-    'png',
-    'docx',
-    'doc',
-    'xlsx',
-    'xls',
-    'pptx',
-    'ppt',
-    'zip',
-    'rar',
-    'txt',
-    'csv',
-    'html',
+  // 1. LABEL CLEANUP (Must be first to expose the duplication)
+  // Longest labels first to avoid partial matches (e.g. "Microsoft Excel" before "Excel")
+  const garbageLabels = [
+    'Microsoft Excel', 'Microsoft Word', 'Microsoft PowerPoint', 'Compressed archive', 
+    'Binary', 'Unknown', 'Google Sheets', 'Google Docs', 'Google Slides', 'Text File',
+    'PDF', 'Video', 'Image', 'Audio', 'Text', 'Word', 'Excel', 'PowerPoint', 
+    'Archive', 'Zip', 'File', 'Document', 'Shortcut', 'Code'
   ];
 
-  const lower = name.toLowerCase();
-
-  for (const ext of extensions) {
-    const pattern = `.${ext}${ext}`; // e.g. .pdfpdf
-    if (lower.endsWith(pattern)) {
-      return name.slice(0, -ext.length).trim();
-    }
-
-    if (lower.endsWith(`.${ext}`)) {
-      return name;
-    }
-
-    if (lower.endsWith(`.${ext}${ext}`)) {
-      return name.slice(0, -ext.length);
+  for (const label of garbageLabels) {
+    if (name.endsWith(label)) {
+      // Try stripping it
+      const potential = name.slice(0, -label.length).trim();
+      
+      // Only accept the strip if we aren't left with an empty string
+      if (potential.length > 0) {
+         name = potential;
+         // We break after the first match to avoid over-stripping 
+         // (e.g. "File File" -> "File") unless your UI stacks them, 
+         // but usually it's just one label.
+         break;
+      }
     }
   }
 
-  const commonLabels = [
-    'PDF',
-    'Video',
-    'Image',
-    'Audio',
-    'Text',
-    'Word',
-    'Excel',
-    'PowerPoint',
-    'Archive',
-  ];
-  for (const label of commonLabels) {
-    if (name.endsWith(label)) {
-      const withoutLabel = name.slice(0, -label.length).trim();
-      if (/\.[a-z0-9]{2,5}$/i.test(withoutLabel)) {
-        return withoutLabel;
-      }
+  // 2. EXACT HALF SPLIT (The "init.phpinit.php" or "HashMapHashMap" Fix)
+  // Now that "Binary" is gone, "HashMapHashMap" will be split correctly.
+  if (name.length > 0 && name.length % 2 === 0) {
+    const mid = name.length / 2;
+    const firstHalf = name.slice(0, mid);
+    const secondHalf = name.slice(mid);
+    if (firstHalf === secondHalf) {
+       return firstHalf;
     }
+  }
+
+  // 3. REGEX SUFFIX REPEAT (The "file.pdfPDF" Fix)
+  const repeatRegex = /\.([a-zA-Z0-9]{2,10})\1$/i;
+  const repeatMatch = name.match(repeatRegex);
+  if (repeatMatch) {
+      return name.slice(0, -repeatMatch[1].length).trim();
   }
 
   return name;
@@ -352,19 +262,14 @@ function extractFileMeta(container: HTMLElement, url: string): FileMeta {
     container.getAttribute('data-tooltip') ||
     container.getAttribute('aria-label') ||
     container.getAttribute('title');
+  
+  if (tooltip && tooltip.trim()) name = tooltip.trim();
 
-  if (tooltip && tooltip.trim()) {
-    name = tooltip.trim();
-  } else {
+  if (!name) {
     const text = (container.textContent || '').trim();
     if (text) {
-      const lines = text
-        .split('\n')
-        .map((l) => l.trim())
-        .filter(Boolean);
-      if (lines.length > 0) {
-        name = lines[0];
-      }
+      const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
+      if (lines.length > 0) name = lines[0];
     }
   }
 
@@ -372,47 +277,49 @@ function extractFileMeta(container: HTMLElement, url: string): FileMeta {
     try {
       const u = new URL(url);
       const pathName = decodeURIComponent(u.pathname.split('/').pop() || '');
-      if (pathName && pathName.includes('.')) {
-        name = pathName;
-      }
-    } catch {
-      // ignore
-    }
+      if (pathName && pathName.includes('.')) name = pathName;
+    } catch {}
   }
 
-  if (name) {
-    name = cleanAttachmentName(name);
-  }
+  // 🧹 Apply the new logic
+  if (name) name = cleanAttachmentName(name);
 
+  // 🔍 Extract Extension
   let ext: string | undefined;
   if (name) {
-    const m = name.match(/\.([a-zA-Z0-9]{1,6})$/);
+    const m = name.match(/\.([a-zA-Z0-9]{2,10})$/); 
     if (m) ext = m[1].toLowerCase();
   }
 
-  if (!ext) {
-    try {
-      const u = new URL(url);
-      const path = u.pathname;
-      const m2 = path.match(/\.([a-zA-Z0-9]{1,6})$/);
-      if (m2) ext = m2[1].toLowerCase();
-    } catch {
-      // ignore
-    }
-  }
-
-  let kind: string | undefined;
+  // 📂 Determine Kind (Fully expanded for your list)
+  let kind: string = 'other';
   if (ext) {
-    if (['pdf'].includes(ext)) kind = 'pdf';
-    else if (['doc', 'docx'].includes(ext)) kind = 'doc';
-    else if (['xls', 'xlsx', 'csv'].includes(ext)) kind = 'sheet';
-    else if (['ppt', 'pptx'].includes(ext)) kind = 'slide';
-    else if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext))
-      kind = 'image';
-    else if (['zip', 'rar', '7z'].includes(ext)) kind = 'archive';
-    else if (['mp4', 'mov', 'mkv', 'avi'].includes(ext)) kind = 'video';
-    else if (['html', 'htm'].includes(ext)) kind = 'html';
-    else kind = 'other';
+    switch (ext) {
+      // Docs
+      case 'pdf': kind = 'pdf'; break;
+      case 'doc': case 'docx': case 'txt': case 'rtf': case 'odt': case 'md': case 'tex': case 'cls': case 'emlx': kind = 'doc'; break;
+      case 'xls': case 'xlsx': case 'csv': case 'ods': case 'numbers': kind = 'sheet'; break;
+      case 'ppt': case 'pptx': case 'odp': case 'key': kind = 'slide'; break;
+      
+      // Media
+      case 'jpg': case 'jpeg': case 'png': case 'gif': case 'webp': case 'svg': case 'bmp': case 'ico': case 'avif': case 'fig': case 'psd': case 'ai': kind = 'image'; break;
+      case 'mp4': case 'mov': case 'avi': case 'mkv': case 'webm': case 'flv': case 'wmv': case 'm4v': kind = 'video'; break;
+      case 'mp3': case 'wav': case 'ogg': case 'm4a': case 'flac': case 'aac': kind = 'audio'; break;
+      
+      // Archives
+      case 'zip': case 'rar': case '7z': case 'tar': case 'gz': case 'iso': case 'dmg': case 'pkg': case 'mht': kind = 'archive'; break;
+      
+      // Code / Web
+      case 'html': case 'htm': case 'xml': case 'css': case 'js': case 'ts': case 'jsx': case 'tsx': case 'json': case 'php': case 'sql': case 'py': case 'c': case 'cpp': case 'cs': case 'java': case 'rb': case 'go': case 'sh': case 'bat': case 'ipynb': case 'pkt': case 'lock': case 'yml': case 'yaml': kind = 'code'; break;
+      
+      // Fonts
+      case 'ttf': case 'otf': case 'woff': case 'woff2': case 'eot': kind = 'font'; break;
+
+      // System / Misc
+      case 'exe': case 'msi': case 'apk': case 'app': case 'jar': case 'dll': case 'pdb': case 'lnk': case 'dat': case 'sqlite': case 'db': case 'drawio': case 'dmp': kind = 'binary'; break;
+      
+      default: kind = 'other';
+    }
   }
 
   return { name, ext, kind };
@@ -424,21 +331,15 @@ function extractFileMeta(container: HTMLElement, url: string): FileMeta {
 
 function injectButtonIntoAttachment(container: HTMLElement, url: string): void {
   if (!url) return;
-
   const computed = window.getComputedStyle(container);
-  if (computed.position === 'static') {
-    container.style.position = 'relative';
-  }
+  if (computed.position === 'static') container.style.position = 'relative';
 
   const directUrl = toDownloadUrl(url);
   const fileMeta = extractFileMeta(container, directUrl);
   const button = createDownloadButton(container, directUrl, fileMeta);
 
   const iconEl = button.querySelector<HTMLElement>('.cqd-download-icon');
-  if (iconEl) {
-    iconEl.classList.add('cqd-icon-medium');
-  }
-
+  if (iconEl) iconEl.classList.add('cqd-icon-medium');
   container.appendChild(button);
 }
 
@@ -453,19 +354,12 @@ function getButtonState(button: HTMLButtonElement): ButtonState {
   return 'idle';
 }
 
-function setButtonState(
-  button: HTMLButtonElement,
-  state: ButtonState,
-  options?: { userMessage?: string },
-): void {
+function setButtonState(button: HTMLButtonElement, state: ButtonState, options?: { userMessage?: string }): void {
   const icon = button.querySelector<HTMLElement>('.cqd-download-icon');
   const label = button.querySelector<HTMLSpanElement>('.cqd-label');
-  const errorDetail = button.querySelector<HTMLSpanElement>(
-    '.cqd-error-detail',
-  );
+  const errorDetail = button.querySelector<HTMLSpanElement>('.cqd-error-detail');
   if (!icon || !label || !errorDetail) return;
 
-  // Reset all state classes / styles
   button.classList.remove('cqd-loading', 'cqd-success', 'cqd-error');
   icon.classList.remove('cqd-spinner');
   icon.textContent = '';
@@ -474,14 +368,11 @@ function setButtonState(
   label.textContent = 'Download';
   errorDetail.textContent = '';
 
-  // Default: download icon
   icon.style.backgroundImage = `url("${DOWNLOAD_ICON_SVG_URL}")`;
   icon.style.backgroundSize = '';
 
   switch (state) {
-    case 'idle':
-      break;
-
+    case 'idle': break;
     case 'loading':
       button.classList.add('cqd-loading');
       button.disabled = true;
@@ -489,24 +380,20 @@ function setButtonState(
       icon.classList.add('cqd-spinner');
       icon.style.backgroundImage = 'none';
       break;
-
     case 'success':
       button.classList.add('cqd-success');
-      button.style.backgroundColor = '#188038'; // Google green
+      button.style.backgroundColor = '#188038';
       label.textContent = 'Downloaded';
       icon.style.backgroundImage = `url("${SUCCESS_ICON_SVG_URL}")`;
       icon.style.backgroundSize = '20px 20px';
       break;
-
     case 'error':
       button.classList.add('cqd-error');
       button.style.backgroundColor = '#e05952';
       label.textContent = 'Error';
       icon.style.backgroundImage = `url("${ERROR_ICON_SVG_URL}")`;
       icon.style.backgroundSize = '20px 20px';
-      errorDetail.textContent =
-        options?.userMessage ||
-        'Something went wrong while downloading this file.';
+      errorDetail.textContent = options?.userMessage || 'Download failed.';
       break;
   }
 }
@@ -515,21 +402,16 @@ function setButtonState(
  * Button factory
  * ---------------------------------------------------*/
 
-function createDownloadButton(
-  _container: HTMLElement,
-  url: string,
-  fileMeta: FileMeta,
-): HTMLButtonElement {
+function createDownloadButton(_container: HTMLElement, url: string, fileMeta: FileMeta): HTMLButtonElement {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'cqd-download-btn';
   button.setAttribute(INJECTED_ATTR, 'true');
-  button.setAttribute('aria-label', 'Quick download attachment');
+  button.setAttribute('aria-label', `Download ${fileMeta.name || 'attachment'}`);
   button.setAttribute('title', 'Quick download');
 
   const iconWrapper = document.createElement('span');
   iconWrapper.className = 'cqd-icon-wrapper';
-
   const iconSpan = document.createElement('span');
   iconSpan.className = 'cqd-download-icon';
   iconWrapper.appendChild(iconSpan);
@@ -537,205 +419,76 @@ function createDownloadButton(
   const label = document.createElement('span');
   label.className = 'cqd-label';
   label.textContent = 'Download';
-
   const errorDetail = document.createElement('span');
   errorDetail.className = 'cqd-error-detail';
-  errorDetail.textContent = '';
 
   button.appendChild(iconWrapper);
   button.appendChild(label);
   button.appendChild(errorDetail);
 
-  button.addEventListener('click', async (event) => {
-    event.preventDefault();
-    event.stopPropagation();
+  button.addEventListener('click', async (e) => {
+    e.preventDefault(); e.stopPropagation();
     await handleSingleDownloadClick(button, url, fileMeta);
   });
-
-  button.addEventListener('auxclick', async (event) => {
-    if (event.button !== 1) return; // middle-click only
-    event.preventDefault();
-    event.stopPropagation();
-    await handleSingleDownloadClick(button, url, fileMeta);
-  });
-
   return button;
 }
 
-/* -----------------------------------------------------
- * Single download flow with IMMEDIATE success/error
- * ---------------------------------------------------*/
-
-async function handleSingleDownloadClick(
-  button: HTMLButtonElement,
-  url: string,
-  fileMeta: FileMeta,
-): Promise<void> {
+async function handleSingleDownloadClick(button: HTMLButtonElement, url: string, fileMeta: FileMeta): Promise<void> {
   if (!url) return;
-
-  const currentState = getButtonState(button);
-  if (currentState !== 'idle') return;
+  if (getButtonState(button) !== 'idle') return;
 
   const requestId = `cqd-${Date.now()}-${nextRequestSeq++}`;
   const startedAt = Date.now();
-
   setButtonState(button, 'loading');
 
   const startResult = await startBackgroundDownload(requestId, url, fileMeta);
-
-  // We still keep a tiny spinner time for visual smoothness
   await ensureMinLoading(startedAt);
 
   if (!startResult.ok) {
     await showErrorState(button, startResult.userMessage);
     return;
   }
-
-  // ✅ IMMEDIATE SUCCESS: browser accepted the download
   setButtonState(button, 'success');
-
-  // Optionally return to idle so the user can click again
   await delay(FEEDBACK_SUCCESS_MS);
-  if (getButtonState(button) === 'success') {
-    setButtonState(button, 'idle');
-  }
+  if (getButtonState(button) === 'success') setButtonState(button, 'idle');
 }
 
-function startBackgroundDownload(
-  requestId: string,
-  url: string,
-  fileMeta: FileMeta,
-): Promise<{ ok: boolean; userMessage?: string }> {
+function startBackgroundDownload(requestId: string, url: string, fileMeta: FileMeta): Promise<{ ok: boolean; userMessage?: string }> {
   const finalUrl = toDownloadUrl(url);
-
   return new Promise((resolve) => {
     if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) {
-      resolve({
-        ok: false,
-        userMessage: 'The extension runtime is not available. Reload page.',
-      });
+      resolve({ ok: false, userMessage: 'Extension runtime not available.' });
       return;
     }
-
     try {
       chrome.runtime.sendMessage(
-        {
-          type: 'CQD_DOWNLOAD',
-          url: finalUrl,
-          requestId,
-          fileMeta,
-        },
-        (response?: {
-          started?: boolean;
-          requestId?: string;
-          userMessage?: string;
-        }) => {
-          const err = chrome.runtime.lastError;
-          if (err) {
-            console.warn('[CQD] sendMessage error:', err.message);
-            resolve({
-              ok: false,
-              userMessage: 'Connection to extension failed.',
-            });
-            return;
+        { type: 'CQD_DOWNLOAD', url: finalUrl, requestId, fileMeta },
+        (response) => {
+          if (chrome.runtime.lastError || !response || response.started === false) {
+            resolve({ ok: false, userMessage: response?.userMessage || 'Could not start download.' });
+          } else {
+            resolve({ ok: true });
           }
-
-          if (!response || response.started === false) {
-            resolve({
-              ok: false,
-              userMessage:
-                response?.userMessage || 'Could not start the download.',
-            });
-            return;
-          }
-
-          // ✅ Browser accepted the download
-          resolve({ ok: true });
-        },
+        }
       );
-    } catch (e) {
-      console.warn('[CQD] sendMessage threw:', e);
-      resolve({
-        ok: false,
-        userMessage: 'Extension communication error.',
-      });
+    } catch {
+      resolve({ ok: false, userMessage: 'Extension communication error.' });
     }
   });
 }
 
 /* -----------------------------------------------------
- * Handle download status messages from background
- * (Now effectively unused, but kept in case you want
- *  to react to special statuses later.)
+ * UI Utils
  * ---------------------------------------------------*/
 
-function setupDownloadStatusListener(): void {
-  if (typeof chrome === 'undefined' || !chrome.runtime?.onMessage) return;
-
-  chrome.runtime.onMessage.addListener((message, _sender, _sendResponse) => {
-    if (!message || message.type !== 'CQD_DOWNLOAD_STATUS') return;
-
-    const {
-      requestId,
-      status,
-      userMessage,
-    }: {
-      requestId: string;
-      status: DownloadStatus;
-      userMessage?: string;
-    } = message;
-
-    const pending = pendingButtons.get(requestId);
-    if (!pending) return;
-
-    // With the new flow we don't actually populate pendingButtons,
-    // so this won't run. Left here for possible future use.
-    void handleDownloadStatusForButton(pending, status, userMessage);
-  });
-}
-
-async function handleDownloadStatusForButton(
-  pending: PendingButton,
-  status: DownloadStatus,
-  userMessage?: string,
-): Promise<void> {
-  const { button, startedAt, requestId } = pending;
-
-  await ensureMinLoading(startedAt);
-
-  if (status === 'complete') {
-    setButtonState(button, 'success');
-    await delay(FEEDBACK_SUCCESS_MS);
-    setButtonState(button, 'idle');
-  } else {
-    await showErrorState(button, userMessage);
-  }
-
-  pendingButtons.delete(requestId);
-}
-
-async function showErrorState(
-  button: HTMLButtonElement,
-  userMessage?: string,
-): Promise<void> {
+async function showErrorState(button: HTMLButtonElement, userMessage?: string): Promise<void> {
   setButtonState(button, 'error', { userMessage });
-
   const earliestReset = Date.now() + FEEDBACK_ERROR_MS;
-
   while (true) {
     await delay(200);
-
-    if (getButtonState(button) !== 'error') {
-      return;
-    }
-
-    const now = Date.now();
-    if (now < earliestReset) {
-      continue;
-    }
-
-    const hovered = button.matches(':hover');
-    if (!hovered) {
+    if (getButtonState(button) !== 'error') return;
+    if (Date.now() < earliestReset) continue;
+    if (!button.matches(':hover')) {
       setButtonState(button, 'idle');
       return;
     }
@@ -744,30 +497,21 @@ async function showErrorState(
 
 async function ensureMinLoading(startedAt: number): Promise<void> {
   const elapsed = Date.now() - startedAt;
-  if (elapsed < LOADING_MIN_MS) {
-    await delay(LOADING_MIN_MS - elapsed);
-  }
+  if (elapsed < LOADING_MIN_MS) await delay(LOADING_MIN_MS - elapsed);
 }
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
-/* -----------------------------------------------------
- * Init
- * ---------------------------------------------------*/
-
 function initContentScript(): void {
   if (!isGoogleClassroom()) return;
   injectStyles();
-  setupDownloadStatusListener(); // harmless now; no pendingButtons
   setupObservers();
 }
 
 export default defineContentScript({
   matches: ['https://classroom.google.com/*'],
   runAt: 'document_idle',
-  main() {
-    initContentScript();
-  },
+  main() { initContentScript(); },
 });
