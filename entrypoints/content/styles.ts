@@ -19,7 +19,7 @@ export function injectStyles(): void {
       --cqd-color-primary: #1a73e8;
       --cqd-color-success: #34a853;
       --cqd-color-error: #e05952;
-      --cqd-frame-color: #3b82f6;
+      --cqd-frame-color: #6366f1;
 
       --cqd-shadow-base: 0 0px 10px rgba(15, 23, 42, 0.22);
       --cqd-shadow-hover: 0 10px 24px rgba(15, 23, 42, 0.30);
@@ -114,7 +114,7 @@ export function injectStyles(): void {
       border-radius: inherit; 
       transition: all 0.2s ease;
       /* Subtle frame glow */
-      box-shadow: inset 0 0 0 2px var(--cqd-frame-color), 0 0 12px rgba(59, 130, 246, 0.4);
+      box-shadow: inset 0 0 0 2px var(--cqd-frame-color), 0 0 12px rgba(99, 102, 241, 0.5);
     }
     
     /* THE BADGE (Vertical Drop) */
