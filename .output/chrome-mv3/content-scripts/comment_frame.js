@@ -1,22 +1,13 @@
-// filepath: entrypoints/content/styles.ts
-import { DOWNLOAD_ICON_SVG_URL } from './icons';
-
-const STYLE_ID = 'cqd-style';
-const SPINNER_SIZE_PX = 16;
-
-// Smooth, slightly bouncy transition for the "Drop" feel
-const TRANSITION_MS = 150;
-const TRANSITION_STR = `${TRANSITION_MS}ms cubic-bezier(0.2, 0, 0, 1)`;
-
-export function injectStyles(): void {
-  if (typeof document === 'undefined') return;
-  if (document.getElementById(STYLE_ID)) return;
-
-  const style = document.createElement('style');
-  style.id = STYLE_ID;
-  style.textContent = `
+var commentframe=(function(){"use strict";function _(t){return t}const v=`data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+  <g stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M6 21H18" />
+    <path d="M12 3V17" />
+    <path d="M12 17L17 12" />
+    <path d="M12 17L7 12" />
+  </g>
+</svg>`)}`,y=`data:image/svg+xml;utf8,${encodeURIComponent('<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" stroke="#ffffff"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"><path d="M10.968 18.769C15.495 18.107 19 14.434 19 9.938a8.49 8.49 0 0 0-.216-1.912C20.718 9.178 22 11.188 22 13.475a6.1 6.1 0 0 1-1.113 3.506c.06.949.396 1.781 1.01 2.497a.43.43 0 0 1-.36.71c-1.367-.111-2.485-.426-3.354-.945A7.434 7.434 0 0 1 15 19.95a7.36 7.36 0 0 1-4.032-1.181z" fill="#ffffff"></path><path d="M7.625 16.657c.6.142 1.228.218 1.875.218 4.142 0 7.5-3.106 7.5-6.938C17 6.107 13.642 3 9.5 3 5.358 3 2 6.106 2 9.938c0 1.946.866 3.705 2.262 4.965a4.406 4.406 0 0 1-1.045 2.29.46.46 0 0 0 .386.76c1.7-.138 3.041-.57 4.022-1.296z" fill="#ffffff"></path></g></svg>')}`,f="cqd-style",b=16,S="150ms cubic-bezier(0.2, 0, 0, 1)";function E(){if(typeof document>"u"||document.getElementById(f))return;const t=document.createElement("style");t.id=f,t.textContent=`
     :root {
-      --cqd-transition: ${TRANSITION_STR};
+      --cqd-transition: ${S};
       --cqd-color-primary: #1a73e8;
       --cqd-color-success: #34a853;
       --cqd-color-error: #e05952;
@@ -109,7 +100,7 @@ export function injectStyles(): void {
       display: block;
       width: 24px;
       height: 24px;
-      background-image: url("${DOWNLOAD_ICON_SVG_URL}");
+      background-image: url("${v}");
       background-repeat: no-repeat;
       background-position: center;
       background-size: 24px 24px;
@@ -288,8 +279,8 @@ export function injectStyles(): void {
     .cqd-spinner {
       background-image: none;
       border-radius: 9999px;
-      width: ${SPINNER_SIZE_PX}px;
-      height: ${SPINNER_SIZE_PX}px;
+      width: ${b}px;
+      height: ${b}px;
       border: 3px solid rgba(255, 255, 255, 0.22);
       border-top-color: #ffffff;
       box-shadow: none;
@@ -400,7 +391,5 @@ export function injectStyles(): void {
       transform: translateY(0);
       max-height: 20px;
     }
-  `.trim();
-
-  (document.head || document.documentElement).appendChild(style);
-}
+  `.trim(),(document.head||document.documentElement).appendChild(t)}const w="div[data-stream-item-id]",p="data-cqd-processed",T={matches:["https://classroom.google.com/*"],runAt:"document_idle",main(){E(),i(),new MutationObserver(e=>{requestAnimationFrame(()=>{i()})}).observe(document.body,{childList:!0,subtree:!0}),setInterval(()=>{i()},1e3);let r=location.href;new MutationObserver(()=>{const e=location.href;e!==r&&(r=e,setTimeout(i,500))}).observe(document,{subtree:!0,childList:!0})}};function i(){try{const t=C();document.body.setAttribute("data-cqd-dir",t),document.querySelectorAll(w).forEach(e=>{if(e.hasAttribute(p)){if(e.querySelector(".cqd-overlay-container"))return;e.removeAttribute(p)}if(e.parentElement?.closest(w))return;const n=((e.innerText||"")+" "+A(e)).match(/(\d+)\s+class comment/i),a=n?parseInt(n[1],10):0;a>0&&(e.setAttribute(p,"true"),I(e,a))})}catch(t){console.warn("CQD Scan Error:",t)}}function I(t,r){const e=window.getComputedStyle(t),o=e.borderRadius||"8px";e.position==="static"&&(t.style.position="relative"),t.style.setProperty("overflow","visible","important"),t.style.setProperty("contain","none","important"),t.style.zIndex="1";const n=document.createElement("div");n.className="cqd-overlay-container",n.style.borderRadius=o,n.addEventListener("click",u=>{u.target===n&&x(t)}),t.appendChild(n);const a=document.createElement("div");a.className="cqd-comment-badge",a.title=`${r} comments`;const l=document.createElement("div");l.className="cqd-badge-icon",l.style.backgroundImage=`url("${y}")`;const g=document.createElement("span");g.className="cqd-badge-label",g.textContent=`${r}`,a.appendChild(l),a.appendChild(g),a.addEventListener("click",u=>{u.stopPropagation(),x(t)}),t.appendChild(a)}function x(t){const r=t.querySelector('a[href*="/details/"], h2 a');r?r.click():t.click()}function C(){return(document.documentElement.dir||document.body.dir)==="rtl"||window.getComputedStyle(document.body).direction==="rtl"?"rtl":"ltr"}function A(t){return Array.from(t.querySelectorAll("[aria-label]")).map(r=>r.getAttribute("aria-label")||"").join(" ")}const q=globalThis.browser?.runtime?.id?globalThis.browser:globalThis.chrome;function d(t,...r){}const k={debug:(...t)=>d(console.debug,...t),log:(...t)=>d(console.log,...t),warn:(...t)=>d(console.warn,...t),error:(...t)=>d(console.error,...t)};class h extends Event{constructor(r,e){super(h.EVENT_NAME,{}),this.newUrl=r,this.oldUrl=e}static EVENT_NAME=m("wxt:locationchange")}function m(t){return`${q?.runtime?.id}:comment_frame:${t}`}function N(t){let r,e;return{run(){r==null&&(e=new URL(location.href),r=t.setInterval(()=>{let o=new URL(location.href);o.href!==e.href&&(window.dispatchEvent(new h(o,e)),e=o)},1e3))}}}class s{constructor(r,e){this.contentScriptName=r,this.options=e,this.abortController=new AbortController,this.isTopFrame?(this.listenForNewerScripts({ignoreFirstEvent:!0}),this.stopOldScripts()):this.listenForNewerScripts()}static SCRIPT_STARTED_MESSAGE_TYPE=m("wxt:content-script-started");isTopFrame=window.self===window.top;abortController;locationWatcher=N(this);receivedMessageIds=new Set;get signal(){return this.abortController.signal}abort(r){return this.abortController.abort(r)}get isInvalid(){return q.runtime.id==null&&this.notifyInvalidated(),this.signal.aborted}get isValid(){return!this.isInvalid}onInvalidated(r){return this.signal.addEventListener("abort",r),()=>this.signal.removeEventListener("abort",r)}block(){return new Promise(()=>{})}setInterval(r,e){const o=setInterval(()=>{this.isValid&&r()},e);return this.onInvalidated(()=>clearInterval(o)),o}setTimeout(r,e){const o=setTimeout(()=>{this.isValid&&r()},e);return this.onInvalidated(()=>clearTimeout(o)),o}requestAnimationFrame(r){const e=requestAnimationFrame((...o)=>{this.isValid&&r(...o)});return this.onInvalidated(()=>cancelAnimationFrame(e)),e}requestIdleCallback(r,e){const o=requestIdleCallback((...n)=>{this.signal.aborted||r(...n)},e);return this.onInvalidated(()=>cancelIdleCallback(o)),o}addEventListener(r,e,o,n){e==="wxt:locationchange"&&this.isValid&&this.locationWatcher.run(),r.addEventListener?.(e.startsWith("wxt:")?m(e):e,o,{...n,signal:this.signal})}notifyInvalidated(){this.abort("Content script context invalidated"),k.debug(`Content script "${this.contentScriptName}" context invalidated`)}stopOldScripts(){window.postMessage({type:s.SCRIPT_STARTED_MESSAGE_TYPE,contentScriptName:this.contentScriptName,messageId:Math.random().toString(36).slice(2)},"*")}verifyScriptStartedEvent(r){const e=r.data?.type===s.SCRIPT_STARTED_MESSAGE_TYPE,o=r.data?.contentScriptName===this.contentScriptName,n=!this.receivedMessageIds.has(r.data?.messageId);return e&&o&&n}listenForNewerScripts(r){let e=!0;const o=n=>{if(this.verifyScriptStartedEvent(n)){this.receivedMessageIds.add(n.data.messageId);const a=e;if(e=!1,a&&r?.ignoreFirstEvent)return;this.notifyInvalidated()}};addEventListener("message",o),this.onInvalidated(()=>removeEventListener("message",o))}}function D(){}function c(t,...r){}const R={debug:(...t)=>c(console.debug,...t),log:(...t)=>c(console.log,...t),warn:(...t)=>c(console.warn,...t),error:(...t)=>c(console.error,...t)};return(async()=>{try{const{main:t,...r}=T,e=new s("comment_frame",r);return await t(e)}catch(t){throw R.error('The content script "comment_frame" crashed on startup!',t),t}})()})();
+commentframe;
