@@ -16,7 +16,6 @@ export default defineContentScript({
   main() {
     let virusHandled = false;
     let previewClicked = false;
-    let authCorrected = false;
     let auth403Reported = false;
 
     const tick = () => {
@@ -25,59 +24,7 @@ export default defineContentScript({
       const bodyText = (body?.innerText || '').toLowerCase();
 
       /* --------------------------------------------------
-       * 1) drive.usercontent 403 → force authuser=0
-       *    (SMALL / NORMAL files that fail on wrong account)
-       * -------------------------------------------------- */
-      if (
-        url.includes('drive.usercontent.google.com') &&
-        !authCorrected &&
-        (bodyText.includes('forbidden') ||
-          bodyText.includes('403') ||
-          bodyText.includes('error'))
-      ) {
-        try {
-          const u = new URL(url);
-          const authuser = u.searchParams.get('authuser');
-
-          // Only self-heal when we are clearly on a non-zero authuser
-          if (authuser && authuser !== '0') {
-            console.log(
-              '[CQD] 403 on drive.usercontent with authuser != 0. Forcing authuser=0…',
-            );
-
-            authCorrected = true;
-
-            // 🔑 IMPORTANT:
-            // Tell background "we triggered the bypass, consider it SUCCESS".
-            // This fixes: button stuck in "trying" for small/normal files after 403.
-            notifySuccessFlood();
-
-            // Optional: let background know we're correcting auth
-            try {
-              chrome.runtime.sendMessage({ type: 'CQD_AUTH_CORRECTING' });
-            } catch {
-              /* ignore */
-            }
-
-            // Stop rendering the current error page
-            try {
-              window.stop();
-            } catch {
-              /* ignore */
-            }
-
-            // Reload with authuser=0 → this usually yields a direct file download
-            u.searchParams.set('authuser', '0');
-            window.location.href = u.toString();
-            return;
-          }
-        } catch {
-          /* ignore parse errors */
-        }
-      }
-
-      /* --------------------------------------------------
-       * 2) Virus / large file warning → auto "Download anyway"
+       * 1) Virus / large file warning → auto "Download anyway"
        * -------------------------------------------------- */
       if (!virusHandled && isVirusWarningPage(bodyText)) {
         console.log(
@@ -93,7 +40,7 @@ export default defineContentScript({
       }
 
       /* --------------------------------------------------
-       * 3) Drive Preview UI → click toolbar Download
+       * 2) Drive Preview UI → click toolbar Download
        *    (NORMAL SMALL / MEDIUM files path)
        * -------------------------------------------------- */
       if (!previewClicked && isDrivePreviewUI()) {
@@ -110,17 +57,18 @@ export default defineContentScript({
       }
 
       /* --------------------------------------------------
-       * 4) Hard 403 on drive.google.com → report to background
+       * 3) Hard 403 on Drive (google.com or usercontent) → report to background
        *    (when authuser loop in background should take over)
        * -------------------------------------------------- */
       if (
         !auth403Reported &&
-        url.includes('drive.google.com') &&
+        (url.includes('drive.google.com') ||
+          url.includes('drive.usercontent.google.com')) &&
         isAccessDeniedPage(bodyText)
       ) {
         auth403Reported = true;
         console.log(
-          '[CQD] Hard 403 on drive.google.com. Reporting CQD_403_SEEN to background…',
+          '[CQD] Hard 403 in Drive tab. Reporting CQD_403_SEEN to background…',
         );
         try {
           chrome.runtime.sendMessage({ type: 'CQD_403_SEEN' });
@@ -175,7 +123,7 @@ function isAccessDeniedPage(bodyText: string): boolean {
     bodyText.includes('access to this page is restricted') ||
     bodyText.includes('request access') ||
     bodyText.includes('switch accounts') ||
-    bodyText.includes('403.') ||
+    bodyText.includes('403') || // generic 403 detection
     bodyText.includes("that’s an error") ||
     bodyText.includes("that's an error") ||
     bodyText.includes("we're sorry, but you do not have access")

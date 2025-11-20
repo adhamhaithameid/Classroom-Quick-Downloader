@@ -26,6 +26,7 @@ type PendingDownload = {
 
   attemptedAuthUsers: number[];
   currentAuthUser?: number;
+  initialAuthUser?: number;
   currentDownloadId?: number;
 
   fallbackStarted?: boolean;
@@ -44,6 +45,28 @@ const pendingByBypassTabId = new Map<number, PendingDownload>();
 const cancelledByUs = new Set<number>();
 
 const AUTHUSER_CANDIDATES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+
+function extractAuthUserFromUrl(rawUrl: string): number | undefined {
+  try {
+    const url = new URL(rawUrl);
+
+    // Try query params first (?authuser=2, ?u=2)
+    const qp = url.searchParams.get('authuser') ?? url.searchParams.get('u');
+
+    // Then path format /u/2/...
+    const pathMatch = url.pathname.match(/\/u\/(\d+)\//);
+    const raw = qp ?? (pathMatch ? pathMatch[1] : undefined);
+    if (raw == null) return undefined;
+
+    const parsed = parseInt(raw, 10);
+    if (Number.isNaN(parsed)) return undefined;
+
+    if (!AUTHUSER_CANDIDATES.includes(parsed)) return undefined;
+    return parsed;
+  } catch {
+    return undefined;
+  }
+}
 
 export default defineBackground(() => {
   console.log('[CQD] Background ready - PRODUCTION ROBUST MODE (merged)');
@@ -254,6 +277,7 @@ export default defineBackground(() => {
     }
 
     const { baseUrl, isDrive } = normalizeUrl(rawUrl);
+    const initialAuthUser = isDrive ? extractAuthUserFromUrl(rawUrl) : undefined;
 
     const pending: PendingDownload = {
       requestId,
@@ -265,6 +289,12 @@ export default defineBackground(() => {
       attemptedAuthUsers: [],
     };
 
+    if (typeof initialAuthUser === 'number') {
+      pending.initialAuthUser = initialAuthUser;
+      pending.attemptedAuthUsers.push(initialAuthUser);
+      pending.currentAuthUser = initialAuthUser;
+    }
+
     pendingByRequestId.set(requestId, pending);
 
     let responseSent = false;
@@ -275,10 +305,16 @@ export default defineBackground(() => {
     };
 
     if (isDrive) {
-      // Try direct download first (effectively authuser=default)
+      // Try direct download first.
+      // If Classroom/rawUrl had an explicit authuser, honor that for the first attempt.
+      const firstUrl =
+        typeof pending.currentAuthUser === 'number'
+          ? buildUrlWithAuthUser(pending.baseUrl, pending.currentAuthUser)
+          : pending.baseUrl;
+
       chrome.downloads.download(
         {
-          url: pending.baseUrl,
+          url: firstUrl,
           saveAs: false,
           conflictAction: 'uniquify',
         },
@@ -357,6 +393,14 @@ function startSingleAttempt(
  * Drive authuser loop (0..9)
  * -----------------------------------------------------*/
 function startNextDriveAttempt(pending: PendingDownload) {
+  // Reset per-attempt HTML / fallback state.
+  // Otherwise, a 403 seen on a previous authuser would cause us
+  // to skip the Drive tab for future HTML responses (including
+  // large-file virus warnings), breaking big downloads.
+  pending.htmlSeen = false;
+  pending.fallbackStarted = false;
+  pending.confirmed403 = false;
+
   const nextAuth = AUTHUSER_CANDIDATES.find(
     (n) => !pending.attemptedAuthUsers.includes(n),
   );
@@ -387,7 +431,7 @@ function startNextDriveAttempt(pending: PendingDownload) {
     },
     (downloadId) => {
       if (chrome.runtime.lastError || !downloadId) {
-        // Immediate fail -> try next
+        // Immediate fail -> try next authuser
         startNextDriveAttempt(pending);
         return;
       }
@@ -402,14 +446,11 @@ function startNextDriveAttempt(pending: PendingDownload) {
  * -----------------------------------------------------*/
 function openDriveBypassTab(pending: PendingDownload, url: string) {
   console.log('[CQD] Opening Drive bypass tab:', url);
-  chrome.tabs.create(
-    { url, active: false },
-    (tab) => {
-      if (tab?.id != null) {
-        pendingByBypassTabId.set(tab.id, pending);
-      }
-    },
-  );
+  chrome.tabs.create({ url, active: false }, (tab) => {
+    if (tab?.id != null) {
+      pendingByBypassTabId.set(tab.id, pending);
+    }
+  });
 }
 
 function normalizeUrl(rawUrl: string): { baseUrl: string; isDrive: boolean } {
