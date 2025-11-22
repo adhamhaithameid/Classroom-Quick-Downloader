@@ -9,6 +9,7 @@ import {
 } from './icons';
 
 import { injectStyles } from './styles';
+import { t } from './i18n';
 
 const INJECTED_ATTR = 'data-cqd-injected';
 const RESCAN_INTERVAL_MS = 2000;
@@ -34,6 +35,10 @@ const DRIVE_URL_PATTERNS: RegExp[] = [
   /https:\/\/drive\.google\.com\/uc\?/,
   /https:\/\/classroom\.google\.com\/drive\//,
 ];
+
+/* -----------------------------------------------------
+ * Global State
+ * ---------------------------------------------------*/
 
 let scanTimeoutId: number | null = null;
 let observer: MutationObserver | null = null;
@@ -539,7 +544,7 @@ function setButtonState(
   icon.textContent = '';
   button.disabled = false;
   button.style.backgroundColor = '#1a73e8';
-  label.textContent = 'Download';
+  label.textContent = t('download');
   errorDetail.textContent = '';
 
   icon.style.backgroundImage = `url("${DOWNLOAD_ICON_SVG_URL}")`;
@@ -555,7 +560,7 @@ function setButtonState(
       const isTrying = state === 'trying';
       button.classList.add(isTrying ? 'cqd-trying' : 'cqd-loading');
       button.disabled = true;
-      label.textContent = isTrying ? 'Trying…' : 'Downloading…';
+      label.textContent = isTrying ? t('trying') : t('downloading');
       icon.classList.add('cqd-spinner');
       icon.style.backgroundImage = 'none';
       break;
@@ -564,7 +569,7 @@ function setButtonState(
     case 'success':
       button.classList.add('cqd-success');
       button.style.backgroundColor = '#188038';
-      label.textContent = 'Downloaded';
+      label.textContent = t('downloaded');
       icon.style.backgroundImage = `url("${SUCCESS_ICON_SVG_URL}")`;
       icon.style.backgroundSize = '20px 20px';
       break;
@@ -572,10 +577,10 @@ function setButtonState(
     case 'error':
       button.classList.add('cqd-error');
       button.style.backgroundColor = '#e05952';
-      label.textContent = 'Error';
+      label.textContent = t('error');
       icon.style.backgroundImage = `url("${ERROR_ICON_SVG_URL}")`;
       icon.style.backgroundSize = '20px 20px';
-      errorDetail.textContent = options?.userMessage || 'Download failed.';
+      errorDetail.textContent = options?.userMessage || t('failed');
       break;
   }
 }
@@ -595,8 +600,8 @@ function createDownloadButton(
   button.type = 'button';
   button.className = 'cqd-download-btn';
   button.setAttribute(INJECTED_ATTR, 'true');
-  button.setAttribute('aria-label', `Download ${fileMeta.name || 'attachment'}`);
-  button.setAttribute('title', 'Quick download');
+  button.setAttribute('aria-label', `${t('ariaDownload')} ${fileMeta.name || ''}`);
+  button.setAttribute('title', t('titleQuick'));
 
   const iconWrapper = document.createElement('span');
   iconWrapper.className = 'cqd-icon-wrapper';
@@ -606,7 +611,7 @@ function createDownloadButton(
 
   const label = document.createElement('span');
   label.className = 'cqd-label';
-  label.textContent = 'Download';
+  label.textContent = t('download');
 
   const errorDetail = document.createElement('span');
   errorDetail.className = 'cqd-error-detail';

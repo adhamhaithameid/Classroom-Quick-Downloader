@@ -1,4 +1,4 @@
-// entrypoints/icons.ts
+// entrypoints/content/icons.ts
 
 // Raw SVGs
 export const DOWNLOAD_ICON_SVG_RAW = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">

@@ -1,10 +1,15 @@
 // filepath: entrypoints/content/comment_frame.content.ts
 import { COMMENT_ICON_URL } from './content/icons';
 import { injectStyles } from './content/styles';
+import { t } from './content/i18n';
 
 // Selector for the main stream card
 const POST_SELECTOR = 'div[data-stream-item-id]';
 const PROCESSED_ATTR = 'data-cqd-processed';
+
+/* -----------------------------------------------------
+ * Main Script
+ * ---------------------------------------------------*/
 
 export default defineContentScript({
   matches: ['https://classroom.google.com/*'],
@@ -106,7 +111,7 @@ function createOverlay(post: HTMLElement, count: number) {
   // --- B. THE VERTICAL BADGE ---
   const badge = document.createElement('div');
   badge.className = 'cqd-comment-badge';
-  badge.title = `${count} comments`;
+  badge.title = `${count} ${t('comments')}`; 
 
   // 1. Icon
   const iconDiv = document.createElement('div');
