@@ -40,7 +40,7 @@ export default defineContentScript({
     // Heartbeat
     setInterval(() => {
       scanForEditedPosts();
-    }, 1000);
+    }, 2500);
 
     // URL watcher
     let lastUrl = location.href;

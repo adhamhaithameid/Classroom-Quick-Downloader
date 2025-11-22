@@ -40,7 +40,7 @@ export default defineContentScript({
 
     setInterval(() => {
       scanForComments();
-    }, 1000);
+    }, 2500);
 
     let lastUrl = location.href; 
     new MutationObserver(() => {
@@ -123,8 +123,9 @@ function createOverlay(post: HTMLElement, count: number) {
   badge.className = 'cqd-comment-badge';
 
   // 🔹 Tooltip for comments pill
-  badge.title = 'Number of comments on this post';
-  badge.setAttribute('aria-label', badge.title);
+  const explanation = 'Number of comments on this post';
+  badge.title = explanation;
+  badge.setAttribute('aria-label', explanation);
 
   badge.title = `${count} ${t('comments')}`;
   if (isPageDark()) badge.classList.add('cqd-theme-dark');
