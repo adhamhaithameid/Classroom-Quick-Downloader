@@ -9,6 +9,7 @@ declare module "wxt/browser" {
     | "/content-scripts/comment_frame.js"
     | "/content-scripts/content.js"
     | "/content-scripts/drive_bypass.js"
+    | "/content-scripts/edited_frame.js"
     | "/icon/128.png"
     | "/icon/16.png"
     | "/icon/32.png"

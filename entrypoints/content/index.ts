@@ -10,6 +10,7 @@ import {
 
 import { injectStyles } from './styles';
 import { t } from './i18n';
+import { isPageDark } from './theme';
 
 const INJECTED_ATTR = 'data-cqd-injected';
 const RESCAN_INTERVAL_MS = 2000;
@@ -543,7 +544,7 @@ function setButtonState(
   icon.classList.remove('cqd-spinner');
   icon.textContent = '';
   button.disabled = false;
-  button.style.backgroundColor = '#1a73e8';
+  button.style.backgroundColor = ''; // Clear manual BG to let CSS variables work
   label.textContent = t('download');
   errorDetail.textContent = '';
 
@@ -568,7 +569,6 @@ function setButtonState(
 
     case 'success':
       button.classList.add('cqd-success');
-      button.style.backgroundColor = '#188038';
       label.textContent = t('downloaded');
       icon.style.backgroundImage = `url("${SUCCESS_ICON_SVG_URL}")`;
       icon.style.backgroundSize = '20px 20px';
@@ -576,7 +576,6 @@ function setButtonState(
 
     case 'error':
       button.classList.add('cqd-error');
-      button.style.backgroundColor = '#e05952';
       label.textContent = t('error');
       icon.style.backgroundImage = `url("${ERROR_ICON_SVG_URL}")`;
       icon.style.backgroundSize = '20px 20px';
@@ -599,6 +598,12 @@ function createDownloadButton(
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'cqd-download-btn';
+  
+  // THEME CHECK: Apply dark mode class if needed
+  if (isPageDark()) {
+    button.classList.add('cqd-theme-dark');
+  }
+
   button.setAttribute(INJECTED_ATTR, 'true');
   button.setAttribute('aria-label', `${t('ariaDownload')} ${fileMeta.name || ''}`);
   button.setAttribute('title', t('titleQuick'));

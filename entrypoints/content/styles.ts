@@ -17,22 +17,99 @@ export function injectStyles(): void {
   style.textContent = `
     :root {
       --cqd-transition: ${TRANSITION_STR};
-      --cqd-color-primary: #1a73e8;
-      --cqd-color-success: #34a853;
-      --cqd-color-error: #e05952;
-      --cqd-frame-color: #6366f1;
 
+      /* Spinner (Light theme defaults) */
+      --cqd-spinner-border: rgba(15, 23, 42, 0.22); /* dark-ish ring */
+      --cqd-spinner-top: #0f172a;                   /* solid dark tip */
+
+      /* =================================================================
+       * COLOR PALETTE & SHADOWS (Light Mode / Default)
+       * ================================================================= */
+      
+      /* 1. Normal (Primary) - Light: #005DD7 */
+      --cqd-color-normal: #005DD7;
+      --cqd-shadow-normal: 0 8px 22px rgba(0, 93, 215, 0.40);
+      --cqd-shadow-normal-strong: 0 12px 28px rgba(0, 93, 215, 0.70);
+
+      /* 2. Success - Light: #00A82D */
+      --cqd-color-success: #00A82D;
+      --cqd-shadow-success: 0 12px 28px rgba(0, 168, 45, 0.40);
+      --cqd-shadow-success-strong: 0 12px 28px rgba(0, 168, 45, 0.70);
+
+      /* 3. Error - Light: #FF4036 */
+      --cqd-color-error: #FF4036;
+      --cqd-shadow-error: 0 12px 28px rgba(255, 64, 54, 0.40);
+      --cqd-shadow-error-strong: 0 12px 28px rgba(255, 64, 54, 0.70);
+
+      /* 4. Trying - Light: #EC6300 */
+      --cqd-color-trying: #EC6300;
+      --cqd-shadow-trying: 0 12px 28px rgba(236, 99, 0, 0.40);
+      --cqd-shadow-trying-strong: 0 12px 28px rgba(236, 99, 0, 0.70);
+
+      /* 5. Comment Frame - Light: #9B00FF */
+      --cqd-color-comment: #9B00FF;
+      
+      /* 6. Edited Frame - Light: #007F8D */
+      --cqd-color-edited: #007F8D;
+
+      /* Base Shadows */
       --cqd-shadow-base: 0 0px 10px rgba(15, 23, 42, 0.22);
       --cqd-shadow-hover: 0 10px 24px rgba(15, 23, 42, 0.30);
-      --cqd-shadow-pill: 0 8px 22px rgba(15, 23, 42, 0.30);
-      --cqd-shadow-success: 0 12px 28px rgba(24, 128, 56, 0.40);
-      --cqd-shadow-success-strong: 0 12px 28px rgba(24, 128, 56, 0.70);
-      --cqd-shadow-error: 0 12px 28px rgba(224, 89, 82, 0.40);
-      --cqd-shadow-error-strong: 0 12px 28px rgba(224, 89, 82, 0.70);
+
+      /* 7. BOTH (Edited + Comments) - Light */
+      --cqd-both-bg: #FF4036;
+      --cqd-both-fg: #FF4036;
+      --cqd-both-shadow: 0 8px 22px rgba(255, 64, 54, 0.70);
+      --cqd-both-overlay-shadow:
+        inset 0 0 0 2px #FF4036,
+        0 0 12px rgba(255, 64, 54, 0.70);
+    }
+
+    /* =================================================================
+     * DARK MODE OVERRIDES (Applied via .cqd-theme-dark class)
+     * ================================================================= */
+    .cqd-theme-dark {
+      /* 1. Normal (Primary) - Dark: #006EFF */
+      --cqd-color-normal: #006EFF;
+      --cqd-shadow-normal: 0 8px 22px rgba(0, 110, 255, 0.40);
+      --cqd-shadow-normal-strong: 0 12px 28px rgba(0, 110, 255, 0.70);
+
+      /* 2. Success - Dark: #07DA3F */
+      --cqd-color-success: #07DA3F;
+      --cqd-shadow-success: 0 12px 28px rgba(7, 218, 63, 0.40);
+      --cqd-shadow-success-strong: 0 12px 28px rgba(7, 218, 63, 0.70);
+
+      /* 3. Error - Dark: #FF4036 */
+      --cqd-color-error: #FF4036;
+      --cqd-shadow-error: 0 12px 28px rgba(255, 64, 54, 0.40);
+      --cqd-shadow-error-strong: 0 12px 28px rgba(255, 64, 54, 0.70);
+
+      /* 4. Trying - Dark: #FF9142 */
+      --cqd-color-trying: #FF9142;
+      --cqd-shadow-trying: 0 12px 28px rgba(255, 145, 66, 0.40);
+      --cqd-shadow-trying-strong: 0 12px 28px rgba(255, 145, 66, 0.70);
+
+      /* 5. Comment Frame - Dark: #9B00FF */
+      --cqd-color-comment: #9B00FF;
+
+      /* 6. Edited Frame - Dark: #00D6EE */
+      --cqd-color-edited: #00D6EE;
+
+      /* 7. BOTH (Edited + Comments) - Dark */
+      --cqd-both-bg: #ffffff;
+      --cqd-both-fg: #000000;
+      --cqd-both-shadow: 0 8px 22px rgba(255, 255, 255, 0.85);
+      --cqd-both-overlay-shadow:
+        inset 0 0 0 2px #ffffff,
+        0 0 12px rgba(255, 255, 255, 0.85);
+
+      /* Spinner (Dark theme overrides) */
+      --cqd-spinner-border: rgba(255, 255, 255, 0.22);
+      --cqd-spinner-top: #ffffff;
     }
 
     /* ============================================================
-     * CRITICAL OVERRIDES: Force Google Card to show the Badge
+     * CRITICAL OVERRIDES
      * ============================================================ */
     div[data-stream-item-id] {
       overflow: visible !important;
@@ -43,7 +120,6 @@ export function injectStyles(): void {
     /* ===============================
      * 1. DOWNLOAD BUTTON STYLES
      * =============================== */
-
     .cqd-download-btn {
       position: absolute;
       top: 50%;
@@ -58,7 +134,7 @@ export function injectStyles(): void {
       padding: 0;
       border: none;
       border-radius: 9999px;
-      background-color: var(--cqd-color-primary);
+      background-color: var(--cqd-color-normal);
       color: #ffffff;
       box-shadow: var(--cqd-shadow-base);
       cursor: pointer;
@@ -78,7 +154,7 @@ export function injectStyles(): void {
         background-color var(--cqd-transition);
     }
 
-    /* Idle hover (no active state) */
+    /* States */
     .cqd-download-btn:not(.cqd-loading):not(.cqd-trying):not(.cqd-success):not(.cqd-error):hover {
       width: 120px;
       padding-inline: 12px;
@@ -94,10 +170,10 @@ export function injectStyles(): void {
     }
 
     .cqd-download-btn:active {
-      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.3);
       transform: translateY(-50%) scale(0.97);
     }
 
+    /* Icons & Labels */
     .cqd-download-btn .cqd-icon-wrapper {
       display: inline-flex;
       align-items: center;
@@ -115,10 +191,7 @@ export function injectStyles(): void {
       background-size: 24px 24px;
       flex-shrink: 0;
       transform-origin: center;
-      transition:
-        width var(--cqd-transition),
-        height var(--cqd-transition),
-        border-width var(--cqd-transition);
+      transition: width var(--cqd-transition), height var(--cqd-transition);
     }
 
     .cqd-icon-small {
@@ -149,17 +222,13 @@ export function injectStyles(): void {
         max-width var(--cqd-transition),
         margin-left var(--cqd-transition);
     }
-
-    /* Idle hover label reveal */
     .cqd-download-btn:not(.cqd-loading):not(.cqd-trying):not(.cqd-success):not(.cqd-error):hover .cqd-label {
       opacity: 1;
       max-width: 110px;
       margin-left: 4px;
     }
 
-    /* ------------------------------------------------------------------
-     * PILL STATES: loading, trying, success, error share pill layout
-     * ------------------------------------------------------------------*/
+    /* Pill States */
     .cqd-download-btn.cqd-loading,
     .cqd-download-btn.cqd-trying,
     .cqd-download-btn.cqd-success,
@@ -167,25 +236,26 @@ export function injectStyles(): void {
       padding-inline: 12px;
       border-radius: 20px;
       justify-content: flex-start;
-      box-shadow: var(--cqd-shadow-pill);
+      box-shadow: var(--cqd-shadow-normal);
       cursor: default;
       width: 150px;
       transform: translateY(-50%) scale(1);
     }
 
-    .cqd-download-btn.cqd-trying{
+    .cqd-download-btn.cqd-trying {
       width: 110px;
+      background-color: var(--cqd-color-trying);
+      box-shadow: var(--cqd-shadow-trying);
     }
 
-    .cqd-download-btn.cqd-loading:active,
-    .cqd-download-btn.cqd-trying:active,
-    .cqd-download-btn.cqd-success:active,
-    .cqd-download-btn.cqd-error:active {
-      transform: translateY(-50%) scale(1);
-      box-shadow: var(--cqd-shadow-pill);
+    .cqd-download-btn.cqd-loading:hover {
+      box-shadow: var(--cqd-shadow-normal-strong);
     }
 
-    /* Labels for loading / trying */
+    .cqd-download-btn.cqd-trying:hover {
+      box-shadow: var(--cqd-shadow-trying-strong);
+    }
+
     .cqd-download-btn.cqd-loading .cqd-label,
     .cqd-download-btn.cqd-trying .cqd-label {
       opacity: 1;
@@ -193,19 +263,15 @@ export function injectStyles(): void {
       margin-left: 12px;
     }
 
-    .cqd-download-btn.cqd-loading:hover,
-    .cqd-download-btn.cqd-trying:hover {
-      padding-inline: 12px;
-      border-radius: 20px;
-      transform: translateY(-50%) scale(1);
-      box-shadow: var(--cqd-shadow-pill);
-    }
-
-    /* SUCCESS STATE */
+    /* Success */
     .cqd-download-btn.cqd-success {
       width: 140px;
       background-color: var(--cqd-color-success);
       box-shadow: var(--cqd-shadow-success);
+    }
+
+    .cqd-download-btn.cqd-success:hover {
+      box-shadow: var(--cqd-shadow-success-strong);
     }
 
     .cqd-download-btn.cqd-success .cqd-label {
@@ -214,13 +280,7 @@ export function injectStyles(): void {
       margin-left: 8px;
     }
 
-    .cqd-download-btn.cqd-success:hover {
-      width: 140px;
-      transform: translateY(-50%) scale(1);
-      box-shadow: var(--cqd-shadow-success-strong);
-    }
-
-    /* ERROR STATE */
+    /* Error */
     .cqd-download-btn.cqd-error {
       width: 90px;
       background-color: var(--cqd-color-error);
@@ -234,21 +294,12 @@ export function injectStyles(): void {
       transition: all var(--cqd-transition);
     }
 
-    .cqd-download-btn.cqd-error .cqd-label {
-      opacity: 1;
-      margin-left: 8px;
-      max-width: 110px;
-      overflow: hidden;
-      flex: 0 0 auto;
-    }
-
     .cqd-error-detail {
       display: block;
       font-size: 11px;
       font-weight: 500;
       line-height: 1.3;
-      margin-left: 0;
-      margin-top: 0;
+      margin: 0;
       opacity: 0;
       max-height: 0;
       overflow: hidden;
@@ -262,11 +313,9 @@ export function injectStyles(): void {
       max-width: 360px;
       height: 60px;
       max-height: 61px;
-      padding-top: 8px;
-      padding-bottom: 8px;
+      padding: 8px;
       border-radius: 18px;
       align-items: center;
-      white-space: normal;
       gap: 7px;
       box-shadow: var(--cqd-shadow-error-strong);
     }
@@ -274,7 +323,7 @@ export function injectStyles(): void {
     .cqd-download-btn.cqd-error:hover .cqd-label {
       opacity: 0;
       max-width: 0;
-      margin-left: 0;
+      margin: 0;
     }
 
     .cqd-download-btn.cqd-error:hover .cqd-error-detail {
@@ -284,80 +333,72 @@ export function injectStyles(): void {
       transform: translateY(0);
     }
 
-    /* Spinner (used for loading & trying) */
+    /* Spinner */
     .cqd-spinner {
       background-image: none;
       border-radius: 9999px;
       width: ${SPINNER_SIZE_PX}px;
       height: ${SPINNER_SIZE_PX}px;
-      border: 3px solid rgba(255, 255, 255, 0.22);
-      border-top-color: #ffffff;
-      box-shadow: none;
+      border: 3px solid var(--cqd-spinner-border);
+      border-top-color: var(--cqd-spinner-top);
       animation: cqd-spin 0.65s linear infinite;
     }
-
     @keyframes cqd-spin {
       from { transform: rotate(0deg); }
-      to { transform: rotate(360deg); }
+      to   { transform: rotate(360deg); }
     }
 
-    /* ===============================
-     * 2. COMMENT FRAME & VERTICAL PILL BADGE
-     * =============================== */
 
-    /* The Border Frame */
+    /* ===============================
+     * 2. COMMENT FRAME & BADGE
+     * =============================== */
     .cqd-overlay-container {
       position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
       pointer-events: none;
       z-index: 10;
       box-sizing: border-box;
       border-radius: inherit;
-      transition: all 0.2s ease;
-      /* Subtle frame glow */
       box-shadow:
-        inset 0 0 0 2px var(--cqd-frame-color),
+        inset 0 0 0 2px var(--cqd-color-comment),
         0 0 12px rgba(99, 102, 241, 0.5);
     }
-
-    /* THE BADGE (Vertical Drop) */
+    
     .cqd-comment-badge {
       position: absolute;
-      top: 21px;
+      top: 7px;
       z-index: 9999;
-
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
-
+      justify-content: flex-start;
       width: 30px;
       height: 30px;
-
-      background-color: var(--cqd-frame-color);
+      background-color: var(--cqd-color-comment);
       color: #ffffff;
       border-radius: 9999px;
-
       cursor: pointer;
       overflow: hidden;
-
       transition:
         height var(--cqd-transition),
         box-shadow 0.2s ease;
     }
 
-    /* HOVER STATE: Expands Vertically to show number */
     .cqd-comment-badge:hover {
-      height: 58px;
+      height: 50px;
+      border-radius: 20px;
+      padding-bottom: 8px;
+      z-index: 10000;
     }
 
-    /* LTR (Left Border) */
     body[data-cqd-dir="ltr"] .cqd-comment-badge {
       left: 0;
       transform: translateX(-50%);
     }
 
-    /* RTL (Right Border) */
     body[data-cqd-dir="rtl"] .cqd-comment-badge {
       right: 0;
       transform: translateX(50%);
@@ -371,28 +412,22 @@ export function injectStyles(): void {
       background-repeat: no-repeat;
       background-position: center;
       filter: brightness(0) invert(1);
-      margin-top: 2px;
-      transition: transform 0.2s ease;
+      margin-top: 4px;
     }
 
     .cqd-badge-label {
       display: block;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-family: system-ui, sans-serif;
       font-size: 13px;
       font-weight: 700;
-
       opacity: 0;
       transform: translateY(-5px);
-
       max-height: 0;
       margin-top: 2px;
       overflow: hidden;
-
       transition:
         opacity 0.15s ease 0.05s,
-        transform 0.15s ease 0.05s,
-        max-height 0.15s ease 0.05s,
-        margin-top 0.15s ease 0.05s;
+        transform 0.15s ease 0.05s;
     }
 
     .cqd-comment-badge:hover .cqd-badge-label {
@@ -400,6 +435,210 @@ export function injectStyles(): void {
       transform: translateY(0);
       max-height: 20px;
     }
+
+    /* ===============================
+     * 3. EDITED FRAME & PILL
+     * =============================== */
+    
+    .cqd-overlay-container.cqd-edited {
+      box-shadow:
+        inset 0 0 0 2px var(--cqd-color-edited),
+        0 0 12px rgba(0, 214, 238, 0.3);
+    }
+
+    .cqd-edited-badge {
+      position: absolute;
+      top: 7px;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      width: 30px;
+      height: 30px;
+      background-color: var(--cqd-color-edited);
+      color: #ffffff;
+      border-radius: 9999px;
+      cursor: default;
+      overflow: hidden;
+      transition:
+        height var(--cqd-transition),
+        box-shadow 0.2s ease;
+      left: 0;
+      transform: translateX(-50%);
+    }
+    
+    body[data-cqd-dir="rtl"] .cqd-edited-badge {
+      right: 0;
+      transform: translateX(50%);
+    }
+
+    body[data-cqd-dir="ltr"] .cqd-edited-badge {
+      left: 0;
+      transform: translateX(-50%);
+    }
+
+    .cqd-edited-icon {
+      flex-shrink: 0;
+      width: 30px;
+      height: 30px;
+      display: flex;
+      align-items: center; 
+      justify-content: center;
+    }
+
+    .cqd-edited-icon svg {
+      width: 18px;
+      height: 18px;
+      stroke: currentColor;
+    }
+
+    .cqd-edited-badge:hover {
+      height: 50px;
+      border-radius: 20px;
+      padding-bottom: 8px;
+      z-index: 10000;
+    }
+
+    .cqd-edited-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      opacity: 0;
+      transform: translateY(-10px);
+      transition:
+        opacity 0.15s ease 0.05s,
+        transform 0.15s ease 0.05s;
+      font-family: system-ui, -apple-system, sans-serif;
+      font-weight: 700;
+      font-size: 13px;
+    }
+
+    .cqd-edited-badge:hover .cqd-edited-content {
+      opacity: 1;
+      transform: translateY(0);
+      max-height: 20px;
+    }
+
+    .cqd-diff-val {
+      font-family: system-ui, -apple-system, sans-serif;
+      font-weight: 700;
+      font-size: 13px;
+    }
+
+    /* ===============================
+     * 4. BOTH STATE (Edited + Comments → ONE pill)
+     * =============================== */
+
+    /* When a post has both data-cqd-processed and data-cqd-edited-processed,
+       give the frame a darker outline/glow so it feels special */
+    div[data-stream-item-id][data-cqd-processed][data-cqd-edited-processed] > .cqd-overlay-container {
+      box-shadow:
+        inset 0 0 0 2px #FF4036,
+        0 0 12px rgba(255, 64, 54, 0.70);
+    }
+
+    .cqd-both-badge {
+      position: absolute;
+      top: 7px;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      width: 30px;
+      height: 70px;
+      background-color: #FF4036;
+      color: #ffffff;
+      border-radius: 9999px;
+      border: 1px solid rgba(255, 64, 54, 0.70);
+      cursor: pointer;
+      overflow: hidden;
+      padding-top: 8px;
+      transition:
+        height var(--cqd-transition),
+        box-shadow 0.2s ease;
+    }
+
+    body[data-cqd-dir="ltr"] .cqd-both-badge {
+      left: 0;
+      transform: translateX(-50%);
+    }
+
+    body[data-cqd-dir="rtl"] .cqd-both-badge {
+      right: 0;
+      transform: translateX(50%);
+    }
+
+    .cqd-both-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .cqd-both-icon {
+      width: 20px;
+      height: 20px;
+      background-size: contain;
+      background-repeat: no-repeat;
+      background-position: center;
+      /* no filter so the asset stays crisp in all themes */
+    }
+
+    /* Edited icon (SVG) uses currentColor (white) */
+    .cqd-both-icon-edited svg {
+      width: 18px;
+      height: 18px;
+      stroke: currentColor;
+    }
+
+    /* The "+" between icons (always visible) */
+    .cqd-both-plus {
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1;
+      margin: 5px;
+    }
+
+    .cqd-both-value,
+    .cqd-both-divider {
+      opacity: 0;
+      max-height: 0;
+      margin-top: 0;
+      overflow: hidden;
+      transition:
+        opacity 0.15s ease 0.05s,
+        max-height 0.15s ease 0.05s,
+        margin-top 0.15s ease 0.05s;
+    }
+
+    .cqd-both-value {
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .cqd-both-badge:hover {
+      height: 120px;
+      border-radius: 20px;
+    }
+
+    .cqd-both-badge:hover .cqd-both-value {
+      opacity: 1;
+      max-height: 20px;
+      margin-top: 2px;
+    }
+
+    .cqd-both-badge:hover .cqd-both-divider {
+      opacity: 1;
+      max-height: 4px;
+      margin-top: 2px;
+    }
+
   `.trim();
 
   (document.head || document.documentElement).appendChild(style);

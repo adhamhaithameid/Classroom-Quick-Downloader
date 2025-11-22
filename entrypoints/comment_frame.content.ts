@@ -1,12 +1,15 @@
-// filepath: entrypoints/content/comment_frame.content.ts
+// filepath: entrypoints/comment_frame.content.ts
 import { COMMENT_ICON_URL } from './content/icons';
 import { injectStyles } from './content/styles';
 import { t } from './content/i18n';
+import { isPageDark } from './content/theme';
 
 // Selector for the main stream card
 const POST_SELECTOR = 'div[data-stream-item-id]';
 const PROCESSED_ATTR = 'data-cqd-processed';
 
+// 🔴 NEW: debounce flag so we don't rescan on every tiny mutation
+let commentScanScheduled = false;
 /* -----------------------------------------------------
  * Main Script
  * ---------------------------------------------------*/
@@ -15,15 +18,17 @@ export default defineContentScript({
   matches: ['https://classroom.google.com/*'],
   runAt: 'document_idle',
   main() {
-    // 1. Inject CSS immediately
     injectStyles();
-
-    // 2. Run initial scan
     scanForComments();
 
     // --- STRATEGY 1: MUTATION OBSERVER ---
-    const observer = new MutationObserver((mutations) => {
+    const observer = new MutationObserver(() => {
+      // ✅ Debounce: only one scan per frame
+      if (commentScanScheduled) return;
+      commentScanScheduled = true;
+
       requestAnimationFrame(() => {
+        commentScanScheduled = false;
         scanForComments();
       });
     });
@@ -33,12 +38,10 @@ export default defineContentScript({
       subtree: true,
     });
 
-    // --- STRATEGY 2: THE HEARTBEAT ---
     setInterval(() => {
       scanForComments();
     }, 1000);
 
-    // --- STRATEGY 3: URL WATCHER ---
     let lastUrl = location.href; 
     new MutationObserver(() => {
       const url = location.href;
@@ -58,19 +61,17 @@ function scanForComments() {
     const posts = document.querySelectorAll<HTMLElement>(POST_SELECTOR);
 
     posts.forEach((post) => {
-      // 1. Check if already processed
       if (post.hasAttribute(PROCESSED_ATTR)) {
         const existingOverlay = post.querySelector('.cqd-overlay-container');
         if (existingOverlay) {
-            return; 
+          return;
         }
         post.removeAttribute(PROCESSED_ATTR);
       }
 
-      // 2. Prevent double borders
+      // Prevent double borders on nested posts
       if (post.parentElement?.closest(POST_SELECTOR)) return;
 
-      // 3. Check for comments text
       const rawText = (post.innerText || '') + ' ' + getAriaLabels(post);
       const match = rawText.match(/(\d+)\s+class comment/i);
       const count = match ? parseInt(match[1], 10) : 0;
@@ -89,39 +90,47 @@ function createOverlay(post: HTMLElement, count: number) {
   const computed = window.getComputedStyle(post);
   const borderRadius = computed.borderRadius || '8px';
 
-  // --- LAYOUT FIXES ---
   if (computed.position === 'static') {
     post.style.position = 'relative';
   }
-  
+
   post.style.setProperty('overflow', 'visible', 'important');
   post.style.setProperty('contain', 'none', 'important');
   post.style.zIndex = '1';
 
-  // --- A. THE FRAME ---
-  const overlay = document.createElement('div');
-  overlay.className = 'cqd-overlay-container';
-  overlay.style.borderRadius = borderRadius;
-  
-  overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) triggerPostClick(post);
-  });
-  post.appendChild(overlay);
+  // Reuse overlay if edited script already created it
+  let overlay = post.querySelector<HTMLDivElement>('.cqd-overlay-container');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.className = 'cqd-overlay-container';
+    overlay.style.borderRadius = borderRadius;
 
-  // --- B. THE VERTICAL BADGE ---
+    if (isPageDark()) overlay.classList.add('cqd-theme-dark');
+
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) triggerPostClick(post);
+    });
+
+    post.appendChild(overlay);
+  }
+
+  // Do not create a comment badge if a BOTH pill already exists
+  if (post.querySelector('.cqd-both-badge')) {
+    return;
+  }
+
   const badge = document.createElement('div');
   badge.className = 'cqd-comment-badge';
-  badge.title = `${count} ${t('comments')}`; 
+  badge.title = `${count} ${t('comments')}`;
+  if (isPageDark()) badge.classList.add('cqd-theme-dark');
 
-  // 1. Icon
   const iconDiv = document.createElement('div');
   iconDiv.className = 'cqd-badge-icon';
   iconDiv.style.backgroundImage = `url("${COMMENT_ICON_URL}")`;
 
-  // 2. Label (Number Only)
   const labelDiv = document.createElement('span');
   labelDiv.className = 'cqd-badge-label';
-  labelDiv.textContent = `${count}`; // Just the number
+  labelDiv.textContent = `${count}`;
 
   badge.appendChild(iconDiv);
   badge.appendChild(labelDiv);
