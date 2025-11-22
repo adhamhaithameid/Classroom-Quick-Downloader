@@ -17,18 +17,71 @@ export function injectStyles(): void {
   style.textContent = `
     :root {
       --cqd-transition: ${TRANSITION_STR};
-      --cqd-color-primary: #1a73e8;
-      --cqd-color-success: #34a853;
-      --cqd-color-error: #e05952;
-      --cqd-frame-color: #6366f1;
 
+      /* =================================================================
+       * COLOR PALETTE & SHADOWS (Light Mode / Default)
+       * ================================================================= */
+      
+      /* 1. Normal (Primary) - Light: #005DD7 */
+      --cqd-color-normal: #005DD7;
+      --cqd-shadow-normal: 0 8px 22px rgba(0, 93, 215, 0.40);
+      --cqd-shadow-normal-strong: 0 12px 28px rgba(0, 93, 215, 0.70);
+
+      /* 2. Success - Light: #00A82D */
+      --cqd-color-success: #00A82D;
+      --cqd-shadow-success: 0 12px 28px rgba(0, 168, 45, 0.40);
+      --cqd-shadow-success-strong: 0 12px 28px rgba(0, 168, 45, 0.70);
+
+      /* 3. Error - Light: #FF4036 */
+      --cqd-color-error: #FF4036;
+      --cqd-shadow-error: 0 12px 28px rgba(255, 64, 54, 0.40);
+      --cqd-shadow-error-strong: 0 12px 28px rgba(255, 64, 54, 0.70);
+
+      /* 4. Trying - Light: #EC6300 */
+      --cqd-color-trying: #EC6300;
+      --cqd-shadow-trying: 0 12px 28px rgba(236, 99, 0, 0.40);
+      --cqd-shadow-trying-strong: 0 12px 28px rgba(236, 99, 0, 0.70);
+
+      /* 5. Comment Frame - Light: #9B00FF */
+      --cqd-color-comment: #9B00FF;
+      
+      /* 6. Edited Frame - Light: #007F8D */
+      --cqd-color-edited: #007F8D;
+
+      /* Base Shadows */
       --cqd-shadow-base: 0 0px 10px rgba(15, 23, 42, 0.22);
       --cqd-shadow-hover: 0 10px 24px rgba(15, 23, 42, 0.30);
-      --cqd-shadow-pill: 0 8px 22px rgba(15, 23, 42, 0.30);
-      --cqd-shadow-success: 0 12px 28px rgba(24, 128, 56, 0.40);
-      --cqd-shadow-success-strong: 0 12px 28px rgba(24, 128, 56, 0.70);
-      --cqd-shadow-error: 0 12px 28px rgba(224, 89, 82, 0.40);
-      --cqd-shadow-error-strong: 0 12px 28px rgba(224, 89, 82, 0.70);
+    }
+
+    /* =================================================================
+     * DARK MODE OVERRIDES (Applied via .cqd-theme-dark class)
+     * ================================================================= */
+    .cqd-theme-dark {
+      /* 1. Normal (Primary) - Dark: #006EFF */
+      --cqd-color-normal: #006EFF;
+      --cqd-shadow-normal: 0 8px 22px rgba(0, 110, 255, 0.40);
+      --cqd-shadow-normal-strong: 0 12px 28px rgba(0, 110, 255, 0.70);
+
+      /* 2. Success - Dark: #07DA3F */
+      --cqd-color-success: #07DA3F;
+      --cqd-shadow-success: 0 12px 28px rgba(7, 218, 63, 0.40);
+      --cqd-shadow-success-strong: 0 12px 28px rgba(7, 218, 63, 0.70);
+
+      /* 3. Error - Dark: #FF4036 */
+      --cqd-color-error: #FF4036;
+      --cqd-shadow-error: 0 12px 28px rgba(255, 64, 54, 0.40);
+      --cqd-shadow-error-strong: 0 12px 28px rgba(255, 64, 54, 0.70);
+
+      /* 4. Trying - Dark: #FF9142 */
+      --cqd-color-trying: #FF9142;
+      --cqd-shadow-trying: 0 12px 28px rgba(255, 145, 66, 0.40);
+      --cqd-shadow-trying-strong: 0 12px 28px rgba(255, 145, 66, 0.70);
+
+      /* 5. Comment Frame - Dark: #C874FF */
+      --cqd-color-comment: #C874FF;
+
+      /* 6. Edited Frame - Dark: #00D6EE */
+      --cqd-color-edited: #00D6EE;
     }
 
     /* ============================================================
@@ -58,7 +111,7 @@ export function injectStyles(): void {
       padding: 0;
       border: none;
       border-radius: 9999px;
-      background-color: var(--cqd-color-primary);
+      background-color: var(--cqd-color-normal);
       color: #ffffff;
       box-shadow: var(--cqd-shadow-base);
       cursor: pointer;
@@ -167,14 +220,20 @@ export function injectStyles(): void {
       padding-inline: 12px;
       border-radius: 20px;
       justify-content: flex-start;
-      box-shadow: var(--cqd-shadow-pill);
+      box-shadow: var(--cqd-shadow-normal);
       cursor: default;
       width: 150px;
       transform: translateY(-50%) scale(1);
     }
 
-    .cqd-download-btn.cqd-trying{
+    .cqd-download-btn.cqd-trying {
       width: 110px;
+      background-color: var(--cqd-color-trying);
+      box-shadow: var(--cqd-shadow-trying);
+    }
+    
+    .cqd-download-btn.cqd-loading {
+      box-shadow: var(--cqd-shadow-normal);
     }
 
     .cqd-download-btn.cqd-loading:active,
@@ -182,7 +241,6 @@ export function injectStyles(): void {
     .cqd-download-btn.cqd-success:active,
     .cqd-download-btn.cqd-error:active {
       transform: translateY(-50%) scale(1);
-      box-shadow: var(--cqd-shadow-pill);
     }
 
     /* Labels for loading / trying */
@@ -193,12 +251,18 @@ export function injectStyles(): void {
       margin-left: 12px;
     }
 
-    .cqd-download-btn.cqd-loading:hover,
+    .cqd-download-btn.cqd-loading:hover {
+      padding-inline: 12px;
+      border-radius: 20px;
+      transform: translateY(-50%) scale(1);
+      box-shadow: var(--cqd-shadow-normal-strong);
+    }
+
     .cqd-download-btn.cqd-trying:hover {
       padding-inline: 12px;
       border-radius: 20px;
       transform: translateY(-50%) scale(1);
-      box-shadow: var(--cqd-shadow-pill);
+      box-shadow: var(--cqd-shadow-trying-strong);
     }
 
     /* SUCCESS STATE */
@@ -313,10 +377,9 @@ export function injectStyles(): void {
       z-index: 10;
       box-sizing: border-box;
       border-radius: inherit;
-      transition: all 0.2s ease;
-      /* Subtle frame glow */
+      transition: all 0.2s ease;      
       box-shadow:
-        inset 0 0 0 2px var(--cqd-frame-color),
+        inset 0 0 0 2px var(--cqd-color-comment),
         0 0 12px rgba(99, 102, 241, 0.5);
     }
 
@@ -325,22 +388,17 @@ export function injectStyles(): void {
       position: absolute;
       top: 21px;
       z-index: 9999;
-
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-
       width: 30px;
       height: 30px;
-
-      background-color: var(--cqd-frame-color);
+      background-color: var(--cqd-color-comment);
       color: #ffffff;
       border-radius: 9999px;
-
       cursor: pointer;
       overflow: hidden;
-
       transition:
         height var(--cqd-transition),
         box-shadow 0.2s ease;
