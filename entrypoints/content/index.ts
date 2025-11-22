@@ -35,6 +35,250 @@ const DRIVE_URL_PATTERNS: RegExp[] = [
   /https:\/\/classroom\.google\.com\/drive\//,
 ];
 
+/* -----------------------------------------------------
+ * Localization / Dynamic Language
+ * ---------------------------------------------------*/
+
+/**
+ * A comprehensive dictionary for "Download" actions.
+ * Covers: English, Arabic, Japanese, Spanish, Portuguese, French,
+ * German, Italian, Russian, Hindi, Chinese (Simplified/Traditional),
+const TRANSLATIONS: Record<string, any> = {
+  // English (Default)
+  en: {
+    download: 'Download',
+    downloading: 'Downloading…',
+    trying: 'Trying…',
+    downloaded: 'Downloaded',
+    error: 'Error',
+    failed: 'Download failed.',
+    ariaDownload: 'Download',
+    titleQuick: 'Quick download',
+  },
+  // Arabic
+  ar: {
+    download: 'تنزيل',
+    downloading: 'جاري التنزيل…',
+    trying: 'محاولة…',
+    downloaded: 'تم التنزيل',
+    error: 'خطأ',
+    failed: 'فشل التنزيل.',
+    ariaDownload: 'تنزيل',
+    titleQuick: 'تنزيل سريع',
+  },
+  // Japanese
+  ja: {
+    download: 'ダウンロード',
+    downloading: 'DL中…',
+    trying: '試行中…',
+    downloaded: '完了',
+    error: 'エラー',
+    failed: '失敗しました。',
+    ariaDownload: 'ダウンロード',
+    titleQuick: 'クイックダウンロード',
+  },
+  // Spanish (Spain & Latin America)
+  es: {
+    download: 'Descargar',
+    downloading: 'Descargando…',
+    trying: 'Intentando…',
+    downloaded: 'Descargado',
+    error: 'Error',
+    failed: 'Falló la descarga.',
+    ariaDownload: 'Descargar',
+    titleQuick: 'Descarga rápida',
+  },
+  // Hindi (India)
+  hi: {
+    download: 'डाउनलोड',
+    downloading: 'डाउनलोड हो रहा है…',
+    trying: 'कोशिश कर रहा हूँ…',
+    downloaded: 'डाउनलोड हो गया',
+    error: 'त्रुटि',
+    failed: 'विफल रहा',
+    ariaDownload: 'डाउनलोड',
+    titleQuick: 'त्वरित डाउनलोड',
+  },
+  // Portuguese (Brazil & Portugal)
+  pt: {
+    download: 'Baixar',
+    downloading: 'Baixando…',
+    trying: 'Tentando…',
+    downloaded: 'Baixado',
+    error: 'Erro',
+    failed: 'Falha ao baixar.',
+    ariaDownload: 'Baixar',
+    titleQuick: 'Download rápido',
+  },
+  // Chinese Simplified (China)
+  'zh-cn': {
+    download: '下载',
+    downloading: '下载中…',
+    trying: '尝试中…',
+    downloaded: '已下载',
+    error: '错误',
+    failed: '下载失败',
+    ariaDownload: '下载',
+    titleQuick: '快速下载',
+  },
+  // Chinese Traditional (Taiwan/HK)
+  'zh-tw': {
+    download: '下載',
+    downloading: '下載中…',
+    trying: '嘗試中…',
+    downloaded: '已下載',
+    error: '錯誤',
+    failed: '下載失敗',
+    ariaDownload: '下載',
+    titleQuick: '快速下載',
+  },
+  // French
+  fr: {
+    download: 'Télécharger',
+    downloading: 'Téléchargement…',
+    trying: 'Essai…',
+    downloaded: 'Téléchargé',
+    error: 'Erreur',
+    failed: 'Échec du téléchargement.',
+    ariaDownload: 'Télécharger',
+    titleQuick: 'Téléchargement rapide',
+  },
+  // German
+  de: {
+    download: 'Herunterladen',
+    downloading: 'Laden…',
+    trying: 'Versuchen…',
+    downloaded: 'Heruntergeladen',
+    error: 'Fehler',
+    failed: 'Fehlgeschlagen.',
+    ariaDownload: 'Herunterladen',
+    titleQuick: 'Schneller Download',
+  },
+  // Italian
+  it: {
+    download: 'Scarica',
+    downloading: 'Scaricamento…',
+    trying: 'Provando…',
+    downloaded: 'Scaricato',
+    error: 'Errore',
+    failed: 'Scaricamento fallito.',
+    ariaDownload: 'Scarica',
+    titleQuick: 'Download rapido',
+  },
+  // Russian
+  ru: {
+    download: 'Скачать',
+    downloading: 'Скачивание…',
+    trying: 'Попытка…',
+    downloaded: 'Скачано',
+    error: 'Ошибка',
+    failed: 'Ошибка скачивания.',
+    ariaDownload: 'Скачать',
+    titleQuick: 'Быстрое скачивание',
+  },
+  // Korean
+  ko: {
+    download: '다운로드',
+    downloading: '다운로드 중…',
+    trying: '시도 중…',
+    downloaded: '완료됨',
+    error: '오류',
+    failed: '다운로드 실패',
+    ariaDownload: '다운로드',
+    titleQuick: '빠른 다운로드',
+  },
+  // Turkish
+  tr: {
+    download: 'İndir',
+    downloading: 'İndiriliyor…',
+    trying: 'Deneniyor…',
+    downloaded: 'İndirildi',
+    error: 'Hata',
+    failed: 'İndirme başarısız.',
+    ariaDownload: 'İndir',
+    titleQuick: 'Hızlı indir',
+  },
+  // Vietnamese
+  vi: {
+    download: 'Tải xuống',
+    downloading: 'Đang tải…',
+    trying: 'Đang thử…',
+    downloaded: 'Đã tải',
+    error: 'Lỗi',
+    failed: 'Tải xuống thất bại.',
+    ariaDownload: 'Tải xuống',
+    titleQuick: 'Tải xuống nhanh',
+  },
+  // Indonesian
+  id: {
+    download: 'Download',
+    downloading: 'Mengunduh…',
+    trying: 'Mencoba…',
+    downloaded: 'Selesai',
+    error: 'Kesalahan',
+    failed: 'Gagal mengunduh.',
+    ariaDownload: 'Download',
+    titleQuick: 'Download cepat',
+  },
+  // Thai
+  th: {
+    download: 'ดาวน์โหลด',
+    downloading: 'กำลังดาวน์โหลด…',
+    trying: 'กำลังพยายาม…',
+    downloaded: 'เสร็จสิ้น',
+    error: 'ข้อผิดพลาด',
+    failed: 'ดาวน์โหลดล้มเหลว',
+    ariaDownload: 'ดาวน์โหลด',
+    titleQuick: 'ดาวน์โหลดด่วน',
+  },
+  // Polish
+  pl: {
+    download: 'Pobierz',
+    downloading: 'Pobieranie…',
+    trying: 'Próba…',
+    downloaded: 'Pobrano',
+    error: 'Błąd',
+    failed: 'Nieudane.',
+    ariaDownload: 'Pobierz',
+    titleQuick: 'Szybkie pobieranie',
+  },
+  // Dutch
+  nl: {
+    download: 'Downloaden',
+    downloading: 'Downloaden…',
+    trying: 'Proberen…',
+    downloaded: 'Gedownload',
+    error: 'Fout',
+    failed: 'Mislukt.',
+    ariaDownload: 'Downloaden',
+    titleQuick: 'Snel downloaden',
+  },
+};
+
+type LangKey = keyof typeof TRANSLATIONS.en;
+
+function t(key: LangKey): string {
+  const rawLang = (document.documentElement.lang || 'en').toLowerCase(); // e.g. "pt-br", "en-us"
+  const baseLang = rawLang.split('-')[0]; // e.g. "pt", "en"
+
+  // 1. Try exact match (e.g. "zh-cn")
+  if (TRANSLATIONS[rawLang]) {
+    return TRANSLATIONS[rawLang][key] || TRANSLATIONS['en'][key];
+  }
+
+  // 2. Try base match (e.g. "es" for "es-mx")
+  if (TRANSLATIONS[baseLang]) {
+    return TRANSLATIONS[baseLang][key] || TRANSLATIONS['en'][key];
+  }
+
+  // 3. Fallback to English
+  return TRANSLATIONS['en'][key];
+}
+
+/* -----------------------------------------------------
+ * Global State
+ * ---------------------------------------------------*/
+
 let scanTimeoutId: number | null = null;
 let observer: MutationObserver | null = null;
 
@@ -539,7 +783,7 @@ function setButtonState(
   icon.textContent = '';
   button.disabled = false;
   button.style.backgroundColor = '#1a73e8';
-  label.textContent = 'Download';
+  label.textContent = t('download');
   errorDetail.textContent = '';
 
   icon.style.backgroundImage = `url("${DOWNLOAD_ICON_SVG_URL}")`;
@@ -555,7 +799,7 @@ function setButtonState(
       const isTrying = state === 'trying';
       button.classList.add(isTrying ? 'cqd-trying' : 'cqd-loading');
       button.disabled = true;
-      label.textContent = isTrying ? 'Trying…' : 'Downloading…';
+      label.textContent = isTrying ? t('trying') : t('downloading');
       icon.classList.add('cqd-spinner');
       icon.style.backgroundImage = 'none';
       break;
@@ -564,7 +808,7 @@ function setButtonState(
     case 'success':
       button.classList.add('cqd-success');
       button.style.backgroundColor = '#188038';
-      label.textContent = 'Downloaded';
+      label.textContent = t('downloaded');
       icon.style.backgroundImage = `url("${SUCCESS_ICON_SVG_URL}")`;
       icon.style.backgroundSize = '20px 20px';
       break;
@@ -572,10 +816,10 @@ function setButtonState(
     case 'error':
       button.classList.add('cqd-error');
       button.style.backgroundColor = '#e05952';
-      label.textContent = 'Error';
+      label.textContent = t('error');
       icon.style.backgroundImage = `url("${ERROR_ICON_SVG_URL}")`;
       icon.style.backgroundSize = '20px 20px';
-      errorDetail.textContent = options?.userMessage || 'Download failed.';
+      errorDetail.textContent = options?.userMessage || t('failed');
       break;
   }
 }
@@ -595,8 +839,8 @@ function createDownloadButton(
   button.type = 'button';
   button.className = 'cqd-download-btn';
   button.setAttribute(INJECTED_ATTR, 'true');
-  button.setAttribute('aria-label', `Download ${fileMeta.name || 'attachment'}`);
-  button.setAttribute('title', 'Quick download');
+  button.setAttribute('aria-label', `${t('ariaDownload')} ${fileMeta.name || ''}`);
+  button.setAttribute('title', t('titleQuick'));
 
   const iconWrapper = document.createElement('span');
   iconWrapper.className = 'cqd-icon-wrapper';
@@ -606,7 +850,7 @@ function createDownloadButton(
 
   const label = document.createElement('span');
   label.className = 'cqd-label';
-  label.textContent = 'Download';
+  label.textContent = t('download');
 
   const errorDetail = document.createElement('span');
   errorDetail.className = 'cqd-error-detail';
