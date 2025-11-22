@@ -920,26 +920,71 @@ const TRANSLATIONS: Record<string, any> = {
 
 export type LangKey = keyof typeof TRANSLATIONS.en;
 
-/**
- * Helper function to get translated string based on <html lang="...">
- */
 export function t(key: LangKey): string {
-  if (typeof document === 'undefined') return TRANSLATIONS['en'][key];
+  try {
+    // 1. FAIL-SAFE: If key is missing or not a string, return a safe placeholder.
+    if (!key || typeof key !== 'string') {
+      return '...';
+    }
 
-  // 1. Get page language (e.g., "pt-BR", "en-US")
-  const rawLang = (document.documentElement.lang || 'en').toLowerCase();
-  const baseLang = rawLang.split('-')[0]; // e.g. "pt", "en"
+    // 2. DETECT LANGUAGE: Hierarchy of sources
+    // Priority A: HTML tag (Google's explicit setting)
+    // Priority B: Browser setting (Navigator)
+    // Priority C: Default to 'en'
+    let rawLang = 'en';
 
-  // 2. Try exact match (e.g. "zh-cn" needs strict match)
-  if (TRANSLATIONS[rawLang] && TRANSLATIONS[rawLang][key]) {
-    return TRANSLATIONS[rawLang][key];
+    if (typeof document !== 'undefined' && document.documentElement && document.documentElement.lang) {
+      rawLang = document.documentElement.lang;
+    } else if (typeof navigator !== 'undefined' && navigator.language) {
+      rawLang = navigator.language;
+    }
+
+    // 3. SANITIZE: Normalize to standard format (e.g., "  en_US;q=0.9 " -> "en-us")
+    // - Lowercase
+    // - Remove anything after a semicolon (headers often have priorities)
+    // - Trim whitespace
+    // - Replace underscores with dashes
+    const normalizedLang = rawLang.toLowerCase().split(';')[0].trim().replace('_', '-');
+
+    // 4. EXTRACT BASE: "pt-br" -> "pt"
+    const baseLang = normalizedLang.split('-')[0];
+
+    // 5. LOOKUP ATTEMPT 1: Exact Match (e.g. "pt-br" or "zh-cn")
+    if (
+      TRANSLATIONS[normalizedLang] &&
+      typeof TRANSLATIONS[normalizedLang][key] === 'string'
+    ) {
+      return TRANSLATIONS[normalizedLang][key];
+    }
+
+    // 6. LOOKUP ATTEMPT 2: Base Match (e.g. "pt", "es")
+    if (
+      TRANSLATIONS[baseLang] &&
+      typeof TRANSLATIONS[baseLang][key] === 'string'
+    ) {
+      return TRANSLATIONS[baseLang][key];
+    }
+
+    // 7. LOOKUP ATTEMPT 3: English Fallback
+    if (
+      TRANSLATIONS['en'] &&
+      typeof TRANSLATIONS['en'][key] === 'string'
+    ) {
+      return TRANSLATIONS['en'][key];
+    }
+
+    // 8. ULTIMATE FALLBACK: Return the key itself formatted nicely
+    // This handles the case where the dictionary is missing the key entirely.
+    return key;
+
+  } catch (e) {
+    // 9. CATASTROPHIC FAILURE HANDLER
+    // If the JS engine throws a memory error or object access error,
+    // we strictly return the key or English fallback if possible.
+    try {
+      return TRANSLATIONS['en'][key] || key;
+    } catch {
+      return String(key || 'Download');
+    }
   }
-
-  // 3. Try base match (e.g. "es-mx" -> use "es")
-  if (TRANSLATIONS[baseLang] && TRANSLATIONS[baseLang][key]) {
-    return TRANSLATIONS[baseLang][key];
-  }
-
-  // 4. Fallback to English
-  return TRANSLATIONS['en'][key] || key;
 }
