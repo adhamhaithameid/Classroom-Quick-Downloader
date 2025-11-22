@@ -1,44 +1,11 @@
 // filepath: entrypoints/content/comment_frame.content.ts
 import { COMMENT_ICON_URL } from './content/icons';
 import { injectStyles } from './content/styles';
+import { t } from './content/i18n';
 
 // Selector for the main stream card
 const POST_SELECTOR = 'div[data-stream-item-id]';
 const PROCESSED_ATTR = 'data-cqd-processed';
-
-/* -----------------------------------------------------
- * Localization
- * ---------------------------------------------------*/
-const TRANSLATIONS: Record<string, any> = {
-  en: { comments: 'comments' },
-  ar: { comments: 'تعليقات' },
-  ja: { comments: '件のコメント' },
-  es: { comments: 'comentarios' },
-  hi: { comments: 'टिप्पणियाँ' },
-  pt: { comments: 'comentários' },
-  'zh-cn': { comments: '条评论' },
-  'zh-tw': { comments: '則留言' },
-  fr: { comments: 'commentaires' },
-  de: { comments: 'Kommentare' },
-  it: { comments: 'commenti' },
-  ru: { comments: 'комментариев' },
-  ko: { comments: '개 댓글' },
-  tr: { comments: 'yorum' },
-  vi: { comments: 'nhận xét' },
-  id: { comments: 'komentar' },
-  th: { comments: 'ความคิดเห็น' },
-  pl: { comments: 'komentarze' },
-  nl: { comments: 'reacties' },
-};
-
-function t(key: string): string {
-  const rawLang = (document.documentElement.lang || 'en').toLowerCase();
-  const baseLang = rawLang.split('-')[0];
-
-  if (TRANSLATIONS[rawLang]) return TRANSLATIONS[rawLang][key] || TRANSLATIONS['en'][key];
-  if (TRANSLATIONS[baseLang]) return TRANSLATIONS[baseLang][key] || TRANSLATIONS['en'][key];
-  return TRANSLATIONS['en'][key];
-}
 
 /* -----------------------------------------------------
  * Main Script
@@ -144,7 +111,7 @@ function createOverlay(post: HTMLElement, count: number) {
   // --- B. THE VERTICAL BADGE ---
   const badge = document.createElement('div');
   badge.className = 'cqd-comment-badge';
-  badge.title = `${count} ${t('comments')}`; // DYNAMIC TRANSLATION HERE
+  badge.title = `${count} ${t('comments')}`; 
 
   // 1. Icon
   const iconDiv = document.createElement('div');
