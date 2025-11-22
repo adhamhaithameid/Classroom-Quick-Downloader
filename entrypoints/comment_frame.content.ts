@@ -121,6 +121,11 @@ function createOverlay(post: HTMLElement, count: number) {
 
   const badge = document.createElement('div');
   badge.className = 'cqd-comment-badge';
+
+  // 🔹 Tooltip for comments pill
+  badge.title = 'Number of comments on this post';
+  badge.setAttribute('aria-label', badge.title);
+
   badge.title = `${count} ${t('comments')}`;
   if (isPageDark()) badge.classList.add('cqd-theme-dark');
 

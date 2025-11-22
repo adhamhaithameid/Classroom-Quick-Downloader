@@ -276,6 +276,10 @@ function createEditedOverlay(post: HTMLElement, diffText: string) {
   pill.className = 'cqd-edited-badge';
   if (isPageDark()) pill.classList.add('cqd-theme-dark');
 
+  // 🔹 Tooltip for edited pill
+  pill.title = 'Days between posting and the last edit';
+  pill.setAttribute('aria-label', pill.title);
+
   const iconWrapper = document.createElement('div');
   iconWrapper.className = 'cqd-edited-icon';
   iconWrapper.innerHTML = EDIT_ICON_SVG_RAW;
@@ -385,6 +389,10 @@ function upgradeCombinedBadge(post: HTMLElement) {
 
   bothBadge = document.createElement('div');
   bothBadge.className = 'cqd-both-badge';
+
+  // 🔹 Tooltip for BOTH pill
+  bothBadge.title = 'Top: number of comments. Bottom: days between posting and last edit.';
+  bothBadge.setAttribute('aria-label', bothBadge.title);
 
   // Section 1: Comments (icon + number)
   const commentsSection = document.createElement('div');
