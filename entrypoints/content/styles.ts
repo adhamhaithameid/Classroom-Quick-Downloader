@@ -19,8 +19,8 @@ export function injectStyles(): void {
       --cqd-transition: ${TRANSITION_STR};
 
       /* Spinner (Light theme defaults) */
-      --cqd-spinner-border: rgba(15, 23, 42, 0.22); /* dark-ish ring */
-      --cqd-spinner-top: #0f172a;                   /* solid dark tip */
+      --cqd-spinner-border: rgba(255, 255, 255, 0.22); /* dark-ish ring */
+      --cqd-spinner-top: #ffffff;                   /* solid dark tip */
 
       /* =================================================================
        * COLOR PALETTE & SHADOWS (Light Mode / Default)
@@ -104,8 +104,8 @@ export function injectStyles(): void {
         0 0 12px rgba(255, 255, 255, 0.85);
 
       /* Spinner (Dark theme overrides) */
-      --cqd-spinner-border: rgba(255, 255, 255, 0.22);
-      --cqd-spinner-top: #ffffff;
+      --cqd-spinner-border: rgba(15, 23, 42, 0.22);
+      --cqd-spinner-top: #0f172a;
     }
 
     /* ============================================================

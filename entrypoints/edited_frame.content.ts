@@ -11,7 +11,6 @@ const EDITED_ATTR = 'data-cqd-edited-processed';
 // 🔴 NEW: debounce flag so we don't rescan on every tiny mutation
 let editedScanScheduled = false;
 
-
 export default defineContentScript({
   matches: ['https://classroom.google.com/*'],
   runAt: 'document_idle',
@@ -41,7 +40,7 @@ export default defineContentScript({
     // Heartbeat
     setInterval(() => {
       scanForEditedPosts();
-    }, 1000);
+    }, 2500);
 
     // URL watcher
     let lastUrl = location.href;
@@ -95,17 +94,14 @@ function scanForEditedPosts() {
 
           const combined = `${text} ${aria} ${title}`.toLowerCase();
 
+          // We only care about elements that mention "edited"
           if (!combined.includes(editedWord)) continue;
 
-          let sourceText = text;
-          if (
-            sourceText.length < 5 ||
-            !sourceText.toLowerCase().includes(editedWord)
-          ) {
-            sourceText = aria || title || text;
-          }
+          // 🔥 NEW: use the FULL post text (visible text + aria labels)
+          const fullPostText =
+            (post.innerText || '') + ' ' + getAriaLabels(post);
 
-          diffText = calculateEditDiff(sourceText, editedWord) ?? '+0';
+          diffText = calculateEditDiff(fullPostText, editedWord) ?? '+0';
           found = true;
           break;
         }
@@ -124,26 +120,32 @@ function scanForEditedPosts() {
   }
 }
 
+
 /**
  * Calculates the difference in days between created and edited date.
  *
- * Example:
- *  "Oct 1 (Edited Oct 5)"  -> "+4"
- *  same-day edit           -> "+0"
+ * We now work on the FULL post text, e.g.:
+ *   "Zeina Sherif ... Nov 1 (Edited Nov 5)"
  *
- * If parsing fails, returns null and caller falls back to "+0".
+ * Strategy:
+ *  - Find the position of "edited" in the string
+ *  - Take all month/day dates *before* that → created date = last one before
+ *  - Take all month/day dates *after* that → edited date = first one after
+ *  - If that fails, fall back to "first date" vs "last date" in the string
+ *
+ * If parsing fails completely, returns null and caller falls back to "+0".
  */
-function calculateEditDiff(fullText: string, _keyword: string): string | null {
+function calculateEditDiff(fullText: string, editedKeyword: string): string | null {
   try {
-    const monthRegex =
-      /\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}\b/gi;
+    const normalized = (fullText || '').replace(/\s+/g, ' ').trim();
+    if (!normalized) return null;
 
-    const matches = fullText.match(monthRegex);
+    const lower = normalized.toLowerCase();
+    const key = editedKeyword.toLowerCase();
+    const editedIndex = lower.indexOf(key);
+    const monthPattern =
+      '\\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\\s+\\d{1,2}\\b';
     const currentYear = new Date().getFullYear();
-
-    if (!matches || matches.length === 0) {
-      return null;
-    }
 
     const parseDate = (s: string): Date | null => {
       const d = new Date(`${s.trim()} ${currentYear}`);
@@ -153,27 +155,82 @@ function calculateEditDiff(fullText: string, _keyword: string): string | null {
     let createdDate: Date | null = null;
     let editedDate: Date | null = null;
 
-    if (matches.length >= 2) {
-      createdDate = parseDate(matches[0]);
-      editedDate = parseDate(matches[1]);
-    } else {
-      createdDate = parseDate(matches[0]);
-      editedDate = createdDate;
+    // 1) Preferred path: use dates around the "edited" keyword
+    if (editedIndex !== -1) {
+      const beforeText = normalized.slice(0, editedIndex);
+      const afterText = normalized.slice(editedIndex);
+
+      const beforeMatches =
+        beforeText.match(new RegExp(monthPattern, 'gi')) || [];
+      const afterMatches =
+        afterText.match(new RegExp(monthPattern, 'gi')) || [];
+
+      if (beforeMatches.length > 0) {
+        const createdStr = beforeMatches[beforeMatches.length - 1];
+        createdDate = parseDate(createdStr);
+      }
+
+      if (afterMatches.length > 0) {
+        const editedStr = afterMatches[0];
+        editedDate = parseDate(editedStr);
+      }
+    }
+
+    // 2) Fallback: just use first and last dates in the whole string
+    if (!createdDate || !editedDate) {
+      const allMatches = normalized.match(
+        new RegExp(monthPattern, 'gi'),
+      );
+
+      if (!allMatches || allMatches.length === 0) {
+        return null;
+      }
+
+      const parsedDates = allMatches
+        .map((m) => parseDate(m))
+        .filter((d): d is Date => !!d);
+
+      if (!parsedDates.length) return null;
+
+      createdDate = parsedDates[0];
+      editedDate =
+        parsedDates.length > 1
+          ? parsedDates[parsedDates.length - 1]
+          : parsedDates[0];
     }
 
     if (!createdDate || !editedDate) return null;
 
+    const dayMs = 1000 * 60 * 60 * 24;
     let diffDays = Math.floor(
-      (editedDate.getTime() - createdDate.getTime()) /
-        (1000 * 60 * 60 * 24)
+      (editedDate.getTime() - createdDate.getTime()) / dayMs,
     );
 
+    // Defensive: never negative (e.g. weird year edge cases)
     if (diffDays < 0) diffDays = 0;
 
     return `+${diffDays}`;
   } catch {
     return null;
   }
+}
+
+
+/**
+ * Helper: collect aria-label/title text from inside the post,
+ * so we can also see dates that are only exposed there.
+ */
+function getAriaLabelsFromPost(post: HTMLElement): string {
+  return Array.from(
+    post.querySelectorAll<HTMLElement>('[aria-label], [title]')
+  )
+    .map(
+      (el) =>
+        (el.getAttribute('aria-label') || '') +
+        ' ' +
+        (el.getAttribute('title') || '')
+    )
+    .join(' ');
 }
 
 function createEditedOverlay(post: HTMLElement, diffText: string) {
@@ -219,6 +276,10 @@ function createEditedOverlay(post: HTMLElement, diffText: string) {
   pill.className = 'cqd-edited-badge';
   if (isPageDark()) pill.classList.add('cqd-theme-dark');
 
+  // 🔹 Tooltip for edited pill
+  pill.title = 'Days between posting and the last edit';
+  pill.setAttribute('aria-label', pill.title);
+
   const iconWrapper = document.createElement('div');
   iconWrapper.className = 'cqd-edited-icon';
   iconWrapper.innerHTML = EDIT_ICON_SVG_RAW;
@@ -229,7 +290,7 @@ function createEditedOverlay(post: HTMLElement, diffText: string) {
 
   const diffSpan = document.createElement('span');
   diffSpan.className = 'cqd-diff-val';
-  diffSpan.textContent = diffText; // "+4", "+0", etc.
+  diffSpan.textContent = diffText; // "+9", "+23", "+0", etc.
   content.appendChild(diffSpan);
 
   pill.appendChild(content);
@@ -263,7 +324,6 @@ function upgradeCombinedBadge(post: HTMLElement) {
 
   // If it doesn't truly have BOTH, no combined pill
   if (!hasComments || !hasEdited) {
-    // If we somehow had an old BOTH pill, clean it up
     bothBadge?.remove();
     return;
   }
@@ -330,6 +390,10 @@ function upgradeCombinedBadge(post: HTMLElement) {
   bothBadge = document.createElement('div');
   bothBadge.className = 'cqd-both-badge';
 
+  // 🔹 Tooltip for BOTH pill
+  bothBadge.title = 'Top: number of comments. Bottom: days between posting and last edit.';
+  bothBadge.setAttribute('aria-label', bothBadge.title);
+
   // Section 1: Comments (icon + number)
   const commentsSection = document.createElement('div');
   commentsSection.className = 'cqd-both-section cqd-both-comments';
@@ -367,7 +431,7 @@ function upgradeCombinedBadge(post: HTMLElement) {
   diffValue.textContent = diffText;
   editedSection.appendChild(diffValue);
 
-  // Final vertical order inside the pill:
+  // Final vertical order:
   //  commentsSection (icon, number)
   //  plus
   //  divider
@@ -392,4 +456,10 @@ function triggerPostClick(post: HTMLElement) {
   } else {
     post.click();
   }
+}
+
+function getAriaLabels(el: HTMLElement): string {
+  return Array.from(el.querySelectorAll('[aria-label]'))
+    .map((node) => node.getAttribute('aria-label') || '')
+    .join(' ');
 }

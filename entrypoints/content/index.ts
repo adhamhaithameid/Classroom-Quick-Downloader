@@ -13,7 +13,7 @@ import { t } from './i18n';
 import { isPageDark } from './theme';
 
 const INJECTED_ATTR = 'data-cqd-injected';
-const RESCAN_INTERVAL_MS = 2000;
+const RESCAN_INTERVAL_MS = 2500;
 const RESCAN_DEBOUNCE_MS = 250;
 const LOADING_MIN_MS = 600;
 const FEEDBACK_SUCCESS_MS = 2000;
@@ -40,6 +40,8 @@ const DRIVE_URL_PATTERNS: RegExp[] = [
 /* -----------------------------------------------------
  * Global State
  * ---------------------------------------------------*/
+
+type QueryRoot = Document | HTMLElement | DocumentFragment;
 
 let scanTimeoutId: number | null = null;
 let observer: MutationObserver | null = null;
@@ -77,17 +79,19 @@ function isGoogleClassroom(): boolean {
  * ---------------------------------------------------*/
 
 function scheduleScan(): void {
+  // Full-document scan, debounced (backup only).
   if (scanTimeoutId !== null) {
     window.clearTimeout(scanTimeoutId);
   }
   scanTimeoutId = window.setTimeout(() => {
     scanTimeoutId = null;
-    scanForAttachments();
+    scanForAttachments(document);
   }, RESCAN_DEBOUNCE_MS);
 }
 
 function setupObservers(): void {
   if (typeof document === 'undefined') return;
+
   if (!document.body) {
     window.addEventListener(
       'DOMContentLoaded',
@@ -99,52 +103,91 @@ function setupObservers(): void {
   if (observer) return;
 
   observer = new MutationObserver((mutations) => {
-    const hasChildListChange = mutations.some(
-      (m) =>
-        m.type === 'childList' &&
-        (m.addedNodes.length > 0 || m.removedNodes.length > 0),
-    );
-    if (hasChildListChange) scheduleScan();
+    const roots = new Set<QueryRoot>();
+
+    for (const m of mutations) {
+      if (m.type !== 'childList') continue;
+
+      m.addedNodes.forEach((node) => {
+        if (node.nodeType !== Node.ELEMENT_NODE) return;
+        const el = node as HTMLElement;
+
+        // Ignore our own injected button nodes
+        if (el.hasAttribute && el.getAttribute(INJECTED_ATTR) === 'true') {
+          return;
+        }
+
+        roots.add(el);
+      });
+    }
+
+    if (roots.size === 0) {
+      // Weird framework updates (attributes only)? Fall back to a full scan.
+      scheduleScan();
+      return;
+    }
+
+    // Fast path: only scan the new subtrees.
+    roots.forEach((root) => scanForAttachments(root));
   });
 
-  observer.observe(document.body, { childList: true, subtree: true });
-  window.setInterval(() => scheduleScan(), RESCAN_INTERVAL_MS);
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true,
+  });
+
+  // Slow backup in case we missed something.
+  window.setInterval(() => {
+    scheduleScan();
+  }, RESCAN_INTERVAL_MS);
+
+  // Initial full scan for already-rendered content.
   scheduleScan();
 }
 
-function scanForAttachments(): void {
+/**
+ * Scan a specific subtree (or the whole document) for Drive links
+ * and inject download buttons.
+ */
+function scanForAttachments(root: QueryRoot = document): void {
   if (!isGoogleClassroom()) return;
-  injectSingleFileButtons();
+  injectSingleFileButtons(root);
 }
 
 /* -----------------------------------------------------
  * Single-file buttons
  * ---------------------------------------------------*/
 
-function injectSingleFileButtons(): void {
+function injectSingleFileButtons(root: QueryRoot = document): void {
   const anchors = Array.from(
-    document.querySelectorAll<HTMLAnchorElement>(DRIVE_ANCHOR_SELECTOR),
+    root.querySelectorAll<HTMLAnchorElement>(DRIVE_ANCHOR_SELECTOR),
   );
+
   for (const anchor of anchors) {
     const url = extractDriveUrlFromAnchor(anchor);
     if (!url) continue;
+
     const container =
       (anchor.closest(ATTACHMENT_CONTAINER_SELECTOR) as HTMLElement | null) ||
       anchor.parentElement ||
       anchor;
+
     if (!container || hasInjectedButton(container)) continue;
     injectButtonIntoAttachment(container, url);
   }
 
   const metaElements = Array.from(
-    document.querySelectorAll<HTMLElement>(
+    root.querySelectorAll<HTMLElement>(
       '[data-drive-id], [data-id][data-item-id], [data-id][data-tooltip]',
     ),
   );
+
   for (const el of metaElements) {
     if (hasInjectedButton(el)) continue;
+
     const url = findDriveUrl(el);
     if (!url) continue;
+
     injectButtonIntoAttachment(el, url);
   }
 }
