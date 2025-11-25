@@ -639,6 +639,78 @@ export function injectStyles(): void {
       margin-top: 2px;
     }
 
+        /* ===============================
+     * 1b. DOWNLOAD ALL BUTTON
+     * =============================== */
+
+    .cqd-download-all-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      z-index: 6;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px 12px;
+      border: none;
+      border-radius: 9999px;
+      background-color: var(--cqd-color-normal);
+      color: #ffffff;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      gap: 6px;
+      box-shadow: var(--cqd-shadow-base);
+      white-space: nowrap;
+      transition:
+        box-shadow var(--cqd-transition),
+        transform var(--cqd-transition),
+        background-color var(--cqd-transition),
+        background-image var(--cqd-transition);
+    }
+
+    body[data-cqd-dir="rtl"] .cqd-download-all-btn {
+      right: auto;
+      left: 8px;
+    }
+
+    .cqd-download-all-btn:hover {
+      box-shadow: var(--cqd-shadow-hover);
+      transform: translateY(-1px);
+    }
+
+    .cqd-download-all-btn:active {
+      transform: translateY(0);
+    }
+
+    .cqd-download-all-icon-wrapper {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .cqd-download-all-icon {
+      width: 18px;
+      height: 18px;
+      background-image: url("${DOWNLOAD_ICON_SVG_URL}");
+      background-repeat: no-repeat;
+      background-position: center;
+      background-size: 18px 18px;
+      flex-shrink: 0;
+    }
+
+    .cqd-download-all-main {
+      font-weight: 600;
+    }
+
+    .cqd-download-all-sub {
+      font-size: 11px;
+      opacity: 0.9;
+      margin-left: 4px;
+    }
+
   `.trim();
 
   (document.head || document.documentElement).appendChild(style);

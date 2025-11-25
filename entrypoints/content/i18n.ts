@@ -6,7 +6,7 @@
  */
 
 const TRANSLATIONS: Record<string, any> = {
-  en: { download: 'Download', downloading: 'Downloading…', trying: 'Trying…', downloaded: 'Downloaded', error: 'Error', failed: 'Download failed.', ariaDownload: 'Download', titleQuick: 'Quick download', comments: 'comments', edited: 'Edited' },
+  en: { download: 'Download', downloading: 'Downloading…', trying: 'Trying…', downloaded: 'Downloaded', error: 'Error', failed: 'Download failed.', ariaDownload: 'Download', titleQuick: 'Quick download', comments: 'comments', edited: 'Edited', downloadAll: 'Download all' },
   ar: { download: 'تنزيل', downloading: 'جاري التنزيل…', trying: 'محاولة…', downloaded: 'تم التنزيل', error: 'خطأ', failed: 'فشل التنزيل.', ariaDownload: 'تنزيل', titleQuick: 'تنزيل سريع', comments: 'تعليقات', edited: 'تم التعديل' },
   ja: { download: 'ダウンロード', downloading: 'DL中…', trying: '試行中…', downloaded: '完了', error: 'エラー', failed: '失敗しました。', ariaDownload: 'ダウンロード', titleQuick: 'クイックダウンロード', comments: '件のコメント', edited: '編集済み' },
   es: { download: 'Descargar', downloading: 'Descargando…', trying: 'Intentando…', downloaded: 'Descargado', error: 'Error', failed: 'Falló la descarga.', ariaDownload: 'Descargar', titleQuick: 'Descarga rápida', comments: 'comentarios', edited: 'Editado' },
