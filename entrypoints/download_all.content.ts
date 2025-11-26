@@ -8,21 +8,31 @@ const DOWNLOAD_BTN_SELECTOR = '.cqd-download-btn';
 const GROUP_SELECTOR = 'div[data-stream-item-id]';
 const INJECTED_ATTR = 'data-cqd-injected';
 
+// Keep this in sync with FEEDBACK_SUCCESS_MS in content/index.ts
+const GROUP_FEEDBACK_SUCCESS_MS = 3000;
+
 type ButtonState = 'idle' | 'loading' | 'trying' | 'success' | 'error';
+
+interface FileEntry {
+  key: string;
+  buttons: Set<HTMLButtonElement>;
+  downloaded: boolean;
+  failed: boolean;
+  inProgress: boolean;
+}
 
 interface GroupState {
   root: HTMLElement;
-  buttons: Set<HTMLButtonElement>;
+  files: Map<string, FileEntry>;
   downloadAllBtn: HTMLButtonElement | null;
   activated: boolean;
-  colors?: {
-    normal: string;
-    success: string;
-  };
+  isBusy: boolean;
+  resetTimeoutId?: number;
 }
 
 const groupStates = new WeakMap<HTMLElement, GroupState>();
 const buttonToGroup = new WeakMap<HTMLButtonElement, GroupState>();
+const buttonToFile = new WeakMap<HTMLButtonElement, FileEntry>();
 
 const dirtyGroups = new Set<GroupState>();
 let refreshScheduled = false;
@@ -34,10 +44,9 @@ export default defineContentScript({
     injectStyles();
     safeSetDirection();
 
-    // Initial scan
+    // Initial discovery
     registerButtonsInSubtree(document);
 
-    // Observe for new download buttons & state changes
     const observer = new MutationObserver((mutations) => {
       for (const m of mutations) {
         if (m.type === 'childList') {
@@ -57,9 +66,7 @@ export default defineContentScript({
             target.classList.contains('cqd-download-btn')
           ) {
             const group = ensureButtonRegistered(target);
-            if (group) {
-              markGroupDirty(group);
-            }
+            if (group) markGroupDirty(group);
           }
         }
       }
@@ -71,10 +78,10 @@ export default defineContentScript({
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ['class'],
+      attributeFilter: ['class', 'data-cqd-all-done'], // Watch for success state
     });
 
-    // Slow backup in case something slips through
+    // Backup scan
     window.setInterval(() => {
       registerButtonsInSubtree(document);
       scheduleRefresh();
@@ -83,11 +90,10 @@ export default defineContentScript({
 });
 
 /* -----------------------------------------------------
- * Group + button discovery
+ * Discovery & grouping
  * ---------------------------------------------------*/
 
 function registerButtonsInSubtree(root: HTMLElement | Document): void {
-  // If root itself is a download button
   if (
     root instanceof HTMLButtonElement &&
     root.classList.contains('cqd-download-btn')
@@ -101,11 +107,7 @@ function registerButtonsInSubtree(root: HTMLElement | Document): void {
 
 function registerSingleButton(btn: HTMLButtonElement): void {
   if (!btn.isConnected) return;
-
-  // If we already know this button, we’re done
-  if (buttonToGroup.has(btn)) {
-    return;
-  }
+  if (buttonToGroup.has(btn) && buttonToFile.has(btn)) return;
 
   const groupRoot = findGroupRoot(btn);
   if (!groupRoot) return;
@@ -114,15 +116,32 @@ function registerSingleButton(btn: HTMLButtonElement): void {
   if (!group) {
     group = {
       root: groupRoot,
-      buttons: new Set<HTMLButtonElement>(),
+      files: new Map<string, FileEntry>(),
       downloadAllBtn: null,
       activated: false,
+      isBusy: false,
     };
     groupStates.set(groupRoot, group);
   }
 
-  group.buttons.add(btn);
+  const key = getCanonicalFileKey(btn);
+  let file = group.files.get(key);
+
+  if (!file) {
+    file = {
+      key,
+      buttons: new Set<HTMLButtonElement>(),
+      downloaded: false,
+      failed: false,
+      inProgress: false,
+    };
+    group.files.set(key, file);
+  }
+
+  file.buttons.add(btn);
   buttonToGroup.set(btn, group);
+  buttonToFile.set(btn, file);
+
   markGroupDirty(group);
 }
 
@@ -142,25 +161,62 @@ function cleanupRemovedButtons(root: HTMLElement): void {
 
   removedButtons.forEach((btn) => {
     const group = buttonToGroup.get(btn);
-    if (!group) return;
-    group.buttons.delete(btn);
+    const file = buttonToFile.get(btn);
+    if (!group || !file) return;
+
+    file.buttons.delete(btn);
     buttonToGroup.delete(btn);
+    buttonToFile.delete(btn);
+
+    if (file.buttons.size === 0) {
+      group.files.delete(file.key);
+    }
+
     markGroupDirty(group);
   });
 }
 
 function findGroupRoot(btn: HTMLElement): HTMLElement | null {
-  // Prefer a stream post card
   const post = btn.closest<HTMLElement>(GROUP_SELECTOR);
   if (post) return post;
 
-  // Fallback: details page main content
   const main =
     btn.closest<HTMLElement>('main') ||
     btn.closest<HTMLElement>('div[role="main"]');
   if (main) return main;
 
   return null;
+}
+
+function getCanonicalFileKey(btn: HTMLButtonElement): string {
+  const ds = btn.dataset as any;
+  const url = ds.cqdUrl || '';
+
+  if (url) {
+    const idMatch =
+      url.match(/\/d\/([a-zA-Z0-9_-]+)/) ||
+      url.match(/[?&](?:id|resourceId|fileId)=([a-zA-Z0-9_-]+)/);
+
+    if (idMatch && idMatch[1]) {
+      return `drive-id-${idMatch[1]}`;
+    }
+
+    try {
+      const u = new URL(url);
+      u.searchParams.delete('authuser');
+      u.searchParams.delete('u');
+      u.searchParams.delete('hl');
+      return u.toString();
+    } catch {
+      return url;
+    }
+  }
+
+  if (ds.cqdName) {
+    return `${ds.cqdName}::${ds.cqdExt || ''}`;
+  }
+
+  return `btn-${Math.random().toString(36).slice(2)}`;
 }
 
 /* -----------------------------------------------------
@@ -182,132 +238,173 @@ function scheduleRefresh(): void {
 }
 
 /* -----------------------------------------------------
- * Group state computation & UI
+ * Group state + visual update
  * ---------------------------------------------------*/
 
 function updateGroupState(group: GroupState): void {
-  // Prune disconnected buttons
-  for (const btn of Array.from(group.buttons)) {
-    if (!btn.isConnected) {
-      group.buttons.delete(btn);
-      buttonToGroup.delete(btn);
+  // Prune dead buttons
+  for (const [key, file] of group.files) {
+    for (const btn of Array.from(file.buttons)) {
+      if (!btn.isConnected) {
+        file.buttons.delete(btn);
+        buttonToGroup.delete(btn);
+        buttonToFile.delete(btn);
+      }
+    }
+    if (file.buttons.size === 0) {
+      group.files.delete(key);
     }
   }
 
-  const total = group.buttons.size;
+  const totalFiles = group.files.size;
 
-  if (total <= 2) {
-    // Not enough files → remove "Download all"
+  // Require at least 2 files to show "Download all"
+  if (totalFiles < 2) {
     if (group.downloadAllBtn && group.downloadAllBtn.isConnected) {
       group.downloadAllBtn.remove();
     }
     group.downloadAllBtn = null;
     group.activated = false;
+    group.isBusy = false;
+    if (group.resetTimeoutId != null) {
+      window.clearTimeout(group.resetTimeoutId);
+      group.resetTimeoutId = undefined;
+    }
     return;
   }
 
   const btn = ensureDownloadAllButton(group);
 
-  // Compute counts from per-file buttons
+  // Aggregate current DOM state (no sticky memory)
   let downloaded = 0;
   let failed = 0;
   let inProgress = 0;
 
-  for (const fileBtn of group.buttons) {
-    if (!fileBtn.isConnected) continue;
+  for (const file of group.files.values()) {
+    let someSuccess = false;
+    let someError = false;
+    let someLoading = false;
 
-    const cls = fileBtn.classList;
-    const isLoading =
-      cls.contains('cqd-loading') || cls.contains('cqd-trying');
-    const isSuccess = cls.contains('cqd-success');
-    const isError = cls.contains('cqd-error');
-    const prevDone = fileBtn.dataset.cqdAllDone === 'true';
+    for (const b of file.buttons) {
+      if (!b.isConnected) continue;
+      const cls = b.classList;
+      const isLoading =
+        cls.contains('cqd-loading') || cls.contains('cqd-trying');
+      const isSuccess =
+        cls.contains('cqd-success') || (b.dataset as any).cqdAllDone === 'true';
+      const isError = cls.contains('cqd-error');
 
-    // Persistent "done" flag
-    if (isLoading) {
-      // New download attempt → reset any previous done flag
-      if (prevDone) fileBtn.dataset.cqdAllDone = 'false';
-    } else if (isSuccess) {
-      fileBtn.dataset.cqdAllDone = 'true';
+      if (isLoading) someLoading = true;
+      if (isSuccess) someSuccess = true;
+      if (isError) someError = true;
     }
 
-    const done = fileBtn.dataset.cqdAllDone === 'true';
-    if (done) downloaded++;
-    if (isError) failed++;
-    if (isLoading) inProgress++;
+    file.downloaded = someSuccess;
+    file.inProgress = someLoading;
+    file.failed = !file.downloaded && someError;
+
+    if (file.downloaded) downloaded++;
+    else if (file.inProgress) inProgress++;
+    else if (file.failed) failed++;
   }
 
-  const noneStarted =
-    downloaded === 0 && failed === 0 && inProgress === 0;
-  const allSucceeded = downloaded === total && failed === 0 && total > 0;
-  const allCompleted =
-    downloaded + failed === total && inProgress === 0 && total > 0;
+  group.isBusy = inProgress > 0;
 
-  if (!group.activated) {
-    if (!noneStarted) {
-      group.activated = true;
-    }
+  // If new downloads started, cancel any pending reset timer
+  if (group.isBusy && group.resetTimeoutId != null) {
+    window.clearTimeout(group.resetTimeoutId);
+    group.resetTimeoutId = undefined;
   }
 
   const mainSpan = btn.querySelector<HTMLElement>('.cqd-download-all-main');
   const subSpan = btn.querySelector<HTMLElement>('.cqd-download-all-sub');
   if (!mainSpan || !subSpan) return;
 
-  // --- Idle (pre-click) view ---
+  const noneStarted = downloaded === 0 && failed === 0 && inProgress === 0;
+  const allSucceeded =
+    downloaded === totalFiles && failed === 0 && totalFiles > 0;
+  const allCompleted =
+    downloaded + failed === totalFiles && inProgress === 0 && totalFiles > 0;
+
+  // Activation check
+  if (!group.activated && !noneStarted) {
+    group.activated = true;
+  }
+
+  // Reset classes
+  btn.classList.remove('cqd-all-success', 'cqd-all-error');
+
+  // Idle state: not yet activated OR everything back to idle
   if (!group.activated || noneStarted) {
     group.activated = group.activated && !noneStarted;
+    group.isBusy = false;
     btn.disabled = false;
-    btn.style.backgroundImage = '';
     mainSpan.textContent = t('downloadAll') || 'Download all';
-    subSpan.textContent = `${total} files`;
+    subSpan.textContent = `${totalFiles} files`;
+    setProgressVisual(btn, 0);
     return;
   }
 
-  // --- Active/progress view ---
+  // Active / completed states
   let mainText: string;
   let subText: string;
+  let progressRatio = totalFiles > 0 ? downloaded / totalFiles : 0;
+
+  // Disable button while any file is still in progress
+  btn.disabled = inProgress > 0;
 
   if (allSucceeded) {
-    // All good 🎉
     mainText = t('downloaded') || 'Downloaded';
-    subText = `${downloaded} / ${total}`;
+    subText = `${downloaded} / ${totalFiles}`;
+    btn.classList.add('cqd-all-success');
+    progressRatio = 1;
+    scheduleGroupReset(group);
   } else if (allCompleted && failed > 0) {
-    // Finished, but some errors
-    mainText = t('downloaded') || 'Downloaded';
     if (downloaded === 0) {
-      // Everything failed
       mainText = t('error') || 'Error';
       subText = `${failed} failed`;
+      btn.classList.add('cqd-all-error');
+      progressRatio = 0;
     } else {
+      mainText = t('downloaded') || 'Downloaded';
       subText = `${downloaded} ok, ${failed} failed`;
+      btn.classList.add('cqd-all-success');
     }
+    scheduleGroupReset(group);
   } else {
-    // Mixed in-progress state
+    // In progress
     mainText = t('downloading') || 'Downloading…';
-
     if (failed === 0) {
-      // Simple progress: 3 -> 10
-      subText = `${downloaded} -> ${total}`;
+      subText = `${downloaded} → ${totalFiles}`;
     } else {
-      // Progress + failures
-      subText = `${downloaded} -> ${total} (${failed} failed)`;
+      subText = `${downloaded} → ${totalFiles} (${failed} failed)`;
     }
   }
 
   mainSpan.textContent = mainText;
   subSpan.textContent = subText;
-
-  // Gradient based on success ratio
-  const successRatio = total > 0 ? downloaded / total : 0;
-  const percent = Math.max(0, Math.min(100, Math.round(successRatio * 100)));
-  applyGradient(btn, group, percent);
+  setProgressVisual(btn, progressRatio);
 }
+
+function scheduleGroupReset(group: GroupState): void {
+  if (group.resetTimeoutId != null) return; // already scheduled
+
+  group.resetTimeoutId = window.setTimeout(() => {
+    group.resetTimeoutId = undefined;
+    group.activated = false;
+    group.isBusy = false;
+    markGroupDirty(group);
+    scheduleRefresh();
+  }, GROUP_FEEDBACK_SUCCESS_MS);
+}
+
+/* -----------------------------------------------------
+ * Download all click
+ * ---------------------------------------------------*/
 
 function ensureDownloadAllButton(group: GroupState): HTMLButtonElement {
   const existing = group.downloadAllBtn;
-  if (existing && existing.isConnected) {
-    return existing;
-  }
+  if (existing && existing.isConnected) return existing;
 
   const root = group.root;
   const button = document.createElement('button');
@@ -325,14 +422,12 @@ function ensureDownloadAllButton(group: GroupState): HTMLButtonElement {
   );
   button.title = t('downloadAll') || 'Download all';
 
-  // Icon
   const iconWrapper = document.createElement('span');
   iconWrapper.className = 'cqd-icon-wrapper cqd-download-all-icon-wrapper';
   const icon = document.createElement('span');
   icon.className = 'cqd-download-all-icon';
   iconWrapper.appendChild(icon);
 
-  // Labels
   const mainSpan = document.createElement('span');
   mainSpan.className = 'cqd-download-all-main';
 
@@ -343,7 +438,7 @@ function ensureDownloadAllButton(group: GroupState): HTMLButtonElement {
   button.appendChild(mainSpan);
   button.appendChild(subSpan);
 
-  // Positioning: ensure root can host an absolutely positioned pill
+  // POSITIONING: top-right of card (CSS handles top: -80px / right: 48px)
   const computed = window.getComputedStyle(root);
   if (computed.position === 'static') {
     root.style.position = 'relative';
@@ -364,14 +459,32 @@ function ensureDownloadAllButton(group: GroupState): HTMLButtonElement {
 }
 
 function handleDownloadAllClick(group: GroupState): void {
+  // If anything is currently downloading, ignore clicks (prevents double batches)
+  if (group.isBusy) return;
+
   group.activated = true;
 
-  for (const fileBtn of group.buttons) {
-    if (!fileBtn.isConnected) continue;
-    const s = getSingleButtonState(fileBtn);
-    // Only click idle/error buttons to either start or retry
-    if (s === 'idle' || s === 'error') {
-      fileBtn.click();
+  // Cancel any pending reset from a previous run
+  if (group.resetTimeoutId != null) {
+    window.clearTimeout(group.resetTimeoutId);
+    group.resetTimeoutId = undefined;
+  }
+
+  const btn = group.downloadAllBtn;
+  if (btn) {
+    btn.disabled = true;
+  }
+
+  for (const file of group.files.values()) {
+    let clicked = false;
+    for (const btn of file.buttons) {
+      if (!btn.isConnected) continue;
+      const s = getSingleButtonState(btn);
+      if (s === 'idle' || s === 'error') {
+        btn.click();
+        clicked = true;
+        break;
+      }
     }
   }
 
@@ -385,44 +498,18 @@ function getSingleButtonState(btn: HTMLButtonElement): ButtonState {
   if (cls.contains('cqd-trying')) return 'trying';
   if (cls.contains('cqd-success')) return 'success';
   if (cls.contains('cqd-error')) return 'error';
+  if ((btn.dataset as any).cqdAllDone === 'true') return 'success';
   return 'idle';
 }
 
 /* -----------------------------------------------------
- * Visual helpers
+ * Visuals: progress → CSS vars
  * ---------------------------------------------------*/
 
-function applyGradient(
-  button: HTMLButtonElement,
-  group: GroupState,
-  percent: number,
-): void {
-  if (!group.colors) {
-    const cs = window.getComputedStyle(button);
-    const normal =
-      cs.getPropertyValue('--cqd-color-normal').trim() || '#005DD7';
-    const success =
-      cs.getPropertyValue('--cqd-color-success').trim() || '#00A82D';
-    group.colors = { normal, success };
-  }
-
-  const { normal, success } = group.colors!;
-  const p = Math.max(0, Math.min(100, percent));
-
-  if (p <= 0) {
-    button.style.backgroundImage = '';
-    return;
-  }
-
-  button.style.backgroundImage = `
-    linear-gradient(
-      to right,
-      ${success} 0%,
-      ${success} ${p}%,
-      ${normal} ${p}%,
-      ${normal} 100%
-    )
-  `;
+function setProgressVisual(btn: HTMLButtonElement, ratio: number): void {
+  const clamped = Math.max(0, Math.min(1, ratio));
+  const percent = Math.round(clamped * 100);
+  btn.style.setProperty('--cqd-progress', `${percent}%`);
 }
 
 /* -----------------------------------------------------
