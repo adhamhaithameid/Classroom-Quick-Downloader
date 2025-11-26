@@ -602,23 +602,21 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
         return;
       }
 
+      // SUCCESS PATH
       if (status === 'success' || status === 'complete') {
         pendingButtons.delete(requestId);
-        
-        // Mark for Group watcher
-        try { (button.dataset as any).cqdAllDone = 'true'; } catch {}
+
+        try {
+          (button.dataset as any).cqdAllDone = 'true';
+        } catch {
+          /* ignore */
+        }
 
         setPillProgress(button, 1);
         setButtonState(button, 'success');
 
-        await delay(FEEDBACK_SUCCESS_MS);
-
-        // RESET LOGIC
-        if (getButtonState(button) === 'success') {
-          setButtonState(button, 'idle');
-          setPillProgress(button, 0);
-          try { delete (button.dataset as any).cqdAllDone; } catch {}
-        }
+        // Stay green until the group batch has finished its success window
+        await waitForSuccessReset(button);
         return;
       }
 
@@ -646,3 +644,42 @@ export default defineContentScript({
   runAt: 'document_idle',
   main() { initContentScript(); },
 });
+
+async function waitForSuccessReset(button: HTMLButtonElement): Promise<void> {
+  const earliestReset = Date.now() + FEEDBACK_SUCCESS_MS;
+
+  while (true) {
+    await delay(200);
+
+    if (getButtonState(button) !== 'success') {
+      return; // something else changed the state
+    }
+
+    // Respect minimum visible success time
+    if (Date.now() < earliestReset) continue;
+
+    // If this button is part of an active "Download all" batch, stay green
+    const postRoot =
+      button.closest<HTMLElement>('div[data-stream-item-id]') ||
+      button.closest<HTMLElement>('main') ||
+      button.closest<HTMLElement>('div[role="main"]');
+
+    if (postRoot && postRoot.dataset.cqdGroupActive === '1') {
+      continue;
+    }
+
+    // Don't snap back while the user is hovering
+    if (button.matches(':hover')) continue;
+
+    break;
+  }
+
+  // Finally reset back to normal blue pill
+  setButtonState(button, 'idle');
+  setPillProgress(button, 0);
+  try {
+    delete (button.dataset as any).cqdAllDone;
+  } catch {
+    /* ignore */
+  }
+}

@@ -130,6 +130,7 @@ export function injectStyles(): void {
     .cqd-download-btn:focus-visible {
       outline: 2px solid #ffffff;
       outline-offset: 2px;
+      transform: scale(0.97);
     }
 
     .cqd-download-btn:active {
@@ -578,25 +579,21 @@ export function injectStyles(): void {
 .cqd-download-all-btn {
   /* Progress control (0% to 100%) */
   --cqd-progress: 0%;
-
   position: absolute;
-
-  /* Position inside the post card, near the 3-dots */
-  top: 12px;       /* <— key change: small positive offset */
+  /* Default fallback pos if header injection fails: */
+  top: 12px;
   right: 48px;
+  height: 40px;
   z-index: 6;
-
   display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 4px 12px;
   border: none;
   border-radius: 9999px;
-
   background-color: var(--cqd-color-normal);
   color: #ffffff;
   box-shadow: var(--cqd-shadow-normal);
-
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 12px;
   font-weight: 600;
@@ -604,13 +601,23 @@ export function injectStyles(): void {
   gap: 6px;
   white-space: nowrap;
   overflow: hidden;
-
   transition:
     box-shadow 0.2s ease,
     transform 0.1s ease,
     background-color 0.3s ease;
-
   transform: translateZ(0);
+}
+
+/* * If successfully injected into the Header row (the preferred location),
+ * center it vertically relative to the author text/menu button.
+ */
+.cqd-download-all-btn.cqd-in-header {
+  top: 50%;
+  transform: translateY(-50%) translateZ(0);
+}
+
+.cqd-download-all-btn.cqd-in-header:active {
+  transform: translateY(-50%) scale(0.97);
 }
 
 body[data-cqd-dir="rtl"] .cqd-download-all-btn {
@@ -620,14 +627,13 @@ body[data-cqd-dir="rtl"] .cqd-download-all-btn {
 
 .cqd-download-all-btn:hover {
   box-shadow: var(--cqd-shadow-hover);
-  transform: translateY(-1px);
 }
 
 .cqd-download-all-btn:active {
-  transform: translateY(0);
+  transform: scale(0.97);
 }
 
-/* Keep pointer cursor even while disabled (you already wanted this behavior) */
+/* Keep pointer cursor even while disabled */
 .cqd-download-all-btn[disabled] {
   cursor: pointer;
 }

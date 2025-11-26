@@ -16,18 +16,19 @@ type ButtonState = 'idle' | 'loading' | 'trying' | 'success' | 'error';
 interface FileEntry {
   key: string;
   buttons: Set<HTMLButtonElement>;
-  downloaded: boolean;
-  failed: boolean;
-  inProgress: boolean;
+  downloaded: boolean;   // latched success for current batch
+  failed: boolean;       // latched error for current batch
+  inProgress: boolean;   // any button loading
 }
 
 interface GroupState {
   root: HTMLElement;
   files: Map<string, FileEntry>;
   downloadAllBtn: HTMLButtonElement | null;
-  activated: boolean;
-  isBusy: boolean;
+  activated: boolean;     // batch has been triggered at least once
+  isBusy: boolean;        // any file still in progress
   resetTimeoutId?: number;
+  currentRunId?: number;
 }
 
 const groupStates = new WeakMap<HTMLElement, GroupState>();
@@ -78,10 +79,10 @@ export default defineContentScript({
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ['class', 'data-cqd-all-done'], // watch per-file status
+      attributeFilter: ['class', 'data-cqd-all-done'],
     });
 
-    // Backup scan (in case we miss something)
+    // Backup scan
     window.setInterval(() => {
       registerButtonsInSubtree(document);
       scheduleRefresh();
@@ -233,7 +234,7 @@ function getPrimaryButton(file: FileEntry): HTMLButtonElement | null {
     if (!btn.isConnected) continue;
     if (!fallback) fallback = btn;
 
-    // Only consider visually laid-out elements as "visible"
+    // Only consider laid-out elements as visible
     if (!btn.offsetParent) continue;
 
     if (!primaryVisible) {
@@ -241,7 +242,6 @@ function getPrimaryButton(file: FileEntry): HTMLButtonElement | null {
       continue;
     }
 
-    // Choose the last one in DOM order (more likely to be the "real" visible one)
     const pos = primaryVisible.compareDocumentPosition(btn);
     if (pos & Node.DOCUMENT_POSITION_FOLLOWING) {
       primaryVisible = btn;
@@ -261,12 +261,10 @@ function normalizeFileButtons(file: FileEntry): void {
     if (!btn.isConnected) continue;
 
     if (btn === primary) {
-      // Primary stays visible & clickable
       btn.style.removeProperty('display');
       btn.style.removeProperty('visibility');
       btn.style.removeProperty('pointer-events');
     } else {
-      // Hide duplicates so we don't see a second layer of blue circles
       btn.style.setProperty('display', 'none', 'important');
       btn.style.setProperty('pointer-events', 'none', 'important');
     }
@@ -296,7 +294,7 @@ function scheduleRefresh(): void {
  * ---------------------------------------------------*/
 
 function updateGroupState(group: GroupState): void {
-  // Prune dead buttons and normalize duplicates per file
+  // Prune + dedup per file
   for (const [key, file] of Array.from(group.files.entries())) {
     for (const btn of Array.from(file.buttons)) {
       if (!btn.isConnected) {
@@ -316,7 +314,7 @@ function updateGroupState(group: GroupState): void {
 
   const totalFiles = group.files.size;
 
-  // Require at least 2 files to show "Download all"
+  // Only show "Download all" if we have at least 2 files
   if (totalFiles < 2) {
     if (group.downloadAllBtn && group.downloadAllBtn.isConnected) {
       group.downloadAllBtn.remove();
@@ -333,25 +331,26 @@ function updateGroupState(group: GroupState): void {
 
   const btn = ensureDownloadAllButton(group);
 
-  // Aggregate current DOM state directly from the single-file buttons
+  // Aggregate per-file state from underlying single buttons,
+  // but LATCH success/error for the whole batch.
   let downloaded = 0;
   let failed = 0;
   let inProgress = 0;
 
   for (const file of group.files.values()) {
-    let someSuccess = false;
-    let someError = false;
-    let someLoading = false;
+    let someSuccess = file.downloaded; // latch
+    let someError = file.failed;       // latch
+    let someLoading = file.inProgress;
 
     for (const b of file.buttons) {
       if (!b.isConnected) continue;
       const cls = b.classList;
+      const ds = b.dataset as any;
 
       const isLoading =
         cls.contains('cqd-loading') || cls.contains('cqd-trying');
       const isSuccess =
-        cls.contains('cqd-success') ||
-        (b.dataset as any).cqdAllDone === 'true';
+        cls.contains('cqd-success') || ds.cqdAllDone === 'true';
       const isError = cls.contains('cqd-error');
 
       if (isLoading) someLoading = true;
@@ -370,7 +369,7 @@ function updateGroupState(group: GroupState): void {
 
   group.isBusy = inProgress > 0;
 
-  // If new downloads started, cancel any pending reset timer
+  // If new downloads are in progress, kill any pending reset timer
   if (group.isBusy && group.resetTimeoutId != null) {
     window.clearTimeout(group.resetTimeoutId);
     group.resetTimeoutId = undefined;
@@ -386,15 +385,14 @@ function updateGroupState(group: GroupState): void {
   const allCompleted =
     downloaded + failed === totalFiles && inProgress === 0 && totalFiles > 0;
 
-  // Activation check: once any file has started, we consider the run "active"
+  // Once any file starts, we consider the run "active"
   if (!group.activated && !noneStarted) {
     group.activated = true;
   }
 
-  // Reset visual classes
   btn.classList.remove('cqd-all-success', 'cqd-all-error');
 
-  // Idle state: no downloads yet OR everything went back to idle
+  // Idle state: nothing started or we've fully reset
   if (!group.activated || noneStarted) {
     group.activated = group.activated && !noneStarted;
     group.isBusy = false;
@@ -405,10 +403,9 @@ function updateGroupState(group: GroupState): void {
     return;
   }
 
-  // From here: run is active or we’re in the success/error feedback window
+  // From here: batch has been activated (and may be in progress or in feedback)
   btn.disabled = true;
 
-  // Active/completed states
   let mainText: string;
   let subText: string;
   let progressRatio = totalFiles > 0 ? downloaded / totalFiles : 0;
@@ -432,7 +429,7 @@ function updateGroupState(group: GroupState): void {
     }
     scheduleGroupReset(group);
   } else {
-    // In progress
+    // Still in progress
     mainText = t('downloading') || 'Downloading…';
     if (failed === 0) {
       subText = `${downloaded} → ${totalFiles}`;
@@ -453,6 +450,21 @@ function scheduleGroupReset(group: GroupState): void {
     group.resetTimeoutId = undefined;
     group.activated = false;
     group.isBusy = false;
+    group.currentRunId = undefined;
+
+    try {
+      delete group.root.dataset.cqdGroupActive;
+    } catch {
+      /* ignore */
+    }
+
+    // Clear latched per-file state for the next run
+    for (const file of group.files.values()) {
+      file.downloaded = false;
+      file.failed = false;
+      file.inProgress = false;
+    }
+
     markGroupDirty(group);
     scheduleRefresh();
   }, GROUP_FEEDBACK_SUCCESS_MS);
@@ -467,9 +479,45 @@ function ensureDownloadAllButton(group: GroupState): HTMLButtonElement {
   if (existing && existing.isConnected) return existing;
 
   const root = group.root;
+  let targetContainer = root;
+  let isInHeader = false;
+
+  // Aggressively search for the "Three Dots" menu button to identify the header row.
+  // We use multiple selectors because Classroom classes are obfuscated, but ARIA is stable.
+  const menuCandidates = Array.from(root.querySelectorAll('div[role="button"], button'));
+  const menuBtn = menuCandidates.find(el => {
+    const aria = (el.getAttribute('aria-label') || '').toLowerCase();
+    return (
+      aria.includes('more options') || 
+      aria.includes('stream item options') || 
+      aria.includes('menu') ||
+      aria.includes('options')
+    );
+  });
+
+  if (menuBtn) {
+    // If we found the menu button, the Header Row is typically its parent or grandparent.
+    // We want the container that spans the width (has flex or block display).
+    // Usually the direct parent of the menu button is a small wrapper.
+    const parent = menuBtn.parentElement;
+    if (parent) {
+      targetContainer = parent;
+      isInHeader = true;
+
+      // Optional: if the direct parent is very small (just the button wrapper), 
+      // maybe go one level up? Usually direct parent is safer for absolute positioning relative to the dots.
+      // We will assume 'parent' is the flex container for the header row or the absolute wrapper.
+    }
+  }
+
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'cqd-download-all-btn';
+  
+  if (isInHeader) {
+    button.classList.add('cqd-in-header');
+  }
+
   button.setAttribute(INJECTED_ATTR, 'true');
 
   if (isPageDark()) {
@@ -498,13 +546,16 @@ function ensureDownloadAllButton(group: GroupState): HTMLButtonElement {
   button.appendChild(mainSpan);
   button.appendChild(subSpan);
 
-  // Root container must allow the button to overflow slightly
-  const computed = window.getComputedStyle(root);
+  const computed = window.getComputedStyle(targetContainer);
   if (computed.position === 'static') {
-    root.style.position = 'relative';
+    targetContainer.style.position = 'relative';
   }
-  root.style.setProperty('overflow', 'visible', 'important');
-  root.style.setProperty('contain', 'none', 'important');
+  
+  if (targetContainer === root) {
+    // Fallback: if we couldn't find the header, ensure root doesn't hide it
+    root.style.setProperty('overflow', 'visible', 'important');
+    root.style.setProperty('contain', 'none', 'important');
+  }
 
   button.addEventListener('click', (e) => {
     e.preventDefault();
@@ -512,19 +563,33 @@ function ensureDownloadAllButton(group: GroupState): HTMLButtonElement {
     handleDownloadAllClick(group);
   });
 
-  root.appendChild(button);
+  targetContainer.appendChild(button);
   group.downloadAllBtn = button;
 
   return button;
 }
 
 function handleDownloadAllClick(group: GroupState): void {
-  // If anything is currently running or still in feedback, ignore clicks
+  // If a batch is already active or in feedback, ignore clicks
   if (group.isBusy || group.activated) return;
 
   group.activated = true;
+  group.isBusy = true;
+  group.currentRunId = Date.now();
 
-  // Cancel any pending reset from a previous run
+  try {
+    group.root.dataset.cqdGroupActive = '1';
+  } catch {
+    /* ignore */
+  }
+
+  // Reset latched state for this new run
+  for (const file of group.files.values()) {
+    file.downloaded = false;
+    file.failed = false;
+    file.inProgress = false;
+  }
+
   if (group.resetTimeoutId != null) {
     window.clearTimeout(group.resetTimeoutId);
     group.resetTimeoutId = undefined;
@@ -535,7 +600,7 @@ function handleDownloadAllClick(group: GroupState): void {
     btn.disabled = true;
   }
 
-  // Trigger at most ONE primary button per file, and only if idle/error
+  // Trigger at most one primary button per file
   for (const file of group.files.values()) {
     const primary = getPrimaryButton(file);
     if (!primary) continue;
