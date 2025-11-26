@@ -110,8 +110,8 @@ function setupObservers(): void {
       if (m.type !== 'childList') continue;
 
       // Optimization: filter out our own mutations
-      const isInternal = Array.from(m.addedNodes).some(n => 
-        n.nodeType === Node.ELEMENT_NODE && 
+      const isInternal = Array.from(m.addedNodes).some(n =>
+        n.nodeType === Node.ELEMENT_NODE &&
         (n as Element).hasAttribute(INJECTED_ATTR)
       );
       if (isInternal) continue;
@@ -171,7 +171,7 @@ function injectSingleFileButtons(root: QueryRoot = document): void {
     if (!container) continue;
 
     // FIX: "Normal buttons doesn't appear"
-    // We strictly check if the button *exists* inside. 
+    // We strictly check if the button *exists* inside.
     // If React re-rendered the container content, the button is gone, so we must re-inject.
     if (hasInjectedButton(container)) continue;
 
@@ -337,7 +337,7 @@ function extractFileMeta(container: HTMLElement, url: string): FileMeta {
     if (m) ext = m[1].toLowerCase();
   }
   // Kind logic omitted for brevity, assume identical to previous...
-  return { name, ext, kind: 'other' }; 
+  return { name, ext, kind: 'other' };
 }
 
 /* -----------------------------------------------------
@@ -346,7 +346,7 @@ function extractFileMeta(container: HTMLElement, url: string): FileMeta {
 
 function injectButtonIntoAttachment(container: HTMLElement, url: string): void {
   if (!url) return;
-  
+
   // Mark as processed (metadata only)
   container.setAttribute(PROCESSED_ATTR, 'true');
 

@@ -11,6 +11,9 @@ const INJECTED_ATTR = 'data-cqd-injected';
 // Keep this in sync with FEEDBACK_SUCCESS_MS in content/index.ts
 const GROUP_FEEDBACK_SUCCESS_MS = 3000;
 
+// Show "Download all" only when there are at least 2 files
+const MIN_FILES_FOR_DOWNLOAD_ALL = 2;
+
 type ButtonState = 'idle' | 'loading' | 'trying' | 'success' | 'error';
 
 interface FileEntry {
@@ -75,12 +78,14 @@ export default defineContentScript({
       scheduleRefresh();
     });
 
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['class', 'data-cqd-all-done'],
-    });
+    if (document.body) {
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['class', 'data-cqd-all-done'],
+      });
+    }
 
     // Backup scan
     window.setInterval(() => {
@@ -177,6 +182,11 @@ function cleanupRemovedButtons(root: HTMLElement): void {
   });
 }
 
+/**
+ * Group root:
+ *   - Stream:  div[data-stream-item-id] per card
+ *   - Post view: fallback to <main> / [role="main"]
+ */
 function findGroupRoot(btn: HTMLElement): HTMLElement | null {
   const post = btn.closest<HTMLElement>(GROUP_SELECTOR);
   if (post) return post;
@@ -314,8 +324,8 @@ function updateGroupState(group: GroupState): void {
 
   const totalFiles = group.files.size;
 
-  // Only show "Download all" if we have at least 2 files
-  if (totalFiles < 2) {
+  // Only show "Download all" if we have at least MIN_FILES_FOR_DOWNLOAD_ALL files
+  if (totalFiles < MIN_FILES_FOR_DOWNLOAD_ALL) {
     if (group.downloadAllBtn && group.downloadAllBtn.isConnected) {
       group.downloadAllBtn.remove();
     }
@@ -471,49 +481,81 @@ function scheduleGroupReset(group: GroupState): void {
 }
 
 /* -----------------------------------------------------
- * Download all click
+ * Header lookup + Download all creation
  * ---------------------------------------------------*/
+
+/**
+ * Find the *header row* for this specific group:
+ *   - Prefer header inside the same container (post view)
+ *   - Otherwise, for a stream card: look for a header sibling above the
+ *     data-stream-item container, but do NOT fall back to a global header.
+ */
+function findHeaderContainer(root: HTMLElement): HTMLElement | null {
+  // 1) Look *inside* the root itself (post view: main contains .N5dSp above content)
+  const internalHeader =
+    root.querySelector<HTMLElement>('.JZicYb.gmNu1d') ||
+    root.querySelector<HTMLElement>('.N5dSp') ||
+    root.querySelector<HTMLElement>('.JZicYb');
+  if (internalHeader) return internalHeader;
+
+  // 2) Walk ancestors and, for each parent, find the last header that appears
+  //    before `root` in DOM order, within that parent's subtree.
+  let current: HTMLElement | null = root;
+  while (
+    current &&
+    current !== document.body &&
+    current !== document.documentElement
+  ) {
+    const parent = current.parentElement;
+    if (!parent) break;
+
+    const headers = Array.from(
+      parent.querySelectorAll<HTMLElement>(
+        '.JZicYb.gmNu1d, .N5dSp, .JZicYb',
+      ),
+    );
+
+    let best: HTMLElement | null = null;
+
+    for (const h of headers) {
+      const rel = h.compareDocumentPosition(current);
+      const isBefore = !!(rel & Node.DOCUMENT_POSITION_FOLLOWING);
+      const isDisconnected = !!(rel & Node.DOCUMENT_POSITION_DISCONNECTED);
+
+      if (isDisconnected || !isBefore) continue;
+
+      if (!best) {
+        best = h;
+      } else {
+        const rel2 = best.compareDocumentPosition(h);
+        const hAfterBest = !!(rel2 & Node.DOCUMENT_POSITION_FOLLOWING);
+        if (hAfterBest) best = h;
+      }
+    }
+
+    if (best) return best;
+
+    current = parent;
+  }
+
+  // 3) No header found locally; caller will fall back to root itself.
+  return null;
+}
 
 function ensureDownloadAllButton(group: GroupState): HTMLButtonElement {
   const existing = group.downloadAllBtn;
   if (existing && existing.isConnected) return existing;
 
   const root = group.root;
-  let targetContainer = root;
-  let isInHeader = false;
 
-  // Aggressively search for the "Three Dots" menu button to identify the header row.
-  // We use multiple selectors because Classroom classes are obfuscated, but ARIA is stable.
-  const menuCandidates = Array.from(root.querySelectorAll('div[role="button"], button'));
-  const menuBtn = menuCandidates.find(el => {
-    const aria = (el.getAttribute('aria-label') || '').toLowerCase();
-    return (
-      aria.includes('more options') || 
-      aria.includes('stream item options') || 
-      aria.includes('menu') ||
-      aria.includes('options')
-    );
-  });
-
-  if (menuBtn) {
-    // If we found the menu button, the Header Row is typically its parent or grandparent.
-    // We want the container that spans the width (has flex or block display).
-    // Usually the direct parent of the menu button is a small wrapper.
-    const parent = menuBtn.parentElement;
-    if (parent) {
-      targetContainer = parent;
-      isInHeader = true;
-
-      // Optional: if the direct parent is very small (just the button wrapper), 
-      // maybe go one level up? Usually direct parent is safer for absolute positioning relative to the dots.
-      // We will assume 'parent' is the flex container for the header row or the absolute wrapper.
-    }
-  }
+  const headerContainer = findHeaderContainer(root);
+  const targetContainer = headerContainer || root;
+  const isInHeader = !!headerContainer;
 
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'cqd-download-all-btn';
-  
+
   if (isInHeader) {
     button.classList.add('cqd-in-header');
   }
@@ -550,9 +592,9 @@ function ensureDownloadAllButton(group: GroupState): HTMLButtonElement {
   if (computed.position === 'static') {
     targetContainer.style.position = 'relative';
   }
-  
-  if (targetContainer === root) {
-    // Fallback: if we couldn't find the header, ensure root doesn't hide it
+
+  if (!isInHeader && targetContainer === root) {
+    // Fallback: ensure container doesn't clip the button
     root.style.setProperty('overflow', 'visible', 'important');
     root.style.setProperty('contain', 'none', 'important');
   }
@@ -568,6 +610,10 @@ function ensureDownloadAllButton(group: GroupState): HTMLButtonElement {
 
   return button;
 }
+
+/* -----------------------------------------------------
+ * Download all click
+ * ---------------------------------------------------*/
 
 function handleDownloadAllClick(group: GroupState): void {
   // If a batch is already active or in feedback, ignore clicks

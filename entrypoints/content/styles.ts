@@ -572,139 +572,144 @@ export function injectStyles(): void {
       margin-top: 2px;
     }
 
-/* ===============================
- * 1b. DOWNLOAD ALL BUTTON (Header-aligned)
- * =============================== */
+    /* ===============================
+     * 1b. DOWNLOAD ALL BUTTON (Header-aligned)
+     * =============================== */
 
-.cqd-download-all-btn {
-  /* Progress control (0% to 100%) */
-  --cqd-progress: 0%;
-  position: absolute;
-  /* Default fallback pos if header injection fails: */
-  top: 12px;
-  right: 48px;
-  height: 40px;
-  z-index: 6;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 4px 12px;
-  border: none;
-  border-radius: 9999px;
-  background-color: var(--cqd-color-normal);
-  color: #ffffff;
-  box-shadow: var(--cqd-shadow-normal);
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  gap: 6px;
-  white-space: nowrap;
-  overflow: hidden;
-  transition:
-    box-shadow 0.2s ease,
-    transform 0.1s ease,
-    background-color 0.3s ease;
-  transform: translateZ(0);
-}
+    .cqd-download-all-btn {
+      /* Progress control (0% to 100%) */
+      --cqd-progress: 0%;
+      position: absolute;
+      top: 12px;
+      right: 48px;
+      height: 40px;
+      z-index: 6;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px 12px;
+      border: none;
+      border-radius: 9999px;
+      background-color: var(--cqd-color-normal);
+      color: #ffffff;
+      box-shadow: var(--cqd-shadow-normal);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      gap: 6px;
+      white-space: nowrap;
+      overflow: hidden;
+      transition:
+        box-shadow 0.2s ease,
+        transform 0.1s ease,
+        background-color 0.3s ease;
+      transform: translateZ(0);
+    }
 
-/* * If successfully injected into the Header row (the preferred location),
- * center it vertically relative to the author text/menu button.
- */
-.cqd-download-all-btn.cqd-in-header {
-  top: 50%;
-  transform: translateY(-50%) translateZ(0);
-}
+    /* When injected into the header flex structure */
+    .cqd-download-all-btn.cqd-in-header {
+      position: relative;
+      top: auto;
+      right: auto;
+      left: auto;
+      bottom: auto;
+      transform: none;
+      
+      /* Important: Margin to separate from the "Three Dots" menu */
+      margin-inline-end: 8px;
+      
+      /* Ensure it doesn't get crushed in flex rows */
+      flex-shrink: 0;
+      align-self: center;
+    }
 
-.cqd-download-all-btn.cqd-in-header:active {
-  transform: translateY(-50%) scale(0.97);
-}
+    /* RTL fallback only for non-header cases (absolute positioned at top corner) */
+    body[data-cqd-dir="rtl"] .cqd-download-all-btn:not(.cqd-in-header) {
+      right: auto;
+      left: 48px;
+    }
 
-body[data-cqd-dir="rtl"] .cqd-download-all-btn {
-  right: auto;
-  left: 48px;
-}
+    .cqd-download-all-btn:hover {
+      box-shadow: var(--cqd-shadow-hover);
+    }
 
-.cqd-download-all-btn:hover {
-  box-shadow: var(--cqd-shadow-hover);
-}
+    .cqd-download-all-btn:active {
+      transform: scale(0.97);
+    }
 
-.cqd-download-all-btn:active {
-  transform: scale(0.97);
-}
+    /* Keep pointer cursor even while disabled */
+    .cqd-download-all-btn[disabled] {
+      cursor: pointer;
+    }
 
-/* Keep pointer cursor even while disabled */
-.cqd-download-all-btn[disabled] {
-  cursor: pointer;
-}
+    /* FULL SUCCESS STATE (Solid Green) */
+    .cqd-download-all-btn.cqd-all-success {
+      background-color: var(--cqd-color-success);
+      box-shadow: var(--cqd-shadow-success);
+    }
 
-/* FULL SUCCESS STATE (Solid Green) */
-.cqd-download-all-btn.cqd-all-success {
-  background-color: var(--cqd-color-success);
-  box-shadow: var(--cqd-shadow-success);
-}
+    .cqd-download-all-btn.cqd-all-error {
+      background-color: var(--cqd-color-error);
+      box-shadow: var(--cqd-shadow-error);
+    }
 
-.cqd-download-all-btn.cqd-all-error {
-  background-color: var(--cqd-color-error);
-  box-shadow: var(--cqd-shadow-error);
-}
+    /* PROGRESS BAR OVERLAY (Fills up) */
+    .cqd-download-all-btn::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      z-index: 0;
 
-/* PROGRESS BAR OVERLAY (Fills up) */
-.cqd-download-all-btn::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  bottom: 0;
-  z-index: 0;
+      background-color: var(--cqd-color-success);
 
-  background-color: var(--cqd-color-success);
+      /* Width controlled by JS */
+      width: var(--cqd-progress);
+      transition: width 0.3s cubic-bezier(0.22, 0.61, 0.36, 1);
 
-  /* Width controlled by JS */
-  width: var(--cqd-progress);
-  transition: width 0.3s cubic-bezier(0.22, 0.61, 0.36, 1);
+      opacity: 1;
+    }
 
-  opacity: 1;
-}
+    .cqd-download-all-btn.cqd-all-success::after {
+      opacity: 0;
+    }
 
-.cqd-download-all-btn.cqd-all-success::after {
-  opacity: 0;
-}
+    /* Content layers */
+    .cqd-download-all-btn .cqd-download-all-main,
+    .cqd-download-all-btn .cqd-download-all-sub,
+    .cqd-download-all-btn .cqd-download-all-icon-wrapper {
+      position: relative;
+      z-index: 2;
+    }
 
-/* Content layers */
-.cqd-download-all-btn .cqd-download-all-main,
-.cqd-download-all-btn .cqd-download-all-sub,
-.cqd-download-all-btn .cqd-download-all-icon-wrapper {
-  position: relative;
-  z-index: 2;
-}
+    .cqd-download-all-btn .cqd-download-all-icon-wrapper {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
 
-.cqd-download-all-btn .cqd-download-all-icon-wrapper {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
+    .cqd-download-all-btn .cqd-download-all-icon {
+      width: 18px;
+      height: 18px;
+      background-image: url("${DOWNLOAD_ICON_SVG_URL}");
+      background-repeat: no-repeat;
+      background-position: center;
+      background-size: 18px 18px;
+      flex-shrink: 0;
+    }
 
-.cqd-download-all-btn .cqd-download-all-icon {
-  width: 18px;
-  height: 18px;
-  background-image: url("${DOWNLOAD_ICON_SVG_URL}");
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: 18px 18px;
-  flex-shrink: 0;
-}
+    .cqd-download-all-btn .cqd-download-all-main {
+      font-weight: 600;
+    }
 
-.cqd-download-all-btn .cqd-download-all-main {
-  font-weight: 600;
-}
-
-.cqd-download-all-btn .cqd-download-all-sub {
-  font-size: 11px;
-  opacity: 0.9;
-  margin-left: 4px;
-}
+    .cqd-download-all-btn .cqd-download-all-sub {
+      font-size: 11px;
+      opacity: 0.9;
+      margin-left: 4px;
+    }
 
   `.trim();
 
