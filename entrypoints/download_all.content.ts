@@ -78,10 +78,10 @@ export default defineContentScript({
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ['class', 'data-cqd-all-done'], // Watch for success state
+      attributeFilter: ['class', 'data-cqd-all-done'], // watch per-file status
     });
 
-    // Backup scan
+    // Backup scan (in case we miss something)
     window.setInterval(() => {
       registerButtonsInSubtree(document);
       scheduleRefresh();
@@ -220,6 +220,60 @@ function getCanonicalFileKey(btn: HTMLButtonElement): string {
 }
 
 /* -----------------------------------------------------
+ * File-level helpers (primary button & dedup)
+ * ---------------------------------------------------*/
+
+function getPrimaryButton(file: FileEntry): HTMLButtonElement | null {
+  if (file.buttons.size === 0) return null;
+
+  let primaryVisible: HTMLButtonElement | null = null;
+  let fallback: HTMLButtonElement | null = null;
+
+  for (const btn of file.buttons) {
+    if (!btn.isConnected) continue;
+    if (!fallback) fallback = btn;
+
+    // Only consider visually laid-out elements as "visible"
+    if (!btn.offsetParent) continue;
+
+    if (!primaryVisible) {
+      primaryVisible = btn;
+      continue;
+    }
+
+    // Choose the last one in DOM order (more likely to be the "real" visible one)
+    const pos = primaryVisible.compareDocumentPosition(btn);
+    if (pos & Node.DOCUMENT_POSITION_FOLLOWING) {
+      primaryVisible = btn;
+    }
+  }
+
+  return primaryVisible || fallback;
+}
+
+function normalizeFileButtons(file: FileEntry): void {
+  if (file.buttons.size <= 1) return;
+
+  const primary = getPrimaryButton(file);
+  if (!primary) return;
+
+  for (const btn of file.buttons) {
+    if (!btn.isConnected) continue;
+
+    if (btn === primary) {
+      // Primary stays visible & clickable
+      btn.style.removeProperty('display');
+      btn.style.removeProperty('visibility');
+      btn.style.removeProperty('pointer-events');
+    } else {
+      // Hide duplicates so we don't see a second layer of blue circles
+      btn.style.setProperty('display', 'none', 'important');
+      btn.style.setProperty('pointer-events', 'none', 'important');
+    }
+  }
+}
+
+/* -----------------------------------------------------
  * Refresh pipeline
  * ---------------------------------------------------*/
 
@@ -242,8 +296,8 @@ function scheduleRefresh(): void {
  * ---------------------------------------------------*/
 
 function updateGroupState(group: GroupState): void {
-  // Prune dead buttons
-  for (const [key, file] of group.files) {
+  // Prune dead buttons and normalize duplicates per file
+  for (const [key, file] of Array.from(group.files.entries())) {
     for (const btn of Array.from(file.buttons)) {
       if (!btn.isConnected) {
         file.buttons.delete(btn);
@@ -251,9 +305,13 @@ function updateGroupState(group: GroupState): void {
         buttonToFile.delete(btn);
       }
     }
+
     if (file.buttons.size === 0) {
       group.files.delete(key);
+      continue;
     }
+
+    normalizeFileButtons(file);
   }
 
   const totalFiles = group.files.size;
@@ -275,7 +333,7 @@ function updateGroupState(group: GroupState): void {
 
   const btn = ensureDownloadAllButton(group);
 
-  // Aggregate current DOM state (no sticky memory)
+  // Aggregate current DOM state directly from the single-file buttons
   let downloaded = 0;
   let failed = 0;
   let inProgress = 0;
@@ -288,10 +346,12 @@ function updateGroupState(group: GroupState): void {
     for (const b of file.buttons) {
       if (!b.isConnected) continue;
       const cls = b.classList;
+
       const isLoading =
         cls.contains('cqd-loading') || cls.contains('cqd-trying');
       const isSuccess =
-        cls.contains('cqd-success') || (b.dataset as any).cqdAllDone === 'true';
+        cls.contains('cqd-success') ||
+        (b.dataset as any).cqdAllDone === 'true';
       const isError = cls.contains('cqd-error');
 
       if (isLoading) someLoading = true;
@@ -326,15 +386,15 @@ function updateGroupState(group: GroupState): void {
   const allCompleted =
     downloaded + failed === totalFiles && inProgress === 0 && totalFiles > 0;
 
-  // Activation check
+  // Activation check: once any file has started, we consider the run "active"
   if (!group.activated && !noneStarted) {
     group.activated = true;
   }
 
-  // Reset classes
+  // Reset visual classes
   btn.classList.remove('cqd-all-success', 'cqd-all-error');
 
-  // Idle state: not yet activated OR everything back to idle
+  // Idle state: no downloads yet OR everything went back to idle
   if (!group.activated || noneStarted) {
     group.activated = group.activated && !noneStarted;
     group.isBusy = false;
@@ -345,13 +405,13 @@ function updateGroupState(group: GroupState): void {
     return;
   }
 
-  // Active / completed states
+  // From here: run is active or we’re in the success/error feedback window
+  btn.disabled = true;
+
+  // Active/completed states
   let mainText: string;
   let subText: string;
   let progressRatio = totalFiles > 0 ? downloaded / totalFiles : 0;
-
-  // Disable button while any file is still in progress
-  btn.disabled = inProgress > 0;
 
   if (allSucceeded) {
     mainText = t('downloaded') || 'Downloaded';
@@ -438,7 +498,7 @@ function ensureDownloadAllButton(group: GroupState): HTMLButtonElement {
   button.appendChild(mainSpan);
   button.appendChild(subSpan);
 
-  // POSITIONING: top-right of card (CSS handles top: -80px / right: 48px)
+  // Root container must allow the button to overflow slightly
   const computed = window.getComputedStyle(root);
   if (computed.position === 'static') {
     root.style.position = 'relative';
@@ -459,8 +519,8 @@ function ensureDownloadAllButton(group: GroupState): HTMLButtonElement {
 }
 
 function handleDownloadAllClick(group: GroupState): void {
-  // If anything is currently downloading, ignore clicks (prevents double batches)
-  if (group.isBusy) return;
+  // If anything is currently running or still in feedback, ignore clicks
+  if (group.isBusy || group.activated) return;
 
   group.activated = true;
 
@@ -475,16 +535,13 @@ function handleDownloadAllClick(group: GroupState): void {
     btn.disabled = true;
   }
 
+  // Trigger at most ONE primary button per file, and only if idle/error
   for (const file of group.files.values()) {
-    let clicked = false;
-    for (const btn of file.buttons) {
-      if (!btn.isConnected) continue;
-      const s = getSingleButtonState(btn);
-      if (s === 'idle' || s === 'error') {
-        btn.click();
-        clicked = true;
-        break;
-      }
+    const primary = getPrimaryButton(file);
+    if (!primary) continue;
+    const s = getSingleButtonState(primary);
+    if (s === 'idle' || s === 'error') {
+      primary.click();
     }
   }
 

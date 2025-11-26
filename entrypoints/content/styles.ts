@@ -571,139 +571,134 @@ export function injectStyles(): void {
       margin-top: 2px;
     }
 
-    /* ===============================
-     * 1b. DOWNLOAD ALL BUTTON (Redesigned & Repositioned)
-     * =============================== */
+/* ===============================
+ * 1b. DOWNLOAD ALL BUTTON (Header-aligned)
+ * =============================== */
 
-    .cqd-download-all-btn {
-      /* Progress control (0% to 100%) */
-      --cqd-progress: 0%;
+.cqd-download-all-btn {
+  /* Progress control (0% to 100%) */
+  --cqd-progress: 0%;
 
-      position: absolute;
-      /* Positioning in Header area (approx left of 3-dots) */
-      top: -80px;
-      right: 48px;
-      z-index: 6;
+  position: absolute;
 
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 4px 12px;
-      border: none;
-      border-radius: 9999px;
+  /* Position inside the post card, near the 3-dots */
+  top: 12px;       /* <— key change: small positive offset */
+  right: 48px;
+  z-index: 6;
 
-      /* Solid Colors (No Blur) */
-      background-color: var(--cqd-color-normal);
-      color: #ffffff;
-      box-shadow: var(--cqd-shadow-normal);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 12px;
+  border: none;
+  border-radius: 9999px;
 
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      gap: 6px;
-      white-space: nowrap;
-      overflow: hidden;
+  background-color: var(--cqd-color-normal);
+  color: #ffffff;
+  box-shadow: var(--cqd-shadow-normal);
 
-      height: 40px; /* Match single-download button height */
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  gap: 6px;
+  white-space: nowrap;
+  overflow: hidden;
 
-      transition:
-        box-shadow 0.2s ease,
-        transform 0.1s ease,
-        background-color 0.3s ease;
+  transition:
+    box-shadow 0.2s ease,
+    transform 0.1s ease,
+    background-color 0.3s ease;
 
-      transform: translateZ(0);
-    }
+  transform: translateZ(0);
+}
 
-    body[data-cqd-dir="rtl"] .cqd-download-all-btn {
-      right: auto;
-      left: 48px;
-    }
+body[data-cqd-dir="rtl"] .cqd-download-all-btn {
+  right: auto;
+  left: 48px;
+}
 
-    .cqd-download-all-btn:not(:disabled):hover {
-      box-shadow: var(--cqd-shadow-hover);
-      transform: translateY(-1px);
-    }
+.cqd-download-all-btn:hover {
+  box-shadow: var(--cqd-shadow-hover);
+  transform: translateY(-1px);
+}
 
-    .cqd-download-all-btn:not(:disabled):active {
-      transform: translateY(0);
-    }
+.cqd-download-all-btn:active {
+  transform: translateY(0);
+}
 
-    .cqd-download-all-btn:disabled {
-      cursor: default;
-      opacity: 0.7;
-      box-shadow: none;
-      transform: none;
-    }
+/* Keep pointer cursor even while disabled (you already wanted this behavior) */
+.cqd-download-all-btn[disabled] {
+  cursor: pointer;
+}
 
-    /* FULL SUCCESS STATE (Solid Green) */
-    .cqd-download-all-btn.cqd-all-success {
-      background-color: var(--cqd-color-success);
-      box-shadow: var(--cqd-shadow-success);
-    }
+/* FULL SUCCESS STATE (Solid Green) */
+.cqd-download-all-btn.cqd-all-success {
+  background-color: var(--cqd-color-success);
+  box-shadow: var(--cqd-shadow-success);
+}
 
-    .cqd-download-all-btn.cqd-all-error {
-      background-color: var(--cqd-color-error);
-      box-shadow: var(--cqd-shadow-error);
-    }
+.cqd-download-all-btn.cqd-all-error {
+  background-color: var(--cqd-color-error);
+  box-shadow: var(--cqd-shadow-error);
+}
 
-    /* PROGRESS BAR OVERLAY (Fills up) */
-    .cqd-download-all-btn::after {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      bottom: 0;
-      z-index: 0;
+/* PROGRESS BAR OVERLAY (Fills up) */
+.cqd-download-all-btn::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 0;
 
-      background-color: var(--cqd-color-success);
+  background-color: var(--cqd-color-success);
 
-      /* Width controlled by JS */
-      width: var(--cqd-progress);
-      transition: width 0.3s cubic-bezier(0.22, 0.61, 0.36, 1);
+  /* Width controlled by JS */
+  width: var(--cqd-progress);
+  transition: width 0.3s cubic-bezier(0.22, 0.61, 0.36, 1);
 
-      opacity: 1;
-    }
+  opacity: 1;
+}
 
-    /* When fully successful, the main bg becomes green anyway, so we can hide progress */
-    .cqd-download-all-btn.cqd-all-success::after {
-      opacity: 0;
-    }
+.cqd-download-all-btn.cqd-all-success::after {
+  opacity: 0;
+}
 
-    /* Content layers */
-    .cqd-download-all-btn .cqd-download-all-main,
-    .cqd-download-all-btn .cqd-download-all-sub,
-    .cqd-download-all-btn .cqd-download-all-icon-wrapper {
-      position: relative;
-      z-index: 2;
-    }
+/* Content layers */
+.cqd-download-all-btn .cqd-download-all-main,
+.cqd-download-all-btn .cqd-download-all-sub,
+.cqd-download-all-btn .cqd-download-all-icon-wrapper {
+  position: relative;
+  z-index: 2;
+}
 
-    .cqd-download-all-icon-wrapper {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-    }
+.cqd-download-all-btn .cqd-download-all-icon-wrapper {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
 
-    .cqd-download-all-icon {
-      width: 18px;
-      height: 18px;
-      background-image: url("${DOWNLOAD_ICON_SVG_URL}");
-      background-repeat: no-repeat;
-      background-position: center;
-      background-size: 18px 18px;
-      flex-shrink: 0;
-    }
+.cqd-download-all-btn .cqd-download-all-icon {
+  width: 18px;
+  height: 18px;
+  background-image: url("${DOWNLOAD_ICON_SVG_URL}");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 18px 18px;
+  flex-shrink: 0;
+}
 
-    .cqd-download-all-main {
-      font-weight: 600;
-    }
+.cqd-download-all-btn .cqd-download-all-main {
+  font-weight: 600;
+}
 
-    .cqd-download-all-sub {
-      font-size: 11px;
-      opacity: 0.9;
-      margin-left: 4px;
-    }
+.cqd-download-all-btn .cqd-download-all-sub {
+  font-size: 11px;
+  opacity: 0.9;
+  margin-left: 4px;
+}
 
   `.trim();
 
