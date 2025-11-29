@@ -631,7 +631,7 @@ export function injectStyles(): void {
     }
 
     .cqd-download-all-btn:hover {
-      box-shadow: var(--cqd-shadow-hover);
+      box-shadow: var(--cqd-shadow-normal-strong);
     }
 
     .cqd-download-all-btn:active {

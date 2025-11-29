@@ -502,7 +502,7 @@ function scheduleGroupReset(group: GroupState): void {
  * Find the *header row* for this specific group:
  * - Prefer header inside the same container (post view)
  * - Otherwise, for a stream card: look for a header sibling above the
- * data-stream-item container, but do NOT fall back to a global header.
+ *   data-stream-item container, but do NOT fall back to a global header.
  */
 function findHeaderContainer(root: HTMLElement): HTMLElement | null {
   // 1) Prefer .N5dSp as explicitly requested by user (Post View Header)
@@ -560,6 +560,11 @@ function findHeaderContainer(root: HTMLElement): HTMLElement | null {
   return null;
 }
 
+/**
+ * STREAM vs POST placement:
+ * - Stream view (div[data-stream-item-id]): use the simple insertBefore logic that already worked.
+ * - Post view (.N5dSp header): wrap 3-dots + download-all in a right-side wrapper to keep 3-dots anchored.
+ */
 function ensureDownloadAllButton(group: GroupState): HTMLButtonElement {
   const existing = group.downloadAllBtn;
   if (existing && existing.isConnected) return existing;
@@ -567,18 +572,20 @@ function ensureDownloadAllButton(group: GroupState): HTMLButtonElement {
   const root = group.root;
 
   const headerContainer = findHeaderContainer(root);
+  const isStreamView = root.matches(GROUP_SELECTOR);
+  const isPostHeader =
+    !!headerContainer && headerContainer.classList.contains('N5dSp');
+
   const targetContainer = headerContainer || root;
   const isInHeader = !!headerContainer;
 
-  // Ensure the target container allows wrapping so the button goes under if text is huge
-  // We forcefully enable flex wrapping to handle "text is so big -> under three dots" case.
+  // Layout tweaks so the header/root can host our button without clipping
   targetContainer.style.setProperty('flex-wrap', 'wrap', 'important');
   targetContainer.style.setProperty('align-items', 'center', 'important');
-  
-  // If it's the N5dSp container, we might want to ensure it's flex.
-  // Usually it is, but let's be safe.
+
   if (targetContainer.classList.contains('N5dSp')) {
-      targetContainer.style.display = 'flex';
+    // Post header container is normally flex, but be safe.
+    targetContainer.style.display = 'flex';
   }
 
   const button = document.createElement('button');
@@ -634,8 +641,93 @@ function ensureDownloadAllButton(group: GroupState): HTMLButtonElement {
     handleDownloadAllClick(group);
   });
 
-  // LOGIC CHANGE FROM ORIGINAL: Position between text and three-dots.
-  // We look for the "options" button (kebab menu) and insert BEFORE it.
+  // --- CASE 1: Post view (.N5dSp header) → wrapper around 3-dots ---
+  if (isPostHeader && headerContainer) {
+    placeDownloadButtonForPostView(button, headerContainer);
+  }
+  // --- CASE 2: Stream view (div[data-stream-item-id]) ---
+  else if (isStreamView) {
+    placeDownloadButtonForStreamView(button, headerContainer || root);
+  }
+  // --- CASE 3: Generic fallback ---
+  else {
+    targetContainer.appendChild(button);
+    button.style.marginInlineStart = '8px';
+  }
+
+  group.downloadAllBtn = button;
+  return button;
+}
+
+/**
+ * Post view: keep the 3-dots anchored by wrapping it together with Download All
+ * in a small inline-flex wrapper that carries the "right side" behavior.
+ */
+function placeDownloadButtonForPostView(
+  button: HTMLButtonElement,
+  headerContainer: HTMLElement,
+): void {
+  const searchRoot = headerContainer;
+
+  const threeDots =
+    searchRoot.querySelector<HTMLElement>(
+      'div[role="button"][aria-haspopup="true"]',
+    ) ||
+    searchRoot.querySelector<HTMLElement>(
+      'div[role="button"][aria-label*="options"]',
+    ) ||
+    searchRoot.querySelector<HTMLElement>(
+      'div[role="button"][aria-label*="menu"]',
+    ) ||
+    searchRoot.querySelector<HTMLElement>('.pYTkkf-Bz112c-LgbsSe');
+
+  if (threeDots && threeDots !== button) {
+    const dotsParent = threeDots.parentElement as HTMLElement | null;
+    if (dotsParent) {
+      let rightWrapper = dotsParent.querySelector<HTMLElement>(
+        '[data-cqd-right-wrapper="1"]',
+      );
+
+      const dotsComputed = window.getComputedStyle(threeDots);
+
+      if (!rightWrapper || !rightWrapper.contains(threeDots)) {
+        rightWrapper = document.createElement('span');
+        rightWrapper.dataset.cqdRightWrapper = '1';
+        rightWrapper.style.display = 'inline-flex';
+        rightWrapper.style.alignItems = 'center';
+        rightWrapper.style.gap = '8px';
+
+        // If the 3-dots uses margin-left:auto to pin itself right, move that onto the wrapper
+        if (dotsComputed.marginLeft === 'auto') {
+          threeDots.style.marginLeft = '0';
+          rightWrapper.style.marginLeft = 'auto';
+        }
+
+        // Replace 3-dots position with wrapper, then move 3-dots inside
+        dotsParent.insertBefore(rightWrapper, threeDots);
+        rightWrapper.appendChild(threeDots);
+      }
+
+      // [Download all][⋮] — keeps the ⋮ visually at the same right anchor
+      rightWrapper.insertBefore(button, rightWrapper.firstChild);
+      button.style.marginInlineEnd = '4px';
+      return;
+    }
+  }
+
+  // Fallback: just append at the end of header
+  searchRoot.appendChild(button);
+  button.style.marginInlineStart = '8px';
+}
+
+/**
+ * Stream view: reuse the simple, working "insertBefore" behavior that you had.
+ * It places Download All just before the menu button in the same header row.
+ */
+function placeDownloadButtonForStreamView(
+  button: HTMLButtonElement,
+  targetContainer: HTMLElement,
+): void {
   const threeDots =
     targetContainer.querySelector<HTMLElement>(
       'div[role="button"][aria-haspopup="true"]',
@@ -646,7 +738,6 @@ function ensureDownloadAllButton(group: GroupState): HTMLButtonElement {
     targetContainer.querySelector<HTMLElement>(
       'div[role="button"][aria-label*="menu"]',
     ) ||
-    // Fallback for known Google Classroom menu button class if ARIA fails
     targetContainer.querySelector<HTMLElement>('.pYTkkf-Bz112c-LgbsSe');
 
   if (
@@ -655,7 +746,6 @@ function ensureDownloadAllButton(group: GroupState): HTMLButtonElement {
     threeDots.parentNode === targetContainer
   ) {
     targetContainer.insertBefore(button, threeDots);
-    // Add spacing for LTR and RTL support
     button.style.marginInlineEnd = '8px';
     button.style.marginInlineStart = '8px';
   } else {
@@ -663,10 +753,6 @@ function ensureDownloadAllButton(group: GroupState): HTMLButtonElement {
     targetContainer.appendChild(button);
     button.style.marginInlineStart = '8px';
   }
-
-  group.downloadAllBtn = button;
-
-  return button;
 }
 
 /* -----------------------------------------------------
