@@ -184,13 +184,27 @@ function cleanupRemovedButtons(root: HTMLElement): void {
 
 /**
  * Group root:
- *   - Stream:  div[data-stream-item-id] per card
- *   - Post view: fallback to <main> / [role="main"]
+ * - Stream:  div[data-stream-item-id] per card
+ * - Post view: nearest ancestor that contains a .N5dSp header
+ * - Fallback: <main> / [role="main"]
  */
 function findGroupRoot(btn: HTMLElement): HTMLElement | null {
+  // 1) Stream card on the main stream page
   const post = btn.closest<HTMLElement>(GROUP_SELECTOR);
   if (post) return post;
 
+  // 2) Post view: walk up ancestors until we find a container
+  //    that has a .N5dSp header inside it. That container will
+  //    include both header (author, date, 3-dots) and attachments.
+  let node: HTMLElement | null = btn.parentElement;
+  while (node && node !== document.body && node !== document.documentElement) {
+    if (node.querySelector('.N5dSp')) {
+      return node;
+    }
+    node = node.parentElement;
+  }
+
+  // 3) Generic fallback to main content container
   const main =
     btn.closest<HTMLElement>('main') ||
     btn.closest<HTMLElement>('div[role="main"]');
@@ -486,19 +500,23 @@ function scheduleGroupReset(group: GroupState): void {
 
 /**
  * Find the *header row* for this specific group:
- *   - Prefer header inside the same container (post view)
- *   - Otherwise, for a stream card: look for a header sibling above the
- *     data-stream-item container, but do NOT fall back to a global header.
+ * - Prefer header inside the same container (post view)
+ * - Otherwise, for a stream card: look for a header sibling above the
+ * data-stream-item container, but do NOT fall back to a global header.
  */
 function findHeaderContainer(root: HTMLElement): HTMLElement | null {
-  // 1) Look *inside* the root itself (post view: main contains .N5dSp above content)
+  // 1) Prefer .N5dSp as explicitly requested by user (Post View Header)
+  // We search for it inside the root.
+  const n5dsp = root.querySelector<HTMLElement>('.N5dSp');
+  if (n5dsp) return n5dsp;
+
+  // 2) Look *inside* the root itself (standard stream item or alternate view)
   const internalHeader =
     root.querySelector<HTMLElement>('.JZicYb.gmNu1d') ||
-    root.querySelector<HTMLElement>('.N5dSp') ||
     root.querySelector<HTMLElement>('.JZicYb');
   if (internalHeader) return internalHeader;
 
-  // 2) Walk ancestors and, for each parent, find the last header that appears
+  // 3) Walk ancestors and, for each parent, find the last header that appears
   //    before `root` in DOM order, within that parent's subtree.
   let current: HTMLElement | null = root;
   while (
@@ -511,7 +529,7 @@ function findHeaderContainer(root: HTMLElement): HTMLElement | null {
 
     const headers = Array.from(
       parent.querySelectorAll<HTMLElement>(
-        '.JZicYb.gmNu1d, .N5dSp, .JZicYb',
+        '.N5dSp, .JZicYb.gmNu1d, .N5dSp, .JZicYb',
       ),
     );
 
@@ -538,7 +556,7 @@ function findHeaderContainer(root: HTMLElement): HTMLElement | null {
     current = parent;
   }
 
-  // 3) No header found locally; caller will fall back to root itself.
+  // 4) No header found locally; caller will fall back to root itself.
   return null;
 }
 
@@ -551,6 +569,17 @@ function ensureDownloadAllButton(group: GroupState): HTMLButtonElement {
   const headerContainer = findHeaderContainer(root);
   const targetContainer = headerContainer || root;
   const isInHeader = !!headerContainer;
+
+  // Ensure the target container allows wrapping so the button goes under if text is huge
+  // We forcefully enable flex wrapping to handle "text is so big -> under three dots" case.
+  targetContainer.style.setProperty('flex-wrap', 'wrap', 'important');
+  targetContainer.style.setProperty('align-items', 'center', 'important');
+  
+  // If it's the N5dSp container, we might want to ensure it's flex.
+  // Usually it is, but let's be safe.
+  if (targetContainer.classList.contains('N5dSp')) {
+      targetContainer.style.display = 'flex';
+  }
 
   const button = document.createElement('button');
   button.type = 'button';
@@ -605,7 +634,36 @@ function ensureDownloadAllButton(group: GroupState): HTMLButtonElement {
     handleDownloadAllClick(group);
   });
 
-  targetContainer.appendChild(button);
+  // LOGIC CHANGE FROM ORIGINAL: Position between text and three-dots.
+  // We look for the "options" button (kebab menu) and insert BEFORE it.
+  const threeDots =
+    targetContainer.querySelector<HTMLElement>(
+      'div[role="button"][aria-haspopup="true"]',
+    ) ||
+    targetContainer.querySelector<HTMLElement>(
+      'div[role="button"][aria-label*="options"]',
+    ) ||
+    targetContainer.querySelector<HTMLElement>(
+      'div[role="button"][aria-label*="menu"]',
+    ) ||
+    // Fallback for known Google Classroom menu button class if ARIA fails
+    targetContainer.querySelector<HTMLElement>('.pYTkkf-Bz112c-LgbsSe');
+
+  if (
+    threeDots &&
+    threeDots !== button &&
+    threeDots.parentNode === targetContainer
+  ) {
+    targetContainer.insertBefore(button, threeDots);
+    // Add spacing for LTR and RTL support
+    button.style.marginInlineEnd = '8px';
+    button.style.marginInlineStart = '8px';
+  } else {
+    // Fallback: just append to end
+    targetContainer.appendChild(button);
+    button.style.marginInlineStart = '8px';
+  }
+
   group.downloadAllBtn = button;
 
   return button;
