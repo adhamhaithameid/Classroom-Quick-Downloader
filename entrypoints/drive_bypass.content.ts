@@ -1,4 +1,5 @@
 // filepath: entrypoints/drive_bypass.content.ts
+import { whenExtensionEnabled } from './content/flags';
 
 type PageState =
   | 'STATE_LOADING'
@@ -14,80 +15,83 @@ export default defineContentScript({
   // Start early so we can react quickly to 403 / virus / preview pages
   runAt: 'document_start',
   main() {
-    let virusHandled = false;
-    let previewClicked = false;
-    let auth403Reported = false;
+    // ⬇️ Only run this helper when the extension is enabled
+    whenExtensionEnabled(() => {
+      let virusHandled = false;
+      let previewClicked = false;
+      let auth403Reported = false;
 
-    const tick = () => {
-      const url = window.location.href;
-      const body = document.body;
-      const bodyText = (body?.innerText || '').toLowerCase();
+      const tick = () => {
+        const url = window.location.href;
+        const body = document.body;
+        const bodyText = (body?.innerText || '').toLowerCase();
 
-      /* --------------------------------------------------
-       * 1) Virus / large file warning → auto "Download anyway"
-       * -------------------------------------------------- */
-      if (!virusHandled && isVirusWarningPage(bodyText)) {
-        console.log(
-          '[CQD] Virus / large-file warning detected. Auto-clicking "Download anyway"...',
-        );
-        if (handleVirusBypassClick()) {
-          virusHandled = true;
-
-          // Tell background "bypass triggered, flip UI to success"
-          notifySuccessFlood();
-          return;
-        }
-      }
-
-      /* --------------------------------------------------
-       * 2) Drive Preview UI → click toolbar Download
-       *    (NORMAL SMALL / MEDIUM files path)
-       * -------------------------------------------------- */
-      if (!previewClicked && isDrivePreviewUI()) {
-        const clicked = clickDriveToolbarDownload();
-        if (clicked) {
-          previewClicked = true;
+        /* --------------------------------------------------
+         * 1) Virus / large file warning → auto "Download anyway"
+         * -------------------------------------------------- */
+        if (!virusHandled && isVirusWarningPage(bodyText)) {
           console.log(
-            '[CQD] Drive preview toolbar Download clicked. Notifying background success…',
+            '[CQD] Virus / large-file warning detected. Auto-clicking "Download anyway"...',
           );
+          if (handleVirusBypassClick()) {
+            virusHandled = true;
 
-          // Same success path: preview UI triggered the real file download
-          notifySuccessFlood();
+            // Tell background "bypass triggered, flip UI to success"
+            notifySuccessFlood();
+            return;
+          }
         }
-      }
 
-      /* --------------------------------------------------
-       * 3) Hard 403 on Drive (google.com or usercontent) → report to background
-       *    (when authuser loop in background should take over)
-       * -------------------------------------------------- */
-      if (
-        !auth403Reported &&
-        (url.includes('drive.google.com') ||
-          url.includes('drive.usercontent.google.com')) &&
-        isAccessDeniedPage(bodyText)
-      ) {
-        auth403Reported = true;
-        console.log(
-          '[CQD] Hard 403 in Drive tab. Reporting CQD_403_SEEN to background…',
-        );
-        try {
-          chrome.runtime.sendMessage({ type: 'CQD_403_SEEN' });
-        } catch {
-          /* ignore */
+        /* --------------------------------------------------
+         * 2) Drive Preview UI → click toolbar Download
+         *    (NORMAL SMALL / MEDIUM files path)
+         * -------------------------------------------------- */
+        if (!previewClicked && isDrivePreviewUI()) {
+          const clicked = clickDriveToolbarDownload();
+          if (clicked) {
+            previewClicked = true;
+            console.log(
+              '[CQD] Drive preview toolbar Download clicked. Notifying background success…',
+            );
+
+            // Same success path: preview UI triggered the real file download
+            notifySuccessFlood();
+          }
         }
-      }
-    };
 
-    // Run immediately & keep watching – Drive updates DOM dynamically
-    tick();
+        /* --------------------------------------------------
+         * 3) Hard 403 on Drive (google.com or usercontent) → report to background
+         *    (when authuser loop in background should take over)
+         * -------------------------------------------------- */
+        if (
+          !auth403Reported &&
+          (url.includes('drive.google.com') ||
+            url.includes('drive.usercontent.google.com')) &&
+          isAccessDeniedPage(bodyText)
+        ) {
+          auth403Reported = true;
+          console.log(
+            '[CQD] Hard 403 in Drive tab. Reporting CQD_403_SEEN to background…',
+          );
+          try {
+            chrome.runtime.sendMessage({ type: 'CQD_403_SEEN' });
+          } catch {
+            /* ignore */
+          }
+        }
+      };
 
-    // Slightly faster than before: every 300 ms (was 500 ms)
-    const intervalId = window.setInterval(tick, 300);
+      // Run immediately & keep watching – Drive updates DOM dynamically
+      tick();
 
-    // Safety: stop after ~45s if nothing interesting happens
-    window.setTimeout(() => {
-      window.clearInterval(intervalId);
-    }, 45000);
+      // Slightly faster than before: every 300 ms (was 500 ms)
+      const intervalId = window.setInterval(tick, 300);
+
+      // Safety: stop after ~45s if nothing interesting happens
+      window.setTimeout(() => {
+        window.clearInterval(intervalId);
+      }, 45000);
+    });
   },
 });
 
