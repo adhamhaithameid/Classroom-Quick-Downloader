@@ -57,12 +57,8 @@ body {
 #root {
   height: 100%;
   width: 100%;
-  /* display: flex;
-  flex-direction: column; */
   position: relative;
   overflow: hidden;
-  /* background: var(--cqd-shell-bg);
-  min-height: 100px; */
 }
 
 .cqd-app {
@@ -101,7 +97,7 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 4px 0 10px;
+  padding: 4px 0 4px;
 }
 
 .cqd-brand-logo {
@@ -141,7 +137,6 @@ body {
   border-radius: 50%;
   background-color: #22c55e;
   box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.25);
-  /* transition: all 0.2s ease; */
   animation: pulse 2s infinite; 
 }
 
@@ -187,49 +182,6 @@ body {
 }
 
 /* ===============================
- * Tabs – pill group
- * =============================== */
-
-.cqd-tabs {
-  display: flex;
-  padding: 4px;
-  background-color: var(--cqd-bg);
-  border-radius: 999px;
-  border: 1px solid var(--cqd-border-subtle);
-  gap: 4px;
-}
-
-.cqd-tab {
-  flex: 1;
-  border: none;
-  background: transparent;
-  padding: 7px 10px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--cqd-text-muted);
-  cursor: pointer;
-  border-radius: 999px;
-  transition:
-    background-color var(--cqd-transition-fast),
-    color var(--cqd-transition-fast),
-    box-shadow var(--cqd-transition-fast),
-    transform var(--cqd-transition-fast);
-}
-
-.cqd-tab:hover {
-  color: var(--cqd-text-main);
-  background-color: #ffffff;
-  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
-  transform: translateY(-0.5px);
-}
-
-.cqd-tab-active {
-  color: var(--cqd-text-main);
-  background-color: #ffffff;
-  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.16);
-}
-
-/* ===============================
  * Content Area / Panels
  * =============================== */
 
@@ -237,30 +189,15 @@ body {
   margin-top: 8px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 16px; /* Increased gap for vertical stacking */
   min-height: 0;
+  padding-bottom: 20px;
 }
 
 .cqd-panel {
-  flex: 1;
   display: flex;
   min-height: 0;
-}
-
-/* Animation */
-.animate-enter {
-  animation: cqd-slideUpFade 0.25s cubic-bezier(0.2, 0, 0, 1);
-}
-
-@keyframes cqd-slideUpFade {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  width: 100%;
 }
 
 /* ===============================
@@ -328,7 +265,7 @@ body {
  * =============================== */
 
 .cqd-card {
-  position: sticky;
+  /* Removed sticky positioning so they stack naturally */
   background-color: #ffffff;
   border-radius: var(--cqd-radius-xl);
   padding: 16px 16px;
@@ -336,12 +273,11 @@ body {
   box-shadow: var(--cqd-shadow-soft);
   display: flex;
   flex-direction: column;
-  flex: 1;
-  min-height: 0;
+  flex: 0 0 auto; /* Don't stretch to fill height */
+  width: 100%;
 }
 
 .cqd-card-header {
-  margin-bottom: 12px;
   flex-shrink: 0;
 }
 
@@ -461,6 +397,7 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
+  margin-top: 5px;
   padding: 10px 10px;
   border-radius: 999px;
   transition:
@@ -471,7 +408,6 @@ body {
 
 .cqd-toggle-row:hover {
   background-color: var(--cqd-surface);
-  transform: translateY(-0.5px);
 }
 
 .cqd-toggle-row-primary {
@@ -604,7 +540,6 @@ body {
   cursor: pointer;
   transition: all var(--cqd-transition-fast);
   text-decoration: none;
-  /* Removed fixed width 15% and max-width */
   width: 40px;
   flex: 0 auto 0; 
   background: #ffffff;
@@ -679,10 +614,10 @@ body {
  * =============================== */
 
 .cqd-footer {
-    position: sticky;
+  margin-top: 4px;
   padding: 8px 0 10px;
   border-top: 1px solid var(--cqd-border-subtle);
-  background-color: var(--cqd-shell-bg);
+  /* background-color: var(--cqd-shell-bg); */
   text-align: center;
 }
 
