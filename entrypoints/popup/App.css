@@ -135,11 +135,12 @@ body {
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background-color: #22c55e;
-  box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.25);
-  animation: pulse 2s infinite; 
+  background-color: #cbd5e1; /* Default to Gray */
+  box-shadow: none;
+  transition: all 0.2s ease;
 }
 
+/* Pulse Animation */
 @-webkit-keyframes pulse {
   0% {
     -webkit-box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.6);
@@ -169,6 +170,7 @@ body {
 .cqd-brand-status-dot.on {
   background-color: #22c55e;
   box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.25);
+  animation: pulse 2s infinite; 
 }
 
 .cqd-brand-version {
@@ -408,6 +410,12 @@ body {
 
 .cqd-toggle-row:hover {
   background-color: var(--cqd-surface);
+}
+
+.cqd-toggle-row.disabled {
+  opacity: 0.6;
+  pointer-events: none;
+  filter: grayscale(100%);
 }
 
 .cqd-toggle-row-primary {
@@ -734,4 +742,15 @@ body {
   box-shadow:
     0 0 0 1px rgba(37, 99, 235, 0.4),
     0 9px 18px rgba(15, 23, 42, 0.26);
+}
+
+/* Disabled State Visuals (Gray out) */
+.cqd-switch input:disabled + .cqd-switch-slider {
+  background-color: #e5e7eb; /* Light Gray */
+  cursor: not-allowed;
+  filter: grayscale(100%);
+}
+
+.cqd-switch input:disabled + .cqd-switch-slider .cqd-switch-circle {
+  box-shadow: none;
 }
