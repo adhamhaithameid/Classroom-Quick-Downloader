@@ -37,6 +37,9 @@ type ToggleRowProps = {
   primary?: boolean;
 };
 
+// --- Analytics Helper Types ---
+type StatItem = { id: string; label: string; value: number; color: string };
+
 function App() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [saving, setSaving] = useState(false);
@@ -46,6 +49,15 @@ function App() {
   const [shareStatus, setShareStatus] = useState<'idle' | 'copied' | 'error'>('idle');
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
+
+  // --- MOCK DATA FOR ANALYTICS (Replace with real data logic later) ---
+  const stats: StatItem[] = [
+    { id: 'docs', label: 'Docs', value: 12, color: 'var(--cqd-blue)' },
+    { id: 'pdf', label: 'PDFs', value: 8, color: 'var(--cqd-red)' },
+    { id: 'images', label: 'Images', value: 5, color: '#10b981' },
+  ];
+  
+  const totalDownloads = stats.reduce((acc, curr) => acc + curr.value, 0);
 
   // Load current settings + version on mount
   useEffect(() => {
@@ -164,15 +176,6 @@ function App() {
     );
   }
 
-  // Helper to quickly toggle other features if you add them to the UI later
-  // function handleToggleFeature(key: keyof Settings) {
-  //   if (!settings) return;
-  //   updateSettings(
-  //     { [key]: !settings[key] } as Partial<Settings>,
-  //     { showReloadHint: true },
-  //   );
-  // }
-
   async function handleShareClick() {
     setShareStatus('idle');
     const linkToCopy = EXTENSION_STORE_URL;
@@ -188,6 +191,26 @@ function App() {
       setShareStatus('error');
     }
   }
+
+  // --- Donut Chart Calculation ---
+  // Radius and Circumference
+  const radius = 40;
+  const circumference = 2 * Math.PI * radius;
+  let cumulativeOffset = 0;
+
+  const chartSegments = stats.map((stat) => {
+    // If total is 0, prevent division by zero
+    const percentage = totalDownloads === 0 ? 0 : stat.value / totalDownloads;
+    const strokeLength = percentage * circumference;
+    const offset = cumulativeOffset;
+    cumulativeOffset += strokeLength;
+
+    return {
+      ...stat,
+      strokeLength,
+      offset: -offset, // Negative to rotate clockwise correctly in SVG
+    };
+  });
 
   const isLoadingSettings = settings == null;
 
@@ -252,34 +275,67 @@ function App() {
               <div className="cqd-card-header">
                 <h2 className="cqd-card-title">Download Activity</h2>
                 <p className="cqd-card-subtitle">
-                  High-level overview of your Classroom downloads.
+                  Overview of your Classroom downloads.
                 </p>
               </div>
               <div className="cqd-analytics-layout">
-                <div className="cqd-analytics-circle" aria-hidden="true">
+                
+                {/* SVG Ring Chart */}
+                <div className="cqd-analytics-circle-wrapper">
+                  <svg
+                    width="100"
+                    height="100"
+                    viewBox="0 0 100 100"
+                    className="cqd-analytics-svg"
+                  >
+                    {/* Background Ring (for empty state or gap fill) */}
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r={radius}
+                      fill="none"
+                      stroke="var(--cqd-surface)"
+                      strokeWidth="10"
+                    />
+
+                    {/* Data Segments */}
+                    {totalDownloads > 0 &&
+                      chartSegments.map((seg) => (
+                        <circle
+                          key={seg.id}
+                          cx="50"
+                          cy="50"
+                          r={radius}
+                          fill="none"
+                          stroke={seg.color}
+                          strokeWidth="10"
+                          strokeDasharray={`${seg.strokeLength} ${circumference}`}
+                          strokeDashoffset={seg.offset}
+                          className="cqd-ring-segment"
+                        >
+                          <title>{`${seg.label}: ${seg.value}`}</title>
+                        </circle>
+                      ))}
+                  </svg>
+
+                  {/* Centered Text */}
                   <div className="cqd-analytics-circle-inner">
-                    <div className="cqd-analytics-main-number">0</div>
-                    <div className="cqd-analytics-main-label">Files</div>
+                    <div className="cqd-analytics-main-number">{totalDownloads}</div>
                   </div>
                 </div>
+
                 <div className="cqd-analytics-side">
                   <ul className="cqd-analytics-legend">
-                    <li>
-                      <span className="cqd-legend-dot cqd-legend-docs" />
-                      Docs / Slides
-                    </li>
-                    <li>
-                      <span className="cqd-legend-dot cqd-legend-pdf" />
-                      PDFs
-                    </li>
-                    <li>
-                      <span className="cqd-legend-dot cqd-legend-image" />
-                      Images
-                    </li>
+                    {stats.map((stat) => (
+                      <li key={stat.id}>
+                        <span
+                          className="cqd-legend-dot"
+                          style={{ backgroundColor: stat.color }}
+                        />
+                        {stat.label}
+                      </li>
+                    ))}
                   </ul>
-                  <p className="cqd-muted-text">
-                    Live analytics are coming in a future update.
-                  </p>
                 </div>
               </div>
             </div>
@@ -305,10 +361,6 @@ function App() {
                   disabled={isLoadingSettings}
                   primary
                 />
-                
-                {/* Add additional ToggleRows here for other flags (downloadAll, etc)
-                  when you want to expose them to the user.
-                */}
               </div>
             </div>
           </section>
@@ -408,9 +460,6 @@ function App() {
             </div>
           </section>
 
-          {/* Footer inside content area or outside? 
-              Inside means you scroll to see it. 
-          */}
           <footer className="cqd-footer">
             <div className="cqd-footer-inner">
               <p className="cqd-footer-text">
@@ -430,7 +479,6 @@ function App() {
 
 // --- Subcomponents ---
 
-// ToggleRow: switch is fully functional + no weird hover breaking layout
 function ToggleRow({
   label,
   description,
