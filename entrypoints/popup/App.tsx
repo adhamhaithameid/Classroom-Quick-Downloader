@@ -45,7 +45,10 @@ function App() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState<string | null>(null);
-  const [reloadHintVisible, setReloadHintVisible] = useState(false);
+  
+  // New state to track if a reload is waiting
+  const [pendingReload, setPendingReload] = useState(false);
+  
   const [shareStatus, setShareStatus] = useState<'idle' | 'copied' | 'error'>('idle');
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -59,7 +62,7 @@ function App() {
   
   const totalDownloads = stats.reduce((acc, curr) => acc + curr.value, 0);
 
-  // Load current settings + version on mount
+  // Load current settings + version + pending state on mount
   useEffect(() => {
     try {
       const manifest = chrome.runtime.getManifest();
@@ -82,6 +85,7 @@ function App() {
         cqdCommentsFlagEnabled: true,
         cqdEditedFlagEnabled: true,
         cqdCombinedFlagEnabled: true,
+        cqdPendingReload: false, // Check if we left a reload pending
       },
       (result) => {
         if (chrome.runtime.lastError) {
@@ -97,20 +101,38 @@ function App() {
           editedFlagEnabled: result.cqdEditedFlagEnabled !== false,
           combinedFlagEnabled: result.cqdCombinedFlagEnabled !== false,
         });
+
+        // Restore the reload banner state
+        setPendingReload(result.cqdPendingReload === true);
       },
     );
   }, []);
 
+  // --- Logic for the Status Dot ---
+  // If pendingReload is true, the page is NOT yet what the settings say.
+  // It is still the previous state (inverse of current setting).
+  // If pendingReload is false, the page matches the settings.
+  const effectiveExtensionStatus =
+    settings == null
+      ? false
+      : pendingReload
+      ? !settings.extensionEnabled
+      : settings.extensionEnabled;
+
   const extensionStatusLabel =
     settings == null
       ? 'Loading…'
-      : settings.extensionEnabled
+      : effectiveExtensionStatus
       ? 'Active'
       : 'Disabled';
 
-  async function persistSettings(next: Settings, showReloadHint: boolean) {
+  async function persistSettings(next: Settings, triggerReloadBanner: boolean) {
     setSaving(true);
     setError(null);
+
+    // If we trigger a reload banner, we save 'true'. 
+    // If not, we keep the current pending state (don't auto-clear it unless explicit).
+    const nextPendingState = triggerReloadBanner ? true : pendingReload;
 
     const toStore: Record<string, boolean> = {
       cqdEnabled: next.extensionEnabled,
@@ -118,6 +140,7 @@ function App() {
       cqdCommentsFlagEnabled: next.commentsFlagEnabled,
       cqdEditedFlagEnabled: next.editedFlagEnabled,
       cqdCombinedFlagEnabled: next.combinedFlagEnabled,
+      cqdPendingReload: nextPendingState,
     };
 
     const savePromise = new Promise<void>((resolve, reject) => {
@@ -144,11 +167,11 @@ function App() {
           () => void chrome.runtime.lastError,
         );
       } catch {
-        // ignore if runtime is unavailable or no listeners
+        // ignore if runtime is unavailable
       }
 
-      if (showReloadHint) {
-        setReloadHintVisible(true);
+      if (triggerReloadBanner) {
+        setPendingReload(true);
       }
     } catch (err: any) {
       setError(err?.message || 'Failed to save settings.');
@@ -161,7 +184,7 @@ function App() {
     if (!settings) return;
     const prev = settings;
     const next: Settings = { ...settings, ...partial };
-    setSettings(next);
+    setSettings(next); // Immediate UI update for the Switch
     persistSettings(next, options?.showReloadHint ?? false).catch(() => {
       // roll back on failure
       setSettings(prev);
@@ -172,8 +195,24 @@ function App() {
     if (!settings) return;
     updateSettings(
       { extensionEnabled: !settings.extensionEnabled },
-      { showReloadHint: true },
+      { showReloadHint: true }, // This triggers the banner + creates the state desync
     );
+  }
+
+  // --- Action: Reload Tabs ---
+  function handleReloadTabs() {
+    if (!chrome?.tabs) return;
+
+    chrome.tabs.query({ url: '*://classroom.google.com/*' }, (tabs) => {
+      tabs.forEach((tab) => {
+        if (tab.id) chrome.tabs.reload(tab.id);
+      });
+
+      // Clear the persistent flag
+      chrome.storage.local.set({ cqdPendingReload: false }, () => {
+        setPendingReload(false);
+      });
+    });
   }
 
   async function handleShareClick() {
@@ -193,13 +232,11 @@ function App() {
   }
 
   // --- Donut Chart Calculation ---
-  // Radius and Circumference
   const radius = 40;
   const circumference = 2 * Math.PI * radius;
   let cumulativeOffset = 0;
 
   const chartSegments = stats.map((stat) => {
-    // If total is 0, prevent division by zero
     const percentage = totalDownloads === 0 ? 0 : stat.value / totalDownloads;
     const strokeLength = percentage * circumference;
     const offset = cumulativeOffset;
@@ -208,7 +245,7 @@ function App() {
     return {
       ...stat,
       strokeLength,
-      offset: -offset, // Negative to rotate clockwise correctly in SVG
+      offset: -offset, 
     };
   });
 
@@ -223,8 +260,12 @@ function App() {
             <div className="cqd-brand-text">
               <div className="cqd-brand-name">Classroom Quick Downloader</div>
               <div className="cqd-brand-meta">
+                {/* Logic: 
+                   1. 'settings.extensionEnabled' drives the switch.
+                   2. 'effectiveExtensionStatus' drives this dot.
+                */}
                 <span
-                  className={`cqd-brand-status-dot ${settings?.extensionEnabled ? 'on' : 'off'}`}
+                  className={`cqd-brand-status-dot ${effectiveExtensionStatus ? 'on' : 'off'}`}
                   aria-hidden="true"
                 />
                 <span className="cqd-brand-status-text">{extensionStatusLabel}</span>
@@ -239,26 +280,31 @@ function App() {
         </header>
 
         <div className="cqd-content-area">
-          {reloadHintVisible && (
+          {/* Dynamic Reload Banner */}
+          {pendingReload && (
             <div className="cqd-banner cqd-banner-reload" role="status">
-              <div className="cqd-banner-indicator" aria-hidden="true" />
-              <div className="cqd-banner-text">
-                <strong>Reload required.</strong> Refresh your Classroom tabs.
+              <div className="cqd-banner-content">
+                <div className="cqd-banner-indicator" aria-hidden="true" />
+                <div className="cqd-banner-text">
+                  <strong>Changes saved.</strong> Reload to apply.
+                </div>
               </div>
               <button
                 type="button"
-                className="cqd-banner-close"
-                onClick={() => setReloadHintVisible(false)}
+                className="cqd-banner-action-btn"
+                onClick={handleReloadTabs}
               >
-                ×
+                Reload Now
               </button>
             </div>
           )}
 
           {error && (
             <div className="cqd-banner cqd-banner-error" role="alert">
-              <div className="cqd-banner-indicator" aria-hidden="true" />
-              <div className="cqd-banner-text">Error: {error}</div>
+              <div className="cqd-banner-content">
+                <div className="cqd-banner-indicator" aria-hidden="true" />
+                <div className="cqd-banner-text">Error: {error}</div>
+              </div>
               <button
                 type="button"
                 className="cqd-banner-close"
@@ -288,7 +334,7 @@ function App() {
                     viewBox="0 0 100 100"
                     className="cqd-analytics-svg"
                   >
-                    {/* Background Ring (for empty state or gap fill) */}
+                    {/* Background Ring */}
                     <circle
                       cx="50"
                       cy="50"
@@ -384,7 +430,6 @@ function App() {
               </div>
 
               <div className="cqd-info-actions">
-                {/* GitHub */}
                 <a
                   href={GITHUB_REPO_URL}
                   target="_blank"
@@ -401,7 +446,6 @@ function App() {
                   </span>
                 </a>
 
-                {/* Buy Me a Coffee */}
                 <button
                   type="button"
                   className="cqd-coffee-button"
@@ -416,7 +460,6 @@ function App() {
                   />
                 </button>
 
-                {/* Share */}
                 <button
                   type="button"
                   className={`cqd-button cqd-button-ghost ${

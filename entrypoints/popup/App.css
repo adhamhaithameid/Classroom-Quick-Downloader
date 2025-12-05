@@ -207,11 +207,17 @@ body {
 
 .cqd-banner {
   display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 11px;
+}
+
+.cqd-banner-content {
+  display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 10px;
-  border-radius: 999px;
-  font-size: 11px;
 }
 
 .cqd-banner-reload {
@@ -221,6 +227,10 @@ body {
 }
 
 .cqd-banner-error {
+  flex-direction: row;
+  align-items: center;
+  border-radius: 999px;
+  padding: 8px 10px;
   background-color: #fef2f2;
   border: 1px solid #fecaca;
   color: #991b1b;
@@ -251,14 +261,30 @@ body {
   align-items: center;
   justify-content: center;
   color: inherit;
-  transition:
-    background-color var(--cqd-transition-fast),
-    transform var(--cqd-transition-fast);
+  transition: background-color var(--cqd-transition-fast);
 }
 
 .cqd-banner-close:hover {
   background-color: rgba(0, 0, 0, 0.04);
-  transform: scale(1.05);
+}
+
+/* Reload Action Button inside Banner */
+.cqd-banner-action-btn {
+  border: none;
+  background-color: rgba(0, 0, 0, 0.05);
+  color: inherit;
+  font-weight: 700;
+  font-size: 11px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  align-self: flex-start;
+  margin-left: 15px; /* Indent to align with text */
+  transition: background-color 0.2s ease;
+}
+
+.cqd-banner-action-btn:hover {
+  background-color: rgba(0, 0, 0, 0.1);
 }
 
 /* ===============================
