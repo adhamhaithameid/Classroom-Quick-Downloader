@@ -1,6 +1,4 @@
-// filepath: entrypoints/popup/App.tsx
-
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import './App.css';
 import logoSrc from '../../assets/GCD.png';
 import logoGraySrc from '../../assets/GCD_gray.png';
@@ -63,6 +61,7 @@ function App() {
     useState<'idle' | 'copied' | 'error'>('idle');
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [scrolled, setScrolled] = useState(false);
 
   // --- MOCK DATA FOR ANALYTICS (per-install global; session logic later) ---
   const stats: StatItem[] = [
@@ -77,7 +76,24 @@ function App() {
     tabIdRef.current = tabId;
   }, [tabId]);
 
-  // Initial: get active tab + version + per-tab CQD state from content script
+  // Track scroll to add blur/shadow under header when not at top
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+
+    const handleScroll = () => {
+      setScrolled(el.scrollTop > 0);
+    };
+
+    el.addEventListener('scroll', handleScroll);
+    handleScroll();
+
+    return () => {
+      el.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
+
+  // Initial: get active tab + version + per-tab state
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const browserApi = (globalThis as any).chrome as typeof chrome | undefined;
@@ -240,7 +256,7 @@ function App() {
 
         if (browserApi.runtime.lastError || !response) {
           setError(
-            "I couldn’t update CQD on this Classroom tab. Try reloading the page and toggling again.",
+            "I couldn’t update the extension on this Classroom tab. Try reloading the page and toggling again.",
           );
           setSettings(prevSettings);
           setTabState(prevTabState);
@@ -260,6 +276,20 @@ function App() {
         setTabState({ desiredEnabled: desired, effectiveEnabled: effective });
       },
     );
+  }
+
+  function handleOpenClassroomClick() {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const browserApi = (globalThis as any).chrome as typeof chrome | undefined;
+    if (!browserApi?.tabs) return;
+
+    try {
+      browserApi.tabs.create({
+        url: 'https://classroom.google.com/',
+      });
+    } catch {
+      // ignore
+    }
   }
 
   // --- Donut chart calculation (unchanged) ---
@@ -283,7 +313,6 @@ function App() {
   const isLoadingSettings = loadingState || settings == null;
 
   const effectiveEnabled = tabState?.effectiveEnabled ?? false;
-  // const desiredEnabled = tabState?.desiredEnabled ?? false;
 
   let extensionStatusLabel: string;
   if (!isClassroomTab) {
@@ -303,9 +332,15 @@ function App() {
     <main className="cqd-app">
       <div className="cqd-scroll-container" ref={scrollRef}>
         {/* HEADER – always visible */}
-        <header className="cqd-header">
+        <header
+          className={`cqd-header ${scrolled ? 'cqd-header-scrolled' : ''}`}
+        >
           <div className="cqd-brand-row">
-            <img src={logoToUse} alt="CQD Logo" className="cqd-brand-logo" />
+            <img
+              src={logoToUse}
+              alt="Extension logo"
+              className="cqd-brand-logo"
+            />
             <div className="cqd-brand-text">
               <div className="cqd-brand-name">Classroom Quick Downloader</div>
               <div className="cqd-brand-meta">
@@ -346,6 +381,7 @@ function App() {
                 type="button"
                 className="cqd-banner-close"
                 onClick={() => setError(null)}
+                aria-label="Dismiss error message"
               >
                 ×
               </button>
@@ -365,7 +401,10 @@ function App() {
                     </p>
                   </div>
                   <div className="cqd-analytics-layout">
-                    <div className="cqd-analytics-circle-wrapper">
+                    <div
+                      className="cqd-analytics-circle-wrapper"
+                      aria-hidden="true"
+                    >
                       <svg
                         width="100"
                         height="100"
@@ -417,6 +456,10 @@ function App() {
                           </li>
                         ))}
                       </ul>
+                      <p className="cqd-muted-text">
+                        (Demo data for now — this will show real per-session
+                        activity later.)
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -428,13 +471,13 @@ function App() {
                   <div className="cqd-card-header">
                     <h2 className="cqd-card-title">Extension Settings</h2>
                     <p className="cqd-card-subtitle">
-                      Turn CQD on or off for this Classroom tab only.
+                      Turn the extension on or off for this Classroom tab only.
                     </p>
                   </div>
 
                   <div className="cqd-toggle-group">
                     <ToggleRow
-                      label="Enable CQD on this Classroom tab"
+                      label="Enable on this tab"
                       description="This only affects the current Classroom tab, not other tabs."
                       checked={settings?.extensionEnabled ?? false}
                       loading={isLoadingSettings || saving}
@@ -447,20 +490,28 @@ function App() {
               </section>
             </>
           ) : (
-            // Non-Classroom view: friendly message instead of analytics/settings
+            // Non-Classroom view: friendly message + redesigned button
             <section className="cqd-panel">
               <div className="cqd-card">
                 <div className="cqd-card-header">
-                  <h2 className="cqd-card-title">Open on Classroom</h2>
+                  <h2 className="cqd-card-title">Use it on Google Classroom</h2>
                   <p className="cqd-card-subtitle">
-                    This popup controls Classroom Quick Downloader only on{' '}
+                    This extension is built specifically for{' '}
                     <strong>classroom.google.com</strong>.
                   </p>
                 </div>
                 <p className="cqd-muted-text" style={{ marginTop: 8 }}>
-                  Open this extension from a Google Classroom tab to see your
-                  download activity.
+                  Open Google Classroom, then click the extension again from
+                  that tab to see your download controls.
                 </p>
+                <button
+                  type="button"
+                  className="cqd-button cqd-open-classroom-btn"
+                  onClick={handleOpenClassroomClick}
+                  aria-label="Open Google Classroom in a new tab"
+                >
+                  <span>Open Google Classroom</span>
+                </button>
               </div>
             </section>
           )}
@@ -489,6 +540,7 @@ function App() {
                   target="_blank"
                   rel="noreferrer"
                   className="cqd-button cqd-button-primary"
+                  aria-label="Open the GitHub repository"
                 >
                   <span className="cqd-button-icon">
                     <svg
@@ -515,6 +567,7 @@ function App() {
                       'noopener,noreferrer',
                     )
                   }
+                  aria-label="Support the developer on Buy Me a Coffee"
                 >
                   <img
                     src={bmcLogoSrc}
@@ -529,6 +582,11 @@ function App() {
                     shareStatus === 'copied' ? 'success' : ''
                   }`}
                   onClick={handleShareClick}
+                  aria-label={
+                    shareStatus === 'copied'
+                      ? 'Extension link copied'
+                      : 'Copy extension link to clipboard'
+                  }
                 >
                   <span className="cqd-button-icon">
                     {shareStatus === 'copied' ? (
@@ -617,6 +675,14 @@ function ToggleRow({
     }
   };
 
+  const handleKeyDown = (e: KeyboardEvent<HTMLLabelElement>) => {
+    if (isDisabled) return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleChange();
+    }
+  };
+
   return (
     <div
       className={`cqd-toggle-row ${
@@ -632,6 +698,11 @@ function ToggleRow({
       <label
         className={`cqd-switch ${loading ? 'cqd-switch-loading' : ''}`}
         aria-label={label}
+        role="switch"
+        aria-checked={checked}
+        aria-disabled={isDisabled || undefined}
+        tabIndex={0}
+        onKeyDown={handleKeyDown}
       >
         <input
           type="checkbox"
