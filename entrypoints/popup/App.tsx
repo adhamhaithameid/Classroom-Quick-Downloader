@@ -12,6 +12,7 @@ const EXTENSION_STORE_URL = 'https://chromewebstore.google.com/';
 const BUY_ME_COFFEE_URL = 'https://buymeacoffee.com/adhamhaithameid';
 
 type Settings = {
+  /** Desired master toggle (what the switch represents) */
   extensionEnabled: boolean;
   downloadAllEnabled: boolean;
   commentsFlagEnabled: boolean;
@@ -40,16 +41,73 @@ type ToggleRowProps = {
 // --- Analytics Helper Types ---
 type StatItem = { id: string; label: string; value: number; color: string };
 
+/**
+ * Try to discover the *effective* runtime state from classroom tabs.
+ * This is optional sugar: if no content scripts respond, we just keep the fallback.
+ *
+ * Expected content-script handler:
+ *   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+ *     if (msg.type === 'CQD_QUERY_EFFECTIVE_STATE') {
+ *       sendResponse({ enabled: isCurrentlyEnabledOnThisPage });
+ *     }
+ *   });
+ */
+function discoverEffectiveStateFromTabs(
+  fallback: boolean,
+  onState: (state: boolean) => void,
+) {
+  // Guard: in popup context chrome is defined, but this keeps things safer in tests.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const anyChrome = (globalThis as any).chrome as typeof chrome | undefined;
+  if (!anyChrome?.tabs) return;
+
+  anyChrome.tabs.query({ url: '*://classroom.google.com/*' }, (tabs) => {
+    if (!tabs?.length) return;
+
+    let resolved = false;
+    const timeout = setTimeout(() => {
+      if (!resolved) {
+        onState(fallback);
+      }
+    }, 400);
+
+    tabs.forEach((tab) => {
+      if (!tab.id) return;
+      try {
+        anyChrome.tabs.sendMessage(
+          tab.id,
+          { type: 'CQD_QUERY_EFFECTIVE_STATE' },
+          (response) => {
+            if (resolved) return;
+            if (anyChrome.runtime.lastError || !response) return;
+
+            if (typeof response.enabled === 'boolean') {
+              resolved = true;
+              clearTimeout(timeout);
+              onState(response.enabled);
+            }
+          },
+        );
+      } catch {
+        // ignore
+      }
+    });
+  });
+}
+
 function App() {
+  // Desired global settings (what the switches represent)
   const [settings, setSettings] = useState<Settings | null>(null);
+
+  // Effective state of the extension on Classroom pages (what the dot represents)
+  const [siteEnabled, setSiteEnabled] = useState<boolean | null>(null);
+
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState<string | null>(null);
-  
-  // New state to track if a reload is waiting
-  const [pendingReload, setPendingReload] = useState(false);
-  
-  const [shareStatus, setShareStatus] = useState<'idle' | 'copied' | 'error'>('idle');
+
+  const [shareStatus, setShareStatus] =
+    useState<'idle' | 'copied' | 'error'>('idle');
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
@@ -59,10 +117,10 @@ function App() {
     { id: 'pdf', label: 'PDFs', value: 8, color: 'var(--cqd-red)' },
     { id: 'images', label: 'Images', value: 5, color: '#10b981' },
   ];
-  
+
   const totalDownloads = stats.reduce((acc, curr) => acc + curr.value, 0);
 
-  // Load current settings + version + pending state on mount
+  // Load current settings + version + effective site state on mount
   useEffect(() => {
     try {
       const manifest = chrome.runtime.getManifest();
@@ -75,6 +133,7 @@ function App() {
 
     if (!chrome?.storage?.local) {
       setSettings(DEFAULT_SETTINGS);
+      setSiteEnabled(DEFAULT_SETTINGS.extensionEnabled);
       return;
     }
 
@@ -85,54 +144,90 @@ function App() {
         cqdCommentsFlagEnabled: true,
         cqdEditedFlagEnabled: true,
         cqdCombinedFlagEnabled: true,
-        cqdPendingReload: false, // Check if we left a reload pending
+        // New explicit effective-state flag
+        cqdEffectiveEnabled: null,
+        // For migration from the old "pendingReload" scheme
+        cqdPendingReload: false,
       },
       (result) => {
         if (chrome.runtime.lastError) {
           setError(chrome.runtime.lastError.message || 'Unknown error');
           setSettings(DEFAULT_SETTINGS);
+          setSiteEnabled(DEFAULT_SETTINGS.extensionEnabled);
           return;
         }
 
-        setSettings({
-          extensionEnabled: result.cqdEnabled !== false,
+        const desiredEnabled = result.cqdEnabled !== false;
+
+        const nextSettings: Settings = {
+          extensionEnabled: desiredEnabled,
           downloadAllEnabled: result.cqdDownloadAllEnabled !== false,
           commentsFlagEnabled: result.cqdCommentsFlagEnabled !== false,
           editedFlagEnabled: result.cqdEditedFlagEnabled !== false,
           combinedFlagEnabled: result.cqdCombinedFlagEnabled !== false,
+        };
+
+        setSettings(nextSettings);
+
+        // --- Determine effective state (what Classroom is actually running) ---
+        let effective: boolean;
+        if (typeof result.cqdEffectiveEnabled === 'boolean') {
+          // New format: trust the explicit effective flag
+          effective = result.cqdEffectiveEnabled;
+        } else if (result.cqdPendingReload === true) {
+          // Old format: pendingReload meant "pages still running the previous state"
+          // -> effective = !desired
+          effective = !desiredEnabled;
+        } else {
+          // No other info: assume pages already match desired
+          effective = desiredEnabled;
+        }
+
+        setSiteEnabled(effective);
+
+        // Migrate storage to the new shape: explicit effective flag, no pendingReload
+        chrome.storage.local.set({
+          cqdEffectiveEnabled: effective,
+          cqdPendingReload: false,
         });
 
-        // Restore the reload banner state
-        setPendingReload(result.cqdPendingReload === true);
+        // Optional: refine with a live check from Classroom content scripts
+        discoverEffectiveStateFromTabs(effective, (runtimeState) => {
+          setSiteEnabled(runtimeState);
+          chrome.storage.local.set({ cqdEffectiveEnabled: runtimeState });
+        });
       },
     );
   }, []);
 
-  // --- Logic for the Status Dot ---
-  // If pendingReload is true, the page is NOT yet what the settings say.
-  // It is still the previous state (inverse of current setting).
-  // If pendingReload is false, the page matches the settings.
-  const effectiveExtensionStatus =
-    settings == null
-      ? false
-      : pendingReload
-      ? !settings.extensionEnabled
-      : settings.extensionEnabled;
+  // Listen for live effective-state updates broadcasted by content scripts
+  // (optional but nice if you ever toggle state from inside the page)
+  useEffect(() => {
+    if (!chrome?.runtime?.onMessage) return;
 
-  const extensionStatusLabel =
-    settings == null
-      ? 'Loading…'
-      : effectiveExtensionStatus
-      ? 'Active'
-      : 'Disabled';
+    const handler = (
+      message: any, // eslint-disable-line @typescript-eslint/no-explicit-any
+    ) => {
+      if (
+        message?.type === 'CQD_EFFECTIVE_STATE_CHANGED' &&
+        typeof message.enabled === 'boolean'
+      ) {
+        setSiteEnabled(message.enabled);
+        if (chrome?.storage?.local) {
+          chrome.storage.local.set({ cqdEffectiveEnabled: message.enabled });
+        }
+      }
+    };
 
-  async function persistSettings(next: Settings, triggerReloadBanner: boolean) {
+    chrome.runtime.onMessage.addListener(handler);
+    return () => {
+      chrome.runtime.onMessage.removeListener(handler);
+    };
+  }, []);
+
+  async function persistSettings(next: Settings) {
     setSaving(true);
     setError(null);
-
-    // If we trigger a reload banner, we save 'true'. 
-    // If not, we keep the current pending state (don't auto-clear it unless explicit).
-    const nextPendingState = triggerReloadBanner ? true : pendingReload;
 
     const toStore: Record<string, boolean> = {
       cqdEnabled: next.extensionEnabled,
@@ -140,7 +235,8 @@ function App() {
       cqdCommentsFlagEnabled: next.commentsFlagEnabled,
       cqdEditedFlagEnabled: next.editedFlagEnabled,
       cqdCombinedFlagEnabled: next.combinedFlagEnabled,
-      cqdPendingReload: nextPendingState,
+      // NOTE: we *do not* touch cqdEffectiveEnabled here.
+      // It only changes when the actual site state changes (reload).
     };
 
     const savePromise = new Promise<void>((resolve, reject) => {
@@ -160,7 +256,7 @@ function App() {
     try {
       await savePromise;
 
-      // Notify other parts (content scripts) that settings changed
+      // Notify other parts (content scripts) that settings changed (desired state)
       try {
         chrome.runtime.sendMessage(
           { type: 'CQD_SETTINGS_UPDATED', settings: next },
@@ -169,10 +265,6 @@ function App() {
       } catch {
         // ignore if runtime is unavailable
       }
-
-      if (triggerReloadBanner) {
-        setPendingReload(true);
-      }
     } catch (err: any) {
       setError(err?.message || 'Failed to save settings.');
     } finally {
@@ -180,12 +272,12 @@ function App() {
     }
   }
 
-  function updateSettings(partial: Partial<Settings>, options?: { showReloadHint?: boolean }) {
+  function updateSettings(partial: Partial<Settings>) {
     if (!settings) return;
     const prev = settings;
     const next: Settings = { ...settings, ...partial };
-    setSettings(next); // Immediate UI update for the Switch
-    persistSettings(next, options?.showReloadHint ?? false).catch(() => {
+    setSettings(next); // optimistic UI
+    persistSettings(next).catch(() => {
       // roll back on failure
       setSettings(prev);
     });
@@ -193,25 +285,29 @@ function App() {
 
   function handleToggleExtension() {
     if (!settings) return;
-    updateSettings(
-      { extensionEnabled: !settings.extensionEnabled },
-      { showReloadHint: true }, // This triggers the banner + creates the state desync
-    );
+    updateSettings({ extensionEnabled: !settings.extensionEnabled });
   }
 
-  // --- Action: Reload Tabs ---
+  // --- Action: Reload Tabs (apply desired -> effective) ---
   function handleReloadTabs() {
-    if (!chrome?.tabs) return;
+    if (!chrome?.tabs || !settings) return;
+
+    const desiredEnabled = settings.extensionEnabled;
 
     chrome.tabs.query({ url: '*://classroom.google.com/*' }, (tabs) => {
       tabs.forEach((tab) => {
         if (tab.id) chrome.tabs.reload(tab.id);
       });
 
-      // Clear the persistent flag
-      chrome.storage.local.set({ cqdPendingReload: false }, () => {
-        setPendingReload(false);
-      });
+      // As soon as we trigger reloads, we can treat the effective state as updated.
+      if (chrome?.storage?.local) {
+        chrome.storage.local.set(
+          { cqdEffectiveEnabled: desiredEnabled },
+          () => setSiteEnabled(desiredEnabled),
+        );
+      } else {
+        setSiteEnabled(desiredEnabled);
+      }
     });
   }
 
@@ -245,11 +341,23 @@ function App() {
     return {
       ...stat,
       strokeLength,
-      offset: -offset, 
+      offset: -offset,
     };
   });
 
   const isLoadingSettings = settings == null;
+
+  const extensionStatusLabel =
+    settings == null || siteEnabled == null
+      ? 'Loading…'
+      : siteEnabled
+      ? 'Active'
+      : 'Disabled';
+
+  const needsReload =
+    settings != null &&
+    siteEnabled != null &&
+    settings.extensionEnabled !== siteEnabled;
 
   return (
     <main className="cqd-app">
@@ -260,17 +368,21 @@ function App() {
             <div className="cqd-brand-text">
               <div className="cqd-brand-name">Classroom Quick Downloader</div>
               <div className="cqd-brand-meta">
-                {/* Logic: 
-                   1. 'settings.extensionEnabled' drives the switch.
-                   2. 'effectiveExtensionStatus' drives this dot.
-                */}
+                {/* Status dot = effective site state (what the pages are actually running) */}
                 <span
-                  className={`cqd-brand-status-dot ${effectiveExtensionStatus ? 'on' : 'off'}`}
+                  className={`cqd-brand-status-dot ${
+                    siteEnabled ? 'on' : ''
+                  }`}
                   aria-hidden="true"
                 />
-                <span className="cqd-brand-status-text">{extensionStatusLabel}</span>
+                <span className="cqd-brand-status-text">
+                  {extensionStatusLabel}
+                </span>
                 {version && (
-                  <span className="cqd-brand-version" aria-label={`Version ${version}`}>
+                  <span
+                    className="cqd-brand-version"
+                    aria-label={`Version ${version}`}
+                  >
                     v{version}
                   </span>
                 )}
@@ -280,8 +392,10 @@ function App() {
         </header>
 
         <div className="cqd-content-area">
-          {/* Dynamic Reload Banner */}
-          {pendingReload && (
+          {/* Dynamic Reload Banner:
+              Shown ONLY when desired state (switch) !== effective state (dot).
+          */}
+          {needsReload && (
             <div className="cqd-banner cqd-banner-reload" role="status">
               <div className="cqd-banner-content">
                 <div className="cqd-banner-indicator" aria-hidden="true" />
@@ -325,7 +439,6 @@ function App() {
                 </p>
               </div>
               <div className="cqd-analytics-layout">
-                
                 {/* SVG Ring Chart */}
                 <div className="cqd-analytics-circle-wrapper">
                   <svg
@@ -366,7 +479,9 @@ function App() {
 
                   {/* Centered Text */}
                   <div className="cqd-analytics-circle-inner">
-                    <div className="cqd-analytics-main-number">{totalDownloads}</div>
+                    <div className="cqd-analytics-main-number">
+                      {totalDownloads}
+                    </div>
                   </div>
                 </div>
 
@@ -392,9 +507,7 @@ function App() {
             <div className="cqd-card cqd-card-settings">
               <div className="cqd-card-header">
                 <h2 className="cqd-card-title">Extension Settings</h2>
-                <p className="cqd-card-subtitle">
-                  Manage core features.
-                </p>
+                <p className="cqd-card-subtitle">Manage core features.</p>
               </div>
 
               <div className="cqd-toggle-group">
@@ -437,7 +550,12 @@ function App() {
                   className="cqd-button cqd-button-primary"
                 >
                   <span className="cqd-button-icon">
-                    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                    <svg
+                      viewBox="0 0 24 24"
+                      width="16"
+                      height="16"
+                      aria-hidden="true"
+                    >
                       <path
                         fill="currentColor"
                         d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405 1.02 0 2.04.135 3 .405 2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.285 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"
@@ -450,7 +568,11 @@ function App() {
                   type="button"
                   className="cqd-coffee-button"
                   onClick={() =>
-                    window.open(BUY_ME_COFFEE_URL, '_blank', 'noopener,noreferrer')
+                    window.open(
+                      BUY_ME_COFFEE_URL,
+                      '_blank',
+                      'noopener,noreferrer',
+                    )
                   }
                 >
                   <img
@@ -493,8 +615,18 @@ function App() {
                         <circle cx="18" cy="5" r="3"></circle>
                         <circle cx="6" cy="12" r="3"></circle>
                         <circle cx="18" cy="19" r="3"></circle>
-                        <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
-                        <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+                        <line
+                          x1="8.59"
+                          y1="13.51"
+                          x2="15.42"
+                          y2="17.49"
+                        ></line>
+                        <line
+                          x1="15.41"
+                          y1="6.51"
+                          x2="8.59"
+                          y2="10.49"
+                        ></line>
                       </svg>
                     )}
                   </span>
@@ -507,13 +639,17 @@ function App() {
             <div className="cqd-footer-inner">
               <p className="cqd-footer-text">
                 Have a suggestion?{' '}
-                <a href={SURVEY_URL} target="_blank" rel="noreferrer" className="cqd-footer-link">
+                <a
+                  href={SURVEY_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="cqd-footer-link"
+                >
                   Take the survey
                 </a>
               </p>
             </div>
           </footer>
-
         </div>
       </div>
     </main>
@@ -541,25 +677,45 @@ function ToggleRow({
 
   return (
     <div
-      className={`cqd-toggle-row ${primary ? 'cqd-toggle-row-primary' : ''} ${
-        isDisabled ? 'disabled' : ''
-      }`}
+      className={`cqd-toggle-row ${
+        primary ? 'cqd-toggle-row-primary' : ''
+      } ${isDisabled ? 'disabled' : ''}`}
     >
       <div className="cqd-toggle-text">
         <div className="cqd-toggle-label">{label}</div>
-        {description && <p className="cqd-toggle-description">{description}</p>}
+        {description && (
+          <p className="cqd-toggle-description">{description}</p>
+        )}
       </div>
-      <label className={`cqd-switch ${loading ? 'cqd-switch-loading' : ''}`} aria-label={label}>
-        <input type="checkbox" checked={checked} disabled={isDisabled} onChange={handleChange} />
+      <label
+        className={`cqd-switch ${loading ? 'cqd-switch-loading' : ''}`}
+        aria-label={label}
+      >
+        <input
+          type="checkbox"
+          checked={checked}
+          disabled={isDisabled}
+          onChange={handleChange}
+        />
         <div className="cqd-switch-slider">
           <div className="cqd-switch-circle">
-            <svg className="cqd-switch-cross" viewBox="0 0 365.696 365.696" width="6" height="6">
+            <svg
+              className="cqd-switch-cross"
+              viewBox="0 0 365.696 365.696"
+              width="6"
+              height="6"
+            >
               <path
                 fill="currentColor"
                 d="M243.188 182.86 356.32 69.726c12.5-12.5 12.5-32.766 0-45.247L341.238 9.398c-12.504-12.503-32.77-12.503-45.25 0L182.86 122.528 69.727 9.374c-12.5-12.5-32.766-12.5-45.247 0L9.375 24.457c-12.5 12.504-12.5 32.77 0 45.25l113.152 113.152L9.398 295.99c-12.503 12.503-12.503 32.769 0 45.25L24.48 356.32c12.5 12.5 32.766 12.5 45.247 0l113.132-113.132L295.99 356.32c12.503 12.5 32.769 12.5 45.25 0l15.081-15.082c12.5-12.504 12.5-32.77 0-45.25zm0 0"
               />
             </svg>
-            <svg className="cqd-switch-checkmark" viewBox="0 0 24 24" width="10" height="10">
+            <svg
+              className="cqd-switch-checkmark"
+              viewBox="0 0 24 24"
+              width="10"
+              height="10"
+            >
               <path
                 fill="currentColor"
                 d="M9.707 19.121a.997.997 0 0 1-1.414 0l-5.646-5.647a1.5 1.5 0 0 1 0-2.121l.707-.707a1.5 1.5 0 0 1 2.121 0L9 14.171l9.525-9.525a1.5 1.5 0 0 1 2.121 0l.707.707a1.5 1.5 0 0 1 0 2.121z"
