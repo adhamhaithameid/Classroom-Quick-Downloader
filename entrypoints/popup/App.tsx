@@ -12,7 +12,7 @@ const EXTENSION_STORE_URL = 'https://chromewebstore.google.com/';
 const BUY_ME_COFFEE_URL = 'https://buymeacoffee.com/adhamhaithameid';
 
 type Settings = {
-  extensionEnabled: boolean;
+  extensionEnabled: boolean; // desired for THIS tab
   downloadAllEnabled: boolean;
   commentsFlagEnabled: boolean;
   editedFlagEnabled: boolean;
@@ -39,59 +39,19 @@ type ToggleRowProps = {
 
 type StatItem = { id: string; label: string; value: number; color: string };
 
-/**
- * Ask any classroom tab what its effective state is.
- * This is a live refinement on top of storage state.
- */
-function discoverEffectiveStateFromTabs(
-  fallback: boolean | null,
-  onState: (state: boolean) => void,
-) {
-  // In the popup context we expect `chrome` to exist, but guard anyway
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const browserApi = (globalThis as any).chrome as typeof chrome | undefined;
-  if (!browserApi?.tabs) return;
-
-  browserApi.tabs.query({ url: '*://classroom.google.com/*' }, (tabs) => {
-    if (!tabs?.length) return;
-
-    let resolved = false;
-    const timeout = window.setTimeout(() => {
-      if (!resolved && typeof fallback === 'boolean') {
-        onState(fallback);
-      }
-    }, 400);
-
-    for (const tab of tabs) {
-      if (!tab.id) continue;
-      try {
-        browserApi.tabs.sendMessage(
-          tab.id,
-          { type: 'CQD_QUERY_EFFECTIVE_STATE' },
-          (response) => {
-            if (resolved) return;
-            if (browserApi.runtime.lastError || !response) return;
-
-            if (typeof response.enabled === 'boolean') {
-              resolved = true;
-              window.clearTimeout(timeout);
-              onState(response.enabled);
-            }
-          },
-        );
-      } catch {
-        // ignore
-      }
-    }
-  });
-}
+type TabState = {
+  desiredEnabled: boolean;
+  effectiveEnabled: boolean;
+};
 
 function App() {
-  // Desired config (what the user wants) → driven by popup switches
   const [settings, setSettings] = useState<Settings | null>(null);
+  const [tabState, setTabState] = useState<TabState | null>(null);
+  const [tabId, setTabId] = useState<number | null>(null);
+  const tabIdRef = useRef<number | null>(null);
 
-  // Effective runtime state on Classroom pages (what is actually running)
-  const [siteEnabled, setSiteEnabled] = useState<boolean | null>(null);
+  const [isClassroomTab, setIsClassroomTab] = useState(false);
+  const [loadingState, setLoadingState] = useState(true);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -102,21 +62,26 @@ function App() {
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
-  // --- MOCK DATA FOR ANALYTICS (Replace with real data logic later) ---
+  // --- MOCK DATA FOR ANALYTICS (per-install global; session logic later) ---
   const stats: StatItem[] = [
     { id: 'docs', label: 'Docs', value: 12, color: 'var(--cqd-blue)' },
     { id: 'pdf', label: 'PDFs', value: 8, color: 'var(--cqd-red)' },
     { id: 'images', label: 'Images', value: 5, color: '#10b981' },
   ];
-
   const totalDownloads = stats.reduce((acc, curr) => acc + curr.value, 0);
 
-  // Initial load: get desired + effective from storage,
-  // then refine the effective state with a live query to content scripts.
+  // Keep ref in sync for onMessage filter
   useEffect(() => {
+    tabIdRef.current = tabId;
+  }, [tabId]);
+
+  // Initial: get active tab + version + per-tab CQD state from content script
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const browserApi = (globalThis as any).chrome as typeof chrome | undefined;
+
+    // extension version
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const browserApi = (globalThis as any).chrome as typeof chrome | undefined;
       const manifest = browserApi?.runtime?.getManifest();
       if (manifest?.version) {
         setVersion(manifest.version);
@@ -125,74 +90,101 @@ function App() {
       // ignore
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const browserApi = (globalThis as any).chrome as typeof chrome | undefined;
-    if (!browserApi?.storage?.local) {
+    if (!browserApi?.tabs) {
+      // fallback for non-extension env
       setSettings(DEFAULT_SETTINGS);
-      setSiteEnabled(DEFAULT_SETTINGS.extensionEnabled);
+      setTabState({ desiredEnabled: true, effectiveEnabled: true });
+      setIsClassroomTab(false);
+      setLoadingState(false);
       return;
     }
 
-    browserApi.storage.local.get(
-      {
-        cqdEnabled: true,
-        cqdDownloadAllEnabled: true,
-        cqdCommentsFlagEnabled: true,
-        cqdEditedFlagEnabled: true,
-        cqdCombinedFlagEnabled: true,
-        cqdEffectiveEnabled: null,
-      },
-      (result) => {
-        if (browserApi.runtime?.lastError) {
-          setError(browserApi.runtime.lastError.message || 'Unknown error');
-          setSettings(DEFAULT_SETTINGS);
-          setSiteEnabled(DEFAULT_SETTINGS.extensionEnabled);
-          return;
-        }
+    browserApi.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      const tab = tabs[0];
+      if (!tab || tab.id == null) {
+        setLoadingState(false);
+        return;
+      }
 
-        const desiredEnabled = result.cqdEnabled !== false;
+      setTabId(tab.id);
+      tabIdRef.current = tab.id;
 
-        const nextSettings: Settings = {
-          extensionEnabled: desiredEnabled,
-          downloadAllEnabled: result.cqdDownloadAllEnabled !== false,
-          commentsFlagEnabled: result.cqdCommentsFlagEnabled !== false,
-          editedFlagEnabled: result.cqdEditedFlagEnabled !== false,
-          combinedFlagEnabled: result.cqdCombinedFlagEnabled !== false,
-        };
+      const url = tab.url || '';
+      const classroomMatch = /^https:\/\/classroom\.google\.com\//.test(url);
+      setIsClassroomTab(classroomMatch);
 
-        setSettings(nextSettings);
+      if (!classroomMatch) {
+        // Popup opened on a non-Classroom page
+        setSettings({ ...DEFAULT_SETTINGS, extensionEnabled: false });
+        setTabState({ desiredEnabled: false, effectiveEnabled: false });
+        setLoadingState(false);
+        return;
+      }
 
-        let effective: boolean | null;
-        if (typeof result.cqdEffectiveEnabled === 'boolean') {
-          effective = result.cqdEffectiveEnabled;
-        } else {
-          // No telemetry yet → assume matches desired until we hear otherwise
-          effective = desiredEnabled;
-        }
-
-        setSiteEnabled(effective);
-
-        // Refine using live info from Classroom content scripts
-        discoverEffectiveStateFromTabs(effective, (runtimeState) => {
-          setSiteEnabled(runtimeState);
-        });
-      },
-    );
+      // Ask THIS tab's content script for its local state
+      browserApi.tabs.sendMessage(
+        tab.id,
+        { type: 'CQD_POPUP_QUERY_STATE' },
+        (response) => {
+          if (browserApi.runtime.lastError || !response) {
+            // If content script not ready, assume enabled by default
+            const defaultState: TabState = {
+              desiredEnabled: true,
+              effectiveEnabled: true,
+            };
+            setSettings({
+              ...DEFAULT_SETTINGS,
+              extensionEnabled: defaultState.desiredEnabled,
+            });
+            setTabState(defaultState);
+          } else {
+            const desired =
+              typeof response.desiredEnabled === 'boolean'
+                ? response.desiredEnabled
+                : true;
+            const effective =
+              typeof response.effectiveEnabled === 'boolean'
+                ? response.effectiveEnabled
+                : desired;
+            setSettings({
+              ...DEFAULT_SETTINGS,
+              extensionEnabled: desired,
+            });
+            setTabState({ desiredEnabled: desired, effectiveEnabled: effective });
+          }
+          setLoadingState(false);
+        },
+      );
+    });
   }, []);
 
-  // Live updates when content scripts broadcast effective-state changes
+  // Listen for live effective-state changes from THIS tab only
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const browserApi = (globalThis as any).chrome as typeof chrome | undefined;
     if (!browserApi?.runtime?.onMessage) return;
 
-    const handler = (message: any) => {
-      if (
-        message?.type === 'CQD_EFFECTIVE_STATE_CHANGED' &&
-        typeof message.enabled === 'boolean'
-      ) {
-        setSiteEnabled(message.enabled);
-      }
+    const handler = (
+      message: any,
+      sender: chrome.runtime.MessageSender,
+    ): void => {
+      if (message?.type !== 'CQD_EFFECTIVE_STATE_CHANGED') return;
+
+      const currentTabId = tabIdRef.current;
+      if (!currentTabId || sender.tab?.id !== currentTabId) return;
+
+      setTabState((prev) => {
+        if (!prev) {
+          return {
+            desiredEnabled: !!message.enabled,
+            effectiveEnabled: !!message.enabled,
+          };
+        }
+        return {
+          ...prev,
+          effectiveEnabled: !!message.enabled,
+        };
+      });
     };
 
     browserApi.runtime.onMessage.addListener(handler);
@@ -204,92 +196,6 @@ function App() {
       }
     };
   }, []);
-
-  async function persistSettings(next: Settings) {
-    setSaving(true);
-    setError(null);
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const browserApi = (globalThis as any).chrome as typeof chrome | undefined;
-
-    const toStore: Record<string, boolean> = {
-      cqdEnabled: next.extensionEnabled,
-      cqdDownloadAllEnabled: next.downloadAllEnabled,
-      cqdCommentsFlagEnabled: next.commentsFlagEnabled,
-      cqdEditedFlagEnabled: next.editedFlagEnabled,
-      cqdCombinedFlagEnabled: next.combinedFlagEnabled,
-      // ⚠️ We do NOT write cqdEffectiveEnabled here.
-      // That is owned by the Classroom content script.
-    };
-
-    const savePromise = new Promise<void>((resolve, reject) => {
-      if (!browserApi?.storage?.local) {
-        resolve();
-        return;
-      }
-      browserApi.storage.local.set(toStore, () => {
-        if (browserApi.runtime.lastError) {
-          reject(browserApi.runtime.lastError);
-        } else {
-          resolve();
-        }
-      });
-    });
-
-    try {
-      await savePromise;
-
-      // Notify other parts (content scripts/background) that desired settings changed
-      try {
-        browserApi?.runtime?.sendMessage(
-          { type: 'CQD_SETTINGS_UPDATED', settings: next },
-          () => void browserApi?.runtime?.lastError,
-        );
-      } catch {
-        // ignore if runtime is unavailable
-      }
-    } catch (err: any) {
-      setError(err?.message || 'Failed to save settings.');
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  function updateSettings(partial: Partial<Settings>) {
-    if (!settings) return;
-    const prev = settings;
-    const next: Settings = { ...settings, ...partial };
-    setSettings(next); // optimistic UI
-    persistSettings(next).catch(() => {
-      // roll back on failure
-      setSettings(prev);
-    });
-  }
-
-  function handleToggleExtension() {
-    if (!settings) return;
-    updateSettings({ extensionEnabled: !settings.extensionEnabled });
-  }
-
-  // Reload tabs so that Classroom actually picks up the new desired state.
-  // We DO NOT write cqdEffectiveEnabled here; the content script will set it on load.
-  function handleReloadTabs() {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const browserApi = (globalThis as any).chrome as typeof chrome | undefined;
-    if (!browserApi?.tabs || !settings) return;
-
-    const desiredEnabled = settings.extensionEnabled;
-
-    browserApi.tabs.query({ url: '*://classroom.google.com/*' }, (tabs) => {
-      tabs.forEach((tab) => {
-        if (tab.id) browserApi.tabs.reload(tab.id);
-      });
-
-      // Optimistic UI: assume site will match desired state after reload.
-      // The content script will send a CQD_EFFECTIVE_STATE_CHANGED once it actually attaches.
-      setSiteEnabled(desiredEnabled);
-    });
-  }
 
   async function handleShareClick() {
     setShareStatus('idle');
@@ -307,7 +213,52 @@ function App() {
     }
   }
 
-  // --- Donut Chart Calculation ---
+  function handleToggleExtension() {
+    if (!settings || !isClassroomTab || tabId == null) return;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const browserApi = (globalThis as any).chrome as typeof chrome | undefined;
+    if (!browserApi?.tabs) return;
+
+    const prevSettings = settings;
+    const prevTabState = tabState;
+
+    const nextDesired = !settings.extensionEnabled;
+
+    setSaving(true);
+    setError(null);
+    // Optimistic switch UI
+    setSettings({ ...settings, extensionEnabled: nextDesired });
+
+    browserApi.tabs.sendMessage(
+      tabId,
+      { type: 'CQD_POPUP_SET_DESIRED_STATE', enabled: nextDesired },
+      (response) => {
+        setSaving(false);
+
+        if (browserApi.runtime.lastError || !response) {
+          setError('Failed to update this Classroom tab. Try reloading the page.');
+          setSettings(prevSettings);
+          setTabState(prevTabState);
+          return;
+        }
+
+        const desired =
+          typeof response.desiredEnabled === 'boolean'
+            ? response.desiredEnabled
+            : nextDesired;
+        const effective =
+          typeof response.effectiveEnabled === 'boolean'
+            ? response.effectiveEnabled
+            : desired;
+
+        setSettings({ ...settings, extensionEnabled: desired });
+        setTabState({ desiredEnabled: desired, effectiveEnabled: effective });
+      },
+    );
+  }
+
+  // --- Donut chart calculation (unchanged) ---
   const radius = 40;
   const circumference = 2 * Math.PI * radius;
   let cumulativeOffset = 0;
@@ -325,19 +276,19 @@ function App() {
     };
   });
 
-  const isLoadingSettings = settings == null;
+  const isLoadingSettings = loadingState || settings == null;
 
-  const extensionStatusLabel =
-    settings == null || siteEnabled == null
-      ? 'Loading…'
-      : siteEnabled
-      ? 'Active'
-      : 'Disabled';
+  const effectiveEnabled = tabState?.effectiveEnabled ?? false;
+  const desiredEnabled = tabState?.desiredEnabled ?? false;
 
-  const needsReload =
-    settings != null &&
-    siteEnabled != null &&
-    settings.extensionEnabled !== siteEnabled;
+  let extensionStatusLabel: string;
+  if (!isClassroomTab) {
+    extensionStatusLabel = 'Not on Classroom';
+  } else if (isLoadingSettings) {
+    extensionStatusLabel = 'Loading…';
+  } else {
+    extensionStatusLabel = effectiveEnabled ? 'Active' : 'Disabled';
+  }
 
   return (
     <main className="cqd-app">
@@ -348,10 +299,10 @@ function App() {
             <div className="cqd-brand-text">
               <div className="cqd-brand-name">Classroom Quick Downloader</div>
               <div className="cqd-brand-meta">
-                {/* Status dot = effective site state (what Classroom pages are actually running) */}
+                {/* Dot reflects this tab's effective state only */}
                 <span
                   className={`cqd-brand-status-dot ${
-                    siteEnabled ? 'on' : ''
+                    isClassroomTab && effectiveEnabled ? 'on' : ''
                   }`}
                   aria-hidden="true"
                 />
@@ -372,25 +323,7 @@ function App() {
         </header>
 
         <div className="cqd-content-area">
-          {/* Reload banner appears iff desired != effective */}
-          {needsReload && (
-            <div className="cqd-banner cqd-banner-reload" role="status">
-              <div className="cqd-banner-content">
-                <div className="cqd-banner-indicator" aria-hidden="true" />
-                <div className="cqd-banner-text">
-                  <strong>Changes saved.</strong> Reload to apply.
-                </div>
-              </div>
-              <button
-                type="button"
-                className="cqd-banner-action-btn"
-                onClick={handleReloadTabs}
-              >
-                Reload Now
-              </button>
-            </div>
-          )}
-
+          {/* Error banner (no reload banner anymore; toggling is instant per tab) */}
           {error && (
             <div className="cqd-banner cqd-banner-error" role="alert">
               <div className="cqd-banner-content">
@@ -407,7 +340,7 @@ function App() {
             </div>
           )}
 
-          {/* Section 1: Analysis */}
+          {/* Section 1: Analytics (global / future session-based) */}
           <section className="cqd-panel">
             <div className="cqd-card cqd-card-analytics">
               <div className="cqd-card-header">
@@ -417,7 +350,6 @@ function App() {
                 </p>
               </div>
               <div className="cqd-analytics-layout">
-                {/* SVG Ring Chart */}
                 <div className="cqd-analytics-circle-wrapper">
                   <svg
                     width="100"
@@ -425,7 +357,6 @@ function App() {
                     viewBox="0 0 100 100"
                     className="cqd-analytics-svg"
                   >
-                    {/* Background Ring */}
                     <circle
                       cx="50"
                       cy="50"
@@ -434,8 +365,6 @@ function App() {
                       stroke="var(--cqd-surface)"
                       strokeWidth="10"
                     />
-
-                    {/* Data Segments */}
                     {totalDownloads > 0 &&
                       chartSegments.map((seg) => (
                         <circle
@@ -454,8 +383,6 @@ function App() {
                         </circle>
                       ))}
                   </svg>
-
-                  {/* Centered Text */}
                   <div className="cqd-analytics-circle-inner">
                     <div className="cqd-analytics-main-number">
                       {totalDownloads}
@@ -480,22 +407,32 @@ function App() {
             </div>
           </section>
 
-          {/* Section 2: Settings */}
+          {/* Section 2: Settings (per-tab enable/disable) */}
           <section className="cqd-panel">
             <div className="cqd-card cqd-card-settings">
               <div className="cqd-card-header">
                 <h2 className="cqd-card-title">Extension Settings</h2>
-                <p className="cqd-card-subtitle">Manage core features.</p>
+                <p className="cqd-card-subtitle">
+                  Per-tab activation for this Classroom page.
+                </p>
               </div>
 
               <div className="cqd-toggle-group">
                 <ToggleRow
-                  label="Enable extension"
-                  description="Master switch for all features."
+                  label={
+                    isClassroomTab
+                      ? 'Enable The Extension on this Classroom tab'
+                      : 'Open on classroom.google.com to enable'
+                  }
+                  description={
+                    isClassroomTab
+                      ? 'Master switch for all features.'
+                      : undefined
+                  }
                   checked={settings?.extensionEnabled ?? false}
                   loading={isLoadingSettings || saving}
                   onToggle={handleToggleExtension}
-                  disabled={isLoadingSettings}
+                  disabled={isLoadingSettings || !isClassroomTab}
                   primary
                 />
               </div>

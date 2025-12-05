@@ -11,11 +11,10 @@ import {
 import { injectStyles } from './styles';
 import { t } from './i18n';
 import { isPageDark } from './theme';
-import { whenExtensionEnabled } from './flags';
 
 const INJECTED_ATTR = 'data-cqd-injected';
 const PROCESSED_ATTR = 'data-cqd-processed';
-const RESCAN_INTERVAL_MS = 2000; // Speed up slightly
+const RESCAN_INTERVAL_MS = 2000;
 const RESCAN_DEBOUNCE_MS = 200;
 const LOADING_MIN_MS = 600;
 const FEEDBACK_SUCCESS_MS = 3000;
@@ -47,6 +46,7 @@ type QueryRoot = Document | HTMLElement | DocumentFragment;
 
 let scanTimeoutId: number | null = null;
 let observer: MutationObserver | null = null;
+let rescanIntervalId: number | null = null;
 
 type ButtonState = 'idle' | 'loading' | 'success' | 'error' | 'trying';
 
@@ -66,27 +66,17 @@ type PendingButton = {
 let nextRequestSeq = 1;
 const pendingButtons = new Map<string, PendingButton>();
 
-// Effective runtime state of this page – does CQD logic actually run here?
-let effectiveEnabled = false;
+// Per-tab CQD state
+let desiredEnabled = true; // what this tab "wants"
+let effectiveEnabled = false; // what is actually active
+let initialized = false;
 
 /* -----------------------------------------------------
- * Effective state telemetry (for popup dot)
+ * Effective state broadcast (for popup dot)
  * ---------------------------------------------------*/
 
-/**
- * Update global "effective" state (what this page is actually running)
- * and broadcast it to the rest of the extension.
- */
 function applyEffectiveState(enabled: boolean): void {
   effectiveEnabled = enabled;
-
-  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-    try {
-      chrome.storage.local.set({ cqdEffectiveEnabled: enabled });
-    } catch {
-      // ignore
-    }
-  }
 
   if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
     try {
@@ -100,35 +90,6 @@ function applyEffectiveState(enabled: boolean): void {
   }
 }
 
-/**
- * On each page load, align the effective state with the global "enabled" flag.
- *
- * - If the user has globally disabled the extension (cqdEnabled === false),
- *   then we know this page is not supposed to be active → effective = false.
- * - If globally enabled, we wait until our DOM logic attaches via
- *   whenExtensionEnabled() before marking effective = true.
- */
-function syncEffectiveStateOnLoad(): void {
-  if (typeof chrome === 'undefined' || !chrome.storage?.local) {
-    // In non-extension contexts / tests, just assume active.
-    applyEffectiveState(true);
-    return;
-  }
-
-  chrome.storage.local.get({ cqdEnabled: true }, (result) => {
-    if (chrome.runtime && chrome.runtime.lastError) {
-      return;
-    }
-    const desiredEnabled = result.cqdEnabled !== false;
-    if (!desiredEnabled) {
-      // User turned CQD off globally → this page is effectively disabled.
-      applyEffectiveState(false);
-    }
-    // If desiredEnabled is true, we'll mark effective true once we actually
-    // attach styles/observers via whenExtensionEnabled.
-  });
-}
-
 /* -----------------------------------------------------
  * Environment / Page Checks
  * ---------------------------------------------------*/
@@ -137,6 +98,50 @@ function isGoogleClassroom(): boolean {
   if (typeof location === 'undefined') return false;
   if (location.hostname !== 'classroom.google.com') return false;
   return CLASSROOM_URL_PATTERN.test(location.href);
+}
+
+/* -----------------------------------------------------
+ * Attach / Detach CQD for this tab
+ * ---------------------------------------------------*/
+
+function startCQD(): void {
+  if (initialized) return;
+  if (!isGoogleClassroom()) return;
+
+  initialized = true;
+  injectStyles();
+  setupObservers();
+  applyEffectiveState(true);
+}
+
+function stopCQD(): void {
+  if (!initialized) return;
+  initialized = false;
+
+  if (observer) {
+    observer.disconnect();
+    observer = null;
+  }
+  if (scanTimeoutId !== null) {
+    window.clearTimeout(scanTimeoutId);
+    scanTimeoutId = null;
+  }
+  if (rescanIntervalId !== null) {
+    window.clearInterval(rescanIntervalId);
+    rescanIntervalId = null;
+  }
+
+  // Remove injected download buttons from this page
+  try {
+    const injectedButtons = document.querySelectorAll<HTMLElement>(
+      '.cqd-download-btn',
+    );
+    injectedButtons.forEach((btn) => btn.remove());
+  } catch {
+    // ignore
+  }
+
+  applyEffectiveState(false);
 }
 
 /* -----------------------------------------------------
@@ -203,15 +208,18 @@ function setupObservers(): void {
     subtree: true,
   });
 
-  window.setInterval(() => {
-    scheduleScan();
-  }, RESCAN_INTERVAL_MS);
+  if (rescanIntervalId == null) {
+    rescanIntervalId = window.setInterval(() => {
+      scheduleScan();
+    }, RESCAN_INTERVAL_MS);
+  }
 
   scheduleScan();
 }
 
 function scanForAttachments(root: QueryRoot = document): void {
   if (!isGoogleClassroom()) return;
+  if (!effectiveEnabled) return; // don't inject if this tab is disabled
   injectSingleFileButtons(root);
 }
 
@@ -235,7 +243,6 @@ function injectSingleFileButtons(root: QueryRoot = document): void {
 
     if (!container) continue;
 
-    // If React re-rendered the container content, the button is gone, so we must re-inject.
     if (hasInjectedButton(container)) continue;
 
     injectButtonIntoAttachment(container, url);
@@ -263,7 +270,6 @@ function injectSingleFileButtons(root: QueryRoot = document): void {
  * ---------------------------------------------------*/
 
 function hasInjectedButton(container: HTMLElement): boolean {
-  // We check if the button is actually in the DOM
   return !!container.querySelector(`[${INJECTED_ATTR}="true"]`);
 }
 
@@ -447,7 +453,6 @@ function extractFileMeta(container: HTMLElement, url: string): FileMeta {
     const m = name.match(/\.([a-zA-Z0-9]{2,10})$/);
     if (m) ext = m[1].toLowerCase();
   }
-  // Kind logic omitted for brevity, assume identical to previous...
   return { name, ext, kind: 'other' };
 }
 
@@ -461,7 +466,6 @@ function injectButtonIntoAttachment(
 ): void {
   if (!url) return;
 
-  // Mark as processed (metadata only)
   container.setAttribute(PROCESSED_ATTR, 'true');
 
   const computed = window.getComputedStyle(container);
@@ -573,7 +577,6 @@ function createDownloadButton(
   );
   button.setAttribute('title', t('titleQuick'));
 
-  // Data for grouping
   try {
     if (url) (button.dataset as any).cqdUrl = url;
     if (fileMeta?.name) (button.dataset as any).cqdName = fileMeta.name;
@@ -657,7 +660,11 @@ function startBackgroundDownload(
       chrome.runtime.sendMessage(
         { type: 'CQD_DOWNLOAD', url: finalUrl, requestId, fileMeta },
         (response) => {
-          if (chrome.runtime.lastError || !response || response.started === false) {
+          if (
+            chrome.runtime.lastError ||
+            !response ||
+            response.started === false
+          ) {
             resolve({
               ok: false,
               userMessage: response?.userMessage || 'Could not start.',
@@ -705,83 +712,99 @@ function delay(ms: number): Promise<void> {
 }
 
 /* -----------------------------------------------------
- * Listen for background status updates + effective state queries
+ * Message handling: popup + download status
  * ---------------------------------------------------*/
 
 if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
-  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    if (!message) return;
+  chrome.runtime.onMessage.addListener(
+    (message, _sender, sendResponse): void | true => {
+      if (!message) return;
 
-    if (message.type === 'CQD_DOWNLOAD_STATUS') {
-      const requestId = message.requestId as string | undefined;
-      if (!requestId) return;
-
-      const pending = pendingButtons.get(requestId);
-      if (!pending) return;
-
-      const { button, startedAt } = pending;
-
-      (async () => {
-        await ensureMinLoading(startedAt);
-
-        const status = message.status as
-          | ButtonState
-          | 'blocked_html'
-          | 'interrupted';
-        const errorCode = message.errorCode as string | undefined;
-        const userMessage = message.userMessage as string | undefined;
-
-        if (status === 'trying') {
-          setButtonState(button, 'trying', { userMessage });
-          return;
+      // Popup asks for this tab's state
+      if (message.type === 'CQD_POPUP_QUERY_STATE') {
+        try {
+          sendResponse({ desiredEnabled, effectiveEnabled });
+        } catch {
+          // ignore
         }
+        return true;
+      }
 
-        // SUCCESS PATH
-        if (status === 'success' || status === 'complete') {
-          pendingButtons.delete(requestId);
-
-          try {
-            (button.dataset as any).cqdAllDone = 'true';
-          } catch {
-            /* ignore */
-          }
-
-          setPillProgress(button, 1);
-          setButtonState(button, 'success');
-
-          // Stay green until the group batch has finished its success window
-          await waitForSuccessReset(button);
-          return;
+      // Popup sets desired state for this tab
+      if (message.type === 'CQD_POPUP_SET_DESIRED_STATE') {
+        desiredEnabled = !!message.enabled;
+        if (desiredEnabled) {
+          startCQD();
+        } else {
+          stopCQD();
         }
+        try {
+          sendResponse({ desiredEnabled, effectiveEnabled });
+        } catch {
+          // ignore
+        }
+        return true;
+      }
 
-        if (
-          status === 'error' ||
-          status === 'interrupted' ||
-          status === 'blocked_html'
-        ) {
-          if (errorCode === 'AUTH_CHECK') {
-            await showErrorState(button, userMessage);
+      if (message.type === 'CQD_DOWNLOAD_STATUS') {
+        const requestId = message.requestId as string | undefined;
+        if (!requestId) return;
+
+        const pending = pendingButtons.get(requestId);
+        if (!pending) return;
+
+        const { button, startedAt } = pending;
+
+        (async () => {
+          await ensureMinLoading(startedAt);
+
+          const status = message.status as
+            | ButtonState
+            | 'blocked_html'
+            | 'interrupted';
+          const errorCode = message.errorCode as string | undefined;
+          const userMessage = message.userMessage as string | undefined;
+
+          if (status === 'trying') {
+            setButtonState(button, 'trying', { userMessage });
             return;
           }
-          pendingButtons.delete(requestId);
-          setPillProgress(button, 0);
-          await showErrorState(button, userMessage);
-        }
-      })();
 
-      return;
-    }
+          if (status === 'success' || status === 'complete') {
+            pendingButtons.delete(requestId);
 
-    if (message.type === 'CQD_QUERY_EFFECTIVE_STATE') {
-      // Popup asks: "what are you actually doing right now?"
-      try {
-        sendResponse({ enabled: effectiveEnabled });
-      } catch {
-        // ignore
+            try {
+              (button.dataset as any).cqdAllDone = 'true';
+            } catch {
+              /* ignore */
+            }
+
+            setPillProgress(button, 1);
+            setButtonState(button, 'success');
+
+            await waitForSuccessReset(button);
+            return;
+          }
+
+          if (
+            status === 'error' ||
+            status === 'interrupted' ||
+            status === 'blocked_html'
+          ) {
+            if (errorCode === 'AUTH_CHECK') {
+              await showErrorState(button, userMessage);
+              return;
+            }
+            pendingButtons.delete(requestId);
+            setPillProgress(button, 0);
+            await showErrorState(button, userMessage);
+          }
+        })();
+
+        return;
       }
-      return true;
-    }
-  });
+    },
+  );
 }
 
 /* -----------------------------------------------------
@@ -791,17 +814,9 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
 function initContentScript(): void {
   if (!isGoogleClassroom()) return;
 
-  // On every load, sync effective state from global flag.
-  // This makes manual reloads/new tabs correctly realign the popup dot & banner.
-  syncEffectiveStateOnLoad();
-
-  // Only inject when the extension is enabled.
-  // When we do attach, mark this page as effectively running CQD.
-  whenExtensionEnabled(() => {
-    injectStyles();
-    setupObservers();
-    applyEffectiveState(true);
-  });
+  // Default per-tab behavior: CQD is enabled when the page loads.
+  desiredEnabled = true;
+  startCQD();
 }
 
 export default defineContentScript({
@@ -823,13 +838,11 @@ async function waitForSuccessReset(button: HTMLButtonElement): Promise<void> {
     await delay(200);
 
     if (getButtonState(button) !== 'success') {
-      return; // something else changed the state
+      return;
     }
 
-    // Respect minimum visible success time
     if (Date.now() < earliestReset) continue;
 
-    // If this button is part of an active "Download all" batch, stay green
     const postRoot =
       button.closest<HTMLElement>('div[data-stream-item-id]') ||
       button.closest<HTMLElement>('main') ||
@@ -839,13 +852,11 @@ async function waitForSuccessReset(button: HTMLButtonElement): Promise<void> {
       continue;
     }
 
-    // Don't snap back while the user is hovering
     if (button.matches(':hover')) continue;
 
     break;
   }
 
-  // Finally reset back to normal blue pill
   setButtonState(button, 'idle');
   setPillProgress(button, 0);
   try {
