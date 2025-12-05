@@ -3,6 +3,7 @@ import { COMMENT_ICON_URL } from './content/icons';
 import { injectStyles } from './content/styles';
 import { t } from './content/i18n';
 import { isPageDark } from './content/theme';
+import { whenExtensionEnabled } from './content/flags';
 
 // Selector for the main stream card
 const POST_SELECTOR = 'div[data-stream-item-id]';
@@ -18,38 +19,41 @@ export default defineContentScript({
   matches: ['https://classroom.google.com/*'],
   runAt: 'document_idle',
   main() {
-    injectStyles();
-    scanForComments();
-
-    // --- STRATEGY 1: MUTATION OBSERVER ---
-    const observer = new MutationObserver(() => {
-      // ✅ Debounce: only one scan per frame
-      if (commentScanScheduled) return;
-      commentScanScheduled = true;
-
-      requestAnimationFrame(() => {
-        commentScanScheduled = false;
-        scanForComments();
-      });
-    });
-
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true,
-    });
-
-    setInterval(() => {
+    // ⬇️ Only run this script when the extension is enabled
+    whenExtensionEnabled(() => {
+      injectStyles();
       scanForComments();
-    }, 2500);
 
-    let lastUrl = location.href; 
-    new MutationObserver(() => {
-      const url = location.href;
-      if (url !== lastUrl) {
-        lastUrl = url;
-        setTimeout(scanForComments, 500); 
-      }
-    }).observe(document, { subtree: true, childList: true });
+      // --- STRATEGY 1: MUTATION OBSERVER ---
+      const observer = new MutationObserver(() => {
+        // ✅ Debounce: only one scan per frame
+        if (commentScanScheduled) return;
+        commentScanScheduled = true;
+
+        requestAnimationFrame(() => {
+          commentScanScheduled = false;
+          scanForComments();
+        });
+      });
+
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+      });
+
+      setInterval(() => {
+        scanForComments();
+      }, 2500);
+
+      let lastUrl = location.href; 
+      new MutationObserver(() => {
+        const url = location.href;
+        if (url !== lastUrl) {
+          lastUrl = url;
+          setTimeout(scanForComments, 500); 
+        }
+      }).observe(document, { subtree: true, childList: true });
+    });
   },
 });
 

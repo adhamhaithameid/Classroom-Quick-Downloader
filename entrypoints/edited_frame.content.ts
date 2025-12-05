@@ -3,6 +3,7 @@ import { EDIT_ICON_SVG_RAW, COMMENT_ICON_URL } from './content/icons';
 import { injectStyles } from './content/styles';
 import { isPageDark } from './content/theme';
 import { t } from './content/i18n';
+import { whenExtensionEnabled } from './content/flags';
 
 // Selector for the main stream card
 const POST_SELECTOR = 'div[data-stream-item-id]';
@@ -15,43 +16,46 @@ export default defineContentScript({
   matches: ['https://classroom.google.com/*'],
   runAt: 'document_idle',
   main() {
-    injectStyles();
-    scanForEditedPosts();
-
-    // --- STRATEGY 1: MUTATION OBSERVER (Reacts to DOM changes) ---
-    const observer = new MutationObserver(() => {
-      // ✅ Debounce: only schedule *one* scan per frame
-      if (editedScanScheduled) return;
-      editedScanScheduled = true;
-
-      requestAnimationFrame(() => {
-        editedScanScheduled = false;
-        scanForEditedPosts();
-      });
-    });
-
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['aria-label', 'title'],
-    });
-
-    // Heartbeat
-    setInterval(() => {
+    // ⬇️ Only run this script when the extension is enabled
+    whenExtensionEnabled(() => {
+      injectStyles();
       scanForEditedPosts();
-    }, 2500);
 
-    // URL watcher
-    let lastUrl = location.href;
-    new MutationObserver(() => {
-      const url = location.href;
-      if (url !== lastUrl) {
-        lastUrl = url;
-        setTimeout(scanForEditedPosts, 500);
-        setTimeout(scanForEditedPosts, 1500);
-      }
-    }).observe(document, { subtree: true, childList: true });
+      // --- STRATEGY 1: MUTATION OBSERVER (Reacts to DOM changes) ---
+      const observer = new MutationObserver(() => {
+        // ✅ Debounce: only schedule *one* scan per frame
+        if (editedScanScheduled) return;
+        editedScanScheduled = true;
+
+        requestAnimationFrame(() => {
+          editedScanScheduled = false;
+          scanForEditedPosts();
+        });
+      });
+
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['aria-label', 'title'],
+      });
+
+      // Heartbeat
+      setInterval(() => {
+        scanForEditedPosts();
+      }, 2500);
+
+      // URL watcher
+      let lastUrl = location.href;
+      new MutationObserver(() => {
+        const url = location.href;
+        if (url !== lastUrl) {
+          lastUrl = url;
+          setTimeout(scanForEditedPosts, 500);
+          setTimeout(scanForEditedPosts, 1500);
+        }
+      }).observe(document, { subtree: true, childList: true });
+    });
   },
 });
 

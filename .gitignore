@@ -1,1 +1,11 @@
 .DS_Store
+node_modules/
+.wxt/
+.output/
+output/
+.output/chrome-mv3
+.output/chrome-mv3-dev
+.env
+assets/.DS_Store
+public/.DS_Store
+public/icon/.DS_Store

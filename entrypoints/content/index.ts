@@ -11,6 +11,7 @@ import {
 import { injectStyles } from './styles';
 import { t } from './i18n';
 import { isPageDark } from './theme';
+import { whenExtensionEnabled } from './flags';
 
 const INJECTED_ATTR = 'data-cqd-injected';
 const PROCESSED_ATTR = 'data-cqd-processed';
@@ -635,8 +636,12 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
 
 function initContentScript(): void {
   if (!isGoogleClassroom()) return;
-  injectStyles();
-  setupObservers();
+
+  // ⬇️ Only inject when the extension is enabled
+  whenExtensionEnabled(() => {
+    injectStyles();
+    setupObservers();
+  });
 }
 
 export default defineContentScript({

@@ -3,6 +3,7 @@
 import { injectStyles } from './content/styles';
 import { t } from './content/i18n';
 import { isPageDark } from './content/theme';
+import { whenExtensionEnabled } from './content/flags';
 
 const DOWNLOAD_BTN_SELECTOR = '.cqd-download-btn';
 const GROUP_SELECTOR = 'div[data-stream-item-id]';
@@ -45,53 +46,56 @@ export default defineContentScript({
   matches: ['https://classroom.google.com/*'],
   runAt: 'document_idle',
   main() {
-    injectStyles();
-    safeSetDirection();
+    // ⬇️ Only run this script when the extension is enabled
+    whenExtensionEnabled(() => {
+      injectStyles();
+      safeSetDirection();
 
-    // Initial discovery
-    registerButtonsInSubtree(document);
+      // Initial discovery
+      registerButtonsInSubtree(document);
 
-    const observer = new MutationObserver((mutations) => {
-      for (const m of mutations) {
-        if (m.type === 'childList') {
-          m.addedNodes.forEach((node) => {
-            if (!(node instanceof HTMLElement)) return;
-            registerButtonsInSubtree(node);
-          });
+      const observer = new MutationObserver((mutations) => {
+        for (const m of mutations) {
+          if (m.type === 'childList') {
+            m.addedNodes.forEach((node) => {
+              if (!(node instanceof HTMLElement)) return;
+              registerButtonsInSubtree(node);
+            });
 
-          m.removedNodes.forEach((node) => {
-            if (!(node instanceof HTMLElement)) return;
-            cleanupRemovedButtons(node);
-          });
-        } else if (m.type === 'attributes') {
-          const target = m.target as HTMLElement;
-          if (
-            target instanceof HTMLButtonElement &&
-            target.classList.contains('cqd-download-btn')
-          ) {
-            const group = ensureButtonRegistered(target);
-            if (group) markGroupDirty(group);
+            m.removedNodes.forEach((node) => {
+              if (!(node instanceof HTMLElement)) return;
+              cleanupRemovedButtons(node);
+            });
+          } else if (m.type === 'attributes') {
+            const target = m.target as HTMLElement;
+            if (
+              target instanceof HTMLButtonElement &&
+              target.classList.contains('cqd-download-btn')
+            ) {
+              const group = ensureButtonRegistered(target);
+              if (group) markGroupDirty(group);
+            }
           }
         }
+
+        scheduleRefresh();
+      });
+
+      if (document.body) {
+        observer.observe(document.body, {
+          childList: true,
+          subtree: true,
+          attributes: true,
+          attributeFilter: ['class', 'data-cqd-all-done'],
+        });
       }
 
-      scheduleRefresh();
+      // Backup scan
+      window.setInterval(() => {
+        registerButtonsInSubtree(document);
+        scheduleRefresh();
+      }, 4000);
     });
-
-    if (document.body) {
-      observer.observe(document.body, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-        attributeFilter: ['class', 'data-cqd-all-done'],
-      });
-    }
-
-    // Backup scan
-    window.setInterval(() => {
-      registerButtonsInSubtree(document);
-      scheduleRefresh();
-    }, 4000);
   },
 });
 
