@@ -46,6 +46,56 @@ const cancelledByUs = new Set<number>();
 
 const AUTHUSER_CANDIDATES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 
+/* ---------------------------------------------
+ * Icon / tab context helpers
+ * -------------------------------------------*/
+
+const CLASSROOM_URL_PATTERN = /^https:\/\/classroom\.google\.com\//;
+
+function isClassroomUrl(url?: string | null): boolean {
+  if (!url) return false;
+  return CLASSROOM_URL_PATTERN.test(url);
+}
+
+const COLOR_ICON_PATHS: Record<number, string> = {
+  16: 'icon/16.png',
+  32: 'icon/32.png',
+  48: 'icon/48.png',
+  96: 'icon/96.png',
+  128: 'icon/128.png',
+};
+
+const GRAY_ICON_PATHS: Record<number, string> = {
+  16: 'icon/16-gray.png',
+  32: 'icon/32-gray.png',
+  48: 'icon/48-gray.png',
+  96: 'icon/96-gray.png',
+  128: 'icon/128-gray.png',
+};
+
+function setActionIcon(tabId: number, classroom: boolean) {
+  if (typeof chrome === 'undefined' || !chrome.action?.setIcon) return;
+
+  const path = classroom ? COLOR_ICON_PATHS : GRAY_ICON_PATHS;
+  try {
+    chrome.action.setIcon({
+      tabId,
+      path,
+    });
+  } catch {
+    // ignore
+  }
+}
+
+function updateIconForTab(tabId: number, url?: string | null) {
+  const classroom = isClassroomUrl(url);
+  setActionIcon(tabId, classroom);
+}
+
+/* ---------------------------------------------
+ * Auth user helpers
+ * -------------------------------------------*/
+
 function extractAuthUserFromUrl(rawUrl: string): number | undefined {
   try {
     const url = new URL(rawUrl);
@@ -69,7 +119,50 @@ function extractAuthUserFromUrl(rawUrl: string): number | undefined {
 }
 
 export default defineBackground(() => {
-  console.log('[CQD] Background ready - PRODUCTION ROBUST MODE (merged)');
+  console.log("[CQD] Background ready - PRODUCTION ROBUST MODE (merged)");
+
+  /* ---------------------------------------------
+   * Icon behavior: gray vs color
+   * -------------------------------------------*/
+  if (typeof chrome !== "undefined" && chrome.tabs && chrome.action) {
+    try {
+      // Initial active tab
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        const tab = tabs[0];
+        if (tab && tab.id != null) {
+          updateIconForTab(tab.id, tab.url);
+        }
+      });
+
+      // URL / navigation changes
+      chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+        if (changeInfo.status === "loading" || changeInfo.url) {
+          updateIconForTab(tabId, changeInfo.url ?? tab.url);
+        }
+      });
+
+      // Active tab changes
+      chrome.tabs.onActivated.addListener((activeInfo) => {
+        chrome.tabs.get(activeInfo.tabId, (tab) => {
+          if (chrome.runtime.lastError) return;
+          updateIconForTab(activeInfo.tabId, tab.url);
+        });
+      });
+
+      // Window focus changes
+      chrome.windows.onFocusChanged.addListener((windowId) => {
+        if (windowId === chrome.windows.WINDOW_ID_NONE) return;
+        chrome.tabs.query({ active: true, windowId }, (tabs) => {
+          const tab = tabs[0];
+          if (tab && tab.id != null) {
+            updateIconForTab(tab.id, tab.url);
+          }
+        });
+      });
+    } catch {
+      // ignore
+    }
+  }
 
   /* -------------------------------------------------------
    * 1) Messages from drive_bypass.content.ts (Drive tab)
@@ -81,16 +174,20 @@ export default defineBackground(() => {
     const pending = pendingByBypassTabId.get(tabId);
 
     // Not related to any bypass tab we're tracking
-    if (!pending && typeof message.type === 'string' && message.type.startsWith('CQD_')) {
+    if (
+      !pending &&
+      typeof message.type === "string" &&
+      message.type.startsWith("CQD_")
+    ) {
       return;
     }
 
     // A) SUCCESS: Drive tab clicked Download / Download anyway
-    if (message.type === 'CQD_BYPASS_SUCCESS') {
+    if (message.type === "CQD_BYPASS_SUCCESS") {
       if (pending) {
-        console.log('[CQD] Bypass SUCCESS reported from Drive tab.');
+        console.log("[CQD] Bypass SUCCESS reported from Drive tab.");
         // 1. Update UI immediately to Green/Success
-        sendStatusToTab(pending, 'success');
+        sendStatusToTab(pending, "success");
         pending.finalized = true;
       }
 
@@ -109,8 +206,8 @@ export default defineBackground(() => {
     }
 
     // B) 403 SEEN: Drive tab says "I see access denied"
-    if (message.type === 'CQD_403_SEEN' && pending) {
-      console.log('[CQD] 403 page detected in Drive tab.');
+    if (message.type === "CQD_403_SEEN" && pending) {
+      console.log("[CQD] 403 page detected in Drive tab.");
       pending.confirmed403 = true;
 
       // Close this tab, we are done with this specific attempt
@@ -126,9 +223,9 @@ export default defineBackground(() => {
         pending.htmlSeen = true;
         sendStatusToTab(
           pending,
-          'trying',
-          'Trying other Google accounts...',
-          'AUTH_LOOP',
+          "trying",
+          "Trying your other Google accounts…",
+          "AUTH_LOOP"
         );
       }
 
@@ -137,9 +234,9 @@ export default defineBackground(() => {
     }
 
     // C) AUTH CORRECTING: Drive tab says "I am fixing the URL, wait."
-    if (message.type === 'CQD_AUTH_CORRECTING' && pending) {
+    if (message.type === "CQD_AUTH_CORRECTING" && pending) {
       console.log(
-        '[CQD] Content script is correcting authuser. Waiting for reload...',
+        "[CQD] Content script is correcting authuser. Waiting for reload..."
       );
       // Do NOT close the tab. Do NOT start next attempt. Just wait.
       return;
@@ -147,9 +244,9 @@ export default defineBackground(() => {
 
     // D) LEGACY: URL Registration (kept for safety)
     if (
-      message.type === 'CQD_REGISTER_BYPASS_URL' &&
+      message.type === "CQD_REGISTER_BYPASS_URL" &&
       pending &&
-      typeof message.url === 'string'
+      typeof message.url === "string"
     ) {
       pendingByUrl.set(message.url, pending);
       return;
@@ -173,26 +270,26 @@ export default defineBackground(() => {
       return;
     }
 
-    const actualMime = (item.mime || '').toLowerCase();
+    const actualMime = (item.mime || "").toLowerCase();
     const actualExt = getFilenameExt(item.filename);
     const expectedKind = pending.fileMeta?.kind;
     const expectedExt = pending.fileMeta?.ext?.toLowerCase();
 
     const looksLikeHtml =
-      actualMime.includes('html') ||
-      actualExt === 'html' ||
-      actualExt === 'htm';
+      actualMime.includes("html") ||
+      actualExt === "html" ||
+      actualExt === "htm";
 
     const userWantedHtml =
-      expectedKind === 'html' ||
-      expectedExt === 'html' ||
-      expectedExt === 'htm';
+      expectedKind === "html" ||
+      expectedExt === "html" ||
+      expectedExt === "htm";
 
     // DRIVE: HTML when we expected a file → either 403 or virus page.
     if (looksLikeHtml && !userWantedHtml && pending.isDrive) {
       console.log(
-        '[CQD] Drive returned HTML (403 or virus). Intercepting. authuser=',
-        pending.currentAuthUser,
+        "[CQD] Drive returned HTML (403 or virus). Intercepting. authuser=",
+        pending.currentAuthUser
       );
 
       cancelledByUs.add(item.id);
@@ -204,9 +301,9 @@ export default defineBackground(() => {
           pending.htmlSeen = true;
           sendStatusToTab(
             pending,
-            'trying',
-            'Google Drive needs an extra step...',
-            'HTML_INTERCEPT',
+            "trying",
+            "Google Drive needs an extra confirmation in a new tab…",
+            "HTML_INTERCEPT"
           );
         }
 
@@ -229,12 +326,12 @@ export default defineBackground(() => {
     }
 
     // SUCCESS: Real file (or user explicitly wanted HTML)
-    sendStatusToTab(pending, 'success');
+    sendStatusToTab(pending, "success");
 
     if (pending.fileMeta?.name) {
-      suggest({ filename: pending.fileMeta.name, conflictAction: 'uniquify' });
+      suggest({ filename: pending.fileMeta.name, conflictAction: "uniquify" });
     } else {
-      suggest({ conflictAction: 'uniquify' });
+      suggest({ conflictAction: "uniquify" });
     }
   });
 
@@ -245,18 +342,22 @@ export default defineBackground(() => {
     const pending = pendingByDownloadId.get(delta.id);
     if (!pending) return;
 
-    if (delta.state && delta.state.current === 'complete') {
+    if (delta.state && delta.state.current === "complete") {
       cleanup(pending, delta.id);
       return;
     }
 
-    if (delta.state && delta.state.current === 'interrupted') {
+    if (delta.state && delta.state.current === "interrupted") {
       if (cancelledByUs.has(delta.id)) {
         cancelledByUs.delete(delta.id);
         pendingByDownloadId.delete(delta.id);
         return;
       }
-      sendStatusToTab(pending, 'error', 'Download interrupted.');
+      sendStatusToTab(
+        pending,
+        "error",
+        "Download interrupted."
+      );
       cleanup(pending, delta.id);
     }
   });
@@ -265,19 +366,24 @@ export default defineBackground(() => {
    * 4) CQD_DOWNLOAD from Classroom content script
    * -----------------------------------------------------*/
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (!message || message.type !== 'CQD_DOWNLOAD') return;
+    if (!message || message.type !== "CQD_DOWNLOAD") return;
 
     const rawUrl = message.url as string | undefined;
     const fileMeta = message.fileMeta as FileMetaMsg | undefined;
     const requestId = message.requestId || `req-${Date.now()}`;
 
     if (!rawUrl) {
-      sendResponse?.({ started: false, userMessage: 'No valid link found.' });
+      sendResponse?.({
+        started: false,
+        userMessage: "No valid link found.",
+      });
       return;
     }
 
     const { baseUrl, isDrive } = normalizeUrl(rawUrl);
-    const initialAuthUser = isDrive ? extractAuthUserFromUrl(rawUrl) : undefined;
+    const initialAuthUser = isDrive
+      ? extractAuthUserFromUrl(rawUrl)
+      : undefined;
 
     const pending: PendingDownload = {
       requestId,
@@ -289,7 +395,7 @@ export default defineBackground(() => {
       attemptedAuthUsers: [],
     };
 
-    if (typeof initialAuthUser === 'number') {
+    if (typeof initialAuthUser === "number") {
       pending.initialAuthUser = initialAuthUser;
       pending.attemptedAuthUsers.push(initialAuthUser);
       pending.currentAuthUser = initialAuthUser;
@@ -308,7 +414,7 @@ export default defineBackground(() => {
       // Try direct download first.
       // If Classroom/rawUrl had an explicit authuser, honor that for the first attempt.
       const firstUrl =
-        typeof pending.currentAuthUser === 'number'
+        typeof pending.currentAuthUser === "number"
           ? buildUrlWithAuthUser(pending.baseUrl, pending.currentAuthUser)
           : pending.baseUrl;
 
@@ -316,13 +422,13 @@ export default defineBackground(() => {
         {
           url: firstUrl,
           saveAs: false,
-          conflictAction: 'uniquify',
+          conflictAction: "uniquify",
         },
         (id) => {
           if (chrome.runtime.lastError || !id) {
             console.warn(
-              '[CQD] Initial Drive download start failed:',
-              chrome.runtime.lastError?.message,
+              "[CQD] Initial Drive download start failed:",
+              chrome.runtime.lastError?.message
             );
 
             if (!pending.fallbackStarted) {
@@ -331,12 +437,12 @@ export default defineBackground(() => {
               respondOnce({
                 started: true,
                 requestId,
-                userMessage: 'Browser blocked. Trying Drive tab…',
+                userMessage: "Browser blocked. Trying Drive tab…",
               });
             } else {
               respondOnce({
                 started: false,
-                userMessage: 'Browser blocked download.',
+                userMessage: "Browser blocked download.",
               });
             }
             return;
@@ -345,7 +451,7 @@ export default defineBackground(() => {
           pending.currentDownloadId = id;
           pendingByDownloadId.set(id, pending);
           respondOnce({ started: true, requestId, downloadId: id });
-        },
+        }
       );
     } else {
       // Non-Drive
@@ -374,7 +480,7 @@ function startSingleAttempt(
         cleanup(pending);
         respondOnce?.({
           started: false,
-          userMessage: 'Browser blocked download.',
+          userMessage: "Browser blocked download.",
         });
         return;
       }
@@ -519,13 +625,13 @@ function sendStatusToTab(
   userMessage?: string,
   errorCode?: string,
 ): void {
-  if (pending.finalized && status === 'success') return;
-  if (status === 'success') pending.finalized = true;
+  if (pending.finalized && status === "success") return;
+  if (status === "success") pending.finalized = true;
   if (pending.tabId == null) return;
 
   try {
     chrome.tabs.sendMessage(pending.tabId, {
-      type: 'CQD_DOWNLOAD_STATUS',
+      type: "CQD_DOWNLOAD_STATUS",
       requestId: pending.requestId,
       status,
       errorCode,

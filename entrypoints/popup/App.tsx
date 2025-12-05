@@ -2,12 +2,14 @@
 
 import { useEffect, useRef, useState } from 'react';
 import './App.css';
-import logoSrc from '../../assets/Google Classroom Downloade Icon.png';
+import logoSrc from '../../assets/GCD.png';
+import logoGraySrc from '../../assets/GCD_gray.png';
 import bmcLogoSrc from '../../assets/bmc-logo.svg';
 
 // External Links
 const SURVEY_URL = 'https://forms.gle/wPU2b1Qxa7svHqJa6';
-const GITHUB_REPO_URL = 'https://github.com/adhamhaithameid/classroom-quick-downloader';
+const GITHUB_REPO_URL =
+  'https://github.com/adhamhaithameid/classroom-quick-downloader';
 const EXTENSION_STORE_URL = 'https://chromewebstore.google.com/';
 const BUY_ME_COFFEE_URL = 'https://buymeacoffee.com/adhamhaithameid';
 
@@ -237,7 +239,9 @@ function App() {
         setSaving(false);
 
         if (browserApi.runtime.lastError || !response) {
-          setError('Failed to update this Classroom tab. Try reloading the page.');
+          setError(
+            "I couldn’t update CQD on this Classroom tab. Try reloading the page and toggling again.",
+          );
           setSettings(prevSettings);
           setTabState(prevTabState);
           return;
@@ -279,23 +283,29 @@ function App() {
   const isLoadingSettings = loadingState || settings == null;
 
   const effectiveEnabled = tabState?.effectiveEnabled ?? false;
-  const desiredEnabled = tabState?.desiredEnabled ?? false;
+  // const desiredEnabled = tabState?.desiredEnabled ?? false;
 
   let extensionStatusLabel: string;
   if (!isClassroomTab) {
-    extensionStatusLabel = 'Not on Classroom';
+    extensionStatusLabel = 'Open on Google Classroom';
   } else if (isLoadingSettings) {
-    extensionStatusLabel = 'Loading…';
+    extensionStatusLabel = 'Checking this tab…';
   } else {
-    extensionStatusLabel = effectiveEnabled ? 'Active' : 'Disabled';
+    extensionStatusLabel = effectiveEnabled
+      ? 'Running on this tab'
+      : 'Paused on this tab';
   }
+
+  // Choose logo based on whether we’re on a Classroom tab
+  const logoToUse = isClassroomTab ? logoSrc : logoGraySrc;
 
   return (
     <main className="cqd-app">
       <div className="cqd-scroll-container" ref={scrollRef}>
+        {/* HEADER – always visible */}
         <header className="cqd-header">
           <div className="cqd-brand-row">
-            <img src={logoSrc} alt="CQD Logo" className="cqd-brand-logo" />
+            <img src={logoToUse} alt="CQD Logo" className="cqd-brand-logo" />
             <div className="cqd-brand-text">
               <div className="cqd-brand-name">Classroom Quick Downloader</div>
               <div className="cqd-brand-meta">
@@ -323,12 +333,14 @@ function App() {
         </header>
 
         <div className="cqd-content-area">
-          {/* Error banner (no reload banner anymore; toggling is instant per tab) */}
+          {/* Error banner */}
           {error && (
             <div className="cqd-banner cqd-banner-error" role="alert">
               <div className="cqd-banner-content">
                 <div className="cqd-banner-indicator" aria-hidden="true" />
-                <div className="cqd-banner-text">Error: {error}</div>
+                <div className="cqd-banner-text">
+                  <strong>Oops.</strong> {error}
+                </div>
               </div>
               <button
                 type="button"
@@ -340,106 +352,120 @@ function App() {
             </div>
           )}
 
-          {/* Section 1: Analytics (global / future session-based) */}
-          <section className="cqd-panel">
-            <div className="cqd-card cqd-card-analytics">
-              <div className="cqd-card-header">
-                <h2 className="cqd-card-title">Download Activity</h2>
-                <p className="cqd-card-subtitle">
-                  Overview of your Classroom downloads.
-                </p>
-              </div>
-              <div className="cqd-analytics-layout">
-                <div className="cqd-analytics-circle-wrapper">
-                  <svg
-                    width="100"
-                    height="100"
-                    viewBox="0 0 100 100"
-                    className="cqd-analytics-svg"
-                  >
-                    <circle
-                      cx="50"
-                      cy="50"
-                      r={radius}
-                      fill="none"
-                      stroke="var(--cqd-surface)"
-                      strokeWidth="10"
-                    />
-                    {totalDownloads > 0 &&
-                      chartSegments.map((seg) => (
+          {/* MAIN BODY: depends on whether we are on Classroom */}
+          {isClassroomTab ? (
+            <>
+              {/* Section 1: Analytics (only on Classroom) */}
+              <section className="cqd-panel">
+                <div className="cqd-card cqd-card-analytics">
+                  <div className="cqd-card-header">
+                    <h2 className="cqd-card-title">Download Activity</h2>
+                    <p className="cqd-card-subtitle">
+                      A quick snapshot of your Classroom downloads.
+                    </p>
+                  </div>
+                  <div className="cqd-analytics-layout">
+                    <div className="cqd-analytics-circle-wrapper">
+                      <svg
+                        width="100"
+                        height="100"
+                        viewBox="0 0 100 100"
+                        className="cqd-analytics-svg"
+                      >
                         <circle
-                          key={seg.id}
                           cx="50"
                           cy="50"
                           r={radius}
                           fill="none"
-                          stroke={seg.color}
+                          stroke="var(--cqd-surface)"
                           strokeWidth="10"
-                          strokeDasharray={`${seg.strokeLength} ${circumference}`}
-                          strokeDashoffset={seg.offset}
-                          className="cqd-ring-segment"
-                        >
-                          <title>{`${seg.label}: ${seg.value}`}</title>
-                        </circle>
-                      ))}
-                  </svg>
-                  <div className="cqd-analytics-circle-inner">
-                    <div className="cqd-analytics-main-number">
-                      {totalDownloads}
+                        />
+                        {totalDownloads > 0 &&
+                          chartSegments.map((seg) => (
+                            <circle
+                              key={seg.id}
+                              cx="50"
+                              cy="50"
+                              r={radius}
+                              fill="none"
+                              stroke={seg.color}
+                              strokeWidth="10"
+                              strokeDasharray={`${seg.strokeLength} ${circumference}`}
+                              strokeDashoffset={seg.offset}
+                              className="cqd-ring-segment"
+                            >
+                              <title>{`${seg.label}: ${seg.value}`}</title>
+                            </circle>
+                          ))}
+                      </svg>
+                      <div className="cqd-analytics-circle-inner">
+                        <div className="cqd-analytics-main-number">
+                          {totalDownloads}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="cqd-analytics-side">
+                      <ul className="cqd-analytics-legend">
+                        {stats.map((stat) => (
+                          <li key={stat.id}>
+                            <span
+                              className="cqd-legend-dot"
+                              style={{ backgroundColor: stat.color }}
+                            />
+                            {stat.label}
+                          </li>
+                        ))}
+                      </ul>
                     </div>
                   </div>
                 </div>
+              </section>
 
-                <div className="cqd-analytics-side">
-                  <ul className="cqd-analytics-legend">
-                    {stats.map((stat) => (
-                      <li key={stat.id}>
-                        <span
-                          className="cqd-legend-dot"
-                          style={{ backgroundColor: stat.color }}
-                        />
-                        {stat.label}
-                      </li>
-                    ))}
-                  </ul>
+              {/* Section 2: Settings (per-tab enable/disable) */}
+              <section className="cqd-panel">
+                <div className="cqd-card cqd-card-settings">
+                  <div className="cqd-card-header">
+                    <h2 className="cqd-card-title">Extension Settings</h2>
+                    <p className="cqd-card-subtitle">
+                      Turn CQD on or off for this Classroom tab only.
+                    </p>
+                  </div>
+
+                  <div className="cqd-toggle-group">
+                    <ToggleRow
+                      label="Enable CQD on this Classroom tab"
+                      description="This only affects the current Classroom tab, not other tabs."
+                      checked={settings?.extensionEnabled ?? false}
+                      loading={isLoadingSettings || saving}
+                      onToggle={handleToggleExtension}
+                      disabled={isLoadingSettings}
+                      primary
+                    />
+                  </div>
                 </div>
-              </div>
-            </div>
-          </section>
-
-          {/* Section 2: Settings (per-tab enable/disable) */}
-          <section className="cqd-panel">
-            <div className="cqd-card cqd-card-settings">
-              <div className="cqd-card-header">
-                <h2 className="cqd-card-title">Extension Settings</h2>
-                <p className="cqd-card-subtitle">
-                  Per-tab activation for this Classroom page.
+              </section>
+            </>
+          ) : (
+            // Non-Classroom view: friendly message instead of analytics/settings
+            <section className="cqd-panel">
+              <div className="cqd-card">
+                <div className="cqd-card-header">
+                  <h2 className="cqd-card-title">Open on Classroom</h2>
+                  <p className="cqd-card-subtitle">
+                    This popup controls Classroom Quick Downloader only on{' '}
+                    <strong>classroom.google.com</strong>.
+                  </p>
+                </div>
+                <p className="cqd-muted-text" style={{ marginTop: 8 }}>
+                  Open this extension from a Google Classroom tab to see your
+                  download activity.
                 </p>
               </div>
+            </section>
+          )}
 
-              <div className="cqd-toggle-group">
-                <ToggleRow
-                  label={
-                    isClassroomTab
-                      ? 'Enable The Extension on this Classroom tab'
-                      : 'Open on classroom.google.com to enable'
-                  }
-                  description={
-                    isClassroomTab
-                      ? 'Master switch for all features.'
-                      : undefined
-                  }
-                  checked={settings?.extensionEnabled ?? false}
-                  loading={isLoadingSettings || saving}
-                  onToggle={handleToggleExtension}
-                  disabled={isLoadingSettings || !isClassroomTab}
-                  primary
-                />
-              </div>
-            </div>
-          </section>
-
-          {/* Section 3: Info & Credits */}
+          {/* Section 3: Info & Credits – always visible */}
           <section className="cqd-panel">
             <div className="cqd-card cqd-card-info">
               <div className="cqd-card-header">
@@ -550,6 +576,7 @@ function App() {
             </div>
           </section>
 
+          {/* FOOTER – always visible */}
           <footer className="cqd-footer">
             <div className="cqd-footer-inner">
               <p className="cqd-footer-text">
