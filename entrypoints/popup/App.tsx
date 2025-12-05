@@ -1,4 +1,4 @@
-// src/App.tsx
+// filepath: entrypoints/popup/App.tsx
 
 import { useEffect, useRef, useState } from 'react';
 import './App.css';
@@ -12,7 +12,6 @@ const EXTENSION_STORE_URL = 'https://chromewebstore.google.com/';
 const BUY_ME_COFFEE_URL = 'https://buymeacoffee.com/adhamhaithameid';
 
 type Settings = {
-  /** Desired master toggle (what the switch represents) */
   extensionEnabled: boolean;
   downloadAllEnabled: boolean;
   commentsFlagEnabled: boolean;
@@ -38,52 +37,44 @@ type ToggleRowProps = {
   primary?: boolean;
 };
 
-// --- Analytics Helper Types ---
 type StatItem = { id: string; label: string; value: number; color: string };
 
 /**
- * Try to discover the *effective* runtime state from classroom tabs.
- * This is optional sugar: if no content scripts respond, we just keep the fallback.
- *
- * Expected content-script handler:
- *   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
- *     if (msg.type === 'CQD_QUERY_EFFECTIVE_STATE') {
- *       sendResponse({ enabled: isCurrentlyEnabledOnThisPage });
- *     }
- *   });
+ * Ask any classroom tab what its effective state is.
+ * This is a live refinement on top of storage state.
  */
 function discoverEffectiveStateFromTabs(
-  fallback: boolean,
+  fallback: boolean | null,
   onState: (state: boolean) => void,
 ) {
-  // Guard: in popup context chrome is defined, but this keeps things safer in tests.
+  // In the popup context we expect `chrome` to exist, but guard anyway
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const anyChrome = (globalThis as any).chrome as typeof chrome | undefined;
-  if (!anyChrome?.tabs) return;
+  const browserApi = (globalThis as any).chrome as typeof chrome | undefined;
+  if (!browserApi?.tabs) return;
 
-  anyChrome.tabs.query({ url: '*://classroom.google.com/*' }, (tabs) => {
+  browserApi.tabs.query({ url: '*://classroom.google.com/*' }, (tabs) => {
     if (!tabs?.length) return;
 
     let resolved = false;
-    const timeout = setTimeout(() => {
-      if (!resolved) {
+    const timeout = window.setTimeout(() => {
+      if (!resolved && typeof fallback === 'boolean') {
         onState(fallback);
       }
     }, 400);
 
-    tabs.forEach((tab) => {
-      if (!tab.id) return;
+    for (const tab of tabs) {
+      if (!tab.id) continue;
       try {
-        anyChrome.tabs.sendMessage(
+        browserApi.tabs.sendMessage(
           tab.id,
           { type: 'CQD_QUERY_EFFECTIVE_STATE' },
           (response) => {
             if (resolved) return;
-            if (anyChrome.runtime.lastError || !response) return;
+            if (browserApi.runtime.lastError || !response) return;
 
             if (typeof response.enabled === 'boolean') {
               resolved = true;
-              clearTimeout(timeout);
+              window.clearTimeout(timeout);
               onState(response.enabled);
             }
           },
@@ -91,15 +82,15 @@ function discoverEffectiveStateFromTabs(
       } catch {
         // ignore
       }
-    });
+    }
   });
 }
 
 function App() {
-  // Desired global settings (what the switches represent)
+  // Desired config (what the user wants) → driven by popup switches
   const [settings, setSettings] = useState<Settings | null>(null);
 
-  // Effective state of the extension on Classroom pages (what the dot represents)
+  // Effective runtime state on Classroom pages (what is actually running)
   const [siteEnabled, setSiteEnabled] = useState<boolean | null>(null);
 
   const [saving, setSaving] = useState(false);
@@ -120,10 +111,13 @@ function App() {
 
   const totalDownloads = stats.reduce((acc, curr) => acc + curr.value, 0);
 
-  // Load current settings + version + effective site state on mount
+  // Initial load: get desired + effective from storage,
+  // then refine the effective state with a live query to content scripts.
   useEffect(() => {
     try {
-      const manifest = chrome.runtime.getManifest();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const browserApi = (globalThis as any).chrome as typeof chrome | undefined;
+      const manifest = browserApi?.runtime?.getManifest();
       if (manifest?.version) {
         setVersion(manifest.version);
       }
@@ -131,27 +125,26 @@ function App() {
       // ignore
     }
 
-    if (!chrome?.storage?.local) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const browserApi = (globalThis as any).chrome as typeof chrome | undefined;
+    if (!browserApi?.storage?.local) {
       setSettings(DEFAULT_SETTINGS);
       setSiteEnabled(DEFAULT_SETTINGS.extensionEnabled);
       return;
     }
 
-    chrome.storage.local.get(
+    browserApi.storage.local.get(
       {
         cqdEnabled: true,
         cqdDownloadAllEnabled: true,
         cqdCommentsFlagEnabled: true,
         cqdEditedFlagEnabled: true,
         cqdCombinedFlagEnabled: true,
-        // New explicit effective-state flag
         cqdEffectiveEnabled: null,
-        // For migration from the old "pendingReload" scheme
-        cqdPendingReload: false,
       },
       (result) => {
-        if (chrome.runtime.lastError) {
-          setError(chrome.runtime.lastError.message || 'Unknown error');
+        if (browserApi.runtime?.lastError) {
+          setError(browserApi.runtime.lastError.message || 'Unknown error');
           setSettings(DEFAULT_SETTINGS);
           setSiteEnabled(DEFAULT_SETTINGS.extensionEnabled);
           return;
@@ -169,59 +162,46 @@ function App() {
 
         setSettings(nextSettings);
 
-        // --- Determine effective state (what Classroom is actually running) ---
-        let effective: boolean;
+        let effective: boolean | null;
         if (typeof result.cqdEffectiveEnabled === 'boolean') {
-          // New format: trust the explicit effective flag
           effective = result.cqdEffectiveEnabled;
-        } else if (result.cqdPendingReload === true) {
-          // Old format: pendingReload meant "pages still running the previous state"
-          // -> effective = !desired
-          effective = !desiredEnabled;
         } else {
-          // No other info: assume pages already match desired
+          // No telemetry yet → assume matches desired until we hear otherwise
           effective = desiredEnabled;
         }
 
         setSiteEnabled(effective);
 
-        // Migrate storage to the new shape: explicit effective flag, no pendingReload
-        chrome.storage.local.set({
-          cqdEffectiveEnabled: effective,
-          cqdPendingReload: false,
-        });
-
-        // Optional: refine with a live check from Classroom content scripts
+        // Refine using live info from Classroom content scripts
         discoverEffectiveStateFromTabs(effective, (runtimeState) => {
           setSiteEnabled(runtimeState);
-          chrome.storage.local.set({ cqdEffectiveEnabled: runtimeState });
         });
       },
     );
   }, []);
 
-  // Listen for live effective-state updates broadcasted by content scripts
-  // (optional but nice if you ever toggle state from inside the page)
+  // Live updates when content scripts broadcast effective-state changes
   useEffect(() => {
-    if (!chrome?.runtime?.onMessage) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const browserApi = (globalThis as any).chrome as typeof chrome | undefined;
+    if (!browserApi?.runtime?.onMessage) return;
 
-    const handler = (
-      message: any, // eslint-disable-line @typescript-eslint/no-explicit-any
-    ) => {
+    const handler = (message: any) => {
       if (
         message?.type === 'CQD_EFFECTIVE_STATE_CHANGED' &&
         typeof message.enabled === 'boolean'
       ) {
         setSiteEnabled(message.enabled);
-        if (chrome?.storage?.local) {
-          chrome.storage.local.set({ cqdEffectiveEnabled: message.enabled });
-        }
       }
     };
 
-    chrome.runtime.onMessage.addListener(handler);
+    browserApi.runtime.onMessage.addListener(handler);
     return () => {
-      chrome.runtime.onMessage.removeListener(handler);
+      try {
+        browserApi.runtime.onMessage.removeListener(handler);
+      } catch {
+        // ignore
+      }
     };
   }, []);
 
@@ -229,24 +209,27 @@ function App() {
     setSaving(true);
     setError(null);
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const browserApi = (globalThis as any).chrome as typeof chrome | undefined;
+
     const toStore: Record<string, boolean> = {
       cqdEnabled: next.extensionEnabled,
       cqdDownloadAllEnabled: next.downloadAllEnabled,
       cqdCommentsFlagEnabled: next.commentsFlagEnabled,
       cqdEditedFlagEnabled: next.editedFlagEnabled,
       cqdCombinedFlagEnabled: next.combinedFlagEnabled,
-      // NOTE: we *do not* touch cqdEffectiveEnabled here.
-      // It only changes when the actual site state changes (reload).
+      // ⚠️ We do NOT write cqdEffectiveEnabled here.
+      // That is owned by the Classroom content script.
     };
 
     const savePromise = new Promise<void>((resolve, reject) => {
-      if (!chrome?.storage?.local) {
+      if (!browserApi?.storage?.local) {
         resolve();
         return;
       }
-      chrome.storage.local.set(toStore, () => {
-        if (chrome.runtime.lastError) {
-          reject(chrome.runtime.lastError);
+      browserApi.storage.local.set(toStore, () => {
+        if (browserApi.runtime.lastError) {
+          reject(browserApi.runtime.lastError);
         } else {
           resolve();
         }
@@ -256,11 +239,11 @@ function App() {
     try {
       await savePromise;
 
-      // Notify other parts (content scripts) that settings changed (desired state)
+      // Notify other parts (content scripts/background) that desired settings changed
       try {
-        chrome.runtime.sendMessage(
+        browserApi?.runtime?.sendMessage(
           { type: 'CQD_SETTINGS_UPDATED', settings: next },
-          () => void chrome.runtime.lastError,
+          () => void browserApi?.runtime?.lastError,
         );
       } catch {
         // ignore if runtime is unavailable
@@ -288,26 +271,23 @@ function App() {
     updateSettings({ extensionEnabled: !settings.extensionEnabled });
   }
 
-  // --- Action: Reload Tabs (apply desired -> effective) ---
+  // Reload tabs so that Classroom actually picks up the new desired state.
+  // We DO NOT write cqdEffectiveEnabled here; the content script will set it on load.
   function handleReloadTabs() {
-    if (!chrome?.tabs || !settings) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const browserApi = (globalThis as any).chrome as typeof chrome | undefined;
+    if (!browserApi?.tabs || !settings) return;
 
     const desiredEnabled = settings.extensionEnabled;
 
-    chrome.tabs.query({ url: '*://classroom.google.com/*' }, (tabs) => {
+    browserApi.tabs.query({ url: '*://classroom.google.com/*' }, (tabs) => {
       tabs.forEach((tab) => {
-        if (tab.id) chrome.tabs.reload(tab.id);
+        if (tab.id) browserApi.tabs.reload(tab.id);
       });
 
-      // As soon as we trigger reloads, we can treat the effective state as updated.
-      if (chrome?.storage?.local) {
-        chrome.storage.local.set(
-          { cqdEffectiveEnabled: desiredEnabled },
-          () => setSiteEnabled(desiredEnabled),
-        );
-      } else {
-        setSiteEnabled(desiredEnabled);
-      }
+      // Optimistic UI: assume site will match desired state after reload.
+      // The content script will send a CQD_EFFECTIVE_STATE_CHANGED once it actually attaches.
+      setSiteEnabled(desiredEnabled);
     });
   }
 
@@ -368,7 +348,7 @@ function App() {
             <div className="cqd-brand-text">
               <div className="cqd-brand-name">Classroom Quick Downloader</div>
               <div className="cqd-brand-meta">
-                {/* Status dot = effective site state (what the pages are actually running) */}
+                {/* Status dot = effective site state (what Classroom pages are actually running) */}
                 <span
                   className={`cqd-brand-status-dot ${
                     siteEnabled ? 'on' : ''
@@ -392,9 +372,7 @@ function App() {
         </header>
 
         <div className="cqd-content-area">
-          {/* Dynamic Reload Banner:
-              Shown ONLY when desired state (switch) !== effective state (dot).
-          */}
+          {/* Reload banner appears iff desired != effective */}
           {needsReload && (
             <div className="cqd-banner cqd-banner-reload" role="status">
               <div className="cqd-banner-content">
