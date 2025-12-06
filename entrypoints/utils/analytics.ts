@@ -15,19 +15,17 @@ export interface AnalyticsEvent {
 
 export interface LocalStats {
   /**
-   * Successful downloads.
-   * This is what your current popup UI uses as "total".
+   * Successful downloads (what your current popup UI uses as "total").
    */
   total: number;
 
   /**
-   * Aggregated counts by normalized type.
-   * (pdf, docs, sheets, slides, images, archive, etc.)
+   * Aggregated counts by normalized type (pdf, docs, sheets, slides, images, etc.).
    */
   byType: Record<string, number>;
 
   /**
-   * Extra fields for analysis only (not used in UI now).
+   * Extra analysis fields (not shown in current UI).
    */
   success?: number;
   fail?: number;
@@ -46,11 +44,66 @@ export interface LocalStats {
 const STORAGE_KEY_QUEUE = 'pending_events';
 const STORAGE_KEY_STATS = 'local_stats';
 
-// You can tune this if you want.
+// You can tune this.
 const BATCH_SIZE = 50;
 
 // Replace with your real Worker endpoint.
 const WORKER_URL = 'https://your-worker.your-name.workers.dev/track';
+
+// -------------------------------------------------------
+// Small helpers
+// -------------------------------------------------------
+
+function bucketDuration(durationMs: number): 'fast' | 'medium' | 'slow' {
+  if (!Number.isFinite(durationMs) || durationMs < 0) return 'fast';
+  if (durationMs <= 3000) return 'fast';
+  if (durationMs <= 15000) return 'medium';
+  return 'slow';
+}
+
+function detectBrowser(): string {
+  if (typeof navigator === 'undefined') return 'unknown';
+  const ua = navigator.userAgent || '';
+  if (ua.includes('Edg/')) return 'edge';
+  if (ua.includes('OPR/') || ua.includes('Opera')) return 'opera';
+  if (ua.includes('Firefox/')) return 'firefox';
+  if (ua.includes('Chrome/')) return 'chrome';
+  return 'unknown';
+}
+
+async function detectOS(): Promise<string> {
+  if (typeof chrome === 'undefined' || !chrome.runtime?.getPlatformInfo) {
+    return 'unknown';
+  }
+  try {
+    const info = await new Promise<chrome.runtime.PlatformInfo>((resolve) => {
+      chrome.runtime.getPlatformInfo((pi) => resolve(pi));
+    });
+    return info.os;
+  } catch {
+    return 'unknown';
+  }
+}
+
+function detectLanguage(): string {
+  if (typeof navigator === 'undefined') return 'en-US';
+  return navigator.language || 'en-US';
+}
+
+let cachedVersion: string | null = null;
+function getExtensionVersion(): string {
+  if (cachedVersion) return cachedVersion;
+  try {
+    if (typeof chrome !== 'undefined' && chrome.runtime?.getManifest) {
+      const v = chrome.runtime.getManifest().version;
+      cachedVersion = v || '0.0.0';
+      return cachedVersion;
+    }
+  } catch {
+    // ignore
+  }
+  return '0.0.0';
+}
 
 // -------------------------------------------------------
 // Storage helpers
@@ -128,62 +181,16 @@ async function saveStats(stats: LocalStats): Promise<void> {
 }
 
 // -------------------------------------------------------
-// Helpers: speed bucket + environment
-// -------------------------------------------------------
-
-function bucketDuration(durationMs: number): 'fast' | 'medium' | 'slow' {
-  if (!Number.isFinite(durationMs) || durationMs < 0) return 'fast';
-  if (durationMs <= 3000) return 'fast';
-  if (durationMs <= 15000) return 'medium';
-  return 'slow';
-}
-
-function detectBrowser(): string {
-  if (typeof navigator === 'undefined') return 'unknown';
-  const ua = navigator.userAgent || '';
-  if (ua.includes('Edg/')) return 'edge';
-  if (ua.includes('OPR/') || ua.includes('Opera')) return 'opera';
-  if (ua.includes('Firefox/')) return 'firefox';
-  if (ua.includes('Chrome/')) return 'chrome';
-  return 'unknown';
-}
-
-async function detectOS(): Promise<string> {
-  if (typeof chrome === 'undefined' || !chrome.runtime?.getPlatformInfo) {
-    return 'unknown';
-  }
-  try {
-    const info = await new Promise<chrome.runtime.PlatformInfo>((resolve) => {
-      chrome.runtime.getPlatformInfo((pi) => resolve(pi));
-    });
-    return info.os;
-  } catch {
-    return 'unknown';
-  }
-}
-
-function detectLanguage(): string {
-  if (typeof navigator === 'undefined') return 'en-US';
-  return navigator.language || 'en-US';
-}
-
-// -------------------------------------------------------
-// Local aggregation – for your own analysis (not UI)
+// Local aggregation – analysis only (UI still uses total/byType)
 // -------------------------------------------------------
 
 async function updateLocalStats(event: AnalyticsEvent): Promise<void> {
-  // You can decide here: do you want to aggregate only success, or both?
-  // For now:
-  // - "total" + byType are success-only (matches your current UI).
-  // - success/fail/attempts/buckets track everything.
-
   const stats = await loadStats();
-
   const isSuccess = event.status === 'success';
 
   if (isSuccess) {
     stats.success = (stats.success || 0) + 1;
-    stats.total = (stats.total || 0) + 1; // keep UI compatible
+    stats.total = (stats.total || 0) + 1; // keep popup compatible
   } else {
     stats.fail = (stats.fail || 0) + 1;
     const key = (event.error_type || 'UNKNOWN').toUpperCase();
@@ -192,7 +199,7 @@ async function updateLocalStats(event: AnalyticsEvent): Promise<void> {
 
   stats.attempts = (stats.attempts || 0) + 1;
 
-  // File type grouping (success-only, like your donut chart)
+  // File-type buckets (success only – same semantics as your donut)
   if (isSuccess) {
     let type = (event.file_type || 'unknown').trim().toLowerCase();
     if (!type) type = 'unknown';
@@ -205,7 +212,7 @@ async function updateLocalStats(event: AnalyticsEvent): Promise<void> {
     else if (['zip', 'rar', '7z', 'tar', 'gz'].includes(type)) type = 'archive';
     else if (['mp4', 'mov', 'avi', 'mkv'].includes(type)) type = 'video';
     else if (['mp3', 'wav', 'aac'].includes(type)) type = 'audio';
-    // else: keep raw extension (.pdf, .exe, .mht, etc.)
+    // else: keep raw extension – pdf, exe, mht, etc.
 
     stats.byType[type] = (stats.byType[type] || 0) + 1;
   }
@@ -220,7 +227,7 @@ async function updateLocalStats(event: AnalyticsEvent): Promise<void> {
   // Bypass count (all attempts where bypass_used = true)
   stats.bypassCount = (stats.bypassCount || 0) + (event.bypass_used ? 1 : 0);
 
-  // Language (success only, so it reflects real usage)
+  // Language (success only, reflects real usage)
   if (isSuccess) {
     if (!stats.byLanguage) stats.byLanguage = {};
     const lang = (event.language || 'unknown').toLowerCase();
@@ -234,7 +241,9 @@ async function updateLocalStats(event: AnalyticsEvent): Promise<void> {
 // Network flush
 // -------------------------------------------------------
 
-async function sendBatchToCloudflare(events: AnalyticsEvent[]): Promise<boolean> {
+async function sendBatchToCloudflare(
+  events: AnalyticsEvent[],
+): Promise<boolean> {
   if (!events.length) return true;
   if (typeof fetch === 'undefined') return false;
 
@@ -261,102 +270,118 @@ async function sendBatchToCloudflare(events: AnalyticsEvent[]): Promise<boolean>
 }
 
 // -------------------------------------------------------
-// Public Analytics API
+// INTERNAL OP QUEUE (prevents race conditions)
+// -------------------------------------------------------
+
+let opChain: Promise<void> = Promise.resolve();
+
+function enqueueOp(op: () => Promise<void>): void {
+  opChain = opChain
+    .then(op)
+    .catch((err) => {
+      console.error('[Analytics] Operation failed:', err);
+    });
+}
+
+// The actual bodies for track() and flush(), run sequentially
+async function internalTrack(
+  event: Omit<
+    AnalyticsEvent,
+    'timestamp' | 'ext_version' | 'browser' | 'os' | 'language'
+  >,
+): Promise<void> {
+  if (typeof chrome === 'undefined' || !chrome.runtime?.getManifest) {
+    // Not in a real extension env – silently ignore
+    return;
+  }
+
+  const fullEvent: AnalyticsEvent = {
+    ...event,
+    timestamp: Date.now(),
+    ext_version: getExtensionVersion(),
+    browser: detectBrowser(),
+    os: await detectOS(),
+    language: detectLanguage(),
+  };
+
+  // 1) Enqueue in persistent queue
+  const queue = await loadQueue();
+  queue.push(fullEvent);
+  await saveQueue(queue);
+
+  // 2) Update local stats (for popup + analysis)
+  await updateLocalStats(fullEvent);
+
+  console.log('[Analytics] Event tracked. Queue size:', queue.length);
+
+  // 3) If queue is large, attempt a flush under the same lock
+  if (queue.length >= BATCH_SIZE) {
+    await internalFlush();
+  }
+}
+
+async function internalFlush(): Promise<void> {
+  const queue = await loadQueue();
+  if (!queue.length) return;
+
+  console.log(`[Analytics] Flushing ${queue.length} events...`);
+
+  let remaining = queue.slice();
+  let flushedCount = 0;
+
+  while (remaining.length) {
+    const batch = remaining.slice(0, BATCH_SIZE);
+    const ok = await sendBatchToCloudflare(batch);
+    if (!ok) {
+      // Stop on first failed batch – keep all remaining events
+      break;
+    }
+    flushedCount += batch.length;
+    remaining = remaining.slice(BATCH_SIZE);
+  }
+
+  if (!flushedCount) {
+    console.warn(
+      '[Analytics] No batches accepted by server. Keeping full queue.',
+    );
+    return;
+  }
+
+  const newQueue = queue.slice(flushedCount);
+  await saveQueue(newQueue);
+  console.log(
+    `[Analytics] Flush complete. Removed ${flushedCount}, remaining ${newQueue.length}.`,
+  );
+}
+
+// -------------------------------------------------------
+// Public API
 // -------------------------------------------------------
 
 export const Analytics = {
   /**
-   * Track a single download event.
-   * This is the ONLY function your background code needs to call.
+   * Fire-and-forget tracking.
+   * Download logic & UI don't wait for this.
+   * All operations are serialized via the internal op queue.
    */
-  async track(
+  track(
     event: Omit<
       AnalyticsEvent,
       'timestamp' | 'ext_version' | 'browser' | 'os' | 'language'
     >,
-  ): Promise<void> {
-    try {
-      if (typeof chrome === 'undefined' || !chrome.runtime?.getManifest) {
-        // Non-extension environment – silently ignore.
-        return;
-      }
-
-      const manifest = chrome.runtime.getManifest();
-
-      const fullEvent: AnalyticsEvent = {
-        ...event,
-        timestamp: Date.now(),
-        ext_version: manifest.version || '0.0.0',
-        browser: detectBrowser(),
-        os: await detectOS(),
-        language: detectLanguage(),
-      };
-
-      // 1) Enqueue event (queue = pending_events array)
-      const queue = await loadQueue();
-      queue.push(fullEvent);
-      await saveQueue(queue);
-
-      // 2) Update local stats (for popup / offline analysis)
-      await updateLocalStats(fullEvent);
-
-      console.log('[Analytics] Event tracked. Queue size:', queue.length);
-
-      // 3) Optional: flush when threshold hit
-      if (queue.length >= BATCH_SIZE) {
-        await this.flush();
-      }
-    } catch (err) {
-      console.error('[Analytics] Failed to track event:', err);
-    }
+  ): void {
+    enqueueOp(() => internalTrack(event));
   },
 
   /**
-   * Flush queued events to Cloudflare in batches.
-   * Only removes events if the Worker accepts them.
+   * Best-effort flush. Also serialized with track operations.
    */
-  async flush(): Promise<void> {
-    try {
-      const queue = await loadQueue();
-      if (!queue.length) return;
-
-      console.log(`[Analytics] Flushing ${queue.length} events...`);
-
-      let remaining = queue.slice();
-      let flushedCount = 0;
-
-      while (remaining.length) {
-        const batch = remaining.slice(0, BATCH_SIZE);
-        const ok = await sendBatchToCloudflare(batch);
-        if (!ok) {
-          // Stop on first failure – keep remaining events
-          break;
-        }
-        flushedCount += batch.length;
-        remaining = remaining.slice(BATCH_SIZE);
-      }
-
-      if (!flushedCount) {
-        console.warn(
-          '[Analytics] No batches accepted by server. Keeping full queue.',
-        );
-        return;
-      }
-
-      const newQueue = queue.slice(flushedCount);
-      await saveQueue(newQueue);
-      console.log(
-        `[Analytics] Flush complete. Removed ${flushedCount}, remaining ${newQueue.length}.`,
-      );
-    } catch (err) {
-      console.error('[Analytics] Flush failed:', err);
-    }
+  flush(): void {
+    enqueueOp(() => internalFlush());
   },
 };
 
-// Auto-flush once shortly after startup (best effort, no UI impact)
+// Auto-flush once shortly after background startup (best-effort)
 setTimeout(() => {
-  Analytics.flush().catch(() => {
-    /* ignore */
-  });
+  Analytics.flush();
 }, 5000);
