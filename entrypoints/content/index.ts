@@ -1,22 +1,23 @@
 // filepath: entrypoints/content/index.ts
-
 const CLASSROOM_URL_PATTERN = /^https:\/\/classroom\.google\.com\//;
-
 import {
   DOWNLOAD_ICON_SVG_URL,
   SUCCESS_ICON_SVG_URL,
   ERROR_ICON_SVG_URL,
 } from './icons';
-
 import { injectStyles } from './styles';
 import { t } from './i18n';
 import { isPageDark } from './theme';
 import { whenExtensionEnabled } from './flags';
 
+/* -----------------------------------------------------
+ * Constants
+ * ---------------------------------------------------*/
 const INJECTED_ATTR = 'data-cqd-injected';
 const PROCESSED_ATTR = 'data-cqd-processed';
-const RESCAN_INTERVAL_MS = 2000; // Speed up slightly
-const RESCAN_DEBOUNCE_MS = 200;
+const RESCAN_INTERVAL_MS = 2000;
+// Reduced debounce to make buttons appear snappier after scroll
+const RESCAN_DEBOUNCE_MS = 150; 
 const LOADING_MIN_MS = 600;
 const FEEDBACK_SUCCESS_MS = 3000;
 const FEEDBACK_ERROR_MS = 4000;
@@ -42,11 +43,11 @@ const DRIVE_URL_PATTERNS: RegExp[] = [
 /* -----------------------------------------------------
  * Global State
  * ---------------------------------------------------*/
-
 type QueryRoot = Document | HTMLElement | DocumentFragment;
 
 let scanTimeoutId: number | null = null;
 let observer: MutationObserver | null = null;
+let rescanIntervalId: number | null = null;
 
 type ButtonState = 'idle' | 'loading' | 'success' | 'error' | 'trying';
 
@@ -66,10 +67,43 @@ type PendingButton = {
 let nextRequestSeq = 1;
 const pendingButtons = new Map<string, PendingButton>();
 
+// Per-tab CQD state
+let desiredEnabled = true; 
+let effectiveEnabled = false; 
+let initialized = false;
+
+// Global ON/OFF flag
+let globalEnabled = true;
+
+/* -----------------------------------------------------
+ * Effective state broadcast
+ * ---------------------------------------------------*/
+function applyEffectiveState(enabled: boolean): void {
+  effectiveEnabled = enabled;
+  if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+    try {
+      chrome.runtime.sendMessage({
+        type: 'CQD_EFFECTIVE_STATE_CHANGED',
+        enabled,
+      });
+    } catch {
+      // ignore
+    }
+  }
+}
+
+function recomputeEffectiveStateFromFlags(): void {
+  const shouldEnable = globalEnabled && desiredEnabled;
+  if (shouldEnable) {
+    startCQD();
+  } else {
+    stopCQD();
+  }
+}
+
 /* -----------------------------------------------------
  * Environment / Page Checks
  * ---------------------------------------------------*/
-
 function isGoogleClassroom(): boolean {
   if (typeof location === 'undefined') return false;
   if (location.hostname !== 'classroom.google.com') return false;
@@ -77,9 +111,49 @@ function isGoogleClassroom(): boolean {
 }
 
 /* -----------------------------------------------------
+ * Attach / Detach CQD for this tab
+ * ---------------------------------------------------*/
+function startCQD(): void {
+  if (initialized) return;
+  if (!isGoogleClassroom()) return;
+  initialized = true;
+  injectStyles();
+  setupObservers();
+  applyEffectiveState(true);
+}
+
+function stopCQD(): void {
+  if (!initialized) return;
+  initialized = false;
+  if (observer) {
+    observer.disconnect();
+    observer = null;
+  }
+  if (scanTimeoutId !== null) {
+    window.clearTimeout(scanTimeoutId);
+    scanTimeoutId = null;
+  }
+  if (rescanIntervalId !== null) {
+    window.clearInterval(rescanIntervalId);
+    rescanIntervalId = null;
+  }
+  // Stop listening to scroll
+  window.removeEventListener('scroll', scheduleScan);
+
+  try {
+    const injectedButtons = document.querySelectorAll<HTMLElement>(
+      '.cqd-download-btn',
+    );
+    injectedButtons.forEach((btn) => btn.remove());
+  } catch {
+    // ignore
+  }
+  applyEffectiveState(false);
+}
+
+/* -----------------------------------------------------
  * Scanning / Observers
  * ---------------------------------------------------*/
-
 function scheduleScan(): void {
   if (scanTimeoutId !== null) {
     window.clearTimeout(scanTimeoutId);
@@ -92,7 +166,6 @@ function scheduleScan(): void {
 
 function setupObservers(): void {
   if (typeof document === 'undefined') return;
-
   if (!document.body) {
     window.addEventListener(
       'DOMContentLoaded',
@@ -101,19 +174,32 @@ function setupObservers(): void {
     );
     return;
   }
-  if (observer) return;
 
+  // 1. Scroll Listener (Crucial for hard scrolling)
+  // Passive listener is better for performance
+  window.addEventListener('scroll', scheduleScan, { passive: true });
+
+  // 2. Mutation Observer
+  if (observer) return;
   observer = new MutationObserver((mutations) => {
     const roots = new Set<QueryRoot>();
     let shouldScan = false;
-
     for (const m of mutations) {
+      // Watch for attribute changes on containers (recycled nodes)
+      if (m.type === 'attributes' && m.target instanceof HTMLElement) {
+        if (m.target.hasAttribute(PROCESSED_ATTR) && !hasInjectedButton(m.target)) {
+          roots.add(m.target);
+          shouldScan = true;
+        }
+        continue;
+      }
+
       if (m.type !== 'childList') continue;
 
-      // Optimization: filter out our own mutations
-      const isInternal = Array.from(m.addedNodes).some(n =>
-        n.nodeType === Node.ELEMENT_NODE &&
-        (n as Element).hasAttribute(INJECTED_ATTR)
+      const isInternal = Array.from(m.addedNodes).some(
+        (n) =>
+          n.nodeType === Node.ELEMENT_NODE &&
+          (n as Element).hasAttribute(INJECTED_ATTR),
       );
       if (isInternal) continue;
 
@@ -123,6 +209,9 @@ function setupObservers(): void {
           roots.add(node as HTMLElement);
         }
       });
+      if (m.target instanceof HTMLElement) {
+        roots.add(m.target);
+      }
     }
 
     if (shouldScan) {
@@ -130,6 +219,7 @@ function setupObservers(): void {
         scheduleScan();
       } else {
         roots.forEach((root) => scanForAttachments(root));
+        scheduleScan(); 
       }
     }
   });
@@ -137,24 +227,28 @@ function setupObservers(): void {
   observer.observe(document.body, {
     childList: true,
     subtree: true,
+    attributes: true,
+    attributeFilter: ['class', 'style', 'data-cqd-processed'], 
   });
 
-  window.setInterval(() => {
-    scheduleScan();
-  }, RESCAN_INTERVAL_MS);
-
+  // 3. Interval Fallback (Safety net)
+  if (rescanIntervalId == null) {
+    rescanIntervalId = window.setInterval(() => {
+      scheduleScan();
+    }, RESCAN_INTERVAL_MS);
+  }
   scheduleScan();
 }
 
 function scanForAttachments(root: QueryRoot = document): void {
   if (!isGoogleClassroom()) return;
+  if (!effectiveEnabled) return; 
   injectSingleFileButtons(root);
 }
 
 /* -----------------------------------------------------
  * Single-file buttons
  * ---------------------------------------------------*/
-
 function injectSingleFileButtons(root: QueryRoot = document): void {
   const anchors = Array.from(
     root.querySelectorAll<HTMLAnchorElement>(DRIVE_ANCHOR_SELECTOR),
@@ -171,11 +265,16 @@ function injectSingleFileButtons(root: QueryRoot = document): void {
 
     if (!container) continue;
 
-    // FIX: "Normal buttons doesn't appear"
-    // We strictly check if the button *exists* inside.
-    // If React re-rendered the container content, the button is gone, so we must re-inject.
-    if (hasInjectedButton(container)) continue;
-
+    // FIX: If container is marked processed, check if button ACTUALLY exists.
+    // If not, clear the flag so we can re-inject.
+    if (container.hasAttribute(PROCESSED_ATTR)) {
+      if (!hasInjectedButton(container)) {
+        container.removeAttribute(PROCESSED_ATTR);
+      } else {
+        continue; // Truly skipped
+      }
+    }
+    
     injectButtonIntoAttachment(container, url);
   }
 
@@ -187,11 +286,17 @@ function injectSingleFileButtons(root: QueryRoot = document): void {
   );
 
   for (const el of metaElements) {
-    if (hasInjectedButton(el)) continue;
+    if (el.hasAttribute(PROCESSED_ATTR)) {
+      if (!hasInjectedButton(el)) {
+        el.removeAttribute(PROCESSED_ATTR);
+      } else {
+        continue;
+      }
+    }
 
     const url = findDriveUrl(el);
     if (!url) continue;
-
+    
     injectButtonIntoAttachment(el, url);
   }
 }
@@ -199,9 +304,7 @@ function injectSingleFileButtons(root: QueryRoot = document): void {
 /* -----------------------------------------------------
  * URL / DOM Helpers
  * ---------------------------------------------------*/
-
 function hasInjectedButton(container: HTMLElement): boolean {
-  // We check if the button is actually in the DOM
   return !!container.querySelector(`[${INJECTED_ATTR}="true"]`);
 }
 
@@ -263,12 +366,17 @@ function toDownloadUrl(originalUrl: string, depth = 0): string {
         const cont = parsed.searchParams.get('continue');
         if (cont) return toDownloadUrl(cont, depth + 1);
         const id = parsed.searchParams.get('id');
-        if (id) return appendAuth(`https://drive.google.com/uc?export=download&id=${id}`);
+        if (id)
+          return appendAuth(
+            `https://drive.google.com/uc?export=download&id=${id}`,
+          );
         return appendAuth(originalUrl);
       }
       const fileMatch = parsed.pathname.match(/^\/file\/d\/([^/]+)/);
       if (fileMatch) {
-        return appendAuth(`https://drive.google.com/uc?export=download&id=${fileMatch[1]}`);
+        return appendAuth(
+          `https://drive.google.com/uc?export=download&id=${fileMatch[1]}`,
+        );
       }
       if (parsed.pathname === '/open' || parsed.pathname === '/uc') {
         parsed.searchParams.set('export', 'download');
@@ -276,12 +384,19 @@ function toDownloadUrl(originalUrl: string, depth = 0): string {
         return parsed.toString();
       }
     }
-
-    if (parsed.hostname === 'classroom.google.com' && parsed.pathname.startsWith('/drive')) {
-      const id = parsed.searchParams.get('id') || parsed.searchParams.get('resourceId') || parsed.searchParams.get('fileId');
-      if (id) return appendAuth(`https://drive.google.com/uc?export=download&id=${id}`);
+    if (
+      parsed.hostname === 'classroom.google.com' &&
+      parsed.pathname.startsWith('/drive')
+    ) {
+      const id =
+        parsed.searchParams.get('id') ||
+        parsed.searchParams.get('resourceId') ||
+        parsed.searchParams.get('fileId');
+      if (id)
+        return appendAuth(
+          `https://drive.google.com/uc?export=download&id=${id}`,
+        );
     }
-
     return appendAuth(originalUrl);
   } catch {
     return originalUrl;
@@ -291,38 +406,78 @@ function toDownloadUrl(originalUrl: string, depth = 0): string {
 /* -----------------------------------------------------
  * File metadata extraction
  * ---------------------------------------------------*/
-// (Keeping existing logic for brevity - no changes needed here)
 function cleanAttachmentName(rawName: string): string {
   if (!rawName) return '';
   let name = rawName.trim();
-  const garbageLabels = ['Microsoft Excel', 'Microsoft Word', 'Microsoft PowerPoint', 'Compressed archive', 'Binary', 'Unknown', 'Google Sheets', 'Google Docs', 'Google Slides', 'Text File', 'PDF', 'Video', 'Image', 'Audio', 'Text', 'Word', 'Excel', 'PowerPoint', 'Archive', 'Zip', 'File', 'Document', 'Shortcut', 'Code'];
+  const garbageLabels = [
+    'Microsoft Excel',
+    'Microsoft Word',
+    'Microsoft PowerPoint',
+    'Compressed archive',
+    'Binary',
+    'Unknown',
+    'Google Sheets',
+    'Google Docs',
+    'Google Slides',
+    'Text File',
+    'PDF',
+    'Video',
+    'Image',
+    'Audio',
+    'Text',
+    'Word',
+    'Excel',
+    'PowerPoint',
+    'Archive',
+    'Zip',
+    'File',
+    'Document',
+    'Shortcut',
+    'Code',
+  ];
+
   for (const label of garbageLabels) {
     if (name.endsWith(label)) {
       const potential = name.slice(0, -label.length).trim();
-      if (potential.length > 0) { name = potential; break; }
+      if (potential.length > 0) {
+        name = potential;
+        break;
+      }
     }
   }
+
   if (name.length > 0 && name.length % 2 === 0) {
     const mid = name.length / 2;
     if (name.slice(0, mid) === name.slice(mid)) return name.slice(0, mid);
   }
+
   const repeatRegex = /\.([a-zA-Z0-9]{2,10})\1$/i;
   const repeatMatch = name.match(repeatRegex);
   if (repeatMatch) return name.slice(0, -repeatMatch[1].length).trim();
+
   return name;
 }
 
 function extractFileMeta(container: HTMLElement, url: string): FileMeta {
   let name: string | undefined;
-  const tooltip = container.getAttribute('data-tooltip') || container.getAttribute('aria-label') || container.getAttribute('title');
+
+  const tooltip =
+    container.getAttribute('data-tooltip') ||
+    container.getAttribute('aria-label') ||
+    container.getAttribute('title');
   if (tooltip && tooltip.trim()) name = tooltip.trim();
+
   if (!name) {
     const text = (container.textContent || '').trim();
     if (text) {
-      const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
+      const lines = text
+        .split('\n')
+        .map((l) => l.trim())
+        .filter(Boolean);
       if (lines.length > 0) name = lines[0];
     }
   }
+
   if (!name) {
     try {
       const u = new URL(url);
@@ -330,6 +485,7 @@ function extractFileMeta(container: HTMLElement, url: string): FileMeta {
       if (pathName && pathName.includes('.')) name = pathName;
     } catch {}
   }
+
   if (name) name = cleanAttachmentName(name);
 
   let ext: string | undefined;
@@ -337,18 +493,18 @@ function extractFileMeta(container: HTMLElement, url: string): FileMeta {
     const m = name.match(/\.([a-zA-Z0-9]{2,10})$/);
     if (m) ext = m[1].toLowerCase();
   }
-  // Kind logic omitted for brevity, assume identical to previous...
+
   return { name, ext, kind: 'other' };
 }
 
 /* -----------------------------------------------------
  * Button injection
  * ---------------------------------------------------*/
-
-function injectButtonIntoAttachment(container: HTMLElement, url: string): void {
+function injectButtonIntoAttachment(
+  container: HTMLElement,
+  url: string,
+): void {
   if (!url) return;
-
-  // Mark as processed (metadata only)
   container.setAttribute(PROCESSED_ATTR, 'true');
 
   const computed = window.getComputedStyle(container);
@@ -356,8 +512,8 @@ function injectButtonIntoAttachment(container: HTMLElement, url: string): void {
 
   const directUrl = toDownloadUrl(url);
   const fileMeta = extractFileMeta(container, directUrl);
-  const button = createDownloadButton(container, directUrl, fileMeta);
 
+  const button = createDownloadButton(container, directUrl, fileMeta);
   const iconEl = button.querySelector<HTMLElement>('.cqd-download-icon');
   if (iconEl) iconEl.classList.add('cqd-icon-medium');
 
@@ -367,7 +523,6 @@ function injectButtonIntoAttachment(container: HTMLElement, url: string): void {
 /* -----------------------------------------------------
  * Button state helpers
  * ---------------------------------------------------*/
-
 function getButtonState(button: HTMLButtonElement): ButtonState {
   if (button.classList.contains('cqd-loading')) return 'loading';
   if (button.classList.contains('cqd-trying')) return 'trying';
@@ -384,16 +539,21 @@ function setButtonState(
   const icon = button.querySelector<HTMLElement>('.cqd-download-icon');
   const label = button.querySelector<HTMLSpanElement>('.cqd-label');
   const errorDetail = button.querySelector<HTMLSpanElement>('.cqd-error-detail');
+
   if (!icon || !label || !errorDetail) return;
 
-  button.classList.remove('cqd-loading', 'cqd-trying', 'cqd-success', 'cqd-error');
+  button.classList.remove(
+    'cqd-loading',
+    'cqd-trying',
+    'cqd-success',
+    'cqd-error',
+  );
   icon.classList.remove('cqd-spinner');
   icon.textContent = '';
   button.disabled = false;
   button.style.backgroundColor = '';
   label.textContent = t('download');
   errorDetail.textContent = '';
-
   icon.style.backgroundImage = `url("${DOWNLOAD_ICON_SVG_URL}")`;
   icon.style.backgroundSize = '';
 
@@ -434,7 +594,6 @@ function setPillProgress(button: HTMLButtonElement, fraction: number): void {
 /* -----------------------------------------------------
  * Button factory
  * ---------------------------------------------------*/
-
 function createDownloadButton(
   _container: HTMLElement,
   url: string,
@@ -443,16 +602,16 @@ function createDownloadButton(
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'cqd-download-btn';
-
   if (isPageDark()) {
     button.classList.add('cqd-theme-dark');
   }
-
   button.setAttribute(INJECTED_ATTR, 'true');
-  button.setAttribute('aria-label', `${t('ariaDownload')} ${fileMeta.name || ''}`);
+  button.setAttribute(
+    'aria-label',
+    `${t('ariaDownload')} ${fileMeta.name || ''}`,
+  );
   button.setAttribute('title', t('titleQuick'));
 
-  // Data for grouping
   try {
     if (url) (button.dataset as any).cqdUrl = url;
     if (fileMeta?.name) (button.dataset as any).cqdName = fileMeta.name;
@@ -481,9 +640,10 @@ function createDownloadButton(
     e.stopPropagation();
     await handleSingleDownloadClick(button, url, fileMeta);
   };
-
   button.addEventListener('click', clickHandler);
-  button.addEventListener('auxclick', (e) => { if (e.button === 1) clickHandler(e); });
+  button.addEventListener('auxclick', (e) => {
+    if (e.button === 1) clickHandler(e);
+  });
 
   return button;
 }
@@ -491,7 +651,6 @@ function createDownloadButton(
 /* -----------------------------------------------------
  * Download click handler
  * ---------------------------------------------------*/
-
 async function handleSingleDownloadClick(
   button: HTMLButtonElement,
   url: string,
@@ -504,13 +663,11 @@ async function handleSingleDownloadClick(
 
   const requestId = `cqd-${Date.now()}-${nextRequestSeq++}`;
   const startedAt = Date.now();
-
   pendingButtons.set(requestId, { button, requestId, fileMeta, startedAt });
 
   setButtonState(button, 'loading');
 
   const startResult = await startBackgroundDownload(requestId, url, fileMeta);
-
   if (!startResult.ok) {
     pendingButtons.delete(requestId);
     await ensureMinLoading(startedAt);
@@ -534,8 +691,15 @@ function startBackgroundDownload(
       chrome.runtime.sendMessage(
         { type: 'CQD_DOWNLOAD', url: finalUrl, requestId, fileMeta },
         (response) => {
-          if (chrome.runtime.lastError || !response || response.started === false) {
-            resolve({ ok: false, userMessage: response?.userMessage || 'Could not start.' });
+          if (
+            chrome.runtime.lastError ||
+            !response ||
+            response.started === false
+          ) {
+            resolve({
+              ok: false,
+              userMessage: response?.userMessage || 'Could not start.',
+            });
           } else {
             resolve({ ok: true });
           }
@@ -550,14 +714,18 @@ function startBackgroundDownload(
 /* -----------------------------------------------------
  * UI Utils
  * ---------------------------------------------------*/
-
-async function showErrorState(button: HTMLButtonElement, userMessage?: string): Promise<void> {
+async function showErrorState(
+  button: HTMLButtonElement,
+  userMessage?: string,
+): Promise<void> {
   setButtonState(button, 'error', { userMessage });
+
   const earliestReset = Date.now() + FEEDBACK_ERROR_MS;
   while (true) {
     await delay(200);
     if (getButtonState(button) !== 'error') return;
     if (Date.now() < earliestReset) continue;
+
     if (!button.matches(':hover')) {
       setButtonState(button, 'idle');
       setPillProgress(button, 0);
@@ -576,80 +744,125 @@ function delay(ms: number): Promise<void> {
 }
 
 /* -----------------------------------------------------
- * Listen for background status updates
+ * Message handling: popup + download status
  * ---------------------------------------------------*/
-
 if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
-  chrome.runtime.onMessage.addListener((message) => {
-    if (!message || message.type !== 'CQD_DOWNLOAD_STATUS') return;
+  chrome.runtime.onMessage.addListener(
+    (message, _sender, sendResponse): void | true => {
+      if (!message) return;
 
-    const requestId = message.requestId as string | undefined;
-    if (!requestId) return;
-
-    const pending = pendingButtons.get(requestId);
-    if (!pending) return;
-
-    const { button, startedAt } = pending;
-
-    (async () => {
-      await ensureMinLoading(startedAt);
-
-      const status = message.status as ButtonState | 'blocked_html' | 'interrupted';
-      const errorCode = message.errorCode as string | undefined;
-      const userMessage = message.userMessage as string | undefined;
-
-      if (status === 'trying') {
-        setButtonState(button, 'trying', { userMessage });
-        return;
-      }
-
-      // SUCCESS PATH
-      if (status === 'success' || status === 'complete') {
-        pendingButtons.delete(requestId);
-
+      // Popup asks for this tab's state
+      if (message.type === 'CQD_POPUP_QUERY_STATE') {
         try {
-          (button.dataset as any).cqdAllDone = 'true';
+          sendResponse({ desiredEnabled, effectiveEnabled });
         } catch {
-          /* ignore */
+          // ignore
         }
+        return true;
+      }
 
-        setPillProgress(button, 1);
-        setButtonState(button, 'success');
+      // Popup sets desired state for this tab
+      if (message.type === 'CQD_POPUP_SET_DESIRED_STATE') {
+        desiredEnabled = !!message.enabled;
+        // NEW: go through the global+tab recompute instead of raw start/stop
+        recomputeEffectiveStateFromFlags();
+        try {
+          sendResponse({ desiredEnabled, effectiveEnabled });
+        } catch {
+          // ignore
+        }
+        return true;
+      }
 
-        // Stay green until the group batch has finished its success window
-        await waitForSuccessReset(button);
+      if (message.type === 'CQD_DOWNLOAD_STATUS') {
+        const requestId = message.requestId as string | undefined;
+        if (!requestId) return;
+
+        const pending = pendingButtons.get(requestId);
+        if (!pending) return;
+
+        const { button, startedAt } = pending;
+        (async () => {
+          await ensureMinLoading(startedAt);
+
+          const status = message.status as
+            | ButtonState
+            | 'blocked_html'
+            | 'interrupted';
+          const errorCode = message.errorCode as string | undefined;
+          const userMessage = message.userMessage as string | undefined;
+
+          if (status === 'trying') {
+            setButtonState(button, 'trying', { userMessage });
+            return;
+          }
+
+          if (status === 'success' || status === 'complete') {
+            pendingButtons.delete(requestId);
+            try {
+              (button.dataset as any).cqdAllDone = 'true';
+            } catch {
+              /* ignore */
+            }
+            setPillProgress(button, 1);
+            setButtonState(button, 'success');
+            await waitForSuccessReset(button);
+            return;
+          }
+
+          if (
+            status === 'error' ||
+            status === 'interrupted' ||
+            status === 'blocked_html'
+          ) {
+            if (errorCode === 'AUTH_CHECK') {
+              await showErrorState(button, userMessage);
+              return;
+            }
+            pendingButtons.delete(requestId);
+            setPillProgress(button, 0);
+            await showErrorState(button, userMessage);
+          }
+        })();
         return;
       }
-
-      if (status === 'error' || status === 'interrupted' || status === 'blocked_html') {
-        if (errorCode === 'AUTH_CHECK') {
-          await showErrorState(button, userMessage);
-          return;
-        }
-        pendingButtons.delete(requestId);
-        setPillProgress(button, 0);
-        await showErrorState(button, userMessage);
-      }
-    })();
-  });
+    },
+  );
 }
 
+/* -----------------------------------------------------
+ * Init
+ * ---------------------------------------------------*/
 function initContentScript(): void {
   if (!isGoogleClassroom()) return;
 
-  // ⬇️ Only inject when the extension is enabled
-  whenExtensionEnabled(() => {
-    injectStyles();
-    setupObservers();
-  });
+  // Default per-tab behavior: CQD is enabled when the page loads.
+  desiredEnabled = true;
+
+  // Wire into the global enable/disable flag.
+  whenExtensionEnabled(
+    () => {
+      globalEnabled = true;
+      recomputeEffectiveStateFromFlags();
+    },
+    // If you ever extend whenExtensionEnabled to accept an "off" callback,
+    // you can plug it here. For now globalEnabled stays true by default.
+  );
+  // Kick once, using default globalEnabled=true
+  recomputeEffectiveStateFromFlags();
 }
 
 export default defineContentScript({
   matches: ['https://classroom.google.com/*'],
   runAt: 'document_idle',
-  main() { initContentScript(); },
+  main() {
+    initContentScript();
+  },
 });
 
+/* -----------------------------------------------------
+ * Success-state reset logic
+ * ---------------------------------------------------*/
 async function waitForSuccessReset(button: HTMLButtonElement): Promise<void> {
   const earliestReset = Date.now() + FEEDBACK_SUCCESS_MS;
 
@@ -657,13 +870,10 @@ async function waitForSuccessReset(button: HTMLButtonElement): Promise<void> {
     await delay(200);
 
     if (getButtonState(button) !== 'success') {
-      return; // something else changed the state
+      return;
     }
-
-    // Respect minimum visible success time
     if (Date.now() < earliestReset) continue;
 
-    // If this button is part of an active "Download all" batch, stay green
     const postRoot =
       button.closest<HTMLElement>('div[data-stream-item-id]') ||
       button.closest<HTMLElement>('main') ||
@@ -673,13 +883,11 @@ async function waitForSuccessReset(button: HTMLButtonElement): Promise<void> {
       continue;
     }
 
-    // Don't snap back while the user is hovering
     if (button.matches(':hover')) continue;
 
     break;
   }
 
-  // Finally reset back to normal blue pill
   setButtonState(button, 'idle');
   setPillProgress(button, 0);
   try {

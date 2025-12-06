@@ -1,3 +1,5 @@
+ /* filepath: entrypoints/popup/App.css */
+
 :root {
   --cqd-blue: #005dd7;
   --cqd-blue-hover: #004bb0;
@@ -44,7 +46,7 @@ html {
 body {
   margin: 0;
   padding: 0;
-  width: 200px; 
+  width: 200px;
   height: 400px;
   background: transparent; /* Crucial for rounded corners effect */
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -91,6 +93,18 @@ body {
   top: 0;
   z-index: 10;
   background: var(--cqd-shell-bg);
+  transition:
+    background-color 160ms ease,
+    box-shadow 160ms ease,
+    backdrop-filter 160ms ease;
+}
+
+/* When scrolled, add blur + subtle shadow on content under header */
+.cqd-header-scrolled {
+  background: rgba(243, 244, 246, 0.88);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
 }
 
 .cqd-brand-row {
@@ -146,10 +160,10 @@ body {
     -webkit-box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.6);
   }
   70% {
-      -webkit-box-shadow: 0 0 0 10px rgba(135, 200, 38, 0);
+    -webkit-box-shadow: 0 0 0 10px rgba(135, 200, 38, 0);
   }
   100% {
-      -webkit-box-shadow: 0 0 0 0 rgba(135, 200, 38, 0);
+    -webkit-box-shadow: 0 0 0 0 rgba(135, 200, 38, 0);
   }
 }
 @keyframes pulse {
@@ -158,19 +172,19 @@ body {
     box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.6);
   }
   70% {
-      -moz-box-shadow: 0 0 0 10px rgba(135, 200, 38, 0);
-      box-shadow: 0 0 0 10px rgba(135, 200, 38, 0);
+    -moz-box-shadow: 0 0 0 10px rgba(135, 200, 38, 0);
+    box-shadow: 0 0 0 10px rgba(135, 200, 38, 0);
   }
   100% {
-      -moz-box-shadow: 0 0 0 0 rgba(135, 200, 38, 0);
-      box-shadow: 0 0 0 0 rgba(135, 200, 38, 0);
+    -moz-box-shadow: 0 0 0 0 rgba(135, 200, 38, 0);
+    box-shadow: 0 0 0 0 rgba(135, 200, 38, 0);
   }
 }
 
 .cqd-brand-status-dot.on {
   background-color: #22c55e;
   box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.25);
-  animation: pulse 2s infinite; 
+  animation: pulse 2s infinite;
 }
 
 .cqd-brand-version {
@@ -207,11 +221,17 @@ body {
 
 .cqd-banner {
   display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 11px;
+}
+
+.cqd-banner-content {
+  display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 10px;
-  border-radius: 999px;
-  font-size: 11px;
 }
 
 .cqd-banner-reload {
@@ -221,6 +241,10 @@ body {
 }
 
 .cqd-banner-error {
+  flex-direction: row;
+  align-items: center;
+  border-radius: 999px;
+  padding: 8px 10px;
   background-color: #fef2f2;
   border: 1px solid #fecaca;
   color: #991b1b;
@@ -251,14 +275,30 @@ body {
   align-items: center;
   justify-content: center;
   color: inherit;
-  transition:
-    background-color var(--cqd-transition-fast),
-    transform var(--cqd-transition-fast);
+  transition: background-color var(--cqd-transition-fast);
 }
 
 .cqd-banner-close:hover {
   background-color: rgba(0, 0, 0, 0.04);
-  transform: scale(1.05);
+}
+
+/* Reload Action Button inside Banner */
+.cqd-banner-action-btn {
+  border: none;
+  background-color: rgba(0, 0, 0, 0.05);
+  color: inherit;
+  font-weight: 700;
+  font-size: 11px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  align-self: flex-start;
+  margin-left: 15px; /* Indent to align with text */
+  transition: background-color 0.2s ease;
+}
+
+.cqd-banner-action-btn:hover {
+  background-color: rgba(0, 0, 0, 0.1);
 }
 
 /* ===============================
@@ -266,7 +306,6 @@ body {
  * =============================== */
 
 .cqd-card {
-  /* Removed sticky positioning so they stack naturally */
   background-color: #ffffff;
   border-radius: var(--cqd-radius-xl);
   padding: 16px 16px;
@@ -274,7 +313,7 @@ body {
   box-shadow: var(--cqd-shadow-soft);
   display: flex;
   flex-direction: column;
-  flex: 0 0 auto; /* Don't stretch to fill height */
+  flex: 0 0 auto;
   width: 100%;
 }
 
@@ -323,7 +362,11 @@ body {
 
 /* Individual ring segments */
 .cqd-ring-segment {
-  transition: stroke-width 0.2s ease, opacity 0.2s ease;
+  transition:
+    stroke-width 0.2s ease,
+    opacity 0.2s ease,
+    stroke-dashoffset 0.4s ease,
+    stroke-dasharray 0.4s ease;
   cursor: pointer;
 }
 
@@ -525,7 +568,7 @@ body {
 }
 
 /* ===============================
- * Info Actions (Refined for One Line)
+ * Info Actions (GitHub / Share / Coffee)
  * =============================== */
 
 .cqd-info-actions {
@@ -550,7 +593,7 @@ body {
   transition: all var(--cqd-transition-fast);
   text-decoration: none;
   width: 40px;
-  flex: 0 auto 0; 
+  flex: 0 auto 0;
   background: #ffffff;
 }
 
@@ -565,28 +608,37 @@ body {
   color: #ffffff;
 }
 
-.cqd-button-primary:hover {
-  transform: scale(1.05);
-  color: #ffffff;
-  box-shadow: rgb(110, 84, 148) 0px 0px 18px;
-}
-
 .cqd-button-ghost {
   background: #ffffff;
   border-color: #d1d5db;
   color: #0f172a;
 }
 
-.cqd-button-ghost:hover {
-  background: #ffffff;
-  color: #0f172a;
-  transform: scale(1.05);
-}
-
 .cqd-button-ghost.success {
   background: #dcfce7;
   border-color: #86efac;
   color: #166534;
+}
+
+/* Unified hover: GitHub, Share, Coffee */
+.cqd-button:hover,
+.cqd-coffee-button:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 15px rgba(15, 23, 42, 0.18);
+}
+
+/* Non-Classroom CTA */
+.cqd-open-classroom-btn {
+  margin-top: 12px;
+  width: 100%;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 999px;
+  background: #0b8043;
+  color: #ffffff;
+  border-color: #0b8043;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 /* Coffee Button */
@@ -603,14 +655,10 @@ body {
   height: fit-content;
   object-fit: contain;
   cursor: pointer;
-  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   box-shadow: 0 4px 15px rgba(255, 221, 0, 0.3);
   overflow: hidden;
-}
-
-.cqd-coffee-button:hover {
-  transform: scale(1.05);
-  box-shadow: 0 4px 15px rgba(255, 221, 0, 0.6);
 }
 
 .cqd-coffee-icon {
@@ -626,7 +674,6 @@ body {
   margin-top: 4px;
   padding: 8px 0 10px;
   border-top: 1px solid var(--cqd-border-subtle);
-  /* background-color: var(--cqd-shell-bg); */
   text-align: center;
 }
 
@@ -714,6 +761,19 @@ body {
   transform: scale(0);
 }
 
+/* Ripple animation for the toggle circle when switching ON */
+@keyframes cqd-switch-ripple {
+  0% {
+    box-shadow: 0 0 0 0 rgba(0, 218, 80, 0.5);
+  }
+  70% {
+    box-shadow: 0 0 0 12px rgba(0, 218, 80, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(0, 218, 80, 0);
+  }
+}
+
 .cqd-switch input:checked + .cqd-switch-slider {
   background: var(--switch-checked-bg);
 }
@@ -736,6 +796,7 @@ body {
 .cqd-switch input:checked + .cqd-switch-slider .cqd-switch-circle {
   left: calc(100% - var(--circle-diameter) - var(--switch-offset));
   box-shadow: -1px 1px 2px rgba(163, 163, 163, 0.45);
+  animation: cqd-switch-ripple 0.45s ease-out;
 }
 
 /* Loading visual */
