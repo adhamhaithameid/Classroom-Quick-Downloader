@@ -1,21 +1,23 @@
 // filepath: entrypoints/content/index.ts
-
 const CLASSROOM_URL_PATTERN = /^https:\/\/classroom\.google\.com\//;
-
 import {
   DOWNLOAD_ICON_SVG_URL,
   SUCCESS_ICON_SVG_URL,
   ERROR_ICON_SVG_URL,
 } from './icons';
-
 import { injectStyles } from './styles';
 import { t } from './i18n';
 import { isPageDark } from './theme';
+import { whenExtensionEnabled } from './flags';
 
+/* -----------------------------------------------------
+ * Constants
+ * ---------------------------------------------------*/
 const INJECTED_ATTR = 'data-cqd-injected';
 const PROCESSED_ATTR = 'data-cqd-processed';
 const RESCAN_INTERVAL_MS = 2000;
-const RESCAN_DEBOUNCE_MS = 200;
+// Reduced debounce to make buttons appear snappier after scroll
+const RESCAN_DEBOUNCE_MS = 150; 
 const LOADING_MIN_MS = 600;
 const FEEDBACK_SUCCESS_MS = 3000;
 const FEEDBACK_ERROR_MS = 4000;
@@ -41,7 +43,6 @@ const DRIVE_URL_PATTERNS: RegExp[] = [
 /* -----------------------------------------------------
  * Global State
  * ---------------------------------------------------*/
-
 type QueryRoot = Document | HTMLElement | DocumentFragment;
 
 let scanTimeoutId: number | null = null;
@@ -67,17 +68,18 @@ let nextRequestSeq = 1;
 const pendingButtons = new Map<string, PendingButton>();
 
 // Per-tab CQD state
-let desiredEnabled = true; // what this tab "wants"
-let effectiveEnabled = false; // what is actually active
+let desiredEnabled = true; 
+let effectiveEnabled = false; 
 let initialized = false;
 
-/* -----------------------------------------------------
- * Effective state broadcast (for popup dot)
- * ---------------------------------------------------*/
+// Global ON/OFF flag
+let globalEnabled = true;
 
+/* -----------------------------------------------------
+ * Effective state broadcast
+ * ---------------------------------------------------*/
 function applyEffectiveState(enabled: boolean): void {
   effectiveEnabled = enabled;
-
   if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
     try {
       chrome.runtime.sendMessage({
@@ -90,10 +92,18 @@ function applyEffectiveState(enabled: boolean): void {
   }
 }
 
+function recomputeEffectiveStateFromFlags(): void {
+  const shouldEnable = globalEnabled && desiredEnabled;
+  if (shouldEnable) {
+    startCQD();
+  } else {
+    stopCQD();
+  }
+}
+
 /* -----------------------------------------------------
  * Environment / Page Checks
  * ---------------------------------------------------*/
-
 function isGoogleClassroom(): boolean {
   if (typeof location === 'undefined') return false;
   if (location.hostname !== 'classroom.google.com') return false;
@@ -103,11 +113,9 @@ function isGoogleClassroom(): boolean {
 /* -----------------------------------------------------
  * Attach / Detach CQD for this tab
  * ---------------------------------------------------*/
-
 function startCQD(): void {
   if (initialized) return;
   if (!isGoogleClassroom()) return;
-
   initialized = true;
   injectStyles();
   setupObservers();
@@ -117,7 +125,6 @@ function startCQD(): void {
 function stopCQD(): void {
   if (!initialized) return;
   initialized = false;
-
   if (observer) {
     observer.disconnect();
     observer = null;
@@ -130,8 +137,9 @@ function stopCQD(): void {
     window.clearInterval(rescanIntervalId);
     rescanIntervalId = null;
   }
+  // Stop listening to scroll
+  window.removeEventListener('scroll', scheduleScan);
 
-  // Remove injected download buttons from this page
   try {
     const injectedButtons = document.querySelectorAll<HTMLElement>(
       '.cqd-download-btn',
@@ -140,14 +148,12 @@ function stopCQD(): void {
   } catch {
     // ignore
   }
-
   applyEffectiveState(false);
 }
 
 /* -----------------------------------------------------
  * Scanning / Observers
  * ---------------------------------------------------*/
-
 function scheduleScan(): void {
   if (scanTimeoutId !== null) {
     window.clearTimeout(scanTimeoutId);
@@ -160,7 +166,6 @@ function scheduleScan(): void {
 
 function setupObservers(): void {
   if (typeof document === 'undefined') return;
-
   if (!document.body) {
     window.addEventListener(
       'DOMContentLoaded',
@@ -169,16 +174,28 @@ function setupObservers(): void {
     );
     return;
   }
-  if (observer) return;
 
+  // 1. Scroll Listener (Crucial for hard scrolling)
+  // Passive listener is better for performance
+  window.addEventListener('scroll', scheduleScan, { passive: true });
+
+  // 2. Mutation Observer
+  if (observer) return;
   observer = new MutationObserver((mutations) => {
     const roots = new Set<QueryRoot>();
     let shouldScan = false;
-
     for (const m of mutations) {
+      // Watch for attribute changes on containers (recycled nodes)
+      if (m.type === 'attributes' && m.target instanceof HTMLElement) {
+        if (m.target.hasAttribute(PROCESSED_ATTR) && !hasInjectedButton(m.target)) {
+          roots.add(m.target);
+          shouldScan = true;
+        }
+        continue;
+      }
+
       if (m.type !== 'childList') continue;
 
-      // Optimization: filter out our own mutations
       const isInternal = Array.from(m.addedNodes).some(
         (n) =>
           n.nodeType === Node.ELEMENT_NODE &&
@@ -192,6 +209,9 @@ function setupObservers(): void {
           roots.add(node as HTMLElement);
         }
       });
+      if (m.target instanceof HTMLElement) {
+        roots.add(m.target);
+      }
     }
 
     if (shouldScan) {
@@ -199,6 +219,7 @@ function setupObservers(): void {
         scheduleScan();
       } else {
         roots.forEach((root) => scanForAttachments(root));
+        scheduleScan(); 
       }
     }
   });
@@ -206,27 +227,28 @@ function setupObservers(): void {
   observer.observe(document.body, {
     childList: true,
     subtree: true,
+    attributes: true,
+    attributeFilter: ['class', 'style', 'data-cqd-processed'], 
   });
 
+  // 3. Interval Fallback (Safety net)
   if (rescanIntervalId == null) {
     rescanIntervalId = window.setInterval(() => {
       scheduleScan();
     }, RESCAN_INTERVAL_MS);
   }
-
   scheduleScan();
 }
 
 function scanForAttachments(root: QueryRoot = document): void {
   if (!isGoogleClassroom()) return;
-  if (!effectiveEnabled) return; // don't inject if this tab is disabled
+  if (!effectiveEnabled) return; 
   injectSingleFileButtons(root);
 }
 
 /* -----------------------------------------------------
  * Single-file buttons
  * ---------------------------------------------------*/
-
 function injectSingleFileButtons(root: QueryRoot = document): void {
   const anchors = Array.from(
     root.querySelectorAll<HTMLAnchorElement>(DRIVE_ANCHOR_SELECTOR),
@@ -243,8 +265,16 @@ function injectSingleFileButtons(root: QueryRoot = document): void {
 
     if (!container) continue;
 
-    if (hasInjectedButton(container)) continue;
-
+    // FIX: If container is marked processed, check if button ACTUALLY exists.
+    // If not, clear the flag so we can re-inject.
+    if (container.hasAttribute(PROCESSED_ATTR)) {
+      if (!hasInjectedButton(container)) {
+        container.removeAttribute(PROCESSED_ATTR);
+      } else {
+        continue; // Truly skipped
+      }
+    }
+    
     injectButtonIntoAttachment(container, url);
   }
 
@@ -256,11 +286,17 @@ function injectSingleFileButtons(root: QueryRoot = document): void {
   );
 
   for (const el of metaElements) {
-    if (hasInjectedButton(el)) continue;
+    if (el.hasAttribute(PROCESSED_ATTR)) {
+      if (!hasInjectedButton(el)) {
+        el.removeAttribute(PROCESSED_ATTR);
+      } else {
+        continue;
+      }
+    }
 
     const url = findDriveUrl(el);
     if (!url) continue;
-
+    
     injectButtonIntoAttachment(el, url);
   }
 }
@@ -268,7 +304,6 @@ function injectSingleFileButtons(root: QueryRoot = document): void {
 /* -----------------------------------------------------
  * URL / DOM Helpers
  * ---------------------------------------------------*/
-
 function hasInjectedButton(container: HTMLElement): boolean {
   return !!container.querySelector(`[${INJECTED_ATTR}="true"]`);
 }
@@ -349,7 +384,6 @@ function toDownloadUrl(originalUrl: string, depth = 0): string {
         return parsed.toString();
       }
     }
-
     if (
       parsed.hostname === 'classroom.google.com' &&
       parsed.pathname.startsWith('/drive')
@@ -363,7 +397,6 @@ function toDownloadUrl(originalUrl: string, depth = 0): string {
           `https://drive.google.com/uc?export=download&id=${id}`,
         );
     }
-
     return appendAuth(originalUrl);
   } catch {
     return originalUrl;
@@ -373,7 +406,6 @@ function toDownloadUrl(originalUrl: string, depth = 0): string {
 /* -----------------------------------------------------
  * File metadata extraction
  * ---------------------------------------------------*/
-
 function cleanAttachmentName(rawName: string): string {
   if (!rawName) return '';
   let name = rawName.trim();
@@ -403,6 +435,7 @@ function cleanAttachmentName(rawName: string): string {
     'Shortcut',
     'Code',
   ];
+
   for (const label of garbageLabels) {
     if (name.endsWith(label)) {
       const potential = name.slice(0, -label.length).trim();
@@ -412,23 +445,28 @@ function cleanAttachmentName(rawName: string): string {
       }
     }
   }
+
   if (name.length > 0 && name.length % 2 === 0) {
     const mid = name.length / 2;
     if (name.slice(0, mid) === name.slice(mid)) return name.slice(0, mid);
   }
+
   const repeatRegex = /\.([a-zA-Z0-9]{2,10})\1$/i;
   const repeatMatch = name.match(repeatRegex);
   if (repeatMatch) return name.slice(0, -repeatMatch[1].length).trim();
+
   return name;
 }
 
 function extractFileMeta(container: HTMLElement, url: string): FileMeta {
   let name: string | undefined;
+
   const tooltip =
     container.getAttribute('data-tooltip') ||
     container.getAttribute('aria-label') ||
     container.getAttribute('title');
   if (tooltip && tooltip.trim()) name = tooltip.trim();
+
   if (!name) {
     const text = (container.textContent || '').trim();
     if (text) {
@@ -439,6 +477,7 @@ function extractFileMeta(container: HTMLElement, url: string): FileMeta {
       if (lines.length > 0) name = lines[0];
     }
   }
+
   if (!name) {
     try {
       const u = new URL(url);
@@ -446,6 +485,7 @@ function extractFileMeta(container: HTMLElement, url: string): FileMeta {
       if (pathName && pathName.includes('.')) name = pathName;
     } catch {}
   }
+
   if (name) name = cleanAttachmentName(name);
 
   let ext: string | undefined;
@@ -453,19 +493,18 @@ function extractFileMeta(container: HTMLElement, url: string): FileMeta {
     const m = name.match(/\.([a-zA-Z0-9]{2,10})$/);
     if (m) ext = m[1].toLowerCase();
   }
+
   return { name, ext, kind: 'other' };
 }
 
 /* -----------------------------------------------------
  * Button injection
  * ---------------------------------------------------*/
-
 function injectButtonIntoAttachment(
   container: HTMLElement,
   url: string,
 ): void {
   if (!url) return;
-
   container.setAttribute(PROCESSED_ATTR, 'true');
 
   const computed = window.getComputedStyle(container);
@@ -473,8 +512,8 @@ function injectButtonIntoAttachment(
 
   const directUrl = toDownloadUrl(url);
   const fileMeta = extractFileMeta(container, directUrl);
-  const button = createDownloadButton(container, directUrl, fileMeta);
 
+  const button = createDownloadButton(container, directUrl, fileMeta);
   const iconEl = button.querySelector<HTMLElement>('.cqd-download-icon');
   if (iconEl) iconEl.classList.add('cqd-icon-medium');
 
@@ -484,7 +523,6 @@ function injectButtonIntoAttachment(
 /* -----------------------------------------------------
  * Button state helpers
  * ---------------------------------------------------*/
-
 function getButtonState(button: HTMLButtonElement): ButtonState {
   if (button.classList.contains('cqd-loading')) return 'loading';
   if (button.classList.contains('cqd-trying')) return 'trying';
@@ -501,6 +539,7 @@ function setButtonState(
   const icon = button.querySelector<HTMLElement>('.cqd-download-icon');
   const label = button.querySelector<HTMLSpanElement>('.cqd-label');
   const errorDetail = button.querySelector<HTMLSpanElement>('.cqd-error-detail');
+
   if (!icon || !label || !errorDetail) return;
 
   button.classList.remove(
@@ -515,7 +554,6 @@ function setButtonState(
   button.style.backgroundColor = '';
   label.textContent = t('download');
   errorDetail.textContent = '';
-
   icon.style.backgroundImage = `url("${DOWNLOAD_ICON_SVG_URL}")`;
   icon.style.backgroundSize = '';
 
@@ -556,7 +594,6 @@ function setPillProgress(button: HTMLButtonElement, fraction: number): void {
 /* -----------------------------------------------------
  * Button factory
  * ---------------------------------------------------*/
-
 function createDownloadButton(
   _container: HTMLElement,
   url: string,
@@ -565,11 +602,9 @@ function createDownloadButton(
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'cqd-download-btn';
-
   if (isPageDark()) {
     button.classList.add('cqd-theme-dark');
   }
-
   button.setAttribute(INJECTED_ATTR, 'true');
   button.setAttribute(
     'aria-label',
@@ -605,7 +640,6 @@ function createDownloadButton(
     e.stopPropagation();
     await handleSingleDownloadClick(button, url, fileMeta);
   };
-
   button.addEventListener('click', clickHandler);
   button.addEventListener('auxclick', (e) => {
     if (e.button === 1) clickHandler(e);
@@ -617,7 +651,6 @@ function createDownloadButton(
 /* -----------------------------------------------------
  * Download click handler
  * ---------------------------------------------------*/
-
 async function handleSingleDownloadClick(
   button: HTMLButtonElement,
   url: string,
@@ -630,13 +663,11 @@ async function handleSingleDownloadClick(
 
   const requestId = `cqd-${Date.now()}-${nextRequestSeq++}`;
   const startedAt = Date.now();
-
   pendingButtons.set(requestId, { button, requestId, fileMeta, startedAt });
 
   setButtonState(button, 'loading');
 
   const startResult = await startBackgroundDownload(requestId, url, fileMeta);
-
   if (!startResult.ok) {
     pendingButtons.delete(requestId);
     await ensureMinLoading(startedAt);
@@ -683,17 +714,18 @@ function startBackgroundDownload(
 /* -----------------------------------------------------
  * UI Utils
  * ---------------------------------------------------*/
-
 async function showErrorState(
   button: HTMLButtonElement,
   userMessage?: string,
 ): Promise<void> {
   setButtonState(button, 'error', { userMessage });
+
   const earliestReset = Date.now() + FEEDBACK_ERROR_MS;
   while (true) {
     await delay(200);
     if (getButtonState(button) !== 'error') return;
     if (Date.now() < earliestReset) continue;
+
     if (!button.matches(':hover')) {
       setButtonState(button, 'idle');
       setPillProgress(button, 0);
@@ -714,7 +746,6 @@ function delay(ms: number): Promise<void> {
 /* -----------------------------------------------------
  * Message handling: popup + download status
  * ---------------------------------------------------*/
-
 if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
   chrome.runtime.onMessage.addListener(
     (message, _sender, sendResponse): void | true => {
@@ -733,11 +764,8 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
       // Popup sets desired state for this tab
       if (message.type === 'CQD_POPUP_SET_DESIRED_STATE') {
         desiredEnabled = !!message.enabled;
-        if (desiredEnabled) {
-          startCQD();
-        } else {
-          stopCQD();
-        }
+        // NEW: go through the global+tab recompute instead of raw start/stop
+        recomputeEffectiveStateFromFlags();
         try {
           sendResponse({ desiredEnabled, effectiveEnabled });
         } catch {
@@ -754,7 +782,6 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
         if (!pending) return;
 
         const { button, startedAt } = pending;
-
         (async () => {
           await ensureMinLoading(startedAt);
 
@@ -772,16 +799,13 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
 
           if (status === 'success' || status === 'complete') {
             pendingButtons.delete(requestId);
-
             try {
               (button.dataset as any).cqdAllDone = 'true';
             } catch {
               /* ignore */
             }
-
             setPillProgress(button, 1);
             setButtonState(button, 'success');
-
             await waitForSuccessReset(button);
             return;
           }
@@ -800,7 +824,6 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
             await showErrorState(button, userMessage);
           }
         })();
-
         return;
       }
     },
@@ -810,13 +833,23 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
 /* -----------------------------------------------------
  * Init
  * ---------------------------------------------------*/
-
 function initContentScript(): void {
   if (!isGoogleClassroom()) return;
 
   // Default per-tab behavior: CQD is enabled when the page loads.
   desiredEnabled = true;
-  startCQD();
+
+  // Wire into the global enable/disable flag.
+  whenExtensionEnabled(
+    () => {
+      globalEnabled = true;
+      recomputeEffectiveStateFromFlags();
+    },
+    // If you ever extend whenExtensionEnabled to accept an "off" callback,
+    // you can plug it here. For now globalEnabled stays true by default.
+  );
+  // Kick once, using default globalEnabled=true
+  recomputeEffectiveStateFromFlags();
 }
 
 export default defineContentScript({
@@ -830,7 +863,6 @@ export default defineContentScript({
 /* -----------------------------------------------------
  * Success-state reset logic
  * ---------------------------------------------------*/
-
 async function waitForSuccessReset(button: HTMLButtonElement): Promise<void> {
   const earliestReset = Date.now() + FEEDBACK_SUCCESS_MS;
 
@@ -840,7 +872,6 @@ async function waitForSuccessReset(button: HTMLButtonElement): Promise<void> {
     if (getButtonState(button) !== 'success') {
       return;
     }
-
     if (Date.now() < earliestReset) continue;
 
     const postRoot =

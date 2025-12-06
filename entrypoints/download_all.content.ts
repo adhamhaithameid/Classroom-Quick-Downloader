@@ -1,5 +1,4 @@
 // filepath: entrypoints/download_all.content.ts
-
 import { injectStyles } from './content/styles';
 import { t } from './content/i18n';
 import { isPageDark } from './content/theme';
@@ -8,10 +7,8 @@ import { whenExtensionEnabled } from './content/flags';
 const DOWNLOAD_BTN_SELECTOR = '.cqd-download-btn';
 const GROUP_SELECTOR = 'div[data-stream-item-id]';
 const INJECTED_ATTR = 'data-cqd-injected';
-
 // Keep this in sync with FEEDBACK_SUCCESS_MS in content/index.ts
 const GROUP_FEEDBACK_SUCCESS_MS = 3000;
-
 // Show "Download all" only when there are at least 2 files
 const MIN_FILES_FOR_DOWNLOAD_ALL = 2;
 
@@ -38,8 +35,8 @@ interface GroupState {
 const groupStates = new WeakMap<HTMLElement, GroupState>();
 const buttonToGroup = new WeakMap<HTMLButtonElement, GroupState>();
 const buttonToFile = new WeakMap<HTMLButtonElement, FileEntry>();
-
 const dirtyGroups = new Set<GroupState>();
+
 let refreshScheduled = false;
 
 export default defineContentScript({
@@ -54,6 +51,9 @@ export default defineContentScript({
       // Initial discovery
       registerButtonsInSubtree(document);
 
+      // Scroll listener (Fixes missing buttons after hard scroll)
+      window.addEventListener('scroll', scheduleRefresh, { passive: true });
+
       const observer = new MutationObserver((mutations) => {
         for (const m of mutations) {
           if (m.type === 'childList') {
@@ -61,7 +61,6 @@ export default defineContentScript({
               if (!(node instanceof HTMLElement)) return;
               registerButtonsInSubtree(node);
             });
-
             m.removedNodes.forEach((node) => {
               if (!(node instanceof HTMLElement)) return;
               cleanupRemovedButtons(node);
@@ -77,7 +76,6 @@ export default defineContentScript({
             }
           }
         }
-
         scheduleRefresh();
       });
 
@@ -102,7 +100,6 @@ export default defineContentScript({
 /* -----------------------------------------------------
  * Discovery & grouping
  * ---------------------------------------------------*/
-
 function registerButtonsInSubtree(root: HTMLElement | Document): void {
   if (
     root instanceof HTMLButtonElement &&
@@ -110,7 +107,6 @@ function registerButtonsInSubtree(root: HTMLElement | Document): void {
   ) {
     registerSingleButton(root);
   }
-
   const buttons = root.querySelectorAll<HTMLButtonElement>(DOWNLOAD_BTN_SELECTOR);
   buttons.forEach((btn) => registerSingleButton(btn));
 }
@@ -136,7 +132,6 @@ function registerSingleButton(btn: HTMLButtonElement): void {
 
   const key = getCanonicalFileKey(btn);
   let file = group.files.get(key);
-
   if (!file) {
     file = {
       key,
@@ -151,7 +146,6 @@ function registerSingleButton(btn: HTMLButtonElement): void {
   file.buttons.add(btn);
   buttonToGroup.set(btn, group);
   buttonToFile.set(btn, file);
-
   markGroupDirty(group);
 }
 
@@ -172,6 +166,7 @@ function cleanupRemovedButtons(root: HTMLElement): void {
   removedButtons.forEach((btn) => {
     const group = buttonToGroup.get(btn);
     const file = buttonToFile.get(btn);
+
     if (!group || !file) return;
 
     file.buttons.delete(btn);
@@ -181,7 +176,6 @@ function cleanupRemovedButtons(root: HTMLElement): void {
     if (file.buttons.size === 0) {
       group.files.delete(file.key);
     }
-
     markGroupDirty(group);
   });
 }
@@ -220,16 +214,13 @@ function findGroupRoot(btn: HTMLElement): HTMLElement | null {
 function getCanonicalFileKey(btn: HTMLButtonElement): string {
   const ds = btn.dataset as any;
   const url = ds.cqdUrl || '';
-
   if (url) {
     const idMatch =
       url.match(/\/d\/([a-zA-Z0-9_-]+)/) ||
       url.match(/[?&](?:id|resourceId|fileId)=([a-zA-Z0-9_-]+)/);
-
     if (idMatch && idMatch[1]) {
       return `drive-id-${idMatch[1]}`;
     }
-
     try {
       const u = new URL(url);
       u.searchParams.delete('authuser');
@@ -240,18 +231,15 @@ function getCanonicalFileKey(btn: HTMLButtonElement): string {
       return url;
     }
   }
-
   if (ds.cqdName) {
     return `${ds.cqdName}::${ds.cqdExt || ''}`;
   }
-
   return `btn-${Math.random().toString(36).slice(2)}`;
 }
 
 /* -----------------------------------------------------
  * File-level helpers (primary button & dedup)
  * ---------------------------------------------------*/
-
 function getPrimaryButton(file: FileEntry): HTMLButtonElement | null {
   if (file.buttons.size === 0) return null;
 
@@ -269,25 +257,21 @@ function getPrimaryButton(file: FileEntry): HTMLButtonElement | null {
       primaryVisible = btn;
       continue;
     }
-
     const pos = primaryVisible.compareDocumentPosition(btn);
     if (pos & Node.DOCUMENT_POSITION_FOLLOWING) {
       primaryVisible = btn;
     }
   }
-
   return primaryVisible || fallback;
 }
 
 function normalizeFileButtons(file: FileEntry): void {
   if (file.buttons.size <= 1) return;
-
   const primary = getPrimaryButton(file);
   if (!primary) return;
 
   for (const btn of file.buttons) {
     if (!btn.isConnected) continue;
-
     if (btn === primary) {
       btn.style.removeProperty('display');
       btn.style.removeProperty('visibility');
@@ -302,7 +286,6 @@ function normalizeFileButtons(file: FileEntry): void {
 /* -----------------------------------------------------
  * Refresh pipeline
  * ---------------------------------------------------*/
-
 function markGroupDirty(group: GroupState): void {
   dirtyGroups.add(group);
 }
@@ -320,8 +303,14 @@ function scheduleRefresh(): void {
 /* -----------------------------------------------------
  * Group state + visual update
  * ---------------------------------------------------*/
-
 function updateGroupState(group: GroupState): void {
+  // If the download button was removed by DOM updates (virtual scroll),
+  // reset it so it can be re-inserted.
+  if (group.downloadAllBtn && !group.downloadAllBtn.isConnected) {
+    group.downloadAllBtn = null;
+    group.activated = false; 
+  }
+
   // Prune + dedup per file
   for (const [key, file] of Array.from(group.files.entries())) {
     for (const btn of Array.from(file.buttons)) {
@@ -331,12 +320,10 @@ function updateGroupState(group: GroupState): void {
         buttonToFile.delete(btn);
       }
     }
-
     if (file.buttons.size === 0) {
       group.files.delete(key);
       continue;
     }
-
     normalizeFileButtons(file);
   }
 
@@ -426,14 +413,14 @@ function updateGroupState(group: GroupState): void {
     group.isBusy = false;
     btn.disabled = false;
     mainSpan.textContent = t('downloadAll') || 'Download all';
-    subSpan.textContent = `${totalFiles} files`;
+    const fileLabel = totalFiles === 1 ? 'file' : 'files';
+    subSpan.textContent = `${totalFiles} ${fileLabel}`;
     setProgressVisual(btn, 0);
     return;
   }
 
   // From here: batch has been activated (and may be in progress or in feedback)
   btn.disabled = true;
-
   let mainText: string;
   let subText: string;
   let progressRatio = totalFiles > 0 ? downloaded / totalFiles : 0;
@@ -473,26 +460,22 @@ function updateGroupState(group: GroupState): void {
 
 function scheduleGroupReset(group: GroupState): void {
   if (group.resetTimeoutId != null) return; // already scheduled
-
   group.resetTimeoutId = window.setTimeout(() => {
     group.resetTimeoutId = undefined;
     group.activated = false;
     group.isBusy = false;
     group.currentRunId = undefined;
-
     try {
       delete group.root.dataset.cqdGroupActive;
     } catch {
       /* ignore */
     }
-
     // Clear latched per-file state for the next run
     for (const file of group.files.values()) {
       file.downloaded = false;
       file.failed = false;
       file.inProgress = false;
     }
-
     markGroupDirty(group);
     scheduleRefresh();
   }, GROUP_FEEDBACK_SUCCESS_MS);
@@ -501,12 +484,11 @@ function scheduleGroupReset(group: GroupState): void {
 /* -----------------------------------------------------
  * Header lookup + Download all creation
  * ---------------------------------------------------*/
-
 /**
  * Find the *header row* for this specific group:
  * - Prefer header inside the same container (post view)
  * - Otherwise, for a stream card: look for a header sibling above the
- *   data-stream-item container, but do NOT fall back to a global header.
+ * data-stream-item container, but do NOT fall back to a global header.
  */
 function findHeaderContainer(root: HTMLElement): HTMLElement | null {
   // 1) Prefer .N5dSp as explicitly requested by user (Post View Header)
@@ -538,7 +520,6 @@ function findHeaderContainer(root: HTMLElement): HTMLElement | null {
     );
 
     let best: HTMLElement | null = null;
-
     for (const h of headers) {
       const rel = h.compareDocumentPosition(current);
       const isBefore = !!(rel & Node.DOCUMENT_POSITION_FOLLOWING);
@@ -554,9 +535,7 @@ function findHeaderContainer(root: HTMLElement): HTMLElement | null {
         if (hAfterBest) best = h;
       }
     }
-
     if (best) return best;
-
     current = parent;
   }
 
@@ -574,19 +553,16 @@ function ensureDownloadAllButton(group: GroupState): HTMLButtonElement {
   if (existing && existing.isConnected) return existing;
 
   const root = group.root;
-
   const headerContainer = findHeaderContainer(root);
   const isStreamView = root.matches(GROUP_SELECTOR);
   const isPostHeader =
     !!headerContainer && headerContainer.classList.contains('N5dSp');
-
   const targetContainer = headerContainer || root;
   const isInHeader = !!headerContainer;
 
   // Layout tweaks so the header/root can host our button without clipping
   targetContainer.style.setProperty('flex-wrap', 'wrap', 'important');
   targetContainer.style.setProperty('align-items', 'center', 'important');
-
   if (targetContainer.classList.contains('N5dSp')) {
     // Post header container is normally flex, but be safe.
     targetContainer.style.display = 'flex';
@@ -595,17 +571,13 @@ function ensureDownloadAllButton(group: GroupState): HTMLButtonElement {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'cqd-download-all-btn';
-
   if (isInHeader) {
     button.classList.add('cqd-in-header');
   }
-
   button.setAttribute(INJECTED_ATTR, 'true');
-
   if (isPageDark()) {
     button.classList.add('cqd-theme-dark');
   }
-
   button.setAttribute(
     'aria-label',
     t('downloadAll') || 'Download all attachments in this post',
@@ -620,7 +592,6 @@ function ensureDownloadAllButton(group: GroupState): HTMLButtonElement {
 
   const mainSpan = document.createElement('span');
   mainSpan.className = 'cqd-download-all-main';
-
   const subSpan = document.createElement('span');
   subSpan.className = 'cqd-download-all-sub';
 
@@ -633,11 +604,8 @@ function ensureDownloadAllButton(group: GroupState): HTMLButtonElement {
     targetContainer.style.position = 'relative';
   }
 
-  if (!isInHeader && targetContainer === root) {
-    // Fallback: ensure container doesn't clip the button
-    root.style.setProperty('overflow', 'visible', 'important');
-    root.style.setProperty('contain', 'none', 'important');
-  }
+  // NOTE: Removed `overflow: visible` and `contain: none` enforcement on root
+  // to avoid reshaping the whole post.
 
   button.addEventListener('click', (e) => {
     e.preventDefault();
@@ -672,7 +640,6 @@ function placeDownloadButtonForPostView(
   headerContainer: HTMLElement,
 ): void {
   const searchRoot = headerContainer;
-
   const threeDots =
     searchRoot.querySelector<HTMLElement>(
       'div[role="button"][aria-haspopup="true"]',
@@ -691,7 +658,6 @@ function placeDownloadButtonForPostView(
       let rightWrapper = dotsParent.querySelector<HTMLElement>(
         '[data-cqd-right-wrapper="1"]',
       );
-
       const dotsComputed = window.getComputedStyle(threeDots);
 
       if (!rightWrapper || !rightWrapper.contains(threeDots)) {
@@ -700,18 +666,18 @@ function placeDownloadButtonForPostView(
         rightWrapper.style.display = 'inline-flex';
         rightWrapper.style.alignItems = 'center';
         rightWrapper.style.gap = '8px';
-
+        
         // If the 3-dots uses margin-left:auto to pin itself right, move that onto the wrapper
         if (dotsComputed.marginLeft === 'auto') {
           threeDots.style.marginLeft = '0';
           rightWrapper.style.marginLeft = 'auto';
         }
-
+        
         // Replace 3-dots position with wrapper, then move 3-dots inside
         dotsParent.insertBefore(rightWrapper, threeDots);
         rightWrapper.appendChild(threeDots);
       }
-
+      
       // [Download all][⋮] — keeps the ⋮ visually at the same right anchor
       rightWrapper.insertBefore(button, rightWrapper.firstChild);
       button.style.marginInlineEnd = '4px';
@@ -762,7 +728,6 @@ function placeDownloadButtonForStreamView(
 /* -----------------------------------------------------
  * Download all click
  * ---------------------------------------------------*/
-
 function handleDownloadAllClick(group: GroupState): void {
   // If a batch is already active or in feedback, ignore clicks
   if (group.isBusy || group.activated) return;
@@ -770,7 +735,6 @@ function handleDownloadAllClick(group: GroupState): void {
   group.activated = true;
   group.isBusy = true;
   group.currentRunId = Date.now();
-
   try {
     group.root.dataset.cqdGroupActive = '1';
   } catch {
@@ -798,6 +762,7 @@ function handleDownloadAllClick(group: GroupState): void {
   for (const file of group.files.values()) {
     const primary = getPrimaryButton(file);
     if (!primary) continue;
+
     const s = getSingleButtonState(primary);
     if (s === 'idle' || s === 'error') {
       primary.click();
@@ -821,7 +786,6 @@ function getSingleButtonState(btn: HTMLButtonElement): ButtonState {
 /* -----------------------------------------------------
  * Visuals: progress → CSS vars
  * ---------------------------------------------------*/
-
 function setProgressVisual(btn: HTMLButtonElement, ratio: number): void {
   const clamped = Math.max(0, Math.min(1, ratio));
   const percent = Math.round(clamped * 100);
@@ -831,7 +795,6 @@ function setProgressVisual(btn: HTMLButtonElement, ratio: number): void {
 /* -----------------------------------------------------
  * Direction helper
  * ---------------------------------------------------*/
-
 function safeSetDirection(): void {
   try {
     const dir = getPageDirection();

@@ -1,5 +1,4 @@
 // filepath: entrypoints/content/styles.ts
-
 import { DOWNLOAD_ICON_SVG_URL } from './icons';
 
 const STYLE_ID = 'cqd-style';
@@ -323,6 +322,20 @@ export function injectStyles(): void {
         0 0 12px rgba(99, 102, 241, 0.5);
     }
 
+    /* EDITED OVERLAY (Green/Teal) */
+    .cqd-overlay-container.cqd-edited {
+      box-shadow:
+        inset 0 0 0 2px var(--cqd-color-edited),
+        0 0 12px rgba(0, 214, 238, 0.3);
+    }
+
+    /* BOTH OVERLAY (Red) - Direct Class */
+    .cqd-overlay-container.cqd-both {
+      box-shadow:
+        inset 0 0 0 2px #FF4036,
+        0 0 12px rgba(255, 64, 54, 0.70);
+    }
+
     .cqd-comment-badge {
       position: absolute;
       top: 7px;
@@ -386,12 +399,6 @@ export function injectStyles(): void {
       opacity: 1;
       transform: translateY(0);
       max-height: 20px;
-    }
-
-    .cqd-overlay-container.cqd-edited {
-      box-shadow:
-        inset 0 0 0 2px var(--cqd-color-edited),
-        0 0 12px rgba(0, 214, 238, 0.3);
     }
 
     .cqd-edited-badge {
@@ -472,12 +479,9 @@ export function injectStyles(): void {
       font-size: 13px;
     }
 
-    div[data-stream-item-id][data-cqd-processed][data-cqd-edited-processed] > .cqd-overlay-container {
-      box-shadow:
-        inset 0 0 0 2px #FF4036,
-        0 0 12px rgba(255, 64, 54, 0.70);
-    }
-
+    /* REPLACED: Old attribute-based rule with direct class rule */
+    /* div[data-stream-item-id][data-cqd-processed][data-cqd-edited-processed] > .cqd-overlay-container */
+    
     .cqd-both-badge {
       position: absolute;
       top: 7px;
@@ -575,7 +579,6 @@ export function injectStyles(): void {
     /* ===============================
      * 1b. DOWNLOAD ALL BUTTON (Header-aligned)
      * =============================== */
-
     .cqd-download-all-btn {
       /* Progress control (0% to 100%) */
       --cqd-progress: 0%;
@@ -662,13 +665,10 @@ export function injectStyles(): void {
       left: 0;
       bottom: 0;
       z-index: 0;
-
       background-color: var(--cqd-color-success);
-
       /* Width controlled by JS */
       width: var(--cqd-progress);
       transition: width 0.3s cubic-bezier(0.22, 0.61, 0.36, 1);
-
       opacity: 1;
     }
 
@@ -710,8 +710,6 @@ export function injectStyles(): void {
       opacity: 0.9;
       margin-left: 4px;
     }
-
   `.trim();
-
   (document.head || document.documentElement).appendChild(style);
 }

@@ -1,3 +1,5 @@
+// filepath: entrypoints/popup/App.tsx
+
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import './App.css';
 import logoSrc from '../../assets/GCD.png';
