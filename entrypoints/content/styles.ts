@@ -1,5 +1,5 @@
 // filepath: entrypoints/content/styles.ts
-import { DOWNLOAD_ICON_SVG_URL } from './icons';
+import { DOWNLOAD_ICON_SVG_URL, SUCCESS_ICON_SVG_URL } from './icons';
 
 const STYLE_ID = 'cqd-style';
 const SPINNER_SIZE_PX = 16;
@@ -479,9 +479,6 @@ export function injectStyles(): void {
       font-size: 13px;
     }
 
-    /* REPLACED: Old attribute-based rule with direct class rule */
-    /* div[data-stream-item-id][data-cqd-processed][data-cqd-edited-processed] > .cqd-overlay-container */
-    
     .cqd-both-badge {
       position: absolute;
       top: 7px;
@@ -597,7 +594,7 @@ export function injectStyles(): void {
       color: #ffffff;
       box-shadow: var(--cqd-shadow-normal);
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      font-size: 12px;
+      font-size: 13px;
       font-weight: 600;
       cursor: pointer;
       gap: 6px;
@@ -606,7 +603,8 @@ export function injectStyles(): void {
       transition:
         box-shadow 0.2s ease,
         transform 0.1s ease,
-        background-color 0.3s ease;
+        background-color 0.3s ease,
+        padding-inline 0.2s ease;
       transform: translateZ(0);
     }
 
@@ -618,11 +616,7 @@ export function injectStyles(): void {
       left: auto;
       bottom: auto;
       transform: none;
-      
-      /* Important: Margin to separate from the "Three Dots" menu */
       margin-inline-end: 8px;
-      
-      /* Ensure it doesn't get crushed in flex rows */
       flex-shrink: 0;
       align-self: center;
     }
@@ -701,13 +695,51 @@ export function injectStyles(): void {
       flex-shrink: 0;
     }
 
+    /* Swap icon on success */
+    .cqd-download-all-btn.cqd-all-success .cqd-download-all-icon {
+      background-image: url("${SUCCESS_ICON_SVG_URL}");
+    }
+
+    /* Spinner when disabled (Loading) but not success/error */
+    .cqd-download-all-btn[disabled]:not(.cqd-all-success):not(.cqd-all-error) .cqd-download-all-icon {
+      background-image: none;
+      border-radius: 9999px;
+      width: ${SPINNER_SIZE_PX}px;
+      height: ${SPINNER_SIZE_PX}px;
+      border: 3px solid var(--cqd-spinner-border);
+      border-top-color: var(--cqd-spinner-top);
+      animation: cqd-spin 0.65s linear infinite;
+    }
+
     .cqd-download-all-btn .cqd-download-all-main {
       font-weight: 600;
     }
 
+    /* Download All Sub-Text Behavior (Hover & Active) */
     .cqd-download-all-btn .cqd-download-all-sub {
       font-size: 11px;
+      opacity: 0;
+      max-width: 0;
+      margin-left: 0;
+      overflow: hidden;
+      white-space: nowrap;
+      transition: 
+        opacity 0.2s ease, 
+        max-width 0.2s ease, 
+        margin-left 0.2s ease;
+    }
+
+    /* Hover State: Reveal sub-text */
+    .cqd-download-all-btn:not([disabled]):hover .cqd-download-all-sub {
       opacity: 0.9;
+      max-width: 100px;
+      margin-left: 4px;
+    }
+
+    /* Active/Disabled State: Always show sub-text (progress) */
+    .cqd-download-all-btn[disabled] .cqd-download-all-sub {
+      opacity: 0.9;
+      max-width: 100px;
       margin-left: 4px;
     }
   `.trim();

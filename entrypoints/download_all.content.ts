@@ -345,9 +345,30 @@ function updateGroupState(group: GroupState): void {
   }
 
   const btn = ensureDownloadAllButton(group);
+  const mainSpan = btn.querySelector<HTMLElement>('.cqd-download-all-main');
+  const subSpan = btn.querySelector<HTMLElement>('.cqd-download-all-sub');
+  
+  if (!mainSpan || !subSpan) return;
 
-  // Aggregate per-file state from underlying single buttons,
-  // but LATCH success/error for the whole batch.
+  // 1. IDLE STATE CHECK (Fix for: Single buttons affecting Download All)
+  // If the batch hasn't been activated by clicking "Download All" itself,
+  // we force it to look IDLE, regardless of individual file status.
+  if (!group.activated) {
+    group.isBusy = false;
+    btn.disabled = false;
+    btn.classList.remove('cqd-all-success', 'cqd-all-error');
+    
+    mainSpan.textContent = t('downloadAll') || 'Download all';
+    
+    const fileLabel = totalFiles === 1 ? 'file' : 'files';
+    subSpan.textContent = `${totalFiles} ${fileLabel}`;
+    
+    setProgressVisual(btn, 0);
+    return; // Stop here. Do not calculate progress.
+  }
+
+  // 2. ACTIVE/RUNNING STATE
+  // Now we care about the status of the files because *we* triggered the batch.
   let downloaded = 0;
   let failed = 0;
   let inProgress = 0;
@@ -390,34 +411,11 @@ function updateGroupState(group: GroupState): void {
     group.resetTimeoutId = undefined;
   }
 
-  const mainSpan = btn.querySelector<HTMLElement>('.cqd-download-all-main');
-  const subSpan = btn.querySelector<HTMLElement>('.cqd-download-all-sub');
-  if (!mainSpan || !subSpan) return;
-
   const noneStarted = downloaded === 0 && failed === 0 && inProgress === 0;
   const allSucceeded =
     downloaded === totalFiles && failed === 0 && totalFiles > 0;
   const allCompleted =
     downloaded + failed === totalFiles && inProgress === 0 && totalFiles > 0;
-
-  // Once any file starts, we consider the run "active"
-  if (!group.activated && !noneStarted) {
-    group.activated = true;
-  }
-
-  btn.classList.remove('cqd-all-success', 'cqd-all-error');
-
-  // Idle state: nothing started or we've fully reset
-  if (!group.activated || noneStarted) {
-    group.activated = group.activated && !noneStarted;
-    group.isBusy = false;
-    btn.disabled = false;
-    mainSpan.textContent = t('downloadAll') || 'Download all';
-    const fileLabel = totalFiles === 1 ? 'file' : 'files';
-    subSpan.textContent = `${totalFiles} ${fileLabel}`;
-    setProgressVisual(btn, 0);
-    return;
-  }
 
   // From here: batch has been activated (and may be in progress or in feedback)
   btn.disabled = true;
