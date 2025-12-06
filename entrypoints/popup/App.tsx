@@ -14,7 +14,7 @@ const EXTENSION_STORE_URL = 'https://chromewebstore.google.com/';
 const BUY_ME_COFFEE_URL = 'https://buymeacoffee.com/adhamhaithameid';
 
 type Settings = {
-  extensionEnabled: boolean; // desired for THIS tab
+  extensionEnabled: boolean;
   downloadAllEnabled: boolean;
   commentsFlagEnabled: boolean;
   editedFlagEnabled: boolean;
@@ -46,6 +46,17 @@ type TabState = {
   effectiveEnabled: boolean;
 };
 
+// Color mapping for file types
+const TYPE_COLORS: Record<string, string> = {
+  pdf: 'var(--cqd-red, #ef4444)',
+  docs: 'var(--cqd-blue, #3b82f6)',
+  images: '#10b981',
+  archive: '#f59e0b',
+  sheets: '#10b981',
+  slides: '#f59e0b',
+  other: '#9ca3af',
+};
+
 function App() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [tabState, setTabState] = useState<TabState | null>(null);
@@ -65,13 +76,9 @@ function App() {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [scrolled, setScrolled] = useState(false);
 
-  // --- MOCK DATA FOR ANALYTICS (per-install global; session logic later) ---
-  const stats: StatItem[] = [
-    { id: 'docs', label: 'Docs', value: 12, color: 'var(--cqd-blue)' },
-    { id: 'pdf', label: 'PDFs', value: 8, color: 'var(--cqd-red)' },
-    { id: 'images', label: 'Images', value: 5, color: '#10b981' },
-  ];
-  const totalDownloads = stats.reduce((acc, curr) => acc + curr.value, 0);
+  // REAL STATS STATE
+  const [stats, setStats] = useState<StatItem[]>([]);
+  const [totalDownloads, setTotalDownloads] = useState(0);
 
   // Keep ref in sync for onMessage filter
   useEffect(() => {
@@ -92,6 +99,66 @@ function App() {
 
     return () => {
       el.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
+
+  // --- STATS LOADING LOGIC ---
+  useEffect(() => {
+    // 1. Function to process stats from storage format to Chart format
+    const loadStats = async () => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const result = await (chrome.storage.local as any).get('local_stats');
+        const raw = result.local_stats || { total: 0, byType: {} };
+        
+        setTotalDownloads(raw.total || 0);
+
+        // Convert byType object to sorted array
+        const entries = Object.entries(raw.byType as Record<string, number>);
+        
+        // Sort by count descending
+        entries.sort((a, b) => b[1] - a[1]);
+
+        // Take top 4, group others
+        const top = entries.slice(0, 4);
+        const others = entries.slice(4);
+        const otherCount = others.reduce((acc, curr) => acc + curr[1], 0);
+
+        const mapped: StatItem[] = top.map(([key, val]) => ({
+          id: key,
+          label: key.charAt(0).toUpperCase() + key.slice(1), // Capitalize
+          value: val,
+          color: TYPE_COLORS[key] || TYPE_COLORS.other
+        }));
+
+        if (otherCount > 0) {
+          mapped.push({
+            id: 'other',
+            label: 'Other',
+            value: otherCount,
+            color: TYPE_COLORS.other
+          });
+        }
+
+        setStats(mapped);
+
+      } catch (e) {
+        console.warn('Failed to load stats', e);
+      }
+    };
+
+    loadStats();
+
+    // 2. Listen for live updates (if user downloads while popup is open)
+    const listener = (changes: any, area: string) => {
+      if (area === 'local' && changes.local_stats) {
+        loadStats();
+      }
+    };
+    chrome.storage.onChanged.addListener(listener);
+
+    return () => {
+      chrome.storage.onChanged.removeListener(listener);
     };
   }, []);
 
@@ -294,7 +361,7 @@ function App() {
     }
   }
 
-  // --- Donut chart calculation (unchanged) ---
+  // --- Donut chart calculation (Dynamic) ---
   const radius = 40;
   const circumference = 2 * Math.PI * radius;
   let cumulativeOffset = 0;
@@ -399,7 +466,7 @@ function App() {
                   <div className="cqd-card-header">
                     <h2 className="cqd-card-title">Download Activity</h2>
                     <p className="cqd-card-subtitle">
-                      A quick snapshot of your Classroom downloads.
+                      Your lifetime downloads with this extension.
                     </p>
                   </div>
                   <div className="cqd-analytics-layout">
@@ -421,7 +488,7 @@ function App() {
                           stroke="var(--cqd-surface)"
                           strokeWidth="10"
                         />
-                        {totalDownloads > 0 &&
+                        {totalDownloads > 0 ? (
                           chartSegments.map((seg) => (
                             <circle
                               key={seg.id}
@@ -437,7 +504,19 @@ function App() {
                             >
                               <title>{`${seg.label}: ${seg.value}`}</title>
                             </circle>
-                          ))}
+                          ))
+                        ) : (
+                          // Empty state ring
+                          <circle
+                            cx="50"
+                            cy="50"
+                            r={radius}
+                            fill="none"
+                            stroke="#e5e7eb"
+                            strokeWidth="10"
+                            className="cqd-ring-segment"
+                          />
+                        )}
                       </svg>
                       <div className="cqd-analytics-circle-inner">
                         <div className="cqd-analytics-main-number">
@@ -448,20 +527,21 @@ function App() {
 
                     <div className="cqd-analytics-side">
                       <ul className="cqd-analytics-legend">
-                        {stats.map((stat) => (
-                          <li key={stat.id}>
-                            <span
-                              className="cqd-legend-dot"
-                              style={{ backgroundColor: stat.color }}
-                            />
-                            {stat.label}
-                          </li>
-                        ))}
+                        {stats.length > 0 ? (
+                          stats.map((stat) => (
+                            <li key={stat.id}>
+                              <span
+                                className="cqd-legend-dot"
+                                style={{ backgroundColor: stat.color }}
+                              />
+                              <span className="cqd-legend-label">{stat.label}</span>
+                              <span className="cqd-legend-val">({stat.value})</span>
+                            </li>
+                          ))
+                        ) : (
+                          <li className="cqd-muted-text">No downloads yet</li>
+                        )}
                       </ul>
-                      <p className="cqd-muted-text">
-                        (Demo data for now — this will show real per-session
-                        activity later.)
-                      </p>
                     </div>
                   </div>
                 </div>
