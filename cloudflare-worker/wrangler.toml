@@ -1,0 +1,20 @@
+name = "cqd-analytics"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+
+# Durable Objects binding
+[durable_objects]
+bindings = [
+  { name = "DOWNLOADS_DO", class_name = "DownloadsDurable" }
+]
+
+# First DO migration
+[[migrations]]
+tag = "v1"
+new_classes = ["DownloadsDurable"]
+
+[vars]
+# Step 1: keep Oracle disabled by leaving this empty
+ORACLE_ENDPOINT = ""
+DO_SHARED_SECRET = ""
+MAX_BATCH_EVENTS = "10000"

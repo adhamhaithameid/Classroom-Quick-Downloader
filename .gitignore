@@ -9,3 +9,11 @@ output/
 assets/.DS_Store
 public/.DS_Store
 public/icon/.DS_Store
+.DS_Store
+node_modules/
+pnpm-debug.log
+*.log
+extension/.output/
+extension/dev/.output/
+extension/.wxt/
+**/.vite/

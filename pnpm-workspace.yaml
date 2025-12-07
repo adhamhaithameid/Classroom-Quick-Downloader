@@ -1,0 +1,6 @@
+packages:
+  - "extension"
+  - "cloudflare-worker"
+  - "oracle-backend"
+  - "landing-site"
+  - "tools/*"
