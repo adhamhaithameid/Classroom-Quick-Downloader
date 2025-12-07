@@ -1,4 +1,4 @@
-// filepath: utils/analytics.ts
+// filepath: extension/entrypoints/utils/analytics.ts
 
 export interface AnalyticsEvent {
   status: 'success' | 'fail';
@@ -11,6 +11,12 @@ export interface AnalyticsEvent {
   error_type?: string;
   language: string;
   timestamp: number;
+
+  /**
+   * Optional: where this came from ("download_all", "single", etc.)
+   * Currently not used in your UI, but forwarded to Cloudflare.
+   */
+  source?: string;
 
   /**
    * Internal only – how many times this event has been included in a
@@ -70,7 +76,8 @@ const MAX_RETRY = 5;
  * If WORKER_URL === '', sendBatchToCloudflare() will "pretend success"
  * and just drain the queue to keep local storage clean.
  */
-const WORKER_URL = ''; // e.g. 'https://your-worker.your-name.workers.dev/track'
+const WORKER_URL =
+  'https://cqd-analytics.adhamhaithameid.workers.dev/track';
 const REMOTE_ENABLED = WORKER_URL.length > 0;
 
 // -------------------------------------------------------
@@ -394,7 +401,9 @@ async function internalFlush(): Promise<void> {
   const queue = await loadQueue();
   if (!queue.length) return;
 
-  console.log(`[Analytics] Attempting flush. Current queue size: ${queue.length}`);
+  console.log(
+    `[Analytics] Attempting flush. Current queue size: ${queue.length}`,
+  );
 
   // We only deal with the *front* window here; repeated alarms will
   // keep chewing through the queue over time.
@@ -481,3 +490,71 @@ export const Analytics = {
 // has been removed in favor of a chrome.alarms-based flush
 // that lives in background.ts (so it still fires when the
 // MV3 service worker wakes up periodically).
+
+// -------------------------------------------------------
+// Small convenience wrapper for “real download finished”
+// -------------------------------------------------------
+
+export type DownloadSource = 'download_all' | 'single' | 'other' | string;
+
+export interface RecordDownloadEventInput {
+  /**
+   * File extension / type. Example: "pdf", "pptx", "zip", ...
+   */
+  type: string;
+
+  /**
+   * "success" → file actually finished downloading.
+   * "fail"    → file definitely failed (interrupted, blocked, etc.).
+   */
+  status: 'success' | 'fail';
+
+  /**
+   * Optional tag: where this came from (download_all, single, etc.).
+   * Currently only forwarded to Cloudflare; dashboard can use it later.
+   */
+  source?: DownloadSource;
+
+  /**
+   * Optional duration of the attempt (ms).
+   * If omitted, defaults to 0.
+   */
+  duration_ms?: number;
+
+  /**
+   * Whether the Drive bypass was used.
+   */
+  bypass_used?: boolean;
+
+  /**
+   * Optional error code / reason for fails.
+   * Example: "BROWSER_START_FAIL", "AUTH_ALL_FAILED", etc.
+   */
+  error_type?: string;
+}
+
+/**
+ * High-level helper: record a completed download attempt.
+ *
+ * Internally this just calls Analytics.track(...) so it
+ * reuses the same queue / flush / poison-pill logic.
+ */
+export function recordDownloadEvent(input: RecordDownloadEventInput): void {
+  const {
+    type,
+    status,
+    source,
+    duration_ms,
+    bypass_used,
+    error_type,
+  } = input;
+
+  Analytics.track({
+    status,
+    file_type: type || 'unknown',
+    duration_ms: duration_ms ?? 0,
+    bypass_used: !!bypass_used,
+    error_type,
+    source,
+  });
+}

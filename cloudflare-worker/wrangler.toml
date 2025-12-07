@@ -1,0 +1,27 @@
+name = "cqd-analytics"
+main = "src/index.ts"
+account_id = "fc9538cb362e6266eea89037f6347225"
+compatibility_date = "2024-10-01"
+
+[vars]
+  ORACLE_ENDPOINT = ""
+  DO_SHARED_SECRET = ""
+  MAX_BATCH_EVENTS = "10000"
+
+[[durable_objects.bindings]]
+  name = "DOWNLOADS_DO"
+  class_name = "DownloadsDurable"
+
+[[migrations]]
+  tag = "v1"
+  new_sqlite_classes = ["DownloadsDurable"]
+
+[observability]
+  enabled = true
+  head_sampling_rate = 1
+
+[observability.logs]
+  enabled = true
+  head_sampling_rate = 1
+  invocation_logs = true
+  persist = true

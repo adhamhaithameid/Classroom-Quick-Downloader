@@ -1,4 +1,4 @@
-// filepath: wxt.config.ts
+// filepath: extension/wxt.config.ts
 import { defineConfig } from 'wxt';
 
 export default defineConfig({

@@ -1,5 +1,5 @@
-// filepath: entrypoints/background.ts
-import { Analytics } from './utils/analytics';
+// filepath: extension/entrypoints/background.ts
+import { Analytics, recordDownloadEvent } from './utils/analytics';
 
 type FileMetaMsg = {
   name?: string;
@@ -347,11 +347,12 @@ export default defineBackground(() => {
       const duration = Date.now() - pending.startTime;
       const ext = pending.finalExtension || pending.fileMeta?.ext || 'unknown';
 
-      Analytics.track({
+      recordDownloadEvent({
+        type: ext,
         status: 'success',
-        file_type: ext,
         duration_ms: duration,
         bypass_used: !!pending.fallbackStarted,
+        // Optional: you can later set source = 'download_all' | 'single'
       });
 
       cleanup(pending, delta.id);
@@ -370,9 +371,9 @@ export default defineBackground(() => {
       const errorType = delta.error?.current || 'UNKNOWN_INTERRUPT';
       const ext = pending.finalExtension || pending.fileMeta?.ext || 'unknown';
 
-      Analytics.track({
+      recordDownloadEvent({
+        type: ext,
         status: 'fail',
-        file_type: ext,
         duration_ms: duration,
         bypass_used: !!pending.fallbackStarted,
         error_type: errorType,
@@ -450,9 +451,10 @@ export default defineBackground(() => {
         },
         (id) => {
           if (chrome.runtime.lastError || !id) {
-            Analytics.track({
+            // download could not even start
+            recordDownloadEvent({
+              type: pending.fileMeta?.ext || 'unknown',
               status: 'fail',
-              file_type: pending.fileMeta?.ext || 'unknown',
               duration_ms: Date.now() - pending.startTime,
               bypass_used: true,
               error_type: 'BROWSER_START_FAIL',
@@ -504,9 +506,10 @@ function startSingleAttempt(
     },
     (downloadId) => {
       if (chrome.runtime.lastError || !downloadId) {
-        Analytics.track({
+        // could not start a direct download at all
+        recordDownloadEvent({
+          type: pending.fileMeta?.ext || 'unknown',
           status: 'fail',
-          file_type: pending.fileMeta?.ext || 'unknown',
           duration_ms: Date.now() - pending.startTime,
           bypass_used: false,
           error_type: 'BROWSER_START_FAIL_DIRECT',
@@ -548,9 +551,9 @@ function startNextDriveAttempt(pending: PendingDownload) {
       'AUTH_ALL_FAILED',
     );
 
-    Analytics.track({
+    recordDownloadEvent({
+      type: pending.fileMeta?.ext || 'unknown',
       status: 'fail',
-      file_type: pending.fileMeta?.ext || 'unknown',
       duration_ms: Date.now() - pending.startTime,
       bypass_used: true,
       error_type: 'AUTH_ALL_FAILED',

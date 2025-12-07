@@ -1,28 +1,10 @@
 {
-  "name": "Classroom Quick Downloader",
-  "description": "manifest.json description",
-  "private": true,
+  "name": "classroom-quick-downloader-monorepo",
   "version": "0.0.0",
-  "type": "module",
+  "private": true,
+  "packageManager": "pnpm@10.17.1",
   "scripts": {
-    "dev": "wxt",
-    "dev:firefox": "wxt -b firefox",
-    "build": "wxt build",
-    "build:firefox": "wxt build -b firefox",
-    "zip": "wxt zip",
-    "zip:firefox": "wxt zip -b firefox",
-    "compile": "tsc --noEmit",
-    "postinstall": "wxt prepare"
-  },
-  "dependencies": {
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0"
-  },
-  "devDependencies": {
-    "@types/react": "^19.2.6",
-    "@types/react-dom": "^19.2.3",
-    "@wxt-dev/module-react": "^1.1.5",
-    "typescript": "^5.9.3",
-    "wxt": "latest"
+    "dev:ext": "pnpm --filter extension dev",
+    "build:ext": "pnpm --filter extension build"
   }
 }
