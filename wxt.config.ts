@@ -8,6 +8,7 @@ export default defineConfig({
       'downloads',
       'tabs',
       'storage',
+      'alarms'
     ],
     host_permissions: [
       'https://drive.google.com/*',
