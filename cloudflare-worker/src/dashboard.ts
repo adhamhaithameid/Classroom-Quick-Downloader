@@ -41,7 +41,7 @@ export const DASHBOARD_HTML = `<!doctype html>
 
       .shell {
         width: 100%;
-        max-width: 1100px;
+        max-width: 1300px;
         background: radial-gradient(circle at top left, #0f172a 0, #020617 60%);
         border-radius: 24px;
         border: 1px solid var(--border-subtle);
@@ -54,7 +54,6 @@ export const DASHBOARD_HTML = `<!doctype html>
         justify-content: space-between;
         align-items: flex-start;
         gap: 16px;
-        margin-bottom: 22px;
       }
 
       h1 {
@@ -137,6 +136,18 @@ export const DASHBOARD_HTML = `<!doctype html>
         }
       }
 
+      .section {
+        margin-top: 22px;
+        padding-top: 16px;
+        border-top: 1px dashed rgba(148, 163, 184, 0.5);
+      }
+
+      .section:first-of-type {
+        margin-top: 16px;
+        border-top: none;
+        padding-top: 0;
+      }
+
       .card {
         background: linear-gradient(145deg, #020617 0, #020617 70%);
         border-radius: 18px;
@@ -170,6 +181,7 @@ export const DASHBOARD_HTML = `<!doctype html>
         font-size: 20px;
         font-weight: 600;
         font-variant-numeric: tabular-nums;
+        transition: color 0.25s ease;
       }
 
       .card-value.success {
@@ -191,7 +203,7 @@ export const DASHBOARD_HTML = `<!doctype html>
         text-transform: uppercase;
         letter-spacing: 0.08em;
         color: var(--text-muted);
-        margin: 16px 0 8px;
+        margin: 0 0 8px;
       }
 
       .pill-row {
@@ -212,17 +224,17 @@ export const DASHBOARD_HTML = `<!doctype html>
         font-variant-numeric: tabular-nums;
       }
 
+      .pill.soft {
+        border-style: dashed;
+        opacity: 0.9;
+      }
+
       .pill .key {
         color: var(--text-muted);
       }
 
       .pill .value {
         color: var(--text-main);
-      }
-
-      .pill.soft {
-        border-style: dashed;
-        opacity: 0.9;
       }
 
       .muted {
@@ -261,7 +273,7 @@ export const DASHBOARD_HTML = `<!doctype html>
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-top: 14px;
+        margin-top: 18px;
         font-size: 11px;
         color: var(--text-muted);
       }
@@ -293,8 +305,8 @@ export const DASHBOARD_HTML = `<!doctype html>
       .btn-row {
         display: flex;
         flex-wrap: wrap;
-        gap: 6px;
-        margin-top: 6px;
+        gap: 8px;
+        margin-top: 8px;
       }
 
       button {
@@ -303,8 +315,8 @@ export const DASHBOARD_HTML = `<!doctype html>
         border: 1px solid rgba(148, 163, 184, 0.5);
         background: rgba(15, 23, 42, 0.9);
         color: var(--text-main);
-        padding: 5px 10px;
-        font-size: 11px;
+        padding: 6px 14px;
+        font-size: 12px;
         display: inline-flex;
         align-items: center;
         gap: 6px;
@@ -319,7 +331,7 @@ export const DASHBOARD_HTML = `<!doctype html>
         );
       }
 
-      button:hover {
+      button:hover:not(:disabled) {
         border-color: var(--accent);
       }
 
@@ -373,13 +385,24 @@ export const DASHBOARD_HTML = `<!doctype html>
         gap: 6px;
       }
 
-      .pill.warning {
-        border-color: rgba(250, 204, 21, 0.8);
-        color: var(--warning);
+      /* Flash effect for updated values */
+      .flash {
+        animation: flash-bg 0.7s ease-out;
       }
 
-      .pill.warning .key {
-        color: var(--warning);
+      @keyframes flash-bg {
+        0% {
+          background-color: rgba(56, 189, 248, 0.22);
+          box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.3);
+        }
+        70% {
+          background-color: transparent;
+          box-shadow: 0 0 0 10px rgba(56, 189, 248, 0);
+        }
+        100% {
+          background-color: transparent;
+          box-shadow: none;
+        }
       }
     </style>
   </head>
@@ -393,7 +416,8 @@ export const DASHBOARD_HTML = `<!doctype html>
           </h1>
           <p class="subtitle">
             Live Worker + Durable Object stats for the Classroom Quick Downloader
-            extension. Auto refresh every <b>5s</b>.
+            extension. Use the <b>Reload stats</b> button when you want fresh
+            data (no auto polling).
           </p>
         </div>
         <div class="meta" id="meta">
@@ -403,184 +427,195 @@ export const DASHBOARD_HTML = `<!doctype html>
         </div>
       </header>
 
-      <!-- Top summary -->
-      <div class="grid grid-cols-4">
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title">Total Downloads</div>
+      <!-- SECTION 1: Summary cards -->
+      <div class="section">
+        <div class="grid grid-cols-4">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">Total Downloads</div>
+            </div>
+            <div class="card-value" id="totalDownloads">–</div>
+            <div class="card-sub">
+              Successful completed downloads (status = <code>success</code>)
+            </div>
           </div>
-          <div class="card-value" id="totalDownloads">–</div>
-          <div class="card-sub">
-            Successful completed downloads (status = <code>success</code>)
-          </div>
-        </div>
 
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title">Total Success</div>
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">Total Success</div>
+            </div>
+            <div class="card-value success" id="totalSuccess">–</div>
+            <div class="card-sub">
+              All events with status <code>success</code>
+            </div>
           </div>
-          <div class="card-value success" id="totalSuccess">–</div>
-          <div class="card-sub">
-            All events with status <code>success</code>
-          </div>
-        </div>
 
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title">Total Fail</div>
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">Total Fail</div>
+            </div>
+            <div class="card-value danger" id="totalFail">–</div>
+            <div class="card-sub">
+              Events with status <code>fail</code> (downloads that errored)
+            </div>
           </div>
-          <div class="card-value danger" id="totalFail">–</div>
-          <div class="card-sub">
-            Events with status <code>fail</code> (downloads that errored)
-          </div>
-        </div>
 
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title">Total Events</div>
-          </div>
-          <div class="card-value" id="totalEvents">–</div>
-          <div class="card-sub">
-            All events received by the Durable Object (success + fail)
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">Total Events</div>
+            </div>
+            <div class="card-value" id="totalEvents">–</div>
+            <div class="card-sub">
+              All events received by the Durable Object (success + fail)
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- Buffer / timing / env -->
-      <div class="grid grid-cols-3" style="margin-top: 12px;">
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title">Buffer</div>
+      <!-- SECTION 2: Buffer / timing / env -->
+      <div class="section">
+        <div class="section-title">Buffer, timing & environment</div>
+        <div class="grid grid-cols-3">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">Buffer</div>
+            </div>
+            <div class="card-sub" id="bufferInfo">
+              Pending in DO buffer: –<br />
+              Buffer age: –<br />
+              Next flush condition: –
+            </div>
           </div>
-          <div class="card-sub" id="bufferInfo">
-            Pending in DO buffer: –<br />
-            Buffer age: –<br />
-            Next flush condition: –
-          </div>
-        </div>
 
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title">Timeline</div>
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">Timeline</div>
+            </div>
+            <div class="card-sub" id="timeInfo">
+              Last event at: –<br />
+              Age since last event: –<br />
+              Last flush to Oracle: –<br />
+              Age since last flush: –
+            </div>
           </div>
-          <div class="card-sub" id="timeInfo">
-            Last event at: –<br />
-            Age since last event: –<br />
-            Last flush to Oracle: –<br />
-            Age since last flush: –
-          </div>
-        </div>
 
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title">Environment</div>
-          </div>
-          <div class="pill-row" id="envInfo">
-            <span class="muted">Loading…</span>
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">Environment</div>
+            </div>
+            <div class="pill-row" id="envInfo">
+              <span class="muted">Loading…</span>
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- Breakdowns -->
-      <div class="section-title">Breakdown by dimensions</div>
-      <div class="grid grid-cols-3">
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title">By Type</div>
+      <!-- SECTION 3: Breakdowns -->
+      <div class="section">
+        <div class="section-title">Breakdown by dimensions</div>
+        <div class="grid grid-cols-3">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">By Type</div>
+            </div>
+            <div class="pill-row" id="byType"></div>
           </div>
-          <div class="pill-row" id="byType"></div>
-        </div>
 
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title">By Status</div>
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">By Status</div>
+            </div>
+            <div class="pill-row" id="byStatus"></div>
           </div>
-          <div class="pill-row" id="byStatus"></div>
-        </div>
 
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title">By Browser</div>
-          </div>
-          <div class="pill-row" id="byBrowser"></div>
-        </div>
-      </div>
-
-      <div class="grid grid-cols-3" style="margin-top: 12px;">
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title">By OS</div>
-          </div>
-          <div class="pill-row" id="byOs"></div>
-        </div>
-
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title">By Extension Version</div>
-          </div>
-          <div class="pill-row" id="byExtVersion"></div>
-        </div>
-
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title">By Language</div>
-          </div>
-          <div class="pill-row" id="byLanguage"></div>
-        </div>
-      </div>
-
-      <!-- Debug + endpoints -->
-      <div class="section-title">Debug & endpoints</div>
-      <div class="grid grid-cols-2">
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title">Endpoints</div>
-          </div>
-          <div class="endpoint-list" id="endpointList">
-            <span class="muted">Loading…</span>
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">By Browser</div>
+            </div>
+            <div class="pill-row" id="byBrowser"></div>
           </div>
         </div>
 
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title">Actions</div>
-            <span class="card-chip">Safe to use in dev</span>
+        <div class="grid grid-cols-3" style="margin-top: 12px;">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">By OS</div>
+            </div>
+            <div class="pill-row" id="byOs"></div>
           </div>
-          <div class="btn-row">
-            <button id="btnRefresh">
-              <span class="btn-dot"></span>
-              Refresh stats now
-            </button>
-            <button id="btnFlush" class="primary">
-              <span class="btn-dot"></span>
-              POST /debug/flush
-            </button>
-            <button id="btnOpenStats">
-              <span class="btn-dot"></span>
-              Open /stats JSON
-            </button>
-            <button id="btnOpenHealth">
-              <span class="btn-dot"></span>
-              Open /health
-            </button>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">By Extension Version</div>
+            </div>
+            <div class="pill-row" id="byExtVersion"></div>
           </div>
-          <div class="debug-status" id="debugStatus">
-            Ready.
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">By Language</div>
+            </div>
+            <div class="pill-row" id="byLanguage"></div>
           </div>
         </div>
       </div>
 
-      <!-- Raw JSON -->
-      <div class="section-title">Raw /stats payload</div>
-      <div class="card">
-        <div class="json-header">
-          <span>
-            <span class="dot yellow"></span>
-            Direct JSON returned by <code>/stats</code>
-          </span>
-          <span id="jsonMeta">size: –</span>
+      <!-- SECTION 4: Debug & endpoints -->
+      <div class="section">
+        <div class="section-title">Debug & endpoints</div>
+        <div class="grid grid-cols-2">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">Endpoints</div>
+            </div>
+            <div class="endpoint-list" id="endpointList">
+              <span class="muted">Loading…</span>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">Actions</div>
+              <span class="card-chip">Manual only – no auto polling</span>
+            </div>
+            <div class="btn-row">
+              <button id="btnRefresh" class="primary">
+                <span class="btn-dot"></span>
+                Reload stats
+              </button>
+              <button id="btnFlush">
+                <span class="btn-dot"></span>
+                POST /debug/flush
+              </button>
+              <button id="btnOpenStats">
+                <span class="btn-dot"></span>
+                Open /stats JSON
+              </button>
+              <button id="btnOpenHealth">
+                <span class="btn-dot"></span>
+                Open /health
+              </button>
+            </div>
+            <div class="debug-status" id="debugStatus">
+              Ready. Click <b>Reload stats</b> to fetch the latest data.
+            </div>
+          </div>
         </div>
-        <pre id="rawJson">{}</pre>
+      </div>
+
+      <!-- SECTION 5: Raw JSON -->
+      <div class="section">
+        <div class="section-title">Raw /stats payload</div>
+        <div class="card">
+          <div class="json-header">
+            <span>
+              <span class="dot yellow"></span>
+              Direct JSON returned by <code>/stats</code>
+            </span>
+            <span id="jsonMeta">size: –</span>
+          </div>
+          <pre id="rawJson">{}</pre>
+        </div>
       </div>
 
       <div class="footer">
@@ -592,7 +627,7 @@ export const DASHBOARD_HTML = `<!doctype html>
         </div>
         <div>
           <span class="muted">Tip:</span>
-          values auto-update every 5 seconds – keep this tab open while testing.
+          reload only when you need – this keeps Cloudflare requests low.
         </div>
       </div>
     </div>
@@ -685,6 +720,18 @@ export const DASHBOARD_HTML = `<!doctype html>
         });
       }
 
+      function updateField(id, newText) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        newText = String(newText);
+        if (el.textContent === newText) return;
+        el.textContent = newText;
+        // restart the flash animation
+        el.classList.remove("flash");
+        void el.offsetWidth; // force reflow
+        el.classList.add("flash");
+      }
+
       function populateEnv(stats) {
         const envInfo = document.getElementById("envInfo");
         envInfo.innerHTML = "";
@@ -745,13 +792,12 @@ export const DASHBOARD_HTML = `<!doctype html>
         const totalDownloads =
           stats.totalDownloads != null ? stats.totalDownloads : totalSuccess;
 
-        document.getElementById("totalDownloads").textContent =
-          fmtNumber(totalDownloads);
-        document.getElementById("totalSuccess").textContent =
-          fmtNumber(totalSuccess);
-        document.getElementById("totalFail").textContent = fmtNumber(totalFail);
-        document.getElementById("totalEvents").textContent = fmtNumber(
-          stats.totalEvents ?? totalSuccess + totalFail
+        updateField("totalDownloads", fmtNumber(totalDownloads));
+        updateField("totalSuccess", fmtNumber(totalSuccess));
+        updateField("totalFail", fmtNumber(totalFail));
+        updateField(
+          "totalEvents",
+          fmtNumber(stats.totalEvents ?? totalSuccess + totalFail)
         );
       }
 
@@ -799,17 +845,21 @@ export const DASHBOARD_HTML = `<!doctype html>
 
       function updateRawJson(stats) {
         const rawEl = document.getElementById("rawJson");
+        let text;
         try {
-          rawEl.textContent = JSON.stringify(stats, null, 2);
+          text = JSON.stringify(stats, null, 2);
         } catch {
-          rawEl.textContent = String(stats);
+          text = String(stats);
         }
-        const size = new Blob([rawEl.textContent]).size;
+        rawEl.textContent = text;
+        const size = new Blob([text]).size;
         document.getElementById("jsonMeta").textContent =
           "size: " + fmtNumber(size) + " bytes";
       }
 
       async function refreshStats() {
+        const status = document.getElementById("debugStatus");
+        status.textContent = "Fetching /stats…";
         try {
           const res = await fetch("/stats");
           if (!res.ok) throw new Error("HTTP " + res.status);
@@ -821,15 +871,12 @@ export const DASHBOARD_HTML = `<!doctype html>
           populateEnv(stats);
           updateRawJson(stats);
 
-          const now = new Date();
-          document.getElementById("lastRefresh").textContent =
-            now.toLocaleTimeString();
-          document.getElementById("debugStatus").textContent =
-            "Last refresh OK (HTTP " + res.status + ").";
+          const now = new Date().toLocaleTimeString();
+          updateField("lastRefresh", now);
+          status.textContent = "Last refresh OK (HTTP " + res.status + ").";
         } catch (e) {
           console.error("Failed to refresh stats", e);
-          document.getElementById("debugStatus").textContent =
-            "Refresh failed: " + e;
+          status.textContent = "Refresh failed: " + e;
         }
       }
 
@@ -875,8 +922,8 @@ export const DASHBOARD_HTML = `<!doctype html>
         .addEventListener("click", () => window.open("/health", "_blank"));
 
       buildEndpoints();
+      // No auto polling – we only fetch once on load + when you click Reload.
       refreshStats();
-      setInterval(refreshStats, 5000);
     </script>
   </body>
 </html>`;
