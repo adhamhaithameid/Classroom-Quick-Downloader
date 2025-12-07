@@ -1,6 +1,4 @@
 // src/downloads_do.ts
-// Durable Object implementation for analytics aggregation + buffering.
-
 import type { DurableObjectState } from '@cloudflare/workers-types';
 import type { Env } from './types';
 
@@ -20,6 +18,8 @@ interface AnalyticsEvent {
 interface Counters {
   totalEvents: number;
   totalDownloads: number;
+  totalSuccess: number;
+  totalFail: number;
 
   byStatus: Record<string, number>;
   byType: Record<string, number>;
@@ -34,6 +34,82 @@ interface Counters {
 
 const STORAGE_KEY_COUNTERS = 'counters';
 const STORAGE_KEY_BUFFER = 'buffer';
+
+function emptyCounters(): Counters {
+  return {
+    totalEvents: 0,
+    totalDownloads: 0,
+    totalSuccess: 0,
+    totalFail: 0,
+    byStatus: {},
+    byType: {},
+    byBrowser: {},
+    byOs: {},
+    byExtVersion: {},
+    byLanguage: {},
+    lastEventAt: null,
+    lastFlushAt: null,
+  };
+}
+
+/**
+ * Normalize/migrate old counters to the new shape.
+ * - Merges stored counters into the new structure.
+ * - Recomputes totalEvents/totalSuccess/totalFail/totalDownloads from byStatus.
+ */
+function normalizeCounters(stored: any | undefined | null): Counters {
+  if (!stored) return emptyCounters();
+
+  const base = emptyCounters();
+
+  const merged: Counters = {
+    ...base,
+    ...stored,
+    byStatus: {
+      ...base.byStatus,
+      ...(stored.byStatus || {}),
+    },
+    byType: {
+      ...base.byType,
+      ...(stored.byType || {}),
+    },
+    byBrowser: {
+      ...base.byBrowser,
+      ...(stored.byBrowser || {}),
+    },
+    byOs: {
+      ...base.byOs,
+      ...(stored.byOs || {}),
+    },
+    byExtVersion: {
+      ...base.byExtVersion,
+      ...(stored.byExtVersion || {}),
+    },
+    byLanguage: {
+      ...base.byLanguage,
+      ...(stored.byLanguage || {}),
+    },
+  };
+
+  // Recompute totals from byStatus EVERY TIME so everything is consistent.
+  let totalEvents = 0;
+  let totalSuccess = 0;
+  let totalFail = 0;
+
+  for (const [status, count] of Object.entries(merged.byStatus)) {
+    const n = typeof count === 'number' && Number.isFinite(count) ? count : 0;
+    totalEvents += n;
+    if (status === 'success') totalSuccess += n;
+    else if (status === 'fail') totalFail += n;
+  }
+
+  merged.totalEvents = totalEvents;
+  merged.totalSuccess = totalSuccess;
+  merged.totalFail = totalFail;
+  merged.totalDownloads = totalSuccess;
+
+  return merged;
+}
 
 export class DownloadsDurable {
   private state: DurableObjectState;
@@ -51,33 +127,15 @@ export class DownloadsDurable {
       parseInt(env.MAX_BATCH_EVENTS || '10000', 10) || 10000;
     this.maxBuffer = parsedMax;
 
-    // Default counters in case nothing is stored yet.
-    this.counters = {
-      totalEvents: 0,
-      totalDownloads: 0,
-      byStatus: {},
-      byType: {},
-      byBrowser: {},
-      byOs: {},
-      byExtVersion: {},
-      byLanguage: {},
-      lastEventAt: null,
-      lastFlushAt: null,
-    };
+    this.counters = emptyCounters();
 
-    // Initialize from durable storage once.
     this.state.blockConcurrencyWhile(async () => {
       const [storedCounters, storedBuffer] = await Promise.all([
-        this.state.storage.get<Counters>(STORAGE_KEY_COUNTERS),
+        this.state.storage.get<any>(STORAGE_KEY_COUNTERS),
         this.state.storage.get<AnalyticsEvent[]>(STORAGE_KEY_BUFFER),
       ]);
 
-      if (storedCounters) {
-        this.counters = {
-          ...this.counters,
-          ...storedCounters,
-        };
-      }
+      this.counters = normalizeCounters(storedCounters);
 
       if (Array.isArray(storedBuffer)) {
         this.buffer = storedBuffer;
@@ -100,65 +158,50 @@ export class DownloadsDurable {
       return this.handleHealth();
     }
 
-    // Fallback: DO is alive but endpoint not recognized.
-    return new Response('OK', { status: 200 });
+    // Debug endpoints (only reachable if Worker forwards them)
+    if (request.method === 'POST' && url.pathname.endsWith('/debug/reset')) {
+      return this.handleReset();
+    }
+
+    if (request.method === 'POST' && url.pathname.endsWith('/debug/flush')) {
+      return this.handleFlush();
+    }
+
+    return this.json({ ok: true }, 200);
   }
 
-  // ---------------------------
-  // Track ingestion
-  // ---------------------------
-
+  // ---------------------------------------------------------------------------
+  // TRACK
+  // ---------------------------------------------------------------------------
   private async handleTrack(request: Request): Promise<Response> {
     let body: any;
     try {
       body = await request.json();
     } catch {
-      return this.json(
-        { ok: false, error: 'invalid_json' },
-        400,
-      );
+      return this.json({ ok: false, error: 'invalid_json' }, 400);
     }
 
     const rawEvents = Array.isArray(body?.events) ? body.events : [];
     if (!rawEvents.length) {
-      return this.json(
-        { ok: false, error: 'no_events' },
-        400,
-      );
+      return this.json({ ok: false, error: 'no_events' }, 400);
     }
 
     const normalized: AnalyticsEvent[] = rawEvents.map(
       (e: any): AnalyticsEvent => ({
         status: e.status === 'success' ? 'success' : 'fail',
-        file_type:
-          typeof e.file_type === 'string'
-            ? e.file_type
-            : 'unknown',
-        browser:
-          typeof e.browser === 'string'
-            ? e.browser
-            : 'unknown',
-        os:
-          typeof e.os === 'string'
-            ? e.os
-            : 'unknown',
+        file_type: typeof e.file_type === 'string' ? e.file_type : 'unknown',
+        browser: typeof e.browser === 'string' ? e.browser : 'unknown',
+        os: typeof e.os === 'string' ? e.os : 'unknown',
         ext_version:
-          typeof e.ext_version === 'string'
-            ? e.ext_version
-            : '0.0.0',
+          typeof e.ext_version === 'string' ? e.ext_version : '0.0.0',
         duration_ms:
           typeof e.duration_ms === 'number' && Number.isFinite(e.duration_ms)
             ? e.duration_ms
             : 0,
         bypass_used: !!e.bypass_used,
         error_type:
-          typeof e.error_type === 'string'
-            ? e.error_type
-            : undefined,
-        language:
-          typeof e.language === 'string'
-            ? e.language
-            : 'unknown',
+          typeof e.error_type === 'string' ? e.error_type : undefined,
+        language: typeof e.language === 'string' ? e.language : 'unknown',
         timestamp:
           typeof e.timestamp === 'number' && Number.isFinite(e.timestamp)
             ? e.timestamp
@@ -177,7 +220,6 @@ export class DownloadsDurable {
       this.state.storage.put(STORAGE_KEY_BUFFER, this.buffer),
     ]);
 
-    // Optional: flush to Oracle when threshold reached AND endpoint configured.
     if (this.buffer.length >= this.maxBuffer) {
       await this.maybeFlushToOracle();
     }
@@ -188,6 +230,8 @@ export class DownloadsDurable {
         accepted: normalized.length,
         totalEvents: this.counters.totalEvents,
         totalDownloads: this.counters.totalDownloads,
+        totalSuccess: this.counters.totalSuccess,
+        totalFail: this.counters.totalFail,
         pendingEvents: this.buffer.length,
         lastEventAt: this.counters.lastEventAt,
         lastFlushAt: this.counters.lastFlushAt,
@@ -197,6 +241,7 @@ export class DownloadsDurable {
   }
 
   private updateCounters(ev: AnalyticsEvent): void {
+    // We recompute from byStatus on load, but we still keep this simple local increment.
     this.counters.totalEvents += 1;
 
     const statusKey = ev.status || 'unknown';
@@ -225,6 +270,9 @@ export class DownloadsDurable {
 
     if (ev.status === 'success') {
       this.counters.totalDownloads += 1;
+      this.counters.totalSuccess += 1;
+    } else {
+      this.counters.totalFail += 1;
     }
 
     if (
@@ -235,15 +283,19 @@ export class DownloadsDurable {
     }
   }
 
-  // ---------------------------
-  // /stats endpoint
-  // ---------------------------
-
+  // ---------------------------------------------------------------------------
+  // STATS / HEALTH / RESET / FLUSH
+  // ---------------------------------------------------------------------------
   private async handleStats(): Promise<Response> {
+    // Ensure totals are coherent every time we expose stats
+    this.counters = normalizeCounters(this.counters);
+
     const body = {
       ok: true,
       totalEvents: this.counters.totalEvents,
       totalDownloads: this.counters.totalDownloads,
+      totalSuccess: this.counters.totalSuccess,
+      totalFail: this.counters.totalFail,
       pendingEvents: this.buffer.length,
       lastEventAt: this.counters.lastEventAt,
       lastFlushAt: this.counters.lastFlushAt,
@@ -260,42 +312,103 @@ export class DownloadsDurable {
     return this.json(body, 200);
   }
 
-  // ---------------------------
-  // /health endpoint
-  // ---------------------------
-
   private async handleHealth(): Promise<Response> {
-    const body = {
-      ok: true,
-      totalEvents: this.counters.totalEvents,
-      totalDownloads: this.counters.totalDownloads,
-      pendingEvents: this.buffer.length,
-      lastEventAt: this.counters.lastEventAt,
-      lastFlushAt: this.counters.lastFlushAt,
-    };
-    return this.json(body, 200);
+    this.counters = normalizeCounters(this.counters);
+
+    return this.json(
+      {
+        ok: true,
+        totalEvents: this.counters.totalEvents,
+        totalDownloads: this.counters.totalDownloads,
+        totalSuccess: this.counters.totalSuccess,
+        totalFail: this.counters.totalFail,
+        pendingEvents: this.buffer.length,
+        lastEventAt: this.counters.lastEventAt,
+        lastFlushAt: this.counters.lastFlushAt,
+      },
+      200,
+    );
   }
 
-  // ---------------------------
-  // Optional Oracle flush
-  // ---------------------------
+  private async handleReset(): Promise<Response> {
+    this.counters = emptyCounters();
+    this.buffer = [];
 
-  private async maybeFlushToOracle(): Promise<void> {
-    const endpoint = (this.env.ORACLE_ENDPOINT || '').trim();
-    if (!endpoint || this.buffer.length === 0) {
-      // No remote configured or nothing to send yet.
-      return;
+    await Promise.all([
+      this.state.storage.put(STORAGE_KEY_COUNTERS, this.counters),
+      this.state.storage.put(STORAGE_KEY_BUFFER, this.buffer),
+    ]);
+
+    return this.json({ ok: true, reset: true }, 200);
+  }
+
+  private async handleFlush(): Promise<Response> {
+    if (this.buffer.length === 0) {
+      return this.json(
+        { ok: true, flushed: false, reason: 'buffer_empty' },
+        200,
+      );
     }
 
-    const eventsToSend = this.buffer.slice();
+    const endpoint = (this.env.ORACLE_ENDPOINT || '').trim();
 
+    // DEV MODE: no Oracle backend yet → just clear buffer and set lastFlushAt.
+    if (!endpoint) {
+      const count = this.buffer.length;
+      this.buffer = [];
+      this.counters.lastFlushAt = Date.now();
+
+      await Promise.all([
+        this.state.storage.put(STORAGE_KEY_BUFFER, this.buffer),
+        this.state.storage.put(STORAGE_KEY_COUNTERS, this.counters),
+      ]);
+
+      return this.json(
+        {
+          ok: true,
+          flushed: true,
+          mode: 'local',
+          droppedEvents: count,
+          note: 'ORACLE_ENDPOINT is empty – buffer cleared only.',
+        },
+        200,
+      );
+    }
+
+    // PROD MODE: we have Oracle endpoint.
+    const eventsToSend = this.buffer.slice();
     const ok = await this.flushToOracle(endpoint, eventsToSend);
     if (!ok) {
-      // Leave buffer intact; will try again later when threshold hit again.
-      return;
+      return this.json(
+        { ok: false, flushed: false, reason: 'oracle_failed' },
+        502,
+      );
     }
 
-    // Remote accepted → clear buffer, store updated counters.
+    this.buffer = [];
+    this.counters.lastFlushAt = Date.now();
+    await Promise.all([
+      this.state.storage.put(STORAGE_KEY_BUFFER, this.buffer),
+      this.state.storage.put(STORAGE_KEY_COUNTERS, this.counters),
+    ]);
+
+    return this.json(
+      { ok: true, flushed: true, mode: 'oracle', sent: eventsToSend.length },
+      200,
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // ORACLE
+  // ---------------------------------------------------------------------------
+  private async maybeFlushToOracle(): Promise<void> {
+    const endpoint = (this.env.ORACLE_ENDPOINT || '').trim();
+    if (!endpoint || this.buffer.length === 0) return;
+
+    const eventsToSend = this.buffer.slice();
+    const ok = await this.flushToOracle(endpoint, eventsToSend);
+    if (!ok) return;
+
     this.buffer = [];
     this.counters.lastFlushAt = Date.now();
 
@@ -314,9 +427,7 @@ export class DownloadsDurable {
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
       };
-      if (secret) {
-        headers['X-DO-SECRET'] = secret;
-      }
+      if (secret) headers['X-DO-SECRET'] = secret;
 
       const res = await fetch(endpoint, {
         method: 'POST',
@@ -331,16 +442,16 @@ export class DownloadsDurable {
     }
   }
 
-  // ---------------------------
-  // Response helper
-  // ---------------------------
-
+  // ---------------------------------------------------------------------------
+  // JSON helper
+  // ---------------------------------------------------------------------------
   private json(obj: unknown, status = 200): Response {
     return new Response(JSON.stringify(obj), {
       status,
       headers: {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
       },
     });
   }
