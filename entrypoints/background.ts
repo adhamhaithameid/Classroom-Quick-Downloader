@@ -112,8 +112,41 @@ function extractAuthUserFromUrl(rawUrl: string): number | undefined {
   }
 }
 
+/* ---------------------------------------------
+ * Analytics alarm setup (MV3-friendly flushing)
+ * -------------------------------------------*/
+
+const ANALYTICS_FLUSH_ALARM = 'CQD_ANALYTICS_FLUSH';
+let analyticsAlarmInitialized = false;
+
+function ensureAnalyticsAlarm() {
+  if (analyticsAlarmInitialized) return;
+  if (typeof chrome === 'undefined' || !chrome.alarms) return;
+
+  analyticsAlarmInitialized = true;
+
+  try {
+    // Create or update a periodic alarm that fires every 1 minute.
+    chrome.alarms.create(ANALYTICS_FLUSH_ALARM, {
+      periodInMinutes: 1,
+    });
+
+    chrome.alarms.onAlarm.addListener((alarm) => {
+      if (alarm.name === ANALYTICS_FLUSH_ALARM) {
+        // Fire-and-forget; Analytics has its own opChain.
+        Analytics.flush();
+      }
+    });
+  } catch {
+    // ignore
+  }
+}
+
 export default defineBackground(() => {
   console.log('[CQD] Background ready - RACE CONDITION FIXED');
+
+  // Ensure MV3-safe periodic flushing of analytics data.
+  ensureAnalyticsAlarm();
 
   // --- Icon Logic ---
   if (typeof chrome !== 'undefined' && chrome.tabs && chrome.action) {
