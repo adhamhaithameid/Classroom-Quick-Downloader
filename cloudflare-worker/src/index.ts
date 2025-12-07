@@ -1,71 +1,74 @@
-// filepath: cloudflare-worker/src/index.ts
+// src/index.ts
+// Worker entrypoint that:
+// - Exposes /track for the extension
+// - Handles CORS (OPTIONS + POST)
+// - Proxies to the Durable Object
+// - Exposes /stats and /health for debugging
 
 import type { Env } from './types';
 import { DownloadsDurable } from './downloads_do';
 
-// IMPORTANT: export the Durable Object class so Wrangler can bind it.
-export { DownloadsDurable };
+// --- CORS helpers ---
+
+function makeCorsPreflightResponse(): Response {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Max-Age': '86400',
+    },
+  });
+}
+
+function withCors(res: Response): Response {
+  const headers = new Headers(res.headers);
+  headers.set('Access-Control-Allow-Origin', '*');
+  return new Response(res.body, {
+    status: res.status,
+    statusText: res.statusText,
+    headers,
+  });
+}
 
 export default {
-  async fetch(
-    request: Request,
-    env: Env,
-    _ctx: ExecutionContext,
-  ): Promise<Response> {
+  async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+    const { pathname } = url;
 
-    // POST /track → forward to DO
-    if (request.method === 'POST' && url.pathname === '/track') {
-      const id = env.DOWNLOADS_DO.idFromName('DownloadsStats');
-      const stub = env.DOWNLOADS_DO.get(id);
-      // Forward original request (body, headers, etc.)
-      return stub.fetch(request);
+    // CORS preflight for POST /track
+    if (pathname === '/track' && request.method === 'OPTIONS') {
+      return makeCorsPreflightResponse();
     }
 
-    // GET /stats → ask the DO for aggregated counters
-    if (request.method === 'GET' && url.pathname === '/stats') {
+    // Forward POST /track to Durable Object
+    if (pathname === '/track' && request.method === 'POST') {
       const id = env.DOWNLOADS_DO.idFromName('DownloadsStats');
       const stub = env.DOWNLOADS_DO.get(id);
-      // We use a fake URL path '/stats' that's interpreted by the DO.
-      return stub.fetch('https://do.internal/stats');
+      const res = await stub.fetch(request);
+      return withCors(res);
     }
 
-    // GET /health → quick health check with DO summary embedded
-    if (request.method === 'GET' && url.pathname === '/health') {
+    // DO health (proxied)
+    if (pathname === '/health' && request.method === 'GET') {
       const id = env.DOWNLOADS_DO.idFromName('DownloadsStats');
       const stub = env.DOWNLOADS_DO.get(id);
+      const res = await stub.fetch('https://do/health');
+      return withCors(res);
+    }
 
-      let doHealth: unknown = null;
-      try {
-        const res = await stub.fetch('https://do.internal/health');
-        if (res.ok) {
-          doHealth = await res.json();
-        } else {
-          doHealth = {
-            ok: false,
-            error: `DO responded with status ${res.status}`,
-          };
-        }
-      } catch (err) {
-        doHealth = {
-          ok: false,
-          error: 'DO unreachable',
-          detail: (err as Error).message,
-        };
-      }
-
-      return new Response(
-        JSON.stringify({
-          ok: true,
-          do: doHealth,
-        }),
-        {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        },
-      );
+    // Aggregated stats (proxied)
+    if (pathname === '/stats' && request.method === 'GET') {
+      const id = env.DOWNLOADS_DO.idFromName('DownloadsStats');
+      const stub = env.DOWNLOADS_DO.get(id);
+      const res = await stub.fetch('https://do/stats');
+      return withCors(res);
     }
 
     return new Response('Not found', { status: 404 });
   },
 };
+
+// Important: export the DO class so Wrangler can bind it
+export { DownloadsDurable };
