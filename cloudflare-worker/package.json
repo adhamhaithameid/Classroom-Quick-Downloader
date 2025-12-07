@@ -1,15 +1,14 @@
 {
   "name": "@cqd/cloudflare-worker",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "private": true,
-  "type": "module",
   "scripts": {
-    "dev": "wrangler dev src/worker.ts --local",
-    "deploy": "wrangler deploy src/worker.ts",
-    "check": "tsc --noEmit"
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.20251205.0",
     "typescript": "^5.9.3",
-    "wrangler": "^3.89.0"
+    "wrangler": "^4.53.0"
   }
 }

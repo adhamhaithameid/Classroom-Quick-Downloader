@@ -70,7 +70,8 @@ const MAX_RETRY = 5;
  * If WORKER_URL === '', sendBatchToCloudflare() will "pretend success"
  * and just drain the queue to keep local storage clean.
  */
-const WORKER_URL = ''; // e.g. 'https://your-worker.your-name.workers.dev/track'
+const WORKER_URL =
+  'https://cqd-analytics.adhamhaithameid.workers.dev/track';
 const REMOTE_ENABLED = WORKER_URL.length > 0;
 
 // -------------------------------------------------------
