@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import './App.css';
 import logoSrc from '../../assets/GCD.png';
 import logoGraySrc from '../../assets/GCD_gray.png';
-import bmcLogoSrc from '../../assets/bmc-logo.svg';
+import bmcLogoSrc from '../../public/bmc-logo.svg';
 
 // External Links
 const SURVEY_URL = 'https://forms.gle/wPU2b1Qxa7svHqJa6';
