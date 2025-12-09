@@ -1,5 +1,5 @@
 // filepath: extension/entrypoints/background.ts
-import { Analytics, recordDownloadEvent } from './utils/analytics';
+import { Analytics, recordDownloadEvent, refreshRemoteAnalyticsConfig } from './utils/analytics';
 
 type FileMetaMsg = {
   name?: string;
@@ -103,7 +103,7 @@ function extractAuthUserFromUrl(rawUrl: string): number | undefined {
     if (raw == null) return undefined;
 
     const parsed = parseInt(raw, 10);
-    if (Number.isNaN(parsed)) return undefined;
+    if (Number.isNaN(parsed(parsed))) return undefined;
     if (!AUTHUSER_CANDIDATES.includes(parsed)) return undefined;
 
     return parsed;
@@ -117,6 +117,7 @@ function extractAuthUserFromUrl(rawUrl: string): number | undefined {
  * -------------------------------------------*/
 
 const ANALYTICS_FLUSH_ALARM = 'CQD_ANALYTICS_FLUSH';
+const ANALYTICS_CONFIG_ALARM = 'CQD_ANALYTICS_CONFIG';
 let analyticsAlarmInitialized = false;
 
 function ensureAnalyticsAlarm() {
@@ -126,15 +127,25 @@ function ensureAnalyticsAlarm() {
   analyticsAlarmInitialized = true;
 
   try {
-    // Create or update a periodic alarm that fires every 1 minute.
+    // Flush alarm: check queue & attempt flush every 5 minutes.
     chrome.alarms.create(ANALYTICS_FLUSH_ALARM, {
-      periodInMinutes: 1,
+      periodInMinutes: 5,
+    });
+
+    // Config refresh alarm: pull /config every 3 hours.
+    chrome.alarms.create(ANALYTICS_CONFIG_ALARM, {
+      periodInMinutes: 180,
     });
 
     chrome.alarms.onAlarm.addListener((alarm) => {
       if (alarm.name === ANALYTICS_FLUSH_ALARM) {
-        // Fire-and-forget; Analytics has its own opChain.
+        // Fire-and-forget; Analytics has its own opChain & backoff.
         Analytics.flush();
+      } else if (alarm.name === ANALYTICS_CONFIG_ALARM) {
+        // Refresh remote config (batchSize, time windows, remoteEnabled).
+        refreshRemoteAnalyticsConfig().catch((err) => {
+          console.warn('[CQD] Analytics config refresh failed', err);
+        });
       }
     });
   } catch {
@@ -147,6 +158,11 @@ export default defineBackground(() => {
 
   // Ensure MV3-safe periodic flushing of analytics data.
   ensureAnalyticsAlarm();
+
+  // Initial config fetch so dynamic batching is active as early as possible.
+  refreshRemoteAnalyticsConfig().catch((err) => {
+    console.warn('[CQD] Initial analytics config fetch failed', err);
+  });
 
   // --- Icon Logic ---
   if (typeof chrome !== 'undefined' && chrome.tabs && chrome.action) {
