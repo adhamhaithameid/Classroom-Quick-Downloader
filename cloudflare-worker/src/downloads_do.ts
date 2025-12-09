@@ -1,6 +1,13 @@
 // filepath: cloudflare-worker/src/downloads_do.ts
 
-import { Counters, RetryState, StatsResponse, ConfigResponse, QuotaDescriptor, StoredEvent } from "./types";
+import {
+  Counters,
+  RetryState,
+  StatsResponse,
+  ConfigResponse,
+  QuotaDescriptor,
+  StoredEvent,
+} from "./types";
 
 export interface Env {
   ORACLE_ENDPOINT: string;
@@ -42,13 +49,13 @@ const DEFAULT_RETRY_STATE: RetryState = {
 };
 
 // Quota thresholds (approx. Cloudflare daily request quotas)
-const QUOTA_VERY_SOFT_LIMIT   = 30_000;
-const QUOTA_SOFT_LIMIT        = 40_000;
+const QUOTA_VERY_SOFT_LIMIT = 30_000;
+const QUOTA_SOFT_LIMIT = 40_000;
 const QUOTA_VERY_NORMAL_LIMIT = 50_000;
-const QUOTA_NORMAL_LIMIT      = 60_000;
+const QUOTA_NORMAL_LIMIT = 60_000;
 const QUOTA_HARD_NORMAL_LIMIT = 70_000;
-const QUOTA_HARD_LIMIT        = 80_000;
-const QUOTA_VERY_HARD_LIMIT   = 90_000;
+const QUOTA_HARD_LIMIT = 80_000;
+const QUOTA_VERY_HARD_LIMIT = 90_000;
 
 // Storage key
 const STORAGE_KEY = "analytics_state";
@@ -108,7 +115,7 @@ function computeQuotaDescriptor(
   }
 
   if (hardRemoteOff) {
-    // Admin override or future "Danger Area" switch.
+    // Admin override / Danger Area toggle.
     remoteEnabled = false;
     if (requestsToday < QUOTA_VERY_HARD_LIMIT) {
       quotaLevel = "ADMIN_REMOTE_OFF";
@@ -181,10 +188,13 @@ export class DownloadsDurable {
       counters: {
         byStatus: stored.counters?.byStatus ?? { ...DEFAULT_COUNTERS.byStatus },
         byType: stored.counters?.byType ?? { ...DEFAULT_COUNTERS.byType },
-        byBrowser: stored.counters?.byBrowser ?? { ...DEFAULT_COUNTERS.byBrowser },
+        byBrowser:
+          stored.counters?.byBrowser ?? { ...DEFAULT_COUNTERS.byBrowser },
         byOs: stored.counters?.byOs ?? { ...DEFAULT_COUNTERS.byOs },
-        byExtVersion: stored.counters?.byExtVersion ?? { ...DEFAULT_COUNTERS.byExtVersion },
-        byLanguage: stored.counters?.byLanguage ?? { ...DEFAULT_COUNTERS.byLanguage },
+        byExtVersion:
+          stored.counters?.byExtVersion ?? { ...DEFAULT_COUNTERS.byExtVersion },
+        byLanguage:
+          stored.counters?.byLanguage ?? { ...DEFAULT_COUNTERS.byLanguage },
       },
       retryState: stored.retryState ?? { ...DEFAULT_RETRY_STATE },
 
@@ -217,9 +227,16 @@ export class DownloadsDurable {
     if (this.d.reqCountDate !== today) {
       this.d.reqCountDate = today;
       this.d.reqCountToday = 0;
-      // Note: hardRemoteOff is *not* reset here – this is a design choice.
-      // You can decide later if it should reset daily or stay sticky.
+      // hardRemoteOff is NOT reset automatically here; you can
+      // clear it via admin endpoint if you want.
     }
+  }
+
+  private isAuthorizedAdmin(request: Request): boolean {
+    const header = request.headers.get("X-Admin-Secret") || "";
+    const expected = this.env.DO_SHARED_SECRET;
+    if (!expected) return false;
+    return header === expected;
   }
 
   // --------------------------------------------------------
@@ -251,7 +268,37 @@ export class DownloadsDurable {
       return this.handleDebugFlush();
     }
 
+    if (pathname === "/debug/reset" && request.method === "POST") {
+      return this.handleDebugReset();
+    }
+
+    if (pathname === "/admin/force-flush" && request.method === "POST") {
+      return this.handleAdminForceFlush(request);
+    }
+
+    if (pathname === "/admin/cut-power" && request.method === "POST") {
+      return this.handleAdminCutPower(request);
+    }
+
+    if (pathname === "/admin/full-sync" && request.method === "POST") {
+      return this.handleAdminFullSync(request);
+    }
+
     return new Response("Not found (DO)", { status: 404 });
+  }
+
+  // --------------------------------------------------------
+  // Durable Object alarm for Oracle retry backoff
+  // --------------------------------------------------------
+
+  async alarm(): Promise<void> {
+    await this.loaded;
+    if (!this.d.retryState || !this.d.retryState.nextRetryAt) return;
+
+    const now = Date.now();
+    if (now >= this.d.retryState.nextRetryAt) {
+      await this.flushToOracle(false);
+    }
   }
 
   // --------------------------------------------------------
@@ -267,6 +314,7 @@ export class DownloadsDurable {
     try {
       body = await request.json();
     } catch {
+      await this.persist();
       return json({ ok: false, error: "invalid_json" }, { status: 400 });
     }
 
@@ -276,7 +324,7 @@ export class DownloadsDurable {
       return json({ ok: true, accepted: 0 }, { status: 202 });
     }
 
-    // Append to buffer
+    // Append to buffer + update counters
     for (const ev of events) {
       this.d.buffer.push(ev);
       this.d.totalEvents += 1;
@@ -300,7 +348,8 @@ export class DownloadsDurable {
       c.byOs[os] = (c.byOs[os] || 0) + 1;
 
       const extVersion = ev.ext_version || "0.0.0";
-      c.byExtVersion[extVersion] = (c.byExtVersion[extVersion] || 0) + 1;
+      c.byExtVersion[extVersion] =
+        (c.byExtVersion[extVersion] || 0) + 1;
 
       const lang = (ev.language || "unknown").toLowerCase();
       c.byLanguage[lang] = (c.byLanguage[lang] || 0) + 1;
@@ -308,15 +357,22 @@ export class DownloadsDurable {
 
     await this.persist();
 
-    // NOTE: actual flush-to-Oracle logic is assumed to live elsewhere
-    // (e.g., time-based or size-based flush plus retryState updates).
-    // We don't change that behavior in this step.
+    // Size-based flush to Oracle
+    const maxBatch =
+      parseInt(this.env.MAX_BATCH_EVENTS || "500", 10) || 500;
+
+    if (this.d.buffer.length >= maxBatch) {
+      await this.flushToOracle(false);
+    }
 
     return json({ ok: true, accepted: events.length }, { status: 202 });
   }
 
   private async handleStats(): Promise<Response> {
-    const quota = computeQuotaDescriptor(this.d.reqCountToday, this.d.hardRemoteOff);
+    const quota = computeQuotaDescriptor(
+      this.d.reqCountToday,
+      this.d.hardRemoteOff,
+    );
 
     const payload: StatsResponse = {
       ok: true,
@@ -338,7 +394,10 @@ export class DownloadsDurable {
    * adapt batching / flush behavior based on current quota state.
    */
   private async handleConfig(): Promise<Response> {
-    const quota = computeQuotaDescriptor(this.d.reqCountToday, this.d.hardRemoteOff);
+    const quota = computeQuotaDescriptor(
+      this.d.reqCountToday,
+      this.d.hardRemoteOff,
+    );
 
     const config: ConfigResponse = {
       ok: true,
@@ -365,15 +424,211 @@ export class DownloadsDurable {
   }
 
   private async handleDebugFlush(): Promise<Response> {
-    // This just exposes current buffer size; real flush-to-Oracle
-    // behavior is assumed to be implemented already.
     const before = this.d.buffer.length;
-    // If you have actual flush logic, you would call it here.
-    // For now we just report.
     return json({
       ok: true,
       message: "debug flush not implemented in this step",
       bufferSize: before,
     });
+  }
+
+  private async handleDebugReset(): Promise<Response> {
+    const today = todayUtcDate();
+    this.data = {
+      totalEvents: 0,
+      totalDownloads: 0,
+      pendingEvents: 0,
+      lastEventAt: null,
+      lastFlushAt: null,
+      counters: { ...DEFAULT_COUNTERS },
+      retryState: { ...DEFAULT_RETRY_STATE },
+      reqCountToday: 0,
+      reqCountDate: today,
+      hardRemoteOff: false,
+      buffer: [],
+    };
+    await this.state.storage.delete(STORAGE_KEY);
+    await this.state.storage.setAlarm(0);
+    await this.persist();
+    return json({ ok: true, message: "state reset" });
+  }
+
+  private async handleAdminForceFlush(request: Request): Promise<Response> {
+    if (!this.isAuthorizedAdmin(request)) {
+      return json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+
+    const result = await this.flushToOracle(true);
+    if (!result.ok) {
+      return json(
+        {
+          ok: false,
+          error: result.error || "flush_failed",
+          remaining: this.d.buffer.length,
+        },
+        { status: 500 },
+      );
+    }
+
+    return json({
+      ok: true,
+      sent: result.sent,
+      remaining: this.d.buffer.length,
+    });
+  }
+
+  private async handleAdminCutPower(request: Request): Promise<Response> {
+    if (!this.isAuthorizedAdmin(request)) {
+      return json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+
+    this.d.hardRemoteOff = true;
+    await this.persist();
+
+    const quota = computeQuotaDescriptor(
+      this.d.reqCountToday,
+      this.d.hardRemoteOff,
+    );
+
+    return json({
+      ok: true,
+      remoteEnabled: quota.remoteEnabled,
+      quotaLevel: quota.quotaLevel,
+      modeLabel: quota.modeLabel,
+    });
+  }
+
+  private async handleAdminFullSync(request: Request): Promise<Response> {
+    if (!this.isAuthorizedAdmin(request)) {
+      return json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+
+    let iterations = 0;
+    let lastError: string | undefined;
+
+    while (this.d.buffer.length > 0 && iterations < 20) {
+      const result = await this.flushToOracle(true);
+      if (!result.ok) {
+        lastError = result.error;
+        break;
+      }
+      iterations++;
+    }
+
+    const ok = this.d.buffer.length === 0 && !lastError;
+
+    return json({
+      ok,
+      remaining: this.d.buffer.length,
+      iterations,
+      error: lastError,
+    });
+  }
+
+  // --------------------------------------------------------
+  // Oracle flush + retry/backoff
+  // --------------------------------------------------------
+
+  private async scheduleRetry(): Promise<void> {
+    if (!this.d.retryState) {
+      this.d.retryState = { ...DEFAULT_RETRY_STATE };
+    }
+
+    const rs = this.d.retryState;
+    const backoffStepsSeconds = [
+      60, // 1 min
+      300, // 5 min
+      900, // 15 min
+      1800, // 30 min
+      3600, // 1 hour
+      21_600, // 6 hours
+      43_200, // 12 hours
+      86_400, // 1 day
+    ];
+    const idx = Math.min(
+      rs.consecutiveFailures,
+      backoffStepsSeconds.length - 1,
+    );
+    const backoffSec = backoffStepsSeconds[idx];
+    const nextMs = Date.now() + backoffSec * 1000;
+
+    rs.nextRetryAt = nextMs;
+    await this.state.storage.setAlarm(nextMs);
+  }
+
+  private async flushToOracle(
+    force: boolean,
+  ): Promise<{ ok: boolean; sent: number; error?: string }> {
+    const now = Date.now();
+
+    if (!this.d.buffer.length) {
+      // Nothing to flush; clear retry state + alarm.
+      this.d.lastFlushAt = now;
+      this.d.retryState = { ...DEFAULT_RETRY_STATE };
+      await this.state.storage.setAlarm(0);
+      await this.persist();
+      return { ok: true, sent: 0 };
+    }
+
+    if (!this.env.ORACLE_ENDPOINT || !this.env.DO_SHARED_SECRET) {
+      const msg = "ORACLE_ENDPOINT or DO_SHARED_SECRET not configured";
+      if (!this.d.retryState) this.d.retryState = { ...DEFAULT_RETRY_STATE };
+      this.d.retryState.lastError = msg;
+      this.d.retryState.lastFlushAttemptAt = now;
+      this.d.retryState.consecutiveFailures += 1;
+      await this.scheduleRetry();
+      await this.persist();
+      return { ok: false, sent: 0, error: msg };
+    }
+
+    const maxBatchEnv = parseInt(this.env.MAX_BATCH_EVENTS || "500", 10) || 500;
+    const maxBatch = force ? this.d.buffer.length : maxBatchEnv;
+
+    const batch = this.d.buffer.slice(0, maxBatch);
+
+    if (!this.d.retryState) this.d.retryState = { ...DEFAULT_RETRY_STATE };
+    this.d.retryState.lastFlushAttemptAt = now;
+
+    try {
+      const res = await fetch(this.env.ORACLE_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-DO-SECRET": this.env.DO_SHARED_SECRET,
+        },
+        body: JSON.stringify({ events: batch }),
+      });
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        const msg = `Oracle responded ${res.status} ${res.statusText} ${text}`;
+        this.d.retryState.lastError = msg;
+        this.d.retryState.consecutiveFailures += 1;
+        await this.scheduleRetry();
+        await this.persist();
+        return { ok: false, sent: 0, error: msg };
+      }
+
+      // Success: drop the sent events
+      this.d.buffer = this.d.buffer.slice(batch.length);
+      this.d.pendingEvents = Math.max(
+        0,
+        this.d.pendingEvents - batch.length,
+      );
+      this.d.lastFlushAt = now;
+      this.d.retryState = { ...DEFAULT_RETRY_STATE };
+      await this.state.storage.setAlarm(0);
+      await this.persist();
+
+      return { ok: true, sent: batch.length };
+    } catch (err: any) {
+      const msg = `Oracle flush error: ${String(err)}`;
+      if (!this.d.retryState) this.d.retryState = { ...DEFAULT_RETRY_STATE };
+      this.d.retryState.lastError = msg;
+      this.d.retryState.consecutiveFailures += 1;
+      await this.scheduleRetry();
+      await this.persist();
+      return { ok: false, sent: 0, error: msg };
+    }
   }
 }

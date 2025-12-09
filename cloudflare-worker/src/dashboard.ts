@@ -398,6 +398,96 @@ export function renderDashboard(stats: StatsResponse): string {
       100% { color: var(--text-soft); }
     }
 
+    .danger-zone {
+      margin-top: 18px;
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(239,68,68,0.6);
+      background: radial-gradient(circle at top left, rgba(127,29,29,0.45), rgba(15,23,42,0.95));
+    }
+    .danger-zone-title {
+      margin: 0 0 4px;
+      font-size: 0.88rem;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      color: #fecaca;
+    }
+    .danger-zone-sub {
+      margin: 0 0 8px;
+      font-size: 0.75rem;
+      color: #fecaca;
+      opacity: 0.9;
+    }
+    .danger-zone-row {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+    .danger-zone-input-row {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .danger-zone-input-row input {
+      flex: 1;
+      min-width: 0;
+      padding: 6px 8px;
+      border-radius: 8px;
+      border: 1px solid rgba(248,250,252,0.4);
+      background: rgba(15,23,42,0.9);
+      color: #f9fafb;
+      font-size: 0.8rem;
+    }
+    .danger-zone-input-row button {
+      padding: 6px 10px;
+      font-size: 0.75rem;
+      border-radius: 8px;
+      border: 1px solid rgba(148,163,184,0.7);
+      background: transparent;
+      color: #e5e7eb;
+      cursor: pointer;
+    }
+    .danger-zone-input-row button:hover {
+      border-color: #e5e7eb;
+    }
+    .danger-zone-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .danger-btn {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      font-size: 0.78rem;
+      border-radius: 8px;
+      border: 1px solid rgba(239,68,68,0.7);
+      background: rgba(127,29,29,0.35);
+      color: #fee2e2;
+      cursor: pointer;
+    }
+    .danger-btn span {
+      font-weight: 500;
+    }
+    .danger-btn small {
+      font-size: 0.7rem;
+      opacity: 0.85;
+    }
+    .danger-btn:hover {
+      background: rgba(127,29,29,0.5);
+    }
+
+    .danger-zone-note {
+      font-size: 0.7rem;
+      color: #fecaca;
+      opacity: 0.85;
+      margin-top: 4px;
+    }
+
     @media (max-width: 900px) {
       main {
         grid-template-columns: minmax(0, 1fr);
@@ -527,8 +617,14 @@ export function renderDashboard(stats: StatsResponse): string {
               </div>
               <div class="remote-flag">
                 Analytics:
-                <span class="${remoteEnabled ? "remote-on" : "remote-off"}">
-                  ${remoteEnabled ? "ON (extensions may send)" : "OFF (store local only)"}
+                <span class="${
+                  remoteEnabled ? "remote-on" : "remote-off"
+                }">
+                  ${
+                    remoteEnabled
+                      ? "ON (extensions may send)"
+                      : "OFF (store local only)"
+                  }
                 </span>
               </div>
             </div>
@@ -543,6 +639,43 @@ export function renderDashboard(stats: StatsResponse): string {
 
           <div class="last-refreshed" id="last-refreshed">
             Last refreshed: <span id="last-refreshed-ts">${new Date().toLocaleTimeString()}</span>
+          </div>
+
+          <div class="danger-zone">
+            <h3 class="danger-zone-title">Danger Area</h3>
+            <p class="danger-zone-sub">
+              Admin-only controls. Be careful – these affect all users.
+            </p>
+            <div class="danger-zone-row">
+              <div class="danger-zone-input-row">
+                <input
+                  id="admin-secret-input"
+                  type="password"
+                  placeholder="Admin secret (DO_SHARED_SECRET)…"
+                  autocomplete="off"
+                />
+                <button id="admin-secret-save">Save</button>
+                <button id="admin-secret-clear">Clear</button>
+              </div>
+              <div class="danger-zone-note">
+                Stored only in <code>localStorage</code> on this browser.
+                DO validates it against <code>X-Admin-Secret</code>.
+              </div>
+            </div>
+            <div class="danger-zone-buttons">
+              <button class="danger-btn" id="btn-force-flush">
+                <span>Flush buffer to Oracle now</span>
+                <small>POST /admin/force-flush</small>
+              </button>
+              <button class="danger-btn" id="btn-cut-power">
+                <span>Cut power of Cloudflare analytics</span>
+                <small>POST /admin/cut-power (remoteEnabled=false)</small>
+              </button>
+              <button class="danger-btn" id="btn-full-sync">
+                <span>Full sync to Oracle</span>
+                <small>POST /admin/full-sync (flush until empty)</small>
+              </button>
+            </div>
           </div>
         </div>
       </section>
@@ -559,10 +692,7 @@ export function renderDashboard(stats: StatsResponse): string {
         try {
           const res = await fetch("/stats", { cache: "no-store" });
           if (!res.ok) return;
-          const data = await res.json();
-
-          // naive reload: for now just reload the page with new HTML
-          // (keeps implementation simple)
+          // simple: just reload to get updated HTML from Worker
           window.location.reload();
         } catch (e) {
           console.error("Failed to refresh stats", e);
@@ -580,6 +710,108 @@ export function renderDashboard(stats: StatsResponse): string {
         lastRef.classList.add("updated");
         lastRefTs.textContent = new Date().toLocaleTimeString();
         setTimeout(() => lastRef.classList.remove("updated"), 900);
+      }
+
+      // ------------------------------
+      // Danger Area admin wiring
+      // ------------------------------
+      const SECRET_KEY = "cqd_admin_secret";
+
+      const secretInput = document.getElementById("admin-secret-input");
+      const secretSave = document.getElementById("admin-secret-save");
+      const secretClear = document.getElementById("admin-secret-clear");
+
+      const btnForceFlush = document.getElementById("btn-force-flush");
+      const btnCutPower = document.getElementById("btn-cut-power");
+      const btnFullSync = document.getElementById("btn-full-sync");
+
+      function getSecret() {
+        try {
+          return localStorage.getItem(SECRET_KEY) || "";
+        } catch {
+          return "";
+        }
+      }
+
+      function setSecret(value) {
+        try {
+          if (!value) {
+            localStorage.removeItem(SECRET_KEY);
+          } else {
+            localStorage.setItem(SECRET_KEY, value);
+          }
+        } catch (e) {
+          console.error("Failed to persist admin secret", e);
+        }
+      }
+
+      // Initialize input from localStorage
+      if (secretInput) {
+        const existing = getSecret();
+        if (existing) secretInput.value = existing;
+      }
+
+      if (secretSave && secretInput) {
+        secretSave.addEventListener("click", () => {
+          const v = secretInput.value.trim();
+          setSecret(v);
+          alert("Admin secret saved locally.");
+        });
+      }
+
+      if (secretClear && secretInput) {
+        secretClear.addEventListener("click", () => {
+          secretInput.value = "";
+          setSecret("");
+          alert("Admin secret cleared.");
+        });
+      }
+
+      async function adminCall(path, label) {
+        const secret = getSecret();
+        if (!secret) {
+          alert("Set admin secret first.");
+          return;
+        }
+        try {
+          const res = await fetch(path, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Admin-Secret": secret,
+            },
+          });
+          const body = await res.json().catch(() => ({}));
+          if (!res.ok || body.ok === false) {
+            console.error("Admin call failed:", path, body);
+            alert(label + " failed: " + (body.error || res.statusText));
+            return;
+          }
+          alert(label + " OK.");
+          // Refresh view to reflect new state
+          window.location.reload();
+        } catch (e) {
+          console.error("Admin call error:", path, e);
+          alert(label + " error – see console.");
+        }
+      }
+
+      if (btnForceFlush) {
+        btnForceFlush.addEventListener("click", () => {
+          adminCall("/admin/force-flush", "Force flush");
+        });
+      }
+
+      if (btnCutPower) {
+        btnCutPower.addEventListener("click", () => {
+          adminCall("/admin/cut-power", "Cut power");
+        });
+      }
+
+      if (btnFullSync) {
+        btnFullSync.addEventListener("click", () => {
+          adminCall("/admin/full-sync", "Full sync");
+        });
       }
     })();
   </script>
