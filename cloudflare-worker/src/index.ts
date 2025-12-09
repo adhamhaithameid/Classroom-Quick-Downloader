@@ -1,7 +1,7 @@
 // filepath: cloudflare-worker/src/index.ts
-import type { Env } from "./types";
+import type { Env, StatsResponse } from "./types";
 import { DownloadsDurable } from "./downloads_do";
-import { DASHBOARD_HTML } from "./dashboard";
+import { renderDashboard, renderLoginPage } from "./dashboard";
 
 function makeCorsPreflightResponse(): Response {
   return new Response(null, {
@@ -38,10 +38,44 @@ export default {
     };
 
     // -----------------------------------------------------------------------
-    // HTML Dashboard at "/"
+    // HTML Dashboard login + render
     // -----------------------------------------------------------------------
-    if (url.pathname === "/" && request.method === "GET") {
-      return new Response(DASHBOARD_HTML, {
+
+    // Show login form
+    if (pathname === "/" && request.method === "GET") {
+      return new Response(renderLoginPage(), {
+        status: 200,
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+      });
+    }
+
+    // Handle login submission
+    if (pathname === "/" && request.method === "POST") {
+      const formData = await request.formData();
+      const password = formData.get("password");
+
+      const secret = env.DO_SHARED_SECRET || "";
+
+      if (typeof password !== "string" || !password || password !== secret) {
+        return new Response(renderLoginPage("Invalid password. Try again."), {
+          status: 401,
+          headers: { "Content-Type": "text/html; charset=utf-8" },
+        });
+      }
+
+      // Auth OK → fetch stats from DO and render dashboard HTML
+      const stub = getStub();
+      const statsRes = await stub.fetch("https://do/stats");
+      if (!statsRes.ok) {
+        return new Response("Failed to load stats from Durable Object", {
+          status: 500,
+        });
+      }
+
+      const stats = (await statsRes.json()) as StatsResponse;
+      const html = renderDashboard(stats);
+
+      return new Response(html, {
         status: 200,
         headers: { "Content-Type": "text/html; charset=utf-8" },
       });

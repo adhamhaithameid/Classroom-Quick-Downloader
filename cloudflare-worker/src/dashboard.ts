@@ -124,6 +124,254 @@ function quotaToStateTag(quota?: QuotaDescriptor) {
   };
 }
 
+/**
+ * Login page – centered, rounded card with blurred background.
+ * Uses the same dark theme as the dashboard.
+ */
+export function renderLoginPage(errorMessage?: string): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>CQD Analytics – Admin Login</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #050816;
+      --bg-elevated: #111827;
+      --border-subtle: #1f2937;
+      --accent: #3b82f6;
+      --accent-soft: rgba(59,130,246,0.15);
+      --danger: #ef4444;
+      --danger-soft: rgba(239,68,68,0.12);
+      --text-main: #e5e7eb;
+      --text-muted: #9ca3af;
+      --text-soft: #6b7280;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      min-height: 100vh;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+      background: radial-gradient(circle at top, #111827 0, #020617 60%, #020617 100%);
+      color: var(--text-main);
+    }
+
+    .login-root {
+      position: relative;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    .login-overlay {
+      position: fixed;
+      inset: 0;
+      backdrop-filter: blur(18px) saturate(1.25);
+      -webkit-backdrop-filter: blur(18px) saturate(1.25);
+      background: radial-gradient(circle at top, rgba(15,23,42,0.85), rgba(2,6,23,0.96));
+      z-index: 0;
+    }
+
+    .login-card {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 380px;
+      border-radius: 20px;
+      padding: 24px 22px 20px;
+      background: rgba(15,23,42,0.92);
+      border: 1px solid rgba(148,163,184,0.45);
+      box-shadow: 0 24px 60px rgba(0,0,0,0.75);
+    }
+
+    .login-title {
+      font-size: 1.35rem;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .login-subtitle {
+      font-size: 0.85rem;
+      color: var(--text-soft);
+      margin-bottom: 16px;
+    }
+
+    .login-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(148,163,184,0.5);
+      background: radial-gradient(circle at top left, rgba(59,130,246,0.12), rgba(15,23,42,0.9));
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+    }
+
+    .login-badge-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: var(--accent);
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-bottom: 14px;
+    }
+
+    .field label {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-soft);
+    }
+
+    .field input[type="password"] {
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(148,163,184,0.6);
+      background: rgba(15,23,42,0.95);
+      color: #f9fafb;
+      font-size: 0.9rem;
+      outline: none;
+    }
+
+    .field input[type="password"]:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px rgba(59,130,246,0.45);
+    }
+
+    .login-error {
+      margin-bottom: 10px;
+      padding: 6px 8px;
+      border-radius: 10px;
+      font-size: 0.78rem;
+      color: #fecaca;
+      background: rgba(248,113,113,0.12);
+      border: 1px solid rgba(248,113,113,0.6);
+    }
+
+    .login-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 8px;
+      gap: 8px;
+    }
+
+    .login-hint {
+      font-size: 0.75rem;
+      color: var(--text-soft);
+    }
+
+    .login-hint code {
+      font-size: 0.72rem;
+      padding: 2px 4px;
+      border-radius: 4px;
+      background: rgba(15,23,42,0.9);
+      border: 1px solid rgba(31,41,55,0.9);
+    }
+
+    .login-button {
+      padding: 8px 14px;
+      border-radius: 999px;
+      border: none;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 500;
+      background: linear-gradient(135deg, #3b82f6, #6366f1);
+      color: #f9fafb;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 10px 30px rgba(37,99,235,0.6);
+    }
+
+    .login-button:hover {
+      filter: brightness(1.05);
+      transform: translateY(-0.5px);
+    }
+
+    .login-button:active {
+      transform: translateY(0);
+      box-shadow: 0 6px 22px rgba(37,99,235,0.5);
+    }
+
+    @media (max-width: 480px) {
+      .login-card {
+        padding: 20px 16px 18px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="login-root">
+    <div class="login-overlay"></div>
+    <form class="login-card" method="POST" action="/">
+      <div class="login-badge">
+        <span class="login-badge-dot"></span>
+        <span>CQD Analytics Admin</span>
+      </div>
+      <h1 class="login-title">Enter admin password</h1>
+      <p class="login-subtitle">
+        This unlocks the analytics dashboard and the Danger Area controls.
+      </p>
+
+      <div class="field">
+        <label for="password-input">Admin password</label>
+        <input
+          id="password-input"
+          name="password"
+          type="password"
+          autocomplete="off"
+          autofocus
+          required
+        />
+      </div>
+
+      ${
+        errorMessage
+          ? `<div class="login-error">${errorMessage}</div>`
+          : ""
+      }
+
+      <div class="login-footer">
+        <div class="login-hint">
+          Password is never stored in the browser. It is only checked against
+          <code>DO_SHARED_SECRET</code> in the Worker env.
+        </div>
+        <button class="login-button" type="submit">
+          <span>Unlock</span>
+          <span>→</span>
+        </button>
+      </div>
+    </form>
+  </div>
+  <script>
+    (function () {
+      const input = document.getElementById("password-input");
+      if (input) input.focus();
+    })();
+  </script>
+</body>
+</html>`;
+}
+
 export function renderDashboard(stats: StatsResponse): string {
   const quota = stats.quota;
   const stateTag = quotaToStateTag(quota);
@@ -651,15 +899,17 @@ export function renderDashboard(stats: StatsResponse): string {
                 <input
                   id="admin-secret-input"
                   type="password"
-                  placeholder="Admin secret (DO_SHARED_SECRET)…"
+                  placeholder="Optional: store admin secret locally…"
                   autocomplete="off"
                 />
                 <button id="admin-secret-save">Save</button>
                 <button id="admin-secret-clear">Clear</button>
               </div>
               <div class="danger-zone-note">
-                Stored only in <code>localStorage</code> on this browser.
-                DO validates it against <code>X-Admin-Secret</code>.
+                If you don't save it, you'll be asked for the admin password
+                every time you use the Danger Area. When present, it is stored
+                only in <code>localStorage</code> on this browser and sent as
+                <code>X-Admin-Secret</code>.
               </div>
             </div>
             <div class="danger-zone-buttons">
@@ -692,7 +942,7 @@ export function renderDashboard(stats: StatsResponse): string {
         try {
           const res = await fetch("/stats", { cache: "no-store" });
           if (!res.ok) return;
-          // simple: just reload to get updated HTML from Worker
+          // For now: just reload the page (browser may ask to re-submit form).
           window.location.reload();
         } catch (e) {
           console.error("Failed to refresh stats", e);
@@ -768,10 +1018,13 @@ export function renderDashboard(stats: StatsResponse): string {
       }
 
       async function adminCall(path, label) {
-        const secret = getSecret();
+        let secret = getSecret();
         if (!secret) {
-          alert("Set admin secret first.");
-          return;
+          secret = window.prompt("Enter admin password:");
+          if (!secret) {
+            alert("Admin password is required for this action.");
+            return;
+          }
         }
         try {
           const res = await fetch(path, {
