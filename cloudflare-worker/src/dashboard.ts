@@ -1,929 +1,588 @@
-// cloudflare-worker/src/dashboard.ts
+// filepath: cloudflare-worker/src/dashboard.ts
 
-export const DASHBOARD_HTML = `<!doctype html>
+import type { StatsResponse, QuotaDescriptor } from "./types";
+
+function formatTs(ts: number | null): string {
+  if (!ts) return "—";
+  const d = new Date(ts);
+  return d.toLocaleString("en-US", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
+
+function quotaToStateTag(quota?: QuotaDescriptor) {
+  if (!quota) {
+    return {
+      label: "unknown",
+      className: "state-unknown",
+      description: "No quota information available.",
+    };
+  }
+
+  const n = quota.requestsToday;
+
+  if (n <= 1_000) {
+    return {
+      label: "sleeping",
+      className: "state-sleeping",
+      description: "Very low traffic today.",
+    };
+  }
+  if (n <= 5_000) {
+    return {
+      label: "super chill",
+      className: "state-super-chill",
+      description: "Extension is barely touching the Worker.",
+    };
+  }
+  if (n <= 10_000) {
+    return {
+      label: "chill",
+      className: "state-chill",
+      description: "Plenty of headroom.",
+    };
+  }
+  if (n <= 20_000) {
+    return {
+      label: "easy",
+      className: "state-easy",
+      description: "Still well below limits.",
+    };
+  }
+  if (n <= 30_000) {
+    return {
+      label: "kinda easy",
+      className: "state-kinda-easy",
+      description: "Load is fine. Batch size may start increasing soon.",
+    };
+  }
+  if (n <= 40_000) {
+    return {
+      label: "normal",
+      className: "state-normal",
+      description: "Normal daily traffic.",
+    };
+  }
+  if (n <= 50_000) {
+    return {
+      label: "slightly busy",
+      className: "state-slightly-busy",
+      description: "Worker is warming up.",
+    };
+  }
+  if (n <= 60_000) {
+    return {
+      label: "kinda busy",
+      className: "state-kinda-busy",
+      description: "Closer to quota, batching should be stronger.",
+    };
+  }
+  if (n <= 70_000) {
+    return {
+      label: "busy",
+      className: "state-busy",
+      description: "We are in the hard-normal zone.",
+    };
+  }
+  if (n <= 80_000) {
+    return {
+      label: "very busy",
+      className: "state-very-busy",
+      description: "High traffic. Worker is protecting quota.",
+    };
+  }
+  if (n <= 90_000) {
+    return {
+      label: "super busy",
+      className: "state-super-busy",
+      description: "Approaching Cloudflare free tier limits.",
+    };
+  }
+  if (n <= 95_000) {
+    return {
+      label: "emergency",
+      className: "state-emergency",
+      description: "Emergency mode. Batch sizes should be huge.",
+    };
+  }
+  if (n <= 99_000) {
+    return {
+      label: "critical",
+      className: "state-critical",
+      description: "We are basically at the limit. Prepare cut power.",
+    };
+  }
+  return {
+    label: "cut the power rn",
+    className: "state-cut-power",
+    description: "Remote analytics should be OFF; everything local.",
+  };
+}
+
+export function renderDashboard(stats: StatsResponse): string {
+  const quota = stats.quota;
+  const stateTag = quotaToStateTag(quota);
+
+  const requestsToday = quota?.requestsToday ?? 0;
+  const remoteEnabled = quota?.remoteEnabled ?? true;
+  const quotaLevel = quota?.quotaLevel ?? "UNKNOWN";
+  const modeLabel = quota?.modeLabel ?? "unknown";
+  const batchSize = quota?.batchSizeSuggestion ?? 50;
+
+  const lastEventAt = formatTs(stats.lastEventAt);
+  const lastFlushAt = formatTs(stats.lastFlushAt);
+
+  const byTypeRows = Object.entries(stats.counters.byType || {})
+    .map(([type, count]) => `<tr><td>${type}</td><td>${count}</td></tr>`)
+    .join("");
+
+  const byStatusRows = Object.entries(stats.counters.byStatus || {})
+    .map(([status, count]) => `<tr><td>${status}</td><td>${count}</td></tr>`)
+    .join("");
+
+  const byBrowserRows = Object.entries(stats.counters.byBrowser || {})
+    .map(([br, count]) => `<tr><td>${br}</td><td>${count}</td></tr>`)
+    .join("");
+
+  const byOsRows = Object.entries(stats.counters.byOs || {})
+    .map(([os, count]) => `<tr><td>${os}</td><td>${count}</td></tr>`)
+    .join("");
+
+  const byLangRows = Object.entries(stats.counters.byLanguage || {})
+    .map(([lang, count]) => `<tr><td>${lang}</td><td>${count}</td></tr>`)
+    .join("");
+
+  return `<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <title>CQD Analytics – Downloads Stats</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <style>
-      :root {
-        color-scheme: dark light;
-        --bg: #020617;
-        --bg-elevated: #020617;
-        --border-subtle: #1e293b;
-        --border-strong: #38bdf8;
-        --accent: #38bdf8;
-        --accent-soft: rgba(56, 189, 248, 0.12);
-        --text-main: #e5e7eb;
-        --text-muted: #9ca3af;
-        --danger: #f97373;
-        --success: #4ade80;
-        --warning: #facc15;
+<head>
+  <meta charset="UTF-8" />
+  <title>CQD Analytics – Worker & DO Dashboard</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #050816;
+      --bg-elevated: #111827;
+      --border-subtle: #1f2937;
+      --accent: #3b82f6;
+      --accent-soft: rgba(59,130,246,0.15);
+      --danger: #ef4444;
+      --danger-soft: rgba(239,68,68,0.12);
+      --text-main: #e5e7eb;
+      --text-muted: #9ca3af;
+      --text-soft: #6b7280;
+      --success: #22c55e;
+      --warning: #f97316;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 24px;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+      background: radial-gradient(circle at top, #111827 0, #020617 60%, #020617 100%);
+      color: var(--text-main);
+    }
+
+    .page {
+      max-width: 1040px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .title-block h1 {
+      margin: 0;
+      font-size: 1.6rem;
+      letter-spacing: 0.02em;
+    }
+    .title-block p {
+      margin: 4px 0 0;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+
+    .badge-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      border: 1px solid var(--border-subtle);
+      background: rgba(15,23,42,0.8);
+    }
+
+    .pill-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: var(--accent);
+    }
+
+    .pill-label {
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    button.refresh-btn {
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--border-subtle);
+      background: rgba(15,23,42,0.9);
+      color: var(--text-main);
+      font-size: 0.8rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    button.refresh-btn:hover {
+      border-color: var(--accent);
+      background: rgba(15,23,42,1);
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: minmax(0, 1.8fr) minmax(0, 1.2fr);
+      gap: 16px;
+      align-items: flex-start;
+    }
+
+    .card {
+      background: linear-gradient(135deg, rgba(15,23,42,0.98), rgba(8,16,32,0.98));
+      border-radius: 18px;
+      border: 1px solid rgba(148,163,184,0.18);
+      padding: 16px 18px;
+      box-shadow: 0 18px 40px rgba(0,0,0,0.55);
+    }
+    .card h2 {
+      margin: 0 0 8px;
+      font-size: 1rem;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+    .card-subtitle {
+      margin: 0 0 12px;
+      font-size: 0.8rem;
+      color: var(--text-soft);
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .metric {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .metric-label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-soft);
+    }
+    .metric-value {
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+    .metric-sub {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.78rem;
+    }
+    th, td {
+      padding: 4px 0;
+      text-align: left;
+    }
+    th {
+      font-weight: 600;
+      color: var(--text-soft);
+    }
+    td {
+      color: var(--text-main);
+    }
+    tr + tr td {
+      border-top: 1px dashed rgba(148,163,184,0.18);
+    }
+
+    .quota-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 600;
+    }
+    .quota-tag span {
+      white-space: nowrap;
+    }
+
+    .state-sleeping      { background: rgba(148,163,184,0.10); color: #d1d5db; border: 1px solid rgba(148,163,184,0.5); }
+    .state-super-chill   { background: rgba(34,197,94,0.12);  color: #bbf7d0; border: 1px solid rgba(34,197,94,0.7); }
+    .state-chill         { background: rgba(52,211,153,0.16); color: #a7f3d0; border: 1px solid rgba(52,211,153,0.7); }
+    .state-easy          { background: rgba(59,130,246,0.15); color: #bfdbfe; border: 1px solid rgba(59,130,246,0.7); }
+    .state-kinda-easy    { background: rgba(59,130,246,0.18); color: #bfdbfe; border: 1px solid rgba(59,130,246,0.8); }
+    .state-normal        { background: rgba(96,165,250,0.18); color: #dbeafe; border: 1px solid rgba(59,130,246,0.9); }
+    .state-slightly-busy { background: rgba(234,179,8,0.16);  color: #fef9c3; border: 1px solid rgba(234,179,8,0.9); }
+    .state-kinda-busy    { background: rgba(245,158,11,0.16); color: #ffedd5; border: 1px solid rgba(245,158,11,0.9); }
+    .state-busy          { background: rgba(249,115,22,0.18); color: #fed7aa; border: 1px solid rgba(249,115,22,0.9); }
+    .state-very-busy     { background: rgba(239,68,68,0.18);  color: #fee2e2; border: 1px solid rgba(239,68,68,0.9); }
+    .state-super-busy    { background: rgba(185,28,28,0.22);  color: #fee2e2; border: 1px solid rgba(239,68,68,1); }
+    .state-emergency     { background: rgba(185,28,28,0.35);  color: #fecaca; border: 1px solid #ef4444; }
+    .state-critical      { background: rgba(127,29,29,0.5);   color: #fecaca; border: 1px solid #f97316; }
+    .state-cut-power     { background: rgba(15,23,42,0.8);    color: #fca5a5; border: 1px solid #ef4444; box-shadow: 0 0 0 1px rgba(239,68,68,0.7); }
+    .state-unknown       { background: rgba(31,41,55,0.8);    color: #e5e7eb; border: 1px dashed rgba(148,163,184,0.6); }
+
+    .remote-flag {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+    .remote-flag span {
+      font-weight: 600;
+    }
+    .remote-on {
+      color: var(--success);
+    }
+    .remote-off {
+      color: var(--danger);
+    }
+
+    .last-refreshed {
+      font-size: 0.75rem;
+      color: var(--text-soft);
+    }
+    .last-refreshed.updated {
+      animation: pulse 0.8s ease-out;
+    }
+
+    @keyframes pulse {
+      0% { color: #22c55e; }
+      100% { color: var(--text-soft); }
+    }
+
+    @media (max-width: 900px) {
+      main {
+        grid-template-columns: minmax(0, 1fr);
       }
-
-      * {
-        box-sizing: border-box;
-      }
-
-      body {
-        margin: 0;
-        min-height: 100vh;
-        font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
-          "Segoe UI", sans-serif;
-        background: radial-gradient(circle at top, #0f172a 0, #020617 60%);
-        color: var(--text-main);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 24px;
-      }
-
-      .shell {
-        width: 100%;
-        max-width: 1300px;
-        background: radial-gradient(circle at top left, #0f172a 0, #020617 60%);
-        border-radius: 24px;
-        border: 1px solid var(--border-subtle);
-        padding: 24px 26px 26px;
-        box-shadow: 0 24px 80px rgba(15, 23, 42, 0.9);
-      }
-
-      header {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        gap: 16px;
-      }
-
-      h1 {
-        font-size: 22px;
-        margin: 0 0 4px;
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-      }
-
-      .badge-primary {
-        font-size: 11px;
-        padding: 2px 8px;
-        border-radius: 999px;
-        background: var(--accent-soft);
-        border: 1px solid rgba(56, 189, 248, 0.6);
-        color: var(--accent);
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-      }
-
-      .subtitle {
-        margin: 0;
-        font-size: 13px;
-        color: var(--text-muted);
-      }
-
-      .meta {
-        text-align: right;
-        font-size: 12px;
-        color: var(--text-muted);
-      }
-
-      .meta b {
-        color: var(--text-main);
-      }
-
-      .grid {
-        display: grid;
-        gap: 12px;
-      }
-
-      .grid-cols-4 {
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-      }
-
-      .grid-cols-3 {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-      }
-
-      .grid-cols-2 {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
-
-      @media (max-width: 900px) {
-        .grid-cols-4 {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-        .grid-cols-3 {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-      }
-
-      @media (max-width: 640px) {
-        body {
-          padding: 12px;
-        }
-        .shell {
-          border-radius: 18px;
-          padding: 18px;
-        }
-        header {
-          flex-direction: column;
-          align-items: flex-start;
-        }
-        .grid-cols-4,
-        .grid-cols-3,
-        .grid-cols-2 {
-          grid-template-columns: minmax(0, 1fr);
-        }
-      }
-
-      .section {
-        margin-top: 22px;
-        padding-top: 16px;
-        border-top: 1px dashed rgba(148, 163, 184, 0.5);
-      }
-
-      .section:first-of-type {
-        margin-top: 16px;
-        border-top: none;
-        padding-top: 0;
-      }
-
-      .card {
-        background: linear-gradient(145deg, #020617 0, #020617 70%);
-        border-radius: 18px;
-        border: 1px solid rgba(148, 163, 184, 0.18);
-        padding: 10px 11px;
-      }
-
-      .card-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 6px;
-      }
-
-      .card-title {
-        font-size: 12px;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        color: var(--text-muted);
-      }
-
-      .card-chip {
-        font-size: 11px;
-        padding: 2px 6px;
-        border-radius: 999px;
-        border: 1px solid rgba(148, 163, 184, 0.3);
-        color: var(--text-muted);
-      }
-
-      .card-value {
-        font-size: 20px;
-        font-weight: 600;
-        font-variant-numeric: tabular-nums;
-        transition: color 0.25s ease;
-      }
-
-      .card-value.success {
-        color: var(--success);
-      }
-
-      .card-value.danger {
-        color: var(--danger);
-      }
-
-      .card-sub {
-        font-size: 12px;
-        color: var(--text-muted);
-        margin-top: 2px;
-      }
-
-      .section-title {
-        font-size: 12px;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        color: var(--text-muted);
-        margin: 0 0 8px;
-      }
-
-      .pill-row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
-      }
-
-      .pill {
-        padding: 4px 8px;
-        border-radius: 999px;
-        background: rgba(15, 23, 42, 0.9);
-        border: 1px solid rgba(148, 163, 184, 0.45);
-        font-size: 11px;
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        font-variant-numeric: tabular-nums;
-      }
-
-      .pill.soft {
-        border-style: dashed;
-        opacity: 0.9;
-      }
-
-      .pill .key {
-        color: var(--text-muted);
-      }
-
-      .pill .value {
-        color: var(--text-main);
-      }
-
-      .muted {
-        color: var(--text-muted);
-      }
-
-      .badge-soft {
-        font-size: 11px;
-        padding: 2px 7px;
-        border-radius: 999px;
-        background: rgba(15, 23, 42, 0.9);
-        border: 1px solid rgba(148, 163, 184, 0.4);
-      }
-
-      .dot {
-        display: inline-block;
-        width: 7px;
-        height: 7px;
-        border-radius: 999px;
-        margin-right: 6px;
-      }
-
-      .dot.green {
-        background: var(--success);
-      }
-
-      .dot.red {
-        background: var(--danger);
-      }
-
-      .dot.yellow {
-        background: var(--warning);
-      }
-
-      .footer {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-top: 18px;
-        font-size: 11px;
-        color: var(--text-muted);
-      }
-
-      .footer a {
-        color: var(--accent);
-        text-decoration: none;
-      }
-
-      .footer a:hover {
-        text-decoration: underline;
-      }
-
-      .endpoint-list {
-        font-size: 11px;
-        line-height: 1.5;
-      }
-
-      .endpoint-list code {
-        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-          "Liberation Mono", "Courier New", monospace;
-        font-size: 11px;
-        background: rgba(15, 23, 42, 0.9);
-        padding: 2px 4px;
-        border-radius: 6px;
-        border: 1px solid rgba(148, 163, 184, 0.35);
-      }
-
-      .btn-row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        margin-top: 8px;
-      }
-
-      button {
-        cursor: pointer;
-        border-radius: 999px;
-        border: 1px solid rgba(148, 163, 184, 0.5);
-        background: rgba(15, 23, 42, 0.9);
-        color: var(--text-main);
-        padding: 6px 14px;
-        font-size: 12px;
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-      }
-
-      button.primary {
-        border-color: rgba(56, 189, 248, 0.8);
-        background: linear-gradient(
-          135deg,
-          rgba(56, 189, 248, 0.15),
-          rgba(56, 189, 248, 0.05)
-        );
-      }
-
-      button:hover:not(:disabled) {
-        border-color: var(--accent);
-      }
-
-      button:disabled {
-        opacity: 0.6;
-        cursor: default;
-      }
-
-      .btn-dot {
-        width: 7px;
-        height: 7px;
-        border-radius: 999px;
-        background: var(--accent);
-      }
-
-      .debug-status {
-        font-size: 11px;
-        color: var(--text-muted);
-        margin-top: 4px;
-      }
-
-      .debug-status strong {
-        color: var(--text-main);
-      }
-
-      pre {
-        margin: 0;
-        max-height: 220px;
-        overflow: auto;
-        font-size: 11px;
-        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-          "Liberation Mono", "Courier New", monospace;
-        background: rgba(15, 23, 42, 0.9);
-        border-radius: 12px;
-        padding: 8px 10px;
-        border: 1px solid rgba(148, 163, 184, 0.3);
-      }
-
-      .json-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 4px;
-        font-size: 11px;
-        color: var(--text-muted);
-      }
-
-      .json-header span {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-      }
-
-      /* Flash effect for updated values */
-      .flash {
-        animation: flash-bg 0.7s ease-out;
-      }
-
-      @keyframes flash-bg {
-        0% {
-          background-color: rgba(56, 189, 248, 0.22);
-          box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.3);
-        }
-        70% {
-          background-color: transparent;
-          box-shadow: 0 0 0 10px rgba(56, 189, 248, 0);
-        }
-        100% {
-          background-color: transparent;
-          box-shadow: none;
-        }
-      }
-    </style>
-  </head>
-  <body>
-    <div class="shell">
-      <header>
-        <div>
-          <h1>
-            CQD Analytics
-            <span class="badge-primary">Durable Object</span>
-          </h1>
-          <p class="subtitle">
-            Live Worker + Durable Object stats for the Classroom Quick Downloader
-            extension. Use the <b>Reload stats</b> button when you want fresh
-            data (no auto polling).
-          </p>
-        </div>
-        <div class="meta" id="meta">
-          Worker: <b>cqd-analytics</b><br />
-          Durable Object: <b>DownloadsDurable</b><br />
-          Last refresh: <span id="lastRefresh">never</span>
-        </div>
-      </header>
-
-      <!-- SECTION 1: Summary cards -->
-      <div class="section">
-        <div class="grid grid-cols-4">
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title">Total Downloads</div>
-            </div>
-            <div class="card-value" id="totalDownloads">–</div>
-            <div class="card-sub">
-              Successful completed downloads (status = <code>success</code>)
-            </div>
-          </div>
-
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title">Total Success</div>
-            </div>
-            <div class="card-value success" id="totalSuccess">–</div>
-            <div class="card-sub">
-              All events with status <code>success</code>
-            </div>
-          </div>
-
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title">Total Fail</div>
-            </div>
-            <div class="card-value danger" id="totalFail">–</div>
-            <div class="card-sub">
-              Events with status <code>fail</code> (downloads that errored)
-            </div>
-          </div>
-
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title">Total Events</div>
-            </div>
-            <div class="card-value" id="totalEvents">–</div>
-            <div class="card-sub">
-              All events received by the Durable Object (success + fail)
-            </div>
-          </div>
-        </div>
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <div class="title-block">
+        <h1>CQD Analytics – Worker + DO</h1>
+        <p>Live view of Durable Object counters and Cloudflare quota state.</p>
       </div>
-
-      <!-- SECTION 2: Buffer / timing / env -->
-      <div class="section">
-        <div class="section-title">Buffer, timing & environment</div>
-        <div class="grid grid-cols-3">
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title">Buffer</div>
-            </div>
-            <div class="card-sub" id="bufferInfo">
-              Pending in DO buffer: –<br />
-              Buffer age: –<br />
-              Next flush condition: –
-            </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+        <div class="badge-row">
+          <div class="pill">
+            <span class="pill-dot"></span>
+            <span class="pill-label">WORKER</span>
+            <span>cqd-analytics</span>
           </div>
-
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title">Timeline</div>
-            </div>
-            <div class="card-sub" id="timeInfo">
-              Last event at: –<br />
-              Age since last event: –<br />
-              Last flush to Oracle: –<br />
-              Age since last flush: –
-            </div>
-          </div>
-
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title">Environment</div>
-            </div>
-            <div class="pill-row" id="envInfo">
-              <span class="muted">Loading…</span>
-            </div>
+          <div class="pill">
+            <span class="pill-label">DO</span>
+            <span>DownloadsDurable</span>
           </div>
         </div>
+        <button class="refresh-btn" id="refresh-btn">
+          <span>↻</span><span>Refresh</span>
+        </button>
       </div>
+    </header>
 
-      <!-- SECTION 3: Breakdowns -->
-      <div class="section">
-        <div class="section-title">Breakdown by dimensions</div>
-        <div class="grid grid-cols-3">
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title">By Type</div>
-            </div>
-            <div class="pill-row" id="byType"></div>
+    <main>
+      <section class="card">
+        <h2>Global Counters</h2>
+        <p class="card-subtitle">Durable Object stats from /stats</p>
+        <div class="grid-2">
+          <div class="metric">
+            <div class="metric-label">Total Downloads</div>
+            <div class="metric-value">${stats.totalDownloads}</div>
+            <div class="metric-sub">successful downloads recorded</div>
           </div>
-
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title">By Status</div>
-            </div>
-            <div class="pill-row" id="byStatus"></div>
+          <div class="metric">
+            <div class="metric-label">Total Events</div>
+            <div class="metric-value">${stats.totalEvents}</div>
+            <div class="metric-sub">success + fail events</div>
           </div>
+          <div class="metric">
+            <div class="metric-label">Pending in DO buffer</div>
+            <div class="metric-value">${stats.pendingEvents}</div>
+            <div class="metric-sub">waiting to flush to Oracle</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">Last Event</div>
+            <div class="metric-value" style="font-size:0.85rem;">${lastEventAt}</div>
+            <div class="metric-sub">lastFlush: ${lastFlushAt}</div>
+          </div>
+        </div>
 
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title">By Browser</div>
-            </div>
-            <div class="pill-row" id="byBrowser"></div>
+        <hr style="margin:16px 0;border:none;border-top:1px dashed var(--border-subtle);" />
+
+        <div class="grid-2">
+          <div>
+            <h3 style="margin:0 0 6px;font-size:0.82rem;color:var(--text-soft);text-transform:uppercase;letter-spacing:0.08em;">By Type</h3>
+            <table>
+              <thead>
+                <tr><th>Type</th><th>Count</th></tr>
+              </thead>
+              <tbody>${byTypeRows || "<tr><td colspan='2'>—</td></tr>"}</tbody>
+            </table>
+          </div>
+          <div>
+            <h3 style="margin:0 0 6px;font-size:0.82rem;color:var(--text-soft);text-transform:uppercase;letter-spacing:0.08em;">By Status</h3>
+            <table>
+              <thead>
+                <tr><th>Status</th><th>Count</th></tr>
+              </thead>
+              <tbody>${byStatusRows || "<tr><td colspan='2'>—</td></tr>"}</tbody>
+            </table>
           </div>
         </div>
 
-        <div class="grid grid-cols-3" style="margin-top: 12px;">
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title">By OS</div>
-            </div>
-            <div class="pill-row" id="byOs"></div>
-          </div>
+        <hr style="margin:16px 0;border:none;border-top:1px dashed var(--border-subtle);" />
 
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title">By Extension Version</div>
-            </div>
-            <div class="pill-row" id="byExtVersion"></div>
+        <div class="grid-2">
+          <div>
+            <h3 style="margin:0 0 6px;font-size:0.82rem;color:var(--text-soft);text-transform:uppercase;letter-spacing:0.08em;">By Browser</h3>
+            <table>
+              <thead>
+                <tr><th>Browser</th><th>Count</th></tr>
+              </thead>
+              <tbody>${byBrowserRows || "<tr><td colspan='2'>—</td></tr>"}</tbody>
+            </table>
           </div>
-
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title">By Language</div>
-            </div>
-            <div class="pill-row" id="byLanguage"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- SECTION 4: Debug & endpoints -->
-      <div class="section">
-        <div class="section-title">Debug & endpoints</div>
-        <div class="grid grid-cols-2">
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title">Endpoints</div>
-            </div>
-            <div class="endpoint-list" id="endpointList">
-              <span class="muted">Loading…</span>
-            </div>
-          </div>
-
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title">Actions</div>
-              <span class="card-chip">Manual only – no auto polling</span>
-            </div>
-            <div class="btn-row">
-              <button id="btnRefresh" class="primary">
-                <span class="btn-dot"></span>
-                Reload stats
-              </button>
-              <button id="btnFlush">
-                <span class="btn-dot"></span>
-                POST /debug/flush
-              </button>
-              <button id="btnOpenStats">
-                <span class="btn-dot"></span>
-                Open /stats JSON
-              </button>
-              <button id="btnOpenHealth">
-                <span class="btn-dot"></span>
-                Open /health
-              </button>
-            </div>
-            <div class="debug-status" id="debugStatus">
-              Ready. Click <b>Reload stats</b> to fetch the latest data.
-            </div>
+          <div>
+            <h3 style="margin:0 0 6px;font-size:0.82rem;color:var(--text-soft);text-transform:uppercase;letter-spacing:0.08em;">By OS / Language</h3>
+            <table>
+              <thead>
+                <tr><th>OS</th><th>Count</th></tr>
+              </thead>
+              <tbody>${byOsRows || "<tr><td colspan='2'>—</td></tr>"}</tbody>
+            </table>
+            <table style="margin-top:6px;">
+              <thead>
+                <tr><th>Lang</th><th>Count</th></tr>
+              </thead>
+              <tbody>${byLangRows || "<tr><td colspan='2'>—</td></tr>"}</tbody>
+            </table>
           </div>
         </div>
-      </div>
+      </section>
 
-      <!-- SECTION 5: Raw JSON -->
-      <div class="section">
-        <div class="section-title">Raw /stats payload</div>
-        <div class="card">
-          <div class="json-header">
-            <span>
-              <span class="dot yellow"></span>
-              Direct JSON returned by <code>/stats</code>
-            </span>
-            <span id="jsonMeta">size: –</span>
+      <section class="card">
+        <h2>Worker Quota & Mode</h2>
+        <p class="card-subtitle">Daily request usage and suggested extension behaviour.</p>
+
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+            <div>
+              <div class="metric-label">Requests Today (approx)</div>
+              <div class="metric-value">${requestsToday}</div>
+              <div class="metric-sub">Cloudflare Worker requests (analytics related)</div>
+            </div>
+            <div>
+              <div class="quota-tag ${stateTag.className}">
+                <span>${stateTag.label}</span>
+              </div>
+              <div class="remote-flag">
+                Analytics:
+                <span class="${remoteEnabled ? "remote-on" : "remote-off"}">
+                  ${remoteEnabled ? "ON (extensions may send)" : "OFF (store local only)"}
+                </span>
+              </div>
+            </div>
           </div>
-          <pre id="rawJson">{}</pre>
-        </div>
-      </div>
 
-      <div class="footer">
-        <div>
-          <span class="badge-soft">
-            <span class="dot green"></span> Global stats for all extension users
-            (Durable Object)
-          </span>
-        </div>
-        <div>
-          <span class="muted">Tip:</span>
-          reload only when you need – this keeps Cloudflare requests low.
-        </div>
-      </div>
-    </div>
+          <div style="font-size:0.78rem;color:var(--text-muted);">
+            <div>Quota level: <code>${quotaLevel}</code></div>
+            <div>Worker mode: <strong>${modeLabel}</strong></div>
+            <div>Suggested batch size for extensions: <strong>${batchSize}</strong> events / POST</div>
+            <div style="margin-top:4px;color:var(--text-soft);">${stateTag.description}</div>
+          </div>
 
-    <script>
-      function fmtNumber(n) {
-        if (n == null || Number.isNaN(n)) return "0";
+          <div class="last-refreshed" id="last-refreshed">
+            Last refreshed: <span id="last-refreshed-ts">${new Date().toLocaleTimeString()}</span>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    (function () {
+      const refreshBtn = document.getElementById("refresh-btn");
+      const lastRef = document.getElementById("last-refreshed");
+      const lastRefTs = document.getElementById("last-refreshed-ts");
+
+      async function refresh() {
         try {
-          return Number(n).toLocaleString("en-US");
-        } catch {
-          return String(n);
+          const res = await fetch("/stats", { cache: "no-store" });
+          if (!res.ok) return;
+          const data = await res.json();
+
+          // naive reload: for now just reload the page with new HTML
+          // (keeps implementation simple)
+          window.location.reload();
+        } catch (e) {
+          console.error("Failed to refresh stats", e);
         }
       }
 
-      function fmtDate(ts) {
-        if (!ts) return "–";
-        const n = Number(ts);
-        if (!n || Number.isNaN(n)) return String(ts);
-        try {
-          return new Date(n).toLocaleString();
-        } catch {
-          return String(ts);
-        }
-      }
-
-      function fmtAge(ts) {
-        if (!ts) return "–";
-        const n = Number(ts);
-        if (!n || Number.isNaN(n)) return "–";
-        const diff = Date.now() - n;
-        if (diff < 0) return "0s";
-        const sec = Math.floor(diff / 1000);
-        if (sec < 60) return sec + "s";
-        const min = Math.floor(sec / 60);
-        if (min < 60) return min + "m";
-        const hours = Math.floor(min / 60);
-        if (hours < 24) return hours + "h";
-        const days = Math.floor(hours / 24);
-        return days + "d";
-      }
-
-      function renderPillsFromMap(containerId, obj) {
-        const el = document.getElementById(containerId);
-        if (!el) return;
-        el.innerHTML = "";
-        if (!obj || typeof obj !== "object") {
-          el.textContent = "–";
-          return;
-        }
-        const entries = Object.entries(obj);
-        if (!entries.length) {
-          el.textContent = "–";
-          return;
-        }
-        for (const [key, value] of entries) {
-          const pill = document.createElement("div");
-          pill.className = "pill";
-          const k = document.createElement("span");
-          k.className = "key";
-          k.textContent = key;
-          const v = document.createElement("span");
-          v.className = "value";
-          v.textContent = fmtNumber(value);
-          pill.appendChild(k);
-          pill.appendChild(v);
-          el.appendChild(pill);
-        }
-      }
-
-      function buildEndpoints() {
-        const base = window.location.origin;
-        const endpoints = {
-          "Worker base": base + "/",
-          "Track endpoint": base + "/track",
-          "Stats (JSON)": base + "/stats",
-          "Health": base + "/health",
-          "Debug flush (POST)": base + "/debug/flush",
-        };
-        const el = document.getElementById("endpointList");
-        el.innerHTML = "";
-        Object.entries(endpoints).forEach(([label, url]) => {
-          const line = document.createElement("div");
-          line.innerHTML =
-            "<span class=\\"muted\\">" +
-            label +
-            ":</span> <code>" +
-            url +
-            "</code>";
-          el.appendChild(line);
+      if (refreshBtn) {
+        refreshBtn.addEventListener("click", () => {
+          refresh();
         });
       }
 
-      function updateField(id, newText) {
-        const el = document.getElementById(id);
-        if (!el) return;
-        newText = String(newText);
-        if (el.textContent === newText) return;
-        el.textContent = newText;
-        // restart the flash animation
-        el.classList.remove("flash");
-        void el.offsetWidth; // force reflow
-        el.classList.add("flash");
+      // Visual feedback that this render is "fresh"
+      if (lastRef && lastRefTs) {
+        lastRef.classList.add("updated");
+        lastRefTs.textContent = new Date().toLocaleTimeString();
+        setTimeout(() => lastRef.classList.remove("updated"), 900);
       }
-
-      function populateEnv(stats) {
-        const envInfo = document.getElementById("envInfo");
-        envInfo.innerHTML = "";
-
-        function pill(label, value) {
-          const p = document.createElement("div");
-          p.className = "pill soft";
-          const k = document.createElement("span");
-          k.className = "key";
-          k.textContent = label;
-          const v = document.createElement("span");
-          v.className = "value";
-          v.textContent = value;
-          p.appendChild(k);
-          p.appendChild(v);
-          envInfo.appendChild(p);
-        }
-
-        const maxBatch =
-          stats.maxBatchEvents != null ? String(stats.maxBatchEvents) : "n/a";
-        pill("MAX_BATCH_EVENTS", maxBatch);
-
-        const oracleFlag =
-          stats.oracleConfigured === true
-            ? "configured"
-            : stats.oracleConfigured === false
-            ? "not set"
-            : "unknown";
-        pill("ORACLE_ENDPOINT", oracleFlag);
-
-        if (stats.pendingEvents != null) {
-          pill("pendingEvents", fmtNumber(stats.pendingEvents));
-        }
-
-        if (stats.retryState) {
-          pill("retry.count", stats.retryState.count ?? "?");
-          if (stats.retryState.nextRetryAt) {
-            pill(
-              "retry.nextRetryAt",
-              fmtDate(stats.retryState.nextRetryAt) +
-                " (" +
-                fmtAge(stats.retryState.nextRetryAt) +
-                " ago)"
-            );
-          }
-        }
-      }
-
-      function updateSummary(stats) {
-        const counters = stats.counters || {};
-        const byStatus = counters.byStatus || {};
-        const totalSuccess =
-          stats.totalSuccess != null
-            ? stats.totalSuccess
-            : byStatus.success || 0;
-        const totalFail =
-          stats.totalFail != null ? stats.totalFail : byStatus.fail || 0;
-        const totalDownloads =
-          stats.totalDownloads != null ? stats.totalDownloads : totalSuccess;
-
-        updateField("totalDownloads", fmtNumber(totalDownloads));
-        updateField("totalSuccess", fmtNumber(totalSuccess));
-        updateField("totalFail", fmtNumber(totalFail));
-        updateField(
-          "totalEvents",
-          fmtNumber(stats.totalEvents ?? totalSuccess + totalFail)
-        );
-      }
-
-      function updateBufferAndTime(stats) {
-        const buf = document.getElementById("bufferInfo");
-        const pending = fmtNumber(stats.pendingEvents ?? 0);
-        const maxBatch =
-          stats.maxBatchEvents != null ? stats.maxBatchEvents : "unknown";
-
-        buf.innerHTML =
-          "Pending in DO buffer: <b>" +
-          pending +
-          "</b><br />" +
-          "Buffer age (since last event): <b>" +
-          fmtAge(stats.lastEventAt) +
-          "</b><br />" +
-          "Next auto flush: when buffer ≥ " +
-          maxBatch +
-          " events";
-
-        const t = document.getElementById("timeInfo");
-        t.innerHTML =
-          "Last event at: <b>" +
-          fmtDate(stats.lastEventAt) +
-          "</b><br />" +
-          "Age since last event: " +
-          fmtAge(stats.lastEventAt) +
-          "<br />" +
-          "Last flush to Oracle: <b>" +
-          fmtDate(stats.lastFlushAt) +
-          "</b><br />" +
-          "Age since last flush: " +
-          fmtAge(stats.lastFlushAt);
-      }
-
-      function updateBreakdowns(stats) {
-        const counters = stats.counters || {};
-        renderPillsFromMap("byType", counters.byType || {});
-        renderPillsFromMap("byStatus", counters.byStatus || {});
-        renderPillsFromMap("byBrowser", counters.byBrowser || {});
-        renderPillsFromMap("byOs", counters.byOs || {});
-        renderPillsFromMap("byExtVersion", counters.byExtVersion || {});
-        renderPillsFromMap("byLanguage", counters.byLanguage || {});
-      }
-
-      function updateRawJson(stats) {
-        const rawEl = document.getElementById("rawJson");
-        let text;
-        try {
-          text = JSON.stringify(stats, null, 2);
-        } catch {
-          text = String(stats);
-        }
-        rawEl.textContent = text;
-        const size = new Blob([text]).size;
-        document.getElementById("jsonMeta").textContent =
-          "size: " + fmtNumber(size) + " bytes";
-      }
-
-      async function refreshStats() {
-        const status = document.getElementById("debugStatus");
-        status.textContent = "Fetching /stats…";
-        try {
-          const res = await fetch("/stats");
-          if (!res.ok) throw new Error("HTTP " + res.status);
-          const stats = await res.json();
-
-          updateSummary(stats);
-          updateBufferAndTime(stats);
-          updateBreakdowns(stats);
-          populateEnv(stats);
-          updateRawJson(stats);
-
-          const now = new Date().toLocaleTimeString();
-          updateField("lastRefresh", now);
-          status.textContent = "Last refresh OK (HTTP " + res.status + ").";
-        } catch (e) {
-          console.error("Failed to refresh stats", e);
-          status.textContent = "Refresh failed: " + e;
-        }
-      }
-
-      async function doDebugFlush() {
-        const btn = document.getElementById("btnFlush");
-        const status = document.getElementById("debugStatus");
-        try {
-          btn.disabled = true;
-          status.textContent = "Sending POST /debug/flush…";
-          const res = await fetch("/debug/flush", { method: "POST" });
-          let bodyText = "";
-          try {
-            const j = await res.json();
-            bodyText = JSON.stringify(j);
-          } catch {
-            bodyText = await res.text();
-          }
-          status.textContent =
-            "Flush response: HTTP " + res.status + " – " + bodyText;
-          await refreshStats();
-        } catch (e) {
-          console.error("flush error", e);
-          status.textContent = "Flush failed: " + e;
-        } finally {
-          btn.disabled = false;
-        }
-      }
-
-      document.getElementById("btnRefresh").addEventListener("click", () => {
-        refreshStats();
-      });
-
-      document.getElementById("btnFlush").addEventListener("click", () => {
-        doDebugFlush();
-      });
-
-      document
-        .getElementById("btnOpenStats")
-        .addEventListener("click", () => window.open("/stats", "_blank"));
-
-      document
-        .getElementById("btnOpenHealth")
-        .addEventListener("click", () => window.open("/health", "_blank"));
-
-      buildEndpoints();
-      // No auto polling – we only fetch once on load + when you click Reload.
-      refreshStats();
-    </script>
-  </body>
+    })();
+  </script>
+</body>
 </html>`;
+}
