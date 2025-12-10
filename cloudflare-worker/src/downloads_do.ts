@@ -7,6 +7,7 @@ import {
   ConfigResponse,
   QuotaDescriptor,
   StoredEvent,
+  EnvSnapshot,
 } from "./types";
 
 export interface Env {
@@ -18,23 +19,25 @@ export interface Env {
 type DurableStateShape = {
   totalEvents: number;
   totalDownloads: number;
+  totalSuccess: number;
+  totalFail: number;
   pendingEvents: number;
   lastEventAt: number | null;
   lastFlushAt: number | null;
   counters: Counters;
   retryState: RetryState | null;
 
-  // NEW: daily request counting for quota awareness
+  // daily request counting for quota awareness
   reqCountToday: number;
   reqCountDate: string | null; // "YYYY-MM-DD" UTC
-  // For future admin "cut power" switch
+
+  // admin switch: when true, remote analytics is forced OFF
   hardRemoteOff: boolean;
 
   // Buffered events waiting to be flushed to Oracle
   buffer: StoredEvent[];
 };
 
-// Reasonable defaults to be merged with whatever is persisted
 const DEFAULT_COUNTERS: Counters = {
   byStatus: {},
   byType: {},
@@ -42,6 +45,8 @@ const DEFAULT_COUNTERS: Counters = {
   byOs: {},
   byExtVersion: {},
   byLanguage: {},
+  byCountry: {},
+  byErrorType: {}, // NEW
 };
 
 const DEFAULT_RETRY_STATE: RetryState = {
@@ -57,7 +62,7 @@ const QUOTA_HARD_NORMAL_LIMIT = 70_000;
 const QUOTA_HARD_LIMIT = 80_000;
 const QUOTA_VERY_HARD_LIMIT = 90_000;
 
-// Storage key
+// Storage key inside DO storage
 const STORAGE_KEY = "analytics_state";
 
 function todayUtcDate(): string {
@@ -115,7 +120,7 @@ function computeQuotaDescriptor(
   }
 
   if (hardRemoteOff) {
-    // Admin override / Danger Area toggle.
+    // Admin override / Danger Zone toggle.
     remoteEnabled = false;
     if (requestsToday < QUOTA_VERY_HARD_LIMIT) {
       quotaLevel = "ADMIN_REMOTE_OFF";
@@ -142,6 +147,10 @@ function json<T>(obj: T, init: ResponseInit = {}): Response {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Durable Object class
+// ---------------------------------------------------------------------------
+
 export class DownloadsDurable {
   private state: DurableObjectState;
   private env: Env;
@@ -154,12 +163,18 @@ export class DownloadsDurable {
     this.loaded = this.load();
   }
 
+  // ---------------------------------------------------------------------------
+  // Loading & persistence
+  // ---------------------------------------------------------------------------
+
   private async load(): Promise<void> {
     const stored = await this.state.storage.get<DurableStateShape>(STORAGE_KEY);
 
     const base: DurableStateShape = {
       totalEvents: 0,
       totalDownloads: 0,
+      totalSuccess: 0,
+      totalFail: 0,
       pendingEvents: 0,
       lastEventAt: null,
       lastFlushAt: null,
@@ -182,6 +197,8 @@ export class DownloadsDurable {
     this.data = {
       totalEvents: stored.totalEvents ?? base.totalEvents,
       totalDownloads: stored.totalDownloads ?? base.totalDownloads,
+      totalSuccess: stored.totalSuccess ?? base.totalSuccess,
+      totalFail: stored.totalFail ?? base.totalFail,
       pendingEvents: stored.pendingEvents ?? base.pendingEvents,
       lastEventAt: stored.lastEventAt ?? base.lastEventAt,
       lastFlushAt: stored.lastFlushAt ?? base.lastFlushAt,
@@ -195,6 +212,10 @@ export class DownloadsDurable {
           stored.counters?.byExtVersion ?? { ...DEFAULT_COUNTERS.byExtVersion },
         byLanguage:
           stored.counters?.byLanguage ?? { ...DEFAULT_COUNTERS.byLanguage },
+        byCountry:
+          stored.counters?.byCountry ?? { ...DEFAULT_COUNTERS.byCountry },
+        byErrorType:
+          stored.counters?.byErrorType ?? { ...DEFAULT_COUNTERS.byErrorType },
       },
       retryState: stored.retryState ?? { ...DEFAULT_RETRY_STATE },
 
@@ -218,6 +239,10 @@ export class DownloadsDurable {
     return this.data;
   }
 
+  // ---------------------------------------------------------------------------
+  // Helpers
+  // ---------------------------------------------------------------------------
+
   /**
    * Ensure reqCountToday is for the current UTC day. Resets counters
    * when the day changes.
@@ -227,8 +252,7 @@ export class DownloadsDurable {
     if (this.d.reqCountDate !== today) {
       this.d.reqCountDate = today;
       this.d.reqCountToday = 0;
-      // hardRemoteOff is NOT reset automatically here; you can
-      // clear it via admin endpoint if you want.
+      // hardRemoteOff is NOT reset automatically here.
     }
   }
 
@@ -239,9 +263,10 @@ export class DownloadsDurable {
     return header === expected;
   }
 
-  // --------------------------------------------------------
+  // ---------------------------------------------------------------------------
   // Core fetch router
-  // --------------------------------------------------------
+  // ---------------------------------------------------------------------------
+
   async fetch(request: Request): Promise<Response> {
     await this.loaded;
 
@@ -280,6 +305,10 @@ export class DownloadsDurable {
       return this.handleAdminCutPower(request);
     }
 
+    if (pathname === "/admin/restore-power" && request.method === "POST") {
+      return this.handleAdminRestorePower(request);
+    }
+
     if (pathname === "/admin/full-sync" && request.method === "POST") {
       return this.handleAdminFullSync(request);
     }
@@ -287,9 +316,9 @@ export class DownloadsDurable {
     return new Response("Not found (DO)", { status: 404 });
   }
 
-  // --------------------------------------------------------
-  // Durable Object alarm for Oracle retry backoff
-  // --------------------------------------------------------
+  // ---------------------------------------------------------------------------
+  // Alarms for retry / backoff
+  // ---------------------------------------------------------------------------
 
   async alarm(): Promise<void> {
     await this.loaded;
@@ -301,9 +330,9 @@ export class DownloadsDurable {
     }
   }
 
-  // --------------------------------------------------------
+  // ---------------------------------------------------------------------------
   // Handlers
-  // --------------------------------------------------------
+  // ---------------------------------------------------------------------------
 
   private async handleTrack(request: Request): Promise<Response> {
     // Update daily request counters
@@ -328,9 +357,14 @@ export class DownloadsDurable {
     for (const ev of events) {
       this.d.buffer.push(ev);
       this.d.totalEvents += 1;
+
       if (ev.status === "success") {
         this.d.totalDownloads += 1;
+        this.d.totalSuccess += 1;
+      } else {
+        this.d.totalFail += 1;
       }
+
       this.d.pendingEvents += 1;
       this.d.lastEventAt = ev.timestamp ?? Date.now();
 
@@ -353,6 +387,15 @@ export class DownloadsDurable {
 
       const lang = (ev.language || "unknown").toLowerCase();
       c.byLanguage[lang] = (c.byLanguage[lang] || 0) + 1;
+
+      const country = (ev.country || "unknown").toLowerCase();
+      c.byCountry[country] = (c.byCountry[country] || 0) + 1;
+
+      // NEW: error-type counter (only for fails)
+      if (ev.status === "fail") {
+        const errKey = (ev.error_type || "unknown").toLowerCase();
+        c.byErrorType[errKey] = (c.byErrorType[errKey] || 0) + 1;
+      }
     }
 
     await this.persist();
@@ -374,24 +417,31 @@ export class DownloadsDurable {
       this.d.hardRemoteOff,
     );
 
+    const envSnapshot: EnvSnapshot = {
+      maxBatchEvents: this.env.MAX_BATCH_EVENTS || "n/a",
+      oracleEndpoint: this.env.ORACLE_ENDPOINT || "unknown",
+    };
+
     const payload: StatsResponse = {
       ok: true,
       totalEvents: this.d.totalEvents,
       totalDownloads: this.d.totalDownloads,
+      totalSuccess: this.d.totalSuccess,
+      totalFail: this.d.totalFail,
       pendingEvents: this.d.pendingEvents,
       lastEventAt: this.d.lastEventAt,
       lastFlushAt: this.d.lastFlushAt,
       counters: this.d.counters,
       retryState: this.d.retryState,
       quota,
+      envSnapshot,
     };
 
     return json(payload);
   }
 
   /**
-   * Config endpoint used by the extension (in a later step) to
-   * adapt batching / flush behavior based on current quota state.
+   * Config endpoint used by the extension to adapt batching / flush behaviour.
    */
   private async handleConfig(): Promise<Response> {
     const quota = computeQuotaDescriptor(
@@ -437,6 +487,8 @@ export class DownloadsDurable {
     this.data = {
       totalEvents: 0,
       totalDownloads: 0,
+      totalSuccess: 0,
+      totalFail: 0,
       pendingEvents: 0,
       lastEventAt: null,
       lastFlushAt: null,
@@ -498,6 +550,27 @@ export class DownloadsDurable {
     });
   }
 
+  private async handleAdminRestorePower(request: Request): Promise<Response> {
+    if (!this.isAuthorizedAdmin(request)) {
+      return json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+
+    this.d.hardRemoteOff = false;
+    await this.persist();
+
+    const quota = computeQuotaDescriptor(
+      this.d.reqCountToday,
+      this.d.hardRemoteOff,
+    );
+
+    return json({
+      ok: true,
+      remoteEnabled: quota.remoteEnabled,
+      quotaLevel: quota.quotaLevel,
+      modeLabel: quota.modeLabel,
+    });
+  }
+
   private async handleAdminFullSync(request: Request): Promise<Response> {
     if (!this.isAuthorizedAdmin(request)) {
       return json({ ok: false, error: "unauthorized" }, { status: 401 });
@@ -525,9 +598,9 @@ export class DownloadsDurable {
     });
   }
 
-  // --------------------------------------------------------
+  // ---------------------------------------------------------------------------
   // Oracle flush + retry/backoff
-  // --------------------------------------------------------
+  // ---------------------------------------------------------------------------
 
   private async scheduleRetry(): Promise<void> {
     if (!this.d.retryState) {
@@ -581,9 +654,9 @@ export class DownloadsDurable {
       return { ok: false, sent: 0, error: msg };
     }
 
-    const maxBatchEnv = parseInt(this.env.MAX_BATCH_EVENTS || "500", 10) || 500;
+    const maxBatchEnv =
+      parseInt(this.env.MAX_BATCH_EVENTS || "500", 10) || 500;
     const maxBatch = force ? this.d.buffer.length : maxBatchEnv;
-
     const batch = this.d.buffer.slice(0, maxBatch);
 
     if (!this.d.retryState) this.d.retryState = { ...DEFAULT_RETRY_STATE };

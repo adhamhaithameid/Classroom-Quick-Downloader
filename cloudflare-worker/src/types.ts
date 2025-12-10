@@ -13,6 +13,7 @@ export interface StoredEvent {
   duration_ms: number;
   bypass_used: boolean;
   language: string;
+  country?: string; // optional country ISO code or name
   timestamp: number;
 
   /**
@@ -37,6 +38,8 @@ export interface Counters {
   byOs: Record<string, number>;
   byExtVersion: Record<string, number>;
   byLanguage: Record<string, number>;
+  byCountry: Record<string, number>;
+  byErrorType: Record<string, number>; // NEW: breakdown by error_type
 }
 
 /**
@@ -59,8 +62,8 @@ export interface QuotaDescriptor {
   requestsToday: number;
 
   /**
-   * String label for quota level, e.g. "BELOW_LIMITS", "QUOTA_SOFT_LIMIT",
-   * "QUOTA_VERY_HARD_LIMIT", "ADMIN_REMOTE_OFF", etc.
+   * String label for quota level.
+   * e.g. "BELOW_LIMITS", "QUOTA_SOFT_LIMIT", "ADMIN_REMOTE_OFF", ...
    */
   quotaLevel: string;
 
@@ -71,7 +74,6 @@ export interface QuotaDescriptor {
 
   /**
    * Whether remote analytics should be considered enabled.
-   * If false, extensions should keep everything local.
    */
   remoteEnabled: boolean;
 
@@ -82,13 +84,23 @@ export interface QuotaDescriptor {
 }
 
 /**
- * Response payload for /stats (DO → Worker → dashboard).
+ * Snapshot of environment variables for the dashboard to display.
+ */
+export interface EnvSnapshot {
+  maxBatchEvents: string;
+  oracleEndpoint: string;
+}
+
+/**
+ * Response payload for /stats (DO -> Worker -> dashboard).
  */
 export interface StatsResponse {
   ok: boolean;
 
   totalEvents: number;
   totalDownloads: number;
+  totalSuccess: number;
+  totalFail: number;
   pendingEvents: number;
 
   lastEventAt: number | null;
@@ -98,67 +110,32 @@ export interface StatsResponse {
   retryState: RetryState | null;
 
   quota: QuotaDescriptor;
+
+  envSnapshot: EnvSnapshot;
 }
 
 /**
- * Response payload for /config (used later by the extension).
+ * Response payload for /config (used by the extension).
  */
 export interface ConfigResponse {
   ok: boolean;
-
-  /**
-   * Suggested batch size (events per POST).
-   */
   batchSize: number;
-
-  /**
-   * Suggested flush intervals (minutes) for different quota regimes.
-   */
   timeFlushMinutes: {
     low: number;
     mid: number;
     high: number;
   };
-
-  /**
-   * Whether remote analytics is currently allowed.
-   */
   remoteEnabled: boolean;
-
-  /**
-   * Quota descriptor for extra context.
-   */
   quota: QuotaDescriptor;
 }
 
 /**
- * Worker Env shape (for the main Worker entrypoint).
- * This is what `fetch(request, env: Env)` sees.
- *
- * The same interface can also be used by the Durable Object constructor
- * if you want a single unified Env type.
+ * Worker Env shape (bindings injected by Cloudflare).
+ * This is used by index.ts (not the Durable Object itself).
  */
 export interface Env {
-  /**
-   * Durable Object namespace for DownloadsDurable.
-   */
   DOWNLOADS_DO: DurableObjectNamespace;
-
-  /**
-   * Shared secret used for:
-   * - Admin dashboard login (password)
-   * - Admin DO endpoints (X-Admin-Secret / X-DO-SECRET)
-   */
   DO_SHARED_SECRET: string;
-
-  /**
-   * Oracle backend endpoint used by the Durable Object flush logic.
-   */
   ORACLE_ENDPOINT: string;
-
-  /**
-   * Max number of events to flush in one Oracle POST.
-   * Typically something like "500".
-   */
   MAX_BATCH_EVENTS: string;
 }
