@@ -15,6 +15,7 @@ export default defineConfig({
       'https://classroom.google.com/*',
       'https://drive.usercontent.google.com/*',
       'https://accounts.google.com/*',
+      'https://cqd-analytics.adhamhaithameid.workers.dev/*',
     ],
   },
 });

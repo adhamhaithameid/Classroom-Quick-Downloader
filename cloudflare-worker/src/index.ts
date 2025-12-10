@@ -7,8 +7,38 @@ import type { Env as WorkerEnv, StatsResponse } from "./types";
 // ---------------------------------------------------------------------------
 
 function getDownloadsStub(env: WorkerEnv): DurableObjectStub {
-  const id = env.DOWNLOADS_DO.idFromName("downloads");
+  const id = env.DOWNLOADS_DO.idFromName("DownloadsStats");
   return env.DOWNLOADS_DO.get(id);
+}
+
+// ---------------------------------------------------------------------------
+// CORS helpers
+// ---------------------------------------------------------------------------
+
+function makeCorsPreflightResponse(): Response {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, X-Admin-Secret",
+      "Access-Control-Max-Age": "86400",
+    },
+  });
+}
+
+function withCors(res: Response): Response {
+  const headers = new Headers(res.headers);
+  headers.set("Access-Control-Allow-Origin", "*");
+  headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  headers.set("Access-Control-Allow-Headers", "Content-Type, X-Admin-Secret");
+  headers.set("Access-Control-Max-Age", "86400");
+  headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
+  return new Response(res.body, {
+    status: res.status,
+    statusText: res.statusText,
+    headers,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -111,34 +141,45 @@ export default {
     const url = new URL(request.url);
     const { pathname } = url;
 
+    // Handle CORS preflight globally
+    if (request.method === "OPTIONS") {
+      return makeCorsPreflightResponse();
+    }
+
     // Root (dashboard + login)
     if (pathname === "/") {
       return handleRoot(request, env);
     }
 
-    // Public JSON endpoints
+    // Public JSON endpoints – wrap with CORS so the extension can call them
     if (pathname === "/stats" && request.method === "GET") {
-      return proxyToDO(request, env);
+      const res = await proxyToDO(request, env);
+      return withCors(res);
     }
 
     if (pathname === "/config" && request.method === "GET") {
-      return proxyToDO(request, env);
+      const res = await proxyToDO(request, env);
+      return withCors(res);
     }
 
     if (pathname === "/health" && request.method === "GET") {
-      return proxyToDO(request, env);
+      const res = await proxyToDO(request, env);
+      return withCors(res);
     }
 
     if (pathname === "/track" && request.method === "POST") {
-      return proxyToDO(request, env);
+      const res = await proxyToDO(request, env);
+      return withCors(res);
     }
 
     if (pathname === "/debug/flush" && request.method === "POST") {
-      return proxyToDO(request, env);
+      const res = await proxyToDO(request, env);
+      return withCors(res);
     }
 
     if (pathname === "/debug/reset" && request.method === "POST") {
-      return proxyToDO(request, env);
+      const res = await proxyToDO(request, env);
+      return withCors(res);
     }
 
     // Admin routes (Danger Zone) – just forward; DO will check X-Admin-Secret.
@@ -148,7 +189,10 @@ export default {
       pathname === "/admin/restore-power" ||
       pathname === "/admin/full-sync"
     ) {
-      return proxyToDO(request, env);
+      // Admin is likely calling from same origin (dashboard), but CORS
+      // headers here don't hurt if ever called cross-origin.
+      const res = await proxyToDO(request, env);
+      return withCors(res);
     }
 
     return new Response("Not found (worker)", { status: 404 });
