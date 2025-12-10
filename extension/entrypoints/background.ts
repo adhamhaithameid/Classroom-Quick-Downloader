@@ -1,5 +1,10 @@
 // filepath: extension/entrypoints/background.ts
-import { Analytics, recordDownloadEvent, refreshRemoteAnalyticsConfig } from './utils/analytics';
+
+import {
+  Analytics,
+  recordDownloadEvent,
+  refreshRemoteAnalyticsConfig,
+} from './utils/analytics';
 
 type FileMetaMsg = {
   name?: string;
@@ -103,7 +108,7 @@ function extractAuthUserFromUrl(rawUrl: string): number | undefined {
     if (raw == null) return undefined;
 
     const parsed = parseInt(raw, 10);
-    if (Number.isNaN(parsed(parsed))) return undefined;
+    if (Number.isNaN(parsed)) return undefined;
     if (!AUTHUSER_CANDIDATES.includes(parsed)) return undefined;
 
     return parsed;

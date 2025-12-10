@@ -228,9 +228,10 @@ async function loadConfig(): Promise<AnalyticsConfig> {
   const stored = raw[STORAGE_KEY_CONFIG] as Partial<AnalyticsConfig> | undefined;
   if (!stored || typeof stored !== 'object') return DEFAULT_CONFIG;
   return {
-    batchSize: typeof stored.batchSize === 'number' && stored.batchSize > 0
-      ? stored.batchSize
-      : DEFAULT_CONFIG.batchSize,
+    batchSize:
+      typeof stored.batchSize === 'number' && stored.batchSize > 0
+        ? stored.batchSize
+        : DEFAULT_CONFIG.batchSize,
     lowUsageFlushMinutes:
       typeof stored.lowUsageFlushMinutes === 'number'
         ? stored.lowUsageFlushMinutes
@@ -301,7 +302,7 @@ function normalizeStats(raw: any): LocalStats {
     attempts:
       typeof raw.attempts === 'number'
         ? raw.attempts
-        : ((raw.total || 0) + (raw.fail || 0)),
+        : (raw.total || 0) + (raw.fail || 0),
     bySpeed: {
       fast: raw.bySpeed?.fast ?? 0,
       medium: raw.bySpeed?.medium ?? 0,
@@ -504,12 +505,7 @@ function enqueueOp(op: () => Promise<void>): void {
 async function internalTrack(
   event: Omit<
     AnalyticsEvent,
-    | 'timestamp'
-    | 'ext_version'
-    | 'browser'
-    | 'os'
-    | 'language'
-    | 'retryCount'
+    'timestamp' | 'ext_version' | 'browser' | 'os' | 'language' | 'retryCount'
   >,
 ): Promise<void> {
   if (typeof chrome === 'undefined' || !chrome.runtime?.getManifest) {
@@ -672,12 +668,7 @@ export const Analytics = {
   track(
     event: Omit<
       AnalyticsEvent,
-      | 'timestamp'
-      | 'ext_version'
-      | 'browser'
-      | 'os'
-      | 'language'
-      | 'retryCount'
+      'timestamp' | 'ext_version' | 'browser' | 'os' | 'language' | 'retryCount'
     >,
   ): void {
     enqueueOp(() => internalTrack(event));
@@ -748,14 +739,7 @@ export interface RecordDownloadEventInput {
  * reuses the same queue / flush / poison-pill logic.
  */
 export function recordDownloadEvent(input: RecordDownloadEventInput): void {
-  const {
-    type,
-    status,
-    source,
-    duration_ms,
-    bypass_used,
-    error_type,
-  } = input;
+  const { type, status, source, duration_ms, bypass_used, error_type } = input;
 
   Analytics.track({
     status,
