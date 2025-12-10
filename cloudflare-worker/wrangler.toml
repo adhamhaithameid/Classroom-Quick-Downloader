@@ -1,11 +1,11 @@
 name = "cqd-analytics"
 main = "src/index.ts"
 account_id = "fc9538cb362e6266eea89037f6347225"
-compatibility_date = "2024-10-01"
+compatibility_date = "2024-12-01"
 
 [vars]
   ORACLE_ENDPOINT = ""
-  DO_SHARED_SECRET = ""
+  DO_SHARED_SECRET = "123"
   MAX_BATCH_EVENTS = "10000"
 
 [[durable_objects.bindings]]

@@ -1,929 +1,2200 @@
-// cloudflare-worker/src/dashboard.ts
+// filepath: cloudflare-worker/src/dashboard.ts
+import type { StatsResponse, QuotaDescriptor } from "./types";
 
-export const DASHBOARD_HTML = `<!doctype html>
+function formatTs(ts: number | null): string {
+  if (!ts) return "—";
+  const d = new Date(ts);
+  return d.toLocaleString("en-US", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
+
+function formatAge(ts: number | null): string {
+  if (!ts) return "—";
+  const diff = Date.now() - ts;
+  if (diff <= 0) return "just now";
+
+  const sec = Math.floor(diff / 1_000);
+  const min = Math.floor(sec / 60);
+  const hr = Math.floor(min / 60);
+  const day = Math.floor(hr / 24);
+
+  if (day > 0) return `${day}d`;
+  if (hr > 0) return `${hr}h`;
+  if (min > 0) return `${min}m`;
+  return `${sec}s`;
+}
+
+function quotaToStateTag(quota?: QuotaDescriptor) {
+  if (!quota) {
+    return {
+      label: "unknown",
+      className: "state-unknown",
+      description: "No quota information available.",
+    };
+  }
+
+  const n = quota.requestsToday;
+
+  if (n <= 1_000)
+    return {
+      label: "sleeping",
+      className: "state-sleeping",
+      description: "Very low traffic today.",
+    };
+  if (n <= 5_000)
+    return {
+      label: "super chill",
+      className: "state-super-chill",
+      description: "Extension is barely touching the Worker.",
+    };
+  if (n <= 10_000)
+    return {
+      label: "chill",
+      className: "state-chill",
+      description: "Plenty of headroom.",
+    };
+  if (n <= 20_000)
+    return {
+      label: "easy",
+      className: "state-easy",
+      description: "Still well below limits.",
+    };
+  if (n <= 30_000)
+    return {
+      label: "kinda easy",
+      className: "state-kinda-easy",
+      description: "Load is fine. Batch size may start increasing soon.",
+    };
+  if (n <= 40_000)
+    return {
+      label: "normal",
+      className: "state-normal",
+      description: "Normal daily traffic.",
+    };
+  if (n <= 50_000)
+    return {
+      label: "slightly busy",
+      className: "state-slightly-busy",
+      description: "Worker is warming up.",
+    };
+  if (n <= 60_000)
+    return {
+      label: "kinda busy",
+      className: "state-kinda-busy",
+      description: "Closer to quota, batching should be stronger.",
+    };
+  if (n <= 70_000)
+    return {
+      label: "busy",
+      className: "state-busy",
+      description: "We are in the hard-normal zone.",
+    };
+  if (n <= 80_000)
+    return {
+      label: "very busy",
+      className: "state-very-busy",
+      description: "High traffic. Worker is protecting quota.",
+    };
+  if (n <= 90_000)
+    return {
+      label: "super busy",
+      className: "state-super-busy",
+      description: "Approaching Cloudflare free tier limits.",
+    };
+  if (n <= 95_000)
+    return {
+      label: "emergency",
+      className: "state-emergency",
+      description: "Emergency mode. Batch sizes should be huge.",
+    };
+  if (n <= 99_000)
+    return {
+      label: "critical",
+      className: "state-critical",
+      description: "We are basically at the limit. Prepare cut power.",
+    };
+  return {
+    label: "cut the power rn",
+    className: "state-cut-power",
+    description: "Remote analytics should be OFF; everything local.",
+  };
+}
+
+function quotaToFlag(quota?: QuotaDescriptor) {
+  if (!quota) {
+    return {
+      label: "unknown",
+      className: "flag-unknown",
+      description: "No info.",
+    };
+  }
+  const n = quota.requestsToday;
+  if (n <= 20_000)
+    return {
+      label: "easy",
+      className: "flag-easy",
+      description: "Way below limits (<20k).",
+    };
+  if (n <= 50_000)
+    return {
+      label: "normal",
+      className: "flag-normal",
+      description: "Comfortable usage (<50k).",
+    };
+  if (n <= 80_000)
+    return {
+      label: "hard",
+      className: "flag-hard",
+      description: "High traffic (<80k).",
+    };
+  return {
+    label: "fuck",
+    className: "flag-fuck",
+    description: "Basically at limits (>80k).",
+  };
+}
+
+function classifySuccessRate(success: number, fail: number) {
+  const total = success + fail;
+  if (!total) {
+    return {
+      text: "—",
+      badge: "No data",
+      className: "",
+    };
+  }
+  const rate = (success / total) * 100;
+  if (rate >= 98) {
+    return {
+      text: `${rate.toFixed(1)}%`,
+      badge: "Excellent",
+      className: "metric-good",
+    };
+  }
+  if (rate >= 95) {
+    return {
+      text: `${rate.toFixed(1)}%`,
+      badge: "Healthy",
+      className: "metric-warn",
+    };
+  }
+  return {
+    text: `${rate.toFixed(1)}%`,
+    badge: "Unstable",
+    className: "metric-bad",
+  };
+}
+
+function topKey(data?: Record<string, number>): string {
+  if (!data) return "—";
+  const entries = Object.entries(data);
+  if (!entries.length) return "—";
+  entries.sort((a, b) => b[1] - a[1]);
+  return entries[0][0];
+}
+
+export function renderLoginPage(errorMessage?: string): string {
+  return `<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <title>CQD Analytics – Downloads Stats</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <style>
-      :root {
-        color-scheme: dark light;
-        --bg: #020617;
-        --bg-elevated: #020617;
-        --border-subtle: #1e293b;
-        --border-strong: #38bdf8;
-        --accent: #38bdf8;
-        --accent-soft: rgba(56, 189, 248, 0.12);
-        --text-main: #e5e7eb;
-        --text-muted: #9ca3af;
-        --danger: #f97373;
-        --success: #4ade80;
-        --warning: #facc15;
-      }
+<head>
+  <meta charset="UTF-8" />
+  <title>CQD Analytics – Admin Login</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root { color-scheme: dark; --bg: #050816; --accent: #3b82f6; --text-main: #e5e7eb; --text-soft: #6b7280; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { min-height: 100vh; font-family: system-ui, sans-serif; background: radial-gradient(circle at top, #111827 0, #020617 60%); color: var(--text-main); display: flex; align-items: center; justify-content: center; padding: 16px; }
+    .login-card { width: 100%; max-width: 380px; border-radius: 20px; padding: 24px 22px 20px; background: rgba(15,23,42,0.92); border: 1px solid rgba(148,163,184,0.45); box-shadow: 0 24px 60px rgba(0,0,0,0.75); }
+    .login-title { font-size: 1.35rem; font-weight: 600; margin-bottom: 4px; }
+    .login-subtitle { font-size: 0.85rem; color: var(--text-soft); margin-bottom: 16px; }
+    .login-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; border: 1px solid rgba(148,163,184,0.5); background: rgba(59,130,246,0.1); font-size: 0.75rem; text-transform: uppercase; color: #9ca3af; margin-bottom: 10px; }
+    .login-badge-dot { width: 7px; height: 7px; border-radius: 999px; background: var(--accent); }
+    .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
+    .field label { font-size: 0.78rem; text-transform: uppercase; color: var(--text-soft); }
+    .field input { padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(148,163,184,0.6); background: rgba(15,23,42,0.95); color: #f9fafb; outline: none; }
+    .field input:focus { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(59,130,246,0.45); }
+    .login-error { margin-bottom: 10px; padding: 6px 8px; border-radius: 10px; font-size: 0.78rem; color: #fecaca; background: rgba(248,113,113,0.12); border: 1px solid rgba(248,113,113,0.6); }
+    .login-button { padding: 8px 14px; border-radius: 999px; border: none; cursor: pointer; font-size: 0.9rem; font-weight: 500; background: linear-gradient(135deg, #3b82f6, #6366f1); color: #f9fafb; display: inline-flex; align-items: center; gap: 6px; float: right; }
+    .login-button:hover { filter: brightness(1.05); }
+  </style>
+</head>
+<body>
+  <form class="login-card" method="POST" action="/">
+    <div class="login-badge"><span class="login-badge-dot"></span><span>CQD Analytics Admin</span></div>
+    <h1 class="login-title">Enter admin password</h1>
+    <p class="login-subtitle">Unlock analytics dashboard & danger controls.</p>
+    <div class="field">
+      <label for="password-input">Admin password</label>
+      <input id="password-input" name="password" type="password" autofocus required />
+    </div>
+    ${errorMessage ? `<div class="login-error">${errorMessage}</div>` : ""}
+    <button class="login-button" type="submit"><span>Unlock</span><span>→</span></button>
+  </form>
+  <script>document.getElementById("password-input")?.focus();</script>
+</body>
+</html>`;
+}
 
-      * {
-        box-sizing: border-box;
-      }
+export function renderDashboard(stats: StatsResponse): string {
+  const quota = stats.quota;
+  const stateTag = quotaToStateTag(quota);
+  const flag = quotaToFlag(quota);
 
-      body {
-        margin: 0;
-        min-height: 100vh;
-        font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
-          "Segoe UI", sans-serif;
-        background: radial-gradient(circle at top, #0f172a 0, #020617 60%);
-        color: var(--text-main);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 24px;
-      }
+  const requestsToday = quota?.requestsToday ?? 0;
+  const remoteEnabled = quota?.remoteEnabled ?? true;
+  const quotaLevel = quota?.quotaLevel ?? "UNKNOWN";
+  const batchSize = quota?.batchSizeSuggestion ?? 50;
 
-      .shell {
+  const lastEventAt = formatTs(stats.lastEventAt);
+  const lastFlushAt = formatTs(stats.lastFlushAt);
+  const ageLastEvent = formatAge(stats.lastEventAt);
+  const ageLastFlush = formatAge(stats.lastFlushAt);
+
+  const maxBatchEvents = stats.envSnapshot?.maxBatchEvents || "n/a";
+  const oracleEndpoint = stats.envSnapshot?.oracleEndpoint || "unknown";
+  const nextAutoFlush =
+    maxBatchEvents !== "n/a"
+      ? `when buffer ≥ ${maxBatchEvents} events`
+      : "unknown";
+
+  const workerUrl = "https://cqd-analytics.adhamhaithameid.workers.dev";
+
+  const renderTableRows = (data: Record<string, number>) => {
+    const keys = Object.keys(data).sort((a, b) => data[b] - data[a]);
+    if (keys.length === 0) return "<tr><td colspan='2'>—</td></tr>";
+    return keys
+      .map((k) => `<tr><td>${k}</td><td>${data[k]}</td></tr>`)
+      .join("");
+  };
+
+  const byTypeRows = renderTableRows(stats.counters.byType || {});
+  const byStatusRows = renderTableRows(stats.counters.byStatus || {});
+  const byBrowserRows = renderTableRows(stats.counters.byBrowser || {});
+  const byOsRows = renderTableRows(stats.counters.byOs || {});
+  const byExtVersionRows = renderTableRows(stats.counters.byExtVersion || {});
+  const byLangRows = renderTableRows(stats.counters.byLanguage || {});
+  const byCountryRows = renderTableRows(stats.counters.byCountry || {});
+  const byErrorRows = renderTableRows(stats.counters.byErrorType || {});
+
+  const totalSuccess = stats.totalSuccess || 0;
+  const totalFail = stats.totalFail || 0;
+  const srMeta = classifySuccessRate(totalSuccess, totalFail);
+  const totalAttempts = totalSuccess + totalFail;
+  const failRate =
+    totalAttempts > 0 ? (totalFail / totalAttempts) * 100 : null;
+  const failRateText = failRate !== null ? `${failRate.toFixed(1)}%` : "—";
+
+  const hotType = topKey(stats.counters.byType);
+  const hotBrowser = topKey(stats.counters.byBrowser);
+  const hotOs = topKey(stats.counters.byOs);
+  const hotCountry = topKey(stats.counters.byCountry);
+
+  const rawStatsJson = JSON.stringify(stats, null, 2)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>CQD Analytics – Worker & DO Dashboard</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #050816;
+      --bg-elevated: #111827;
+      --border-subtle: #1f2937;
+      --accent: #3b82f6;
+      --danger: #ef4444;
+      --text-main: #e5e7eb;
+      --text-muted: #9ca3af;
+      --text-soft: #6b7280;
+      --success: #22c55e;
+      --warning: #f59e0b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 24px;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: radial-gradient(circle at top, #111827 0, #020617 60%, #020617 100%);
+      color: var(--text-main);
+      line-height: 1.5;
+    }
+    .page {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      position: relative;
+    }
+    .hidden {
+      display: none;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      margin-bottom: 8px;
+    }
+    .title-block h1 {
+      margin: 0;
+      font-size: 1.75rem;
+      letter-spacing: -0.01em;
+      font-weight: 700;
+      background: linear-gradient(to right, #e5e7eb, #9ca3af);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .title-block p {
+      margin: 0;
+      font-size: 0.95rem;
+      color: var(--text-muted);
+    }
+
+    .header-controls {
+      display: flex;
+      flex-direction: row-reverse;
+      align-items: flex-end;
+      gap: 8px;
+    }
+    .live-wrapper {
+      display: flex;
+      flex-direction: row-reverse;
+      align-items: center;
+      justify-content: flex-center;
+      gap: 8px;
+    }
+    .refresh-indicator {
+      text-align: right;
+      font-size: 0.75rem;
+    }
+    .refresh-label {
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-soft);
+    }
+    .refresh-value {
+      color: var(--text-main);
+      font-feature-settings: "tnum" 1;
+    }
+
+    .live-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(148,163,184,0.4);
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+    }
+    .live-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: #22c55e;
+      box-shadow: 0 0 8px rgba(34,197,94,0.7);
+    }
+    .live-label { font-weight: 600; }
+
+    @keyframes live-pulse {
+      0% { transform: scale(0.9); opacity: 0.7; }
+      50% { transform: scale(1.15); opacity: 1; }
+      100% { transform: scale(0.9); opacity: 0.7; }
+    }
+    .live-indicator[data-state="live"] .live-dot {
+      animation: live-pulse 1.5s infinite;
+    }
+    .live-indicator[data-state="stale"] .live-dot {
+      background: #f59e0b;
+      box-shadow: 0 0 8px rgba(245,158,11,0.7);
+      animation: none;
+    }
+    .live-indicator[data-state="cold"] .live-dot {
+      background: #ef4444;
+      box-shadow: 0 0 8px rgba(239,68,68,0.7);
+      animation: none;
+    }
+
+    .info-btn {
+      border-radius: 999px;
+      border: 1px solid var(--border-subtle);
+      background: rgba(15,23,42,0.9);
+      color: var(--text-muted);
+      display: inline-flex;
+      align-items: end;
+      gap: 6px;
+      padding: 6px 10px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .info-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(59,130,246,0.15);
+    }
+    .info-pill {
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(31,41,55,0.9);
+      border: 1px solid rgba(148,163,184,0.5);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: 0.65rem;
+      color: var(--text-muted);
+    }
+    .info-pill-flag {
+      border-color: rgba(34,197,94,0.7);
+      color: #22c55e;
+    }
+    .info-icon {
+      width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      border: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.85rem;
+    }
+
+    main {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .card {
+      background: rgba(15,23,42,0.6);
+      backdrop-filter: blur(10px);
+      border-radius: 16px;
+      border: 1px solid rgba(148,163,184,0.12);
+      padding: 20px;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+      transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+    }
+    .card:hover {
+      border-color: rgba(148,163,184,0.25);
+    }
+    .card h2 {
+      margin: 0 0 16px;
+      font-size: 0.95rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .section-header {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+
+    .grid-4 {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+    .split-section {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .metric {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 8px;
+      border-radius: 8px;
+      transition: background 0.5s;
+      position: relative;
+    }
+    .metric-compact {
+      padding: 6px;
+    }
+    .metric-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-soft);
+      font-weight: 600;
+    }
+    .metric-value {
+      font-size: 1.6rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      transition: color 0.3s;
+    }
+    .metric-sub {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .metric-good .metric-value {
+      color: var(--success);
+    }
+    .metric-warn .metric-value {
+      color: var(--warning);
+    }
+    .metric-bad .metric-value {
+      color: var(--danger);
+    }
+
+    .empty-state {
+      margin-top: 12px;
+      font-size: 0.8rem;
+      color: var(--text-soft);
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px dashed rgba(148,163,184,0.35);
+      background: rgba(15,23,42,0.8);
+    }
+
+    @keyframes flash-green {
+      0% { background-color: rgba(34, 197, 94, 0.2); }
+      100% { background-color: transparent; }
+    }
+    @keyframes text-flash {
+      0% {
+        color: #fff;
+        text-shadow: 0 0 10px rgba(255,255,255,0.5);
+      }
+      100% {
+        color: inherit;
+        text-shadow: none;
+      }
+    }
+    .updated {
+      animation: flash-green 1.5s ease-out;
+    }
+    .updated .metric-value,
+    .updated strong,
+    .updated .quota-val,
+    .updated .refresh-value,
+    .updated .live-label {
+      animation: text-flash 1.5s ease-out;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+    }
+    th, td {
+      padding: 6px 4px;
+      text-align: left;
+    }
+    th {
+      font-weight: 600;
+      color: var(--text-soft);
+      border-bottom: 1px solid rgba(148,163,184,0.1);
+    }
+    td {
+      color: var(--text-main);
+    }
+    tr:not(:last-child) td {
+      border-bottom: 1px dashed rgba(148,163,184,0.1);
+    }
+    tr:hover td {
+      color: #fff;
+      background: rgba(255,255,255,0.02);
+    }
+
+    .breakdown-grid {
+      margin-top: 4px;
+    }
+    .breakdown-block {
+      border-radius: 12px;
+      border: 1px solid rgba(148,163,184,0.14);
+      padding: 12px 12px 10px;
+      background: rgba(15,23,42,0.75);
+      transition: background 0.3s, border-color 0.3s;
+    }
+
+    .hot-today {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 12px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(148,163,184,0.2);
+      background: rgba(15,23,42,0.7);
+    }
+    .hot-item {
+      min-width: 120px;
+    }
+    .hot-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-soft);
+      margin-bottom: 2px;
+    }
+    .hot-value {
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: var(--text-main);
+    }
+
+    button.btn {
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: 1px solid var(--border-subtle);
+      background: rgba(15,23,42,0.8);
+      color: var(--text-main);
+      font-size: 0.85rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s;
+      font-weight: 500;
+    }
+    button.btn:hover {
+      border-color: var(--accent);
+      background: rgba(15,23,42,1);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(59,130,246,0.15);
+    }
+    button.btn:active {
+      transform: translateY(0);
+    }
+    .btn-bullet {
+      font-size: 1.4em;
+      line-height: 0;
+      color: var(--accent);
+      margin-right: 4px;
+    }
+
+    .quota-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 700;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+      cursor: help;
+    }
+
+    [data-tooltip] { position: relative; cursor: help; }
+    [data-tooltip]:hover::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      bottom: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 6px 10px;
+      background: #0f172a;
+      border: 1px solid var(--border-subtle);
+      color: #e2e8f0;
+      font-size: 0.75rem;
+      border-radius: 6px;
+      white-space: nowrap;
+      pointer-events: none;
+      z-index: 10;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+      margin-bottom: 6px;
+    }
+
+    .state-unknown,
+    .flag-unknown {
+      background: rgba(148,163,184,0.05);
+      color: #e5e7eb;
+      border: 1px dashed rgba(148,163,184,0.3);
+    }
+    .state-sleeping,
+    .state-super-chill,
+    .state-chill,
+    .state-easy,
+    .state-kinda-easy {
+      background: rgba(148,163,184,0.1);
+      color: #d1d5db;
+      border: 1px solid rgba(148,163,184,0.3);
+    }
+    .state-normal,
+    .state-slightly-busy {
+      background: rgba(59,130,246,0.1);
+      color: #93c5fd;
+      border: 1px solid rgba(59,130,246,0.4);
+    }
+    .state-kinda-busy,
+    .state-busy,
+    .state-very-busy,
+    .state-super-busy {
+      background: rgba(249,115,22,0.1);
+      color: #fdba74;
+      border: 1px solid rgba(249,115,22,0.4);
+    }
+    .state-emergency,
+    .state-critical,
+    .state-cut-power {
+      background: rgba(239,68,68,0.15);
+      color: #fca5a5;
+      border: 1px solid rgba(239,68,68,0.5);
+    }
+
+    .flag-easy   { background: rgba(34,197,94,0.1);  color: #86efac; border: 1px solid rgba(34,197,94,0.4); }
+    .flag-normal { background: rgba(59,130,246,0.1); color: #93c5fd; border: 1px solid rgba(59,130,246,0.4); }
+    .flag-hard   { background: rgba(245,158,11,0.1); color: #fcd34d; border: 1px solid rgba(245,158,11,0.4); }
+    .flag-fuck   { background: rgba(239,68,68,0.2);  color: #fca5a5; border: 1px solid rgba(239,68,68,0.6); }
+
+    .danger-zone {
+      border: 1px solid rgba(220, 38, 38, 0.5);
+      background: rgba(69, 10, 10, 0.25);
+      transition: all 0.3s ease;
+    }
+    .danger-zone:hover {
+      background: rgba(127, 29, 29, 0.3);
+      border-color: rgba(239, 68, 68, 0.8);
+      box-shadow: 0 0 20px rgba(220, 38, 38, 0.15);
+    }
+    .danger-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .danger-title {
+      font-size: 0.95rem;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      color: #f87171;
+      font-weight: 700;
+    }
+    .danger-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(239,68,68,0.15);
+    }
+    .danger-row:last-child {
+      border-bottom: none;
+    }
+    .danger-desc {
+      font-size: 0.9rem;
+      color: #fca5a5;
+      font-weight: 500;
+    }
+    .danger-sub {
+      font-size: 0.75rem;
+      color: rgba(254, 202, 202, 0.7);
+      margin-top: 2px;
+    }
+    .btn-danger {
+      padding: 8px 16px;
+      font-size: 0.85rem;
+      border-radius: 8px;
+      border: 1px solid rgba(239, 68, 68, 0.5);
+      background: transparent;
+      color: #fca5a5;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+    .btn-danger:hover {
+      background: rgba(220,38,38,0.3);
+      border-color: #ef4444;
+      color: #fff;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(220,38,38,0.15);
+    }
+    .btn-danger:active {
+      transform: translateY(0);
+    }
+
+    .auth-bar {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .auth-input {
+      background: rgba(0,0,0,0.3);
+      border: 1px solid rgba(248, 113, 113, 0.3);
+      color: #fca5a5;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      outline: none;
+      transition: all 0.2s;
+    }
+    .auth-input:focus {
+      border-color: #ef4444;
+      box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
+    }
+    .auth-btn {
+      padding: 6px 12px;
+      font-size: 0.75rem;
+      border-radius: 6px;
+      border: 1px solid rgba(239, 68, 68, 0.5);
+      background: transparent;
+      color: #fca5a5;
+      cursor: pointer;
+    }
+    .auth-btn:hover {
+      background: rgba(239, 68, 68, 0.1);
+    }
+
+    .danger-status-hint {
+      font-size: 0.78rem;
+      color: #fecaca;
+      margin-top: 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .danger-status-label {
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: 0.7rem;
+      color: rgba(254,202,202,0.8);
+    }
+    .danger-status-value {
+      font-weight: 600;
+    }
+    .danger-status-value.enabled {
+      color: #bbf7d0;
+    }
+    .danger-status-value.disabled {
+      color: #fecaca;
+    }
+    .danger-chip {
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(248,113,113,0.8);
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      background: rgba(127,29,29,0.5);
+    }
+
+    .code-block {
+      font-family: 'SFMono-Regular', Consolas, monospace;
+      font-size: 0.8rem;
+      background: rgba(0,0,0,0.3);
+      padding: 4px 8px;
+      border-radius: 4px;
+      border: 1px solid rgba(148,163,184,0.1);
+      color: #94a3b8;
+      word-break: break-all;
+      user-select: all;
+    }
+    .code-block:hover {
+      color: #e2e8f0;
+      border-color: rgba(148,163,184,0.3);
+    }
+    .code-block-large {
+      display: block;
+      margin-top: 8px;
+      max-height: 260px;
+      overflow: auto;
+      padding: 8px 10px;
+      background: rgba(15,23,42,0.9);
+    }
+
+    .quota-panel {
+      background: rgba(0,0,0,0.2);
+      border-radius: 12px;
+      padding: 16px;
+      border: 1px solid rgba(255,255,255,0.03);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .quota-stat {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 4px 0;
+      border-radius: 6px;
+      transition: background 0.5s;
+    }
+    .quota-label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+    .quota-val {
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .modal-overlay.open {
+      display: flex;
+      opacity: 1;
+    }
+    .modal {
+      background: #1e293b;
+      border: 1px solid var(--border-subtle);
+      width: 100%;
+      max-width: 500px;
+      max-height: 80vh;
+      overflow-y: auto;
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);
+      transform: scale(0.95);
+      transition: transform 0.2s;
+      position: relative;
+    }
+    .modal-overlay.open .modal {
+      transform: scale(1);
+    }
+    .modal h3 {
+      margin-top: 0;
+      font-size: 1.2rem;
+    }
+    .modal-section {
+      margin-top: 16px;
+    }
+    .modal-section h4 {
+      font-size: 0.85rem;
+      color: var(--text-soft);
+      text-transform: uppercase;
+      margin-bottom: 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      padding-bottom: 4px;
+    }
+    .modal-item {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      padding: 6px 0;
+      border-bottom: 1px dashed rgba(255,255,255,0.05);
+    }
+    .modal-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 8px 0 10px;
+    }
+    .close-modal {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 1.2rem;
+    }
+    .close-modal:hover {
+      color: #fff;
+    }
+
+    @media (max-width: 900px) {
+      .grid-4,
+      .grid-3,
+      .split-section {
+        grid-template-columns: 1fr;
+      }
+      .auth-bar {
         width: 100%;
-        max-width: 1300px;
-        background: radial-gradient(circle at top left, #0f172a 0, #020617 60%);
-        border-radius: 24px;
-        border: 1px solid var(--border-subtle);
-        padding: 24px 26px 26px;
-        box-shadow: 0 24px 80px rgba(15, 23, 42, 0.9);
-      }
-
-      header {
-        display: flex;
         justify-content: space-between;
-        align-items: flex-start;
-        gap: 16px;
-      }
-
-      h1 {
-        font-size: 22px;
-        margin: 0 0 4px;
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-      }
-
-      .badge-primary {
-        font-size: 11px;
-        padding: 2px 8px;
-        border-radius: 999px;
-        background: var(--accent-soft);
-        border: 1px solid rgba(56, 189, 248, 0.6);
-        color: var(--accent);
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-      }
-
-      .subtitle {
-        margin: 0;
-        font-size: 13px;
-        color: var(--text-muted);
-      }
-
-      .meta {
-        text-align: right;
-        font-size: 12px;
-        color: var(--text-muted);
-      }
-
-      .meta b {
-        color: var(--text-main);
-      }
-
-      .grid {
-        display: grid;
-        gap: 12px;
-      }
-
-      .grid-cols-4 {
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-      }
-
-      .grid-cols-3 {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-      }
-
-      .grid-cols-2 {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
-
-      @media (max-width: 900px) {
-        .grid-cols-4 {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-        .grid-cols-3 {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-      }
-
-      @media (max-width: 640px) {
-        body {
-          padding: 12px;
-        }
-        .shell {
-          border-radius: 18px;
-          padding: 18px;
-        }
-        header {
-          flex-direction: column;
-          align-items: flex-start;
-        }
-        .grid-cols-4,
-        .grid-cols-3,
-        .grid-cols-2 {
-          grid-template-columns: minmax(0, 1fr);
-        }
-      }
-
-      .section {
-        margin-top: 22px;
-        padding-top: 16px;
-        border-top: 1px dashed rgba(148, 163, 184, 0.5);
-      }
-
-      .section:first-of-type {
-        margin-top: 16px;
-        border-top: none;
-        padding-top: 0;
-      }
-
-      .card {
-        background: linear-gradient(145deg, #020617 0, #020617 70%);
-        border-radius: 18px;
-        border: 1px solid rgba(148, 163, 184, 0.18);
-        padding: 10px 11px;
-      }
-
-      .card-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 6px;
-      }
-
-      .card-title {
-        font-size: 12px;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        color: var(--text-muted);
-      }
-
-      .card-chip {
-        font-size: 11px;
-        padding: 2px 6px;
-        border-radius: 999px;
-        border: 1px solid rgba(148, 163, 184, 0.3);
-        color: var(--text-muted);
-      }
-
-      .card-value {
-        font-size: 20px;
-        font-weight: 600;
-        font-variant-numeric: tabular-nums;
-        transition: color 0.25s ease;
-      }
-
-      .card-value.success {
-        color: var(--success);
-      }
-
-      .card-value.danger {
-        color: var(--danger);
-      }
-
-      .card-sub {
-        font-size: 12px;
-        color: var(--text-muted);
-        margin-top: 2px;
-      }
-
-      .section-title {
-        font-size: 12px;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        color: var(--text-muted);
-        margin: 0 0 8px;
-      }
-
-      .pill-row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
-      }
-
-      .pill {
-        padding: 4px 8px;
-        border-radius: 999px;
-        background: rgba(15, 23, 42, 0.9);
-        border: 1px solid rgba(148, 163, 184, 0.45);
-        font-size: 11px;
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        font-variant-numeric: tabular-nums;
-      }
-
-      .pill.soft {
-        border-style: dashed;
-        opacity: 0.9;
-      }
-
-      .pill .key {
-        color: var(--text-muted);
-      }
-
-      .pill .value {
-        color: var(--text-main);
-      }
-
-      .muted {
-        color: var(--text-muted);
-      }
-
-      .badge-soft {
-        font-size: 11px;
-        padding: 2px 7px;
-        border-radius: 999px;
-        background: rgba(15, 23, 42, 0.9);
-        border: 1px solid rgba(148, 163, 184, 0.4);
-      }
-
-      .dot {
-        display: inline-block;
-        width: 7px;
-        height: 7px;
-        border-radius: 999px;
-        margin-right: 6px;
-      }
-
-      .dot.green {
-        background: var(--success);
-      }
-
-      .dot.red {
-        background: var(--danger);
-      }
-
-      .dot.yellow {
-        background: var(--warning);
-      }
-
-      .footer {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-top: 18px;
-        font-size: 11px;
-        color: var(--text-muted);
-      }
-
-      .footer a {
-        color: var(--accent);
-        text-decoration: none;
-      }
-
-      .footer a:hover {
-        text-decoration: underline;
-      }
-
-      .endpoint-list {
-        font-size: 11px;
-        line-height: 1.5;
-      }
-
-      .endpoint-list code {
-        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-          "Liberation Mono", "Courier New", monospace;
-        font-size: 11px;
-        background: rgba(15, 23, 42, 0.9);
-        padding: 2px 4px;
-        border-radius: 6px;
-        border: 1px solid rgba(148, 163, 184, 0.35);
-      }
-
-      .btn-row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
         margin-top: 8px;
       }
-
-      button {
-        cursor: pointer;
-        border-radius: 999px;
-        border: 1px solid rgba(148, 163, 184, 0.5);
-        background: rgba(15, 23, 42, 0.9);
-        color: var(--text-main);
-        padding: 6px 14px;
-        font-size: 12px;
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
+      .danger-header {
+        flex-direction: column;
+        align-items: flex-start;
       }
-
-      button.primary {
-        border-color: rgba(56, 189, 248, 0.8);
-        background: linear-gradient(
-          135deg,
-          rgba(56, 189, 248, 0.15),
-          rgba(56, 189, 248, 0.05)
-        );
+      header {
+        flex-direction: column;
+        gap: 8px;
       }
-
-      button:hover:not(:disabled) {
-        border-color: var(--accent);
+      .header-controls {
+        align-self: flex-end;
       }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <div class="title-block">
+        <h1>Classroom Quick Downloader Extension Analytics</h1>
+        <p>Live Worker + Durable Object stats. Manual refresh only.</p>
+      </div>
+      <div class="header-controls">
+        <button class="info-btn" id="info-btn" title="View Context & Legend" type="button">
+          <span class="info-pill" id="header-pill-status">${stateTag.label}</span>
+          <span class="info-pill info-pill-flag" id="header-pill-flag">${flag.label}</span>
+          <span class="info-icon">!</span>
+        </button>
+        <div class="live-wrapper">
+          <div class="live-indicator" id="live-indicator" data-state="live">
+            <span class="live-dot"></span>
+            <span class="live-label" id="live-label">Live</span>
+          </div>
+          <div class="refresh-indicator">
+            <div class="refresh-label">Last refresh</div>
+            <div class="refresh-value" id="last-refresh-label">—</div>
+          </div>
+        </div>
+      </div>
+    </header>
 
-      button:disabled {
-        opacity: 0.6;
-        cursor: default;
-      }
+    <main>
+      <!-- Top Cards -->
+      <section class="card">
+        <div class="grid-4">
+          <div class="metric" id="card-downloads" data-tooltip="Downloads completed successfully (status=success)">
+            <div class="metric-label">Total Downloads</div>
+            <div class="metric-value" data-bind="totalDownloads">${stats.totalDownloads}</div>
+          </div>
+          <div class="metric" id="card-success" data-tooltip="All events with status=success">
+            <div class="metric-label">Total Success</div>
+            <div class="metric-value" data-bind="totalSuccess" style="color:var(--success)">${stats.totalSuccess}</div>
+          </div>
+          <div class="metric" id="card-fail" data-tooltip="All events with status=fail">
+            <div class="metric-label">Total Fail</div>
+            <div class="metric-value" data-bind="totalFail" style="color:var(--danger)">${stats.totalFail}</div>
+          </div>
+          <div class="metric" id="card-events" data-tooltip="Total events received by DO">
+            <div class="metric-label">Total Events</div>
+            <div class="metric-value" data-bind="totalEvents">${stats.totalEvents}</div>
+          </div>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:12px; margin-top:12px;">
+          <div class="metric metric-compact ${srMeta.className}" id="card-success-rate" data-tooltip="Successful downloads / (success + fail)">
+            <div class="metric-label">Success rate</div>
+            <div class="metric-value" data-bind="successRate">${srMeta.text}</div>
+            <div class="metric-sub" data-bind="successRateBadge">${srMeta.badge}</div>
+          </div>
+          <div class="metric metric-compact" id="card-fail-rate" data-tooltip="Failed downloads / (success + fail)">
+            <div class="metric-label">Fail rate</div>
+            <div class="metric-value" data-bind="failRate">${failRateText}</div>
+            <div class="metric-sub">of attempts</div>
+          </div>
+        </div>
+        <div id="empty-state" class="empty-state${
+          stats.totalEvents > 0 ? " hidden" : ""
+        }">
+          No events yet – install the extension and trigger a download to see analytics here.
+        </div>
+      </section>
 
-      .btn-dot {
-        width: 7px;
-        height: 7px;
-        border-radius: 999px;
-        background: var(--accent);
-      }
+      <!-- Buffer, Timing & Environment -->
+      <section class="card">
+        <h2>Buffer, Timing & Environment</h2>
+        <div class="grid-3">
+          <div id="card-buffer">
+            <div class="section-header">Buffer</div>
+            <div class="metric-sub">
+              Pending:
+              <strong style="color:white" data-bind="pendingEvents">${stats.pendingEvents}</strong>
+            </div>
+            <div class="metric-sub">
+              Age: <strong data-bind="ageLastEvent">${ageLastEvent}</strong>
+            </div>
+            <div class="metric-sub">Next flush: ${nextAutoFlush}</div>
+          </div>
+          <div id="card-timeline">
+            <div class="section-header">Timeline</div>
+            <div class="metric-sub">
+              Last event: <span data-bind="lastEventAt">${lastEventAt}</span>
+            </div>
+            <div class="metric-sub">
+              Last flush: <span data-bind="lastFlushAt">${lastFlushAt}</span>
+            </div>
+            <div class="metric-sub">
+              Flush age:
+              <strong data-bind="ageLastFlush">${ageLastFlush}</strong>
+            </div>
+          </div>
+          <div>
+            <div class="section-header">Environment</div>
+            <div class="metric-sub">
+              MAX_BATCH_EVENTS: <code>${maxBatchEvents}</code>
+            </div>
+            <div class="metric-sub">
+              ORACLE_ENDPOINT:
+              <code>${
+                oracleEndpoint.startsWith("http")
+                  ? "configured"
+                  : oracleEndpoint
+              }</code>
+            </div>
+          </div>
+        </div>
+      </section>
 
-      .debug-status {
-        font-size: 11px;
-        color: var(--text-muted);
-        margin-top: 4px;
-      }
+      <!-- Worker Quota & Mode -->
+      <section class="card">
+        <h2>Worker Quota & Mode</h2>
+        <div class="split-section">
+          <!-- Left: Usage -->
+          <div class="quota-panel" id="panel-usage">
+            <div class="section-header" style="border:none; margin:0">
+              Daily Usage
+            </div>
+            <div class="quota-stat">
+              <span class="quota-label">Requests Today</span>
+              <span class="quota-val" data-bind="requestsToday">${requestsToday}</span>
+            </div>
+            <div class="quota-stat">
+              <span class="quota-label">Status</span>
+              <span
+                class="quota-tag ${stateTag.className}"
+                id="tag-status"
+                data-tooltip="${stateTag.description}"
+              >${stateTag.label}</span>
+            </div>
+            <div class="quota-stat">
+              <span class="quota-label">Flag</span>
+              <span
+                class="quota-tag ${flag.className}"
+                id="tag-flag"
+                data-tooltip="${flag.description}"
+              >${flag.label}</span>
+            </div>
+          </div>
+          <!-- Right: Config -->
+          <div class="quota-panel" id="panel-config">
+            <div class="section-header" style="border:none; margin:0">
+              Configuration
+            </div>
+            <div class="quota-stat">
+              <span
+                class="quota-label"
+                data-tooltip="When ENABLED, the browser extension sends analytics events to this Worker via /track. When DISABLED, remote tracking is cut and the extension should keep analytics local to protect Cloudflare quota."
+              >
+                Remote Analytics
+              </span>
+              <span
+                class="quota-val"
+                id="val-remote"
+                style="color:${
+                  remoteEnabled ? "var(--success)" : "var(--danger)"
+                }"
+              >${remoteEnabled ? "ENABLED" : "DISABLED"}</span>
+            </div>
+            <div class="quota-stat">
+              <span class="quota-label">Quota Level</span>
+              <span
+                class="quota-val"
+                style="font-size:0.85rem"
+                data-bind="quotaLevel"
+              >${quotaLevel}</span>
+            </div>
+            <div class="quota-stat">
+              <span class="quota-label">Suggested Batch</span>
+              <span class="quota-val">
+                <span data-bind="batchSize">${batchSize}</span> events / POST
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
 
-      .debug-status strong {
-        color: var(--text-main);
-      }
+      <!-- Debug & Actions -->
+      <section class="card">
+        <h2>Debug & Actions</h2>
+        <div class="split-section">
+          <!-- Debug & Endpoints -->
+          <div>
+            <div class="section-header">Endpoints</div>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+              <div>
+                <span class="metric-label">Worker Base</span><br />
+                <span class="code-block">${workerUrl}/</span>
+              </div>
+              <div>
+                <span class="metric-label">Track Endpoint</span><br />
+                <span class="code-block">${workerUrl}/track</span>
+              </div>
+              <div>
+                <span class="metric-label">Stats (JSON)</span><br />
+                <span class="code-block">${workerUrl}/stats</span>
+              </div>
+              <div>
+                <span class="metric-label">Health</span><br />
+                <span class="code-block">${workerUrl}/health</span>
+              </div>
+              <div>
+                <span class="metric-label">Debug Flush</span><br />
+                <span class="code-block">${workerUrl}/debug/flush</span>
+              </div>
+            </div>
+          </div>
 
-      pre {
-        margin: 0;
-        max-height: 220px;
-        overflow: auto;
-        font-size: 11px;
-        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-          "Liberation Mono", "Courier New", monospace;
-        background: rgba(15, 23, 42, 0.9);
-        border-radius: 12px;
-        padding: 8px 10px;
-        border: 1px solid rgba(148, 163, 184, 0.3);
-      }
+          <!-- Actions -->
+          <div>
+            <div class="section-header">Manual only – no auto polling</div>
+            <div style="display:flex; flex-direction:column; gap:12px;">
+              <button class="btn" id="btn-reload" type="button">
+                <span class="btn-bullet">•</span> Reload stats
+              </button>
+              <button
+                class="btn"
+                onclick="window.open('/stats', '_blank')"
+                type="button"
+              >
+                <span class="btn-bullet">•</span> Open /stats JSON
+              </button>
+              <button
+                class="btn"
+                onclick="window.open('/health', '_blank')"
+                type="button"
+              >
+                <span class="btn-bullet">•</span> Open /health
+              </button>
+              <button class="btn" id="btn-debug-flush-action" type="button">
+                <span class="btn-bullet">•</span> POST /debug/flush
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
 
-      .json-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 4px;
-        font-size: 11px;
-        color: var(--text-muted);
-      }
+      <!-- Breakdown -->
+      <section class="card">
+        <h2>Breakdown by Dimensions</h2>
+        <div class="hot-today">
+          <div class="hot-item">
+            <div class="hot-label">Top type today</div>
+            <div class="hot-value" data-bind="hotType">${hotType}</div>
+          </div>
+          <div class="hot-item">
+            <div class="hot-label">Top browser</div>
+            <div class="hot-value" data-bind="hotBrowser">${hotBrowser}</div>
+          </div>
+          <div class="hot-item">
+            <div class="hot-label">Top OS</div>
+            <div class="hot-value" data-bind="hotOs">${hotOs}</div>
+          </div>
+          <div class="hot-item">
+            <div class="hot-label">Top country</div>
+            <div class="hot-value" data-bind="hotCountry">${hotCountry}</div>
+          </div>
+        </div>
+        <div class="grid-3 breakdown-grid">
+          <div class="breakdown-block">
+            <div class="section-header">By Type</div>
+            <table>
+              <thead><tr><th>Type</th><th>Count</th></tr></thead>
+              <tbody id="tbody-type">${byTypeRows}</tbody>
+            </table>
+          </div>
+          <div class="breakdown-block">
+            <div class="section-header">By Status</div>
+            <table>
+              <thead><tr><th>Status</th><th>Count</th></tr></thead>
+              <tbody id="tbody-status">${byStatusRows}</tbody>
+            </table>
+          </div>
+          <div class="breakdown-block">
+            <div class="section-header">By Browser</div>
+            <table>
+              <thead><tr><th>Browser</th><th>Count</th></tr></thead>
+              <tbody id="tbody-browser">${byBrowserRows}</tbody>
+            </table>
+          </div>
+          <div class="breakdown-block">
+            <div class="section-header">By OS</div>
+            <table>
+              <thead><tr><th>OS</th><th>Count</th></tr></thead>
+              <tbody id="tbody-os">${byOsRows}</tbody>
+            </table>
+          </div>
+          <div class="breakdown-block">
+            <div class="section-header">By Extension Version</div>
+            <table>
+              <thead><tr><th>Version</th><th>Count</th></tr></thead>
+              <tbody id="tbody-ext">${byExtVersionRows}</tbody>
+            </table>
+          </div>
+          <div class="breakdown-block">
+            <div class="section-header">By Language</div>
+            <table>
+              <thead><tr><th>Lang</th><th>Count</th></tr></thead>
+              <tbody id="tbody-lang">${byLangRows}</tbody>
+            </table>
+          </div>
+          <div class="breakdown-block">
+            <div class="section-header">By Country</div>
+            <table>
+              <thead><tr><th>Country</th><th>Count</th></tr></thead>
+              <tbody id="tbody-country">${byCountryRows}</tbody>
+            </table>
+          </div>
+          <div class="breakdown-block">
+            <div class="section-header">By Error Reason</div>
+            <table>
+              <thead><tr><th>Error</th><th>Count</th></tr></thead>
+              <tbody id="tbody-error">${byErrorRows}</tbody>
+            </table>
+          </div>
+        </div>
+      </section>
 
-      .json-header span {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-      }
+      <!-- Danger Zone -->
+      <section class="card danger-zone">
+        <div class="danger-header">
+          <div>
+            <div class="danger-title">Admin Controls / Danger Zone</div>
+            <div class="danger-status-hint" id="danger-status-hint">
+              <span class="danger-status-label">Remote analytics</span>
+              <span
+                class="danger-status-value ${
+                  remoteEnabled ? "enabled" : "disabled"
+                }"
+                id="danger-remote-state"
+              >
+                ${remoteEnabled ? "ENABLED" : "DISABLED"}
+              </span>
+              <span
+                class="danger-chip"
+                id="danger-remote-chip"
+                style="display:${remoteEnabled ? "none" : "inline-block"}"
+              >
+                CUT POWER ACTIVE
+              </span>
+            </div>
+          </div>
+        </div>
 
-      /* Flash effect for updated values */
-      .flash {
-        animation: flash-bg 0.7s ease-out;
-      }
+        <div
+          class="danger-row"
+          data-tooltip="Immediately pushes all pending analytics events from the Durable Object buffer to ORACLE_ENDPOINT, even if the batch threshold is not reached. Use this to force sync remote storage and any external dashboards."
+        >
+          <div>
+            <div class="danger-desc">Flush Buffer to Oracle</div>
+            <div class="danger-sub">
+              Force pushes all pending events immediately.
+            </div>
+          </div>
+          <button class="btn-danger" id="btn-force-flush" type="button">
+            Flush now
+          </button>
+        </div>
 
-      @keyframes flash-bg {
-        0% {
-          background-color: rgba(56, 189, 248, 0.22);
-          box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.3);
-        }
-        70% {
-          background-color: transparent;
-          box-shadow: 0 0 0 10px rgba(56, 189, 248, 0);
-        }
-        100% {
-          background-color: transparent;
-          box-shadow: none;
-        }
-      }
-    </style>
-  </head>
-  <body>
-    <div class="shell">
-      <header>
-        <div>
-          <h1>
-            CQD Analytics
-            <span class="badge-primary">Durable Object</span>
-          </h1>
-          <p class="subtitle">
-            Live Worker + Durable Object stats for the Classroom Quick Downloader
-            extension. Use the <b>Reload stats</b> button when you want fresh
-            data (no auto polling).
+        <div
+          class="danger-row"
+          data-tooltip="Sets remoteEnabled to OFF. The Worker will tell all extensions to stop sending analytics to /track and keep everything local. Use this in emergencies to protect your Cloudflare request quota."
+        >
+          <div>
+            <div class="danger-desc">Cut Power (Remote OFF)</div>
+            <div class="danger-sub">
+              Disables remote analytics for all extensions. Emergency only.
+            </div>
+          </div>
+          <button class="btn-danger" id="btn-cut-power" type="button">
+            Cut power
+          </button>
+        </div>
+
+        <div
+          class="danger-row"
+          data-tooltip="Re-enables remote analytics if you previously cut power. The Worker will once again accept remote events and extensions may start hitting /track again."
+        >
+          <div>
+            <div class="danger-desc">Restore Power (Remote ON)</div>
+            <div class="danger-sub">
+              Re-enables remote analytics if previously cut.
+            </div>
+          </div>
+          <button class="btn-danger" id="btn-restore-power" type="button">
+            Restore
+          </button>
+        </div>
+
+        <div
+          class="danger-row"
+          data-tooltip="Repeatedly flushes until the Durable Object buffer is completely empty. This may issue multiple POSTs to ORACLE_ENDPOINT and is best used off-peak or when you explicitly want a fully drained buffer."
+        >
+          <div>
+            <div class="danger-desc">Full Sync</div>
+            <div class="danger-sub">
+              Repeatedly flushes until buffer is empty.
+            </div>
+          </div>
+          <button class="btn-danger" id="btn-full-sync" type="button">
+            Sync all
+          </button>
+        </div>
+      </section>
+
+      <!-- Raw /stats payload -->
+      <section class="card">
+        <h2>Raw /stats payload</h2>
+        <div class="metric-sub">
+          Direct JSON returned by <code>/stats</code>
+        </div>
+        <pre id="raw-stats-json" class="code-block code-block-large">${rawStatsJson}</pre>
+      </section>
+    </main>
+
+    <!-- Context Modal -->
+    <div class="modal-overlay" id="info-modal">
+      <div class="modal">
+        <button class="close-modal" id="close-modal" type="button">×</button>
+        <h3>Dashboard Context</h3>
+
+        <div class="modal-section">
+          <h4>Flags (Quota)</h4>
+          <div class="modal-pills">
+            <span class="quota-tag flag-easy">easy</span>
+            <span class="quota-tag flag-normal">normal</span>
+            <span class="quota-tag flag-hard">hard</span>
+            <span class="quota-tag flag-fuck">fuck</span>
+          </div>
+          <div class="modal-item"><span>EASY</span> <span>&lt; 20k reqs</span></div>
+          <div class="modal-item"><span>NORMAL</span> <span>&lt; 50k reqs</span></div>
+          <div class="modal-item"><span>HARD</span> <span>&lt; 80k reqs</span></div>
+          <div class="modal-item">
+            <span style="color:#f87171">FUCK</span>
+            <span>&gt; 80k reqs</span>
+          </div>
+        </div>
+
+        <div class="modal-section">
+          <h4>Status States</h4>
+          <div class="modal-pills">
+            <span class="quota-tag state-sleeping">sleeping</span>
+            <span class="quota-tag state-chill">chill</span>
+            <span class="quota-tag state-normal">normal</span>
+            <span class="quota-tag state-busy">busy</span>
+            <span class="quota-tag state-emergency">emergency</span>
+            <span class="quota-tag state-cut-power">cut the power rn</span>
+          </div>
+        </div>
+
+        <div class="modal-section">
+          <h4>Variables</h4>
+          <div class="modal-item">
+            <span>MAX_BATCH_EVENTS</span>
+            <span>Threshold for auto-flush</span>
+          </div>
+          <div class="modal-item">
+            <span>ORACLE_ENDPOINT</span>
+            <span>Backend ingestion URL</span>
+          </div>
+          <div class="modal-item">
+            <span>Batch Size</span>
+            <span>Events sent per POST request</span>
+          </div>
+        </div>
+
+        <div class="modal-section">
+          <h4>Notes</h4>
+          <p style="font-size:0.8rem; color:var(--text-muted)">
+            This dashboard does not auto-poll to save Worker requests.
+            Use the "Reload" action to get fresh data without refreshing the page.
           </p>
-        </div>
-        <div class="meta" id="meta">
-          Worker: <b>cqd-analytics</b><br />
-          Durable Object: <b>DownloadsDurable</b><br />
-          Last refresh: <span id="lastRefresh">never</span>
-        </div>
-      </header>
-
-      <!-- SECTION 1: Summary cards -->
-      <div class="section">
-        <div class="grid grid-cols-4">
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title">Total Downloads</div>
-            </div>
-            <div class="card-value" id="totalDownloads">–</div>
-            <div class="card-sub">
-              Successful completed downloads (status = <code>success</code>)
-            </div>
-          </div>
-
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title">Total Success</div>
-            </div>
-            <div class="card-value success" id="totalSuccess">–</div>
-            <div class="card-sub">
-              All events with status <code>success</code>
-            </div>
-          </div>
-
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title">Total Fail</div>
-            </div>
-            <div class="card-value danger" id="totalFail">–</div>
-            <div class="card-sub">
-              Events with status <code>fail</code> (downloads that errored)
-            </div>
-          </div>
-
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title">Total Events</div>
-            </div>
-            <div class="card-value" id="totalEvents">–</div>
-            <div class="card-sub">
-              All events received by the Durable Object (success + fail)
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- SECTION 2: Buffer / timing / env -->
-      <div class="section">
-        <div class="section-title">Buffer, timing & environment</div>
-        <div class="grid grid-cols-3">
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title">Buffer</div>
-            </div>
-            <div class="card-sub" id="bufferInfo">
-              Pending in DO buffer: –<br />
-              Buffer age: –<br />
-              Next flush condition: –
-            </div>
-          </div>
-
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title">Timeline</div>
-            </div>
-            <div class="card-sub" id="timeInfo">
-              Last event at: –<br />
-              Age since last event: –<br />
-              Last flush to Oracle: –<br />
-              Age since last flush: –
-            </div>
-          </div>
-
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title">Environment</div>
-            </div>
-            <div class="pill-row" id="envInfo">
-              <span class="muted">Loading…</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- SECTION 3: Breakdowns -->
-      <div class="section">
-        <div class="section-title">Breakdown by dimensions</div>
-        <div class="grid grid-cols-3">
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title">By Type</div>
-            </div>
-            <div class="pill-row" id="byType"></div>
-          </div>
-
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title">By Status</div>
-            </div>
-            <div class="pill-row" id="byStatus"></div>
-          </div>
-
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title">By Browser</div>
-            </div>
-            <div class="pill-row" id="byBrowser"></div>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-3" style="margin-top: 12px;">
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title">By OS</div>
-            </div>
-            <div class="pill-row" id="byOs"></div>
-          </div>
-
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title">By Extension Version</div>
-            </div>
-            <div class="pill-row" id="byExtVersion"></div>
-          </div>
-
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title">By Language</div>
-            </div>
-            <div class="pill-row" id="byLanguage"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- SECTION 4: Debug & endpoints -->
-      <div class="section">
-        <div class="section-title">Debug & endpoints</div>
-        <div class="grid grid-cols-2">
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title">Endpoints</div>
-            </div>
-            <div class="endpoint-list" id="endpointList">
-              <span class="muted">Loading…</span>
-            </div>
-          </div>
-
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title">Actions</div>
-              <span class="card-chip">Manual only – no auto polling</span>
-            </div>
-            <div class="btn-row">
-              <button id="btnRefresh" class="primary">
-                <span class="btn-dot"></span>
-                Reload stats
-              </button>
-              <button id="btnFlush">
-                <span class="btn-dot"></span>
-                POST /debug/flush
-              </button>
-              <button id="btnOpenStats">
-                <span class="btn-dot"></span>
-                Open /stats JSON
-              </button>
-              <button id="btnOpenHealth">
-                <span class="btn-dot"></span>
-                Open /health
-              </button>
-            </div>
-            <div class="debug-status" id="debugStatus">
-              Ready. Click <b>Reload stats</b> to fetch the latest data.
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- SECTION 5: Raw JSON -->
-      <div class="section">
-        <div class="section-title">Raw /stats payload</div>
-        <div class="card">
-          <div class="json-header">
-            <span>
-              <span class="dot yellow"></span>
-              Direct JSON returned by <code>/stats</code>
-            </span>
-            <span id="jsonMeta">size: –</span>
-          </div>
-          <pre id="rawJson">{}</pre>
-        </div>
-      </div>
-
-      <div class="footer">
-        <div>
-          <span class="badge-soft">
-            <span class="dot green"></span> Global stats for all extension users
-            (Durable Object)
-          </span>
-        </div>
-        <div>
-          <span class="muted">Tip:</span>
-          reload only when you need – this keeps Cloudflare requests low.
         </div>
       </div>
     </div>
 
-    <script>
-      function fmtNumber(n) {
-        if (n == null || Number.isNaN(n)) return "0";
-        try {
-          return Number(n).toLocaleString("en-US");
-        } catch {
-          return String(n);
-        }
-      }
+    <!-- Danger Password Modal -->
+    <div class="modal-overlay" id="danger-modal">
+      <div class="modal">
+        <button class="close-modal" id="close-danger-modal" type="button">×</button>
+        <h3 id="danger-modal-title">Confirm admin action</h3>
+        <p id="danger-modal-desc" style="font-size:0.85rem; color:var(--text-muted); margin-top:4px;">
+          Enter your admin password to run this Danger Zone action.
+        </p>
+        <div class="field" style="margin-top:12px;">
+          <label for="danger-password-input">Admin password</label>
+          <input id="danger-password-input" type="password" autocomplete="current-password" />
+        </div>
+        <div id="danger-modal-error" class="login-error" style="display:none; margin-top:8px;"></div>
+        <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:16px;">
+          <button type="button" class="auth-btn" id="danger-cancel-btn">Cancel</button>
+          <button type="button" class="btn-danger" id="danger-confirm-btn">Confirm</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
-      function fmtDate(ts) {
-        if (!ts) return "–";
-        const n = Number(ts);
-        if (!n || Number.isNaN(n)) return String(ts);
-        try {
-          return new Date(n).toLocaleString();
-        } catch {
-          return String(ts);
-        }
-      }
+  <script>
+    (function () {
+      let lastRefreshAt = 0;
 
-      function fmtAge(ts) {
-        if (!ts) return "–";
-        const n = Number(ts);
-        if (!n || Number.isNaN(n)) return "–";
-        const diff = Date.now() - n;
-        if (diff < 0) return "0s";
+      function formatTs(ts) {
+        if (!ts) return "—";
+        const d = new Date(ts);
+        return d.toLocaleString("en-US", {
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        });
+      }
+      function formatAge(ts) {
+        if (!ts) return "—";
+        const diff = Date.now() - ts;
+        if (diff <= 0) return "just now";
         const sec = Math.floor(diff / 1000);
-        if (sec < 60) return sec + "s";
         const min = Math.floor(sec / 60);
-        if (min < 60) return min + "m";
-        const hours = Math.floor(min / 60);
-        if (hours < 24) return hours + "h";
-        const days = Math.floor(hours / 24);
-        return days + "d";
+        const hr = Math.floor(min / 60);
+        const day = Math.floor(hr / 24);
+        if (day > 0) return day + "d";
+        if (hr > 0) return hr + "h";
+        if (min > 0) return min + "m";
+        return sec + "s";
       }
 
-      function renderPillsFromMap(containerId, obj) {
-        const el = document.getElementById(containerId);
-        if (!el) return;
-        el.innerHTML = "";
-        if (!obj || typeof obj !== "object") {
-          el.textContent = "–";
-          return;
-        }
-        const entries = Object.entries(obj);
-        if (!entries.length) {
-          el.textContent = "–";
-          return;
-        }
-        for (const [key, value] of entries) {
-          const pill = document.createElement("div");
-          pill.className = "pill";
-          const k = document.createElement("span");
-          k.className = "key";
-          k.textContent = key;
-          const v = document.createElement("span");
-          v.className = "value";
-          v.textContent = fmtNumber(value);
-          pill.appendChild(k);
-          pill.appendChild(v);
-          el.appendChild(pill);
-        }
+      function quotaStateFromRequests(n) {
+        if (!Number.isFinite(n)) n = 0;
+        if (n <= 1000)   return { label: "sleeping",     className: "state-sleeping",     description: "Very low traffic today." };
+        if (n <= 5000)   return { label: "super chill",  className: "state-super-chill",  description: "Extension is barely touching the Worker." };
+        if (n <= 10000)  return { label: "chill",        className: "state-chill",        description: "Plenty of headroom." };
+        if (n <= 20000)  return { label: "easy",         className: "state-easy",         description: "Still well below limits." };
+        if (n <= 30000)  return { label: "kinda easy",   className: "state-kinda-easy",   description: "Load is fine. Batch size may start increasing soon." };
+        if (n <= 40000)  return { label: "normal",       className: "state-normal",       description: "Normal daily traffic." };
+        if (n <= 50000)  return { label: "slightly busy",className: "state-slightly-busy",description: "Worker is warming up." };
+        if (n <= 60000)  return { label: "kinda busy",   className: "state-kinda-busy",   description: "Closer to quota, batching should be stronger." };
+        if (n <= 70000)  return { label: "busy",         className: "state-busy",         description: "We are in the hard-normal zone." };
+        if (n <= 80000)  return { label: "very busy",    className: "state-very-busy",    description: "High traffic. Worker is protecting quota." };
+        if (n <= 90000)  return { label: "super busy",   className: "state-super-busy",   description: "Approaching Cloudflare free tier limits." };
+        if (n <= 95000)  return { label: "emergency",    className: "state-emergency",    description: "Emergency mode. Batch sizes should be huge." };
+        if (n <= 99000)  return { label: "critical",     className: "state-critical",     description: "We are basically at the limit. Prepare cut power." };
+        return { label: "cut the power rn", className: "state-cut-power", description: "Remote analytics should be OFF; everything local." };
       }
 
-      function buildEndpoints() {
-        const base = window.location.origin;
-        const endpoints = {
-          "Worker base": base + "/",
-          "Track endpoint": base + "/track",
-          "Stats (JSON)": base + "/stats",
-          "Health": base + "/health",
-          "Debug flush (POST)": base + "/debug/flush",
+      function quotaFlagFromRequests(n) {
+        if (!Number.isFinite(n)) n = 0;
+        if (n <= 20000) return { label: "easy",   className: "flag-easy",   description: "Way below limits (<20k)." };
+        if (n <= 50000) return { label: "normal", className: "flag-normal", description: "Comfortable usage (<50k)." };
+        if (n <= 80000) return { label: "hard",   className: "flag-hard",   description: "High traffic (<80k)." };
+        return { label: "fuck", className: "flag-fuck", description: "Basically at limits (>80k)." };
+      }
+
+      function classifySuccessRateJS(success, fail) {
+        var total = (success || 0) + (fail || 0);
+        if (!total) {
+          return { text: "—", badge: "No data", className: "" };
+        }
+        var rate = (success / total) * 100;
+        if (rate >= 98) {
+          return {
+            text: rate.toFixed(1) + "%",
+            badge: "Excellent",
+            className: "metric-good",
+          };
+        }
+        if (rate >= 95) {
+          return {
+            text: rate.toFixed(1) + "%",
+            badge: "Healthy",
+            className: "metric-warn",
+          };
+        }
+        return {
+          text: rate.toFixed(1) + "%",
+          badge: "Unstable",
+          className: "metric-bad",
         };
-        const el = document.getElementById("endpointList");
-        el.innerHTML = "";
-        Object.entries(endpoints).forEach(([label, url]) => {
-          const line = document.createElement("div");
-          line.innerHTML =
-            "<span class=\\"muted\\">" +
-            label +
-            ":</span> <code>" +
-            url +
-            "</code>";
-          el.appendChild(line);
+      }
+
+      function renderTableRowsJS(data) {
+        const entries = Object.entries(data || {});
+        if (!entries.length) return "<tr><td colspan='2'>—</td></tr>";
+        entries.sort((a, b) => b[1] - a[1]);
+        return entries
+          .map(function ([k, v]) {
+            return "<tr><td>" + k + "</td><td>" + v + "</td></tr>";
+          })
+          .join("");
+      }
+
+      function topKeyJS(data) {
+        const entries = Object.entries(data || {});
+        if (!entries.length) return "—";
+        entries.sort(function (a, b) {
+          return b[1] - a[1];
+        });
+        return entries[0][0];
+      }
+
+      function updateHotToday(counters) {
+        if (!counters) return;
+        const values = {
+          hotType: topKeyJS(counters.byType),
+          hotBrowser: topKeyJS(counters.byBrowser),
+          hotOs: topKeyJS(counters.byOs),
+          hotCountry: topKeyJS(counters.byCountry),
+        };
+        Object.entries(values).forEach(function ([key, value]) {
+          const els = document.querySelectorAll('[data-bind="' + key + '"]');
+          els.forEach(function (el) {
+            const current = el.textContent || "";
+            const next = value || "—";
+            if (current !== next) {
+              el.textContent = next;
+              const parent =
+                el.closest(".hot-item") ||
+                el.closest(".hot-today") ||
+                el.parentElement;
+              if (parent) {
+                parent.classList.remove("updated");
+                void parent.offsetWidth;
+                parent.classList.add("updated");
+              }
+            }
+          });
         });
       }
 
-      function updateField(id, newText) {
-        const el = document.getElementById(id);
-        if (!el) return;
-        newText = String(newText);
-        if (el.textContent === newText) return;
-        el.textContent = newText;
-        // restart the flash animation
-        el.classList.remove("flash");
-        void el.offsetWidth; // force reflow
-        el.classList.add("flash");
+      function updateBreakdowns(counters) {
+        if (!counters) return;
+        const mapping = [
+          ["tbody-type", counters.byType],
+          ["tbody-status", counters.byStatus],
+          ["tbody-browser", counters.byBrowser],
+          ["tbody-os", counters.byOs],
+          ["tbody-ext", counters.byExtVersion],
+          ["tbody-lang", counters.byLanguage],
+          ["tbody-country", counters.byCountry],
+          ["tbody-error", counters.byErrorType], // NEW
+        ];
+        mapping.forEach(function (item) {
+          const id = item[0];
+          const data = item[1] || {};
+          const el = document.getElementById(id);
+          if (!el) return;
+          const next = renderTableRowsJS(data);
+          if (el.innerHTML !== next) {
+            el.innerHTML = next;
+            const parent =
+              el.closest(".breakdown-block") || el.closest("table");
+            if (parent) {
+              parent.classList.remove("updated");
+              void parent.offsetWidth;
+              parent.classList.add("updated");
+            }
+          }
+        });
+        updateHotToday(counters);
       }
 
-      function populateEnv(stats) {
-        const envInfo = document.getElementById("envInfo");
-        envInfo.innerHTML = "";
+      function updateQuotaChips(quota) {
+        if (!quota) return;
+        const n = quota.requestsToday || 0;
+        const st = quotaStateFromRequests(n);
+        const fl = quotaFlagFromRequests(n);
 
-        function pill(label, value) {
-          const p = document.createElement("div");
-          p.className = "pill soft";
-          const k = document.createElement("span");
-          k.className = "key";
-          k.textContent = label;
-          const v = document.createElement("span");
-          v.className = "value";
-          v.textContent = value;
-          p.appendChild(k);
-          p.appendChild(v);
-          envInfo.appendChild(p);
+        var tagStatus = document.getElementById("tag-status");
+        if (tagStatus) {
+          var changed =
+            tagStatus.textContent !== st.label ||
+            tagStatus.getAttribute("data-tooltip") !== st.description;
+          tagStatus.textContent = st.label;
+          tagStatus.className = "quota-tag " + st.className;
+          tagStatus.setAttribute("data-tooltip", st.description);
+          if (changed) {
+            var parentS =
+              tagStatus.closest(".quota-stat") || tagStatus.parentElement;
+            if (parentS) {
+              parentS.classList.remove("updated");
+              void parentS.offsetWidth;
+              parentS.classList.add("updated");
+            }
+          }
         }
 
-        const maxBatch =
-          stats.maxBatchEvents != null ? String(stats.maxBatchEvents) : "n/a";
-        pill("MAX_BATCH_EVENTS", maxBatch);
-
-        const oracleFlag =
-          stats.oracleConfigured === true
-            ? "configured"
-            : stats.oracleConfigured === false
-            ? "not set"
-            : "unknown";
-        pill("ORACLE_ENDPOINT", oracleFlag);
-
-        if (stats.pendingEvents != null) {
-          pill("pendingEvents", fmtNumber(stats.pendingEvents));
+        var tagFlag = document.getElementById("tag-flag");
+        if (tagFlag) {
+          var changedF =
+            tagFlag.textContent !== fl.label ||
+            tagFlag.getAttribute("data-tooltip") !== fl.description;
+          tagFlag.textContent = fl.label;
+          tagFlag.className = "quota-tag " + fl.className;
+          tagFlag.setAttribute("data-tooltip", fl.description);
+          if (changedF) {
+            var parentF =
+              tagFlag.closest(".quota-stat") || tagFlag.parentElement;
+            if (parentF) {
+              parentF.classList.remove("updated");
+              void parentF.offsetWidth;
+              parentF.classList.add("updated");
+            }
+          }
         }
 
-        if (stats.retryState) {
-          pill("retry.count", stats.retryState.count ?? "?");
-          if (stats.retryState.nextRetryAt) {
-            pill(
-              "retry.nextRetryAt",
-              fmtDate(stats.retryState.nextRetryAt) +
-                " (" +
-                fmtAge(stats.retryState.nextRetryAt) +
-                " ago)"
-            );
+        var headerStatus = document.getElementById("header-pill-status");
+        if (headerStatus) {
+          if (headerStatus.textContent !== st.label) {
+            headerStatus.textContent = st.label;
+            headerStatus.classList.remove("updated");
+            void headerStatus.offsetWidth;
+            headerStatus.classList.add("updated");
+          }
+        }
+        var headerFlag = document.getElementById("header-pill-flag");
+        if (headerFlag) {
+          if (headerFlag.textContent !== fl.label) {
+            headerFlag.textContent = fl.label;
+            headerFlag.classList.remove("updated");
+            void headerFlag.offsetWidth;
+            headerFlag.classList.add("updated");
           }
         }
       }
 
-      function updateSummary(stats) {
-        const counters = stats.counters || {};
-        const byStatus = counters.byStatus || {};
-        const totalSuccess =
-          stats.totalSuccess != null
-            ? stats.totalSuccess
-            : byStatus.success || 0;
-        const totalFail =
-          stats.totalFail != null ? stats.totalFail : byStatus.fail || 0;
-        const totalDownloads =
-          stats.totalDownloads != null ? stats.totalDownloads : totalSuccess;
-
-        updateField("totalDownloads", fmtNumber(totalDownloads));
-        updateField("totalSuccess", fmtNumber(totalSuccess));
-        updateField("totalFail", fmtNumber(totalFail));
-        updateField(
-          "totalEvents",
-          fmtNumber(stats.totalEvents ?? totalSuccess + totalFail)
-        );
-      }
-
-      function updateBufferAndTime(stats) {
-        const buf = document.getElementById("bufferInfo");
-        const pending = fmtNumber(stats.pendingEvents ?? 0);
-        const maxBatch =
-          stats.maxBatchEvents != null ? stats.maxBatchEvents : "unknown";
-
-        buf.innerHTML =
-          "Pending in DO buffer: <b>" +
-          pending +
-          "</b><br />" +
-          "Buffer age (since last event): <b>" +
-          fmtAge(stats.lastEventAt) +
-          "</b><br />" +
-          "Next auto flush: when buffer ≥ " +
-          maxBatch +
-          " events";
-
-        const t = document.getElementById("timeInfo");
-        t.innerHTML =
-          "Last event at: <b>" +
-          fmtDate(stats.lastEventAt) +
-          "</b><br />" +
-          "Age since last event: " +
-          fmtAge(stats.lastEventAt) +
-          "<br />" +
-          "Last flush to Oracle: <b>" +
-          fmtDate(stats.lastFlushAt) +
-          "</b><br />" +
-          "Age since last flush: " +
-          fmtAge(stats.lastFlushAt);
-      }
-
-      function updateBreakdowns(stats) {
-        const counters = stats.counters || {};
-        renderPillsFromMap("byType", counters.byType || {});
-        renderPillsFromMap("byStatus", counters.byStatus || {});
-        renderPillsFromMap("byBrowser", counters.byBrowser || {});
-        renderPillsFromMap("byOs", counters.byOs || {});
-        renderPillsFromMap("byExtVersion", counters.byExtVersion || {});
-        renderPillsFromMap("byLanguage", counters.byLanguage || {});
-      }
-
-      function updateRawJson(stats) {
-        const rawEl = document.getElementById("rawJson");
-        let text;
-        try {
-          text = JSON.stringify(stats, null, 2);
-        } catch {
-          text = String(stats);
+      function updateLastRefreshLabel() {
+        var el = document.getElementById("last-refresh-label");
+        lastRefreshAt = Date.now();
+        if (!el) return;
+        var v = formatTs(lastRefreshAt);
+        if (el.textContent !== v) {
+          el.textContent = v;
+          var parent = el.parentElement;
+          if (parent) {
+            parent.classList.remove("updated");
+            void parent.offsetWidth;
+            parent.classList.add("updated");
+          }
         }
-        rawEl.textContent = text;
-        const size = new Blob([text]).size;
-        document.getElementById("jsonMeta").textContent =
-          "size: " + fmtNumber(size) + " bytes";
+        updateLiveIndicator();
       }
+
+      function updateLiveIndicator() {
+        var wrap = document.getElementById("live-indicator");
+        var label = document.getElementById("live-label");
+        if (!wrap || !label) return;
+
+        // If no manual reload yet, just treat as "Live" with no special tag
+        if (!lastRefreshAt) {
+          wrap.setAttribute("data-state", "live");
+          var text0 = "Live";
+          if (label.textContent !== text0) {
+            label.textContent = text0;
+            var parent0 = label.parentElement;
+            if (parent0) {
+              parent0.classList.remove("updated");
+              void parent0.offsetWidth;
+              parent0.classList.add("updated");
+            }
+          }
+          return;
+        }
+
+        var ageSec = Math.floor((Date.now() - lastRefreshAt) / 1000);
+        var state = "live";
+        var text = "Live";
+        if (ageSec >= 30 && ageSec < 180) {
+          state = "stale";
+          text = "Stale";
+        } else if (ageSec >= 180) {
+          state = "cold";
+          text = "Cold";
+        }
+        wrap.setAttribute("data-state", state);
+        if (label.textContent !== text) {
+          label.textContent = text;
+          var parent = label.parentElement;
+          if (parent) {
+            parent.classList.remove("updated");
+            void parent.offsetWidth;
+            parent.classList.add("updated");
+          }
+        }
+      }
+
+      // 1. Reload logic
+      const btnReload = document.getElementById("btn-reload");
 
       async function refreshStats() {
-        const status = document.getElementById("debugStatus");
-        status.textContent = "Fetching /stats…";
+        if (!btnReload) return;
+        btnReload.textContent = "Loading...";
         try {
           const res = await fetch("/stats");
-          if (!res.ok) throw new Error("HTTP " + res.status);
-          const stats = await res.json();
-
-          updateSummary(stats);
-          updateBufferAndTime(stats);
-          updateBreakdowns(stats);
-          populateEnv(stats);
-          updateRawJson(stats);
-
-          const now = new Date().toLocaleTimeString();
-          updateField("lastRefresh", now);
-          status.textContent = "Last refresh OK (HTTP " + res.status + ").";
+          const data = await res.json();
+          if (!data.ok) throw new Error("Stats fetch failed");
+          updateUI(data);
+          btnReload.innerHTML =
+            '<span class="btn-bullet">•</span> Reload stats';
         } catch (e) {
-          console.error("Failed to refresh stats", e);
-          status.textContent = "Refresh failed: " + e;
+          console.error(e);
+          btnReload.textContent = "Error";
+          setTimeout(function () {
+            btnReload.innerHTML =
+              '<span class="btn-bullet">•</span> Reload stats';
+          }, 2000);
         }
       }
 
-      async function doDebugFlush() {
-        const btn = document.getElementById("btnFlush");
-        const status = document.getElementById("debugStatus");
-        try {
-          btn.disabled = true;
-          status.textContent = "Sending POST /debug/flush…";
-          const res = await fetch("/debug/flush", { method: "POST" });
-          let bodyText = "";
-          try {
-            const j = await res.json();
-            bodyText = JSON.stringify(j);
-          } catch {
-            bodyText = await res.text();
+      function updateUI(stats) {
+        const map = {
+          totalDownloads: stats.totalDownloads,
+          totalSuccess: stats.totalSuccess,
+          totalFail: stats.totalFail,
+          totalEvents: stats.totalEvents,
+          pendingEvents: stats.pendingEvents,
+          ageLastEvent: formatAge(stats.lastEventAt),
+          lastEventAt: formatTs(stats.lastEventAt),
+          lastFlushAt: formatTs(stats.lastFlushAt),
+          ageLastFlush: formatAge(stats.lastFlushAt),
+        };
+
+        if (stats.quota) {
+          map.requestsToday = stats.quota.requestsToday || 0;
+          map.quotaLevel = stats.quota.quotaLevel || "UNKNOWN";
+          map.batchSize = stats.quota.batchSizeSuggestion || 0;
+        }
+
+        for (const [key, val] of Object.entries(map)) {
+          const els = document.querySelectorAll('[data-bind="' + key + '"]');
+          els.forEach((el) => {
+            const current = el.textContent;
+            const next = String(val);
+            if (current !== next) {
+              el.textContent = next;
+              const parent =
+                el.closest(".metric, .quota-stat, .quota-panel") ||
+                el.parentElement;
+              if (!parent) return;
+              parent.classList.remove("updated");
+              void parent.offsetWidth;
+              parent.classList.add("updated");
+            }
+          });
+        }
+
+        // Empty state toggle
+        const emptyEl = document.getElementById("empty-state");
+        if (emptyEl) {
+          if ((stats.totalEvents || 0) === 0) {
+            emptyEl.classList.remove("hidden");
+          } else if (!emptyEl.classList.contains("hidden")) {
+            emptyEl.classList.add("hidden");
           }
-          status.textContent =
-            "Flush response: HTTP " + res.status + " – " + bodyText;
-          await refreshStats();
-        } catch (e) {
-          console.error("flush error", e);
-          status.textContent = "Flush failed: " + e;
-        } finally {
-          btn.disabled = false;
         }
+
+        // Success / fail rate cards
+        var success = stats.totalSuccess || 0;
+        var fail = stats.totalFail || 0;
+        var total = success + fail;
+        var srMeta = classifySuccessRateJS(success, fail);
+        var srEls = document.querySelectorAll('[data-bind="successRate"]');
+        var srBadgeEls = document.querySelectorAll(
+          '[data-bind="successRateBadge"]',
+        );
+        var frEls = document.querySelectorAll('[data-bind="failRate"]');
+        var failRateText =
+          total > 0 ? ((fail / total) * 100).toFixed(1) + "%" : "—";
+
+        var srCard = document.getElementById("card-success-rate");
+        if (srCard) {
+          srCard.classList.remove("metric-good", "metric-warn", "metric-bad");
+          if (srMeta.className) {
+            srCard.classList.add(srMeta.className);
+          }
+        }
+
+        srEls.forEach(function (el) {
+          var current = el.textContent || "";
+          if (current !== srMeta.text) {
+            el.textContent = srMeta.text;
+            var parent =
+              el.closest(".metric") || el.closest("#card-success-rate");
+            if (parent) {
+              parent.classList.remove("updated");
+              void parent.offsetWidth;
+              parent.classList.add("updated");
+            }
+          }
+        });
+        srBadgeEls.forEach(function (el) {
+          var current = el.textContent || "";
+          if (current !== srMeta.badge) {
+            el.textContent = srMeta.badge;
+          }
+        });
+        frEls.forEach(function (el) {
+          var current = el.textContent || "";
+          if (current !== failRateText) {
+            el.textContent = failRateText;
+            var parent =
+              el.closest(".metric") || el.closest("#card-fail-rate");
+            if (parent) {
+              parent.classList.remove("updated");
+              void parent.offsetWidth;
+              parent.classList.add("updated");
+            }
+          }
+        });
+
+        const elRemote = document.getElementById("val-remote");
+        if (elRemote && stats.quota) {
+          const txt = stats.quota.remoteEnabled ? "ENABLED" : "DISABLED";
+          if (elRemote.textContent.trim() !== txt) {
+            elRemote.textContent = txt;
+            elRemote.style.color = stats.quota.remoteEnabled
+              ? "var(--success)"
+              : "var(--danger)";
+            elRemote.parentElement &&
+              elRemote.parentElement.classList.add("updated");
+          }
+
+          var hintState = document.getElementById("danger-remote-state");
+          var hintChip = document.getElementById("danger-remote-chip");
+          var hintWrap = document.getElementById("danger-status-hint");
+          if (hintState) {
+            var oldTxt = (hintState.textContent || "").trim();
+            if (oldTxt !== txt) {
+              hintState.textContent = txt;
+              hintState.classList.toggle("enabled", stats.quota.remoteEnabled);
+              hintState.classList.toggle(
+                "disabled",
+                !stats.quota.remoteEnabled,
+              );
+              if (hintWrap) {
+                hintWrap.classList.remove("updated");
+                void hintWrap.offsetWidth;
+                hintWrap.classList.add("updated");
+              }
+            }
+          }
+          if (hintChip) {
+            hintChip.style.display = stats.quota.remoteEnabled
+              ? "none"
+              : "inline-block";
+          }
+        }
+
+        const rawEl = document.getElementById("raw-stats-json");
+        if (rawEl) {
+          const next = JSON.stringify(stats, null, 2);
+          if (rawEl.textContent !== next) {
+            rawEl.textContent = next;
+            rawEl.parentElement &&
+              rawEl.parentElement.classList.add("updated");
+          }
+        }
+
+        updateQuotaChips(stats.quota);
+        updateBreakdowns(stats.counters);
+        updateLastRefreshLabel();
       }
 
-      document.getElementById("btnRefresh").addEventListener("click", () => {
-        refreshStats();
+      if (btnReload) {
+        btnReload.onclick = refreshStats;
+      }
+
+      // 2. Info modal logic
+      const modal = document.getElementById("info-modal");
+      const btnInfo = document.getElementById("info-btn");
+      const btnClose = document.getElementById("close-modal");
+
+      if (btnInfo && modal) {
+        btnInfo.onclick = () => modal.classList.add("open");
+      }
+      if (btnClose && modal) {
+        btnClose.onclick = () => modal.classList.remove("open");
+      }
+      if (modal) {
+        modal.onclick = (e) => {
+          if (e.target === modal) modal.classList.remove("open");
+        };
+      }
+
+      // 3. Danger Zone modal + admin calls
+      const dangerModal = document.getElementById("danger-modal");
+      const dangerClose = document.getElementById("close-danger-modal");
+      const dangerCancel = document.getElementById("danger-cancel-btn");
+      const dangerConfirm = document.getElementById("danger-confirm-btn");
+      const dangerPwdInput = document.getElementById("danger-password-input");
+      const dangerTitle = document.getElementById("danger-modal-title");
+      const dangerDesc = document.getElementById("danger-modal-desc");
+      const dangerError = document.getElementById("danger-modal-error");
+
+      let dangerActionPath = null;
+      let dangerActionLabel = null;
+
+      function openDangerModal(path, label, description) {
+        dangerActionPath = path;
+        dangerActionLabel = label;
+        if (dangerTitle) dangerTitle.textContent = label;
+        if (dangerDesc && description) dangerDesc.textContent = description;
+        if (dangerError) {
+          dangerError.style.display = "none";
+          dangerError.textContent = "";
+        }
+        if (dangerPwdInput) {
+          dangerPwdInput.value = "";
+          dangerPwdInput.focus();
+        }
+        if (dangerModal) dangerModal.classList.add("open");
+      }
+
+      function closeDangerModal() {
+        dangerActionPath = null;
+        dangerActionLabel = null;
+        if (dangerModal) dangerModal.classList.remove("open");
+      }
+
+      function showDangerError(message) {
+        if (!dangerError) return;
+        if (!message) {
+          dangerError.style.display = "none";
+          dangerError.textContent = "";
+          return;
+        }
+        dangerError.textContent = message;
+        dangerError.style.display = "block";
+      }
+
+      if (dangerClose) dangerClose.onclick = closeDangerModal;
+      if (dangerCancel) dangerCancel.onclick = closeDangerModal;
+      if (dangerModal) {
+        dangerModal.addEventListener("click", function (e) {
+          if (e.target === dangerModal) {
+            closeDangerModal();
+          }
+        });
+      }
+
+      if (dangerConfirm) {
+        dangerConfirm.onclick = function () {
+          if (!dangerActionPath || !dangerPwdInput) {
+            return;
+          }
+          const pwd = dangerPwdInput.value.trim();
+          if (!pwd) {
+            showDangerError("Password is required.");
+            return;
+          }
+          dangerConfirm.disabled = true;
+          showDangerError("");
+          fetch(dangerActionPath, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Admin-Secret": pwd,
+            },
+          })
+            .then(function (r) {
+              return r
+                .json()
+                .catch(function () {
+                  return { ok: false, error: "Invalid JSON response" };
+                });
+            })
+            .then(function (data) {
+              if (!data || !data.ok) {
+                showDangerError(
+                  "Error: " + (data && data.error ? data.error : "Unknown"),
+                );
+                return;
+              }
+              closeDangerModal();
+              refreshStats();
+            })
+            .catch(function () {
+              showDangerError(
+                "Network error while calling this admin action.",
+              );
+            })
+            .finally(function () {
+              dangerConfirm.disabled = false;
+            });
+        };
+      }
+
+      function bindDangerButton(id, path, label, description) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener("click", function () {
+          openDangerModal(path, label, description || "");
+        });
+      }
+
+      bindDangerButton(
+        "btn-force-flush",
+        "/admin/force-flush",
+        "Force Flush Buffer",
+        "Flush all currently buffered analytics to your ORACLE endpoint immediately.",
+      );
+      bindDangerButton(
+        "btn-cut-power",
+        "/admin/cut-power",
+        "Cut Remote Analytics (OFF)",
+        "Turn off remote analytics for all extensions to protect Cloudflare quota.",
+      );
+      bindDangerButton(
+        "btn-restore-power",
+        "/admin/restore-power",
+        "Restore Remote Analytics (ON)",
+        "Re-enable remote analytics if you previously cut power.",
+      );
+      bindDangerButton(
+        "btn-full-sync",
+        "/admin/full-sync",
+        "Full Sync Buffer",
+        "Repeatedly flush until the Durable Object buffer is empty.",
+      );
+
+      // 4. Debug flush binding
+      const bind = (id, fn) => {
+        const el = document.getElementById(id);
+        if (el) el.onclick = fn;
+      };
+
+      bind("btn-debug-flush-action", () => {
+        fetch("/debug/flush", { method: "POST" })
+          .then((r) => r.json())
+          .then((d) =>
+            alert("Debug Flush: " + JSON.stringify(d)),
+          )
+          .catch(() => alert("Error"));
       });
 
-      document.getElementById("btnFlush").addEventListener("click", () => {
-        doDebugFlush();
-      });
-
-      document
-        .getElementById("btnOpenStats")
-        .addEventListener("click", () => window.open("/stats", "_blank"));
-
-      document
-        .getElementById("btnOpenHealth")
-        .addEventListener("click", () => window.open("/health", "_blank"));
-
-      buildEndpoints();
-      // No auto polling – we only fetch once on load + when you click Reload.
-      refreshStats();
-    </script>
-  </body>
+      updateLiveIndicator();
+      setInterval(updateLiveIndicator, 5000);
+    })();
+  </script>
+</body>
 </html>`;
+}

@@ -56,10 +56,12 @@ export interface LocalStats {
 const STORAGE_KEY_QUEUE = 'pending_events';
 const STORAGE_KEY_STATS = 'local_stats';
 
+// NEW: dynamic config + meta keys
+const STORAGE_KEY_CONFIG = 'cqd_analytics_config_v1';
+const STORAGE_KEY_META = 'cqd_analytics_meta_v1';
+
 /**
- * Max events per HTTP request.
- * - track(): if queue.length >= BATCH_SIZE → trigger a flush
- * - alarm: flush whatever is there, even 1 event
+ * Default / baseline batch size when no config is available.
  */
 const BATCH_SIZE = 50;
 
@@ -70,15 +72,70 @@ const BATCH_SIZE = 50;
 const MAX_RETRY = 5;
 
 /**
- * Step 0: remote sending is effectively disabled by default.
- * When you move to Step 1, set this to your real Worker URL.
- *
- * If WORKER_URL === '', sendBatchToCloudflare() will "pretend success"
- * and just drain the queue to keep local storage clean.
+ * Step 1: remote sending is enabled with your Worker URL.
+ * (You can later switch this to an env variable via Vite.)
  */
 const WORKER_URL =
   'https://cqd-analytics.adhamhaithameid.workers.dev/track';
 const REMOTE_ENABLED = WORKER_URL.length > 0;
+
+// Derived URLs
+const TRACK_URL = WORKER_URL;
+const WORKER_BASE_URL = WORKER_URL.replace(/\/+track$/, '');
+const CONFIG_URL = WORKER_BASE_URL ? `${WORKER_BASE_URL}/config` : '';
+
+/**
+ * Config pulled from Worker /config.
+ */
+type AnalyticsConfig = {
+  batchSize: number;
+  lowUsageFlushMinutes: number; // queue < 15
+  midUsageFlushMinutes: number; // 15 <= queue < 35
+  highUsageFlushMinutes: number; // 35 <= queue < 50
+  remoteEnabled: boolean;
+};
+
+/**
+ * Meta info for time-based flush and backoff.
+ */
+type AnalyticsMeta = {
+  lastFlushAt: number | null;
+  nextRetryAt: number | null;
+  backoffIndex: number;
+};
+
+/**
+ * Default values when there's no config/meta yet.
+ */
+const DEFAULT_CONFIG: AnalyticsConfig = {
+  batchSize: BATCH_SIZE,
+  lowUsageFlushMinutes: 120,
+  midUsageFlushMinutes: 60,
+  highUsageFlushMinutes: 30,
+  remoteEnabled: REMOTE_ENABLED,
+};
+
+const DEFAULT_META: AnalyticsMeta = {
+  lastFlushAt: null,
+  nextRetryAt: null,
+  backoffIndex: 0,
+};
+
+/**
+ * Backoff steps in seconds for retry after /track failure.
+ * 1 min → 5 → 15 → 30 → 1h → 3h → 6h → 12h → 1d
+ */
+const BACKOFF_STEPS_SECONDS = [
+  60,
+  300,
+  900,
+  1800,
+  3600,
+  10_800,
+  21_600,
+  43_200,
+  86_400,
+];
 
 // -------------------------------------------------------
 // Small helpers
@@ -161,6 +218,66 @@ async function saveQueue(queue: AnalyticsEvent[]): Promise<void> {
   await chrome.storage.local.set({ [STORAGE_KEY_QUEUE]: queue });
 }
 
+// --- Config/meta helpers ---
+
+async function loadConfig(): Promise<AnalyticsConfig> {
+  if (typeof chrome === 'undefined' || !chrome.storage?.local) {
+    return DEFAULT_CONFIG;
+  }
+  const raw = await chrome.storage.local.get(STORAGE_KEY_CONFIG);
+  const stored = raw[STORAGE_KEY_CONFIG] as Partial<AnalyticsConfig> | undefined;
+  if (!stored || typeof stored !== 'object') return DEFAULT_CONFIG;
+  return {
+    batchSize:
+      typeof stored.batchSize === 'number' && stored.batchSize > 0
+        ? stored.batchSize
+        : DEFAULT_CONFIG.batchSize,
+    lowUsageFlushMinutes:
+      typeof stored.lowUsageFlushMinutes === 'number'
+        ? stored.lowUsageFlushMinutes
+        : DEFAULT_CONFIG.lowUsageFlushMinutes,
+    midUsageFlushMinutes:
+      typeof stored.midUsageFlushMinutes === 'number'
+        ? stored.midUsageFlushMinutes
+        : DEFAULT_CONFIG.midUsageFlushMinutes,
+    highUsageFlushMinutes:
+      typeof stored.highUsageFlushMinutes === 'number'
+        ? stored.highUsageFlushMinutes
+        : DEFAULT_CONFIG.highUsageFlushMinutes,
+    remoteEnabled:
+      typeof stored.remoteEnabled === 'boolean'
+        ? stored.remoteEnabled
+        : DEFAULT_CONFIG.remoteEnabled,
+  };
+}
+
+async function saveConfig(cfg: AnalyticsConfig): Promise<void> {
+  if (typeof chrome === 'undefined' || !chrome.storage?.local) return;
+  await chrome.storage.local.set({ [STORAGE_KEY_CONFIG]: cfg });
+}
+
+async function loadMeta(): Promise<AnalyticsMeta> {
+  if (typeof chrome === 'undefined' || !chrome.storage?.local) {
+    return DEFAULT_META;
+  }
+  const raw = await chrome.storage.local.get(STORAGE_KEY_META);
+  const meta = raw[STORAGE_KEY_META] as Partial<AnalyticsMeta> | undefined;
+  if (!meta || typeof meta !== 'object') return DEFAULT_META;
+  return {
+    lastFlushAt:
+      typeof meta.lastFlushAt === 'number' ? meta.lastFlushAt : null,
+    nextRetryAt:
+      typeof meta.nextRetryAt === 'number' ? meta.nextRetryAt : null,
+    backoffIndex:
+      typeof meta.backoffIndex === 'number' ? meta.backoffIndex : 0,
+  };
+}
+
+async function saveMeta(meta: AnalyticsMeta): Promise<void> {
+  if (typeof chrome === 'undefined' || !chrome.storage?.local) return;
+  await chrome.storage.local.set({ [STORAGE_KEY_META]: meta });
+}
+
 function normalizeStats(raw: any): LocalStats {
   const base: LocalStats = {
     total: 0,
@@ -185,7 +302,7 @@ function normalizeStats(raw: any): LocalStats {
     attempts:
       typeof raw.attempts === 'number'
         ? raw.attempts
-        : ((raw.total || 0) + (raw.fail || 0)),
+        : (raw.total || 0) + (raw.fail || 0),
     bySpeed: {
       fast: raw.bySpeed?.fast ?? 0,
       medium: raw.bySpeed?.medium ?? 0,
@@ -278,7 +395,7 @@ async function updateLocalStats(event: AnalyticsEvent): Promise<void> {
 }
 
 // -------------------------------------------------------
-// Network flush (Step 0: effectively disabled, but wired)
+// Network flush
 // -------------------------------------------------------
 
 async function sendBatchToCloudflare(
@@ -286,8 +403,8 @@ async function sendBatchToCloudflare(
 ): Promise<boolean> {
   if (!events.length) return true;
 
-  // STEP 0: remote disabled → simulate success & drop events.
-  if (!REMOTE_ENABLED || !WORKER_URL) {
+  // If remote is globally disabled or URL not configured → simulate success.
+  if (!REMOTE_ENABLED || !TRACK_URL) {
     console.log(
       '[Analytics] Remote endpoint not configured. Simulating flush of',
       events.length,
@@ -302,7 +419,7 @@ async function sendBatchToCloudflare(
   }
 
   try {
-    const res = await fetch(WORKER_URL, {
+    const res = await fetch(TRACK_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ events }),
@@ -316,11 +433,55 @@ async function sendBatchToCloudflare(
       return false;
     }
 
+    const json = await res.json().catch(() => ({} as any));
+    if (json && json.ok === false) {
+      console.warn('[Analytics] Cloudflare Worker ok=false:', json);
+      return false;
+    }
+
     return true;
   } catch (err) {
     console.error('[Analytics] Error sending batch to Cloudflare:', err);
     return false;
   }
+}
+
+/**
+ * Helper: should we flush right now based on:
+ * - queue length vs batchSize
+ * - time-based thresholds (120 / 60 / 30 minutes)
+ */
+function shouldFlushNowForTimeAndSize(
+  cfg: AnalyticsConfig,
+  meta: AnalyticsMeta,
+  queueLength: number,
+): boolean {
+  if (!cfg.remoteEnabled) return false;
+  if (queueLength === 0) return false;
+
+  const now = Date.now();
+  const last = meta.lastFlushAt ?? 0;
+  const ageMinutes = last === 0 ? Infinity : (now - last) / 60000;
+
+  // Immediate flush when queue >= target batch size
+  if (queueLength >= cfg.batchSize) return true;
+
+  // Time-based flush rules (for low-activity users)
+  if (queueLength < 15 && ageMinutes >= cfg.lowUsageFlushMinutes) return true;
+  if (
+    queueLength >= 15 &&
+    queueLength < 35 &&
+    ageMinutes >= cfg.midUsageFlushMinutes
+  )
+    return true;
+  if (
+    queueLength >= 35 &&
+    queueLength < 50 &&
+    ageMinutes >= cfg.highUsageFlushMinutes
+  )
+    return true;
+
+  return false;
 }
 
 // -------------------------------------------------------
@@ -338,18 +499,13 @@ function enqueueOp(op: () => Promise<void>): void {
 }
 
 // -------------------------------------------------------
-// internalTrack / internalFlush with poison-pill protection
+// internalTrack / internalFlush with poison-pill + backoff
 // -------------------------------------------------------
 
 async function internalTrack(
   event: Omit<
     AnalyticsEvent,
-    | 'timestamp'
-    | 'ext_version'
-    | 'browser'
-    | 'os'
-    | 'language'
-    | 'retryCount'
+    'timestamp' | 'ext_version' | 'browser' | 'os' | 'language' | 'retryCount'
   >,
 ): Promise<void> {
   if (typeof chrome === 'undefined' || !chrome.runtime?.getManifest) {
@@ -367,8 +523,14 @@ async function internalTrack(
     // retryCount intentionally left undefined; set only on failure
   };
 
+  // Load config + meta + queue so we can decide flush behavior.
+  const [cfg, meta, queue] = await Promise.all([
+    loadConfig(),
+    loadMeta(),
+    loadQueue(),
+  ]);
+
   // 1) Enqueue in persistent queue
-  const queue = await loadQueue();
   queue.push(fullEvent);
   await saveQueue(queue);
 
@@ -377,44 +539,73 @@ async function internalTrack(
 
   console.log('[Analytics] Event tracked. Queue size:', queue.length);
 
-  // 3) If queue is large, attempt a flush under the same lock
-  if (queue.length >= BATCH_SIZE) {
-    await internalFlush();
+  // 3) If conditions are met (size/time), schedule a flush.
+  if (shouldFlushNowForTimeAndSize(cfg, meta, queue.length)) {
+    Analytics.flush();
   }
 }
 
 /**
- * Flush logic with "poison pill" protection:
- * - Take up to BATCH_SIZE events from the head of the queue.
- * - Try to send them.
- *   - If success → drop them from queue.
- *   - If failure:
- *       - Increment retryCount for those events.
- *       - If retryCount > MAX_RETRY → drop event permanently.
- *       - Re-queue surviving events at the front.
- *
- * This way:
- * - One bad event can't jam everything forever.
- * - New events can move forward as old poisoned ones are trimmed.
+ * Flush logic with:
+ * - Time-based thresholds handled via shouldFlushNowForTimeAndSize()
+ *   (we call internalFlush() periodically from background alarms).
+ * - Backoff when /track fails:
+ *     1 min → 5 → 15 → 30 → 1h → 3h → 6h → 12h → 1d
+ * - Poison-pill protection:
+ *     retryCount > MAX_RETRY → drop that event.
  */
 async function internalFlush(): Promise<void> {
-  const queue = await loadQueue();
+  const [cfg, meta, queue] = await Promise.all([
+    loadConfig(),
+    loadMeta(),
+    loadQueue(),
+  ]);
   if (!queue.length) return;
 
-  console.log(
-    `[Analytics] Attempting flush. Current queue size: ${queue.length}`,
-  );
+  // If remote is disabled (emergency mode), keep everything local, no flush.
+  if (!cfg.remoteEnabled) {
+    console.log(
+      '[Analytics] Remote disabled by config; keeping',
+      queue.length,
+      'events local.',
+    );
+    return;
+  }
 
-  // We only deal with the *front* window here; repeated alarms will
-  // keep chewing through the queue over time.
-  const batch = queue.slice(0, BATCH_SIZE);
-  const rest = queue.slice(BATCH_SIZE);
+  const now = Date.now();
+
+  // Respect backoff schedule: if it's not time yet, skip.
+  if (meta.nextRetryAt && now < meta.nextRetryAt) {
+    return;
+  }
+
+  // Also respect time-based thresholds + batch size; if it's "too early",
+  // we just skip – alarms will keep calling this.
+  if (!shouldFlushNowForTimeAndSize(cfg, meta, queue.length)) {
+    return;
+  }
+
+  const effectiveBatchSize = cfg.batchSize || BATCH_SIZE;
+  const batch = queue.slice(0, effectiveBatchSize);
+  const rest = queue.slice(effectiveBatchSize);
+
+  console.log(
+    `[Analytics] Attempting flush. Sending ${batch.length} events of ${queue.length} queued.`,
+  );
 
   const ok = await sendBatchToCloudflare(batch);
 
   if (ok) {
     // Remote accepted → remove those items.
     await saveQueue(rest);
+
+    const newMeta: AnalyticsMeta = {
+      lastFlushAt: now,
+      nextRetryAt: null,
+      backoffIndex: 0,
+    };
+    await saveMeta(newMeta);
+
     console.log(
       '[Analytics] Flush succeeded. Sent',
       batch.length,
@@ -424,7 +615,7 @@ async function internalFlush(): Promise<void> {
     return;
   }
 
-  // Flush failed → poison-pill handling
+  // Flush failed → poison-pill & schedule backoff
   const updatedBatch: AnalyticsEvent[] = batch.map((ev) => {
     const prev = typeof ev.retryCount === 'number' ? ev.retryCount : 0;
     return { ...ev, retryCount: prev + 1 };
@@ -445,8 +636,21 @@ async function internalFlush(): Promise<void> {
   const newQueue = survivors.concat(rest);
   await saveQueue(newQueue);
 
+  const idx = Math.min(meta.backoffIndex, BACKOFF_STEPS_SECONDS.length - 1);
+  const delaySec = BACKOFF_STEPS_SECONDS[idx];
+  const nextRetryAt = now + delaySec * 1000;
+
+  const newMeta: AnalyticsMeta = {
+    lastFlushAt: meta.lastFlushAt ?? null,
+    nextRetryAt,
+    backoffIndex: meta.backoffIndex + 1,
+  };
+  await saveMeta(newMeta);
+
   console.warn(
-    '[Analytics] Flush failed. Will retry later. Queue size now:',
+    '[Analytics] Flush failed. Backing off for',
+    delaySec,
+    'seconds. Queue size now:',
     newQueue.length,
   );
 }
@@ -464,12 +668,7 @@ export const Analytics = {
   track(
     event: Omit<
       AnalyticsEvent,
-      | 'timestamp'
-      | 'ext_version'
-      | 'browser'
-      | 'os'
-      | 'language'
-      | 'retryCount'
+      'timestamp' | 'ext_version' | 'browser' | 'os' | 'language' | 'retryCount'
     >,
   ): void {
     enqueueOp(() => internalTrack(event));
@@ -478,8 +677,8 @@ export const Analytics = {
   /**
    * Best-effort flush. Also serialized with track operations.
    * Called by:
-   * - our download logic when queue >= BATCH_SIZE
-   * - chrome.alarms (every 1 minute) from background.ts
+   * - our download logic when queue conditions are met
+   * - chrome.alarms (every 5 minutes) from background.ts
    */
   flush(): void {
     enqueueOp(() => internalFlush());
@@ -487,12 +686,12 @@ export const Analytics = {
 };
 
 // NOTE: The old `setTimeout(() => Analytics.flush(), 5000);`
-// has been removed in favor of a chrome.alarms-based flush
+// remains removed in favor of a chrome.alarms-based flush
 // that lives in background.ts (so it still fires when the
 // MV3 service worker wakes up periodically).
 
 // -------------------------------------------------------
-// Small convenience wrapper for “real download finished”
+// High-level helper for “real download finished”
 // -------------------------------------------------------
 
 export type DownloadSource = 'download_all' | 'single' | 'other' | string;
@@ -540,14 +739,7 @@ export interface RecordDownloadEventInput {
  * reuses the same queue / flush / poison-pill logic.
  */
 export function recordDownloadEvent(input: RecordDownloadEventInput): void {
-  const {
-    type,
-    status,
-    source,
-    duration_ms,
-    bypass_used,
-    error_type,
-  } = input;
+  const { type, status, source, duration_ms, bypass_used, error_type } = input;
 
   Analytics.track({
     status,
@@ -557,4 +749,75 @@ export function recordDownloadEvent(input: RecordDownloadEventInput): void {
     error_type,
     source,
   });
+}
+
+/**
+ * Public: refresh remote analytics config from Worker /config.
+ * Called by background.ts:
+ *  - once on startup
+ *  - every 3 hours via chrome.alarms
+ */
+export async function refreshRemoteAnalyticsConfig(): Promise<void> {
+  if (!CONFIG_URL) {
+    // No config endpoint configured – keep defaults.
+    await saveConfig(DEFAULT_CONFIG);
+    return;
+  }
+
+  try {
+    const res = await fetch(CONFIG_URL, {
+      method: 'GET',
+      cache: 'no-store',
+    });
+    if (!res.ok) {
+      throw new Error(`config HTTP ${res.status}`);
+    }
+    const data = await res.json();
+
+    // Expected shape from Worker:
+    // {
+    //   ok: true,
+    //   batchSize: number,
+    //   timeFlushMinutes: { low, mid, high },
+    //   remoteEnabled: boolean,
+    //   quota: { batchSizeSuggestion, remoteEnabled, ... }
+    // }
+    if (!data || data.ok === false) {
+      throw new Error('config ok=false');
+    }
+
+    const cfg: AnalyticsConfig = {
+      batchSize:
+        typeof data.batchSize === 'number'
+          ? data.batchSize
+          : data.quota?.batchSizeSuggestion ?? DEFAULT_CONFIG.batchSize,
+      lowUsageFlushMinutes:
+        data.timeFlushMinutes?.low ?? DEFAULT_CONFIG.lowUsageFlushMinutes,
+      midUsageFlushMinutes:
+        data.timeFlushMinutes?.mid ?? DEFAULT_CONFIG.midUsageFlushMinutes,
+      highUsageFlushMinutes:
+        data.timeFlushMinutes?.high ?? DEFAULT_CONFIG.highUsageFlushMinutes,
+      remoteEnabled:
+        typeof data.remoteEnabled === 'boolean'
+          ? data.remoteEnabled
+          : data.quota?.remoteEnabled ?? DEFAULT_CONFIG.remoteEnabled,
+    };
+
+    await saveConfig(cfg);
+    console.log(
+      '[Analytics] /config updated:',
+      cfg.batchSize,
+      cfg.lowUsageFlushMinutes,
+      cfg.midUsageFlushMinutes,
+      cfg.highUsageFlushMinutes,
+      'remoteEnabled=',
+      cfg.remoteEnabled,
+    );
+  } catch (err) {
+    console.warn(
+      '[Analytics] /config fetch failed, falling back to defaults',
+      err,
+    );
+    await saveConfig(DEFAULT_CONFIG);
+  }
 }

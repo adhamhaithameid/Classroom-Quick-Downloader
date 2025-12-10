@@ -1,406 +1,172 @@
-# CQD Analytics – Cloudflare Worker + Durable Object
+# CQD Analytics Backend (Cloudflare Worker)
 
-This package is the **backend analytics layer** for the Classroom Quick Downloader (CQD) extension.
+The high-performance ingestion and aggregation layer for **Classroom Quick Downloader**
 
-It performs three main functions:
+## 📖 Overview
 
-1. **Ingest:** Accepts batched analytics events from the extension via `POST /track`.
-2. **Aggregate:** Uses a **Durable Object** (`DownloadsDurable`) to maintain fast, persistent statistics.
-3. **Visualize:** Exposes a mini debugging dashboard and JSON endpoints for inspection.
+This service acts as the central nervous system for the CQD extension's analytics.
 
-### Architecture in one line
+Unlike traditional stateless APIs, this Worker uses a **Cloudflare Durable Object (DO)** to:
 
-> **Extension** (`analytics.ts` + `background.ts`) → **Cloudflare Worker** (`index.ts`) → **Durable Object** (`DownloadsDurable`)
+- Maintain **stateful counters**
+- Manage **ingestion buffers**
+- Enforce **adaptive quota limits** to protect against overages on the Cloudflare free tier
 
-## 1. Repository Layout
+### Core Responsibilities
 
-### Package Structure
+- **Ingestion**
+  Receives **batched analytics events** (`POST /track`) from client extensions.
+- **Aggregation**
+  Maintains **real-time counters** (downloads, success/fail, browser stats, etc.) in reliable storage.
+- **Buffering**
+  Queues raw events and **flushes them to the Oracle backend** in optimized batches.
+- **Traffic Control**
+  Monitors **daily request counts** and can instruct extensions to **back off** (“cut power”) when limits are approached.
 
-```
-cloudflare-worker/
-├── README.md              # (this file)
-├── wrangler.toml          # Worker + Durable Object config
-├── package.json           # Scripts, dev dependencies
-├── tsconfig.json          # TypeScript config
-└── src/
-    ├── index.ts           # Worker entrypoint (routes + DO export)
-    ├── downloads_do.ts    # Durable Object implementation
-    ├── dashboard.ts       # HTML dashboard renderer
-    └── types.ts           # Shared types/interfaces (stats, counters, etc.)
-```
+## 🏗 Architecture
 
-### Monorepo Context
-
-```
-/Classroom-Quick-Downloader/
-├── cloudflare-worker/         # ⇐ (This package)
-├── extension/                 # WXT MV3 extension
-├── oracle-backend/            # (Future) Long-term storage API
-├── landing-site/              # Marketing / Docs site
-└── tools/                     # Scripts & helpers
-```
-
-## 2. High-Level Architecture
+The system follows a **write-heavy, read-periodic** pattern designed for high concurrency.
 
 ```
 graph LR
-    Ext[Extension Background] -->|Batch POST| Worker[Cloudflare Worker]
-    Worker -->|Forward Request| DO[Durable Object]
-    DO -->|Update| Mem[In-Memory Counters]
-    DO -->|Persist| Storage[DO Storage]
-    User[Developer] -->|GET /| Dash[HTML Dashboard]
-    Dash -->|Fetch| DO
-```
+    Ext[Extension Client] -->|POST /track (Batch)| Worker[Cloudflare Worker]
+    Worker -->|Proxy| DO[Durable Object]
 
-### 2.1 Client-Side (Extension)
+    subgraph "Durable Object State"
+        DO -->|Increment| Counters[Real-time Counters]
+        DO -->|Push| Buffer[Event Buffer]
+        DO -->|Check| Quota[Daily Limit Guard]
+    end
 
-**`extension/entrypoints/background.ts`** Tracks real download completions via `chrome.downloads.onChanged`.
+    Buffer -->|Flush Trigger| Alarm[Scheduled Alarm]
+    Alarm -->|POST Batch| Oracle[Oracle Backend DB]
 
-* **Success:**`state.complete` → `status: "success"`
-* **Fail:**`state.interrupted` → `status: "fail"`
+    Admin[Developer] -->|GET /| Dashboard[HTML Dashboard]
+    Dashboard -->|Fetch JSON| DO
+````
 
-**`extension/entrypoints/utils/analytics.ts`** Buffers events in `chrome.storage.local` instead of sending one HTTP call per download.
+## 🔌 API Reference
 
-* **Flush Condition:** Queue size ≥ 50 events OR Queue is "old enough".
-* **Result:** Cloudflare receives \~1 POST per 50 downloads per user.
+### Public Endpoints
 
-**Payload Example:**
+These endpoints are accessible by the extension or external monitoring tools.
 
-```
-{
-  "clientId": "cid_xxx",
-  "browser": "chrome",
-  "os": "mac",
-  "language": "en-US",
-  "extVersion": "1.2.3",
-  "events": [
-    { "type": "pdf", "status": "success", "source": "download_all", "ts": 1765092900685 },
-    { "type": "pptx", "status": "fail", "source": "single", "ts": 1765092910000 }
-  ]
-}
-```
 
-### 2.2 Cloudflare Worker
+| Method | Endpoint  | Description                                                                                |
+| ------ | --------- | ------------------------------------------------------------------------------------------ |
+| POST   | `/track`  | Ingestion endpoint. Accepts a JSON payload of events. Updates counters and buffers events. |
+| GET    | `/config` | Returns dynamic configuration (batch size,`remoteEnabled`, quota descriptor).              |
+| GET    | `/stats`  | Returns the full JSON state: counters, buffer size, last event time, quota status, env.    |
+| GET    | `/health` | Lightweight probe with basic health info (pending events, last event, last flush, etc.).   |
 
-**`src/index.ts`** The main entrypoint. It routes incoming requests (`fetch`) and gets the stub for the `DownloadsDurable` object. It proxies endpoints (`/track`, `/stats`) to the DO and serves the HTML dashboard.
+### Admin Interface
 
-### 2.3 Durable Object
 
-**`src/downloads_do.ts`** Holds the persistent analytics state.
+| Method | Endpoint | Description                                      |
+| ------ | -------- | ------------------------------------------------ |
+| GET    | `/`      | Renders the HTML Admin Dashboard (login screen). |
+| POST   | `/`      | Dashboard authentication handler (password).     |
 
-* **State Variables:**`totalEvents`, `totalDownloads` (success only), `pendingEvents`.
-* **Counters:**
-  * `byStatus`: `{ success, fail }`
-  * `byType`: `{ pdf: N, pptx: M, ... }`
-  * `byBrowser`: `{ chrome: N, firefox: M, ... }`
-  * `byOs`: `{ mac: N, windows: M, ... }`
-  * `byExtVersion`: `{ "0.0.0": N, ... }`
-  * `byLanguage`: `{ "en-US": N, ... }`
+The dashboard is **password-protected**, typically using the same secret as `DO_SHARED_SECRET`.
 
-**Binding & Migration:** The Worker always talks to a single instance ID (`DownloadsStats`). If scale requires it later, we can shard by hashing `fileType + browser`.
+### Danger Zone (Admin Only)
 
-## 3. Worker API Endpoints
+These endpoints require an `X-Admin-Secret` header matching `DO_SHARED_SECRET`.
 
-### 3.1 `POST /track` (Ingest)
 
-Called by the extension's analytics utility.
+| Endpoint               | Action          | Use Case                                                                |
+| ---------------------- | --------------- | ----------------------------------------------------------------------- |
+| `/admin/force-flush`   | Force Flush     | Push all buffered events to Oracle immediately, ignoring batch size.    |
+| `/admin/cut-power`     | Disable Remote  | Set`remoteEnabled: false`. Extensions stop sending data. **Emergency.** |
+| `/admin/restore-power` | Enable Remote   | Re-enable remote ingestion after an emergency or quota event.           |
+| `/admin/full-sync`     | Full Sync       | Repeatedly flush until the DO buffer is completely empty.               |
+| `/debug/reset`         | Hard Reset ⚠️ | **Destructive.** Wipes all counters, buffers and retry state.           |
 
-* **Status:**`202 Accepted`
-* **Behavior:** Queues events into the DO for processing. It does not wait for aggregation to finish before responding.
+## 🧠 Smart Features
 
-### 3.2 `GET /stats` (JSON Data)
+### 1. Adaptive Quota System
 
-Called by the dashboard or external tools. This is the **source of truth** for live analytics.
+The Durable Object tracks **`requestsToday`** and exposes a `QuotaDescriptor` via `/config`. As traffic increases, the system automatically shifts modes:
 
-**Response Example:**
+* **Chill Mode** (e.g. `< 10k` requests/day)
 
-```
-{
-  "ok": true,
-  "totalEvents": 69,
-  "totalDownloads": 67,
-  "pendingEvents": 68,
-  "lastEventAt": 1765092900685,
-  "counters": {
-    "byStatus": { "success": 66, "fail": 2 },
-    "byType": { "pdf": 16, "pptx": 52 },
-    "byBrowser": { "chrome": 68 }
-  }
-}
-```
+  * Small batch size (≈ 50 events per POST)
+  * Normal operation
+* **Busy Modes** (e.g. `30k+`, `40k+`, `50k+`, …)
 
-### 3.3 `GET /health` (Probe)
+  * Gradually **increase batch size** (100 → 150 → 200 → 250 → 300 → 500)
+  * Reduce HTTP overhead under high load
+* **Emergency Mode** (e.g. `90k+` requests/day)
 
-Simple health check returning `200 OK` and `{ "ok": true }`.
+  * `remoteEnabled: false`
+  * Worker instructs extensions to **stop sending remote analytics**
+  * Protects against Cloudflare free-tier or billing overages
 
-### 3.4 `GET /` (Dashboard)
+The same mechanism is used when an admin explicitly **cuts power** via `/admin/cut-power`.
 
-Renders the HTML dashboard (`src/dashboard.ts`).
+### 2. Intelligent Buffering
 
-* **Visuals:** Clean layout, dashed separators, "Last Refreshed" indicator.
-* **Data:** Totals, Buffer size, Breakdowns (Type, Status, Browser, OS).
-* **Actions:** Manual "Reload Stats" button (no auto-polling).
+To minimize calls to the Oracle backend and reduce latency/cost:
 
-### 3.5 `POST /debug/flush` (Optional)
+* Events are **stored in the DO buffer** as they arrive.
+* Data is flushed to Oracle only when:
 
-Manually triggers the DO to flush its buffer to the Oracle backend (if configured).
+  * **Buffer size ≥ `MAX_BATCH_EVENTS`** (environment variable).
+  * An admin triggers a **force flush** (`/admin/force-flush`).
+  * A **retry alarm** fires after a previous failure (backoff logic).
 
-## 4. Configuration
+Failed Oracle flushes update a retry state and schedule a **delayed alarm**, avoiding tight loops and protecting the backend from being hammered.
 
-### 4.1 Wrangler Config (`wrangler.toml`)
+## 🛠 Development & Setup
 
-```
-name = "cqd-analytics"
-main = "src/index.ts"
-compatibility_date = "2024-10-01"
+### Prerequisites
 
-# ⚠️ Fill this with your real ID (Safe to commit)
-account_id = "<YOUR_ACCOUNT_ID>"
+* **Node.js** & **pnpm**
+* **Cloudflare Wrangler CLI**
 
-[vars]
-ORACLE_ENDPOINT = ""        # URL for future backend
-DO_SHARED_SECRET = ""       # Shared secret for backend auth
-MAX_BATCH_EVENTS = "10000"  # Flush threshold
+  ```bash
+  npm i -g wrangler
+  ```
 
-[[durable_objects.bindings]]
-name = "DOWNLOADS_DO"
-class_name = "DownloadsDurable"
+You will also need a Cloudflare account and a configured `wrangler.toml` with:
 
-[[migrations]]
-tag = "v1"
-new_sqlite_classes = ["DownloadsDurable"]
-```
+* `DOWNLOADS_DO` Durable Object binding
+* `ORACLE_ENDPOINT` (can be empty in dev)
+* `DO_SHARED_SECRET`
+* `MAX_BATCH_EVENTS`
 
-### 4.2 Cloudflare Requirements
+### Installation
 
-1. **Subdomain:** Ensure you have a `*.workers.dev` subdomain active.
-2. **Login:** Run `pnpm wrangler login`.
-3. **Deploy:** The first deploy will create the SQLite-backed namespace via the `v1` migration.
-
-## 5. Development Workflow
-
-### 5.1 Install Dependencies
-
-```
-# Inside cloudflare-worker/
+```bash
+cd cloudflare-worker
 pnpm install
 ```
 
-### 5.2 Local Development
+### Local Development
 
-```
+Runs a local Miniflare instance via Wrangler.
+By default it’s accessible at: `http://localhost:8787`.
+
+```bash
 pnpm dev
-# Runs: wrangler dev
 ```
 
-This starts Miniflare at `http://localhost:8787`.
+You can then test endpoints like:
 
-* Visit `/` to see the dashboard.
-* POST to `/track` to test ingestion.
+* `GET http://localhost:8787/health`
+* `POST http://localhost:8787/track`
+* `GET http://localhost:8787/stats`
 
-### 5.3 Connecting Extension to Local Worker
+### Deployment
 
-To test the full flow locally:
+Deploys the Worker and applies the Durable Object binding configuration:
 
-1. Edit `extension/entrypoints/utils/analytics.ts`:
-   ```
-   const WORKER_URL = "http://localhost:8787/track";
-   ```
-2. Run the extension in dev mode.
-3. Downloads will now POST to your local Miniflare instance.
-4. **Revert** to the production URL before committing.
-
-### 5.4 Deploy to Production
-
-```
-pnpm wrangler deploy
+```bash
+pnpm deploy
 ```
 
+After deployment:
 
-This package is the **backend analytics service** for Classroom Quick Downloader.
+* Point the **CQD extension**’s analytics config to the deployed `/track` & `/config` endpoints.
+* Use the **Admin Dashboard** (`GET /`) with your configured password (`DO_SHARED_SECRET`) to monitor health, quotas and perform Danger Zone actions.
 
-Stack:
-
-- **Cloudflare Worker** (`cqd-analytics`) – HTTP entrypoint
-- **Durable Object** (`DownloadsDurable`) – durable counters + buffered raw events
-- Optional **Oracle VM** backend for batch storage
-
----
-
-## Endpoints Overview
-
-All paths are relative to your Worker URL, e.g.:
-
-```text
- https://cqd-analytics.adhamhaithameid.workers.dev
-```
-
-1. POST /track – Ingestion
-
-Called by the extension.
-
-CORS enabled.
-
-Accepts:
-
-```
-{
-  "events": [
-    {
-      "status": "success",          // "success" | "fail"
-      "file_type": "pdf",           // e.g. "pdf", "pptx"
-      "browser": "chrome",
-      "os": "mac",
-      "ext_version": "0.0.0",
-      "duration_ms": 1200,
-      "bypass_used": false,
-      "error_type": null,
-      "language": "en-US",
-      "timestamp": 1765092900685
-    }
-  ]
-}
-```
-
-Each event = one file with a final status.
-
-The Durable Object updates:
-
-totalEvents = success + fail
-
-totalDownloads = success
-
-totalSuccess
-
-totalFail
-
-plus breakdowns by type, browser, OS, etc.
-
-2. GET /stats – JSON Stats
-
-Returns the full state:
-
-```
-{
-  "ok": true,
-  "totalEvents": 98,
-  "totalDownloads": 95,
-  "totalSuccess": 95,
-  "totalFail": 3,
-  "pendingEvents": 98,
-  "lastEventAt": 1765092900685,
-  "lastFlushAt": null,
-  "counters": {
-    "byStatus": { "success": 95, "fail": 3 },
-    "byType": { "pdf": 30, "pptx": 65 },
-    "byBrowser": { "chrome": 98 },
-    "byOs": { "mac": 98 },
-    "byExtVersion": { "0.0.0": 98 },
-    "byLanguage": { "en-US": 98 }
-  }
-}
-```
-
-Useful for:
-
-Debugging numeric drift.
-
-Building a custom admin UI later.
-
-3. GET /health – Health Snapshot
-
-Cheaper JSON version, suitable for monitoring:
-
-```
-{
-  "ok": true,
-  "totalEvents": 98,
-  "totalDownloads": 95,
-  "totalSuccess": 95,
-  "totalFail": 3,
-  "pendingEvents": 98,
-  "lastEventAt": 1765092900685,
-  "lastFlushAt": null
-}
-```
-
-4. GET / – Mini Dashboard (GUI)
-
-Small HTML dashboard:
-
-Shows:
-
-- Total Downloads (success)
-- Total Success
-- Total Fail
-- Total Events
-- Pending buffer size
-- Last event time
-- Last flush time
-- Breakdown by type + status
-- Auto-refreshes every 5 seconds.
-
-Visit in browser:
-
-```
-https://cqd-analytics.adhamhaithameid.workers.dev/
-```
-
-🔧 Debugging Endpoints (for now)
-
-You can keep these while you’re building and remove/protect them later.
-
-1. POST /debug/reset – Reset All Counters
-
-Resets all counters and clears the buffer in the Durable Object.
-
-URL:
-
-```
-https://cqd-analytics.<your-workers-subdomain>.workers.dev/debug/reset
-```
-
-Example (terminal):
-
-```
-curl -X POST \
-  "https://cqd-analytics.<your-workers-subdomain>.workers.dev/debug/reset"
-```
-
-Response:
-
-{ "ok": true, "reset": true }
-
-Use this when you want to:
-
-Zero everything.
-
-Perform a clean test (e.g. click Download All for 5 files).
-
-Compare the new /stats output vs what you expect.
-
-⚠ In production, you should:
-
-Protect this endpoint with a secret header, OR
-
-Remove it entirely.
-
-2. Quick manual checks
-
-See raw stats:
-
-```
-https://cqd-analytics.<your-workers-subdomain>.workers.dev/stats
-```
-
-Check health:
-
-```
-https://cqd-analytics.<your-workers-subdomain>.workers.dev/health
-```
-
-Open GUI dashboard:
-
-```
-https://cqd-analytics.<your-workers-subdomain>.workers.dev/
-```

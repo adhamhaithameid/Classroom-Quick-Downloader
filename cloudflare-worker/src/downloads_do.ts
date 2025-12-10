@@ -1,458 +1,707 @@
-// src/downloads_do.ts
-import type { DurableObjectState } from '@cloudflare/workers-types';
-import type { Env } from './types';
+// filepath: cloudflare-worker/src/downloads_do.ts
 
-interface AnalyticsEvent {
-  status: 'success' | 'fail';
-  file_type: string;
-  browser: string;
-  os: string;
-  ext_version: string;
-  duration_ms: number;
-  bypass_used: boolean;
-  error_type?: string;
-  language: string;
-  timestamp: number;
+import {
+  Counters,
+  RetryState,
+  StatsResponse,
+  ConfigResponse,
+  QuotaDescriptor,
+  StoredEvent,
+  EnvSnapshot,
+} from "./types";
+
+export interface Env {
+  ORACLE_ENDPOINT: string;
+  DO_SHARED_SECRET: string;
+  MAX_BATCH_EVENTS: string;
 }
 
-interface Counters {
+type DurableStateShape = {
   totalEvents: number;
   totalDownloads: number;
   totalSuccess: number;
   totalFail: number;
-
-  byStatus: Record<string, number>;
-  byType: Record<string, number>;
-  byBrowser: Record<string, number>;
-  byOs: Record<string, number>;
-  byExtVersion: Record<string, number>;
-  byLanguage: Record<string, number>;
-
+  pendingEvents: number;
   lastEventAt: number | null;
   lastFlushAt: number | null;
-}
+  counters: Counters;
+  retryState: RetryState | null;
 
-const STORAGE_KEY_COUNTERS = 'counters';
-const STORAGE_KEY_BUFFER = 'buffer';
+  // daily request counting for quota awareness
+  reqCountToday: number;
+  reqCountDate: string | null; // "YYYY-MM-DD" UTC
 
-function emptyCounters(): Counters {
-  return {
-    totalEvents: 0,
-    totalDownloads: 0,
-    totalSuccess: 0,
-    totalFail: 0,
-    byStatus: {},
-    byType: {},
-    byBrowser: {},
-    byOs: {},
-    byExtVersion: {},
-    byLanguage: {},
-    lastEventAt: null,
-    lastFlushAt: null,
-  };
+  // admin switch: when true, remote analytics is forced OFF
+  hardRemoteOff: boolean;
+
+  // Buffered events waiting to be flushed to Oracle
+  buffer: StoredEvent[];
+};
+
+const DEFAULT_COUNTERS: Counters = {
+  byStatus: {},
+  byType: {},
+  byBrowser: {},
+  byOs: {},
+  byExtVersion: {},
+  byLanguage: {},
+  byCountry: {},
+  byErrorType: {}, // NEW
+};
+
+const DEFAULT_RETRY_STATE: RetryState = {
+  consecutiveFailures: 0,
+};
+
+// Quota thresholds (approx. Cloudflare daily request quotas)
+const QUOTA_VERY_SOFT_LIMIT = 30_000;
+const QUOTA_SOFT_LIMIT = 40_000;
+const QUOTA_VERY_NORMAL_LIMIT = 50_000;
+const QUOTA_NORMAL_LIMIT = 60_000;
+const QUOTA_HARD_NORMAL_LIMIT = 70_000;
+const QUOTA_HARD_LIMIT = 80_000;
+const QUOTA_VERY_HARD_LIMIT = 90_000;
+
+// Storage key inside DO storage
+const STORAGE_KEY = "analytics_state";
+
+function todayUtcDate(): string {
+  return new Date().toISOString().slice(0, 10); // YYYY-MM-DD
 }
 
 /**
- * Normalize/migrate old counters to the new shape.
- * - Merges stored counters into the new structure.
- * - Recomputes totalEvents/totalSuccess/totalFail/totalDownloads from byStatus.
+ * Decide quota level, mode label, remoteEnabled and batchSizeSuggestion
+ * from the current daily request count.
  */
-function normalizeCounters(stored: any | undefined | null): Counters {
-  if (!stored) return emptyCounters();
+function computeQuotaDescriptor(
+  requestsToday: number,
+  hardRemoteOff: boolean,
+): QuotaDescriptor {
+  let quotaLevel = "BELOW_LIMITS";
+  let modeLabel = "chill";
+  let batchSizeSuggestion = 50;
+  let remoteEnabled = !hardRemoteOff;
 
-  const base = emptyCounters();
-
-  const merged: Counters = {
-    ...base,
-    ...stored,
-    byStatus: {
-      ...base.byStatus,
-      ...(stored.byStatus || {}),
-    },
-    byType: {
-      ...base.byType,
-      ...(stored.byType || {}),
-    },
-    byBrowser: {
-      ...base.byBrowser,
-      ...(stored.byBrowser || {}),
-    },
-    byOs: {
-      ...base.byOs,
-      ...(stored.byOs || {}),
-    },
-    byExtVersion: {
-      ...base.byExtVersion,
-      ...(stored.byExtVersion || {}),
-    },
-    byLanguage: {
-      ...base.byLanguage,
-      ...(stored.byLanguage || {}),
-    },
-  };
-
-  // Recompute totals from byStatus EVERY TIME so everything is consistent.
-  let totalEvents = 0;
-  let totalSuccess = 0;
-  let totalFail = 0;
-
-  for (const [status, count] of Object.entries(merged.byStatus)) {
-    const n = typeof count === 'number' && Number.isFinite(count) ? count : 0;
-    totalEvents += n;
-    if (status === 'success') totalSuccess += n;
-    else if (status === 'fail') totalFail += n;
+  if (requestsToday >= QUOTA_VERY_SOFT_LIMIT) {
+    quotaLevel = "QUOTA_VERY_SOFT_LIMIT";
+    modeLabel = "kinda easy";
+    batchSizeSuggestion = 100;
+  }
+  if (requestsToday >= QUOTA_SOFT_LIMIT) {
+    quotaLevel = "QUOTA_SOFT_LIMIT";
+    modeLabel = "normal";
+    batchSizeSuggestion = 150;
+  }
+  if (requestsToday >= QUOTA_VERY_NORMAL_LIMIT) {
+    quotaLevel = "QUOTA_VERY_NORMAL_LIMIT";
+    modeLabel = "slightly busy";
+    batchSizeSuggestion = 200;
+  }
+  if (requestsToday >= QUOTA_NORMAL_LIMIT) {
+    quotaLevel = "QUOTA_NORMAL_LIMIT";
+    modeLabel = "kinda busy";
+    batchSizeSuggestion = 250;
+  }
+  if (requestsToday >= QUOTA_HARD_NORMAL_LIMIT) {
+    quotaLevel = "QUOTA_HARD_NORMAL_LIMIT";
+    modeLabel = "busy";
+    batchSizeSuggestion = 300;
+  }
+  if (requestsToday >= QUOTA_HARD_LIMIT) {
+    quotaLevel = "QUOTA_HARD_LIMIT";
+    modeLabel = "very busy";
+    batchSizeSuggestion = 500;
+  }
+  if (requestsToday >= QUOTA_VERY_HARD_LIMIT) {
+    quotaLevel = "QUOTA_VERY_HARD_LIMIT";
+    modeLabel = "emergency";
+    // At this point, we effectively "cut power" to remote analytics.
+    remoteEnabled = false;
   }
 
-  merged.totalEvents = totalEvents;
-  merged.totalSuccess = totalSuccess;
-  merged.totalFail = totalFail;
-  merged.totalDownloads = totalSuccess;
+  if (hardRemoteOff) {
+    // Admin override / Danger Zone toggle.
+    remoteEnabled = false;
+    if (requestsToday < QUOTA_VERY_HARD_LIMIT) {
+      quotaLevel = "ADMIN_REMOTE_OFF";
+      modeLabel = "admin-cut-power";
+    }
+  }
 
-  return merged;
+  return {
+    requestsToday,
+    quotaLevel,
+    modeLabel,
+    remoteEnabled,
+    batchSizeSuggestion,
+  };
 }
+
+function json<T>(obj: T, init: ResponseInit = {}): Response {
+  return new Response(JSON.stringify(obj), {
+    ...init,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      ...(init.headers || {}),
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Durable Object class
+// ---------------------------------------------------------------------------
 
 export class DownloadsDurable {
   private state: DurableObjectState;
   private env: Env;
-
-  private counters: Counters;
-  private buffer: AnalyticsEvent[] = [];
-  private readonly maxBuffer: number;
+  private data: DurableStateShape | null = null;
+  private loaded: Promise<void>;
 
   constructor(state: DurableObjectState, env: Env) {
     this.state = state;
     this.env = env;
-
-    const parsedMax =
-      parseInt(env.MAX_BATCH_EVENTS || '10000', 10) || 10000;
-    this.maxBuffer = parsedMax;
-
-    this.counters = emptyCounters();
-
-    this.state.blockConcurrencyWhile(async () => {
-      const [storedCounters, storedBuffer] = await Promise.all([
-        this.state.storage.get<any>(STORAGE_KEY_COUNTERS),
-        this.state.storage.get<AnalyticsEvent[]>(STORAGE_KEY_BUFFER),
-      ]);
-
-      this.counters = normalizeCounters(storedCounters);
-
-      if (Array.isArray(storedBuffer)) {
-        this.buffer = storedBuffer;
-      }
-    });
+    this.loaded = this.load();
   }
 
-  async fetch(request: Request): Promise<Response> {
-    const url = new URL(request.url);
+  // ---------------------------------------------------------------------------
+  // Loading & persistence
+  // ---------------------------------------------------------------------------
 
-    if (request.method === 'POST' && url.pathname.endsWith('/track')) {
+  private async load(): Promise<void> {
+    const stored = await this.state.storage.get<DurableStateShape>(STORAGE_KEY);
+
+    const base: DurableStateShape = {
+      totalEvents: 0,
+      totalDownloads: 0,
+      totalSuccess: 0,
+      totalFail: 0,
+      pendingEvents: 0,
+      lastEventAt: null,
+      lastFlushAt: null,
+      counters: { ...DEFAULT_COUNTERS },
+      retryState: { ...DEFAULT_RETRY_STATE },
+
+      reqCountToday: 0,
+      reqCountDate: null,
+      hardRemoteOff: false,
+
+      buffer: [],
+    };
+
+    if (!stored) {
+      this.data = base;
+      return;
+    }
+
+    // Merge stored with defaults to be robust to schema changes.
+    this.data = {
+      totalEvents: stored.totalEvents ?? base.totalEvents,
+      totalDownloads: stored.totalDownloads ?? base.totalDownloads,
+      totalSuccess: stored.totalSuccess ?? base.totalSuccess,
+      totalFail: stored.totalFail ?? base.totalFail,
+      pendingEvents: stored.pendingEvents ?? base.pendingEvents,
+      lastEventAt: stored.lastEventAt ?? base.lastEventAt,
+      lastFlushAt: stored.lastFlushAt ?? base.lastFlushAt,
+      counters: {
+        byStatus: stored.counters?.byStatus ?? { ...DEFAULT_COUNTERS.byStatus },
+        byType: stored.counters?.byType ?? { ...DEFAULT_COUNTERS.byType },
+        byBrowser:
+          stored.counters?.byBrowser ?? { ...DEFAULT_COUNTERS.byBrowser },
+        byOs: stored.counters?.byOs ?? { ...DEFAULT_COUNTERS.byOs },
+        byExtVersion:
+          stored.counters?.byExtVersion ?? { ...DEFAULT_COUNTERS.byExtVersion },
+        byLanguage:
+          stored.counters?.byLanguage ?? { ...DEFAULT_COUNTERS.byLanguage },
+        byCountry:
+          stored.counters?.byCountry ?? { ...DEFAULT_COUNTERS.byCountry },
+        byErrorType:
+          stored.counters?.byErrorType ?? { ...DEFAULT_COUNTERS.byErrorType },
+      },
+      retryState: stored.retryState ?? { ...DEFAULT_RETRY_STATE },
+
+      reqCountToday: stored.reqCountToday ?? 0,
+      reqCountDate: stored.reqCountDate ?? null,
+      hardRemoteOff: stored.hardRemoteOff ?? false,
+
+      buffer: Array.isArray(stored.buffer) ? stored.buffer : [],
+    };
+  }
+
+  private async persist(): Promise<void> {
+    if (!this.data) return;
+    await this.state.storage.put(STORAGE_KEY, this.data);
+  }
+
+  private get d(): DurableStateShape {
+    if (!this.data) {
+      throw new Error("DurableObject state not loaded yet");
+    }
+    return this.data;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Helpers
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Ensure reqCountToday is for the current UTC day. Resets counters
+   * when the day changes.
+   */
+  private ensureRequestDay(): void {
+    const today = todayUtcDate();
+    if (this.d.reqCountDate !== today) {
+      this.d.reqCountDate = today;
+      this.d.reqCountToday = 0;
+      // hardRemoteOff is NOT reset automatically here.
+    }
+  }
+
+  private isAuthorizedAdmin(request: Request): boolean {
+    const header = request.headers.get("X-Admin-Secret") || "";
+    const expected = this.env.DO_SHARED_SECRET;
+    if (!expected) return false;
+    return header === expected;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Core fetch router
+  // ---------------------------------------------------------------------------
+
+  async fetch(request: Request): Promise<Response> {
+    await this.loaded;
+
+    const url = new URL(request.url);
+    const { pathname } = url;
+
+    if (pathname === "/track" && request.method === "POST") {
       return this.handleTrack(request);
     }
 
-    if (request.method === 'GET' && url.pathname.endsWith('/stats')) {
+    if (pathname === "/stats" && request.method === "GET") {
       return this.handleStats();
     }
 
-    if (request.method === 'GET' && url.pathname.endsWith('/health')) {
+    if (pathname === "/config" && request.method === "GET") {
+      return this.handleConfig();
+    }
+
+    if (pathname === "/health" && request.method === "GET") {
       return this.handleHealth();
     }
 
-    // Debug endpoints (only reachable if Worker forwards them)
-    if (request.method === 'POST' && url.pathname.endsWith('/debug/reset')) {
-      return this.handleReset();
+    if (pathname === "/debug/flush" && request.method === "POST") {
+      return this.handleDebugFlush();
     }
 
-    if (request.method === 'POST' && url.pathname.endsWith('/debug/flush')) {
-      return this.handleFlush();
+    if (pathname === "/debug/reset" && request.method === "POST") {
+      return this.handleDebugReset();
     }
 
-    return this.json({ ok: true }, 200);
+    if (pathname === "/admin/force-flush" && request.method === "POST") {
+      return this.handleAdminForceFlush(request);
+    }
+
+    if (pathname === "/admin/cut-power" && request.method === "POST") {
+      return this.handleAdminCutPower(request);
+    }
+
+    if (pathname === "/admin/restore-power" && request.method === "POST") {
+      return this.handleAdminRestorePower(request);
+    }
+
+    if (pathname === "/admin/full-sync" && request.method === "POST") {
+      return this.handleAdminFullSync(request);
+    }
+
+    return new Response("Not found (DO)", { status: 404 });
   }
 
   // ---------------------------------------------------------------------------
-  // TRACK
+  // Alarms for retry / backoff
   // ---------------------------------------------------------------------------
+
+  async alarm(): Promise<void> {
+    await this.loaded;
+    if (!this.d.retryState || !this.d.retryState.nextRetryAt) return;
+
+    const now = Date.now();
+    if (now >= this.d.retryState.nextRetryAt) {
+      await this.flushToOracle(false);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Handlers
+  // ---------------------------------------------------------------------------
+
   private async handleTrack(request: Request): Promise<Response> {
-    let body: any;
+    // Update daily request counters
+    this.ensureRequestDay();
+    this.d.reqCountToday += 1;
+
+    let body: { events?: StoredEvent[] } | null = null;
     try {
       body = await request.json();
     } catch {
-      return this.json({ ok: false, error: 'invalid_json' }, 400);
+      await this.persist();
+      return json({ ok: false, error: "invalid_json" }, { status: 400 });
     }
 
-    const rawEvents = Array.isArray(body?.events) ? body.events : [];
-    if (!rawEvents.length) {
-      return this.json({ ok: false, error: 'no_events' }, 400);
+    const events = body?.events;
+    if (!Array.isArray(events) || events.length === 0) {
+      await this.persist();
+      return json({ ok: true, accepted: 0 }, { status: 202 });
     }
 
-    const normalized: AnalyticsEvent[] = rawEvents.map(
-      (e: any): AnalyticsEvent => ({
-        status: e.status === 'success' ? 'success' : 'fail',
-        file_type: typeof e.file_type === 'string' ? e.file_type : 'unknown',
-        browser: typeof e.browser === 'string' ? e.browser : 'unknown',
-        os: typeof e.os === 'string' ? e.os : 'unknown',
-        ext_version:
-          typeof e.ext_version === 'string' ? e.ext_version : '0.0.0',
-        duration_ms:
-          typeof e.duration_ms === 'number' && Number.isFinite(e.duration_ms)
-            ? e.duration_ms
-            : 0,
-        bypass_used: !!e.bypass_used,
-        error_type:
-          typeof e.error_type === 'string' ? e.error_type : undefined,
-        language: typeof e.language === 'string' ? e.language : 'unknown',
-        timestamp:
-          typeof e.timestamp === 'number' && Number.isFinite(e.timestamp)
-            ? e.timestamp
-            : Date.now(),
-      }),
-    );
+    // Append to buffer + update counters
+    for (const ev of events) {
+      this.d.buffer.push(ev);
+      this.d.totalEvents += 1;
 
-    for (const ev of normalized) {
-      this.updateCounters(ev);
+      if (ev.status === "success") {
+        this.d.totalDownloads += 1;
+        this.d.totalSuccess += 1;
+      } else {
+        this.d.totalFail += 1;
+      }
+
+      this.d.pendingEvents += 1;
+      this.d.lastEventAt = ev.timestamp ?? Date.now();
+
+      // Update counters
+      const c = this.d.counters;
+      c.byStatus[ev.status] = (c.byStatus[ev.status] || 0) + 1;
+
+      const type = (ev.file_type || "unknown").toLowerCase();
+      c.byType[type] = (c.byType[type] || 0) + 1;
+
+      const browser = (ev.browser || "unknown").toLowerCase();
+      c.byBrowser[browser] = (c.byBrowser[browser] || 0) + 1;
+
+      const os = (ev.os || "unknown").toLowerCase();
+      c.byOs[os] = (c.byOs[os] || 0) + 1;
+
+      const extVersion = ev.ext_version || "0.0.0";
+      c.byExtVersion[extVersion] =
+        (c.byExtVersion[extVersion] || 0) + 1;
+
+      const lang = (ev.language || "unknown").toLowerCase();
+      c.byLanguage[lang] = (c.byLanguage[lang] || 0) + 1;
+
+      const country = (ev.country || "unknown").toLowerCase();
+      c.byCountry[country] = (c.byCountry[country] || 0) + 1;
+
+      // NEW: error-type counter (only for fails)
+      if (ev.status === "fail") {
+        const errKey = (ev.error_type || "unknown").toLowerCase();
+        c.byErrorType[errKey] = (c.byErrorType[errKey] || 0) + 1;
+      }
     }
 
-    this.buffer.push(...normalized);
+    await this.persist();
 
-    await Promise.all([
-      this.state.storage.put(STORAGE_KEY_COUNTERS, this.counters),
-      this.state.storage.put(STORAGE_KEY_BUFFER, this.buffer),
-    ]);
+    // Size-based flush to Oracle
+    const maxBatch =
+      parseInt(this.env.MAX_BATCH_EVENTS || "500", 10) || 500;
 
-    if (this.buffer.length >= this.maxBuffer) {
-      await this.maybeFlushToOracle();
+    if (this.d.buffer.length >= maxBatch) {
+      await this.flushToOracle(false);
     }
 
-    return this.json(
-      {
-        ok: true,
-        accepted: normalized.length,
-        totalEvents: this.counters.totalEvents,
-        totalDownloads: this.counters.totalDownloads,
-        totalSuccess: this.counters.totalSuccess,
-        totalFail: this.counters.totalFail,
-        pendingEvents: this.buffer.length,
-        lastEventAt: this.counters.lastEventAt,
-        lastFlushAt: this.counters.lastFlushAt,
-      },
-      202,
-    );
+    return json({ ok: true, accepted: events.length }, { status: 202 });
   }
 
-  private updateCounters(ev: AnalyticsEvent): void {
-    // We recompute from byStatus on load, but we still keep this simple local increment.
-    this.counters.totalEvents += 1;
-
-    const statusKey = ev.status || 'unknown';
-    this.counters.byStatus[statusKey] =
-      (this.counters.byStatus[statusKey] || 0) + 1;
-
-    const typeKey = ev.file_type || 'unknown';
-    this.counters.byType[typeKey] =
-      (this.counters.byType[typeKey] || 0) + 1;
-
-    const browserKey = ev.browser || 'unknown';
-    this.counters.byBrowser[browserKey] =
-      (this.counters.byBrowser[browserKey] || 0) + 1;
-
-    const osKey = ev.os || 'unknown';
-    this.counters.byOs[osKey] =
-      (this.counters.byOs[osKey] || 0) + 1;
-
-    const verKey = ev.ext_version || '0.0.0';
-    this.counters.byExtVersion[verKey] =
-      (this.counters.byExtVersion[verKey] || 0) + 1;
-
-    const langKey = ev.language || 'unknown';
-    this.counters.byLanguage[langKey] =
-      (this.counters.byLanguage[langKey] || 0) + 1;
-
-    if (ev.status === 'success') {
-      this.counters.totalDownloads += 1;
-      this.counters.totalSuccess += 1;
-    } else {
-      this.counters.totalFail += 1;
-    }
-
-    if (
-      this.counters.lastEventAt == null ||
-      ev.timestamp > this.counters.lastEventAt
-    ) {
-      this.counters.lastEventAt = ev.timestamp;
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // STATS / HEALTH / RESET / FLUSH
-  // ---------------------------------------------------------------------------
   private async handleStats(): Promise<Response> {
-    // Ensure totals are coherent every time we expose stats
-    this.counters = normalizeCounters(this.counters);
+    const quota = computeQuotaDescriptor(
+      this.d.reqCountToday,
+      this.d.hardRemoteOff,
+    );
 
-    const body = {
-      ok: true,
-      totalEvents: this.counters.totalEvents,
-      totalDownloads: this.counters.totalDownloads,
-      totalSuccess: this.counters.totalSuccess,
-      totalFail: this.counters.totalFail,
-      pendingEvents: this.buffer.length,
-      lastEventAt: this.counters.lastEventAt,
-      lastFlushAt: this.counters.lastFlushAt,
-      counters: {
-        byStatus: this.counters.byStatus,
-        byType: this.counters.byType,
-        byBrowser: this.counters.byBrowser,
-        byOs: this.counters.byOs,
-        byExtVersion: this.counters.byExtVersion,
-        byLanguage: this.counters.byLanguage,
-      },
+    const envSnapshot: EnvSnapshot = {
+      maxBatchEvents: this.env.MAX_BATCH_EVENTS || "n/a",
+      oracleEndpoint: this.env.ORACLE_ENDPOINT || "unknown",
     };
 
-    return this.json(body, 200);
+    const payload: StatsResponse = {
+      ok: true,
+      totalEvents: this.d.totalEvents,
+      totalDownloads: this.d.totalDownloads,
+      totalSuccess: this.d.totalSuccess,
+      totalFail: this.d.totalFail,
+      pendingEvents: this.d.pendingEvents,
+      lastEventAt: this.d.lastEventAt,
+      lastFlushAt: this.d.lastFlushAt,
+      counters: this.d.counters,
+      retryState: this.d.retryState,
+      quota,
+      envSnapshot,
+    };
+
+    return json(payload);
+  }
+
+  /**
+   * Config endpoint used by the extension to adapt batching / flush behaviour.
+   */
+  private async handleConfig(): Promise<Response> {
+    const quota = computeQuotaDescriptor(
+      this.d.reqCountToday,
+      this.d.hardRemoteOff,
+    );
+
+    const config: ConfigResponse = {
+      ok: true,
+      batchSize: quota.batchSizeSuggestion,
+      timeFlushMinutes: {
+        low: 120,
+        mid: 60,
+        high: 30,
+      },
+      remoteEnabled: quota.remoteEnabled,
+      quota,
+    };
+
+    return json(config);
   }
 
   private async handleHealth(): Promise<Response> {
-    this.counters = normalizeCounters(this.counters);
-
-    return this.json(
-      {
-        ok: true,
-        totalEvents: this.counters.totalEvents,
-        totalDownloads: this.counters.totalDownloads,
-        totalSuccess: this.counters.totalSuccess,
-        totalFail: this.counters.totalFail,
-        pendingEvents: this.buffer.length,
-        lastEventAt: this.counters.lastEventAt,
-        lastFlushAt: this.counters.lastFlushAt,
-      },
-      200,
-    );
+    return json({
+      ok: true,
+      pendingEvents: this.d.pendingEvents,
+      lastEventAt: this.d.lastEventAt,
+      lastFlushAt: this.d.lastFlushAt,
+    });
   }
 
-  private async handleReset(): Promise<Response> {
-    this.counters = emptyCounters();
-    this.buffer = [];
-
-    await Promise.all([
-      this.state.storage.put(STORAGE_KEY_COUNTERS, this.counters),
-      this.state.storage.put(STORAGE_KEY_BUFFER, this.buffer),
-    ]);
-
-    return this.json({ ok: true, reset: true }, 200);
+  private async handleDebugFlush(): Promise<Response> {
+    const before = this.d.buffer.length;
+    return json({
+      ok: true,
+      message: "debug flush not implemented in this step",
+      bufferSize: before,
+    });
   }
 
-  private async handleFlush(): Promise<Response> {
-    if (this.buffer.length === 0) {
-      return this.json(
-        { ok: true, flushed: false, reason: 'buffer_empty' },
-        200,
-      );
+  private async handleDebugReset(): Promise<Response> {
+    const today = todayUtcDate();
+    this.data = {
+      totalEvents: 0,
+      totalDownloads: 0,
+      totalSuccess: 0,
+      totalFail: 0,
+      pendingEvents: 0,
+      lastEventAt: null,
+      lastFlushAt: null,
+      counters: { ...DEFAULT_COUNTERS },
+      retryState: { ...DEFAULT_RETRY_STATE },
+      reqCountToday: 0,
+      reqCountDate: today,
+      hardRemoteOff: false,
+      buffer: [],
+    };
+    await this.state.storage.delete(STORAGE_KEY);
+    await this.state.storage.setAlarm(0);
+    await this.persist();
+    return json({ ok: true, message: "state reset" });
+  }
+
+  private async handleAdminForceFlush(request: Request): Promise<Response> {
+    if (!this.isAuthorizedAdmin(request)) {
+      return json({ ok: false, error: "unauthorized" }, { status: 401 });
     }
 
-    const endpoint = (this.env.ORACLE_ENDPOINT || '').trim();
-
-    // DEV MODE: no Oracle backend yet → just clear buffer and set lastFlushAt.
-    if (!endpoint) {
-      const count = this.buffer.length;
-      this.buffer = [];
-      this.counters.lastFlushAt = Date.now();
-
-      await Promise.all([
-        this.state.storage.put(STORAGE_KEY_BUFFER, this.buffer),
-        this.state.storage.put(STORAGE_KEY_COUNTERS, this.counters),
-      ]);
-
-      return this.json(
+    const result = await this.flushToOracle(true);
+    if (!result.ok) {
+      return json(
         {
-          ok: true,
-          flushed: true,
-          mode: 'local',
-          droppedEvents: count,
-          note: 'ORACLE_ENDPOINT is empty – buffer cleared only.',
+          ok: false,
+          error: result.error || "flush_failed",
+          remaining: this.d.buffer.length,
         },
-        200,
+        { status: 500 },
       );
     }
 
-    // PROD MODE: we have Oracle endpoint.
-    const eventsToSend = this.buffer.slice();
-    const ok = await this.flushToOracle(endpoint, eventsToSend);
-    if (!ok) {
-      return this.json(
-        { ok: false, flushed: false, reason: 'oracle_failed' },
-        502,
-      );
+    return json({
+      ok: true,
+      sent: result.sent,
+      remaining: this.d.buffer.length,
+    });
+  }
+
+  private async handleAdminCutPower(request: Request): Promise<Response> {
+    if (!this.isAuthorizedAdmin(request)) {
+      return json({ ok: false, error: "unauthorized" }, { status: 401 });
     }
 
-    this.buffer = [];
-    this.counters.lastFlushAt = Date.now();
-    await Promise.all([
-      this.state.storage.put(STORAGE_KEY_BUFFER, this.buffer),
-      this.state.storage.put(STORAGE_KEY_COUNTERS, this.counters),
-    ]);
+    this.d.hardRemoteOff = true;
+    await this.persist();
 
-    return this.json(
-      { ok: true, flushed: true, mode: 'oracle', sent: eventsToSend.length },
-      200,
+    const quota = computeQuotaDescriptor(
+      this.d.reqCountToday,
+      this.d.hardRemoteOff,
     );
+
+    return json({
+      ok: true,
+      remoteEnabled: quota.remoteEnabled,
+      quotaLevel: quota.quotaLevel,
+      modeLabel: quota.modeLabel,
+    });
+  }
+
+  private async handleAdminRestorePower(request: Request): Promise<Response> {
+    if (!this.isAuthorizedAdmin(request)) {
+      return json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+
+    this.d.hardRemoteOff = false;
+    await this.persist();
+
+    const quota = computeQuotaDescriptor(
+      this.d.reqCountToday,
+      this.d.hardRemoteOff,
+    );
+
+    return json({
+      ok: true,
+      remoteEnabled: quota.remoteEnabled,
+      quotaLevel: quota.quotaLevel,
+      modeLabel: quota.modeLabel,
+    });
+  }
+
+  private async handleAdminFullSync(request: Request): Promise<Response> {
+    if (!this.isAuthorizedAdmin(request)) {
+      return json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+
+    let iterations = 0;
+    let lastError: string | undefined;
+
+    while (this.d.buffer.length > 0 && iterations < 20) {
+      const result = await this.flushToOracle(true);
+      if (!result.ok) {
+        lastError = result.error;
+        break;
+      }
+      iterations++;
+    }
+
+    const ok = this.d.buffer.length === 0 && !lastError;
+
+    return json({
+      ok,
+      remaining: this.d.buffer.length,
+      iterations,
+      error: lastError,
+    });
   }
 
   // ---------------------------------------------------------------------------
-  // ORACLE
+  // Oracle flush + retry/backoff
   // ---------------------------------------------------------------------------
-  private async maybeFlushToOracle(): Promise<void> {
-    const endpoint = (this.env.ORACLE_ENDPOINT || '').trim();
-    if (!endpoint || this.buffer.length === 0) return;
 
-    const eventsToSend = this.buffer.slice();
-    const ok = await this.flushToOracle(endpoint, eventsToSend);
-    if (!ok) return;
+  private async scheduleRetry(): Promise<void> {
+    if (!this.d.retryState) {
+      this.d.retryState = { ...DEFAULT_RETRY_STATE };
+    }
 
-    this.buffer = [];
-    this.counters.lastFlushAt = Date.now();
+    const rs = this.d.retryState;
+    const backoffStepsSeconds = [
+      60, // 1 min
+      300, // 5 min
+      900, // 15 min
+      1800, // 30 min
+      3600, // 1 hour
+      21_600, // 6 hours
+      43_200, // 12 hours
+      86_400, // 1 day
+    ];
+    const idx = Math.min(
+      rs.consecutiveFailures,
+      backoffStepsSeconds.length - 1,
+    );
+    const backoffSec = backoffStepsSeconds[idx];
+    const nextMs = Date.now() + backoffSec * 1000;
 
-    await Promise.all([
-      this.state.storage.put(STORAGE_KEY_BUFFER, this.buffer),
-      this.state.storage.put(STORAGE_KEY_COUNTERS, this.counters),
-    ]);
+    rs.nextRetryAt = nextMs;
+    await this.state.storage.setAlarm(nextMs);
   }
 
   private async flushToOracle(
-    endpoint: string,
-    events: AnalyticsEvent[],
-  ): Promise<boolean> {
-    try {
-      const secret = (this.env.DO_SHARED_SECRET || '').trim();
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      };
-      if (secret) headers['X-DO-SECRET'] = secret;
+    force: boolean,
+  ): Promise<{ ok: boolean; sent: number; error?: string }> {
+    const now = Date.now();
 
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ events }),
+    if (!this.d.buffer.length) {
+      // Nothing to flush; clear retry state + alarm.
+      this.d.lastFlushAt = now;
+      this.d.retryState = { ...DEFAULT_RETRY_STATE };
+      await this.state.storage.setAlarm(0);
+      await this.persist();
+      return { ok: true, sent: 0 };
+    }
+
+    if (!this.env.ORACLE_ENDPOINT || !this.env.DO_SHARED_SECRET) {
+      const msg = "ORACLE_ENDPOINT or DO_SHARED_SECRET not configured";
+      if (!this.d.retryState) this.d.retryState = { ...DEFAULT_RETRY_STATE };
+      this.d.retryState.lastError = msg;
+      this.d.retryState.lastFlushAttemptAt = now;
+      this.d.retryState.consecutiveFailures += 1;
+      await this.scheduleRetry();
+      await this.persist();
+      return { ok: false, sent: 0, error: msg };
+    }
+
+    const maxBatchEnv =
+      parseInt(this.env.MAX_BATCH_EVENTS || "500", 10) || 500;
+    const maxBatch = force ? this.d.buffer.length : maxBatchEnv;
+    const batch = this.d.buffer.slice(0, maxBatch);
+
+    if (!this.d.retryState) this.d.retryState = { ...DEFAULT_RETRY_STATE };
+    this.d.retryState.lastFlushAttemptAt = now;
+
+    try {
+      const res = await fetch(this.env.ORACLE_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-DO-SECRET": this.env.DO_SHARED_SECRET,
+        },
+        body: JSON.stringify({ events: batch }),
       });
 
-      return res.ok;
-    } catch (err) {
-      console.error('Flush to Oracle failed', err);
-      return false;
-    }
-  }
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        const msg = `Oracle responded ${res.status} ${res.statusText} ${text}`;
+        this.d.retryState.lastError = msg;
+        this.d.retryState.consecutiveFailures += 1;
+        await this.scheduleRetry();
+        await this.persist();
+        return { ok: false, sent: 0, error: msg };
+      }
 
-  // ---------------------------------------------------------------------------
-  // JSON helper
-  // ---------------------------------------------------------------------------
-  private json(obj: unknown, status = 200): Response {
-    return new Response(JSON.stringify(obj), {
-      status,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Cache-Control': 'no-store, no-cache, must-revalidate',
-      },
-    });
+      // Success: drop the sent events
+      this.d.buffer = this.d.buffer.slice(batch.length);
+      this.d.pendingEvents = Math.max(
+        0,
+        this.d.pendingEvents - batch.length,
+      );
+      this.d.lastFlushAt = now;
+      this.d.retryState = { ...DEFAULT_RETRY_STATE };
+      await this.state.storage.setAlarm(0);
+      await this.persist();
+
+      return { ok: true, sent: batch.length };
+    } catch (err: any) {
+      const msg = `Oracle flush error: ${String(err)}`;
+      if (!this.d.retryState) this.d.retryState = { ...DEFAULT_RETRY_STATE };
+      this.d.retryState.lastError = msg;
+      this.d.retryState.consecutiveFailures += 1;
+      await this.scheduleRetry();
+      await this.persist();
+      return { ok: false, sent: 0, error: msg };
+    }
   }
 }
