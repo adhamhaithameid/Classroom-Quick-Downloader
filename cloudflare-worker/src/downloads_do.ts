@@ -339,6 +339,13 @@ export class DownloadsDurable {
     this.ensureRequestDay();
     this.d.reqCountToday += 1;
 
+    // --- NEW: derive country from Cloudflare geo (if available) ---
+    const cf = (request as any).cf as { country?: string } | undefined;
+    const countryFromRequest =
+      cf && typeof cf.country === "string" && cf.country.length > 0
+        ? cf.country // e.g. "EG", "US"
+        : undefined;
+
     let body: { events?: StoredEvent[] } | null = null;
     try {
       body = await request.json();
@@ -355,6 +362,11 @@ export class DownloadsDurable {
 
     // Append to buffer + update counters
     for (const ev of events) {
+      // If the extension didn't set country, hydrate it from CF geo
+      if (!ev.country && countryFromRequest) {
+        ev.country = countryFromRequest; // keep original ISO code for Oracle
+      }
+
       this.d.buffer.push(ev);
       this.d.totalEvents += 1;
 
@@ -388,8 +400,14 @@ export class DownloadsDurable {
       const lang = (ev.language || "unknown").toLowerCase();
       c.byLanguage[lang] = (c.byLanguage[lang] || 0) + 1;
 
-      const country = (ev.country || "unknown").toLowerCase();
-      c.byCountry[country] = (c.byCountry[country] || 0) + 1;
+      // --- CHANGED: use request geo as fallback before "unknown" ---
+      const effectiveCountry = (
+        ev.country ||
+        countryFromRequest ||
+        "unknown"
+      ).toLowerCase();
+      c.byCountry[effectiveCountry] =
+        (c.byCountry[effectiveCountry] || 0) + 1;
 
       // NEW: error-type counter (only for fails)
       if (ev.status === "fail") {
