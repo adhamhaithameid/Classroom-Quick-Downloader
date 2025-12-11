@@ -23,3 +23,8 @@ cloudflare-worker/.wrangler
 /cloudflare-worker/.wrangler
 cloudflare-worker/.wrangler/state/v3/do/cqd-analytics-DownloadsDurable/ca1af5fd1a55636b10e2163e38086e5cb6ad71d17ed3d2da4e49efb8ce13fa6b.sqlite
 cloudflare-worker/.wrangler/state/v3/do/cqd-analytics-DownloadsDurable/ca1af5fd1a55636b10e2163e38086e5cb6ad71d17ed3d2da4e49efb8ce13fa6b.sqlite
+oracle-backend/data/
+oracle-backend/docker_data/
+*.db
+*.db-shm
+*.db-wal

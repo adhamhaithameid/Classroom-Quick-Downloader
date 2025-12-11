@@ -1,0 +1,7 @@
+# filepath: oracle-backend/.dockerignore
+.git
+.gitignore
+data/
+*.db
+*.db-wal
+*.db-shm

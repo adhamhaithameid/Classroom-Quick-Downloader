@@ -1,0 +1,78 @@
+<!-- filepath: oracle-backend/static/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CQD Oracle Dashboard</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 600px; margin: 2rem auto; padding: 0 1rem; background: #f4f4f9; color: #333; }
+        .card { background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 1rem; }
+        h1 { font-size: 1.2rem; color: #666; margin-bottom: 0.5rem; }
+        .big-number { font-size: 3rem; font-weight: 700; color: #2563eb; }
+        ul { list-style: none; padding: 0; }
+        li { display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid #eee; }
+        li:last-child { border-bottom: none; }
+        button { background: #2563eb; color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; font-size: 0.9rem; }
+        button:hover { background: #1d4ed8; }
+    </style>
+</head>
+<body>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+        <h3>CQD Oracle</h3>
+        <button onclick="fetchStats()">Refresh</button>
+    </div>
+
+    <div class="card">
+        <h1>Total Downloads</h1>
+        <div class="big-number" id="total">0</div>
+    </div>
+
+    <div class="card">
+        <h1>By File Type</h1>
+        <ul id="byType"></ul>
+    </div>
+
+    <div class="card">
+        <h1>By Browser</h1>
+        <ul id="byBrowser"></ul>
+    </div>
+
+    <script>
+        async function fetchStats() {
+            try {
+                const res = await fetch('/stats');
+                const data = await res.json();
+                
+                document.getElementById('total').innerText = data.total.toLocaleString();
+                
+                renderList('byType', data.byType);
+                renderList('byBrowser', data.byBrowser);
+            } catch (e) {
+                console.error("Failed to fetch stats", e);
+            }
+        }
+
+        function renderList(elementId, mapData) {
+            const list = document.getElementById(elementId);
+            list.innerHTML = '';
+            // Sort keys for consistent display
+            const sortedKeys = Object.keys(mapData).sort((a,b) => mapData[b] - mapData[a]);
+            
+            if (sortedKeys.length === 0) {
+                list.innerHTML = '<li style="color:#999">No data yet</li>';
+                return;
+            }
+
+            sortedKeys.forEach(key => {
+                const li = document.createElement('li');
+                li.innerHTML = `<span>${key}</span> <strong>${mapData[key]}</strong>`;
+                list.appendChild(li);
+            });
+        }
+
+        // Auto-load on start
+        fetchStats();
+    </script>
+</body>
+</html>
