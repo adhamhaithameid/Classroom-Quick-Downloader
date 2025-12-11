@@ -3,380 +3,1217 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>CQD Oracle Analytics Backend</title>
+    <title>CQD Oracle Analytics Dashboard</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
       :root {
-        font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
-          "Segoe UI", sans-serif;
-        color-scheme: dark;
+        --bg-primary: #09090b;
+        --bg-secondary: #18181b;
+        --bg-tertiary: #27272a;
+        --bg-hover: #3f3f46;
+        --border-primary: #27272a;
+        --border-secondary: #3f3f46;
+        --text-primary: #fafafa;
+        --text-secondary: #a1a1aa;
+        --text-muted: #71717a;
+        --accent: #3b82f6;
+        --accent-hover: #2563eb;
+        --success: #22c55e;
+        --danger: #ef4444;
+        --warning: #f59e0b;
+        --purple: #a855f7;
+        --cyan: #06b6d4;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
       }
+
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      
       body {
-        margin: 0;
-        padding: 0;
-        background: #050816;
-        color: #f9fafb;
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        font-size: 14px;
+        line-height: 1.5;
+        min-height: 100vh;
       }
-      header {
+
+      .layout { display: flex; min-height: 100vh; }
+
+      /* Sidebar */
+      .sidebar {
+        width: 220px;
+        background: var(--bg-primary);
+        border-right: 1px solid var(--border-primary);
+        display: flex;
+        flex-direction: column;
+        position: fixed;
+        height: 100vh;
+        z-index: 50;
+      }
+
+      .sidebar-header {
+        padding: 16px;
+        border-bottom: 1px solid var(--border-primary);
+      }
+
+      .logo {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .logo-icon {
+        width: 28px;
+        height: 28px;
+        background: var(--accent);
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .logo-icon svg { width: 16px; height: 16px; color: white; }
+      .logo-text { font-weight: 600; font-size: 14px; }
+
+      .sidebar-nav { flex: 1; padding: 8px; overflow-y: auto; }
+      .nav-section { margin-bottom: 16px; }
+
+      .nav-label {
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-muted);
+        padding: 8px 10px 4px;
+      }
+
+      .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px;
+        border-radius: 6px;
+        color: var(--text-secondary);
+        text-decoration: none;
+        font-size: 13px;
+        font-weight: 500;
+        transition: all 0.15s ease;
+        cursor: pointer;
+        border: none;
+        background: none;
+        width: 100%;
+        text-align: left;
+      }
+
+      .nav-item:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+      .nav-item.active { background: var(--bg-tertiary); color: var(--text-primary); }
+      .nav-item svg { width: 16px; height: 16px; opacity: 0.7; flex-shrink: 0; }
+
+      .sidebar-footer {
+        padding: 12px;
+        border-top: 1px solid var(--border-primary);
+      }
+
+      .status-indicator {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px;
+        background: var(--bg-secondary);
+        border-radius: 6px;
+        font-size: 11px;
+      }
+
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--success);
+        box-shadow: 0 0 8px rgba(34, 197, 94, 0.5);
+      }
+
+      .status-dot.error { background: var(--danger); box-shadow: 0 0 8px rgba(239,68,68,0.5); }
+      .status-dot.warning { background: var(--warning); box-shadow: 0 0 8px rgba(245,158,11,0.5); }
+
+      /* Main Content */
+      .main-content { flex: 1; margin-left: 220px; min-height: 100vh; }
+
+      /* Top Bar */
+      .topbar {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 16px 24px;
-        border-bottom: 1px solid rgba(148, 163, 184, 0.35);
-        backdrop-filter: blur(16px);
+        padding: 12px 20px;
+        border-bottom: 1px solid var(--border-primary);
+        background: var(--bg-primary);
         position: sticky;
         top: 0;
-        z-index: 10;
-        background: rgba(15, 23, 42, 0.85);
+        z-index: 40;
       }
-      header h1 {
-        font-size: 18px;
-        margin: 0;
-        font-weight: 600;
-      }
-      header .right {
-        display: flex;
-        gap: 8px;
-        align-items: center;
-      }
+
+      .topbar-left h1 { font-size: 16px; font-weight: 600; }
+      .topbar-left p { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+      .topbar-right { display: flex; gap: 8px; align-items: center; }
+
       .btn {
-        border-radius: 999px;
-        border: 1px solid rgba(148, 163, 184, 0.7);
-        padding: 6px 14px;
-        font-size: 13px;
-        text-decoration: none;
-        color: #e5e7eb;
-        background: rgba(15, 23, 42, 0.9);
-        cursor: pointer;
-      }
-      .btn:hover {
-        background: rgba(30, 64, 175, 0.9);
-        border-color: rgba(129, 140, 248, 0.9);
-      }
-      main {
-        max-width: 1024px;
-        margin: 24px auto 40px;
-        padding: 0 16px;
-        display: flex;
-        flex-direction: column;
-        gap: 24px;
-      }
-      .card {
-        border-radius: 18px;
-        border: 1px solid rgba(148, 163, 184, 0.3);
-        background: radial-gradient(circle at top left, #1d283a 0, #020617 55%);
-        padding: 16px 18px;
-      }
-      .card h2 {
-        margin: 0 0 10px;
-        font-size: 16px;
-      }
-      .metrics {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 16px;
-      }
-      .metric {
-        min-width: 140px;
-      }
-      .metric-label {
-        font-size: 11px;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        color: #9ca3af;
-        margin-bottom: 2px;
-      }
-      .metric-value {
-        font-size: 18px;
-        font-weight: 600;
-      }
-      .metric-secondary {
-        font-size: 12px;
-        color: #9ca3af;
-      }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 13px;
-      }
-      th,
-      td {
-        padding: 6px 4px;
-        border-bottom: 1px solid rgba(31, 41, 55, 0.9);
-      }
-      th {
-        text-align: left;
-        font-weight: 500;
-        color: #9ca3af;
-      }
-      .pill {
         display: inline-flex;
         align-items: center;
-        border-radius: 999px;
-        padding: 2px 10px;
-        font-size: 11px;
-        border: 1px solid rgba(148, 163, 184, 0.5);
-      }
-      .pill.ok {
-        border-color: rgba(74, 222, 128, 0.7);
-        color: #bbf7d0;
-      }
-      .pill.warn {
-        border-color: rgba(250, 204, 21, 0.8);
-        color: #fef9c3;
-      }
-      .pill.err {
-        border-color: rgba(248, 113, 113, 0.8);
-        color: #fee2e2;
-      }
-      .pill + .pill {
-        margin-left: 4px;
-      }
-      .pill-muted {
-        font-size: 11px;
-        color: #9ca3af;
-      }
-      .small {
+        gap: 6px;
+        padding: 6px 12px;
+        border-radius: 6px;
         font-size: 12px;
-        color: #9ca3af;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        border: 1px solid var(--border-secondary);
+        background: var(--bg-secondary);
+        color: var(--text-primary);
+        text-decoration: none;
+      }
+
+      .btn:hover { background: var(--bg-tertiary); }
+      .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+      .btn svg { width: 14px; height: 14px; }
+
+      .btn-primary { background: var(--accent); border-color: var(--accent); color: white; }
+      .btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+
+      .container { padding: 20px; }
+
+      /* Page visibility */
+      .page { display: none; }
+      .page.active { display: block; }
+
+      /* Stats Grid */
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        margin-bottom: 20px;
+      }
+
+      .stat-card {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
+        border-radius: 8px;
+        padding: 16px;
+        transition: border-color 0.15s ease;
+      }
+
+      .stat-card:hover { border-color: var(--border-secondary); }
+
+      .stat-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 8px;
+      }
+
+      .stat-label { font-size: 12px; color: var(--text-secondary); font-weight: 500; }
+
+      .stat-icon {
+        width: 28px;
+        height: 28px;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .stat-icon.blue { background: rgba(59, 130, 246, 0.15); color: var(--accent); }
+      .stat-icon.green { background: rgba(34, 197, 94, 0.15); color: var(--success); }
+      .stat-icon.red { background: rgba(239, 68, 68, 0.15); color: var(--danger); }
+      .stat-icon.yellow { background: rgba(245, 158, 11, 0.15); color: var(--warning); }
+      .stat-icon.purple { background: rgba(168, 85, 247, 0.15); color: var(--purple); }
+      .stat-icon.cyan { background: rgba(6, 182, 212, 0.15); color: var(--cyan); }
+      .stat-icon svg { width: 14px; height: 14px; }
+
+      .stat-value {
+        font-size: 24px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        line-height: 1;
+      }
+
+      .stat-subtext {
+        font-size: 11px;
+        color: var(--text-muted);
+        margin-top: 6px;
+      }
+
+      /* Top Today Grid */
+      .top-today-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+      }
+
+      .top-card {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
+        border-radius: 8px;
+        padding: 16px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .top-icon {
+        width: 40px;
+        height: 40px;
+        background: var(--bg-tertiary);
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+      }
+
+      .top-info { flex: 1; }
+      .top-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+      .top-value { font-size: 14px; font-weight: 600; margin-top: 2px; }
+      .top-count { font-size: 11px; color: var(--text-secondary); }
+
+      /* Cards */
+      .card {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
+        border-radius: 8px;
+        margin-bottom: 20px;
+      }
+
+      .card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--border-primary);
+      }
+
+      .card-title { font-size: 13px; font-weight: 600; }
+      .card-subtitle { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+      .card-body { padding: 16px; }
+      .card-body.no-padding { padding: 0; }
+
+      /* Bar Chart */
+      .chart-container {
+        height: 200px;
+        position: relative;
+        padding: 10px 0;
+      }
+
+      .chart-wrapper {
+        display: flex;
+        height: 100%;
+        align-items: flex-end;
+        position: relative;
+        padding-left: 40px;
+        padding-bottom: 30px;
+      }
+
+      .chart-y-axis {
+        position: absolute;
+        left: 0;
+        top: 10px;
+        bottom: 30px;
+        width: 35px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        align-items: flex-end;
+        padding-right: 8px;
+      }
+
+      .chart-y-label {
+        font-size: 10px;
+        color: var(--text-muted);
+      }
+
+      .chart-grid {
+        position: absolute;
+        left: 40px;
+        right: 16px;
+        top: 10px;
+        bottom: 30px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        pointer-events: none;
+      }
+
+      .chart-grid-line {
+        border-top: 1px dashed var(--border-primary);
+        width: 100%;
+      }
+
+      .chart-bars {
+        display: flex;
+        align-items: flex-end;
+        gap: 3px;
+        flex: 1;
+        height: calc(100% - 30px);
+        position: relative;
+      }
+
+      .chart-bar-wrapper {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        height: 100%;
+        position: relative;
+      }
+
+      .chart-bar {
+        width: 100%;
+        max-width: 20px;
+        background: var(--accent);
+        border-radius: 2px 2px 0 0;
+        transition: all 0.3s ease;
+        cursor: pointer;
+        position: absolute;
+        bottom: 0;
+        min-height: 2px;
+      }
+
+      .chart-bar:hover {
+        background: var(--accent-hover);
+        transform: scaleX(1.1);
+      }
+
+      .chart-x-axis {
+        display: flex;
+        position: absolute;
+        bottom: 0;
+        left: 40px;
+        right: 16px;
+        justify-content: space-between;
+        padding-top: 8px;
+      }
+
+      .chart-x-label {
+        font-size: 9px;
+        color: var(--text-muted);
+        text-align: center;
+        flex: 1;
+      }
+
+      .chart-tooltip {
+        position: absolute;
+        background: var(--bg-primary);
+        border: 1px solid var(--border-secondary);
+        border-radius: 6px;
+        padding: 8px 12px;
+        font-size: 12px;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.2s;
+        z-index: 10;
+        white-space: nowrap;
+      }
+
+      .chart-tooltip.visible { opacity: 1; }
+
+      .chart-stats {
+        display: flex;
+        gap: 24px;
+        padding: 12px 16px;
+        border-top: 1px solid var(--border-primary);
+        background: var(--bg-tertiary);
+        font-size: 12px;
+      }
+
+      .chart-stat {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .chart-stat-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+      }
+
+      .chart-stat-dot.blue { background: var(--accent); }
+      .chart-stat-dot.green { background: var(--success); }
+      .chart-stat-dot.red { background: var(--danger); }
+
+      /* Table */
+      .table-container { overflow-x: auto; }
+      table { width: 100%; border-collapse: collapse; }
+
+      th {
+        padding: 10px 16px;
+        text-align: left;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-muted);
+        background: var(--bg-tertiary);
+        white-space: nowrap;
+      }
+
+      td {
+        padding: 12px 16px;
+        font-size: 12px;
+        color: var(--text-secondary);
+        border-bottom: 1px solid var(--border-primary);
+      }
+
+      tbody tr:last-child td { border-bottom: none; }
+      tbody tr:hover { background: rgba(59, 130, 246, 0.02); }
+      .td-primary { color: var(--text-primary); font-weight: 500; font-family: monospace; font-size: 11px; }
+
+      /* Badge */
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 3px 8px;
+        font-size: 11px;
+        font-weight: 500;
+        border-radius: 4px;
+      }
+
+      .badge-success { background: rgba(34,197,94,0.1); color: var(--success); }
+      .badge-danger { background: rgba(239,68,68,0.1); color: var(--danger); }
+      .badge-muted { background: var(--bg-tertiary); color: var(--text-muted); }
+
+      /* Breakdown Charts Page */
+      .charts-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+      }
+
+      .breakdown-bars {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .breakdown-bar-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .breakdown-bar-label {
+        width: 80px;
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--text-secondary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .breakdown-bar-track {
+        flex: 1;
+        height: 20px;
+        background: var(--bg-tertiary);
+        border-radius: 4px;
+        overflow: hidden;
+        position: relative;
+      }
+
+      .breakdown-bar-fill {
+        height: 100%;
+        border-radius: 4px;
+        transition: width 0.5s ease;
+        display: flex;
+        align-items: center;
+        padding-left: 8px;
+      }
+
+      .breakdown-bar-fill.purple { background: linear-gradient(90deg, var(--purple), #c084fc); }
+      .breakdown-bar-fill.blue { background: linear-gradient(90deg, var(--accent), #60a5fa); }
+      .breakdown-bar-fill.cyan { background: linear-gradient(90deg, var(--cyan), #22d3d8); }
+      .breakdown-bar-fill.green { background: linear-gradient(90deg, var(--success), #4ade80); }
+
+      .breakdown-bar-value {
+        font-size: 11px;
+        font-weight: 600;
+        color: white;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+      }
+
+      .breakdown-bar-count {
+        width: 60px;
+        text-align: right;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+
+      /* Loading & Empty */
+      .loading {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        padding: 32px;
+        color: var(--text-muted);
+        font-size: 12px;
+      }
+
+      .spinner {
+        width: 14px;
+        height: 14px;
+        border: 2px solid var(--border-secondary);
+        border-top-color: var(--accent);
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+
+      @keyframes spin { to { transform: rotate(360deg); } }
+
+      .empty-state {
+        text-align: center;
+        padding: 40px;
+        color: var(--text-muted);
+        font-size: 12px;
+      }
+
+      /* Tabs */
+      .tabs {
+        display: flex;
+        gap: 2px;
+        padding: 3px;
+        background: var(--bg-tertiary);
+        border-radius: 6px;
+      }
+
+      .tab {
+        padding: 5px 10px;
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--text-muted);
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        border: none;
+        background: none;
+      }
+
+      .tab:hover { color: var(--text-secondary); }
+      .tab.active { background: var(--bg-secondary); color: var(--text-primary); }
+
+      /* Responsive */
+      @media (max-width: 1024px) {
+        .sidebar { display: none; }
+        .main-content { margin-left: 0; }
+        .stats-grid, .top-today-grid { grid-template-columns: repeat(2, 1fr); }
+        .charts-grid { grid-template-columns: 1fr; }
+      }
+
+      @media (max-width: 640px) {
+        .stats-grid, .top-today-grid { grid-template-columns: 1fr; }
+        .topbar { flex-direction: column; gap: 12px; align-items: flex-start; }
+        .topbar-right { width: 100%; justify-content: flex-end; }
       }
     </style>
   </head>
   <body>
-    <header>
-      <h1>Classroom Quick Downloader &mdash; Oracle Analytics Backend</h1>
-      <div class="right">
-        <a
-          class="btn"
-          href="https://cqd-analytics.adhamhaithameid.workers.dev/"
-          target="_blank"
-          rel="noreferrer"
-        >
-          Open Cloudflare Worker Dashboard
-        </a>
-      </div>
-    </header>
-
-    <main>
-      <section class="card" id="summary-card">
-        <h2>Backend Summary</h2>
-        <div class="metrics" id="summary-metrics">
-          <div class="small">Loading summary...</div>
+    <div class="layout">
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <div class="logo">
+            <div class="logo-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/>
+              </svg>
+            </div>
+            <span class="logo-text">CQD Oracle</span>
+          </div>
         </div>
-        <div class="small" id="summary-meta"></div>
-      </section>
 
-      <section class="card">
-        <div style="display:flex;align-items:center;justify-content:space-between;">
-          <h2>Downloads &amp; Success Rate (Last 7 Days)</h2>
-          <div class="pill pill-muted">Granularity: day</div>
-        </div>
-        <table id="timeseries-table">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Downloads</th>
-              <th>Success</th>
-              <th>Fail</th>
-              <th>Success Rate</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr><td colspan="5" class="small">Loading…</td></tr>
-          </tbody>
-        </table>
-      </section>
+        <nav class="sidebar-nav">
+          <div class="nav-section">
+            <div class="nav-label">Dashboard</div>
+            <button class="nav-item active" data-page="overview" onclick="showPage('overview')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+                <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+              </svg>
+              Overview
+            </button>
+            <button class="nav-item" data-page="activity" onclick="showPage('activity')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+              </svg>
+              Activity
+            </button>
+            <button class="nav-item" data-page="charts" onclick="showPage('charts')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/>
+              </svg>
+              Charts
+            </button>
+          </div>
 
-      <section class="card">
-        <div style="display:flex;align-items:center;justify-content:space-between;">
-          <h2>Top Types (Last 7 Days)</h2>
-          <div class="pill pill-muted">Dimension: type</div>
+          <div class="nav-section">
+            <div class="nav-label">External</div>
+            <a class="nav-item" href="https://cqd-analytics.adhamhaithameid.workers.dev/" target="_blank">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
+                <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+              </svg>
+              CF Worker
+            </a>
+          </div>
+        </nav>
+
+        <div class="sidebar-footer">
+          <div class="status-indicator">
+            <div class="status-dot" id="sidebar-status"></div>
+            <span id="sidebar-status-text">Connecting...</span>
+          </div>
         </div>
-        <table id="breakdown-table">
-          <thead>
-            <tr>
-              <th>Type</th>
-              <th>Count</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr><td colspan="2" class="small">Loading…</td></tr>
-          </tbody>
-        </table>
-      </section>
-    </main>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="main-content">
+        <div class="topbar">
+          <div class="topbar-left">
+            <h1 id="page-title">Overview</h1>
+            <p id="last-updated">Last updated: --</p>
+          </div>
+          <div class="topbar-right">
+            <button class="btn" onclick="refreshAll()" id="refresh-btn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 12a9 9 0 11-2.52-6.25"/><path d="M21 4v5h-5"/>
+              </svg>
+              Refresh
+            </button>
+          </div>
+        </div>
+
+        <div class="container">
+          <!-- OVERVIEW PAGE -->
+          <div class="page active" id="page-overview">
+            <div class="stats-grid" id="stats-grid">
+              <div class="stat-card">
+                <div class="stat-header">
+                  <span class="stat-label">Total Downloads</span>
+                  <div class="stat-icon blue">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                      <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                  </div>
+                </div>
+                <div class="stat-value" id="stat-downloads">--</div>
+                <div class="stat-subtext">All time</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-header">
+                  <span class="stat-label">Success Rate</span>
+                  <div class="stat-icon yellow">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                    </svg>
+                  </div>
+                </div>
+                <div class="stat-value" id="stat-rate">--</div>
+                <div class="stat-subtext">Overall</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-header">
+                  <span class="stat-label">Successful</span>
+                  <div class="stat-icon green">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                  </div>
+                </div>
+                <div class="stat-value" id="stat-success">--</div>
+                <div class="stat-subtext">All time</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-header">
+                  <span class="stat-label">Failed</span>
+                  <div class="stat-icon red">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                  </div>
+                </div>
+                <div class="stat-value" id="stat-fail">--</div>
+                <div class="stat-subtext">All time</div>
+              </div>
+            </div>
+
+            <h3 style="font-size: 13px; font-weight: 600; margin-bottom: 12px; color: var(--text-secondary);">Top Today</h3>
+            <div class="top-today-grid" id="top-today-grid">
+              <div class="top-card">
+                <div class="top-icon" id="top-browser-icon">🌐</div>
+                <div class="top-info">
+                  <div class="top-label">Browser</div>
+                  <div class="top-value" id="top-browser">--</div>
+                  <div class="top-count" id="top-browser-count"></div>
+                </div>
+              </div>
+              <div class="top-card">
+                <div class="top-icon" id="top-os-icon">💻</div>
+                <div class="top-info">
+                  <div class="top-label">OS</div>
+                  <div class="top-value" id="top-os">--</div>
+                  <div class="top-count" id="top-os-count"></div>
+                </div>
+              </div>
+              <div class="top-card">
+                <div class="top-icon" id="top-type-icon">📄</div>
+                <div class="top-info">
+                  <div class="top-label">File Type</div>
+                  <div class="top-value" id="top-type">--</div>
+                  <div class="top-count" id="top-type-count"></div>
+                </div>
+              </div>
+              <div class="top-card">
+                <div class="top-icon" id="top-country-icon">🌍</div>
+                <div class="top-info">
+                  <div class="top-label">Country</div>
+                  <div class="top-value" id="top-country">--</div>
+                  <div class="top-count" id="top-country-count"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ACTIVITY PAGE -->
+          <div class="page" id="page-activity">
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <div class="card-title">Download Activity</div>
+                  <div class="card-subtitle">Hourly downloads today</div>
+                </div>
+                <div class="tabs" id="activity-tabs">
+                  <button class="tab active" onclick="setActivityRange('today')">Today</button>
+                  <button class="tab" onclick="setActivityRange('week')">This Week</button>
+                </div>
+              </div>
+              <div class="card-body">
+                <div class="chart-container" id="activity-chart">
+                  <div class="loading"><div class="spinner"></div>Loading chart...</div>
+                </div>
+              </div>
+              <div class="chart-stats" id="activity-stats">
+                <div class="chart-stat">
+                  <div class="chart-stat-dot blue"></div>
+                  <span>Total: <strong id="activity-total">0</strong></span>
+                </div>
+                <div class="chart-stat">
+                  <div class="chart-stat-dot green"></div>
+                  <span>Success: <strong id="activity-success">0</strong></span>
+                </div>
+                <div class="chart-stat">
+                  <div class="chart-stat-dot red"></div>
+                  <span>Failed: <strong id="activity-fail">0</strong></span>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <div class="card-title">Recent Activity</div>
+                  <div class="card-subtitle">Download events log</div>
+                </div>
+              </div>
+              <div class="card-body no-padding">
+                <div class="table-container" id="activity-log">
+                  <div class="loading"><div class="spinner"></div>Loading...</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- CHARTS PAGE -->
+          <div class="page" id="page-charts">
+            <div class="charts-grid">
+              <div class="card">
+                <div class="card-header">
+                  <div>
+                    <div class="card-title">Downloads by Browser</div>
+                    <div class="card-subtitle">Last 7 days</div>
+                  </div>
+                </div>
+                <div class="card-body" id="chart-browser">
+                  <div class="loading"><div class="spinner"></div>Loading...</div>
+                </div>
+              </div>
+
+              <div class="card">
+                <div class="card-header">
+                  <div>
+                    <div class="card-title">Downloads by OS</div>
+                    <div class="card-subtitle">Last 7 days</div>
+                  </div>
+                </div>
+                <div class="card-body" id="chart-os">
+                  <div class="loading"><div class="spinner"></div>Loading...</div>
+                </div>
+              </div>
+
+              <div class="card">
+                <div class="card-header">
+                  <div>
+                    <div class="card-title">Downloads by File Type</div>
+                    <div class="card-subtitle">Last 7 days</div>
+                  </div>
+                </div>
+                <div class="card-body" id="chart-type">
+                  <div class="loading"><div class="spinner"></div>Loading...</div>
+                </div>
+              </div>
+
+              <div class="card">
+                <div class="card-header">
+                  <div>
+                    <div class="card-title">Downloads by Country</div>
+                    <div class="card-subtitle">Last 7 days</div>
+                  </div>
+                </div>
+                <div class="card-body" id="chart-country">
+                  <div class="loading"><div class="spinner"></div>Loading...</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Daily Downloads Chart -->
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <div class="card-title">Daily Downloads</div>
+                  <div class="card-subtitle">Last 14 days</div>
+                </div>
+              </div>
+              <div class="card-body">
+                <div class="chart-container" id="daily-chart">
+                  <div class="loading"><div class="spinner"></div>Loading chart...</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
 
     <script>
+      // State
+      let currentPage = 'overview';
+      let activityRange = 'today';
+
+      // Helpers
       async function fetchJSON(url) {
         const res = await fetch(url);
         if (!res.ok) throw new Error("HTTP " + res.status);
         return res.json();
       }
 
-      function fmtPct(v) {
-        return (v * 100).toFixed(1) + "%";
+      function fmtPct(v) { return (v * 100).toFixed(1) + "%"; }
+      
+      function fmtNumber(n) {
+        if (n >= 1000000) return (n / 1000000).toFixed(1) + "M";
+        if (n >= 1000) return (n / 1000).toFixed(1) + "K";
+        return (n || 0).toLocaleString();
       }
 
-      function humanTs(ms) {
-        if (!ms) return "—";
-        const d = new Date(ms);
-        return d.toLocaleString();
+      function getDateRange(days) {
+        const today = new Date();
+        const to = today.toISOString().slice(0, 10);
+        const fromDate = new Date(today);
+        fromDate.setDate(fromDate.getDate() - (days - 1));
+        const from = fromDate.toISOString().slice(0, 10);
+        return { from, to };
       }
 
-      async function loadSummary() {
-        const elMetrics = document.getElementById("summary-metrics");
-        const elMeta = document.getElementById("summary-meta");
-        elMetrics.innerHTML = '<div class="small">Loading summary...</div>';
-        elMeta.textContent = "";
+      function getBrowserIcon(b) {
+        const icons = { chrome: '🌐', firefox: '🦊', safari: '🧭', edge: '📘', opera: '🔴' };
+        return icons[(b || '').toLowerCase()] || '🌐';
+      }
 
+      function getOSIcon(o) {
+        const icons = { windows: '🪟', macos: '🍎', mac: '🍎', linux: '🐧', android: '🤖', ios: '📱' };
+        return icons[(o || '').toLowerCase()] || '💻';
+      }
+
+      function getFileIcon(t) {
+        const icons = { pdf: '📄', doc: '📝', docx: '📝', ppt: '📊', pptx: '📊', xls: '📈', xlsx: '📈', zip: '📦', jpg: '🖼️', png: '🖼️', mp4: '🎬' };
+        return icons[(t || '').toLowerCase()] || '📎';
+      }
+
+      // Page Navigation
+      function showPage(page) {
+        currentPage = page;
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.getElementById('page-' + page).classList.add('active');
+        
+        document.querySelectorAll('.nav-item').forEach(n => {
+          n.classList.toggle('active', n.dataset.page === page);
+        });
+
+        const titles = { overview: 'Overview', activity: 'Activity', charts: 'Charts' };
+        document.getElementById('page-title').textContent = titles[page];
+
+        if (page === 'activity') loadActivity();
+        if (page === 'charts') loadCharts();
+      }
+
+      // Overview Page
+      async function loadOverview() {
         try {
           const data = await fetchJSON("/api/stats/summary");
+          
+          document.getElementById("sidebar-status").className = "status-dot " + 
+            (data.status === "online" ? "" : data.status === "stale" ? "warning" : "error");
+          document.getElementById("sidebar-status-text").textContent = 
+            (data.status || "Unknown").charAt(0).toUpperCase() + (data.status || "unknown").slice(1);
 
-          const status = data.status || "unknown";
-          const flags = data.flags || [];
+          document.getElementById("stat-downloads").textContent = fmtNumber(data.totalDownloads);
+          document.getElementById("stat-success").textContent = fmtNumber(data.totalSuccess);
+          document.getElementById("stat-fail").textContent = fmtNumber(data.totalFail);
+          document.getElementById("stat-rate").textContent = fmtPct(data.successRate || 0);
 
-          const pills = [];
-          if (status === "online") {
-            pills.push('<span class="pill ok">Online</span>');
-          } else if (status === "stale") {
-            pills.push('<span class="pill warn">Stale</span>');
-          } else if (status === "idle") {
-            pills.push('<span class="pill warn">Idle</span>');
-          } else {
-            pills.push('<span class="pill err">Unknown</span>');
-          }
-          for (const f of flags) {
-            pills.push('<span class="pill pill-muted">' + f + "</span>");
-          }
-
-          elMetrics.innerHTML = `
-            <div class="metric">
-              <div class="metric-label">Status</div>
-              <div class="metric-value">${pills.join(" ")}</div>
-            </div>
-            <div class="metric">
-              <div class="metric-label">Total Downloads</div>
-              <div class="metric-value">${data.totalDownloads ?? 0}</div>
-            </div>
-            <div class="metric">
-              <div class="metric-label">Total Success</div>
-              <div class="metric-value">${data.totalSuccess ?? 0}</div>
-            </div>
-            <div class="metric">
-              <div class="metric-label">Total Fail</div>
-              <div class="metric-value">${data.totalFail ?? 0}</div>
-            </div>
-            <div class="metric">
-              <div class="metric-label">Success Rate</div>
-              <div class="metric-value">${fmtPct(data.successRate || 0)}</div>
-            </div>
-            <div class="metric">
-              <div class="metric-label">Fail Rate</div>
-              <div class="metric-value">${fmtPct(data.failRate || 0)}</div>
-            </div>
-          `;
-
-          let extra = "Generated at " + humanTs(data.generatedAt);
-          if (data.lastBatch) {
-            extra +=
-              " • Last batch ingested at " + humanTs(data.lastBatch.ingestedAt);
-          }
-          if (data.doState) {
-            extra +=
-              " • Pending events in DO: " + (data.doState.pendingEvents ?? 0);
-          }
-          elMeta.textContent = extra;
+          document.getElementById("last-updated").textContent = "Last updated: " + new Date().toLocaleTimeString();
         } catch (e) {
-          elMetrics.innerHTML =
-            '<div class="small">Failed to load summary: ' +
-            e.message +
-            "</div>";
+          document.getElementById("sidebar-status").className = "status-dot error";
+          document.getElementById("sidebar-status-text").textContent = "Error";
         }
       }
 
-      async function loadTimeseries() {
-        const tbody = document.querySelector("#timeseries-table tbody");
-        tbody.innerHTML =
-          '<tr><td colspan="5" class="small">Loading…</td></tr>';
+      async function loadTopToday() {
+        const today = new Date().toISOString().slice(0, 10);
+        
+        const dimensions = ['browser', 'os', 'type', 'country'];
+        for (const dim of dimensions) {
+          try {
+            const data = await fetchJSON(`/api/stats/breakdown?dimension=${dim}&from=${today}&to=${today}`);
+            if (data.values && data.values.length > 0) {
+              const top = data.values[0];
+              document.getElementById(`top-${dim}`).textContent = top.value || 'Unknown';
+              document.getElementById(`top-${dim}-count`).textContent = fmtNumber(top.count) + ' downloads';
+              
+              if (dim === 'browser') document.getElementById(`top-${dim}-icon`).textContent = getBrowserIcon(top.value);
+              if (dim === 'os') document.getElementById(`top-${dim}-icon`).textContent = getOSIcon(top.value);
+              if (dim === 'type') document.getElementById(`top-${dim}-icon`).textContent = getFileIcon(top.value);
+            } else {
+              document.getElementById(`top-${dim}`).textContent = 'No data';
+              document.getElementById(`top-${dim}-count`).textContent = '';
+            }
+          } catch (e) {
+            document.getElementById(`top-${dim}`).textContent = '--';
+          }
+        }
+      }
 
-        const today = new Date();
-        const to = today.toISOString().slice(0, 10);
-        const fromDate = new Date(today);
-        fromDate.setDate(fromDate.getDate() - 6);
-        const from = fromDate.toISOString().slice(0, 10);
+      // Activity Page
+      function setActivityRange(range) {
+        activityRange = range;
+        document.querySelectorAll('#activity-tabs .tab').forEach(t => {
+          t.classList.toggle('active', t.textContent.toLowerCase().includes(range));
+        });
+        loadActivity();
+      }
+
+      async function loadActivity() {
+        const chartContainer = document.getElementById('activity-chart');
+        const logContainer = document.getElementById('activity-log');
+        
+        chartContainer.innerHTML = '<div class="loading"><div class="spinner"></div>Loading chart...</div>';
+        logContainer.innerHTML = '<div class="loading"><div class="spinner"></div>Loading...</div>';
+
+        const days = activityRange === 'today' ? 1 : 7;
+        const { from, to } = getDateRange(days);
+        const granularity = activityRange === 'today' ? 'hour' : 'day';
 
         try {
-          const data = await fetchJSON(
-            `/api/stats/timeseries?granularity=day&from=${from}&to=${to}`
-          );
+          const data = await fetchJSON(`/api/stats/timeseries?granularity=${granularity}&from=${from}&to=${to}`);
+          
           if (!data.points || !data.points.length) {
-            tbody.innerHTML =
-              '<tr><td colspan="5" class="small">No data in selected range.</td></tr>';
+            chartContainer.innerHTML = '<div class="empty-state">No activity data available</div>';
+            logContainer.innerHTML = '<div class="empty-state">No events logged</div>';
             return;
           }
-          tbody.innerHTML = "";
-          for (const p of data.points) {
-            tbody.insertAdjacentHTML(
-              "beforeend",
-              `<tr>
-                <td>${p.timestamp}</td>
-                <td>${p.downloads}</td>
-                <td>${p.success}</td>
-                <td>${p.fail}</td>
-                <td>${fmtPct(p.successRate || 0)}</td>
-              </tr>`
-            );
+
+          // Render bar chart
+          renderBarChart(chartContainer, data.points, granularity);
+
+          // Update stats
+          const totalDownloads = data.points.reduce((s, p) => s + (p.downloads || 0), 0);
+          const totalSuccess = data.points.reduce((s, p) => s + (p.success || 0), 0);
+          const totalFail = data.points.reduce((s, p) => s + (p.fail || 0), 0);
+          
+          document.getElementById('activity-total').textContent = fmtNumber(totalDownloads);
+          document.getElementById('activity-success').textContent = fmtNumber(totalSuccess);
+          document.getElementById('activity-fail').textContent = fmtNumber(totalFail);
+
+          // Render table
+          let tableHtml = `
+            <table>
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>Downloads</th>
+                  <th>Success</th>
+                  <th>Failed</th>
+                  <th>Rate</th>
+                </tr>
+              </thead>
+              <tbody>`;
+          
+          for (const p of data.points.slice().reverse()) {
+            const rate = p.successRate || 0;
+            const badgeClass = rate >= 0.9 ? 'badge-success' : rate >= 0.7 ? 'badge-warning' : 'badge-danger';
+            tableHtml += `
+              <tr>
+                <td class="td-primary">${p.timestamp}</td>
+                <td>${fmtNumber(p.downloads)}</td>
+                <td style="color: var(--success)">${fmtNumber(p.success)}</td>
+                <td style="color: var(--danger)">${fmtNumber(p.fail)}</td>
+                <td><span class="badge ${badgeClass}">${fmtPct(rate)}</span></td>
+              </tr>`;
           }
+          tableHtml += '</tbody></table>';
+          logContainer.innerHTML = tableHtml;
+
         } catch (e) {
-          tbody.innerHTML =
-            '<tr><td colspan="5" class="small">Failed to load timeseries: ' +
-            e.message +
-            "</td></tr>";
+          chartContainer.innerHTML = `<div class="empty-state" style="color: var(--danger)">Failed to load: ${e.message}</div>`;
+          logContainer.innerHTML = `<div class="empty-state" style="color: var(--danger)">Failed to load</div>`;
         }
       }
 
-      async function loadBreakdown() {
-        const tbody = document.querySelector("#breakdown-table tbody");
-        tbody.innerHTML =
-          '<tr><td colspan="2" class="small">Loading…</td></tr>';
+      function renderBarChart(container, points, granularity) {
+        const maxVal = Math.max(...points.map(p => p.downloads || 0), 1);
+        const yLabels = [maxVal, Math.round(maxVal * 0.66), Math.round(maxVal * 0.33), 0];
 
-        const today = new Date();
-        const to = today.toISOString().slice(0, 10);
-        const fromDate = new Date(today);
-        fromDate.setDate(fromDate.getDate() - 6);
-        const from = fromDate.toISOString().slice(0, 10);
+        let html = `
+          <div class="chart-wrapper">
+            <div class="chart-y-axis">
+              ${yLabels.map(v => `<span class="chart-y-label">${fmtNumber(v)}</span>`).join('')}
+            </div>
+            <div class="chart-grid">
+              <div class="chart-grid-line"></div>
+              <div class="chart-grid-line"></div>
+              <div class="chart-grid-line"></div>
+              <div class="chart-grid-line"></div>
+            </div>
+            <div class="chart-bars">
+        `;
 
+        for (const p of points) {
+          const height = ((p.downloads || 0) / maxVal) * 100;
+          const label = granularity === 'hour' ? p.timestamp.split(' ')[1] || p.timestamp.slice(-5) : p.timestamp.slice(5);
+          html += `
+            <div class="chart-bar-wrapper" title="${p.timestamp}: ${p.downloads} downloads">
+              <div class="chart-bar" style="height: ${height}%"></div>
+            </div>`;
+        }
+
+        html += `</div>
+            <div class="chart-x-axis">`;
+        
+        // Show fewer labels
+        const step = Math.ceil(points.length / 8);
+        for (let i = 0; i < points.length; i++) {
+          const p = points[i];
+          const label = granularity === 'hour' 
+            ? (p.timestamp.split(' ')[1] || p.timestamp).slice(0, 5) 
+            : p.timestamp.slice(5);
+          html += `<span class="chart-x-label">${i % step === 0 ? label : ''}</span>`;
+        }
+        
+        html += '</div></div>';
+        container.innerHTML = html;
+      }
+
+      // Charts Page
+      async function loadCharts() {
+        const dimensions = ['browser', 'os', 'type', 'country'];
+        const colors = ['purple', 'blue', 'cyan', 'green'];
+        const { from, to } = getDateRange(7);
+
+        for (let i = 0; i < dimensions.length; i++) {
+          const dim = dimensions[i];
+          const container = document.getElementById(`chart-${dim}`);
+          
+          try {
+            const data = await fetchJSON(`/api/stats/breakdown?dimension=${dim}&from=${from}&to=${to}`);
+            
+            if (!data.values || !data.values.length) {
+              container.innerHTML = '<div class="empty-state">No data</div>';
+              continue;
+            }
+
+            const maxCount = Math.max(...data.values.map(v => v.count));
+            let html = '<div class="breakdown-bars">';
+            
+            for (const v of data.values.slice(0, 5)) {
+              const pct = (v.count / maxCount) * 100;
+              html += `
+                <div class="breakdown-bar-item">
+                  <span class="breakdown-bar-label">${v.value || 'Unknown'}</span>
+                  <div class="breakdown-bar-track">
+                    <div class="breakdown-bar-fill ${colors[i]}" style="width: ${pct}%">
+                      <span class="breakdown-bar-value">${Math.round(pct)}%</span>
+                    </div>
+                  </div>
+                  <span class="breakdown-bar-count">${fmtNumber(v.count)}</span>
+                </div>`;
+            }
+            html += '</div>';
+            container.innerHTML = html;
+          } catch (e) {
+            container.innerHTML = `<div class="empty-state" style="color: var(--danger)">Failed</div>`;
+          }
+        }
+
+        // Daily chart
+        const dailyContainer = document.getElementById('daily-chart');
         try {
-          const data = await fetchJSON(
-            `/api/stats/breakdown?dimension=type&from=${from}&to=${to}`
-          );
-          if (!data.values || !data.values.length) {
-            tbody.innerHTML =
-              '<tr><td colspan="2" class="small">No data.</td></tr>';
+          const { from, to } = getDateRange(14);
+          const data = await fetchJSON(`/api/stats/timeseries?granularity=day&from=${from}&to=${to}`);
+          
+          if (!data.points || !data.points.length) {
+            dailyContainer.innerHTML = '<div class="empty-state">No data</div>';
             return;
           }
-          tbody.innerHTML = "";
-          for (const v of data.values.slice(0, 10)) {
-            tbody.insertAdjacentHTML(
-              "beforeend",
-              `<tr>
-                <td>${v.value}</td>
-                <td>${v.count}</td>
-              </tr>`
-            );
-          }
+
+          renderBarChart(dailyContainer, data.points, 'day');
         } catch (e) {
-          tbody.innerHTML =
-            '<tr><td colspan="2" class="small">Failed to load breakdown: ' +
-            e.message +
-            "</td></tr>";
+          dailyContainer.innerHTML = `<div class="empty-state" style="color: var(--danger)">Failed</div>`;
         }
       }
 
+      // Refresh
+      async function refreshAll() {
+        const btn = document.getElementById("refresh-btn");
+        btn.disabled = true;
+        btn.innerHTML = '<div class="spinner"></div> Refreshing...';
+        
+        await loadOverview();
+        await loadTopToday();
+        
+        if (currentPage === 'activity') await loadActivity();
+        if (currentPage === 'charts') await loadCharts();
+
+        btn.disabled = false;
+        btn.innerHTML = `
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12a9 9 0 11-2.52-6.25"/><path d="M21 4v5h-5"/>
+          </svg> Refresh`;
+      }
+
+      // Init
       window.addEventListener("load", () => {
-        loadSummary();
-        loadTimeseries();
-        loadBreakdown();
+        refreshAll();
+        setInterval(refreshAll, 60000);
       });
     </script>
   </body>
