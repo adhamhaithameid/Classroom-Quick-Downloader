@@ -1,38 +1,98 @@
-// filepath: oracle-backend/internal/model/counters.go
+// oracle-backend/internal/model/counters.go
 package model
 
-import (
-	"database/sql"
-)
-
-// BatchIncrement updates a counter by a specific delta (usually +1).
-// It handles the "upsert" logic: insert if new, update if exists.
-func BatchIncrement(tx *sql.Tx, key string, delta int) error {
-	query := `
-	INSERT INTO counters(key, value)
-	VALUES(?, ?)
-	ON CONFLICT(key) DO UPDATE SET value = counters.value + excluded.value;
-	`
-	_, err := tx.Exec(query, key, delta)
-	return err
+// BucketTotals represents aggregated totals for a single time bucket
+// (e.g. one hour).
+type BucketTotals struct {
+	TotalEvents    int64 `json:"totalEvents"`
+	TotalDownloads int64 `json:"totalDownloads"`
+	TotalSuccess   int64 `json:"totalSuccess"`
+	TotalFail      int64 `json:"totalFail"`
 }
 
-// GetAllCounters fetches all raw counters from the database.
-func GetAllCounters(db *sql.DB) (map[string]int64, error) {
-	rows, err := db.Query("SELECT key, value FROM counters")
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
+// BucketCounters holds per-dimension counters for a time bucket.
+type BucketCounters struct {
+	ByStatus    map[string]int64 `json:"byStatus"`
+	ByType      map[string]int64 `json:"byType"`
+	ByBrowser   map[string]int64 `json:"byBrowser"`
+	ByOs        map[string]int64 `json:"byOs"`
+	ByExtVer    map[string]int64 `json:"byExtVersion"`
+	ByLanguage  map[string]int64 `json:"byLanguage"`
+	ByCountry   map[string]int64 `json:"byCountry"`
+	ByErrorType map[string]int64 `json:"byErrorType"`
+}
 
-	result := make(map[string]int64)
-	for rows.Next() {
-		var key string
-		var value int64
-		if err := rows.Scan(&key, &value); err != nil {
-			return nil, err
-		}
-		result[key] = value
-	}
-	return result, nil
+// TimeBucket represents one aggregated time bucket (typically one hour).
+// bucketStart/bucketEnd should be RFC3339 (UTC) strings like
+// "2025-12-11T03:00:00Z".
+type TimeBucket struct {
+	BucketStart string         `json:"bucketStart"`
+	BucketEnd   string         `json:"bucketEnd"`
+	Totals      BucketTotals   `json:"totals"`
+	Counters    BucketCounters `json:"counters"`
+}
+
+// DOStateRetry mirrors the retryState block from the DO /stats JSON.
+type DOStateRetry struct {
+	ConsecutiveFailures int    `json:"consecutiveFailures"`
+	LastError           string `json:"lastError"`
+	LastFlushAttemptAt  *int64 `json:"lastFlushAttemptAt"`
+	NextRetryAt         *int64 `json:"nextRetryAt"`
+}
+
+// DOStateQuota mirrors the quota block from the DO /stats JSON.
+type DOStateQuota struct {
+	RequestsToday       int64  `json:"requestsToday"`
+	QuotaLevel          string `json:"quotaLevel"`
+	ModeLabel           string `json:"modeLabel"`
+	RemoteEnabled       bool   `json:"remoteEnabled"`
+	BatchSizeSuggestion int64  `json:"batchSizeSuggestion"`
+}
+
+// DOStateEnvSnapshot mirrors the envSnapshot block from the DO /stats JSON.
+type DOStateEnvSnapshot struct {
+	MaxBatchEvents string `json:"maxBatchEvents"`
+	OracleEndpoint string `json:"oracleEndpoint"`
+}
+
+// DOStateCounters mirrors the counters block from the DO /stats JSON.
+// (We don't strictly need this for ingestion, but it's here for completeness.)
+type DOStateCounters struct {
+	ByStatus    map[string]int64 `json:"byStatus"`
+	ByType      map[string]int64 `json:"byType"`
+	ByBrowser   map[string]int64 `json:"byBrowser"`
+	ByOs        map[string]int64 `json:"byOs"`
+	ByExtVer    map[string]int64 `json:"byExtVersion"`
+	ByLanguage  map[string]int64 `json:"byLanguage"`
+	ByCountry   map[string]int64 `json:"byCountry"`
+	ByErrorType map[string]int64 `json:"byErrorType"`
+}
+
+// DOState is a compact representation of the DO's current /stats state,
+// included once per batch in OracleBatch.DOState.
+type DOState struct {
+	OK             bool                 `json:"ok"`
+	TotalEvents    int64                `json:"totalEvents"`
+	TotalDownloads int64                `json:"totalDownloads"`
+	TotalSuccess   int64                `json:"totalSuccess"`
+	TotalFail      int64                `json:"totalFail"`
+	PendingEvents  int64                `json:"pendingEvents"`
+	LastEventAt    *int64               `json:"lastEventAt"`
+	LastFlushAt    *int64               `json:"lastFlushAt"`
+	Counters       *DOStateCounters     `json:"counters,omitempty"`
+	RetryState     *DOStateRetry        `json:"retryState,omitempty"`
+	Quota          *DOStateQuota        `json:"quota,omitempty"`
+	EnvSnapshot    *DOStateEnvSnapshot  `json:"envSnapshot,omitempty"`
+}
+
+// OracleBatch is the payload that the Durable Object sends to the Oracle
+// backend.
+// It is *aggregated* (no raw events), idempotent by batchId, and may contain
+// multiple time buckets (e.g. per hour).
+type OracleBatch struct {
+	BatchID     string       `json:"batchId"`
+	GeneratedAt int64        `json:"generatedAt"` // unix ms from DO
+	TimeZone    string       `json:"timeZone"`    // e.g. "UTC"
+	TimeBuckets []TimeBucket `json:"timeBuckets"`
+	DOState     DOState      `json:"doState"`
 }

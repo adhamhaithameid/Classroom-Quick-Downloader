@@ -1,121 +1,383 @@
-<!-- filepath: oracle-backend/static/index.html -->
+<!-- oracle-backend/static/index.html -->
 <!DOCTYPE html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>CQD Oracle Dashboard</title>
-        <style>
-            body {
-                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-                max-width: 600px;
-                margin: 2rem auto;
-                padding: 0 1rem;
-                background: #f4f4f9;
-                color: #333;
-            }
-            .card {
-                background: white;
-                padding: 1.5rem;
-                border-radius: 12px;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-                margin-bottom: 1rem;
-            }
-            h1 {
-                font-size: 1.2rem;
-                color: #666;
-                margin-bottom: 0.5rem;
-            }
-            .big-number {
-                font-size: 3rem;
-                font-weight: 700;
-                color: #2563eb;
-            }
-            ul {
-                list-style: none;
-                padding: 0;
-            }
-            li {
-                display: flex;
-                justify-content: space-between;
-                padding: 0.5rem 0;
-                border-bottom: 1px solid #eee;
-            }
-            li:last-child {
-                border-bottom: none;
-            }
-            button {
-                background: #2563eb;
-                color: white;
-                border: none;
-                padding: 0.5rem 1rem;
-                border-radius: 6px;
-                cursor: pointer;
-                font-size: 0.9rem;
-            }
-            button:hover {
-                background: #1d4ed8;
-            }
-        </style>
-    </head>
-    <body>
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
-            <h3>CQD Oracle</h3>
-            <button onclick="fetchStats()">Refresh</button>
+  <head>
+    <meta charset="UTF-8" />
+    <title>CQD Oracle Analytics Backend</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      :root {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+          "Segoe UI", sans-serif;
+        color-scheme: dark;
+      }
+      body {
+        margin: 0;
+        padding: 0;
+        background: #050816;
+        color: #f9fafb;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 24px;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.35);
+        backdrop-filter: blur(16px);
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background: rgba(15, 23, 42, 0.85);
+      }
+      header h1 {
+        font-size: 18px;
+        margin: 0;
+        font-weight: 600;
+      }
+      header .right {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .btn {
+        border-radius: 999px;
+        border: 1px solid rgba(148, 163, 184, 0.7);
+        padding: 6px 14px;
+        font-size: 13px;
+        text-decoration: none;
+        color: #e5e7eb;
+        background: rgba(15, 23, 42, 0.9);
+        cursor: pointer;
+      }
+      .btn:hover {
+        background: rgba(30, 64, 175, 0.9);
+        border-color: rgba(129, 140, 248, 0.9);
+      }
+      main {
+        max-width: 1024px;
+        margin: 24px auto 40px;
+        padding: 0 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+      }
+      .card {
+        border-radius: 18px;
+        border: 1px solid rgba(148, 163, 184, 0.3);
+        background: radial-gradient(circle at top left, #1d283a 0, #020617 55%);
+        padding: 16px 18px;
+      }
+      .card h2 {
+        margin: 0 0 10px;
+        font-size: 16px;
+      }
+      .metrics {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+      }
+      .metric {
+        min-width: 140px;
+      }
+      .metric-label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #9ca3af;
+        margin-bottom: 2px;
+      }
+      .metric-value {
+        font-size: 18px;
+        font-weight: 600;
+      }
+      .metric-secondary {
+        font-size: 12px;
+        color: #9ca3af;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      th,
+      td {
+        padding: 6px 4px;
+        border-bottom: 1px solid rgba(31, 41, 55, 0.9);
+      }
+      th {
+        text-align: left;
+        font-weight: 500;
+        color: #9ca3af;
+      }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 2px 10px;
+        font-size: 11px;
+        border: 1px solid rgba(148, 163, 184, 0.5);
+      }
+      .pill.ok {
+        border-color: rgba(74, 222, 128, 0.7);
+        color: #bbf7d0;
+      }
+      .pill.warn {
+        border-color: rgba(250, 204, 21, 0.8);
+        color: #fef9c3;
+      }
+      .pill.err {
+        border-color: rgba(248, 113, 113, 0.8);
+        color: #fee2e2;
+      }
+      .pill + .pill {
+        margin-left: 4px;
+      }
+      .pill-muted {
+        font-size: 11px;
+        color: #9ca3af;
+      }
+      .small {
+        font-size: 12px;
+        color: #9ca3af;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Classroom Quick Downloader &mdash; Oracle Analytics Backend</h1>
+      <div class="right">
+        <a
+          class="btn"
+          href="https://cqd-analytics.adhamhaithameid.workers.dev/"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Open Cloudflare Worker Dashboard
+        </a>
+      </div>
+    </header>
+
+    <main>
+      <section class="card" id="summary-card">
+        <h2>Backend Summary</h2>
+        <div class="metrics" id="summary-metrics">
+          <div class="small">Loading summary...</div>
         </div>
+        <div class="small" id="summary-meta"></div>
+      </section>
 
-        <div class="card">
-            <h1>Total Downloads</h1>
-            <div class="big-number" id="total">0</div>
+      <section class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <h2>Downloads &amp; Success Rate (Last 7 Days)</h2>
+          <div class="pill pill-muted">Granularity: day</div>
         </div>
+        <table id="timeseries-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Downloads</th>
+              <th>Success</th>
+              <th>Fail</th>
+              <th>Success Rate</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="5" class="small">Loading…</td></tr>
+          </tbody>
+        </table>
+      </section>
 
-        <div class="card">
-            <h1>By File Type</h1>
-            <ul id="byType"></ul>
+      <section class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <h2>Top Types (Last 7 Days)</h2>
+          <div class="pill pill-muted">Dimension: type</div>
         </div>
+        <table id="breakdown-table">
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Count</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="2" class="small">Loading…</td></tr>
+          </tbody>
+        </table>
+      </section>
+    </main>
 
-        <div class="card">
-            <h1>By Browser</h1>
-            <ul id="byBrowser"></ul>
-        </div>
+    <script>
+      async function fetchJSON(url) {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.json();
+      }
 
-        <script>
-            async function fetchStats() {
-                try {
-                    const res = await fetch('/stats');
-                    const data = await res.json();
+      function fmtPct(v) {
+        return (v * 100).toFixed(1) + "%";
+      }
 
-                    document.getElementById('total').innerText =
-                        (data.total || 0).toLocaleString();
+      function humanTs(ms) {
+        if (!ms) return "—";
+        const d = new Date(ms);
+        return d.toLocaleString();
+      }
 
-                    renderList('byType', data.byType || {});
-                    renderList('byBrowser', data.byBrowser || {});
-                } catch (e) {
-                    console.error("Failed to fetch stats", e);
-                }
-            }
+      async function loadSummary() {
+        const elMetrics = document.getElementById("summary-metrics");
+        const elMeta = document.getElementById("summary-meta");
+        elMetrics.innerHTML = '<div class="small">Loading summary...</div>';
+        elMeta.textContent = "";
 
-            function renderList(elementId, mapData) {
-                const list = document.getElementById(elementId);
-                list.innerHTML = '';
+        try {
+          const data = await fetchJSON("/api/stats/summary");
 
-                const sortedKeys = Object.keys(mapData)
-                    .sort((a, b) => mapData[b] - mapData[a]);
+          const status = data.status || "unknown";
+          const flags = data.flags || [];
 
-                if (sortedKeys.length === 0) {
-                    list.innerHTML = '<li style="color:#999">No data yet</li>';
-                    return;
-                }
+          const pills = [];
+          if (status === "online") {
+            pills.push('<span class="pill ok">Online</span>');
+          } else if (status === "stale") {
+            pills.push('<span class="pill warn">Stale</span>');
+          } else if (status === "idle") {
+            pills.push('<span class="pill warn">Idle</span>');
+          } else {
+            pills.push('<span class="pill err">Unknown</span>');
+          }
+          for (const f of flags) {
+            pills.push('<span class="pill pill-muted">' + f + "</span>");
+          }
 
-                sortedKeys.forEach(key => {
-                    const li = document.createElement('li');
-                    li.innerHTML = `<span>${key}</span> <strong>${mapData[key]}</strong>`;
-                    list.appendChild(li);
-                });
-            }
+          elMetrics.innerHTML = `
+            <div class="metric">
+              <div class="metric-label">Status</div>
+              <div class="metric-value">${pills.join(" ")}</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">Total Downloads</div>
+              <div class="metric-value">${data.totalDownloads ?? 0}</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">Total Success</div>
+              <div class="metric-value">${data.totalSuccess ?? 0}</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">Total Fail</div>
+              <div class="metric-value">${data.totalFail ?? 0}</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">Success Rate</div>
+              <div class="metric-value">${fmtPct(data.successRate || 0)}</div>
+            </div>
+            <div class="metric">
+              <div class="metric-label">Fail Rate</div>
+              <div class="metric-value">${fmtPct(data.failRate || 0)}</div>
+            </div>
+          `;
 
-            // Auto-load on start
-            fetchStats();
-        </script>
-    </body>
+          let extra = "Generated at " + humanTs(data.generatedAt);
+          if (data.lastBatch) {
+            extra +=
+              " • Last batch ingested at " + humanTs(data.lastBatch.ingestedAt);
+          }
+          if (data.doState) {
+            extra +=
+              " • Pending events in DO: " + (data.doState.pendingEvents ?? 0);
+          }
+          elMeta.textContent = extra;
+        } catch (e) {
+          elMetrics.innerHTML =
+            '<div class="small">Failed to load summary: ' +
+            e.message +
+            "</div>";
+        }
+      }
+
+      async function loadTimeseries() {
+        const tbody = document.querySelector("#timeseries-table tbody");
+        tbody.innerHTML =
+          '<tr><td colspan="5" class="small">Loading…</td></tr>';
+
+        const today = new Date();
+        const to = today.toISOString().slice(0, 10);
+        const fromDate = new Date(today);
+        fromDate.setDate(fromDate.getDate() - 6);
+        const from = fromDate.toISOString().slice(0, 10);
+
+        try {
+          const data = await fetchJSON(
+            `/api/stats/timeseries?granularity=day&from=${from}&to=${to}`
+          );
+          if (!data.points || !data.points.length) {
+            tbody.innerHTML =
+              '<tr><td colspan="5" class="small">No data in selected range.</td></tr>';
+            return;
+          }
+          tbody.innerHTML = "";
+          for (const p of data.points) {
+            tbody.insertAdjacentHTML(
+              "beforeend",
+              `<tr>
+                <td>${p.timestamp}</td>
+                <td>${p.downloads}</td>
+                <td>${p.success}</td>
+                <td>${p.fail}</td>
+                <td>${fmtPct(p.successRate || 0)}</td>
+              </tr>`
+            );
+          }
+        } catch (e) {
+          tbody.innerHTML =
+            '<tr><td colspan="5" class="small">Failed to load timeseries: ' +
+            e.message +
+            "</td></tr>";
+        }
+      }
+
+      async function loadBreakdown() {
+        const tbody = document.querySelector("#breakdown-table tbody");
+        tbody.innerHTML =
+          '<tr><td colspan="2" class="small">Loading…</td></tr>';
+
+        const today = new Date();
+        const to = today.toISOString().slice(0, 10);
+        const fromDate = new Date(today);
+        fromDate.setDate(fromDate.getDate() - 6);
+        const from = fromDate.toISOString().slice(0, 10);
+
+        try {
+          const data = await fetchJSON(
+            `/api/stats/breakdown?dimension=type&from=${from}&to=${to}`
+          );
+          if (!data.values || !data.values.length) {
+            tbody.innerHTML =
+              '<tr><td colspan="2" class="small">No data.</td></tr>';
+            return;
+          }
+          tbody.innerHTML = "";
+          for (const v of data.values.slice(0, 10)) {
+            tbody.insertAdjacentHTML(
+              "beforeend",
+              `<tr>
+                <td>${v.value}</td>
+                <td>${v.count}</td>
+              </tr>`
+            );
+          }
+        } catch (e) {
+          tbody.innerHTML =
+            '<tr><td colspan="2" class="small">Failed to load breakdown: ' +
+            e.message +
+            "</td></tr>";
+        }
+      }
+
+      window.addEventListener("load", () => {
+        loadSummary();
+        loadTimeseries();
+        loadBreakdown();
+      });
+    </script>
+  </body>
 </html>

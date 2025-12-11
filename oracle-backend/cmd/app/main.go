@@ -1,65 +1,83 @@
-// filepath oracle-backend/cmd/app/main.go
+// oracle-backend/cmd/app/main.go
 package main
 
 import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
+	"time"
 
-	"github.com/adhamhaithameid/cqd-oracle-backend/internal/db"
-	"github.com/adhamhaithameid/cqd-oracle-backend/internal/handlers"
+	"oracle-backend/internal/db"
+	"oracle-backend/internal/handlers"
 )
 
 func main() {
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
+	addr := getenv("ADDR", ":8080")
+	dbPath := getenv("DB_PATH", "./data/analytics.db")
+	staticDir := getenv("STATIC_DIR", "./static")
+	doSecret := os.Getenv("DO_SHARED_SECRET")
+
+	if doSecret == "" {
+		log.Println("[WARN] DO_SHARED_SECRET is empty – /ingest-batch will reject requests")
 	}
 
-	dbPath := os.Getenv("DB_PATH")
-	if dbPath == "" {
-		dbPath = "./data/cqd-analytics.db"
+	// Ensure data directory exists.
+	if err := os.MkdirAll(filepath.Dir(dbPath), 0o755); err != nil {
+		log.Fatalf("failed to create data dir: %v", err)
 	}
 
-	secret := os.Getenv("DO_SHARED_SECRET")
-	if secret == "" {
-		log.Println("[WARN] DO_SHARED_SECRET is empty – StoreBatch will reject writes until you set it")
-	}
-
-	// Open DB
-	sqlDB, err := db.Open(dbPath)
+	sqlDB, err := db.Init(dbPath)
 	if err != nil {
-		log.Fatalf("failed to open DB: %v", err)
+		log.Fatalf("failed to init db: %v", err)
 	}
 	defer sqlDB.Close()
 
 	mux := http.NewServeMux()
 
-	// Health endpoints
-	mux.HandleFunc("/health", handlers.HealthAPI)
-	mux.Handle("/health/db", handlers.HealthDB(sqlDB))
+	// Health endpoints.
+	mux.HandleFunc("/health", handlers.APIHealthHandler)
+	mux.HandleFunc("/health/api", handlers.APIHealthHandler)
+	mux.HandleFunc("/health/db", handlers.DBHealthHandler(sqlDB))
 
-	// Stats + ingest
-	mux.Handle("/stats", handlers.GetStats(sqlDB))
-	mux.Handle("/store-batch", handlers.StoreBatch(sqlDB, secret))
+	// Ingest endpoint (aggregated batches from DO).
+	mux.HandleFunc("/ingest-batch", handlers.IngestBatchHandler(sqlDB, doSecret))
+	// Backwards-compatible alias, if you ever used /storeBatch naming.
+	mux.HandleFunc("/storeBatch", handlers.IngestBatchHandler(sqlDB, doSecret))
 
-	// Static dashboard at "/"
-	//   GET /           -> static/index.html
-	//   GET /static/... -> static assets if you add more later
-	fs := http.FileServer(http.Dir("static"))
-	mux.Handle("/", fs)
+	// Analytics API endpoints.
+	mux.HandleFunc("/api/stats/summary", handlers.SummaryHandler(sqlDB))
+	mux.HandleFunc("/api/stats/timeseries", handlers.TimeSeriesHandler(sqlDB))
+	mux.HandleFunc("/api/stats/breakdown", handlers.BreakdownHandler(sqlDB))
 
-	addr := ":" + port
-	log.Printf("CQD Oracle backend listening on %s (DB=%s)", addr, dbPath)
-	if err := http.ListenAndServe(addr, logRequest(mux)); err != nil {
+	// Serve static dashboard.
+	fileServer := http.FileServer(http.Dir(staticDir))
+	mux.Handle("/", fileServer)
+
+	server := &http.Server{
+		Addr:              addr,
+		Handler:           loggingMiddleware(mux),
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+
+	log.Printf("oracle-backend listening on %s (db: %s, static: %s)", addr, dbPath, staticDir)
+	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("server error: %v", err)
 	}
 }
 
-// logRequest is a simple logging middleware.
-func logRequest(next http.Handler) http.Handler {
+func getenv(key, def string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return def
+}
+
+// loggingMiddleware logs basic request info.
+func loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("%s %s from %s", r.Method, r.URL.Path, r.RemoteAddr)
+		start := time.Now()
 		next.ServeHTTP(w, r)
+		log.Printf("%s %s from %s in %s", r.Method, r.URL.Path, r.RemoteAddr, time.Since(start))
 	})
 }
