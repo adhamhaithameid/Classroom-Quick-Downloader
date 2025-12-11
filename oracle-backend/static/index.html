@@ -41,6 +41,66 @@
 
       .layout { display: flex; min-height: 100vh; }
 
+      /* Tooltip styles */
+      [data-tooltip] {
+        position: relative;
+        cursor: help;
+      }
+
+      [data-tooltip]::before,
+      [data-tooltip]::after {
+        position: absolute;
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.2s ease;
+        z-index: 100;
+        pointer-events: none;
+      }
+
+      [data-tooltip]::before {
+        content: attr(data-tooltip);
+        bottom: calc(100% + 8px);
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 6px 10px;
+        background: var(--bg-primary);
+        border: 1px solid var(--border-secondary);
+        border-radius: 6px;
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--text-primary);
+        white-space: nowrap;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      }
+
+      [data-tooltip]::after {
+        content: '';
+        bottom: calc(100% + 2px);
+        left: 50%;
+        transform: translateX(-50%);
+        border: 6px solid transparent;
+        border-top-color: var(--border-secondary);
+      }
+
+      [data-tooltip]:hover::before,
+      [data-tooltip]:hover::after {
+        opacity: 1;
+        visibility: visible;
+      }
+
+      /* Tooltip below for items near top */
+      [data-tooltip-position="bottom"]::before {
+        bottom: auto;
+        top: calc(100% + 8px);
+      }
+
+      [data-tooltip-position="bottom"]::after {
+        bottom: auto;
+        top: calc(100% + 2px);
+        border-top-color: transparent;
+        border-bottom-color: var(--border-secondary);
+      }
+
       /* Sidebar */
       .sidebar {
         width: 220px;
@@ -67,13 +127,14 @@
       .logo-icon {
         width: 28px;
         height: 28px;
-        background: var(--accent);
         border-radius: 6px;
         display: flex;
         align-items: center;
         justify-content: center;
+        overflow: hidden;
       }
 
+      .logo-icon img { width: 100%; height: 100%; object-fit: contain; }
       .logo-icon svg { width: 16px; height: 16px; color: white; }
       .logo-text { font-weight: 600; font-size: 14px; }
 
@@ -105,6 +166,7 @@
         background: none;
         width: 100%;
         text-align: left;
+        margin-top: 15px;
       }
 
       .nav-item:hover { background: var(--bg-tertiary); color: var(--text-primary); }
@@ -124,6 +186,7 @@
         background: var(--bg-secondary);
         border-radius: 6px;
         font-size: 11px;
+        cursor: help;
       }
 
       .status-dot {
@@ -132,6 +195,12 @@
         border-radius: 50%;
         background: var(--success);
         box-shadow: 0 0 8px rgba(34, 197, 94, 0.5);
+        animation: pulse 2s infinite;
+      }
+
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.6; }
       }
 
       .status-dot.error { background: var(--danger); box-shadow: 0 0 8px rgba(239,68,68,0.5); }
@@ -173,8 +242,9 @@
         text-decoration: none;
       }
 
-      .btn:hover { background: var(--bg-tertiary); }
-      .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+      .btn:hover { background: var(--bg-tertiary); transform: translateY(-1px); }
+      .btn:active { transform: translateY(0); }
+      .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
       .btn svg { width: 14px; height: 14px; }
 
       .btn-primary { background: var(--accent); border-color: var(--accent); color: white; }
@@ -199,10 +269,15 @@
         border: 1px solid var(--border-primary);
         border-radius: 8px;
         padding: 16px;
-        transition: border-color 0.15s ease;
+        transition: all 0.2s ease;
+        cursor: default;
       }
 
-      .stat-card:hover { border-color: var(--border-secondary); }
+      .stat-card:hover { 
+        border-color: var(--border-secondary); 
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      }
 
       .stat-header {
         display: flex;
@@ -220,7 +295,10 @@
         display: flex;
         align-items: center;
         justify-content: center;
+        transition: transform 0.2s ease;
       }
+
+      .stat-card:hover .stat-icon { transform: scale(1.1); }
 
       .stat-icon.blue { background: rgba(59, 130, 246, 0.15); color: var(--accent); }
       .stat-icon.green { background: rgba(34, 197, 94, 0.15); color: var(--success); }
@@ -258,6 +336,14 @@
         display: flex;
         align-items: center;
         gap: 12px;
+        transition: all 0.2s ease;
+        cursor: default;
+      }
+
+      .top-card:hover { 
+        border-color: var(--border-secondary);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
       }
 
       .top-icon {
@@ -269,12 +355,23 @@
         align-items: center;
         justify-content: center;
         font-size: 18px;
+        transition: transform 0.2s ease;
       }
 
-      .top-info { flex: 1; }
+      .top-card:hover .top-icon { transform: scale(1.1); }
+
+      .top-info { flex: 1; min-width: 0; }
       .top-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
-      .top-value { font-size: 14px; font-weight: 600; margin-top: 2px; }
+      .top-value { 
+        font-size: 14px; 
+        font-weight: 600; 
+        margin-top: 2px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
       .top-count { font-size: 11px; color: var(--text-secondary); }
+      .top-tied { font-size: 10px; color: var(--warning); margin-top: 2px; }
 
       /* Cards */
       .card {
@@ -299,7 +396,7 @@
 
       /* Bar Chart */
       .chart-container {
-        height: 200px;
+        height: 220px;
         position: relative;
         padding: 10px 0;
       }
@@ -309,16 +406,16 @@
         height: 100%;
         align-items: flex-end;
         position: relative;
-        padding-left: 40px;
-        padding-bottom: 30px;
+        padding-left: 50px;
+        padding-bottom: 35px;
       }
 
       .chart-y-axis {
         position: absolute;
         left: 0;
         top: 10px;
-        bottom: 30px;
-        width: 35px;
+        bottom: 35px;
+        width: 45px;
         display: flex;
         flex-direction: column;
         justify-content: space-between;
@@ -326,34 +423,28 @@
         padding-right: 8px;
       }
 
-      .chart-y-label {
-        font-size: 10px;
-        color: var(--text-muted);
-      }
+      .chart-y-label { font-size: 10px; color: var(--text-muted); }
 
       .chart-grid {
         position: absolute;
-        left: 40px;
+        left: 50px;
         right: 16px;
         top: 10px;
-        bottom: 30px;
+        bottom: 35px;
         display: flex;
         flex-direction: column;
         justify-content: space-between;
         pointer-events: none;
       }
 
-      .chart-grid-line {
-        border-top: 1px dashed var(--border-primary);
-        width: 100%;
-      }
+      .chart-grid-line { border-top: 1px dashed var(--border-primary); width: 100%; }
 
       .chart-bars {
         display: flex;
         align-items: flex-end;
         gap: 3px;
         flex: 1;
-        height: calc(100% - 30px);
+        height: calc(100% - 35px);
         position: relative;
       }
 
@@ -368,10 +459,10 @@
 
       .chart-bar {
         width: 100%;
-        max-width: 20px;
-        background: var(--accent);
-        border-radius: 2px 2px 0 0;
-        transition: all 0.3s ease;
+        max-width: 24px;
+        background: linear-gradient(180deg, var(--accent), #1d4ed8);
+        border-radius: 3px 3px 0 0;
+        transition: all 0.2s ease;
         cursor: pointer;
         position: absolute;
         bottom: 0;
@@ -379,15 +470,16 @@
       }
 
       .chart-bar:hover {
-        background: var(--accent-hover);
-        transform: scaleX(1.1);
+        background: linear-gradient(180deg, #60a5fa, var(--accent));
+        transform: scaleX(1.2);
+        box-shadow: 0 0 12px rgba(59, 130, 246, 0.4);
       }
 
       .chart-x-axis {
         display: flex;
         position: absolute;
         bottom: 0;
-        left: 40px;
+        left: 50px;
         right: 16px;
         justify-content: space-between;
         padding-top: 8px;
@@ -398,23 +490,46 @@
         color: var(--text-muted);
         text-align: center;
         flex: 1;
+        transition: color 0.2s;
       }
 
-      .chart-tooltip {
-        position: absolute;
+      /* Floating tooltip */
+      .floating-tooltip {
+        position: fixed;
         background: var(--bg-primary);
-        border: 1px solid var(--border-secondary);
-        border-radius: 6px;
-        padding: 8px 12px;
+        border: 1px solid var(--accent);
+        border-radius: 8px;
+        padding: 10px 14px;
         font-size: 12px;
         pointer-events: none;
         opacity: 0;
-        transition: opacity 0.2s;
-        z-index: 10;
-        white-space: nowrap;
+        transition: opacity 0.15s ease;
+        z-index: 1000;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+        max-width: 200px;
       }
 
-      .chart-tooltip.visible { opacity: 1; }
+      .floating-tooltip.visible { opacity: 1; }
+
+      .floating-tooltip .tooltip-title {
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 6px;
+        border-bottom: 1px solid var(--border-primary);
+        padding-bottom: 6px;
+      }
+
+      .floating-tooltip .tooltip-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        margin-top: 4px;
+      }
+
+      .floating-tooltip .tooltip-label { color: var(--text-muted); }
+      .floating-tooltip .tooltip-value { color: var(--text-primary); font-weight: 500; }
+      .floating-tooltip .tooltip-success { color: var(--success); }
+      .floating-tooltip .tooltip-fail { color: var(--danger); }
 
       .chart-stats {
         display: flex;
@@ -425,18 +540,8 @@
         font-size: 12px;
       }
 
-      .chart-stat {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-      }
-
-      .chart-stat-dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-      }
-
+      .chart-stat { display: flex; align-items: center; gap: 8px; }
+      .chart-stat-dot { width: 8px; height: 8px; border-radius: 50%; }
       .chart-stat-dot.blue { background: var(--accent); }
       .chart-stat-dot.green { background: var(--success); }
       .chart-stat-dot.red { background: var(--danger); }
@@ -465,8 +570,10 @@
       }
 
       tbody tr:last-child td { border-bottom: none; }
-      tbody tr:hover { background: rgba(59, 130, 246, 0.02); }
-      .td-primary { color: var(--text-primary); font-weight: 500; font-family: monospace; font-size: 11px; }
+      tbody tr { transition: background 0.15s ease; }
+      tbody tr:hover { background: rgba(59, 130, 246, 0.05); }
+      .td-primary { color: var(--text-primary); font-weight: 500; }
+      .td-time { font-family: 'SF Mono', Monaco, monospace; font-size: 11px; }
 
       /* Badge */
       .badge {
@@ -476,10 +583,13 @@
         font-size: 11px;
         font-weight: 500;
         border-radius: 4px;
+        transition: transform 0.15s ease;
       }
 
+      .badge:hover { transform: scale(1.05); }
       .badge-success { background: rgba(34,197,94,0.1); color: var(--success); }
       .badge-danger { background: rgba(239,68,68,0.1); color: var(--danger); }
+      .badge-warning { background: rgba(245,158,11,0.1); color: var(--warning); }
       .badge-muted { background: var(--bg-tertiary); color: var(--text-muted); }
 
       /* Breakdown Charts Page */
@@ -489,17 +599,18 @@
         gap: 16px;
       }
 
-      .breakdown-bars {
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-      }
+      .breakdown-bars { display: flex; flex-direction: column; gap: 10px; }
 
       .breakdown-bar-item {
         display: flex;
         align-items: center;
         gap: 12px;
+        padding: 4px;
+        border-radius: 4px;
+        transition: background 0.15s ease;
       }
+
+      .breakdown-bar-item:hover { background: var(--bg-tertiary); }
 
       .breakdown-bar-label {
         width: 80px;
@@ -599,8 +710,105 @@
         background: none;
       }
 
-      .tab:hover { color: var(--text-secondary); }
+      .tab:hover { color: var(--text-secondary); background: rgba(255,255,255,0.05); }
       .tab.active { background: var(--bg-secondary); color: var(--text-primary); }
+
+      /* Enhanced Log Viewer */
+      .log-toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--border-primary);
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      .log-toolbar-left { display: flex; align-items: center; gap: 8px; }
+      .log-toolbar-right { display: flex; align-items: center; gap: 8px; }
+
+      .log-sort-btn, .log-export-btn {
+        padding: 6px 10px;
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--text-muted);
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        transition: all 0.15s;
+      }
+
+      .log-sort-btn:hover, .log-export-btn:hover {
+        color: var(--text-primary);
+        border-color: var(--border-secondary);
+      }
+
+      .log-sort-btn.active { color: var(--accent); border-color: var(--accent); }
+
+      .mini-bar {
+        display: inline-flex;
+        width: 60px;
+        height: 6px;
+        background: var(--bg-tertiary);
+        border-radius: 3px;
+        overflow: hidden;
+        margin-right: 8px;
+        vertical-align: middle;
+      }
+
+      .mini-bar-fill {
+        height: 100%;
+        background: var(--accent);
+        border-radius: 3px;
+        transition: width 0.3s ease;
+      }
+
+      .mini-bar-fill.green { background: var(--success); }
+      .mini-bar-fill.red { background: var(--danger); }
+
+      .trend-indicator {
+        font-size: 10px;
+        margin-left: 4px;
+        font-weight: 600;
+      }
+
+      .trend-up { color: var(--success); }
+      .trend-down { color: var(--danger); }
+      .trend-stable { color: var(--text-muted); }
+
+      .peak-badge, .low-badge {
+        font-size: 9px;
+        padding: 1px 5px;
+        border-radius: 3px;
+        margin-left: 6px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .peak-badge { background: rgba(34, 197, 94, 0.15); color: var(--success); }
+      .low-badge { background: rgba(239, 68, 68, 0.1); color: var(--danger); }
+
+      .log-row-highlight { background: rgba(59, 130, 246, 0.05); }
+
+      table tr:hover { background: var(--bg-tertiary); }
+
+      .log-summary {
+        display: flex;
+        justify-content: space-between;
+        padding: 10px 16px;
+        background: var(--bg-tertiary);
+        border-top: 1px solid var(--border-primary);
+        font-size: 11px;
+        color: var(--text-muted);
+      }
+
+      .log-summary-item { display: flex; align-items: center; gap: 4px; }
+      .log-summary-value { color: var(--text-primary); font-weight: 500; }
 
       /* Responsive */
       @media (max-width: 1024px) {
@@ -615,6 +823,105 @@
         .topbar { flex-direction: column; gap: 12px; align-items: flex-start; }
         .topbar-right { width: 100%; justify-content: flex-end; }
       }
+
+      /* Modal */
+      .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.7);
+        backdrop-filter: blur(4px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.2s ease;
+      }
+
+      .modal-overlay.visible { opacity: 1; visibility: visible; }
+
+      .modal {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-secondary);
+        border-radius: 12px;
+        width: 90%;
+        max-width: 700px;
+        max-height: 85vh;
+        overflow: hidden;
+        transform: scale(0.95);
+        transition: transform 0.2s ease;
+      }
+
+      .modal-overlay.visible .modal { transform: scale(1); }
+
+      .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border-primary);
+      }
+
+      .modal-title { font-size: 16px; font-weight: 600; }
+
+      .modal-close {
+        width: 32px;
+        height: 32px;
+        border-radius: 6px;
+        border: none;
+        background: var(--bg-tertiary);
+        color: var(--text-secondary);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.15s;
+      }
+
+      .modal-close:hover { background: var(--danger); color: white; }
+      .modal-close svg { width: 16px; height: 16px; }
+
+      .modal-body { padding: 20px; overflow-y: auto; max-height: 60vh; }
+      .modal-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+
+      .json-viewer {
+        background: var(--bg-primary);
+        border: 1px solid var(--border-primary);
+        border-radius: 8px;
+        padding: 16px;
+        font-family: 'SF Mono', Monaco, Consolas, monospace;
+        font-size: 11px;
+        line-height: 1.6;
+        overflow-x: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+        color: var(--text-secondary);
+        max-height: 400px;
+        overflow-y: auto;
+      }
+
+      .json-key { color: var(--accent); }
+      .json-string { color: var(--success); }
+      .json-number { color: var(--warning); }
+      .json-boolean { color: var(--purple); }
+      .json-null { color: var(--text-muted); }
+
+      .batch-info-grid {
+        display: grid;
+        gap: 12px;
+      }
+
+      .batch-info-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 10px 14px;
+        background: var(--bg-tertiary);
+        border-radius: 6px;
+      }
+
+      .batch-info-label { color: var(--text-muted); font-size: 12px; }
+      .batch-info-value { color: var(--text-primary); font-weight: 500; font-size: 13px; }
     </style>
   </head>
   <body>
@@ -622,11 +929,9 @@
       <!-- Sidebar -->
       <aside class="sidebar">
         <div class="sidebar-header">
-          <div class="logo">
+          <div class="logo" data-tooltip="Classroom Quick Downloader Oracle" data-tooltip-position="bottom">
             <div class="logo-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/>
-              </svg>
+              <img src="/GCD.png" alt="CQD">
             </div>
             <span class="logo-text">CQD Oracle</span>
           </div>
@@ -635,20 +940,23 @@
         <nav class="sidebar-nav">
           <div class="nav-section">
             <div class="nav-label">Dashboard</div>
-            <button class="nav-item active" data-page="overview" onclick="showPage('overview')">
+            <button class="nav-item active" data-page="overview" onclick="showPage('overview')"
+              data-tooltip="View summary statistics" data-tooltip-position="bottom">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
                 <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
               </svg>
               Overview
             </button>
-            <button class="nav-item" data-page="activity" onclick="showPage('activity')">
+            <button class="nav-item" data-page="activity" onclick="showPage('activity')"
+              data-tooltip="View download activity over time" data-tooltip-position="bottom">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
               </svg>
               Activity
             </button>
-            <button class="nav-item" data-page="charts" onclick="showPage('charts')">
+            <button class="nav-item" data-page="charts" onclick="showPage('charts')" data-tooltip="View breakdown charts"
+              data-tooltip-position="bottom">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/>
               </svg>
@@ -658,7 +966,8 @@
 
           <div class="nav-section">
             <div class="nav-label">External</div>
-            <a class="nav-item" href="https://cqd-analytics.adhamhaithameid.workers.dev/" target="_blank">
+            <a class="nav-item" href="https://cqd-analytics.adhamhaithameid.workers.dev/" target="_blank"
+              data-tooltip="Open Cloudflare Worker dashboard">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
                 <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
@@ -669,7 +978,7 @@
         </nav>
 
         <div class="sidebar-footer">
-          <div class="status-indicator">
+          <div class="status-indicator" id="status-indicator" data-tooltip="System status">
             <div class="status-dot" id="sidebar-status"></div>
             <span id="sidebar-status-text">Connecting...</span>
           </div>
@@ -684,7 +993,14 @@
             <p id="last-updated">Last updated: --</p>
           </div>
           <div class="topbar-right">
-            <button class="btn" onclick="refreshAll()" id="refresh-btn">
+            <button class="btn" onclick="showBatchModal()" id="batch-btn" data-tooltip="View last batch info" data-tooltip-position="bottom">
+              <!-- <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+              </svg> -->
+              📦  Last Batch
+            </button>
+            <button class="btn" onclick="refreshAll()" id="refresh-btn" data-tooltip="Refresh all data" data-tooltip-position="bottom">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M21 12a9 9 0 11-2.52-6.25"/><path d="M21 4v5h-5"/>
               </svg>
@@ -697,7 +1013,7 @@
           <!-- OVERVIEW PAGE -->
           <div class="page active" id="page-overview">
             <div class="stats-grid" id="stats-grid">
-              <div class="stat-card">
+              <div class="stat-card" data-tooltip="Total downloads tracked all time" data-tooltip-position="bottom">
                 <div class="stat-header">
                   <span class="stat-label">Total Downloads</span>
                   <div class="stat-icon blue">
@@ -710,7 +1026,7 @@
                 <div class="stat-value" id="stat-downloads">--</div>
                 <div class="stat-subtext">All time</div>
               </div>
-              <div class="stat-card">
+              <div class="stat-card" data-tooltip="Percentage of successful downloads" data-tooltip-position="bottom">
                 <div class="stat-header">
                   <span class="stat-label">Success Rate</span>
                   <div class="stat-icon yellow">
@@ -722,7 +1038,7 @@
                 <div class="stat-value" id="stat-rate">--</div>
                 <div class="stat-subtext">Overall</div>
               </div>
-              <div class="stat-card">
+              <div class="stat-card" data-tooltip="Downloads completed successfully" data-tooltip-position="bottom">
                 <div class="stat-header">
                   <span class="stat-label">Successful</span>
                   <div class="stat-icon green">
@@ -734,7 +1050,7 @@
                 <div class="stat-value" id="stat-success">--</div>
                 <div class="stat-subtext">All time</div>
               </div>
-              <div class="stat-card">
+              <div class="stat-card" data-tooltip="Downloads that failed" data-tooltip-position="bottom">
                 <div class="stat-header">
                   <span class="stat-label">Failed</span>
                   <div class="stat-icon red">
@@ -750,36 +1066,40 @@
 
             <h3 style="font-size: 13px; font-weight: 600; margin-bottom: 12px; color: var(--text-secondary);">Top Today</h3>
             <div class="top-today-grid" id="top-today-grid">
-              <div class="top-card">
+              <div class="top-card" data-tooltip="Most used browser today">
                 <div class="top-icon" id="top-browser-icon">🌐</div>
                 <div class="top-info">
                   <div class="top-label">Browser</div>
                   <div class="top-value" id="top-browser">--</div>
                   <div class="top-count" id="top-browser-count"></div>
+                  <div class="top-tied" id="top-browser-tied"></div>
                 </div>
               </div>
-              <div class="top-card">
+              <div class="top-card" data-tooltip="Most common OS today">
                 <div class="top-icon" id="top-os-icon">💻</div>
                 <div class="top-info">
                   <div class="top-label">OS</div>
                   <div class="top-value" id="top-os">--</div>
                   <div class="top-count" id="top-os-count"></div>
+                  <div class="top-tied" id="top-os-tied"></div>
                 </div>
               </div>
-              <div class="top-card">
+              <div class="top-card" data-tooltip="Most downloaded file type today">
                 <div class="top-icon" id="top-type-icon">📄</div>
                 <div class="top-info">
                   <div class="top-label">File Type</div>
                   <div class="top-value" id="top-type">--</div>
                   <div class="top-count" id="top-type-count"></div>
+                  <div class="top-tied" id="top-type-tied"></div>
                 </div>
               </div>
-              <div class="top-card">
+              <div class="top-card" data-tooltip="Country with most downloads today">
                 <div class="top-icon" id="top-country-icon">🌍</div>
                 <div class="top-info">
                   <div class="top-label">Country</div>
                   <div class="top-value" id="top-country">--</div>
                   <div class="top-count" id="top-country-count"></div>
+                  <div class="top-tied" id="top-country-tied"></div>
                 </div>
               </div>
             </div>
@@ -791,11 +1111,11 @@
               <div class="card-header">
                 <div>
                   <div class="card-title">Download Activity</div>
-                  <div class="card-subtitle">Hourly downloads today</div>
+                  <div class="card-subtitle">Hover over bars for details</div>
                 </div>
                 <div class="tabs" id="activity-tabs">
-                  <button class="tab active" onclick="setActivityRange('today')">Today</button>
-                  <button class="tab" onclick="setActivityRange('week')">This Week</button>
+                  <button class="tab active" onclick="setActivityRange('today')" data-tooltip="Show today's hourly data">Today</button>
+                  <button class="tab" onclick="setActivityRange('week')" data-tooltip="Show last 7 days">This Week</button>
                 </div>
               </div>
               <div class="card-body">
@@ -804,15 +1124,15 @@
                 </div>
               </div>
               <div class="chart-stats" id="activity-stats">
-                <div class="chart-stat">
+                <div class="chart-stat" data-tooltip="Total downloads in period">
                   <div class="chart-stat-dot blue"></div>
                   <span>Total: <strong id="activity-total">0</strong></span>
                 </div>
-                <div class="chart-stat">
+                <div class="chart-stat" data-tooltip="Successful downloads">
                   <div class="chart-stat-dot green"></div>
                   <span>Success: <strong id="activity-success">0</strong></span>
                 </div>
-                <div class="chart-stat">
+                <div class="chart-stat" data-tooltip="Failed downloads">
                   <div class="chart-stat-dot red"></div>
                   <span>Failed: <strong id="activity-fail">0</strong></span>
                 </div>
@@ -822,14 +1142,28 @@
             <div class="card">
               <div class="card-header">
                 <div>
-                  <div class="card-title">Recent Activity</div>
-                  <div class="card-subtitle">Download events log</div>
+                  <div class="card-title">📋 Recent Activity</div>
+                  <div class="card-subtitle">Download events log with analytics</div>
+                </div>
+                <div class="log-toolbar-right">
+                  <button class="log-sort-btn" id="log-sort-btn" onclick="toggleLogSort()" data-tooltip="Toggle sort order">
+                    ⬇️ Newest First
+                  </button>
+                  <button class="log-export-btn" onclick="exportLogCSV()" data-tooltip="Export as CSV">
+                    📥 Export
+                  </button>
                 </div>
               </div>
               <div class="card-body no-padding">
                 <div class="table-container" id="activity-log">
                   <div class="loading"><div class="spinner"></div>Loading...</div>
                 </div>
+              </div>
+              <div class="log-summary" id="log-summary" style="display:none">
+                <div class="log-summary-item">📊 <span class="log-summary-value" id="summary-periods">--</span> periods</div>
+                <div class="log-summary-item">⬆️ Peak: <span class="log-summary-value" id="summary-peak">--</span></div>
+                <div class="log-summary-item">📈 Avg: <span class="log-summary-value" id="summary-avg">--</span></div>
+                <div class="log-summary-item">⬇️ Low: <span class="log-summary-value" id="summary-low">--</span></div>
               </div>
             </div>
           </div>
@@ -891,7 +1225,7 @@
               <div class="card-header">
                 <div>
                   <div class="card-title">Daily Downloads</div>
-                  <div class="card-subtitle">Last 14 days</div>
+                  <div class="card-subtitle">Last 14 days • Hover for details</div>
                 </div>
               </div>
               <div class="card-body">
@@ -905,10 +1239,38 @@
       </main>
     </div>
 
+    <!-- Floating Tooltip -->
+    <div class="floating-tooltip" id="chart-tooltip"></div>
+
+    <!-- Batch Info Modal -->
+    <div class="modal-overlay" id="batch-modal" onclick="closeBatchModal(event)">
+      <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-header">
+          <span class="modal-title">📦 Last Batch Info</span>
+          <button class="modal-close" onclick="closeBatchModal()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="modal-tabs">
+            <button class="tab active" onclick="setBatchTab('info')">📋 Info</button>
+            <button class="tab" onclick="setBatchTab('json')">🔧 JSON</button>
+          </div>
+          <div id="batch-info-content">
+            <div class="loading"><div class="spinner"></div>Loading batch info...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <script>
       // State
       let currentPage = 'overview';
       let activityRange = 'today';
+      let lastBatchData = null;
+      let batchTab = 'info';
 
       // Helpers
       async function fetchJSON(url) {
@@ -925,43 +1287,192 @@
         return (n || 0).toLocaleString();
       }
 
+      function fmtTimestamp(ts, granularity) {
+        if (!ts) return '--';
+        const date = new Date(ts.includes('T') ? ts : ts + 'T00:00:00Z');
+        if (isNaN(date.getTime())) return ts;
+        
+        const now = new Date();
+        const isToday = date.toDateString() === now.toDateString();
+        const yesterday = new Date(now);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const isYesterday = date.toDateString() === yesterday.toDateString();
+        
+        if (granularity === 'hour') {
+          const hours = date.getHours();
+          const ampm = hours >= 12 ? 'PM' : 'AM';
+          const h = hours % 12 || 12;
+          const timeStr = h + ':00 ' + ampm;
+          if (isToday) return 'Today, ' + timeStr;
+          if (isYesterday) return 'Yesterday, ' + timeStr;
+          return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', ' + timeStr;
+        }
+        
+        if (isToday) return 'Today';
+        if (isYesterday) return 'Yesterday';
+        return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      }
+
+      function fmtShortTime(ts) {
+        if (!ts) return '';
+        const date = new Date(ts.includes('T') ? ts : ts + 'T00:00:00Z');
+        if (isNaN(date.getTime())) return ts.slice(-5);
+        if (ts.includes('T')) return date.getHours() + ':00';
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      }
+
+      function fmtFullDateTime(ts) {
+        if (!ts) return '--';
+        const date = new Date(ts);
+        if (isNaN(date.getTime())) return ts;
+        return date.toLocaleString('en-US', {
+          weekday: 'short', month: 'short', day: 'numeric', 
+          hour: 'numeric', minute: '2-digit', hour12: true
+        });
+      }
+
+      function timeAgo(ts) {
+        if (!ts) return '';
+        const date = new Date(ts);
+        const now = new Date();
+        const diffMs = now - date;
+        const diffSec = Math.floor(diffMs / 1000);
+        const diffMin = Math.floor(diffSec / 60);
+        const diffHr = Math.floor(diffMin / 60);
+        const diffDay = Math.floor(diffHr / 24);
+        if (diffSec < 60) return 'just now';
+        if (diffMin < 60) return diffMin + 'm ago';
+        if (diffHr < 24) return diffHr + 'h ago';
+        return diffDay + 'd ago';
+      }
+
       function getDateRange(days) {
         const today = new Date();
-        const to = today.toISOString().slice(0, 10);
+        const toDate = new Date(today);
+        toDate.setDate(toDate.getDate() + 1);
+        const to = toDate.toISOString().slice(0, 10);
         const fromDate = new Date(today);
-        fromDate.setDate(fromDate.getDate() - (days - 1));
+        if (days > 1) fromDate.setDate(fromDate.getDate() - (days - 1));
         const from = fromDate.toISOString().slice(0, 10);
-        return { from, to };
+        return { from: from, to: to };
       }
 
       function getBrowserIcon(b) {
-        const icons = { chrome: '🌐', firefox: '🦊', safari: '🧭', edge: '📘', opera: '🔴' };
+        var icons = { chrome: '🌐', firefox: '🦊', safari: '🧭', edge: '📘', opera: '🔴' };
         return icons[(b || '').toLowerCase()] || '🌐';
       }
 
       function getOSIcon(o) {
-        const icons = { windows: '🪟', macos: '🍎', mac: '🍎', linux: '🐧', android: '🤖', ios: '📱' };
+        var icons = { windows: '🪟', macos: '🍎', mac: '🍎', linux: '🐧', android: '🤖', ios: '📱' };
         return icons[(o || '').toLowerCase()] || '💻';
       }
 
       function getFileIcon(t) {
-        const icons = { pdf: '📄', doc: '📝', docx: '📝', ppt: '📊', pptx: '📊', xls: '📈', xlsx: '📈', zip: '📦', jpg: '🖼️', png: '🖼️', mp4: '🎬' };
+        var icons = { pdf: '📄', doc: '📝', docx: '📝', ppt: '📊', pptx: '📊', xls: '📈', xlsx: '📈', zip: '📦', jpg: '🖼️', png: '🖼️', mp4: '🎬' };
         return icons[(t || '').toLowerCase()] || '📎';
+      }
+
+      // Floating tooltip
+      var tooltip = document.getElementById('chart-tooltip');
+      
+      function showTooltip(e, html) {
+        tooltip.innerHTML = html;
+        tooltip.classList.add('visible');
+        var rect = tooltip.getBoundingClientRect();
+        var x = e.clientX + 15;
+        var y = e.clientY - 10;
+        if (x + rect.width > window.innerWidth - 20) x = e.clientX - rect.width - 15;
+        if (y + rect.height > window.innerHeight - 20) y = e.clientY - rect.height - 10;
+        tooltip.style.left = x + 'px';
+        tooltip.style.top = y + 'px';
+      }
+      
+      function hideTooltip() { tooltip.classList.remove('visible'); }
+
+      // Batch Modal
+      function showBatchModal() {
+        document.getElementById('batch-modal').classList.add('visible');
+        loadBatchInfo();
+      }
+
+      function closeBatchModal(e) {
+        if (e && e.target !== e.currentTarget) return;
+        document.getElementById('batch-modal').classList.remove('visible');
+      }
+
+      function setBatchTab(tab) {
+        batchTab = tab;
+        var tabs = document.querySelectorAll('#batch-modal .modal-tabs .tab');
+        tabs.forEach(function(t) {
+          t.classList.toggle('active', t.textContent.includes(tab === 'info' ? 'Info' : 'JSON'));
+        });
+        renderBatchContent();
+      }
+
+      async function loadBatchInfo() {
+        var container = document.getElementById('batch-info-content');
+        container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading...</div>';
+        try {
+          lastBatchData = await fetchJSON('/api/stats/summary');
+          renderBatchContent();
+        } catch (e) {
+          container.innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed to load</div>';
+        }
+      }
+
+      function renderBatchContent() {
+        var container = document.getElementById('batch-info-content');
+        if (!lastBatchData) return;
+        
+        if (batchTab === 'json') {
+          container.innerHTML = '<div class="json-viewer">' + syntaxHighlight(JSON.stringify(lastBatchData, null, 2)) + '</div>';
+          return;
+        }
+        
+        var lb = lastBatchData.lastBatch;
+        var ds = lastBatchData.doState;
+        var html = '<div class="batch-info-grid">';
+        html += '<div class="batch-info-row"><span class="batch-info-label">Status</span><span class="batch-info-value">' + (lastBatchData.status || 'Unknown') + '</span></div>';
+        
+        if (lb) {
+          html += '<div class="batch-info-row"><span class="batch-info-label">Last Batch ID</span><span class="batch-info-value" style="font-family:monospace;font-size:11px">' + (lb.batchId || '--') + '</span></div>';
+          html += '<div class="batch-info-row"><span class="batch-info-label">Received</span><span class="batch-info-value">' + fmtFullDateTime(lb.ingestedAt) + ' (' + timeAgo(lb.ingestedAt) + ')</span></div>';
+          html += '<div class="batch-info-row"><span class="batch-info-label">Generated</span><span class="batch-info-value">' + fmtFullDateTime(lb.generatedAt) + '</span></div>';
+          html += '<div class="batch-info-row"><span class="batch-info-label">Events</span><span class="batch-info-value">' + fmtNumber(lb.eventsCount) + '</span></div>';
+          html += '<div class="batch-info-row"><span class="batch-info-label">Downloads</span><span class="batch-info-value">' + fmtNumber(lb.downloadsCount) + '</span></div>';
+          html += '<div class="batch-info-row"><span class="batch-info-label">Success / Fail</span><span class="batch-info-value"><span style="color:var(--success)">' + fmtNumber(lb.successCount) + '</span> / <span style="color:var(--danger)">' + fmtNumber(lb.failCount) + '</span></span></div>';
+        } else {
+          html += '<div class="batch-info-row"><span class="batch-info-label">Last Batch</span><span class="batch-info-value" style="color:var(--text-muted)">No batches yet</span></div>';
+        }
+        
+        if (ds) {
+          html += '<div class="batch-info-row"><span class="batch-info-label">Pending Events</span><span class="batch-info-value">' + fmtNumber(ds.pendingEvents) + '</span></div>';
+        }
+        html += '</div>';
+        container.innerHTML = html;
+      }
+
+      function syntaxHighlight(json) {
+        json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function(match) {
+          var cls = 'json-number';
+          if (/^"/.test(match)) { cls = /:$/.test(match) ? 'json-key' : 'json-string'; }
+          else if (/true|false/.test(match)) { cls = 'json-boolean'; }
+          else if (/null/.test(match)) { cls = 'json-null'; }
+          return '<span class="' + cls + '">' + match + '</span>';
+        });
       }
 
       // Page Navigation
       function showPage(page) {
         currentPage = page;
-        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
         document.getElementById('page-' + page).classList.add('active');
-        
-        document.querySelectorAll('.nav-item').forEach(n => {
+        document.querySelectorAll('.nav-item').forEach(function(n) {
           n.classList.toggle('active', n.dataset.page === page);
         });
-
-        const titles = { overview: 'Overview', activity: 'Activity', charts: 'Charts' };
+        var titles = { overview: 'Overview', activity: 'Activity', charts: 'Charts' };
         document.getElementById('page-title').textContent = titles[page];
-
         if (page === 'activity') loadActivity();
         if (page === 'charts') loadCharts();
       }
@@ -969,18 +1480,15 @@
       // Overview Page
       async function loadOverview() {
         try {
-          const data = await fetchJSON("/api/stats/summary");
-          
+          var data = await fetchJSON("/api/stats/summary");
           document.getElementById("sidebar-status").className = "status-dot " + 
             (data.status === "online" ? "" : data.status === "stale" ? "warning" : "error");
           document.getElementById("sidebar-status-text").textContent = 
             (data.status || "Unknown").charAt(0).toUpperCase() + (data.status || "unknown").slice(1);
-
           document.getElementById("stat-downloads").textContent = fmtNumber(data.totalDownloads);
           document.getElementById("stat-success").textContent = fmtNumber(data.totalSuccess);
           document.getElementById("stat-fail").textContent = fmtNumber(data.totalFail);
           document.getElementById("stat-rate").textContent = fmtPct(data.successRate || 0);
-
           document.getElementById("last-updated").textContent = "Last updated: " + new Date().toLocaleTimeString();
         } catch (e) {
           document.getElementById("sidebar-status").className = "status-dot error";
@@ -989,26 +1497,49 @@
       }
 
       async function loadTopToday() {
-        const today = new Date().toISOString().slice(0, 10);
+        var today = new Date();
+        var fromStr = today.toISOString().slice(0, 10);
+        var toDate = new Date(today);
+        toDate.setDate(toDate.getDate() + 1);
+        var toStr = toDate.toISOString().slice(0, 10);
         
-        const dimensions = ['browser', 'os', 'type', 'country'];
-        for (const dim of dimensions) {
+        var dimensions = ['browser', 'os', 'type', 'country'];
+        for (var i = 0; i < dimensions.length; i++) {
+          var dim = dimensions[i];
           try {
-            const data = await fetchJSON(`/api/stats/breakdown?dimension=${dim}&from=${today}&to=${today}`);
+            var data = await fetchJSON('/api/stats/breakdown?dimension=' + dim + '&from=' + fromStr + '&to=' + toStr);
+            var valueEl = document.getElementById('top-' + dim);
+            var countEl = document.getElementById('top-' + dim + '-count');
+            var tiedEl = document.getElementById('top-' + dim + '-tied');
+            var iconEl = document.getElementById('top-' + dim + '-icon');
+            
             if (data.values && data.values.length > 0) {
-              const top = data.values[0];
-              document.getElementById(`top-${dim}`).textContent = top.value || 'Unknown';
-              document.getElementById(`top-${dim}-count`).textContent = fmtNumber(top.count) + ' downloads';
+              var top = data.values[0];
+              var topCount = top.count;
+              var tiedItems = data.values.filter(function(v) { return v.count === topCount; });
               
-              if (dim === 'browser') document.getElementById(`top-${dim}-icon`).textContent = getBrowserIcon(top.value);
-              if (dim === 'os') document.getElementById(`top-${dim}-icon`).textContent = getOSIcon(top.value);
-              if (dim === 'type') document.getElementById(`top-${dim}-icon`).textContent = getFileIcon(top.value);
+              if (tiedItems.length > 1) {
+                valueEl.textContent = tiedItems.map(function(t) { return t.value; }).join(' / ');
+                countEl.textContent = fmtNumber(topCount) + ' each';
+                tiedEl.textContent = '🏆 ' + tiedItems.length + '-way tie';
+              } else {
+                valueEl.textContent = top.value || 'Unknown';
+                countEl.textContent = fmtNumber(topCount) + ' downloads';
+                tiedEl.textContent = '';
+              }
+              
+              if (dim === 'browser') iconEl.textContent = getBrowserIcon(top.value);
+              if (dim === 'os') iconEl.textContent = getOSIcon(top.value);
+              if (dim === 'type') iconEl.textContent = getFileIcon(top.value);
             } else {
-              document.getElementById(`top-${dim}`).textContent = 'No data';
-              document.getElementById(`top-${dim}-count`).textContent = '';
+              valueEl.textContent = 'No data';
+              countEl.textContent = '';
+              tiedEl.textContent = '';
             }
           } catch (e) {
-            document.getElementById(`top-${dim}`).textContent = '--';
+            document.getElementById('top-' + dim).textContent = '--';
+            document.getElementById('top-' + dim + '-count').textContent = '';
+            document.getElementById('top-' + dim + '-tied').textContent = '';
           }
         }
       }
@@ -1016,184 +1547,262 @@
       // Activity Page
       function setActivityRange(range) {
         activityRange = range;
-        document.querySelectorAll('#activity-tabs .tab').forEach(t => {
+        document.querySelectorAll('#activity-tabs .tab').forEach(function(t) {
           t.classList.toggle('active', t.textContent.toLowerCase().includes(range));
         });
         loadActivity();
       }
 
       async function loadActivity() {
-        const chartContainer = document.getElementById('activity-chart');
-        const logContainer = document.getElementById('activity-log');
-        
-        chartContainer.innerHTML = '<div class="loading"><div class="spinner"></div>Loading chart...</div>';
+        var chartContainer = document.getElementById('activity-chart');
+        var logContainer = document.getElementById('activity-log');
+        chartContainer.innerHTML = '<div class="loading"><div class="spinner"></div>Loading...</div>';
         logContainer.innerHTML = '<div class="loading"><div class="spinner"></div>Loading...</div>';
 
-        const days = activityRange === 'today' ? 1 : 7;
-        const { from, to } = getDateRange(days);
-        const granularity = activityRange === 'today' ? 'hour' : 'day';
+         var days = activityRange === 'today' ? 1 : 7;
+        var range = getDateRange(days);
+        var granularity = activityRange === 'today' ? 'hour' : 'day';
 
         try {
-          const data = await fetchJSON(`/api/stats/timeseries?granularity=${granularity}&from=${from}&to=${to}`);
+          var data = await fetchJSON('/api/stats/timeseries?granularity=' + granularity + '&from=' + range.from + '&to=' + range.to);
           
           if (!data.points || !data.points.length) {
-            chartContainer.innerHTML = '<div class="empty-state">No activity data available</div>';
-            logContainer.innerHTML = '<div class="empty-state">No events logged</div>';
+            chartContainer.innerHTML = '<div class="empty-state">No activity data</div>';
+            logContainer.innerHTML = '<div class="empty-state">No events</div>';
+            document.getElementById('log-summary').style.display = 'none';
             return;
           }
 
-          // Render bar chart
+          // Store for sorting/export
+          currentLogData = data.points;
+          currentGranularity = granularity;
+
           renderBarChart(chartContainer, data.points, granularity);
 
-          // Update stats
-          const totalDownloads = data.points.reduce((s, p) => s + (p.downloads || 0), 0);
-          const totalSuccess = data.points.reduce((s, p) => s + (p.success || 0), 0);
-          const totalFail = data.points.reduce((s, p) => s + (p.fail || 0), 0);
+          var totalDownloads = 0, totalSuccess = 0, totalFail = 0;
+          data.points.forEach(function(p) {
+            totalDownloads += p.downloads || 0;
+            totalSuccess += p.success || 0;
+            totalFail += p.fail || 0;
+          });
           
           document.getElementById('activity-total').textContent = fmtNumber(totalDownloads);
           document.getElementById('activity-success').textContent = fmtNumber(totalSuccess);
           document.getElementById('activity-fail').textContent = fmtNumber(totalFail);
 
-          // Render table
-          let tableHtml = `
-            <table>
-              <thead>
-                <tr>
-                  <th>Timestamp</th>
-                  <th>Downloads</th>
-                  <th>Success</th>
-                  <th>Failed</th>
-                  <th>Rate</th>
-                </tr>
-              </thead>
-              <tbody>`;
-          
-          for (const p of data.points.slice().reverse()) {
-            const rate = p.successRate || 0;
-            const badgeClass = rate >= 0.9 ? 'badge-success' : rate >= 0.7 ? 'badge-warning' : 'badge-danger';
-            tableHtml += `
-              <tr>
-                <td class="td-primary">${p.timestamp}</td>
-                <td>${fmtNumber(p.downloads)}</td>
-                <td style="color: var(--success)">${fmtNumber(p.success)}</td>
-                <td style="color: var(--danger)">${fmtNumber(p.fail)}</td>
-                <td><span class="badge ${badgeClass}">${fmtPct(rate)}</span></td>
-              </tr>`;
-          }
-          tableHtml += '</tbody></table>';
-          logContainer.innerHTML = tableHtml;
+          renderEnhancedLog(data.points, granularity);
 
         } catch (e) {
-          chartContainer.innerHTML = `<div class="empty-state" style="color: var(--danger)">Failed to load: ${e.message}</div>`;
-          logContainer.innerHTML = `<div class="empty-state" style="color: var(--danger)">Failed to load</div>`;
+          chartContainer.innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed: ' + e.message + '</div>';
+          logContainer.innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed</div>';
         }
       }
 
+      // Enhanced log state
+      var currentLogData = [];
+      var currentGranularity = 'hour';
+      var logSortAsc = false;
+
+      function toggleLogSort() {
+        logSortAsc = !logSortAsc;
+        var btn = document.getElementById('log-sort-btn');
+        btn.innerHTML = logSortAsc ? '⬆️ Oldest First' : '⬇️ Newest First';
+        btn.classList.toggle('active', logSortAsc);
+        renderEnhancedLog(currentLogData, currentGranularity);
+      }
+
+      function renderEnhancedLog(points, granularity) {
+        var logContainer = document.getElementById('activity-log');
+        
+        // Calculate stats
+        var downloads = points.map(function(p) { return p.downloads || 0; });
+        var maxDownloads = Math.max.apply(null, downloads);
+        var minDownloads = Math.min.apply(null, downloads);
+        var avgDownloads = downloads.reduce(function(a, b) { return a + b; }, 0) / downloads.length;
+        
+        // Find peak and low indices
+        var peakIdx = downloads.indexOf(maxDownloads);
+        var lowIdx = downloads.indexOf(minDownloads);
+
+        // Sort data
+        var sortedPoints = points.slice();
+        if (logSortAsc) {
+          // Already in chronological order from API
+        } else {
+          sortedPoints = sortedPoints.slice().reverse();
+          // Adjust indices for reversed array
+          peakIdx = sortedPoints.length - 1 - peakIdx;
+          lowIdx = sortedPoints.length - 1 - lowIdx;
+        }
+
+        // Build table
+        var tableHtml = '<table><thead><tr>';
+        tableHtml += '<th>Time</th>';
+        tableHtml += '<th>Downloads</th>';
+        tableHtml += '<th>Success</th>';
+        tableHtml += '<th>Failed</th>';
+        tableHtml += '<th>Rate</th>';
+        tableHtml += '<th>Trend</th>';
+        tableHtml += '</tr></thead><tbody>';
+
+        sortedPoints.forEach(function(p, i) {
+          var rate = p.successRate || 0;
+          var badgeClass = rate >= 0.9 ? 'badge-success' : rate >= 0.7 ? 'badge-warning' : 'badge-danger';
+          var barWidth = maxDownloads > 0 ? ((p.downloads || 0) / maxDownloads) * 100 : 0;
+          
+          // Trend indicator (compare with previous)
+          var trend = '';
+          var prevIdx = logSortAsc ? i - 1 : i + 1;
+          if (prevIdx >= 0 && prevIdx < sortedPoints.length) {
+            var prevDownloads = sortedPoints[prevIdx].downloads || 0;
+            var currDownloads = p.downloads || 0;
+            if (currDownloads > prevDownloads) {
+              trend = '<span class="trend-indicator trend-up">▲</span>';
+            } else if (currDownloads < prevDownloads) {
+              trend = '<span class="trend-indicator trend-down">▼</span>';
+            } else {
+              trend = '<span class="trend-indicator trend-stable">◆</span>';
+            }
+          }
+
+          // Peak/low badges
+          var badges = '';
+          if (i === peakIdx && maxDownloads > 0) badges += '<span class="peak-badge">Peak</span>';
+          if (i === lowIdx && points.length > 1 && maxDownloads !== minDownloads) badges += '<span class="low-badge">Low</span>';
+
+          var rowClass = i === peakIdx ? 'log-row-highlight' : '';
+          
+          tableHtml += '<tr class="' + rowClass + '">';
+          tableHtml += '<td class="td-primary">' + fmtTimestamp(p.timestamp, granularity) + badges + '</td>';
+          tableHtml += '<td><div class="mini-bar"><div class="mini-bar-fill" style="width:' + barWidth + '%"></div></div>' + fmtNumber(p.downloads) + '</td>';
+          tableHtml += '<td style="color:var(--success)">' + fmtNumber(p.success) + '</td>';
+          tableHtml += '<td style="color:var(--danger)">' + fmtNumber(p.fail) + '</td>';
+          tableHtml += '<td><span class="badge ' + badgeClass + '">' + fmtPct(rate) + '</span></td>';
+          tableHtml += '<td>' + trend + '</td>';
+          tableHtml += '</tr>';
+        });
+
+        tableHtml += '</tbody></table>';
+        logContainer.innerHTML = tableHtml;
+
+        // Update summary
+        document.getElementById('log-summary').style.display = 'flex';
+        document.getElementById('summary-periods').textContent = points.length;
+        document.getElementById('summary-peak').textContent = fmtNumber(maxDownloads);
+        document.getElementById('summary-avg').textContent = fmtNumber(Math.round(avgDownloads));
+        document.getElementById('summary-low').textContent = fmtNumber(minDownloads);
+      }
+
+      function exportLogCSV() {
+        if (!currentLogData.length) return;
+        
+        var csv = 'Time,Downloads,Success,Failed,Rate\n';
+        currentLogData.forEach(function(p) {
+          csv += fmtTimestamp(p.timestamp, currentGranularity) + ',';
+          csv += (p.downloads || 0) + ',';
+          csv += (p.success || 0) + ',';
+          csv += (p.fail || 0) + ',';
+          csv += fmtPct(p.successRate || 0) + '\n';
+        });
+
+        var blob = new Blob([csv], { type: 'text/csv' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'activity_log_' + new Date().toISOString().slice(0,10) + '.csv';
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+
       function renderBarChart(container, points, granularity) {
-        const maxVal = Math.max(...points.map(p => p.downloads || 0), 1);
-        const yLabels = [maxVal, Math.round(maxVal * 0.66), Math.round(maxVal * 0.33), 0];
+        var maxVal = Math.max.apply(null, points.map(function(p) { return p.downloads || 0; })) || 1;
+        var yLabels = [maxVal, Math.round(maxVal * 0.66), Math.round(maxVal * 0.33), 0];
 
-        let html = `
-          <div class="chart-wrapper">
-            <div class="chart-y-axis">
-              ${yLabels.map(v => `<span class="chart-y-label">${fmtNumber(v)}</span>`).join('')}
-            </div>
-            <div class="chart-grid">
-              <div class="chart-grid-line"></div>
-              <div class="chart-grid-line"></div>
-              <div class="chart-grid-line"></div>
-              <div class="chart-grid-line"></div>
-            </div>
-            <div class="chart-bars">
-        `;
+        var html = '<div class="chart-wrapper"><div class="chart-y-axis">';
+        yLabels.forEach(function(v) { html += '<span class="chart-y-label">' + fmtNumber(v) + '</span>'; });
+        html += '</div><div class="chart-grid"><div class="chart-grid-line"></div><div class="chart-grid-line"></div><div class="chart-grid-line"></div><div class="chart-grid-line"></div></div><div class="chart-bars">';
 
-        for (const p of points) {
-          const height = ((p.downloads || 0) / maxVal) * 100;
-          const label = granularity === 'hour' ? p.timestamp.split(' ')[1] || p.timestamp.slice(-5) : p.timestamp.slice(5);
-          html += `
-            <div class="chart-bar-wrapper" title="${p.timestamp}: ${p.downloads} downloads">
-              <div class="chart-bar" style="height: ${height}%"></div>
-            </div>`;
-        }
+        points.forEach(function(p, i) {
+          var height = ((p.downloads || 0) / maxVal) * 100;
+          var tooltipData = JSON.stringify({
+            time: fmtTimestamp(p.timestamp, granularity),
+            downloads: p.downloads || 0,
+            success: p.success || 0,
+            fail: p.fail || 0,
+            rate: fmtPct(p.successRate || 0)
+          }).replace(/"/g, '&quot;');
+          html += '<div class="chart-bar-wrapper"><div class="chart-bar" style="height:' + height + '%" data-point=\'' + tooltipData + '\' onmouseenter="handleBarHover(event)" onmousemove="handleBarMove(event)" onmouseleave="hideTooltip()"></div></div>';
+        });
 
-        html += `</div>
-            <div class="chart-x-axis">`;
-        
-        // Show fewer labels
-        const step = Math.ceil(points.length / 8);
-        for (let i = 0; i < points.length; i++) {
-          const p = points[i];
-          const label = granularity === 'hour' 
-            ? (p.timestamp.split(' ')[1] || p.timestamp).slice(0, 5) 
-            : p.timestamp.slice(5);
-          html += `<span class="chart-x-label">${i % step === 0 ? label : ''}</span>`;
-        }
-        
+        html += '</div><div class="chart-x-axis">';
+        var step = Math.ceil(points.length / 8);
+        points.forEach(function(p, i) {
+          var label = i % step === 0 ? fmtShortTime(p.timestamp) : '';
+          html += '<span class="chart-x-label">' + label + '</span>';
+        });
         html += '</div></div>';
         container.innerHTML = html;
       }
 
+      function handleBarHover(e) { handleBarMove(e); }
+      function handleBarMove(e) {
+        var data = JSON.parse(e.target.dataset.point);
+        var html = '<div class="tooltip-title">' + data.time + '</div>';
+        html += '<div class="tooltip-row"><span class="tooltip-label">Downloads</span><span class="tooltip-value">' + fmtNumber(data.downloads) + '</span></div>';
+        html += '<div class="tooltip-row"><span class="tooltip-label">Success</span><span class="tooltip-value tooltip-success">' + fmtNumber(data.success) + '</span></div>';
+        html += '<div class="tooltip-row"><span class="tooltip-label">Failed</span><span class="tooltip-value tooltip-fail">' + fmtNumber(data.fail) + '</span></div>';
+        html += '<div class="tooltip-row"><span class="tooltip-label">Rate</span><span class="tooltip-value">' + data.rate + '</span></div>';
+        showTooltip(e, html);
+      }
+
       // Charts Page
       async function loadCharts() {
-        const dimensions = ['browser', 'os', 'type', 'country'];
-        const colors = ['purple', 'blue', 'cyan', 'green'];
-        const { from, to } = getDateRange(7);
+        var dimensions = ['browser', 'os', 'type', 'country'];
+        var colors = ['purple', 'blue', 'cyan', 'green'];
+        var range = getDateRange(7);
 
-        for (let i = 0; i < dimensions.length; i++) {
-          const dim = dimensions[i];
-          const container = document.getElementById(`chart-${dim}`);
-          
+        for (var i = 0; i < dimensions.length; i++) {
+          var dim = dimensions[i];
+          var container = document.getElementById('chart-' + dim);
           try {
-            const data = await fetchJSON(`/api/stats/breakdown?dimension=${dim}&from=${from}&to=${to}`);
-            
+            var data = await fetchJSON('/api/stats/breakdown?dimension=' + dim + '&from=' + range.from + '&to=' + range.to);
             if (!data.values || !data.values.length) {
               container.innerHTML = '<div class="empty-state">No data</div>';
               continue;
             }
-
-            const maxCount = Math.max(...data.values.map(v => v.count));
-            let html = '<div class="breakdown-bars">';
-            
-            for (const v of data.values.slice(0, 5)) {
-              const pct = (v.count / maxCount) * 100;
-              html += `
-                <div class="breakdown-bar-item">
-                  <span class="breakdown-bar-label">${v.value || 'Unknown'}</span>
-                  <div class="breakdown-bar-track">
-                    <div class="breakdown-bar-fill ${colors[i]}" style="width: ${pct}%">
-                      <span class="breakdown-bar-value">${Math.round(pct)}%</span>
-                    </div>
-                  </div>
-                  <span class="breakdown-bar-count">${fmtNumber(v.count)}</span>
-                </div>`;
-            }
+            var maxCount = Math.max.apply(null, data.values.map(function(v) { return v.count; }));
+            var html = '<div class="breakdown-bars">';
+            data.values.slice(0, 5).forEach(function(v) {
+              var pct = (v.count / maxCount) * 100;
+              html += '<div class="breakdown-bar-item"><span class="breakdown-bar-label">' + (v.value || 'Unknown') + '</span>';
+              html += '<div class="breakdown-bar-track"><div class="breakdown-bar-fill ' + colors[i] + '" style="width:' + pct + '%"><span class="breakdown-bar-value">' + Math.round(pct) + '%</span></div></div>';
+              html += '<span class="breakdown-bar-count">' + fmtNumber(v.count) + '</span></div>';
+            });
             html += '</div>';
             container.innerHTML = html;
           } catch (e) {
-            container.innerHTML = `<div class="empty-state" style="color: var(--danger)">Failed</div>`;
+            container.innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed</div>';
           }
         }
 
         // Daily chart
-        const dailyContainer = document.getElementById('daily-chart');
+        var dailyContainer = document.getElementById('daily-chart');
         try {
-          const { from, to } = getDateRange(14);
-          const data = await fetchJSON(`/api/stats/timeseries?granularity=day&from=${from}&to=${to}`);
-          
+          var range14 = getDateRange(14);
+          var data = await fetchJSON('/api/stats/timeseries?granularity=day&from=' + range14.from + '&to=' + range14.to);
           if (!data.points || !data.points.length) {
             dailyContainer.innerHTML = '<div class="empty-state">No data</div>';
             return;
           }
-
           renderBarChart(dailyContainer, data.points, 'day');
         } catch (e) {
-          dailyContainer.innerHTML = `<div class="empty-state" style="color: var(--danger)">Failed</div>`;
+          dailyContainer.innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed</div>';
         }
       }
 
       // Refresh
       async function refreshAll() {
-        const btn = document.getElementById("refresh-btn");
+        var btn = document.getElementById("refresh-btn");
         btn.disabled = true;
         btn.innerHTML = '<div class="spinner"></div> Refreshing...';
         
@@ -1204,14 +1813,11 @@
         if (currentPage === 'charts') await loadCharts();
 
         btn.disabled = false;
-        btn.innerHTML = `
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 12a9 9 0 11-2.52-6.25"/><path d="M21 4v5h-5"/>
-          </svg> Refresh`;
+        btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 11-2.52-6.25"/><path d="M21 4v5h-5"/></svg> Refresh';
       }
 
       // Init
-      window.addEventListener("load", () => {
+      window.addEventListener("load", function() {
         refreshAll();
         setInterval(refreshAll, 60000);
       });
