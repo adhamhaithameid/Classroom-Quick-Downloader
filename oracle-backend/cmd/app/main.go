@@ -11,7 +11,6 @@ import (
 )
 
 func main() {
-	// 1. Configuration
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
@@ -22,38 +21,45 @@ func main() {
 		dbPath = "./data/cqd-analytics.db"
 	}
 
-	doSecret := os.Getenv("DO_SECRET")
-	if doSecret == "" {
-		// We enforce this to prevent insecure deployments
-		log.Fatal("DO_SECRET env var is required")
+	secret := os.Getenv("DO_SHARED_SECRET")
+	if secret == "" {
+		log.Println("[WARN] DO_SHARED_SECRET is empty – StoreBatch will reject writes until you set it")
 	}
 
-	// 2. Initialize Database
-	log.Printf("Opening database at %s...", dbPath)
-	database, err := db.Open(dbPath)
+	// Open DB
+	sqlDB, err := db.Open(dbPath)
 	if err != nil {
-		log.Fatalf("Failed to open database: %v", err)
+		log.Fatalf("failed to open DB: %v", err)
 	}
-	defer database.Close()
+	defer sqlDB.Close()
 
-	// 3. Setup Router (Go 1.22+ style)
 	mux := http.NewServeMux()
 
-	// Health
-	mux.HandleFunc("GET /health/api", handlers.HealthAPI)
-	mux.HandleFunc("GET /health/db", handlers.HealthDB(database))
+	// Health endpoints
+	mux.HandleFunc("/health", handlers.HealthAPI)
+	mux.Handle("/health/db", handlers.HealthDB(sqlDB))
 
-	// Core Logic
-	mux.HandleFunc("POST /storeBatch", handlers.StoreBatch(database, doSecret))
-	mux.HandleFunc("GET /stats", handlers.GetStats(database))
+	// Stats + ingest
+	mux.Handle("/stats", handlers.GetStats(sqlDB))
+	mux.Handle("/store-batch", handlers.StoreBatch(sqlDB, secret))
 
-	// Static UI
-	fs := http.FileServer(http.Dir("./static"))
-	mux.Handle("GET /", fs)
+	// Static dashboard at "/"
+	//   GET /           -> static/index.html
+	//   GET /static/... -> static assets if you add more later
+	fs := http.FileServer(http.Dir("static"))
+	mux.Handle("/", fs)
 
-	// 4. Start Server
-	log.Printf("Server starting on :%s", port)
-	if err := http.ListenAndServe(":"+port, mux); err != nil {
-		log.Fatalf("Server failed: %v", err)
+	addr := ":" + port
+	log.Printf("CQD Oracle backend listening on %s (DB=%s)", addr, dbPath)
+	if err := http.ListenAndServe(addr, logRequest(mux)); err != nil {
+		log.Fatalf("server error: %v", err)
 	}
+}
+
+// logRequest is a simple logging middleware.
+func logRequest(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("%s %s from %s", r.Method, r.URL.Path, r.RemoteAddr)
+		next.ServeHTTP(w, r)
+	})
 }

@@ -54,6 +54,8 @@ func migrate(db *sql.DB) error {
 	}
 
 	// Seed the base 'total' counter if it doesn't exist
-	_, err := db.Exec("INSERT OR IGNORE INTO counters(key, value) VALUES ('total', 0);")
+	_, err := db.Exec(
+		"INSERT OR IGNORE INTO counters(key, value) VALUES ('total', 0);",
+	)
 	return err
 }

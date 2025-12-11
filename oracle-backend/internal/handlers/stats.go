@@ -33,14 +33,15 @@ func GetStats(db *sql.DB) http.HandlerFunc {
 		}
 
 		for key, value := range counters {
-			if key == "total" {
+			switch {
+			case key == "total":
 				resp.Total = value
-			} else if strings.HasPrefix(key, "type:") {
-				// Remove "type:" prefix (e.g. "type:pdf" -> "pdf")
+
+			case strings.HasPrefix(key, "type:"):
 				cleanKey := strings.TrimPrefix(key, "type:")
 				resp.ByType[cleanKey] = value
-			} else if strings.HasPrefix(key, "browser:") {
-				// Remove "browser:" prefix
+
+			case strings.HasPrefix(key, "browser:"):
 				cleanKey := strings.TrimPrefix(key, "browser:")
 				resp.ByBrowser[cleanKey] = value
 			}
@@ -50,6 +51,6 @@ func GetStats(db *sql.DB) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		// Allow CORS so your static UI or local testing can reach it easily
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}
 }
