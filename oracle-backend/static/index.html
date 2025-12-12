@@ -250,6 +250,9 @@
       .btn-primary { background: var(--accent); border-color: var(--accent); color: white; }
       .btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
 
+      .btn-secondary { background: transparent; border-color: var(--border-primary); color: var(--text-muted); }
+      .btn-secondary:hover { background: var(--bg-tertiary); color: var(--text-primary); border-color: var(--border-secondary); }
+
       .container { padding: 20px; }
 
       /* Page visibility */
@@ -810,6 +813,92 @@
       .log-summary-item { display: flex; align-items: center; gap: 4px; }
       .log-summary-value { color: var(--text-primary); font-weight: 500; }
 
+      /* Comparison Cards */
+      .comparison-grid {
+        display: grid;
+        grid-template-columns: 1fr 80px 1fr;
+        gap: 20px;
+        align-items: center;
+      }
+
+      .period-card {
+        padding: 20px;
+        background: var(--bg-tertiary);
+        border-radius: 10px;
+        text-align: center;
+      }
+
+      .period-label {
+        font-size: 11px;
+        color: var(--text-muted);
+        margin-bottom: 4px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .period-dates {
+        font-size: 12px;
+        color: var(--text-secondary);
+        margin-bottom: 12px;
+      }
+
+      .period-value {
+        font-size: 28px;
+        font-weight: 700;
+        color: var(--text-primary);
+      }
+
+      .period-stats {
+        display: flex;
+        justify-content: center;
+        gap: 16px;
+        margin-top: 12px;
+        font-size: 12px;
+      }
+
+      .period-stat { color: var(--text-muted); }
+      .period-stat strong { color: var(--text-primary); }
+
+      .comparison-arrow {
+        font-size: 24px;
+        text-align: center;
+        color: var(--text-muted);
+      }
+
+      .change-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      .change-badge.positive {
+        background: rgba(34, 197, 94, 0.15);
+        color: var(--success);
+      }
+
+      .change-badge.negative {
+        background: rgba(239, 68, 68, 0.1);
+        color: var(--danger);
+      }
+
+      .change-badge.neutral {
+        background: var(--bg-tertiary);
+        color: var(--text-muted);
+      }
+
+      .change-summary {
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+        margin-top: 16px;
+        padding-top: 16px;
+        border-top: 1px solid var(--border-primary);
+      }
+
       /* Responsive */
       @media (max-width: 1024px) {
         .sidebar { display: none; }
@@ -964,7 +1053,7 @@
             </button>
           </div>
 
-          <div class="nav-section">
+          <!-- <div class="nav-section">
             <div class="nav-label">External</div>
             <a class="nav-item" href="https://cqd-analytics.adhamhaithameid.workers.dev/" target="_blank"
               data-tooltip="Open Cloudflare Worker dashboard">
@@ -974,7 +1063,7 @@
               </svg>
               CF Worker
             </a>
-          </div>
+          </div> -->
         </nav>
 
         <div class="sidebar-footer">
@@ -993,6 +1082,9 @@
             <p id="last-updated">Last updated: --</p>
           </div>
           <div class="topbar-right">
+            <a href="https://cqd-analytics.adhamhaithameid.workers.dev/" target="_blank" class="btn btn-secondary" data-tooltip="Open Cloudflare Worker dashboard" data-tooltip-position="bottom">
+              ☁️ CF Dashboard
+            </a>
             <button class="btn" onclick="showBatchModal()" id="batch-btn" data-tooltip="View last batch info" data-tooltip-position="bottom">
               <!-- <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
@@ -1170,6 +1262,23 @@
 
           <!-- CHARTS PAGE -->
           <div class="page" id="page-charts">
+            <!-- Comparison Section -->
+            <div class="card" style="margin-bottom: 20px;">
+              <div class="card-header">
+                <div>
+                  <div class="card-title">📊 Period Comparison</div>
+                  <div class="card-subtitle">Compare two time periods</div>
+                </div>
+                <div class="tabs">
+                  <button class="tab active" onclick="setComparison('week')" id="cmp-week">This Week vs Last</button>
+                  <button class="tab" onclick="setComparison('month')" id="cmp-month">This Month vs Last</button>
+                </div>
+              </div>
+              <div class="card-body" id="comparison-content">
+                <div class="loading"><div class="spinner"></div>Loading comparison...</div>
+              </div>
+            </div>
+
             <div class="charts-grid">
               <div class="card">
                 <div class="card-header">
@@ -1800,7 +1909,136 @@
         }
       }
 
-      // Refresh
+      // Comparison feature
+      var currentComparisonMode = 'week';
+
+      function setComparison(mode) {
+        currentComparisonMode = mode;
+        document.getElementById('cmp-week').classList.toggle('active', mode === 'week');
+        document.getElementById('cmp-month').classList.toggle('active', mode === 'month');
+        loadComparison();
+      }
+
+      async function loadComparison() {
+        var container = document.getElementById('comparison-content');
+        container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading comparison...</div>';
+
+        var now = new Date();
+        var from1, to1, from2, to2, label1, label2;
+
+        if (currentComparisonMode === 'week') {
+          // This week vs Last week
+          var today = new Date(now);
+          var dayOfWeek = today.getDay() || 7; // Sunday = 7
+          
+          // This week (Mon - Today)
+          var thisWeekStart = new Date(today);
+          thisWeekStart.setDate(today.getDate() - dayOfWeek + 1);
+          to2 = fmtDate(today);
+          from2 = fmtDate(thisWeekStart);
+          label2 = 'This Week';
+
+          // Last week (Mon - Sun)
+          var lastWeekEnd = new Date(thisWeekStart);
+          lastWeekEnd.setDate(thisWeekStart.getDate() - 1);
+          var lastWeekStart = new Date(lastWeekEnd);
+          lastWeekStart.setDate(lastWeekEnd.getDate() - 6);
+          to1 = fmtDate(lastWeekEnd);
+          from1 = fmtDate(lastWeekStart);
+          label1 = 'Last Week';
+        } else {
+          // This month vs Last month
+          var thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+          from2 = fmtDate(thisMonthStart);
+          to2 = fmtDate(now);
+          label2 = 'This Month';
+
+          var lastMonthEnd = new Date(thisMonthStart);
+          lastMonthEnd.setDate(lastMonthEnd.getDate() - 1);
+          var lastMonthStart = new Date(lastMonthEnd.getFullYear(), lastMonthEnd.getMonth(), 1);
+          from1 = fmtDate(lastMonthStart);
+          to1 = fmtDate(lastMonthEnd);
+          label1 = 'Last Month';
+        }
+
+        try {
+          var url = '/api/stats/comparison?from1=' + from1 + '&to1=' + to1 + '&from2=' + from2 + '&to2=' + to2;
+          var data = await fetchJSON(url);
+
+          var p1 = data.period1;
+          var p2 = data.period2;
+          var change = data.change;
+
+          var changeClass = function(str) {
+            if (str.startsWith('+') && str !== '+0%' && str !== '+0.0%') return 'positive';
+            if (str.startsWith('-')) return 'negative';
+            return 'neutral';
+          };
+
+          var html = '<div class="comparison-grid">';
+          
+          // Period 1
+          html += '<div class="period-card">';
+          html += '<div class="period-label">' + label1 + '</div>';
+          html += '<div class="period-dates">' + p1.from + ' → ' + p1.to + '</div>';
+          html += '<div class="period-value">' + fmtNumber(p1.downloads) + '</div>';
+          html += '<div class="period-stats">';
+          html += '<span class="period-stat">✓ <strong>' + fmtNumber(p1.success) + '</strong></span>';
+          html += '<span class="period-stat">✗ <strong>' + fmtNumber(p1.fail) + '</strong></span>';
+          html += '<span class="period-stat">' + fmtPct(p1.successRate) + '</span>';
+          html += '</div></div>';
+
+          // Arrow
+          html += '<div class="comparison-arrow">→</div>';
+
+          // Period 2
+          html += '<div class="period-card">';
+          html += '<div class="period-label">' + label2 + '</div>';
+          html += '<div class="period-dates">' + p2.from + ' → ' + p2.to + '</div>';
+          html += '<div class="period-value">' + fmtNumber(p2.downloads) + '</div>';
+          html += '<div class="period-stats">';
+          html += '<span class="period-stat">✓ <strong>' + fmtNumber(p2.success) + '</strong></span>';
+          html += '<span class="period-stat">✗ <strong>' + fmtNumber(p2.fail) + '</strong></span>';
+          html += '<span class="period-stat">' + fmtPct(p2.successRate) + '</span>';
+          html += '</div></div>';
+
+          html += '</div>';
+
+          // Change summary
+          html += '<div class="change-summary">';
+          html += '<span class="change-badge ' + changeClass(change.downloads) + '">Downloads ' + change.downloads + '</span>';
+          html += '<span class="change-badge ' + changeClass(change.success) + '">Success ' + change.success + '</span>';
+          html += '<span class="change-badge ' + changeClass(change.fail) + '">Fails ' + change.fail + '</span>';
+          html += '</div>';
+
+          container.innerHTML = html;
+        } catch (e) {
+          container.innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed to load: ' + e.message + '</div>';
+        }
+      }
+
+      function fmtDate(d) {
+        return d.toISOString().slice(0, 10);
+      }
+
+      // API Export button for Activity page
+      function exportAPICSV() {
+        var days = activityRange === 'today' ? 1 : 7;
+        var range = getDateRange(days);
+        var granularity = activityRange === 'today' ? 'hour' : 'day';
+        var url = '/api/stats/export?format=csv&granularity=' + granularity + '&from=' + range.from + '&to=' + range.to;
+        window.open(url, '_blank');
+      }
+
+      function exportAPIJSON() {
+        var days = activityRange === 'today' ? 1 : 7;
+        var range = getDateRange(days);
+        var granularity = activityRange === 'today' ? 'hour' : 'day';
+        var url = '/api/stats/export?format=json&granularity=' + granularity + '&from=' + range.from + '&to=' + range.to;
+        window.open(url, '_blank');
+      }
+
+      // Refresh all data
       async function refreshAll() {
         var btn = document.getElementById("refresh-btn");
         btn.disabled = true;
@@ -1810,7 +2048,10 @@
         await loadTopToday();
         
         if (currentPage === 'activity') await loadActivity();
-        if (currentPage === 'charts') await loadCharts();
+        if (currentPage === 'charts') {
+          await loadCharts();
+          await loadComparison();
+        }
 
         btn.disabled = false;
         btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 11-2.52-6.25"/><path d="M21 4v5h-5"/></svg> Refresh';

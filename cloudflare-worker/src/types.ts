@@ -139,3 +139,68 @@ export interface Env {
   ORACLE_ENDPOINT: string;
   MAX_BATCH_EVENTS: string;
 }
+
+// ---------------------------------------------------------------------------
+// OracleBatch types (sent to Oracle backend)
+// ---------------------------------------------------------------------------
+
+/**
+ * Aggregated totals for a single time bucket (typically one hour).
+ */
+export interface BucketTotals {
+  totalEvents: number;
+  totalDownloads: number;
+  totalSuccess: number;
+  totalFail: number;
+}
+
+/**
+ * Per-dimension counters for a time bucket.
+ */
+export interface BucketCounters {
+  byStatus: Record<string, number>;
+  byType: Record<string, number>;
+  byBrowser: Record<string, number>;
+  byOs: Record<string, number>;
+  byExtVersion: Record<string, number>;
+  byLanguage: Record<string, number>;
+  byCountry: Record<string, number>;
+  byErrorType: Record<string, number>;
+}
+
+/**
+ * One aggregated time bucket (typically one hour).
+ */
+export interface TimeBucket {
+  bucketStart: string; // RFC3339 UTC, e.g. "2025-12-11T03:00:00Z"
+  bucketEnd: string;
+  totals: BucketTotals;
+  counters: BucketCounters;
+}
+
+/**
+ * DO state snapshot included in each batch.
+ */
+export interface DOStateBatch {
+  ok: boolean;
+  totalEvents: number;
+  totalDownloads: number;
+  totalSuccess: number;
+  totalFail: number;
+  pendingEvents: number;
+  lastEventAt: number | null;
+  lastFlushAt: number | null;
+  quota?: QuotaDescriptor;
+  envSnapshot?: EnvSnapshot;
+}
+
+/**
+ * The aggregated payload sent to Oracle backend.
+ */
+export interface OracleBatch {
+  batchId: string;
+  generatedAt: number; // Unix ms
+  timeZone: string;
+  timeBuckets: TimeBucket[];
+  doState: DOStateBatch;
+}

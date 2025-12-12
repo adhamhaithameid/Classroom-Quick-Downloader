@@ -8,6 +8,11 @@ import {
   QuotaDescriptor,
   StoredEvent,
   EnvSnapshot,
+  OracleBatch,
+  TimeBucket,
+  BucketTotals,
+  BucketCounters,
+  DOStateBatch,
 } from "./types";
 
 export interface Env {
@@ -500,7 +505,7 @@ export class DownloadsDurable {
       buffer: [],
     };
     await this.state.storage.delete(STORAGE_KEY);
-    await this.state.storage.setAlarm(0);
+    await this.state.storage.deleteAlarm();
     await this.persist();
     return json({ ok: true, message: "state reset" });
   }
@@ -629,6 +634,134 @@ export class DownloadsDurable {
     await this.state.storage.setAlarm(nextMs);
   }
 
+  /**
+   * Build an aggregated OracleBatch from raw events in buffer.
+   * Groups events by hour and aggregates counters.
+   */
+  private buildOracleBatch(events: StoredEvent[]): OracleBatch {
+    const now = Date.now();
+    
+    // Group events by hour bucket
+    const hourBuckets = new Map<string, StoredEvent[]>();
+    for (const ev of events) {
+      const ts = ev.timestamp || now;
+      const d = new Date(ts);
+      // Truncate to hour: "2025-12-11T03:00:00Z"
+      const hourKey = d.toISOString().slice(0, 13) + ":00:00Z";
+      if (!hourBuckets.has(hourKey)) {
+        hourBuckets.set(hourKey, []);
+      }
+      hourBuckets.get(hourKey)!.push(ev);
+    }
+
+    // Aggregate each hour bucket
+    const timeBuckets: TimeBucket[] = [];
+    for (const [hourStart, evs] of hourBuckets) {
+      const bucket = this.aggregateBucket(hourStart, evs);
+      timeBuckets.push(bucket);
+    }
+
+    // Sort by bucket start
+    timeBuckets.sort((a, b) => a.bucketStart.localeCompare(b.bucketStart));
+
+    // Build DO state snapshot
+    const quota = computeQuotaDescriptor(this.d.reqCountToday, this.d.hardRemoteOff);
+    const doState: DOStateBatch = {
+      ok: true,
+      totalEvents: this.d.totalEvents,
+      totalDownloads: this.d.totalDownloads,
+      totalSuccess: this.d.totalSuccess,
+      totalFail: this.d.totalFail,
+      pendingEvents: this.d.pendingEvents,
+      lastEventAt: this.d.lastEventAt,
+      lastFlushAt: this.d.lastFlushAt,
+      quota,
+      envSnapshot: {
+        maxBatchEvents: this.env.MAX_BATCH_EVENTS || "n/a",
+        oracleEndpoint: this.env.ORACLE_ENDPOINT || "unknown",
+      },
+    };
+
+    // Generate unique batch ID
+    const batchId = `do-${now}-${Math.random().toString(36).slice(2, 8)}`;
+
+    return {
+      batchId,
+      generatedAt: now,
+      timeZone: "UTC",
+      timeBuckets,
+      doState,
+    };
+  }
+
+  private aggregateBucket(hourStart: string, events: StoredEvent[]): TimeBucket {
+    const totals: BucketTotals = {
+      totalEvents: events.length,
+      totalDownloads: 0,
+      totalSuccess: 0,
+      totalFail: 0,
+    };
+
+    const counters: BucketCounters = {
+      byStatus: {},
+      byType: {},
+      byBrowser: {},
+      byOs: {},
+      byExtVersion: {},
+      byLanguage: {},
+      byCountry: {},
+      byErrorType: {},
+    };
+
+    for (const ev of events) {
+      if (ev.status === "success") {
+        totals.totalDownloads++;
+        totals.totalSuccess++;
+      } else {
+        totals.totalFail++;
+      }
+
+      // Aggregate counters
+      const status = ev.status || "unknown";
+      counters.byStatus[status] = (counters.byStatus[status] || 0) + 1;
+
+      const type = (ev.file_type || "unknown").toLowerCase();
+      counters.byType[type] = (counters.byType[type] || 0) + 1;
+
+      const browser = (ev.browser || "unknown").toLowerCase();
+      counters.byBrowser[browser] = (counters.byBrowser[browser] || 0) + 1;
+
+      const os = (ev.os || "unknown").toLowerCase();
+      counters.byOs[os] = (counters.byOs[os] || 0) + 1;
+
+      const extVer = ev.ext_version || "0.0.0";
+      counters.byExtVersion[extVer] = (counters.byExtVersion[extVer] || 0) + 1;
+
+      const lang = (ev.language || "unknown").toLowerCase();
+      counters.byLanguage[lang] = (counters.byLanguage[lang] || 0) + 1;
+
+      const country = (ev.country || "unknown").toLowerCase();
+      counters.byCountry[country] = (counters.byCountry[country] || 0) + 1;
+
+      if (ev.status === "fail") {
+        const errType = (ev.error_type || "unknown").toLowerCase();
+        counters.byErrorType[errType] = (counters.byErrorType[errType] || 0) + 1;
+      }
+    }
+
+    // Calculate bucket end (1 hour later)
+    const startDate = new Date(hourStart);
+    const endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
+    const bucketEnd = endDate.toISOString().slice(0, 19) + "Z";
+
+    return {
+      bucketStart: hourStart,
+      bucketEnd,
+      totals,
+      counters,
+    };
+  }
+
   private async flushToOracle(
     force: boolean,
   ): Promise<{ ok: boolean; sent: number; error?: string }> {
@@ -638,7 +771,7 @@ export class DownloadsDurable {
       // Nothing to flush; clear retry state + alarm.
       this.d.lastFlushAt = now;
       this.d.retryState = { ...DEFAULT_RETRY_STATE };
-      await this.state.storage.setAlarm(0);
+      await this.state.storage.deleteAlarm();
       await this.persist();
       return { ok: true, sent: 0 };
     }
@@ -657,19 +790,23 @@ export class DownloadsDurable {
     const maxBatchEnv =
       parseInt(this.env.MAX_BATCH_EVENTS || "500", 10) || 500;
     const maxBatch = force ? this.d.buffer.length : maxBatchEnv;
-    const batch = this.d.buffer.slice(0, maxBatch);
+    const eventsToFlush = this.d.buffer.slice(0, maxBatch);
 
     if (!this.d.retryState) this.d.retryState = { ...DEFAULT_RETRY_STATE };
     this.d.retryState.lastFlushAttemptAt = now;
 
+    // Build aggregated batch (groups by hour, aggregates counters)
+    const oracleBatch = this.buildOracleBatch(eventsToFlush);
+
     try {
+      // Send to /ingest-batch endpoint (aggregated format)
       const res = await fetch(this.env.ORACLE_ENDPOINT, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "X-DO-SECRET": this.env.DO_SHARED_SECRET,
         },
-        body: JSON.stringify({ events: batch }),
+        body: JSON.stringify(oracleBatch),
       });
 
       if (!res.ok) {
@@ -683,17 +820,17 @@ export class DownloadsDurable {
       }
 
       // Success: drop the sent events
-      this.d.buffer = this.d.buffer.slice(batch.length);
+      this.d.buffer = this.d.buffer.slice(eventsToFlush.length);
       this.d.pendingEvents = Math.max(
         0,
-        this.d.pendingEvents - batch.length,
+        this.d.pendingEvents - eventsToFlush.length,
       );
       this.d.lastFlushAt = now;
       this.d.retryState = { ...DEFAULT_RETRY_STATE };
-      await this.state.storage.setAlarm(0);
+      await this.state.storage.deleteAlarm();
       await this.persist();
 
-      return { ok: true, sent: batch.length };
+      return { ok: true, sent: eventsToFlush.length };
     } catch (err: any) {
       const msg = `Oracle flush error: ${String(err)}`;
       if (!this.d.retryState) this.d.retryState = { ...DEFAULT_RETRY_STATE };

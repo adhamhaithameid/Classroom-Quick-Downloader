@@ -8,6 +8,7 @@ import (
 	"errors"
 	"net/http"
 	"sort"
+	"strconv"
 	"time"
 )
 
@@ -622,4 +623,263 @@ func queryBreakdown(ctx context.Context, db *sql.DB, jsonColumn, fromIso, toIso 
 	}
 
 	return out, nil
+}
+
+// ---------------------------------------------------------------------------
+// Comparison & Export Handlers
+// ---------------------------------------------------------------------------
+
+type periodData struct {
+	From      string  `json:"from"`
+	To        string  `json:"to"`
+	Downloads int64   `json:"downloads"`
+	Success   int64   `json:"success"`
+	Fail      int64   `json:"fail"`
+	Rate      float64 `json:"successRate"`
+}
+
+type comparisonChange struct {
+	Downloads string `json:"downloads"`
+	Success   string `json:"success"`
+	Fail      string `json:"fail"`
+}
+
+type comparisonResponse struct {
+	OK      bool             `json:"ok"`
+	Period1 periodData       `json:"period1"`
+	Period2 periodData       `json:"period2"`
+	Change  comparisonChange `json:"change"`
+}
+
+// ComparisonHandler serves GET /api/stats/comparison.
+// Compares two time periods (e.g., this week vs last week).
+func ComparisonHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		ctx := r.Context()
+		q := r.URL.Query()
+
+		// Parse both periods
+		from1Str := q.Get("from1")
+		to1Str := q.Get("to1")
+		from2Str := q.Get("from2")
+		to2Str := q.Get("to2")
+
+		if from1Str == "" || to1Str == "" || from2Str == "" || to2Str == "" {
+			http.Error(w, "missing from1, to1, from2, to2 params", http.StatusBadRequest)
+			return
+		}
+
+		from1, err := time.Parse("2006-01-02", from1Str)
+		if err != nil {
+			http.Error(w, "invalid from1", http.StatusBadRequest)
+			return
+		}
+		to1, err := time.Parse("2006-01-02", to1Str)
+		if err != nil {
+			http.Error(w, "invalid to1", http.StatusBadRequest)
+			return
+		}
+		from2, err := time.Parse("2006-01-02", from2Str)
+		if err != nil {
+			http.Error(w, "invalid from2", http.StatusBadRequest)
+			return
+		}
+		to2, err := time.Parse("2006-01-02", to2Str)
+		if err != nil {
+			http.Error(w, "invalid to2", http.StatusBadRequest)
+			return
+		}
+
+		// Query both periods
+		p1, err := queryPeriodTotals(ctx, db, from1, to1)
+		if err != nil {
+			http.Error(w, "failed to query period1: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		p1.From = from1Str
+		p1.To = to1Str
+
+		p2, err := queryPeriodTotals(ctx, db, from2, to2)
+		if err != nil {
+			http.Error(w, "failed to query period2: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		p2.From = from2Str
+		p2.To = to2Str
+
+		// Calculate change percentages
+		change := comparisonChange{
+			Downloads: calcChange(p1.Downloads, p2.Downloads),
+			Success:   calcChange(p1.Success, p2.Success),
+			Fail:      calcChange(p1.Fail, p2.Fail),
+		}
+
+		resp := comparisonResponse{
+			OK:      true,
+			Period1: p1,
+			Period2: p2,
+			Change:  change,
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}
+}
+
+func queryPeriodTotals(ctx context.Context, db *sql.DB, from, to time.Time) (periodData, error) {
+	fromIso := from.UTC().Format(time.RFC3339)
+	toIso := to.AddDate(0, 0, 1).UTC().Format(time.RFC3339)
+
+	row := db.QueryRowContext(ctx, `
+		SELECT COALESCE(SUM(total_downloads), 0),
+		       COALESCE(SUM(total_success), 0),
+		       COALESCE(SUM(total_fail), 0)
+		FROM downloads_hourly
+		WHERE bucket_start >= ? AND bucket_start < ?
+	`, fromIso, toIso)
+
+	var d, s, f int64
+	if err := row.Scan(&d, &s, &f); err != nil {
+		return periodData{}, err
+	}
+
+	var rate float64
+	if d > 0 {
+		rate = float64(s) / float64(d)
+	}
+
+	return periodData{
+		Downloads: d,
+		Success:   s,
+		Fail:      f,
+		Rate:      rate,
+	}, nil
+}
+
+func calcChange(old, new int64) string {
+	if old == 0 {
+		if new == 0 {
+			return "0%"
+		}
+		return "+∞"
+	}
+	pct := float64(new-old) / float64(old) * 100
+	if pct >= 0 {
+		return "+" + strconv.FormatFloat(pct, 'f', 1, 64) + "%"
+	}
+	return strconv.FormatFloat(pct, 'f', 1, 64) + "%"
+}
+
+type exportPoint struct {
+	Timestamp string `json:"timestamp"`
+	Downloads int64  `json:"downloads"`
+	Success   int64  `json:"success"`
+	Fail      int64  `json:"fail"`
+	Rate      string `json:"rate"`
+}
+
+// ExportHandler serves GET /api/stats/export.
+// Returns CSV or JSON export of time series data.
+func ExportHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		ctx := r.Context()
+		q := r.URL.Query()
+
+		format := q.Get("format")
+		if format == "" {
+			format = "json"
+		}
+
+		gran := q.Get("granularity")
+		if gran == "" {
+			gran = "day"
+		}
+
+		now := time.Now().UTC()
+		fromStr := q.Get("from")
+		toStr := q.Get("to")
+
+		var fromTime, toTime time.Time
+		var err error
+
+		if fromStr == "" {
+			fromTime = now.AddDate(0, 0, -30)
+		} else {
+			fromTime, err = time.Parse("2006-01-02", fromStr)
+			if err != nil {
+				http.Error(w, "invalid from", http.StatusBadRequest)
+				return
+			}
+		}
+
+		if toStr == "" {
+			toTime = now
+		} else {
+			toTime, err = time.Parse("2006-01-02", toStr)
+			if err != nil {
+				http.Error(w, "invalid to", http.StatusBadRequest)
+				return
+			}
+		}
+
+		fromIso := fromTime.UTC().Format(time.RFC3339)
+		toIso := toTime.AddDate(0, 0, 1).UTC().Format(time.RFC3339)
+
+		var points []timeSeriesPoint
+		switch gran {
+		case "hour":
+			points, err = queryTimeSeriesHour(ctx, db, fromIso, toIso)
+		case "day":
+			points, err = queryTimeSeriesDay(ctx, db, fromIso, toIso)
+		default:
+			http.Error(w, "invalid granularity", http.StatusBadRequest)
+			return
+		}
+
+		if err != nil {
+			http.Error(w, "failed to query data: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if format == "csv" {
+			filename := "cqd_analytics_" + fromTime.Format("2006-01-02") + "_to_" + toTime.Format("2006-01-02") + ".csv"
+			w.Header().Set("Content-Type", "text/csv")
+			w.Header().Set("Content-Disposition", "attachment; filename=\""+filename+"\"")
+
+			// Write CSV header + rows
+			_, _ = w.Write([]byte("Timestamp,Downloads,Success,Fail,SuccessRate\n"))
+			for _, p := range points {
+				rate := "0%"
+				if p.Downloads > 0 {
+					rate = strconv.FormatFloat(p.SuccessRate*100, 'f', 1, 64) + "%"
+				}
+				line := p.Timestamp + "," +
+					strconv.FormatInt(p.Downloads, 10) + "," +
+					strconv.FormatInt(p.Success, 10) + "," +
+					strconv.FormatInt(p.Fail, 10) + "," +
+					rate + "\n"
+				_, _ = w.Write([]byte(line))
+			}
+			return
+		}
+
+		// Default: JSON
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"ok":          true,
+			"granularity": gran,
+			"from":        fromTime.Format("2006-01-02"),
+			"to":          toTime.Format("2006-01-02"),
+			"totalRows":   len(points),
+			"data":        points,
+		})
+	}
 }

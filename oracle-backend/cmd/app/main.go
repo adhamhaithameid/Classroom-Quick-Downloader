@@ -49,6 +49,8 @@ func main() {
 	mux.HandleFunc("/api/stats/summary", handlers.SummaryHandler(sqlDB))
 	mux.HandleFunc("/api/stats/timeseries", handlers.TimeSeriesHandler(sqlDB))
 	mux.HandleFunc("/api/stats/breakdown", handlers.BreakdownHandler(sqlDB))
+	mux.HandleFunc("/api/stats/comparison", handlers.ComparisonHandler(sqlDB))
+	mux.HandleFunc("/api/stats/export", handlers.ExportHandler(sqlDB))
 
 	// Serve static dashboard.
 	fileServer := http.FileServer(http.Dir(staticDir))
