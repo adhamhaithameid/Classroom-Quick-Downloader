@@ -3,6 +3,7 @@ package handlers
 
 import (
 	"context"
+	"crypto/subtle"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -37,8 +38,12 @@ func IngestBatchHandler(db *sql.DB, sharedSecret string) http.HandlerFunc {
 			return
 		}
 
+		// Limit body size to 5MB to prevent abuse
+		r.Body = http.MaxBytesReader(w, r.Body, 5<<20)
+
+		// Constant-time comparison for secret to prevent timing attacks
 		headerSecret := r.Header.Get("X-DO-SECRET")
-		if headerSecret == "" || headerSecret != sharedSecret {
+		if headerSecret == "" || subtle.ConstantTimeCompare([]byte(headerSecret), []byte(sharedSecret)) != 1 {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}

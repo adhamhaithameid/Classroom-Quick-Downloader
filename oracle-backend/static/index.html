@@ -1457,9 +1457,7 @@
 
       function getDateRange(days) {
         const today = new Date();
-        const toDate = new Date(today);
-        toDate.setDate(toDate.getDate() + 1);
-        const to = toDate.toISOString().slice(0, 10);
+        const to = today.toISOString().slice(0, 10); // inclusive end (today)
         const fromDate = new Date(today);
         if (days > 1) fromDate.setDate(fromDate.getDate() - (days - 1));
         const from = fromDate.toISOString().slice(0, 10);
@@ -1608,9 +1606,7 @@
       async function loadTopToday() {
         var today = new Date();
         var fromStr = today.toISOString().slice(0, 10);
-        var toDate = new Date(today);
-        toDate.setDate(toDate.getDate() + 1);
-        var toStr = toDate.toISOString().slice(0, 10);
+        var toStr = fromStr; // inclusive same-day
         
         var dimensions = ['browser', 'os', 'type', 'country'];
         for (var i = 0; i < dimensions.length; i++) {

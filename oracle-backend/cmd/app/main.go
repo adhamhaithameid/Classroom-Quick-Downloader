@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"oracle-backend/internal/db"
@@ -52,9 +53,8 @@ func main() {
 	mux.HandleFunc("/api/stats/comparison", handlers.ComparisonHandler(sqlDB))
 	mux.HandleFunc("/api/stats/export", handlers.ExportHandler(sqlDB))
 
-	// Serve static dashboard.
-	fileServer := http.FileServer(http.Dir(staticDir))
-	mux.Handle("/", fileServer)
+	// Serve static dashboard with SPA fallback.
+	mux.Handle("/", spaHandler(staticDir))
 
 	server := &http.Server{
 		Addr:              addr,
@@ -81,5 +81,31 @@ func loggingMiddleware(next http.Handler) http.Handler {
 		start := time.Now()
 		next.ServeHTTP(w, r)
 		log.Printf("%s %s from %s in %s", r.Method, r.URL.Path, r.RemoteAddr, time.Since(start))
+	})
+}
+
+// spaHandler serves static files with SPA fallback for client-side routing.
+func spaHandler(staticDir string) http.Handler {
+	fs := http.FileServer(http.Dir(staticDir))
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Let API routes be handled by mux (defensive, since this handler is last)
+		if strings.HasPrefix(r.URL.Path, "/api/") ||
+			strings.HasPrefix(r.URL.Path, "/health") ||
+			r.URL.Path == "/ingest-batch" ||
+			r.URL.Path == "/storeBatch" {
+			http.NotFound(w, r)
+			return
+		}
+
+		// If file exists, serve it
+		path := filepath.Join(staticDir, filepath.Clean(r.URL.Path))
+		if info, err := os.Stat(path); err == nil && !info.IsDir() {
+			fs.ServeHTTP(w, r)
+			return
+		}
+
+		// Otherwise serve SPA entry (index.html)
+		http.ServeFile(w, r, filepath.Join(staticDir, "index.html"))
 	})
 }

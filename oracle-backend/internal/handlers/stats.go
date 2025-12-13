@@ -344,8 +344,8 @@ func TimeSeriesHandler(db *sql.DB) http.HandlerFunc {
 			}
 		}
 
-		if !toTime.After(fromTime) {
-			http.Error(w, "to must be after from", http.StatusBadRequest)
+		if toTime.Before(fromTime) {
+			http.Error(w, "to must be >= from", http.StatusBadRequest)
 			return
 		}
 
@@ -385,9 +385,13 @@ func TimeSeriesHandler(db *sql.DB) http.HandlerFunc {
 
 func queryTimeSeriesHour(ctx context.Context, db *sql.DB, fromIso, toIso string) ([]timeSeriesPoint, error) {
 	rows, err := db.QueryContext(ctx, `
-		SELECT bucket_start, total_downloads, total_success, total_fail
+		SELECT bucket_start,
+		       COALESCE(SUM(total_downloads), 0),
+		       COALESCE(SUM(total_success), 0),
+		       COALESCE(SUM(total_fail), 0)
 		FROM downloads_hourly
 		WHERE bucket_start >= ? AND bucket_start < ?
+		GROUP BY bucket_start
 		ORDER BY bucket_start ASC
 	`, fromIso, toIso)
 	if err != nil {
@@ -518,8 +522,8 @@ func BreakdownHandler(db *sql.DB) http.HandlerFunc {
 				return
 			}
 		}
-		if !toTime.After(fromTime) {
-			http.Error(w, "to must be after from", http.StatusBadRequest)
+		if toTime.Before(fromTime) {
+			http.Error(w, "to must be >= from", http.StatusBadRequest)
 			return
 		}
 
