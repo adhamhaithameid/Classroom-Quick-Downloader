@@ -417,6 +417,7 @@ export class DownloadsDurable {
   }
 
   private async handleStats(): Promise<Response> {
+    this.ensureRequestDay();
     const quota = computeQuotaDescriptor(
       this.d.reqCountToday,
       this.d.hardRemoteOff,
@@ -449,6 +450,7 @@ export class DownloadsDurable {
    * Config endpoint used by the extension to adapt batching / flush behaviour.
    */
   private async handleConfig(): Promise<Response> {
+    this.ensureRequestDay();
     const quota = computeQuotaDescriptor(
       this.d.reqCountToday,
       this.d.hardRemoteOff,
@@ -470,6 +472,7 @@ export class DownloadsDurable {
   }
 
   private async handleHealth(): Promise<Response> {
+    this.ensureRequestDay();
     return json({
       ok: true,
       pendingEvents: this.d.pendingEvents,
@@ -623,8 +626,9 @@ export class DownloadsDurable {
       43_200, // 12 hours
       86_400, // 1 day
     ];
+    // FIX: first failure (1) should map to index 0 (60s)
     const idx = Math.min(
-      rs.consecutiveFailures,
+      Math.max((rs.consecutiveFailures || 0) - 1, 0),
       backoffStepsSeconds.length - 1,
     );
     const backoffSec = backoffStepsSeconds[idx];
@@ -781,16 +785,16 @@ export class DownloadsDurable {
       if (!this.d.retryState) this.d.retryState = { ...DEFAULT_RETRY_STATE };
       this.d.retryState.lastError = msg;
       this.d.retryState.lastFlushAttemptAt = now;
-      this.d.retryState.consecutiveFailures += 1;
-      await this.scheduleRetry();
+      // Don't schedule retries if endpoint is missing - just report error
+      await this.state.storage.deleteAlarm();
       await this.persist();
       return { ok: false, sent: 0, error: msg };
     }
 
     const maxBatchEnv =
       parseInt(this.env.MAX_BATCH_EVENTS || "500", 10) || 500;
-    const maxBatch = force ? this.d.buffer.length : maxBatchEnv;
-    const eventsToFlush = this.d.buffer.slice(0, maxBatch);
+    // FIX: even "force" should chunk; force just means "try now / bypass gating"
+    const eventsToFlush = this.d.buffer.slice(0, maxBatchEnv);
 
     if (!this.d.retryState) this.d.retryState = { ...DEFAULT_RETRY_STATE };
     this.d.retryState.lastFlushAttemptAt = now;

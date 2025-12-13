@@ -2,26 +2,52 @@
 import { renderDashboard, renderLoginPage } from "./dashboard";
 import type { Env as WorkerEnv, StatsResponse } from "./types";
 
-// ---------------------------------------------------------------------------
-// Helper: get DO stub
-// ---------------------------------------------------------------------------
-
 function getDownloadsStub(env: WorkerEnv): DurableObjectStub {
   const id = env.DOWNLOADS_DO.idFromName("downloads");
   return env.DOWNLOADS_DO.get(id);
+}
+
+// --- CORS helpers -----------------------------------------------------------
+
+function corsHeaders(request: Request): Headers {
+  const origin = request.headers.get("Origin") || "*";
+
+  // If you want to lock it down later, replace "*" with a whitelist check.
+  const h = new Headers();
+  h.set("Access-Control-Allow-Origin", origin);
+  h.set("Vary", "Origin");
+  h.set("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  h.set(
+    "Access-Control-Allow-Headers",
+    "Content-Type, X-Admin-Secret",
+  );
+  h.set("Access-Control-Max-Age", "86400");
+  return h;
+}
+
+function withCors(request: Request, res: Response): Response {
+  const headers = new Headers(res.headers);
+  const ch = corsHeaders(request);
+  ch.forEach((v, k) => headers.set(k, v));
+
+  return new Response(res.body, {
+    status: res.status,
+    statusText: res.statusText,
+    headers,
+  });
+}
+
+function handleOptions(request: Request): Response {
+  return new Response(null, { status: 204, headers: corsHeaders(request) });
 }
 
 // ---------------------------------------------------------------------------
 // Dashboard (GET / shows login every time, POST / validates password & renders)
 // ---------------------------------------------------------------------------
 
-async function handleRoot(
-  request: Request,
-  env: WorkerEnv,
-): Promise<Response> {
+async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
   const method = request.method.toUpperCase();
 
-  // Always show login page on GET /
   if (method === "GET") {
     return new Response(renderLoginPage(), {
       status: 200,
@@ -44,10 +70,7 @@ async function handleRoot(
     if (!env.DO_SHARED_SECRET) {
       return new Response(
         renderLoginPage("Server misconfigured: DO_SHARED_SECRET missing."),
-        {
-          status: 500,
-          headers: { "content-type": "text/html; charset=utf-8" },
-        },
+        { status: 500, headers: { "content-type": "text/html; charset=utf-8" } },
       );
     }
 
@@ -58,14 +81,11 @@ async function handleRoot(
       });
     }
 
-    // Correct password for this request: fetch stats and render dashboard.
     const stub = getDownloadsStub(env);
     const url = new URL(request.url);
     url.pathname = "/stats";
 
-    const statsRes = await stub.fetch(url.toString(), {
-      method: "GET",
-    });
+    const statsRes = await stub.fetch(url.toString(), { method: "GET" });
     if (!statsRes.ok) {
       const text = await statsRes.text().catch(() => "");
       return new Response(
@@ -86,63 +106,33 @@ async function handleRoot(
   return new Response("Method Not Allowed", { status: 405 });
 }
 
-// ---------------------------------------------------------------------------
-// Generic proxy to DO
-// ---------------------------------------------------------------------------
-
-async function proxyToDO(
-  request: Request,
-  env: WorkerEnv,
-): Promise<Response> {
+async function proxyToDO(request: Request, env: WorkerEnv): Promise<Response> {
   const stub = getDownloadsStub(env);
-  return stub.fetch(request);
+  const res = await stub.fetch(request);
+  return withCors(request, res);
 }
 
-// ---------------------------------------------------------------------------
-// Worker fetch
-// ---------------------------------------------------------------------------
-
 export default {
-  async fetch(
-    request: Request,
-    env: WorkerEnv,
-    ctx: ExecutionContext,
-  ): Promise<Response> {
+  async fetch(request: Request, env: WorkerEnv, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     const { pathname } = url;
 
-    // Root (dashboard + login)
+    // Preflight for all routes
+    if (request.method === "OPTIONS") {
+      return handleOptions(request);
+    }
+
     if (pathname === "/") {
       return handleRoot(request, env);
     }
 
-    // Public JSON endpoints
-    if (pathname === "/stats" && request.method === "GET") {
-      return proxyToDO(request, env);
-    }
-
-    if (pathname === "/config" && request.method === "GET") {
-      return proxyToDO(request, env);
-    }
-
-    if (pathname === "/health" && request.method === "GET") {
-      return proxyToDO(request, env);
-    }
-
-    if (pathname === "/track" && request.method === "POST") {
-      return proxyToDO(request, env);
-    }
-
-    if (pathname === "/debug/flush" && request.method === "POST") {
-      return proxyToDO(request, env);
-    }
-
-    if (pathname === "/debug/reset" && request.method === "POST") {
-      return proxyToDO(request, env);
-    }
-
-    // Admin routes (Danger Zone) – just forward; DO will check X-Admin-Secret.
     if (
+      (pathname === "/stats" && request.method === "GET") ||
+      (pathname === "/config" && request.method === "GET") ||
+      (pathname === "/health" && request.method === "GET") ||
+      (pathname === "/track" && request.method === "POST") ||
+      (pathname === "/debug/flush" && request.method === "POST") ||
+      (pathname === "/debug/reset" && request.method === "POST") ||
       pathname === "/admin/force-flush" ||
       pathname === "/admin/cut-power" ||
       pathname === "/admin/restore-power" ||
@@ -155,8 +145,4 @@ export default {
   },
 };
 
-/**
- * IMPORTANT: export the Durable Object class from the entrypoint
- * so Wrangler can wire the binding.
- */
 export { DownloadsDurable } from "./downloads_do";
