@@ -6,7 +6,7 @@ compatibility_date = "2024-12-01"
 [vars]
   ORACLE_ENDPOINT = ""
   DO_SHARED_SECRET = "123"
-  MAX_BATCH_EVENTS = "5"
+  MAX_BATCH_EVENTS = "10000"
 
 [[durable_objects.bindings]]
   name = "DOWNLOADS_DO"

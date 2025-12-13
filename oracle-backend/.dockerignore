@@ -1,7 +1,24 @@
 # filepath: oracle-backend/.dockerignore
 .git
 .gitignore
+.DS_Store
+
+# Development data
 data/
+docker_data/
 *.db
 *.db-wal
 *.db-shm
+
+# Binary artifacts
+app
+oracle-backend
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Documentation
+README.md
+*.md
