@@ -1,5 +1,6 @@
 // filepath: cloudflare-worker/src/dashboard.ts
 import type { StatsResponse, QuotaDescriptor } from "./types";
+import { LOGO_SVG_DATA_URI, FAVICON_PNG_DATA_URI } from "./assets";
 
 function formatTs(ts: number | null): string {
   if (!ts) return "—";
@@ -205,6 +206,7 @@ export function renderLoginPage(errorMessage?: string): string {
 <head>
   <meta charset="UTF-8" />
   <title>CQD Analytics – Admin Login</title>
+  <link rel="icon" href="${FAVICON_PNG_DATA_URI}">
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
     :root { color-scheme: dark; --bg: #050816; --accent: #3b82f6; --text-main: #e5e7eb; --text-soft: #6b7280; }
@@ -215,13 +217,14 @@ export function renderLoginPage(errorMessage?: string): string {
     .login-subtitle { font-size: 0.85rem; color: var(--text-soft); margin-bottom: 16px; }
     .login-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; border: 1px solid rgba(148,163,184,0.5); background: rgba(59,130,246,0.1); font-size: 0.75rem; text-transform: uppercase; color: #9ca3af; margin-bottom: 10px; }
     .login-badge-dot { width: 7px; height: 7px; border-radius: 999px; background: var(--accent); }
-    .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
-    .field label { font-size: 0.78rem; text-transform: uppercase; color: var(--text-soft); }
-    .field input { padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(148,163,184,0.6); background: rgba(15,23,42,0.95); color: #f9fafb; outline: none; }
-    .field input:focus { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(59,130,246,0.45); }
-    .login-error { margin-bottom: 10px; padding: 6px 8px; border-radius: 10px; font-size: 0.78rem; color: #fecaca; background: rgba(248,113,113,0.12); border: 1px solid rgba(248,113,113,0.6); }
-    .login-button { padding: 8px 14px; border-radius: 999px; border: none; cursor: pointer; font-size: 0.9rem; font-weight: 500; background: linear-gradient(135deg, #3b82f6, #6366f1); color: #f9fafb; display: inline-flex; align-items: center; gap: 6px; float: right; }
-    .login-button:hover { filter: brightness(1.05); }
+    .login-row { display: flex; align-items: center; gap: 8px; margin-top: 16px; }
+    .field { display: flex; flex-direction: column; gap: 4px; flex: 1; margin: 0; }
+    .field input { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(148,163,184,0.6); background: rgba(15,23,42,0.95); color: #f9fafb; outline: none; transition: all 0.2s; }
+    .field input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(59,130,246,0.25); }
+    .login-error { margin-top: 12px; padding: 6px 8px; border-radius: 8px; font-size: 0.78rem; color: #fecaca; background: rgba(248,113,113,0.12); border: 1px solid rgba(248,113,113,0.6); }
+    .login-button { padding: 10px 16px; border-radius: 10px; border: none; cursor: pointer; font-size: 0.9rem; font-weight: 600; background: linear-gradient(135deg, #3b82f6, #6366f1); color: #f9fafb; display: inline-flex; align-items: center; transition: all 0.2s; white-space: nowrap; height: 100%; }
+    .login-button:hover { filter: brightness(1.1); transform: translateY(-1px); }
+    .login-button:active { transform: translateY(0); }
   </style>
 </head>
 <body>
@@ -229,12 +232,14 @@ export function renderLoginPage(errorMessage?: string): string {
     <div class="login-badge"><span class="login-badge-dot"></span><span>CQD Analytics Admin</span></div>
     <h1 class="login-title">Enter admin password</h1>
     <p class="login-subtitle">Unlock analytics dashboard & danger controls.</p>
-    <div class="field">
-      <label for="password-input">Admin password</label>
-      <input id="password-input" name="password" type="password" autofocus required />
+    
+    <div class="login-row">
+      <div class="field">
+        <input id="password-input" name="password" type="password" placeholder="Password..." autofocus required />
+      </div>
+      <button class="login-button" type="submit">Unlock →</button>
     </div>
     ${errorMessage ? `<div class="login-error">${errorMessage}</div>` : ""}
-    <button class="login-button" type="submit"><span>Unlock</span><span>→</span></button>
   </form>
   <script>document.getElementById("password-input")?.focus();</script>
 </body>
@@ -305,6 +310,7 @@ export function renderDashboard(stats: StatsResponse): string {
 <head>
   <meta charset="UTF-8" />
   <title>CQD Analytics – Worker & DO Dashboard</title>
+  <link rel="icon" href="${FAVICON_PNG_DATA_URI}">
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
     :root {
@@ -341,12 +347,22 @@ export function renderDashboard(stats: StatsResponse): string {
       display: none;
     }
 
+
     header {
       display: flex;
       justify-content: space-between;
-      align-items: flex-start;
+      align-items: center;
       gap: 16px;
       margin-bottom: 8px;
+    }
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .header-logo {
+      width: 42px;
+      height: 42px;
     }
     .title-block h1 {
       margin: 0;
@@ -598,8 +614,7 @@ export function renderDashboard(stats: StatsResponse): string {
     .updated .metric-value,
     .updated strong,
     .updated .quota-val,
-    .updated .refresh-value,
-    .updated .live-label {
+    .updated .live-indicator .live-dot {
       animation: text-flash 1.5s ease-out;
     }
 
@@ -1058,9 +1073,11 @@ export function renderDashboard(stats: StatsResponse): string {
 <body>
   <div class="page">
     <header>
-      <div class="title-block">
-        <h1>Classroom Quick Downloader Extension Analytics</h1>
-        <p>Live Worker + Durable Object stats. Manual refresh only.</p>
+      <div class="header-left">
+        <div class="title-block">
+          <h1>CQD Extension Analytics Dashboard</h1>
+          <p>Real-time metrics from Cloudflare Worker & Durable Objects. Manual refresh only</p>
+        </div>
       </div>
       <div class="header-controls">
         <button class="info-btn" id="info-btn" title="View Context & Legend" type="button">
