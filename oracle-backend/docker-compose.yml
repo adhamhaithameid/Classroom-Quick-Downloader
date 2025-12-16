@@ -1,0 +1,32 @@
+# oracle-backend/docker-compose.yml
+# For local development and easy deployment
+
+version: '3.8'
+
+services:
+  oracle-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cqd-oracle-backend
+    ports:
+      - "8080:8080"
+    environment:
+      - ADDR=:8080
+      - DB_PATH=/data/analytics.db
+      - STATIC_DIR=/app/static
+      - DO_SHARED_SECRET=${DO_SHARED_SECRET:-your-secure-secret-here}
+    volumes:
+      # Persist SQLite database
+      - oracle_data:/data
+    restart: always
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  oracle_data:
+    driver: local

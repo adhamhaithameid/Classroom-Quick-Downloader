@@ -139,3 +139,94 @@ export interface Env {
   ORACLE_ENDPOINT: string;
   MAX_BATCH_EVENTS: string;
 }
+
+// ---------------------------------------------------------------------------
+// OracleBatch types (sent to Oracle backend)
+// ---------------------------------------------------------------------------
+
+/**
+ * Aggregated totals for a single time bucket (typically one hour).
+ */
+export interface BucketTotals {
+  totalEvents: number;
+  totalDownloads: number;
+  totalSuccess: number;
+  totalFail: number;
+}
+
+/**
+ * Per-dimension counters for a time bucket.
+ */
+export interface BucketCounters {
+  byStatus: Record<string, number>;
+  byType: Record<string, number>;
+  byBrowser: Record<string, number>;
+  byOs: Record<string, number>;
+  byExtVersion: Record<string, number>;
+  byLanguage: Record<string, number>;
+  byCountry: Record<string, number>;
+  byErrorType: Record<string, number>;
+}
+
+/**
+ * One aggregated time bucket (typically one hour).
+ */
+export interface TimeBucket {
+  bucketStart: string; // RFC3339 UTC, e.g. "2025-12-11T03:00:00Z"
+  bucketEnd: string;
+  totals: BucketTotals;
+  counters: BucketCounters;
+}
+
+/**
+ * Detailed summary for the entire batch.
+ * This aggregates all events in the payload into one view.
+ */
+export interface BatchSummary {
+  totals: BucketTotals;
+  // Full breakdowns
+  browsers: Record<string, number>;
+  os: Record<string, number>;
+  countries: Record<string, number>;
+  languages: Record<string, number>;
+  versions: Record<string, number>;
+  types: Record<string, number>;
+  errorReasons: Record<string, number>;
+  
+  // Calculated "Top" stats
+  topBrowser: string;
+  topOs: string;
+  topCountry: string;
+  topType: string;
+}
+
+/**
+ * DO state snapshot included in each batch.
+ */
+export interface DOStateBatch {
+  ok: boolean;
+  totalEvents: number;
+  totalDownloads: number;
+  totalSuccess: number;
+  totalFail: number;
+  pendingEvents: number;
+  lastEventAt: number | null;
+  lastFlushAt: number | null;
+  quota?: QuotaDescriptor;
+  envSnapshot?: EnvSnapshot;
+}
+
+/**
+ * The aggregated payload sent to Oracle backend.
+ */
+export interface OracleBatch {
+  batchId: string;
+  generatedAt: number; // Unix ms
+  timeZone: string;
+  
+  // The new detailed summary for the whole batch
+  summary: BatchSummary;
+  
+  timeBuckets: TimeBucket[];
+  doState: DOStateBatch;
+}
