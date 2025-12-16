@@ -13,6 +13,7 @@ import {
   BucketTotals,
   BucketCounters,
   DOStateBatch,
+  BatchSummary,
 } from "./types";
 
 export interface Env {
@@ -669,13 +670,28 @@ export class DownloadsDurable {
   }
 
   /**
+   * Helper to find the key with the highest count in a record
+   */
+  private getTopKey(record: Record<string, number>): string {
+    let topKey = "unknown";
+    let max = -1;
+    for (const [key, val] of Object.entries(record)) {
+      if (val > max) {
+        max = val;
+        topKey = key;
+      }
+    }
+    return topKey;
+  }
+
+  /**
    * Build an aggregated OracleBatch from raw events in buffer.
    * Groups events by hour and aggregates counters.
    */
   private buildOracleBatch(events: StoredEvent[]): OracleBatch {
     const now = Date.now();
     
-    // Group events by hour bucket
+    // 1. Group events by hour bucket (Keep logic for historical data)
     const hourBuckets = new Map<string, StoredEvent[]>();
     for (const ev of events) {
       const ts = ev.timestamp || now;
@@ -694,11 +710,63 @@ export class DownloadsDurable {
       const bucket = this.aggregateBucket(hourStart, evs);
       timeBuckets.push(bucket);
     }
-
-    // Sort by bucket start
     timeBuckets.sort((a, b) => a.bucketStart.localeCompare(b.bucketStart));
 
-    // Build DO state snapshot
+    // 2. Build Full Batch Summary (Aggregates EVERYTHING)
+    const summary: BatchSummary = {
+      totals: { totalEvents: 0, totalDownloads: 0, totalSuccess: 0, totalFail: 0 },
+      browsers: {},
+      os: {},
+      countries: {},
+      languages: {},
+      versions: {},
+      types: {},
+      errorReasons: {},
+      topBrowser: "unknown",
+      topOs: "unknown",
+      topCountry: "unknown",
+      topType: "unknown"
+    };
+
+    for (const ev of events) {
+      summary.totals.totalEvents++;
+      summary.totals.totalDownloads++; // Assuming every event is a download attempt
+      
+      if (ev.status === "success") summary.totals.totalSuccess++;
+      else summary.totals.totalFail++;
+
+      // Aggregations
+      const browser = (ev.browser || "unknown").toLowerCase();
+      summary.browsers[browser] = (summary.browsers[browser] || 0) + 1;
+
+      const os = (ev.os || "unknown").toLowerCase();
+      summary.os[os] = (summary.os[os] || 0) + 1;
+
+      const country = (ev.country || "unknown").toLowerCase();
+      summary.countries[country] = (summary.countries[country] || 0) + 1;
+
+      const lang = (ev.language || "unknown").toLowerCase();
+      summary.languages[lang] = (summary.languages[lang] || 0) + 1;
+
+      const ver = ev.ext_version || "0.0.0";
+      summary.versions[ver] = (summary.versions[ver] || 0) + 1;
+
+      const type = (ev.file_type || "unknown").toLowerCase();
+      summary.types[type] = (summary.types[type] || 0) + 1;
+
+      if (ev.status === "fail") {
+        const err = (ev.error_type || "unknown").toLowerCase();
+        summary.errorReasons[err] = (summary.errorReasons[err] || 0) + 1;
+      }
+    }
+
+    // Calculate "Top" stats
+    summary.topBrowser = this.getTopKey(summary.browsers);
+    summary.topOs = this.getTopKey(summary.os);
+    summary.topCountry = this.getTopKey(summary.countries);
+    summary.topType = this.getTopKey(summary.types);
+
+    // 3. Build DO state snapshot
     const quota = computeQuotaDescriptor(this.d.reqCountToday, this.d.hardRemoteOff);
     const doState: DOStateBatch = {
       ok: true,
@@ -717,14 +785,14 @@ export class DownloadsDurable {
     };
 
     // Generate stable batch ID using sequence number (doesn't change on retry)
-    // batchSeq is only incremented after successful flush
     const batchId = `do-seq${this.d.batchSeq}-${events.length}ev`;
 
     return {
       batchId,
       generatedAt: now,
       timeZone: "UTC",
-      timeBuckets,
+      summary,     // <--- The new big JSON object
+      timeBuckets, // <--- Still useful for hourly charts
       doState,
     };
   }
@@ -829,6 +897,13 @@ export class DownloadsDurable {
     // FIX: even "force" should chunk; force just means "try now / bypass gating"
     const eventsToFlush = this.d.buffer.slice(0, maxBatchEnv);
 
+    // --- LOGGING for Debugging ---
+    const targetUrl = this.env.ORACLE_ENDPOINT + "/ingest-batch";
+    console.log("------------------------------------------------");
+    console.log("Attempting Flush to:", targetUrl);
+    console.log("Secret Length:", this.env.DO_SHARED_SECRET ? this.env.DO_SHARED_SECRET.length : "MISSING");
+    // ----------------------
+
     if (!this.d.retryState) this.d.retryState = { ...DEFAULT_RETRY_STATE };
     this.d.retryState.lastFlushAttemptAt = now;
 
@@ -837,7 +912,8 @@ export class DownloadsDurable {
 
     try {
       // Send to /ingest-batch endpoint (aggregated format)
-      const res = await fetch(this.env.ORACLE_ENDPOINT, {
+      // We append "/ingest-batch" here to correct the base URL if needed
+      const res = await fetch(targetUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

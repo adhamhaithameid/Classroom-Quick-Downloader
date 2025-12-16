@@ -22,6 +22,23 @@ type BucketCounters struct {
 	ByErrorType map[string]int64 `json:"byErrorType"`
 }
 
+// BatchSummary matches the new detailed summary sent by Cloudflare.
+// This is the "1 big JSON" aggregation of the whole batch.
+type BatchSummary struct {
+	Totals       BucketTotals     `json:"totals"`
+	Browsers     map[string]int64 `json:"browsers"`
+	Os           map[string]int64 `json:"os"`
+	Countries    map[string]int64 `json:"countries"`
+	Languages    map[string]int64 `json:"languages"`
+	Versions     map[string]int64 `json:"versions"`
+	Types        map[string]int64 `json:"types"`
+	ErrorReasons map[string]int64 `json:"errorReasons"`
+	TopBrowser   string           `json:"topBrowser"`
+	TopOs        string           `json:"topOs"`
+	TopCountry   string           `json:"topCountry"`
+	TopType      string           `json:"topType"`
+}
+
 // TimeBucket represents one aggregated time bucket (typically one hour).
 // bucketStart/bucketEnd should be RFC3339 (UTC) strings like
 // "2025-12-11T03:00:00Z".
@@ -71,18 +88,18 @@ type DOStateCounters struct {
 // DOState is a compact representation of the DO's current /stats state,
 // included once per batch in OracleBatch.DOState.
 type DOState struct {
-	OK             bool                 `json:"ok"`
-	TotalEvents    int64                `json:"totalEvents"`
-	TotalDownloads int64                `json:"totalDownloads"`
-	TotalSuccess   int64                `json:"totalSuccess"`
-	TotalFail      int64                `json:"totalFail"`
-	PendingEvents  int64                `json:"pendingEvents"`
-	LastEventAt    *int64               `json:"lastEventAt"`
-	LastFlushAt    *int64               `json:"lastFlushAt"`
-	Counters       *DOStateCounters     `json:"counters,omitempty"`
-	RetryState     *DOStateRetry        `json:"retryState,omitempty"`
-	Quota          *DOStateQuota        `json:"quota,omitempty"`
-	EnvSnapshot    *DOStateEnvSnapshot  `json:"envSnapshot,omitempty"`
+	OK             bool                `json:"ok"`
+	TotalEvents    int64               `json:"totalEvents"`
+	TotalDownloads int64               `json:"totalDownloads"`
+	TotalSuccess   int64               `json:"totalSuccess"`
+	TotalFail      int64               `json:"totalFail"`
+	PendingEvents  int64               `json:"pendingEvents"`
+	LastEventAt    *int64              `json:"lastEventAt"`
+	LastFlushAt    *int64              `json:"lastFlushAt"`
+	Counters       *DOStateCounters    `json:"counters,omitempty"`
+	RetryState     *DOStateRetry       `json:"retryState,omitempty"`
+	Quota          *DOStateQuota       `json:"quota,omitempty"`
+	EnvSnapshot    *DOStateEnvSnapshot `json:"envSnapshot,omitempty"`
 }
 
 // OracleBatch is the payload that the Durable Object sends to the Oracle
@@ -93,6 +110,7 @@ type OracleBatch struct {
 	BatchID     string       `json:"batchId"`
 	GeneratedAt int64        `json:"generatedAt"` // unix ms from DO
 	TimeZone    string       `json:"timeZone"`    // e.g. "UTC"
+	Summary     BatchSummary `json:"summary"`     // <--- NEW FIELD
 	TimeBuckets []TimeBucket `json:"timeBuckets"`
 	DOState     DOState      `json:"doState"`
 }

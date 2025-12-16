@@ -179,6 +179,28 @@ export interface TimeBucket {
 }
 
 /**
+ * Detailed summary for the entire batch.
+ * This aggregates all events in the payload into one view.
+ */
+export interface BatchSummary {
+  totals: BucketTotals;
+  // Full breakdowns
+  browsers: Record<string, number>;
+  os: Record<string, number>;
+  countries: Record<string, number>;
+  languages: Record<string, number>;
+  versions: Record<string, number>;
+  types: Record<string, number>;
+  errorReasons: Record<string, number>;
+  
+  // Calculated "Top" stats
+  topBrowser: string;
+  topOs: string;
+  topCountry: string;
+  topType: string;
+}
+
+/**
  * DO state snapshot included in each batch.
  */
 export interface DOStateBatch {
@@ -201,6 +223,10 @@ export interface OracleBatch {
   batchId: string;
   generatedAt: number; // Unix ms
   timeZone: string;
+  
+  // The new detailed summary for the whole batch
+  summary: BatchSummary;
+  
   timeBuckets: TimeBucket[];
   doState: DOStateBatch;
 }

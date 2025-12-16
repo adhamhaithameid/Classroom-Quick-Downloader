@@ -4,7 +4,7 @@ account_id = "fc9538cb362e6266eea89037f6347225"
 compatibility_date = "2024-12-01"
 
 [vars]
-  ORACLE_ENDPOINT = "http://129.151.233.229:8080/"
+  ORACLE_ENDPOINT = "http://129.151.233.229.nip.io:8080"
   MAX_BATCH_EVENTS = "10000"
 
 [[durable_objects.bindings]]
