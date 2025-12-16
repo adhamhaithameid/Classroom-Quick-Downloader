@@ -572,6 +572,26 @@ The `archive-stats` tool uses a **Push Monitor** to "call home" after each succe
 3. If no heartbeat is received within the expected window (24 hours + configurable grace period), Kuma sends an alert.
 4. This catches silent failures like: cron not running, archiver crashes, network issues, or Google Sheets API errors.
 
+**Cron Monitoring Flow:**
+
+```mermaid
+sequenceDiagram
+    participant Cron
+    participant Archiver
+    participant Kuma as Uptime Kuma
+    participant Alert
+
+    Cron->>Archiver: Runs Daily (00:00)
+    alt Success
+        Archiver->>Kuma: Sends "Heartbeat" (HTTP GET)
+        Kuma->>Kuma: Resets 24h Timer 🟢
+    else Failure / Crash
+        Archiver--xKuma: No Signal
+        Kuma->>Kuma: Timer Expires
+        Kuma->>Alert: Sends Notification (Down) 🔴
+    end
+```
+
 ### Deployment
 
 Start the monitoring container with Docker:
