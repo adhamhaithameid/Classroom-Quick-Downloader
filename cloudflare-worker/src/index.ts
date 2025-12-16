@@ -108,7 +108,25 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
 
 async function proxyToDO(request: Request, env: WorkerEnv): Promise<Response> {
   const stub = getDownloadsStub(env);
-  const res = await stub.fetch(request);
+  
+  // Extract country from Cloudflare's incoming request properties
+  const country = (request.cf as any)?.country;
+  
+  // Create a new request based on the original, but with the added header
+  const headers = new Headers(request.headers);
+  if (country) {
+    headers.set("X-Geo-Country", country);
+  }
+
+  // We need to create a new Request object to modify headers locally before fetching the Stub
+  const newReq = new Request(request.url, {
+    method: request.method,
+    headers: headers,
+    body: request.body,
+    redirect: request.redirect,
+  });
+
+  const res = await stub.fetch(newReq);
   return withCors(request, res);
 }
 
