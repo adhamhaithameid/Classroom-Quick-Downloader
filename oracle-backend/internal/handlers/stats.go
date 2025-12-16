@@ -1,4 +1,3 @@
-// oracle-backend/internal/handlers/stats.go
 package handlers
 
 import (
@@ -11,10 +10,12 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	model "oracle-backend/internal/model"
 )
 
 // ---------------------------------------------------------------------------
-// Structs for Summary / Dashboard / Archiver
+// Structs
 // ---------------------------------------------------------------------------
 
 type summaryBatchInfo struct {
@@ -44,51 +45,40 @@ type summaryDOStateInfo struct {
 	MaxBatchEvents      int64  `json:"maxBatchEvents"`
 }
 
-// totalsStruct matches the { "totals": { ... } } structure expected by the Archiver
-type totalsStruct struct {
-	TotalEvents    int64 `json:"totalEvents"`
-	TotalDownloads int64 `json:"totalDownloads"`
-	TotalSuccess   int64 `json:"totalSuccess"`
-	TotalFail      int64 `json:"totalFail"`
-}
-
+// SummaryResponse is the "Master Struct"
+// It contains fields for the Dashboard (Status, Flags, Rates)
+// AND fields for the Archiver (Browsers, Os, Countries maps)
 type summaryResponse struct {
-	OK          bool     `json:"ok"`
-	GeneratedAt int64    `json:"generatedAt"`
-	Status      string   `json:"status"`
-	Flags       []string `json:"flags"`
+	// --- Dashboard Fields ---
+	OK             bool                `json:"ok"`
+	GeneratedAt    int64               `json:"generatedAt"`
+	Status         string              `json:"status"`
+	Flags          []string            `json:"flags"`
+	TotalDownloads int64               `json:"totalDownloads"`
+	TotalSuccess   int64               `json:"totalSuccess"`
+	TotalFail      int64               `json:"totalFail"`
+	SuccessRate    float64             `json:"successRate"`
+	FailRate       float64             `json:"failRate"`
+	LastBatch      *summaryBatchInfo   `json:"lastBatch,omitempty"`
+	DOState        *summaryDOStateInfo `json:"doState,omitempty"`
 
-	// Nested totals object for Archiver compatibility
-	Totals totalsStruct `json:"totals"`
-
-	// Flat fields for Dashboard compatibility
-	TotalDownloads int64   `json:"totalDownloads"`
-	TotalSuccess   int64   `json:"totalSuccess"`
-	TotalFail      int64   `json:"totalFail"`
-	SuccessRate    float64 `json:"successRate"`
-	FailRate       float64 `json:"failRate"`
-
-	// Detailed Maps for Archiver (The "Big JSON" data)
-	Browsers     map[string]int64 `json:"browsers"`
-	Os           map[string]int64 `json:"os"`
-	Countries    map[string]int64 `json:"countries"`
-	Languages    map[string]int64 `json:"languages"`
-	Versions     map[string]int64 `json:"versions"`
-	Types        map[string]int64 `json:"types"`
-	ErrorReasons map[string]int64 `json:"errorReasons"`
-
-	// Top Stats
-	TopBrowser string `json:"topBrowser"`
-	TopOs      string `json:"topOs"`
-	TopCountry string `json:"topCountry"`
-	TopType    string `json:"topType"`
-
-	LastBatch *summaryBatchInfo   `json:"lastBatch,omitempty"`
-	DOState   *summaryDOStateInfo `json:"doState,omitempty"`
+	// --- Archiver Fields (Detailed Data) ---
+	Totals       model.BucketTotals `json:"totals"` // Nested totals object for Archiver
+	Browsers     map[string]int64   `json:"browsers"`
+	Os           map[string]int64   `json:"os"`
+	Countries    map[string]int64   `json:"countries"`
+	Languages    map[string]int64   `json:"languages"`
+	Versions     map[string]int64   `json:"versions"`
+	Types        map[string]int64   `json:"types"`
+	ErrorReasons map[string]int64   `json:"errorReasons"`
+	TopBrowser   string             `json:"topBrowser"`
+	TopOs        string             `json:"topOs"`
+	TopCountry   string             `json:"topCountry"`
+	TopType      string             `json:"topType"`
 }
 
 // ---------------------------------------------------------------------------
-// 1. Summary Handler (Dashboard + Archiver)
+// 1. Summary Handler (Merged Logic)
 // ---------------------------------------------------------------------------
 
 func SummaryHandler(db *sql.DB) http.HandlerFunc {
@@ -99,14 +89,7 @@ func SummaryHandler(db *sql.DB) http.HandlerFunc {
 		}
 		ctx := r.Context()
 
-		// 1. Load all raw key-values from downloads_totals
-		rawTotals, err := loadTotals(ctx, db)
-		if err != nil {
-			http.Error(w, "failed to load totals: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		// 2. Parse raw totals into specific maps and counts
+		// Initialize maps
 		resp := summaryResponse{
 			Browsers:     make(map[string]int64),
 			Os:           make(map[string]int64),
@@ -117,22 +100,30 @@ func SummaryHandler(db *sql.DB) http.HandlerFunc {
 			ErrorReasons: make(map[string]int64),
 		}
 
+		// 1. Load Totals from DB
+		rawTotals, err := loadTotals(ctx, db)
+		if err != nil {
+			http.Error(w, "failed to load totals: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// 2. Parse Raw Totals into Structs (for both Dashboard and Archiver)
 		for key, val := range rawTotals {
 			switch {
-			// Global Counters
+			// Global Counts
 			case key == "totalEvents":
 				resp.Totals.TotalEvents = val
 			case key == "totalDownloads":
 				resp.Totals.TotalDownloads = val
-				resp.TotalDownloads = val // For Dashboard
+				resp.TotalDownloads = val // Flat field for Dashboard
 			case key == "totalSuccess":
 				resp.Totals.TotalSuccess = val
-				resp.TotalSuccess = val // For Dashboard
+				resp.TotalSuccess = val // Flat field for Dashboard
 			case key == "totalFail":
 				resp.Totals.TotalFail = val
-				resp.TotalFail = val // For Dashboard
+				resp.TotalFail = val // Flat field for Dashboard
 
-			// Breakdowns
+			// Breakdowns (Parsing "prefix:value" keys)
 			case strings.HasPrefix(key, "browser:"):
 				resp.Browsers[strings.TrimPrefix(key, "browser:")] = val
 			case strings.HasPrefix(key, "os:"):
@@ -156,13 +147,13 @@ func SummaryHandler(db *sql.DB) http.HandlerFunc {
 			resp.FailRate = float64(resp.TotalFail) / float64(resp.TotalDownloads)
 		}
 
-		// 4. Calculate Tops
+		// 4. Calculate Top Stats
 		resp.TopBrowser = getTopKey(resp.Browsers)
 		resp.TopOs = getTopKey(resp.Os)
 		resp.TopCountry = getTopKey(resp.Countries)
 		resp.TopType = getTopKey(resp.Types)
 
-		// 5. Load Metadata (LastBatch / DOState) for Dashboard Status
+		// 5. Load Metadata (Last Batch & DO State) for Dashboard Status
 		lastBatch, err := loadLastBatch(ctx, db)
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			http.Error(w, "failed to load batch info: "+err.Error(), http.StatusInternalServerError)
@@ -177,7 +168,7 @@ func SummaryHandler(db *sql.DB) http.HandlerFunc {
 		}
 		resp.DOState = doSnapshot
 
-		// 6. Derive Status
+		// 6. Derive Status Flags
 		status, flags := deriveStatusAndFlags(lastBatch, doSnapshot)
 		resp.Status = status
 		resp.Flags = flags
@@ -256,7 +247,6 @@ func TimeSeriesHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		fromIso := fromTime.UTC().Format(time.RFC3339)
-		// Add 1 day to include full "to" date.
 		toIso := toTime.AddDate(0, 0, 1).UTC().Format(time.RFC3339)
 
 		var points []timeSeriesPoint
@@ -438,53 +428,53 @@ func ComparisonHandler(db *sql.DB) http.HandlerFunc {
 		to1, err := time.Parse("2006-01-02", to1Str)
 		if err != nil {
 			http.Error(w, "invalid to1", http.StatusBadRequest)
-            return
-        }
-        from2, err := time.Parse("2006-01-02", from2Str)
-        if err != nil {
-            http.Error(w, "invalid from2", http.StatusBadRequest)
-            return
-        }
-        to2, err := time.Parse("2006-01-02", to2Str)
-        if err != nil {
-            http.Error(w, "invalid to2", http.StatusBadRequest)
-            return
-        }
+			return
+		}
+		from2, err := time.Parse("2006-01-02", from2Str)
+		if err != nil {
+			http.Error(w, "invalid from2", http.StatusBadRequest)
+			return
+		}
+		to2, err := time.Parse("2006-01-02", to2Str)
+		if err != nil {
+			http.Error(w, "invalid to2", http.StatusBadRequest)
+			return
+		}
 
-        // Query both periods
-        p1, err := queryPeriodTotals(ctx, db, from1, to1)
-        if err != nil {
-            http.Error(w, "failed to query period1: "+err.Error(), http.StatusInternalServerError)
-            return
-        }
-        p1.From = from1Str
-        p1.To = to1Str
+		// Query both periods
+		p1, err := queryPeriodTotals(ctx, db, from1, to1)
+		if err != nil {
+			http.Error(w, "failed to query period1: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		p1.From = from1Str
+		p1.To = to1Str
 
-        p2, err := queryPeriodTotals(ctx, db, from2, to2)
-        if err != nil {
-            http.Error(w, "failed to query period2: "+err.Error(), http.StatusInternalServerError)
-            return
-        }
-        p2.From = from2Str
-        p2.To = to2Str
+		p2, err := queryPeriodTotals(ctx, db, from2, to2)
+		if err != nil {
+			http.Error(w, "failed to query period2: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		p2.From = from2Str
+		p2.To = to2Str
 
-        // Calculate change percentages
-        change := comparisonChange{
-            Downloads: calcChange(p1.Downloads, p2.Downloads),
-            Success:   calcChange(p1.Success, p2.Success),
-            Fail:      calcChange(p1.Fail, p2.Fail),
-        }
+		// Calculate change percentages
+		change := comparisonChange{
+			Downloads: calcChange(p1.Downloads, p2.Downloads),
+			Success:   calcChange(p1.Success, p2.Success),
+			Fail:      calcChange(p1.Fail, p2.Fail),
+		}
 
-        resp := comparisonResponse{
-            OK:      true,
-            Period1: p1,
-            Period2: p2,
-            Change:  change,
-        }
+		resp := comparisonResponse{
+			OK:      true,
+			Period1: p1,
+			Period2: p2,
+			Change:  change,
+		}
 
-        w.Header().Set("Content-Type", "application/json")
-        _ = json.NewEncoder(w).Encode(resp)
-    }
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -492,103 +482,103 @@ func ComparisonHandler(db *sql.DB) http.HandlerFunc {
 // ---------------------------------------------------------------------------
 
 func ExportHandler(db *sql.DB) http.HandlerFunc {
-    return func(w http.ResponseWriter, r *http.Request) {
-        if r.Method != http.MethodGet {
-            w.WriteHeader(http.StatusMethodNotAllowed)
-            return
-        }
-        ctx := r.Context()
-        q := r.URL.Query()
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		ctx := r.Context()
+		q := r.URL.Query()
 
-        format := q.Get("format")
-        if format == "" {
-            format = "json"
-        }
+		format := q.Get("format")
+		if format == "" {
+			format = "json"
+		}
 
-        gran := q.Get("granularity")
-        if gran == "" {
-            gran = "day"
-        }
+		gran := q.Get("granularity")
+		if gran == "" {
+			gran = "day"
+		}
 
-        now := time.Now().UTC()
-        fromStr := q.Get("from")
-        toStr := q.Get("to")
+		now := time.Now().UTC()
+		fromStr := q.Get("from")
+		toStr := q.Get("to")
 
-        var fromTime, toTime time.Time
-        var err error
+		var fromTime, toTime time.Time
+		var err error
 
-        if fromStr == "" {
-            fromTime = now.AddDate(0, 0, -30)
-        } else {
-            fromTime, err = time.Parse("2006-01-02", fromStr)
-            if err != nil {
-                http.Error(w, "invalid from", http.StatusBadRequest)
-                return
-            }
-        }
+		if fromStr == "" {
+			fromTime = now.AddDate(0, 0, -30)
+		} else {
+			fromTime, err = time.Parse("2006-01-02", fromStr)
+			if err != nil {
+				http.Error(w, "invalid from", http.StatusBadRequest)
+				return
+			}
+		}
 
-        if toStr == "" {
-            toTime = now
-        } else {
-            toTime, err = time.Parse("2006-01-02", toStr)
-            if err != nil {
-                http.Error(w, "invalid to", http.StatusBadRequest)
-                return
-            }
-        }
+		if toStr == "" {
+			toTime = now
+		} else {
+			toTime, err = time.Parse("2006-01-02", toStr)
+			if err != nil {
+				http.Error(w, "invalid to", http.StatusBadRequest)
+				return
+			}
+		}
 
-        fromIso := fromTime.UTC().Format(time.RFC3339)
-        toIso := toTime.AddDate(0, 0, 1).UTC().Format(time.RFC3339)
+		fromIso := fromTime.UTC().Format(time.RFC3339)
+		toIso := toTime.AddDate(0, 0, 1).UTC().Format(time.RFC3339)
 
-        var points []timeSeriesPoint
-        switch gran {
-        case "hour":
-            points, err = queryTimeSeriesHour(ctx, db, fromIso, toIso)
-        case "day":
-            points, err = queryTimeSeriesDay(ctx, db, fromIso, toIso)
-        default:
-            http.Error(w, "invalid granularity", http.StatusBadRequest)
-            return
-        }
+		var points []timeSeriesPoint
+		switch gran {
+		case "hour":
+			points, err = queryTimeSeriesHour(ctx, db, fromIso, toIso)
+		case "day":
+			points, err = queryTimeSeriesDay(ctx, db, fromIso, toIso)
+		default:
+			http.Error(w, "invalid granularity", http.StatusBadRequest)
+			return
+		}
 
-        if err != nil {
-            http.Error(w, "failed to query data: "+err.Error(), http.StatusInternalServerError)
-            return
-        }
+		if err != nil {
+			http.Error(w, "failed to query data: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
 
-        if format == "csv" {
-            filename := "cqd_analytics_" + fromTime.Format("2006-01-02") + "_to_" + toTime.Format("2006-01-02") + ".csv"
-            w.Header().Set("Content-Type", "text/csv")
-            w.Header().Set("Content-Disposition", "attachment; filename=\""+filename+"\"")
+		if format == "csv" {
+			filename := "cqd_analytics_" + fromTime.Format("2006-01-02") + "_to_" + toTime.Format("2006-01-02") + ".csv"
+			w.Header().Set("Content-Type", "text/csv")
+			w.Header().Set("Content-Disposition", "attachment; filename=\""+filename+"\"")
 
-            // Write CSV header + rows
-            _, _ = w.Write([]byte("Timestamp,Downloads,Success,Fail,SuccessRate\n"))
-            for _, p := range points {
-                rate := "0%"
-                if p.Downloads > 0 {
-                    rate = strconv.FormatFloat(p.SuccessRate*100, 'f', 1, 64) + "%"
-                }
-                line := p.Timestamp + "," +
-                    strconv.FormatInt(p.Downloads, 10) + "," +
-                    strconv.FormatInt(p.Success, 10) + "," +
-                    strconv.FormatInt(p.Fail, 10) + "," +
-                    rate + "\n"
-                _, _ = w.Write([]byte(line))
-            }
-            return
-        }
+			// Write CSV header + rows
+			_, _ = w.Write([]byte("Timestamp,Downloads,Success,Fail,SuccessRate\n"))
+			for _, p := range points {
+				rate := "0%"
+				if p.Downloads > 0 {
+					rate = strconv.FormatFloat(p.SuccessRate*100, 'f', 1, 64) + "%"
+				}
+				line := p.Timestamp + "," +
+					strconv.FormatInt(p.Downloads, 10) + "," +
+					strconv.FormatInt(p.Success, 10) + "," +
+					strconv.FormatInt(p.Fail, 10) + "," +
+					rate + "\n"
+				_, _ = w.Write([]byte(line))
+			}
+			return
+		}
 
-        // Default: JSON
-        w.Header().Set("Content-Type", "application/json")
-        _ = json.NewEncoder(w).Encode(map[string]interface{}{
-            "ok":          true,
-            "granularity": gran,
-            "from":        fromTime.Format("2006-01-02"),
-            "to":          toTime.Format("2006-01-02"),
-            "totalRows":   len(points),
-            "data":        points,
-        })
-    }
+		// Default: JSON
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"ok":          true,
+			"granularity": gran,
+			"from":        fromTime.Format("2006-01-02"),
+			"to":          toTime.Format("2006-01-02"),
+			"totalRows":   len(points),
+			"data":        points,
+		})
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -596,49 +586,49 @@ func ExportHandler(db *sql.DB) http.HandlerFunc {
 // ---------------------------------------------------------------------------
 
 func loadTotals(ctx context.Context, db *sql.DB) (map[string]int64, error) {
-    rows, err := db.QueryContext(ctx, `SELECT key, value FROM downloads_totals`)
-    if err != nil {
-        return nil, err
-    }
-    defer rows.Close()
+	rows, err := db.QueryContext(ctx, `SELECT key, value FROM downloads_totals`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
 
-    out := make(map[string]int64)
-    for rows.Next() {
-        var key string
-        var v int64
-        if err := rows.Scan(&key, &v); err != nil {
-            return nil, err
-        }
-        out[key] = v
-    }
-    return out, rows.Err()
+	out := make(map[string]int64)
+	for rows.Next() {
+		var key string
+		var v int64
+		if err := rows.Scan(&key, &v); err != nil {
+			return nil, err
+		}
+		out[key] = v
+	}
+	return out, rows.Err()
 }
 
 func loadLastBatch(ctx context.Context, db *sql.DB) (*summaryBatchInfo, error) {
-    row := db.QueryRowContext(ctx, `
+	row := db.QueryRowContext(ctx, `
         SELECT batch_id, generated_at, ingested_at, events_count,
                downloads_count, success_count, fail_count
         FROM batches
         ORDER BY ingested_at DESC
         LIMIT 1
     `)
-    var b summaryBatchInfo
-    if err := row.Scan(
-        &b.BatchID,
-        &b.GeneratedAt,
-        &b.IngestedAt,
-        &b.EventsCount,
-        &b.DownloadsCount,
-        &b.SuccessCount,
-        &b.FailCount,
-    ); err != nil {
-        return nil, err
-    }
-    return &b, nil
+	var b summaryBatchInfo
+	if err := row.Scan(
+		&b.BatchID,
+		&b.GeneratedAt,
+		&b.IngestedAt,
+		&b.EventsCount,
+		&b.DownloadsCount,
+		&b.SuccessCount,
+		&b.FailCount,
+	); err != nil {
+		return nil, err
+	}
+	return &b, nil
 }
 
 func loadLastDOSnapshot(ctx context.Context, db *sql.DB) (*summaryDOStateInfo, error) {
-    row := db.QueryRowContext(ctx, `
+	row := db.QueryRowContext(ctx, `
         SELECT
             captured_at,
             total_events,
@@ -659,40 +649,40 @@ func loadLastDOSnapshot(ctx context.Context, db *sql.DB) (*summaryDOStateInfo, e
         LIMIT 1
     `)
 
-    var (
-        capturedAt   int64
-        totalEvents  sql.NullInt64
-        totalDown    sql.NullInt64
-        totalSucc    sql.NullInt64
-        totalFail    sql.NullInt64
-        pending      sql.NullInt64
-        lastEventAt  sql.NullInt64
-        lastFlushAt  sql.NullInt64
-        reqToday     sql.NullInt64
-        quotaLevel   sql.NullString
-        modeLabel    sql.NullString
-        remote       sql.NullInt64
-        batchSizeSug sql.NullInt64
-        maxBatch     sql.NullInt64
-    )
+	var (
+		capturedAt   int64
+		totalEvents  sql.NullInt64
+		totalDown    sql.NullInt64
+		totalSucc    sql.NullInt64
+		totalFail    sql.NullInt64
+		pending      sql.NullInt64
+		lastEventAt  sql.NullInt64
+		lastFlushAt  sql.NullInt64
+		reqToday     sql.NullInt64
+		quotaLevel   sql.NullString
+		modeLabel    sql.NullString
+		remote       sql.NullInt64
+		batchSizeSug sql.NullInt64
+		maxBatch     sql.NullInt64
+	)
 
-    if err := row.Scan(
-        &capturedAt,
-        &totalEvents,
-        &totalDown,
-        &totalSucc,
-        &totalFail,
-        &pending,
-        &lastEventAt,
-        &lastFlushAt,
-        &reqToday,
-        &quotaLevel,
-        &modeLabel,
-        &remote,
-        &batchSizeSug,
-        &maxBatch,
-    ); err != nil {
-        return nil, err
+	if err := row.Scan(
+		&capturedAt,
+		&totalEvents,
+		&totalDown,
+		&totalSucc,
+		&totalFail,
+		&pending,
+		&lastEventAt,
+		&lastFlushAt,
+		&reqToday,
+		&quotaLevel,
+		&modeLabel,
+		&remote,
+		&batchSizeSug,
+		&maxBatch,
+	); err != nil {
+		return nil, err
     }
 
     resp := &summaryDOStateInfo{
