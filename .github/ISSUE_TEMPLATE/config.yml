@@ -1,4 +1,4 @@
-blank_issues_enabled: false  # Stops people from clicking "New Issue" and writing nonsense
+blank_issues_enabled: true  # Stops people from clicking "New Issue" and writing nonsense
 contact_links:
   - name: 📝 Submit Feedback / Feature Request
     url: https://docs.google.com/forms/d/1nB95r35O_h98odg8Y6_OrfYdjKGBqhrUCb_wFHA-RA8/edit
