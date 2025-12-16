@@ -29,3 +29,4 @@ oracle-backend/docker_data/
 *.db-shm
 *.db-wal
 .dev.vars
+google-credentials.json

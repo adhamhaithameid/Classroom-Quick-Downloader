@@ -17,6 +17,7 @@ COPY . .
 # Use TARGETARCH from Docker buildx (defaults to amd64 if not set, but we want flexibility)
 ARG TARGETARCH=arm64
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build -ldflags="-s -w" -o oracle-backend ./cmd/app
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build -ldflags="-s -w" -o archiver ./cmd/archiver
 
 # -------------------------------------------
 # Production image
@@ -33,6 +34,7 @@ WORKDIR /app
 
 # Copy binary and static files
 COPY --from=builder /app/oracle-backend .
+COPY --from=builder /app/archiver .
 COPY --from=builder /app/static ./static
 
 # Create data directory for SQLite
