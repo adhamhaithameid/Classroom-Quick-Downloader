@@ -1,4 +1,3 @@
-// oracle-backend/cmd/archiver/main.go
 package main
 
 import (
@@ -9,6 +8,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sort"
+	"strings"
 	"time"
 
 	"golang.org/x/oauth2/google"
@@ -16,22 +17,29 @@ import (
 	"google.golang.org/api/sheets/v4"
 )
 
-// SummaryResponse matches the JSON structure from /api/stats/summary
+// SummaryResponse matches the FULL JSON structure from your backend
 type SummaryResponse struct {
-	TotalDownloads int64 `json:"totalDownloads"`
-	TotalSuccess   int64 `json:"totalSuccess"`
-	TotalFail      int64 `json:"totalFail"`
-	Totals         struct {
-		BrowserChrome  int64 `json:"browser:chrome"`
-		BrowserFirefox int64 `json:"browser:firefox"`
-		BrowserEdge    int64 `json:"browser:edge"`
-		BrowserSafari  int64 `json:"browser:safari"`
-		OSMac          int64 `json:"os:mac"`
-		OSWin          int64 `json:"os:win"`
-		OSLinux        int64 `json:"os:linux"`
-		OSAndroid      int64 `json:"os:android"`
-		OSiOS          int64 `json:"os:ios"`
+	Totals struct {
+		TotalEvents    int64 `json:"totalEvents"`
+		TotalDownloads int64 `json:"totalDownloads"`
+		TotalSuccess   int64 `json:"totalSuccess"`
+		TotalFail      int64 `json:"totalFail"`
 	} `json:"totals"`
+
+	// Dimensional maps
+	Browsers     map[string]int64 `json:"browsers"`
+	Os           map[string]int64 `json:"os"`
+	Countries    map[string]int64 `json:"countries"`
+	Languages    map[string]int64 `json:"languages"`
+	Versions     map[string]int64 `json:"versions"`
+	Types        map[string]int64 `json:"types"`
+	ErrorReasons map[string]int64 `json:"errorReasons"`
+
+	// Top stats
+	TopBrowser string `json:"topBrowser"`
+	TopOs      string `json:"topOs"`
+	TopCountry string `json:"topCountry"`
+	TopType    string `json:"topType"`
 }
 
 func main() {
@@ -44,7 +52,7 @@ func main() {
 		log.Fatal("Please provide a --sheet ID")
 	}
 
-	// 1. Fetch Stats from Local Backend
+	// 1. Fetch Stats
 	log.Printf("Fetching stats from %s...", *apiURL)
 	resp, err := http.Get(*apiURL)
 	if err != nil {
@@ -57,24 +65,50 @@ func main() {
 		log.Fatalf("Failed to decode JSON: %v", err)
 	}
 
-	// 2. Prepare the Row Data
-	// Format: Date, Downloads, Success, Fail, Chrome, Firefox, Edge, Safari, Win, Mac, Linux
+	// 2. Prepare Data
 	today := time.Now().Format("2006-01-02")
-	row := []interface{}{
-		today,
-		data.TotalDownloads,
-		data.TotalSuccess,
-		data.TotalFail,
-		data.Totals.BrowserChrome,
-		data.Totals.BrowserFirefox,
-		data.Totals.BrowserEdge,
-		data.Totals.BrowserSafari,
-		data.Totals.OSWin,
-		data.Totals.OSMac,
-		data.Totals.OSLinux,
+	
+	// Helper to format map as readable string
+	formatMap := func(m map[string]int64) string {
+		var parts []string
+		for k, v := range m {
+			parts = append(parts, fmt.Sprintf("%s: %d", k, v))
+		}
+		sort.Strings(parts)
+		return strings.Join(parts, "\n") 
 	}
 
-	// 3. Authenticate with Google
+	// Calculate Success Rate
+	successRate := 0.0
+	if data.Totals.TotalDownloads > 0 {
+		successRate = float64(data.Totals.TotalSuccess) / float64(data.Totals.TotalDownloads) * 100
+	}
+
+	// 3. Build the "Everything" Row
+	row := []interface{}{
+		today,                                // A: Date
+		data.Totals.TotalDownloads,           // B: Total Downloads
+		data.Totals.TotalSuccess,             // C: Success Count
+		data.Totals.TotalFail,                // D: Fail Count
+		fmt.Sprintf("%.2f%%", successRate),   // E: Success Rate
+		
+		// Top Stats
+		data.TopBrowser,                      // F: Top Browser
+		data.TopOs,                           // G: Top OS
+		data.TopCountry,                      // H: Top Country
+		data.TopType,                         // I: Top File Type
+		
+		// Full Data Dumps
+		formatMap(data.Browsers),             // J: All Browsers
+		formatMap(data.Os),                   // K: All OS
+		formatMap(data.Countries),            // L: All Countries
+		formatMap(data.Languages),            // M: All Languages
+		formatMap(data.Types),                // N: All File Types
+		formatMap(data.ErrorReasons),         // O: All Errors
+		formatMap(data.Versions),             // P: Extension Versions
+	}
+
+	// 4. Send to Google
 	ctx := context.Background()
 	b, err := os.ReadFile(*credsPath)
 	if err != nil {
@@ -92,16 +126,15 @@ func main() {
 		log.Fatalf("Unable to retrieve Sheets client: %v", err)
 	}
 
-	// 4. Append to Sheet
-	rangeData := "Sheet1!A1" // Appends to the end of the sheet automatically
+	rangeData := "Sheet1!A1"
 	rb := &sheets.ValueRange{
 		Values: [][]interface{}{row},
 	}
 
-	_, err = srv.Spreadsheets.Values.Append(*sheetID, rangeData, rb).ValueInputOption("RAW").Do()
+	_, err = srv.Spreadsheets.Values.Append(*sheetID, rangeData, rb).ValueInputOption("USER_ENTERED").Do()
 	if err != nil {
 		log.Fatalf("Unable to append data to sheet: %v", err)
 	}
 
-	log.Printf("Successfully archived stats for %s", today)
+	log.Printf("Successfully archived FULL stats for %s", today)
 }

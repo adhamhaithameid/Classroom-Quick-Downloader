@@ -359,11 +359,13 @@ export class DownloadsDurable {
     this.ensureRequestDay();
     this.d.reqCountToday += 1;
 
-    // --- NEW: derive country from Cloudflare geo (if available) ---
-    const cf = (request as any).cf as { country?: string } | undefined;
+    // --- NEW: derive country from custom header passed by Worker ---
+    // The "cf" object is lost in DO fetch, so we look for X-Geo-Country
+    const countryHeader = request.headers.get("X-Geo-Country");
+
     const countryFromRequest =
-      cf && typeof cf.country === "string" && cf.country.length > 0
-        ? cf.country // e.g. "EG", "US"
+      countryHeader && countryHeader.length > 0
+        ? countryHeader // e.g. "EG", "US"
         : undefined;
 
     let body: { events?: StoredEvent[] } | null = null;
