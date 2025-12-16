@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    # We still need to install dependencies first
+    - name: Install Dependencies
+      run: |
+        cd cloudflare-worker
+        npm ci
+
+    # Make sure the script is executable (Linux permissions)
+    - name: Make Script Executable
+      run: chmod +x tools/validate.sh
+
+    # Run the exact same script you use locally
+    - name: Run Full Validation Suite
+      run: ./tools/validate.sh

@@ -73,7 +73,8 @@ const MAX_RETRY = 5;
 
 /**
  * Step 1: remote sending is enabled with your Worker URL.
- * (You can later switch this to an env variable via Vite.)
+ * For LOCAL TESTING: use http://localhost:8787/track
+ * For PRODUCTION: use https://cqd-analytics.adhamhaithameid.workers.dev/track
  */
 const WORKER_URL =
   'https://cqd-analytics.adhamhaithameid.workers.dev/track';

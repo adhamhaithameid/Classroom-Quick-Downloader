@@ -41,6 +41,10 @@ type DurableStateShape = {
 
   // Buffered events waiting to be flushed to Oracle
   buffer: StoredEvent[];
+  
+  // Monotonically increasing batch sequence number for stable batchId across retries
+  // Only incremented after successful flush to Oracle
+  batchSeq: number;
 };
 
 const DEFAULT_COUNTERS: Counters = {
@@ -191,6 +195,7 @@ export class DownloadsDurable {
       hardRemoteOff: false,
 
       buffer: [],
+      batchSeq: 0,
     };
 
     if (!stored) {
@@ -229,6 +234,7 @@ export class DownloadsDurable {
       hardRemoteOff: stored.hardRemoteOff ?? false,
 
       buffer: Array.isArray(stored.buffer) ? stored.buffer : [],
+      batchSeq: stored.batchSeq ?? 0,
     };
   }
 
@@ -295,10 +301,18 @@ export class DownloadsDurable {
     }
 
     if (pathname === "/debug/flush" && request.method === "POST") {
+      // Require admin auth for debug endpoints
+      if (!this.isAuthorizedAdmin(request)) {
+        return json({ ok: false, error: "unauthorized" }, { status: 401 });
+      }
       return this.handleDebugFlush();
     }
 
     if (pathname === "/debug/reset" && request.method === "POST") {
+      // Require admin auth for debug endpoints
+      if (!this.isAuthorizedAdmin(request)) {
+        return json({ ok: false, error: "unauthorized" }, { status: 401 });
+      }
       return this.handleDebugReset();
     }
 
@@ -358,13 +372,28 @@ export class DownloadsDurable {
       return json({ ok: true, accepted: 0 }, { status: 202 });
     }
 
+    // Input validation: cap events per request to prevent abuse
+    const MAX_EVENTS_PER_REQUEST = 500;
+    const MAX_BUFFER_SIZE = 50_000;
+    
+    if (events.length > MAX_EVENTS_PER_REQUEST) {
+      return json({ ok: false, error: "too_many_events", max: MAX_EVENTS_PER_REQUEST }, { status: 400 });
+    }
+    
+    // Prevent buffer from growing too large (drop request if at limit)
+    if (this.d.buffer.length >= MAX_BUFFER_SIZE) {
+      return json({ ok: false, error: "buffer_full", bufferSize: this.d.buffer.length }, { status: 503 });
+    }
+
     // Append to buffer + update counters
     for (const ev of events) {
       this.d.buffer.push(ev);
       this.d.totalEvents += 1;
+      
+      // totalDownloads = all download attempts (success + fail)
+      this.d.totalDownloads += 1;
 
       if (ev.status === "success") {
-        this.d.totalDownloads += 1;
         this.d.totalSuccess += 1;
       } else {
         this.d.totalFail += 1;
@@ -506,6 +535,7 @@ export class DownloadsDurable {
       reqCountDate: today,
       hardRemoteOff: false,
       buffer: [],
+      batchSeq: 0,
     };
     await this.state.storage.delete(STORAGE_KEY);
     await this.state.storage.deleteAlarm();
@@ -686,8 +716,9 @@ export class DownloadsDurable {
       },
     };
 
-    // Generate unique batch ID
-    const batchId = `do-${now}-${Math.random().toString(36).slice(2, 8)}`;
+    // Generate stable batch ID using sequence number (doesn't change on retry)
+    // batchSeq is only incremented after successful flush
+    const batchId = `do-seq${this.d.batchSeq}-${events.length}ev`;
 
     return {
       batchId,
@@ -718,8 +749,10 @@ export class DownloadsDurable {
     };
 
     for (const ev of events) {
+      // totalDownloads = all download attempts (success + fail)
+      totals.totalDownloads++;
+      
       if (ev.status === "success") {
-        totals.totalDownloads++;
         totals.totalSuccess++;
       } else {
         totals.totalFail++;
@@ -823,13 +856,14 @@ export class DownloadsDurable {
         return { ok: false, sent: 0, error: msg };
       }
 
-      // Success: drop the sent events
+      // Success: drop the sent events and increment batch sequence
       this.d.buffer = this.d.buffer.slice(eventsToFlush.length);
       this.d.pendingEvents = Math.max(
         0,
         this.d.pendingEvents - eventsToFlush.length,
       );
       this.d.lastFlushAt = now;
+      this.d.batchSeq += 1; // Increment so next batch gets new ID
       this.d.retryState = { ...DEFAULT_RETRY_STATE };
       await this.state.storage.deleteAlarm();
       await this.persist();
