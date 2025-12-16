@@ -526,6 +526,107 @@ docker cp cqd-oracle-backend:/data/analytics.db ./backup-$(date +%Y%m%d).db
 
 ---
 
+## 📡 System Monitoring & Alerting
+
+We use **Uptime Kuma** for self-hosted infrastructure monitoring. It runs on the same Oracle VM as the backend, providing 24/7 uptime tracking and instant alerts when something goes wrong.
+
+### Tooling
+
+| Component | Details |
+|-----------|---------|
+| **Software** | [Uptime Kuma](https://github.com/louislam/uptime-kuma) |
+| **Deployment** | Docker container on Oracle VM |
+| **Port** | `3001` |
+
+### Monitors
+
+We monitor three critical components of the CQD analytics pipeline:
+
+| Monitor | Type | Endpoint | Purpose |
+|---------|------|----------|---------|
+| **Cloudflare Edge** | HTTP(S) | `https://cqd-analytics.*.workers.dev/health` | Verifies the Worker is responding and can route requests to the Durable Object |
+| **Backend API** | HTTP | `GET /health` | Checks the Go server is running and accepting connections |
+| **SQLite Database** | HTTP | `GET /health/db` | Verifies database read access and checks for lock contention issues |
+
+### Cron Monitoring (Push Monitor)
+
+The `archive-stats` tool uses a **Push Monitor** to "call home" after each successful run:
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│                         CRON JOB                               │
+│   0 0 * * * /app/archiver --sheet "..." && curl <push-url>    │
+└──────────────────────────────┬─────────────────────────────────┘
+                               │
+                               ▼ (on success)
+┌────────────────────────────────────────────────────────────────┐
+│                      UPTIME KUMA                               │
+│   Push Monitor expects a "heartbeat" within 24h + grace period │
+│   If no heartbeat → Alert triggered!                           │
+└────────────────────────────────────────────────────────────────┘
+```
+
+**How it works:**
+1. The cron job runs the archiver tool daily.
+2. If the archiver succeeds, it curls the Uptime Kuma push URL.
+3. If no heartbeat is received within the expected window (24 hours + configurable grace period), Kuma sends an alert.
+4. This catches silent failures like: cron not running, archiver crashes, network issues, or Google Sheets API errors.
+
+**Cron Monitoring Flow:**
+
+```mermaid
+sequenceDiagram
+    participant Cron
+    participant Archiver
+    participant Kuma as Uptime Kuma
+    participant Alert
+
+    Cron->>Archiver: Runs Daily (00:00)
+    alt Success
+        Archiver->>Kuma: Sends "Heartbeat" (HTTP GET)
+        Kuma->>Kuma: Resets 24h Timer 🟢
+    else Failure / Crash
+        Archiver--xKuma: No Signal
+        Kuma->>Kuma: Timer Expires
+        Kuma->>Alert: Sends Notification (Down) 🔴
+    end
+```
+
+### Deployment
+
+Start the monitoring container with Docker:
+
+```bash
+docker run -d \
+  --restart=always \
+  -p 3001:3001 \
+  -v uptime-kuma:/app/data \
+  --name uptime-kuma \
+  louislam/uptime-kuma:latest
+```
+
+**Key flags:**
+- `--restart=always` — Auto-restart on VM reboot
+- `-v uptime-kuma:/app/data` — Persist configuration and history
+- `-p 3001:3001` — Expose web dashboard
+
+### Public Status Page
+
+A public status page is available for users to check system health without authentication:
+
+```
+http://<your-vm-ip>:3001/status/cqd
+```
+
+This page shows:
+- Current status of all monitors (up/down)
+- Uptime percentages (24h, 7d, 30d)
+- Incident history
+
+> **Tip:** Share this status page URL in your extension's support documentation so users can self-diagnose outage issues.
+
+---
+
 ## 🚨 Troubleshooting
 
 ### 401 Unauthorized on `/ingest-batch`

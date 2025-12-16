@@ -25,6 +25,12 @@
 ![License](https://img.shields.io/badge/License-MIT-blue)
 ![PRs Welcome](https://img.shields.io/badge/PRs-Welcome-brightgreen)
 
+<!-- Uptime Kuma Live Status -->
+[![Oracle Backend](http://129.151.233.229:3001/api/badge/1/status?style=flat&label=Oracle+Backend)](http://129.151.233.229:3001/status/cqd) 
+[![SQLite Database](http://129.151.233.229:3001/api/badge/2/status?style=flat&label=SQLite+Database)](http://129.151.233.229:3001/status/cqd) 
+[![Cloudflare Worker](http://129.151.233.229:3001/api/badge/4/status?style=flat&label=Cloudflare+Worker+DO)](http://129.151.233.229:3001/status/cqd) 
+[![Daily Archiver](http://129.151.233.229:3001/api/badge/3/status?style=flat&label=Daily+Archiver)](http://129.151.233.229:3001/status/cqd)
+
 ---
 
 **Downloading files from Google Classroom shouldn't feel like a chore.** CQD transforms bulk file downloads into a single click while powering an enterprise-grade analytics pipeline that tracks millions of download events at the edge.
@@ -343,6 +349,62 @@ sequenceDiagram
 | **Data Privacy** | No usernames, emails, or file names collected. Only: file type, browser, OS, country, duration. |
 | **Transport** | All external communication over HTTPS. |
 | **Secrets Management** | Cloudflare Secrets API + Docker environment variables. Never committed to git. |
+
+---
+
+## 🩺 System Health & Monitoring
+
+Production systems require production-grade monitoring. CQD uses a self-hosted **Uptime Kuma** instance running on the Oracle Cloud VM to monitor every layer of the analytics stack.
+
+### Active Monitors
+
+| Monitor | Type | Target | What It Checks |
+|---------|------|--------|----------------|
+| **🌐 Edge Availability** | HTTP(S) | [Worker](./cloudflare-worker/) `/health` | Cloudflare Worker is globally reachable and routing to the Durable Object |
+| **🚀 API Health** | HTTP | [Backend](./oracle-backend/) `GET /health` | Go server is running and accepting connections |
+| **🗄️ Database Integrity** | HTTP | [Backend](./oracle-backend/) `GET /health/db` | SQLite is writable and not locked (WAL mode healthy) |
+| **⏱️ Cron Job Verification** | Push (Dead Man's Switch) | Archiver cron | Daily `archive-stats` job completed successfully |
+
+### How Cron Monitoring Works
+
+The archiver uses a **Push Monitor** (Dead Man's Switch pattern):
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│   CRON: 0 0 * * * /app/archiver && curl <push-url>         │
+└──────────────────────────────┬──────────────────────────────┘
+                               │ (on success)
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│   UPTIME KUMA: Expects heartbeat within 24h + grace        │
+│   No heartbeat? → Email/Discord/Slack alert triggered      │
+└─────────────────────────────────────────────────────────────┘
+```
+
+If the cron job fails to run, the archiver crashes, or the Google Sheets upload fails—we get alerted automatically.
+
+### Deployment
+
+Start the monitoring stack with a single Docker command:
+
+```bash
+docker run -d \
+  --restart=always \
+  -p 3001:3001 \
+  -v uptime-kuma:/app/data \
+  --name uptime-kuma \
+  louislam/uptime-kuma:latest
+```
+
+### Public Status Page
+
+Users can check system health at any time:
+
+```
+http://<your-vm-ip>:3001/status/cqd
+```
+
+This page shows real-time status, uptime percentages, and incident history—useful for self-diagnosing issues before opening a support request.
 
 ---
 

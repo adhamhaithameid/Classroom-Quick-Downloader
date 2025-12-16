@@ -1,3 +1,4 @@
+// oracle-backend/cmd/archiver/main.go
 package main
 
 import (
@@ -46,6 +47,7 @@ func main() {
 	sheetID := flag.String("sheet", "", "Google Sheet ID")
 	credsPath := flag.String("creds", "/app/google-credentials.json", "Path to Service Account JSON")
 	apiURL := flag.String("api", "http://localhost:8080/api/stats/summary", "URL to fetch stats from")
+	kumaPushURL := flag.String("kuma", "", "Uptime Kuma Push URL (optional)")
 	flag.Parse()
 
 	if *sheetID == "" {
@@ -67,7 +69,7 @@ func main() {
 
 	// 2. Prepare Data
 	today := time.Now().Format("2006-01-02")
-	
+
 	// Helper to format map as readable string
 	formatMap := func(m map[string]int64) string {
 		var parts []string
@@ -75,7 +77,7 @@ func main() {
 			parts = append(parts, fmt.Sprintf("%s: %d", k, v))
 		}
 		sort.Strings(parts)
-		return strings.Join(parts, "\n") 
+		return strings.Join(parts, "\n")
 	}
 
 	// Calculate Success Rate
@@ -86,26 +88,26 @@ func main() {
 
 	// 3. Build the "Everything" Row
 	row := []interface{}{
-		today,                                // A: Date
-		data.Totals.TotalDownloads,           // B: Total Downloads
-		data.Totals.TotalSuccess,             // C: Success Count
-		data.Totals.TotalFail,                // D: Fail Count
-		fmt.Sprintf("%.2f%%", successRate),   // E: Success Rate
-		
+		today,                              // A: Date
+		data.Totals.TotalDownloads,         // B: Total Downloads
+		data.Totals.TotalSuccess,           // C: Success Count
+		data.Totals.TotalFail,              // D: Fail Count
+		fmt.Sprintf("%.2f%%", successRate), // E: Success Rate
+
 		// Top Stats
-		data.TopBrowser,                      // F: Top Browser
-		data.TopOs,                           // G: Top OS
-		data.TopCountry,                      // H: Top Country
-		data.TopType,                         // I: Top File Type
-		
+		data.TopBrowser, // F: Top Browser
+		data.TopOs,      // G: Top OS
+		data.TopCountry, // H: Top Country
+		data.TopType,    // I: Top File Type
+
 		// Full Data Dumps
-		formatMap(data.Browsers),             // J: All Browsers
-		formatMap(data.Os),                   // K: All OS
-		formatMap(data.Countries),            // L: All Countries
-		formatMap(data.Languages),            // M: All Languages
-		formatMap(data.Types),                // N: All File Types
-		formatMap(data.ErrorReasons),         // O: All Errors
-		formatMap(data.Versions),             // P: Extension Versions
+		formatMap(data.Browsers),     // J: All Browsers
+		formatMap(data.Os),           // K: All OS
+		formatMap(data.Countries),    // L: All Countries
+		formatMap(data.Languages),    // M: All Languages
+		formatMap(data.Types),        // N: All File Types
+		formatMap(data.ErrorReasons), // O: All Errors
+		formatMap(data.Versions),     // P: Extension Versions
 	}
 
 	// 4. Send to Google
@@ -137,4 +139,17 @@ func main() {
 	}
 
 	log.Printf("Successfully archived FULL stats for %s", today)
+
+	// 5. Notify Uptime Kuma (Push Monitor)
+	if *kumaPushURL != "" {
+		// Append success message param
+		pushURL := fmt.Sprintf("%s&msg=OK&ping=", *kumaPushURL)
+		k_resp, k_err := http.Get(pushURL)
+		if k_err != nil {
+			log.Printf("[WARN] Failed to push status to Uptime Kuma: %v", k_err)
+		} else {
+			defer k_resp.Body.Close()
+			log.Println("Uptime Kuma notified.")
+		}
+	}
 }

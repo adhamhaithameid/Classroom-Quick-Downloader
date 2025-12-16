@@ -2,6 +2,7 @@
 package main
 
 import (
+	"database/sql"
 	"log"
 	"net/http"
 	"os"
@@ -39,7 +40,9 @@ func main() {
 	// Health endpoints.
 	mux.HandleFunc("/health", handlers.APIHealthHandler)
 	mux.HandleFunc("/health/api", handlers.APIHealthHandler)
-	mux.HandleFunc("/health/db", handlers.DBHealthHandler(sqlDB))
+	
+	// Updated: Use the local HealthDBHandler for granular SQLite monitoring
+	mux.HandleFunc("/health/db", HealthDBHandler(sqlDB))
 
 	// Ingest endpoint (aggregated batches from DO).
 	mux.HandleFunc("/ingest-batch", handlers.IngestBatchHandler(sqlDB, doSecret))
@@ -73,6 +76,24 @@ func getenv(key, def string) string {
 		return v
 	}
 	return def
+}
+
+// HealthDBHandler returns a handler that checks the database connection
+// by executing a lightweight query.
+func HealthDBHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var one int
+		// Execute a lightweight query to ensure the DB is not locked
+		err := db.QueryRow("SELECT 1").Scan(&one)
+		if err != nil {
+			log.Printf("Health Check Failed: %v", err)
+			http.Error(w, "Database Unhealthy", http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("ok"))
+	}
 }
 
 // loggingMiddleware logs basic request info.
