@@ -1,12 +1,28 @@
-Creative Commons Attribution-NonCommercial 4.0 International
-https://creativecommons.org/licenses/by-nc/4.0/
+The "Classroom Quick Downloader" Software License
 
-You are free to:
-- Share — copy and redistribute the material in any medium or format
-- Adapt — remix, transform, and build upon the material
+Copyright (c) 2025 Adham Haitham. All Rights Reserved.
 
-Under the following terms:
-- Attribution — You must give appropriate credit and link to the original source.
-- NonCommercial — You may not use the material for commercial purposes.
+TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
 
-No additional restrictions — You may not apply legal terms or technological measures that legally restrict others from doing anything the license permits.
+1. Definitions.
+   "Licensor" shall mean the copyright owner, Adham Haitham.
+   "Software" shall mean the source code, object code, and documentation included in this repository.
+
+2. Grant of License.
+   Permission is hereby granted to any person obtaining a copy of this Software to:
+   (a) View and read the source code for educational or review purposes.
+   (b) Run the compiled extension for personal, non-commercial use.
+   (c) Share the link to this repository verbatim.
+
+3. Restrictions.
+   (a) NO MODIFICATIONS: You may not modify, alter, or build upon the Software.
+   (b) NO REDISTRIBUTION OF MODIFIED WORKS: You may not distribute any modified versions of this Software.
+   (c) NO COMMERCIAL USE: You may not use the Software for commercial purposes or sell it.
+   (d) NO PRIVATE FORKS: You may not create a public fork of this repository for the purpose of maintaining a separate version.
+
+4. Contributions.
+   This project does NOT accept code contributions, pull requests, or modifications from the public. 
+   Bug reports and suggestions are welcome via the issue tracker or the official feedback form.
+
+5. Disclaimer.
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.

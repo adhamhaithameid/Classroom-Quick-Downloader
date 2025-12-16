@@ -1,54 +1,378 @@
-# Classroom Quick Downloader
+<div align="center">
 
-## Features
+# 🎓 Classroom Quick Downloader
 
-* **One-click downloads** for Google Classroom attachments — skips Drive preview.
-* **Material-style blue pill** (“Download”) with **inline SVG icon** (no broken images).
-* **Smart de-duplication**: injects a single pill per file per post/card (even if multiple links exist).
-* **Dynamic placement**: inserts after the filename; if the row is cramped (e.g., *Your work*), the pill automatically **moves to its own row below**, and moves back inline when space allows.
-* **SPA-resilient**: survives route changes, lazy loads, and DOM re-renders (MutationObserver + route hooks + periodic light rescan).
-* **No config, no extra permissions** — just works on `https://classroom.google.com/*`.
+<!-- Client Stack -->
+![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite-Powered-646CFF?logo=vite&logoColor=white)
+![WXT](https://img.shields.io/badge/WXT-Framework-7C3AED)
+![Chrome Web Store](https://img.shields.io/badge/Chrome_Web_Store-Published-4285F4?logo=googlechrome&logoColor=white)
 
-## File Tree
+<!-- Edge Stack -->
+![Cloudflare Workers](https://img.shields.io/badge/Cloudflare_Workers-Edge-F38020?logo=cloudflare&logoColor=white)
+![Durable Objects](https://img.shields.io/badge/Durable_Objects-Stateful-7C3AED)
+
+<!-- Backend Stack -->
+![Go](https://img.shields.io/badge/Go-1.24-00ADD8?logo=go&logoColor=white)
+![SQLite](https://img.shields.io/badge/SQLite-WAL_Mode-003B57?logo=sqlite&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-ARM64-2496ED?logo=docker&logoColor=white)
+![Oracle Cloud](https://img.shields.io/badge/Oracle_Cloud-Ampere_A1-F80000?logo=oracle&logoColor=white)
+![Google Sheets](https://img.shields.io/badge/Google_Sheets-API-34A853?logo=googlesheets&logoColor=white)
+
+<!-- Status -->
+![Build](https://img.shields.io/badge/Build-Passing-success)
+![License](https://img.shields.io/badge/License-MIT-blue)
+![PRs Welcome](https://img.shields.io/badge/PRs-Welcome-brightgreen)
+
+---
+
+**Downloading files from Google Classroom shouldn't feel like a chore.** CQD transforms bulk file downloads into a single click while powering an enterprise-grade analytics pipeline that tracks millions of download events at the edge.
+
+[📦 Extension](#-the-extension-client) · [⚡ Worker](#-the-worker-edge) · [🏛️ Backend](#-the-backend-sink) · [🚀 Getting Started](#-getting-started) · [📘 Deployment](DEPLOYMENT.md)
+
+</div>
+
+---
+
+## 📂 Project Modules & Documentation
+
+> **This is a complex distributed system.** Each module has its own comprehensive README with implementation details, API references, and configuration guides. Start here for the big picture, then dive into the module you're working on.
+
+| Module | Description | Documentation |
+|--------|-------------|---------------|
+| **🧩 Extension** | Browser extension for bulk downloading from Google Classroom. Built with WXT + React. | [Read Extension Docs →](./extension/README.md) |
+| **⚡ Worker** | Edge ingestion layer on Cloudflare. Buffers events in Durable Objects and pre-aggregates data. | [Read Worker Docs →](./cloudflare-worker/README.md) |
+| **🏛️ Backend** | Go server with SQLite storage, analytics API, and Google Sheets archiver. | [Read Backend Docs →](./oracle-backend/README.md) |
+| **🛠️ Tools** | DevOps scripts for validation, pipeline testing, and deployment automation. | [View Scripts →](./tools/) |
+
+---
+
+## 🌍 System Architecture
+
+CQD is not just a browser extension—it's a **distributed analytics system** designed for scale, resilience, and cost-efficiency.
+
+```mermaid
+graph TD
+    User((👤 Student)) -->|Clicks Download| Ext[🧩 Chrome Extension]
+    
+    subgraph Client Side
+      Ext -->|Batch Logic| DL[Download Queue]
+      Ext -->|Anon Stats| Reporter[Analytics Reporter]
+    end
+
+    subgraph Edge Layer
+      Reporter -->|POST /track| CF[⚡ Cloudflare Worker]
+      CF -->|Buffer & Aggregation| DO[📦 Durable Object]
+    end
+
+    subgraph "Oracle Cloud Backend"
+      DO -->|Flush Batch| GoServer[🚀 Go Backend]
+      GoServer -->|Write| DB[(🗄️ SQLite DB)]
+      Cron[⏱️ Daily Cron] -->|Trigger| Archiver[📜 Archiver Tool]
+    end
+
+    subgraph External
+      Archiver -->|Append Row| Sheet[📊 Google Sheets]
+    end
+```
+
+### Detailed Data Flow
 
 ```
-classroom-quick-downloader/
-├── manifest.json
-├── icons.js          # inline SVG icon helper (CSP-proof; exposes CQD_ICONS)
-├── content.js        # main logic: detect, extract ID, inject pill, dynamic placement
-└── icons/
-    ├── icon48.png    # (optional) toolbar icon
-    └── icon128.png   # toolbar icon referenced by manifest
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                                    USER'S BROWSER                                       │
+│                                                                                         │
+│   ┌─────────────────────────────────────────────────────────────────────────────────┐   │
+│   │                     CQD Browser Extension (Client)                              │   │
+│   │   • Bulk file downloads from Google Classroom                                   │   │
+│   │   • Automatic Drive confirmation bypass                                         │   │
+│   │   • Anonymous event tracking (file type, duration, success/fail)                │   │
+│   └─────────────────────────────────────────────────────────────────────────────────┘   │
+│                                          │                                              │
+│                                          │  POST /track (batched events)                │
+│                                          │                                              │
+└──────────────────────────────────────────┼──────────────────────────────────────────────┘
+                                           │
+                                           ▼
+┌──────────────────────────────────────────────────────────────────────────────────────────┐
+│                              CLOUDFLARE EDGE (Global)                                    │
+│                                                                                          │
+│   ┌────────────────────────────────────────────────────────────────────────────────────┐ │
+│   │                           Worker + Durable Object                                  │ │
+│   │   • Low-latency ingestion at 300+ edge locations                                   │ │
+│   │   • Event buffering with Durable Object state persistence                          │ │
+│   │   • Pre-aggregation: calculates Top Browser, Top Country, etc.                     │ │
+│   │   • Smart batching with exponential backoff retry                                  │ │
+│   └────────────────────────────────────────────────────────────────────────────────────┘ │
+│                                          │                                               │
+│                                          │  POST /ingest-batch (aggregated JSON)         │
+│                                          │                                               │
+└──────────────────────────────────────────┼───────────────────────────────────────────────┘
+                                           │
+                                           ▼
+┌──────────────────────────────────────────────────────────────────────────────────────────┐
+│                           ORACLE CLOUD (ARM64 Ampere)                                    │
+│                                                                                          │
+│   ┌────────────────────────────────────────────────────────────────────────────────────┐ │
+│   │                       Go Backend + SQLite (WAL Mode)                               │ │
+│   │   • Persistent storage with zero external dependencies                             │ │
+│   │   • Real-time analytics dashboard                                                  │ │
+│   │   • Time-series data with hourly/daily granularity                                 │ │
+│   └────────────────────────────────────────────────────────────────────────────────────┘ │
+│                                          │                                               │
+│                                          │  Daily Cron Job                               │
+│                                          ▼                                               │
+│   ┌────────────────────────────────────────────────────────────────────────────────────┐ │
+│   │                         Google Sheets (Archive)                                    │ │
+│   │   • Long-term historical data                                                      │ │
+│   │   • Easy sharing and reporting                                                     │ │
+│   └────────────────────────────────────────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-## Installation
+### 📍 The Journey of an Analytics Event
 
-1. Open Chrome and go to `chrome://extensions/`.
-2. Enable **Developer mode** (top-right).
-3. Click **Load unpacked** and select the `classroom-quick-downloader` folder.
-4. Open or refresh `https://classroom.google.com/`.
+Every download attempt in the [Extension](./extension/) triggers an analytics event. Here's its complete journey through the system:
 
-## How It Works
+1. **📥 Capture (Client)** — The [Extension](./extension/) records: file type, browser, OS, duration, and success/fail status. Events are queued locally in `chrome.storage`.
 
-* **Detect**: Scans Classroom posts/tiles for attachment elements (`a`, `[role="link"]`), skipping thumbnail-only links.
-* **Extract File ID**: Parses Drive IDs from:
+2. **📤 Batch & Send (Client → Edge)** — When the queue reaches 50 events (or after a time threshold), the extension POSTs the batch to the [Cloudflare Worker](./cloudflare-worker/).
 
-  * `/file/d/<FILE_ID>/…`
-  * `?id=<FILE_ID>`
-  * ID-like values found in attributes or embedded JSON blobs on the element.
-* **Inject Pill**: Creates a Material-style **Download** pill (button + inline SVG icon) right after the filename link.
-* **Direct Download**: Builds `https://drive.google.com/uc?export=download&id=<FILE_ID>` and triggers it immediately on click.
-* **Stay Visible**: A layout watchdog (ResizeObserver) checks for overflow/no-wrap rows. If the pill is clipped, it **moves to a dedicated row below** the file; if space returns, it goes **back inline**.
-* **Resilience**: MutationObserver + `history.pushState/replaceState` hooks + a light periodic rescan keep pills present across SPA navigation and DOM churn.
+3. **🔄 Buffer & Aggregate (Edge)** — The [Worker](./cloudflare-worker/) forwards events to its [Durable Object](./cloudflare-worker/README.md#why-durable-objects), which:
+   - Persists events in memory (survives Worker restarts).
+   - Aggregates counters: by browser, by OS, by country, by file type.
+   - Calculates "Top" stats: most common browser, most active country, etc.
 
-## Privacy
+4. **🚀 Flush (Edge → Backend)** — When the buffer exceeds `MAX_BATCH_EVENTS` or an alarm fires, the DO sends a pre-aggregated JSON payload to the [Oracle Backend](./oracle-backend/).
 
-* Runs entirely **client-side** as a content script on `classroom.google.com`.
-* **No data collection**, tracking, analytics, or external network calls.
-* **No additional permissions** beyond the content script match.
-* Downloads are initiated directly from Google Drive URLs; the extension does not proxy or inspect file contents.
+5. **💾 Store (Backend)** — The [Backend](./oracle-backend/) receives the batch, deduplicates by `batchId`, and stores:
+   - Raw batch metadata in `batches` table.
+   - Hourly aggregates in `downloads_hourly` table.
+   - Lifetime totals in `downloads_totals` key-value table.
 
-## License
+6. **📊 Archive (Backend → Sheets)** — At midnight UTC, a cron job runs the [Archiver](./oracle-backend/README.md#-google-sheets-archiver), which:
+   - Fetches the current summary from the local API.
+   - Appends a row to Google Sheets with all dimension breakdowns.
 
-This project is licensed under the **Creative Commons Attribution-NonCommercial 4.0 License**.
-Commercial use is **not** allowed without my explicit written permission.
+---
+
+## 🧠 Why This Stack?
+
+### Why Durable Objects?
+
+> **Problem:** If every extension sends events directly to our database, we'd have thousands of concurrent writes—overwhelming SQLite and spiking costs.
+
+**Solution:** [Durable Objects](./cloudflare-worker/README.md) act as a **global buffer**. All events for a given namespace (e.g., "downloads") are routed to the *same* instance, regardless of which edge location receives the request. This provides:
+
+- **Strong consistency** — No split-brain, no race conditions.
+- **Persistence** — State survives Worker restarts.
+- **Rate limiting** — We control how often we flush to the backend.
+- **Pre-aggregation** — Compute "Top Browser" before sending, saving backend CPU.
+
+### Why Go + SQLite?
+
+> **Problem:** We need maximum performance on Oracle Cloud's Free Tier (4 ARM cores, 24GB RAM) without paying for managed databases.
+
+**Solution:** [Go with pure-Go SQLite](./oracle-backend/README.md) (no CGO) gives us:
+
+- **Single binary deployment** — No runtime dependencies.
+- **Zero external services** — No Postgres, no Redis, no connection pooling.
+- **WAL mode** — Concurrent reads while writing.
+- **ARM64 optimized** — Native compilation for Ampere A1.
+
+### Why WXT?
+
+> **Problem:** Building Manifest v3 extensions with React is painful—bundling, HMR, multi-target builds.
+
+**Solution:** [WXT](./extension/README.md) provides:
+
+- **File-system routing** — `popup/index.html`, `background.ts`, `*.content.ts` just work.
+- **Hot Module Replacement** — See changes instantly during development.
+- **Cross-browser builds** — Chrome and Firefox from the same codebase.
+- **TypeScript-first** — Auto-imports, type safety, and modern DX.
+
+---
+
+## 🛠️ Tech Stack Matrix
+
+| Layer | Language | Key Technologies | Data Flow |
+|-------|----------|------------------|-----------|
+| **🧩 Client** | TypeScript | [WXT](./extension/), React 19, Chrome APIs | Captures events → Queues locally → Batches to Edge |
+| **⚡ Edge** | TypeScript | [Cloudflare Workers](./cloudflare-worker/), Durable Objects | Buffers events → Aggregates → Flushes to Backend |
+| **🏛️ Backend** | Go | [net/http](./oracle-backend/), SQLite (pure Go), Docker | Stores batches → Serves API → Archives to Sheets |
+
+---
+
+## ✨ Features
+
+### For Users
+
+- **📦 Bulk Downloads** — Download all files from a Classroom assignment with one click.
+- **🔓 Drive Bypass** — Automatically handles Google Drive's "Download anyway" confirmation pages.
+- **🔄 Multi-Account Support** — Cycles through your Google accounts to find the one with access.
+- **📊 Local Stats** — See your download history right in the [Extension](./extension/) popup.
+
+### For Developers
+
+- **📈 Real-time Dashboard** — Monitor download events, success rates, and breakdowns by browser/OS/country.
+- **⏱️ Time-Series Analytics** — Hourly and daily granularity for trend analysis.
+- **📋 Google Sheets Archive** — Automated daily exports for long-term reporting.
+- **🔒 Privacy-First** — No PII collected. Only file types, durations, and success/fail status.
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+| Tool | Version | Purpose |
+|------|---------|---------|
+| [Node.js](https://nodejs.org/) | 20+ | [Extension](./extension/) and [Worker](./cloudflare-worker/) development |
+| [pnpm](https://pnpm.io/) | 8+ | Monorepo package management |
+| [Go](https://go.dev/) | 1.24+ | [Oracle Backend](./oracle-backend/) |
+| [Docker](https://docker.com/) | 20+ | [Backend](./oracle-backend/) deployment |
+| [Wrangler](https://developers.cloudflare.com/workers/wrangler/) | Latest | [Cloudflare Worker](./cloudflare-worker/) CLI |
+
+### Quick Start
+
+```bash
+# Clone the repository
+git clone https://github.com/adhamhaithameid/Classroom-Quick-Downloader.git
+cd Classroom-Quick-Downloader
+
+# Install all dependencies (monorepo)
+pnpm install
+
+# Run the extension in development mode
+cd extension && pnpm dev
+```
+
+### Full Validation Suite
+
+Run static analysis, type checking, and local health probes:
+
+```bash
+./tools/validate.sh
+```
+
+This script:
+
+1. Lints the [Cloudflare Worker](./cloudflare-worker/) (`eslint`).
+2. Type-checks the [Worker](./cloudflare-worker/) (`tsc --noEmit`).
+3. Audits npm dependencies.
+4. Runs a local Worker health check.
+
+### Test the Analytics Pipeline
+
+Simulate the full data flow from [Extension](./extension/) → [Worker](./cloudflare-worker/) → [Backend](./oracle-backend/):
+
+```bash
+./tools/test_pipeline.sh
+```
+
+This script:
+
+1. Sends mock events to the [Worker](./cloudflare-worker/).
+2. Triggers a force-flush.
+3. Verifies data appears in the [Backend](./oracle-backend/).
+
+---
+
+## 🚢 Deployment
+
+Deploying CQD involves three independent deployments:
+
+| Component | Platform | Guide |
+|-----------|----------|-------|
+| **🏛️ Backend** | Oracle Cloud (Docker) | [DEPLOYMENT.md § Backend](DEPLOYMENT.md#part-1-oracle-backend-deployment) |
+| **⚡ Worker** | Cloudflare | [DEPLOYMENT.md § Worker](DEPLOYMENT.md#part-2-cloudflare-worker-configuration) |
+| **🧩 Extension** | Chrome Web Store | [Extension README](./extension/README.md#build-for-production) |
+
+> **📘 See [DEPLOYMENT.md](DEPLOYMENT.md) for the complete step-by-step guide.**
+
+### Quick Reference
+
+```bash
+# Deploy Oracle Backend
+cd oracle-backend && ./deploy.sh
+
+# Deploy Cloudflare Worker
+cd cloudflare-worker
+npx wrangler secret put DO_SHARED_SECRET
+npm run deploy
+
+# Build Extension for Web Store
+cd extension && npm run zip
+```
+
+---
+
+## 📊 Analytics Flow Summary
+
+```mermaid
+sequenceDiagram
+    participant User as Browser Extension
+    participant Worker as Cloudflare Worker
+    participant DO as Durable Object
+    participant Backend as Oracle Backend
+    participant Sheets as Google Sheets
+
+    User->>Worker: POST /track (batched events)
+    Worker->>DO: Forward to Durable Object
+    DO->>DO: Buffer + Aggregate
+    DO-->>Worker: Ack
+    Worker-->>User: 200 OK
+
+    Note over DO: When buffer >= threshold
+    DO->>Backend: POST /ingest-batch
+    Backend->>Backend: Store in SQLite
+    Backend-->>DO: 200 OK
+
+    Note over Backend: Daily at midnight
+    Backend->>Sheets: Append daily summary
+```
+
+---
+
+## 🔒 Security & Privacy
+
+| Concern | Implementation |
+|---------|----------------|
+| **Authentication** | Shared secret (`DO_SHARED_SECRET`) between [Worker](./cloudflare-worker/) and [Backend](./oracle-backend/). |
+| **Data Privacy** | No usernames, emails, or file names collected. Only: file type, browser, OS, country, duration. |
+| **Transport** | All external communication over HTTPS. |
+| **Secrets Management** | Cloudflare Secrets API + Docker environment variables. Never committed to git. |
+
+---
+
+## 🤝 Feedback & Issues
+
+This project is **Source Available**. You are welcome to review the code and share it, but modification and derivative works are not permitted without permission.
+
+### Found a bug or have a suggestion?
+We strictly do **not** accept Pull Requests or Code Modifications from the public. However, we value your feedback!
+
+Please report issues or suggestions via:
+1.  **GitHub Issues:** [Open an Issue here](../../issues)
+2.  **Feedback Form:** [Submit via Google Forms](https://docs.google.com/forms/d/1nB95r35O_h98odg8Y6_OrfYdjKGBqhrUCb_wFHA-RA8/edit)
+
+### ⚠️ Licensing & Usage
+This software is **Proprietary & Source Available**. Copyright © 2025 Adham Haitham. All Rights Reserved.
+
+* ✅ **You can:** View, read, and use the extension for personal, non-commercial purposes.
+* ❌ **You cannot:** Modify, edit, or build upon the source code.
+* ❌ **You cannot:** Distribute modified versions or forks.
+* ❌ **You cannot:** Use this code for commercial purposes.
+
+For commercial inquiries or modification requests, please contact me directly.
+
+---
+
+<div align="center">
+
+**Built with ☕ by [Adham Haitham](https://github.com/adhamhaithameid)**
+
+*A sophisticated analytics pipeline masquerading as a simple productivity tool.*
+
+</div>

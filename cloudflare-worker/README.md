@@ -1,172 +1,487 @@
-# CQD Analytics Backend (Cloudflare Worker)
+# ⚡ CQD Analytics Worker
 
-The high-performance ingestion and aggregation layer for **Classroom Quick Downloader**
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
+![Cloudflare Workers](https://img.shields.io/badge/Cloudflare_Workers-F38020?logo=cloudflare&logoColor=white)
+![Durable Objects](https://img.shields.io/badge/Durable_Objects-Enabled-blueviolet)
+![Version](https://img.shields.io/badge/v1.0-stable-success)
 
-## 📖 Overview
+The **CQD Analytics Worker** is a high-performance, edge-deployed analytics ingestion service for the Classroom Quick Downloader browser extension. Built on **Cloudflare Workers** and **Durable Objects**, it captures download events from thousands of users worldwide and intelligently batches them before forwarding to an Oracle backend.
 
-This service acts as the central nervous system for the CQD extension's analytics.
+---
 
-Unlike traditional stateless APIs, this Worker uses a **Cloudflare Durable Object (DO)** to:
+## 🌟 Why This Architecture?
 
-- Maintain **stateful counters**
-- Manage **ingestion buffers**
-- Enforce **adaptive quota limits** to protect against overages on the Cloudflare free tier
 
-### Core Responsibilities
+| Feature                   | Benefit                                                                                                                       |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| **Edge Computing**        | Requests are handled at the closest datacenter to each user (~50ms global latency).                                           |
+| **Low Latency Ingestion** | Fire-and-forget`POST /track` accepts events instantly; processing happens asynchronously.                                     |
+| **Intelligent Batching**  | Events are buffered in a Durable Object and flushed in optimized batches, preventing database saturation.                     |
+| **Pre-Aggregation**       | Calculates "Top Browser", "Top Country", and detailed breakdowns*before* sending to Oracle, saving bandwidth and backend CPU. |
+| **Built-in Retry**        | Failed flushes trigger exponential backoff (1m → 5m → 15m → ... → 24h), ensuring no data is lost.                         |
 
-- **Ingestion**
-  Receives **batched analytics events** (`POST /track`) from client extensions.
-- **Aggregation**
-  Maintains **real-time counters** (downloads, success/fail, browser stats, etc.) in reliable storage.
-- **Buffering**
-  Queues raw events and **flushes them to the Oracle backend** in optimized batches.
-- **Traffic Control**
-  Monitors **daily request counts** and can instruct extensions to **back off** (“cut power”) when limits are approached.
+---
 
-## 🏗 Architecture
-
-The system follows a **write-heavy, read-periodic** pattern designed for high concurrency.
+## 📐 Architecture & Data Flow
 
 ```
-graph LR
-    Ext[Extension Client] -->|POST /track (Batch)| Worker[Cloudflare Worker]
-    Worker -->|Proxy| DO[Durable Object]
+┌───────────────────────────────────────────────────────────────────────────────┐
+│                              USER'S BROWSER                                   │
+│                                                                               │
+│   ┌────────────────────────────────────────────────────────────────────────┐  │
+│   │         CQD Browser Extension (Chrome / Firefox / Edge)                │  │
+│   │     Collects: file_type, browser, os, country, status, duration...     │  │
+│   └───────────────────────────────────┬────────────────────────────────────┘  │
+│                                       │                                       │
+│                                       │ POST /track { events: [...] }         │
+│                                       │ (Batched every N events or M minutes) │
+└───────────────────────────────────────┼───────────────────────────────────────┘
+                                        │
+                                        ▼
+┌───────────────────────────────────────────────────────────────────────────────┐
+│                         CLOUDFLARE WORKER (Edge)                              │
+│                         ───────────────────────                               │
+│   • Receives request at nearest datacenter (low latency)                      │
+│   • Handles CORS for browser requests                                         │
+│   • Extracts geo (country) from `request.cf` and injects `X-Geo-Country`      │
+│   • Routes request to the Durable Object                                      │
+│                                                                               │
+│   Endpoints:                                                                  │
+│     POST /track          - Ingest events                                      │
+│     GET  /stats          - Dashboard stats                                    │
+│     GET  /config         - Extension config                                   │
+│     GET  /health         - Health check                                       │
+│     POST /admin/*        - Admin actions (force-flush, cut-power, etc.)       │
+└───────────────────────────────────────┬───────────────────────────────────────┘
+                                        │
+                                        │ stub.fetch(request)
+                                        ▼
+┌───────────────────────────────────────────────────────────────────────────────┐
+│                   DURABLE OBJECT: DownloadsDurable                            │
+│                   ────────────────────────────────                            │
+│                                                                               │
+│   STATE (Persistent):                                                         │
+│     • buffer[]         - Raw events awaiting flush                            │
+│     • counters         - Live aggregated stats (by browser, OS, country...)   │
+│     • batchSeq         - Monotonic batch ID for idempotency                   │
+│     • retryState       - Backoff tracking for failed flushes                  │
+│     • reqCountToday    - Daily request quota tracking                         │
+│                                                                               │
+│   BUFFERING:                                                                  │
+│     • Events accumulate in `buffer[]`                                         │
+│     • When buffer.length >= MAX_BATCH_EVENTS, flush triggers                  │
+│                                                                               │
+│   AGGREGATION (before sending to Oracle):                                     │
+│     • Groups events by hour (TimeBuckets)                                     │
+│     • Calculates: topBrowser, topOs, topCountry, topType                      │
+│     • Builds full breakdown maps (browsers, countries, languages, etc.)       │
+│                                                                               │
+└───────────────────────────────────────┬───────────────────────────────────────┘
+                                        │
+                                        │ POST /ingest-batch (aggregated JSON)
+                                        │ Header: X-DO-SECRET
+                                        ▼
+┌───────────────────────────────────────────────────────────────────────────────┐
+│                         ORACLE BACKEND (VM)                                   │
+│                         ───────────────────                                   │
+│   • Receives pre-aggregated batch                                             │
+│   • Stores in SQLite (downloads_hourly, downloads_totals, batches...)         │
+│   • Serves dashboard UI with historical charts                                │
+└───────────────────────────────────────────────────────────────────────────────┘
+```
 
-    subgraph "Durable Object State"
-        DO -->|Increment| Counters[Real-time Counters]
-        DO -->|Push| Buffer[Event Buffer]
-        DO -->|Check| Quota[Daily Limit Guard]
-    end
+### Why Durable Objects?
 
-    Buffer -->|Flush Trigger| Alarm[Scheduled Alarm]
-    Alarm -->|POST Batch| Oracle[Oracle Backend DB]
+1. **Strong Consistency**: All analytics requests for a given name ("downloads") are routed to the *same* DO instance globally. No split-brain, no race conditions.
+2. **Persistent State**: The buffer survives Worker restarts. Events are never lost.
+3. **Rate Limiting**: Batching prevents overwhelming the Oracle backend with high-frequency individual writes.
+4. **Alarms**: Durable Objects have built-in scheduled alarms for retry logic with exponential backoff.
 
-    Admin[Developer] -->|GET /| Dashboard[HTML Dashboard]
-    Dashboard -->|Fetch JSON| DO
-````
+---
 
-## 🔌 API Reference
+## 📁 Project Structure
 
-### Public Endpoints
-
-These endpoints are accessible by the extension or external monitoring tools.
-
-
-| Method | Endpoint  | Description                                                                                |
-| ------ | --------- | ------------------------------------------------------------------------------------------ |
-| POST   | `/track`  | Ingestion endpoint. Accepts a JSON payload of events. Updates counters and buffers events. |
-| GET    | `/config` | Returns dynamic configuration (batch size,`remoteEnabled`, quota descriptor).              |
-| GET    | `/stats`  | Returns the full JSON state: counters, buffer size, last event time, quota status, env.    |
-| GET    | `/health` | Lightweight probe with basic health info (pending events, last event, last flush, etc.).   |
-
-### Admin Interface
+```
+cloudflare-worker/
+├── src/
+│   ├── index.ts          # Main Worker entrypoint: routing, CORS, DO proxy
+│   ├── downloads_do.ts   # Durable Object: buffering, aggregation, Oracle flush
+│   ├── types.ts          # TypeScript interfaces for all payloads
+│   ├── dashboard.ts      # HTML rendering for the admin dashboard
+│   └── assets.ts         # Base64-encoded logo/favicon for dashboard
+├── wrangler.toml         # Cloudflare deployment configuration
+├── package.json          # Dependencies and scripts
+├── tsconfig.json         # TypeScript configuration
+└── README.md             # You are here! 📍
+```
 
 
-| Method | Endpoint | Description                                      |
-| ------ | -------- | ------------------------------------------------ |
-| GET    | `/`      | Renders the HTML Admin Dashboard (login screen). |
-| POST   | `/`      | Dashboard authentication handler (password).     |
+| File              | Responsibility                                                                   |
+| ----------------- | -------------------------------------------------------------------------------- |
+| `index.ts`        | Routes requests, handles CORS preflight, extracts geo headers, proxies to DO.    |
+| `downloads_do.ts` | The brain. Buffers events, aggregates stats, flushes to Oracle with retry logic. |
+| `types.ts`        | Defines exact shapes for`StoredEvent`, `OracleBatch`, `StatsResponse`, etc.      |
+| `dashboard.ts`    | Renders the live admin dashboard UI (inline CSS/JS, no external dependencies).   |
+| `assets.ts`       | Contains base64 SVG/PNG for favicon and logo.                                    |
 
-The dashboard is **password-protected**, typically using the same secret as `DO_SHARED_SECRET`.
+---
 
-### Danger Zone (Admin Only)
+## ⚙️ Configuration & Environment
 
-These endpoints require an `X-Admin-Secret` header matching `DO_SHARED_SECRET`.
+All configuration is defined in `wrangler.toml`:
 
 
-| Endpoint               | Action          | Use Case                                                                |
-| ---------------------- | --------------- | ----------------------------------------------------------------------- |
-| `/admin/force-flush`   | Force Flush     | Push all buffered events to Oracle immediately, ignoring batch size.    |
-| `/admin/cut-power`     | Disable Remote  | Set`remoteEnabled: false`. Extensions stop sending data. **Emergency.** |
-| `/admin/restore-power` | Enable Remote   | Re-enable remote ingestion after an emergency or quota event.           |
-| `/admin/full-sync`     | Full Sync       | Repeatedly flush until the DO buffer is completely empty.               |
-| `/debug/reset`         | Hard Reset ⚠️ | **Destructive.** Wipes all counters, buffers and retry state.           |
+| Variable           | Type                           | Description                                                                                        | Example                       |
+| ------------------ | ------------------------------ | -------------------------------------------------------------------------------------------------- | ----------------------------- |
+| `ORACLE_ENDPOINT`  | `[vars]`                       | Base URL of the Oracle backend. Do not include`/ingest-batch`.                                     | `http://your-server.com:8080` |
+| `MAX_BATCH_EVENTS` | `[vars]`                       | Maximum events per flush. When buffer reaches this size, a flush is triggered.                     | `10000`                       |
+| `DO_SHARED_SECRET` | **Secret**                     | Shared secret for authorizing admin endpoints and Oracle communication.**Do NOT put in `[vars]`**. | —                            |
+| `DOWNLOADS_DO`     | `[[durable_objects.bindings]]` | The binding name for the Durable Object.                                                           | `DOWNLOADS_DO`                |
 
-## 🧠 Smart Features
+### 🔐 Setting `DO_SHARED_SECRET` Securely
 
-### 1. Adaptive Quota System
+The shared secret **must not** be committed to `wrangler.toml`. Use Wrangler's secret management:
 
-The Durable Object tracks **`requestsToday`** and exposes a `QuotaDescriptor` via `/config`. As traffic increases, the system automatically shifts modes:
+```bash
+# Set the secret interactively
+npx wrangler secret put DO_SHARED_SECRET
 
-* **Chill Mode** (e.g. `< 10k` requests/day)
+# You'll be prompted to enter the value
+# Enter your strong, random secret (e.g., from `openssl rand -hex 32`)
+```
 
-  * Small batch size (≈ 50 events per POST)
-  * Normal operation
-* **Busy Modes** (e.g. `30k+`, `40k+`, `50k+`, …)
+This secret must match the `DO_SHARED_SECRET` environment variable on your Oracle backend.
 
-  * Gradually **increase batch size** (100 → 150 → 200 → 250 → 300 → 500)
-  * Reduce HTTP overhead under high load
-* **Emergency Mode** (e.g. `90k+` requests/day)
+---
 
-  * `remoteEnabled: false`
-  * Worker instructs extensions to **stop sending remote analytics**
-  * Protects against Cloudflare free-tier or billing overages
+## 📡 API Reference
 
-The same mechanism is used when an admin explicitly **cuts power** via `/admin/cut-power`.
+### `POST /track` — Ingest Events
 
-### 2. Intelligent Buffering
+The primary endpoint called by the browser extension. Accepts a batch of download events.
 
-To minimize calls to the Oracle backend and reduce latency/cost:
+**Request:**
 
-* Events are **stored in the DO buffer** as they arrive.
-* Data is flushed to Oracle only when:
+```bash
+curl -X POST https://cqd-analytics.your-subdomain.workers.dev/track \
+  -H "Content-Type: application/json" \
+  -d '{
+    "events": [
+      {
+        "status": "success",
+        "file_type": "pdf",
+        "browser": "chrome",
+        "os": "windows",
+        "ext_version": "1.2.0",
+        "duration_ms": 1500,
+        "bypass_used": false,
+        "language": "en",
+        "country": "EG",
+        "timestamp": 1702732800000
+      },
+      {
+        "status": "fail",
+        "file_type": "docx",
+        "browser": "firefox",
+        "os": "macos",
+        "ext_version": "1.2.0",
+        "duration_ms": 3000,
+        "bypass_used": true,
+        "language": "ar",
+        "error_type": "AUTH_ALL_FAILED",
+        "timestamp": 1702732801000
+      }
+    ]
+  }'
+```
 
-  * **Buffer size ≥ `MAX_BATCH_EVENTS`** (environment variable).
-  * An admin triggers a **force flush** (`/admin/force-flush`).
-  * A **retry alarm** fires after a previous failure (backoff logic).
+**Response:**
 
-Failed Oracle flushes update a retry state and schedule a **delayed alarm**, avoiding tight loops and protecting the backend from being hammered.
+```json
+{ "ok": true, "accepted": 2 }
+```
 
-## 🛠 Development & Setup
+**Event Schema (`StoredEvent`):**
+
+
+| Field         | Type                    | Required | Description                                                |
+| ------------- | ----------------------- | -------- | ---------------------------------------------------------- |
+| `status`      | `"success"` \| `"fail"` | ✅       | Outcome of the download.                                   |
+| `file_type`   | `string`                | ✅       | File extension (e.g., "pdf", "docx").                      |
+| `browser`     | `string`                | ✅       | Browser name (e.g., "chrome", "firefox").                  |
+| `os`          | `string`                | ✅       | Operating system (e.g., "windows", "macos").               |
+| `ext_version` | `string`                | ✅       | Extension version (e.g., "1.2.0").                         |
+| `duration_ms` | `number`                | ✅       | Time taken for the download attempt in milliseconds.       |
+| `bypass_used` | `boolean`               | ✅       | Whether a bypass mechanism was used.                       |
+| `language`    | `string`                | ✅       | User's browser language.                                   |
+| `country`     | `string`                | ❌       | ISO country code. If missing, derived from Cloudflare geo. |
+| `timestamp`   | `number`                | ✅       | Unix timestamp in milliseconds.                            |
+| `error_type`  | `string`                | ❌       | Error code if`status` is `"fail"`.                         |
+| `source`      | `string`                | ❌       | Origin tag (e.g., "download_all", "single").               |
+
+---
+
+### `GET /stats` — Dashboard Statistics
+
+Returns the current aggregated stats from the Durable Object. Used by the admin dashboard.
+
+**Request:**
+
+```bash
+curl https://cqd-analytics.your-subdomain.workers.dev/stats
+```
+
+**Response:**
+
+```json
+{
+  "ok": true,
+  "totalEvents": 12500,
+  "totalDownloads": 12500,
+  "totalSuccess": 11800,
+  "totalFail": 700,
+  "pendingEvents": 350,
+  "lastEventAt": 1702732800000,
+  "lastFlushAt": 1702732500000,
+  "counters": {
+    "byStatus": { "success": 11800, "fail": 700 },
+    "byType": { "pdf": 8000, "docx": 3000, "png": 1500 },
+    "byBrowser": { "chrome": 9000, "firefox": 2500, "edge": 1000 },
+    "byOs": { "windows": 7000, "macos": 4000, "linux": 1500 },
+    "byCountry": { "eg": 5000, "us": 3000, "sa": 2000 },
+    "...": "..."
+  },
+  "quota": {
+    "requestsToday": 1500,
+    "quotaLevel": "BELOW_LIMITS",
+    "modeLabel": "chill",
+    "remoteEnabled": true,
+    "batchSizeSuggestion": 50
+  },
+  "envSnapshot": {
+    "maxBatchEvents": "10000",
+    "oracleEndpoint": "http://..."
+  }
+}
+```
+
+---
+
+### `GET /config` — Extension Configuration
+
+Returns configuration hints for the browser extension (batch size, remote enabled, etc.).
+
+```bash
+curl https://cqd-analytics.your-subdomain.workers.dev/config
+```
+
+---
+
+### `GET /health` — Health Check
+
+Simple health probe.
+
+```bash
+curl https://cqd-analytics.your-subdomain.workers.dev/health
+```
+
+```json
+{ "ok": true, "pendingEvents": 350, "lastEventAt": 1702732800000, "lastFlushAt": 1702732500000 }
+```
+
+---
+
+### `POST /admin/force-flush` — Force Buffer Flush 🔒
+
+Immediately flushes the event buffer to Oracle, bypassing the batch size threshold.
+
+**Requires `X-Admin-Secret` header.**
+
+```bash
+curl -X POST https://cqd-analytics.your-subdomain.workers.dev/admin/force-flush \
+  -H "X-Admin-Secret: YOUR_DO_SHARED_SECRET"
+```
+
+---
+
+### `POST /admin/cut-power` — Disable Remote Analytics 🔒
+
+Stops sending data to Oracle (useful for emergencies or maintenance).
+
+```bash
+curl -X POST https://cqd-analytics.your-subdomain.workers.dev/admin/cut-power \
+  -H "X-Admin-Secret: YOUR_DO_SHARED_SECRET"
+```
+
+---
+
+### `POST /admin/restore-power` — Re-enable Remote Analytics 🔒
+
+Resumes sending data to Oracle.
+
+```bash
+curl -X POST https://cqd-analytics.your-subdomain.workers.dev/admin/restore-power \
+  -H "X-Admin-Secret: YOUR_DO_SHARED_SECRET"
+```
+
+---
+
+### `POST /admin/full-sync` — Full Buffer Sync 🔒
+
+Iteratively flushes the entire buffer until empty or an error occurs.
+
+```bash
+curl -X POST https://cqd-analytics.your-subdomain.workers.dev/admin/full-sync \
+  -H "X-Admin-Secret: YOUR_DO_SHARED_SECRET"
+```
+
+---
+
+## 📊 The "Big JSON" Aggregation
+
+Before sending data to Oracle, the Durable Object performs significant pre-aggregation to minimize payload size and backend processing:
+
+**What Gets Calculated:**
+
+1. **`timeBuckets[]`**: Events grouped by hour. Each bucket contains aggregated totals and dimension breakdowns for that hour.
+2. **`summary`**: A single object aggregating *all* events in the batch:
+   * `totals`: `totalEvents`, `totalSuccess`, `totalFail`
+   * `browsers`: `{ "chrome": 900, "firefox": 100 }`
+   * `os`: `{ "windows": 700, "macos": 300 }`
+   * `countries`: `{ "eg": 500, "us": 300, ... }`
+   * `languages`, `versions`, `types`, `errorReasons`
+   * **`topBrowser`, `topOs`, `topCountry`, `topType`**: Pre-computed "winners".
+
+**Example Final Payload to Oracle (`OracleBatch`):**
+
+```json
+{
+  "batchId": "do-seq15-500ev",
+  "generatedAt": 1702732800000,
+  "timeZone": "UTC",
+  "summary": {
+    "totals": { "totalEvents": 500, "totalDownloads": 500, "totalSuccess": 480, "totalFail": 20 },
+    "browsers": { "chrome": 350, "firefox": 100, "edge": 50 },
+    "os": { "windows": 300, "macos": 150, "linux": 50 },
+    "countries": { "eg": 200, "us": 150, "de": 100, "sa": 50 },
+    "topBrowser": "chrome",
+    "topOs": "windows",
+    "topCountry": "eg",
+    "topType": "pdf"
+  },
+  "timeBuckets": [
+    {
+      "bucketStart": "2024-12-16T10:00:00Z",
+      "bucketEnd": "2024-12-16T11:00:00Z",
+      "totals": { "totalEvents": 250, "totalSuccess": 240, "totalFail": 10 },
+      "counters": { "byBrowser": { "chrome": 180, ... }, ... }
+    }
+  ],
+  "doState": { "...": "DO health snapshot..." }
+}
+```
+
+This design means Oracle receives an already-analyzed summary, drastically reducing database writes and query complexity.
+
+---
+
+## 🛠️ Setup & Development
 
 ### Prerequisites
 
-* **Node.js** & **pnpm**
-* **Cloudflare Wrangler CLI**
+* [Node.js](https://nodejs.org/) (v18+ recommended)
+* [npm](https://www.npmjs.com/) or [pnpm](https://pnpm.io/)
+* [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/install-and-update/) (`npm install -g wrangler`)
 
-  ```bash
-  npm i -g wrangler
-  ```
-
-You will also need a Cloudflare account and a configured `wrangler.toml` with:
-
-* `DOWNLOADS_DO` Durable Object binding
-* `ORACLE_ENDPOINT` (can be empty in dev)
-* `DO_SHARED_SECRET`
-* `MAX_BATCH_EVENTS`
-
-### Installation
+### Install Dependencies
 
 ```bash
 cd cloudflare-worker
-pnpm install
+npm install
 ```
 
-### Local Development
-
-Runs a local Miniflare instance via Wrangler.
-By default it’s accessible at: `http://localhost:8787`.
+### Run Local Development Server
 
 ```bash
-pnpm dev
+npm run dev
+# Wrangler starts a local server, typically at http://localhost:8787
 ```
 
-You can then test endpoints like:
+> **Note:** Durable Objects work locally, but `request.cf` (geo data) will not be populated. Country will fall back to "unknown" in local dev.
 
-* `GET http://localhost:8787/health`
-* `POST http://localhost:8787/track`
-* `GET http://localhost:8787/stats`
-
-### Deployment
-
-Deploys the Worker and applies the Durable Object binding configuration:
+### Type Checking & Linting
 
 ```bash
-pnpm deploy
+npm run typecheck  # tsc --noEmit
+npm run lint       # eslint
 ```
 
-After deployment:
+### Deploy to Production
 
-* Point the **CQD extension**’s analytics config to the deployed `/track` & `/config` endpoints.
-* Use the **Admin Dashboard** (`GET /`) with your configured password (`DO_SHARED_SECRET`) to monitor health, quotas and perform Danger Zone actions.
+```bash
+# Ensure you're logged in
+npx wrangler login
 
+# Set secrets (only once, or when they change)
+npx wrangler secret put DO_SHARED_SECRET
+
+# Deploy
+npm run deploy
+```
+
+The Worker will be deployed to `https://cqd-analytics.<your-subdomain>.workers.dev`.
+
+---
+
+## 🚨 Troubleshooting
+
+### Error 1003: Direct IP Access Not Allowed
+
+**Symptom:** When hitting the worker URL, you get "Error 1003".
+
+**Cause:** You are accessing the Worker via a direct IP address or a URL that Cloudflare doesn't recognize.
+
+**Solution:** Always use the `*.workers.dev` domain or a custom domain proxied through Cloudflare.
+
+---
+
+### 401 Unauthorized on Admin Endpoints
+
+**Symptom:** `POST /admin/force-flush` returns `{"ok":false,"error":"unauthorized"}`.
+
+**Cause:** The `X-Admin-Secret` header is missing or doesn't match `DO_SHARED_SECRET`.
+
+**Solution:**
+
+1. Ensure you are passing `-H "X-Admin-Secret: YOUR_SECRET"`.
+2. Verify the secret matches what was set via `wrangler secret put DO_SHARED_SECRET`.
+
+---
+
+### Oracle Flush Failing (`ORACLE_ENDPOINT or DO_SHARED_SECRET not configured`)
+
+**Symptom:** Stats show `retryState.lastError: "ORACLE_ENDPOINT or DO_SHARED_SECRET not configured"`.
+
+**Cause:** Environment variables are missing or incorrectly set.
+
+**Solution:**
+
+1. Check `wrangler.toml` for `ORACLE_ENDPOINT` under `[vars]`.
+2. Ensure `DO_SHARED_SECRET` was set via `wrangler secret put`.
+3. Redeploy after making changes: `npm run deploy`.
+
+---
+
+### Country Showing as "unknown"
+
+**Symptom:** Analytics show most users in the "unknown" country bucket.
+
+**Cause:** The `request.cf` object (Cloudflare geo data) was not propagated to the Durable Object prior to a recent fix.
+
+**Solution:** Ensure you are running the latest version of the Worker, which passes `X-Geo-Country` explicitly.
+
+---
+
+## 📄 License
+
+This project is part of the Classroom Quick Downloader suite. See the main repository for licensing details.
