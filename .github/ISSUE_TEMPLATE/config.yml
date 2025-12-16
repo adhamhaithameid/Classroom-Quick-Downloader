@@ -1,0 +1,9 @@
+blank_issues_enabled: false  # Stops people from clicking "New Issue" and writing nonsense
+contact_links:
+  - name: 📝 Submit Feedback / Feature Request
+    url: https://docs.google.com/forms/d/1nB95r35O_h98odg8Y6_OrfYdjKGBqhrUCb_wFHA-RA8/edit
+    about: Please use this form for general feedback, feature requests, or non-critical bugs.
+
+  - name: 🔐 Report a Security Vulnerability
+    url: https://github.com/adhamhaithameid/Classroom-Quick-Downloader/blob/main/SECURITY.md
+    about: Found a security flaw? Please read our Security Policy first.
