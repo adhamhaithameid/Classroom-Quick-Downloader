@@ -28,3 +28,4 @@ oracle-backend/docker_data/
 *.db
 *.db-shm
 *.db-wal
+.dev.vars
