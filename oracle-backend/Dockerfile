@@ -1,12 +1,12 @@
 # oracle-backend/Dockerfile
 # Multi-stage build for minimal production image
 
-FROM golang:1.22-alpine AS builder
+FROM golang:1.24-alpine AS builder
 
 WORKDIR /app
 
-# Install build dependencies for CGO (needed for some SQLite bindings)
-RUN apk add --no-cache gcc musl-dev
+# CGO_ENABLED=0 means we don't need gcc/musl-dev for compilation
+# RUN apk add --no-cache gcc musl-dev
 
 # Cache dependencies
 COPY go.mod go.sum ./
@@ -14,7 +14,9 @@ RUN go mod download
 
 # Build the application
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o oracle-backend ./cmd/app
+# Use TARGETARCH from Docker buildx (defaults to amd64 if not set, but we want flexibility)
+ARG TARGETARCH=arm64
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build -ldflags="-s -w" -o oracle-backend ./cmd/app
 
 # -------------------------------------------
 # Production image

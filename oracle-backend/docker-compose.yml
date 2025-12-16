@@ -19,7 +19,7 @@ services:
     volumes:
       # Persist SQLite database
       - oracle_data:/data
-    restart: unless-stopped
+    restart: always
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
       interval: 30s
