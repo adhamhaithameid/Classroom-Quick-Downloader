@@ -1,18 +1,23 @@
 {
-  "name": "extension",
-  "description": "manifest.json description",
+  "name": "classroom-quick-downloader",
+  "displayName": "Classroom Quick Downloader", 
+  "description": "One-click 'Download All' button for Google Classroom. Automatically handles Drive permissions and batch downloads.",
   "private": true,
   "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "wxt",
     "dev:firefox": "wxt -b firefox",
+    "dev:edge": "wxt -b edge",
     "build": "wxt build",
     "build:firefox": "wxt build -b firefox",
+    "build:edge": "wxt build -b edge",
     "zip": "wxt zip",
     "zip:firefox": "wxt zip -b firefox",
+    "zip:edge": "wxt zip -b edge",
     "compile": "tsc --noEmit",
-    "postinstall": "wxt prepare"
+    "postinstall": "wxt prepare",
+    "build:all": "wxt build -b chrome && wxt build -b firefox && wxt build -b safari"
   },
   "dependencies": {
     "react": "^19.2.1",

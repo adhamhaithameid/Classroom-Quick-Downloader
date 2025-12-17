@@ -17,5 +17,13 @@ export default defineConfig({
       'https://accounts.google.com/*',
       'https://cqd-analytics.adhamhaithameid.workers.dev/*',
     ],
+    browser_specific_settings: {
+      gecko: {
+        id: "classroom-quick-downloader@adhamhaitham.dev",
+        data_collection_permissions: {
+          required: ["none"]
+        }
+      }
+    }
   },
 });

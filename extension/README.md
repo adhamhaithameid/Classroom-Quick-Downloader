@@ -1,3 +1,38 @@
+# 🕵️ For Mozilla Reviewers: Build Instructions
+
+## System Requirements
+- **OS:** Windows, macOS, or Linux (Tested on macOS/Linux)
+- **Node.js:** v22.14.0 (Required, see `.nvmrc`)
+- **Package Manager:** pnpm (Required, see `pnpm-lock.yaml`)
+
+## Setup
+1. Unzip the source code archive.
+2. Open a terminal in the root directory (where `package.json` is located).
+3. Install dependencies:
+   ```bash
+   pnpm install
+   ```
+
+## Build
+To generate the production build for Firefox (identical to the submitted XPI):
+
+```bash
+pnpm run build:firefox
+```
+
+## Output
+The built extension will be located in:
+`./.output/firefox-mv2`
+
+## Verification
+You can compare the contents of the `.output/firefox-mv2` directory with the submitted extension package to verify they match.
+
+---
+
+**(Original README follows below)**
+
+---
+
 # 🎓 Classroom Quick Downloader (Extension)
 
 ![WXT](https://img.shields.io/badge/WXT-Framework-7C3AED?logo=data:image/svg+xml;base64,...)
