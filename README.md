@@ -32,6 +32,7 @@
 ![Build](https://img.shields.io/badge/Build-Passing-success)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 ![PRs Welcome](https://img.shields.io/badge/PRs-Welcome-brightgreen)
+![Current Version](https://img.shields.io/github/v/release/adhamhaithameid/Classroom-Quick-Downloader?label=Version&color=blue)
 
 <!-- Uptime Kuma Live Status -->
 
