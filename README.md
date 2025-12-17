@@ -51,6 +51,34 @@
 
 ---
 
+## 📖 The Backstory: From a Bored Student to a Distributed System
+
+As a software engineer, I found myself trapped in a loop of repetitive, manual labor every time I needed course materials. Downloading files one-by-one wasn't just slow—it felt like a technical debt I was paying every day. Eventually, the "misery" of clicking through dozens of links became too much to ignore.
+
+### The Paper Manifesto
+
+The plan for CQD didn't start in an IDE; it started on a piece of paper during a particularly boring university lecture. Out of pure frustration, I began sketching a solution. What started as a student’s bored scribbles quickly evolved into a rigorous system architecture, complete with data flow diagrams and a security-first mindset.
+
+### The Evolution
+
+I moved the plan from paper to Notion, created this repository, and began tracking the technical journey through GitHub issues.
+
+* **V1:** A raw prototype built with native JavaScript.
+* **Modern Stack:** After several iterations, I migrated to the **WXT** framework to build a robust, production-grade extension.
+
+### Validating the Pain
+
+To ensure I wasn't alone in this frustration, I conducted a local survey among my colleagues. The results were unanimous: everyone was struggling. This "misery" reaches its peak during final exams, when we all rush to download massive amounts of study material, and every second wasted on manual clicks counts.
+
+### 🛡️ The Misery Cure (Mostly Universal)
+I've spent countless hours testing this extension across multiple browsers and operating systems to ensure every student has access to the "cure." Whether you are on Windows, Mac, or Linux, or using Chrome, Edge, or Firefox—I've got you covered. 
+
+*(Wait, What about Safari? We don't talk about Safari. You're on your own there, buddy.)*
+
+**CQD is built by a student, for students.** It’s a tool rooted in human connection and shared academic trauma, designed to make your student life just a little bit more bearable.
+
+---
+
 ## 📂 Project Modules & Documentation
 
 > **This is a complex distributed system.** Each module has its own comprehensive README with implementation details, API references, and configuration guides. Start here for the big picture, then dive into the module you're working on.
@@ -156,19 +184,21 @@ Every download attempt in the [Extension](./extension/) triggers an analytics ev
 2. **📤 Batch & Send (Client → Edge)** — When the queue reaches 50 events (or after a time threshold), the extension POSTs the batch to the [Cloudflare Worker](./cloudflare-worker/).
 3. **🔄 Buffer & Aggregate (Edge)** — The [Worker](./cloudflare-worker/) forwards events to its [Durable Object](./cloudflare-worker/README.md#why-durable-objects), which:
 
-   - Persists events in memory (survives Worker restarts).
-   - Aggregates counters: by browser, by OS, by country, by file type.
-   - Calculates "Top" stats: most common browser, most active country, etc.
+* Persists events in memory (survives Worker restarts).
+* Aggregates counters: by browser, by OS, by country, by file type.
+* Calculates "Top" stats: most common browser, most active country, etc.
+
 4. **🚀 Flush (Edge → Backend)** — When the buffer exceeds `MAX_BATCH_EVENTS` or an alarm fires, the DO sends a pre-aggregated JSON payload to the [Oracle Backend](./oracle-backend/).
 5. **💾 Store (Backend)** — The [Backend](./oracle-backend/) receives the batch, deduplicates by `batchId`, and stores:
 
-   - Raw batch metadata in `batches` table.
-   - Hourly aggregates in `downloads_hourly` table.
-   - Lifetime totals in `downloads_totals` key-value table.
-6. **📊 Archive (Backend → Sheets)** — At midnight UTC, a cron job runs the [Archiver](./oracle-backend/README.md#-google-sheets-archiver), which:
+* Raw batch metadata in `batches` table.
+* Hourly aggregates in `downloads_hourly` table.
+* Lifetime totals in `downloads_totals` key-value table.
 
-   - Fetches the current summary from the local API.
-   - Appends a row to Google Sheets with all dimension breakdowns.
+6. **📊 Archive (Backend → Sheets)** — At midnight UTC, a cron job runs the [Archiver](./oracle-backend/README.md%23-google-sheets-archiver), which:
+
+* Fetches the current summary from the local API.
+* Appends a row to Google Sheets with all dimension breakdowns.
 
 ---
 
@@ -180,10 +210,10 @@ Every download attempt in the [Extension](./extension/) triggers an analytics ev
 
 **Solution:** [Durable Objects](./cloudflare-worker/README.md) act as a **global buffer**. All events for a given namespace (e.g., "downloads") are routed to the *same* instance, regardless of which edge location receives the request. This provides:
 
-- **Strong consistency** — No split-brain, no race conditions.
-- **Persistence** — State survives Worker restarts.
-- **Rate limiting** — We control how often we flush to the backend.
-- **Pre-aggregation** — Compute "Top Browser" before sending, saving backend CPU.
+* **Strong consistency** — No split-brain, no race conditions.
+* **Persistence** — State survives Worker restarts.
+* **Rate limiting** — We control how often we flush to the backend.
+* **Pre-aggregation** — Compute "Top Browser" before sending, saving backend CPU.
 
 ### Why Go + SQLite?
 
@@ -191,10 +221,10 @@ Every download attempt in the [Extension](./extension/) triggers an analytics ev
 
 **Solution:** [Go with pure-Go SQLite](./oracle-backend/README.md) (no CGO) gives us:
 
-- **Single binary deployment** — No runtime dependencies.
-- **Zero external services** — No Postgres, no Redis, no connection pooling.
-- **WAL mode** — Concurrent reads while writing.
-- **ARM64 optimized** — Native compilation for Ampere A1.
+* **Single binary deployment** — No runtime dependencies.
+* **Zero external services** — No Postgres, no Redis, no connection pooling.
+* **WAL mode** — Concurrent reads while writing.
+* **ARM64 optimized** — Native compilation for Ampere A1.
 
 ### Why WXT?
 
@@ -202,10 +232,10 @@ Every download attempt in the [Extension](./extension/) triggers an analytics ev
 
 **Solution:** [WXT](./extension/README.md) provides:
 
-- **File-system routing** — `popup/index.html`, `background.ts`, `*.content.ts` just work.
-- **Hot Module Replacement** — See changes instantly during development.
-- **Cross-browser builds** — Chrome and Firefox from the same codebase.
-- **TypeScript-first** — Auto-imports, type safety, and modern DX.
+* **File-system routing** — `popup/index.html`, `background.ts`, `*.content.ts` just work.
+* **Hot Module Replacement** — See changes instantly during development.
+* **Cross-browser builds** — Chrome and Firefox from the same codebase.
+* **TypeScript-first** — Auto-imports, type safety, and modern DX.
 
 ---
 
@@ -224,17 +254,17 @@ Every download attempt in the [Extension](./extension/) triggers an analytics ev
 
 ### For Users
 
-- **📦 Bulk Downloads** — Download all files from a Classroom assignment with one click.
-- **🔓 Drive Bypass** — Automatically handles Google Drive's "Download anyway" confirmation pages.
-- **🔄 Multi-Account Support** — Cycles through your Google accounts to find the one with access.
-- **📊 Local Stats** — See your download history right in the [Extension](./extension/) popup.
+* **📦 Bulk Downloads** — Download all files from a Classroom assignment with one click.
+* **🔓 Drive Bypass** — Automatically handles Google Drive's "Download anyway" confirmation pages.
+* **🔄 Multi-Account Support** — Cycles through your Google accounts to find the one with access.
+* **📊 Local Stats** — See your download history right in the [Extension](./extension/) popup.
 
 ### For Developers
 
-- **📈 Real-time Dashboard** — Monitor download events, success rates, and breakdowns by browser/OS/country.
-- **⏱️ Time-Series Analytics** — Hourly and daily granularity for trend analysis.
-- **📋 Google Sheets Archive** — Automated daily exports for long-term reporting.
-- **🔒 Privacy-First** — No PII collected. Only file types, durations, and success/fail status.
+* **📈 Real-time Dashboard** — Monitor download events, success rates, and breakdowns by browser/OS/country.
+* **⏱️ Time-Series Analytics** — Hourly and daily granularity for trend analysis.
+* **📋 Google Sheets Archive** — Automated daily exports for long-term reporting.
+* **🔒 Privacy-First** — No PII collected. Only file types, durations, and success/fail status.
 
 ---
 
@@ -301,11 +331,11 @@ This script:
 Deploying CQD involves three independent deployments:
 
 
-| Component        | Platform              | Guide                                                                           |
-| ---------------- | --------------------- | ------------------------------------------------------------------------------- |
-| **🏛️ Backend** | Oracle Cloud (Docker) | [DEPLOYMENT.md § Backend](DEPLOYMENT.md#part-1-oracle-backend-deployment)      |
-| **⚡ Worker**    | Cloudflare            | [DEPLOYMENT.md § Worker](DEPLOYMENT.md#part-2-cloudflare-worker-configuration) |
-| **🧩 Extension** | Chrome Web Store      | [Extension README](./extension/README.md#build-for-production)                  |
+| Component        | Platform              | Guide                                                                                                             |
+| ---------------- | --------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| **🏛️ Backend** | Oracle Cloud (Docker) | [DEPLOYMENT.md § Backend](DEPLOYMENT.md%23part-1-oracle-backend-deployment)      |
+| **⚡ Worker**    | Cloudflare            | [DEPLOYMENT.md § Worker](DEPLOYMENT.md%23part-2-cloudflare-worker-configuration) |
+| **🧩 Extension** | Chrome Web Store      | [Extension README](./extension/README.md%23build-for-production)                  |
 
 > **📘 See [DEPLOYMENT.md](DEPLOYMENT.md) for the complete step-by-step guide.**
 
@@ -356,12 +386,12 @@ sequenceDiagram
 ## 🔒 Security & Privacy
 
 
-| Concern                | Implementation                                                                                              |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Concern                | Implementation                                                                                                                                                              |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Authentication**     | Shared secret (`DO_SHARED_SECRET`) between [Worker](./cloudflare-worker/) and [Backend](./oracle-backend/). |
-| **Data Privacy**       | No usernames, emails, or file names collected. Only: file type, browser, OS, country, duration.             |
-| **Transport**          | All external communication over HTTPS.                                                                      |
-| **Secrets Management** | Cloudflare Secrets API + Docker environment variables. Never committed to git.                              |
+| **Data Privacy**       | No usernames, emails, or file names collected. Only: file type, browser, OS, country, duration.                                                                             |
+| **Transport**          | All external communication over HTTPS.                                                                                                                                      |
+| **Secrets Management** | Cloudflare Secrets API + Docker environment variables. Never committed to git.                                                                                              |
 
 ---
 
@@ -372,12 +402,12 @@ Production systems require production-grade monitoring. CQD uses a self-hosted *
 ### Active Monitors
 
 
-| Monitor                        | Type                     | Target                                        | What It Checks                                                            |
-| ------------------------------ | ------------------------ | --------------------------------------------- | ------------------------------------------------------------------------- |
+| Monitor                        | Type                     | Target                                                                        | What It Checks                                                            |
+| ------------------------------ | ------------------------ | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
 | **🌐 Edge Availability**       | HTTP(S)                  | [Worker](./cloudflare-worker/) `/health`      | Cloudflare Worker is globally reachable and routing to the Durable Object |
 | **🚀 API Health**              | HTTP                     | [Backend](./oracle-backend/) `GET /health`    | Go server is running and accepting connections                            |
 | **🗄️ Database Integrity**    | HTTP                     | [Backend](./oracle-backend/) `GET /health/db` | SQLite is writable and not locked (WAL mode healthy)                      |
-| **⏱️ Cron Job Verification** | Push (Dead Man's Switch) | Archiver cron                                 | Daily`archive-stats` job completed successfully                           |
+| **⏱️ Cron Job Verification** | Push (Dead Man's Switch) | Archiver cron                                                                 | Daily`archive-stats` job completed successfully                           |
 
 ### How Cron Monitoring Works
 
@@ -451,7 +481,6 @@ For commercial inquiries or modification requests, please contact me directly.
 <div align="center">
 
 **Built with ☕ by [Adham Haitham](https://github.com/adhamhaithameid)**
-
 *A sophisticated analytics pipeline masquerading as a simple productivity tool.*
 
 </div>
