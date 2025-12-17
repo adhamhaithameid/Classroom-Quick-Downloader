@@ -55,18 +55,18 @@
 
 As a software engineer, I found myself trapped in a loop of repetitive, manual labor every time I needed course materials. Downloading files one-by-one wasn't just slow—it felt like a technical debt I was paying every day. Eventually, the "misery" of clicking through dozens of links became too much to ignore.
 
-### The Paper Manifesto
+### 📝 The Paper Manifesto
 
 The plan for CQD didn't start in an IDE; it started on a piece of paper during a particularly boring university lecture. Out of pure frustration, I began sketching a solution. What started as a student’s bored scribbles quickly evolved into a rigorous system architecture, complete with data flow diagrams and a security-first mindset.
 
-### The Evolution
+### 📈 The Evolution
 
 I moved the plan from paper to Notion, created this repository, and began tracking the technical journey through GitHub issues.
 
 * **V1:** A raw prototype built with native JavaScript.
 * **Modern Stack:** After several iterations, I migrated to the **WXT** framework to build a robust, production-grade extension.
 
-### Validating the Pain
+### 🧪 Validating the Pain
 
 To ensure I wasn't alone in this frustration, I conducted a local survey among my colleagues. The results were unanimous: everyone was struggling. This "misery" reaches its peak during final exams, when we all rush to download massive amounts of study material, and every second wasted on manual clicks counts.
 
