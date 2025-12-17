@@ -3,17 +3,24 @@
 # 🎓 Classroom Quick Downloader
 
 <!-- Client Stack -->
+
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white)
 ![Vite](https://img.shields.io/badge/Vite-Powered-646CFF?logo=vite&logoColor=white)
 ![WXT](https://img.shields.io/badge/WXT-Framework-7C3AED)
-![Chrome Web Store](https://img.shields.io/badge/Chrome_Web_Store-Published-4285F4?logo=googlechrome&logoColor=white)
+
+<!-- Browsers Versions -->
+
+![Chrome: Pending Review](https://img.shields.io/badge/Chrome_Web_Store-Pending_Review-yellow?logo=googlechrome&logoColor=white)
+![Firefox: Pending Review](https://img.shields.io/badge/Firefox_Add--ons-Pending_Review-yellow?logo=firefoxbrowser&logoColor=white)
 
 <!-- Edge Stack -->
+
 ![Cloudflare Workers](https://img.shields.io/badge/Cloudflare_Workers-Edge-F38020?logo=cloudflare&logoColor=white)
 ![Durable Objects](https://img.shields.io/badge/Durable_Objects-Stateful-7C3AED)
 
 <!-- Backend Stack -->
+
 ![Go](https://img.shields.io/badge/Go-1.24-00ADD8?logo=go&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-WAL_Mode-003B57?logo=sqlite&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-ARM64-2496ED?logo=docker&logoColor=white)
@@ -21,14 +28,16 @@
 ![Google Sheets](https://img.shields.io/badge/Google_Sheets-API-34A853?logo=googlesheets&logoColor=white)
 
 <!-- Status -->
+
 ![Build](https://img.shields.io/badge/Build-Passing-success)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 ![PRs Welcome](https://img.shields.io/badge/PRs-Welcome-brightgreen)
 
 <!-- Uptime Kuma Live Status -->
-[![Oracle Backend](http://129.151.233.229:3001/api/badge/1/status?style=flat&label=Oracle+Backend)](http://129.151.233.229:3001/status/cqd) 
-[![SQLite Database](http://129.151.233.229:3001/api/badge/2/status?style=flat&label=SQLite+Database)](http://129.151.233.229:3001/status/cqd) 
-[![Cloudflare Worker](http://129.151.233.229:3001/api/badge/4/status?style=flat&label=Cloudflare+Worker+DO)](http://129.151.233.229:3001/status/cqd) 
+
+[![Oracle Backend](http://129.151.233.229:3001/api/badge/1/status?style=flat&label=Oracle+Backend)](http://129.151.233.229:3001/status/cqd)
+[![SQLite Database](http://129.151.233.229:3001/api/badge/2/status?style=flat&label=SQLite+Database)](http://129.151.233.229:3001/status/cqd)
+[![Cloudflare Worker](http://129.151.233.229:3001/api/badge/4/status?style=flat&label=Cloudflare+Worker+DO)](http://129.151.233.229:3001/status/cqd)
 [![Daily Archiver](http://129.151.233.229:3001/api/badge/3/status?style=flat&label=Daily+Archiver)](http://129.151.233.229:3001/status/cqd)
 
 ---
@@ -45,12 +54,13 @@
 
 > **This is a complex distributed system.** Each module has its own comprehensive README with implementation details, API references, and configuration guides. Start here for the big picture, then dive into the module you're working on.
 
-| Module | Description | Documentation |
-|--------|-------------|---------------|
-| **🧩 Extension** | Browser extension for bulk downloading from Google Classroom. Built with WXT + React. | [Read Extension Docs →](./extension/README.md) |
-| **⚡ Worker** | Edge ingestion layer on Cloudflare. Buffers events in Durable Objects and pre-aggregates data. | [Read Worker Docs →](./cloudflare-worker/README.md) |
-| **🏛️ Backend** | Go server with SQLite storage, analytics API, and Google Sheets archiver. | [Read Backend Docs →](./oracle-backend/README.md) |
-| **🛠️ Tools** | DevOps scripts for validation, pipeline testing, and deployment automation. | [View Scripts →](./tools/) |
+
+| Module           | Description                                                                                    | Documentation                                        |
+| ---------------- | ---------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| **🧩 Extension** | Browser extension for bulk downloading from Google Classroom. Built with WXT + React.          | [Read Extension Docs →](./extension/README.md)      |
+| **⚡ Worker**    | Edge ingestion layer on Cloudflare. Buffers events in Durable Objects and pre-aggregates data. | [Read Worker Docs →](./cloudflare-worker/README.md) |
+| **🏛️ Backend** | Go server with SQLite storage, analytics API, and Google Sheets archiver.                      | [Read Backend Docs →](./oracle-backend/README.md)   |
+| **🛠️ Tools**   | DevOps scripts for validation, pipeline testing, and deployment automation.                    | [View Scripts →](./tools/)                          |
 
 ---
 
@@ -61,7 +71,7 @@ CQD is not just a browser extension—it's a **distributed analytics system** de
 ```mermaid
 graph TD
     User((👤 Student)) -->|Clicks Download| Ext[🧩 Chrome Extension]
-    
+  
     subgraph Client Side
       Ext -->|Batch Logic| DL[Download Queue]
       Ext -->|Anon Stats| Reporter[Analytics Reporter]
@@ -142,22 +152,20 @@ graph TD
 Every download attempt in the [Extension](./extension/) triggers an analytics event. Here's its complete journey through the system:
 
 1. **📥 Capture (Client)** — The [Extension](./extension/) records: file type, browser, OS, duration, and success/fail status. Events are queued locally in `chrome.storage`.
-
 2. **📤 Batch & Send (Client → Edge)** — When the queue reaches 50 events (or after a time threshold), the extension POSTs the batch to the [Cloudflare Worker](./cloudflare-worker/).
-
 3. **🔄 Buffer & Aggregate (Edge)** — The [Worker](./cloudflare-worker/) forwards events to its [Durable Object](./cloudflare-worker/README.md#why-durable-objects), which:
+
    - Persists events in memory (survives Worker restarts).
    - Aggregates counters: by browser, by OS, by country, by file type.
    - Calculates "Top" stats: most common browser, most active country, etc.
-
 4. **🚀 Flush (Edge → Backend)** — When the buffer exceeds `MAX_BATCH_EVENTS` or an alarm fires, the DO sends a pre-aggregated JSON payload to the [Oracle Backend](./oracle-backend/).
-
 5. **💾 Store (Backend)** — The [Backend](./oracle-backend/) receives the batch, deduplicates by `batchId`, and stores:
+
    - Raw batch metadata in `batches` table.
    - Hourly aggregates in `downloads_hourly` table.
    - Lifetime totals in `downloads_totals` key-value table.
-
 6. **📊 Archive (Backend → Sheets)** — At midnight UTC, a cron job runs the [Archiver](./oracle-backend/README.md#-google-sheets-archiver), which:
+
    - Fetches the current summary from the local API.
    - Appends a row to Google Sheets with all dimension breakdowns.
 
@@ -202,11 +210,12 @@ Every download attempt in the [Extension](./extension/) triggers an analytics ev
 
 ## 🛠️ Tech Stack Matrix
 
-| Layer | Language | Key Technologies | Data Flow |
-|-------|----------|------------------|-----------|
-| **🧩 Client** | TypeScript | [WXT](./extension/), React 19, Chrome APIs | Captures events → Queues locally → Batches to Edge |
-| **⚡ Edge** | TypeScript | [Cloudflare Workers](./cloudflare-worker/), Durable Objects | Buffers events → Aggregates → Flushes to Backend |
-| **🏛️ Backend** | Go | [net/http](./oracle-backend/), SQLite (pure Go), Docker | Stores batches → Serves API → Archives to Sheets |
+
+| Layer            | Language   | Key Technologies                                            | Data Flow                                            |
+| ---------------- | ---------- | ----------------------------------------------------------- | ---------------------------------------------------- |
+| **🧩 Client**    | TypeScript | [WXT](./extension/), React 19, Chrome APIs                  | Captures events → Queues locally → Batches to Edge |
+| **⚡ Edge**      | TypeScript | [Cloudflare Workers](./cloudflare-worker/), Durable Objects | Buffers events → Aggregates → Flushes to Backend   |
+| **🏛️ Backend** | Go         | [net/http](./oracle-backend/), SQLite (pure Go), Docker     | Stores batches → Serves API → Archives to Sheets   |
 
 ---
 
@@ -232,13 +241,14 @@ Every download attempt in the [Extension](./extension/) triggers an analytics ev
 
 ### Prerequisites
 
-| Tool | Version | Purpose |
-|------|---------|---------|
-| [Node.js](https://nodejs.org/) | 20+ | [Extension](./extension/) and [Worker](./cloudflare-worker/) development |
-| [pnpm](https://pnpm.io/) | 8+ | Monorepo package management |
-| [Go](https://go.dev/) | 1.24+ | [Oracle Backend](./oracle-backend/) |
-| [Docker](https://docker.com/) | 20+ | [Backend](./oracle-backend/) deployment |
-| [Wrangler](https://developers.cloudflare.com/workers/wrangler/) | Latest | [Cloudflare Worker](./cloudflare-worker/) CLI |
+
+| Tool                                                            | Version | Purpose                                                                  |
+| --------------------------------------------------------------- | ------- | ------------------------------------------------------------------------ |
+| [Node.js](https://nodejs.org/)                                  | 20+     | [Extension](./extension/) and [Worker](./cloudflare-worker/) development |
+| [pnpm](https://pnpm.io/)                                        | 8+      | Monorepo package management                                              |
+| [Go](https://go.dev/)                                           | 1.24+   | [Oracle Backend](./oracle-backend/)                                      |
+| [Docker](https://docker.com/)                                   | 20+     | [Backend](./oracle-backend/) deployment                                  |
+| [Wrangler](https://developers.cloudflare.com/workers/wrangler/) | Latest  | [Cloudflare Worker](./cloudflare-worker/) CLI                            |
 
 ### Quick Start
 
@@ -289,11 +299,12 @@ This script:
 
 Deploying CQD involves three independent deployments:
 
-| Component | Platform | Guide |
-|-----------|----------|-------|
-| **🏛️ Backend** | Oracle Cloud (Docker) | [DEPLOYMENT.md § Backend](DEPLOYMENT.md#part-1-oracle-backend-deployment) |
-| **⚡ Worker** | Cloudflare | [DEPLOYMENT.md § Worker](DEPLOYMENT.md#part-2-cloudflare-worker-configuration) |
-| **🧩 Extension** | Chrome Web Store | [Extension README](./extension/README.md#build-for-production) |
+
+| Component        | Platform              | Guide                                                                           |
+| ---------------- | --------------------- | ------------------------------------------------------------------------------- |
+| **🏛️ Backend** | Oracle Cloud (Docker) | [DEPLOYMENT.md § Backend](DEPLOYMENT.md#part-1-oracle-backend-deployment)      |
+| **⚡ Worker**    | Cloudflare            | [DEPLOYMENT.md § Worker](DEPLOYMENT.md#part-2-cloudflare-worker-configuration) |
+| **🧩 Extension** | Chrome Web Store      | [Extension README](./extension/README.md#build-for-production)                  |
 
 > **📘 See [DEPLOYMENT.md](DEPLOYMENT.md) for the complete step-by-step guide.**
 
@@ -343,12 +354,13 @@ sequenceDiagram
 
 ## 🔒 Security & Privacy
 
-| Concern | Implementation |
-|---------|----------------|
-| **Authentication** | Shared secret (`DO_SHARED_SECRET`) between [Worker](./cloudflare-worker/) and [Backend](./oracle-backend/). |
-| **Data Privacy** | No usernames, emails, or file names collected. Only: file type, browser, OS, country, duration. |
-| **Transport** | All external communication over HTTPS. |
-| **Secrets Management** | Cloudflare Secrets API + Docker environment variables. Never committed to git. |
+
+| Concern                | Implementation                                                                                              |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------- |
+| **Authentication**     | Shared secret (`DO_SHARED_SECRET`) between [Worker](./cloudflare-worker/) and [Backend](./oracle-backend/). |
+| **Data Privacy**       | No usernames, emails, or file names collected. Only: file type, browser, OS, country, duration.             |
+| **Transport**          | All external communication over HTTPS.                                                                      |
+| **Secrets Management** | Cloudflare Secrets API + Docker environment variables. Never committed to git.                              |
 
 ---
 
@@ -358,12 +370,13 @@ Production systems require production-grade monitoring. CQD uses a self-hosted *
 
 ### Active Monitors
 
-| Monitor | Type | Target | What It Checks |
-|---------|------|--------|----------------|
-| **🌐 Edge Availability** | HTTP(S) | [Worker](./cloudflare-worker/) `/health` | Cloudflare Worker is globally reachable and routing to the Durable Object |
-| **🚀 API Health** | HTTP | [Backend](./oracle-backend/) `GET /health` | Go server is running and accepting connections |
-| **🗄️ Database Integrity** | HTTP | [Backend](./oracle-backend/) `GET /health/db` | SQLite is writable and not locked (WAL mode healthy) |
-| **⏱️ Cron Job Verification** | Push (Dead Man's Switch) | Archiver cron | Daily `archive-stats` job completed successfully |
+
+| Monitor                        | Type                     | Target                                        | What It Checks                                                            |
+| ------------------------------ | ------------------------ | --------------------------------------------- | ------------------------------------------------------------------------- |
+| **🌐 Edge Availability**       | HTTP(S)                  | [Worker](./cloudflare-worker/) `/health`      | Cloudflare Worker is globally reachable and routing to the Durable Object |
+| **🚀 API Health**              | HTTP                     | [Backend](./oracle-backend/) `GET /health`    | Go server is running and accepting connections                            |
+| **🗄️ Database Integrity**    | HTTP                     | [Backend](./oracle-backend/) `GET /health/db` | SQLite is writable and not locked (WAL mode healthy)                      |
+| **⏱️ Cron Job Verification** | Push (Dead Man's Switch) | Archiver cron                                 | Daily`archive-stats` job completed successfully                           |
 
 ### How Cron Monitoring Works
 
@@ -413,13 +426,16 @@ This page shows real-time status, uptime percentages, and incident history—use
 This project is **Source Available**. You are welcome to review the code and share it, but modification and derivative works are not permitted without permission.
 
 ### Found a bug or have a suggestion?
+
 We strictly do **not** accept Pull Requests or Code Modifications from the public. However, we value your feedback!
 
 Please report issues or suggestions via:
-1.  **GitHub Issues:** [Open an Issue here](../../issues)
-2.  **Feedback Form:** [Submit via Google Forms](https://docs.google.com/forms/d/1nB95r35O_h98odg8Y6_OrfYdjKGBqhrUCb_wFHA-RA8/edit)
+
+1. **GitHub Issues:** [Open an Issue here](../../issues)
+2. **Feedback Form:** [Submit via Google Forms](https://docs.google.com/forms/d/1nB95r35O_h98odg8Y6_OrfYdjKGBqhrUCb_wFHA-RA8/edit)
 
 ### ⚠️ Licensing & Usage
+
 This software is **Proprietary & Source Available**. Copyright © 2025 Adham Haitham. All Rights Reserved.
 
 * ✅ **You can:** View, read, and use the extension for personal, non-commercial purposes.
