@@ -11,8 +11,9 @@
 
 <!-- Browsers Versions -->
 
-![Chrome: Pending Review](https://img.shields.io/badge/Chrome_Web_Store-Pending_Review-yellow?logo=googlechrome&logoColor=white)
-![Firefox: Pending Review](https://img.shields.io/badge/Firefox_Add--ons-Pending_Review-yellow?logo=firefoxbrowser&logoColor=white)
+[![Chrome](https://img.shields.io/badge/Chrome-Pending_Review-yellow?logo=googlechrome&logoColor=white)](https://chrome.google.com/webstore)
+[![Firefox](https://img.shields.io/badge/Firefox-Pending_Review-yellow?logo=firefoxbrowser&logoColor=white)](https://addons.mozilla.org)
+[![Edge](https://img.shields.io/badge/Edge-Pending_Review-yellow?logo=microsoft-edge&logoColor=white)](https://microsoftedge.microsoft.com/addons)
 
 <!-- Edge Stack -->
 
@@ -45,7 +46,7 @@
 
 **Downloading files from Google Classroom shouldn't feel like a chore.** CQD transforms bulk file downloads into a single click while powering an enterprise-grade analytics pipeline that tracks millions of download events at the edge.
 
-[📦 Extension](#-the-extension-client) · [⚡ Worker](#-the-worker-edge) · [🏛️ Backend](#-the-backend-sink) · [🚀 Getting Started](#-getting-started) · [📘 Deployment](DEPLOYMENT.md)
+[📦 Get the Extension](#-installation) · [📖 Documentation](#-documentation) · [🏗️ Architecture](ARCHITECTURE.md) · [🔒 Privacy](PRIVACY.md)
 
 </div>
 
@@ -284,186 +285,38 @@ Every download attempt in the [Extension](./extension/) triggers an analytics ev
 ### Quick Start
 
 ```bash
-# Clone the repository
+# Clone and install
 git clone https://github.com/adhamhaithameid/Classroom-Quick-Downloader.git
 cd Classroom-Quick-Downloader
-
-# Install all dependencies (monorepo)
 pnpm install
 
-# Run the extension in development mode
+# Run extension in dev mode
 cd extension && pnpm dev
 ```
 
-### Full Validation Suite
+---
 
-Run static analysis, type checking, and local health probes:
+## 🔒 Privacy
 
-```bash
-./tools/validate.sh
-```
+We collect **anonymous usage metrics** only—never your files, passwords, or personal information.
 
-This script:
+| ✅ We Collect | ❌ We Never Collect |
+|--------------|---------------------|
+| File types (pdf, docx) | File contents |
+| Browser & OS | Usernames or emails |
+| Success/fail status | Google credentials |
+| Country (from IP) | Browsing history |
 
-1. Lints the [Cloudflare Worker](./cloudflare-worker/) (`eslint`).
-2. Type-checks the [Worker](./cloudflare-worker/) (`tsc --noEmit`).
-3. Audits npm dependencies.
-4. Runs a local Worker health check.
-
-### Test the Analytics Pipeline
-
-Simulate the full data flow from [Extension](./extension/) → [Worker](./cloudflare-worker/) → [Backend](./oracle-backend/):
-
-```bash
-./tools/test_pipeline.sh
-```
-
-This script:
-
-1. Sends mock events to the [Worker](./cloudflare-worker/).
-2. Triggers a force-flush.
-3. Verifies data appears in the [Backend](./oracle-backend/).
+> **📘 Full details in [PRIVACY.md](PRIVACY.md)**
 
 ---
 
-## 🚢 Deployment
+## 🤝 Feedback
 
-Deploying CQD involves three independent deployments:
+Found a bug? Have a suggestion? We'd love to hear from you.
 
-
-| Component        | Platform              | Guide                                                                                                             |
-| ---------------- | --------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| **🏛️ Backend** | Oracle Cloud (Docker) | [DEPLOYMENT.md § Backend](DEPLOYMENT.md%23part-1-oracle-backend-deployment)      |
-| **⚡ Worker**    | Cloudflare            | [DEPLOYMENT.md § Worker](DEPLOYMENT.md%23part-2-cloudflare-worker-configuration) |
-| **🧩 Extension** | Chrome Web Store      | [Extension README](./extension/README.md%23build-for-production)                  |
-
-> **📘 See [DEPLOYMENT.md](DEPLOYMENT.md) for the complete step-by-step guide.**
-
-### Quick Reference
-
-```bash
-# Deploy Oracle Backend
-cd oracle-backend && ./deploy.sh
-
-# Deploy Cloudflare Worker
-cd cloudflare-worker
-npx wrangler secret put DO_SHARED_SECRET
-npm run deploy
-
-# Build Extension for Web Store
-cd extension && npm run zip
-```
-
----
-
-## 📊 Analytics Flow Summary
-
-```mermaid
-sequenceDiagram
-    participant User as Browser Extension
-    participant Worker as Cloudflare Worker
-    participant DO as Durable Object
-    participant Backend as Oracle Backend
-    participant Sheets as Google Sheets
-
-    User->>Worker: POST /track (batched events)
-    Worker->>DO: Forward to Durable Object
-    DO->>DO: Buffer + Aggregate
-    DO-->>Worker: Ack
-    Worker-->>User: 200 OK
-
-    Note over DO: When buffer >= threshold
-    DO->>Backend: POST /ingest-batch
-    Backend->>Backend: Store in SQLite
-    Backend-->>DO: 200 OK
-
-    Note over Backend: Daily at midnight
-    Backend->>Sheets: Append daily summary
-```
-
----
-
-## 🔒 Security & Privacy
-
-
-| Concern                | Implementation                                                                                                                                                              |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Authentication**     | Shared secret (`DO_SHARED_SECRET`) between [Worker](./cloudflare-worker/) and [Backend](./oracle-backend/). |
-| **Data Privacy**       | No usernames, emails, or file names collected. Only: file type, browser, OS, country, duration.                                                                             |
-| **Transport**          | All external communication over HTTPS.                                                                                                                                      |
-| **Secrets Management** | Cloudflare Secrets API + Docker environment variables. Never committed to git.                                                                                              |
-
----
-
-## 🩺 System Health & Monitoring
-
-Production systems require production-grade monitoring. CQD uses a self-hosted **Uptime Kuma** instance running on the Oracle Cloud VM to monitor every layer of the analytics stack.
-
-### Active Monitors
-
-
-| Monitor                        | Type                     | Target                                                                        | What It Checks                                                            |
-| ------------------------------ | ------------------------ | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| **🌐 Edge Availability**       | HTTP(S)                  | [Worker](./cloudflare-worker/) `/health`      | Cloudflare Worker is globally reachable and routing to the Durable Object |
-| **🚀 API Health**              | HTTP                     | [Backend](./oracle-backend/) `GET /health`    | Go server is running and accepting connections                            |
-| **🗄️ Database Integrity**    | HTTP                     | [Backend](./oracle-backend/) `GET /health/db` | SQLite is writable and not locked (WAL mode healthy)                      |
-| **⏱️ Cron Job Verification** | Push (Dead Man's Switch) | Archiver cron                                                                 | Daily`archive-stats` job completed successfully                           |
-
-### How Cron Monitoring Works
-
-The archiver uses a **Push Monitor** (Dead Man's Switch pattern):
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│   CRON: 0 0 * * * /app/archiver && curl <push-url>         │
-└──────────────────────────────┬──────────────────────────────┘
-                               │ (on success)
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│   UPTIME KUMA: Expects heartbeat within 24h + grace        │
-│   No heartbeat? → Email/Discord/Slack alert triggered      │
-└─────────────────────────────────────────────────────────────┘
-```
-
-If the cron job fails to run, the archiver crashes, or the Google Sheets upload fails—we get alerted automatically.
-
-### Deployment
-
-Start the monitoring stack with a single Docker command:
-
-```bash
-docker run -d \
-  --restart=always \
-  -p 3001:3001 \
-  -v uptime-kuma:/app/data \
-  --name uptime-kuma \
-  louislam/uptime-kuma:latest
-```
-
-### Public Status Page
-
-Users can check system health at any time:
-
-```
-http://<your-vm-ip>:3001/status/cqd
-```
-
-This page shows real-time status, uptime percentages, and incident history—useful for self-diagnosing issues before opening a support request.
-
----
-
-## 🤝 Feedback & Issues
-
-This project is **Source Available**. You are welcome to review the code and share it, but modification and derivative works are not permitted without permission.
-
-### Found a bug or have a suggestion?
-
-We strictly do **not** accept Pull Requests or Code Modifications from the public. However, we value your feedback!
-
-Please report issues or suggestions via:
-
-1. **GitHub Issues:** [Open an Issue here](../../issues)
-2. **Feedback Form:** [Submit via Google Forms](https://docs.google.com/forms/d/1nB95r35O_h98odg8Y6_OrfYdjKGBqhrUCb_wFHA-RA8/edit)
+- **GitHub Issues:** [Open an Issue](https://github.com/adhamhaithameid/Classroom-Quick-Downloader/issues)
+- **Feedback Form:** [Submit Feedback](https://docs.google.com/forms/d/1nB95r35O_h98odg8Y6_OrfYdjKGBqhrUCb_wFHA-RA8/edit)
 
 ### ⚠️ Licensing & Usage
 
@@ -481,6 +334,7 @@ For commercial inquiries or modification requests, please contact me directly.
 <div align="center">
 
 **Built with ☕ by [Adham Haitham](https://github.com/adhamhaithameid)**
-*A sophisticated analytics pipeline masquerading as a simple productivity tool.*
+
+*A distributed analytics pipeline masquerading as a simple productivity tool.*
 
 </div>
