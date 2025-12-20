@@ -17,7 +17,8 @@
     "zip:edge": "wxt zip -b edge",
     "compile": "tsc --noEmit",
     "postinstall": "wxt prepare",
-    "build:all": "wxt build -b chrome && wxt build -b firefox && wxt build -b safari"
+    "build:all": "wxt build -b chrome && wxt build -b firefox && wxt build -b safari",
+    "zip:all": "wxt zip -b chrome && wxt zip -b firefox && wxt zip -b safari"
   },
   "dependencies": {
     "react": "^19.2.3",

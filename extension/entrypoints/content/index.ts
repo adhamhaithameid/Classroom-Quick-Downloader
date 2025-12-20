@@ -688,19 +688,25 @@ function startBackgroundDownload(
       return;
     }
     try {
+      console.log('[CQD:Content] Sending download message:', { type: 'CQD_DOWNLOAD', url: finalUrl, requestId });
       chrome.runtime.sendMessage(
         { type: 'CQD_DOWNLOAD', url: finalUrl, requestId, fileMeta },
         (response) => {
+          console.log('[CQD:Content] Got response:', response);
+          console.log('[CQD:Content] Last error:', chrome.runtime.lastError?.message);
+
           if (
             chrome.runtime.lastError ||
             !response ||
             response.started === false
           ) {
+            console.log('[CQD:Content] Download failed to start');
             resolve({
               ok: false,
               userMessage: response?.userMessage || 'Could not start.',
             });
           } else {
+            console.log('[CQD:Content] Download started successfully');
             resolve({ ok: true });
           }
         },
@@ -748,8 +754,9 @@ function delay(ms: number): Promise<void> {
  * ---------------------------------------------------*/
 if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
   chrome.runtime.onMessage.addListener(
-    (message, _sender, sendResponse): void | true => {
-      if (!message) return;
+    (message, _sender, sendResponse): boolean => {
+      // Firefox fix: return false for messages we don't handle
+      if (!message) return false;
 
       // Popup asks for this tab's state
       if (message.type === 'CQD_POPUP_QUERY_STATE') {
@@ -776,10 +783,10 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
 
       if (message.type === 'CQD_DOWNLOAD_STATUS') {
         const requestId = message.requestId as string | undefined;
-        if (!requestId) return;
+        if (!requestId) return false;
 
         const pending = pendingButtons.get(requestId);
-        if (!pending) return;
+        if (!pending) return false;
 
         const { button, startedAt } = pending;
         (async () => {
@@ -824,8 +831,10 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
             await showErrorState(button, userMessage);
           }
         })();
-        return;
+        return false; // Firefox fix: no async response needed for status updates
       }
+
+      return false; // Firefox fix: unhandled message types
     },
   );
 }

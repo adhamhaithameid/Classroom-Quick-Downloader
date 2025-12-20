@@ -1,5 +1,5 @@
 // filepath: entrypoints/content/both-badge.ts
-import { COMMENT_ICON_URL, EDIT_ICON_SVG_RAW } from './icons';
+import { COMMENT_ICON_URL, EDIT_ICON_SVG_RAW, appendSvgFromString } from './icons';
 
 const INJECTED_ATTR = 'data-cqd-injected';
 
@@ -128,7 +128,7 @@ export function upgradeCombinedBadge(post: HTMLElement): void {
     
     const editedIcon = document.createElement('div');
     editedIcon.className = 'cqd-both-icon cqd-both-icon-edited';
-    editedIcon.innerHTML = EDIT_ICON_SVG_RAW;
+    appendSvgFromString(editedIcon, EDIT_ICON_SVG_RAW);
     
     const diffValue = document.createElement('span');
     diffValue.className = 'cqd-both-value cqd-both-value-edited';

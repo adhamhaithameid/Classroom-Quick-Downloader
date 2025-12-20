@@ -51,3 +51,28 @@ export const EDIT_ICON_URL = `data:image/svg+xml;utf8,${encodeURIComponent(
 export const COMMENT_ICON_URL = `data:image/svg+xml;utf8,${encodeURIComponent(
   COMMENT_ICON_SVG_RAW
 )}`;
+
+/**
+ * CSP-safe: Parse SVG string and append to container using DOMParser.
+ * Avoids innerHTML which can be blocked by strict CSP in Firefox.
+ */
+export function appendSvgFromString(container: HTMLElement, svgString: string): void {
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(svgString, 'image/svg+xml');
+    const svg = doc.documentElement;
+    
+    // Check for parse errors
+    const parseError = doc.querySelector('parsererror');
+    if (parseError) {
+      console.warn('[CQD] SVG parse error:', parseError.textContent);
+      return;
+    }
+    
+    // Import the node into the current document and append
+    const importedSvg = document.importNode(svg, true);
+    container.appendChild(importedSvg);
+  } catch (err) {
+    console.warn('[CQD] Failed to append SVG:', err);
+  }
+}

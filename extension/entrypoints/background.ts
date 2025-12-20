@@ -55,6 +55,21 @@ const cancelledByUs = new Set<number>();
 const AUTHUSER_CANDIDATES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 const CLASSROOM_URL_PATTERN = /^https:\/\/classroom\.google\.com\//;
 
+/**
+ * Detect if running in Firefox.
+ * Firefox's downloads API doesn't pass auth cookies for cross-origin requests,
+ * so we need to use bypass tab method instead.
+ */
+function isFirefox(): boolean {
+  if (typeof navigator === 'undefined') {
+    console.log('[CQD:BG] isFirefox check: navigator is undefined');
+    return false;
+  }
+  const isFF = /Firefox/i.test(navigator.userAgent);
+  console.log('[CQD:BG] isFirefox check:', { isFF, userAgent: navigator.userAgent });
+  return isFF;
+}
+
 /* ---------------------------------------------
  * Icon / tab context helpers
  * -------------------------------------------*/
@@ -81,10 +96,18 @@ const GRAY_ICON_PATHS: Record<number, string> = {
 };
 
 function setActionIcon(tabId: number, classroom: boolean) {
-  if (typeof chrome === 'undefined' || !chrome.action?.setIcon) return;
+  if (typeof chrome === 'undefined') return;
+  
   const path = classroom ? COLOR_ICON_PATHS : GRAY_ICON_PATHS;
+  
+  // Firefox MV2 uses browserAction, Chrome MV3 uses action
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const actionApi = (chrome as any).action || (chrome as any).browserAction;
+  
+  if (!actionApi?.setIcon) return;
+  
   try {
-    chrome.action.setIcon({ tabId, path });
+    actionApi.setIcon({ tabId, path });
   } catch {
     /* ignore */
   }
@@ -170,7 +193,9 @@ export default defineBackground(() => {
   });
 
   // --- Icon Logic ---
-  if (typeof chrome !== 'undefined' && chrome.tabs && chrome.action) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const hasActionApi = (chrome as any).action || (chrome as any).browserAction;
+  if (typeof chrome !== 'undefined' && chrome.tabs && hasActionApi) {
     try {
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         if (tabs[0]?.id != null) updateIconForTab(tabs[0].id, tabs[0].url);
@@ -205,14 +230,15 @@ export default defineBackground(() => {
    * 1) Messages from drive_bypass.content.ts (Drive tab)
    * -----------------------------------------------------*/
   chrome.runtime.onMessage.addListener((message, sender) => {
-    if (!message || !sender.tab || sender.tab.id == null) return;
+    // Firefox fix: explicitly return false if we won't handle this message
+    if (!message || !sender.tab || sender.tab.id == null) return false;
 
     const tabId = sender.tab.id;
     const pending = pendingByBypassTabId.get(tabId);
 
     // Not related to any bypass tab we're tracking
     if (!pending && typeof message.type === 'string' && message.type.startsWith('CQD_')) {
-      return;
+      return false;
     }
 
     // A) SUCCESS: Drive tab clicked Download / Download anyway
@@ -274,7 +300,9 @@ export default defineBackground(() => {
   /* -------------------------------------------------------
    * 2) onDeterminingFilename - SELF HEALING LOGIC ADDED
    * -----------------------------------------------------*/
-  chrome.downloads.onDeterminingFilename.addListener((item, suggest) => {
+  // Firefox does not support onDeterminingFilename, so we guard this.
+  if (chrome.downloads && chrome.downloads.onDeterminingFilename) {
+    chrome.downloads.onDeterminingFilename.addListener((item, suggest) => {
     // 1. Try finding by ID first
     let pending = pendingByDownloadId.get(item.id);
 
@@ -355,6 +383,7 @@ export default defineBackground(() => {
       suggest({ conflictAction: 'uniquify' });
     }
   });
+  }
 
   /* -------------------------------------------------------
    * 3) onChanged: ANALYTICS TRIGGER
@@ -409,19 +438,25 @@ export default defineBackground(() => {
    * 4) CQD_DOWNLOAD HANDLER
    * -----------------------------------------------------*/
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (!message || message.type !== 'CQD_DOWNLOAD') return;
+    // Firefox fix: Only handle CQD_DOWNLOAD messages in this listener
+    if (!message || message.type !== 'CQD_DOWNLOAD') return false;
+
+    console.log('[CQD:BG] Received CQD_DOWNLOAD message:', { url: message.url, requestId: message.requestId });
 
     const rawUrl = message.url as string | undefined;
     const fileMeta = message.fileMeta as FileMetaMsg | undefined;
     const requestId = message.requestId || `req-${Date.now()}`;
 
     if (!rawUrl) {
+      console.log('[CQD:BG] No rawUrl provided, sending error response');
       sendResponse?.({
         started: false,
         userMessage: 'No valid link found.',
       });
-      return;
+      return true; // Firefox: must return true even for sync responses
     }
+
+    console.log('[CQD:BG] Processing URL:', rawUrl);
 
     const { baseUrl, isDrive } = normalizeUrl(rawUrl);
     const initialAuthUser = isDrive
@@ -459,10 +494,26 @@ export default defineBackground(() => {
     };
 
     if (isDrive) {
+      // FIREFOX WORKAROUND: Firefox's downloads API doesn't pass authentication
+      // cookies for cross-origin requests (like Drive). Skip directly to bypass tab.
+      if (isFirefox()) {
+        console.log('[CQD:BG] Firefox detected - using bypass tab for Drive download');
+        pending.fallbackStarted = true;
+        openDriveBypassTab(pending, pending.baseUrl);
+        respondOnce({
+          started: true,
+          requestId,
+          userMessage: 'Opening Drive tab for download…',
+        });
+        return true;
+      }
+
       const firstUrl =
         typeof pending.currentAuthUser === 'number'
           ? buildUrlWithAuthUser(pending.baseUrl, pending.currentAuthUser)
           : pending.baseUrl;
+
+      console.log('[CQD:BG] Starting Drive download:', { firstUrl, isDrive: true });
 
       chrome.downloads.download(
         {
@@ -471,8 +522,12 @@ export default defineBackground(() => {
           conflictAction: 'uniquify',
         },
         (id) => {
+          console.log('[CQD:BG] Download callback:', { id, lastError: chrome.runtime.lastError?.message });
+          
           if (chrome.runtime.lastError || !id) {
             // download could not even start
+            console.log('[CQD:BG] Download failed to start:', chrome.runtime.lastError?.message);
+            
             recordDownloadEvent({
               type: pending.fileMeta?.ext || 'unknown',
               status: 'fail',
@@ -498,6 +553,7 @@ export default defineBackground(() => {
             return;
           }
 
+          console.log('[CQD:BG] Download started successfully:', { id, requestId });
           pending.currentDownloadId = id;
           pendingByDownloadId.set(id, pending);
           respondOnce({ started: true, requestId, downloadId: id });
@@ -519,6 +575,8 @@ function startSingleAttempt(
   pending: PendingDownload,
   respondOnce?: (payload: any) => void,
 ) {
+  console.log('[CQD:BG] startSingleAttempt (non-Drive):', { url: pending.baseUrl });
+  
   chrome.downloads.download(
     {
       url: pending.baseUrl,
@@ -526,8 +584,12 @@ function startSingleAttempt(
       conflictAction: 'uniquify',
     },
     (downloadId) => {
+      console.log('[CQD:BG] Non-Drive download callback:', { downloadId, lastError: chrome.runtime.lastError?.message });
+      
       if (chrome.runtime.lastError || !downloadId) {
         // could not start a direct download at all
+        console.log('[CQD:BG] Non-Drive download failed:', chrome.runtime.lastError?.message);
+        
         recordDownloadEvent({
           type: pending.fileMeta?.ext || 'unknown',
           status: 'fail',
