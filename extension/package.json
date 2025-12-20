@@ -1,7 +1,7 @@
 {
   "name": "Classroom Quick Downloader",
   "displayName": "Classroom Quick Downloader: One-Click File Saver",
-  "description": "The fastest way to download all Google Classroom materials, assignments, and PDFs in one click. Automatically handles Drive permissions.",
+  "description": "The fastest way to download all Google Classroom materials, assignments, and PDFs in one click.",
   "private": true,
   "version": "1.0.1",
   "type": "module",
