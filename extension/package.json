@@ -1,9 +1,9 @@
 {
-  "name": "classroom-quick-downloader",
-  "displayName": "Classroom Quick Downloader", 
-  "description": "One-click 'Download All' button for Google Classroom. Automatically handles Drive permissions and batch downloads.",
+  "name": "Classroom Quick Downloader",
+  "displayName": "Classroom Quick Downloader: One-Click File Saver",
+  "description": "The fastest way to download all Google Classroom materials, assignments, and PDFs in one click. Automatically handles Drive permissions.",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "scripts": {
     "dev": "wxt",
@@ -20,8 +20,8 @@
     "build:all": "wxt build -b chrome && wxt build -b firefox && wxt build -b safari"
   },
   "dependencies": {
-    "react": "^19.2.1",
-    "react-dom": "^19.2.1"
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3"
   },
   "devDependencies": {
     "@types/react": "^19.2.7",

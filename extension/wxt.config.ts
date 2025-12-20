@@ -4,6 +4,8 @@ import { defineConfig } from 'wxt';
 export default defineConfig({
   modules: ['@wxt-dev/module-react'],
   manifest: {
+    name: "Classroom Quick Downloader: One-Click File Saver",
+    short_name: "Classroom Quick Downloader",
     permissions: [
       'downloads',
       'tabs',
