@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import './App.css';
-import logoSrc from '../../assets/GCD.png';
-import logoGraySrc from '../../assets/GCD_gray.png';
+import logoSrc from '../../assets/CQD.png';
+import logoGraySrc from '../../assets/CQD-gray.png';
 import bmcLogoSrc from '../../public/bmc-logo.svg';
 
 // External Links

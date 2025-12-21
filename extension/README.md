@@ -159,8 +159,8 @@ extension/
 │   └── utils/
 │       └── analytics.ts               # Analytics module
 ├── assets/
-│   ├── GCD.png                        # Color logo
-│   └── GCD_gray.png                   # Grayscale logo (non-Classroom)
+│   ├── CQD.png                        # Color logo
+│   └── CQD-gray.png                   # Grayscale logo (non-Classroom)
 ├── public/
 │   ├── icon/                          # Extension icons (16, 32, 48, 96, 128)
 │   ├── logo.svg                       # SVG logo
