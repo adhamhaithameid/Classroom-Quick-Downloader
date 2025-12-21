@@ -178,7 +178,7 @@ function scanForEditedPosts() {
         // Use the FULL post text (visible text + aria labels)
         const fullPostText =
           (post.innerText || '') + ' ' + getAriaLabelsFromPost(post);
-        diffText = calculateEditDiff(fullPostText, editedWord) ?? '+0';
+        diffText = calculateEditDiff(fullPostText, editedWord) ?? '0';
         found = true;
         break;
       }
@@ -296,7 +296,7 @@ function calculateEditDiff(
     );
     if (diffDays < 0) diffDays = 0;
 
-    return `+${diffDays}`;
+    return `${diffDays}`;
   } catch {
     return null;
   }

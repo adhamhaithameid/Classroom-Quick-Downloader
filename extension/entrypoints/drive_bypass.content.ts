@@ -79,6 +79,27 @@ export default defineContentScript({
             /* ignore */
           }
         }
+
+        /* --------------------------------------------------
+         * 4) Direct Download URL Check (Firefox Fix)
+         *    If we are on a "uc?export=download" page, and we haven't virus-blocked,
+         *    assume success so the button turns green and tab closes.
+         * -------------------------------------------------- */
+        if (url.includes('export=download') && !virusHandled) {
+             // We give it a moment to see if it's a virus warning (handled above),
+             // otherwise we assume it's working/downloading.
+             // We check document.readyState to ensure body text helps us detect virus first.
+             if (document.readyState === 'complete' || document.readyState === 'interactive') {
+                 if (!isVirusWarningPage(bodyText) && !isAccessDeniedPage(bodyText)) {
+                     console.log('[CQD] Direct download URL detected. Signaling success...');
+                     notifySuccessFlood();
+                     // We only need to notify once, but flood handles "ensure delivery".
+                     // To avoid infinite spam, notifySuccessFlood stops itself after a few bursts.
+                     // But we should stop checking here to avoid re-triggering logic.
+                     virusHandled = true; // Use this flag to stop recurring checks
+                 }
+             }
+        }
       };
 
       // Run immediately & keep watching – Drive updates DOM dynamically

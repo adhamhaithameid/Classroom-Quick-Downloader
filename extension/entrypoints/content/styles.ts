@@ -238,12 +238,14 @@ export function injectStyles(): void {
     }
 
     .cqd-download-btn.cqd-error {
-      width: 90px;
+      width: auto;
+      min-width: 90px;
       background-color: var(--cqd-color-error);
       box-shadow: var(--cqd-shadow-error);
       height: 40px;
       max-width: 150px;
       max-height: 40px;
+      padding: 0 12px;
       padding-top: 0;
       padding-bottom: 0;
       align-items: center;

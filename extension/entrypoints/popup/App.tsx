@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import './App.css';
-import logoSrc from '../../assets/GCD.png';
-import logoGraySrc from '../../assets/GCD_gray.png';
+import logoSrc from '../../assets/CQD.png';
+import logoGraySrc from '../../assets/CQD-gray.png';
 import bmcLogoSrc from '../../public/bmc-logo.svg';
 
 // External Links
@@ -107,8 +107,18 @@ function App() {
     // 1. Function to process stats from storage format to Chart format
     const loadStats = async () => {
       try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const result = await (chrome.storage.local as any).get('local_stats');
+        // Wrapper for Firefox which doesn't return Promise for 'chrome' namespace
+        const result = await new Promise<any>((resolve) => {
+           // eslint-disable-next-line @typescript-eslint/no-explicit-any
+           (chrome.storage.local as any).get('local_stats', (res: any) => {
+             // In Firefox/Chrome callback, result is the object
+             if (chrome.runtime.lastError) {
+               resolve({});
+             } else {
+               resolve(res || {});
+             }
+           });
+        });
         const raw = result.local_stats || { total: 0, byType: {} };
         
         setTotalDownloads(raw.total || 0);

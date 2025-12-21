@@ -51,7 +51,7 @@ export function upgradeCombinedBadge(post: HTMLElement): void {
 
   // 2. We have both values. Time to render the "Both" badge.
   const commentCount = rawCount || '0';
-  const diffText = rawDiff || '+0';
+  const diffText = rawDiff || '0';
 
   // Remove separate badges (cleanup)
   post.querySelector('.cqd-comment-badge')?.remove();
