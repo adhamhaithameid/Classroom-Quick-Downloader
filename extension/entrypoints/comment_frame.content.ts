@@ -139,8 +139,9 @@ function stopCommentsFeature(): void {
  * ---------------------------------------------------*/
 if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
   chrome.runtime.onMessage.addListener((message) => {
-    if (!message) return;
-    if (message.type !== 'CQD_POPUP_SET_DESIRED_STATE') return;
+    // Firefox fix: return false for messages we don't handle
+    if (!message) return false;
+    if (message.type !== 'CQD_POPUP_SET_DESIRED_STATE') return false;
     tabEnabled = !!message.enabled;
     if (tabEnabled) {
       whenExtensionEnabled(() => {
@@ -149,6 +150,7 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
     } else {
       stopCommentsFeature();
     }
+    return false; // No async response needed
   });
 }
 

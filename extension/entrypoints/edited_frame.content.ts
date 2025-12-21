@@ -1,5 +1,5 @@
 // filepath: entrypoints/edited_frame.content.ts
-import { EDIT_ICON_SVG_RAW } from './content/icons';
+import { EDIT_ICON_SVG_RAW, appendSvgFromString } from './content/icons';
 import { injectStyles } from './content/styles';
 import { isPageDark } from './content/theme';
 import { t } from './content/i18n';
@@ -132,8 +132,9 @@ function stopEditedFeature(): void {
  * ---------------------------------------------------*/
 if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
   chrome.runtime.onMessage.addListener((message) => {
-    if (!message) return;
-    if (message.type !== 'CQD_POPUP_SET_DESIRED_STATE') return;
+    // Firefox fix: return false for messages we don't handle
+    if (!message) return false;
+    if (message.type !== 'CQD_POPUP_SET_DESIRED_STATE') return false;
     tabEnabled = !!message.enabled;
     if (tabEnabled) {
       whenExtensionEnabled(() => {
@@ -142,6 +143,7 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
     } else {
       stopEditedFeature();
     }
+    return false; // No async response needed
   });
 }
 
@@ -360,7 +362,7 @@ function createEditedOverlay(post: HTMLElement, diffText: string) {
 
     const iconWrapper = document.createElement('div');
     iconWrapper.className = 'cqd-edited-icon';
-    iconWrapper.innerHTML = EDIT_ICON_SVG_RAW;
+    appendSvgFromString(iconWrapper, EDIT_ICON_SVG_RAW);
     pill.appendChild(iconWrapper);
 
     const content = document.createElement('div');
