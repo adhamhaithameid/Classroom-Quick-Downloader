@@ -203,29 +203,57 @@ function getExtensionVersion(): string {
 }
 
 // -------------------------------------------------------
-// Storage helpers
+// Storage helpers (Promisified for Firefox 'chrome' namespace support)
 // -------------------------------------------------------
 
+function storageGet(key: string): Promise<any> {
+  return new Promise((resolve) => {
+    if (typeof chrome === 'undefined' || !chrome.storage?.local) {
+      resolve({});
+      return;
+    }
+    chrome.storage.local.get(key, (result) => {
+      // In Firefox/Chrome callback, result is the object
+      if (chrome.runtime.lastError) {
+        // ignore error
+        resolve({});
+      } else {
+        resolve(result || {});
+      }
+    });
+  });
+}
+
+function storageSet(items: Record<string, any>): Promise<void> {
+  return new Promise((resolve) => {
+    if (typeof chrome === 'undefined' || !chrome.storage?.local) {
+      resolve();
+      return;
+    }
+    chrome.storage.local.set(items, () => {
+      if (chrome.runtime.lastError) {
+        // ignore
+      }
+      resolve();
+    });
+  });
+}
+
 async function loadQueue(): Promise<AnalyticsEvent[]> {
-  if (typeof chrome === 'undefined' || !chrome.storage?.local) return [];
-  const raw = await chrome.storage.local.get(STORAGE_KEY_QUEUE);
+  const raw = await storageGet(STORAGE_KEY_QUEUE);
   const queue = raw[STORAGE_KEY_QUEUE];
   if (!Array.isArray(queue)) return [];
   return queue as AnalyticsEvent[];
 }
 
 async function saveQueue(queue: AnalyticsEvent[]): Promise<void> {
-  if (typeof chrome === 'undefined' || !chrome.storage?.local) return;
-  await chrome.storage.local.set({ [STORAGE_KEY_QUEUE]: queue });
+  await storageSet({ [STORAGE_KEY_QUEUE]: queue });
 }
 
 // --- Config/meta helpers ---
 
 async function loadConfig(): Promise<AnalyticsConfig> {
-  if (typeof chrome === 'undefined' || !chrome.storage?.local) {
-    return DEFAULT_CONFIG;
-  }
-  const raw = await chrome.storage.local.get(STORAGE_KEY_CONFIG);
+  const raw = await storageGet(STORAGE_KEY_CONFIG);
   const stored = raw[STORAGE_KEY_CONFIG] as Partial<AnalyticsConfig> | undefined;
   if (!stored || typeof stored !== 'object') return DEFAULT_CONFIG;
   return {
@@ -253,15 +281,11 @@ async function loadConfig(): Promise<AnalyticsConfig> {
 }
 
 async function saveConfig(cfg: AnalyticsConfig): Promise<void> {
-  if (typeof chrome === 'undefined' || !chrome.storage?.local) return;
-  await chrome.storage.local.set({ [STORAGE_KEY_CONFIG]: cfg });
+  await storageSet({ [STORAGE_KEY_CONFIG]: cfg });
 }
 
 async function loadMeta(): Promise<AnalyticsMeta> {
-  if (typeof chrome === 'undefined' || !chrome.storage?.local) {
-    return DEFAULT_META;
-  }
-  const raw = await chrome.storage.local.get(STORAGE_KEY_META);
+  const raw = await storageGet(STORAGE_KEY_META);
   const meta = raw[STORAGE_KEY_META] as Partial<AnalyticsMeta> | undefined;
   if (!meta || typeof meta !== 'object') return DEFAULT_META;
   return {
@@ -275,8 +299,7 @@ async function loadMeta(): Promise<AnalyticsMeta> {
 }
 
 async function saveMeta(meta: AnalyticsMeta): Promise<void> {
-  if (typeof chrome === 'undefined' || !chrome.storage?.local) return;
-  await chrome.storage.local.set({ [STORAGE_KEY_META]: meta });
+  await storageSet({ [STORAGE_KEY_META]: meta });
 }
 
 function normalizeStats(raw: any): LocalStats {
@@ -324,17 +347,12 @@ function normalizeStats(raw: any): LocalStats {
 }
 
 async function loadStats(): Promise<LocalStats> {
-  if (typeof chrome === 'undefined' || !chrome.storage?.local) {
-    return normalizeStats(null);
-  }
-  const raw = await chrome.storage.local.get(STORAGE_KEY_STATS);
+  const raw = await storageGet(STORAGE_KEY_STATS);
   return normalizeStats(raw[STORAGE_KEY_STATS]);
 }
 
 async function saveStats(stats: LocalStats): Promise<void> {
-  if (typeof chrome === 'undefined' || !chrome.storage?.local) return;
-  stats.lastUpdated = Date.now();
-  await chrome.storage.local.set({ [STORAGE_KEY_STATS]: stats });
+  await storageSet({ [STORAGE_KEY_STATS]: stats });
 }
 
 // -------------------------------------------------------

@@ -1,4 +1,8 @@
-// filepath: extension/entrypoints/background.ts
+/**
+ * Unified background script that delegates to browser-specific implementation.
+ * This allows Firefox and Chrome/Edge to have completely separate download logic
+ * for easier debugging and maintenance.
+ */
 
 import {
   Analytics,
@@ -46,14 +50,24 @@ type PendingDownload = {
   finalized?: boolean;
 };
 
+// --- GLOBAL STATE ---
 const pendingByRequestId = new Map<string, PendingDownload>();
 const pendingByDownloadId = new Map<number, PendingDownload>();
 const pendingByUrl = new Map<string, PendingDownload>();
 const pendingByBypassTabId = new Map<number, PendingDownload>();
 
 const cancelledByUs = new Set<number>();
+const recentDownloads = new Map<string, number>();
 const AUTHUSER_CANDIDATES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 const CLASSROOM_URL_PATTERN = /^https:\/\/classroom\.google\.com\//;
+
+// --- BROWSER DETECTION ---
+function isFirefox(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return /Firefox/i.test(navigator.userAgent);
+}
+
+const IS_FIREFOX = isFirefox();
 
 /* ---------------------------------------------
  * Icon / tab context helpers
@@ -65,34 +79,24 @@ function isClassroomUrl(url?: string | null): boolean {
 }
 
 const COLOR_ICON_PATHS: Record<number, string> = {
-  16: 'icon/16.png',
-  32: 'icon/32.png',
-  48: 'icon/48.png',
-  96: 'icon/96.png',
-  128: 'icon/128.png',
+  16: 'icon/16.png', 32: 'icon/32.png', 48: 'icon/48.png', 96: 'icon/96.png', 128: 'icon/128.png',
 };
 
 const GRAY_ICON_PATHS: Record<number, string> = {
-  16: 'icon/16-gray.png',
-  32: 'icon/32-gray.png',
-  48: 'icon/48-gray.png',
-  96: 'icon/96-gray.png',
-  128: 'icon/128-gray.png',
+  16: 'icon/16-gray.png', 32: 'icon/32-gray.png', 48: 'icon/48-gray.png', 96: 'icon/96-gray.png', 128: 'icon/128-gray.png',
 };
 
 function setActionIcon(tabId: number, classroom: boolean) {
-  if (typeof chrome === 'undefined' || !chrome.action?.setIcon) return;
+  if (typeof chrome === 'undefined') return;
   const path = classroom ? COLOR_ICON_PATHS : GRAY_ICON_PATHS;
-  try {
-    chrome.action.setIcon({ tabId, path });
-  } catch {
-    /* ignore */
-  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const actionApi = (chrome as any).action || (chrome as any).browserAction;
+  if (!actionApi?.setIcon) return;
+  try { actionApi.setIcon({ tabId, path }); } catch {}
 }
 
 function updateIconForTab(tabId: number, url?: string | null) {
-  const classroom = isClassroomUrl(url);
-  setActionIcon(tabId, classroom);
+  setActionIcon(tabId, isClassroomUrl(url));
 }
 
 /* ---------------------------------------------
@@ -106,255 +110,268 @@ function extractAuthUserFromUrl(rawUrl: string): number | undefined {
     const pathMatch = url.pathname.match(/\/u\/(\d+)\//);
     const raw = qp ?? (pathMatch ? pathMatch[1] : undefined);
     if (raw == null) return undefined;
-
     const parsed = parseInt(raw, 10);
-    if (Number.isNaN(parsed)) return undefined;
-    if (!AUTHUSER_CANDIDATES.includes(parsed)) return undefined;
-
+    if (Number.isNaN(parsed) || !AUTHUSER_CANDIDATES.includes(parsed)) return undefined;
     return parsed;
-  } catch {
-    return undefined;
-  }
+  } catch { return undefined; }
+}
+
+function extractDriveFileId(url: string): string | null {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    const idParam = parsed.searchParams.get('id');
+    if (idParam) return idParam;
+    const fileMatch = parsed.pathname.match(/\/file\/d\/([^/]+)/);
+    if (fileMatch) return fileMatch[1];
+    const dMatch = parsed.pathname.match(/\/d\/([^/]+)/);
+    if (dMatch) return dMatch[1];
+    return null;
+  } catch { return null; }
 }
 
 /* ---------------------------------------------
- * Analytics alarm setup (MV3-friendly flushing)
+ * Analytics alarm setup
  * -------------------------------------------*/
 
-const ANALYTICS_FLUSH_ALARM = 'CQD_ANALYTICS_FLUSH';
-const ANALYTICS_CONFIG_ALARM = 'CQD_ANALYTICS_CONFIG';
 let analyticsAlarmInitialized = false;
-
 function ensureAnalyticsAlarm() {
   if (analyticsAlarmInitialized) return;
   if (typeof chrome === 'undefined' || !chrome.alarms) return;
-
   analyticsAlarmInitialized = true;
-
   try {
-    // Flush alarm: check queue & attempt flush every 5 minutes.
-    chrome.alarms.create(ANALYTICS_FLUSH_ALARM, {
-      periodInMinutes: 5,
-    });
-
-    // Config refresh alarm: pull /config every 3 hours.
-    chrome.alarms.create(ANALYTICS_CONFIG_ALARM, {
-      periodInMinutes: 180,
-    });
-
+    chrome.alarms.create('CQD_ANALYTICS_FLUSH', { periodInMinutes: 5 });
+    chrome.alarms.create('CQD_ANALYTICS_CONFIG', { periodInMinutes: 180 });
     chrome.alarms.onAlarm.addListener((alarm) => {
-      if (alarm.name === ANALYTICS_FLUSH_ALARM) {
-        // Fire-and-forget; Analytics has its own opChain & backoff.
-        Analytics.flush();
-      } else if (alarm.name === ANALYTICS_CONFIG_ALARM) {
-        // Refresh remote config (batchSize, time windows, remoteEnabled).
-        refreshRemoteAnalyticsConfig().catch((err) => {
-          console.warn('[CQD] Analytics config refresh failed', err);
-        });
-      }
+      if (alarm.name === 'CQD_ANALYTICS_FLUSH') Analytics.flush();
+      else if (alarm.name === 'CQD_ANALYTICS_CONFIG') refreshRemoteAnalyticsConfig().catch(() => {});
     });
-  } catch {
-    // ignore
+  } catch {}
+}
+
+/* ---------------------------------------------
+ * Firefox file:// tab auto-close
+ * -------------------------------------------*/
+function checkAndCloseFileTab(tabId: number, url?: string) {
+  if (!IS_FIREFOX || !url || !url.startsWith('file://')) return;
+  const filename = decodeURIComponent(url.split('/').pop() || '');
+  const completionTime = recentDownloads.get(filename);
+  if (completionTime && Date.now() - completionTime < 10000) {
+    try { chrome.tabs.remove(tabId); recentDownloads.delete(filename); } catch {}
   }
 }
 
+/* =====================================================
+ * MAIN ENTRYPOINT
+ * ===================================================*/
+
 export default defineBackground(() => {
-  console.log('[CQD] Background ready - RACE CONDITION FIXED');
+  console.log(`[CQD] Background ready - ${IS_FIREFOX ? 'FIREFOX' : 'CHROME/EDGE'}`);
 
-  // Ensure MV3-safe periodic flushing of analytics data.
   ensureAnalyticsAlarm();
-
-  // Initial config fetch so dynamic batching is active as early as possible.
-  refreshRemoteAnalyticsConfig().catch((err) => {
-    console.warn('[CQD] Initial analytics config fetch failed', err);
-  });
+  refreshRemoteAnalyticsConfig().catch(() => {});
 
   // --- Icon Logic ---
-  if (typeof chrome !== 'undefined' && chrome.tabs && chrome.action) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const actionApi = (chrome as any).action || (chrome as any).browserAction;
+  if (typeof chrome !== 'undefined' && chrome.tabs && actionApi) {
     try {
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         if (tabs[0]?.id != null) updateIconForTab(tabs[0].id, tabs[0].url);
       });
-
       chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
         if (changeInfo.status === 'loading' || changeInfo.url) {
           updateIconForTab(tabId, changeInfo.url ?? tab.url);
         }
+        if (changeInfo.url) checkAndCloseFileTab(tabId, changeInfo.url);
       });
-
       chrome.tabs.onActivated.addListener((activeInfo) => {
         chrome.tabs.get(activeInfo.tabId, (tab) => {
-          if (!chrome.runtime.lastError) {
-            updateIconForTab(activeInfo.tabId, tab.url);
-          }
+          if (!chrome.runtime.lastError) updateIconForTab(activeInfo.tabId, tab.url);
         });
       });
-
-      chrome.windows.onFocusChanged.addListener((windowId) => {
-        if (windowId === chrome.windows.WINDOW_ID_NONE) return;
-        chrome.tabs.query({ active: true, windowId }, (tabs) => {
-          if (tabs[0]?.id != null) updateIconForTab(tabs[0].id, tabs[0].url);
-        });
+      chrome.tabs.onCreated.addListener((tab) => {
+        if (tab.id && tab.url) checkAndCloseFileTab(tab.id, tab.url);
       });
-    } catch {
-      /* ignore */
-    }
+    } catch {}
   }
 
   /* -------------------------------------------------------
    * 1) Messages from drive_bypass.content.ts (Drive tab)
    * -----------------------------------------------------*/
   chrome.runtime.onMessage.addListener((message, sender) => {
-    if (!message || !sender.tab || sender.tab.id == null) return;
+    if (!message || !sender.tab || sender.tab.id == null) return false;
 
     const tabId = sender.tab.id;
     const pending = pendingByBypassTabId.get(tabId);
 
-    // Not related to any bypass tab we're tracking
     if (!pending && typeof message.type === 'string' && message.type.startsWith('CQD_')) {
       return;
     }
 
-    // A) SUCCESS: Drive tab clicked Download / Download anyway
     if (message.type === 'CQD_BYPASS_SUCCESS') {
       if (pending) {
         pending.fallbackStarted = true;
         sendStatusToTab(pending, 'success');
         pending.finalized = true;
       }
-
       pendingByBypassTabId.delete(tabId);
-      setTimeout(() => {
-        try {
-          chrome.tabs.remove(tabId);
-        } catch {
-          /* ignore */
-        }
-      }, 5000);
+      setTimeout(() => { try { chrome.tabs.remove(tabId); } catch {} }, 5000);
       return;
     }
 
-    // B) 403 SEEN
     if (message.type === 'CQD_403_SEEN' && pending) {
       pending.confirmed403 = true;
       pending.fallbackStarted = true;
-
       pendingByBypassTabId.delete(tabId);
-      try {
-        chrome.tabs.remove(tabId);
-      } catch {
-        /* ignore */
+      try { chrome.tabs.remove(tabId); } catch {}
+      
+      if (IS_FIREFOX) {
+        // Firefox: Don't rotate auth users via bypass tabs - it's too slow and spammy
+        // Just report failure immediately
+        console.log('[CQD-FF] 403 in bypass tab - failing immediately (no auth rotation for Firefox)');
+        sendStatusToTab(pending, 'error', 'Access denied. Try opening the file directly.', 'ACCESS_DENIED');
+        recordDownloadEvent({
+          type: pending.fileMeta?.ext || 'unknown',
+          status: 'fail',
+          duration_ms: Date.now() - pending.startTime,
+          bypass_used: true,
+          error_type: 'ACCESS_DENIED_FIREFOX',
+        });
+        cleanup(pending);
+      } else {
+        // Chrome: Try auth rotation with native downloads
+        if (!pending.htmlSeen) {
+          pending.htmlSeen = true;
+          sendStatusToTab(pending, 'trying', 'Trying your other Google accounts…', 'AUTH_LOOP');
+        }
+        startNextDriveAttempt(pending);
       }
-
-      if (!pending.htmlSeen) {
-        pending.htmlSeen = true;
-        sendStatusToTab(
-          pending,
-          'trying',
-          'Trying your other Google accounts…',
-          'AUTH_LOOP',
-        );
-      }
-
-      startNextDriveAttempt(pending);
       return;
     }
 
-    // C) LEGACY: URL Registration
-    if (
-      message.type === 'CQD_REGISTER_BYPASS_URL' &&
-      pending &&
-      typeof message.url === 'string'
-    ) {
+    if (message.type === 'CQD_REGISTER_BYPASS_URL' && pending && typeof message.url === 'string') {
       pendingByUrl.set(message.url, pending);
       return;
     }
   });
 
   /* -------------------------------------------------------
-   * 2) onDeterminingFilename - SELF HEALING LOGIC ADDED
+   * 2) onDeterminingFilename (Chrome only)
    * -----------------------------------------------------*/
-  chrome.downloads.onDeterminingFilename.addListener((item, suggest) => {
-    // 1. Try finding by ID first
-    let pending = pendingByDownloadId.get(item.id);
+  if (!IS_FIREFOX && chrome.downloads && chrome.downloads.onDeterminingFilename) {
+    chrome.downloads.onDeterminingFilename.addListener((item, suggest) => {
+      let pending = pendingByDownloadId.get(item.id);
+      if (!pending) {
+        pending = pendingByUrl.get(item.url) ?? pendingByUrl.get(item.finalUrl || item.url);
+        if (pending) {
+          pending.currentDownloadId = item.id;
+          pendingByDownloadId.set(item.id, pending);
+        }
+      }
+      if (!pending) { suggest(); return; }
 
-    // 2. Race Condition Fix: If ID missing, aggressively look up by URL
-    if (!pending) {
-      pending =
-        pendingByUrl.get(item.url) ??
-        pendingByUrl.get(item.finalUrl || item.url);
+      const actualMime = (item.mime || '').toLowerCase();
+      const actualExt = getFilenameExt(item.filename);
+      if (actualExt) pending.finalExtension = actualExt;
 
-      // ✅ SELF-HEAL: If we found it by URL, register the ID *immediately*.
-      // This ensures that when the download finishes (onChanged), the ID map exists.
+      const expectedKind = pending.fileMeta?.kind;
+      const expectedExt = pending.fileMeta?.ext?.toLowerCase();
+      const looksLikeHtml = actualMime.includes('html') || actualExt === 'html' || actualExt === 'htm';
+      const userWantedHtml = expectedKind === 'html' || expectedExt === 'html' || expectedExt === 'htm';
+
+      if (looksLikeHtml && !userWantedHtml && pending.isDrive) {
+        cancelledByUs.add(item.id);
+        chrome.downloads.cancel(item.id, () => {
+          pendingByDownloadId.delete(item.id);
+          if (!pending.htmlSeen) {
+            pending.htmlSeen = true;
+            sendStatusToTab(pending, 'trying', 'Google Drive needs an extra confirmation…', 'HTML_INTERCEPT');
+          }
+          if (pending.confirmed403) { startNextDriveAttempt(pending); return; }
+          if (!pending.fallbackStarted) {
+            pending.fallbackStarted = true;
+            openDriveBypassTab(pending, item.finalUrl || item.url || pending.baseUrl);
+          }
+        });
+        return;
+      }
+
+      sendStatusToTab(pending, 'success');
+      if (pending.fileMeta?.name) {
+        suggest({ filename: pending.fileMeta.name, conflictAction: 'uniquify' });
+      } else {
+        suggest({ conflictAction: 'uniquify' });
+      }
+    });
+  }
+
+  /* -------------------------------------------------------
+   * 2b) onCreated (Firefox - match downloads by Drive ID)
+   * -----------------------------------------------------*/
+  if (IS_FIREFOX && chrome.downloads && chrome.downloads.onCreated) {
+    chrome.downloads.onCreated.addListener((item) => {
+      console.log('[CQD-FF] onCreated:', { id: item.id, url: item.url });
+      
+      let pending = pendingByDownloadId.get(item.id);
+      
+      if (!pending && item.url) {
+        // Match by Drive file ID - search ALL pending downloads
+        // NOTE: We DO NOT skip finalized entries because we still need to track 
+        // subsequent downloads (virus bypass) for analytics
+        const downloadFileId = extractDriveFileId(item.url);
+        if (downloadFileId) {
+          // First: Check bypass tabs
+          for (const [tabId, p] of pendingByBypassTabId.entries()) {
+            const pendingFileId = extractDriveFileId(p.baseUrl) || extractDriveFileId(p.originalUrl);
+            if (pendingFileId === downloadFileId) {
+              pending = p;
+              console.log('[CQD-FF] Matched by Drive ID (bypass):', downloadFileId);
+              break;
+            }
+          }
+          // Second: Check by URL map (for virus bypass redirects)
+          if (!pending) {
+            for (const [url, p] of pendingByUrl.entries()) {
+              const pendingFileId = extractDriveFileId(url) || extractDriveFileId(p.baseUrl) || extractDriveFileId(p.originalUrl);
+              if (pendingFileId === downloadFileId) {
+                pending = p;
+                console.log('[CQD-FF] Matched by Drive ID (url map):', downloadFileId);
+                break;
+              }
+            }
+          }
+          // Third: Check by request ID map
+          if (!pending) {
+            for (const [reqId, p] of pendingByRequestId.entries()) {
+              const pendingFileId = extractDriveFileId(p.baseUrl) || extractDriveFileId(p.originalUrl);
+              if (pendingFileId === downloadFileId) {
+                pending = p;
+                console.log('[CQD-FF] Matched by Drive ID (request):', downloadFileId);
+                break;
+              }
+            }
+          }
+        }
+        // Fallback: URL map exact match
+        if (!pending) {
+          pending = pendingByUrl.get(item.url);
+          if (pending) console.log('[CQD-FF] Matched by URL map');
+        }
+      }
+      
       if (pending) {
-        console.log(`[CQD] Self-healing ID map for ${item.id} via URL match`);
         pending.currentDownloadId = item.id;
         pendingByDownloadId.set(item.id, pending);
+        const ext = getFilenameExt(item.filename);
+        if (ext) pending.finalExtension = ext;
+        if (!pending.finalized) {
+          sendStatusToTab(pending, 'success');
+          pending.finalized = true;
+        }
       }
-    }
-
-    if (!pending) {
-      suggest();
-      return;
-    }
-
-    const actualMime = (item.mime || '').toLowerCase();
-    const actualExt = getFilenameExt(item.filename);
-    if (actualExt) {
-      pending.finalExtension = actualExt;
-    }
-
-    const expectedKind = pending.fileMeta?.kind;
-    const expectedExt = pending.fileMeta?.ext?.toLowerCase();
-
-    const looksLikeHtml =
-      actualMime.includes('html') ||
-      actualExt === 'html' ||
-      actualExt === 'htm';
-
-    const userWantedHtml =
-      expectedKind === 'html' ||
-      expectedExt === 'html' ||
-      expectedExt === 'htm';
-
-    // DRIVE: HTML INTERCEPTION
-    if (looksLikeHtml && !userWantedHtml && pending.isDrive) {
-      cancelledByUs.add(item.id);
-      chrome.downloads.cancel(item.id, () => {
-        pendingByDownloadId.delete(item.id);
-
-        if (!pending.htmlSeen) {
-          pending.htmlSeen = true;
-          sendStatusToTab(
-            pending,
-            'trying',
-            'Google Drive needs an extra confirmation…',
-            'HTML_INTERCEPT',
-          );
-        }
-
-        if (pending.confirmed403) {
-          startNextDriveAttempt(pending);
-          return;
-        }
-
-        if (!pending.fallbackStarted) {
-          pending.fallbackStarted = true;
-          const driveUrl = item.finalUrl || item.url || pending.baseUrl;
-          openDriveBypassTab(pending, driveUrl);
-        }
-      });
-      return;
-    }
-
-    // SUCCESS: Real file
-    sendStatusToTab(pending, 'success');
-    if (pending.fileMeta?.name) {
-      suggest({ filename: pending.fileMeta.name, conflictAction: 'uniquify' });
-    } else {
-      suggest({ conflictAction: 'uniquify' });
-    }
-  });
+    });
+  }
 
   /* -------------------------------------------------------
    * 3) onChanged: ANALYTICS TRIGGER
@@ -363,43 +380,25 @@ export default defineBackground(() => {
     const pending = pendingByDownloadId.get(delta.id);
     if (!pending) return;
 
-    // --- ANALYTICS: SUCCESS ---
     if (delta.state && delta.state.current === 'complete') {
       const duration = Date.now() - pending.startTime;
       const ext = pending.finalExtension || pending.fileMeta?.ext || 'unknown';
-
-      recordDownloadEvent({
-        type: ext,
-        status: 'success',
-        duration_ms: duration,
-        bypass_used: !!pending.fallbackStarted,
-        // Optional: you can later set source = 'download_all' | 'single'
-      });
-
+      recordDownloadEvent({ type: ext, status: 'success', duration_ms: duration, bypass_used: !!pending.fallbackStarted });
+      if (pending.fileMeta?.name) recentDownloads.set(pending.fileMeta.name, Date.now());
       cleanup(pending, delta.id);
       return;
     }
 
-    // --- ANALYTICS: FAILURE ---
     if (delta.state && delta.state.current === 'interrupted') {
       if (cancelledByUs.has(delta.id)) {
         cancelledByUs.delete(delta.id);
         pendingByDownloadId.delete(delta.id);
         return;
       }
-
       const duration = Date.now() - pending.startTime;
       const errorType = delta.error?.current || 'UNKNOWN_INTERRUPT';
       const ext = pending.finalExtension || pending.fileMeta?.ext || 'unknown';
-
-      recordDownloadEvent({
-        type: ext,
-        status: 'fail',
-        duration_ms: duration,
-        bypass_used: !!pending.fallbackStarted,
-        error_type: errorType,
-      });
-
+      recordDownloadEvent({ type: ext, status: 'fail', duration_ms: duration, bypass_used: !!pending.fallbackStarted, error_type: errorType });
       sendStatusToTab(pending, 'error', 'Download interrupted.');
       cleanup(pending, delta.id);
     }
@@ -409,24 +408,19 @@ export default defineBackground(() => {
    * 4) CQD_DOWNLOAD HANDLER
    * -----------------------------------------------------*/
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (!message || message.type !== 'CQD_DOWNLOAD') return;
+    if (!message || message.type !== 'CQD_DOWNLOAD') return false;
 
     const rawUrl = message.url as string | undefined;
     const fileMeta = message.fileMeta as FileMetaMsg | undefined;
     const requestId = message.requestId || `req-${Date.now()}`;
 
     if (!rawUrl) {
-      sendResponse?.({
-        started: false,
-        userMessage: 'No valid link found.',
-      });
-      return;
+      sendResponse?.({ started: false, userMessage: 'No valid link found.' });
+      return true;
     }
 
     const { baseUrl, isDrive } = normalizeUrl(rawUrl);
-    const initialAuthUser = isDrive
-      ? extractAuthUserFromUrl(rawUrl)
-      : undefined;
+    const initialAuthUser = isDrive ? extractAuthUserFromUrl(rawUrl) : undefined;
 
     const pending: PendingDownload = {
       requestId,
@@ -447,8 +441,6 @@ export default defineBackground(() => {
     }
 
     pendingByRequestId.set(requestId, pending);
-
-    // Also register by URL immediately for the race condition fix
     pendingByUrl.set(baseUrl, pending);
 
     let responseSent = false;
@@ -458,51 +450,41 @@ export default defineBackground(() => {
       sendResponse?.(payload);
     };
 
+    // ====== FIREFOX: Always use bypass tab for Drive ======
+    if (IS_FIREFOX && isDrive) {
+      // Use authuser from Classroom URL if available (important for uni/work accounts)
+      const bypassUrl = typeof pending.currentAuthUser === 'number'
+        ? buildUrlWithAuthUser(pending.baseUrl, pending.currentAuthUser)
+        : pending.baseUrl;
+      console.log('[CQD-FF] Using bypass tab for Drive download, authuser:', pending.currentAuthUser);
+      pending.fallbackStarted = true;
+      openDriveBypassTab(pending, bypassUrl);
+      respondOnce({ started: true, requestId, userMessage: 'Opening Drive tab…' });
+      return true;
+    }
+
+    // ====== CHROME/EDGE: Try native download first ======
     if (isDrive) {
-      const firstUrl =
-        typeof pending.currentAuthUser === 'number'
-          ? buildUrlWithAuthUser(pending.baseUrl, pending.currentAuthUser)
-          : pending.baseUrl;
+      const firstUrl = typeof pending.currentAuthUser === 'number'
+        ? buildUrlWithAuthUser(pending.baseUrl, pending.currentAuthUser)
+        : pending.baseUrl;
 
-      chrome.downloads.download(
-        {
-          url: firstUrl,
-          saveAs: false,
-          conflictAction: 'uniquify',
-        },
-        (id) => {
-          if (chrome.runtime.lastError || !id) {
-            // download could not even start
-            recordDownloadEvent({
-              type: pending.fileMeta?.ext || 'unknown',
-              status: 'fail',
-              duration_ms: Date.now() - pending.startTime,
-              bypass_used: true,
-              error_type: 'BROWSER_START_FAIL',
-            });
-
-            if (!pending.fallbackStarted) {
-              pending.fallbackStarted = true;
-              openDriveBypassTab(pending, pending.baseUrl);
-              respondOnce({
-                started: true,
-                requestId,
-                userMessage: 'Browser blocked. Trying Drive tab…',
-              });
-            } else {
-              respondOnce({
-                started: false,
-                userMessage: 'Browser blocked download.',
-              });
-            }
-            return;
+      chrome.downloads.download({ url: firstUrl, saveAs: false, conflictAction: 'uniquify' }, (id) => {
+        if (chrome.runtime.lastError || !id) {
+          recordDownloadEvent({ type: pending.fileMeta?.ext || 'unknown', status: 'fail', duration_ms: Date.now() - pending.startTime, bypass_used: true, error_type: 'BROWSER_START_FAIL' });
+          if (!pending.fallbackStarted) {
+            pending.fallbackStarted = true;
+            openDriveBypassTab(pending, pending.baseUrl);
+            respondOnce({ started: true, requestId, userMessage: 'Browser blocked. Trying Drive tab…' });
+          } else {
+            respondOnce({ started: false, userMessage: 'Browser blocked download.' });
           }
-
-          pending.currentDownloadId = id;
-          pendingByDownloadId.set(id, pending);
-          respondOnce({ started: true, requestId, downloadId: id });
-        },
-      );
+          return;
+        }
+        pending.currentDownloadId = id;
+        pendingByDownloadId.set(id, pending);
+        respondOnce({ started: true, requestId, downloadId: id });
+      });
     } else {
       startSingleAttempt(pending, respondOnce);
     }
@@ -515,44 +497,18 @@ export default defineBackground(() => {
  * Helpers
  * -----------------------------------------------------*/
 
-function startSingleAttempt(
-  pending: PendingDownload,
-  respondOnce?: (payload: any) => void,
-) {
-  chrome.downloads.download(
-    {
-      url: pending.baseUrl,
-      saveAs: false,
-      conflictAction: 'uniquify',
-    },
-    (downloadId) => {
-      if (chrome.runtime.lastError || !downloadId) {
-        // could not start a direct download at all
-        recordDownloadEvent({
-          type: pending.fileMeta?.ext || 'unknown',
-          status: 'fail',
-          duration_ms: Date.now() - pending.startTime,
-          bypass_used: false,
-          error_type: 'BROWSER_START_FAIL_DIRECT',
-        });
-
-        cleanup(pending);
-        respondOnce?.({
-          started: false,
-          userMessage: 'Browser blocked download.',
-        });
-        return;
-      }
-
-      pending.currentDownloadId = downloadId;
-      pendingByDownloadId.set(downloadId, pending);
-      respondOnce?.({
-        started: true,
-        requestId: pending.requestId,
-        downloadId,
-      });
-    },
-  );
+function startSingleAttempt(pending: PendingDownload, respondOnce?: (payload: any) => void) {
+  chrome.downloads.download({ url: pending.baseUrl, saveAs: false, conflictAction: 'uniquify' }, (downloadId) => {
+    if (chrome.runtime.lastError || !downloadId) {
+      recordDownloadEvent({ type: pending.fileMeta?.ext || 'unknown', status: 'fail', duration_ms: Date.now() - pending.startTime, bypass_used: false, error_type: 'BROWSER_START_FAIL_DIRECT' });
+      cleanup(pending);
+      respondOnce?.({ started: false, userMessage: 'Browser blocked download.' });
+      return;
+    }
+    pending.currentDownloadId = downloadId;
+    pendingByDownloadId.set(downloadId, pending);
+    respondOnce?.({ started: true, requestId: pending.requestId, downloadId });
+  });
 }
 
 function startNextDriveAttempt(pending: PendingDownload) {
@@ -560,49 +516,33 @@ function startNextDriveAttempt(pending: PendingDownload) {
   pending.fallbackStarted = false;
   pending.confirmed403 = false;
 
-  const nextAuth = AUTHUSER_CANDIDATES.find(
-    (n) => !pending.attemptedAuthUsers.includes(n),
-  );
-
+  const nextAuth = AUTHUSER_CANDIDATES.find((n) => !pending.attemptedAuthUsers.includes(n));
   if (nextAuth == null) {
-    sendStatusToTab(
-      pending,
-      'error',
-      'Access denied for all accounts.',
-      'AUTH_ALL_FAILED',
-    );
-
-    recordDownloadEvent({
-      type: pending.fileMeta?.ext || 'unknown',
-      status: 'fail',
-      duration_ms: Date.now() - pending.startTime,
-      bypass_used: true,
-      error_type: 'AUTH_ALL_FAILED',
-    });
-
+    sendStatusToTab(pending, 'error', 'Access denied for all accounts.', 'AUTH_ALL_FAILED');
+    recordDownloadEvent({ type: pending.fileMeta?.ext || 'unknown', status: 'fail', duration_ms: Date.now() - pending.startTime, bypass_used: true, error_type: 'AUTH_ALL_FAILED' });
     cleanup(pending);
     return;
   }
 
   pending.attemptedAuthUsers.push(nextAuth);
   pending.currentAuthUser = nextAuth;
-  const attemptUrl = buildUrlWithAuthUser(pending.baseUrl, nextAuth);
 
-  chrome.downloads.download(
-    {
-      url: attemptUrl,
-      saveAs: false,
-      conflictAction: 'uniquify',
-    },
-    (downloadId) => {
+  if (IS_FIREFOX) {
+    // Firefox: Open bypass tab with next auth
+    const attemptUrl = buildUrlWithAuthUser(pending.baseUrl, nextAuth);
+    openDriveBypassTab(pending, attemptUrl);
+  } else {
+    // Chrome: Try native download
+    const attemptUrl = buildUrlWithAuthUser(pending.baseUrl, nextAuth);
+    chrome.downloads.download({ url: attemptUrl, saveAs: false, conflictAction: 'uniquify' }, (downloadId) => {
       if (chrome.runtime.lastError || !downloadId) {
         startNextDriveAttempt(pending);
         return;
       }
       pending.currentDownloadId = downloadId;
       pendingByDownloadId.set(downloadId, pending);
-    },
-  );
+    });
+  }
 }
 
 function openDriveBypassTab(pending: PendingDownload, url: string) {
@@ -616,20 +556,11 @@ function normalizeUrl(rawUrl: string): { baseUrl: string; isDrive: boolean } {
     const url = new URL(rawUrl);
     const isDrive = url.hostname.includes('drive');
     if (!isDrive) return { baseUrl: rawUrl, isDrive: false };
-
     url.searchParams.delete('authuser');
-
-    if (url.pathname.includes('/open')) {
-      url.pathname = '/uc';
-    }
-    if (!url.searchParams.has('export')) {
-      url.searchParams.set('export', 'download');
-    }
-
+    if (url.pathname.includes('/open')) url.pathname = '/uc';
+    if (!url.searchParams.has('export')) url.searchParams.set('export', 'download');
     return { baseUrl: url.toString(), isDrive: true };
-  } catch {
-    return { baseUrl: rawUrl, isDrive: false };
-  }
+  } catch { return { baseUrl: rawUrl, isDrive: false }; }
 }
 
 function buildUrlWithAuthUser(baseUrl: string, authuser: number): string {
@@ -637,63 +568,37 @@ function buildUrlWithAuthUser(baseUrl: string, authuser: number): string {
     const url = new URL(baseUrl);
     url.searchParams.set('authuser', String(authuser));
     return url.toString();
-  } catch {
-    return baseUrl;
-  }
+  } catch { return baseUrl; }
 }
 
 function cleanup(pending: PendingDownload, downloadId?: number) {
   pendingByRequestId.delete(pending.requestId);
-
   if (downloadId != null) {
     pendingByDownloadId.delete(downloadId);
     cancelledByUs.delete(downloadId);
   }
-
   for (const [url, p] of pendingByUrl.entries()) {
-    if (p.requestId === pending.requestId) {
-      pendingByUrl.delete(url);
-    }
+    if (p.requestId === pending.requestId) pendingByUrl.delete(url);
   }
-
   for (const [tabId, p] of pendingByBypassTabId.entries()) {
     if (p.requestId === pending.requestId) {
       pendingByBypassTabId.delete(tabId);
-      try {
-        chrome.tabs.remove(tabId);
-      } catch {
-        /* ignore */
-      }
+      try { chrome.tabs.remove(tabId); } catch {}
     }
   }
 }
 
 function getFilenameExt(filename?: string): string | undefined {
   if (!filename) return undefined;
-  // Allows 1–10 chars to capture things like .mht, .html, .json, .classroom
   const m = filename.match(/\.([a-zA-Z0-9]{1,10})$/);
   return m ? m[1].toLowerCase() : undefined;
 }
 
-function sendStatusToTab(
-  pending: PendingDownload,
-  status: DownloadStatus,
-  userMessage?: string,
-  errorCode?: string,
-): void {
+function sendStatusToTab(pending: PendingDownload, status: DownloadStatus, userMessage?: string, errorCode?: string): void {
   if (pending.finalized && status === 'success') return;
   if (status === 'success') pending.finalized = true;
   if (pending.tabId == null) return;
-
   try {
-    chrome.tabs.sendMessage(pending.tabId, {
-      type: 'CQD_DOWNLOAD_STATUS',
-      requestId: pending.requestId,
-      status,
-      errorCode,
-      userMessage,
-    });
-  } catch {
-    /* ignore */
-  }
+    chrome.tabs.sendMessage(pending.tabId, { type: 'CQD_DOWNLOAD_STATUS', requestId: pending.requestId, status, errorCode, userMessage });
+  } catch {}
 }

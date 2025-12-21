@@ -7,17 +7,17 @@
   "type": "module",
   "scripts": {
     "dev": "wxt",
-    "dev:firefox": "wxt -b firefox",
-    "dev:edge": "wxt -b edge",
     "build": "wxt build",
-    "build:firefox": "wxt build -b firefox",
-    "build:edge": "wxt build -b edge",
     "zip": "wxt zip",
-    "zip:firefox": "wxt zip -b firefox",
-    "zip:edge": "wxt zip -b edge",
     "compile": "tsc --noEmit",
     "postinstall": "wxt prepare",
-    "build:all": "wxt build -b chrome && wxt build -b firefox && wxt build -b safari"
+    "build:all": "wxt build -b chrome && wxt build -b firefox && wxt build -b safari",
+    "edge": "wxt build -b edge && wxt zip -b edge",
+    "firefox": "wxt build -b firefox && wxt zip -b firefox",
+    "chrome": "wxt build -b chrome && wxt zip -b chrome",
+    "safari": "wxt build -b safari && wxt zip -b safari",
+    "build:all": "wxt build -b chrome && wxt build -b firefox && wxt build -b safari && wxt build -b edge",
+    "zip:all": "wxt zip -b chrome && wxt zip -b firefox && wxt zip -b safari && wxt zip -b edge"
   },
   "dependencies": {
     "react": "^19.2.3",

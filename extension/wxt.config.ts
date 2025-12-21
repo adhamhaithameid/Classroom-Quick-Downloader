@@ -24,7 +24,8 @@ export default defineConfig({
         id: "classroom-quick-downloader@adhamhaitham.dev",
         data_collection_permissions: {
           required: ["none"]
-        }
+        },
+        strict_min_version: "109.0"
       }
     }
   },

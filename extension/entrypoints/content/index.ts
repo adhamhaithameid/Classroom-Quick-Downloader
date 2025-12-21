@@ -688,6 +688,7 @@ function startBackgroundDownload(
       return;
     }
     try {
+
       chrome.runtime.sendMessage(
         { type: 'CQD_DOWNLOAD', url: finalUrl, requestId, fileMeta },
         (response) => {
@@ -776,10 +777,17 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
 
       if (message.type === 'CQD_DOWNLOAD_STATUS') {
         const requestId = message.requestId as string | undefined;
-        if (!requestId) return;
+        console.log('[CQD-Content] Received status message:', message.status, 'for requestId:', requestId);
+        
+        if (!requestId) return false;
 
         const pending = pendingButtons.get(requestId);
-        if (!pending) return;
+        if (!pending) {
+          console.log('[CQD-Content] No pending button found for requestId:', requestId);
+          return false;
+        }
+        
+        console.log('[CQD-Content] Found button, updating state to:', message.status);
 
         const { button, startedAt } = pending;
         (async () => {
