@@ -1,0 +1,13 @@
+version: 2
+updates:
+  # npm dependencies for the extension
+  - package-ecosystem: "npm"
+    directory: "/extension"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(deps)"
+    labels:
+      - "dependencies"
+      - "npm"
+    open-pull-requests-limit: 10
