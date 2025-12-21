@@ -1,9 +1,9 @@
 {
   "name": "Classroom Quick Downloader",
-  "displayName": "Classroom Quick Downloader: One-Click File Saver",
+  "displayName": "Classroom Quick Downloader",
   "description": "The fastest way to download all Google Classroom materials, assignments, and PDFs in one click.",
   "private": true,
-  "version": "1.1.0",
+  "version": "1.1.1",
   "type": "module",
   "scripts": {
     "dev": "wxt",
@@ -11,7 +11,6 @@
     "zip": "wxt zip",
     "compile": "tsc --noEmit",
     "postinstall": "wxt prepare",
-    "build:all": "wxt build -b chrome && wxt build -b firefox && wxt build -b safari",
     "edge": "wxt build -b edge && wxt zip -b edge",
     "firefox": "wxt build -b firefox && wxt zip -b firefox",
     "chrome": "wxt build -b chrome && wxt zip -b chrome",
