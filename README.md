@@ -13,7 +13,7 @@
 
 [![Chrome](https://img.shields.io/badge/Chrome-Available-green?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/classroom-quick-downloade/oemoongiefmpmomjikcjmkkkhffcbdid)
 [![Firefox](https://img.shields.io/badge/Firefox-Available-green?logo=firefoxbrowser&logoColor=white)](https://addons.mozilla.org/en-US/firefox/addon/classroom-quick-downloader/)
-[![Edge](https://img.shields.io/badge/Edge-Pending_Review-yellow?logo=microsoft-edge&logoColor=white)](https://microsoftedge.microsoft.com/addons)
+[![Edge](https://img.shields.io/badge/Edge-Available-green?logo=microsoft-edge&logoColor=white)](https://microsoftedge.microsoft.com/addons/detail/classroom-quick-downloade/ecojbijjkcjdolpeoiemnccgmaeomcmn)
 
 <!-- Edge Stack -->
 
