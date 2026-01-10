@@ -10,9 +10,11 @@ Credentials: ~/.config/cqd-workflows/telegram.env  (TELEGRAM_BOT_TOKEN, TELEGRAM
 Stdlib only. Read-only except after explicit approval.
 """
 
+import ipaddress
 import json
 import os
 import re
+import socket
 import subprocess
 import sys
 import time
@@ -30,6 +32,41 @@ MAX_READY_BEADS = 5
 MAX_BRIEF_LINES = 40
 
 # ---------------------------------------------------------------- utilities
+
+
+def _assert_public_https(url: str) -> None:
+    """SSRF guard: require https and publicly-routable resolved addresses."""
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme != "https":
+        raise ValueError(f"blocked non-https URL: {parsed.scheme or '(none)'}")
+    host = parsed.hostname or ""
+    if not host:
+        raise ValueError("blocked URL without host")
+    for info in socket.getaddrinfo(host, parsed.port or 443, proto=socket.IPPROTO_TCP):
+        ip = ipaddress.ip_address(info[4][0])
+        if not ip.is_global:
+            raise ValueError(f"blocked non-public address for {host}: {ip}")
+
+
+class _SafeRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Refuse redirects that leave https or resolve to non-public addresses."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        try:
+            _assert_public_https(newurl)
+        except ValueError:
+            return None
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+_OPENER = urllib.request.build_opener(_SafeRedirectHandler())
+
+
+def safe_urlopen(url: str, timeout: float, data=None, headers=None):
+    """urlopen behind the SSRF guard (scheme, resolved host IPs, redirects)."""
+    _assert_public_https(url)
+    req = urllib.request.Request(url, data=data, headers=headers or {})
+    return _OPENER.open(req, timeout=timeout)
 
 
 def sh(cmd: list[str], timeout: int = 60) -> tuple[int, str]:
@@ -69,9 +106,8 @@ def tg_api(method: str, payload: dict) -> dict | None:
         return None
     url = f"https://api.telegram.org/bot{token}/{method}"
     data = json.dumps(payload).encode()
-    req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
     try:
-        with urllib.request.urlopen(req, timeout=40) as resp:
+        with safe_urlopen(url, 40, data=data, headers={"Content-Type": "application/json"}) as resp:
             return json.loads(resp.read().decode())
     except Exception as exc:  # noqa: BLE001
         print(f"[triage] telegram {method} failed: {exc}", file=sys.stderr)
@@ -223,8 +259,7 @@ def probe_endpoint(url: str, timeout_s: float = 8.0) -> tuple[int, int]:
     """GET an endpoint; returns (http_code|0 for unreachable, latency_ms)."""
     start = time.perf_counter()
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": "cqd-repo-bot/1.0"})
-        with urllib.request.urlopen(req, timeout=timeout_s) as resp:
+        with safe_urlopen(url, timeout_s, headers={"User-Agent": "cqd-repo-bot/1.0"}) as resp:
             code = resp.status
     except urllib.error.HTTPError as exc:
         code = exc.code
@@ -283,12 +318,12 @@ def gather_snapshot_metrics() -> dict[str, int]:
         if not base:
             continue
         for path in ("/api/public/website/snapshot", "/api/site/v1/snapshot"):
-            req = urllib.request.Request(
-                base.rstrip("/") + path,
-                headers={"User-Agent": "cqd-repo-bot/1.0", "Accept": "application/json"},
-            )
             try:
-                with urllib.request.urlopen(req, timeout=6) as resp:
+                with safe_urlopen(
+                    base.rstrip("/") + path,
+                    6,
+                    headers={"User-Agent": "cqd-repo-bot/1.0", "Accept": "application/json"},
+                ) as resp:
                     return coerce_snapshot_metrics(json.loads(resp.read().decode()))
             except Exception:  # noqa: BLE001
                 continue
@@ -520,7 +555,7 @@ def tg_await_approval(deadline_s: int, since_ts: float = 0.0) -> str:
             "&allowed_updates=[\"message\"]"
         )
         try:
-            with urllib.request.urlopen(url, timeout=35) as resp:
+            with safe_urlopen(url, 35) as resp:
                 data = json.loads(resp.read().decode())
         except Exception:  # noqa: BLE001
             time.sleep(3)
@@ -872,7 +907,7 @@ def serve() -> int:
             f"?timeout=30&offset={offset}&allowed_updates=%5B%22message%22%5D"
         )
         try:
-            with urllib.request.urlopen(url, timeout=45) as resp:
+            with safe_urlopen(url, 45) as resp:
                 data = json.loads(resp.read().decode())
         except Exception as exc:  # noqa: BLE001
             print(f"[bot] poll error: {exc}", file=sys.stderr)
