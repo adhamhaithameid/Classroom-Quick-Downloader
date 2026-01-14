@@ -1,4 +1,4 @@
-## v1.7.10
+## v1.8.0
 ### Summary
 The no-dead-ends release: every download either succeeds or tells you exactly what to do next — with automatic retries, honest timeouts, and an adversarial test program proving it.
 ### Added
@@ -64,22 +64,22 @@ The engine's internals now communicate through a typed event bus — the archite
 ### Summary
 Zero-window downloads verified end-to-end: the old background-tab workaround is fully removed, and a locked test file proves the invisible account fallback completes real downloads.
 
-## v1.6.8
+## v1.6.9
 ### Summary
 The fix for the most-reported download bug: files that start but fail now quietly try your other signed-in accounts, and downloads go straight through Google's direct file endpoint.
 ### Fixed
 - Fixed "files start but fail" reports on Firefox-family browsers (zen) and Brave.
 - Fixed Download All groups with one broken file hanging instead of settling.
 
-## v1.6.7
+## v1.6.8
 ### Summary
 The automated QA pipeline now replays the entire manual test runbook in real browsers — including real downloads verified byte-for-byte.
 
-## v1.6.6
+## v1.6.7
 ### Summary
 Foundation for the automated QA program: a local, deterministic Google Classroom simulator that serves real downloadable files under the real Classroom origins.
 
-## v1.6.5
+## v1.6.6
 ### Summary
 Detection and naming hardening: localized type labels no longer leak into filenames, download state races are fixed, and Sheets attachments get their buttons back.
 ### Fixed
@@ -87,36 +87,39 @@ Detection and naming hardening: localized type labels no longer leak into filena
 - Fixed download state races where concurrent downloads of the same file could cross wires.
 - Fixed Google Sheets attachments not getting download buttons.
 
-## v1.6.4
+## v1.6.5
 ### Summary
 More detection accuracy fixes: comment counts survive markup drift, exclusions match whole tokens, and localized dates parse correctly.
 
-## v1.6.3
+## v1.6.4
 ### Summary
 Exclusion matching now operates on whole words, eliminating a family of false-positive detections.
 
-## v1.6.2
+## v1.6.3
 ### Summary
 Detection defenses: number extraction now sanity-checks the page before trusting it.
 
-## v1.6.1
+## v1.6.2
 ### Summary
 Detection accuracy across scripts: Armenian keywords, exact word-number matching, and Arabic diacritic folding fixed.
 
-## v1.6.0
+## v1.6.1
 ### Summary
 The Engine V4 foundation: a measurable accuracy standard for the detection engine, a pure download state machine, and hardened release gates. Everything after this version is measured against a fixed corpus.
 ### Added
 - Added the accuracy corpus and gates: detection decisions are held to labeled expectations across locales, with floors that may only move up.
 - Added typed contracts, an event bus, and a pure acquisition state machine with bounded account rotation and forced deadlines.
 
-## v1.5.11
+## v1.6.0
 ### Summary
-Under-the-hood hardening: stricter typing, updated dependencies, and stronger release gates.
-
-## v1.5.10
-### Summary
-A security-and-stability release: an external audit rolled in, one download-tracking race fixed, and the extension now requests fewer browser permissions.
+The Engine V4 foundation: a measurable accuracy standard for the detection engine, a pure download state machine, and hardened release gates — plus the security-audit roll-up that closed the 1.5 line. Everything after this version is measured against a fixed corpus.
+### Added
+- Added the accuracy corpus and gates: detection decisions are held to labeled expectations across locales, with floors that may only move up.
+- Added typed contracts, an event bus, and a pure acquisition state machine with bounded account rotation and forced deadlines.
+- Added cryptographically secure download identifiers and hardened release gates.
+### Fixed
+- Fixed a race condition where concurrent downloads of the same file could cross wires.
+- Removed an unused browser permission (least privilege).
 
 ## v1.5.9
 ### Summary
