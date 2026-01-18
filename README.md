@@ -58,7 +58,7 @@ As a software engineer, I found myself trapped in a loop of repetitive, manual l
 
 ### 📝 The Paper Manifesto
 
-The plan for CQD didn't start in an IDE; it started on a piece of paper during a particularly boring university lecture. Out of pure frustration, I began sketching a solution. What started as a student’s bored scribbles quickly evolved into a rigorous system architecture, complete with data flow diagrams and a security-first mindset.
+The plan for CQD didn't start in an IDE; it started on a piece of paper during a particularly boring university lecture. Out of pure frustration, I began sketching a solution. What started as a student's bored scribbles quickly evolved into a rigorous system architecture, complete with data flow diagrams and a security-first mindset.
 
 ### 📈 The Evolution
 
@@ -76,7 +76,30 @@ I've spent countless hours testing this extension across multiple browsers and o
 
 *(Wait, What about Safari? We don't talk about Safari. You're on your own there, buddy.)*
 
-**CQD is built by a student, for students.** It’s a tool rooted in human connection and shared academic trauma, designed to make your student life just a little bit more bearable.
+**CQD is built by a student, for students.** It's a tool rooted in human connection and shared academic trauma, designed to make your student life just a little bit more bearable.
+
+---
+
+## 📦 Installation
+
+Getting CQD is quick and easy! Just install it from your browser's extension store.
+
+### Choose Your Browser
+
+| Browser | Install Link | How to Install |
+|---------|--------------|----------------|
+| **Chrome** | [Chrome Web Store](https://chromewebstore.google.com/detail/classroom-quick-downloade/oemoongiefmpmomjikcjmkkkhffcbdid) | Click → **Add to Chrome** → **Add Extension** |
+| **Firefox** | [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/classroom-quick-downloader/) | Click → **Add to Firefox** → **Add** |
+| **Edge** | [Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/classroom-quick-downloade/ecojbijjkcjdolpeoiemnccgmaeomcmn) | Click → **Get** → **Add Extension** |
+
+### After Installing
+
+1. You'll see the CQD icon appear in your browser toolbar 🎉
+2. Go to [Google Classroom](https://classroom.google.com)
+3. Open any assignment with attachments
+4. Click the download button and watch the magic happen!
+
+> **👨‍💻 Want to run it locally for development?** Check out the [Developer Guide](DEVELOPMENT.md).
 
 ---
 
@@ -266,33 +289,6 @@ Every download attempt in the [Extension](./extension/) triggers an analytics ev
 * **⏱️ Time-Series Analytics** — Hourly and daily granularity for trend analysis.
 * **📋 Google Sheets Archive** — Automated daily exports for long-term reporting.
 * **🔒 Privacy-First** — No PII collected. Only file types, durations, and success/fail status.
-
----
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-
-| Tool                                                            | Version | Purpose                                                                  |
-| --------------------------------------------------------------- | ------- | ------------------------------------------------------------------------ |
-| [Node.js](https://nodejs.org/)                                  | 20+     | [Extension](./extension/) and [Worker](./cloudflare-worker/) development |
-| [pnpm](https://pnpm.io/)                                        | 8+      | Monorepo package management                                              |
-| [Go](https://go.dev/)                                           | 1.24+   | [Oracle Backend](./oracle-backend/)                                      |
-| [Docker](https://docker.com/)                                   | 20+     | [Backend](./oracle-backend/) deployment                                  |
-| [Wrangler](https://developers.cloudflare.com/workers/wrangler/) | Latest  | [Cloudflare Worker](./cloudflare-worker/) CLI                            |
-
-### Quick Start
-
-```bash
-# Clone and install
-git clone https://github.com/adhamhaithameid/Classroom-Quick-Downloader.git
-cd Classroom-Quick-Downloader
-pnpm install
-
-# Run extension in dev mode
-cd extension && pnpm dev
-```
 
 ---
 
