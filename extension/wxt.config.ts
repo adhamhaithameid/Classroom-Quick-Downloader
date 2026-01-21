@@ -2,6 +2,15 @@
 import { defineConfig } from 'wxt';
 
 export default defineConfig({
+  runner: {
+    binaries: {
+      // Path for Brave on macOS
+      chrome: '/Applications/Brave Browser.app/Contents/MacOS/Brave Browser',
+    },
+    // Optional: Keep your logins and pins in a dev profile
+    chromiumArgs: ['--user-data-dir=./.wxt/brave-data'],
+    startUrls: ['https://classroom.google.com'],
+  },
   modules: ['@wxt-dev/module-react'],
   manifest: {
     name: "Classroom Quick Downloader",
