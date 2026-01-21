@@ -110,7 +110,7 @@ async function proxyToDO(request: Request, env: WorkerEnv): Promise<Response> {
   const stub = getDownloadsStub(env);
   
   // Extract country from Cloudflare's incoming request properties
-  const country = (request.cf as any)?.country;
+  const country = (request.cf as unknown as { country?: string })?.country;
   
   // Create a new request based on the original, but with the added header
   const headers = new Headers(request.headers);
@@ -131,7 +131,7 @@ async function proxyToDO(request: Request, env: WorkerEnv): Promise<Response> {
 }
 
 export default {
-  async fetch(request: Request, env: WorkerEnv, ctx: ExecutionContext): Promise<Response> {
+  async fetch(request: Request, env: WorkerEnv, _ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     const { pathname } = url;
 

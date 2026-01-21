@@ -888,7 +888,7 @@ export class DownloadsDurable {
   }
 
   private async flushToOracle(
-    force: boolean,
+    _force: boolean,
   ): Promise<{ ok: boolean; sent: number; error?: string }> {
     const now = Date.now();
 
@@ -965,7 +965,7 @@ export class DownloadsDurable {
       await this.persist();
 
       return { ok: true, sent: eventsToFlush.length };
-    } catch (err: any) {
+    } catch (err: unknown) {
       const msg = `Oracle flush error: ${String(err)}`;
       if (!this.d.retryState) this.d.retryState = { ...DEFAULT_RETRY_STATE };
       this.d.retryState.lastError = msg;
