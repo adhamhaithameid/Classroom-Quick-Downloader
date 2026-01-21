@@ -118,6 +118,11 @@ export function injectStyles(): void {
         background-color var(--cqd-transition);
     }
 
+    body[data-cqd-dir="rtl"] .cqd-download-btn {
+      right: auto;
+      left: 8px;
+    }
+
     .cqd-download-btn:not(.cqd-loading):not(.cqd-trying):not(.cqd-success):not(.cqd-error):hover {
       width: auto;
       max-width: 250px;
