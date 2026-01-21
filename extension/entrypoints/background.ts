@@ -9,6 +9,7 @@ import {
   recordDownloadEvent,
   refreshRemoteAnalyticsConfig,
 } from './utils/analytics';
+import { t } from './content/i18n';
 
 type FileMetaMsg = {
   name?: string;
@@ -399,7 +400,7 @@ export default defineBackground(() => {
       const errorType = delta.error?.current || 'UNKNOWN_INTERRUPT';
       const ext = pending.finalExtension || pending.fileMeta?.ext || 'unknown';
       recordDownloadEvent({ type: ext, status: 'fail', duration_ms: duration, bypass_used: !!pending.fallbackStarted, error_type: errorType });
-      sendStatusToTab(pending, 'error', 'Download interrupted.');
+      sendStatusToTab(pending, 'error', t('downloadInterrupted'));
       cleanup(pending, delta.id);
     }
   });

@@ -2,7 +2,8 @@
 import { EDIT_ICON_SVG_RAW, appendSvgFromString } from './content/icons';
 import { injectStyles } from './content/styles';
 import { isPageDark } from './content/theme';
-import { t } from './content/i18n';
+import { t, getCurrentCachedLanguage } from './content/i18n';
+import { detectEdited } from './content/smart-detector';
 import { whenExtensionEnabled } from './content/flags';
 import { triggerPostClick, upgradeCombinedBadge, ATTR_EDIT_DIFF } from './content/both-badge';
 
@@ -155,33 +156,18 @@ function scanForEditedPosts() {
   try {
     const direction = getPageDirection();
     document.body.setAttribute('data-cqd-dir', direction);
-    const editedWord = t('edited').toLowerCase();
+    
+    // Use smart detector for language-agnostic edited detection
+    // Uses two-date pattern matching first (works in ALL languages),
+    // then falls back to keywords with page language + English
+    const currentLang = getCurrentCachedLanguage();
 
     const posts = document.querySelectorAll<HTMLElement>(POST_SELECTOR);
     posts.forEach((post) => {
-      let found = false;
-      let diffText: string | null = null;
-      
-      const candidates = Array.from(
-        post.querySelectorAll<HTMLElement>('a, span, div[aria-label]'),
-      );
-
-      for (const el of candidates) {
-        const text = (el.textContent || '').trim();
-        const aria = (el.getAttribute('aria-label') || '').trim();
-        const title = (el.getAttribute('title') || '').trim();
-        const combined = `${text} ${aria} ${title}`.toLowerCase();
-
-        // We only care about elements that mention "edited"
-        if (!combined.includes(editedWord)) continue;
-
-        // Use the FULL post text (visible text + aria labels)
-        const fullPostText =
-          (post.innerText || '') + ' ' + getAriaLabelsFromPost(post);
-        diffText = calculateEditDiff(fullPostText, editedWord) ?? '0';
-        found = true;
-        break;
-      }
+      // Smart detection - language agnostic
+      const result = detectEdited(post, currentLang);
+      const found = result.isEdited;
+      const diffText = result.editDiff;
 
       // DATA SOURCE OF TRUTH:
       // Always update the data attribute first.
@@ -356,29 +342,32 @@ function createEditedOverlay(post: HTMLElement, diffText: string) {
     pill.className = 'cqd-edited-badge';
     pill.setAttribute(INJECTED_ATTR, 'true');
     if (isPageDark()) pill.classList.add('cqd-theme-dark');
-    // Tooltip for edited pill
-    pill.title = 'Days between posting and the last edit';
-    pill.setAttribute('aria-label', pill.title);
+    // Tooltip for edited pill (NO NUMBER)
+    pill.title = t('edited');
+    pill.setAttribute('aria-label', t('edited'));
 
     const iconWrapper = document.createElement('div');
     iconWrapper.className = 'cqd-edited-icon';
     appendSvgFromString(iconWrapper, EDIT_ICON_SVG_RAW);
     pill.appendChild(iconWrapper);
 
-    const content = document.createElement('div');
-    content.className = 'cqd-edited-content';
-    const diffSpan = document.createElement('span');
-    diffSpan.className = 'cqd-diff-val';
-    diffSpan.textContent = diffText;
-    content.appendChild(diffSpan);
-    pill.appendChild(content);
+    // === NUMBER DISPLAY COMMENTED OUT - Uncomment to restore ===
+    // const content = document.createElement('div');
+    // content.className = 'cqd-edited-content';
+    // const diffSpan = document.createElement('span');
+    // diffSpan.className = 'cqd-diff-val';
+    // diffSpan.textContent = diffText;
+    // content.appendChild(diffSpan);
+    // pill.appendChild(content);
+    // === END NUMBER DISPLAY ===
 
     post.appendChild(pill);
   }
   
-  // Update text just in case
-  const span = pill.querySelector('.cqd-diff-val');
-  if (span) span.textContent = diffText;
+  // === NUMBER UPDATE COMMENTED OUT - Uncomment to restore ===
+  // const span = pill.querySelector('.cqd-diff-val');
+  // if (span) span.textContent = diffText;
+  // === END NUMBER UPDATE ===
 }
 
 function getPageDirection(): 'ltr' | 'rtl' {

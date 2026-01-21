@@ -92,8 +92,9 @@ export function injectStyles(): void {
       align-items: center;
       justify-content: center;
       height: 40px;
-      width: 40px;
-      max-width: calc(100% - 16px);
+      width: auto;
+      min-width: 40px;
+      max-width: 40px;
       padding: 0;
       border: none;
       border-radius: 9999px;
@@ -109,7 +110,7 @@ export function injectStyles(): void {
       overflow: hidden;
       will-change: transform, box-shadow, width, border-radius, padding-inline;
       transition:
-        width var(--cqd-transition),
+        max-width var(--cqd-transition),
         padding-inline var(--cqd-transition),
         border-radius var(--cqd-transition),
         box-shadow var(--cqd-transition),
@@ -118,7 +119,8 @@ export function injectStyles(): void {
     }
 
     .cqd-download-btn:not(.cqd-loading):not(.cqd-trying):not(.cqd-success):not(.cqd-error):hover {
-      width: 120px;
+      width: auto;
+      max-width: 250px;
       padding-inline: 12px;
       box-shadow: var(--cqd-shadow-hover);
       justify-content: flex-start;
@@ -184,7 +186,7 @@ export function injectStyles(): void {
 
     .cqd-download-btn:not(.cqd-loading):not(.cqd-trying):not(.cqd-success):not(.cqd-error):hover .cqd-label {
       opacity: 1;
-      max-width: 110px;
+      max-width: 150px;
       margin-left: 4px;
     }
 
@@ -196,12 +198,12 @@ export function injectStyles(): void {
       border-radius: 20px;
       justify-content: flex-start;
       box-shadow: var(--cqd-shadow-normal);
-      width: 150px;
+      width: auto;
+      max-width: 300px;
       transform: translateY(-50%) scale(1);
     }
 
     .cqd-download-btn.cqd-trying {
-      width: 110px;
       background-color: var(--cqd-color-trying);
       box-shadow: var(--cqd-shadow-trying);
     }
@@ -217,12 +219,11 @@ export function injectStyles(): void {
     .cqd-download-btn.cqd-loading .cqd-label,
     .cqd-download-btn.cqd-trying .cqd-label {
       opacity: 1;
-      max-width: 110px;
+      max-width: 150px;
       margin-left: 12px;
     }
 
     .cqd-download-btn.cqd-success {
-      width: 140px;
       background-color: var(--cqd-color-success);
       box-shadow: var(--cqd-shadow-success);
     }
@@ -233,7 +234,7 @@ export function injectStyles(): void {
 
     .cqd-download-btn.cqd-success .cqd-label {
       opacity: 1;
-      max-width: 110px;
+      max-width: 150px;
       margin-left: 8px;
     }
 
@@ -353,15 +354,16 @@ export function injectStyles(): void {
       border-radius: 9999px;
       cursor: pointer;
       overflow: hidden;
-      transition: height var(--cqd-transition), box-shadow 0.2s ease;
     }
 
+    /* === EXPAND HOVER COMMENTED OUT ===
     .cqd-comment-badge:hover {
       height: 50px;
       border-radius: 20px;
       padding-bottom: 8px;
       z-index: 10000;
     }
+    === END EXPAND HOVER === */
 
     body[data-cqd-dir="ltr"] .cqd-comment-badge {
       left: 0;
@@ -397,11 +399,13 @@ export function injectStyles(): void {
       transition: opacity 0.15s ease 0.05s, transform 0.15s ease 0.05s;
     }
 
+    /* === NUMBER HOVER ANIMATION COMMENTED OUT - Uncomment to restore ===
     .cqd-comment-badge:hover .cqd-badge-label {
       opacity: 1;
       transform: translateY(0);
       max-height: 20px;
     }
+    === END NUMBER HOVER ANIMATION === */
 
     .cqd-edited-badge {
       position: absolute;
@@ -416,9 +420,8 @@ export function injectStyles(): void {
       background-color: var(--cqd-color-edited);
       color: #ffffff;
       border-radius: 9999px;
-      cursor: default;
+      cursor: pointer;
       overflow: hidden;
-      transition: height var(--cqd-transition), box-shadow 0.2s ease;
       left: 0;
       transform: translateX(-50%);
     }
@@ -448,12 +451,14 @@ export function injectStyles(): void {
       stroke: currentColor;
     }
 
+    /* === NUMBER HOVER ANIMATION COMMENTED OUT - Uncomment to restore ===
     .cqd-edited-badge:hover {
       height: 50px;
       border-radius: 20px;
       padding-bottom: 8px;
       z-index: 10000;
     }
+    === END NUMBER HOVER ANIMATION === */
 
     .cqd-edited-content {
       display: flex;
@@ -469,11 +474,13 @@ export function injectStyles(): void {
       font-size: 13px;
     }
 
+    /* === NUMBER HOVER ANIMATION COMMENTED OUT - Uncomment to restore ===
     .cqd-edited-badge:hover .cqd-edited-content {
       opacity: 1;
       transform: translateY(0);
       max-height: 20px;
     }
+    === END NUMBER HOVER ANIMATION === */
 
     .cqd-diff-val {
       font-family: system-ui, -apple-system, sans-serif;
@@ -498,7 +505,6 @@ export function injectStyles(): void {
       cursor: pointer;
       overflow: hidden;
       padding-top: 8px;
-      transition: height var(--cqd-transition), box-shadow 0.2s ease;
     }
 
     body[data-cqd-dir="ltr"] .cqd-both-badge {
@@ -558,6 +564,7 @@ export function injectStyles(): void {
       text-align: center;
     }
 
+    /* === NUMBER HOVER ANIMATION COMMENTED OUT - Uncomment to restore ===
     .cqd-both-badge:hover {
       height: 120px;
       border-radius: 20px;
@@ -574,6 +581,7 @@ export function injectStyles(): void {
       max-height: 4px;
       margin-top: 2px;
     }
+    === END NUMBER HOVER ANIMATION === */
 
     /* ===============================
      * 1b. DOWNLOAD ALL BUTTON (Header-aligned)

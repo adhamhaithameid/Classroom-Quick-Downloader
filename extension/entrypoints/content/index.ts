@@ -684,14 +684,14 @@ function startBackgroundDownload(
   const finalUrl = toDownloadUrl(url);
   return new Promise((resolve) => {
     if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) {
-      resolve({ ok: false, userMessage: 'Runtime not available.' });
+      resolve({ ok: false, userMessage: t('runtimeError') || 'Runtime not available.' });
       return;
     }
     try {
 
       chrome.runtime.sendMessage(
         { type: 'CQD_DOWNLOAD', url: finalUrl, requestId, fileMeta },
-        (response) => {
+        (response: any) => {
           if (
             chrome.runtime.lastError ||
             !response ||
@@ -699,7 +699,7 @@ function startBackgroundDownload(
           ) {
             resolve({
               ok: false,
-              userMessage: response?.userMessage || 'Could not start.',
+              userMessage: response?.userMessage || t('startError') || 'Could not start.',
             });
           } else {
             resolve({ ok: true });
@@ -707,7 +707,7 @@ function startBackgroundDownload(
         },
       );
     } catch {
-      resolve({ ok: false, userMessage: 'Comm error.' });
+      resolve({ ok: false, userMessage: t('commError') || 'Comm error.' });
     }
   });
 }
@@ -749,7 +749,7 @@ function delay(ms: number): Promise<void> {
  * ---------------------------------------------------*/
 if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
   chrome.runtime.onMessage.addListener(
-    (message, _sender, sendResponse): void | true => {
+    (message: any, _sender: any, sendResponse: any): void | true => {
       if (!message) return;
 
       // Popup asks for this tab's state
@@ -779,18 +779,16 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
         const requestId = message.requestId as string | undefined;
         console.log('[CQD-Content] Received status message:', message.status, 'for requestId:', requestId);
         
-        if (!requestId) return false;
+        if (!requestId) return;
 
         const pending = pendingButtons.get(requestId);
         if (!pending) {
           console.log('[CQD-Content] No pending button found for requestId:', requestId);
-          return false;
+          return;
         }
         
-        console.log('[CQD-Content] Found button, updating state to:', message.status);
-
         const { button, startedAt } = pending;
-        (async () => {
+      (async () => {
           await ensureMinLoading(startedAt);
 
           const status = message.status as

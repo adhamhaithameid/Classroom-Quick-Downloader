@@ -1,7 +1,8 @@
 // filepath: entrypoints/comment_frame.content.ts
 import { COMMENT_ICON_URL } from './content/icons';
 import { injectStyles } from './content/styles';
-import { t } from './content/i18n';
+import { t, getCurrentCachedLanguage } from './content/i18n';
+import { detectComments } from './content/smart-detector';
 import { isPageDark } from './content/theme';
 import { whenExtensionEnabled } from './content/flags';
 import { triggerPostClick, upgradeCombinedBadge, ATTR_COMMENT_COUNT } from './content/both-badge';
@@ -15,6 +16,14 @@ const INJECTED_ATTR = 'data-cqd-injected';
 
 // Debounce flag so we don't rescan on every tiny mutation
 let commentScanScheduled = false;
+
+/**
+ * Escape special regex characters in a string
+ */
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 
 // Per-tab + runtime state
 let tabEnabled = true;
@@ -168,9 +177,11 @@ function scanForComments() {
       // Prevent double borders on nested posts
       if (post.parentElement?.closest(POST_SELECTOR)) return;
 
-      const rawText = (post.innerText || '') + ' ' + getAriaLabels(post);
-      const match = rawText.match(/(\d+)\s+class comment/i);
-      const count = match ? parseInt(match[1], 10) : 0;
+      // Use smart detector for language-agnostic comment detection
+      // Checks current language + English fallback, uses DOM analysis + pattern matching
+      const currentLang = getCurrentCachedLanguage();
+      const result = detectComments(post, currentLang);
+      const count = result.count;
 
       // DATA SOURCE OF TRUTH:
       // Always update the data attribute first. This enables the "Both" logic to work 
@@ -247,7 +258,8 @@ function createOverlay(post: HTMLElement, count: number) {
     badge = document.createElement('div');
     badge.className = 'cqd-comment-badge';
     badge.setAttribute(INJECTED_ATTR, 'true');
-    const explanation = 'Number of comments on this post';
+    // Tooltip (NO NUMBER)
+    const explanation = t('comments');
     badge.title = explanation;
     badge.setAttribute('aria-label', explanation);
     if (isPageDark()) badge.classList.add('cqd-theme-dark');
@@ -256,12 +268,16 @@ function createOverlay(post: HTMLElement, count: number) {
     iconDiv.className = 'cqd-badge-icon';
     iconDiv.style.backgroundImage = `url("${COMMENT_ICON_URL}")`;
 
-    const labelDiv = document.createElement('span');
-    labelDiv.className = 'cqd-badge-label';
-    labelDiv.textContent = `${count}`;
+    // === NUMBER DISPLAY COMMENTED OUT - Uncomment to restore ===
+    // const labelDiv = document.createElement('span');
+    // labelDiv.className = 'cqd-badge-label';
+    // labelDiv.textContent = `${count}`;
+    // === END NUMBER DISPLAY ===
 
     badge.appendChild(iconDiv);
-    badge.appendChild(labelDiv);
+    // === Uncomment if restoring numbers ===
+    // badge.appendChild(labelDiv);
+    // ===
 
     badge.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -270,10 +286,11 @@ function createOverlay(post: HTMLElement, count: number) {
     post.appendChild(badge);
   }
   
-  // Update title if count changed
-  badge.title = `${count} ${t('comments')}`;
-  const label = badge.querySelector('.cqd-badge-label');
-  if (label) label.textContent = `${count}`;
+  // === NUMBER UPDATE COMMENTED OUT - Uncomment to restore ===
+  // badge.title = `${count} ${t('comments')}`;
+  // const label = badge.querySelector('.cqd-badge-label');
+  // if (label) label.textContent = `${count}`;
+  // === END NUMBER UPDATE ===
 }
 
 function getPageDirection(): 'ltr' | 'rtl' {
