@@ -145,12 +145,12 @@ function registerSingleButton(btn: HTMLButtonElement): void {
 }
 
 function ensureButtonRegistered(btn: HTMLButtonElement): GroupState | null {
-  let group = buttonToGroup.get(btn);
+  let group: GroupState | undefined | null = buttonToGroup.get(btn);
   if (!group) {
     registerSingleButton(btn);
-    group = buttonToGroup.get(btn) || null;
+    group = buttonToGroup.get(btn);
   }
-  return group;
+  return group ?? null;
 }
 
 function cleanupRemovedButtons(root: HTMLElement): void {
@@ -323,7 +323,7 @@ function updateGroupState(group: GroupState): void {
     btn.disabled = false;
     btn.classList.remove('cqd-all-success', 'cqd-all-error');
     mainSpan.textContent = t('downloadAll') || 'Download all';
-    const fileLabel = totalFiles === 1 ? 'file' : 'files';
+    const fileLabel = totalFiles === 1 ? (t('file') || 'file') : (t('files') || 'files');
     subSpan.textContent = `${totalFiles} ${fileLabel}`;
     setProgressVisual(btn, 0);
     return; 
@@ -445,7 +445,7 @@ function findHeaderContainer(root: HTMLElement): HTMLElement | null {
     current !== document.body &&
     current !== document.documentElement
   ) {
-    const parent = current.parentElement;
+    const parent: HTMLElement | null = current.parentElement;
     if (!parent) break;
 
     const headers = Array.from(
