@@ -1,6 +1,6 @@
 // filepath: cloudflare-worker/src/dashboard.ts
 import type { StatsResponse, QuotaDescriptor } from "./types";
-import { LOGO_SVG_DATA_URI, FAVICON_PNG_DATA_URI } from "./assets";
+import { FAVICON_PNG_DATA_URI } from "./assets";
 
 function formatTs(ts: number | null): string {
   if (!ts) return "—";
