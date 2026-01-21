@@ -1,5 +1,6 @@
 // filepath: entrypoints/content/both-badge.ts
 import { COMMENT_ICON_URL, EDIT_ICON_SVG_RAW, appendSvgFromString } from './icons';
+import { t } from './i18n';
 
 const INJECTED_ATTR = 'data-cqd-injected';
 
@@ -93,9 +94,10 @@ export function upgradeCombinedBadge(post: HTMLElement): void {
     bothBadge.className = 'cqd-both-badge';
     bothBadge.setAttribute(INJECTED_ATTR, 'true');
     
-    // Tooltip
-    bothBadge.title = 'Top: number of comments. Bottom: days between posting and last edit.';
-    bothBadge.setAttribute('aria-label', bothBadge.title);
+    // Tooltip: Localized "Comments | Edited" (NO NUMBERS)
+    const tooltipText = `${t('comments')} | ${t('edited')}`;
+    bothBadge.title = tooltipText;
+    bothBadge.setAttribute('aria-label', tooltipText);
 
     // Build Internal Structure
     
@@ -107,12 +109,16 @@ export function upgradeCombinedBadge(post: HTMLElement): void {
     commentIcon.className = 'cqd-both-icon cqd-both-icon-comment';
     commentIcon.style.backgroundImage = `url("${COMMENT_ICON_URL}")`;
     
-    const commentValue = document.createElement('span');
-    commentValue.className = 'cqd-both-value cqd-both-value-comment';
-    commentValue.textContent = commentCount;
+    // === NUMBER DISPLAY COMMENTED OUT - Uncomment to restore ===
+    // const commentValue = document.createElement('span');
+    // commentValue.className = 'cqd-both-value cqd-both-value-comment';
+    // commentValue.textContent = commentCount;
+    // === END NUMBER DISPLAY ===
     
     commentsSection.appendChild(commentIcon);
-    commentsSection.appendChild(commentValue);
+    // === Uncomment if restoring numbers ===
+    // commentsSection.appendChild(commentValue);
+    // ===
 
     // -- Plus / Divider --
     const plus = document.createElement('div');
@@ -130,12 +136,16 @@ export function upgradeCombinedBadge(post: HTMLElement): void {
     editedIcon.className = 'cqd-both-icon cqd-both-icon-edited';
     appendSvgFromString(editedIcon, EDIT_ICON_SVG_RAW);
     
-    const diffValue = document.createElement('span');
-    diffValue.className = 'cqd-both-value cqd-both-value-edited';
-    diffValue.textContent = diffText;
+    // === NUMBER DISPLAY COMMENTED OUT - Uncomment to restore ===
+    // const diffValue = document.createElement('span');
+    // diffValue.className = 'cqd-both-value cqd-both-value-edited';
+    // diffValue.textContent = diffText;
+    // === END NUMBER DISPLAY ===
     
     editedSection.appendChild(editedIcon);
-    editedSection.appendChild(diffValue);
+    // === Uncomment if restoring numbers ===
+    // editedSection.appendChild(diffValue);
+    // ===
 
     // Assemble
     bothBadge.appendChild(commentsSection);
@@ -151,10 +161,16 @@ export function upgradeCombinedBadge(post: HTMLElement): void {
     post.appendChild(bothBadge);
 
   } else {
-    // Just update the numbers if badge exists
-    const cc = bothBadge.querySelector<HTMLElement>('.cqd-both-value-comment');
-    const dd = bothBadge.querySelector<HTMLElement>('.cqd-both-value-edited');
-    if (cc && cc.textContent !== commentCount) cc.textContent = commentCount;
-    if (dd && dd.textContent !== diffText) dd.textContent = diffText;
+    // === NUMBER UPDATE COMMENTED OUT - Uncomment to restore ===
+    // const cc = bothBadge.querySelector<HTMLElement>('.cqd-both-value-comment');
+    // const dd = bothBadge.querySelector<HTMLElement>('.cqd-both-value-edited');
+    // if (cc && cc.textContent !== commentCount) cc.textContent = commentCount;
+    // if (dd && dd.textContent !== diffText) dd.textContent = diffText;
+    // === END NUMBER UPDATE ===
+    
+    // Tooltip (NO NUMBERS)
+    const tooltipText = `${t('comments')} | ${t('edited')}`;
+    bothBadge.title = tooltipText;
+    bothBadge.setAttribute('aria-label', tooltipText);
   }
 }
