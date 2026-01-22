@@ -1,11 +1,14 @@
-// filepath: entrypoints/drive_bypass.content.ts
-import { whenExtensionEnabled } from './content/flags';
+import { subscribeToGlobalState } from './content/flags';
 
 type PageState =
   | 'STATE_LOADING'
   | 'STATE_VIRUS_WARNING'
   | 'STATE_DRIVE_PREVIEW'
   | 'STATE_ACCESS_DENIED';
+
+let bypassIntervalId: number | null = null;
+let bypassTimeoutId: number | null = null;
+let isBypassRunning = false;
 
 export default defineContentScript({
   matches: [
@@ -15,106 +18,105 @@ export default defineContentScript({
   // Start early so we can react quickly to 403 / virus / preview pages
   runAt: 'document_start',
   main() {
-    // ⬇️ Only run this helper when the extension is enabled
-    whenExtensionEnabled(() => {
-      let virusHandled = false;
-      let previewClicked = false;
-      let auth403Reported = false;
-
-      const tick = () => {
-        const url = window.location.href;
-        const body = document.body;
-        const bodyText = (body?.innerText || '').toLowerCase();
-
-        /* --------------------------------------------------
-         * 1) Virus / large file warning → auto "Download anyway"
-         * -------------------------------------------------- */
-        if (!virusHandled && isVirusWarningPage(bodyText)) {
-          console.log(
-            '[CQD] Virus / large-file warning detected. Auto-clicking "Download anyway"...',
-          );
-          if (handleVirusBypassClick()) {
-            virusHandled = true;
-
-            // Tell background "bypass triggered, flip UI to success"
-            notifySuccessFlood();
-            return;
-          }
-        }
-
-        /* --------------------------------------------------
-         * 2) Drive Preview UI → click toolbar Download
-         *    (NORMAL SMALL / MEDIUM files path)
-         * -------------------------------------------------- */
-        if (!previewClicked && isDrivePreviewUI()) {
-          const clicked = clickDriveToolbarDownload();
-          if (clicked) {
-            previewClicked = true;
-            console.log(
-              '[CQD] Drive preview toolbar Download clicked. Notifying background success…',
-            );
-
-            // Same success path: preview UI triggered the real file download
-            notifySuccessFlood();
-          }
-        }
-
-        /* --------------------------------------------------
-         * 3) Hard 403 on Drive (google.com or usercontent) → report to background
-         *    (when authuser loop in background should take over)
-         * -------------------------------------------------- */
-        if (
-          !auth403Reported &&
-          (url.includes('drive.google.com') ||
-            url.includes('drive.usercontent.google.com')) &&
-          isAccessDeniedPage(bodyText)
-        ) {
-          auth403Reported = true;
-          console.log(
-            '[CQD] Hard 403 in Drive tab. Reporting CQD_403_SEEN to background…',
-          );
-          try {
-            chrome.runtime.sendMessage({ type: 'CQD_403_SEEN' });
-          } catch {
-            /* ignore */
-          }
-        }
-
-        /* --------------------------------------------------
-         * 4) Direct Download URL Check (Firefox Fix)
-         *    If we are on a "uc?export=download" page, and we haven't virus-blocked,
-         *    assume success so the button turns green and tab closes.
-         * -------------------------------------------------- */
-        if (url.includes('export=download') && !virusHandled) {
-             // We give it a moment to see if it's a virus warning (handled above),
-             // otherwise we assume it's working/downloading.
-             // We check document.readyState to ensure body text helps us detect virus first.
-             if (document.readyState === 'complete' || document.readyState === 'interactive') {
-                 if (!isVirusWarningPage(bodyText) && !isAccessDeniedPage(bodyText)) {
-                     console.log('[CQD] Direct download URL detected. Signaling success...');
-                     notifySuccessFlood();
-                     // We only need to notify once, but flood handles "ensure delivery".
-                     // To avoid infinite spam, notifySuccessFlood stops itself after a few bursts.
-                     // But we should stop checking here to avoid re-triggering logic.
-                     virusHandled = true; // Use this flag to stop recurring checks
-                 }
-             }
-        }
-      };
-
-      // Run immediately & keep watching – Drive updates DOM dynamically
-      tick();
-
-      // Slightly faster than before: every 300 ms (was 500 ms)
-      const intervalId = window.setInterval(tick, 300);
-
-      // Safety: stop after ~45s if nothing interesting happens
-      window.setTimeout(() => {
-        window.clearInterval(intervalId);
-      }, 45000);
-    });
+    subscribeToGlobalState(
+      () => startBypassFeature(),
+      () => stopBypassFeature()
+    );
   },
 });
+
+function startBypassFeature() {
+  if (isBypassRunning) return;
+  isBypassRunning = true;
+
+  let virusHandled = false;
+  let previewClicked = false;
+  let auth403Reported = false;
+
+  const tick = () => {
+    if (!isBypassRunning) return;
+    const url = window.location.href;
+    const body = document.body;
+    const bodyText = (body?.innerText || '').toLowerCase();
+
+    // 1) Virus / large file warning
+    if (!virusHandled && isVirusWarningPage(bodyText)) {
+      console.log(
+        '[CQD] Virus / large-file warning detected. Auto-clicking "Download anyway"...',
+      );
+      if (handleVirusBypassClick()) {
+        virusHandled = true;
+        notifySuccessFlood();
+        return;
+      }
+    }
+
+    // 2) Drive Preview UI
+    if (!previewClicked && isDrivePreviewUI()) {
+      const clicked = clickDriveToolbarDownload();
+      if (clicked) {
+        previewClicked = true;
+        console.log(
+          '[CQD] Drive preview toolbar Download clicked. Notifying background success…',
+        );
+        notifySuccessFlood();
+      }
+    }
+
+    // 3) Hard 403
+    if (
+      !auth403Reported &&
+      (url.includes('drive.google.com') ||
+        url.includes('drive.usercontent.google.com')) &&
+      isAccessDeniedPage(bodyText)
+    ) {
+      auth403Reported = true;
+      console.log(
+        '[CQD] Hard 403 in Drive tab. Reporting CQD_403_SEEN to background…',
+      );
+      try {
+        chrome.runtime.sendMessage({ type: 'CQD_403_SEEN' });
+      } catch {
+        /* ignore */
+      }
+    }
+
+    // 4) Direct Download URL Check (Firefox Fix)
+    if (url.includes('export=download') && !virusHandled) {
+          if (document.readyState === 'complete' || document.readyState === 'interactive') {
+              if (!isVirusWarningPage(bodyText) && !isAccessDeniedPage(bodyText)) {
+                  console.log('[CQD] Direct download URL detected. Signaling success...');
+                  notifySuccessFlood();
+                  virusHandled = true; 
+              }
+          }
+    }
+  };
+
+  // Run immediately & check periodically
+  tick();
+
+  if (bypassIntervalId) window.clearInterval(bypassIntervalId);
+  bypassIntervalId = window.setInterval(tick, 300);
+
+  // Safety stop
+  if (bypassTimeoutId) window.clearTimeout(bypassTimeoutId);
+  bypassTimeoutId = window.setTimeout(() => {
+    stopBypassFeature();
+  }, 45000);
+}
+
+function stopBypassFeature() {
+  isBypassRunning = false;
+  if (bypassIntervalId) {
+    window.clearInterval(bypassIntervalId);
+    bypassIntervalId = null;
+  }
+  if (bypassTimeoutId) {
+    window.clearTimeout(bypassTimeoutId);
+    bypassTimeoutId = null;
+  }
+}
 
 /* --------------------------------------------------------------------------
  * Detection helpers

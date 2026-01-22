@@ -2,7 +2,7 @@
 import { injectStyles } from './content/styles';
 import { t } from './content/i18n';
 import { isPageDark } from './content/theme';
-import { whenExtensionEnabled } from './content/flags';
+
 
 const DOWNLOAD_BTN_SELECTOR = '.cqd-download-all-btn';
 const SINGLE_BTN_SELECTOR = '.cqd-download-btn';
@@ -35,62 +35,111 @@ const groupStates = new WeakMap<HTMLElement, GroupState>();
 const buttonToGroup = new WeakMap<HTMLButtonElement, GroupState>();
 const buttonToFile = new WeakMap<HTMLButtonElement, FileEntry>();
 const dirtyGroups = new Set<GroupState>();
-
 let refreshScheduled = false;
+
+import { subscribeToGlobalState } from './content/flags';
+
+
+
+// Per-tab runtime state
+let running = false;
+let globalObserver: MutationObserver | null = null;
+let globalInterval: number | null = null;
+
+// Clean up handler reference for removal
+const scrollHandler = () => scheduleRefresh();
 
 export default defineContentScript({
   matches: ['https://classroom.google.com/*'],
   runAt: 'document_idle',
   main() {
-    whenExtensionEnabled(() => {
-      injectStyles();
-      safeSetDirection();
-
-      registerButtonsInSubtree(document);
-
-      window.addEventListener('scroll', scheduleRefresh, { passive: true });
-
-      const observer = new MutationObserver((mutations) => {
-        for (const m of mutations) {
-          if (m.type === 'childList') {
-            m.addedNodes.forEach((node) => {
-              if (!(node instanceof HTMLElement)) return;
-              registerButtonsInSubtree(node);
-            });
-            m.removedNodes.forEach((node) => {
-              if (!(node instanceof HTMLElement)) return;
-              cleanupRemovedButtons(node);
-            });
-          } else if (m.type === 'attributes') {
-            const target = m.target as HTMLElement;
-            if (
-              target instanceof HTMLButtonElement &&
-              target.classList.contains('cqd-download-btn')
-            ) {
-              const group = ensureButtonRegistered(target);
-              if (group) markGroupDirty(group);
-            }
-          }
-        }
-        scheduleRefresh();
-      });
-
-      if (document.body) {
-        observer.observe(document.body, {
-          childList: true,
-          subtree: true,
-          attributes: true,
-          attributeFilter: ['class', 'data-cqd-all-done'],
-        });
-      }
-
-      window.setInterval(() => {
-        registerButtonsInSubtree(document);
-        scheduleRefresh();
-      }, 4000);
-    });
+    subscribeToGlobalState(
+      () => startDownloadAllFeature(),
+      () => stopDownloadAllFeature()
+    );
   },
 });
+
+function startDownloadAllFeature() {
+  if (running) return;
+  running = true;
+
+  injectStyles();
+  safeSetDirection();
+
+  registerButtonsInSubtree(document);
+
+  window.addEventListener('scroll', scrollHandler, { passive: true });
+
+  globalObserver = new MutationObserver((mutations) => {
+    if (!running) return;
+    for (const m of mutations) {
+      if (m.type === 'childList') {
+        m.addedNodes.forEach((node) => {
+          if (!(node instanceof HTMLElement)) return;
+          registerButtonsInSubtree(node);
+        });
+        m.removedNodes.forEach((node) => {
+          if (!(node instanceof HTMLElement)) return;
+          cleanupRemovedButtons(node);
+        });
+      } else if (m.type === 'attributes') {
+        const target = m.target as HTMLElement;
+        if (
+          target instanceof HTMLButtonElement &&
+          target.classList.contains('cqd-download-btn')
+        ) {
+          const group = ensureButtonRegistered(target);
+          if (group) markGroupDirty(group);
+        }
+      }
+    }
+    scheduleRefresh();
+  });
+
+  if (document.body) {
+    globalObserver.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['class', 'data-cqd-all-done'],
+    });
+  }
+
+  globalInterval = window.setInterval(() => {
+    if (!running) return;
+    registerButtonsInSubtree(document);
+    scheduleRefresh();
+  }, 4000);
+}
+
+function stopDownloadAllFeature() {
+  if (!running) return;
+  running = false;
+
+  window.removeEventListener('scroll', scrollHandler);
+
+  if (globalObserver) {
+    globalObserver.disconnect();
+    globalObserver = null;
+  }
+
+  if (globalInterval != null) {
+    window.clearInterval(globalInterval);
+    globalInterval = null;
+  }
+  
+  refreshScheduled = false;
+
+  // Cleanup UI
+  document.querySelectorAll(DOWNLOAD_BTN_SELECTOR).forEach(btn => btn.remove());
+  
+  // Clear weak maps / state would be nice but difficult with WeakMap.
+  // Instead we just remove our buttons.
+  // The WeakMaps will naturally clean up if DOM nodes are removed, or stick around if not.
+  // We should clear dirtyGroups at least.
+  dirtyGroups.clear();
+}
 
 /* -----------------------------------------------------
  * Discovery & grouping
