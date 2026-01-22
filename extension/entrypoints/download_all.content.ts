@@ -554,7 +554,8 @@ function placeDownloadButtonForPostView(
   headerContainer: HTMLElement,
 ): void {
   const searchRoot = headerContainer;
-  const threeDots = findThreeDots(searchRoot);
+  const rawDots = findThreeDots(searchRoot);
+  const threeDots = rawDots ? getDirectChild(searchRoot, rawDots) : null;
 
   if (threeDots && threeDots !== button) {
     const dotsParent = threeDots.parentElement as HTMLElement | null;
@@ -594,13 +595,10 @@ function placeDownloadButtonForStreamView(
   button: HTMLButtonElement,
   targetContainer: HTMLElement,
 ): void {
-  const threeDots = findThreeDots(targetContainer);
+  const rawDots = findThreeDots(targetContainer);
+  const threeDots = rawDots ? getDirectChild(targetContainer, rawDots) : null;
 
-  if (
-    threeDots &&
-    threeDots !== button &&
-    threeDots.parentNode === targetContainer
-  ) {
+  if (threeDots && threeDots !== button) {
     targetContainer.insertBefore(button, threeDots);
     button.style.marginInlineEnd = '8px';
     button.style.marginInlineStart = '8px';
@@ -620,7 +618,11 @@ function findThreeDots(container: HTMLElement): HTMLElement | null {
   const chunkWrapper = container.querySelector<HTMLElement>('[data-guided-help-id="streamItemActionMenuGH"]');
   if (chunkWrapper) return chunkWrapper;
 
-  // 2. Language-Agnostic Fallbacks
+  // 2. The kpDQ8 class (Action Menu Identifier) - Explicitly detected in first post
+  const kp = container.querySelector<HTMLElement>('.kpDQ8');
+  if (kp) return kp;
+
+  // 3. Language-Agnostic Fallbacks
   const selectors = [
     '.pYTkkf-Bz112c-LgbsSe', // Class name for the button
     'div[role="button"][aria-haspopup="true"]',
@@ -633,6 +635,15 @@ function findThreeDots(container: HTMLElement): HTMLElement | null {
     if (el) return el;
   }
   return null;
+}
+
+function getDirectChild(parent: HTMLElement, descendant: HTMLElement): HTMLElement | null {
+  let curr: HTMLElement | null = descendant;
+  while (curr && curr.parentElement !== parent) {
+    curr = curr.parentElement;
+    if (!curr || curr === document.body) return null;
+  }
+  return curr;
 }
 
 function handleDownloadAllClick(group: GroupState): void {
