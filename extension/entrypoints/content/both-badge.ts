@@ -1,6 +1,7 @@
 // filepath: entrypoints/content/both-badge.ts
 import { COMMENT_ICON_URL, EDIT_ICON_SVG_RAW, appendSvgFromString } from './icons';
 import { t } from './i18n';
+import { triggerPulseEffect, markTargetElements } from './pulse-effect';
 
 const INJECTED_ATTR = 'data-cqd-injected';
 
@@ -85,6 +86,9 @@ export function upgradeCombinedBadge(post: HTMLElement): void {
   if (!finalOverlay.classList.contains('cqd-both')) {
       finalOverlay.classList.add('cqd-both');
   }
+  
+  // Mark BOTH comment counter and date elements for permanent bold styling
+  markTargetElements(post, 'both');
 
   // 4. Create or Update the Badge
   let bothBadge = post.querySelector<HTMLElement>('.cqd-both-badge');
@@ -155,6 +159,7 @@ export function upgradeCombinedBadge(post: HTMLElement): void {
 
     bothBadge.addEventListener('click', (e) => {
       e.stopPropagation();
+      triggerPulseEffect(post, 'both');
       triggerPostClick(post);
     });
 

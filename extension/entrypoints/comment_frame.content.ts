@@ -4,8 +4,9 @@ import { injectStyles } from './content/styles';
 import { t, getCurrentCachedLanguage } from './content/i18n';
 import { detectComments } from './content/smart-detector';
 import { isPageDark } from './content/theme';
-import { whenExtensionEnabled } from './content/flags';
+import { subscribeToGlobalState } from './content/flags';
 import { triggerPostClick, upgradeCombinedBadge, ATTR_COMMENT_COUNT } from './content/both-badge';
+import { triggerPulseEffect, markTargetElements } from './content/pulse-effect';
 
 // Selector for the main stream card
 const POST_SELECTOR = 'div[data-stream-item-id]';
@@ -26,7 +27,7 @@ function escapeRegex(str: string): string {
 
 
 // Per-tab + runtime state
-let tabEnabled = true;
+// let tabEnabled = true; // Removed
 let running = false;
 let domObserver: MutationObserver | null = null;
 let heartbeatId: number | null = null;
@@ -39,16 +40,17 @@ export default defineContentScript({
   matches: ['https://classroom.google.com/*'],
   runAt: 'document_idle',
   main() {
-    // Start only if global master switch is ON
-    whenExtensionEnabled(() => {
-      if (!tabEnabled) return;
-      startCommentsFeature();
-    });
+    // Subscribe to global enabled/disabled events
+    // This handles initial check AND live updates
+    subscribeToGlobalState(
+      () => startCommentsFeature(),
+      () => stopCommentsFeature()
+    );
   },
 });
 
 /* -----------------------------------------------------
- * Start / Stop logic (per tab)
+ * Start / Stop logic
  * ---------------------------------------------------*/
 function startCommentsFeature(): void {
   if (running) return;
@@ -57,7 +59,7 @@ function startCommentsFeature(): void {
     window.addEventListener(
       'DOMContentLoaded',
       () => {
-        if (!running && tabEnabled) {
+        if (!running) {
           startCommentsFeature();
         }
       },
@@ -141,26 +143,6 @@ function stopCommentsFeature(): void {
       post.removeAttribute(ATTR_COMMENT_COUNT); // Clean up data attr
       post.style.removeProperty('position');
     });
-}
-
-/* -----------------------------------------------------
- * Per-tab toggle messages
- * ---------------------------------------------------*/
-if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
-  chrome.runtime.onMessage.addListener((message) => {
-    // Firefox fix: return false for messages we don't handle
-    if (!message) return false;
-    if (message.type !== 'CQD_POPUP_SET_DESIRED_STATE') return false;
-    tabEnabled = !!message.enabled;
-    if (tabEnabled) {
-      whenExtensionEnabled(() => {
-        startCommentsFeature();
-      });
-    } else {
-      stopCommentsFeature();
-    }
-    return false; // No async response needed
-  });
 }
 
 /* -----------------------------------------------------
@@ -250,6 +232,9 @@ function createOverlay(post: HTMLElement, count: number) {
       if (e.target === overlay) triggerPostClick(post);
     });
     post.appendChild(overlay);
+    
+    // Mark comment counter for permanent bold styling
+    markTargetElements(post, 'comment');
   }
 
   // Create Single Comment Badge
@@ -281,6 +266,7 @@ function createOverlay(post: HTMLElement, count: number) {
 
     badge.addEventListener('click', (e) => {
       e.stopPropagation();
+      triggerPulseEffect(post, 'comment');
       triggerPostClick(post);
     });
     post.appendChild(badge);
