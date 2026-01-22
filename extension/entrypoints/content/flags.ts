@@ -1,71 +1,64 @@
 // filepath: entrypoints/content/flags.ts
 
-export const ENABLE_KEY = 'cqdEnabled';
+export const ENABLE_KEY = 'extensionEnabled';
 
-type WhenEnabledOn = () => void;
-type WhenEnabledOff = () => void;
+type StateCallback = () => void;
 
 /**
- * Reads the extension-wide "enabled" flag from chrome.storage.local
- * and calls:
- *
- *   - onEnabled()  if the flag is ON (or missing)
- *   - onDisabled() if the flag is present and false
- *
- * onDisabled is optional; if omitted, nothing happens when the global
- * flag is OFF.
- *
- * This is a one-shot check, not a live subscription.
- * Safe to call from any content script (Classroom, Drive, popup, etc.).
+ * Subscribes to the global extension enabled state.
+ * - Checks initial state and calls onEnabled() or onDisabled().
+ * - Listens for changes and calls the appropriate callback.
+ * - Returns a cleanup function to remove the listener.
+ */
+export function subscribeToGlobalState(
+  onEnabled: StateCallback,
+  onDisabled?: StateCallback
+): () => void {
+  // If no chrome API, assume enabled (dev/test env)
+  if (typeof chrome === 'undefined' || !chrome.storage?.local) {
+    try { onEnabled(); } catch {}
+    return () => {};
+  }
+
+  const handleState = (isEnabled: boolean) => {
+    try {
+      if (isEnabled) {
+        onEnabled();
+      } else {
+        onDisabled?.();
+      }
+    } catch (e) {
+      console.warn('[CQD] Error in state callback', e);
+    }
+  };
+
+  // 1. Initial Check
+  chrome.storage.local.get(ENABLE_KEY, (result: { [key: string]: any }) => {
+    // If error, fail-open (true)
+    const isEnabled = chrome.runtime.lastError ? true : (result[ENABLE_KEY] !== false);
+    handleState(isEnabled);
+  });
+
+  // 2. Change Listener
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const listener = (changes: any, area: string) => {
+    if (area === 'local' && changes[ENABLE_KEY]) {
+      const newValue = changes[ENABLE_KEY].newValue !== false;
+      handleState(newValue);
+    }
+  };
+
+  chrome.storage.onChanged.addListener(listener);
+  return () => chrome.storage.onChanged.removeListener(listener);
+}
+
+/**
+ * Legacy one-shot check, updated to use new key.
+ * Prefer subscribeToGlobalState for dynamic toggling.
  */
 export function whenExtensionEnabled(
-  onEnabled: WhenEnabledOn,
-  onDisabled?: WhenEnabledOff,
+  onEnabled: StateCallback,
+  onDisabled?: StateCallback,
 ): void {
-  // If chrome API is not available (tests / non-extension env), assume enabled.
-  if (typeof chrome === 'undefined' || !chrome.storage?.local) {
-    try {
-      onEnabled();
-    } catch {
-      // ignore
-    }
-    return;
-  }
-
-  try {
-    chrome.storage.local.get({ [ENABLE_KEY]: true }, (result) => {
-      if (chrome.runtime?.lastError) {
-        // On storage error, fail-open (treat as enabled) so UX keeps working.
-        try {
-          onEnabled();
-        } catch {
-          // ignore
-        }
-        return;
-      }
-
-      const enabled = result[ENABLE_KEY] !== false;
-
-      if (enabled) {
-        try {
-          onEnabled();
-        } catch {
-          // ignore
-        }
-      } else if (onDisabled) {
-        try {
-          onDisabled();
-        } catch {
-          // ignore
-        }
-      }
-    });
-  } catch {
-    // Extremely defensive: if storage access itself throws, treat as enabled.
-    try {
-      onEnabled();
-    } catch {
-      // ignore
-    }
-  }
+  subscribeToGlobalState(onEnabled, onDisabled);
 }

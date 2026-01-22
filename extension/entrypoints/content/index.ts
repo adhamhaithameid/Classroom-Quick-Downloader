@@ -8,7 +8,7 @@ import {
 import { injectStyles } from './styles';
 import { t } from './i18n';
 import { isPageDark } from './theme';
-import { whenExtensionEnabled } from './flags';
+import { subscribeToGlobalState } from './flags';
 
 /* -----------------------------------------------------
  * Constants
@@ -842,20 +842,21 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
 function initContentScript(): void {
   if (!isGoogleClassroom()) return;
 
-  // Default per-tab behavior: CQD is enabled when the page loads.
-  desiredEnabled = true;
-
-  // Wire into the global enable/disable flag.
-  whenExtensionEnabled(
+  // Subscribe to global enable/disable state.
+  // This handles both initial state and dynamic changes.
+  subscribeToGlobalState(
     () => {
+      // Extension enabled
       globalEnabled = true;
+      desiredEnabled = true;
       recomputeEffectiveStateFromFlags();
     },
-    // If you ever extend whenExtensionEnabled to accept an "off" callback,
-    // you can plug it here. For now globalEnabled stays true by default.
+    () => {
+      // Extension disabled
+      globalEnabled = false;
+      stopCQD();
+    }
   );
-  // Kick once, using default globalEnabled=true
-  recomputeEffectiveStateFromFlags();
 }
 
 export default defineContentScript({

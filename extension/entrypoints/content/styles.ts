@@ -325,6 +325,7 @@ export function injectStyles(): void {
       z-index: 10;
       box-sizing: border-box;
       border-radius: inherit;
+      overflow: visible !important; /* Allow pulse to go outside */
       box-shadow:
         inset 0 0 0 2px var(--cqd-color-comment),
         0 0 12px rgba(99, 102, 241, 0.5);
@@ -342,6 +343,139 @@ export function injectStyles(): void {
       box-shadow:
         inset 0 0 0 2px #FF4036,
         0 0 12px rgba(255, 64, 54, 0.70);
+    }
+
+    /* PERMANENT BOLD styling (always applied to marked elements) */
+    .cqd-permanent-bold-comment,
+    .cqd-permanent-bold-edited {
+      font-weight: 900 !important;
+      transition: color 0.3s ease, text-shadow 0.3s ease;
+    }
+
+    /* COLOR highlight classes (applied on click, temporary) */
+    .cqd-color-comment {
+      color: var(--cqd-color-comment) !important;
+      text-shadow: 0 0 8px rgba(155, 0, 255, 0.4);
+    }
+    .cqd-color-edited {
+      color: var(--cqd-color-edited) !important;
+      text-shadow: 0 0 8px rgba(0, 214, 238, 0.4);
+    }
+    /* Special class for "Both" - applies Red to everything */
+    .cqd-color-both {
+      color: #FF4036 !important;
+      text-shadow: 0 0 8px rgba(255, 64, 54, 0.4);
+    }
+
+    /* Inner element pulse (NO SCALE, just color/shadow transition) */
+    /* BOTH OVERLAY (Red) - Direct Class */
+    .cqd-overlay-container.cqd-both {
+      box-shadow:
+        inset 0 0 0 2px #FF4036,
+        0 0 12px rgba(255, 64, 54, 0.70);
+    }
+
+    /* Inner element pulse (NO SCALE, just color/shadow transition) */
+    .cqd-inner-pulse {
+      /* No animation needed, transition handles color/shadow */
+    }
+
+    /* ===============================
+     * PULSE ANIMATIONS (Shadow fades out, pulse ripples, shadow fades back)
+     * =============================== */
+    @keyframes cqd-pulse-comment-anim {
+      0% {
+        box-shadow: 
+          inset 0 0 0 2px var(--cqd-color-comment),
+          0 0 12px rgba(99, 102, 241, 0.5);
+      }
+      15% {
+        box-shadow: 
+          inset 0 0 0 2px var(--cqd-color-comment),
+          0 0 0 0 rgba(155, 0, 255, 0.6);
+      }
+      50% {
+        box-shadow: 
+          inset 0 0 0 2px var(--cqd-color-comment),
+          0 0 0 14px rgba(155, 0, 255, 0);
+      }
+      85% {
+        box-shadow: 
+          inset 0 0 0 2px var(--cqd-color-comment),
+          0 0 0 0 rgba(155, 0, 255, 0);
+      }
+      100% {
+        box-shadow: 
+          inset 0 0 0 2px var(--cqd-color-comment),
+          0 0 12px rgba(99, 102, 241, 0.5);
+      }
+    }
+
+    @keyframes cqd-pulse-edited-anim {
+      0% {
+        box-shadow: 
+          inset 0 0 0 2px var(--cqd-color-edited),
+          0 0 12px rgba(0, 214, 238, 0.3);
+      }
+      15% {
+        box-shadow: 
+          inset 0 0 0 2px var(--cqd-color-edited),
+          0 0 0 0 rgba(0, 214, 238, 0.6);
+      }
+      50% {
+        box-shadow: 
+          inset 0 0 0 2px var(--cqd-color-edited),
+          0 0 0 14px rgba(0, 214, 238, 0);
+      }
+      85% {
+        box-shadow: 
+          inset 0 0 0 2px var(--cqd-color-edited),
+          0 0 0 0 rgba(0, 214, 238, 0);
+      }
+      100% {
+        box-shadow: 
+          inset 0 0 0 2px var(--cqd-color-edited),
+          0 0 12px rgba(0, 214, 238, 0.3);
+      }
+    }
+
+    @keyframes cqd-pulse-both-anim {
+      0% {
+        box-shadow: 
+          inset 0 0 0 2px #FF4036,
+          0 0 12px rgba(255, 64, 54, 0.7);
+      }
+      15% {
+        box-shadow: 
+          inset 0 0 0 2px #FF4036,
+          0 0 0 0 rgba(255, 64, 54, 0.6);
+      }
+      50% {
+        box-shadow: 
+          inset 0 0 0 2px #FF4036,
+          0 0 0 14px rgba(255, 64, 54, 0);
+      }
+      85% {
+        box-shadow: 
+          inset 0 0 0 2px #FF4036,
+          0 0 0 0 rgba(255, 64, 54, 0);
+      }
+      100% {
+        box-shadow: 
+          inset 0 0 0 2px #FF4036,
+          0 0 12px rgba(255, 64, 54, 0.7);
+      }
+    }
+
+    /* Pulse trigger classes - apply animation when class is added */
+    .cqd-overlay-container.cqd-pulse-comment {
+      animation: cqd-pulse-comment-anim 1.5s ease-out forwards;
+    }
+    .cqd-overlay-container.cqd-pulse-edited {
+      animation: cqd-pulse-edited-anim 1.5s ease-out forwards;
+    }
+    .cqd-overlay-container.cqd-pulse-both {
+      animation: cqd-pulse-both-anim 1.5s ease-out forwards;
     }
 
     .cqd-comment-badge {

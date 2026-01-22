@@ -172,30 +172,42 @@ export default defineBackground(() => {
   ensureAnalyticsAlarm();
   refreshRemoteAnalyticsConfig().catch(() => {});
 
-  // --- Icon Logic ---
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const actionApi = (chrome as any).action || (chrome as any).browserAction;
-  if (typeof chrome !== 'undefined' && chrome.tabs && actionApi) {
-    try {
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]?.id != null) updateIconForTab(tabs[0].id, tabs[0].url);
-      });
-      chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-        if (changeInfo.status === 'loading' || changeInfo.url) {
-          updateIconForTab(tabId, changeInfo.url ?? tab.url);
-        }
-        if (changeInfo.url) checkAndCloseFileTab(tabId, changeInfo.url);
-      });
-      chrome.tabs.onActivated.addListener((activeInfo) => {
-        chrome.tabs.get(activeInfo.tabId, (tab) => {
-          if (!chrome.runtime.lastError) updateIconForTab(activeInfo.tabId, tab.url);
-        });
-      });
-      chrome.tabs.onCreated.addListener((tab) => {
-        if (tab.id && tab.url) checkAndCloseFileTab(tab.id, tab.url);
-      });
-    } catch {}
-  }
+  // --- Icon Logic (Global + Tab Context) ---
+  const updateGlobalIcon = (enabled: boolean) => {
+    // If disabled globally, set gray icon everywhere
+    // (In V3, setIcon without tabId sets the default icon)
+    const path = enabled ? COLOR_ICON_PATHS : GRAY_ICON_PATHS;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const actionApi = (chrome as any).action || (chrome as any).browserAction;
+    if (actionApi?.setIcon) {
+      actionApi.setIcon({ path });
+    }
+  };
+
+  // Initial check
+  chrome.storage.local.get('extensionEnabled', (res) => {
+    const enabled = res.extensionEnabled !== false;
+    updateGlobalIcon(enabled);
+  });
+
+  // Listen for global toggle
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && changes.extensionEnabled) {
+      updateGlobalIcon(changes.extensionEnabled.newValue !== false);
+    }
+  });
+
+  // Tab updates: Only relevant if we want per-tab "graying out" on non-classroom pages
+  // But user said: "if i refreshed the page the extension won't be running... the icon to the gray one"
+  // This implies if globally disabled -> GRAY.
+  // If globally enabled -> COLOR (on all pages? or just classroom?)
+  // Standard behavior: Extension is "active" (color) when it *can* run.
+  // We'll keep it simple: Global Toggle controls the DEFAULT icon.
+  // We can still gray it out on non-Classroom tabs if we want, but "Global Disable" overrides everything.
+
+  // NOTE: We rely on the global toggle to set the default icon state.
+  // Individual tab logic (checking if URL matches) can be added on top if needed,
+  // but for "Global Disable", setting the default icon is the most robust way.
 
   /* -------------------------------------------------------
    * 1) Messages from drive_bypass.content.ts (Drive tab)

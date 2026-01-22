@@ -4,8 +4,9 @@ import { injectStyles } from './content/styles';
 import { isPageDark } from './content/theme';
 import { t, getCurrentCachedLanguage } from './content/i18n';
 import { detectEdited } from './content/smart-detector';
-import { whenExtensionEnabled } from './content/flags';
+import { subscribeToGlobalState } from './content/flags';
 import { triggerPostClick, upgradeCombinedBadge, ATTR_EDIT_DIFF } from './content/both-badge';
+import { triggerPulseEffect, markTargetElements } from './content/pulse-effect';
 
 // Selector for the main stream card
 const POST_SELECTOR = 'div[data-stream-item-id]';
@@ -16,25 +17,29 @@ const INJECTED_ATTR = 'data-cqd-injected';
 let editedScanScheduled = false;
 
 // Per-tab + runtime state
-let tabEnabled = true;
+// let tabEnabled = true; // Removed
 let running = false;
 let domObserver: MutationObserver | null = null;
 let heartbeatId: number | null = null;
 let urlObserver: MutationObserver | null = null;
 
+/* --------------------------------------------------------------------------
+ * Content script entry
+ * ------------------------------------------------------------------------*/
+
 export default defineContentScript({
   matches: ['https://classroom.google.com/*'],
   runAt: 'document_idle',
   main() {
-    whenExtensionEnabled(() => {
-      if (!tabEnabled) return;
-      startEditedFeature();
-    });
+    subscribeToGlobalState(
+      () => startEditedFeature(),
+      () => stopEditedFeature()
+    );
   },
 });
 
 /* -----------------------------------------------------
- * Start / Stop logic (per tab)
+ * Start / Stop logic
  * ---------------------------------------------------*/
 function startEditedFeature(): void {
   if (running) return;
@@ -42,7 +47,7 @@ function startEditedFeature(): void {
     window.addEventListener(
       'DOMContentLoaded',
       () => {
-        if (!running && tabEnabled) {
+        if (!running) {
           startEditedFeature();
         }
       },
@@ -126,26 +131,6 @@ function stopEditedFeature(): void {
       post.removeAttribute(ATTR_EDIT_DIFF); // Clean up data attr
       post.style.removeProperty('position');
     });
-}
-
-/* -----------------------------------------------------
- * Per-tab toggle messages
- * ---------------------------------------------------*/
-if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
-  chrome.runtime.onMessage.addListener((message) => {
-    // Firefox fix: return false for messages we don't handle
-    if (!message) return false;
-    if (message.type !== 'CQD_POPUP_SET_DESIRED_STATE') return false;
-    tabEnabled = !!message.enabled;
-    if (tabEnabled) {
-      whenExtensionEnabled(() => {
-        startEditedFeature();
-      });
-    } else {
-      stopEditedFeature();
-    }
-    return false; // No async response needed
-  });
 }
 
 /* -----------------------------------------------------
@@ -332,6 +317,9 @@ function createEditedOverlay(post: HTMLElement, diffText: string) {
       }
     });
     post.appendChild(overlay);
+    
+    // Mark date element for permanent bold styling
+    markTargetElements(post, 'edited');
   } else {
     overlay.classList.add('cqd-edited');
     overlay.setAttribute(INJECTED_ATTR, 'true');
@@ -363,6 +351,13 @@ function createEditedOverlay(post: HTMLElement, diffText: string) {
     // content.appendChild(diffSpan);
     // pill.appendChild(content);
     // === END NUMBER DISPLAY ===
+
+    // Click handler with pulse effect
+    pill.addEventListener('click', (e) => {
+      e.stopPropagation();
+      triggerPulseEffect(post, 'edited');
+      triggerPostClick(post);
+    });
 
     post.appendChild(pill);
   }

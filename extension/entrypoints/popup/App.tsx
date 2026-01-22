@@ -41,11 +41,6 @@ type ToggleRowProps = {
 
 type StatItem = { id: string; label: string; value: number; color: string };
 
-type TabState = {
-  desiredEnabled: boolean;
-  effectiveEnabled: boolean;
-};
-
 // Color mapping for file types
 const TYPE_COLORS: Record<string, string> = {
   pdf: 'var(--cqd-red, #ef4444)',
@@ -59,9 +54,7 @@ const TYPE_COLORS: Record<string, string> = {
 
 function App() {
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [tabState, setTabState] = useState<TabState | null>(null);
   const [tabId, setTabId] = useState<number | null>(null);
-  const tabIdRef = useRef<number | null>(null);
 
   const [isClassroomTab, setIsClassroomTab] = useState(false);
   const [loadingState, setLoadingState] = useState(true);
@@ -80,11 +73,6 @@ function App() {
   const [stats, setStats] = useState<StatItem[]>([]);
   const [totalDownloads, setTotalDownloads] = useState(0);
 
-  // Keep ref in sync for onMessage filter
-  useEffect(() => {
-    tabIdRef.current = tabId;
-  }, [tabId]);
-
   // Track scroll to add blur/shadow under header when not at top
   useEffect(() => {
     const el = scrollRef.current;
@@ -102,17 +90,64 @@ function App() {
     };
   }, []);
 
+  // --- DETECT IF ON CLASSROOM & LOAD VERSION ---
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const browserApi = (globalThis as any).chrome;
+    
+    // Dev environment fallback
+    if (!browserApi || !browserApi.tabs || !browserApi.tabs.query) {
+       setIsClassroomTab(true); // Default to true in dev so we see the main UI
+       setVersion('dev');
+       return;
+    }
+
+    // Load version from manifest
+    try {
+      const manifest = browserApi.runtime.getManifest();
+      if (manifest && manifest.version) {
+        setVersion(manifest.version);
+      }
+    } catch {
+      // Ignore version loading errors
+    }
+
+    // Query active tab
+    browserApi.tabs.query({ active: true, currentWindow: true }, (tabs: any[]) => {
+      if (browserApi.runtime.lastError) {
+        // Fallback or ignore
+        return;
+      }
+      if (tabs && tabs.length > 0) {
+        const url = tabs[0].url || '';
+        setTabId(tabs[0].id || null);
+        if (url.includes('classroom.google.com')) {
+          setIsClassroomTab(true);
+        } else {
+          setIsClassroomTab(false);
+        }
+      }
+    });
+  }, []);
+
   // --- STATS LOADING LOGIC ---
   useEffect(() => {
     // 1. Function to process stats from storage format to Chart format
     const loadStats = async () => {
       try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const browserApi = (globalThis as any).chrome;
+        if (!browserApi || !browserApi.storage || !browserApi.storage.local) {
+            setStats([]); // Empty stats in dev
+            return;
+        }
+
         // Wrapper for Firefox which doesn't return Promise for 'chrome' namespace
         const result = await new Promise<any>((resolve) => {
            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-           (chrome.storage.local as any).get('local_stats', (res: any) => {
+           (browserApi.storage.local as any).get('local_stats', (res: any) => {
              // In Firefox/Chrome callback, result is the object
-             if (chrome.runtime.lastError) {
+             if (browserApi.runtime.lastError) {
                resolve({});
              } else {
                resolve(res || {});
@@ -160,201 +195,80 @@ function App() {
     loadStats();
 
     // 2. Listen for live updates (if user downloads while popup is open)
-    const listener = (changes: any, area: string) => {
-      if (area === 'local' && changes.local_stats) {
-        loadStats();
-      }
-    };
-    chrome.storage.onChanged.addListener(listener);
-
-    return () => {
-      chrome.storage.onChanged.removeListener(listener);
-    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const browserApi = (globalThis as any).chrome;
+    if (browserApi && browserApi.storage && browserApi.storage.onChanged) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const listener = (changes: any, area: string) => {
+          if (area === 'local' && changes.local_stats) {
+            loadStats();
+          }
+        };
+        browserApi.storage.onChanged.addListener(listener);
+        return () => {
+          browserApi.storage.onChanged.removeListener(listener);
+        };
+    }
   }, []);
 
-  // Initial: get active tab + version + per-tab state
+  // --- GLOBAL SETTINGS LOGIC ---
+  // --- GLOBAL SETTINGS LOGIC ---
   useEffect(() => {
+    // Safety check for non-extension environment (e.g. pnpm dev)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const browserApi = (globalThis as any).chrome as typeof chrome | undefined;
-
-    // extension version
-    try {
-      const manifest = browserApi?.runtime?.getManifest();
-      if (manifest?.version) {
-        setVersion(manifest.version);
-      }
-    } catch {
-      // ignore
-    }
-
-    if (!browserApi?.tabs) {
-      // fallback for non-extension env
-      setSettings(DEFAULT_SETTINGS);
-      setTabState({ desiredEnabled: true, effectiveEnabled: true });
-      setIsClassroomTab(false);
+    const browserApi = (globalThis as any).chrome;
+    if (!browserApi || !browserApi.storage || !browserApi.storage.local) {
+      setSettings((prev) => ({
+        ...DEFAULT_SETTINGS,
+        ...prev,
+        extensionEnabled: true, // Default to true in dev
+      }));
       setLoadingState(false);
       return;
     }
 
-    browserApi.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      const tab = tabs[0];
-      if (!tab || tab.id == null) {
-        setLoadingState(false);
-        return;
-      }
-
-      setTabId(tab.id);
-      tabIdRef.current = tab.id;
-
-      const url = tab.url || '';
-      const classroomMatch = /^https:\/\/classroom\.google\.com\//.test(url);
-      setIsClassroomTab(classroomMatch);
-
-      if (!classroomMatch) {
-        // Popup opened on a non-Classroom page
-        setSettings({ ...DEFAULT_SETTINGS, extensionEnabled: false });
-        setTabState({ desiredEnabled: false, effectiveEnabled: false });
-        setLoadingState(false);
-        return;
-      }
-
-      // Ask THIS tab's content script for its local state
-      browserApi.tabs.sendMessage(
-        tab.id,
-        { type: 'CQD_POPUP_QUERY_STATE' },
-        (response) => {
-          if (browserApi.runtime.lastError || !response) {
-            // If content script not ready, assume enabled by default
-            const defaultState: TabState = {
-              desiredEnabled: true,
-              effectiveEnabled: true,
-            };
-            setSettings({
-              ...DEFAULT_SETTINGS,
-              extensionEnabled: defaultState.desiredEnabled,
-            });
-            setTabState(defaultState);
-          } else {
-            const desired =
-              typeof response.desiredEnabled === 'boolean'
-                ? response.desiredEnabled
-                : true;
-            const effective =
-              typeof response.effectiveEnabled === 'boolean'
-                ? response.effectiveEnabled
-                : desired;
-            setSettings({
-              ...DEFAULT_SETTINGS,
-              extensionEnabled: desired,
-            });
-            setTabState({ desiredEnabled: desired, effectiveEnabled: effective });
-          }
-          setLoadingState(false);
-        },
-      );
+    // Initial load
+    browserApi.storage.local.get('extensionEnabled', (res: { extensionEnabled?: boolean }) => {
+      const isEnabled = res.extensionEnabled !== false; // default true
+      setSettings((prev) => ({
+        ...DEFAULT_SETTINGS,
+        ...prev,
+        extensionEnabled: isEnabled
+      }));
+      setLoadingState(false);
     });
-  }, []);
 
-  // Listen for live effective-state changes from THIS tab only
-  useEffect(() => {
+    // Listen for changes (cross-tab sync)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const browserApi = (globalThis as any).chrome as typeof chrome | undefined;
-    if (!browserApi?.runtime?.onMessage) return;
-
-    const handler = (
-      message: any,
-      sender: chrome.runtime.MessageSender,
-    ): void => {
-      if (message?.type !== 'CQD_EFFECTIVE_STATE_CHANGED') return;
-
-      const currentTabId = tabIdRef.current;
-      if (!currentTabId || sender.tab?.id !== currentTabId) return;
-
-      setTabState((prev) => {
-        if (!prev) {
-          return {
-            desiredEnabled: !!message.enabled,
-            effectiveEnabled: !!message.enabled,
-          };
-        }
-        return {
+    const listener = (changes: any, area: string) => {
+      if (area === 'local' && changes.extensionEnabled) {
+        setSettings((prev) => ({
+          ...DEFAULT_SETTINGS,
           ...prev,
-          effectiveEnabled: !!message.enabled,
-        };
-      });
-    };
-
-    browserApi.runtime.onMessage.addListener(handler);
-    return () => {
-      try {
-        browserApi.runtime.onMessage.removeListener(handler);
-      } catch {
-        // ignore
+          extensionEnabled: changes.extensionEnabled.newValue !== false
+        }));
       }
     };
-  }, []);
-
-  async function handleShareClick() {
-    setShareStatus('idle');
-    const linkToCopy = EXTENSION_STORE_URL;
-    try {
-      if (navigator?.clipboard?.writeText) {
-        await navigator.clipboard.writeText(linkToCopy);
-        setShareStatus('copied');
-        setTimeout(() => setShareStatus('idle'), 2500);
-      } else {
-        setShareStatus('error');
-      }
-    } catch {
-      setShareStatus('error');
+    
+    if (browserApi.storage.onChanged) {
+      browserApi.storage.onChanged.addListener(listener);
+      return () => browserApi.storage.onChanged.removeListener(listener);
     }
-  }
+  }, []);
 
   function handleToggleExtension() {
-    if (!settings || !isClassroomTab || tabId == null) return;
-
+    if (!settings) return;
+    const nextState = !settings.extensionEnabled;
+    
+    // Optimistic update
+    setSettings({ ...settings, extensionEnabled: nextState });
+    
+    // Save to storage
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const browserApi = (globalThis as any).chrome as typeof chrome | undefined;
-    if (!browserApi?.tabs) return;
-
-    const prevSettings = settings;
-    const prevTabState = tabState;
-
-    const nextDesired = !settings.extensionEnabled;
-
-    setSaving(true);
-    setError(null);
-    // Optimistic switch UI
-    setSettings({ ...settings, extensionEnabled: nextDesired });
-
-    browserApi.tabs.sendMessage(
-      tabId,
-      { type: 'CQD_POPUP_SET_DESIRED_STATE', enabled: nextDesired },
-      (response) => {
-        setSaving(false);
-
-        if (browserApi.runtime.lastError || !response) {
-          setError(
-            "I couldn’t update the extension on this Classroom tab. Try reloading the page and toggling again.",
-          );
-          setSettings(prevSettings);
-          setTabState(prevTabState);
-          return;
-        }
-
-        const desired =
-          typeof response.desiredEnabled === 'boolean'
-            ? response.desiredEnabled
-            : nextDesired;
-        const effective =
-          typeof response.effectiveEnabled === 'boolean'
-            ? response.effectiveEnabled
-            : desired;
-
-        setSettings({ ...settings, extensionEnabled: desired });
-        setTabState({ desiredEnabled: desired, effectiveEnabled: effective });
-      },
-    );
+    const browserApi = (globalThis as any).chrome;
+    if (browserApi && browserApi.storage && browserApi.storage.local) {
+      browserApi.storage.local.set({ extensionEnabled: nextState });
+    }
   }
 
   function handleOpenClassroomClick() {
@@ -370,6 +284,17 @@ function App() {
       // ignore
     }
   }
+
+  const handleShareClick = async () => {
+    try {
+      await navigator.clipboard.writeText(EXTENSION_STORE_URL);
+      setShareStatus('copied');
+      setTimeout(() => setShareStatus('idle'), 2000);
+    } catch {
+      setShareStatus('error');
+      setTimeout(() => setShareStatus('idle'), 2000);
+    }
+  };
 
   // --- Donut chart calculation (Dynamic) ---
   const radius = 40;
@@ -390,18 +315,17 @@ function App() {
   });
 
   const isLoadingSettings = loadingState || settings == null;
-
-  const effectiveEnabled = tabState?.effectiveEnabled ?? false;
+  const isEnabled = settings?.extensionEnabled ?? true;
 
   let extensionStatusLabel: string;
   if (!isClassroomTab) {
     extensionStatusLabel = 'Open on Google Classroom';
   } else if (isLoadingSettings) {
-    extensionStatusLabel = 'Checking this tab…';
+    extensionStatusLabel = 'Loading…';
   } else {
-    extensionStatusLabel = effectiveEnabled
-      ? 'Running on this tab'
-      : 'Paused on this tab';
+    extensionStatusLabel = isEnabled
+      ? 'Extension Enabled'
+      : 'Extension Disabled';
   }
 
   // Choose logo based on whether we’re on a Classroom tab
@@ -426,7 +350,7 @@ function App() {
                 {/* Dot reflects this tab's effective state only */}
                 <span
                   className={`cqd-brand-status-dot ${
-                    isClassroomTab && effectiveEnabled ? 'on' : ''
+                    isClassroomTab && isEnabled ? 'on' : ''
                   }`}
                   aria-hidden="true"
                 />
@@ -569,9 +493,9 @@ function App() {
 
                   <div className="cqd-toggle-group">
                     <ToggleRow
-                      label="Enable on this tab"
-                      description="This only affects the current Classroom tab, not other tabs."
-                      checked={settings?.extensionEnabled ?? false}
+                      label="Enable Extension"
+                      description="Turn the extension on or off globally."
+                      checked={settings?.extensionEnabled ?? true}
                       loading={isLoadingSettings || saving}
                       onToggle={handleToggleExtension}
                       disabled={isLoadingSettings}
@@ -620,7 +544,7 @@ function App() {
                       <span className="cqd-designer-name">Adham Haitham</span>
                     </span>
                     <span className="cqd-designer-extra">
-                      UI/UX Designer
+                      Junior Software Engineer
                     </span>
                   </p>
                 </div>
