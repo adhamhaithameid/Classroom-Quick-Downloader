@@ -620,7 +620,7 @@ function App() {
                       <span className="cqd-designer-name">Adham Haitham</span>
                     </span>
                     <span className="cqd-designer-extra">
-                      Junior Software Engineer &amp; UI/UX Designer
+                      UI/UX Designer
                     </span>
                   </p>
                 </div>
@@ -730,14 +730,14 @@ function App() {
           <footer className="cqd-footer">
             <div className="cqd-footer-inner">
               <p className="cqd-footer-text">
-                Have a suggestion?{' '}
+                Have a suggestion or problem?{' '}
                 <a
                   href={SURVEY_URL}
                   target="_blank"
                   rel="noreferrer"
                   className="cqd-footer-link"
                 >
-                  Take the survey
+                  Report it here
                 </a>
               </p>
             </div>

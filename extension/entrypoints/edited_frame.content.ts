@@ -211,6 +211,7 @@ function scanForEditedPosts() {
 
 /**
  * Calculates the difference in days between created and edited date.
+ * @deprecated Legacy implementation, kept for reference/fallback
  */
 function calculateEditDiff(
   fullText: string,
@@ -287,6 +288,8 @@ function calculateEditDiff(
     return null;
   }
 }
+
+
 
 /**
  * Helper: collect aria-label/title text from inside the post,

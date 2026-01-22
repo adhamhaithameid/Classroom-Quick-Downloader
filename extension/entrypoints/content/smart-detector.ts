@@ -29,7 +29,7 @@ const MONTH_NAMES: Record<string, number> = {
   'يونيو': 6, 'يوليو': 7, 'أغسطس': 8, 'اغسطس': 8, 'سبتمبر': 9,
   'أكتوبر': 10, 'اكتوبر': 10, 'نوفمبر': 11, 'ديسمبر': 12,
   
-  // English
+  // English (and shared global terms)
   'january': 1, 'february': 2, 'march': 3, 'april': 4, 'may': 5, 'june': 6,
   'july': 7, 'august': 8, 'september': 9, 'october': 10, 'november': 11, 'december': 12,
   'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'jun': 6, 'jul': 7, 'aug': 8,
@@ -40,13 +40,14 @@ const MONTH_NAMES: Record<string, number> = {
   'juin': 6, 'juillet': 7, 'août': 8, 'aout': 8, 'septembre': 9,
   'octobre': 10, 'novembre': 11, 'décembre': 12, 'decembre': 12,
   
-  // German
-  'januar': 1, 'februar': 2, 'märz': 3, 'marz': 3, 'juni': 6, 'juli': 7,
-  'oktober': 10, 'dezember': 12,
+  // German (unique terms only)
+  'januar': 1, 'februar': 2, 'märz': 3, 'marz': 3, 
+  // 'juni', 'juli' covered by others/duplicates, removing to fix lint
+  'dezember': 12,
   
   // Spanish
   'enero': 1, 'febrero': 2, 'marzo': 3, 'mayo': 5, 'junio': 6, 'julio': 7,
-  'agosto': 8, 'septiembre': 9, 'octubre': 10, 'noviembre': 11, 'diciembre': 12,
+  'agosto': 8, 'septiembre': 9, 'noviembre': 11, 'diciembre': 12,
   
   // Portuguese
   'janeiro': 1, 'fevereiro': 2, 'março': 3, 'marco': 3, 'maio': 5, 'junho': 6,
@@ -68,9 +69,9 @@ const MONTH_NAMES: Record<string, number> = {
   'ekim': 10, 'kasım': 11, 'kasim': 11, 'aralık': 12, 'aralik': 12,
   
   // Dutch/Swedish/Indonesian/Swahili (shared)
-  'januari': 1, 'februari': 2, 'maart': 3, 'mei': 5, 'juni': 6, 'juli': 7,
-  'augustus': 8, 'augusti': 8, 'september': 9, 'oktober': 10, 'november': 11, 'december': 12,
-  'desember': 12, 'maret': 3, 'agustus': 8, 'desemba': 12,
+  'januari': 1, 'februari': 2, 'maart': 3, 'mei': 5,
+  'augustus': 8, 'augusti': 8,
+  'desember': 12, 'maret': 3, 'desemba': 12,
   
   // Polish
   'styczeń': 1, 'styczen': 1, 'luty': 2, 'marzec': 3, 'kwiecień': 4, 'kwiecien': 4,
@@ -84,8 +85,8 @@ const MONTH_NAMES: Record<string, number> = {
   'srpen': 8, 'září': 9, 'zari': 9, 'říjen': 10, 'rijen': 10,
   'prosinec': 12,
   
-  // Norwegian/Danish
-  'januar': 1, 'februar': 2, 'mars': 3, 'april': 4, 'mai': 5, 'august': 8,
+  // Norwegian/Danish (duplicates removed)
+  // 'januar', 'februar', 'mars', 'april', 'mai', 'august' are all covered above
   
   // Finnish
   'tammikuu': 1, 'helmikuu': 2, 'maaliskuu': 3, 'huhtikuu': 4, 'toukokuu': 5,
@@ -173,7 +174,7 @@ const MONTH_NAMES: Record<string, number> = {
   'جنوری': 1, 'فروری': 2, 'مارچ': 3, 'اپریل': 4, 'مئی': 5, 'جون': 6,
   'جولائی': 7, 'اگست': 8, 'ستمبر': 9, 'اکتوبر': 10, 'نومبر': 11, 'دسمبر': 12,
   
-  // Swahili specific
+  // Swahili specific (duplicates removed)
   'machi': 3, 'aprili': 4, 'julai': 7, 'agosti': 8, 'septemba': 9, 'oktoba': 10, 'novemba': 11,
 };
 
@@ -373,45 +374,85 @@ function isExcludedCommentText(text: string): boolean {
 }
 
 // ============================================================================
+// SAFE TEXT EXTRACTION
+// ============================================================================
+
+/**
+ * Extracts text from a post while explicitly excluding the body content
+ * where teachers might type ambiguous keywords like "Hand In" or "Edited".
+ * 
+ * Excludes:
+ * - .n8F6Jd (The main post body content wrapper)
+ * - .a3j8U (Another common body wrapper in streams)
+ */
+function getSafeText(post: HTMLElement): string {
+  // Clone the node to avoid modifying the live DOM
+  // (Deep clone is necessary to filter out children)
+  const clone = post.cloneNode(true) as HTMLElement;
+  
+  // Remove the body content wrappers
+  const bodyContent = clone.querySelectorAll('.n8F6Jd, .a3j8U, .gM4mlb, .A6dC2c');
+  bodyContent.forEach(el => el.remove());
+  
+  // Also remove the "expand" text which might be noisy
+  const expandButtons = clone.querySelectorAll('[role="button"]');
+  expandButtons.forEach(btn => {
+    if (btn.textContent?.includes('more') || btn.textContent?.includes('less')) {
+      btn.remove();
+    }
+  });
+
+  return (clone.innerText || '') + ' ' + getAriaLabels(clone);
+}
+
+// ============================================================================
 // COMMENT DETECTION
 // ============================================================================
 
 export function detectComments(post: HTMLElement, pageLang: string): CommentDetectionResult {
-  const text = (post.innerText || '') + ' ' + getAriaLabels(post);
-  const pageKeywords = getCommentKeywords(pageLang);
-  const englishKeywords = getCommentKeywords('en');
-  
-  // Strategy 1: DOM pattern check for class comments
-  const commentSpans = post.querySelectorAll('.asQXV, [class*="comment"], span');
-  for (const span of Array.from(commentSpans)) {
-    const spanText = span.textContent || '';
-    if (isExcludedCommentText(spanText)) continue;
-    
-    // Arabic: "تعليق واحد من الصف" or "X تعليقات من الصف"
-    if (spanText.includes('من الصف')) {
-      const count = extractNumber(spanText);
-      if (count && count > 0 && count < 10000) {
-        return { hasComments: true, count, confidence: 'high', matchedText: spanText };
-      }
+  // Strategy 1: Targeted DOM for Google Classroom Comment Count
+  // The specific class for the comment count span
+  const countSpan = post.querySelector('.mUIrbf-vQzf8d');
+  if (countSpan && countSpan.textContent) {
+    const text = countSpan.textContent;
+    const count = extractNumber(text);
+    if (count !== null && count > 0) {
+      return { hasComments: true, count, confidence: 'high', matchedText: text };
     }
+  }
+
+  // Strategy 2: Look for the specific comment button aria-label
+  // This button usually has classes like mUIrbf-LgbsSe
+  const commentButton = post.querySelector('button[aria-label]');
+  if (commentButton) {
+    const label = commentButton.getAttribute('aria-label') || '';
+    const pageKeywords = getCommentKeywords(pageLang);
+    const englishKeywords = getCommentKeywords('en');
+    const allKeywords = [...pageKeywords.plural, ...englishKeywords.plural, ...pageKeywords.singular, ...englishKeywords.singular];
     
-    // English/Other: "class comment"
-    if (spanText.toLowerCase().includes('class comment')) {
-      const count = extractNumber(spanText);
-      if (count && count > 0 && count < 10000) {
-        return { hasComments: true, count, confidence: 'high', matchedText: spanText };
+    // Only check the LABEL of the button, not arbitrary text
+    for (const keyword of allKeywords) {
+      if (label.toLowerCase().includes(keyword.toLowerCase())) {
+        const count = extractNumber(label);
+        if (count && count > 0) {
+          return { hasComments: true, count, confidence: 'high', matchedText: label };
+        }
       }
     }
   }
   
-  // Strategy 2: Keyword pattern matching
+  // Strategy 3: SAFE Text Fallback (Restored but filtered)
+  // Only scans headers, footers, and metadata - explicitly excludes body content
+  const safeText = getSafeText(post);
+  const pageKeywords = getCommentKeywords(pageLang);
+  const englishKeywords = getCommentKeywords('en');
   const allPlural = [...pageKeywords.plural, ...englishKeywords.plural].map(k => k.toLowerCase());
   const allSingular = [...pageKeywords.singular, ...englishKeywords.singular].map(k => k.toLowerCase());
   
   for (const keyword of [...allPlural, ...allSingular]) {
     const escapedKeyword = escapeRegex(keyword);
     const numeralPattern = new RegExp(`(\\d+)\\s*\\S*?${escapedKeyword}`, 'i');
-    const numeralMatch = text.match(numeralPattern);
+    const numeralMatch = safeText.match(numeralPattern);
     
     if (numeralMatch) {
       const count = parseInt(numeralMatch[1], 10);
@@ -419,22 +460,22 @@ export function detectComments(post: HTMLElement, pageLang: string): CommentDete
         return {
           hasComments: true,
           count,
-          confidence: keyword.includes('class') || keyword.includes('الصف') ? 'high' : 'medium',
+          confidence: 'medium', // Lower confidence for fallback
           matchedText: numeralMatch[0],
         };
       }
     }
     
     // Arabic word numbers
-    if (text.toLowerCase().includes(keyword)) {
+    if (safeText.toLowerCase().includes(keyword)) {
       for (const [arabicWord, value] of Object.entries(ARABIC_NUMBER_WORDS)) {
-        if (text.includes(arabicWord)) {
-          return { hasComments: true, count: value, confidence: 'high', matchedText: `${arabicWord} ${keyword}` };
+        if (safeText.includes(arabicWord)) {
+          return { hasComments: true, count: value, confidence: 'medium', matchedText: `${arabicWord} ${keyword}` };
         }
       }
     }
   }
-  
+
   return { hasComments: false, count: 0, confidence: 'high' };
 }
 
@@ -593,13 +634,17 @@ function extractDatesFromDOM(post: HTMLElement): Date[] {
   }
   
   // Strategy 2: Look for spans with aria-hidden that contain dates
+  // often the visible date is aria-hidden
   if (dates.length < 2) {
     const hiddenSpans = post.querySelectorAll('span[aria-hidden="true"]');
     for (const span of hiddenSpans) {
-      const spanText = span.textContent || '';
-      const spanDates = extractAllDatesFromText(spanText);
-      if (spanDates.length > 0) {
-        dates.push(...spanDates);
+      // Ensure we are only looking at date-like spans, not just any aria-hidden span
+      if (span.closest('.IMvYId') || span.parentElement?.closest('.IMvYId')) {
+          const spanText = span.textContent || '';
+          const spanDates = extractAllDatesFromText(spanText);
+          if (spanDates.length > 0) {
+            dates.push(...spanDates);
+          }
       }
     }
   }
@@ -628,39 +673,59 @@ export function detectEdited(post: HTMLElement, pageLang: string): EditedDetecti
     };
   }
   
-  // STRATEGY 2: Fallback to text-based detection
-  const text = (post.innerText || '') + ' ' + getAriaLabels(post);
-  const extraction = extractEditedDates(text);
-  
-  if (extraction) {
-    if (extraction.originalDate && extraction.editedDate) {
-      const daysDiff = calculateDaysDiff(extraction.originalDate, extraction.editedDate);
+  // STRATEGY 2: Fallback to text-based detection BUT ONLY within the date metadata container
+  // We do NOT scan the whole post text anymore to avoid false positives.
+  // The date metadata container usually has class 'IMvYId' or 'dDKhVc'
+  const dateMetadataContainer = post.querySelector('.IMvYId.dDKhVc, .IMvYId');
+  if (dateMetadataContainer) {
+    const text = (dateMetadataContainer.textContent || '') + ' ' + getAriaLabels(dateMetadataContainer as HTMLElement);
+    const extraction = extractEditedDates(text);
+    
+    if (extraction) {
+      if (extraction.originalDate && extraction.editedDate) {
+        const daysDiff = calculateDaysDiff(extraction.originalDate, extraction.editedDate);
+        return {
+          isEdited: true,
+          editDiff: daysDiff.toString(),
+          confidence: 'high',
+          originalDate: extraction.originalDate.toLocaleDateString(),
+          editedDate: extraction.editedDate.toLocaleDateString(),
+        };
+      }
+      
+      // Edited keyword found but couldn't calculate diff
       return {
         isEdited: true,
-        editDiff: daysDiff.toString(),
-        confidence: 'high',
-        originalDate: extraction.originalDate.toLocaleDateString(),
-        editedDate: extraction.editedDate.toLocaleDateString(),
+        editDiff: '0',
+        confidence: 'medium', // Higher confidence since we are in the metadata container
       };
     }
-    
-    // Edited keyword found but couldn't calculate diff
-    return {
-      isEdited: true,
-      editDiff: '0',
-      confidence: extraction.matchedPattern === 'keyword_only' ? 'low' : 'medium',
-    };
   }
+
+  // STRATEGY 3: Fallback keyword check (Restored but SAFE)
+  // Scanning specific Safe Text (excluding body) for edit keywords
+  const safeText = getSafeText(post);
+  const extraction = extractEditedDates(safeText);
   
-  // STRATEGY 3: Fallback keyword check
-  const pageKeywords = getEditedKeywords(pageLang);
-  const englishKeywords = getEditedKeywords('en');
-  const allKeywords = [...pageKeywords, ...englishKeywords];
-  
-  for (const keyword of allKeywords) {
-    if (text.toLowerCase().includes(keyword.toLowerCase())) {
-      return { isEdited: true, editDiff: '0', confidence: 'low' };
-    }
+  if (extraction) {
+      if (extraction.originalDate && extraction.editedDate) {
+        // ... (same as above)
+         const daysDiff = calculateDaysDiff(extraction.originalDate, extraction.editedDate);
+        return {
+          isEdited: true,
+          editDiff: daysDiff.toString(),
+          confidence: 'medium',
+          originalDate: extraction.originalDate.toLocaleDateString(),
+          editedDate: extraction.editedDate.toLocaleDateString(),
+        };
+      }
+      
+       // Edited keyword found
+      return {
+        isEdited: true,
+        editDiff: '0',
+        confidence: 'low',
+      };
   }
   
   return { isEdited: false, editDiff: null, confidence: 'high' };
