@@ -1,8 +1,28 @@
 // filepath: entrypoints/content/smart-detector.ts
-import { detectComments } from './smart-detector-comments';
-import { ARABIC_MONTHS, MONTH_NAMES } from './constants';
+/**
+ * SMART DETECTOR - Zero-Fail v2 Architecture
+ * 
+ * UPGRADES FROM v1:
+ * - Noun-form keyword detection (Modification, Änderung, etc.)
+ * - European date format support (DD MMM. YYYY)
+ * - Retains: BiDi normalization, Eastern numerals, parent context expansion
+ */
 
-export * from './smart-detector-comments';
+import {
+  GOLDEN_SELECTORS,
+  CONFIDENCE_WEIGHTS,
+  normalizeText,
+  normalizeForComparison,
+  getEditedKeywords,
+  hasDatePattern,
+  isExcludedEditedPattern,
+} from './detection-keywords';
+
+import {
+  detectComments,
+  type CommentDetectionResult,
+  type LayerDebugInfo,
+} from './smart-detector-comments';
 
 // ============================================================================
 // TYPES & INTERFACES
@@ -11,102 +31,465 @@ export * from './smart-detector-comments';
 export interface EditedDetectionResult {
   isEdited: boolean;
   confidence: 'high' | 'medium' | 'low' | 'none';
-  matchedText?: string;
-  editDiff?: string;
+  confidenceScore: number;
+  matchedText: string | null;
+  detectionLayer: number;
+  hasDateProximity: boolean;
+  usedParentContext: boolean;
+  debugInfo?: EditedLayerDebugInfo;
+}
+
+interface EditedLayerDebugInfo {
+  layer1Score: number;
+  layer2Score: number;
+  layer3Score: number;
+  layer4Penalty: number;
+  dateProximityBonus: number;
+  parentContextBonus: number;
+  matchDetails: string[];
+}
+
+interface LayerResult {
+  score: number;
+  matchedText: string | null;
+  hasDateProximity: boolean;
+  usedParentContext: boolean;
+  details: string;
+}
+
+export interface PostStateResult {
+  comments: CommentDetectionResult;
+  edited: EditedDetectionResult;
+  combinedConfidence: 'high' | 'medium' | 'low' | 'none';
+  hasBothFlags: boolean;
 }
 
 // ============================================================================
-// KEYWORD DICTIONARIES
+// UTILITY FUNCTIONS
 // ============================================================================
 
-const EDITED_KEYWORDS: Record<string, string[]> = {
-  ar: ['تم تعديله', '(تم تعديله)', 'معدل', 'تعديل'],
-  en: ['edited', '(edited)', 'modified'],
-  es: ['editado', '(editado)'],
-  fr: ['modifié', '(modifié)'],
-  de: ['bearbeitet', '(bearbeitet)'],
-  pt: ['editado', '(editado)'],
-  it: ['modificato', '(modificato)'],
-  ru: ['изменено', '(изменено)'],
-  ja: ['編集済み', '(編集済み)'],
-  ko: ['수정됨', '(수정됨)'],
-  zh: ['已编辑', '(已编辑)'],
-};
-
-function getEditedKeywords(lang: string): string[] {
-  const shortLang = lang.split('-')[0].toLowerCase();
-  return EDITED_KEYWORDS[shortLang] || EDITED_KEYWORDS['en'];
-}
-
-function getAriaLabels(el: HTMLElement): string {
-  return Array.from(el.querySelectorAll('[aria-label]'))
-    .map((node) => node.getAttribute('aria-label') || '')
-    .join(' ');
-}
-
-// ============================================================================
-// EDITED POST DETECTION
-// ============================================================================
-
-/**
- * The specific container class provided by user that contains the updated date info.
- * This container will have "Created Dec 30, 2025" and "(Edited Dec 30, 2025)"
- */
-const EDITED_DATE_CONTAINER_SELECTOR = '.IMvYId.dDKhVc.Vu2fZd';
-
-/**
- * Extracts text from a post while explicitly excluding the body content
- * where teachers might type ambiguous keywords like "Hand In" or "Edited".
- */
-function getSafeMetadataText(post: HTMLElement): string {
-  // Clone the node to avoid modifying the live DOM
-  const clone = post.cloneNode(true) as HTMLElement;
+function createSanitizedClone(element: HTMLElement): HTMLElement {
+  const clone = element.cloneNode(true) as HTMLElement;
   
-  // Remove the body content wrappers to avoid false positives from user typed text
-  const bodyContent = clone.querySelectorAll('.n8F6Jd, .a3j8U, .gM4mlb, .A6dC2c');
-  bodyContent.forEach(el => el.remove());
+  for (const selector of GOLDEN_SELECTORS.userContentExclusions) {
+    clone.querySelectorAll(selector).forEach(el => el.remove());
+  }
   
-  // Also remove expand buttons
-  const expandButtons = clone.querySelectorAll('[role="button"]');
-  expandButtons.forEach(btn => {
-    if (btn.textContent?.includes('more') || btn.textContent?.includes('less')) {
+  clone.querySelectorAll('[role="button"]').forEach(btn => {
+    const text = normalizeText(btn.textContent || '').toLowerCase();
+    if (text.includes('more') || text.includes('less')) {
       btn.remove();
     }
   });
-
-  return (clone.innerText || '') + ' ' + getAriaLabels(clone);
+  
+  return clone;
 }
 
-export function detectEdited(post: HTMLElement, pageLang: string): EditedDetectionResult {
-  // 1. PRIMARY: Check the specific date container first (User request)
-  // This is the most reliable method for the current Google Classroom UI
-  const dateContainer = post.querySelector<HTMLElement>(EDITED_DATE_CONTAINER_SELECTOR);
+function extractAriaLabels(element: HTMLElement): string[] {
+  const labels: string[] = [];
   
-  const keywords = getEditedKeywords(pageLang);
-  const englishKeywords = getEditedKeywords('en');
-  // Combine current language + English (fallback)
-  const allKeywords = [...new Set([...keywords, ...englishKeywords])];
+  const selfLabel = element.getAttribute('aria-label');
+  if (selfLabel) labels.push(normalizeText(selfLabel));
+  
+  element.querySelectorAll('[aria-label]').forEach(el => {
+    const label = el.getAttribute('aria-label');
+    if (label) labels.push(normalizeText(label));
+  });
+  
+  return labels;
+}
 
-  if (dateContainer) {
-    const text = dateContainer.textContent || '';
-    for (const keyword of allKeywords) {
-      if (text.toLowerCase().includes(keyword.toLowerCase())) {
-        return { isEdited: true, confidence: 'high', matchedText: keyword };
+function findEditedKeyword(text: string, keywords: string[]): string | null {
+  const normalizedText = normalizeForComparison(text);
+  
+  for (const keyword of keywords) {
+    if (normalizedText.includes(normalizeForComparison(keyword))) {
+      return keyword;
+    }
+  }
+  return null;
+}
+
+function expandParentContext(node: Node): { text: string; hasDate: boolean; level: number } {
+  const directText = normalizeText(node.textContent || '');
+  if (hasDatePattern(directText)) {
+    return { text: directText, hasDate: true, level: 0 };
+  }
+  
+  if (node.parentElement) {
+    const parentText = normalizeText(node.parentElement.textContent || '');
+    if (hasDatePattern(parentText)) {
+      return { text: parentText, hasDate: true, level: 1 };
+    }
+    
+    if (node.parentElement.parentElement) {
+      const grandparentText = normalizeText(node.parentElement.parentElement.textContent || '');
+      if (hasDatePattern(grandparentText)) {
+        return { text: grandparentText, hasDate: true, level: 2 };
       }
     }
   }
-
-  // 2. FALLBACK: Enhanced "Safe Text" scan
-  // If the specific container isn't found (maybe different view/layout), scan metadata
-  const safeText = getSafeMetadataText(post);
   
-  for (const keyword of allKeywords) {
-    if (safeText.toLowerCase().includes(keyword.toLowerCase())) {
-       // Extra safety check: ensure it's not part of "Expected: ..." or other UI text
-       // that might contain "edited" in some context (though unlikely in metadata)
-       return { isEdited: true, confidence: 'high', matchedText: keyword };
+  return { text: directText, hasDate: false, level: 0 };
+}
+
+// ============================================================================
+// LAYER 1: GOLDEN SELECTORS
+// ============================================================================
+
+function executeEditedLayer1(post: HTMLElement, keywords: string[]): LayerResult {
+  for (const selector of GOLDEN_SELECTORS.dateContainer) {
+    const container = post.querySelector<HTMLElement>(selector);
+    if (!container) continue;
+    
+    const text = normalizeText(container.textContent || '');
+    
+    const matchedKeyword = findEditedKeyword(text, keywords);
+    if (matchedKeyword) {
+      const datePresent = hasDatePattern(text);
+      let score = CONFIDENCE_WEIGHTS.LAYER_1_GOLDEN;
+      if (datePresent) {
+        score += CONFIDENCE_WEIGHTS.DATE_PROXIMITY_BONUS;
+      }
+      
+      return {
+        score,
+        matchedText: matchedKeyword,
+        hasDateProximity: datePresent,
+        usedParentContext: false,
+        details: `Layer1: Found "${matchedKeyword}" in "${selector}" (date: ${datePresent})`,
+      };
     }
   }
+  
+  return { 
+    score: 0, 
+    matchedText: null, 
+    hasDateProximity: false,
+    usedParentContext: false,
+    details: 'Layer1: No golden selector match' 
+  };
+}
 
-  return { isEdited: false, confidence: 'none' };
+// ============================================================================
+// LAYER 2: SEMANTIC ATTRIBUTES
+// ============================================================================
+
+function executeEditedLayer2(post: HTMLElement, keywords: string[]): LayerResult {
+  const ariaLabels = extractAriaLabels(post);
+  
+  for (const label of ariaLabels) {
+    const matchedKeyword = findEditedKeyword(label, keywords);
+    if (matchedKeyword) {
+      const datePresent = hasDatePattern(label);
+      let score = CONFIDENCE_WEIGHTS.LAYER_2_SEMANTIC;
+      if (datePresent) {
+        score += CONFIDENCE_WEIGHTS.DATE_PROXIMITY_BONUS;
+      }
+      
+      return {
+        score,
+        matchedText: matchedKeyword,
+        hasDateProximity: datePresent,
+        usedParentContext: false,
+        details: `Layer2: Found "${matchedKeyword}" in aria-label (date: ${datePresent})`,
+      };
+    }
+  }
+  
+  const titleElements = post.querySelectorAll('[title]');
+  for (const el of titleElements) {
+    const title = normalizeText(el.getAttribute('title') || '');
+    
+    const matchedKeyword = findEditedKeyword(title, keywords);
+    if (matchedKeyword) {
+      const datePresent = hasDatePattern(title);
+      let score = CONFIDENCE_WEIGHTS.LAYER_2_SEMANTIC;
+      if (datePresent) {
+        score += CONFIDENCE_WEIGHTS.DATE_PROXIMITY_BONUS;
+      }
+      
+      return {
+        score,
+        matchedText: matchedKeyword,
+        hasDateProximity: datePresent,
+        usedParentContext: false,
+        details: `Layer2: Found "${matchedKeyword}" in title (date: ${datePresent})`,
+      };
+    }
+  }
+  
+  return { 
+    score: 0, 
+    matchedText: null, 
+    hasDateProximity: false,
+    usedParentContext: false,
+    details: 'Layer2: No semantic match' 
+  };
+}
+
+// ============================================================================
+// LAYER 3: TREEWALKER WITH PARENT CONTEXT EXPANSION
+// ============================================================================
+
+function executeEditedLayer3(post: HTMLElement, keywords: string[]): LayerResult {
+  const sanitizedPost = createSanitizedClone(post);
+  
+  const walker = document.createTreeWalker(
+    sanitizedPost,
+    NodeFilter.SHOW_TEXT,
+    {
+      acceptNode: (node) => {
+        const parent = node.parentElement;
+        if (!parent) return NodeFilter.FILTER_REJECT;
+        
+        try {
+          const style = window.getComputedStyle(parent);
+          if (style.display === 'none' || style.visibility === 'hidden') {
+            return NodeFilter.FILTER_REJECT;
+          }
+        } catch {
+          // Ignore
+        }
+        
+        const tagName = parent.tagName.toLowerCase();
+        if (tagName === 'script' || tagName === 'style' || tagName === 'noscript') {
+          return NodeFilter.FILTER_REJECT;
+        }
+        
+        return NodeFilter.FILTER_ACCEPT;
+      },
+    }
+  );
+  
+  let bestMatchWithDate: LayerResult | null = null;
+  let bestMatchWithoutDate: LayerResult | null = null;
+  
+  let node: Node | null;
+  while ((node = walker.nextNode())) {
+    const text = normalizeText(node.textContent || '');
+    if (!text || text.length < 3) continue;
+    
+    if (isExcludedEditedPattern(text)) continue;
+    
+    const matchedKeyword = findEditedKeyword(text, keywords);
+    if (matchedKeyword) {
+      let datePresent = hasDatePattern(text);
+      let usedParentContext = false;
+      
+      if (!datePresent) {
+        const expanded = expandParentContext(node);
+        if (expanded.hasDate) {
+          datePresent = true;
+          usedParentContext = true;
+        }
+      }
+      
+      let score = CONFIDENCE_WEIGHTS.LAYER_3_STRUCTURAL;
+      if (datePresent) {
+        score += CONFIDENCE_WEIGHTS.DATE_PROXIMITY_BONUS;
+      }
+      if (usedParentContext) {
+        score += CONFIDENCE_WEIGHTS.PARENT_CONTEXT_BONUS;
+      }
+      
+      const result: LayerResult = {
+        score,
+        matchedText: matchedKeyword,
+        hasDateProximity: datePresent,
+        usedParentContext,
+        details: `Layer3: Found "${matchedKeyword}" (date: ${datePresent}, parent: ${usedParentContext})`,
+      };
+      
+      if (datePresent) {
+        if (!bestMatchWithDate || result.score > bestMatchWithDate.score) {
+          bestMatchWithDate = result;
+        }
+      } else {
+        if (!bestMatchWithoutDate || result.score > bestMatchWithoutDate.score) {
+          bestMatchWithoutDate = result;
+        }
+      }
+    }
+  }
+  
+  if (bestMatchWithDate) {
+    return bestMatchWithDate;
+  }
+  if (bestMatchWithoutDate) {
+    return {
+      ...bestMatchWithoutDate,
+      score: bestMatchWithoutDate.score / 2,
+      details: bestMatchWithoutDate.details + ' (no date - reduced)',
+    };
+  }
+  
+  return { 
+    score: 0, 
+    matchedText: null, 
+    hasDateProximity: false,
+    usedParentContext: false,
+    details: 'Layer3: No structural match' 
+  };
+}
+
+// ============================================================================
+// LAYER 4: EXCLUSION ENGINE
+// ============================================================================
+
+function executeEditedLayer4(post: HTMLElement, matchedText: string | null): LayerResult {
+  if (!matchedText) {
+    return { 
+      score: 0, 
+      matchedText: null, 
+      hasDateProximity: false,
+      usedParentContext: false,
+      details: 'Layer4: Nothing to validate' 
+    };
+  }
+  
+  if (isExcludedEditedPattern(matchedText)) {
+    return {
+      score: CONFIDENCE_WEIGHTS.LAYER_4_EXCLUSION,
+      matchedText,
+      hasDateProximity: false,
+      usedParentContext: false,
+      details: `Layer4: PENALTY - "${matchedText}" excluded`,
+    };
+  }
+  
+  for (const selector of GOLDEN_SELECTORS.userContentExclusions.slice(0, 4)) {
+    const userContent = post.querySelector(selector);
+    if (userContent) {
+      const userText = normalizeForComparison(userContent.textContent || '');
+      if (userText.includes(normalizeForComparison(matchedText))) {
+        return {
+          score: CONFIDENCE_WEIGHTS.LAYER_4_EXCLUSION,
+          matchedText,
+          hasDateProximity: false,
+          usedParentContext: false,
+          details: `Layer4: PENALTY - Found in user content "${selector}"`,
+        };
+      }
+    }
+  }
+  
+  return { 
+    score: 0, 
+    matchedText: null, 
+    hasDateProximity: false,
+    usedParentContext: false,
+    details: 'Layer4: Passed' 
+  };
+}
+
+// ============================================================================
+// EDITED DETECTION FUNCTION
+// ============================================================================
+
+export function detectEdited(post: HTMLElement, pageLang: string): EditedDetectionResult {
+  const keywords = getEditedKeywords(pageLang);
+  const englishKeywords = getEditedKeywords('en');
+  
+  const combinedKeywords = [...new Set([...keywords, ...englishKeywords])];
+  
+  const layer1 = executeEditedLayer1(post, combinedKeywords);
+  const layer2 = executeEditedLayer2(post, combinedKeywords);
+  const layer3 = executeEditedLayer3(post, combinedKeywords);
+  
+  let primaryMatch: LayerResult = { 
+    score: 0, matchedText: null, hasDateProximity: false, usedParentContext: false, details: '' 
+  };
+  let primaryLayer = 0;
+  
+  if (layer1.score > primaryMatch.score) { primaryMatch = layer1; primaryLayer = 1; }
+  if (layer2.score > primaryMatch.score) { primaryMatch = layer2; primaryLayer = 2; }
+  if (layer3.score > primaryMatch.score) { primaryMatch = layer3; primaryLayer = 3; }
+  
+  const layer4 = executeEditedLayer4(post, primaryMatch.matchedText);
+  const finalScore = primaryMatch.score + layer4.score;
+  
+  let confidence: 'high' | 'medium' | 'low' | 'none';
+  if (finalScore >= CONFIDENCE_WEIGHTS.HIGH_CONFIDENCE) {
+    confidence = 'high';
+  } else if (finalScore >= CONFIDENCE_WEIGHTS.MEDIUM_CONFIDENCE) {
+    confidence = 'medium';
+  } else if (finalScore >= CONFIDENCE_WEIGHTS.LOW_CONFIDENCE) {
+    confidence = 'low';
+  } else {
+    confidence = 'none';
+  }
+  
+  const isEdited = finalScore >= CONFIDENCE_WEIGHTS.LOW_CONFIDENCE && 
+                   primaryMatch.matchedText !== null;
+  
+  return {
+    isEdited,
+    confidence,
+    confidenceScore: finalScore,
+    matchedText: primaryMatch.matchedText,
+    detectionLayer: primaryLayer,
+    hasDateProximity: primaryMatch.hasDateProximity,
+    usedParentContext: primaryMatch.usedParentContext,
+    debugInfo: {
+      layer1Score: layer1.score,
+      layer2Score: layer2.score,
+      layer3Score: layer3.score,
+      layer4Penalty: layer4.score,
+      dateProximityBonus: primaryMatch.hasDateProximity ? CONFIDENCE_WEIGHTS.DATE_PROXIMITY_BONUS : 0,
+      parentContextBonus: primaryMatch.usedParentContext ? CONFIDENCE_WEIGHTS.PARENT_CONTEXT_BONUS : 0,
+      matchDetails: [layer1.details, layer2.details, layer3.details, layer4.details],
+    },
+  };
+}
+
+// ============================================================================
+// MASTER AGGREGATION FUNCTION
+// ============================================================================
+
+export function detectPostState(post: HTMLElement, pageLang: string): PostStateResult {
+  const comments = detectComments(post, pageLang);
+  const edited = detectEdited(post, pageLang);
+  
+  const hasComments = comments.hasComments && comments.confidence !== 'none';
+  const isEdited = edited.isEdited && edited.confidence !== 'none';
+  
+  let combinedConfidence: 'high' | 'medium' | 'low' | 'none';
+  
+  if ((comments.confidence === 'high' && hasComments) || 
+      (edited.confidence === 'high' && isEdited)) {
+    combinedConfidence = 'high';
+  } else if ((comments.confidence === 'medium' && hasComments) || 
+             (edited.confidence === 'medium' && isEdited)) {
+    combinedConfidence = 'medium';
+  } else if ((comments.confidence === 'low' && hasComments) || 
+             (edited.confidence === 'low' && isEdited)) {
+    combinedConfidence = 'low';
+  } else {
+    combinedConfidence = 'none';
+  }
+  
+  return {
+    comments,
+    edited,
+    combinedConfidence,
+    hasBothFlags: hasComments && isEdited,
+  };
+}
+
+// ============================================================================
+// LEGACY EXPORTS
+// ============================================================================
+
+export { detectComments } from './smart-detector-comments';
+export type { CommentDetectionResult, LayerDebugInfo } from './smart-detector-comments';
+
+export function analyzePost(
+  post: HTMLElement,
+  pageLang: string
+): { comments: CommentDetectionResult; edited: EditedDetectionResult } {
+  return {
+    comments: detectComments(post, pageLang),
+    edited: detectEdited(post, pageLang),
+  };
 }
