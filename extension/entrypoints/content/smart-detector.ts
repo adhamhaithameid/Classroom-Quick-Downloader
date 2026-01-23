@@ -18,7 +18,7 @@ import {
   parseUnicodeDate,
   formatTimeDifference,
   type ParsedDate,
-} from './detection-keywords';
+} from './translations/detection-keywords';
 
 import {
   detectComments,
