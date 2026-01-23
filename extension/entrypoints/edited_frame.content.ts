@@ -152,22 +152,12 @@ function scanForEditedPosts() {
       // Smart detection - language agnostic
       const result = detectEdited(post, currentLang);
       const found = result.isEdited;
-      const diffText = result.timeDiffString; // Updated field name
-      const date = result.detectedDate;
 
       // Construct native tooltip text
-      let tooltipText = t('edited');
-      if (found && date && diffText) {
-        // Format: "Edited: Jan 12, 2025 \n(Modified 2 days after posting)"
-        const dateStr = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-        tooltipText = `${t('edited')}: ${dateStr}\n(${t('modified')} ${diffText} ${t('after_posting')})`;
-      } else if (found) {
-        tooltipText = t('edited');
-      }
+      const tooltipText = t('edited');
 
       // DATA SOURCE OF TRUTH:
       if (found) {
-        if (diffText) post.setAttribute(ATTR_EDIT_DIFF, diffText);
         post.setAttribute('data-cqd-edit-tooltip', tooltipText); // Store full tooltip for shared use
       } else {
         post.removeAttribute(ATTR_EDIT_DIFF);
