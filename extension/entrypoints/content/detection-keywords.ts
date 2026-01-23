@@ -510,10 +510,25 @@ export const GOLDEN_SELECTORS = {
     '.EZrbnd',
   ],
   commentContainer: [
+    // Primary selectors (current Classroom structure)
     '.asQXV.QRiHXd',
     '.mUIrbf-vQzf8d',
     '.z3vRcc-aD1xae',
     '.z3vRcc',
+    // Additional potential selectors
+    '[data-stream-item-id] .asQXV',
+    '[jsname="z3vRcc"]',
+    '[jscontroller] .QRiHXd',
+    // Click area / comment button selectors
+    '.yqQS0c',
+    '.gVJHxe',
+    // Semantic fallbacks
+    '[aria-label*="comment"]',
+    '[aria-label*="Comment"]',
+    '[aria-label*="تعليق"]',
+    '[aria-label*="コメント"]',
+    '[aria-label*="评论"]',
+    '[aria-label*="комментар"]',
   ],
   userContentExclusions: [
     '.n8F6Jd',
