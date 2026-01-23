@@ -1,121 +1,353 @@
 // filepath: entrypoints/content/smart-detector-comments.ts
-import { ARABIC_NUMBER_WORDS } from './constants';
+/**
+ * SMART DETECTOR COMMENTS - Zero-Fail v2 Architecture
+ * 
+ * Uses the same normalization pipeline as v2, ensuring consistency
+ * for mixed-language inputs and European date formats.
+ */
+
+import {
+  GOLDEN_SELECTORS,
+  CONFIDENCE_WEIGHTS,
+  normalizeText,
+  normalizeForComparison,
+  extractNumber,
+  getCommentKeywords,
+  isExcludedCommentPattern,
+  type CommentKeywords,
+} from './detection-keywords';
+
+// ============================================================================
+// TYPES & INTERFACES
+// ============================================================================
 
 export interface CommentDetectionResult {
   hasComments: boolean;
   count: number;
   confidence: 'high' | 'medium' | 'low' | 'none';
-  matchedText?: string;
+  confidenceScore: number;
+  matchedText: string | null;
+  detectionLayer: number;
+  debugInfo?: LayerDebugInfo;
 }
 
-// Keywords for "comment" in support languages
-const COMMENT_KEYWORDS: Record<string, { singular: string[]; plural: string[] }> = {
-  ar: { singular: ['تعليق', 'تعليق واحد'], plural: ['تعليقات', 'تعليقًا'] },
-  en: { singular: ['comment'], plural: ['comments'] },
-  es: { singular: ['comentario'], plural: ['comentarios'] },
-  fr: { singular: ['commentaire'], plural: ['commentaires'] },
-  de: { singular: ['kommentar'], plural: ['kommentare'] },
-  pt: { singular: ['comentário'], plural: ['comentários'] },
-  it: { singular: ['commento'], plural: ['commenti'] },
-  ru: { singular: ['комментарий'], plural: ['комментария', 'комментариев'] },
-  ja: { singular: ['コメント'], plural: ['コメント'] },
-  ko: { singular: ['댓글'], plural: ['댓글'] },
-  zh: { singular: ['评论'], plural: ['评论'] },
-};
-
-function getCommentKeywords(lang: string) {
-  const shortLang = lang.split('-')[0].toLowerCase();
-  return COMMENT_KEYWORDS[shortLang] || COMMENT_KEYWORDS['en'];
+export interface LayerDebugInfo {
+  layer1Score: number;
+  layer2Score: number;
+  layer3Score: number;
+  layer4Penalty: number;
+  matchDetails: string[];
 }
 
-function extractNumber(text: string): number | null {
-  const match = text.match(/[\d,.]+/);
-  if (match) {
-    // Remove commas, etc.
-    const num = parseInt(match[0].replace(/[,.]/g, ''), 10);
-    if (!isNaN(num)) return num;
+interface LayerResult {
+  score: number;
+  count: number | null;
+  matchedText: string | null;
+  details: string;
+}
+
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
+
+function createSanitizedClone(element: HTMLElement): HTMLElement {
+  const clone = element.cloneNode(true) as HTMLElement;
+  
+  for (const selector of GOLDEN_SELECTORS.userContentExclusions) {
+    clone.querySelectorAll(selector).forEach(el => el.remove());
   }
   
-  // Check Arabic words
-  for (const [word, value] of Object.entries(ARABIC_NUMBER_WORDS)) {
-    if (text.includes(word)) return value;
+  clone.querySelectorAll('[role="button"]').forEach(btn => {
+    const text = normalizeText(btn.textContent || '').toLowerCase();
+    if (text.includes('more') || text.includes('less') || text.includes('show') || text.includes('hide')) {
+      btn.remove();
+    }
+  });
+  
+  return clone;
+}
+
+function extractAriaLabels(element: HTMLElement): string[] {
+  const labels: string[] = [];
+  
+  const selfLabel = element.getAttribute('aria-label');
+  if (selfLabel) labels.push(normalizeText(selfLabel));
+  
+  element.querySelectorAll('[aria-label]').forEach(el => {
+    const label = el.getAttribute('aria-label');
+    if (label) labels.push(normalizeText(label));
+  });
+  
+  return labels;
+}
+
+function findCommentKeyword(text: string, keywords: CommentKeywords): string | null {
+  const normalizedText = normalizeForComparison(text);
+  const allKeywords = [...keywords.singular, ...keywords.plural, ...keywords.classComment];
+  
+  for (const keyword of allKeywords) {
+    if (normalizedText.includes(normalizeForComparison(keyword))) {
+      return keyword;
+    }
   }
   return null;
 }
 
-const EXCLUDED_COMMENT_PATTERNS = [
-  'اضافة تعليق', 'إضافة تعليق', 'أضف تعليق', 'كتابة تعليق',
-  'add comment', 'add a comment', 'write a comment', 'leave a comment',
-  'ajouter un commentaire', 'kommentar hinzufügen',
-  'añadir comentario', 'agregar comentario', 'escribe un comentario',
-  'adicionar comentário', 'aggiungi commento',
-  'добавить комментарий',
-];
+// ============================================================================
+// LAYER 1: GOLDEN SELECTORS
+// ============================================================================
 
-function isExcludedCommentText(text: string): boolean {
-  const lowerText = text.toLowerCase();
-  return EXCLUDED_COMMENT_PATTERNS.some(pattern => lowerText.includes(pattern));
-}
-
-// Extract aria-labels helper (duplicated simple version to avoid circular dependency)
-function getAriaLabels(el: HTMLElement): string {
-  return Array.from(el.querySelectorAll('[aria-label]'))
-    .map((node) => node.getAttribute('aria-label') || '')
-    .join(' ');
-}
-
-export function detectComments(post: HTMLElement, pageLang: string): CommentDetectionResult {
-  // Strategy 1: Targeted DOM for Google Classroom Comment Count
-  const countSpan = post.querySelector('.mUIrbf-vQzf8d');
-  if (countSpan && countSpan.textContent) {
-    const text = countSpan.textContent;
-    const count = extractNumber(text);
-    if (count !== null && count > 0) {
-      return { hasComments: true, count, confidence: 'high', matchedText: text };
+function executeLayer1(post: HTMLElement, keywords: CommentKeywords): LayerResult {
+  for (const selector of GOLDEN_SELECTORS.commentContainer) {
+    const element = post.querySelector<HTMLElement>(selector);
+    if (!element) continue;
+    
+    const text = normalizeText(element.textContent || '');
+    if (!text) continue;
+    
+    const matchedKeyword = findCommentKeyword(text, keywords);
+    if (matchedKeyword) {
+      const count = extractNumber(text);
+      if (count !== null && count > 0) {
+        return {
+          score: CONFIDENCE_WEIGHTS.LAYER_1_GOLDEN + CONFIDENCE_WEIGHTS.NUMBER_PRESENT_BONUS,
+          count,
+          matchedText: text,
+          details: `Layer1: Found "${text}" via "${selector}" (count: ${count})`,
+        };
+      }
     }
   }
+  
+  return { score: 0, count: null, matchedText: null, details: 'Layer1: No match' };
+}
 
-  // Strategy 2: Look for the specific comment button aria-label
-  const commentButton = post.querySelector('button[aria-label]');
-  if (commentButton) {
-    const label = commentButton.getAttribute('aria-label') || '';
-    const pageKeywords = getCommentKeywords(pageLang);
-    const englishKeywords = getCommentKeywords('en');
-    const allKeywords = [...pageKeywords.plural, ...englishKeywords.plural, ...pageKeywords.singular, ...englishKeywords.singular];
+// ============================================================================
+// LAYER 2: SEMANTIC ATTRIBUTES
+// ============================================================================
+
+function executeLayer2(post: HTMLElement, keywords: CommentKeywords): LayerResult {
+  const ariaLabels = extractAriaLabels(post);
+  
+  for (const label of ariaLabels) {
+    if (isExcludedCommentPattern(label)) continue;
+    
+    const matchedKeyword = findCommentKeyword(label, keywords);
+    if (matchedKeyword) {
+      const count = extractNumber(label);
+      if (count !== null && count > 0) {
+        return {
+          score: CONFIDENCE_WEIGHTS.LAYER_2_SEMANTIC + CONFIDENCE_WEIGHTS.ARIA_MATCH_BONUS,
+          count,
+          matchedText: label,
+          details: `Layer2: Found "${label}" in aria-label (count: ${count})`,
+        };
+      }
+    }
+  }
+  
+  const titleElements = post.querySelectorAll('[title]');
+  for (const el of titleElements) {
+    const title = normalizeText(el.getAttribute('title') || '');
+    
+    if (isExcludedCommentPattern(title)) continue;
+    
+    const matchedKeyword = findCommentKeyword(title, keywords);
+    if (matchedKeyword) {
+      const count = extractNumber(title);
+      if (count !== null && count > 0) {
+        return {
+          score: CONFIDENCE_WEIGHTS.LAYER_2_SEMANTIC,
+          count,
+          matchedText: title,
+          details: `Layer2: Found "${title}" in title (count: ${count})`,
+        };
+      }
+    }
+  }
+  
+  return { score: 0, count: null, matchedText: null, details: 'Layer2: No semantic match' };
+}
+
+// ============================================================================
+// LAYER 3: TREEWALKER WITH PARENT CONTEXT EXPANSION
+// ============================================================================
+
+function executeLayer3(post: HTMLElement, keywords: CommentKeywords): LayerResult {
+  const sanitizedPost = createSanitizedClone(post);
+  const allKeywords = [...keywords.singular, ...keywords.plural, ...keywords.classComment];
+  
+  const walker = document.createTreeWalker(
+    sanitizedPost,
+    NodeFilter.SHOW_TEXT,
+    {
+      acceptNode: (node) => {
+        const parent = node.parentElement;
+        if (!parent) return NodeFilter.FILTER_REJECT;
+        
+        try {
+          const style = window.getComputedStyle(parent);
+          if (style.display === 'none' || style.visibility === 'hidden') {
+            return NodeFilter.FILTER_REJECT;
+          }
+        } catch {
+          // Ignore
+        }
+        
+        const tagName = parent.tagName.toLowerCase();
+        if (tagName === 'script' || tagName === 'style' || tagName === 'noscript') {
+          return NodeFilter.FILTER_REJECT;
+        }
+        
+        return NodeFilter.FILTER_ACCEPT;
+      },
+    }
+  );
+  
+  let node: Node | null;
+  while ((node = walker.nextNode())) {
+    const text = normalizeText(node.textContent || '');
+    if (!text || text.length < 2) continue;
+    
+    if (isExcludedCommentPattern(text)) continue;
     
     for (const keyword of allKeywords) {
-      if (label.toLowerCase().includes(keyword.toLowerCase())) {
-        const count = extractNumber(label);
-        if (count && count > 0) {
-          return { hasComments: true, count, confidence: 'high', matchedText: label };
+      const normalizedKeyword = normalizeForComparison(keyword);
+      if (normalizeForComparison(text).includes(normalizedKeyword)) {
+        let count = extractNumber(text);
+        
+        // Parent context expansion
+        if (count === null && node.parentElement) {
+          const parentText = normalizeText(node.parentElement.textContent || '');
+          count = extractNumber(parentText);
+          
+          if (count === null && node.parentElement.parentElement) {
+            const grandparentText = normalizeText(node.parentElement.parentElement.textContent || '');
+            count = extractNumber(grandparentText);
+            
+            if (count !== null && count > 0) {
+              return {
+                score: CONFIDENCE_WEIGHTS.LAYER_3_STRUCTURAL + CONFIDENCE_WEIGHTS.PARENT_CONTEXT_BONUS,
+                count,
+                matchedText: grandparentText.substring(0, 50),
+                details: `Layer3: Found "${keyword}" (count: ${count}) via grandparent`,
+              };
+            }
+          } else if (count !== null && count > 0) {
+            return {
+              score: CONFIDENCE_WEIGHTS.LAYER_3_STRUCTURAL + CONFIDENCE_WEIGHTS.PARENT_CONTEXT_BONUS,
+              count,
+              matchedText: parentText.substring(0, 50),
+              details: `Layer3: Found "${keyword}" (count: ${count}) via parent`,
+            };
+          }
+        } else if (count !== null && count > 0) {
+          return {
+            score: CONFIDENCE_WEIGHTS.LAYER_3_STRUCTURAL + CONFIDENCE_WEIGHTS.NUMBER_PRESENT_BONUS,
+            count,
+            matchedText: text,
+            details: `Layer3: Found "${keyword}" (count: ${count}) in direct text`,
+          };
         }
       }
     }
   }
   
-  // Strategy 3: Text Fallback (ignoring body content)
-  // We need to be careful not to trigger on "Add class comment" placeholder
-  const clone = post.cloneNode(true) as HTMLElement;
-  const bodyContent = clone.querySelectorAll('.n8F6Jd, .a3j8U, .gM4mlb, .A6dC2c');
-  bodyContent.forEach(el => el.remove());
+  return { score: 0, count: null, matchedText: null, details: 'Layer3: No structural match' };
+}
+
+// ============================================================================
+// LAYER 4: EXCLUSION ENGINE
+// ============================================================================
+
+function executeLayer4(post: HTMLElement, matchedText: string | null): LayerResult {
+  if (!matchedText) {
+    return { score: 0, count: null, matchedText: null, details: 'Layer4: Nothing to validate' };
+  }
   
-  const safeText = (clone.innerText || '') + ' ' + getAriaLabels(clone);
+  if (isExcludedCommentPattern(matchedText)) {
+    return {
+      score: CONFIDENCE_WEIGHTS.LAYER_4_EXCLUSION,
+      count: null,
+      matchedText,
+      details: `Layer4: PENALTY - "${matchedText.substring(0, 30)}" excluded`,
+    };
+  }
   
-  const pageKeywords = getCommentKeywords(pageLang);
-  const englishKeywords = getCommentKeywords('en');
-  const allPlural = [...pageKeywords.plural, ...englishKeywords.plural];
-  const allSingular = [...pageKeywords.singular, ...englishKeywords.singular];
-  
-  for (const keyword of allPlural) {
-    if (safeText.toLowerCase().includes(keyword.toLowerCase())) {
-      if (isExcludedCommentText(safeText)) continue;
-      
-      const count = extractNumber(safeText);
-      if (count && count > 0) {
-        return { hasComments: true, count, confidence: 'medium', matchedText: keyword };
-      }
+  const inputElements = post.querySelectorAll('input, textarea, [contenteditable="true"]');
+  for (const input of inputElements) {
+    const placeholder = normalizeText(input.getAttribute('placeholder') || '');
+    if (normalizeForComparison(placeholder).includes(normalizeForComparison(matchedText))) {
+      return {
+        score: CONFIDENCE_WEIGHTS.LAYER_4_EXCLUSION,
+        count: null,
+        matchedText,
+        details: 'Layer4: PENALTY - Found in placeholder',
+      };
     }
   }
   
-  return { hasComments: false, count: 0, confidence: 'high' };
+  return { score: 0, count: null, matchedText: null, details: 'Layer4: Passed' };
 }
+
+// ============================================================================
+// MAIN DETECTION FUNCTION
+// ============================================================================
+
+export function detectComments(post: HTMLElement, pageLang: string): CommentDetectionResult {
+  const keywords = getCommentKeywords(pageLang);
+  const englishKeywords = getCommentKeywords('en');
+  
+  const combinedKeywords: CommentKeywords = {
+    singular: [...new Set([...keywords.singular, ...englishKeywords.singular])],
+    plural: [...new Set([...keywords.plural, ...englishKeywords.plural])],
+    classComment: [...new Set([...keywords.classComment, ...englishKeywords.classComment])],
+  };
+  
+  const layer1 = executeLayer1(post, combinedKeywords);
+  const layer2 = executeLayer2(post, combinedKeywords);
+  const layer3 = executeLayer3(post, combinedKeywords);
+  
+  let primaryMatch: LayerResult = { score: 0, count: null, matchedText: null, details: '' };
+  let primaryLayer = 0;
+  
+  if (layer1.score > primaryMatch.score) { primaryMatch = layer1; primaryLayer = 1; }
+  if (layer2.score > primaryMatch.score) { primaryMatch = layer2; primaryLayer = 2; }
+  if (layer3.score > primaryMatch.score) { primaryMatch = layer3; primaryLayer = 3; }
+  
+  const layer4 = executeLayer4(post, primaryMatch.matchedText);
+  const finalScore = primaryMatch.score + layer4.score;
+  
+  let confidence: 'high' | 'medium' | 'low' | 'none';
+  if (finalScore >= CONFIDENCE_WEIGHTS.HIGH_CONFIDENCE) {
+    confidence = 'high';
+  } else if (finalScore >= CONFIDENCE_WEIGHTS.MEDIUM_CONFIDENCE) {
+    confidence = 'medium';
+  } else if (finalScore >= CONFIDENCE_WEIGHTS.LOW_CONFIDENCE) {
+    confidence = 'low';
+  } else {
+    confidence = 'none';
+  }
+  
+  const hasComments = finalScore >= CONFIDENCE_WEIGHTS.LOW_CONFIDENCE && 
+                      primaryMatch.count !== null && 
+                      primaryMatch.count > 0;
+  
+  return {
+    hasComments,
+    count: primaryMatch.count || 0,
+    confidence,
+    confidenceScore: finalScore,
+    matchedText: primaryMatch.matchedText,
+    detectionLayer: primaryLayer,
+    debugInfo: {
+      layer1Score: layer1.score,
+      layer2Score: layer2.score,
+      layer3Score: layer3.score,
+      layer4Penalty: layer4.score,
+      matchDetails: [layer1.details, layer2.details, layer3.details, layer4.details],
+    },
+  };
+}
+
+export type { CommentKeywords };
