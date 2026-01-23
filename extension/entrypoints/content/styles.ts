@@ -652,36 +652,35 @@ export function injectStyles(): void {
     }
 
     .cqd-both-badge {
-      /* Custom handling for BOTH */
+      /* BOTH badge with VERTICAL expansion */
       position: absolute;
       top: 7px;
       z-index: 9999;
       display: flex;
-      flex-direction: row; /* Horizontal */
+      flex-direction: column; /* VERTICAL layout */
       align-items: center;
-      justify-content: flex-start;
+      justify-content: center;
       
-      /* Base size */
+      /* Base size (collapsed) */
       width: 50px; 
       height: 30px;
       
       background-color: #FF4036;
       color: #ffffff;
       border-radius: 9999px;
-      border: 1px solid rgba(255, 64, 54, 0.70);
+      border: 2px solid rgba(255, 255, 255, 0.3);
       cursor: pointer;
       overflow: hidden;
-      padding: 0 8px; /* Padding for icons */
-      transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s ease;
-      gap: 4px;
+      padding: 0;
+      transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-radius 0.3s ease, box-shadow 0.2s ease;
+      gap: 2px;
     }
 
     .cqd-both-badge:hover {
-      width: auto;
-      max-width: 350px;
+      height: 70px; /* Expand vertically */
+      border-radius: 20px;
       z-index: 10000;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-      padding-right: 12px;
+      box-shadow: 0 4px 12px rgba(255, 64, 54, 0.35);
     }
 
     /* Hide divider on default? No, keep logic. */
@@ -694,18 +693,20 @@ export function injectStyles(): void {
     /* Text spans inside both badge */
     .cqd-both-value {
        opacity: 0;
-       max-width: 0;
+       max-height: 0;
        overflow: hidden;
        font-family: system-ui, -apple-system, sans-serif;
        font-size: 11px;
        font-weight: 700;
+       text-align: center;
        white-space: nowrap;
-       transition: opacity 0.2s ease, max-width 0.3s ease;
+       transition: opacity 0.2s ease, max-height 0.3s ease, margin-top 0.2s ease;
     }
 
     .cqd-both-badge:hover .cqd-both-value {
        opacity: 1;
-       max-width: 150px;
+       max-height: 20px;
+       margin-top: 2px;
     }
 
     body[data-cqd-dir="ltr"] .cqd-both-badge {
