@@ -1,4 +1,11 @@
 // filepath: entrypoints/content/flags.ts
+/**
+ * FLAGS - Universal V4 "Hover Intelligence" Smart Pills
+ * 
+ * Structure: Container > [Icon] + [Text Span (hidden by default)]
+ * Animation: Text expands vertically on hover with smooth transition
+ */
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
 declare const chrome: any;
 
@@ -8,15 +15,11 @@ type StateCallback = () => void;
 
 /**
  * Subscribes to the global extension enabled state.
- * - Checks initial state and calls onEnabled() or onDisabled().
- * - Listens for changes and calls the appropriate callback.
- * - Returns a cleanup function to remove the listener.
  */
 export function subscribeToGlobalState(
   onEnabled: StateCallback,
   onDisabled?: StateCallback
 ): () => void {
-  // If no chrome API, assume enabled (dev/test env)
   if (typeof chrome === 'undefined' || !chrome.storage?.local) {
     try { onEnabled(); } catch {}
     return () => {};
@@ -34,15 +37,11 @@ export function subscribeToGlobalState(
     }
   };
 
-  // 1. Initial Check
   chrome.storage.local.get(ENABLE_KEY, (result: { [key: string]: any }) => {
-    // If error, fail-open (true)
     const isEnabled = chrome.runtime.lastError ? true : (result[ENABLE_KEY] !== false);
     handleState(isEnabled);
   });
 
-  // 2. Change Listener
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const listener = (changes: any, area: string) => {
     if (area === 'local' && changes[ENABLE_KEY]) {
       const newValue = changes[ENABLE_KEY].newValue !== false;
@@ -55,8 +54,7 @@ export function subscribeToGlobalState(
 }
 
 /**
- * Legacy one-shot check, updated to use new key.
- * Prefer subscribeToGlobalState for dynamic toggling.
+ * Legacy one-shot check.
  */
 export function whenExtensionEnabled(
   onEnabled: StateCallback,
@@ -66,7 +64,7 @@ export function whenExtensionEnabled(
 }
 
 // ============================================================================
-// BADGE FACTORY FUNCTIONS (Hover Intelligence)
+// SMART PILL BADGE FACTORY (Hover Intelligence)
 // ============================================================================
 
 import { COMMENT_ICON_URL, EDIT_ICON_SVG_RAW, appendSvgFromString } from './icons';
@@ -77,15 +75,20 @@ import { triggerPostClick } from './both-badge';
 const INJECTED_ATTR = 'data-cqd-injected';
 
 /**
- * Creates the expanding Comment Badge
- * Structure: [Icon] [Span: "5 Comments"]
+ * Creates the Comment Badge with Smart Pill structure
+ * 
+ * Structure:
+ * <div class="cqd-flag cqd-comment-badge">
+ *   <div class="cqd-flag-icon" style="background-image: ..."></div>
+ *   <span class="cqd-flag-text">{count}</span>
+ * </div>
  */
 export function createCommentBadge(post: HTMLElement, count: number): HTMLElement {
   const badge = document.createElement('div');
-  badge.className = 'cqd-comment-badge cqd-flag'; // Base class + specific
+  badge.className = 'cqd-comment-badge cqd-flag';
   badge.setAttribute(INJECTED_ATTR, 'true');
   
-  // Theme check
+  // Dark mode check
   if (document.body.classList.contains('cqd-theme-dark') || post.classList.contains('cqd-theme-dark')) {
     badge.classList.add('cqd-theme-dark');
   }
@@ -94,16 +97,18 @@ export function createCommentBadge(post: HTMLElement, count: number): HTMLElemen
   const iconDiv = document.createElement('div');
   iconDiv.className = 'cqd-flag-icon';
   iconDiv.style.backgroundImage = `url("${COMMENT_ICON_URL}")`;
-  // Invert color for dark mode/white text logic is handled by CSS filter
+  iconDiv.style.backgroundSize = '18px 18px';
+  iconDiv.style.backgroundRepeat = 'no-repeat';
+  iconDiv.style.backgroundPosition = 'center';
+  iconDiv.style.filter = 'brightness(0) invert(1)'; // White icon
   
-  // 2. Text Span (Hidden by default, expands on hover)
-  // Text: Just the count number
-  const labelDiv = document.createElement('span');
-  labelDiv.className = 'cqd-flag-text';
-  labelDiv.textContent = String(count);
+  // 2. Text Span (Shows count only, expands on hover)
+  const labelSpan = document.createElement('span');
+  labelSpan.className = 'cqd-flag-text';
+  labelSpan.textContent = String(count);
 
   badge.appendChild(iconDiv);
-  badge.appendChild(labelDiv);
+  badge.appendChild(labelSpan);
 
   // Tooltip (Full text for accessibility)
   const tooltipText = `${count} ${t('comments')}`;
@@ -121,8 +126,13 @@ export function createCommentBadge(post: HTMLElement, count: number): HTMLElemen
 }
 
 /**
- * Creates the expanding Edited Badge
- * Structure: [Icon] [Span: "Edited (+2d)"]
+ * Creates the Edited Badge with Smart Pill structure
+ * 
+ * Structure:
+ * <div class="cqd-flag cqd-edited-badge">
+ *   <div class="cqd-flag-icon cqd-edited-icon">[SVG]</div>
+ *   <span class="cqd-flag-text">+{diffString}</span>
+ * </div>
  */
 export function createEditedBadge(post: HTMLElement, diffString: string | null): HTMLElement {
   const badge = document.createElement('div');
@@ -133,22 +143,22 @@ export function createEditedBadge(post: HTMLElement, diffString: string | null):
     badge.classList.add('cqd-theme-dark');
   }
 
-  // 1. Icon
+  // 1. Icon Container with SVG
   const iconDiv = document.createElement('div');
   iconDiv.className = 'cqd-flag-icon cqd-edited-icon';
   appendSvgFromString(iconDiv, EDIT_ICON_SVG_RAW);
 
-  // 2. Text Span (shows diff if available, or empty)
-  const labelDiv = document.createElement('span');
-  labelDiv.className = 'cqd-flag-text';
+  // 2. Text Span (Shows diff if available)
+  const labelSpan = document.createElement('span');
+  labelSpan.className = 'cqd-flag-text';
   
-  // Show diff time if available, otherwise show nothing (icon only)
+  // Show diff time if available
   if (diffString) {
-    labelDiv.textContent = `+${diffString}`;
+    labelSpan.textContent = `+${diffString}`;
   }
 
   badge.appendChild(iconDiv);
-  badge.appendChild(labelDiv);
+  badge.appendChild(labelSpan);
 
   // Tooltip (Full text)
   let tooltipText = t('edited');
