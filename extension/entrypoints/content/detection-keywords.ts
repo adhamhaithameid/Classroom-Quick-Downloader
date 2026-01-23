@@ -124,6 +124,107 @@ export function parseUnicodeInteger(text: string): number | null {
 export const extractNumber = parseUnicodeInteger;
 
 // ============================================================================
+// DATE PARSING ENGINE (V3 Hover Intelligence)
+// ============================================================================
+
+/** Month name mappings (multilingual) */
+const MONTH_MAP: Record<string, number> = {
+  // English
+  jan:0, feb:1, mar:2, apr:3, may:4, jun:5, jul:6, aug:7, sep:8, oct:9, nov:10, dec:11,
+  // French (unique keys only)
+  janv:0, févr:1, mars:2, avr:3, mai:4, juin:5, juil:6, août:7, sept:8, déc:11,
+  // Spanish
+  ene:0, abr:3, ago:7, dic:11,
+  // German
+  mär:2, okt:9, dez:11,
+  // Arabic
+  'يناير':0, 'فبراير':1, 'مارس':2, 'أبريل':3, 'مايو':4, 'يونيو':5, 
+  'يوليو':6, 'أغسطس':7, 'سبتمبر':8, 'أكتوبر':9, 'نوفمبر':10, 'ديسمبر':11,
+  'كانون':0, 'شباط':1, 'آذار':2, 'نيسان':3, 'أيار':4, 'حزيران':5,
+  'تموز':6, 'آب':7, 'أيلول':8, 'تشرين':9,
+};
+
+/**
+ * Parses a localized date string into a JS Date.
+ * Returns {date, raw, confidence} or null.
+ */
+export function parseUnicodeDate(dateString: string): { date: Date; raw: string; confidence: 'high' | 'medium' | 'low' } | null {
+  if (!dateString) return null;
+  const clean = normalizeText(dateString).toLowerCase();
+
+  // Try standard Date.parse first (ISO, English)
+  const timestamp = Date.parse(clean);
+  if (!isNaN(timestamp)) {
+    return { date: new Date(timestamp), raw: dateString, confidence: 'high' };
+  }
+
+  // Extract all digit sequences
+  const normalized = normalizeText(dateString);
+  const parts = normalized.split(/[\s\/\-\.,،年月日]+/).filter(Boolean);
+  const numbers = parts.map(p => {
+    const n = parseUnicodeInteger(p);
+    return n !== null ? n : NaN;
+  }).filter(n => !isNaN(n));
+  
+  const words = parts.filter(p => parseUnicodeInteger(p) === null);
+
+  let day: number | undefined, month: number | undefined, year: number | undefined;
+
+  // 3 numbers: try to infer format
+  if (numbers.length >= 3) {
+    const [a, b, c] = numbers;
+    if (a > 1000) { year = a; month = b - 1; day = c; } // YYYY-MM-DD
+    else if (c > 1000) { year = c; month = b - 1; day = a; } // DD-MM-YYYY
+    else if (c > 31) { year = c + 2000; month = a - 1; day = b; } // MM/DD/YY
+    else { year = c + 2000; month = b - 1; day = a; } // DD/MM/YY
+  }
+  // 2 numbers + month name
+  else if (numbers.length === 2 && words.length >= 1) {
+    for (const w of words) {
+      for (const [key, val] of Object.entries(MONTH_MAP)) {
+        if (w.includes(key)) {
+          month = val;
+          break;
+        }
+      }
+      if (month !== undefined) break;
+    }
+    if (month !== undefined) {
+      const [n1, n2] = numbers;
+      if (n2 > 1000) { day = n1; year = n2; }
+      else if (n1 > 1000) { day = n2; year = n1; }
+      else { day = n1; year = n2 > 31 ? n2 + 2000 : 2020 + n2; }
+    }
+  }
+
+  if (year && month !== undefined && day) {
+    const d = new Date(year, month, day);
+    if (!isNaN(d.getTime())) {
+      return { date: d, raw: dateString, confidence: 'medium' };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Formats milliseconds into human-readable duration for Hover Intelligence.
+ */
+export function formatTimeDifference(ms: number): string {
+  if (ms <= 0) return '';
+  
+  const seconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+
+  if (days > 0) return `${days}d ${hours % 24}h`;
+  if (hours > 0) return `${hours}h ${minutes % 60}m`;
+  if (minutes > 0) return `${minutes}m`;
+  return 'just now';
+}
+
+// ============================================================================
 // SUPPORTED LANGUAGES (100+ including joke languages)
 // ============================================================================
 
