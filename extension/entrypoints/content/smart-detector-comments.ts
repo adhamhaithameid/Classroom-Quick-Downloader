@@ -1,9 +1,9 @@
 // filepath: entrypoints/content/smart-detector-comments.ts
 /**
- * SMART DETECTOR COMMENTS - Zero-Fail v2 Architecture
+ * SMART DETECTOR COMMENTS - Universal Tier Architecture
  * 
- * Uses the same normalization pipeline as v2, ensuring consistency
- * for mixed-language inputs and European date formats.
+ * Uses parseUnicodeInteger() for Unicode digit parsing (Devanagari, Bengali, Thai, etc.)
+ * All patterns use the `u` flag for Unicode Property Escape support.
  */
 
 import {
@@ -11,7 +11,7 @@ import {
   CONFIDENCE_WEIGHTS,
   normalizeText,
   normalizeForComparison,
-  extractNumber,
+  parseUnicodeInteger,
   getCommentKeywords,
   isExcludedCommentPattern,
   type CommentKeywords,
@@ -59,7 +59,7 @@ function createSanitizedClone(element: HTMLElement): HTMLElement {
   
   clone.querySelectorAll('[role="button"]').forEach(btn => {
     const text = normalizeText(btn.textContent || '').toLowerCase();
-    if (text.includes('more') || text.includes('less') || text.includes('show') || text.includes('hide')) {
+    if (/more|less|show|hide|voir|mehr|menos/i.test(text)) {
       btn.remove();
     }
   });
@@ -107,7 +107,8 @@ function executeLayer1(post: HTMLElement, keywords: CommentKeywords): LayerResul
     
     const matchedKeyword = findCommentKeyword(text, keywords);
     if (matchedKeyword) {
-      const count = extractNumber(text);
+      // CRITICAL: Use parseUnicodeInteger for universal digit support
+      const count = parseUnicodeInteger(text);
       if (count !== null && count > 0) {
         return {
           score: CONFIDENCE_WEIGHTS.LAYER_1_GOLDEN + CONFIDENCE_WEIGHTS.NUMBER_PRESENT_BONUS,
@@ -134,7 +135,7 @@ function executeLayer2(post: HTMLElement, keywords: CommentKeywords): LayerResul
     
     const matchedKeyword = findCommentKeyword(label, keywords);
     if (matchedKeyword) {
-      const count = extractNumber(label);
+      const count = parseUnicodeInteger(label);
       if (count !== null && count > 0) {
         return {
           score: CONFIDENCE_WEIGHTS.LAYER_2_SEMANTIC + CONFIDENCE_WEIGHTS.ARIA_MATCH_BONUS,
@@ -154,7 +155,7 @@ function executeLayer2(post: HTMLElement, keywords: CommentKeywords): LayerResul
     
     const matchedKeyword = findCommentKeyword(title, keywords);
     if (matchedKeyword) {
-      const count = extractNumber(title);
+      const count = parseUnicodeInteger(title);
       if (count !== null && count > 0) {
         return {
           score: CONFIDENCE_WEIGHTS.LAYER_2_SEMANTIC,
@@ -214,16 +215,16 @@ function executeLayer3(post: HTMLElement, keywords: CommentKeywords): LayerResul
     for (const keyword of allKeywords) {
       const normalizedKeyword = normalizeForComparison(keyword);
       if (normalizeForComparison(text).includes(normalizedKeyword)) {
-        let count = extractNumber(text);
+        let count = parseUnicodeInteger(text);
         
         // Parent context expansion
         if (count === null && node.parentElement) {
           const parentText = normalizeText(node.parentElement.textContent || '');
-          count = extractNumber(parentText);
+          count = parseUnicodeInteger(parentText);
           
           if (count === null && node.parentElement.parentElement) {
             const grandparentText = normalizeText(node.parentElement.parentElement.textContent || '');
-            count = extractNumber(grandparentText);
+            count = parseUnicodeInteger(grandparentText);
             
             if (count !== null && count > 0) {
               return {

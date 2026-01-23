@@ -1,11 +1,9 @@
 // filepath: entrypoints/content/smart-detector.ts
 /**
- * SMART DETECTOR - Zero-Fail v2 Architecture
+ * SMART DETECTOR - Universal Tier Architecture
  * 
- * UPGRADES FROM v1:
- * - Noun-form keyword detection (Modification, Änderung, etc.)
- * - European date format support (DD MMM. YYYY)
- * - Retains: BiDi normalization, Eastern numerals, parent context expansion
+ * Uses Unicode Property Escapes (\p{Nd}) with `u` flag for universal digit matching.
+ * Supports 100+ languages including joke languages (Pirate, Hacker, Bork, Klingon).
  */
 
 import {
@@ -77,7 +75,7 @@ function createSanitizedClone(element: HTMLElement): HTMLElement {
   
   clone.querySelectorAll('[role="button"]').forEach(btn => {
     const text = normalizeText(btn.textContent || '').toLowerCase();
-    if (text.includes('more') || text.includes('less')) {
+    if (/more|less|show|hide|voir|mehr|menos/i.test(text)) {
       btn.remove();
     }
   });
@@ -229,7 +227,7 @@ function executeEditedLayer2(post: HTMLElement, keywords: string[]): LayerResult
 }
 
 // ============================================================================
-// LAYER 3: TREEWALKER WITH PARENT CONTEXT EXPANSION
+// LAYER 3: TREEWALKER WITH PARENT CONTEXT EXPANSION (Sliding Window)
 // ============================================================================
 
 function executeEditedLayer3(post: HTMLElement, keywords: string[]): LayerResult {
@@ -277,6 +275,7 @@ function executeEditedLayer3(post: HTMLElement, keywords: string[]): LayerResult
       let datePresent = hasDatePattern(text);
       let usedParentContext = false;
       
+      // SLIDING WINDOW: Escalate to parent/grandparent if no date in direct text
       if (!datePresent) {
         const expanded = expandParentContext(node);
         if (expanded.hasDate) {

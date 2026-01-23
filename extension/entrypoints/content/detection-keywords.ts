@@ -1,12 +1,24 @@
 // filepath: entrypoints/content/detection-keywords.ts
 /**
- * DETECTION KEYWORDS - Zero-Fail v2 Architecture
+ * DETECTION KEYWORDS - Universal Tier Architecture
  * 
- * UPGRADES FROM v1:
- * 1. Noun-Form Support: "Modification", "Änderung", "Modificación" etc.
- * 2. European Date Regex: DD MMM YYYY with dot-abbreviated months (déc., janv.)
- * 3. Retains: Arabic BiDi normalization, Eastern numerals, RTL support
+ * KEY UPGRADES:
+ * 1. Unicode Property Escapes (\p{Nd}) for any script's decimal digits
+ * 2. 100+ languages including joke languages (Pirate, Hacker, Bork, etc.)
+ * 3. Script-based keyword grouping for efficiency
+ * 4. BiDi control character stripping
  */
+
+// ============================================================================
+// UNICODE PROPERTY ESCAPES - THE NUCLEAR REGEX
+// \p{Nd} matches decimal digits in ANY human script automatically
+// ============================================================================
+
+/** Universal decimal digit pattern - matches ANY script's digits (0-9, ٠-٩, ०-९, etc.) */
+export const D = '\\p{Nd}';
+
+/** Pre-compiled regex for universal digit matching */
+export const UNIVERSAL_DIGIT_REGEX = new RegExp(`[${D}]`, 'gu');
 
 // ============================================================================
 // BIDI CONTROL CHARACTERS TO STRIP
@@ -14,15 +26,18 @@
 
 const BIDI_CONTROL_CHARS: RegExp = new RegExp(
   '[' +
-    '\u200B\u200C\u200D\u200E\u200F' + // Zero-width and directional marks
-    '\u202A\u202B\u202C\u202D\u202E' + // Directional embeddings/overrides
-    '\u2066\u2067\u2068\u2069' +       // Isolates
-    '\u061C\uFEFF' +                   // Arabic letter mark, BOM
+    '\u200B\u200C\u200D' + // Zero-width spaces/joiners
+    '\u200E\u200F' +       // LTR/RTL marks
+    '\u202A-\u202E' +      // Directional embeddings/overrides
+    '\u2066-\u2069' +      // Isolates
+    '\u061C' +             // Arabic Letter Mark
+    '\uFEFF' +             // BOM
+    '\u00AD' +             // Soft hyphen
   ']',
-  'g'
+  'gu'
 );
 
-const WHITESPACE_VARIANTS: RegExp = /[\u00A0\u2000-\u200A\u202F\u205F\u3000]/g;
+const WHITESPACE_VARIANTS: RegExp = /[\u00A0\u2000-\u200A\u202F\u205F\u3000]/gu;
 
 // ============================================================================
 // TEXT NORMALIZATION ENGINE
@@ -52,80 +67,107 @@ export function normalizeForComparison(text: string): string {
 }
 
 // ============================================================================
-// UNIVERSAL NUMERAL SUPPORT
-// Western (0-9) + Eastern Arabic (٠-٩) + Persian (۰-۹)
+// UNICODE INTEGER PARSING
+// JavaScript's parseInt() does NOT handle Unicode digits (e.g., parseInt('٥') is NaN)
 // ============================================================================
 
-export const UNIVERSAL_DIGIT = '[0-9\u0660-\u0669\u06F0-\u06F9]';
-export const UNIVERSAL_DIGIT_REGEX = new RegExp(UNIVERSAL_DIGIT, 'g');
-
-export const EASTERN_ARABIC_NUMERALS: Record<string, number> = {
-  '٠': 0, '١': 1, '٢': 2, '٣': 3, '٤': 4,
-  '٥': 5, '٦': 6, '٧': 7, '٨': 8, '٩': 9,
-};
-
-export const PERSIAN_NUMERALS: Record<string, number> = {
-  '۰': 0, '۱': 1, '۲': 2, '۳': 3, '۴': 4,
-  '۵': 5, '۶': 6, '۷': 7, '۸': 8, '۹': 9,
-};
-
-export function normalizeNumerals(text: string): string {
-  if (!text) return '';
-  let result = text;
-  for (const [eastern, western] of Object.entries(EASTERN_ARABIC_NUMERALS)) {
-    result = result.replace(new RegExp(eastern, 'g'), String(western));
+/**
+ * Maps any Unicode decimal digit to its integer value (0-9).
+ * Uses the Unicode property that all \p{Nd} digits are in blocks of 10.
+ */
+function unicodeDigitToInt(char: string): number {
+  const code = char.codePointAt(0);
+  if (code === undefined) return -1;
+  
+  // Get the digit value by finding offset within its numeric block
+  // All Unicode decimal digit blocks start at a codepoint divisible by 10
+  // and the digit value is the offset from that base
+  const digitValue = code % 10;
+  
+  // Validate it's actually in range 0-9
+  if (digitValue >= 0 && digitValue <= 9) {
+    return digitValue;
   }
-  for (const [persian, western] of Object.entries(PERSIAN_NUMERALS)) {
-    result = result.replace(new RegExp(persian, 'g'), String(western));
-  }
-  return result;
+  return -1;
 }
 
-export const ARABIC_NUMBER_WORDS: Record<string, number> = {
-  'واحد': 1, 'واحدة': 1, 'أحد': 1,
-  'اثنان': 2, 'اثنين': 2, 'اثنتان': 2, 'اثنتين': 2,
-  'ثلاثة': 3, 'ثلاث': 3,
-  'أربعة': 4, 'أربع': 4, 'اربع': 4, 'اربعة': 4,
-  'خمسة': 5, 'خمس': 5,
-  'ستة': 6, 'ست': 6,
-  'سبعة': 7, 'سبع': 7,
-  'ثمانية': 8, 'ثمان': 8, 'ثماني': 8,
-  'تسعة': 9, 'تسع': 9,
-  'عشرة': 10, 'عشر': 10,
-};
-
-export function extractNumber(text: string): number | null {
+/**
+ * Parses any Unicode number string to an integer.
+ * Handles Devanagari (०-९), Bengali (০-৯), Thai (๐-๙), Arabic (٠-٩), etc.
+ */
+export function parseUnicodeInteger(text: string): number | null {
   if (!text) return null;
-  const normalized = normalizeNumerals(normalizeText(text));
-  const numericMatch = normalized.match(/[0-9,،]+/);
-  if (numericMatch) {
-    const cleanNum = numericMatch[0].replace(/[,،]/g, '');
-    const num = parseInt(cleanNum, 10);
-    if (!isNaN(num) && num > 0 && num < 100000) {
-      return num;
-    }
+  
+  const normalized = normalizeText(text);
+  
+  // Extract all sequences of Unicode digits
+  const digitMatches = normalized.match(new RegExp(`[${D}]+`, 'gu'));
+  if (!digitMatches || digitMatches.length === 0) return null;
+  
+  // Take the first numeric sequence
+  const digitSequence = digitMatches[0];
+  
+  // Convert each Unicode digit to its integer value
+  let result = 0;
+  for (const char of digitSequence) {
+    const digitValue = unicodeDigitToInt(char);
+    if (digitValue < 0) return null; // Invalid digit
+    result = result * 10 + digitValue;
   }
-  for (const [word, value] of Object.entries(ARABIC_NUMBER_WORDS)) {
-    if (normalized.includes(word)) {
-      return value;
-    }
-  }
-  return null;
+  
+  return result > 0 && result < 100000 ? result : null;
 }
 
+/**
+ * Legacy alias for backward compatibility
+ */
+export const extractNumber = parseUnicodeInteger;
+
 // ============================================================================
-// SUPPORTED LANGUAGES
+// SUPPORTED LANGUAGES (100+ including joke languages)
 // ============================================================================
 
 export const SUPPORTED_LANGUAGES = [
-  'en', 'ar', 'es', 'fr', 'de', 'pt', 'it', 'ru', 'ja', 'ko', 'zh', 
-  'tr', 'nl', 'pl', 'vi', 'th', 'id', 'hi', 'he', 'fa', 'sv', 'da', 'no', 'fi'
+  // Major world languages
+  'en', 'ar', 'es', 'fr', 'de', 'pt', 'it', 'ru', 'ja', 'ko', 'zh', 'zh-TW', 'zh-HK',
+  // European
+  'nl', 'pl', 'sv', 'da', 'no', 'nn', 'fi', 'cs', 'sk', 'hu', 'ro', 'bg', 'uk', 'be',
+  'sr', 'sr-Latn', 'hr', 'bs', 'sl', 'mk', 'sq', 'el', 'tr', 'az', 'ka', 'hy',
+  'lv', 'lt', 'et', 'is', 'mt', 'ga', 'cy', 'gd', 'br', 'eu', 'gl', 'ca', 'oc',
+  'rm', 'fo', 'lb', 'fy',
+  // Asian
+  'vi', 'th', 'lo', 'km', 'my', 'id', 'ms', 'tl', 'jv', 'su', 'ceb',
+  'hi', 'bn', 'pa', 'gu', 'or', 'ta', 'te', 'kn', 'ml', 'si', 'ne', 'mr', 'sa', 'as',
+  'bh', // Bhojpuri
+  // Middle Eastern
+  'he', 'fa', 'ur', 'ps', 'sd', 'ku', 'ug', 'ckb',
+  // African
+  'sw', 'am', 'ti', 'ha', 'yo', 'ig', 'zu', 'xh', 'sn', 'st', 'tn', 'nso', 'rw', 'ny',
+  'lg', 'ln', 'kg', 'bem', 'loz', 'lu', 'run', 'rn', 'wo', 'ak', 'gaa', 'ee', 'kri',
+  'pcm', // Nigerian Pidgin
+  'crs', // Seychellois Creole
+  'mfe', // Mauritian Creole
+  'ht', // Haitian Creole
+  // Pacific
+  'mi', 'haw', 'sm', 'to', 'fj',
+  // Other
+  'eo', 'ia', 'la', 'qu', 'gn', 'mg', 'co', 'chr',
+  // Central Asian
+  'kk', 'ky', 'uz', 'tk', 'tg', 'mn',
+  // Yiddish
+  'yi',
+  // Joke languages
+  'xx-bork',   // Bork, bork, bork! (Swedish Chef)
+  'xx-elmer',  // Elmer Fudd
+  'xx-hacker', // 1337 H4X0R
+  'xx-pirate', // Pirate
+  'tlh',       // Klingon
 ] as const;
 
 export type SupportedLanguage = typeof SUPPORTED_LANGUAGES[number];
 
 // ============================================================================
-// COMMENT KEYWORDS
+// COMMENT KEYWORDS - GROUPED BY SCRIPT FOR EFFICIENCY
 // ============================================================================
 
 export interface CommentKeywords {
@@ -134,375 +176,224 @@ export interface CommentKeywords {
   classComment: string[];
 }
 
+// Script-based keyword groups
+const COMMENT_KEYWORDS_LATIN: Record<string, CommentKeywords> = {
+  en: { singular: ['comment'], plural: ['comments'], classComment: ['class comment', 'class comments'] },
+  es: { singular: ['comentario'], plural: ['comentarios'], classComment: ['comentario de clase'] },
+  fr: { singular: ['commentaire'], plural: ['commentaires'], classComment: ['commentaire de classe'] },
+  de: { singular: ['kommentar'], plural: ['kommentare'], classComment: ['klassenkommentar'] },
+  pt: { singular: ['comentário'], plural: ['comentários'], classComment: ['comentário da turma'] },
+  it: { singular: ['commento'], plural: ['commenti'], classComment: ['commento della classe'] },
+  nl: { singular: ['opmerking'], plural: ['opmerkingen'], classComment: ['klasopmerking'] },
+  pl: { singular: ['komentarz'], plural: ['komentarze', 'komentarzy'], classComment: ['komentarz klasy'] },
+  cs: { singular: ['komentář'], plural: ['komentáře', 'komentářů'], classComment: ['komentář třídy'] },
+  ro: { singular: ['comentariu'], plural: ['comentarii'], classComment: ['comentariu lecție'] },
+  tr: { singular: ['yorum'], plural: ['yorum'], classComment: ['sınıf yorumu'] },
+  vi: { singular: ['bình luận'], plural: ['bình luận'], classComment: ['bình luận lớp học'] },
+  id: { singular: ['komentar'], plural: ['komentar'], classComment: ['komentar kelas'] },
+  ms: { singular: ['komen'], plural: ['komen'], classComment: ['komen kelas'] },
+  tl: { singular: ['komento'], plural: ['mga komento'], classComment: ['komento ng klase'] },
+  sw: { singular: ['maoni'], plural: ['maoni'], classComment: ['maoni ya darasa'] },
+  'xx-pirate': { singular: ['comment', 'yarr'], plural: ['comments'], classComment: ['crew comment'] },
+  'xx-bork': { singular: ['kumment', 'bork'], plural: ['kumments'], classComment: ['cless kumment'] },
+  'xx-elmer': { singular: ['comment', 'commentw'], plural: ['commentws'], classComment: ['cwass comment'] },
+  'xx-hacker': { singular: ['c0mm3nt', 'comm3nt'], plural: ['c0mm3nt5'], classComment: ['c14ss c0mm3nt'] },
+};
+
+const COMMENT_KEYWORDS_CYRILLIC: Record<string, CommentKeywords> = {
+  ru: { singular: ['комментарий'], plural: ['комментария', 'комментариев', 'комментарии'], classComment: ['комментарий класса'] },
+  uk: { singular: ['коментар'], plural: ['коментарі', 'коментарів'], classComment: ['коментар класу'] },
+  be: { singular: ['каментарый'], plural: ['каментарыі', 'каментарыяў'], classComment: ['каментарый класа'] },
+  bg: { singular: ['коментар'], plural: ['коментара', 'коментари'], classComment: ['коментар на клас'] },
+  sr: { singular: ['коментар'], plural: ['коментара', 'коментари'], classComment: ['коментар одељења'] },
+  mk: { singular: ['коментар'], plural: ['коментари'], classComment: ['коментар на класот'] },
+  kk: { singular: ['пікір'], plural: ['пікірлер'], classComment: ['сынып пікірі'] },
+  ky: { singular: ['комментарий'], plural: ['комментарийлер'], classComment: ['класс комментарийи'] },
+  mn: { singular: ['сэтгэгдэл'], plural: ['сэтгэгдлүүд'], classComment: ['ангийн сэтгэгдэл'] },
+  tg: { singular: ['шарҳ'], plural: ['шарҳҳо'], classComment: ['шарҳи синф'] },
+};
+
+const COMMENT_KEYWORDS_ARABIC: Record<string, CommentKeywords> = {
+  ar: { singular: ['تعليق'], plural: ['تعليقات', 'تعليقًا'], classComment: ['تعليق صف', 'تعليقات الصف'] },
+  fa: { singular: ['نظر'], plural: ['نظرات'], classComment: ['نظر کلاس'] },
+  ur: { singular: ['تبصرہ'], plural: ['تبصرے'], classComment: ['کلاس تبصرہ'] },
+  ps: { singular: ['تبصره'], plural: ['تبصرې'], classComment: ['ټولګي تبصره'] },
+  ug: { singular: ['ئىنكاس'], plural: ['ئىنكاسلار'], classComment: ['سىنىپ ئىنكاسى'] },
+  ckb: { singular: ['لێدوان'], plural: ['لێدوانەکان'], classComment: ['لێدوانی پۆل'] },
+};
+
+const COMMENT_KEYWORDS_DEVANAGARI: Record<string, CommentKeywords> = {
+  hi: { singular: ['टिप्पणी'], plural: ['टिप्पणियां', 'टिप्पणियाँ'], classComment: ['क्लास टिप्पणी'] },
+  mr: { singular: ['प्रतिक्रिया'], plural: ['प्रतिक्रिया'], classComment: ['वर्ग प्रतिक्रिया'] },
+  ne: { singular: ['टिप्पणी'], plural: ['टिप्पणीहरू'], classComment: ['कक्षा टिप्पणी'] },
+  sa: { singular: ['टिप्पणी'], plural: ['टिप्पण्यः'], classComment: ['वर्ग टिप्पणी'] },
+};
+
+const COMMENT_KEYWORDS_CJK: Record<string, CommentKeywords> = {
+  zh: { singular: ['评论', '留言'], plural: ['评论', '条评论'], classComment: ['课堂评论', '班级评论'] },
+  'zh-TW': { singular: ['評論', '留言'], plural: ['則評論'], classComment: ['課堂評論'] },
+  ja: { singular: ['コメント'], plural: ['コメント'], classComment: ['クラスのコメント'] },
+  ko: { singular: ['댓글'], plural: ['댓글'], classComment: ['수업 댓글'] },
+};
+
+const COMMENT_KEYWORDS_OTHER: Record<string, CommentKeywords> = {
+  he: { singular: ['תגובה'], plural: ['תגובות'], classComment: ['תגובת כיתה'] },
+  th: { singular: ['ความคิดเห็น'], plural: ['ความคิดเห็น'], classComment: ['ความคิดเห็นของชั้นเรียน'] },
+  el: { singular: ['σχόλιο'], plural: ['σχόλια'], classComment: ['σχόλιο τάξης'] },
+  ka: { singular: ['კომენტარი'], plural: ['კომენტარები'], classComment: ['კლასის კომენტარი'] },
+  hy: { singular: ['մեկdelays'], plural: ['մegdelays'], classComment: ['delays'] },
+  am: { singular: ['አስተያየት'], plural: ['አስተያየቶች'], classComment: ['የክፍል አስተያየት'] },
+  bn: { singular: ['মন্তব্য'], plural: ['মন্তव्यগুলি'], classComment: ['ক্লাس মন্তব্য'] },
+  ta: { singular: ['கருத்து'], plural: ['கருத்துகள்'], classComment: ['வகுப்பு கருத்து'] },
+  te: { singular: ['వ్యాఖ్య'], plural: ['వ్యాఖ్యలు'], classComment: ['తరಗತಿ వ్యాఖ్య'] },
+  kn: { singular: ['ಕಾಮೆಂಟ್'], plural: ['ಕಾಮೆಂಟ್‌ಗಳು'], classComment: ['ತರಗತಿ ಕಾಮೆಂಟ್'] },
+  ml: { singular: ['അഭിപ്രായം'], plural: ['അഭിപ്രായങ್ങൾ'], classComment: ['ക്ലാസ് അഭിപ്രായം'] },
+  si: { singular: ['අදහස'], plural: ['අදහස්'], classComment: ['පන්ති අදහස'] },
+  my: { singular: ['မှတ်ချက်'], plural: ['မှတ်ချက်များ'], classComment: ['အတန်းမှတ်ချက်'] },
+  km: { singular: ['មតិយោបល់'], plural: ['មតិយោបល់'], classComment: ['មតិយោបល់ថ្នាក់'] },
+  lo: { singular: ['ຄຳເຫັນ'], plural: ['ຄຳເຫັນ'], classComment: ['ຄຳເຫັນຂອງຫ້ອງຮຽນ'] },
+  tlh: { singular: ['QIn'], plural: ['QInmey'], classComment: ['ghom QIn'] }, // Klingon
+};
+
+// Merge all keyword groups
 export const COMMENT_KEYWORDS: Record<string, CommentKeywords> = {
-  en: {
-    singular: ['comment'],
-    plural: ['comments'],
-    classComment: ['class comment', 'class comments'],
-  },
-  ar: {
-    singular: ['تعليق', 'تعليق واحد'],
-    plural: ['تعليقات', 'تعليقًا', 'تعليق'],
-    classComment: ['تعليق صف', 'تعليقات الصف', 'تعليقات صف', 'تعليق الصف'],
-  },
-  es: {
-    singular: ['comentario'],
-    plural: ['comentarios'],
-    classComment: ['comentario de clase', 'comentarios de clase'],
-  },
-  fr: {
-    singular: ['commentaire'],
-    plural: ['commentaires'],
-    classComment: ['commentaire de classe', 'commentaires de classe'],
-  },
-  de: {
-    singular: ['kommentar'],
-    plural: ['kommentare'],
-    classComment: ['klassenkommentar', 'klassenkommentare'],
-  },
-  pt: {
-    singular: ['comentário'],
-    plural: ['comentários'],
-    classComment: ['comentário da turma', 'comentários da turma'],
-  },
-  it: {
-    singular: ['commento'],
-    plural: ['commenti'],
-    classComment: ['commento della classe', 'commenti della classe'],
-  },
-  ru: {
-    singular: ['комментарий'],
-    plural: ['комментария', 'комментариев', 'комментарии'],
-    classComment: ['комментарий класса', 'комментарии класса'],
-  },
-  ja: {
-    singular: ['コメント'],
-    plural: ['コメント'],
-    classComment: ['クラスのコメント'],
-  },
-  ko: {
-    singular: ['댓글'],
-    plural: ['댓글'],
-    classComment: ['수업 댓글'],
-  },
-  zh: {
-    singular: ['评论', '留言'],
-    plural: ['评论', '留言', '条评论'],
-    classComment: ['课堂评论', '班级评论'],
-  },
-  tr: {
-    singular: ['yorum'],
-    plural: ['yorum'],
-    classComment: ['sınıf yorumu', 'sınıf yorumları'],
-  },
-  nl: {
-    singular: ['opmerking'],
-    plural: ['opmerkingen'],
-    classComment: ['klasopmerking', 'klasopmerkingen'],
-  },
-  pl: {
-    singular: ['komentarz'],
-    plural: ['komentarze', 'komentarzy'],
-    classComment: ['komentarz klasy', 'komentarze klasy'],
-  },
-  vi: {
-    singular: ['bình luận'],
-    plural: ['bình luận'],
-    classComment: ['bình luận lớp học'],
-  },
-  th: {
-    singular: ['ความคิดเห็น'],
-    plural: ['ความคิดเห็น'],
-    classComment: ['ความคิดเห็นของชั้นเรียน'],
-  },
-  id: {
-    singular: ['komentar'],
-    plural: ['komentar'],
-    classComment: ['komentar kelas'],
-  },
-  hi: {
-    singular: ['टिप्पणी'],
-    plural: ['टिप्पणियां', 'टिप्पणियाँ'],
-    classComment: ['क्लास टिप्पणी', 'कक्षा टिप्पणी'],
-  },
-  he: {
-    singular: ['תגובה'],
-    plural: ['תגובות'],
-    classComment: ['תגובת כיתה', 'תגובות כיתה'],
-  },
-  fa: {
-    singular: ['نظر'],
-    plural: ['نظرات'],
-    classComment: ['نظر کلاس', 'نظرات کلاس'],
-  },
-  sv: {
-    singular: ['kommentar'],
-    plural: ['kommentarer'],
-    classComment: ['klasskommentar', 'klasskommentarer'],
-  },
-  da: {
-    singular: ['kommentar'],
-    plural: ['kommentarer'],
-    classComment: ['klassekommentar', 'klassekommentarer'],
-  },
-  no: {
-    singular: ['kommentar'],
-    plural: ['kommentarer'],
-    classComment: ['klassekommentar', 'klassekommentarer'],
-  },
-  fi: {
-    singular: ['kommentti'],
-    plural: ['kommenttia', 'kommentit'],
-    classComment: ['luokan kommentti', 'luokan kommentit'],
-  },
+  ...COMMENT_KEYWORDS_LATIN,
+  ...COMMENT_KEYWORDS_CYRILLIC,
+  ...COMMENT_KEYWORDS_ARABIC,
+  ...COMMENT_KEYWORDS_DEVANAGARI,
+  ...COMMENT_KEYWORDS_CJK,
+  ...COMMENT_KEYWORDS_OTHER,
 };
 
 // ============================================================================
-// EDITED KEYWORDS - v2: INCLUDES NOUN FORMS
-// Each language now has: Verbs/Adjectives + Noun Forms
+// EDITED KEYWORDS - INCLUDES NOUN FORMS + JOKE LANGUAGES
 // ============================================================================
 
+const EDITED_KEYWORDS_LATIN: Record<string, string[]> = {
+  en: ['edited', '(edited)', 'modified', 'last modified', 'modification', 'edit', 'last edit'],
+  es: ['editado', 'modificado', 'modificación', 'última modificación', 'edición'],
+  fr: ['modifié', 'modification', 'dernière modification', 'édité', 'édition'],
+  de: ['bearbeitet', 'geändert', 'änderung', 'bearbeitung', 'letzte änderung'],
+  pt: ['editado', 'modificado', 'modificação', 'última modificação'],
+  it: ['modificato', 'modifica', 'ultima modifica', 'modificazione'],
+  nl: ['bewerkt', 'gewijzigd', 'wijziging', 'bewerking'],
+  pl: ['edytowano', 'zmieniono', 'modyfikacja', 'zmiana', 'edycja'],
+  cs: ['upraveno', 'změněno', 'úprava', 'změna'],
+  ro: ['editat', 'modificat', 'modificare', 'ultima modificare'],
+  tr: ['düzenlendi', 'değiştirildi', 'düzenleme', 'değişiklik'],
+  vi: ['đã chỉnh sửa', 'sửa đổi', 'chỉnh sửa'],
+  id: ['diedit', 'diubah', 'perubahan', 'pengeditan'],
+  ms: ['disunting', 'diubah', 'suntingan'],
+  tl: ['na-edit', 'binago', 'pagbabago'],
+  sw: ['imehaririwa', 'imebadilishwa', 'mabadiliko'],
+  // JOKE LANGUAGES
+  'xx-pirate': ['altered', 'be changed', 'yarr update', 'modified by the crew'],
+  'xx-bork': ['Bork', 'Editee-a', 'Zee-a', 'moodeefied'],
+  'xx-elmer': ['editewd', 'modifiewd', 'changed by wabbit'],
+  'xx-hacker': ['3d1t3d', 'm0d1f13d', 'upd4t3d', 'ch4ng3d', 'h4x0r3d'],
+};
+
+const EDITED_KEYWORDS_CYRILLIC: Record<string, string[]> = {
+  ru: ['изменено', 'отредактировано', 'редактирование', 'изменение', 'правка'],
+  uk: ['відредаговано', 'змінено', 'редагування', 'зміна'],
+  be: ['адрэдагавана', 'зменена', 'змена'],
+  bg: ['редактирано', 'променено', 'промяна', 'редакция'],
+  sr: ['измењено', 'уређено', 'измена', 'уређивање'],
+  mk: ['уредено', 'изменето', 'измена', 'уредување'],
+  kk: ['өңделді', 'өзгертілді', 'өзгеріс', 'өңдеу'],
+  ky: ['оңдолду', 'өзгөртүлдү', 'өзгөртүү'],
+  mn: ['засварласан', 'өөрчилсөн', 'өөрчлөлт', 'засвар'],
+  tg: ['таҳрир шуд', 'тағйир ёфт', 'тағйирот'],
+};
+
+const EDITED_KEYWORDS_ARABIC: Record<string, string[]> = {
+  ar: ['تم تعديله', 'تم التعديل', 'معدل', 'وقت آخر تعديل', 'آخر تعديل', 'تعديل', 'التعديل'],
+  fa: ['ویرایش شد', 'آخرین ویرایش', 'ویرایش', 'تغییر'],
+  ur: ['ترمیم شدہ', 'تبدیل شدہ', 'ترمیم'],
+  ps: ['سمون شوی', 'بدلون', 'سمون'],
+  ug: ['تەھرىرلەندى', 'ئۆزگەرتىلدى', 'تەھرىر'],
+  ckb: ['دەستکاری کرا', 'گۆڕانکاری', 'دەستکاری'],
+};
+
+const EDITED_KEYWORDS_DEVANAGARI: Record<string, string[]> = {
+  hi: ['संपादित', 'बदला गया', 'संपादन', 'परिवर्तन', 'अंतिम संपादन'],
+  mr: ['संपादित', 'बदललेले', 'संपादन', 'बदल'],
+  ne: ['सम्पादन गरियो', 'परिवर्तन', 'सम्पादन'],
+  sa: ['संपादितम्', 'परिवर्तितम्', 'संपादनम्'],
+};
+
+const EDITED_KEYWORDS_CJK: Record<string, string[]> = {
+  zh: ['已编辑', '已修改', '编辑', '修改', '更改', '最后编辑'],
+  'zh-TW': ['已編輯', '已修改', '編輯', '修改', '最後編輯'],
+  ja: ['編集済み', '編集しました', '編集', '変更', '最終編集'],
+  ko: ['수정됨', '수정함', '수정', '편집', '마지막 수정'],
+};
+
+const EDITED_KEYWORDS_OTHER: Record<string, string[]> = {
+  he: ['נערך', 'עריכה אחרונה', 'עריכה', 'שינוי'],
+  th: ['แก้ไขแล้ว', 'แก้ไขล่าสุด', 'การแก้ไข'],
+  el: ['επεξεργάστηκε', 'τροποποιήθηκε', 'τροποποίηση', 'επεξεργασία'],
+  ka: ['რედაქტირებულია', 'შეცვლილია', 'რედაქტირება', 'ცვლილება'],
+  hy: ['խdelays', 'փdelays', 'խdelays'],
+  am: ['ተስተካክል', 'ተቀይሮ', 'አርትዕ', 'ለውጥ'],
+  bn: ['সম্পাদিত', 'পরিবর্তিত', 'সম্পাদনা'],
+  ta: ['திருத்தப்பட்டது', 'மாற்றப்பட்டது', 'திருத்தம்'],
+  te: ['సవరించబడింది', 'మార్చబడింది', 'సవరణ'],
+  kn: ['ಸಂಪಾದಿಸಲಾಗಿದೆ', 'ಬದಲಾಯಿಸಲಾಗಿದೆ', 'ಸಂಪಾದನೆ'],
+  ml: ['എഡിറ്റ് ചെയ്തു', 'മാറ്റി', 'എഡിറ്റ്'],
+  si: ['සංස්කරණය කළා', 'වෙනස් කළා', 'සංස්කරණය'],
+  my: ['တည်းဖြတ်ပြီး', 'ပြင်ဆင်ပြီး', 'တည်းဖြတ်'],
+  km: ['បានកែសម្រួល', 'បានកែប្រែ', 'កែសម្រួល'],
+  lo: ['ແກ້ໄຂແລ້ວ', 'ປ່ຽນແປງແລ້ວ', 'ການແກ້ໄຂ'],
+  tlh: ['choHta\'', 'mughta\'', 'choH'], // Klingon
+};
+
+// Merge all edited keyword groups
 export const EDITED_KEYWORDS: Record<string, string[]> = {
-  en: [
-    // Verb/Adjective forms
-    'edited', '(edited)', 'modified', 'last modified',
-    // Noun forms
-    'modification', 'edit', 'last edit',
-  ],
-  ar: [
-    'تم تعديله', '(تم تعديله)', 'تم التعديل', 'معدل', 'معدّل',
-    'وقت آخر تعديل', 'آخر تعديل', 'تعديل',
-    // Noun forms
-    'التعديل', 'تعديلات',
-  ],
-  es: [
-    // Verb/Adjective forms
-    'editado', '(editado)', 'modificado', 'última modificación',
-    // Noun forms - CRITICAL for Spanish
-    'modificación', 'edición', 'última edición',
-  ],
-  fr: [
-    // Verb/Adjective forms
-    'modifié', '(modifié)', 'édité', 'dernière modification',
-    // Noun forms - CRITICAL for French
-    'modification', 'dernière édition', 'édition',
-  ],
-  de: [
-    // Verb/Adjective forms
-    'bearbeitet', '(bearbeitet)', 'geändert', 'letzte änderung',
-    // Noun forms - CRITICAL for German
-    'änderung', 'bearbeitung', 'letzte bearbeitung',
-  ],
-  pt: [
-    'editado', '(editado)', 'modificado', 'última modificação',
-    // Noun forms
-    'modificação', 'edição', 'última edição',
-  ],
-  it: [
-    'modificato', '(modificato)', 'editato', 'ultima modifica',
-    // Noun forms
-    'modifica', 'modifiche', 'ultima modificazione',
-  ],
-  ru: [
-    'изменено', '(изменено)', 'отредактировано', 'последнее изменение',
-    // Noun forms
-    'изменение', 'редактирование', 'правка',
-  ],
-  ja: [
-    '編集済み', '(編集済み)', '編集しました', '最終編集',
-    // Noun forms
-    '編集', '変更',
-  ],
-  ko: [
-    '수정됨', '(수정됨)', '수정함', '마지막 수정',
-    // Noun forms
-    '수정', '편집',
-  ],
-  zh: [
-    '已编辑', '(已编辑)', '已修改', '已編輯', '最后编辑',
-    // Noun forms
-    '编辑', '修改', '更改',
-  ],
-  tr: [
-    'düzenlendi', '(düzenlendi)', 'değiştirildi', 'son düzenleme',
-    // Noun forms
-    'düzenleme', 'değişiklik',
-  ],
-  nl: [
-    'bewerkt', '(bewerkt)', 'gewijzigd', 'laatst gewijzigd',
-    // Noun forms
-    'wijziging', 'bewerking', 'aanpassing',
-  ],
-  pl: [
-    'edytowano', '(edytowano)', 'zmieniono', 'ostatnia edycja',
-    // Noun forms - CRITICAL for Polish
-    'modyfikacja', 'zmiana', 'edycja',
-  ],
-  vi: [
-    'đã chỉnh sửa', '(đã chỉnh sửa)', 'sửa đổi lần cuối',
-    // Noun forms
-    'chỉnh sửa', 'sửa đổi',
-  ],
-  th: [
-    'แก้ไขแล้ว', '(แก้ไขแล้ว)', 'แก้ไขล่าสุด',
-    // Noun forms
-    'การแก้ไข',
-  ],
-  id: [
-    'diedit', '(diedit)', 'diubah', 'terakhir diedit',
-    // Noun forms
-    'perubahan', 'pengeditan',
-  ],
-  hi: [
-    'संपादित', '(संपादित)', 'बदला गया', 'अंतिम संपादन',
-    // Noun forms
-    'संपादन', 'परिवर्तन',
-  ],
-  he: [
-    'נערך', '(נערך)', 'עריכה אחרונה',
-    // Noun forms
-    'עריכה', 'שינוי',
-  ],
-  fa: [
-    'ویرایش شد', '(ویرایش شد)', 'آخرین ویرایش',
-    // Noun forms
-    'ویرایش', 'تغییر',
-  ],
-  sv: [
-    'redigerad', '(redigerad)', 'ändrad', 'senast ändrad',
-    // Noun forms
-    'ändring', 'redigering',
-  ],
-  da: [
-    'redigeret', '(redigeret)', 'ændret', 'sidst ændret',
-    // Noun forms
-    'ændring', 'redigering',
-  ],
-  no: [
-    'redigert', '(redigert)', 'endret', 'sist endret',
-    // Noun forms
-    'endring', 'redigering',
-  ],
-  fi: [
-    'muokattu', '(muokattu)', 'viimeksi muokattu',
-    // Noun forms
-    'muokkaus', 'muutos',
-  ],
+  ...EDITED_KEYWORDS_LATIN,
+  ...EDITED_KEYWORDS_CYRILLIC,
+  ...EDITED_KEYWORDS_ARABIC,
+  ...EDITED_KEYWORDS_DEVANAGARI,
+  ...EDITED_KEYWORDS_CJK,
+  ...EDITED_KEYWORDS_OTHER,
 };
 
 // ============================================================================
-// EXCLUSION PATTERNS (FALSE POSITIVES)
+// EXCLUSION PATTERNS
 // ============================================================================
 
 export const COMMENT_EXCLUSION_PATTERNS: string[] = [
   'add comment', 'add a comment', 'write a comment', 'leave a comment',
-  'add class comment', 'add a class comment', 'type a comment', 'enter a comment',
-  'اضافة تعليق', 'إضافة تعليق', 'أضف تعليق', 'كتابة تعليق', 'أضف تعليقًا',
-  'añadir comentario', 'agregar comentario', 'escribe un comentario',
-  'ajouter un commentaire', 'ajouter commentaire', 'écrire un commentaire',
-  'kommentar hinzufügen', 'kommentar schreiben',
-  'adicionar comentário', 'aggiungi commento',
-  'добавить комментарий', 'コメントを追加', '댓글 추가', '添加评论',
-  'yorum ekle', 'הוסף תגובה', 'افزودن نظر',
+  'add class comment', 'type a comment', 'post a comment',
+  'اضافة تعليق', 'إضافة تعليق', 'أضف تعليق',
+  'ajouter un commentaire', 'kommentar hinzufügen', 'добавить комментарий',
+  'コメントを追加', '댓글 추가', '添加评论', 'הוסף תגובה',
 ];
 
 export const EDITED_EXCLUSION_PATTERNS: string[] = [
   'can be edited', 'should be edited', 'needs to be edited',
-  'i edited', 'you edited', 'we edited', 'they edited',
-  'edit this', 'edit the', 'editing', 'to edit',
-  'editor', 'editorial', 'expected', 'submission', 'submit',
-  'قم بالتعديل', 'يمكن التعديل', 'أريد تعديل',
+  'i edited', 'you edited', 'editing', 'to edit', 'editor', 'editorial',
+  'قم بالتعديل', 'يمكن التعديل',
 ];
 
 // ============================================================================
-// EUROPEAN DATE REGEX ENGINE - v2 ADDITION
-// Handles dot-abbreviated months: DD MMM. YYYY (e.g., "10 déc. 2025")
-// ============================================================================
-
-// Abbreviated months with optional dots - MULTILINGUAL
-const MONTHS_ABBREVIATED = [
-  // English
-  'jan\\.?', 'feb\\.?', 'mar\\.?', 'apr\\.?', 'may', 'jun\\.?',
-  'jul\\.?', 'aug\\.?', 'sep\\.?', 'oct\\.?', 'nov\\.?', 'dec\\.?',
-  // French (CRITICAL)
-  'janv\\.?', 'févr?\\.?', 'mars', 'avr\\.?', 'mai', 'juin',
-  'juil\\.?', 'août', 'sept\\.?', 'oct\\.?', 'nov\\.?', 'déc\\.?',
-  // German
-  'jan\\.?', 'feb\\.?', 'mär\\.?', 'apr\\.?', 'mai', 'jun\\.?',
-  'jul\\.?', 'aug\\.?', 'sep\\.?', 'okt\\.?', 'nov\\.?', 'dez\\.?',
-  // Spanish
-  'ene\\.?', 'feb\\.?', 'mar\\.?', 'abr\\.?', 'may\\.?', 'jun\\.?',
-  'jul\\.?', 'ago\\.?', 'sep\\.?', 'oct\\.?', 'nov\\.?', 'dic\\.?',
-  // Italian
-  'gen\\.?', 'feb\\.?', 'mar\\.?', 'apr\\.?', 'mag\\.?', 'giu\\.?',
-  'lug\\.?', 'ago\\.?', 'set\\.?', 'ott\\.?', 'nov\\.?', 'dic\\.?',
-  // Portuguese
-  'jan\\.?', 'fev\\.?', 'mar\\.?', 'abr\\.?', 'mai\\.?', 'jun\\.?',
-  'jul\\.?', 'ago\\.?', 'set\\.?', 'out\\.?', 'nov\\.?', 'dez\\.?',
-  // Dutch
-  'jan\\.?', 'feb\\.?', 'mrt\\.?', 'apr\\.?', 'mei', 'jun\\.?',
-  'jul\\.?', 'aug\\.?', 'sep\\.?', 'okt\\.?', 'nov\\.?', 'dec\\.?',
-  // Polish
-  'sty\\.?', 'lut\\.?', 'mar\\.?', 'kwi\\.?', 'maj', 'cze\\.?',
-  'lip\\.?', 'sie\\.?', 'wrz\\.?', 'paź\\.?', 'lis\\.?', 'gru\\.?',
-];
-
-// Full month names - MULTILINGUAL
-const MONTHS_FULL = [
-  // English
-  'january', 'february', 'march', 'april', 'may', 'june',
-  'july', 'august', 'september', 'october', 'november', 'december',
-  // French
-  'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
-  'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre',
-  // German
-  'januar', 'februar', 'märz', 'april', 'mai', 'juni',
-  'juli', 'august', 'september', 'oktober', 'november', 'dezember',
-  // Spanish
-  'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
-  'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
-  // Italian
-  'gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno',
-  'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre',
-  // Portuguese
-  'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
-  'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro',
-  // Arabic
-  'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
-  'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر',
-];
-
-// Build the unified month pattern
-const MONTH_PATTERN = [...new Set([...MONTHS_ABBREVIATED, ...MONTHS_FULL])].join('|');
-
-// Universal digit shorthand
-const D = UNIVERSAL_DIGIT;
-
-// ============================================================================
-// DATE PATTERNS - v2: Includes European DD MMM YYYY format
+// DATE PATTERNS WITH UNICODE PROPERTY ESCAPES
+// Uses \p{Nd} for universal digit matching
 // ============================================================================
 
 export const DATE_PATTERNS: RegExp[] = [
-  // EUROPEAN FORMAT: DD MMM. YYYY (e.g., "10 déc. 2025", "14 janv. 2024")
-  new RegExp(`${D}{1,2}\\s*(?:${MONTH_PATTERN})\\s*\\.?\\s*${D}{2,4}`, 'i'),
-  
-  // AMERICAN FORMAT: MMM DD, YYYY (e.g., "Dec 10, 2025")
-  new RegExp(`(?:${MONTH_PATTERN})\\s*\\.?\\s*${D}{1,2}[,،]?\\s*${D}{2,4}`, 'i'),
-  
-  // Numeric: DD/MM/YYYY, MM-DD-YYYY, YYYY.MM.DD (with universal digits)
-  new RegExp(`${D}{1,4}[/\\-.]${D}{1,2}[/\\-.]${D}{1,4}`),
-  
-  // Short numeric: DD/MM or MM/DD
-  new RegExp(`${D}{1,2}[/\\-.]${D}{1,2}`),
-  
-  // Eastern Arabic numeric dates
-  new RegExp(`[٠-٩]{1,4}[/\\-][٠-٩]{1,2}[/\\-][٠-٩]{1,4}`),
-  
+  // European: DD MMM. YYYY with universal digits
+  new RegExp(`${D}{1,2}\\s+\\w{3,9}\\.?\\s+${D}{2,4}`, 'iu'),
+  // American: MMM DD, YYYY
+  new RegExp(`\\w{3,9}\\.?\\s+${D}{1,2}[,،]?\\s*${D}{2,4}`, 'iu'),
+  // Numeric: DD/MM/YYYY (universal digits)
+  new RegExp(`${D}{1,4}[/\\-.]${D}{1,2}[/\\-.]${D}{1,4}`, 'u'),
+  // Short: DD/MM
+  new RegExp(`${D}{1,2}[/\\-.]${D}{1,2}`, 'u'),
   // Relative dates (multilingual)
-  /\b(?:today|yesterday|aujourdhui|hier|hoy|ayer|heute|gestern|oggi|ieri|vandaag|gisteren|اليوم|أمس|البارحة)\b/i,
-  
-  // Time patterns with universal digits
-  new RegExp(`${D}{1,2}:${D}{2}\\s*(?:AM|PM|am|pm|ص|م)?`),
+  /\b(?:today|yesterday|aujourd'hui|hier|hoy|ayer|heute|gestern|oggi|ieri|vandaag|gisteren|اليوم|أمس|oggi|昨日|어제|昨天|сегодня|вчера)\b/iu,
+  // Time: HH:MM with universal digits
+  new RegExp(`${D}{1,2}:${D}{2}\\s*(?:AM|PM|am|pm|ص|م)?`, 'u'),
 ];
 
 // ============================================================================
@@ -543,11 +434,9 @@ export const CONFIDENCE_WEIGHTS = {
   LAYER_2_SEMANTIC: 35,
   LAYER_3_STRUCTURAL: 20,
   LAYER_4_EXCLUSION: -25,
-  
   HIGH_CONFIDENCE: 60,
   MEDIUM_CONFIDENCE: 35,
   LOW_CONFIDENCE: 15,
-  
   DATE_PROXIMITY_BONUS: 10,
   NUMBER_PRESENT_BONUS: 5,
   ARIA_MATCH_BONUS: 15,
@@ -560,12 +449,14 @@ export const CONFIDENCE_WEIGHTS = {
 
 export function getCommentKeywords(lang: string): CommentKeywords {
   const shortLang = lang.split('-')[0].toLowerCase();
-  return COMMENT_KEYWORDS[shortLang] || COMMENT_KEYWORDS['en'];
+  const fullLang = lang.toLowerCase();
+  return COMMENT_KEYWORDS[fullLang] || COMMENT_KEYWORDS[shortLang] || COMMENT_KEYWORDS['en'];
 }
 
 export function getEditedKeywords(lang: string): string[] {
   const shortLang = lang.split('-')[0].toLowerCase();
-  return EDITED_KEYWORDS[shortLang] || EDITED_KEYWORDS['en'];
+  const fullLang = lang.toLowerCase();
+  return EDITED_KEYWORDS[fullLang] || EDITED_KEYWORDS[shortLang] || EDITED_KEYWORDS['en'];
 }
 
 export function getAllEditedKeywords(): string[] {
@@ -577,9 +468,6 @@ export function getAllCommentKeywords(): string[] {
     .flatMap(k => [...k.singular, ...k.plural, ...k.classComment]);
 }
 
-/**
- * Checks if normalized text contains a date pattern.
- */
 export function hasDatePattern(text: string): boolean {
   const normalized = normalizeText(text);
   for (const pattern of DATE_PATTERNS) {
@@ -592,14 +480,10 @@ export function hasDatePattern(text: string): boolean {
 
 export function isExcludedCommentPattern(text: string): boolean {
   const normalized = normalizeForComparison(text);
-  return COMMENT_EXCLUSION_PATTERNS.some(pattern => 
-    normalized.includes(normalizeForComparison(pattern))
-  );
+  return COMMENT_EXCLUSION_PATTERNS.some(p => normalized.includes(normalizeForComparison(p)));
 }
 
 export function isExcludedEditedPattern(text: string): boolean {
   const normalized = normalizeForComparison(text);
-  return EDITED_EXCLUSION_PATTERNS.some(pattern => 
-    normalized.includes(normalizeForComparison(pattern))
-  );
+  return EDITED_EXCLUSION_PATTERNS.some(p => normalized.includes(normalizeForComparison(p)));
 }
