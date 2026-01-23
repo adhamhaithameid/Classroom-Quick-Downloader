@@ -791,6 +791,7 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
       (async () => {
           await ensureMinLoading(startedAt);
 
+          const status = message.status as
             | ButtonState
             | 'blocked_html'
             | 'interrupted'

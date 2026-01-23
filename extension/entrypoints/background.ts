@@ -314,7 +314,7 @@ export default defineBackground(() => {
       if (pending.fileMeta?.name) {
         suggest({ filename: pending.fileMeta.name, conflictAction: 'uniquify' });
       } else {
-        suggest({ conflictAction: 'uniquify' });
+        suggest({ filename: 'classroom_download', conflictAction: 'uniquify' });
       }
     });
   }
