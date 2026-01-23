@@ -12,8 +12,12 @@ import {
   normalizeText,
   normalizeForComparison,
   getEditedKeywords,
+  getCreatedKeywords, // Added
   hasDatePattern,
   isExcludedEditedPattern,
+  parseUnicodeDate,
+  formatTimeDifference,
+  type ParsedDate,
 } from './detection-keywords';
 
 import {
@@ -35,6 +39,11 @@ export interface EditedDetectionResult {
   hasDateProximity: boolean;
   usedParentContext: boolean;
   debugInfo?: EditedLayerDebugInfo;
+  // New Hover Intelligence fields
+  detectedDate?: Date | null;
+  createdDate?: Date | null;
+  timeDiff?: number | null; // ms
+  timeDiffString?: string | null;
 }
 
 interface EditedLayerDebugInfo {
@@ -129,6 +138,113 @@ function expandParentContext(node: Node): { text: string; hasDate: boolean; leve
   }
   
   return { text: directText, hasDate: false, level: 0 };
+}
+
+// ============================================================================
+// DATE EXTRACTION & DISAMBIGUATION ENGINE
+// ============================================================================
+
+interface DateCandidate {
+  date: Date;
+  raw: string;
+  confidence: 'high' | 'medium' | 'low';
+  context: 'edited' | 'created' | 'unknown';
+  node: Node;
+}
+
+function extractDatesFromPost(post: HTMLElement, pageLang: string): { created: Date | null; edited: Date | null } {
+  const editedKeywords = getEditedKeywords(pageLang);
+  const createdKeywords = getCreatedKeywords(pageLang);
+  const englishEdited = getEditedKeywords('en'); // Safety fallback
+  const englishCreated = getCreatedKeywords('en');
+  
+  const allEdited = [...new Set([...editedKeywords, ...englishEdited])];
+  const allCreated = [...new Set([...createdKeywords, ...englishCreated])];
+  
+  const candidates: DateCandidate[] = [];
+  
+  // 1. Scan for dates using TreeWalker
+  const walker = document.createTreeWalker(
+    post,
+    NodeFilter.SHOW_TEXT,
+    {
+      acceptNode: (node) => {
+        // Skip hidden elements and scripts
+        if (node.parentElement) {
+          const style = window.getComputedStyle(node.parentElement);
+          if (style.display === 'none' || style.visibility === 'hidden') return NodeFilter.FILTER_REJECT;
+          const tagName = node.parentElement.tagName.toLowerCase();
+          if (['script', 'style', 'noscript'].includes(tagName)) return NodeFilter.FILTER_REJECT;
+        }
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    }
+  );
+  
+  let node: Node | null;
+  while ((node = walker.nextNode())) {
+    const text = normalizeText(node.textContent || '');
+    if (text.length < 5) continue; // Too short for a date
+    
+    // Parse date from this node
+    const parsed = parseUnicodeDate(text);
+    if (parsed) {
+      // Determine context by checking siblings/parents for keywords
+      let context: 'edited' | 'created' | 'unknown' = 'unknown';
+      
+      const parentText = normalizeText(node.parentElement?.textContent || '');
+      const grandParentText = normalizeText(node.parentElement?.parentElement?.textContent || '');
+      const surroundingText = (parentText + ' ' + grandParentText).toLowerCase();
+      
+      // Check for Edited keywords nearby
+      if (allEdited.some(k => surroundingText.includes(normalizeForComparison(k)))) {
+        context = 'edited';
+      } 
+      // Check for Created keywords nearby
+      else if (allCreated.some(k => surroundingText.includes(normalizeForComparison(k)))) {
+        context = 'created';
+      }
+      
+      candidates.push({
+        ...parsed,
+        context,
+        node
+      });
+    }
+  }
+  
+  // 2. Disambiguate strategies
+  let createdDate: Date | null = null;
+  let editedDate: Date | null = null;
+  
+  // Strategy A: Explicit Context
+  const explicitEdited = candidates.find(c => c.context === 'edited');
+  const explicitCreated = candidates.find(c => c.context === 'created');
+  
+  if (explicitEdited) editedDate = explicitEdited.date;
+  if (explicitCreated) createdDate = explicitCreated.date;
+  
+  // Strategy B: Time Heuristic (if we have 2 dates and unknown context)
+  if ((!editedDate || !createdDate) && candidates.length >= 2) {
+    // Sort logic: Created date is usually older than Edited date
+    // But be careful - mostly we care if we found explicit "Edited".
+    // If we haven't found explicit "Edited", maybe we shouldn't assume.
+    // But assume we are calling this because we detected an "Edited" flag.
+    
+    const sortedDates = candidates.sort((a, b) => a.date.getTime() - b.date.getTime());
+    const earliest = sortedDates[0];
+    const latest = sortedDates[sortedDates.length - 1];
+    
+    if (!createdDate) createdDate = earliest.date;
+    if (!editedDate && earliest !== latest) editedDate = latest.date;
+  }
+  
+  // Strategy C: Single date found near "Edited" -> that's the Edit date
+  if (candidates.length === 1 && candidates[0].context === 'edited' && !editedDate) {
+    editedDate = candidates[0].date;
+  }
+  
+  return { created: createdDate, edited: editedDate };
 }
 
 // ============================================================================
@@ -422,6 +538,25 @@ export function detectEdited(post: HTMLElement, pageLang: string): EditedDetecti
   const isEdited = finalScore >= CONFIDENCE_WEIGHTS.LOW_CONFIDENCE && 
                    primaryMatch.matchedText !== null;
   
+  // Perform Date Extraction & Diff Calculation
+  let detectedDate: Date | null = null;
+  let createdDate: Date | null = null;
+  let timeDiff: number | null = null;
+  let timeDiffString: string | null = null;
+  
+  if (isEdited) {
+    const dates = extractDatesFromPost(post, pageLang);
+    detectedDate = dates.edited;
+    createdDate = dates.created;
+    
+    if (detectedDate && createdDate) {
+      timeDiff = detectedDate.getTime() - createdDate.getTime();
+      // Ensure positive diff (sometimes clocks or parsing might be slight off)
+      if (timeDiff < 0) timeDiff = 0;
+      timeDiffString = formatTimeDifference(timeDiff);
+    }
+  }
+
   return {
     isEdited,
     confidence,
@@ -430,6 +565,10 @@ export function detectEdited(post: HTMLElement, pageLang: string): EditedDetecti
     detectionLayer: primaryLayer,
     hasDateProximity: primaryMatch.hasDateProximity,
     usedParentContext: primaryMatch.usedParentContext,
+    detectedDate, // New field
+    createdDate,  // New field
+    timeDiff,     // New field
+    timeDiffString, // New field
     debugInfo: {
       layer1Score: layer1.score,
       layer2Score: layer2.score,

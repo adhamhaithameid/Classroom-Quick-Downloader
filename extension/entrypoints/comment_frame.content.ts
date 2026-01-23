@@ -243,8 +243,8 @@ function createOverlay(post: HTMLElement, count: number) {
     badge = document.createElement('div');
     badge.className = 'cqd-comment-badge';
     badge.setAttribute(INJECTED_ATTR, 'true');
-    // Tooltip (NO NUMBER)
-    const explanation = t('comments');
+    // Tooltip with Count
+    const explanation = `${count} ${t('comments')}`;
     badge.title = explanation;
     badge.setAttribute('aria-label', explanation);
     if (isPageDark()) badge.classList.add('cqd-theme-dark');

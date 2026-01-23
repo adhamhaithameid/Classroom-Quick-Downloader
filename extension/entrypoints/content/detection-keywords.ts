@@ -359,6 +359,416 @@ export const EDITED_KEYWORDS: Record<string, string[]> = {
 };
 
 // ============================================================================
+// CREATED KEYWORDS (for detecting original post date)
+// Supports "Posted", "Created", "Published" patterns across 100+ languages
+// ============================================================================
+
+const CREATED_KEYWORDS_LATIN: Record<string, string[]> = {
+  en: ['posted', 'created', 'published', 'added', 'written'],
+  es: ['publicado', 'creado', 'añadido', 'escrito'],
+  fr: ['publié', 'posté', 'créé', 'ajouté'],
+  de: ['gepostet', 'erstellt', 'veröffentlicht', 'hinzugefügt', 'geschrieben'],
+  pt: ['publicado', 'postado', 'criado', 'adicionado'],
+  it: ['pubblicato', 'creato', 'aggiunto', 'scritto'],
+  nl: ['gepost', 'gemaakt', 'gepubliceerd', 'toegevoegd'],
+  pl: ['opublikowano', 'utworzono', 'dodano', 'napisano'],
+  cs: ['zveřejněno', 'vytvořeno', 'přidáno'],
+  ro: ['publicat', 'creat', 'adăugat'],
+  tr: ['yayınlandı', 'oluşturuldu', 'eklendi', 'gönderildi'],
+  vi: ['đã đăng', 'đã tạo', 'đã thêm'],
+  id: ['diposting', 'dibuat', 'ditambahkan'],
+  ms: ['diposkan', 'dicipta', 'ditambah'],
+  tl: ['na-post', 'nilikha', 'idinagdag'],
+  sw: ['imechapishwa', 'imeundwa', 'imeongezwa'],
+};
+
+const CREATED_KEYWORDS_CYRILLIC: Record<string, string[]> = {
+  ru: ['опубликовано', 'создано', 'добавлено', 'написано'],
+  uk: ['опубліковано', 'створено', 'додано'],
+  be: ['апублікавана', 'створана', 'дададзена'],
+  bg: ['публикувано', 'създадено', 'добавено'],
+  sr: ['објављено', 'креирано', 'додато'],
+  mk: ['објавено', 'создадено', 'додадено'],
+  kk: ['жарияланды', 'жасалды', 'қосылды'],
+  ky: ['жарыяланды', 'түзүлдү', 'кошулду'],
+  mn: ['нийтэлсэн', 'үүсгэсэн', 'нэмсэн'],
+  tg: ['нашр шуд', 'сохта шуд', 'илова шуд'],
+};
+
+const CREATED_KEYWORDS_ARABIC: Record<string, string[]> = {
+  ar: ['تم النشر', 'نُشر', 'تاريخ النشر', 'أُضيف', 'تاريخ الإنشاء', 'تم الإنشاء'],
+  fa: ['منتشر شد', 'ایجاد شد', 'اضافه شد'],
+  ur: ['شائع کیا گیا', 'بنایا گیا', 'شامل کیا گیا'],
+  ps: ['خپور شو', 'جوړ شو', 'اضافه شو'],
+  ug: ['ئېلان قىلىندى', 'قۇرۇلدى', 'قوشۇلدى'],
+  ckb: ['بڵاو کرایەوە', 'دروست کرا', 'زیاد کرا'],
+};
+
+const CREATED_KEYWORDS_DEVANAGARI: Record<string, string[]> = {
+  hi: ['पोस्ट किया गया', 'प्रकाशित', 'जोड़ा गया', 'लिखा गया'],
+  mr: ['प्रकाशित', 'तयार केले', 'जोडले'],
+  ne: ['प्रकाशित गरियो', 'सिर्जना गरियो', 'थपियो'],
+  sa: ['प्रकाशितम्', 'सृष्टम्', 'योजितम्'],
+};
+
+const CREATED_KEYWORDS_CJK: Record<string, string[]> = {
+  zh: ['发布于', '发布', '创建于', '创建', '添加于', '已发布'],
+  'zh-TW': ['發佈於', '發佈', '建立於', '建立', '已發佈'],
+  ja: ['投稿日', '投稿', '作成日', '作成', '追加'],
+  ko: ['게시됨', '작성됨', '생성됨', '추가됨'],
+};
+
+const CREATED_KEYWORDS_OTHER: Record<string, string[]> = {
+  he: ['פורסם', 'נוצר', 'נוסף', 'נכתב'],
+  th: ['โพสต์เมื่อ', 'สร้างเมื่อ', 'เพิ่มเมื่อ'],
+  el: ['δημοσιεύτηκε', 'δημιουργήθηκε', 'προστέθηκε'],
+  ka: ['გამოქვეყნდა', 'შეიქმნა', 'დაემატა'],
+  hy: ['հրապdelays', ' delays'],
+  am: ['ታትሟል', 'ተፈጥሯል', 'ታክሏል'],
+  bn: ['পোস্ট করা হয়েছে', 'তৈরি করা হয়েছে', 'যোগ করা হয়েছে'],
+  ta: ['வெளியிடப்பட்டது', 'உருவாக்கப்பட்டது', 'சேர்க்கப்பட்டது'],
+  te: ['పోస్ట్ చేయబడింది', 'సృష్టించబడింది', 'జోడించబడింది'],
+  kn: ['ಪೋಸ್ಟ್ ಮಾಡಲಾಗಿದೆ', 'ರಚಿಸಲಾಗಿದೆ', 'ಸೇರಿಸಲಾಗಿದೆ'],
+  ml: ['പോസ്റ്റ് ചെയ്തു', 'സൃഷ്ടിച്ചു', 'ചേർത്തു'],
+  si: ['පළ කළා', 'නිර්මාණය කළා', 'එකතු කළා'],
+  my: ['တင်ပြီး', 'ဖန်တီးပြီး', 'ထည့်ပြီး'],
+  km: ['បានបង្ហោះ', 'បានបង្កើត', 'បានបន្ថែម'],
+  lo: ['ໂພສແລ້ວ', 'ສ້າງແລ້ວ', 'ເພີ່ມແລ້ວ'],
+  tlh: ['qaSta\'', 'chenmoHta\''], // Klingon
+};
+
+export const CREATED_KEYWORDS: Record<string, string[]> = {
+  ...CREATED_KEYWORDS_LATIN,
+  ...CREATED_KEYWORDS_CYRILLIC,
+  ...CREATED_KEYWORDS_ARABIC,
+  ...CREATED_KEYWORDS_DEVANAGARI,
+  ...CREATED_KEYWORDS_CJK,
+  ...CREATED_KEYWORDS_OTHER,
+};
+
+export function getCreatedKeywords(lang: string): string[] {
+  const shortLang = lang.split('-')[0].toLowerCase();
+  const fullLang = lang.toLowerCase();
+  return CREATED_KEYWORDS[fullLang] || CREATED_KEYWORDS[shortLang] || CREATED_KEYWORDS['en'];
+}
+
+// ============================================================================
+// MONTHS PATTERN - Universal month name mapping for date parsing
+// Maps month names from 100+ languages to month index (0-11)
+// ============================================================================
+
+const MONTHS_MAP: Record<string, number> = {
+  // English
+  january: 0, february: 1, march: 2, april: 3, may: 4, june: 5,
+  july: 6, august: 7, september: 8, october: 9, november: 10, december: 11,
+  jan: 0, feb: 1, mar: 2, apr: 3, jun: 5, jul: 6, aug: 7, sep: 8, sept: 8, oct: 9, nov: 10, dec: 11,
+  
+  // French
+  janvier: 0, février: 1, fevrier: 1, mars: 2, avril: 3, mai: 4, juin: 5,
+  juillet: 6, août: 7, aout: 7, septembre: 8, octobre: 9, novembre: 10, décembre: 11, decembre: 11,
+  janv: 0, févr: 1, avr: 3, juil: 6, déc: 11,
+  
+  // German (Shared: november, dezember -> English; juni, juli, oktober -> Dutch)
+  januar: 0, februar: 1, märz: 2, marz: 2, 
+  
+  // Spanish
+  enero: 0, febrero: 1, marzo: 2, abril: 3, mayo: 4, junio: 5,
+  julio: 6, agosto: 7, septiembre: 8, octubre: 9, noviembre: 10, diciembre: 11,
+  
+  // Portuguese
+  janeiro: 0, fevereiro: 1, março: 2, marco: 2, maio: 4, junho: 5,
+  julho: 6, setembro: 8, outubro: 9, novembro: 10, dezembro: 11,
+  
+  // Italian
+  gennaio: 0, febbraio: 1, marzo: 2, aprile: 3, maggio: 4, giugno: 5,
+  luglio: 6, agosto: 7, settembre: 8, ottobre: 9, novembre: 10, dicembre: 11,
+  
+  // Dutch (Shared: april -> English; september, november, december -> English)
+  januari: 0, februari: 1, maart: 2, mei: 4, juni: 5, juli: 6, augustus: 7, oktober: 9,
+  
+  // Russian
+  'январь': 0, 'января': 0, 'февраль': 1, 'февраля': 1, 'март': 2, 'марта': 2,
+  'апрель': 3, 'апреля': 3, 'май': 4, 'мая': 4, 'июнь': 5, 'июня': 5,
+  'июль': 6, 'июля': 6, 'август': 7, 'августа': 7, 'сентябрь': 8, 'сентября': 8,
+  'октябрь': 9, 'октября': 9, 'ноябрь': 10, 'ноября': 10, 'декабрь': 11, 'декабря': 11,
+  
+  // Arabic
+  'يناير': 0, 'فبراير': 1, 'مارس': 2, 'أبريل': 3, 'إبريل': 3, 'مايو': 4, 'يونيو': 5,
+  'يوليو': 6, 'أغسطس': 7, 'سبتمبر': 8, 'أكتوبر': 9, 'نوفمبر': 10, 'ديسمبر': 11,
+  
+  // CJK - Chinese & Japanese (Shared numeric months)
+  '一月': 0, '二月': 1, '三月': 2, '四月': 3, '五月': 4, '六月': 5,
+  '七月': 6, '八月': 7, '九月': 8, '十月': 9, '十一月': 10, '十二月': 11,
+  '1月': 0, '2月': 1, '3月': 2, '4月': 3, '5月': 4, '6月': 5,
+  '7月': 6, '8月': 7, '9月': 8, '10月': 9, '11月': 10, '12月': 11,
+  '投稿日': -1, // Not a month, but prevents false positives if checking keys? No, this is MONTHS_MAP. 
+  
+  // Hebrew
+  'ינואר': 0, 'פברואר': 1, 'מרץ': 2, 'אפריל': 3, 'מאי': 4, 'יוני': 5,
+  'יולי': 6, 'אוגוסט': 7, 'ספטמבר': 8, 'אוקטובר': 9, 'נובמבר': 10, 'דצמבר': 11,
+  
+  // Hindi  
+  'जनवरी': 0, 'फ़रवरी': 1, 'मार्च': 2, 'अप्रैल': 3, 'मई': 4, 'जून': 5,
+  'जुलाई': 6, 'अगस्त': 7, 'सितंबर': 8, 'सितम्बर': 8, 'अक्टूबर': 9, 'अक्तूबर': 9, 'नवंबर': 10, 'नवम्बर': 10, 'दिसंबर': 11, 'दिसम्बर': 11,
+  
+  // Turkish
+  'ocak': 0, 'şubat': 1, 'subat': 1, 'mart': 2, 'nisan': 3, 'mayıs': 4, 'mayis': 4, 'haziran': 5,
+  'temmuz': 6, 'ağustos': 7, 'agustos': 7, 'eylül': 8, 'eylul': 8, 'ekim': 9, 'kasım': 10, 'kasim': 10, 'aralık': 11, 'aralik': 11,
+  
+  // Polish
+  'styczeń': 0, 'styczen': 0, 'luty': 1, 'marzec': 2, 'kwiecień': 3, 'kwiecien': 3, 'czerwiec': 5,
+  'lipiec': 6, 'sierpień': 7, 'sierpien': 7, 'wrzesień': 8, 'wrzesien': 8, 'październik': 9, 'pazdziernik': 9, 'listopad': 10, 'grudzień': 11, 'grudzien': 11,
+  
+  // Greek
+  'ιανουάριος': 0, 'φεβρουάριος': 1, 'μάρτιος': 2, 'απρίλιος': 3, 'μάιος': 4, 'ιούνιος': 5,
+  'ιούλιος': 6, 'αύγουστος': 7, 'σεπτέμβριος': 8, 'οκτώβριος': 9, 'νοέμβριος': 10, 'δεκέμβριος': 11,
+  'ιαν': 0, 'φεβ': 1, 'μαρ': 2, 'απρ': 3, 'μαϊ': 4, 'ιουν': 5, 'ιουλ': 6, 'αυγ': 7, 'σεπ': 8, 'οκτ': 9, 'νοε': 10, 'δεκ': 11,
+};
+
+/**
+ * Get month index (0-11) from month name in any supported language
+ */
+export function getMonthFromName(monthName: string): number | null {
+  const normalized = normalizeForComparison(monthName).replace(/\.$/g, '');
+  return MONTHS_MAP[normalized] ?? null;
+}
+
+// ============================================================================
+// RELATIVE DATE PATTERNS - Multilingual
+// ============================================================================
+
+const RELATIVE_DATE_PATTERNS: Record<string, { pattern: RegExp; daysAgo: number }[]> = {
+  today: [
+    { pattern: /\b(?:today|aujourd'hui|hoy|heute|oggi|vandaag|dzisiaj|сегодня|اليوم|今日|오늘|今天)\b/iu, daysAgo: 0 },
+  ],
+  yesterday: [
+    { pattern: /\b(?:yesterday|hier|ayer|gestern|ieri|gisteren|wczoraj|вчера|أمس|昨日|어제|昨天)\b/iu, daysAgo: 1 },
+  ],
+  justNow: [
+    { pattern: /\b(?:just now|à l'instant|ahora mismo|gerade eben|proprio adesso|zojuist|только что|الآن فقط|たった今|방금|刚刚|刚才)\b/iu, daysAgo: 0 },
+  ],
+};
+
+/**
+ * Parse relative date patterns (today, yesterday, just now)
+ * Returns Date object or null
+ */
+export function parseRelativeDate(text: string): Date | null {
+  const normalized = normalizeText(text).toLowerCase();
+  
+  for (const [, patterns] of Object.entries(RELATIVE_DATE_PATTERNS)) {
+    for (const { pattern, daysAgo } of patterns) {
+      if (pattern.test(normalized)) {
+        const date = new Date();
+        date.setDate(date.getDate() - daysAgo);
+        date.setHours(0, 0, 0, 0);
+        return date;
+      }
+    }
+  }
+  return null;
+}
+
+// ============================================================================
+// UNICODE DATE PARSING ENGINE
+// Handles dates with Unicode digits and multilingual month names
+// ============================================================================
+
+export interface ParsedDate {
+  date: Date;
+  raw: string;
+  confidence: 'high' | 'medium' | 'low';
+}
+
+/**
+ * Normalize Unicode digits to ASCII (0-9)
+ * Converts ٥ → 5, ५ → 5, etc.
+ */
+function normalizeDigitsToAscii(text: string): string {
+  let result = '';
+  for (const char of text) {
+    const code = char.codePointAt(0);
+    if (code !== undefined) {
+      // Check if it's a Unicode decimal digit
+      const digitMatch = char.match(new RegExp(`[${D}]`, 'u'));
+      if (digitMatch) {
+        // Convert to ASCII digit using the modulo trick
+        result += String(code % 10);
+      } else {
+        result += char;
+      }
+    }
+  }
+  return result;
+}
+
+/**
+ * Parse a date string from any language into a Date object
+ * Handles:
+ * - Unicode digits (Arabic-Indic, Devanagari, Thai, etc.)
+ * - Multilingual month names
+ * - European (DD MMM YYYY) and American (MMM DD, YYYY) formats
+ * - Relative dates (today, yesterday)
+ * - Numeric formats (DD/MM/YYYY, MM/DD/YYYY with heuristic disambiguation)
+ */
+export function parseUnicodeDate(text: string): ParsedDate | null {
+  if (!text) return null;
+  
+  const normalized = normalizeText(text);
+  
+  // 1. Try relative dates first
+  const relativeDate = parseRelativeDate(normalized);
+  if (relativeDate) {
+    return { date: relativeDate, raw: text, confidence: 'high' };
+  }
+  
+  // 2. Normalize all Unicode digits to ASCII
+  const asciiText = normalizeDigitsToAscii(normalized);
+  
+  // 3. Try extracting date with month name
+  // Pattern: captures optional day, month name, optional day (for American format), year
+  const monthNamePattern = /(\d{1,2})?\s*([A-Za-z\u0400-\u04FF\u0600-\u06FF\u0900-\u097F\u0980-\u09FF\u0A00-\u0A7F\u0B00-\u0B7F\u0C00-\u0C7F\u0D00-\u0D7F\u0E00-\u0E7F\u0590-\u05FF\u4E00-\u9FFF\u3040-\u309F\u30A0-\u30FF\uAC00-\uD7AF]+)\.?\s*(\d{1,2})?[,،]?\s*(\d{2,4})?/iu;
+  
+  const monthMatch = asciiText.match(monthNamePattern);
+  if (monthMatch) {
+    const [, beforeMonth, monthStr, afterMonth, yearStr] = monthMatch;
+    const monthIndex = getMonthFromName(monthStr);
+    
+    if (monthIndex !== null) {
+      let day: number | null = null;
+      let year = new Date().getFullYear();
+      
+      // Determine day (before or after month name)
+      if (beforeMonth) {
+        day = parseInt(beforeMonth, 10);
+      } else if (afterMonth) {
+        day = parseInt(afterMonth, 10);
+      }
+      
+      // Parse year
+      if (yearStr) {
+        year = parseInt(yearStr, 10);
+        if (year < 100) {
+          year += year > 50 ? 1900 : 2000; // 23 → 2023, 99 → 1999
+        }
+      }
+      
+      if (day && day >= 1 && day <= 31) {
+        const date = new Date(year, monthIndex, day);
+        if (!isNaN(date.getTime())) {
+          return { date, raw: text, confidence: 'high' };
+        }
+      }
+    }
+  }
+  
+  // 4. Try numeric date formats (DD/MM/YYYY or MM/DD/YYYY)
+  const numericPattern = /(\d{1,4})[/\-.](\d{1,2})[/\-.](\d{1,4})/;
+  const numericMatch = asciiText.match(numericPattern);
+  if (numericMatch) {
+    const [, p1, p2, p3] = numericMatch;
+    const n1 = parseInt(p1, 10);
+    const n2 = parseInt(p2, 10);
+    const n3 = parseInt(p3, 10);
+    
+    let day: number, month: number, year: number;
+    
+    // Heuristic: if first number > 31, assume YYYY/MM/DD (ISO-like)
+    if (n1 > 31) {
+      year = n1;
+      month = n2 - 1;
+      day = n3;
+    }
+    // If third number > 31, it's the year
+    else if (n3 > 31) {
+      year = n3 < 100 ? (n3 > 50 ? 1900 + n3 : 2000 + n3) : n3;
+      // Heuristic: if n1 > 12, it must be day (European DD/MM/YYYY)
+      if (n1 > 12) {
+        day = n1;
+        month = n2 - 1;
+      }
+      // If n2 > 12, n2 must be day (American MM/DD/YYYY)
+      else if (n2 > 12) {
+        month = n1 - 1;
+        day = n2;
+      }
+      // Both could be day or month - prefer European (DD/MM/YYYY)
+      else {
+        day = n1;
+        month = n2 - 1;
+      }
+    }
+    // No clear year indicator - assume current year
+    else {
+      year = new Date().getFullYear();
+      // Same heuristic for day/month
+      if (n1 > 12) {
+        day = n1;
+        month = n2 - 1;
+      } else if (n2 > 12) {
+        month = n1 - 1;
+        day = n2;
+      } else {
+        day = n1;
+        month = n2 - 1;
+      }
+    }
+    
+    if (month >= 0 && month <= 11 && day >= 1 && day <= 31) {
+      const date = new Date(year, month, day);
+      if (!isNaN(date.getTime())) {
+        return { date, raw: text, confidence: 'medium' };
+      }
+    }
+  }
+  
+  // 5. Try to extract just time (fallback to today's date with that time)
+  const timePattern = /(\d{1,2}):(\d{2})(?::(\d{2}))?\s*([APap][Mm]|ص|م)?/;
+  const timeMatch = asciiText.match(timePattern);
+  if (timeMatch) {
+    const [, hourStr, minStr, , ampm] = timeMatch;
+    let hour = parseInt(hourStr, 10);
+    const min = parseInt(minStr, 10);
+    
+    // Handle AM/PM
+    if (ampm) {
+      const isAM = /[Aa]|ص/.test(ampm);
+      const isPM = /[Pp]|م/.test(ampm);
+      if (isPM && hour < 12) hour += 12;
+      if (isAM && hour === 12) hour = 0;
+    }
+    
+    const date = new Date();
+    date.setHours(hour, min, 0, 0);
+    return { date, raw: text, confidence: 'low' };
+  }
+  
+  return null;
+}
+
+/**
+ * Calculate human-readable time difference between two dates
+ */
+export function formatTimeDifference(diffMs: number): string {
+  const absDiff = Math.abs(diffMs);
+  const seconds = Math.floor(absDiff / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  const weeks = Math.floor(days / 7);
+  const months = Math.floor(days / 30);
+  const years = Math.floor(days / 365);
+  
+  if (years > 0) return `${years} year${years > 1 ? 's' : ''}`;
+  if (months > 0) return `${months} month${months > 1 ? 's' : ''}`;
+  if (weeks > 0) return `${weeks} week${weeks > 1 ? 's' : ''}`;
+  if (days > 0) return `${days} day${days > 1 ? 's' : ''}`;
+  if (hours > 0) return `${hours} hour${hours > 1 ? 's' : ''}`;
+  if (minutes > 0) return `${minutes} minute${minutes > 1 ? 's' : ''}`;
+  return 'moments';
+}
+
+// ============================================================================
 // EXCLUSION PATTERNS
 // ============================================================================
 

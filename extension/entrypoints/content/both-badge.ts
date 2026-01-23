@@ -34,12 +34,14 @@ export function upgradeCombinedBadge(post: HTMLElement): void {
   // 1. Read the Source of Truth directly from the container
   const rawCount = post.getAttribute(ATTR_COMMENT_COUNT);
   const rawDiff = post.getAttribute(ATTR_EDIT_DIFF);
+  const rawEditTooltip = post.getAttribute('data-cqd-edit-tooltip');
 
   // Get the overlay now to handle cleanup if needed
   const overlay = post.querySelector<HTMLDivElement>('.cqd-overlay-container');
 
   // If we don't have BOTH pieces of data yet, we cannot form a valid "Both" badge.
-  if (rawCount === null || rawDiff === null) {
+  // RELAXED CONDITION: We need a comment count AND (either a diff OR at least an edited tooltip/flag)
+  if (rawCount === null || (rawDiff === null && rawEditTooltip === null)) {
     const existingBoth = post.querySelector('.cqd-both-badge');
     if (existingBoth) {
       existingBoth.remove();
@@ -98,8 +100,11 @@ export function upgradeCombinedBadge(post: HTMLElement): void {
     bothBadge.className = 'cqd-both-badge';
     bothBadge.setAttribute(INJECTED_ATTR, 'true');
     
-    // Tooltip: Localized "Comments | Edited" (NO NUMBERS)
-    const tooltipText = `${t('comments')} | ${t('edited')}`;
+    // Tooltip: "[Count] comments | [Edit Tooltip]"
+    const commentTooltip = `${commentCount} ${t('comments')}`;
+    const editTooltipText = rawEditTooltip || t('edited');
+    const tooltipText = `${commentTooltip} | ${editTooltipText}`;
+    
     bothBadge.title = tooltipText;
     bothBadge.setAttribute('aria-label', tooltipText);
 
@@ -113,15 +118,15 @@ export function upgradeCombinedBadge(post: HTMLElement): void {
     commentIcon.className = 'cqd-both-icon cqd-both-icon-comment';
     commentIcon.style.backgroundImage = `url("${COMMENT_ICON_URL}")`;
     
-    // === NUMBER DISPLAY COMMENTED OUT - Uncomment to restore ===
-    // const commentValue = document.createElement('span');
-    // commentValue.className = 'cqd-both-value cqd-both-value-comment';
-    // commentValue.textContent = commentCount;
+    // === NUMBER DISPLAY RESTORED ===
+    const commentValue = document.createElement('span');
+    commentValue.className = 'cqd-both-value cqd-both-value-comment';
+    commentValue.textContent = commentCount;
     // === END NUMBER DISPLAY ===
     
     commentsSection.appendChild(commentIcon);
     // === Uncomment if restoring numbers ===
-    // commentsSection.appendChild(commentValue);
+    commentsSection.appendChild(commentValue);
     // ===
 
     // -- Plus / Divider --
@@ -166,16 +171,19 @@ export function upgradeCombinedBadge(post: HTMLElement): void {
     post.appendChild(bothBadge);
 
   } else {
-    // === NUMBER UPDATE COMMENTED OUT - Uncomment to restore ===
-    // const cc = bothBadge.querySelector<HTMLElement>('.cqd-both-value-comment');
-    // const dd = bothBadge.querySelector<HTMLElement>('.cqd-both-value-edited');
-    // if (cc && cc.textContent !== commentCount) cc.textContent = commentCount;
-    // if (dd && dd.textContent !== diffText) dd.textContent = diffText;
+    // === NUMBER UPDATE ===
+    const cc = bothBadge.querySelector<HTMLElement>('.cqd-both-value-comment');
+    if (cc && cc.textContent !== commentCount) cc.textContent = commentCount;
     // === END NUMBER UPDATE ===
     
-    // Tooltip (NO NUMBERS)
-    const tooltipText = `${t('comments')} | ${t('edited')}`;
-    bothBadge.title = tooltipText;
-    bothBadge.setAttribute('aria-label', tooltipText);
+    // Tooltip Update
+    const commentTooltip = `${commentCount} ${t('comments')}`;
+    const editTooltipText = rawEditTooltip || t('edited');
+    const tooltipText = `${commentTooltip} | ${editTooltipText}`;
+    
+    if (bothBadge.title !== tooltipText) {
+      bothBadge.title = tooltipText;
+      bothBadge.setAttribute('aria-label', tooltipText);
+    }
   }
 }

@@ -152,18 +152,30 @@ function scanForEditedPosts() {
       // Smart detection - language agnostic
       const result = detectEdited(post, currentLang);
       const found = result.isEdited;
-      const diffText = result.editDiff;
+      const diffText = result.timeDiffString; // Updated field name
+      const date = result.detectedDate;
+
+      // Construct native tooltip text
+      let tooltipText = t('edited');
+      if (found && date && diffText) {
+        // Format: "Edited: Jan 12, 2025 \n(Modified 2 days after posting)"
+        const dateStr = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+        tooltipText = `${t('edited')}: ${dateStr}\n(${t('modified')} ${diffText} ${t('after_posting')})`;
+      } else if (found) {
+        tooltipText = t('edited');
+      }
 
       // DATA SOURCE OF TRUTH:
-      // Always update the data attribute first.
-      if (found && diffText !== null) {
-        post.setAttribute(ATTR_EDIT_DIFF, diffText);
+      if (found) {
+        if (diffText) post.setAttribute(ATTR_EDIT_DIFF, diffText);
+        post.setAttribute('data-cqd-edit-tooltip', tooltipText); // Store full tooltip for shared use
       } else {
         post.removeAttribute(ATTR_EDIT_DIFF);
+        post.removeAttribute('data-cqd-edit-tooltip');
       }
 
       // 1. Single Badge Logic
-      if (found && diffText !== null) {
+      if (found) {
         if (post.hasAttribute(EDITED_ATTR)) {
           // Verify presence
           const hasEditedOverlay =
@@ -182,7 +194,14 @@ function scanForEditedPosts() {
 
         if (!post.hasAttribute(EDITED_ATTR)) {
           post.setAttribute(EDITED_ATTR, 'true');
-          createEditedOverlay(post, diffText);
+          createEditedOverlay(post, tooltipText);
+        } else {
+           // Update existing tooltip if needed
+           const badge = post.querySelector<HTMLElement>('.cqd-edited-badge');
+           if (badge && badge.title !== tooltipText) {
+             badge.title = tooltipText;
+             badge.setAttribute('aria-label', tooltipText);
+           }
         }
       }
 
@@ -293,7 +312,7 @@ function getAriaLabelsFromPost(post: HTMLElement): string {
     .join(' ');
 }
 
-function createEditedOverlay(post: HTMLElement, diffText: string) {
+function createEditedOverlay(post: HTMLElement, tooltipText: string) {
   // If BOTH pill already exists, don't create a separate edited pill
   // Data attr logic handles the update.
   if (post.querySelector('.cqd-both-badge')) {
