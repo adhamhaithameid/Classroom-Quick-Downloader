@@ -214,7 +214,7 @@ const COMMENT_KEYWORDS_CYRILLIC: Record<string, CommentKeywords> = {
 };
 
 const COMMENT_KEYWORDS_ARABIC: Record<string, CommentKeywords> = {
-  ar: { singular: ['تعليق'], plural: ['تعليقات', 'تعليقًا'], classComment: ['تعليق صف', 'تعليقات الصف'] },
+  ar: { singular: ['تعليق', 'تعليق واحد'], plural: ['تعليقات', 'تعليقًا'], classComment: ['تعليق صف', 'تعليقات الصف', 'تعليق واحد من الصف', 'تعليقات صفية'] },
   fa: { singular: ['نظر'], plural: ['نظرات'], classComment: ['نظر کلاس'] },
   ur: { singular: ['تبصرہ'], plural: ['تبصرے'], classComment: ['کلاس تبصرہ'] },
   ps: { singular: ['تبصره'], plural: ['تبصرې'], classComment: ['ټولګي تبصره'] },

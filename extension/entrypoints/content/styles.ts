@@ -488,25 +488,25 @@ export function injectStyles(): void {
       top: 7px;
       z-index: 9999;
       display: flex;
-      flex-direction: row; /* Horizontal layout */
+      flex-direction: column; /* VERTICAL layout */
       align-items: center;
-      justify-content: flex-start;
-      height: 30px; /* Fixed height */
-      width: 30px;  /* Collapsed width */
+      justify-content: center;
+      height: 30px; /* Collapsed height */
+      width: 30px;  /* Fixed width */
       border-radius: 9999px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
       cursor: pointer;
       overflow: hidden;
       padding: 0;
-      transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s ease;
+      transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-radius 0.3s ease, box-shadow 0.2s ease;
       white-space: nowrap;
     }
 
     .cqd-flag:hover {
-      width: auto;
-      max-width: 250px; /* Max expand width */
+      height: 55px; /* Expand vertically */
+      border-radius: 20px;
       z-index: 10000;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-      padding-right: 12px; /* Pad text on expand */
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
     }
 
     .cqd-flag-icon {
@@ -518,29 +518,27 @@ export function injectStyles(): void {
       justify-content: center;
     }
 
-    /* Text span hidden by default */
+    /* Text span hidden by default - shows COUNT only on hover */
     .cqd-flag-text {
       opacity: 0;
-      max-width: 0;
+      max-height: 0;
       overflow: hidden;
       font-family: system-ui, -apple-system, sans-serif;
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 700;
-      margin-left: 0;
-      transform: translateX(-5px);
+      margin-top: 0;
+      text-align: center;
       transition: 
         opacity 0.2s ease 0.05s, 
-        max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
-        margin-left 0.3s ease,
-        transform 0.2s ease;
+        max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
+        margin-top 0.2s ease;
     }
 
     /* Expand text on hover */
     .cqd-flag:hover .cqd-flag-text {
       opacity: 1;
-      max-width: 200px;
-      margin-left: 0px; 
-      transform: translateX(0);
+      max-height: 25px;
+      margin-top: 2px; 
     }
 
     .cqd-comment-badge {

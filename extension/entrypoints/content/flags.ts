@@ -97,20 +97,18 @@ export function createCommentBadge(post: HTMLElement, count: number): HTMLElemen
   // Invert color for dark mode/white text logic is handled by CSS filter
   
   // 2. Text Span (Hidden by default, expands on hover)
-  // Text: "{count} Comments"
+  // Text: Just the count number
   const labelDiv = document.createElement('span');
   labelDiv.className = 'cqd-flag-text';
-  // If count is 1, use singular? User said "{count} Comments" broadly, but let's be nice.
-  // Actually user requirement: '"{count} Comments"'
-  const text = `${count} ${t('comments')}`;
-  labelDiv.textContent = text;
+  labelDiv.textContent = String(count);
 
   badge.appendChild(iconDiv);
   badge.appendChild(labelDiv);
 
-  // Tooltip (Native fallback)
-  badge.title = text;
-  badge.setAttribute('aria-label', text);
+  // Tooltip (Full text for accessibility)
+  const tooltipText = `${count} ${t('comments')}`;
+  badge.title = tooltipText;
+  badge.setAttribute('aria-label', tooltipText);
 
   // Interaction
   badge.addEventListener('click', (e) => {
@@ -140,26 +138,25 @@ export function createEditedBadge(post: HTMLElement, diffString: string | null):
   iconDiv.className = 'cqd-flag-icon cqd-edited-icon';
   appendSvgFromString(iconDiv, EDIT_ICON_SVG_RAW);
 
-  // 2. Text Span
-  // Text: "Edited (+{diffString})" OR "Edited"
+  // 2. Text Span (shows diff if available, or empty)
   const labelDiv = document.createElement('span');
   labelDiv.className = 'cqd-flag-text';
   
-  let text = t('edited');
+  // Show diff time if available, otherwise show nothing (icon only)
   if (diffString) {
-    text = `${t('edited')} (+${diffString})`;
+    labelDiv.textContent = `+${diffString}`;
   }
-  labelDiv.textContent = text;
 
   badge.appendChild(iconDiv);
   badge.appendChild(labelDiv);
 
-  // Tooltip
-  // If we have a stored rich tooltip in data attribute, usage might be better, 
-  // but factories usually are stateless. We'll use the generated text for now, 
-  // or rely on the caller to set title if needed.
-  badge.title = text;
-  badge.setAttribute('aria-label', text);
+  // Tooltip (Full text)
+  let tooltipText = t('edited');
+  if (diffString) {
+    tooltipText = `${t('edited')} (+${diffString})`;
+  }
+  badge.title = tooltipText;
+  badge.setAttribute('aria-label', tooltipText);
 
   // Interaction
   badge.addEventListener('click', (e) => {
