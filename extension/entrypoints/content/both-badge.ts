@@ -92,98 +92,56 @@ export function upgradeCombinedBadge(post: HTMLElement): void {
   // Mark BOTH comment counter and date elements for permanent bold styling
   markTargetElements(post, 'both');
 
-  // 4. Create or Update the Badge
-  let bothBadge = post.querySelector<HTMLElement>('.cqd-both-badge');
-  
-  if (!bothBadge) {
-    bothBadge = document.createElement('div');
-    bothBadge.className = 'cqd-both-badge';
-    bothBadge.setAttribute(INJECTED_ATTR, 'true');
+    // 4. Create or Update the Badge (New Expanding Style)
+    // We treat the "Both" badge as a standard .cqd-flag now.
+    let bothBadge = post.querySelector<HTMLElement>('.cqd-both-badge');
     
-    // Tooltip: "[Count] comments | [Edit Tooltip]"
     const commentTooltip = `${commentCount} ${t('comments')}`;
     const editTooltipText = rawEditTooltip || t('edited');
+    // Combine for the expanded text: "5 Comments | Modified 2d ago"
     const tooltipText = `${commentTooltip} | ${editTooltipText}`;
-    
-    bothBadge.title = tooltipText;
-    bothBadge.setAttribute('aria-label', tooltipText);
 
-    // Build Internal Structure
-    
-    // -- Comments Section --
-    const commentsSection = document.createElement('div');
-    commentsSection.className = 'cqd-both-section cqd-both-comments';
-    
-    const commentIcon = document.createElement('div');
-    commentIcon.className = 'cqd-both-icon cqd-both-icon-comment';
-    commentIcon.style.backgroundImage = `url("${COMMENT_ICON_URL}")`;
-    
-    // === NUMBER DISPLAY RESTORED ===
-    const commentValue = document.createElement('span');
-    commentValue.className = 'cqd-both-value cqd-both-value-comment';
-    commentValue.textContent = commentCount;
-    // === END NUMBER DISPLAY ===
-    
-    commentsSection.appendChild(commentIcon);
-    // === Uncomment if restoring numbers ===
-    commentsSection.appendChild(commentValue);
-    // ===
-
-    // -- Plus / Divider --
-    const plus = document.createElement('div');
-    plus.className = 'cqd-both-plus';
-    plus.textContent = '+';
-    
-    const divider = document.createElement('div');
-    divider.className = 'cqd-both-divider';
-
-    // -- Edited Section --
-    const editedSection = document.createElement('div');
-    editedSection.className = 'cqd-both-section cqd-both-edited';
-    
-    const editedIcon = document.createElement('div');
-    editedIcon.className = 'cqd-both-icon cqd-both-icon-edited';
-    appendSvgFromString(editedIcon, EDIT_ICON_SVG_RAW);
-    
-    // === NUMBER DISPLAY COMMENTED OUT - Uncomment to restore ===
-    // const diffValue = document.createElement('span');
-    // diffValue.className = 'cqd-both-value cqd-both-value-edited';
-    // diffValue.textContent = diffText;
-    // === END NUMBER DISPLAY ===
-    
-    editedSection.appendChild(editedIcon);
-    // === Uncomment if restoring numbers ===
-    // editedSection.appendChild(diffValue);
-    // ===
-
-    // Assemble
-    bothBadge.appendChild(commentsSection);
-    bothBadge.appendChild(plus);
-    bothBadge.appendChild(divider);
-    bothBadge.appendChild(editedSection);
-
-    bothBadge.addEventListener('click', (e) => {
-      e.stopPropagation();
-      triggerPulseEffect(post, 'both');
-      triggerPostClick(post);
-    });
-
-    post.appendChild(bothBadge);
-
-  } else {
-    // === NUMBER UPDATE ===
-    const cc = bothBadge.querySelector<HTMLElement>('.cqd-both-value-comment');
-    if (cc && cc.textContent !== commentCount) cc.textContent = commentCount;
-    // === END NUMBER UPDATE ===
-    
-    // Tooltip Update
-    const commentTooltip = `${commentCount} ${t('comments')}`;
-    const editTooltipText = rawEditTooltip || t('edited');
-    const tooltipText = `${commentTooltip} | ${editTooltipText}`;
-    
-    if (bothBadge.title !== tooltipText) {
+    if (!bothBadge) {
+      bothBadge = document.createElement('div');
+      // inherits .cqd-flag styles from global CSS
+      bothBadge.className = 'cqd-flag cqd-both-badge'; 
+      bothBadge.setAttribute(INJECTED_ATTR, 'true');
+      
       bothBadge.title = tooltipText;
       bothBadge.setAttribute('aria-label', tooltipText);
+
+      // --- Icon Container ---
+      const iconDiv = document.createElement('div');
+      iconDiv.className = 'cqd-flag-icon';
+      // Use comment icon as primary, or we could add a specific 'both' icon
+      iconDiv.style.backgroundImage = `url("${COMMENT_ICON_URL}")`;
+      
+      // Optional: Add a small indicator for "Edited" on top of the icon?
+      // For now, simplicity: Just the icon.
+      
+      // --- Text Span (Hidden by default, expands on hover) ---
+      const textSpan = document.createElement('span');
+      textSpan.className = 'cqd-flag-text';
+      textSpan.textContent = tooltipText;
+      
+      bothBadge.appendChild(iconDiv);
+      bothBadge.appendChild(textSpan);
+
+      // Click Handler
+      bothBadge.addEventListener('click', (e) => {
+        e.stopPropagation();
+        triggerPulseEffect(post, 'both');
+        triggerPostClick(post);
+      });
+
+      post.appendChild(bothBadge);
+    } else {
+        // Update if existing
+        if (bothBadge.title !== tooltipText) {
+            bothBadge.title = tooltipText;
+            bothBadge.setAttribute('aria-label', tooltipText);
+            const textSpan = bothBadge.querySelector('.cqd-flag-text');
+            if (textSpan) textSpan.textContent = tooltipText;
+        }
     }
-  }
 }

@@ -478,21 +478,76 @@ export function injectStyles(): void {
       animation: cqd-pulse-both-anim 1.5s ease-out forwards;
     }
 
-    .cqd-comment-badge {
+    /* ===============================
+     * 3. HOVER INTELLIGENCE (Expanding Badges)
+     * =============================== */
+    
+    /* Base class for all expanding flags */
+    .cqd-flag {
       position: absolute;
       top: 7px;
       z-index: 9999;
       display: flex;
-      flex-direction: column;
+      flex-direction: row; /* Horizontal layout */
       align-items: center;
       justify-content: flex-start;
-      width: 30px;
-      height: 30px;
-      background-color: var(--cqd-color-comment);
-      color: #ffffff;
+      height: 30px; /* Fixed height */
+      width: 30px;  /* Collapsed width */
       border-radius: 9999px;
       cursor: pointer;
       overflow: hidden;
+      padding: 0;
+      transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .cqd-flag:hover {
+      width: auto;
+      max-width: 250px; /* Max expand width */
+      z-index: 10000;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      padding-right: 12px; /* Pad text on expand */
+    }
+
+    .cqd-flag-icon {
+      flex-shrink: 0;
+      width: 30px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Text span hidden by default */
+    .cqd-flag-text {
+      opacity: 0;
+      max-width: 0;
+      overflow: hidden;
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      margin-left: 0;
+      transform: translateX(-5px);
+      transition: 
+        opacity 0.2s ease 0.05s, 
+        max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
+        margin-left 0.3s ease,
+        transform 0.2s ease;
+    }
+
+    /* Expand text on hover */
+    .cqd-flag:hover .cqd-flag-text {
+      opacity: 1;
+      max-width: 200px;
+      margin-left: 0px; 
+      transform: translateX(0);
+    }
+
+    .cqd-comment-badge {
+      /* inherit from .cqd-flag via class list, just add colors */
+      background-color: var(--cqd-color-comment);
+      color: #ffffff;
+      /* Positioning handled by JS direction or body[data-cqd-dir] */
     }
 
     /* === EXPAND HOVER COMMENTED OUT ===
@@ -515,27 +570,18 @@ export function injectStyles(): void {
     }
 
     .cqd-badge-icon {
-      flex-shrink: 0;
-      width: 20px;
-      height: 20px;
+      /* Now using .cqd-flag-icon structure */
+      width: 18px;
+      height: 18px;
       background-size: contain;
       background-repeat: no-repeat;
       background-position: center;
       filter: brightness(0) invert(1);
-      margin-top: 4px;
     }
 
     .cqd-badge-label {
-      display: block;
-      font-family: system-ui, sans-serif;
-      font-size: 13px;
-      font-weight: 700;
-      opacity: 0;
-      transform: translateY(-5px);
-      max-height: 0;
-      margin-top: 2px;
-      overflow: hidden;
-      transition: opacity 0.15s ease 0.05s, transform 0.15s ease 0.05s;
+      /* Deprecated. Using .cqd-flag-text */
+      display: none; 
     }
 
     /* === NUMBER HOVER ANIMATION COMMENTED OUT - Uncomment to restore ===
@@ -547,20 +593,9 @@ export function injectStyles(): void {
     === END NUMBER HOVER ANIMATION === */
 
     .cqd-edited-badge {
-      position: absolute;
-      top: 7px;
-      z-index: 9999;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: flex-start;
-      width: 30px;
-      height: 30px;
+      /* Inherit .cqd-flag */
       background-color: var(--cqd-color-edited);
       color: #ffffff;
-      border-radius: 9999px;
-      cursor: pointer;
-      overflow: hidden;
       left: 0;
       transform: translateX(-50%);
     }
@@ -600,17 +635,8 @@ export function injectStyles(): void {
     === END NUMBER HOVER ANIMATION === */
 
     .cqd-edited-content {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      width: 100%;
-      opacity: 0;
-      transform: translateY(-10px);
-      transition: opacity 0.15s ease 0.05s, transform 0.15s ease 0.05s;
-      font-family: system-ui, -apple-system, sans-serif;
-      font-weight: 700;
-      font-size: 13px;
+      /* Deprecated. Using .cqd-flag-text */
+      display: none;
     }
 
     /* === NUMBER HOVER ANIMATION COMMENTED OUT - Uncomment to restore ===
@@ -628,22 +654,60 @@ export function injectStyles(): void {
     }
 
     .cqd-both-badge {
+      /* Custom handling for BOTH */
       position: absolute;
       top: 7px;
       z-index: 9999;
       display: flex;
-      flex-direction: column;
+      flex-direction: row; /* Horizontal */
       align-items: center;
       justify-content: flex-start;
-      width: 30px;
-      height: 70px;
+      
+      /* Base size */
+      width: 50px; 
+      height: 30px;
+      
       background-color: #FF4036;
       color: #ffffff;
       border-radius: 9999px;
       border: 1px solid rgba(255, 64, 54, 0.70);
       cursor: pointer;
       overflow: hidden;
-      padding-top: 8px;
+      padding: 0 8px; /* Padding for icons */
+      transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s ease;
+      gap: 4px;
+    }
+
+    .cqd-both-badge:hover {
+      width: auto;
+      max-width: 350px;
+      z-index: 10000;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      padding-right: 12px;
+    }
+
+    /* Hide divider on default? No, keep logic. */
+    .cqd-both-section {
+       display: flex;
+       align-items: center;
+       gap: 4px;
+    }
+    
+    /* Text spans inside both badge */
+    .cqd-both-value {
+       opacity: 0;
+       max-width: 0;
+       overflow: hidden;
+       font-family: system-ui, -apple-system, sans-serif;
+       font-size: 11px;
+       font-weight: 700;
+       white-space: nowrap;
+       transition: opacity 0.2s ease, max-width 0.3s ease;
+    }
+
+    .cqd-both-badge:hover .cqd-both-value {
+       opacity: 1;
+       max-width: 150px;
     }
 
     body[data-cqd-dir="ltr"] .cqd-both-badge {

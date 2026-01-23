@@ -4,7 +4,7 @@ import { injectStyles } from './content/styles';
 import { t, getCurrentCachedLanguage } from './content/i18n';
 import { detectComments } from './content/smart-detector';
 import { isPageDark } from './content/theme';
-import { subscribeToGlobalState } from './content/flags';
+import { subscribeToGlobalState, createCommentBadge } from './content/flags';
 import { triggerPostClick, upgradeCombinedBadge, ATTR_COMMENT_COUNT } from './content/both-badge';
 import { triggerPulseEffect, markTargetElements } from './content/pulse-effect';
 
@@ -240,35 +240,7 @@ function createOverlay(post: HTMLElement, count: number) {
   // Create Single Comment Badge
   let badge = post.querySelector<HTMLElement>('.cqd-comment-badge');
   if (!badge) {
-    badge = document.createElement('div');
-    badge.className = 'cqd-comment-badge';
-    badge.setAttribute(INJECTED_ATTR, 'true');
-    // Tooltip with Count
-    const explanation = `${count} ${t('comments')}`;
-    badge.title = explanation;
-    badge.setAttribute('aria-label', explanation);
-    if (isPageDark()) badge.classList.add('cqd-theme-dark');
-
-    const iconDiv = document.createElement('div');
-    iconDiv.className = 'cqd-badge-icon';
-    iconDiv.style.backgroundImage = `url("${COMMENT_ICON_URL}")`;
-
-    // === NUMBER DISPLAY COMMENTED OUT - Uncomment to restore ===
-    // const labelDiv = document.createElement('span');
-    // labelDiv.className = 'cqd-badge-label';
-    // labelDiv.textContent = `${count}`;
-    // === END NUMBER DISPLAY ===
-
-    badge.appendChild(iconDiv);
-    // === Uncomment if restoring numbers ===
-    // badge.appendChild(labelDiv);
-    // ===
-
-    badge.addEventListener('click', (e) => {
-      e.stopPropagation();
-      triggerPulseEffect(post, 'comment');
-      triggerPostClick(post);
-    });
+    badge = createCommentBadge(post, count);
     post.appendChild(badge);
   }
   

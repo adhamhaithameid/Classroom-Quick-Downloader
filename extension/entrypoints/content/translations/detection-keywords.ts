@@ -176,6 +176,12 @@ export interface CommentKeywords {
   classComment: string[];
 }
 
+// Matches: (Digits) + (Optional Whitespace) + (Keyword)
+// Uses \p{Nd} for universal digits
+// Group 1: Number (Digits)
+// Group 2: Keyword
+export const COMMENT_REGEX_PATTERN = new RegExp(`(${D}+)\\s*([\\p{L}\\p{M}]+(?:\\s+[\\p{L}\\p{M}]+)*)`, 'iu');
+
 // Script-based keyword groups
 const COMMENT_KEYWORDS_LATIN: Record<string, CommentKeywords> = {
   en: { singular: ['comment'], plural: ['comments'], classComment: ['class comment', 'class comments'] },
@@ -241,13 +247,13 @@ const COMMENT_KEYWORDS_OTHER: Record<string, CommentKeywords> = {
   th: { singular: ['ความคิดเห็น'], plural: ['ความคิดเห็น'], classComment: ['ความคิดเห็นของชั้นเรียน'] },
   el: { singular: ['σχόλιο'], plural: ['σχόλια'], classComment: ['σχόλιο τάξης'] },
   ka: { singular: ['კომენტარი'], plural: ['კომენტარები'], classComment: ['კლასის კომენტარი'] },
-  hy: { singular: ['մեկdelays'], plural: ['մegdelays'], classComment: ['delays'] },
+  hy: { singular: ['մեկնաբանություն'], plural: ['մեկնաբանություններ'], classComment: ['դասարանի մեկնաբանություն'] }, // Fixed broken text
   am: { singular: ['አስተያየት'], plural: ['አስተያየቶች'], classComment: ['የክፍል አስተያየት'] },
-  bn: { singular: ['মন্তব্য'], plural: ['মন্তव्यগুলি'], classComment: ['ক্লাس মন্তব্য'] },
+  bn: { singular: ['মন্তব্য'], plural: ['মন্তব্যগুলি'], classComment: ['ক্লাস মন্তব্য'] },
   ta: { singular: ['கருத்து'], plural: ['கருத்துகள்'], classComment: ['வகுப்பு கருத்து'] },
-  te: { singular: ['వ్యాఖ్య'], plural: ['వ్యాఖ్యలు'], classComment: ['తరಗತಿ వ్యాఖ్య'] },
+  te: { singular: ['వ్యాఖ్య'], plural: ['వ్యాఖ్యలు'], classComment: ['తరగతి వ్యాఖ్య'] },
   kn: { singular: ['ಕಾಮೆಂಟ್'], plural: ['ಕಾಮೆಂಟ್‌ಗಳು'], classComment: ['ತರಗತಿ ಕಾಮೆಂಟ್'] },
-  ml: { singular: ['അഭിപ്രായം'], plural: ['അഭിപ്രായങ್ങൾ'], classComment: ['ക്ലാസ് അഭിപ്രായം'] },
+  ml: { singular: ['അഭിപ്രായം'], plural: ['അഭിപ്രായങ്ങൾ'], classComment: ['ക്ലാസ് അഭിപ്രായം'] },
   si: { singular: ['අදහස'], plural: ['අදහස්'], classComment: ['පන්ති අදහස'] },
   my: { singular: ['မှတ်ချက်'], plural: ['မှတ်ချက်များ'], classComment: ['အတန်းမှတ်ချက်'] },
   km: { singular: ['មតិយោបល់'], plural: ['មតិយោបល់'], classComment: ['មតិយោបល់ថ្នាក់'] },
@@ -458,33 +464,54 @@ export function getCreatedKeywords(lang: string): string[] {
 // ============================================================================
 
 const MONTHS_MAP: Record<string, number> = {
-  // English
+  // English (and shared global keys like 'september', 'november', 'december' found in Dutch too)
   january: 0, february: 1, march: 2, april: 3, may: 4, june: 5,
   july: 6, august: 7, september: 8, october: 9, november: 10, december: 11,
   jan: 0, feb: 1, mar: 2, apr: 3, jun: 5, jul: 6, aug: 7, sep: 8, sept: 8, oct: 9, nov: 10, dec: 11,
   
   // French
-  janvier: 0, février: 1, fevrier: 1, mars: 2, avril: 3, mai: 4, juin: 5,
-  juillet: 6, août: 7, aout: 7, septembre: 8, octobre: 9, novembre: 10, décembre: 11, decembre: 11,
+  janvier: 0, février: 1, fevrier: 1, mars: 2, mai: 4, juin: 5,
+  juillet: 6, août: 7, aout: 7, octobre: 9, décembre: 11, decembre: 11,
   janv: 0, févr: 1, avr: 3, juil: 6, déc: 11,
+  // 'novembre' (French) is shared with Italian below OR duplicates regular 'november' if typo? 
+  // No, 'novembre' != 'november'. 
+  // 'septembre' != 'september'.
+  novembre: 10, septembre: 8, 
   
-  // German (Shared: november, dezember -> English; juni, juli, oktober -> Dutch)
-  januar: 0, februar: 1, märz: 2, marz: 2, 
+  // German
+  januar: 0, märz: 2, marz: 2, 
+  // Others: februar(1), mai(4), juni(5), juli(6), oktober(9), dezember -> check
+  // 'februar' overlaps with nothing? No, English is 'february'.
+  // 'mai' overlaps with French 'mai'. (Already defined in French block)
   
-  // Spanish
-  enero: 0, febrero: 1, marzo: 2, abril: 3, mayo: 4, junio: 5,
-  julio: 6, agosto: 7, septiembre: 8, octubre: 9, noviembre: 10, diciembre: 11,
+  // Spanish / Portuguese / Italian (Shared Romance)
+  enero: 0, febrero: 1, marzo: 2, mayo: 4, junio: 5,
+  julio: 6, agosto: 7, diciembre: 11,
+  // 'septiembre' != 'settembre' != 'septembre' != 'september'
+  septiembre: 8, 
+  // 'octubre' != 'ottobre' != 'octobre' != 'october'
+  octubre: 9,
+  // 'noviembre' != 'novembre' (French/Italian) != 'november'
+  noviembre: 10,
   
-  // Portuguese
-  janeiro: 0, fevereiro: 1, março: 2, marco: 2, maio: 4, junho: 5,
-  julho: 6, setembro: 8, outubro: 9, novembro: 10, dezembro: 11,
+  // Portuguese specific
+  janeiro: 0, março: 2, marco: 2, maio: 4, junho: 5,
+  julho: 6, setembro: 8, outubro: 9, 
+  // 'fevereiro' duplicates 'febrero' (Spanish)? No 'v' vs 'b'.
+  fevereiro: 1,
   
-  // Italian
-  gennaio: 0, febbraio: 1, marzo: 2, aprile: 3, maggio: 4, giugno: 5,
-  luglio: 6, agosto: 7, settembre: 8, ottobre: 9, novembre: 10, dicembre: 11,
+  // Italian specific
+  gennaio: 0, febbraio: 1, maggio: 4, 
+  luglio: 6, settembre: 8, ottobre: 9, dicembre: 11,
+  // 'novembre' is shared with French. ALREADY DEFINED in French block.
   
-  // Dutch (Shared: april -> English; september, november, december -> English)
-  januari: 0, februari: 1, maart: 2, mei: 4, juni: 5, juli: 6, augustus: 7, oktober: 9,
+  // Dutch
+  januari: 0, maart: 2, mei: 4, augustus: 7, 
+  // 'februari' matches Italian 'febbrari'? No. 
+  februari: 1,
+  // 'juni', 'juli' match Spanish/French/German?
+  // 'juni' matches 'junio'? No. 'juni' matches German 'juni'? Yes.
+  // 'oktober' matches German 'oktober'? Yes.
   
   // Russian
   'январь': 0, 'января': 0, 'февраль': 1, 'февраля': 1, 'март': 2, 'марта': 2,
@@ -493,16 +520,16 @@ const MONTHS_MAP: Record<string, number> = {
   'октябрь': 9, 'октября': 9, 'ноябрь': 10, 'ноября': 10, 'декабрь': 11, 'декабря': 11,
   
   // Arabic
-  'يناير': 0, 'فبراير': 1, 'مارس': 2, 'أبريل': 3, 'إبريل': 3, 'مايو': 4, 'يونيو': 5,
+  'يناير': 0, 'فبراير': 1, 'مارس': 2, 'أبريل': 3, 'إبريل': 3, 'يونيو': 5,
   'يوليو': 6, 'أغسطس': 7, 'سبتمبر': 8, 'أكتوبر': 9, 'نوفمبر': 10, 'ديسمبر': 11,
   
-  // CJK - Chinese & Japanese (Shared numeric months)
+  // CJK
   '一月': 0, '二月': 1, '三月': 2, '四月': 3, '五月': 4, '六月': 5,
   '七月': 6, '八月': 7, '九月': 8, '十月': 9, '十一月': 10, '十二月': 11,
   '1月': 0, '2月': 1, '3月': 2, '4月': 3, '5月': 4, '6月': 5,
   '7月': 6, '8月': 7, '9月': 8, '10月': 9, '11月': 10, '12月': 11,
-  '投稿日': -1, // Not a month, but prevents false positives if checking keys? No, this is MONTHS_MAP. 
-  
+  '投稿日': -1, 
+
   // Hebrew
   'ינואר': 0, 'פברואר': 1, 'מרץ': 2, 'אפריל': 3, 'מאי': 4, 'יוני': 5,
   'יולי': 6, 'אוגוסט': 7, 'ספטמבר': 8, 'אוקטובר': 9, 'נובמבר': 10, 'דצמבר': 11,

@@ -4,7 +4,7 @@ import { injectStyles } from './content/styles';
 import { isPageDark } from './content/theme';
 import { t, getCurrentCachedLanguage } from './content/i18n';
 import { detectEdited } from './content/smart-detector';
-import { subscribeToGlobalState } from './content/flags';
+import { subscribeToGlobalState, createEditedBadge } from './content/flags';
 import { triggerPostClick, upgradeCombinedBadge, ATTR_EDIT_DIFF } from './content/both-badge';
 import { triggerPulseEffect, markTargetElements } from './content/pulse-effect';
 
@@ -194,13 +194,20 @@ function scanForEditedPosts() {
 
         if (!post.hasAttribute(EDITED_ATTR)) {
           post.setAttribute(EDITED_ATTR, 'true');
-          createEditedOverlay(post, tooltipText);
+          // Use factory to create the expanding badge
+          const badge = createEditedBadge(post, tooltipText);
+          post.appendChild(badge);
         } else {
            // Update existing tooltip if needed
            const badge = post.querySelector<HTMLElement>('.cqd-edited-badge');
-           if (badge && badge.title !== tooltipText) {
-             badge.title = tooltipText;
-             badge.setAttribute('aria-label', tooltipText);
+           if (badge) {
+             // If badge title differs, update it AND the text span
+             if (badge.title !== tooltipText) {
+               badge.title = tooltipText;
+               badge.setAttribute('aria-label', tooltipText);
+               const textSpan = badge.querySelector('.cqd-flag-text');
+               if (textSpan) textSpan.textContent = tooltipText;
+             }
            }
         }
       }
@@ -217,81 +224,7 @@ function scanForEditedPosts() {
  * Calculates the difference in days between created and edited date.
  * @deprecated Legacy implementation, kept for reference/fallback
  */
-function calculateEditDiff(
-  fullText: string,
-  editedKeyword: string,
-): string | null {
-  try {
-    const normalized = (fullText || '').replace(/\s+/g, ' ').trim();
-    if (!normalized) return null;
 
-    const lower = normalized.toLowerCase();
-    const key = editedKeyword.toLowerCase();
-    const editedIndex = lower.indexOf(key);
-
-    const monthPattern =
-      '\\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\\s+\\d{1,2}\\b';
-    const currentYear = new Date().getFullYear();
-
-    const parseDate = (s: string): Date | null => {
-      const d = new Date(`${s.trim()} ${currentYear}`);
-      return isNaN(d.getTime()) ? null : d;
-    };
-
-    let createdDate: Date | null = null;
-    let editedDate: Date | null = null;
-
-    // 1) Preferred path: use dates around the "edited" keyword
-    if (editedIndex !== -1) {
-      const beforeText = normalized.slice(0, editedIndex);
-      const afterText = normalized.slice(editedIndex);
-
-      const beforeMatches =
-        beforeText.match(new RegExp(monthPattern, 'gi')) || [];
-      const afterMatches =
-        afterText.match(new RegExp(monthPattern, 'gi')) || [];
-
-      if (beforeMatches.length > 0) {
-        const createdStr = beforeMatches[beforeMatches.length - 1];
-        createdDate = parseDate(createdStr);
-      }
-      if (afterMatches.length > 0) {
-        const editedStr = afterMatches[0];
-        editedDate = parseDate(editedStr);
-      }
-    }
-
-    // 2) Fallback: just use first and last dates in the whole string
-    if (!createdDate || !editedDate) {
-      const allMatches = normalized.match(new RegExp(monthPattern, 'gi'));
-      if (!allMatches || allMatches.length === 0) {
-        return null;
-      }
-      const parsedDates = allMatches
-        .map((m) => parseDate(m))
-        .filter((d): d is Date => !!d);
-
-      if (!parsedDates.length) return null;
-      createdDate = parsedDates[0];
-      editedDate =
-        parsedDates.length > 1
-          ? parsedDates[parsedDates.length - 1]
-          : parsedDates[0];
-    }
-
-    if (!createdDate || !editedDate) return null;
-
-    const dayMs = 1000 * 60 * 60 * 24;
-    let diffDays = Math.floor(
-      (editedDate.getTime() - createdDate.getTime()) / dayMs,
-    );
-    if (diffDays < 0) diffDays = 0;
-
-    return `${diffDays}`;
-  } catch {
-    return null;
-  }
-}
 
 
 
