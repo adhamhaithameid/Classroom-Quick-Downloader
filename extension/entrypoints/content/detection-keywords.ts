@@ -69,7 +69,49 @@ export function normalizeForComparison(text: string): string {
 // ============================================================================
 // UNICODE INTEGER PARSING
 // JavaScript's parseInt() does NOT handle Unicode digits (e.g., parseInt('٥') is NaN)
+// Also handles word-numbers like Arabic "واحد" (one), "اثنان" (two)
 // ============================================================================
+
+/**
+ * Word-number mappings for languages that use words instead of digits for small counts
+ * This is critical for Arabic where "تعليق واحد" (one comment) uses the word "واحد"
+ */
+const WORD_NUMBERS: Record<string, number> = {
+  // Arabic
+  'واحد': 1, 'واحدة': 1,  // one (masculine/feminine)
+  'اثنان': 2, 'اثنين': 2, 'اثنتان': 2, 'اثنتين': 2,  // two
+  'ثلاثة': 3, 'ثلاث': 3,  // three
+  'أربعة': 4, 'أربع': 4,  // four
+  'خمسة': 5, 'خمس': 5,    // five
+  'ستة': 6, 'ست': 6,      // six
+  'سبعة': 7, 'سبع': 7,    // seven
+  'ثمانية': 8, 'ثماني': 8, 'ثمان': 8,  // eight
+  'تسعة': 9, 'تسع': 9,    // nine
+  'عشرة': 10, 'عشر': 10,  // ten
+  // English
+  'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5,
+  'six': 6, 'seven': 7, 'eight': 8, 'nine': 9, 'ten': 10,
+  // Spanish & French (shared: un/una)
+  'un': 1, 'uno': 1, 'una': 1, 'une': 1, 'dos': 2, 'deux': 2, 
+  'tres': 3, 'trois': 3, 'cuatro': 4, 'quatre': 4, 'cinco': 5, 'cinq': 5,
+  // German
+  'ein': 1, 'eine': 1, 'eins': 1, 'zwei': 2, 'drei': 3, 'vier': 4, 'fünf': 5,
+  // Hebrew
+  'אחד': 1, 'אחת': 1, 'שניים': 2, 'שתיים': 2, 'שלושה': 3, 'שלוש': 3,
+};
+
+/**
+ * Parse word-numbers from text
+ */
+function parseWordNumber(text: string): number | null {
+  const normalized = normalizeForComparison(text);
+  for (const [word, value] of Object.entries(WORD_NUMBERS)) {
+    if (normalized.includes(word.toLowerCase())) {
+      return value;
+    }
+  }
+  return null;
+}
 
 /**
  * Maps any Unicode decimal digit to its integer value (0-9).
@@ -93,29 +135,40 @@ function unicodeDigitToInt(char: string): number {
 
 /**
  * Parses any Unicode number string to an integer.
- * Handles Devanagari (०-९), Bengali (০-৯), Thai (๐-๙), Arabic (٠-٩), etc.
+ * Handles Devanagari (०-९), Bengali (০-৯), Thai (๐-๙), Arabic numerals (٠-٩), etc.
+ * Also handles word-numbers like Arabic "واحد" (one), "اثنان" (two)
  */
 export function parseUnicodeInteger(text: string): number | null {
   if (!text) return null;
   
   const normalized = normalizeText(text);
   
-  // Extract all sequences of Unicode digits
+  // First, try to extract numeric digits
   const digitMatches = normalized.match(new RegExp(`[${D}]+`, 'gu'));
-  if (!digitMatches || digitMatches.length === 0) return null;
-  
-  // Take the first numeric sequence
-  const digitSequence = digitMatches[0];
-  
-  // Convert each Unicode digit to its integer value
-  let result = 0;
-  for (const char of digitSequence) {
-    const digitValue = unicodeDigitToInt(char);
-    if (digitValue < 0) return null; // Invalid digit
-    result = result * 10 + digitValue;
+  if (digitMatches && digitMatches.length > 0) {
+    // Take the first numeric sequence
+    const digitSequence = digitMatches[0];
+    
+    // Convert each Unicode digit to its integer value
+    let result = 0;
+    for (const char of digitSequence) {
+      const digitValue = unicodeDigitToInt(char);
+      if (digitValue < 0) break; // Invalid digit
+      result = result * 10 + digitValue;
+    }
+    
+    if (result > 0 && result < 100000) {
+      return result;
+    }
   }
   
-  return result > 0 && result < 100000 ? result : null;
+  // Fallback: Try word-number parsing (for Arabic "واحد", etc.)
+  const wordNumber = parseWordNumber(normalized);
+  if (wordNumber !== null) {
+    return wordNumber;
+  }
+  
+  return null;
 }
 
 /**
@@ -315,7 +368,18 @@ const COMMENT_KEYWORDS_CYRILLIC: Record<string, CommentKeywords> = {
 };
 
 const COMMENT_KEYWORDS_ARABIC: Record<string, CommentKeywords> = {
-  ar: { singular: ['تعليق', 'تعليق واحد'], plural: ['تعليقات', 'تعليقًا'], classComment: ['تعليق صف', 'تعليقات الصف', 'تعليق واحد من الصف', 'تعليقات صفية'] },
+  ar: { 
+    singular: [
+      'تعليق', 'تعليق واحد', 'تعليق صفي', 'ردّ', 'رد',
+    ], 
+    plural: [
+      'تعليقات', 'تعليقًا', 'تعليقين', 'ردود',
+    ], 
+    classComment: [
+      'تعليق صف', 'تعليقات الصف', 'تعليق واحد من الصف', 'تعليقات صفية',
+      'تعليق صف واحد', 'تعليق الصف', 'تعليقات صف', 'من الصف',
+    ] 
+  },
   fa: { singular: ['نظر'], plural: ['نظرات'], classComment: ['نظر کلاس'] },
   ur: { singular: ['تبصرہ'], plural: ['تبصرے'], classComment: ['کلاس تبصرہ'] },
   ps: { singular: ['تبصره'], plural: ['تبصرې'], classComment: ['ټولګي تبصره'] },

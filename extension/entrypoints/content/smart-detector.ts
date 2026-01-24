@@ -389,8 +389,10 @@ function executeEditedLayer4(post: HTMLElement, matchedText: string | null): Lay
 export function detectEdited(post: HTMLElement, pageLang: string): EditedDetectionResult {
   const keywords = getEditedKeywords(pageLang);
   const englishKeywords = getEditedKeywords('en');
+  const arabicKeywords = getEditedKeywords('ar');
   
-  const combinedKeywords = [...new Set([...keywords, ...englishKeywords])];
+  // Always include English and Arabic as fallbacks for maximum detection
+  const combinedKeywords = [...new Set([...keywords, ...englishKeywords, ...arabicKeywords])];
   
   const layer1 = executeEditedLayer1(post, combinedKeywords);
   const layer2 = executeEditedLayer2(post, combinedKeywords);
@@ -401,9 +403,17 @@ export function detectEdited(post: HTMLElement, pageLang: string): EditedDetecti
   };
   let primaryLayer = 0;
   
-  if (layer1.score > primaryMatch.score) { primaryMatch = layer1; primaryLayer = 1; }
-  if (layer2.score > primaryMatch.score) { primaryMatch = layer2; primaryLayer = 2; }
-  if (layer3.score > primaryMatch.score) { primaryMatch = layer3; primaryLayer = 3; }
+  // Priority-based matching
+  if (layer1.score > 0 && layer1.matchedText) { 
+    primaryMatch = layer1; 
+    primaryLayer = 1; 
+  } else if (layer2.score > 0 && layer2.matchedText) { 
+    primaryMatch = layer2; 
+    primaryLayer = 2; 
+  } else if (layer3.score > 0 && layer3.matchedText) { 
+    primaryMatch = layer3; 
+    primaryLayer = 3; 
+  }
   
   const layer4 = executeEditedLayer4(post, primaryMatch.matchedText);
   const finalScore = primaryMatch.score + layer4.score;
@@ -415,16 +425,20 @@ export function detectEdited(post: HTMLElement, pageLang: string): EditedDetecti
     confidence = 'medium';
   } else if (finalScore >= CONFIDENCE_WEIGHTS.LOW_CONFIDENCE) {
     confidence = 'low';
+  } else if (primaryMatch.matchedText !== null) {
+    // If we matched a keyword, give low confidence
+    confidence = 'low';
   } else {
     confidence = 'none';
   }
   
-  const isEdited = finalScore >= CONFIDENCE_WEIGHTS.LOW_CONFIDENCE && 
-                   primaryMatch.matchedText !== null;
+  // More permissive: if we found any edited keyword, consider it edited
+  const isEdited = primaryMatch.matchedText !== null && 
+                   layer4.score >= 0; // Not penalized by exclusion
   
   return {
     isEdited,
-    confidence,
+    confidence: isEdited ? confidence : 'none',
     confidenceScore: finalScore,
     matchedText: primaryMatch.matchedText,
     detectionLayer: primaryLayer,
