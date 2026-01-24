@@ -115,21 +115,44 @@ function parseWordNumber(text: string): number | null {
 
 /**
  * Maps any Unicode decimal digit to its integer value (0-9).
- * Uses the Unicode property that all \p{Nd} digits are in blocks of 10.
+ * Handles all Unicode numeric scripts by finding the base codepoint of the block.
+ * 
+ * Unicode digit blocks are sequences of 10 consecutive codepoints (0-9).
+ * To find the digit value: char.codePointAt(0) - blockBase
  */
 function unicodeDigitToInt(char: string): number {
   const code = char.codePointAt(0);
   if (code === undefined) return -1;
   
-  // Get the digit value by finding offset within its numeric block
-  // All Unicode decimal digit blocks start at a codepoint divisible by 10
-  // and the digit value is the offset from that base
-  const digitValue = code % 10;
+  // Known digit block base codepoints (the "zero" character of each script)
+  const DIGIT_BLOCKS: Array<[number, number]> = [
+    [0x0030, 0x0039], // ASCII: 0-9
+    [0x0660, 0x0669], // Arabic-Indic: ٠-٩
+    [0x06F0, 0x06F9], // Extended Arabic-Indic: ۰-۹ (Persian)
+    [0x0966, 0x096F], // Devanagari: ०-९
+    [0x09E6, 0x09EF], // Bengali: ০-৯
+    [0x0A66, 0x0A6F], // Gurmukhi: ੦-੯
+    [0x0AE6, 0x0AEF], // Gujarati: ૦-૯
+    [0x0B66, 0x0B6F], // Oriya: ୦-୯
+    [0x0BE6, 0x0BEF], // Tamil: ௦-௯
+    [0x0C66, 0x0C6F], // Telugu: ౦-౯
+    [0x0CE6, 0x0CEF], // Kannada: ೦-೯
+    [0x0D66, 0x0D6F], // Malayalam: ൦-൯
+    [0x0E50, 0x0E59], // Thai: ๐-๙
+    [0x0ED0, 0x0ED9], // Lao: ໐-໙
+    [0x0F20, 0x0F29], // Tibetan: ༠-༩
+    [0x1040, 0x1049], // Myanmar: ၀-၉
+    [0x17E0, 0x17E9], // Khmer: ០-៩
+    [0x1810, 0x1819], // Mongolian: ᠐-᠙
+    [0xFF10, 0xFF19], // Fullwidth: ０-９
+  ];
   
-  // Validate it's actually in range 0-9
-  if (digitValue >= 0 && digitValue <= 9) {
-    return digitValue;
+  for (const [start, end] of DIGIT_BLOCKS) {
+    if (code >= start && code <= end) {
+      return code - start;
+    }
   }
+  
   return -1;
 }
 
