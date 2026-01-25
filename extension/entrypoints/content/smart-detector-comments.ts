@@ -129,14 +129,17 @@ function executeLayer1_AccessibilityScan(post: HTMLElement, keywords: CommentKey
     
     const matchedKeyword = containsCommentKeyword(label, keywords);
     if (matchedKeyword) {
-      const count = extractCount(label) || 1; // Default to 1 if keyword found but no number
-      return {
-        score: CONFIDENCE_WEIGHTS.LAYER_2_SEMANTIC + CONFIDENCE_WEIGHTS.ARIA_MATCH_BONUS + 
-               (count > 0 ? CONFIDENCE_WEIGHTS.NUMBER_PRESENT_BONUS : 0),
-        count,
-        matchedText: label,
-        details: `Layer1-Aria: Found "${matchedKeyword}" in "${label}" (count: ${count})`,
-      };
+      const count = extractCount(label);
+      // CRITICAL: Only match if we have an actual count - don't default to 1
+      if (count !== null && count > 0) {
+        return {
+          score: CONFIDENCE_WEIGHTS.LAYER_2_SEMANTIC + CONFIDENCE_WEIGHTS.ARIA_MATCH_BONUS + 
+                 CONFIDENCE_WEIGHTS.NUMBER_PRESENT_BONUS,
+          count,
+          matchedText: label,
+          details: `Layer1-Aria: Found "${matchedKeyword}" in "${label}" (count: ${count})`,
+        };
+      }
     }
   }
   
@@ -152,13 +155,16 @@ function executeLayer1_AccessibilityScan(post: HTMLElement, keywords: CommentKey
     
     const matchedKeyword = containsCommentKeyword(title, keywords);
     if (matchedKeyword) {
-      const count = extractCount(title) || 1;
-      return {
-        score: CONFIDENCE_WEIGHTS.LAYER_2_SEMANTIC + (count > 0 ? CONFIDENCE_WEIGHTS.NUMBER_PRESENT_BONUS : 0),
-        count,
-        matchedText: title,
-        details: `Layer1-Title: Found "${matchedKeyword}" in "${title}" (count: ${count})`,
-      };
+      const count = extractCount(title);
+      // CRITICAL: Only match if we have an actual count
+      if (count !== null && count > 0) {
+        return {
+          score: CONFIDENCE_WEIGHTS.LAYER_2_SEMANTIC + CONFIDENCE_WEIGHTS.NUMBER_PRESENT_BONUS,
+          count,
+          matchedText: title,
+          details: `Layer1-Title: Found "${matchedKeyword}" in "${title}" (count: ${count})`,
+        };
+      }
     }
   }
   
@@ -183,13 +189,16 @@ function executeLayer2_ButtonHeuristic(post: HTMLElement, keywords: CommentKeywo
     
     const matchedKeyword = containsCommentKeyword(text, keywords);
     if (matchedKeyword) {
-      const count = extractCount(text) || 1;
-      return {
-        score: CONFIDENCE_WEIGHTS.LAYER_3_STRUCTURAL + (count > 0 ? CONFIDENCE_WEIGHTS.NUMBER_PRESENT_BONUS : 0),
-        count,
-        matchedText: text,
-        details: `Layer2-Button: Found "${matchedKeyword}" (count: ${count})`,
-      };
+      const count = extractCount(text);
+      // CRITICAL: Only match if we have an actual count
+      if (count !== null && count > 0) {
+        return {
+          score: CONFIDENCE_WEIGHTS.LAYER_3_STRUCTURAL + CONFIDENCE_WEIGHTS.NUMBER_PRESENT_BONUS,
+          count,
+          matchedText: text,
+          details: `Layer2-Button: Found "${matchedKeyword}" (count: ${count})`,
+        };
+      }
     }
     
     // Also check aria-label on the button itself
@@ -197,13 +206,16 @@ function executeLayer2_ButtonHeuristic(post: HTMLElement, keywords: CommentKeywo
     if (ariaLabel && !isActionButton(ariaLabel) && !isExcludedCommentPattern(ariaLabel)) {
       const matchedKeyword = containsCommentKeyword(ariaLabel, keywords);
       if (matchedKeyword) {
-        const count = extractCount(ariaLabel) || 1;
-        return {
-          score: CONFIDENCE_WEIGHTS.LAYER_3_STRUCTURAL + CONFIDENCE_WEIGHTS.ARIA_MATCH_BONUS,
-          count,
-          matchedText: ariaLabel,
-          details: `Layer2-ButtonAria: Found "${matchedKeyword}" (count: ${count})`,
-        };
+        const count = extractCount(ariaLabel);
+        // CRITICAL: Only match if we have an actual count
+        if (count !== null && count > 0) {
+          return {
+            score: CONFIDENCE_WEIGHTS.LAYER_3_STRUCTURAL + CONFIDENCE_WEIGHTS.ARIA_MATCH_BONUS,
+            count,
+            matchedText: ariaLabel,
+            details: `Layer2-ButtonAria: Found "${matchedKeyword}" (count: ${count})`,
+          };
+        }
       }
     }
   }
@@ -230,13 +242,16 @@ function executeLayer3_GoldenSelectors(post: HTMLElement, keywords: CommentKeywo
         
         const matchedKeyword = containsCommentKeyword(text, keywords);
         if (matchedKeyword) {
-          const count = extractCount(text) || 1;
-          return {
-            score: CONFIDENCE_WEIGHTS.LAYER_1_GOLDEN + (count > 0 ? CONFIDENCE_WEIGHTS.NUMBER_PRESENT_BONUS : 0),
-            count,
-            matchedText: text,
-            details: `Layer3-Golden: Found "${matchedKeyword}" via "${selector}" (count: ${count})`,
-          };
+          const count = extractCount(text);
+          // CRITICAL: Only match if we have an actual count
+          if (count !== null && count > 0) {
+            return {
+              score: CONFIDENCE_WEIGHTS.LAYER_1_GOLDEN + CONFIDENCE_WEIGHTS.NUMBER_PRESENT_BONUS,
+              count,
+              matchedText: text,
+              details: `Layer3-Golden: Found "${matchedKeyword}" via "${selector}" (count: ${count})`,
+            };
+          }
         }
       }
     } catch {
@@ -303,16 +318,18 @@ function executeLayer4_NuclearScan(post: HTMLElement, keywords: CommentKeywords)
     
     const matchedKeyword = containsCommentKeyword(text, keywords);
     if (matchedKeyword) {
-      const count = extractCount(text) || 1;
-      
-      // Only accept if we haven't found a better match yet
-      if (!bestMatch || count > (bestMatch.count || 0)) {
-        bestMatch = {
-          score: CONFIDENCE_WEIGHTS.LOW_CONFIDENCE + (count > 1 ? CONFIDENCE_WEIGHTS.NUMBER_PRESENT_BONUS : 0),
-          count,
-          matchedText: text,
-          details: `Layer4-Nuclear: Found "${matchedKeyword}" in DOM text (count: ${count})`,
-        };
+      const count = extractCount(text);
+      // CRITICAL: Only match if we have an actual count
+      if (count !== null && count > 0) {
+        // Only accept if we haven't found a better match yet
+        if (!bestMatch || count > (bestMatch.count || 0)) {
+          bestMatch = {
+            score: CONFIDENCE_WEIGHTS.LOW_CONFIDENCE + (count > 1 ? CONFIDENCE_WEIGHTS.NUMBER_PRESENT_BONUS : 0),
+            count,
+            matchedText: text,
+            details: `Layer4-Nuclear: Found "${matchedKeyword}" in DOM text (count: ${count})`,
+          };
+        }
       }
     }
   }
