@@ -119,13 +119,11 @@ export function upgradeCombinedBadge(post: HTMLElement): void {
     const commentSection = document.createElement('div');
     commentSection.className = 'cqd-both-section';
     
-    // Comment icon
+    // Comment icon (same size as other pills - 18px)
     const commentIcon = document.createElement('div');
     commentIcon.className = 'cqd-both-icon cqd-both-icon-comment';
-    commentIcon.style.width = '16px';
-    commentIcon.style.height = '16px';
     commentIcon.style.backgroundImage = `url("${COMMENT_ICON_URL}")`;
-    commentIcon.style.backgroundSize = 'contain';
+    commentIcon.style.backgroundSize = '18px 18px';
     commentIcon.style.backgroundRepeat = 'no-repeat';
     commentIcon.style.backgroundPosition = 'center';
     commentIcon.style.filter = 'brightness(0) invert(1)';
@@ -147,22 +145,20 @@ export function upgradeCombinedBadge(post: HTMLElement): void {
     const editSection = document.createElement('div');
     editSection.className = 'cqd-both-section';
     
-    // Edit icon
+    // Edit icon (same size as other pills - 18px)
     const editIcon = document.createElement('div');
     editIcon.className = 'cqd-both-icon cqd-both-icon-edited';
-    editIcon.style.width = '16px';
-    editIcon.style.height = '16px';
     appendSvgFromString(editIcon, EDIT_ICON_SVG_RAW);
     const svg = editIcon.querySelector('svg');
     if (svg) {
-      svg.style.width = '14px';
-      svg.style.height = '14px';
+      svg.style.width = '18px';
+      svg.style.height = '18px';
     }
     
-    // Edit diff value (hidden by default, appears on hover)
+    // Edit diff value (hidden by default, appears on hover) - shows only the number
     const editValue = document.createElement('span');
     editValue.className = 'cqd-both-value';
-    editValue.textContent = diffText ? `+${diffText}` : '✓';
+    editValue.textContent = diffText || '✓';
     
     editSection.appendChild(editIcon);
     editSection.appendChild(editValue);

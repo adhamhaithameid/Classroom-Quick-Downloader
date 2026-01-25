@@ -335,7 +335,7 @@ export function injectStyles(): void {
     .cqd-overlay-container.cqd-edited {
       box-shadow:
         inset 0 0 0 2px var(--cqd-color-edited),
-        0 0 12px rgba(0, 214, 238, 0.3);
+        0 0 12px rgba(0, 214, 238, 0.50);
     }
 
     /* BOTH OVERLAY (Red) - Direct Class */
@@ -506,7 +506,7 @@ export function injectStyles(): void {
     }
 
     .cqd-flag:hover {
-      height: 50px;
+      height: 60px;
       border-radius: 15px;
       z-index: 10000;
     }
@@ -665,7 +665,7 @@ export function injectStyles(): void {
       
       /* Base size (collapsed) - tall enough for stacked icons */
       width: 30px;
-      height: 70px; /* Fits: icon + plus + icon */
+      height: 60px; /* Fits: icon + plus + icon */
       
       background-color: #FF4036;
       color: #ffffff;
@@ -682,7 +682,7 @@ export function injectStyles(): void {
     }
 
     .cqd-both-badge:hover {
-      height: 110px; /* Expand to show numbers under each icon */
+      height: 100px; /* Expand to show numbers under each icon */
       border-radius: 15px;
       z-index: 10000;
     }
@@ -744,11 +744,12 @@ export function injectStyles(): void {
     }
 
     .cqd-both-icon {
-      width: 20px;
-      height: 20px;
-      background-size: contain;
-      background-repeat: no-repeat;
-      background-position: center;
+      flex-shrink: 0;
+      width: 30px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .cqd-both-icon-edited svg {
