@@ -673,7 +673,8 @@ export function injectStyles(): void {
       border: none;
       cursor: pointer;
       overflow: hidden;
-      padding: 6px 0;
+      padding-top: 5px; /* Minimal padding to maximize space */
+      padding-bottom: 10px; /* Minimal padding to maximize space */
       transition: 
         height var(--cqd-transition),
         border-radius var(--cqd-transition),
@@ -700,7 +701,7 @@ export function injectStyles(): void {
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 10px;
+      font-size: 14px;
       font-weight: 700;
       opacity: 0.8;
       padding: 2px 0;
@@ -746,7 +747,7 @@ export function injectStyles(): void {
     .cqd-both-icon {
       flex-shrink: 0;
       width: 30px;
-      height: 30px;
+      height: 24px; /* Reduced to fit in 60px total height */
       display: flex;
       align-items: center;
       justify-content: center;
@@ -762,7 +763,11 @@ export function injectStyles(): void {
       font-size: 14px;
       font-weight: 700;
       line-height: 1;
-      margin: 5px;
+      margin: 1px 0; /* Compact spacing */
+      height: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .cqd-both-value,

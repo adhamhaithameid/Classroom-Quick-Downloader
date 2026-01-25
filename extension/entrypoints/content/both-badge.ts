@@ -6,7 +6,7 @@
  * Uses vertical expansion on hover with combined info display.
  */
 
-import { COMMENT_ICON_URL, EDIT_ICON_SVG_RAW, appendSvgFromString } from './icons';
+import { COMMENT_ICON_URL, EDIT_ICON_SVG_RAW, CHECKMARK_ICON_SVG_RAW, appendSvgFromString } from './icons';
 import { t } from './i18n';
 import { triggerPulseEffect, markTargetElements } from './pulse-effect';
 
@@ -158,7 +158,26 @@ export function upgradeCombinedBadge(post: HTMLElement): void {
     // Edit diff value (hidden by default, appears on hover) - shows only the number
     const editValue = document.createElement('span');
     editValue.className = 'cqd-both-value';
-    editValue.textContent = diffText || '✓';
+    
+    // Show only the diff value (e.g. "2d")
+    // If no diff value, show Checkmark SVG ICON (not text)
+    if (diffText) {
+      editValue.textContent = diffText;
+    } else {
+      const checkIcon = document.createElement('div');
+      checkIcon.style.width = '14px';
+      checkIcon.style.height = '14px';
+      checkIcon.style.display = 'inline-flex';
+      checkIcon.style.alignItems = 'center';
+      checkIcon.style.justifyContent = 'center';
+      appendSvgFromString(checkIcon, CHECKMARK_ICON_SVG_RAW);
+      const svg = checkIcon.querySelector('svg');
+      if (svg) {
+        svg.style.width = '100%';
+        svg.style.height = '100%';
+      }
+      editValue.appendChild(checkIcon);
+    }
     
     editSection.appendChild(editIcon);
     editSection.appendChild(editValue);

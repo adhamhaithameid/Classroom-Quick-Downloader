@@ -67,7 +67,7 @@ export function whenExtensionEnabled(
 // SMART PILL BADGE FACTORY (Hover Intelligence)
 // ============================================================================
 
-import { COMMENT_ICON_URL, EDIT_ICON_SVG_RAW, appendSvgFromString } from './icons';
+import { COMMENT_ICON_URL, EDIT_ICON_SVG_RAW, CHECKMARK_ICON_SVG_RAW, appendSvgFromString } from './icons';
 import { t } from './i18n';
 import { triggerPulseEffect, markTargetElements } from './pulse-effect';
 import { triggerPostClick } from './both-badge';
@@ -153,11 +153,25 @@ export function createEditedBadge(post: HTMLElement, diffString: string | null):
   const labelSpan = document.createElement('span');
   labelSpan.className = 'cqd-flag-text';
   
-  // Show ONLY the diff value (e.g. "2d") - NO plus, NO words
+  // Show ONLY the diff value (e.g. "2d") - NO plus
+  // If no diff value, show Checkmark SVG ICON (not text)
   if (diffString) {
     labelSpan.textContent = diffString;
   } else {
-    labelSpan.textContent = '✓';
+    // Append Checkmark SVG
+    const checkIcon = document.createElement('div');
+    checkIcon.style.width = '14px';
+    checkIcon.style.height = '14px';
+    checkIcon.style.display = 'inline-flex';
+    checkIcon.style.alignItems = 'center';
+    checkIcon.style.justifyContent = 'center';
+    appendSvgFromString(checkIcon, CHECKMARK_ICON_SVG_RAW);
+    const svg = checkIcon.querySelector('svg');
+    if (svg) {
+      svg.style.width = '100%';
+      svg.style.height = '100%';
+    }
+    labelSpan.appendChild(checkIcon);
   }
 
   badge.appendChild(iconDiv);
