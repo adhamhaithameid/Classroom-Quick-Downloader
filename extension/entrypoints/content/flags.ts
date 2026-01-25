@@ -67,7 +67,11 @@ export function whenExtensionEnabled(
 // SMART PILL BADGE FACTORY (Hover Intelligence)
 // ============================================================================
 
-import { COMMENT_ICON_URL, EDIT_ICON_SVG_RAW, CHECKMARK_ICON_SVG_RAW, appendSvgFromString } from './icons';
+import {
+  COMMENT_ICON_URL,
+  EDIT_ICON_SVG_RAW,
+  appendSvgFromString,
+} from "./icons";
 import { t } from './i18n';
 import { triggerPulseEffect, markTargetElements } from './pulse-effect';
 import { triggerPostClick } from './both-badge';
@@ -135,81 +139,79 @@ export function createCommentBadge(post: HTMLElement, count: number): HTMLElemen
  *   <span class="cqd-flag-text">+{diffString}</span>
  * </div>
  */
-export function createEditedBadge(post: HTMLElement, diffString: string | null): HTMLElement {
-  const badge = document.createElement('div');
-  badge.className = 'cqd-edited-badge cqd-flag';
-  badge.setAttribute(INJECTED_ATTR, 'true');
+export function createEditedBadge(
+  post: HTMLElement,
+  diffString: string | null,
+): HTMLElement {
+  const badge = document.createElement("div");
+  badge.className = "cqd-edited-badge cqd-flag";
+  badge.setAttribute(INJECTED_ATTR, "true");
 
-  if (document.body.classList.contains('cqd-theme-dark') || post.classList.contains('cqd-theme-dark')) {
-    badge.classList.add('cqd-theme-dark');
+  if (
+    document.body.classList.contains("cqd-theme-dark") ||
+    post.classList.contains("cqd-theme-dark")
+  ) {
+    badge.classList.add("cqd-theme-dark");
   }
 
   // 1. Icon Container with SVG
-  const iconDiv = document.createElement('div');
-  iconDiv.className = 'cqd-flag-icon cqd-edited-icon';
+  const iconDiv = document.createElement("div");
+  iconDiv.className = "cqd-flag-icon cqd-edited-icon";
   appendSvgFromString(iconDiv, EDIT_ICON_SVG_RAW);
 
   // 2. Text Span - Shows ONLY the number/time (NO WORDS at all)
-  const labelSpan = document.createElement('span');
-  labelSpan.className = 'cqd-flag-text';
-  
-  // Show ONLY the diff value (e.g. "2d") - NO plus
-  // If no diff value, show Checkmark SVG ICON (not text)
+  const labelSpan = document.createElement("span");
+  labelSpan.className = "cqd-flag-text";
+
+  // Show ONLY the diff value (e.g. "2d") - NO plus, NO words
   if (diffString) {
     labelSpan.textContent = diffString;
   } else {
-    // Append Checkmark SVG
-    const checkIcon = document.createElement('div');
-    checkIcon.style.width = '14px';
-    checkIcon.style.height = '14px';
-    checkIcon.style.display = 'inline-flex';
-    checkIcon.style.alignItems = 'center';
-    checkIcon.style.justifyContent = 'center';
-    appendSvgFromString(checkIcon, CHECKMARK_ICON_SVG_RAW);
-    const svg = checkIcon.querySelector('svg');
-    if (svg) {
-      svg.style.width = '100%';
-      svg.style.height = '100%';
-    }
-    labelSpan.appendChild(checkIcon);
+    labelSpan.textContent = "✓";
   }
 
   badge.appendChild(iconDiv);
   badge.appendChild(labelSpan);
 
   // Tooltip (Full text for accessibility)
-  let tooltipText = t('edited');
+  let tooltipText = t("edited");
   if (diffString) {
-    tooltipText = `${t('edited')} (+${diffString})`;
+    tooltipText = `${t("edited")} (+${diffString})`;
   }
   badge.title = tooltipText;
-  badge.setAttribute('aria-label', tooltipText);
+  badge.setAttribute("aria-label", tooltipText);
 
   // 3. Create overlay container for border around the post
-  let overlay = post.querySelector<HTMLElement>('.cqd-overlay-container');
+  let overlay = post.querySelector<HTMLElement>(".cqd-overlay-container");
   if (!overlay) {
     const computed = window.getComputedStyle(post);
-    overlay = document.createElement('div');
-    overlay.className = 'cqd-overlay-container cqd-edited';
-    overlay.setAttribute(INJECTED_ATTR, 'true');
-    overlay.style.borderRadius = computed.borderRadius || '8px';
-    
-    if (document.body.classList.contains('cqd-theme-dark') || post.classList.contains('cqd-theme-dark')) {
-      overlay.classList.add('cqd-theme-dark');
+    overlay = document.createElement("div");
+    overlay.className = "cqd-overlay-container cqd-edited";
+    overlay.setAttribute(INJECTED_ATTR, "true");
+    overlay.style.borderRadius = computed.borderRadius || "8px";
+
+    if (
+      document.body.classList.contains("cqd-theme-dark") ||
+      post.classList.contains("cqd-theme-dark")
+    ) {
+      overlay.classList.add("cqd-theme-dark");
     }
-    
+
     post.appendChild(overlay);
-  } else if (!overlay.classList.contains('cqd-edited') && !overlay.classList.contains('cqd-both')) {
-    overlay.classList.add('cqd-edited');
+  } else if (
+    !overlay.classList.contains("cqd-edited") &&
+    !overlay.classList.contains("cqd-both")
+  ) {
+    overlay.classList.add("cqd-edited");
   }
-  
+
   // Mark elements for permanent bold styling
-  markTargetElements(post, 'edited');
+  markTargetElements(post, "edited");
 
   // Interaction
-  badge.addEventListener('click', (e) => {
+  badge.addEventListener("click", (e) => {
     e.stopPropagation();
-    triggerPulseEffect(post, 'edited');
+    triggerPulseEffect(post, "edited");
     triggerPostClick(post);
   });
 

@@ -182,22 +182,22 @@ function scanForEditedPosts() {
           }
         }
 
+        // Get existing diff value if stored, otherwise null (will show ✓)
+        const diffValue = post.getAttribute(ATTR_EDIT_DIFF) || null;
+
         if (!post.hasAttribute(EDITED_ATTR)) {
           post.setAttribute(EDITED_ATTR, 'true');
-          // Use factory to create the expanding badge
-          const badge = createEditedBadge(post, tooltipText);
+          // Use factory to create the expanding badge - pass diffValue not tooltipText!
+          const badge = createEditedBadge(post, diffValue);
           post.appendChild(badge);
         } else {
-           // Update existing tooltip if needed
+           // Update existing badge text span - don't override with tooltipText!
            const badge = post.querySelector<HTMLElement>('.cqd-edited-badge');
            if (badge) {
-             // If badge title differs, update it AND the text span
-             if (badge.title !== tooltipText) {
-               badge.title = tooltipText;
-               badge.setAttribute('aria-label', tooltipText);
-               const textSpan = badge.querySelector('.cqd-flag-text');
-               if (textSpan) textSpan.textContent = tooltipText;
-             }
+             // Only update tooltip (for accessibility), not the visible text
+             badge.title = tooltipText;
+             badge.setAttribute('aria-label', tooltipText);
+             // Text span should keep showing the diff value or ✓
            }
         }
       }
