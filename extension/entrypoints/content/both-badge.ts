@@ -118,9 +118,6 @@ export function upgradeCombinedBadge(post: HTMLElement): void {
     // --- Comment Section (Icon + Number stacked vertically) ---
     const commentSection = document.createElement('div');
     commentSection.className = 'cqd-both-section';
-    commentSection.style.display = 'flex';
-    commentSection.style.flexDirection = 'column';
-    commentSection.style.alignItems = 'center';
     
     // Comment icon
     const commentIcon = document.createElement('div');
@@ -132,9 +129,8 @@ export function upgradeCombinedBadge(post: HTMLElement): void {
     commentIcon.style.backgroundRepeat = 'no-repeat';
     commentIcon.style.backgroundPosition = 'center';
     commentIcon.style.filter = 'brightness(0) invert(1)';
-    commentIcon.style.transition = 'transform 0.3s ease';
     
-    // Comment count (hidden by default)
+    // Comment count (hidden by default, appears on hover)
     const commentValue = document.createElement('span');
     commentValue.className = 'cqd-both-value';
     commentValue.textContent = commentCount;
@@ -142,19 +138,20 @@ export function upgradeCombinedBadge(post: HTMLElement): void {
     commentSection.appendChild(commentIcon);
     commentSection.appendChild(commentValue);
     
+    // --- Plus Sign (between the two sections) ---
+    const plusSign = document.createElement('span');
+    plusSign.className = 'cqd-both-plus';
+    plusSign.textContent = '+';
+    
     // --- Edit Section (Icon + Number stacked vertically) ---
     const editSection = document.createElement('div');
     editSection.className = 'cqd-both-section';
-    editSection.style.display = 'flex';
-    editSection.style.flexDirection = 'column';
-    editSection.style.alignItems = 'center';
     
     // Edit icon
     const editIcon = document.createElement('div');
     editIcon.className = 'cqd-both-icon cqd-both-icon-edited';
     editIcon.style.width = '16px';
     editIcon.style.height = '16px';
-    editIcon.style.transition = 'transform 0.3s ease';
     appendSvgFromString(editIcon, EDIT_ICON_SVG_RAW);
     const svg = editIcon.querySelector('svg');
     if (svg) {
@@ -162,7 +159,7 @@ export function upgradeCombinedBadge(post: HTMLElement): void {
       svg.style.height = '14px';
     }
     
-    // Edit diff value (hidden by default)
+    // Edit diff value (hidden by default, appears on hover)
     const editValue = document.createElement('span');
     editValue.className = 'cqd-both-value';
     editValue.textContent = diffText ? `+${diffText}` : '✓';
@@ -170,7 +167,9 @@ export function upgradeCombinedBadge(post: HTMLElement): void {
     editSection.appendChild(editIcon);
     editSection.appendChild(editValue);
     
+    // Assemble: Comment + Plus + Edit
     bothBadge.appendChild(commentSection);
+    bothBadge.appendChild(plusSign);
     bothBadge.appendChild(editSection);
 
     // Click Handler
