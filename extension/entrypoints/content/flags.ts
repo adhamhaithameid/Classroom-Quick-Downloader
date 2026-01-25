@@ -148,13 +148,15 @@ export function createEditedBadge(post: HTMLElement, diffString: string | null):
   iconDiv.className = 'cqd-flag-icon cqd-edited-icon';
   appendSvgFromString(iconDiv, EDIT_ICON_SVG_RAW);
 
-  // 2. Text Span (Shows diff if available)
+  // 2. Text Span (Shows ONLY the diff time, no words)
   const labelSpan = document.createElement('span');
   labelSpan.className = 'cqd-flag-text';
   
-  // Show diff time if available
+  // Show only the diff time (e.g. "+2d") - NO WORDS
   if (diffString) {
     labelSpan.textContent = `+${diffString}`;
+  } else {
+    labelSpan.textContent = '✓'; // Checkmark if no diff available
   }
 
   badge.appendChild(iconDiv);

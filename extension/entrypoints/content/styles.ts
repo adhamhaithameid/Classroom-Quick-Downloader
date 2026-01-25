@@ -488,25 +488,26 @@ export function injectStyles(): void {
       top: 7px;
       z-index: 9999;
       display: flex;
-      flex-direction: column; /* VERTICAL layout */
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      height: 30px; /* Collapsed height */
-      width: 30px;  /* Fixed width */
+      height: 30px;
+      width: 30px;
       border-radius: 9999px;
-      border: 2px solid rgba(255, 255, 255, 0.3);
+      border: none; /* NO BORDER */
       cursor: pointer;
       overflow: hidden;
       padding: 0;
       transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-radius 0.3s ease, box-shadow 0.2s ease;
       white-space: nowrap;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15); /* Subtle shadow instead of border */
     }
 
     .cqd-flag:hover {
-      height: 55px; /* Expand vertically */
+      height: 55px;
       border-radius: 20px;
       z-index: 10000;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.25);
     }
 
     .cqd-flag-icon {
@@ -516,6 +517,12 @@ export function injectStyles(): void {
       display: flex;
       align-items: center;
       justify-content: center;
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* Icon bounces down on hover */
+    .cqd-flag:hover .cqd-flag-icon {
+      transform: translateY(4px);
     }
 
     /* Text span hidden by default - shows COUNT only on hover */
@@ -652,35 +659,36 @@ export function injectStyles(): void {
     }
 
     .cqd-both-badge {
-      /* BOTH badge with VERTICAL expansion */
+      /* BOTH badge with VERTICAL layout - icons stacked */
       position: absolute;
       top: 7px;
       z-index: 9999;
       display: flex;
-      flex-direction: column; /* VERTICAL layout */
+      flex-direction: column;
       align-items: center;
       justify-content: center;
       
-      /* Base size (collapsed) */
-      width: 50px; 
-      height: 30px;
+      /* Base size (collapsed) - taller to fit both icons vertically */
+      width: 36px; 
+      height: 46px;
       
       background-color: #FF4036;
       color: #ffffff;
-      border-radius: 9999px;
-      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 18px;
+      border: none; /* NO BORDER */
       cursor: pointer;
       overflow: hidden;
-      padding: 0;
+      padding: 4px 0;
       transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-radius 0.3s ease, box-shadow 0.2s ease;
       gap: 2px;
+      box-shadow: 0 2px 10px rgba(255, 64, 54, 0.25); /* Shadow instead of border */
     }
 
     .cqd-both-badge:hover {
-      height: 70px; /* Expand vertically */
-      border-radius: 20px;
+      height: 90px; /* Expand to show numbers under each icon */
+      border-radius: 18px;
       z-index: 10000;
-      box-shadow: 0 4px 12px rgba(255, 64, 54, 0.35);
+      box-shadow: 0 4px 16px rgba(255, 64, 54, 0.4);
     }
 
     /* Hide divider on default? No, keep logic. */
