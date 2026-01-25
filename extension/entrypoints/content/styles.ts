@@ -335,7 +335,7 @@ export function injectStyles(): void {
     .cqd-overlay-container.cqd-edited {
       box-shadow:
         inset 0 0 0 2px var(--cqd-color-edited),
-        0 0 12px rgba(0, 214, 238, 0.3);
+        0 0 12px rgba(0, 214, 238, 0.50);
     }
 
     /* BOTH OVERLAY (Red) - Direct Class */
@@ -478,21 +478,76 @@ export function injectStyles(): void {
       animation: cqd-pulse-both-anim 1.5s ease-out forwards;
     }
 
-    .cqd-comment-badge {
+    /* ===============================
+     * 3. HOVER INTELLIGENCE (Expanding Badges)
+     * =============================== */
+    
+    /* Base class for all expanding flags (Comment & Edited pills) */
+    .cqd-flag {
       position: absolute;
       top: 7px;
       z-index: 9999;
-      display: flex;
+      display: inline-flex;
       flex-direction: column;
       align-items: center;
       justify-content: flex-start;
-      width: 30px;
       height: 30px;
-      background-color: var(--cqd-color-comment);
-      color: #ffffff;
+      width: 30px;
       border-radius: 9999px;
+      border: none;
       cursor: pointer;
       overflow: hidden;
+      padding: 0;
+      transition: 
+        height var(--cqd-transition),
+        border-radius var(--cqd-transition),
+        box-shadow var(--cqd-transition);
+      white-space: nowrap;
+    }
+
+    .cqd-flag:hover {
+      height: 60px;
+      border-radius: 15px;
+      z-index: 10000;
+    }
+
+    /* Icon stays FIXED - does NOT move on hover */
+    .cqd-flag-icon {
+      flex-shrink: 0;
+      width: 30px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      /* NO transform transition - icon is static */
+    }
+
+    /* Text span hidden by default - expands like download button */
+    .cqd-flag-text {
+      opacity: 0;
+      max-height: 0;
+      overflow: hidden;
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      margin-top: 0;
+      text-align: center;
+      transition: 
+        opacity var(--cqd-transition), 
+        max-height var(--cqd-transition);
+    }
+
+    /* Expand text on hover - smooth fade like download button */
+    .cqd-flag:hover .cqd-flag-text {
+      opacity: 1;
+      max-height: 20px;
+    }
+
+    .cqd-comment-badge {
+      /* inherit from .cqd-flag via class list, just add colors */
+      background-color: var(--cqd-color-comment);
+      color: #ffffff;
+      /* Positioning handled by JS direction or body[data-cqd-dir] */
     }
 
     /* === EXPAND HOVER COMMENTED OUT ===
@@ -515,27 +570,18 @@ export function injectStyles(): void {
     }
 
     .cqd-badge-icon {
-      flex-shrink: 0;
-      width: 20px;
-      height: 20px;
+      /* Now using .cqd-flag-icon structure */
+      width: 18px;
+      height: 18px;
       background-size: contain;
       background-repeat: no-repeat;
       background-position: center;
       filter: brightness(0) invert(1);
-      margin-top: 4px;
     }
 
     .cqd-badge-label {
-      display: block;
-      font-family: system-ui, sans-serif;
-      font-size: 13px;
-      font-weight: 700;
-      opacity: 0;
-      transform: translateY(-5px);
-      max-height: 0;
-      margin-top: 2px;
-      overflow: hidden;
-      transition: opacity 0.15s ease 0.05s, transform 0.15s ease 0.05s;
+      /* Deprecated. Using .cqd-flag-text */
+      display: none; 
     }
 
     /* === NUMBER HOVER ANIMATION COMMENTED OUT - Uncomment to restore ===
@@ -547,20 +593,9 @@ export function injectStyles(): void {
     === END NUMBER HOVER ANIMATION === */
 
     .cqd-edited-badge {
-      position: absolute;
-      top: 7px;
-      z-index: 9999;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: flex-start;
-      width: 30px;
-      height: 30px;
+      /* Inherit .cqd-flag */
       background-color: var(--cqd-color-edited);
       color: #ffffff;
-      border-radius: 9999px;
-      cursor: pointer;
-      overflow: hidden;
       left: 0;
       transform: translateX(-50%);
     }
@@ -600,17 +635,8 @@ export function injectStyles(): void {
     === END NUMBER HOVER ANIMATION === */
 
     .cqd-edited-content {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      width: 100%;
-      opacity: 0;
-      transform: translateY(-10px);
-      transition: opacity 0.15s ease 0.05s, transform 0.15s ease 0.05s;
-      font-family: system-ui, -apple-system, sans-serif;
-      font-weight: 700;
-      font-size: 13px;
+      /* Deprecated. Using .cqd-flag-text */
+      display: none;
     }
 
     /* === NUMBER HOVER ANIMATION COMMENTED OUT - Uncomment to restore ===
@@ -628,22 +654,77 @@ export function injectStyles(): void {
     }
 
     .cqd-both-badge {
+      /* BOTH badge: VERTICAL layout - icons stacked, numbers appear under each on hover */
       position: absolute;
       top: 7px;
       z-index: 9999;
       display: flex;
+      flex-direction: column; /* VERTICAL layout for icons */
+      align-items: center;
+      justify-content: flex-start;
+      
+      /* Base size (collapsed) - tall enough for stacked icons */
+      width: 30px;
+      height: 60px; /* Fits: icon + plus + icon */
+      
+      background-color: #FF4036;
+      color: #ffffff;
+      border-radius: 15px;
+      border: none;
+      cursor: pointer;
+      overflow: hidden;
+      padding-top: 5px; /* Minimal padding to maximize space */
+      padding-bottom: 10px; /* Minimal padding to maximize space */
+      transition: 
+        height var(--cqd-transition),
+        border-radius var(--cqd-transition),
+        box-shadow var(--cqd-transition);
+      gap: 0;
+    }
+
+    .cqd-both-badge:hover {
+      height: 100px; /* Expand to show numbers under each icon */
+      border-radius: 15px;
+      z-index: 10000;
+    }
+
+    /* Each section contains icon + number (stacked vertically) */
+    .cqd-both-section {
+      display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: flex-start;
-      width: 30px;
-      height: 70px;
-      background-color: #FF4036;
-      color: #ffffff;
-      border-radius: 9999px;
-      border: 1px solid rgba(255, 64, 54, 0.70);
-      cursor: pointer;
+    }
+
+    /* Plus sign between icons */
+    .cqd-both-plus {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 700;
+      opacity: 0.8;
+      padding: 2px 0;
+    }
+    
+    /* Values hidden by default - appear on hover */
+    .cqd-both-value {
+      opacity: 0;
+      max-height: 0;
       overflow: hidden;
-      padding-top: 8px;
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 12px;
+      font-weight: 700;
+      text-align: center;
+      white-space: nowrap;
+      transition: 
+        opacity var(--cqd-transition), 
+        max-height var(--cqd-transition);
+    }
+
+    .cqd-both-badge:hover .cqd-both-value {
+      opacity: 1;
+      max-height: 20px;
     }
 
     body[data-cqd-dir="ltr"] .cqd-both-badge {
@@ -664,11 +745,12 @@ export function injectStyles(): void {
     }
 
     .cqd-both-icon {
-      width: 20px;
-      height: 20px;
-      background-size: contain;
-      background-repeat: no-repeat;
-      background-position: center;
+      flex-shrink: 0;
+      width: 30px;
+      height: 24px; /* Reduced to fit in 60px total height */
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .cqd-both-icon-edited svg {
@@ -681,7 +763,11 @@ export function injectStyles(): void {
       font-size: 14px;
       font-weight: 700;
       line-height: 1;
-      margin: 5px;
+      margin: 1px 0; /* Compact spacing */
+      height: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .cqd-both-value,

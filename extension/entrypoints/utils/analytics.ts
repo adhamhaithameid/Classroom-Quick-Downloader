@@ -191,10 +191,10 @@ let cachedVersion: string | null = null;
 function getExtensionVersion(): string {
   if (cachedVersion) return cachedVersion;
   try {
-    if (typeof chrome !== 'undefined' && chrome.runtime?.getManifest) {
+    if (typeof chrome !== 'undefined') {
       const v = chrome.runtime.getManifest().version;
       cachedVersion = v || '0.0.0';
-      return cachedVersion;
+      return cachedVersion!;
     }
   } catch {
     // ignore

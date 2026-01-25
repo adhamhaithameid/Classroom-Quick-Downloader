@@ -794,7 +794,8 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
           const status = message.status as
             | ButtonState
             | 'blocked_html'
-            | 'interrupted';
+            | 'interrupted'
+            | 'complete';
           const errorCode = message.errorCode as string | undefined;
           const userMessage = message.userMessage as string | undefined;
 

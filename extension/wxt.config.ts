@@ -31,6 +31,7 @@ export default defineConfig({
     browser_specific_settings: {
       gecko: {
         id: "classroom-quick-downloader@adhamhaitham.dev",
+        // @ts-expect-error: Firefox specific key not in WXT types
         data_collection_permissions: {
           required: ["none"]
         },

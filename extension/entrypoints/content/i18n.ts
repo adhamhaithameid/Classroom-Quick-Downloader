@@ -23,6 +23,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: 'Runtime not available',
     startError: 'Could not start.',
     commError: 'Communication error.',
+    modified: 'Modified',
+    after_posting: 'after posting',
   },
   ar: {
     download: 'تنزيل',
