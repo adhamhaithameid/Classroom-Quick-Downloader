@@ -503,14 +503,12 @@ export function injectStyles(): void {
         border-radius var(--cqd-transition),
         box-shadow var(--cqd-transition);
       white-space: nowrap;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
     }
 
     .cqd-flag:hover {
       height: 50px;
       border-radius: 15px;
       z-index: 10000;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.25);
     }
 
     /* Icon stays FIXED - does NOT move on hover */
@@ -656,19 +654,18 @@ export function injectStyles(): void {
     }
 
     .cqd-both-badge {
-      /* BOTH badge: Horizontal icons, expands vertically to show numbers */
+      /* BOTH badge: VERTICAL layout - icons stacked, numbers appear under each on hover */
       position: absolute;
       top: 7px;
       z-index: 9999;
       display: flex;
-      flex-direction: row; /* HORIZONTAL layout for icons */
-      align-items: flex-start;
-      justify-content: center;
+      flex-direction: column; /* VERTICAL layout for icons */
+      align-items: center;
+      justify-content: flex-start;
       
-      /* Base size (collapsed) - wide enough for both icons + plus sign */
-      width: auto;
-      min-width: 56px;
-      height: 30px;
+      /* Base size (collapsed) - tall enough for stacked icons */
+      width: 30px;
+      height: 70px; /* Fits: icon + plus + icon */
       
       background-color: #FF4036;
       color: #ffffff;
@@ -676,20 +673,18 @@ export function injectStyles(): void {
       border: none;
       cursor: pointer;
       overflow: hidden;
-      padding: 0 6px;
+      padding: 6px 0;
       transition: 
         height var(--cqd-transition),
         border-radius var(--cqd-transition),
         box-shadow var(--cqd-transition);
       gap: 0;
-      box-shadow: 0 2px 10px rgba(255, 64, 54, 0.25);
     }
 
     .cqd-both-badge:hover {
-      height: 55px; /* Expand vertically to show numbers */
+      height: 110px; /* Expand to show numbers under each icon */
       border-radius: 15px;
       z-index: 10000;
-      box-shadow: 0 4px 16px rgba(255, 64, 54, 0.4);
     }
 
     /* Each section contains icon + number (stacked vertically) */
@@ -698,8 +693,6 @@ export function injectStyles(): void {
       flex-direction: column;
       align-items: center;
       justify-content: flex-start;
-      height: 100%;
-      padding-top: 6px;
     }
 
     /* Plus sign between icons */
@@ -707,11 +700,10 @@ export function injectStyles(): void {
       display: flex;
       align-items: center;
       justify-content: center;
-      height: 30px;
-      font-size: 12px;
+      font-size: 10px;
       font-weight: 700;
       opacity: 0.8;
-      padding: 0 2px;
+      padding: 2px 0;
     }
     
     /* Values hidden by default - appear on hover */

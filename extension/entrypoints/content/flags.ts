@@ -127,6 +127,7 @@ export function createCommentBadge(post: HTMLElement, count: number): HTMLElemen
 
 /**
  * Creates the Edited Badge with Smart Pill structure
+ * Also adds overlay container for border around the post
  * 
  * Structure:
  * <div class="cqd-flag cqd-edited-badge">
@@ -148,27 +149,48 @@ export function createEditedBadge(post: HTMLElement, diffString: string | null):
   iconDiv.className = 'cqd-flag-icon cqd-edited-icon';
   appendSvgFromString(iconDiv, EDIT_ICON_SVG_RAW);
 
-  // 2. Text Span (Shows ONLY the diff time, no words)
+  // 2. Text Span - Shows ONLY the number/time (NO WORDS at all)
   const labelSpan = document.createElement('span');
   labelSpan.className = 'cqd-flag-text';
   
-  // Show only the diff time (e.g. "+2d") - NO WORDS
+  // Show ONLY the diff value (e.g. "2d") - NO plus, NO words
   if (diffString) {
-    labelSpan.textContent = `+${diffString}`;
+    labelSpan.textContent = diffString;
   } else {
-    labelSpan.textContent = '✓'; // Checkmark if no diff available
+    labelSpan.textContent = '✓';
   }
 
   badge.appendChild(iconDiv);
   badge.appendChild(labelSpan);
 
-  // Tooltip (Full text)
+  // Tooltip (Full text for accessibility)
   let tooltipText = t('edited');
   if (diffString) {
     tooltipText = `${t('edited')} (+${diffString})`;
   }
   badge.title = tooltipText;
   badge.setAttribute('aria-label', tooltipText);
+
+  // 3. Create overlay container for border around the post
+  let overlay = post.querySelector<HTMLElement>('.cqd-overlay-container');
+  if (!overlay) {
+    const computed = window.getComputedStyle(post);
+    overlay = document.createElement('div');
+    overlay.className = 'cqd-overlay-container cqd-edited';
+    overlay.setAttribute(INJECTED_ATTR, 'true');
+    overlay.style.borderRadius = computed.borderRadius || '8px';
+    
+    if (document.body.classList.contains('cqd-theme-dark') || post.classList.contains('cqd-theme-dark')) {
+      overlay.classList.add('cqd-theme-dark');
+    }
+    
+    post.appendChild(overlay);
+  } else if (!overlay.classList.contains('cqd-edited') && !overlay.classList.contains('cqd-both')) {
+    overlay.classList.add('cqd-edited');
+  }
+  
+  // Mark elements for permanent bold styling
+  markTargetElements(post, 'edited');
 
   // Interaction
   badge.addEventListener('click', (e) => {
