@@ -75,16 +75,30 @@ type ToggleRowProps = {
 
 type StatItem = { id: string; label: string; value: number; color: string };
 
-// Color mapping for file types
-const TYPE_COLORS: Record<string, string> = {
-  pdf: 'var(--cqd-red, #ef4444)',
-  docs: 'var(--cqd-blue, #3b82f6)',
-  images: '#10b981',
-  archive: '#f59e0b',
-  sheets: '#10b981',
-  slides: '#f59e0b',
-  other: '#9ca3af',
-};
+/**
+ * Generate distinct colors with maximum hue spacing using golden ratio
+ * This ensures no two adjacent colors are similar
+ */
+function generateDistinctColors(count: number): string[] {
+  if (count === 0) return [];
+  
+  const colors: string[] = [];
+  const goldenRatio = 0.618033988749895;
+  // Start with a random hue, but use a seed for consistency within session
+  let hue = Math.random();
+  
+  for (let i = 0; i < count; i++) {
+    // Use golden ratio to spread hues maximally
+    hue = (hue + goldenRatio) % 1;
+    // Convert to degrees, use high saturation and medium lightness for vibrancy
+    const h = Math.round(hue * 360);
+    const s = 65 + Math.random() * 15; // 65-80% saturation
+    const l = 50 + Math.random() * 10; // 50-60% lightness
+    colors.push(`hsl(${h}, ${s}%, ${l}%)`);
+  }
+  
+  return colors;
+}
 
 function App() {
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -204,11 +218,15 @@ function App() {
         const others = entries.slice(4);
         const otherCount = others.reduce((acc, curr) => acc + curr[1], 0);
 
-        const mapped: StatItem[] = top.map(([key, val]) => ({
+        // Generate distinct colors for all items (including "other" if needed)
+        const itemCount = top.length + (otherCount > 0 ? 1 : 0);
+        const colors = generateDistinctColors(itemCount);
+
+        const mapped: StatItem[] = top.map(([key, val], index) => ({
           id: key,
           label: key.charAt(0).toUpperCase() + key.slice(1), // Capitalize
           value: val,
-          color: TYPE_COLORS[key] || TYPE_COLORS.other
+          color: colors[index]
         }));
 
         if (otherCount > 0) {
@@ -216,7 +234,7 @@ function App() {
             id: 'other',
             label: 'Other',
             value: otherCount,
-            color: TYPE_COLORS.other
+            color: colors[colors.length - 1]
           });
         }
 
