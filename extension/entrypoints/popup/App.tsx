@@ -241,6 +241,7 @@ function App() {
   // REAL STATS STATE
   const [stats, setStats] = useState<StatItem[]>([]);
   const [totalDownloads, setTotalDownloads] = useState(0);
+  const [hoveredStatId, setHoveredStatId] = useState<string | null>(null);
 
   // Track scroll to add blur/shadow under header when not at top
   useEffect(() => {
@@ -540,12 +541,20 @@ function App() {
                   {extensionStatusLabel}
                 </span>
                 {version && (
-                  <span
+                  <button
                     className="cqd-brand-version"
-                    aria-label={`Version ${version}`}
+                    aria-label={`Version ${version} - View changelog`}
+                    title="View changelog"
+                    onClick={() => {
+                      // TODO: Replace with actual changelog URL when website is created
+                      const changelogUrl = null; // Will be: 'https://cqd.adhamhaitham.dev/changelog'
+                      if (changelogUrl) {
+                        window.open(changelogUrl, '_blank');
+                      }
+                    }}
                   >
                     v{version}
-                  </span>
+                  </button>
                 )}
               </div>
             </div>
@@ -613,10 +622,13 @@ function App() {
                               r={radius}
                               fill="none"
                               stroke={seg.color}
-                              strokeWidth="10"
+                              strokeWidth={hoveredStatId === seg.id ? '12' : '10'}
                               strokeDasharray={`${seg.strokeLength} ${circumference}`}
                               strokeDashoffset={seg.offset}
-                              className="cqd-ring-segment"
+                              className={`cqd-ring-segment ${hoveredStatId === seg.id ? 'hovered' : ''}`}
+                              style={{ cursor: 'pointer', transition: 'stroke-width 0.15s ease' }}
+                              onMouseEnter={() => setHoveredStatId(seg.id)}
+                              onMouseLeave={() => setHoveredStatId(null)}
                             >
                               <title>{`${seg.label}: ${seg.value}`}</title>
                             </circle>
@@ -645,17 +657,27 @@ function App() {
                       <ul className="cqd-analytics-legend">
                         {stats.length > 0 ? (
                           stats.map((stat) => (
-                            <li key={stat.id}>
+                            <li 
+                              key={stat.id}
+                              className={`cqd-legend-item ${hoveredStatId === stat.id ? 'hovered' : ''}`}
+                              onMouseEnter={() => setHoveredStatId(stat.id)}
+                              onMouseLeave={() => setHoveredStatId(null)}
+                              style={{ cursor: 'pointer' }}
+                            >
                               <span
-                                className="cqd-legend-dot"
+                                className={`cqd-legend-dot ${hoveredStatId === stat.id ? 'hovered' : ''}`}
                                 style={{ 
                                   backgroundColor: stat.color,
                                   border: isColorDark(stat.color) 
                                     ? '1.5px solid rgba(255, 255, 255, 0.8)' 
                                     : '1.5px solid rgba(0, 0, 0, 0.25)',
-                                  boxShadow: isColorDark(stat.color)
-                                    ? '0 0 0 0.5px rgba(0, 0, 0, 0.15)'
-                                    : 'none'
+                                  boxShadow: hoveredStatId === stat.id
+                                    ? '0 2px 8px rgba(0, 0, 0, 0.25)'
+                                    : isColorDark(stat.color)
+                                      ? '0 0 0 0.5px rgba(0, 0, 0, 0.15)'
+                                      : 'none',
+                                  transform: hoveredStatId === stat.id ? 'scale(1.3)' : 'scale(1)',
+                                  transition: 'transform 0.15s ease, box-shadow 0.15s ease'
                                 }}
                               />
                               <span className="cqd-legend-label">{stat.label}</span>

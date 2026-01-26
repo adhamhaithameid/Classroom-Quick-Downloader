@@ -192,6 +192,16 @@ body {
   padding: 2px 8px;
   border-radius: 999px;
   font-size: 10px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.cqd-brand-version:hover {
+  background: var(--cqd-blue);
+  color: white;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
 }
 
 /* ===============================
@@ -408,6 +418,29 @@ body {
   gap: 8px;
   font-size: 11px;
   margin-bottom: 4px;
+}
+
+.cqd-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  margin-bottom: 4px;
+  padding: 4px 8px;
+  margin-left: -8px;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.cqd-legend-item.hovered {
+  background: rgba(0, 0, 0, 0.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transform: translateX(2px);
+}
+
+.cqd-legend-item.hovered .cqd-legend-label,
+.cqd-legend-item.hovered .cqd-legend-val {
+  font-weight: 600;
 }
 
 .cqd-legend-dot {
