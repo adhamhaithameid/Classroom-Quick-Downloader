@@ -76,28 +76,74 @@ type ToggleRowProps = {
 type StatItem = { id: string; label: string; value: number; color: string };
 
 /**
- * Generate distinct colors with maximum hue spacing using golden ratio
- * This ensures no two adjacent colors are similar
+ * Generate a single distinct color using golden ratio hue spacing
+ * @param existingHues - array of existing hue values (0-1) to avoid
  */
-function generateDistinctColors(count: number): string[] {
-  if (count === 0) return [];
-  
-  const colors: string[] = [];
+function generateNextColor(existingHues: number[]): { color: string; hue: number } {
   const goldenRatio = 0.618033988749895;
-  // Start with a random hue, but use a seed for consistency within session
-  let hue = Math.random();
   
-  for (let i = 0; i < count; i++) {
-    // Use golden ratio to spread hues maximally
-    hue = (hue + goldenRatio) % 1;
-    // Convert to degrees, use high saturation and medium lightness for vibrancy
-    const h = Math.round(hue * 360);
-    const s = 65 + Math.random() * 15; // 65-80% saturation
-    const l = 50 + Math.random() * 10; // 50-60% lightness
-    colors.push(`hsl(${h}, ${s}%, ${l}%)`);
+  // Start from last hue or random if none exist
+  let hue = existingHues.length > 0 
+    ? (existingHues[existingHues.length - 1] + goldenRatio) % 1
+    : Math.random();
+  
+  // Use golden ratio to get next hue
+  hue = (hue + goldenRatio) % 1;
+  
+  const h = Math.round(hue * 360);
+  const s = 65 + Math.round(Math.random() * 15); // 65-80% saturation
+  const l = 50 + Math.round(Math.random() * 10); // 50-60% lightness
+  
+  return {
+    color: `hsl(${h}, ${s}%, ${l}%)`,
+    hue
+  };
+}
+
+// Session storage key for persistent color mapping
+const COLOR_STORAGE_KEY = 'cqd_type_colors';
+
+type ColorMapping = {
+  colors: Record<string, string>;
+  hues: number[];
+};
+
+/**
+ * Get or create persistent color mapping for file types
+ * Colors persist across popup openings within the same browser session
+ */
+function getOrCreateColorMapping(types: string[]): Record<string, string> {
+  // Try to load existing mapping from sessionStorage
+  let mapping: ColorMapping;
+  try {
+    const stored = sessionStorage.getItem(COLOR_STORAGE_KEY);
+    mapping = stored ? JSON.parse(stored) : { colors: {}, hues: [] };
+  } catch {
+    mapping = { colors: {}, hues: [] };
   }
   
-  return colors;
+  let hasNewTypes = false;
+  
+  // Generate colors only for new types
+  for (const type of types) {
+    if (!mapping.colors[type]) {
+      const { color, hue } = generateNextColor(mapping.hues);
+      mapping.colors[type] = color;
+      mapping.hues.push(hue);
+      hasNewTypes = true;
+    }
+  }
+  
+  // Save back to sessionStorage if we added new types
+  if (hasNewTypes) {
+    try {
+      sessionStorage.setItem(COLOR_STORAGE_KEY, JSON.stringify(mapping));
+    } catch {
+      // Ignore storage errors
+    }
+  }
+  
+  return mapping.colors;
 }
 
 function App() {
@@ -218,15 +264,20 @@ function App() {
         const others = entries.slice(4);
         const otherCount = others.reduce((acc, curr) => acc + curr[1], 0);
 
-        // Generate distinct colors for all items (including "other" if needed)
-        const itemCount = top.length + (otherCount > 0 ? 1 : 0);
-        const colors = generateDistinctColors(itemCount);
+        // Get all type IDs that need colors (including "other" if needed)
+        const typeIds = top.map(([key]) => key);
+        if (otherCount > 0) {
+          typeIds.push('other');
+        }
+        
+        // Get persistent color mapping (creates new colors only for new types)
+        const colorMapping = getOrCreateColorMapping(typeIds);
 
-        const mapped: StatItem[] = top.map(([key, val], index) => ({
+        const mapped: StatItem[] = top.map(([key, val]) => ({
           id: key,
           label: key.charAt(0).toUpperCase() + key.slice(1), // Capitalize
           value: val,
-          color: colors[index]
+          color: colorMapping[key]
         }));
 
         if (otherCount > 0) {
@@ -234,7 +285,7 @@ function App() {
             id: 'other',
             label: 'Other',
             value: otherCount,
-            color: colors[colors.length - 1]
+            color: colorMapping['other']
           });
         }
 
