@@ -4,10 +4,10 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import './App.css';
 import logoSrc from '../../assets/CQD.png';
 import logoGraySrc from '../../assets/CQD-gray.png';
-import bmcLogoSrc from '../../public/bmc-logo.svg';
-import chromeSvg from '../../public/Chrome.svg';
-import firefoxSvg from '../../public/Firefox.svg';
-import edgeSvg from '../../public/Edge.svg';
+import bmcLogoSrc from '../../src/bmc-logo.svg';
+import chromeSvg from '../../src/Chrome.svg';
+import firefoxSvg from '../../src/Firefox.svg';
+import edgeSvg from '../../src/Edge.svg';
 
 // External Links
 const SURVEY_URL = 'https://forms.gle/wPU2b1Qxa7svHqJa6';
@@ -473,56 +473,28 @@ function App() {
   // --- Donut chart calculation (Dynamic) ---
   const radius = 40;
   const circumference = 2 * Math.PI * radius;
-  const gapSize = 2; // Size of gap between segments in units
+  const gapAngle = 3; // Gap angle in degrees between segments
+  const gapLength = (gapAngle / 360) * circumference; // Convert gap to stroke units
   let cumulativeOffset = 0;
-
-  // Calculate where each segment starts (for separator positioning)
-  const segmentAngles: number[] = [];
 
   const chartSegments = stats.map((stat, index) => {
     const percentage = totalDownloads === 0 ? 0 : stat.value / totalDownloads;
-    const strokeLength = percentage * circumference;
-    const offset = cumulativeOffset;
+    const fullStrokeLength = percentage * circumference;
     
-    // Store starting angle for this segment (for separator lines)
-    const startAngle = (offset / circumference) * 360 - 90; // -90 to start from top
-    segmentAngles.push(startAngle);
+    // Each segment gets reduced by one gap (shown after it)
+    const strokeLength = Math.max(0, fullStrokeLength - gapLength);
     
-    cumulativeOffset += strokeLength;
+    // Offset includes cumulative length plus half gap to center the segment
+    const offset = cumulativeOffset + (gapLength / 2);
+    cumulativeOffset += fullStrokeLength;
 
     return {
       ...stat,
-      strokeLength: Math.max(0, strokeLength - gapSize), // Reduce by gap size
+      strokeLength,
       offset: -offset,
       index,
     };
   });
-
-  // Calculate separator lines between segments
-  const separatorLines = stats.length > 1 ? segmentAngles.slice(1).map((angle, i) => {
-    // Get colors of the two neighboring segments
-    const prevColor = stats[i].color;
-    const nextColor = stats[i + 1].color;
-    // Determine separator color: white if both are dark, black if both are light, use contrast otherwise
-    const prevDark = isColorDark(prevColor);
-    const nextDark = isColorDark(nextColor);
-    const separatorColor = (prevDark && nextDark) ? 'rgba(255,255,255,0.9)' 
-      : (!prevDark && !nextDark) ? 'rgba(0,0,0,0.4)' 
-      : 'rgba(128,128,128,0.6)';
-    
-    const angleRad = (angle * Math.PI) / 180;
-    const innerR = radius - 6;
-    const outerR = radius + 6;
-    
-    return {
-      x1: 50 + innerR * Math.cos(angleRad),
-      y1: 50 + innerR * Math.sin(angleRad),
-      x2: 50 + outerR * Math.cos(angleRad),
-      y2: 50 + outerR * Math.sin(angleRad),
-      color: separatorColor,
-      key: `sep-${i}`,
-    };
-  }) : [];
 
   const isLoadingSettings = loadingState || settings == null;
   const isEnabled = settings?.extensionEnabled ?? true;
@@ -661,19 +633,6 @@ function App() {
                             className="cqd-ring-segment"
                           />
                         )}
-                        {/* Separator lines between segments */}
-                        {separatorLines.map((sep) => (
-                          <line
-                            key={sep.key}
-                            x1={sep.x1}
-                            y1={sep.y1}
-                            x2={sep.x2}
-                            y2={sep.y2}
-                            stroke={sep.color}
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                          />
-                        ))}
                       </svg>
                       <div className="cqd-analytics-circle-inner">
                         <div className="cqd-analytics-main-number">
