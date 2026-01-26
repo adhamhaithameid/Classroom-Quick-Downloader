@@ -4,14 +4,48 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import './App.css';
 import logoSrc from '../../assets/CQD.png';
 import logoGraySrc from '../../assets/CQD-gray.png';
-import bmcLogoSrc from '../../public/bmc-logo.svg';
+import bmcLogoSrc from '../../src/bmc-logo.svg';
+import chromeSvg from '../../src/Chrome.svg';
+import firefoxSvg from '../../src/Firefox.svg';
+import edgeSvg from '../../src/Edge.svg';
 
 // External Links
 const SURVEY_URL = 'https://forms.gle/wPU2b1Qxa7svHqJa6';
 const GITHUB_REPO_URL =
   'https://github.com/adhamhaithameid/classroom-quick-downloader';
-const EXTENSION_STORE_URL = 'https://chromewebstore.google.com/';
 const BUY_ME_COFFEE_URL = 'https://buymeacoffee.com/adhamhaithameid';
+
+// Extension Store URLs for each browser
+const EXTENSION_STORE_URLS = {
+  chrome: 'https://chromewebstore.google.com/detail/classroom-quick-downloade/oemoongiefmpmomjikcjmkkkhffcbdid',
+  firefox: 'https://addons.mozilla.org/en-US/firefox/addon/classroom-quick-downloader/',
+  edge: 'https://microsoftedge.microsoft.com/addons/detail/classroom-quick-downloade/ecojbijjkcjdolpeoiemnccgmaeomcmn',
+};
+
+type BrowserType = 'chrome' | 'firefox' | 'edge';
+
+type BrowserDetection = {
+  browser: BrowserType;
+  isCertain: boolean;
+};
+
+function detectBrowser(): BrowserDetection {
+  const ua = navigator.userAgent.toLowerCase();
+  // Firefox detection - certain
+  if (ua.includes('firefox')) {
+    return { browser: 'firefox', isCertain: true };
+  }
+  // Edge detection - certain (edg/ for desktop, edga/ for Android, edgios/ for iOS)
+  if (ua.includes('edg/') || ua.includes('edga/') || ua.includes('edgios/')) {
+    return { browser: 'edge', isCertain: true };
+  }
+  // Chrome detection - only certain if explicitly Chrome
+  if (ua.includes('chrome') && !ua.includes('opr') && !ua.includes('opera') && !ua.includes('brave')) {
+    return { browser: 'chrome', isCertain: true };
+  }
+  // Default to Chrome for other Chromium browsers - not certain
+  return { browser: 'chrome', isCertain: false };
+}
 
 type Settings = {
   extensionEnabled: boolean;
@@ -41,16 +75,206 @@ type ToggleRowProps = {
 
 type StatItem = { id: string; label: string; value: number; color: string };
 
-// Color mapping for file types
-const TYPE_COLORS: Record<string, string> = {
-  pdf: 'var(--cqd-red, #ef4444)',
-  docs: 'var(--cqd-blue, #3b82f6)',
-  images: '#10b981',
-  archive: '#f59e0b',
-  sheets: '#10b981',
-  slides: '#f59e0b',
-  other: '#9ca3af',
-};
+// Base colors - vibrant starting points for triadic harmony generation
+const BASE_COLORS = [
+  '#dc2626', // Red
+  '#ea580c', // Orange
+  '#d97706', // Amber
+  '#65a30d', // Lime
+  '#16a34a', // Green
+  '#059669', // Emerald
+  '#0d9488', // Teal
+  '#0891b2', // Cyan
+  '#0284c7', // Sky
+  '#2563eb', // Blue
+  '#4f46e5', // Indigo
+  '#7c3aed', // Violet
+  '#9333ea', // Purple
+  '#c026d3', // Fuchsia
+  '#db2777', // Pink
+  '#e11d48', // Rose
+  '#78350f', // Brown
+  '#1e3a8a', // Navy
+  '#064e3b', // Forest
+  '#7f1d1d', // Maroon
+];
+
+// LocalStorage key for persistent color assignments
+const COLOR_STORAGE_KEY = 'cqd_type_color_assignments_v2';
+
+/**
+ * Convert hex to HSL
+ */
+function hexToHsl(hex: string): { h: number; s: number; l: number } {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if (!result) return { h: 0, s: 70, l: 50 };
+  
+  let r = parseInt(result[1], 16) / 255;
+  let g = parseInt(result[2], 16) / 255;
+  let b = parseInt(result[3], 16) / 255;
+  
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h = 0, s = 0;
+  const l = (max + min) / 2;
+
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+      case g: h = ((b - r) / d + 2) / 6; break;
+      case b: h = ((r - g) / d + 4) / 6; break;
+    }
+  }
+  
+  return { h: Math.round(h * 360), s: Math.round(s * 100), l: Math.round(l * 100) };
+}
+
+/**
+ * Convert HSL to hex
+ */
+function hslToHex(h: number, s: number, l: number): string {
+  s /= 100;
+  l /= 100;
+  const a = s * Math.min(l, 1 - l);
+  const f = (n: number) => {
+    const k = (n + h / 30) % 12;
+    const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+    return Math.round(255 * color).toString(16).padStart(2, '0');
+  };
+  return `#${f(0)}${f(8)}${f(4)}`;
+}
+
+/**
+ * Generate triadic color - rotate hue by 120° or 240° (complementary positions on color wheel)
+ */
+function getTriadicColor(baseHex: string, position: number): string {
+  const hsl = hexToHsl(baseHex);
+  // Rotate hue by 120° * position for triadic harmony
+  const newHue = (hsl.h + (120 * position)) % 360;
+  return hslToHex(newHue, Math.min(hsl.s + 5, 85), Math.max(hsl.l, 40));
+}
+
+/**
+ * Simple hash function to convert string to number
+ */
+function hashString(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return Math.abs(hash);
+}
+
+/**
+ * Determine if a hex color is dark (needs white border) or light (needs black border)
+ */
+function isColorDark(hexColor: string): boolean {
+  const hex = hexColor.replace('#', '');
+  const r = parseInt(hex.substring(0, 2), 16);
+  const g = parseInt(hex.substring(2, 4), 16);
+  const b = parseInt(hex.substring(4, 6), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance < 0.5;
+}
+
+/**
+ * Calculate distance between two hex colors (simple RGB Euclidean distance)
+ * Returns value between 0 (identical) and ~441 (opposite)
+ */
+function getColorDistance(hex1: string, hex2: string): number {
+  const c1 = hexToHsl(hex1); // Use HSL for better perceptual tracking? Actually RGB is easier for simple diff
+  // Let's use RGB for distance
+  const r1 = parseInt(hex1.slice(1, 3), 16);
+  const g1 = parseInt(hex1.slice(3, 5), 16);
+  const b1 = parseInt(hex1.slice(5, 7), 16);
+  
+  const r2 = parseInt(hex2.slice(1, 3), 16);
+  const g2 = parseInt(hex2.slice(3, 5), 16);
+  const b2 = parseInt(hex2.slice(5, 7), 16);
+  
+  return Math.sqrt(
+    Math.pow(r1 - r2, 2) +
+    Math.pow(g1 - g2, 2) +
+    Math.pow(b1 - b2, 2)
+  );
+}
+
+/**
+ * Get distinct color for a file type, ensuring no collisions with already used colors
+ * @param typeId - file type ID
+ * @param position - position in the list (for triadic harmony)
+ * @param usedColors - set of already assigned colors to avoid
+ */
+function getDistinctColorForTypeAtPosition(
+  typeId: string, 
+  position: number, 
+  usedColors: Set<string>
+): string {
+  // Try to load existing assignments
+  let assignments: Record<string, string> = {};
+  try {
+    const stored = localStorage.getItem(COLOR_STORAGE_KEY);
+    assignments = stored ? JSON.parse(stored) : {};
+  } catch {
+    assignments = {};
+  }
+  
+  const key = `${typeId}_pos${position}`;
+  
+  // Deterministic candidate generation
+  const baseIndex = hashString(typeId) % BASE_COLORS.length;
+  let baseColor = BASE_COLORS[baseIndex];
+  let candidate = getTriadicColor(baseColor, position);
+  
+  // Use stored if available AND distinct enough from *others* in the current used list
+  // Note: We prioritize the *stored* color if it exists, but we MUST check collision
+  if (assignments[key]) {
+    candidate = assignments[key];
+  }
+  
+  // Conflict resolution: if candidate is too close to any used color, shift it
+  // Threshold 100 is roughly "visually distinct"
+  let attempts = 0;
+  let isdistinct = false;
+  
+  while (!isdistinct && attempts < 20) {
+    let collision = false;
+    for (const used of usedColors) {
+      if (getColorDistance(candidate, used) < 100) { // Collision threshold
+        collision = true;
+        break;
+      }
+    }
+    
+    if (collision) {
+      // Rotate hue by 45 degrees to find a free spot
+      const hsl = hexToHsl(candidate);
+      candidate = hslToHex((hsl.h + 45) % 360, hsl.s, hsl.l);
+      attempts++;
+    } else {
+      isdistinct = true;
+    }
+  }
+  
+  // If we still have collision after rotations (crowded), try lightening/darkening
+  if (!isdistinct) {
+     const hsl = hexToHsl(candidate);
+     candidate = hslToHex(hsl.h, hsl.s, Math.max(20, Math.min(80, hsl.l + (attempts % 2 === 0 ? 20 : -20))));
+  }
+  
+  // Save the resolved color
+  assignments[key] = candidate;
+  try {
+    localStorage.setItem(COLOR_STORAGE_KEY, JSON.stringify(assignments));
+  } catch {
+    // Ignore
+  }
+  
+  return candidate;
+}
 
 function App() {
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -63,8 +287,9 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState<string | null>(null);
 
-  const [shareStatus, setShareStatus] =
-    useState<'idle' | 'copied' | 'error'>('idle');
+  const [copiedBrowser, setCopiedBrowser] = useState<BrowserType | null>(null);
+  const [showSharePanel, setShowSharePanel] = useState(false);
+  const [browserDetection] = useState<BrowserDetection>(detectBrowser);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [scrolled, setScrolled] = useState(false);
@@ -72,6 +297,7 @@ function App() {
   // REAL STATS STATE
   const [stats, setStats] = useState<StatItem[]>([]);
   const [totalDownloads, setTotalDownloads] = useState(0);
+  const [hoveredStatId, setHoveredStatId] = useState<string | null>(null);
 
   // Track scroll to add blur/shadow under header when not at top
   useEffect(() => {
@@ -169,19 +395,27 @@ function App() {
         const others = entries.slice(4);
         const otherCount = others.reduce((acc, curr) => acc + curr[1], 0);
 
-        const mapped: StatItem[] = top.map(([key, val]) => ({
-          id: key,
-          label: key.charAt(0).toUpperCase() + key.slice(1), // Capitalize
-          value: val,
-          color: TYPE_COLORS[key] || TYPE_COLORS.other
-        }));
+        const usedColors = new Set<string>();
+
+        const mapped: StatItem[] = top.map(([key, val], index) => {
+          const color = getDistinctColorForTypeAtPosition(key, index, usedColors);
+          usedColors.add(color);
+          return {
+            id: key,
+            label: key.charAt(0).toUpperCase() + key.slice(1), // Capitalize
+            value: val,
+            color
+          };
+        });
 
         if (otherCount > 0) {
+          const otherColor = getDistinctColorForTypeAtPosition('other', mapped.length, usedColors);
+          usedColors.add(otherColor);
           mapped.push({
             id: 'other',
             label: 'Other',
             value: otherCount,
-            color: TYPE_COLORS.other
+            color: otherColor
           });
         }
 
@@ -285,32 +519,45 @@ function App() {
     }
   }
 
-  const handleShareClick = async () => {
+  const handleCopyLink = async (browser: BrowserType) => {
     try {
-      await navigator.clipboard.writeText(EXTENSION_STORE_URL);
-      setShareStatus('copied');
-      setTimeout(() => setShareStatus('idle'), 2000);
+      await navigator.clipboard.writeText(EXTENSION_STORE_URLS[browser]);
+      setCopiedBrowser(browser);
+      setTimeout(() => setCopiedBrowser(null), 2000);
     } catch {
-      setShareStatus('error');
-      setTimeout(() => setShareStatus('idle'), 2000);
+      // Silent fail
     }
+  };
+
+  const browserIcons: Record<BrowserType, React.ReactNode> = {
+    chrome: <img src={chromeSvg} alt="Chrome" width="20" height="20" />,
+    firefox: <img src={firefoxSvg} alt="Firefox" width="20" height="20" />,
+    edge: <img src={edgeSvg} alt="Edge" width="20" height="20" />,
   };
 
   // --- Donut chart calculation (Dynamic) ---
   const radius = 40;
   const circumference = 2 * Math.PI * radius;
+  const gapAngle = 3; // Gap angle in degrees between segments
+  const gapLength = (gapAngle / 360) * circumference; // Convert gap to stroke units
   let cumulativeOffset = 0;
 
-  const chartSegments = stats.map((stat) => {
+  const chartSegments = stats.map((stat, index) => {
     const percentage = totalDownloads === 0 ? 0 : stat.value / totalDownloads;
-    const strokeLength = percentage * circumference;
-    const offset = cumulativeOffset;
-    cumulativeOffset += strokeLength;
+    const fullStrokeLength = percentage * circumference;
+    
+    // Each segment gets reduced by one gap (shown after it)
+    const strokeLength = Math.max(0, fullStrokeLength - gapLength);
+    
+    // Offset includes cumulative length plus half gap to center the segment
+    const offset = cumulativeOffset + (gapLength / 2);
+    cumulativeOffset += fullStrokeLength;
 
     return {
       ...stat,
       strokeLength,
       offset: -offset,
+      index,
     };
   });
 
@@ -358,12 +605,20 @@ function App() {
                   {extensionStatusLabel}
                 </span>
                 {version && (
-                  <span
+                  <button
                     className="cqd-brand-version"
-                    aria-label={`Version ${version}`}
+                    aria-label={`Version ${version} - View changelog`}
+                    title="View changelog"
+                    onClick={() => {
+                      // TODO: Replace with actual changelog URL when website is created
+                      const changelogUrl = null; // Will be: 'https://cqd.adhamhaitham.dev/changelog'
+                      if (changelogUrl) {
+                        window.open(changelogUrl, '_blank');
+                      }
+                    }}
                   >
                     v{version}
-                  </span>
+                  </button>
                 )}
               </div>
             </div>
@@ -431,10 +686,13 @@ function App() {
                               r={radius}
                               fill="none"
                               stroke={seg.color}
-                              strokeWidth="10"
+                              strokeWidth={hoveredStatId === seg.id ? '12' : '10'}
                               strokeDasharray={`${seg.strokeLength} ${circumference}`}
                               strokeDashoffset={seg.offset}
-                              className="cqd-ring-segment"
+                              className={`cqd-ring-segment ${hoveredStatId === seg.id ? 'hovered' : ''}`}
+                              style={{ cursor: 'pointer', transition: 'stroke-width 0.15s ease' }}
+                              onMouseEnter={() => setHoveredStatId(seg.id)}
+                              onMouseLeave={() => setHoveredStatId(null)}
                             >
                               <title>{`${seg.label}: ${seg.value}`}</title>
                             </circle>
@@ -463,10 +721,28 @@ function App() {
                       <ul className="cqd-analytics-legend">
                         {stats.length > 0 ? (
                           stats.map((stat) => (
-                            <li key={stat.id}>
+                            <li 
+                              key={stat.id}
+                              className={`cqd-legend-item ${hoveredStatId === stat.id ? 'hovered' : ''}`}
+                              onMouseEnter={() => setHoveredStatId(stat.id)}
+                              onMouseLeave={() => setHoveredStatId(null)}
+                              style={{ cursor: 'pointer' }}
+                            >
                               <span
-                                className="cqd-legend-dot"
-                                style={{ backgroundColor: stat.color }}
+                                className={`cqd-legend-dot ${hoveredStatId === stat.id ? 'hovered' : ''}`}
+                                style={{ 
+                                  backgroundColor: stat.color,
+                                  border: isColorDark(stat.color) 
+                                    ? '1.5px solid rgba(255, 255, 255, 0.8)' 
+                                    : '1.5px solid rgba(0, 0, 0, 0.25)',
+                                  boxShadow: hoveredStatId === stat.id
+                                    ? '0 2px 8px rgba(0, 0, 0, 0.25)'
+                                    : isColorDark(stat.color)
+                                      ? '0 0 0 0.5px rgba(0, 0, 0, 0.15)'
+                                      : 'none',
+                                  transform: hoveredStatId === stat.id ? 'scale(1.3)' : 'scale(1)',
+                                  transition: 'transform 0.15s ease, box-shadow 0.15s ease'
+                                }}
                               />
                               <span className="cqd-legend-label">{stat.label}</span>
                               <span className="cqd-legend-val">({stat.value})</span>
@@ -594,61 +870,108 @@ function App() {
 
                 <button
                   type="button"
-                  className={`cqd-button cqd-button-ghost ${
-                    shareStatus === 'copied' ? 'success' : ''
-                  }`}
-                  onClick={handleShareClick}
-                  aria-label={
-                    shareStatus === 'copied'
-                      ? 'Extension link copied'
-                      : 'Copy extension link to clipboard'
-                  }
+                  className={`cqd-button cqd-button-ghost ${showSharePanel ? 'active' : ''}`}
+                  onClick={() => setShowSharePanel(!showSharePanel)}
+                  title="Share extension"
+                  aria-label="Share extension links"
+                  aria-expanded={showSharePanel}
                 >
                   <span className="cqd-button-icon">
-                    {shareStatus === 'copied' ? (
-                      <svg
-                        viewBox="0 0 24 24"
-                        width="16"
-                        height="16"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        aria-hidden="true"
-                      >
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                    ) : (
-                      <svg
-                        viewBox="0 0 24 24"
-                        width="16"
-                        height="16"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        aria-hidden="true"
-                      >
-                        <circle cx="18" cy="5" r="3"></circle>
-                        <circle cx="6" cy="12" r="3"></circle>
-                        <circle cx="18" cy="19" r="3"></circle>
-                        <line
-                          x1="8.59"
-                          y1="13.51"
-                          x2="15.42"
-                          y2="17.49"
-                        ></line>
-                        <line
-                          x1="15.41"
-                          y1="6.51"
-                          x2="8.59"
-                          y2="10.49"
-                        ></line>
-                      </svg>
-                    )}
+                    <svg
+                      viewBox="0 0 24 24"
+                      width="16"
+                      height="16"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      aria-hidden="true"
+                    >
+                      <circle cx="18" cy="5" r="3"></circle>
+                      <circle cx="6" cy="12" r="3"></circle>
+                      <circle cx="18" cy="19" r="3"></circle>
+                      <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                      <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+                    </svg>
                   </span>
                 </button>
               </div>
             </div>
           </section>
+
+          {/* Share Panel - Expandable */}
+          {showSharePanel && (
+            <section className="cqd-panel">
+              <div className="cqd-card cqd-card-share">
+                <div className="cqd-card-header">
+                  <h2 className="cqd-card-title">Share Extension</h2>
+                  <p className="cqd-card-subtitle">
+                    Copy the extension link for your browser.
+                  </p>
+                </div>
+                <div className="cqd-share-links">
+                  {(Object.keys(EXTENSION_STORE_URLS) as BrowserType[]).map((browser) => (
+                    <div 
+                      key={browser} 
+                      className={`cqd-share-link-row ${browser === browserDetection.browser && browserDetection.isCertain ? 'detected' : ''}`}
+                    >
+                      <a 
+                        href={EXTENSION_STORE_URLS[browser]}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="cqd-share-browser-icon"
+                        title={`Open ${browser.charAt(0).toUpperCase() + browser.slice(1)} Web Store`}
+                      >
+                        {browserIcons[browser]}
+                      </a>
+                      <span className="cqd-share-browser-name">
+                        {browser.charAt(0).toUpperCase() + browser.slice(1)}
+                        {browser === browserDetection.browser && browserDetection.isCertain && (
+                          <span className="cqd-share-detected-badge">current</span>
+                        )}
+                      </span>
+                      <button
+                        type="button"
+                        className={`cqd-share-copy-btn ${copiedBrowser === browser ? 'copied' : ''}`}
+                        onClick={() => handleCopyLink(browser)}
+                        aria-label={`Copy ${browser} extension link`}
+                      >
+                        {copiedBrowser === browser ? (
+                          <>
+                            <svg
+                              viewBox="0 0 24 24"
+                              width="14"
+                              height="14"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                            >
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                            <span>Copied!</span>
+                          </>
+                        ) : (
+                          <>
+                            <svg
+                              viewBox="0 0 24 24"
+                              width="14"
+                              height="14"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                            >
+                              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                            <span>Copy</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+          )}
 
           {/* FOOTER – always visible */}
           <footer className="cqd-footer">

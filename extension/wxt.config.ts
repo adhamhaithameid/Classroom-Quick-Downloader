@@ -1,6 +1,7 @@
 // filepath: extension/wxt.config.ts
 import { defineConfig } from 'wxt';
 
+// the runner should be webExt
 export default defineConfig({
   runner: {
     binaries: {
@@ -28,6 +29,13 @@ export default defineConfig({
       'https://accounts.google.com/*',
       'https://cqd-analytics.adhamhaithameid.workers.dev/*',
     ],
+    icons: {
+      "16": "icon/16.png",
+      "32": "icon/32.png",
+      "48": "icon/48.png",
+      "96": "icon/96.png",
+      "128": "icon/128.png"
+    },
     browser_specific_settings: {
       gecko: {
         id: "classroom-quick-downloader@adhamhaitham.dev",
@@ -39,4 +47,5 @@ export default defineConfig({
       }
     }
   },
+  publicDir: 'src',
 });
