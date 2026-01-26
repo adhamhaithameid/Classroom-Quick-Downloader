@@ -75,32 +75,85 @@ type ToggleRowProps = {
 
 type StatItem = { id: string; label: string; value: number; color: string };
 
-// Predefined palette of 100 colors - alternating dark and light for visual contrast between adjacent items
-const COLOR_PALETTE = [
-  // Row 1: Alternating dark/light reds and oranges
-  '#dc2626', '#fca5a5', '#ea580c', '#fdba74', '#d97706', '#fcd34d', '#ca8a04', '#fef08a', '#84cc16', '#d9f99d',
-  // Row 2: Alternating dark/light greens and teals
-  '#16a34a', '#86efac', '#059669', '#6ee7b7', '#0d9488', '#5eead4', '#0891b2', '#67e8f9', '#0284c7', '#7dd3fc',
-  // Row 3: Alternating dark/light blues and purples
-  '#2563eb', '#93c5fd', '#4f46e5', '#a5b4fc', '#7c3aed', '#c4b5fd', '#9333ea', '#d8b4fe', '#c026d3', '#f0abfc',
-  // Row 4: Alternating dark/light pinks and deep colors
-  '#db2777', '#f9a8d4', '#e11d48', '#fda4af', '#be123c', '#fecdd3', '#991b1b', '#fecaca', '#9a3412', '#fed7aa',
-  // Row 5: More dark variants with paired lights
-  '#854d0e', '#fef3c7', '#3f6212', '#ecfccb', '#166534', '#dcfce7', '#115e59', '#ccfbf1', '#155e75', '#cffafe',
-  // Row 6: Deep blues/purples with lights
-  '#075985', '#e0f2fe', '#1e40af', '#dbeafe', '#3730a3', '#e0e7ff', '#5b21b6', '#ede9fe', '#7e22ce', '#f3e8ff',
-  // Row 7: Deep pinks/reds with lights
-  '#a21caf', '#fae8ff', '#be185d', '#fce7f3', '#9d174d', '#ffe4e6', '#881337', '#fff1f2', '#7f1d1d', '#fee2e2',
-  // Row 8: Earth tones alternating
-  '#78350f', '#ffedd5', '#713f12', '#fef9c3', '#365314', '#f7fee7', '#14532d', '#f0fdf4', '#134e4a', '#f0fdfa',
-  // Row 9: Cool darks with lights
-  '#164e63', '#ecfeff', '#0c4a6e', '#f0f9ff', '#1e3a8a', '#eff6ff', '#312e81', '#eef2ff', '#4c1d95', '#f5f3ff',
-  // Row 10: Final deep colors with lights
-  '#581c87', '#faf5ff', '#701a75', '#fdf4ff', '#831843', '#fdf2f8', '#4a044e', '#fdf4ff', '#500724', '#fff1f2',
+// Base colors - vibrant starting points for triadic harmony generation
+const BASE_COLORS = [
+  '#dc2626', // Red
+  '#ea580c', // Orange
+  '#d97706', // Amber
+  '#65a30d', // Lime
+  '#16a34a', // Green
+  '#059669', // Emerald
+  '#0d9488', // Teal
+  '#0891b2', // Cyan
+  '#0284c7', // Sky
+  '#2563eb', // Blue
+  '#4f46e5', // Indigo
+  '#7c3aed', // Violet
+  '#9333ea', // Purple
+  '#c026d3', // Fuchsia
+  '#db2777', // Pink
+  '#e11d48', // Rose
+  '#78350f', // Brown
+  '#1e3a8a', // Navy
+  '#064e3b', // Forest
+  '#7f1d1d', // Maroon
 ];
 
 // LocalStorage key for persistent color assignments
-const COLOR_STORAGE_KEY = 'cqd_type_color_assignments';
+const COLOR_STORAGE_KEY = 'cqd_type_color_assignments_v2';
+
+/**
+ * Convert hex to HSL
+ */
+function hexToHsl(hex: string): { h: number; s: number; l: number } {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if (!result) return { h: 0, s: 70, l: 50 };
+  
+  let r = parseInt(result[1], 16) / 255;
+  let g = parseInt(result[2], 16) / 255;
+  let b = parseInt(result[3], 16) / 255;
+  
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h = 0, s = 0;
+  const l = (max + min) / 2;
+
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+      case g: h = ((b - r) / d + 2) / 6; break;
+      case b: h = ((r - g) / d + 4) / 6; break;
+    }
+  }
+  
+  return { h: Math.round(h * 360), s: Math.round(s * 100), l: Math.round(l * 100) };
+}
+
+/**
+ * Convert HSL to hex
+ */
+function hslToHex(h: number, s: number, l: number): string {
+  s /= 100;
+  l /= 100;
+  const a = s * Math.min(l, 1 - l);
+  const f = (n: number) => {
+    const k = (n + h / 30) % 12;
+    const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+    return Math.round(255 * color).toString(16).padStart(2, '0');
+  };
+  return `#${f(0)}${f(8)}${f(4)}`;
+}
+
+/**
+ * Generate triadic color - rotate hue by 120° or 240° (complementary positions on color wheel)
+ */
+function getTriadicColor(baseHex: string, position: number): string {
+  const hsl = hexToHsl(baseHex);
+  // Rotate hue by 120° * position for triadic harmony
+  const newHue = (hsl.h + (120 * position)) % 360;
+  return hslToHex(newHue, Math.min(hsl.s + 5, 85), Math.max(hsl.l, 40));
+}
 
 /**
  * Simple hash function to convert string to number
@@ -110,7 +163,7 @@ function hashString(str: string): number {
   for (let i = 0; i < str.length; i++) {
     const char = str.charCodeAt(i);
     hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32bit integer
+    hash = hash & hash;
   }
   return Math.abs(hash);
 }
@@ -119,22 +172,19 @@ function hashString(str: string): number {
  * Determine if a hex color is dark (needs white border) or light (needs black border)
  */
 function isColorDark(hexColor: string): boolean {
-  // Remove # if present
   const hex = hexColor.replace('#', '');
   const r = parseInt(hex.substring(0, 2), 16);
   const g = parseInt(hex.substring(2, 4), 16);
   const b = parseInt(hex.substring(4, 6), 16);
-  // Calculate relative luminance using sRGB formula
   const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
   return luminance < 0.5;
 }
 
 /**
- * Get deterministic color for a file type
- * Uses hash-based selection from predefined palette + localStorage persistence
- * Colors NEVER change once assigned to a type
+ * Get color for a file type at a specific position in the list
+ * Uses triadic harmony so adjacent colors are complementary (120° apart)
  */
-function getColorForType(typeId: string): string {
+function getColorForTypeAtPosition(typeId: string, position: number): string {
   // Try to load existing assignments from localStorage
   let assignments: Record<string, string> = {};
   try {
@@ -144,17 +194,23 @@ function getColorForType(typeId: string): string {
     assignments = {};
   }
   
-  // If type already has a color, return it
-  if (assignments[typeId]) {
-    return assignments[typeId];
+  // Create a unique key for this type+position combo
+  const key = `${typeId}_pos${position}`;
+  
+  // If already assigned, return it
+  if (assignments[key]) {
+    return assignments[key];
   }
   
-  // Deterministically pick a color based on type name hash
-  const colorIndex = hashString(typeId) % COLOR_PALETTE.length;
-  const color = COLOR_PALETTE[colorIndex];
+  // Pick a base color using hash of the type name
+  const baseIndex = hashString(typeId) % BASE_COLORS.length;
+  const baseColor = BASE_COLORS[baseIndex];
   
-  // Save the assignment permanently
-  assignments[typeId] = color;
+  // Apply triadic rotation based on position (0, 1, 2, 3, 4 -> rotations of 0, 120, 240, 360, 480...)
+  const color = getTriadicColor(baseColor, position);
+  
+  // Save the assignment
+  assignments[key] = color;
   try {
     localStorage.setItem(COLOR_STORAGE_KEY, JSON.stringify(assignments));
   } catch {
@@ -282,11 +338,11 @@ function App() {
         const others = entries.slice(4);
         const otherCount = others.reduce((acc, curr) => acc + curr[1], 0);
 
-        const mapped: StatItem[] = top.map(([key, val]) => ({
+        const mapped: StatItem[] = top.map(([key, val], index) => ({
           id: key,
           label: key.charAt(0).toUpperCase() + key.slice(1), // Capitalize
           value: val,
-          color: getColorForType(key)
+          color: getColorForTypeAtPosition(key, index)
         }));
 
         if (otherCount > 0) {
@@ -294,7 +350,7 @@ function App() {
             id: 'other',
             label: 'Other',
             value: otherCount,
-            color: getColorForType('other')
+            color: getColorForTypeAtPosition('other', mapped.length)
           });
         }
 
@@ -417,20 +473,56 @@ function App() {
   // --- Donut chart calculation (Dynamic) ---
   const radius = 40;
   const circumference = 2 * Math.PI * radius;
+  const gapSize = 2; // Size of gap between segments in units
   let cumulativeOffset = 0;
 
-  const chartSegments = stats.map((stat) => {
+  // Calculate where each segment starts (for separator positioning)
+  const segmentAngles: number[] = [];
+
+  const chartSegments = stats.map((stat, index) => {
     const percentage = totalDownloads === 0 ? 0 : stat.value / totalDownloads;
     const strokeLength = percentage * circumference;
     const offset = cumulativeOffset;
+    
+    // Store starting angle for this segment (for separator lines)
+    const startAngle = (offset / circumference) * 360 - 90; // -90 to start from top
+    segmentAngles.push(startAngle);
+    
     cumulativeOffset += strokeLength;
 
     return {
       ...stat,
-      strokeLength,
+      strokeLength: Math.max(0, strokeLength - gapSize), // Reduce by gap size
       offset: -offset,
+      index,
     };
   });
+
+  // Calculate separator lines between segments
+  const separatorLines = stats.length > 1 ? segmentAngles.slice(1).map((angle, i) => {
+    // Get colors of the two neighboring segments
+    const prevColor = stats[i].color;
+    const nextColor = stats[i + 1].color;
+    // Determine separator color: white if both are dark, black if both are light, use contrast otherwise
+    const prevDark = isColorDark(prevColor);
+    const nextDark = isColorDark(nextColor);
+    const separatorColor = (prevDark && nextDark) ? 'rgba(255,255,255,0.9)' 
+      : (!prevDark && !nextDark) ? 'rgba(0,0,0,0.4)' 
+      : 'rgba(128,128,128,0.6)';
+    
+    const angleRad = (angle * Math.PI) / 180;
+    const innerR = radius - 6;
+    const outerR = radius + 6;
+    
+    return {
+      x1: 50 + innerR * Math.cos(angleRad),
+      y1: 50 + innerR * Math.sin(angleRad),
+      x2: 50 + outerR * Math.cos(angleRad),
+      y2: 50 + outerR * Math.sin(angleRad),
+      color: separatorColor,
+      key: `sep-${i}`,
+    };
+  }) : [];
 
   const isLoadingSettings = loadingState || settings == null;
   const isEnabled = settings?.extensionEnabled ?? true;
@@ -569,6 +661,19 @@ function App() {
                             className="cqd-ring-segment"
                           />
                         )}
+                        {/* Separator lines between segments */}
+                        {separatorLines.map((sep) => (
+                          <line
+                            key={sep.key}
+                            x1={sep.x1}
+                            y1={sep.y1}
+                            x2={sep.x2}
+                            y2={sep.y2}
+                            stroke={sep.color}
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                          />
+                        ))}
                       </svg>
                       <div className="cqd-analytics-circle-inner">
                         <div className="cqd-analytics-main-number">
