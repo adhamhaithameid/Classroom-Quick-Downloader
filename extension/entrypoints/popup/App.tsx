@@ -5,13 +5,47 @@ import './App.css';
 import logoSrc from '../../assets/CQD.png';
 import logoGraySrc from '../../assets/CQD-gray.png';
 import bmcLogoSrc from '../../public/bmc-logo.svg';
+import chromeSvg from '../../public/Chrome.svg';
+import firefoxSvg from '../../public/Firefox.svg';
+import edgeSvg from '../../public/Edge.svg';
 
 // External Links
 const SURVEY_URL = 'https://forms.gle/wPU2b1Qxa7svHqJa6';
 const GITHUB_REPO_URL =
   'https://github.com/adhamhaithameid/classroom-quick-downloader';
-const EXTENSION_STORE_URL = 'https://chromewebstore.google.com/';
 const BUY_ME_COFFEE_URL = 'https://buymeacoffee.com/adhamhaithameid';
+
+// Extension Store URLs for each browser
+const EXTENSION_STORE_URLS = {
+  chrome: 'https://chromewebstore.google.com/detail/classroom-quick-downloade/oemoongiefmpmomjikcjmkkkhffcbdid',
+  firefox: 'https://addons.mozilla.org/en-US/firefox/addon/classroom-quick-downloader/',
+  edge: 'https://microsoftedge.microsoft.com/addons/detail/classroom-quick-downloade/ecojbijjkcjdolpeoiemnccgmaeomcmn',
+};
+
+type BrowserType = 'chrome' | 'firefox' | 'edge';
+
+type BrowserDetection = {
+  browser: BrowserType;
+  isCertain: boolean;
+};
+
+function detectBrowser(): BrowserDetection {
+  const ua = navigator.userAgent.toLowerCase();
+  // Firefox detection - certain
+  if (ua.includes('firefox')) {
+    return { browser: 'firefox', isCertain: true };
+  }
+  // Edge detection - certain (edg/ for desktop, edga/ for Android, edgios/ for iOS)
+  if (ua.includes('edg/') || ua.includes('edga/') || ua.includes('edgios/')) {
+    return { browser: 'edge', isCertain: true };
+  }
+  // Chrome detection - only certain if explicitly Chrome
+  if (ua.includes('chrome') && !ua.includes('opr') && !ua.includes('opera') && !ua.includes('brave')) {
+    return { browser: 'chrome', isCertain: true };
+  }
+  // Default to Chrome for other Chromium browsers - not certain
+  return { browser: 'chrome', isCertain: false };
+}
 
 type Settings = {
   extensionEnabled: boolean;
@@ -63,8 +97,9 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState<string | null>(null);
 
-  const [shareStatus, setShareStatus] =
-    useState<'idle' | 'copied' | 'error'>('idle');
+  const [copiedBrowser, setCopiedBrowser] = useState<BrowserType | null>(null);
+  const [showSharePanel, setShowSharePanel] = useState(false);
+  const [browserDetection] = useState<BrowserDetection>(detectBrowser);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [scrolled, setScrolled] = useState(false);
@@ -285,15 +320,20 @@ function App() {
     }
   }
 
-  const handleShareClick = async () => {
+  const handleCopyLink = async (browser: BrowserType) => {
     try {
-      await navigator.clipboard.writeText(EXTENSION_STORE_URL);
-      setShareStatus('copied');
-      setTimeout(() => setShareStatus('idle'), 2000);
+      await navigator.clipboard.writeText(EXTENSION_STORE_URLS[browser]);
+      setCopiedBrowser(browser);
+      setTimeout(() => setCopiedBrowser(null), 2000);
     } catch {
-      setShareStatus('error');
-      setTimeout(() => setShareStatus('idle'), 2000);
+      // Silent fail
     }
+  };
+
+  const browserIcons: Record<BrowserType, React.ReactNode> = {
+    chrome: <img src={chromeSvg} alt="Chrome" width="20" height="20" />,
+    firefox: <img src={firefoxSvg} alt="Firefox" width="20" height="20" />,
+    edge: <img src={edgeSvg} alt="Edge" width="20" height="20" />,
   };
 
   // --- Donut chart calculation (Dynamic) ---
@@ -594,61 +634,108 @@ function App() {
 
                 <button
                   type="button"
-                  className={`cqd-button cqd-button-ghost ${
-                    shareStatus === 'copied' ? 'success' : ''
-                  }`}
-                  onClick={handleShareClick}
-                  aria-label={
-                    shareStatus === 'copied'
-                      ? 'Extension link copied'
-                      : 'Copy extension link to clipboard'
-                  }
+                  className={`cqd-button cqd-button-ghost ${showSharePanel ? 'active' : ''}`}
+                  onClick={() => setShowSharePanel(!showSharePanel)}
+                  title="Share extension"
+                  aria-label="Share extension links"
+                  aria-expanded={showSharePanel}
                 >
                   <span className="cqd-button-icon">
-                    {shareStatus === 'copied' ? (
-                      <svg
-                        viewBox="0 0 24 24"
-                        width="16"
-                        height="16"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        aria-hidden="true"
-                      >
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                    ) : (
-                      <svg
-                        viewBox="0 0 24 24"
-                        width="16"
-                        height="16"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        aria-hidden="true"
-                      >
-                        <circle cx="18" cy="5" r="3"></circle>
-                        <circle cx="6" cy="12" r="3"></circle>
-                        <circle cx="18" cy="19" r="3"></circle>
-                        <line
-                          x1="8.59"
-                          y1="13.51"
-                          x2="15.42"
-                          y2="17.49"
-                        ></line>
-                        <line
-                          x1="15.41"
-                          y1="6.51"
-                          x2="8.59"
-                          y2="10.49"
-                        ></line>
-                      </svg>
-                    )}
+                    <svg
+                      viewBox="0 0 24 24"
+                      width="16"
+                      height="16"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      aria-hidden="true"
+                    >
+                      <circle cx="18" cy="5" r="3"></circle>
+                      <circle cx="6" cy="12" r="3"></circle>
+                      <circle cx="18" cy="19" r="3"></circle>
+                      <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                      <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+                    </svg>
                   </span>
                 </button>
               </div>
             </div>
           </section>
+
+          {/* Share Panel - Expandable */}
+          {showSharePanel && (
+            <section className="cqd-panel">
+              <div className="cqd-card cqd-card-share">
+                <div className="cqd-card-header">
+                  <h2 className="cqd-card-title">Share Extension</h2>
+                  <p className="cqd-card-subtitle">
+                    Copy the extension link for your browser.
+                  </p>
+                </div>
+                <div className="cqd-share-links">
+                  {(Object.keys(EXTENSION_STORE_URLS) as BrowserType[]).map((browser) => (
+                    <div 
+                      key={browser} 
+                      className={`cqd-share-link-row ${browser === browserDetection.browser && browserDetection.isCertain ? 'detected' : ''}`}
+                    >
+                      <a 
+                        href={EXTENSION_STORE_URLS[browser]}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="cqd-share-browser-icon"
+                        title={`Open ${browser.charAt(0).toUpperCase() + browser.slice(1)} Web Store`}
+                      >
+                        {browserIcons[browser]}
+                      </a>
+                      <span className="cqd-share-browser-name">
+                        {browser.charAt(0).toUpperCase() + browser.slice(1)}
+                        {browser === browserDetection.browser && browserDetection.isCertain && (
+                          <span className="cqd-share-detected-badge">current</span>
+                        )}
+                      </span>
+                      <button
+                        type="button"
+                        className={`cqd-share-copy-btn ${copiedBrowser === browser ? 'copied' : ''}`}
+                        onClick={() => handleCopyLink(browser)}
+                        aria-label={`Copy ${browser} extension link`}
+                      >
+                        {copiedBrowser === browser ? (
+                          <>
+                            <svg
+                              viewBox="0 0 24 24"
+                              width="14"
+                              height="14"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                            >
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                            <span>Copied!</span>
+                          </>
+                        ) : (
+                          <>
+                            <svg
+                              viewBox="0 0 24 24"
+                              width="14"
+                              height="14"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                            >
+                              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                            <span>Copy</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+          )}
 
           {/* FOOTER – always visible */}
           <footer className="cqd-footer">
