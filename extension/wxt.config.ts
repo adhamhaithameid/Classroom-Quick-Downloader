@@ -47,7 +47,5 @@ export default defineConfig({
       }
     }
   },
-  vite: () => ({
-    publicDir: 'src',
-  }),
+  publicDir: 'src',
 });
