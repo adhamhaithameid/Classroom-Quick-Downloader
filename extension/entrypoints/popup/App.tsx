@@ -75,75 +75,69 @@ type ToggleRowProps = {
 
 type StatItem = { id: string; label: string; value: number; color: string };
 
+// Predefined palette of 50 dark, vibrant colors (good contrast on light backgrounds)
+const DARK_COLOR_PALETTE = [
+  '#dc2626', '#ea580c', '#d97706', '#ca8a04', '#65a30d', // red, orange, amber, yellow, lime
+  '#16a34a', '#059669', '#0d9488', '#0891b2', '#0284c7', // green, emerald, teal, cyan, sky
+  '#2563eb', '#4f46e5', '#7c3aed', '#9333ea', '#c026d3', // blue, indigo, violet, purple, fuchsia
+  '#db2777', '#e11d48', '#be123c', '#991b1b', '#9a3412', // pink, rose, rose-dark, red-dark, orange-dark
+  '#854d0e', '#3f6212', '#166534', '#115e59', '#155e75', // yellow-dark, lime-dark, green-dark, teal-dark, cyan-dark
+  '#075985', '#1e40af', '#3730a3', '#5b21b6', '#7e22ce', // sky-dark, blue-dark, indigo-dark, violet-dark, purple-dark
+  '#a21caf', '#be185d', '#9d174d', '#881337', '#7f1d1d', // fuchsia-dark, pink-dark, rose-darker, rose-darkest, red-darkest
+  '#78350f', '#713f12', '#365314', '#14532d', '#134e4a', // amber-dark, yellow-darkest, lime-darkest, green-darkest, teal-darkest
+  '#164e63', '#0c4a6e', '#1e3a8a', '#312e81', '#4c1d95', // cyan-darkest, sky-darkest, blue-darkest, indigo-darkest, violet-darkest
+  '#581c87', '#701a75', '#831843', '#4a044e', '#500724', // purple-darkest, fuchsia-darkest, pink-darkest, fuchsia-dark2, rose-dark2
+];
+
+// LocalStorage key for persistent color assignments
+const COLOR_STORAGE_KEY = 'cqd_type_color_assignments';
+
 /**
- * Generate a single distinct color using golden ratio hue spacing
- * @param existingHues - array of existing hue values (0-1) to avoid
+ * Simple hash function to convert string to number
  */
-function generateNextColor(existingHues: number[]): { color: string; hue: number } {
-  const goldenRatio = 0.618033988749895;
-  
-  // Start from last hue or random if none exist
-  let hue = existingHues.length > 0 
-    ? (existingHues[existingHues.length - 1] + goldenRatio) % 1
-    : Math.random();
-  
-  // Use golden ratio to get next hue
-  hue = (hue + goldenRatio) % 1;
-  
-  const h = Math.round(hue * 360);
-  const s = 65 + Math.round(Math.random() * 15); // 65-80% saturation
-  const l = 50 + Math.round(Math.random() * 10); // 50-60% lightness
-  
-  return {
-    color: `hsl(${h}, ${s}%, ${l}%)`,
-    hue
-  };
+function hashString(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return Math.abs(hash);
 }
 
-// Session storage key for persistent color mapping
-const COLOR_STORAGE_KEY = 'cqd_type_colors';
-
-type ColorMapping = {
-  colors: Record<string, string>;
-  hues: number[];
-};
-
 /**
- * Get or create persistent color mapping for file types
- * Colors persist across popup openings within the same browser session
+ * Get deterministic color for a file type
+ * Uses hash-based selection from predefined palette + localStorage persistence
+ * Colors NEVER change once assigned to a type
  */
-function getOrCreateColorMapping(types: string[]): Record<string, string> {
-  // Try to load existing mapping from sessionStorage
-  let mapping: ColorMapping;
+function getColorForType(typeId: string): string {
+  // Try to load existing assignments from localStorage
+  let assignments: Record<string, string> = {};
   try {
-    const stored = sessionStorage.getItem(COLOR_STORAGE_KEY);
-    mapping = stored ? JSON.parse(stored) : { colors: {}, hues: [] };
+    const stored = localStorage.getItem(COLOR_STORAGE_KEY);
+    assignments = stored ? JSON.parse(stored) : {};
   } catch {
-    mapping = { colors: {}, hues: [] };
+    assignments = {};
   }
   
-  let hasNewTypes = false;
-  
-  // Generate colors only for new types
-  for (const type of types) {
-    if (!mapping.colors[type]) {
-      const { color, hue } = generateNextColor(mapping.hues);
-      mapping.colors[type] = color;
-      mapping.hues.push(hue);
-      hasNewTypes = true;
-    }
+  // If type already has a color, return it
+  if (assignments[typeId]) {
+    return assignments[typeId];
   }
   
-  // Save back to sessionStorage if we added new types
-  if (hasNewTypes) {
-    try {
-      sessionStorage.setItem(COLOR_STORAGE_KEY, JSON.stringify(mapping));
-    } catch {
-      // Ignore storage errors
-    }
+  // Deterministically pick a color based on type name hash
+  const colorIndex = hashString(typeId) % DARK_COLOR_PALETTE.length;
+  const color = DARK_COLOR_PALETTE[colorIndex];
+  
+  // Save the assignment permanently
+  assignments[typeId] = color;
+  try {
+    localStorage.setItem(COLOR_STORAGE_KEY, JSON.stringify(assignments));
+  } catch {
+    // Ignore storage errors
   }
   
-  return mapping.colors;
+  return color;
 }
 
 function App() {
@@ -264,20 +258,11 @@ function App() {
         const others = entries.slice(4);
         const otherCount = others.reduce((acc, curr) => acc + curr[1], 0);
 
-        // Get all type IDs that need colors (including "other" if needed)
-        const typeIds = top.map(([key]) => key);
-        if (otherCount > 0) {
-          typeIds.push('other');
-        }
-        
-        // Get persistent color mapping (creates new colors only for new types)
-        const colorMapping = getOrCreateColorMapping(typeIds);
-
         const mapped: StatItem[] = top.map(([key, val]) => ({
           id: key,
           label: key.charAt(0).toUpperCase() + key.slice(1), // Capitalize
           value: val,
-          color: colorMapping[key]
+          color: getColorForType(key)
         }));
 
         if (otherCount > 0) {
@@ -285,7 +270,7 @@ function App() {
             id: 'other',
             label: 'Other',
             value: otherCount,
-            color: colorMapping['other']
+            color: getColorForType('other')
           });
         }
 
