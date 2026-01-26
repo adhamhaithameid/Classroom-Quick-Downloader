@@ -75,18 +75,28 @@ type ToggleRowProps = {
 
 type StatItem = { id: string; label: string; value: number; color: string };
 
-// Predefined palette of 50 dark, vibrant colors (good contrast on light backgrounds)
-const DARK_COLOR_PALETTE = [
-  '#dc2626', '#ea580c', '#d97706', '#ca8a04', '#65a30d', // red, orange, amber, yellow, lime
-  '#16a34a', '#059669', '#0d9488', '#0891b2', '#0284c7', // green, emerald, teal, cyan, sky
-  '#2563eb', '#4f46e5', '#7c3aed', '#9333ea', '#c026d3', // blue, indigo, violet, purple, fuchsia
-  '#db2777', '#e11d48', '#be123c', '#991b1b', '#9a3412', // pink, rose, rose-dark, red-dark, orange-dark
-  '#854d0e', '#3f6212', '#166534', '#115e59', '#155e75', // yellow-dark, lime-dark, green-dark, teal-dark, cyan-dark
-  '#075985', '#1e40af', '#3730a3', '#5b21b6', '#7e22ce', // sky-dark, blue-dark, indigo-dark, violet-dark, purple-dark
-  '#a21caf', '#be185d', '#9d174d', '#881337', '#7f1d1d', // fuchsia-dark, pink-dark, rose-darker, rose-darkest, red-darkest
-  '#78350f', '#713f12', '#365314', '#14532d', '#134e4a', // amber-dark, yellow-darkest, lime-darkest, green-darkest, teal-darkest
-  '#164e63', '#0c4a6e', '#1e3a8a', '#312e81', '#4c1d95', // cyan-darkest, sky-darkest, blue-darkest, indigo-darkest, violet-darkest
-  '#581c87', '#701a75', '#831843', '#4a044e', '#500724', // purple-darkest, fuchsia-darkest, pink-darkest, fuchsia-dark2, rose-dark2
+// Predefined palette of 100 colors - alternating dark and light for visual contrast between adjacent items
+const COLOR_PALETTE = [
+  // Row 1: Alternating dark/light reds and oranges
+  '#dc2626', '#fca5a5', '#ea580c', '#fdba74', '#d97706', '#fcd34d', '#ca8a04', '#fef08a', '#84cc16', '#d9f99d',
+  // Row 2: Alternating dark/light greens and teals
+  '#16a34a', '#86efac', '#059669', '#6ee7b7', '#0d9488', '#5eead4', '#0891b2', '#67e8f9', '#0284c7', '#7dd3fc',
+  // Row 3: Alternating dark/light blues and purples
+  '#2563eb', '#93c5fd', '#4f46e5', '#a5b4fc', '#7c3aed', '#c4b5fd', '#9333ea', '#d8b4fe', '#c026d3', '#f0abfc',
+  // Row 4: Alternating dark/light pinks and deep colors
+  '#db2777', '#f9a8d4', '#e11d48', '#fda4af', '#be123c', '#fecdd3', '#991b1b', '#fecaca', '#9a3412', '#fed7aa',
+  // Row 5: More dark variants with paired lights
+  '#854d0e', '#fef3c7', '#3f6212', '#ecfccb', '#166534', '#dcfce7', '#115e59', '#ccfbf1', '#155e75', '#cffafe',
+  // Row 6: Deep blues/purples with lights
+  '#075985', '#e0f2fe', '#1e40af', '#dbeafe', '#3730a3', '#e0e7ff', '#5b21b6', '#ede9fe', '#7e22ce', '#f3e8ff',
+  // Row 7: Deep pinks/reds with lights
+  '#a21caf', '#fae8ff', '#be185d', '#fce7f3', '#9d174d', '#ffe4e6', '#881337', '#fff1f2', '#7f1d1d', '#fee2e2',
+  // Row 8: Earth tones alternating
+  '#78350f', '#ffedd5', '#713f12', '#fef9c3', '#365314', '#f7fee7', '#14532d', '#f0fdf4', '#134e4a', '#f0fdfa',
+  // Row 9: Cool darks with lights
+  '#164e63', '#ecfeff', '#0c4a6e', '#f0f9ff', '#1e3a8a', '#eff6ff', '#312e81', '#eef2ff', '#4c1d95', '#f5f3ff',
+  // Row 10: Final deep colors with lights
+  '#581c87', '#faf5ff', '#701a75', '#fdf4ff', '#831843', '#fdf2f8', '#4a044e', '#fdf4ff', '#500724', '#fff1f2',
 ];
 
 // LocalStorage key for persistent color assignments
@@ -103,6 +113,20 @@ function hashString(str: string): number {
     hash = hash & hash; // Convert to 32bit integer
   }
   return Math.abs(hash);
+}
+
+/**
+ * Determine if a hex color is dark (needs white border) or light (needs black border)
+ */
+function isColorDark(hexColor: string): boolean {
+  // Remove # if present
+  const hex = hexColor.replace('#', '');
+  const r = parseInt(hex.substring(0, 2), 16);
+  const g = parseInt(hex.substring(2, 4), 16);
+  const b = parseInt(hex.substring(4, 6), 16);
+  // Calculate relative luminance using sRGB formula
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance < 0.5;
 }
 
 /**
@@ -126,8 +150,8 @@ function getColorForType(typeId: string): string {
   }
   
   // Deterministically pick a color based on type name hash
-  const colorIndex = hashString(typeId) % DARK_COLOR_PALETTE.length;
-  const color = DARK_COLOR_PALETTE[colorIndex];
+  const colorIndex = hashString(typeId) % COLOR_PALETTE.length;
+  const color = COLOR_PALETTE[colorIndex];
   
   // Save the assignment permanently
   assignments[typeId] = color;
@@ -560,7 +584,15 @@ function App() {
                             <li key={stat.id}>
                               <span
                                 className="cqd-legend-dot"
-                                style={{ backgroundColor: stat.color }}
+                                style={{ 
+                                  backgroundColor: stat.color,
+                                  border: isColorDark(stat.color) 
+                                    ? '1.5px solid rgba(255, 255, 255, 0.8)' 
+                                    : '1.5px solid rgba(0, 0, 0, 0.25)',
+                                  boxShadow: isColorDark(stat.color)
+                                    ? '0 0 0 0.5px rgba(0, 0, 0, 0.15)'
+                                    : 'none'
+                                }}
                               />
                               <span className="cqd-legend-label">{stat.label}</span>
                               <span className="cqd-legend-val">({stat.value})</span>

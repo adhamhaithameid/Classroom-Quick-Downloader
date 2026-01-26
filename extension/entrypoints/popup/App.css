@@ -411,9 +411,11 @@ body {
 }
 
 .cqd-legend-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  box-sizing: border-box;
+  flex-shrink: 0;
 }
 
 .cqd-muted-text {
