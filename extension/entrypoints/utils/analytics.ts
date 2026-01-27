@@ -93,13 +93,32 @@ const CONFIG_URL = WORKER_BASE_URL ? `${WORKER_BASE_URL}/config` : '';
 
 /**
  * Config pulled from Worker /config.
+ * All these values are remotely controllable from Cloudflare dashboard.
  */
 type AnalyticsConfig = {
   batchSize: number;
-  lowUsageFlushMinutes: number; // queue < 15
-  midUsageFlushMinutes: number; // 15 <= queue < 35
+  maxDailyRequests: number;  // Max requests per day (default: 50)
+  maxRetry: number;          // Max retries before dropping event (default: 5)
+  flushMode: 'next_day' | 'time_based';
+  lowUsageFlushMinutes: number;  // queue < 15 (only used if flushMode is 'time_based')
+  midUsageFlushMinutes: number;  // 15 <= queue < 35
   highUsageFlushMinutes: number; // 35 <= queue < 50
   remoteEnabled: boolean;
+};
+
+/**
+ * Default values when there's no config/meta yet.
+ * flushMode: 'next_day' means events are sent once daily at 1:00 AM local time.
+ */
+const DEFAULT_CONFIG: AnalyticsConfig = {
+  batchSize: BATCH_SIZE,
+  maxDailyRequests: 50,
+  maxRetry: MAX_RETRY,
+  flushMode: 'next_day',
+  lowUsageFlushMinutes: 1440,  // 24h = next day
+  midUsageFlushMinutes: 1440,
+  highUsageFlushMinutes: 1440,
+  remoteEnabled: REMOTE_ENABLED,
 };
 
 /**
@@ -109,17 +128,6 @@ type AnalyticsMeta = {
   lastFlushAt: number | null;
   nextRetryAt: number | null;
   backoffIndex: number;
-};
-
-/**
- * Default values when there's no config/meta yet.
- */
-const DEFAULT_CONFIG: AnalyticsConfig = {
-  batchSize: BATCH_SIZE,
-  lowUsageFlushMinutes: 120,
-  midUsageFlushMinutes: 60,
-  highUsageFlushMinutes: 30,
-  remoteEnabled: REMOTE_ENABLED,
 };
 
 const DEFAULT_META: AnalyticsMeta = {
@@ -245,20 +253,37 @@ interface RateLimitState {
 /**
  * Check if we can make a request today and increment counter.
  * Also returns isNewDay flag for consolidation logic.
+ * 
+ * Day resets at 1:00 AM LOCAL TIME (not midnight UTC).
+ * This ensures consistent behavior for users in all timezones.
  */
 async function checkAndIncrementRateLimit(): Promise<{ 
   allowed: boolean; 
   remaining: number;
   isNewDay: boolean;
 }> {
-  const today = new Date().toISOString().slice(0, 10);
+  // Get current date adjusted for 1:00 AM reset
+  // If it's before 1:00 AM, treat as previous day
+  const now = new Date();
+  const localHour = now.getHours();
+  
+  // If before 1:00 AM, use yesterday's date for the "day"
+  let effectiveDate: string;
+  if (localHour < 1) {
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    effectiveDate = yesterday.toLocaleDateString('en-CA'); // YYYY-MM-DD format
+  } else {
+    effectiveDate = now.toLocaleDateString('en-CA');
+  }
+  
   const raw = await storageGet(STORAGE_KEY_RATE_LIMIT);
   let state: RateLimitState = raw[STORAGE_KEY_RATE_LIMIT];
   
-  const isNewDay = !state || state.date !== today;
+  const isNewDay = !state || state.date !== effectiveDate;
   
   if (isNewDay) {
-    state = { date: today, count: 0 };
+    state = { date: effectiveDate, count: 0 };
   }
   
   if (state.count >= MAX_DAILY_REQUESTS) {
@@ -382,6 +407,18 @@ async function loadConfig(): Promise<AnalyticsConfig> {
       typeof stored.batchSize === 'number' && stored.batchSize > 0
         ? stored.batchSize
         : DEFAULT_CONFIG.batchSize,
+    maxDailyRequests:
+      typeof stored.maxDailyRequests === 'number' && stored.maxDailyRequests > 0
+        ? stored.maxDailyRequests
+        : DEFAULT_CONFIG.maxDailyRequests,
+    maxRetry:
+      typeof stored.maxRetry === 'number' && stored.maxRetry >= 0
+        ? stored.maxRetry
+        : DEFAULT_CONFIG.maxRetry,
+    flushMode:
+      stored.flushMode === 'next_day' || stored.flushMode === 'time_based'
+        ? stored.flushMode
+        : DEFAULT_CONFIG.flushMode,
     lowUsageFlushMinutes:
       typeof stored.lowUsageFlushMinutes === 'number'
         ? stored.lowUsageFlushMinutes
@@ -1021,9 +1058,12 @@ export async function refreshRemoteAnalyticsConfig(): Promise<void> {
     // {
     //   ok: true,
     //   batchSize: number,
+    //   maxDailyRequests: number,
+    //   maxRetry: number,
+    //   flushMode: 'next_day' | 'time_based',
     //   timeFlushMinutes: { low, mid, high },
     //   remoteEnabled: boolean,
-    //   quota: { batchSizeSuggestion, remoteEnabled, ... }
+    //   quota: { ... }
     // }
     if (!data || data.ok === false) {
       throw new Error('config ok=false');
@@ -1034,6 +1074,18 @@ export async function refreshRemoteAnalyticsConfig(): Promise<void> {
         typeof data.batchSize === 'number'
           ? data.batchSize
           : data.quota?.batchSizeSuggestion ?? DEFAULT_CONFIG.batchSize,
+      maxDailyRequests:
+        typeof data.maxDailyRequests === 'number'
+          ? data.maxDailyRequests
+          : DEFAULT_CONFIG.maxDailyRequests,
+      maxRetry:
+        typeof data.maxRetry === 'number'
+          ? data.maxRetry
+          : DEFAULT_CONFIG.maxRetry,
+      flushMode:
+        data.flushMode === 'next_day' || data.flushMode === 'time_based'
+          ? data.flushMode
+          : DEFAULT_CONFIG.flushMode,
       lowUsageFlushMinutes:
         data.timeFlushMinutes?.low ?? DEFAULT_CONFIG.lowUsageFlushMinutes,
       midUsageFlushMinutes:
@@ -1048,13 +1100,10 @@ export async function refreshRemoteAnalyticsConfig(): Promise<void> {
 
     await saveConfig(cfg);
     console.log(
-      '[Analytics] /config updated:',
-      cfg.batchSize,
-      cfg.lowUsageFlushMinutes,
-      cfg.midUsageFlushMinutes,
-      cfg.highUsageFlushMinutes,
-      'remoteEnabled=',
-      cfg.remoteEnabled,
+      '[Analytics] /config updated: batchSize=', cfg.batchSize,
+      'maxDailyRequests=', cfg.maxDailyRequests,
+      'flushMode=', cfg.flushMode,
+      'remoteEnabled=', cfg.remoteEnabled,
     );
   } catch (err) {
     console.warn(

@@ -1,123 +1,89 @@
-# Security Architecture (Developer Reference)
-
-This document describes the analytics security system for developers.
+# Security & Remote Configuration
 
 ## Overview
 
-The system is designed to **protect the free Cloudflare plan** while ensuring **zero data loss** and **never affecting user downloads**.
-
-```
-User Downloads (unlimited) → Extension Batching (50→1) → Rate Limit (50/day) → Cloudflare
-```
+All analytics behavior is now **remotely controllable** from the Cloudflare dashboard.
 
 ---
 
-## Extension Responsibilities
+## Remote Config (Controllable from Dashboard)
 
-### 1. Batching (50 downloads → 1 request)
-```typescript
-const BATCH_SIZE = 50;
-// After 50 download events, send ONE request to Cloudflare
-```
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `batchSize` | 50 | Downloads per request |
+| `maxDailyRequests` | 50 | Max requests/day |
+| `maxRetry` | 5 | Retries before drop |
+| `flushMode` | `next_day` | When to send |
+| `timeFlushMinutes` | {low:1440, mid:1440, high:1440} | Time-based intervals |
 
-### 2. Daily Request Limit (50 requests/day)
-```typescript
-const MAX_DAILY_REQUESTS = 50;
-// Max 50 requests/day = 2500 downloads tracked per day
-// Remaining events saved locally for tomorrow
-```
-
-### 3. Next-Day Consolidation
-```typescript
-if (rateLimit.isNewDay && queue.length > 0) {
-  // Send ALL pending events in ONE request
-  batch = queue; // Could be 500, 1000, 5000 events!
-}
-```
-
-### 4. Crypto Event IDs
-```typescript
-// Format: ext-<timestamp>-<random12chars>
-// Uses Web Crypto API for strong randomness
-function generateEventId(): string {
-  const ts = Date.now();
-  const rand = crypto.getRandomValues(new Uint8Array(8));
-  return `ext-${ts}-${Array.from(rand, b => b.toString(36)).join('')}`;
-}
-```
-
-### 5. Storage Integrity
-```typescript
-// Checksum-based tamper detection
-const checksum = computeChecksum(JSON.stringify(queue));
-// Warns if data modified outside extension
-```
+### Flush Modes
+- **`next_day`** (default): Events sent at 1:00 AM local time
+- **`time_based`**: Events sent based on timeFlushMinutes intervals
 
 ---
 
-## Worker Responsibilities
+## Admin Endpoints
 
-### 1. Payload Validation
-- JSON parsing
-- Required fields (id, status, timestamp)
-- Event ID format validation
-- Timestamp within 24h past to 5min future
-
-### 2. Idempotency (O(1) deduplication)
-```typescript
-const processedSet = new Set(this.d.processedIds);
-if (processedSet.has(ev.id)) {
-  duplicateCount++;
-  continue; // Skip duplicate
-}
-```
-
-### 3. Buffer Limits
-```typescript
-const MAX_EVENTS_PER_REQUEST = 5000; // Support next-day consolidation
-const MAX_BUFFER_SIZE = 50_000;      // Global buffer limit
-```
-
-### 4. Remote Kill Switch
-```typescript
-// Set hardRemoteOff: true via admin endpoint
-// All extensions switch to local-only mode
-```
-
----
-
-## What Was Removed
-
-- ❌ Per-IP rate limiting (extension handles this)
-- ❌ Burst protection (unnecessary with batching)
-- ❌ Per-request event limit of 10 (increased to 5000)
-
----
-
-## Configuration
-
-| Setting | Default | Controlled By |
-|---------|---------|---------------|
-| `remoteEnabled` | true | Worker /config |
-| `hardRemoteOff` | false | Worker admin |
-| `batchSize` | 50 | Worker /config |
-| `MAX_DAILY_REQUESTS` | 50 | Extension code |
-
----
-
-## Testing
-
-To verify next-day consolidation:
-```javascript
-// In browser console (extension context)
-await chrome.storage.local.set({
-  'cqd_rate_limit_v1': { date: '2020-01-01', count: 50 }
-});
-// This makes extension think it's a new day on next flush
-```
-
-To simulate emergency shutdown:
+### Update Config
 ```bash
-curl -X POST https://your-worker.workers.dev/admin/force-hard-off \
-  -H "Authorization: Bearer YOUR_SECRET"
+curl -X POST https://your-worker.workers.dev/admin/update-config \
+  -H "X-Admin-Secret: YOUR_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "batchSize": 50,
+    "maxDailyRequests": 25,
+    "flushMode": "next_day"
+  }'
 ```
+
+### Emergency Kill Switch
+```bash
+# Disable all remote analytics
+curl -X POST https://your-worker.workers.dev/admin/cut-power \
+  -H "X-Admin-Secret: YOUR_SECRET"
+
+# Re-enable
+curl -X POST https://your-worker.workers.dev/admin/restore-power \
+  -H "X-Admin-Secret: YOUR_SECRET"
+```
+
+---
+
+## Timing
+
+| Event | When |
+|-------|------|
+| Extension day reset | 1:00 AM local time |
+| Extension consolidation | First request after 1:00 AM |
+
+---
+
+## Data Flow
+
+```
+User Downloads → Local Queue → 1:00 AM → Consolidate ALL → ONE Request → Cloudflare
+```
+
+With default `flushMode: 'next_day'`, users can download unlimited files all day. At 1:00 AM local time, ALL pending events are sent in ONE request.
+
+---
+
+## Scenarios
+
+### Normal Day (100 downloads)
+1. User downloads 100 files throughout the day
+2. At 1:00 AM: Extension sends ALL 100 events in 1-2 requests
+3. **Cloudflare requests: 2**
+
+### Heavy Day (5000 downloads)
+1. User downloads 5000 files
+2. At 1:00 AM: Extension sends all in batches of 50
+3. Max 50 requests = 2500 events. Rest saved for next day.
+4. **Cloudflare requests: 50**
+
+### Emergency
+1. You notice Cloudflare quota spiking
+2. Run: `curl .../admin/cut-power`
+3. ALL extensions go local-only immediately
+4. Crisis passes → `curl .../admin/restore-power`
+5. **Zero data lost**

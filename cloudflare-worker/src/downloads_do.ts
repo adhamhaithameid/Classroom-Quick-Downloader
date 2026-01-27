@@ -48,14 +48,45 @@ type DurableStateShape = {
   batchSeq: number;
 
   // --- Security / Anti-Abuse ---
-  // Tracks requests per IP for the current day to prevent single-source DoS
+  // Tracks requests per IP (for monitoring, not enforcement)
   ipCounts: Record<string, number>;
   
   // Set of recently processed event IDs for O(1) idempotency lookup
   processedIds: string[];
   
-  // Burst tracking: requests per IP in current minute
+  // Burst tracking (legacy, kept for compatibility)
   burstCounts: Record<string, { count: number; minute: number }>;
+
+  // =========================================================================
+  // REMOTE CONFIG - Controllable from Cloudflare Dashboard
+  // =========================================================================
+  
+  // Extension batching: downloads per request (default: 50)
+  configBatchSize: number;
+  
+  // Extension rate limit: max requests per day (default: 50)
+  configMaxDailyRequests: number;
+  
+  // Extension retry: max retries before dropping event (default: 5)
+  configMaxRetry: number;
+  
+  // Worker validation: max events per request (default: 5000)
+  configMaxEventsPerRequest: number;
+  
+  // Worker buffer: max events in buffer (default: 50000)
+  configMaxBufferSize: number;
+  
+  // Flush mode: 'next_day' | 'time_based' (default: 'next_day')
+  // next_day: Only flush at 1:00 AM local time
+  // time_based: Flush based on timeFlushMinutes
+  configFlushMode: 'next_day' | 'time_based';
+  
+  // Time-based flush intervals (only used if flushMode is 'time_based')
+  configTimeFlushMinutes: {
+    low: number;   // queue < 15 events
+    mid: number;   // 15-35 events  
+    high: number;  // 35+ events
+  };
 };
 
 const DEFAULT_COUNTERS: Counters = {
@@ -211,6 +242,15 @@ export class DownloadsDurable {
       ipCounts: {},
       processedIds: [],
       burstCounts: {},
+
+      // Remote config defaults
+      configBatchSize: 50,
+      configMaxDailyRequests: 50,
+      configMaxRetry: 5,
+      configMaxEventsPerRequest: 5000,
+      configMaxBufferSize: 50000,
+      configFlushMode: 'next_day',
+      configTimeFlushMinutes: { low: 1440, mid: 1440, high: 1440 }, // 1440 = 24h = next day
     };
 
     if (!stored) {
@@ -254,6 +294,15 @@ export class DownloadsDurable {
       ipCounts: stored.ipCounts ?? {},
       processedIds: Array.isArray(stored.processedIds) ? stored.processedIds : [],
       burstCounts: stored.burstCounts ?? {},
+
+      // Remote config - preserve stored values or use defaults
+      configBatchSize: stored.configBatchSize ?? base.configBatchSize,
+      configMaxDailyRequests: stored.configMaxDailyRequests ?? base.configMaxDailyRequests,
+      configMaxRetry: stored.configMaxRetry ?? base.configMaxRetry,
+      configMaxEventsPerRequest: stored.configMaxEventsPerRequest ?? base.configMaxEventsPerRequest,
+      configMaxBufferSize: stored.configMaxBufferSize ?? base.configMaxBufferSize,
+      configFlushMode: stored.configFlushMode ?? base.configFlushMode,
+      configTimeFlushMinutes: stored.configTimeFlushMinutes ?? base.configTimeFlushMinutes,
     };
   }
 
@@ -347,6 +396,11 @@ export class DownloadsDurable {
 
     if (pathname === "/admin/restore-power" && request.method === "POST") {
       return this.handleAdminRestorePower(request);
+    }
+
+    // Admin endpoint to update remote config (batchSize, maxDailyRequests, etc.)
+    if (pathname === "/admin/update-config" && request.method === "POST") {
+      return this.handleAdminUpdateConfig(request);
     }
 
     if (pathname === "/admin/full-sync" && request.method === "POST") {
@@ -607,6 +661,7 @@ export class DownloadsDurable {
 
   /**
    * Config endpoint used by the extension to adapt batching / flush behaviour.
+   * All these values are controllable from Cloudflare dashboard via admin endpoints.
    */
   private async handleConfig(): Promise<Response> {
     this.ensureRequestDay();
@@ -615,15 +670,25 @@ export class DownloadsDurable {
       this.d.hardRemoteOff,
     );
 
-    const config: ConfigResponse = {
+    // Return all remote-controllable config values
+    const config = {
       ok: true,
-      batchSize: quota.batchSizeSuggestion,
-      timeFlushMinutes: {
-        low: 120,
-        mid: 60,
-        high: 30,
-      },
+      
+      // Batching config
+      batchSize: this.d.configBatchSize,
+      maxDailyRequests: this.d.configMaxDailyRequests,
+      maxRetry: this.d.configMaxRetry,
+      
+      // Flush mode: 'next_day' (default) or 'time_based'
+      flushMode: this.d.configFlushMode,
+      
+      // Time-based flush intervals (only used if flushMode is 'time_based')
+      timeFlushMinutes: this.d.configTimeFlushMinutes,
+      
+      // Remote enabled (can be disabled for emergencies)
       remoteEnabled: quota.remoteEnabled,
+      
+      // Quota info for extension awareness
       quota,
     };
 
@@ -651,6 +716,17 @@ export class DownloadsDurable {
 
   private async handleDebugReset(): Promise<Response> {
     const today = todayUtcDate();
+    // Preserve config settings during reset
+    const preservedConfig = {
+      configBatchSize: this.d.configBatchSize ?? 50,
+      configMaxDailyRequests: this.d.configMaxDailyRequests ?? 50,
+      configMaxRetry: this.d.configMaxRetry ?? 5,
+      configMaxEventsPerRequest: this.d.configMaxEventsPerRequest ?? 5000,
+      configMaxBufferSize: this.d.configMaxBufferSize ?? 50000,
+      configFlushMode: this.d.configFlushMode ?? 'next_day' as const,
+      configTimeFlushMinutes: this.d.configTimeFlushMinutes ?? { low: 1440, mid: 1440, high: 1440 },
+    };
+    
     this.data = {
       totalEvents: 0,
       totalDownloads: 0,
@@ -669,6 +745,7 @@ export class DownloadsDurable {
       ipCounts: {},
       processedIds: [],
       burstCounts: {},
+      ...preservedConfig,
     };
     await this.state.storage.delete(STORAGE_KEY);
     await this.state.storage.deleteAlarm();
@@ -697,6 +774,82 @@ export class DownloadsDurable {
       ok: true,
       sent: result.sent,
       remaining: this.d.buffer.length,
+    });
+  }
+
+  /**
+   * Admin endpoint to update remote config values.
+   * All extensions will pick up these changes on their next config fetch.
+   * 
+   * POST /admin/update-config
+   * Body: { batchSize?: number, maxDailyRequests?: number, maxRetry?: number, 
+   *         maxEventsPerRequest?: number, maxBufferSize?: number,
+   *         flushMode?: 'next_day' | 'time_based',
+   *         timeFlushMinutes?: { low: number, mid: number, high: number } }
+   */
+  private async handleAdminUpdateConfig(request: Request): Promise<Response> {
+    if (!this.isAuthorizedAdmin(request)) {
+      return json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+
+    let body: Record<string, unknown>;
+    try {
+      body = await request.json();
+    } catch {
+      return json({ ok: false, error: "invalid_json" }, { status: 400 });
+    }
+
+    // Update each config field if provided and valid
+    if (typeof body.batchSize === 'number' && body.batchSize > 0 && body.batchSize <= 1000) {
+      this.d.configBatchSize = body.batchSize;
+    }
+    
+    if (typeof body.maxDailyRequests === 'number' && body.maxDailyRequests > 0 && body.maxDailyRequests <= 1000) {
+      this.d.configMaxDailyRequests = body.maxDailyRequests;
+    }
+    
+    if (typeof body.maxRetry === 'number' && body.maxRetry >= 0 && body.maxRetry <= 20) {
+      this.d.configMaxRetry = body.maxRetry;
+    }
+    
+    if (typeof body.maxEventsPerRequest === 'number' && body.maxEventsPerRequest > 0 && body.maxEventsPerRequest <= 50000) {
+      this.d.configMaxEventsPerRequest = body.maxEventsPerRequest;
+    }
+    
+    if (typeof body.maxBufferSize === 'number' && body.maxBufferSize > 0 && body.maxBufferSize <= 500000) {
+      this.d.configMaxBufferSize = body.maxBufferSize;
+    }
+    
+    if (body.flushMode === 'next_day' || body.flushMode === 'time_based') {
+      this.d.configFlushMode = body.flushMode;
+    }
+    
+    if (body.timeFlushMinutes && typeof body.timeFlushMinutes === 'object') {
+      const tfm = body.timeFlushMinutes as Record<string, unknown>;
+      if (typeof tfm.low === 'number' && typeof tfm.mid === 'number' && typeof tfm.high === 'number') {
+        this.d.configTimeFlushMinutes = {
+          low: Math.max(1, Math.min(10080, tfm.low)),   // 1 min to 7 days
+          mid: Math.max(1, Math.min(10080, tfm.mid)),
+          high: Math.max(1, Math.min(10080, tfm.high)),
+        };
+      }
+    }
+
+    await this.persist();
+
+    // Return current config state
+    return json({
+      ok: true,
+      message: "Config updated. Extensions will pick up changes on next config fetch.",
+      config: {
+        batchSize: this.d.configBatchSize,
+        maxDailyRequests: this.d.configMaxDailyRequests,
+        maxRetry: this.d.configMaxRetry,
+        maxEventsPerRequest: this.d.configMaxEventsPerRequest,
+        maxBufferSize: this.d.configMaxBufferSize,
+        flushMode: this.d.configFlushMode,
+        timeFlushMinutes: this.d.configTimeFlushMinutes,
+      },
     });
   }
 
