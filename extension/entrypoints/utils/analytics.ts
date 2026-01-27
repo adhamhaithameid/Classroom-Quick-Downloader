@@ -242,23 +242,33 @@ interface RateLimitState {
   count: number;
 }
 
-async function checkAndIncrementRateLimit(): Promise<{ allowed: boolean; remaining: number }> {
+/**
+ * Check if we can make a request today and increment counter.
+ * Also returns isNewDay flag for consolidation logic.
+ */
+async function checkAndIncrementRateLimit(): Promise<{ 
+  allowed: boolean; 
+  remaining: number;
+  isNewDay: boolean;
+}> {
   const today = new Date().toISOString().slice(0, 10);
   const raw = await storageGet(STORAGE_KEY_RATE_LIMIT);
   let state: RateLimitState = raw[STORAGE_KEY_RATE_LIMIT];
   
-  if (!state || state.date !== today) {
+  const isNewDay = !state || state.date !== today;
+  
+  if (isNewDay) {
     state = { date: today, count: 0 };
   }
   
   if (state.count >= MAX_DAILY_REQUESTS) {
-    return { allowed: false, remaining: 0 };
+    return { allowed: false, remaining: 0, isNewDay };
   }
   
   state.count += 1;
   await storageSet({ [STORAGE_KEY_RATE_LIMIT]: state });
   
-  return { allowed: true, remaining: MAX_DAILY_REQUESTS - state.count };
+  return { allowed: true, remaining: MAX_DAILY_REQUESTS - state.count, isNewDay };
 }
 
 // -------------------------------------------------------
@@ -771,24 +781,43 @@ async function internalFlush(): Promise<void> {
     return;
   }
 
-  const effectiveBatchSize = cfg.batchSize || BATCH_SIZE;
-  const batch = queue.slice(0, effectiveBatchSize);
-  const rest = queue.slice(effectiveBatchSize);
 
   // =========================================================================
-  // EXTENSION-SIDE RATE LIMIT CHECK (defense in depth)
+  // EXTENSION-SIDE RATE LIMIT CHECK (50 requests/day)
   // =========================================================================
   const rateLimit = await checkAndIncrementRateLimit();
   if (!rateLimit.allowed) {
     console.warn(
-      '[Analytics] Extension daily rate limit exceeded (50/day). Keeping events local until tomorrow.',
+      '[Analytics] Daily request limit reached (50/day). Events saved locally, will send tomorrow.',
     );
     // Don't update backoff - this is intentional hold, not a failure
     return;
   }
+
+  // =========================================================================
+  // NEW DAY CONSOLIDATION: Send ALL pending events in ONE request
+  // This saves Cloudflare requests by combining everything accumulated overnight
+  // =========================================================================
+  let batch: AnalyticsEvent[];
+  let rest: AnalyticsEvent[];
+  
+  if (rateLimit.isNewDay && queue.length > 0) {
+    // New day! Consolidate ALL pending events into one request
+    // This is the most efficient use of our daily 50 request quota
+    console.log(
+      `[Analytics] New day detected! Consolidating ${queue.length} pending events into ONE request.`,
+    );
+    batch = queue; // Send everything
+    rest = [];
+  } else {
+    // Normal batching: send up to batchSize (50) events
+    const effectiveBatchSize = cfg.batchSize || BATCH_SIZE;
+    batch = queue.slice(0, effectiveBatchSize);
+    rest = queue.slice(effectiveBatchSize);
+  }
   
   console.log(
-    `[Analytics] Attempting flush. Sending ${batch.length} events (${rateLimit.remaining} requests remaining today).`,
+    `[Analytics] Sending ${batch.length} events (${rateLimit.remaining} requests remaining today).`,
   );
 
   const result = await sendBatchToCloudflare(batch);

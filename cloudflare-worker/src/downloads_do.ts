@@ -375,12 +375,11 @@ export class DownloadsDurable {
   // ---------------------------------------------------------------------------
 
   private async handleTrack(request: Request): Promise<Response> {
-    // Update daily request counters
+    // Update daily request counters (for dashboard monitoring only)
     this.ensureRequestDay();
     this.d.reqCountToday += 1;
 
     const now = Date.now();
-    const currentMinute = Math.floor(now / 60000);
 
     // --- Country from CF header ---
     const countryHeader = request.headers.get("X-Geo-Country");
@@ -389,46 +388,14 @@ export class DownloadsDurable {
         ? countryHeader
         : undefined;
 
-    // --- IP Extraction ---
+    // --- IP Extraction (for audit logging only, not rate limiting) ---
     const ip = request.headers.get("X-Client-IP") || "unknown";
-
-    // =========================================================================
-    // LAYER 1: BURST PROTECTION (max 5 requests per IP per minute)
-    // =========================================================================
-    const MAX_BURST_PER_MINUTE = 5;
-    if (!this.d.burstCounts) this.d.burstCounts = {};
     
-    const burst = this.d.burstCounts[ip];
-    if (burst && burst.minute === currentMinute) {
-      burst.count += 1;
-      if (burst.count > MAX_BURST_PER_MINUTE) {
-        await this.persist();
-        return json(
-          { ok: false, error: "burst_limit_exceeded", message: "Too many requests per minute. Slow down." },
-          { status: 429 }
-        );
-      }
-    } else {
-      this.d.burstCounts[ip] = { count: 1, minute: currentMinute };
-    }
+    // Track IP for monitoring (no enforcement - extension handles rate limiting)
+    this.d.ipCounts[ip] = (this.d.ipCounts[ip] || 0) + 1;
 
     // =========================================================================
-    // LAYER 2: DAILY RATE LIMITING (50 requests per IP per day)
-    // =========================================================================
-    const MAX_PER_IP_DAILY = 50;
-    const ipCount = (this.d.ipCounts[ip] || 0) + 1;
-    this.d.ipCounts[ip] = ipCount;
-
-    if (ipCount > MAX_PER_IP_DAILY) {
-      await this.persist();
-      return json(
-        { ok: false, error: "rate_limit_exceeded", message: "Daily limit exceeded. Try again tomorrow.", limit: MAX_PER_IP_DAILY },
-        { status: 429 }
-      );
-    }
-
-    // =========================================================================
-    // LAYER 3: PAYLOAD VALIDATION
+    // LAYER 1: PAYLOAD VALIDATION
     // =========================================================================
     let body: { events?: StoredEvent[] } | null = null;
     try {
@@ -444,8 +411,8 @@ export class DownloadsDurable {
       return json({ ok: true, accepted: 0 }, { status: 202 });
     }
 
-    // Strict event limit per request (prevents batch abuse)
-    const MAX_EVENTS_PER_REQUEST = 10;
+    // Allow large batches to support next-day consolidation (extension sends all pending at once)
+    const MAX_EVENTS_PER_REQUEST = 5000;
     const MAX_BUFFER_SIZE = 50_000;
 
     if (events.length > MAX_EVENTS_PER_REQUEST) {
@@ -582,20 +549,12 @@ export class DownloadsDurable {
     }
 
     // =========================================================================
-    // LAYER 5: CLEANUP - Trim processedIds to prevent unbounded growth
+    // CLEANUP - Trim processedIds to prevent unbounded growth
     // =========================================================================
     const MAX_PROCESSED_IDS_TRIM = 5000;
     if (this.d.processedIds.length > MAX_PROCESSED_IDS_TRIM) {
       // Keep newest IDs (from end)
       this.d.processedIds = this.d.processedIds.slice(-MAX_PROCESSED_IDS_TRIM);
-    }
-
-    // Clean up old burst entries (older than 2 minutes)
-    const oldMinute = currentMinute - 2;
-    for (const [burstIp, burstData] of Object.entries(this.d.burstCounts)) {
-      if (burstData.minute < oldMinute) {
-        delete this.d.burstCounts[burstIp];
-      }
     }
 
     await this.persist();

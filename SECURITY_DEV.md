@@ -4,186 +4,120 @@ This document describes the analytics security system for developers.
 
 ## Overview
 
-The system implements **defense in depth** with multiple independent security layers. Even if one layer fails, others provide protection.
+The system is designed to **protect the free Cloudflare plan** while ensuring **zero data loss** and **never affecting user downloads**.
 
-```mermaid
-flowchart LR
-    A[Extension] -->|Rate Limited| B[Cloudflare Worker]
-    B -->|5 Layers| C[Oracle DB]
-    
-    subgraph Extension Side
-        A1[Crypto Event IDs]
-        A2[Storage Integrity]
-        A3[50/day Limit]
-    end
-    
-    subgraph Worker Side
-        B1[Burst: 5/min]
-        B2[Daily: 50/IP]
-        B3[Validation]
-        B4[Idempotency]
-        B5[Cleanup]
-    end
+```
+User Downloads (unlimited) → Extension Batching (50→1) → Rate Limit (50/day) → Cloudflare
 ```
 
 ---
 
-## Worker Security (5 Layers)
+## Extension Responsibilities
 
-### Layer 1: Burst Protection
+### 1. Batching (50 downloads → 1 request)
 ```typescript
-const MAX_BURST_PER_MINUTE = 5;
-// Prevents rapid-fire requests from single IP
-// Returns: 429 burst_limit_exceeded
+const BATCH_SIZE = 50;
+// After 50 download events, send ONE request to Cloudflare
 ```
 
-### Layer 2: Daily Rate Limiting
+### 2. Daily Request Limit (50 requests/day)
 ```typescript
-const MAX_PER_IP_DAILY = 50;
-// Resets at midnight UTC
-// Returns: 429 rate_limit_exceeded
+const MAX_DAILY_REQUESTS = 50;
+// Max 50 requests/day = 2500 downloads tracked per day
+// Remaining events saved locally for tomorrow
 ```
 
-### Layer 3: Payload Validation
-| Check | Limit | Error |
-|-------|-------|-------|
-| Events per request | 10 | `too_many_events` |
-| Buffer size | 50,000 | `buffer_full` |
-| JSON parsing | - | `invalid_json` |
-
-### Layer 4: Robust Idempotency
+### 3. Next-Day Consolidation
 ```typescript
-// Event ID format: ext-<timestamp>-<random12chars>
-// Validation:
-// - ID required, min 10 chars
-// - Format must match regex
-// - Timestamp within 24h past to 5min future
-// - O(1) Set-based deduplication (5000 ID cache)
+if (rateLimit.isNewDay && queue.length > 0) {
+  // Send ALL pending events in ONE request
+  batch = queue; // Could be 500, 1000, 5000 events!
+}
 ```
 
-### Layer 5: Automatic Cleanup
-- **processedIds**: Trimmed to newest 5000
-- **burstCounts**: Entries older than 2 minutes deleted
-- Prevents unbounded memory growth
-
----
-
-## Extension Security
-
-### Cryptographic Event IDs
+### 4. Crypto Event IDs
 ```typescript
-// Uses Web Crypto API when available
-crypto.getRandomValues(new Uint8Array(8))
 // Format: ext-<timestamp>-<random12chars>
-// Worker validates format + timestamp range
+// Uses Web Crypto API for strong randomness
+function generateEventId(): string {
+  const ts = Date.now();
+  const rand = crypto.getRandomValues(new Uint8Array(8));
+  return `ext-${ts}-${Array.from(rand, b => b.toString(36)).join('')}`;
+}
 ```
 
-### Storage Integrity Protection
+### 5. Storage Integrity
 ```typescript
 // Checksum-based tamper detection
 const checksum = computeChecksum(JSON.stringify(queue));
-// Stored alongside queue with count + timestamp
-// Warns if checksum mismatch detected
+// Warns if data modified outside extension
 ```
 
-### Extension-Side Rate Limiting
+---
+
+## Worker Responsibilities
+
+### 1. Payload Validation
+- JSON parsing
+- Required fields (id, status, timestamp)
+- Event ID format validation
+- Timestamp within 24h past to 5min future
+
+### 2. Idempotency (O(1) deduplication)
 ```typescript
-const MAX_DAILY_REQUESTS = 50;
-// Defense in depth - matches worker limit
-// Prevents wasted network requests
-// Events stay local until tomorrow
+const processedSet = new Set(this.d.processedIds);
+if (processedSet.has(ev.id)) {
+  duplicateCount++;
+  continue; // Skip duplicate
+}
 ```
 
----
-
-## Error Response Types
-
-| Status | Error | Meaning |
-|--------|-------|---------|
-| 429 | `burst_limit_exceeded` | >5 requests/minute |
-| 429 | `rate_limit_exceeded` | >50 requests/day |
-| 400 | `too_many_events` | >10 events in batch |
-| 400 | `invalid_json` | Malformed request body |
-| 503 | `buffer_full` | Worker buffer at capacity |
-
----
-
-## Data Flow
-
-1. **Track Event**
-   - Generate crypto event ID
-   - Save to local storage (LOCAL FIRST)
-   - Update local stats
-   - Check flush conditions
-
-2. **Flush Attempt**
-   - Check extension rate limit (50/day)
-   - Check backoff schedule
-   - Send batch (max 10 events)
-
-3. **Worker Processing**
-   - Layer 1: Burst check
-   - Layer 2: Daily limit check
-   - Layer 3: Payload validation
-   - Layer 4: Idempotency check
-   - Process valid events
-   - Layer 5: Cleanup
-
-4. **Response Handling**
-   - Success: Remove from queue
-   - Rate limited: Extended backoff (3x)
-   - Other failure: Normal backoff + retry
-
----
-
-## Security Guarantees
-
-| Threat | Protection |
-|--------|------------|
-| DoS from single source | 50/day rate limit |
-| Burst spam | 5/min burst limit |
-| Replay attacks | Idempotency + timestamp validation |
-| ID spoofing | Format validation + timestamp range |
-| Data tampering | Storage integrity checksum |
-| Data loss | LOCAL FIRST + retry queue |
-
----
-
-## Configuration Constants
-
-### Worker (`downloads_do.ts`)
+### 3. Buffer Limits
 ```typescript
-MAX_BURST_PER_MINUTE = 5
-MAX_PER_IP_DAILY = 50
-MAX_EVENTS_PER_REQUEST = 10
-MAX_PROCESSED_IDS = 5000
-MAX_EVENT_AGE_MS = 24 hours
-MAX_FUTURE_DRIFT_MS = 5 minutes
+const MAX_EVENTS_PER_REQUEST = 5000; // Support next-day consolidation
+const MAX_BUFFER_SIZE = 50_000;      // Global buffer limit
 ```
 
-### Extension (`analytics.ts`)
+### 4. Remote Kill Switch
 ```typescript
-MAX_DAILY_REQUESTS = 50
-MAX_RETRY = 5
-BACKOFF_STEPS = [60, 300, 900, 1800, 3600, 10800, 21600, 43200, 86400]
+// Set hardRemoteOff: true via admin endpoint
+// All extensions switch to local-only mode
 ```
+
+---
+
+## What Was Removed
+
+- ❌ Per-IP rate limiting (extension handles this)
+- ❌ Burst protection (unnecessary with batching)
+- ❌ Per-request event limit of 10 (increased to 5000)
+
+---
+
+## Configuration
+
+| Setting | Default | Controlled By |
+|---------|---------|---------------|
+| `remoteEnabled` | true | Worker /config |
+| `hardRemoteOff` | false | Worker admin |
+| `batchSize` | 50 | Worker /config |
+| `MAX_DAILY_REQUESTS` | 50 | Extension code |
 
 ---
 
 ## Testing
 
-To test rate limiting:
-```bash
-# Simulate burst (should fail after 5th request)
-for i in {1..10}; do
-  curl -X POST https://your-worker.workers.dev/track \
-    -H "Content-Type: application/json" \
-    -d '{"events":[{"id":"ext-'$(date +%s)'000-abc123def456","status":"success","file_type":"pdf","timestamp":'$(date +%s)'000}]}'
-done
+To verify next-day consolidation:
+```javascript
+// In browser console (extension context)
+await chrome.storage.local.set({
+  'cqd_rate_limit_v1': { date: '2020-01-01', count: 50 }
+});
+// This makes extension think it's a new day on next flush
 ```
 
-To reset worker state (admin only):
+To simulate emergency shutdown:
 ```bash
-curl -X POST https://your-worker.workers.dev/debug/reset \
+curl -X POST https://your-worker.workers.dev/admin/force-hard-off \
   -H "Authorization: Bearer YOUR_SECRET"
 ```
