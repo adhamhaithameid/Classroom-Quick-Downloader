@@ -56,6 +56,7 @@ func main() {
 	mux.HandleFunc("/api/stats/breakdown", handlers.BreakdownHandler(sqlDB))
 	mux.HandleFunc("/api/stats/comparison", handlers.ComparisonHandler(sqlDB))
 	mux.HandleFunc("/api/stats/export", handlers.ExportHandler(sqlDB))
+	mux.HandleFunc("/api/deploy-status", handlers.DeployStatusHandler())
 
 	// Serve static dashboard with SPA fallback.
 	mux.Handle("/", spaHandler(staticDir))
