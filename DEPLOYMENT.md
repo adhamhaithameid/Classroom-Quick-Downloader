@@ -20,9 +20,25 @@ scp -r oracle-backend opc@your-server-ip:~/oracle-backend
 On the server, edit `docker-compose.yml` or create a `.env` file to set a strong secret.
 ```bash
 cd ~/oracle-backend
-# Set your shared secret (must match Cloudflare Worker)
-export DO_SHARED_SECRET="your-super-secret-password-here"
+
+# 1. Set your shared secret (must match Cloudflare Worker)
+export DO_SHARED_SECRET="your-password-here"
+
+# 2. Google Sheets Configuration (Required for 12:15 AM scheduled flush)
+# Create a Google Sheet and share it with your Service Account email
+export SHEETS_ID="your-google-sheet-id"
+# Ensure your service account JSON is at ./google-credentials.json
+export GOOGLE_CREDS_PATH="/app/google-credentials.json"
 ```
+
+#### Getting Google Sheets Credentials
+1. Create a Project in [Google Cloud Console](https://console.cloud.google.com/).
+2. Enable **"Google Sheets API"**.
+3. Create a **Service Account** and download the JSON key.
+4. Rename it to `google-credentials.json` and place it in `oracle-backend/`.
+5. Create a new Google Sheet.
+6. **Share** the sheet with the Service Account email address (Editor access).
+7. Copy the Sheet ID from the URL: `docs.google.com/spreadsheets/d/THIS_PART_IS_THE_ID/edit`
 
 ### 3. Deploy
 Start the service using Docker Compose.

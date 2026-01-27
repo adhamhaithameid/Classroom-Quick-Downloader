@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -55,9 +56,17 @@ func main() {
 	mux.HandleFunc("/api/stats/breakdown", handlers.BreakdownHandler(sqlDB))
 	mux.HandleFunc("/api/stats/comparison", handlers.ComparisonHandler(sqlDB))
 	mux.HandleFunc("/api/stats/export", handlers.ExportHandler(sqlDB))
+	mux.HandleFunc("/api/deploy-status", handlers.DeployStatusHandler())
 
 	// Serve static dashboard with SPA fallback.
 	mux.Handle("/", spaHandler(staticDir))
+
+	// =========================================================================
+	// SCHEDULED 12:15 AM GOOGLE SHEETS EXPORT
+	// Runs daily at 00:15 to archive stats to Google Sheets
+	// Configure via SHEETS_ID and GOOGLE_CREDS_PATH env vars
+	// =========================================================================
+	go scheduleSheetsArchiver()
 
 	server := &http.Server{
 		Addr:              addr,
@@ -129,4 +138,62 @@ func spaHandler(staticDir string) http.Handler {
 		// Otherwise serve SPA entry (index.html)
 		http.ServeFile(w, r, filepath.Join(staticDir, "index.html"))
 	})
+}
+
+// scheduleSheetsArchiver runs a scheduled task at 00:15 daily to export stats to Google Sheets.
+// Configure with environment variables:
+// - SHEETS_ID: Google Sheets spreadsheet ID
+// - GOOGLE_CREDS_PATH: Path to service account JSON (default: /app/google-credentials.json)
+// - KUMA_PUSH_URL: Optional Uptime Kuma push URL
+func scheduleSheetsArchiver() {
+	sheetsID := os.Getenv("SHEETS_ID")
+	if sheetsID == "" {
+		log.Println("[Scheduler] SHEETS_ID not set, skipping automated Sheets export")
+		return
+	}
+
+	credsPath := getenv("GOOGLE_CREDS_PATH", "/app/google-credentials.json")
+	kumaPushURL := os.Getenv("KUMA_PUSH_URL")
+	
+	log.Printf("[Scheduler] Sheets archiver enabled: sheet=%s, creds=%s", sheetsID, credsPath)
+	
+	for {
+		// Calculate time until next 00:15
+		now := time.Now()
+		next := time.Date(now.Year(), now.Month(), now.Day(), 0, 15, 0, 0, now.Location())
+		if now.After(next) {
+			next = next.Add(24 * time.Hour)
+		}
+		sleepDuration := time.Until(next)
+		
+		log.Printf("[Scheduler] Next Sheets export at %s (in %s)", next.Format(time.RFC3339), sleepDuration.Round(time.Minute))
+		time.Sleep(sleepDuration)
+		
+		// Run the archiver
+		log.Println("[Scheduler] Running scheduled Sheets export...")
+		runArchiver(sheetsID, credsPath, kumaPushURL)
+	}
+}
+
+// runArchiver executes the archiver binary with the given parameters.
+// This calls the archiver as a subprocess to maintain separation of concerns.
+func runArchiver(sheetsID, credsPath, kumaPushURL string) {
+	args := []string{"-sheet", sheetsID, "-creds", credsPath, "-api", "http://localhost:8080/api/stats/summary"}
+	if kumaPushURL != "" {
+		args = append(args, "-kuma", kumaPushURL)
+	}
+	
+	// Note: In production, the archiver binary should be at /app/archiver
+	// For development, set ARCHIVER_PATH env var
+	archiverPath := getenv("ARCHIVER_PATH", "/app/archiver")
+	
+	cmd := exec.Command(archiverPath, args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	
+	if err := cmd.Run(); err != nil {
+		log.Printf("[Scheduler] Archiver failed: %v", err)
+	} else {
+		log.Println("[Scheduler] Sheets export completed successfully")
+	}
 }

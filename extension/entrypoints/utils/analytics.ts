@@ -13,6 +13,12 @@ export interface AnalyticsEvent {
   timestamp: number;
 
   /**
+   * Unique event ID for idempotency (deduplication on worker).
+   * Format: "ext-<timestamp>-<random>"
+   */
+  id?: string;
+
+  /**
    * Optional: where this came from ("download_all", "single", etc.)
    * Currently not used in your UI, but forwarded to Cloudflare.
    */
@@ -87,13 +93,32 @@ const CONFIG_URL = WORKER_BASE_URL ? `${WORKER_BASE_URL}/config` : '';
 
 /**
  * Config pulled from Worker /config.
+ * All these values are remotely controllable from Cloudflare dashboard.
  */
 type AnalyticsConfig = {
   batchSize: number;
-  lowUsageFlushMinutes: number; // queue < 15
-  midUsageFlushMinutes: number; // 15 <= queue < 35
+  maxDailyRequests: number;  // Max requests per day (default: 50)
+  maxRetry: number;          // Max retries before dropping event (default: 5)
+  flushMode: 'next_day' | 'time_based';
+  lowUsageFlushMinutes: number;  // queue < 15 (only used if flushMode is 'time_based')
+  midUsageFlushMinutes: number;  // 15 <= queue < 35
   highUsageFlushMinutes: number; // 35 <= queue < 50
   remoteEnabled: boolean;
+};
+
+/**
+ * Default values when there's no config/meta yet.
+ * flushMode: 'next_day' means events are sent once daily at 1:00 AM local time.
+ */
+const DEFAULT_CONFIG: AnalyticsConfig = {
+  batchSize: BATCH_SIZE,
+  maxDailyRequests: 50,
+  maxRetry: MAX_RETRY,
+  flushMode: 'next_day',
+  lowUsageFlushMinutes: 1440,  // 24h = next day
+  midUsageFlushMinutes: 1440,
+  highUsageFlushMinutes: 1440,
+  remoteEnabled: REMOTE_ENABLED,
 };
 
 /**
@@ -103,17 +128,6 @@ type AnalyticsMeta = {
   lastFlushAt: number | null;
   nextRetryAt: number | null;
   backoffIndex: number;
-};
-
-/**
- * Default values when there's no config/meta yet.
- */
-const DEFAULT_CONFIG: AnalyticsConfig = {
-  batchSize: BATCH_SIZE,
-  lowUsageFlushMinutes: 120,
-  midUsageFlushMinutes: 60,
-  highUsageFlushMinutes: 30,
-  remoteEnabled: REMOTE_ENABLED,
 };
 
 const DEFAULT_META: AnalyticsMeta = {
@@ -202,6 +216,140 @@ function getExtensionVersion(): string {
   return '0.0.0';
 }
 
+/**
+ * Generate a cryptographically strong unique event ID for idempotency.
+ * Format: ext-<timestamp>-<random12chars>
+ * Uses Web Crypto API for stronger randomness when available.
+ */
+function generateEventId(): string {
+  const ts = Date.now();
+  let rand: string;
+  
+  // Try to use crypto API for stronger randomness
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    const arr = new Uint8Array(8);
+    crypto.getRandomValues(arr);
+    rand = Array.from(arr, b => b.toString(36).padStart(2, '0')).join('').substring(0, 12);
+  } else {
+    // Fallback to Math.random (less secure but functional)
+    rand = Math.random().toString(36).substring(2, 14);
+  }
+  
+  return `ext-${ts}-${rand}`;
+}
+
+// -------------------------------------------------------
+// Extension-side Rate Limiting (defense in depth)
+// -------------------------------------------------------
+
+const STORAGE_KEY_RATE_LIMIT = 'cqd_rate_limit_v1';
+const MAX_DAILY_REQUESTS = 50;
+
+interface RateLimitState {
+  date: string; // YYYY-MM-DD UTC
+  count: number;
+}
+
+/**
+ * Check if we can make a request today and increment counter.
+ * Also returns isNewDay flag for consolidation logic.
+ * 
+ * Day resets at 1:00 AM LOCAL TIME (not midnight UTC).
+ * This ensures consistent behavior for users in all timezones.
+ */
+async function checkAndIncrementRateLimit(): Promise<{ 
+  allowed: boolean; 
+  remaining: number;
+  isNewDay: boolean;
+}> {
+  // Get current date adjusted for 1:00 AM reset
+  // If it's before 1:00 AM, treat as previous day
+  const now = new Date();
+  const localHour = now.getHours();
+  
+  // If before 1:00 AM, use yesterday's date for the "day"
+  let effectiveDate: string;
+  if (localHour < 1) {
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    effectiveDate = yesterday.toLocaleDateString('en-CA'); // YYYY-MM-DD format
+  } else {
+    effectiveDate = now.toLocaleDateString('en-CA');
+  }
+  
+  const raw = await storageGet(STORAGE_KEY_RATE_LIMIT);
+  let state: RateLimitState = raw[STORAGE_KEY_RATE_LIMIT];
+  
+  const isNewDay = !state || state.date !== effectiveDate;
+  
+  if (isNewDay) {
+    state = { date: effectiveDate, count: 0 };
+  }
+  
+  if (state.count >= MAX_DAILY_REQUESTS) {
+    return { allowed: false, remaining: 0, isNewDay };
+  }
+  
+  state.count += 1;
+  await storageSet({ [STORAGE_KEY_RATE_LIMIT]: state });
+  
+  return { allowed: true, remaining: MAX_DAILY_REQUESTS - state.count, isNewDay };
+}
+
+// -------------------------------------------------------
+// Storage Integrity Protection
+// -------------------------------------------------------
+
+const INTEGRITY_KEY = 'cqd_integrity_v1';
+
+/**
+ * Simple checksum for tamper detection.
+ * Not cryptographically secure, but detects accidental/casual tampering.
+ */
+function computeChecksum(data: string): string {
+  let hash = 0;
+  for (let i = 0; i < data.length; i++) {
+    const char = data.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return Math.abs(hash).toString(36);
+}
+
+async function saveQueueWithIntegrity(queue: AnalyticsEvent[]): Promise<void> {
+  const data = JSON.stringify(queue);
+  const checksum = computeChecksum(data);
+  await storageSet({ 
+    [STORAGE_KEY_QUEUE]: queue,
+    [INTEGRITY_KEY]: { checksum, count: queue.length, timestamp: Date.now() },
+  });
+}
+
+async function loadQueueWithIntegrity(): Promise<{ queue: AnalyticsEvent[]; valid: boolean }> {
+  const raw = await storageGet(STORAGE_KEY_QUEUE);
+  const integrityRaw = await storageGet(INTEGRITY_KEY);
+  
+  const queue = raw[STORAGE_KEY_QUEUE];
+  const integrity = integrityRaw[INTEGRITY_KEY];
+  
+  if (!Array.isArray(queue)) {
+    return { queue: [], valid: true };
+  }
+  
+  // Verify integrity
+  if (integrity && typeof integrity === 'object') {
+    const data = JSON.stringify(queue);
+    const expectedChecksum = computeChecksum(data);
+    
+    if (integrity.checksum !== expectedChecksum || integrity.count !== queue.length) {
+      console.warn('[Analytics] Storage integrity check failed! Data may have been tampered with.');
+      return { queue: queue as AnalyticsEvent[], valid: false };
+    }
+  }
+  
+  return { queue: queue as AnalyticsEvent[], valid: true };
+}
+
 // -------------------------------------------------------
 // Storage helpers (Promisified for Firefox 'chrome' namespace support)
 // -------------------------------------------------------
@@ -240,14 +388,12 @@ function storageSet(items: Record<string, any>): Promise<void> {
 }
 
 async function loadQueue(): Promise<AnalyticsEvent[]> {
-  const raw = await storageGet(STORAGE_KEY_QUEUE);
-  const queue = raw[STORAGE_KEY_QUEUE];
-  if (!Array.isArray(queue)) return [];
-  return queue as AnalyticsEvent[];
+  const { queue } = await loadQueueWithIntegrity();
+  return queue;
 }
 
 async function saveQueue(queue: AnalyticsEvent[]): Promise<void> {
-  await storageSet({ [STORAGE_KEY_QUEUE]: queue });
+  await saveQueueWithIntegrity(queue);
 }
 
 // --- Config/meta helpers ---
@@ -261,6 +407,18 @@ async function loadConfig(): Promise<AnalyticsConfig> {
       typeof stored.batchSize === 'number' && stored.batchSize > 0
         ? stored.batchSize
         : DEFAULT_CONFIG.batchSize,
+    maxDailyRequests:
+      typeof stored.maxDailyRequests === 'number' && stored.maxDailyRequests > 0
+        ? stored.maxDailyRequests
+        : DEFAULT_CONFIG.maxDailyRequests,
+    maxRetry:
+      typeof stored.maxRetry === 'number' && stored.maxRetry >= 0
+        ? stored.maxRetry
+        : DEFAULT_CONFIG.maxRetry,
+    flushMode:
+      stored.flushMode === 'next_day' || stored.flushMode === 'time_based'
+        ? stored.flushMode
+        : DEFAULT_CONFIG.flushMode,
     lowUsageFlushMinutes:
       typeof stored.lowUsageFlushMinutes === 'number'
         ? stored.lowUsageFlushMinutes
@@ -417,10 +575,31 @@ async function updateLocalStats(event: AnalyticsEvent): Promise<void> {
 // Network flush
 // -------------------------------------------------------
 
+/**
+ * Enhanced response type from worker.
+ */
+interface WorkerResponse {
+  ok: boolean;
+  error?: string; // 'rate_limit_exceeded' | 'buffer_full' | 'too_many_events' | ...
+  message?: string;
+  accepted?: number;
+}
+
+/**
+ * Result type for sendBatchToCloudflare with detailed status.
+ */
+interface FlushResult {
+  success: boolean;
+  rateLimited?: boolean;
+  serverOverloaded?: boolean;
+  accepted?: number;
+  error?: string;
+}
+
 async function sendBatchToCloudflare(
   events: AnalyticsEvent[],
-): Promise<boolean> {
-  if (!events.length) return true;
+): Promise<FlushResult> {
+  if (!events.length) return { success: true, accepted: 0 };
 
   // If remote is globally disabled or URL not configured → simulate success.
   if (!REMOTE_ENABLED || !TRACK_URL) {
@@ -429,12 +608,12 @@ async function sendBatchToCloudflare(
       events.length,
       'events.',
     );
-    return true;
+    return { success: true, accepted: events.length };
   }
 
   if (typeof fetch === 'undefined') {
     console.warn('[Analytics] fetch() not available in this context.');
-    return false;
+    return { success: false, error: 'fetch_unavailable' };
   }
 
   try {
@@ -444,24 +623,58 @@ async function sendBatchToCloudflare(
       body: JSON.stringify({ events }),
     });
 
+    // Parse response body regardless of status
+    let json: WorkerResponse = { ok: false };
+    try {
+      json = await res.json();
+    } catch {
+      // If we can't parse JSON, continue with status code checks
+    }
+
+    // Rate limited by worker (429)
+    if (res.status === 429 || json.error === 'rate_limit_exceeded') {
+      console.warn('[Analytics] Rate limited by worker:', json.message || res.status);
+      return { 
+        success: false, 
+        rateLimited: true, 
+        error: json.error || 'rate_limit_exceeded',
+      };
+    }
+
+    // Server overloaded (503 buffer_full)
+    if (res.status === 503 || json.error === 'buffer_full') {
+      console.warn('[Analytics] Worker buffer full:', json.message || res.status);
+      return { 
+        success: false, 
+        serverOverloaded: true, 
+        error: json.error || 'buffer_full',
+      };
+    }
+
+    // Other non-OK status
     if (!res.ok) {
       console.warn(
         '[Analytics] Cloudflare Worker returned non-200:',
         res.status,
+        json,
       );
-      return false;
+      return { success: false, error: `http_${res.status}` };
     }
 
-    const json = await res.json().catch(() => ({} as any));
+    // Response indicates failure
     if (json && json.ok === false) {
       console.warn('[Analytics] Cloudflare Worker ok=false:', json);
-      return false;
+      return { success: false, error: json.error || 'worker_rejected' };
     }
 
-    return true;
+    // Success!
+    return { 
+      success: true, 
+      accepted: json.accepted ?? events.length,
+    };
   } catch (err) {
     console.error('[Analytics] Error sending batch to Cloudflare:', err);
-    return false;
+    return { success: false, error: String(err) };
   }
 }
 
@@ -469,23 +682,41 @@ async function sendBatchToCloudflare(
  * Helper: should we flush right now based on:
  * - queue length vs batchSize
  * - time-based thresholds (120 / 60 / 30 minutes)
+ * - 1:00 AM consolidated flush (sends ALL events regardless of size)
  */
 function shouldFlushNowForTimeAndSize(
   cfg: AnalyticsConfig,
-  meta: AnalyticsMeta,
+  _meta: AnalyticsMeta,
   queueLength: number,
 ): boolean {
   if (!cfg.remoteEnabled) return false;
   if (queueLength === 0) return false;
 
-  const now = Date.now();
-  const last = meta.lastFlushAt ?? 0;
-  const ageMinutes = last === 0 ? Infinity : (now - last) / 60000;
+  // =========================================================================
+  // 1:00 AM CONSOLIDATED FLUSH
+  // Right after blackout ends (1:00 AM), flush ALL pending events
+  // This ensures even users with <50 downloads get their data sent daily
+  // =========================================================================
+  const currentHour = new Date().getHours();
+  if (currentHour === 1) {
+    // It's 1:00 AM - flush everything!
+    return true;
+  }
 
   // Immediate flush when queue >= target batch size
   if (queueLength >= cfg.batchSize) return true;
 
-  // Time-based flush rules (for low-activity users)
+  // If flushMode is 'next_day', only flush at batch size or 1 AM (handled above)
+  // Don't apply time-based thresholds in next_day mode
+  if (cfg.flushMode === 'next_day') {
+    return false;
+  }
+
+  // Time-based flush rules (only for time_based mode)
+  const now = Date.now();
+  const last = _meta.lastFlushAt ?? 0;
+  const ageMinutes = last === 0 ? Infinity : (now - last) / 60000;
+
   if (queueLength < 15 && ageMinutes >= cfg.lowUsageFlushMinutes) return true;
   if (
     queueLength >= 15 &&
@@ -524,7 +755,7 @@ function enqueueOp(op: () => Promise<void>): void {
 async function internalTrack(
   event: Omit<
     AnalyticsEvent,
-    'timestamp' | 'ext_version' | 'browser' | 'os' | 'language' | 'retryCount'
+    'timestamp' | 'ext_version' | 'browser' | 'os' | 'language' | 'retryCount' | 'id'
   >,
 ): Promise<void> {
   if (typeof chrome === 'undefined' || !chrome.runtime?.getManifest) {
@@ -534,6 +765,7 @@ async function internalTrack(
 
   const fullEvent: AnalyticsEvent = {
     ...event,
+    id: generateEventId(), // Unique ID for idempotency
     timestamp: Date.now(),
     ext_version: getExtensionVersion(),
     browser: detectBrowser(),
@@ -549,14 +781,14 @@ async function internalTrack(
     loadQueue(),
   ]);
 
-  // 1) Enqueue in persistent queue
+  // 1) Enqueue in persistent queue (LOCAL FIRST - fail-safe layer)
   queue.push(fullEvent);
   await saveQueue(queue);
 
-  // 2) Update local stats (for popup + analysis)
+  // 2) Update local stats (for popup + analysis) - LOCAL FIRST
   await updateLocalStats(fullEvent);
 
-  console.log('[Analytics] Event tracked. Queue size:', queue.length);
+  console.log('[Analytics] Event tracked (id:', fullEvent.id, '). Queue size:', queue.length);
 
   // 3) If conditions are met (size/time), schedule a flush.
   if (shouldFlushNowForTimeAndSize(cfg, meta, queue.length)) {
@@ -598,23 +830,70 @@ async function internalFlush(): Promise<void> {
     return;
   }
 
+  // =========================================================================
+  // BLACKOUT WINDOW: 12:00 AM - 1:00 AM (local time)
+  // During this hour, we don't send requests to Cloudflare.
+  // This prevents interference with Worker→Oracle flush at midnight.
+  // Events continue accumulating locally and will be sent after 1:00 AM.
+  // =========================================================================
+  const currentHour = new Date().getHours();
+  if (currentHour === 0) {
+    console.log(
+      '[Analytics] Blackout window (12-1 AM). Holding',
+      queue.length,
+      'events until 1:00 AM.',
+    );
+    return;
+  }
+
   // Also respect time-based thresholds + batch size; if it's "too early",
   // we just skip – alarms will keep calling this.
   if (!shouldFlushNowForTimeAndSize(cfg, meta, queue.length)) {
     return;
   }
 
-  const effectiveBatchSize = cfg.batchSize || BATCH_SIZE;
-  const batch = queue.slice(0, effectiveBatchSize);
-  const rest = queue.slice(effectiveBatchSize);
 
+  // =========================================================================
+  // EXTENSION-SIDE RATE LIMIT CHECK (50 requests/day)
+  // =========================================================================
+  const rateLimit = await checkAndIncrementRateLimit();
+  if (!rateLimit.allowed) {
+    console.warn(
+      '[Analytics] Daily request limit reached (50/day). Events saved locally, will send tomorrow.',
+    );
+    // Don't update backoff - this is intentional hold, not a failure
+    return;
+  }
+
+  // =========================================================================
+  // NEW DAY CONSOLIDATION: Send ALL pending events in ONE request
+  // This saves Cloudflare requests by combining everything accumulated overnight
+  // =========================================================================
+  let batch: AnalyticsEvent[];
+  let rest: AnalyticsEvent[];
+  
+  if (rateLimit.isNewDay && queue.length > 0) {
+    // New day! Consolidate ALL pending events into one request
+    // This is the most efficient use of our daily 50 request quota
+    console.log(
+      `[Analytics] New day detected! Consolidating ${queue.length} pending events into ONE request.`,
+    );
+    batch = queue; // Send everything
+    rest = [];
+  } else {
+    // Normal batching: send up to batchSize (50) events
+    const effectiveBatchSize = cfg.batchSize || BATCH_SIZE;
+    batch = queue.slice(0, effectiveBatchSize);
+    rest = queue.slice(effectiveBatchSize);
+  }
+  
   console.log(
-    `[Analytics] Attempting flush. Sending ${batch.length} events of ${queue.length} queued.`,
+    `[Analytics] Sending ${batch.length} events (${rateLimit.remaining} requests remaining today).`,
   );
 
-  const ok = await sendBatchToCloudflare(batch);
+  const result = await sendBatchToCloudflare(batch);
 
-  if (ok) {
+  if (result.success) {
     // Remote accepted → remove those items.
     await saveQueue(rest);
 
@@ -627,11 +906,26 @@ async function internalFlush(): Promise<void> {
 
     console.log(
       '[Analytics] Flush succeeded. Sent',
-      batch.length,
+      result.accepted ?? batch.length,
       'events. Remaining in queue:',
       rest.length,
     );
     return;
+  }
+
+  // --- FAIL-SAFE: Handle different failure modes ---
+  
+  // Rate limited → longer backoff (jump to 1 hour minimum)
+  let backoffMultiplier = 1;
+  if (result.rateLimited) {
+    console.warn('[Analytics] Rate limited! Applying extended backoff.');
+    backoffMultiplier = 3; // Triple the backoff time
+  }
+
+  // Server overloaded → also back off harder
+  if (result.serverOverloaded) {
+    console.warn('[Analytics] Server buffer full! Applying moderate backoff.');
+    backoffMultiplier = 2;
   }
 
   // Flush failed → poison-pill & schedule backoff
@@ -656,7 +950,8 @@ async function internalFlush(): Promise<void> {
   await saveQueue(newQueue);
 
   const idx = Math.min(meta.backoffIndex, BACKOFF_STEPS_SECONDS.length - 1);
-  const delaySec = BACKOFF_STEPS_SECONDS[idx];
+  const baseDelaySec = BACKOFF_STEPS_SECONDS[idx];
+  const delaySec = baseDelaySec * backoffMultiplier;
   const nextRetryAt = now + delaySec * 1000;
 
   const newMeta: AnalyticsMeta = {
@@ -667,7 +962,7 @@ async function internalFlush(): Promise<void> {
   await saveMeta(newMeta);
 
   console.warn(
-    '[Analytics] Flush failed. Backing off for',
+    '[Analytics] Flush failed (', result.error, '). Backing off for',
     delaySec,
     'seconds. Queue size now:',
     newQueue.length,
@@ -797,9 +1092,12 @@ export async function refreshRemoteAnalyticsConfig(): Promise<void> {
     // {
     //   ok: true,
     //   batchSize: number,
+    //   maxDailyRequests: number,
+    //   maxRetry: number,
+    //   flushMode: 'next_day' | 'time_based',
     //   timeFlushMinutes: { low, mid, high },
     //   remoteEnabled: boolean,
-    //   quota: { batchSizeSuggestion, remoteEnabled, ... }
+    //   quota: { ... }
     // }
     if (!data || data.ok === false) {
       throw new Error('config ok=false');
@@ -810,6 +1108,18 @@ export async function refreshRemoteAnalyticsConfig(): Promise<void> {
         typeof data.batchSize === 'number'
           ? data.batchSize
           : data.quota?.batchSizeSuggestion ?? DEFAULT_CONFIG.batchSize,
+      maxDailyRequests:
+        typeof data.maxDailyRequests === 'number'
+          ? data.maxDailyRequests
+          : DEFAULT_CONFIG.maxDailyRequests,
+      maxRetry:
+        typeof data.maxRetry === 'number'
+          ? data.maxRetry
+          : DEFAULT_CONFIG.maxRetry,
+      flushMode:
+        data.flushMode === 'next_day' || data.flushMode === 'time_based'
+          ? data.flushMode
+          : DEFAULT_CONFIG.flushMode,
       lowUsageFlushMinutes:
         data.timeFlushMinutes?.low ?? DEFAULT_CONFIG.lowUsageFlushMinutes,
       midUsageFlushMinutes:
@@ -824,13 +1134,10 @@ export async function refreshRemoteAnalyticsConfig(): Promise<void> {
 
     await saveConfig(cfg);
     console.log(
-      '[Analytics] /config updated:',
-      cfg.batchSize,
-      cfg.lowUsageFlushMinutes,
-      cfg.midUsageFlushMinutes,
-      cfg.highUsageFlushMinutes,
-      'remoteEnabled=',
-      cfg.remoteEnabled,
+      '[Analytics] /config updated: batchSize=', cfg.batchSize,
+      'maxDailyRequests=', cfg.maxDailyRequests,
+      'flushMode=', cfg.flushMode,
+      'remoteEnabled=', cfg.remoteEnabled,
     );
   } catch (err) {
     console.warn(

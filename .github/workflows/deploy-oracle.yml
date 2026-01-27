@@ -1,0 +1,58 @@
+name: Deploy Oracle Backend
+
+on:
+  push:
+    branches: [oracle-deploy]
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Deploy to Oracle Cloud
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.ORACLE_HOST }}
+          username: ubuntu
+          key: ${{ secrets.ORACLE_SSH_KEY }}
+          script_stop: true
+          script: |
+            set -e
+            echo "📦 Starting deployment..."
+            cd ~/oracle-backend
+            
+            # Pull latest changes
+            echo "🔄 Pulling latest code..."
+            git fetch origin oracle-deploy
+            git reset --hard origin/oracle-deploy
+            
+            # Stop existing containers
+            echo "🛑 Stopping containers..."
+            docker-compose down || true
+            
+            # Build and start
+            echo "🚀 Building and starting..."
+            docker-compose up -d --build
+            
+            # Cleanup
+            echo "🧹 Cleaning up..."
+            docker image prune -f
+            
+            # Verify health
+            echo "✅ Verifying health..."
+            sleep 5
+            curl -sf http://localhost:8080/health || exit 1
+            
+            echo "🎉 Deployment complete!"
+
+      - name: Deployment Status
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ Deployment successful!"
+          else
+            echo "❌ Deployment failed!"
+            exit 1
+          fi

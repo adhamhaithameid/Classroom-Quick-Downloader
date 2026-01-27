@@ -139,7 +139,48 @@ func ingestBatch(ctx context.Context, db *sql.DB, batch *model.OracleBatch) erro
 		return err
 	}
 
+	// Insert unique IPs from raw events.
+	if err := insertBatchIPs(ctx, tx, batch); err != nil {
+		return err
+	}
+
 	return tx.Commit()
+}
+
+func insertBatchIPs(ctx context.Context, tx *sql.Tx, batch *model.OracleBatch) error {
+	// 1. Extract unique IPs
+	ipSet := make(map[string]bool)
+	for _, ev := range batch.Events {
+		if ev.IPAddress != "" {
+			ipSet[ev.IPAddress] = true
+		}
+	}
+
+	// 2. Convert to list
+	ips := make([]string, 0, len(ipSet))
+	for ip := range ipSet {
+		ips = append(ips, ip)
+	}
+
+	if len(ips) == 0 {
+		return nil
+	}
+
+	// 3. Serialize to JSON
+	raw, err := json.Marshal(ips)
+	if err != nil {
+		return err
+	}
+
+	// 4. Insert
+	_, err = tx.ExecContext(
+		ctx,
+		`INSERT INTO batch_ips (batch_id, ip_count, unique_ips) VALUES (?, ?, ?)`,
+		batch.BatchID,
+		len(ips),
+		string(raw),
+	)
+	return err
 }
 
 func insertHourly(ctx context.Context, tx *sql.Tx, batch *model.OracleBatch) error {

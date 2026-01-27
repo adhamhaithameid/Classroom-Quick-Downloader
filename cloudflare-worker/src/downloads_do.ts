@@ -46,6 +46,47 @@ type DurableStateShape = {
   // Monotonically increasing batch sequence number for stable batchId across retries
   // Only incremented after successful flush to Oracle
   batchSeq: number;
+
+  // --- Security / Anti-Abuse ---
+  // Tracks requests per IP (for monitoring, not enforcement)
+  ipCounts: Record<string, number>;
+  
+  // Set of recently processed event IDs for O(1) idempotency lookup
+  processedIds: string[];
+  
+  // Burst tracking (legacy, kept for compatibility)
+  burstCounts: Record<string, { count: number; minute: number }>;
+
+  // =========================================================================
+  // REMOTE CONFIG - Controllable from Cloudflare Dashboard
+  // =========================================================================
+  
+  // Extension batching: downloads per request (default: 50)
+  configBatchSize: number;
+  
+  // Extension rate limit: max requests per day (default: 50)
+  configMaxDailyRequests: number;
+  
+  // Extension retry: max retries before dropping event (default: 5)
+  configMaxRetry: number;
+  
+  // Worker validation: max events per request (default: 5000)
+  configMaxEventsPerRequest: number;
+  
+  // Worker buffer: max events in buffer (default: 50000)
+  configMaxBufferSize: number;
+  
+  // Flush mode: 'next_day' | 'time_based' (default: 'next_day')
+  // next_day: Only flush at 1:00 AM local time
+  // time_based: Flush based on timeFlushMinutes
+  configFlushMode: 'next_day' | 'time_based';
+  
+  // Time-based flush intervals (only used if flushMode is 'time_based')
+  configTimeFlushMinutes: {
+    low: number;   // queue < 15 events
+    mid: number;   // 15-35 events  
+    high: number;  // 35+ events
+  };
 };
 
 const DEFAULT_COUNTERS: Counters = {
@@ -197,6 +238,19 @@ export class DownloadsDurable {
 
       buffer: [],
       batchSeq: 0,
+      
+      ipCounts: {},
+      processedIds: [],
+      burstCounts: {},
+
+      // Remote config defaults
+      configBatchSize: 50,
+      configMaxDailyRequests: 50,
+      configMaxRetry: 5,
+      configMaxEventsPerRequest: 5000,
+      configMaxBufferSize: 50000,
+      configFlushMode: 'next_day',
+      configTimeFlushMinutes: { low: 1440, mid: 1440, high: 1440 }, // 1440 = 24h = next day
     };
 
     if (!stored) {
@@ -236,7 +290,23 @@ export class DownloadsDurable {
 
       buffer: Array.isArray(stored.buffer) ? stored.buffer : [],
       batchSeq: stored.batchSeq ?? 0,
+
+      ipCounts: stored.ipCounts ?? {},
+      processedIds: Array.isArray(stored.processedIds) ? stored.processedIds : [],
+      burstCounts: stored.burstCounts ?? {},
+
+      // Remote config - preserve stored values or use defaults
+      configBatchSize: stored.configBatchSize ?? base.configBatchSize,
+      configMaxDailyRequests: stored.configMaxDailyRequests ?? base.configMaxDailyRequests,
+      configMaxRetry: stored.configMaxRetry ?? base.configMaxRetry,
+      configMaxEventsPerRequest: stored.configMaxEventsPerRequest ?? base.configMaxEventsPerRequest,
+      configMaxBufferSize: stored.configMaxBufferSize ?? base.configMaxBufferSize,
+      configFlushMode: stored.configFlushMode ?? base.configFlushMode,
+      configTimeFlushMinutes: stored.configTimeFlushMinutes ?? base.configTimeFlushMinutes,
     };
+
+    // Ensure midnight alarm is scheduled
+    await this.scheduleNextMidnightAlarm();
   }
 
   private async persist(): Promise<void> {
@@ -264,6 +334,8 @@ export class DownloadsDurable {
     if (this.d.reqCountDate !== today) {
       this.d.reqCountDate = today;
       this.d.reqCountToday = 0;
+      // Reset daily IP counters
+      this.d.ipCounts = {};
       // hardRemoteOff is NOT reset automatically here.
     }
   }
@@ -329,6 +401,11 @@ export class DownloadsDurable {
       return this.handleAdminRestorePower(request);
     }
 
+    // Admin endpoint to update remote config (batchSize, maxDailyRequests, etc.)
+    if (pathname === "/admin/update-config" && request.method === "POST") {
+      return this.handleAdminUpdateConfig(request);
+    }
+
     if (pathname === "/admin/full-sync" && request.method === "POST") {
       return this.handleAdminFullSync(request);
     }
@@ -337,16 +414,50 @@ export class DownloadsDurable {
   }
 
   // ---------------------------------------------------------------------------
-  // Alarms for retry / backoff
+  // Alarms for retry / backoff AND scheduled midnight flush
   // ---------------------------------------------------------------------------
 
   async alarm(): Promise<void> {
     await this.loaded;
-    if (!this.d.retryState || !this.d.retryState.nextRetryAt) return;
-
     const now = Date.now();
-    if (now >= this.d.retryState.nextRetryAt) {
+
+    // =========================================================================
+    // SCHEDULED MIDNIGHT FLUSH TO ORACLE
+    // At 00:00-00:15, flush all buffered events to Oracle
+    // This happens before extensions wake up at 1:00 AM
+    // =========================================================================
+    const currentHour = new Date().getUTCHours();
+    if (this.d.buffer.length > 0 && currentHour === 0) {
+      console.log(`[Alarm] Midnight flush: ${this.d.buffer.length} events to Oracle`);
+      await this.flushToOracle(true);
+    }
+
+    // Schedule next midnight alarm
+    await this.scheduleNextMidnightAlarm();
+
+    // Retry failed Oracle flushes
+    if (this.d.retryState && this.d.retryState.nextRetryAt && now >= this.d.retryState.nextRetryAt) {
       await this.flushToOracle(false);
+    }
+  }
+
+  /**
+   * Schedule an alarm for the next midnight (00:00 UTC).
+   * Called after each alarm to ensure continuous scheduling.
+   */
+  private async scheduleNextMidnightAlarm(): Promise<void> {
+    const now = new Date();
+    const tomorrow = new Date(now);
+    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+    tomorrow.setUTCHours(0, 0, 0, 0); // Midnight UTC tomorrow
+
+    const alarmTime = tomorrow.getTime();
+    
+    // Only set if no alarm is scheduled or if this is earlier
+    const currentAlarm = await this.state.storage.getAlarm();
+    if (!currentAlarm || currentAlarm > alarmTime) {
+      await this.state.storage.setAlarm(alarmTime);
+      console.log(`[Alarm] Scheduled next midnight flush for ${tomorrow.toISOString()}`);
     }
   }
 
@@ -355,19 +466,28 @@ export class DownloadsDurable {
   // ---------------------------------------------------------------------------
 
   private async handleTrack(request: Request): Promise<Response> {
-    // Update daily request counters
+    // Update daily request counters (for dashboard monitoring only)
     this.ensureRequestDay();
     this.d.reqCountToday += 1;
 
-    // --- NEW: derive country from custom header passed by Worker ---
-    // The "cf" object is lost in DO fetch, so we look for X-Geo-Country
-    const countryHeader = request.headers.get("X-Geo-Country");
+    const now = Date.now();
 
+    // --- Country from CF header ---
+    const countryHeader = request.headers.get("X-Geo-Country");
     const countryFromRequest =
       countryHeader && countryHeader.length > 0
-        ? countryHeader // e.g. "EG", "US"
+        ? countryHeader
         : undefined;
 
+    // --- IP Extraction (for audit logging only, not rate limiting) ---
+    const ip = request.headers.get("X-Client-IP") || "unknown";
+    
+    // Track IP for monitoring (no enforcement - extension handles rate limiting)
+    this.d.ipCounts[ip] = (this.d.ipCounts[ip] || 0) + 1;
+
+    // =========================================================================
+    // LAYER 1: PAYLOAD VALIDATION
+    // =========================================================================
     let body: { events?: StoredEvent[] } | null = null;
     try {
       body = await request.json();
@@ -382,28 +502,94 @@ export class DownloadsDurable {
       return json({ ok: true, accepted: 0 }, { status: 202 });
     }
 
-    // Input validation: cap events per request to prevent abuse
-    const MAX_EVENTS_PER_REQUEST = 500;
+    // Allow large batches to support next-day consolidation (extension sends all pending at once)
+    const MAX_EVENTS_PER_REQUEST = 5000;
     const MAX_BUFFER_SIZE = 50_000;
-    
+
     if (events.length > MAX_EVENTS_PER_REQUEST) {
-      return json({ ok: false, error: "too_many_events", max: MAX_EVENTS_PER_REQUEST }, { status: 400 });
-    }
-    
-    // Prevent buffer from growing too large (drop request if at limit)
-    if (this.d.buffer.length >= MAX_BUFFER_SIZE) {
-      return json({ ok: false, error: "buffer_full", bufferSize: this.d.buffer.length }, { status: 503 });
+      return json(
+        { ok: false, error: "too_many_events", max: MAX_EVENTS_PER_REQUEST, message: "Max 10 events per request." },
+        { status: 400 }
+      );
     }
 
-    // Append to buffer + update counters
+    if (this.d.buffer.length >= MAX_BUFFER_SIZE) {
+      return json(
+        { ok: false, error: "buffer_full", bufferSize: this.d.buffer.length },
+        { status: 503 }
+      );
+    }
+
+    // =========================================================================
+    // LAYER 4: ROBUST IDEMPOTENCY (Set-based O(1) lookup + timestamp validation)
+    // =========================================================================
+    const MAX_PROCESSED_IDS = 5000;
+    const MAX_EVENT_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
+    const MIN_EVENT_TIME = now - MAX_EVENT_AGE_MS;
+    const MAX_FUTURE_DRIFT_MS = 5 * 60 * 1000; // 5 minutes
+
+    // Use Set for O(1) lookup
+    const processedSet = new Set(this.d.processedIds);
+    let acceptedCount = 0;
+    let duplicateCount = 0;
+    let invalidCount = 0;
+
     for (const ev of events) {
-      // If the extension didn't set country, hydrate it from CF geo
+      // ----- VALIDATION: Event ID required -----
+      if (!ev.id || typeof ev.id !== "string" || ev.id.length < 10) {
+        invalidCount++;
+        continue;
+      }
+
+      // ----- VALIDATION: Event ID format (ext-<timestamp>-<random>) -----
+      const idMatch = ev.id.match(/^ext-(\d+)-([a-z0-9]+)$/);
+      if (!idMatch) {
+        invalidCount++;
+        continue;
+      }
+
+      // ----- VALIDATION: Timestamp must be reasonable -----
+      const idTimestamp = parseInt(idMatch[1], 10);
+      if (isNaN(idTimestamp) || idTimestamp < MIN_EVENT_TIME || idTimestamp > now + MAX_FUTURE_DRIFT_MS) {
+        invalidCount++;
+        continue;
+      }
+
+      // ----- IDEMPOTENCY: Skip duplicates -----
+      if (processedSet.has(ev.id)) {
+        duplicateCount++;
+        continue;
+      }
+
+      // ----- VALIDATION: Timestamp sanity -----
+      if (typeof ev.timestamp !== "number" || ev.timestamp < MIN_EVENT_TIME || ev.timestamp > now + MAX_FUTURE_DRIFT_MS) {
+        invalidCount++;
+        continue;
+      }
+
+      // ----- VALIDATION: Required fields -----
+      if (!ev.status || (ev.status !== "success" && ev.status !== "fail")) {
+        invalidCount++;
+        continue;
+      }
+
+      // Add to processed set and array
+      processedSet.add(ev.id);
+      this.d.processedIds.push(ev.id);
+
+      // Hydrate country from CF geo if missing
       if (!ev.country && countryFromRequest) {
-        ev.country = countryFromRequest; // keep original ISO code for Oracle
+        ev.country = countryFromRequest;
+      }
+
+      // Store IP for audit
+      if (!ev.ip_address) {
+        ev.ip_address = ip;
       }
 
       this.d.buffer.push(ev);
       this.d.totalEvents += 1;
+      acceptedCount++;
       
       // totalDownloads = all download attempts (success + fail)
       this.d.totalDownloads += 1;
@@ -453,6 +639,15 @@ export class DownloadsDurable {
       }
     }
 
+    // =========================================================================
+    // CLEANUP - Trim processedIds to prevent unbounded growth
+    // =========================================================================
+    const MAX_PROCESSED_IDS_TRIM = 5000;
+    if (this.d.processedIds.length > MAX_PROCESSED_IDS_TRIM) {
+      // Keep newest IDs (from end)
+      this.d.processedIds = this.d.processedIds.slice(-MAX_PROCESSED_IDS_TRIM);
+    }
+
     await this.persist();
 
     // Size-based flush to Oracle
@@ -463,7 +658,12 @@ export class DownloadsDurable {
       await this.flushToOracle(false);
     }
 
-    return json({ ok: true, accepted: events.length }, { status: 202 });
+    return json({ 
+      ok: true, 
+      accepted: acceptedCount,
+      duplicates: duplicateCount,
+      invalid: invalidCount,
+    }, { status: 202 });
   }
 
   private async handleStats(): Promise<Response> {
@@ -478,19 +678,52 @@ export class DownloadsDurable {
       oracleEndpoint: this.env.ORACLE_ENDPOINT || "unknown",
     };
 
-    const payload: StatsResponse = {
+    // Get next scheduled alarm time
+    const nextAlarm = await this.state.storage.getAlarm();
+    const nextAlarmAt = nextAlarm ? new Date(nextAlarm).toISOString() : null;
+
+    // Remote config with null-safe values for dashboard display
+    const remoteConfig = {
+      batchSize: this.d.configBatchSize ?? 50,
+      maxDailyRequests: this.d.configMaxDailyRequests ?? 50,
+      maxRetry: this.d.configMaxRetry ?? 5,
+      maxEventsPerRequest: this.d.configMaxEventsPerRequest ?? 5000,
+      maxBufferSize: this.d.configMaxBufferSize ?? 50000,
+      flushMode: this.d.configFlushMode ?? 'next_day',
+      timeFlushMinutes: this.d.configTimeFlushMinutes ?? { low: 1440, mid: 1440, high: 1440 },
+      hardRemoteOff: this.d.hardRemoteOff ?? false,
+    };
+
+    // Buffer status for dashboard
+    const bufferStatus = {
+      currentSize: this.d.buffer?.length ?? 0,
+      maxSize: remoteConfig.maxBufferSize,
+      utilizationPercent: ((this.d.buffer?.length ?? 0) / remoteConfig.maxBufferSize * 100).toFixed(2),
+    };
+
+    const payload = {
       ok: true,
-      totalEvents: this.d.totalEvents,
-      totalDownloads: this.d.totalDownloads,
-      totalSuccess: this.d.totalSuccess,
-      totalFail: this.d.totalFail,
-      pendingEvents: this.d.pendingEvents,
-      lastEventAt: this.d.lastEventAt,
-      lastFlushAt: this.d.lastFlushAt,
-      counters: this.d.counters,
-      retryState: this.d.retryState,
+      totalEvents: this.d.totalEvents ?? 0,
+      totalDownloads: this.d.totalDownloads ?? 0,
+      totalSuccess: this.d.totalSuccess ?? 0,
+      totalFail: this.d.totalFail ?? 0,
+      pendingEvents: this.d.pendingEvents ?? 0,
+      lastEventAt: this.d.lastEventAt ?? null,
+      lastFlushAt: this.d.lastFlushAt ?? null,
+      counters: this.d.counters ?? {},
+      retryState: this.d.retryState ?? null,
       quota,
       envSnapshot,
+      
+      // NEW: Remote config for dashboard display
+      remoteConfig,
+      bufferStatus,
+      nextAlarmAt,
+      
+      // Request tracking (for monitoring)
+      requestsToday: this.d.reqCountToday ?? 0,
+      requestDate: this.d.reqCountDate ?? null,
+      uniqueIpsToday: Object.keys(this.d.ipCounts ?? {}).length,
     };
 
     return json(payload);
@@ -498,6 +731,7 @@ export class DownloadsDurable {
 
   /**
    * Config endpoint used by the extension to adapt batching / flush behaviour.
+   * All these values are controllable from Cloudflare dashboard via admin endpoints.
    */
   private async handleConfig(): Promise<Response> {
     this.ensureRequestDay();
@@ -506,15 +740,25 @@ export class DownloadsDurable {
       this.d.hardRemoteOff,
     );
 
-    const config: ConfigResponse = {
+    // Return all remote-controllable config values
+    const config = {
       ok: true,
-      batchSize: quota.batchSizeSuggestion,
-      timeFlushMinutes: {
-        low: 120,
-        mid: 60,
-        high: 30,
-      },
+      
+      // Batching config
+      batchSize: this.d.configBatchSize,
+      maxDailyRequests: this.d.configMaxDailyRequests,
+      maxRetry: this.d.configMaxRetry,
+      
+      // Flush mode: 'next_day' (default) or 'time_based'
+      flushMode: this.d.configFlushMode,
+      
+      // Time-based flush intervals (only used if flushMode is 'time_based')
+      timeFlushMinutes: this.d.configTimeFlushMinutes,
+      
+      // Remote enabled (can be disabled for emergencies)
       remoteEnabled: quota.remoteEnabled,
+      
+      // Quota info for extension awareness
       quota,
     };
 
@@ -542,6 +786,17 @@ export class DownloadsDurable {
 
   private async handleDebugReset(): Promise<Response> {
     const today = todayUtcDate();
+    // Preserve config settings during reset
+    const preservedConfig = {
+      configBatchSize: this.d.configBatchSize ?? 50,
+      configMaxDailyRequests: this.d.configMaxDailyRequests ?? 50,
+      configMaxRetry: this.d.configMaxRetry ?? 5,
+      configMaxEventsPerRequest: this.d.configMaxEventsPerRequest ?? 5000,
+      configMaxBufferSize: this.d.configMaxBufferSize ?? 50000,
+      configFlushMode: this.d.configFlushMode ?? 'next_day' as const,
+      configTimeFlushMinutes: this.d.configTimeFlushMinutes ?? { low: 1440, mid: 1440, high: 1440 },
+    };
+    
     this.data = {
       totalEvents: 0,
       totalDownloads: 0,
@@ -557,6 +812,10 @@ export class DownloadsDurable {
       hardRemoteOff: false,
       buffer: [],
       batchSeq: 0,
+      ipCounts: {},
+      processedIds: [],
+      burstCounts: {},
+      ...preservedConfig,
     };
     await this.state.storage.delete(STORAGE_KEY);
     await this.state.storage.deleteAlarm();
@@ -585,6 +844,82 @@ export class DownloadsDurable {
       ok: true,
       sent: result.sent,
       remaining: this.d.buffer.length,
+    });
+  }
+
+  /**
+   * Admin endpoint to update remote config values.
+   * All extensions will pick up these changes on their next config fetch.
+   * 
+   * POST /admin/update-config
+   * Body: { batchSize?: number, maxDailyRequests?: number, maxRetry?: number, 
+   *         maxEventsPerRequest?: number, maxBufferSize?: number,
+   *         flushMode?: 'next_day' | 'time_based',
+   *         timeFlushMinutes?: { low: number, mid: number, high: number } }
+   */
+  private async handleAdminUpdateConfig(request: Request): Promise<Response> {
+    if (!this.isAuthorizedAdmin(request)) {
+      return json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+
+    let body: Record<string, unknown>;
+    try {
+      body = await request.json();
+    } catch {
+      return json({ ok: false, error: "invalid_json" }, { status: 400 });
+    }
+
+    // Update each config field if provided and valid
+    if (typeof body.batchSize === 'number' && body.batchSize > 0 && body.batchSize <= 1000) {
+      this.d.configBatchSize = body.batchSize;
+    }
+    
+    if (typeof body.maxDailyRequests === 'number' && body.maxDailyRequests > 0 && body.maxDailyRequests <= 1000) {
+      this.d.configMaxDailyRequests = body.maxDailyRequests;
+    }
+    
+    if (typeof body.maxRetry === 'number' && body.maxRetry >= 0 && body.maxRetry <= 20) {
+      this.d.configMaxRetry = body.maxRetry;
+    }
+    
+    if (typeof body.maxEventsPerRequest === 'number' && body.maxEventsPerRequest > 0 && body.maxEventsPerRequest <= 50000) {
+      this.d.configMaxEventsPerRequest = body.maxEventsPerRequest;
+    }
+    
+    if (typeof body.maxBufferSize === 'number' && body.maxBufferSize > 0 && body.maxBufferSize <= 500000) {
+      this.d.configMaxBufferSize = body.maxBufferSize;
+    }
+    
+    if (body.flushMode === 'next_day' || body.flushMode === 'time_based') {
+      this.d.configFlushMode = body.flushMode;
+    }
+    
+    if (body.timeFlushMinutes && typeof body.timeFlushMinutes === 'object') {
+      const tfm = body.timeFlushMinutes as Record<string, unknown>;
+      if (typeof tfm.low === 'number' && typeof tfm.mid === 'number' && typeof tfm.high === 'number') {
+        this.d.configTimeFlushMinutes = {
+          low: Math.max(1, Math.min(10080, tfm.low)),   // 1 min to 7 days
+          mid: Math.max(1, Math.min(10080, tfm.mid)),
+          high: Math.max(1, Math.min(10080, tfm.high)),
+        };
+      }
+    }
+
+    await this.persist();
+
+    // Return current config state
+    return json({
+      ok: true,
+      message: "Config updated. Extensions will pick up changes on next config fetch.",
+      config: {
+        batchSize: this.d.configBatchSize,
+        maxDailyRequests: this.d.configMaxDailyRequests,
+        maxRetry: this.d.configMaxRetry,
+        maxEventsPerRequest: this.d.configMaxEventsPerRequest,
+        maxBufferSize: this.d.configMaxBufferSize,
+        flushMode: this.d.configFlushMode,
+        timeFlushMinutes: this.d.configTimeFlushMinutes,
+      },
     });
   }
 

@@ -1087,6 +1087,13 @@
             <a href="https://cqd-analytics.adhamhaithameid.workers.dev/" target="_blank" class="btn btn-secondary" data-tooltip="Open Cloudflare Worker dashboard" data-tooltip-position="bottom">
               ☁️ CF Dashboard
             </a>
+            <a href="http://129.151.233.229:3001/status/cqd" target="_blank" class="btn btn-secondary" data-tooltip="Open Uptime Kuma status" data-tooltip-position="bottom">
+              🟢 Uptime Kuma
+            </a>
+            <a href="https://github.com/adhamhaithameid/Classroom-Quick-Downloader/tree/oracle-deploy" target="_blank" class="btn btn-secondary" id="deploy-status-btn" data-tooltip="Deployment status - Click to view branch" data-tooltip-position="bottom">
+              <span id="deploy-icon">🔄</span>
+              <span id="deploy-commit">Loading...</span>
+            </a>
             <button class="btn" onclick="showBatchModal()" id="batch-btn" data-tooltip="View last batch info" data-tooltip-position="bottom">
               <!-- <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
@@ -2036,6 +2043,36 @@
         window.open(url, '_blank');
       }
 
+      // Load deployment status
+      async function loadDeployStatus() {
+        try {
+          var data = await fetchJSON('/api/deploy-status');
+          var icon = document.getElementById('deploy-icon');
+          var commit = document.getElementById('deploy-commit');
+          var btn = document.getElementById('deploy-status-btn');
+          
+          if (data.commit && data.commit !== 'unknown') {
+            commit.textContent = data.commit;
+            btn.href = 'https://github.com/adhamhaithameid/Classroom-Quick-Downloader/commit/' + data.commit_full;
+            
+            if (data.stale) {
+              icon.textContent = '⚠️';
+              btn.setAttribute('data-tooltip', 'Stale deployment (>24h) - ' + data.message);
+              btn.classList.add('btn-warning');
+            } else {
+              icon.textContent = '✅';
+              btn.setAttribute('data-tooltip', 'Commit: ' + data.message + ' - Deployed: ' + new Date(data.deployed_at).toLocaleString());
+            }
+          } else {
+            commit.textContent = 'Unknown';
+            icon.textContent = '❓';
+          }
+        } catch (e) {
+          document.getElementById('deploy-icon').textContent = '❌';
+          document.getElementById('deploy-commit').textContent = 'Error';
+        }
+      }
+
       // Refresh all data
       async function refreshAll() {
         var btn = document.getElementById("refresh-btn");
@@ -2044,6 +2081,7 @@
         
         await loadOverview();
         await loadTopToday();
+        await loadDeployStatus();
         
         if (currentPage === 'activity') await loadActivity();
         if (currentPage === 'charts') {
