@@ -17,6 +17,16 @@ export interface StoredEvent {
   timestamp: number;
 
   /**
+   * Optional unique ID for idempotency (deduplication).
+   */
+  id?: string;
+
+  /**
+   * Optional sender IP (masked or full) for debugging/abuse tracking.
+   */
+  ip_address?: string;
+
+  /**
    * Optional error code / reason for fails.
    * Example: "BROWSER_START_FAIL", "AUTH_ALL_FAILED", etc.
    */

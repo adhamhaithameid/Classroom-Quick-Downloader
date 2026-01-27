@@ -46,6 +46,13 @@ type DurableStateShape = {
   // Monotonically increasing batch sequence number for stable batchId across retries
   // Only incremented after successful flush to Oracle
   batchSeq: number;
+
+  // --- NEW: Security / Anti-Abuse ---
+  // Tracks requests per IP for the current day to prevent single-source DoS
+  ipCounts: Record<string, number>;
+  
+  // Circular buffer of recently processed event IDs for idempotency
+  processedIds: string[];
 };
 
 const DEFAULT_COUNTERS: Counters = {
@@ -197,6 +204,9 @@ export class DownloadsDurable {
 
       buffer: [],
       batchSeq: 0,
+      
+      ipCounts: {},
+      processedIds: [],
     };
 
     if (!stored) {
@@ -236,6 +246,9 @@ export class DownloadsDurable {
 
       buffer: Array.isArray(stored.buffer) ? stored.buffer : [],
       batchSeq: stored.batchSeq ?? 0,
+
+      ipCounts: stored.ipCounts ?? {},
+      processedIds: Array.isArray(stored.processedIds) ? stored.processedIds : [],
     };
   }
 
@@ -264,6 +277,8 @@ export class DownloadsDurable {
     if (this.d.reqCountDate !== today) {
       this.d.reqCountDate = today;
       this.d.reqCountToday = 0;
+      // Reset daily IP counters
+      this.d.ipCounts = {};
       // hardRemoteOff is NOT reset automatically here.
     }
   }
@@ -368,6 +383,26 @@ export class DownloadsDurable {
         ? countryHeader // e.g. "EG", "US"
         : undefined;
 
+    // --- NEW: IP-based Rate Limiting ---
+    const ip = request.headers.get("X-Client-IP") || "unknown";
+    const MAX_PER_IP_DAILY = 1000; 
+
+    // Allow "unknown" IPs (dev/test) but still count them to be safe
+    const ipCount = (this.d.ipCounts[ip] || 0) + 1;
+    this.d.ipCounts[ip] = ipCount;
+
+    if (ipCount > MAX_PER_IP_DAILY) {
+       // We still persist state to save the incremented counter
+       await this.persist();
+       return json(
+         { ok: false, error: "rate_limit_exceeded", message: "Too many requests from this IP today." }, 
+         { status: 429 }
+       );
+    }
+    
+    // Global Quota Check (Soft enforcement here, strict enforcement is upstream/monitoring)
+    // We already track this.d.reqCountToday
+
     let body: { events?: StoredEvent[] } | null = null;
     try {
       body = await request.json();
@@ -395,15 +430,39 @@ export class DownloadsDurable {
       return json({ ok: false, error: "buffer_full", bufferSize: this.d.buffer.length }, { status: 503 });
     }
 
+    const MAX_PROCESSED_IDS = 2000;
+    let acceptedCount = 0;
+
     // Append to buffer + update counters
     for (const ev of events) {
+      // Idempotency Check
+      if (ev.id) {
+         if (this.d.processedIds.includes(ev.id)) {
+           // Duplicate event -> skip processing
+           continue; 
+         }
+         // Add to processed list
+         this.d.processedIds.push(ev.id);
+         // Trim if too big (circular-ish buffer)
+         if (this.d.processedIds.length > MAX_PROCESSED_IDS) {
+            // Remove oldest 500
+            this.d.processedIds = this.d.processedIds.slice(this.d.processedIds.length - MAX_PROCESSED_IDS + 500);
+         }
+      }
+
       // If the extension didn't set country, hydrate it from CF geo
       if (!ev.country && countryFromRequest) {
         ev.country = countryFromRequest; // keep original ISO code for Oracle
       }
+      
+      // Store IP for audit (optional)
+      if (!ev.ip_address) {
+        ev.ip_address = ip;
+      }
 
       this.d.buffer.push(ev);
       this.d.totalEvents += 1;
+      acceptedCount++;
       
       // totalDownloads = all download attempts (success + fail)
       this.d.totalDownloads += 1;
@@ -463,7 +522,7 @@ export class DownloadsDurable {
       await this.flushToOracle(false);
     }
 
-    return json({ ok: true, accepted: events.length }, { status: 202 });
+    return json({ ok: true, accepted: acceptedCount }, { status: 202 });
   }
 
   private async handleStats(): Promise<Response> {
@@ -557,6 +616,8 @@ export class DownloadsDurable {
       hardRemoteOff: false,
       buffer: [],
       batchSeq: 0,
+      ipCounts: {},
+      processedIds: [],
     };
     await this.state.storage.delete(STORAGE_KEY);
     await this.state.storage.deleteAlarm();

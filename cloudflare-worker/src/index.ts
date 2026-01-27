@@ -118,6 +118,12 @@ async function proxyToDO(request: Request, env: WorkerEnv): Promise<Response> {
     headers.set("X-Geo-Country", country);
   }
 
+  // Pass Client IP to DO for rate limiting
+  const clientIp = request.headers.get("CF-Connecting-IP");
+  if (clientIp) {
+    headers.set("X-Client-IP", clientIp);
+  }
+
   // We need to create a new Request object to modify headers locally before fetching the Stub
   const newReq = new Request(request.url, {
     method: request.method,
