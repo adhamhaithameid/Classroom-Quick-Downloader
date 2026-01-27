@@ -47,12 +47,15 @@ type DurableStateShape = {
   // Only incremented after successful flush to Oracle
   batchSeq: number;
 
-  // --- NEW: Security / Anti-Abuse ---
+  // --- Security / Anti-Abuse ---
   // Tracks requests per IP for the current day to prevent single-source DoS
   ipCounts: Record<string, number>;
   
-  // Circular buffer of recently processed event IDs for idempotency
+  // Set of recently processed event IDs for O(1) idempotency lookup
   processedIds: string[];
+  
+  // Burst tracking: requests per IP in current minute
+  burstCounts: Record<string, { count: number; minute: number }>;
 };
 
 const DEFAULT_COUNTERS: Counters = {
@@ -207,6 +210,7 @@ export class DownloadsDurable {
       
       ipCounts: {},
       processedIds: [],
+      burstCounts: {},
     };
 
     if (!stored) {
@@ -249,6 +253,7 @@ export class DownloadsDurable {
 
       ipCounts: stored.ipCounts ?? {},
       processedIds: Array.isArray(stored.processedIds) ? stored.processedIds : [],
+      burstCounts: stored.burstCounts ?? {},
     };
   }
 
@@ -374,35 +379,57 @@ export class DownloadsDurable {
     this.ensureRequestDay();
     this.d.reqCountToday += 1;
 
-    // --- NEW: derive country from custom header passed by Worker ---
-    // The "cf" object is lost in DO fetch, so we look for X-Geo-Country
-    const countryHeader = request.headers.get("X-Geo-Country");
+    const now = Date.now();
+    const currentMinute = Math.floor(now / 60000);
 
+    // --- Country from CF header ---
+    const countryHeader = request.headers.get("X-Geo-Country");
     const countryFromRequest =
       countryHeader && countryHeader.length > 0
-        ? countryHeader // e.g. "EG", "US"
+        ? countryHeader
         : undefined;
 
-    // --- NEW: IP-based Rate Limiting ---
+    // --- IP Extraction ---
     const ip = request.headers.get("X-Client-IP") || "unknown";
-    const MAX_PER_IP_DAILY = 1000; 
 
-    // Allow "unknown" IPs (dev/test) but still count them to be safe
+    // =========================================================================
+    // LAYER 1: BURST PROTECTION (max 5 requests per IP per minute)
+    // =========================================================================
+    const MAX_BURST_PER_MINUTE = 5;
+    if (!this.d.burstCounts) this.d.burstCounts = {};
+    
+    const burst = this.d.burstCounts[ip];
+    if (burst && burst.minute === currentMinute) {
+      burst.count += 1;
+      if (burst.count > MAX_BURST_PER_MINUTE) {
+        await this.persist();
+        return json(
+          { ok: false, error: "burst_limit_exceeded", message: "Too many requests per minute. Slow down." },
+          { status: 429 }
+        );
+      }
+    } else {
+      this.d.burstCounts[ip] = { count: 1, minute: currentMinute };
+    }
+
+    // =========================================================================
+    // LAYER 2: DAILY RATE LIMITING (50 requests per IP per day)
+    // =========================================================================
+    const MAX_PER_IP_DAILY = 50;
     const ipCount = (this.d.ipCounts[ip] || 0) + 1;
     this.d.ipCounts[ip] = ipCount;
 
     if (ipCount > MAX_PER_IP_DAILY) {
-       // We still persist state to save the incremented counter
-       await this.persist();
-       return json(
-         { ok: false, error: "rate_limit_exceeded", message: "Too many requests from this IP today." }, 
-         { status: 429 }
-       );
+      await this.persist();
+      return json(
+        { ok: false, error: "rate_limit_exceeded", message: "Daily limit exceeded. Try again tomorrow.", limit: MAX_PER_IP_DAILY },
+        { status: 429 }
+      );
     }
-    
-    // Global Quota Check (Soft enforcement here, strict enforcement is upstream/monitoring)
-    // We already track this.d.reqCountToday
 
+    // =========================================================================
+    // LAYER 3: PAYLOAD VALIDATION
+    // =========================================================================
     let body: { events?: StoredEvent[] } | null = null;
     try {
       body = await request.json();
@@ -417,45 +444,87 @@ export class DownloadsDurable {
       return json({ ok: true, accepted: 0 }, { status: 202 });
     }
 
-    // Input validation: cap events per request to prevent abuse
-    const MAX_EVENTS_PER_REQUEST = 500;
+    // Strict event limit per request (prevents batch abuse)
+    const MAX_EVENTS_PER_REQUEST = 10;
     const MAX_BUFFER_SIZE = 50_000;
-    
+
     if (events.length > MAX_EVENTS_PER_REQUEST) {
-      return json({ ok: false, error: "too_many_events", max: MAX_EVENTS_PER_REQUEST }, { status: 400 });
+      return json(
+        { ok: false, error: "too_many_events", max: MAX_EVENTS_PER_REQUEST, message: "Max 10 events per request." },
+        { status: 400 }
+      );
     }
-    
-    // Prevent buffer from growing too large (drop request if at limit)
+
     if (this.d.buffer.length >= MAX_BUFFER_SIZE) {
-      return json({ ok: false, error: "buffer_full", bufferSize: this.d.buffer.length }, { status: 503 });
+      return json(
+        { ok: false, error: "buffer_full", bufferSize: this.d.buffer.length },
+        { status: 503 }
+      );
     }
 
-    const MAX_PROCESSED_IDS = 2000;
+    // =========================================================================
+    // LAYER 4: ROBUST IDEMPOTENCY (Set-based O(1) lookup + timestamp validation)
+    // =========================================================================
+    const MAX_PROCESSED_IDS = 5000;
+    const MAX_EVENT_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
+    const MIN_EVENT_TIME = now - MAX_EVENT_AGE_MS;
+    const MAX_FUTURE_DRIFT_MS = 5 * 60 * 1000; // 5 minutes
+
+    // Use Set for O(1) lookup
+    const processedSet = new Set(this.d.processedIds);
     let acceptedCount = 0;
+    let duplicateCount = 0;
+    let invalidCount = 0;
 
-    // Append to buffer + update counters
     for (const ev of events) {
-      // Idempotency Check
-      if (ev.id) {
-         if (this.d.processedIds.includes(ev.id)) {
-           // Duplicate event -> skip processing
-           continue; 
-         }
-         // Add to processed list
-         this.d.processedIds.push(ev.id);
-         // Trim if too big (circular-ish buffer)
-         if (this.d.processedIds.length > MAX_PROCESSED_IDS) {
-            // Remove oldest 500
-            this.d.processedIds = this.d.processedIds.slice(this.d.processedIds.length - MAX_PROCESSED_IDS + 500);
-         }
+      // ----- VALIDATION: Event ID required -----
+      if (!ev.id || typeof ev.id !== "string" || ev.id.length < 10) {
+        invalidCount++;
+        continue;
       }
 
-      // If the extension didn't set country, hydrate it from CF geo
-      if (!ev.country && countryFromRequest) {
-        ev.country = countryFromRequest; // keep original ISO code for Oracle
+      // ----- VALIDATION: Event ID format (ext-<timestamp>-<random>) -----
+      const idMatch = ev.id.match(/^ext-(\d+)-([a-z0-9]+)$/);
+      if (!idMatch) {
+        invalidCount++;
+        continue;
       }
-      
-      // Store IP for audit (optional)
+
+      // ----- VALIDATION: Timestamp must be reasonable -----
+      const idTimestamp = parseInt(idMatch[1], 10);
+      if (isNaN(idTimestamp) || idTimestamp < MIN_EVENT_TIME || idTimestamp > now + MAX_FUTURE_DRIFT_MS) {
+        invalidCount++;
+        continue;
+      }
+
+      // ----- IDEMPOTENCY: Skip duplicates -----
+      if (processedSet.has(ev.id)) {
+        duplicateCount++;
+        continue;
+      }
+
+      // ----- VALIDATION: Timestamp sanity -----
+      if (typeof ev.timestamp !== "number" || ev.timestamp < MIN_EVENT_TIME || ev.timestamp > now + MAX_FUTURE_DRIFT_MS) {
+        invalidCount++;
+        continue;
+      }
+
+      // ----- VALIDATION: Required fields -----
+      if (!ev.status || (ev.status !== "success" && ev.status !== "fail")) {
+        invalidCount++;
+        continue;
+      }
+
+      // Add to processed set and array
+      processedSet.add(ev.id);
+      this.d.processedIds.push(ev.id);
+
+      // Hydrate country from CF geo if missing
+      if (!ev.country && countryFromRequest) {
+        ev.country = countryFromRequest;
+      }
+
+      // Store IP for audit
       if (!ev.ip_address) {
         ev.ip_address = ip;
       }
@@ -512,6 +581,23 @@ export class DownloadsDurable {
       }
     }
 
+    // =========================================================================
+    // LAYER 5: CLEANUP - Trim processedIds to prevent unbounded growth
+    // =========================================================================
+    const MAX_PROCESSED_IDS_TRIM = 5000;
+    if (this.d.processedIds.length > MAX_PROCESSED_IDS_TRIM) {
+      // Keep newest IDs (from end)
+      this.d.processedIds = this.d.processedIds.slice(-MAX_PROCESSED_IDS_TRIM);
+    }
+
+    // Clean up old burst entries (older than 2 minutes)
+    const oldMinute = currentMinute - 2;
+    for (const [burstIp, burstData] of Object.entries(this.d.burstCounts)) {
+      if (burstData.minute < oldMinute) {
+        delete this.d.burstCounts[burstIp];
+      }
+    }
+
     await this.persist();
 
     // Size-based flush to Oracle
@@ -522,7 +608,12 @@ export class DownloadsDurable {
       await this.flushToOracle(false);
     }
 
-    return json({ ok: true, accepted: acceptedCount }, { status: 202 });
+    return json({ 
+      ok: true, 
+      accepted: acceptedCount,
+      duplicates: duplicateCount,
+      invalid: invalidCount,
+    }, { status: 202 });
   }
 
   private async handleStats(): Promise<Response> {
@@ -618,6 +709,7 @@ export class DownloadsDurable {
       batchSeq: 0,
       ipCounts: {},
       processedIds: [],
+      burstCounts: {},
     };
     await this.state.storage.delete(STORAGE_KEY);
     await this.state.storage.deleteAlarm();

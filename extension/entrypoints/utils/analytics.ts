@@ -209,13 +209,110 @@ function getExtensionVersion(): string {
 }
 
 /**
- * Generate a unique event ID for idempotency.
- * Format: ext-<timestamp>-<random8chars>
+ * Generate a cryptographically strong unique event ID for idempotency.
+ * Format: ext-<timestamp>-<random12chars>
+ * Uses Web Crypto API for stronger randomness when available.
  */
 function generateEventId(): string {
   const ts = Date.now();
-  const rand = Math.random().toString(36).substring(2, 10);
+  let rand: string;
+  
+  // Try to use crypto API for stronger randomness
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    const arr = new Uint8Array(8);
+    crypto.getRandomValues(arr);
+    rand = Array.from(arr, b => b.toString(36).padStart(2, '0')).join('').substring(0, 12);
+  } else {
+    // Fallback to Math.random (less secure but functional)
+    rand = Math.random().toString(36).substring(2, 14);
+  }
+  
   return `ext-${ts}-${rand}`;
+}
+
+// -------------------------------------------------------
+// Extension-side Rate Limiting (defense in depth)
+// -------------------------------------------------------
+
+const STORAGE_KEY_RATE_LIMIT = 'cqd_rate_limit_v1';
+const MAX_DAILY_REQUESTS = 50;
+
+interface RateLimitState {
+  date: string; // YYYY-MM-DD UTC
+  count: number;
+}
+
+async function checkAndIncrementRateLimit(): Promise<{ allowed: boolean; remaining: number }> {
+  const today = new Date().toISOString().slice(0, 10);
+  const raw = await storageGet(STORAGE_KEY_RATE_LIMIT);
+  let state: RateLimitState = raw[STORAGE_KEY_RATE_LIMIT];
+  
+  if (!state || state.date !== today) {
+    state = { date: today, count: 0 };
+  }
+  
+  if (state.count >= MAX_DAILY_REQUESTS) {
+    return { allowed: false, remaining: 0 };
+  }
+  
+  state.count += 1;
+  await storageSet({ [STORAGE_KEY_RATE_LIMIT]: state });
+  
+  return { allowed: true, remaining: MAX_DAILY_REQUESTS - state.count };
+}
+
+// -------------------------------------------------------
+// Storage Integrity Protection
+// -------------------------------------------------------
+
+const INTEGRITY_KEY = 'cqd_integrity_v1';
+
+/**
+ * Simple checksum for tamper detection.
+ * Not cryptographically secure, but detects accidental/casual tampering.
+ */
+function computeChecksum(data: string): string {
+  let hash = 0;
+  for (let i = 0; i < data.length; i++) {
+    const char = data.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return Math.abs(hash).toString(36);
+}
+
+async function saveQueueWithIntegrity(queue: AnalyticsEvent[]): Promise<void> {
+  const data = JSON.stringify(queue);
+  const checksum = computeChecksum(data);
+  await storageSet({ 
+    [STORAGE_KEY_QUEUE]: queue,
+    [INTEGRITY_KEY]: { checksum, count: queue.length, timestamp: Date.now() },
+  });
+}
+
+async function loadQueueWithIntegrity(): Promise<{ queue: AnalyticsEvent[]; valid: boolean }> {
+  const raw = await storageGet(STORAGE_KEY_QUEUE);
+  const integrityRaw = await storageGet(INTEGRITY_KEY);
+  
+  const queue = raw[STORAGE_KEY_QUEUE];
+  const integrity = integrityRaw[INTEGRITY_KEY];
+  
+  if (!Array.isArray(queue)) {
+    return { queue: [], valid: true };
+  }
+  
+  // Verify integrity
+  if (integrity && typeof integrity === 'object') {
+    const data = JSON.stringify(queue);
+    const expectedChecksum = computeChecksum(data);
+    
+    if (integrity.checksum !== expectedChecksum || integrity.count !== queue.length) {
+      console.warn('[Analytics] Storage integrity check failed! Data may have been tampered with.');
+      return { queue: queue as AnalyticsEvent[], valid: false };
+    }
+  }
+  
+  return { queue: queue as AnalyticsEvent[], valid: true };
 }
 
 // -------------------------------------------------------
@@ -256,14 +353,12 @@ function storageSet(items: Record<string, any>): Promise<void> {
 }
 
 async function loadQueue(): Promise<AnalyticsEvent[]> {
-  const raw = await storageGet(STORAGE_KEY_QUEUE);
-  const queue = raw[STORAGE_KEY_QUEUE];
-  if (!Array.isArray(queue)) return [];
-  return queue as AnalyticsEvent[];
+  const { queue } = await loadQueueWithIntegrity();
+  return queue;
 }
 
 async function saveQueue(queue: AnalyticsEvent[]): Promise<void> {
-  await storageSet({ [STORAGE_KEY_QUEUE]: queue });
+  await saveQueueWithIntegrity(queue);
 }
 
 // --- Config/meta helpers ---
@@ -680,8 +775,20 @@ async function internalFlush(): Promise<void> {
   const batch = queue.slice(0, effectiveBatchSize);
   const rest = queue.slice(effectiveBatchSize);
 
+  // =========================================================================
+  // EXTENSION-SIDE RATE LIMIT CHECK (defense in depth)
+  // =========================================================================
+  const rateLimit = await checkAndIncrementRateLimit();
+  if (!rateLimit.allowed) {
+    console.warn(
+      '[Analytics] Extension daily rate limit exceeded (50/day). Keeping events local until tomorrow.',
+    );
+    // Don't update backoff - this is intentional hold, not a failure
+    return;
+  }
+  
   console.log(
-    `[Analytics] Attempting flush. Sending ${batch.length} events of ${queue.length} queued.`,
+    `[Analytics] Attempting flush. Sending ${batch.length} events (${rateLimit.remaining} requests remaining today).`,
   );
 
   const result = await sendBatchToCloudflare(batch);
