@@ -304,6 +304,9 @@ export class DownloadsDurable {
       configFlushMode: stored.configFlushMode ?? base.configFlushMode,
       configTimeFlushMinutes: stored.configTimeFlushMinutes ?? base.configTimeFlushMinutes,
     };
+
+    // Ensure midnight alarm is scheduled
+    await this.scheduleNextMidnightAlarm();
   }
 
   private async persist(): Promise<void> {
@@ -411,16 +414,50 @@ export class DownloadsDurable {
   }
 
   // ---------------------------------------------------------------------------
-  // Alarms for retry / backoff
+  // Alarms for retry / backoff AND scheduled midnight flush
   // ---------------------------------------------------------------------------
 
   async alarm(): Promise<void> {
     await this.loaded;
-    if (!this.d.retryState || !this.d.retryState.nextRetryAt) return;
-
     const now = Date.now();
-    if (now >= this.d.retryState.nextRetryAt) {
+
+    // =========================================================================
+    // SCHEDULED MIDNIGHT FLUSH TO ORACLE
+    // At 00:00-00:15, flush all buffered events to Oracle
+    // This happens before extensions wake up at 1:00 AM
+    // =========================================================================
+    const currentHour = new Date().getUTCHours();
+    if (this.d.buffer.length > 0 && currentHour === 0) {
+      console.log(`[Alarm] Midnight flush: ${this.d.buffer.length} events to Oracle`);
+      await this.flushToOracle(true);
+    }
+
+    // Schedule next midnight alarm
+    await this.scheduleNextMidnightAlarm();
+
+    // Retry failed Oracle flushes
+    if (this.d.retryState && this.d.retryState.nextRetryAt && now >= this.d.retryState.nextRetryAt) {
       await this.flushToOracle(false);
+    }
+  }
+
+  /**
+   * Schedule an alarm for the next midnight (00:00 UTC).
+   * Called after each alarm to ensure continuous scheduling.
+   */
+  private async scheduleNextMidnightAlarm(): Promise<void> {
+    const now = new Date();
+    const tomorrow = new Date(now);
+    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+    tomorrow.setUTCHours(0, 0, 0, 0); // Midnight UTC tomorrow
+
+    const alarmTime = tomorrow.getTime();
+    
+    // Only set if no alarm is scheduled or if this is earlier
+    const currentAlarm = await this.state.storage.getAlarm();
+    if (!currentAlarm || currentAlarm > alarmTime) {
+      await this.state.storage.setAlarm(alarmTime);
+      console.log(`[Alarm] Scheduled next midnight flush for ${tomorrow.toISOString()}`);
     }
   }
 
@@ -641,19 +678,52 @@ export class DownloadsDurable {
       oracleEndpoint: this.env.ORACLE_ENDPOINT || "unknown",
     };
 
-    const payload: StatsResponse = {
+    // Get next scheduled alarm time
+    const nextAlarm = await this.state.storage.getAlarm();
+    const nextAlarmAt = nextAlarm ? new Date(nextAlarm).toISOString() : null;
+
+    // Remote config with null-safe values for dashboard display
+    const remoteConfig = {
+      batchSize: this.d.configBatchSize ?? 50,
+      maxDailyRequests: this.d.configMaxDailyRequests ?? 50,
+      maxRetry: this.d.configMaxRetry ?? 5,
+      maxEventsPerRequest: this.d.configMaxEventsPerRequest ?? 5000,
+      maxBufferSize: this.d.configMaxBufferSize ?? 50000,
+      flushMode: this.d.configFlushMode ?? 'next_day',
+      timeFlushMinutes: this.d.configTimeFlushMinutes ?? { low: 1440, mid: 1440, high: 1440 },
+      hardRemoteOff: this.d.hardRemoteOff ?? false,
+    };
+
+    // Buffer status for dashboard
+    const bufferStatus = {
+      currentSize: this.d.buffer?.length ?? 0,
+      maxSize: remoteConfig.maxBufferSize,
+      utilizationPercent: ((this.d.buffer?.length ?? 0) / remoteConfig.maxBufferSize * 100).toFixed(2),
+    };
+
+    const payload = {
       ok: true,
-      totalEvents: this.d.totalEvents,
-      totalDownloads: this.d.totalDownloads,
-      totalSuccess: this.d.totalSuccess,
-      totalFail: this.d.totalFail,
-      pendingEvents: this.d.pendingEvents,
-      lastEventAt: this.d.lastEventAt,
-      lastFlushAt: this.d.lastFlushAt,
-      counters: this.d.counters,
-      retryState: this.d.retryState,
+      totalEvents: this.d.totalEvents ?? 0,
+      totalDownloads: this.d.totalDownloads ?? 0,
+      totalSuccess: this.d.totalSuccess ?? 0,
+      totalFail: this.d.totalFail ?? 0,
+      pendingEvents: this.d.pendingEvents ?? 0,
+      lastEventAt: this.d.lastEventAt ?? null,
+      lastFlushAt: this.d.lastFlushAt ?? null,
+      counters: this.d.counters ?? {},
+      retryState: this.d.retryState ?? null,
       quota,
       envSnapshot,
+      
+      // NEW: Remote config for dashboard display
+      remoteConfig,
+      bufferStatus,
+      nextAlarmAt,
+      
+      // Request tracking (for monitoring)
+      requestsToday: this.d.reqCountToday ?? 0,
+      requestDate: this.d.reqCountDate ?? null,
+      uniqueIpsToday: Object.keys(this.d.ipCounts ?? {}).length,
     };
 
     return json(payload);

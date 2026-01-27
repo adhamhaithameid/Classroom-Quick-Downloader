@@ -1,8 +1,15 @@
 # Security & Remote Configuration
 
-## Overview
+## System Timing
 
-All analytics behavior is now **remotely controllable** from the Cloudflare dashboard.
+All analytics systems now work together in harmony:
+
+| Time | System | Action |
+|------|--------|--------|
+| 12:00-12:59 AM | Extension | **BLACKOUT** - No requests to Cloudflare |
+| 12:00 AM UTC | Worker | Alarm → flush buffer to Oracle |
+| 12:15 AM | Oracle | Scheduler → flush DB to Google Sheets |
+| 1:00 AM+ | Extension | Send ALL accumulated events |
 
 ---
 
@@ -10,80 +17,48 @@ All analytics behavior is now **remotely controllable** from the Cloudflare dash
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `batchSize` | 50 | Downloads per request |
+| `batchSize` | 50 | Events per request |
 | `maxDailyRequests` | 50 | Max requests/day |
 | `maxRetry` | 5 | Retries before drop |
+| `maxEventsPerRequest` | 5000 | Max events in one Oracle flush |
+| `maxBufferSize` | 50000 | Max events in Worker buffer |
 | `flushMode` | `next_day` | When to send |
 | `timeFlushMinutes` | {low:1440, mid:1440, high:1440} | Time-based intervals |
-
-### Flush Modes
-- **`next_day`** (default): Events sent at 1:00 AM local time
-- **`time_based`**: Events sent based on timeFlushMinutes intervals
 
 ---
 
 ## Admin Endpoints
 
+### Get Current Config + Stats
+```bash
+curl https://your-worker.workers.dev/stats
+```
+
+Returns: `remoteConfig`, `bufferStatus`, `nextAlarmAt`, `requestsToday`, etc.
+
 ### Update Config
 ```bash
 curl -X POST https://your-worker.workers.dev/admin/update-config \
   -H "X-Admin-Secret: YOUR_SECRET" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "batchSize": 50,
-    "maxDailyRequests": 25,
-    "flushMode": "next_day"
-  }'
+  -d '{"batchSize": 25, "maxDailyRequests": 30}'
 ```
 
 ### Emergency Kill Switch
 ```bash
-# Disable all remote analytics
-curl -X POST https://your-worker.workers.dev/admin/cut-power \
-  -H "X-Admin-Secret: YOUR_SECRET"
-
-# Re-enable
-curl -X POST https://your-worker.workers.dev/admin/restore-power \
-  -H "X-Admin-Secret: YOUR_SECRET"
+curl -X POST .../admin/cut-power -H "X-Admin-Secret: SECRET"
+curl -X POST .../admin/restore-power -H "X-Admin-Secret: SECRET"
 ```
 
 ---
 
-## Timing
+## Environment Variables
 
-| Event | When |
-|-------|------|
-| Extension day reset | 1:00 AM local time |
-| Extension consolidation | First request after 1:00 AM |
+### Worker
+- `DO_SHARED_SECRET`: Admin auth secret
+- `ORACLE_ENDPOINT`: Oracle backend URL
 
----
-
-## Data Flow
-
-```
-User Downloads → Local Queue → 1:00 AM → Consolidate ALL → ONE Request → Cloudflare
-```
-
-With default `flushMode: 'next_day'`, users can download unlimited files all day. At 1:00 AM local time, ALL pending events are sent in ONE request.
-
----
-
-## Scenarios
-
-### Normal Day (100 downloads)
-1. User downloads 100 files throughout the day
-2. At 1:00 AM: Extension sends ALL 100 events in 1-2 requests
-3. **Cloudflare requests: 2**
-
-### Heavy Day (5000 downloads)
-1. User downloads 5000 files
-2. At 1:00 AM: Extension sends all in batches of 50
-3. Max 50 requests = 2500 events. Rest saved for next day.
-4. **Cloudflare requests: 50**
-
-### Emergency
-1. You notice Cloudflare quota spiking
-2. Run: `curl .../admin/cut-power`
-3. ALL extensions go local-only immediately
-4. Crisis passes → `curl .../admin/restore-power`
-5. **Zero data lost**
+### Oracle
+- `SHEETS_ID`: Google Sheets spreadsheet ID
+- `GOOGLE_CREDS_PATH`: Service account JSON path
+- `KUMA_PUSH_URL`: Uptime Kuma push URL (optional)
+- `ARCHIVER_PATH`: Path to archiver binary

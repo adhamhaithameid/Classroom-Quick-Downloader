@@ -682,23 +682,41 @@ async function sendBatchToCloudflare(
  * Helper: should we flush right now based on:
  * - queue length vs batchSize
  * - time-based thresholds (120 / 60 / 30 minutes)
+ * - 1:00 AM consolidated flush (sends ALL events regardless of size)
  */
 function shouldFlushNowForTimeAndSize(
   cfg: AnalyticsConfig,
-  meta: AnalyticsMeta,
+  _meta: AnalyticsMeta,
   queueLength: number,
 ): boolean {
   if (!cfg.remoteEnabled) return false;
   if (queueLength === 0) return false;
 
-  const now = Date.now();
-  const last = meta.lastFlushAt ?? 0;
-  const ageMinutes = last === 0 ? Infinity : (now - last) / 60000;
+  // =========================================================================
+  // 1:00 AM CONSOLIDATED FLUSH
+  // Right after blackout ends (1:00 AM), flush ALL pending events
+  // This ensures even users with <50 downloads get their data sent daily
+  // =========================================================================
+  const currentHour = new Date().getHours();
+  if (currentHour === 1) {
+    // It's 1:00 AM - flush everything!
+    return true;
+  }
 
   // Immediate flush when queue >= target batch size
   if (queueLength >= cfg.batchSize) return true;
 
-  // Time-based flush rules (for low-activity users)
+  // If flushMode is 'next_day', only flush at batch size or 1 AM (handled above)
+  // Don't apply time-based thresholds in next_day mode
+  if (cfg.flushMode === 'next_day') {
+    return false;
+  }
+
+  // Time-based flush rules (only for time_based mode)
+  const now = Date.now();
+  const last = _meta.lastFlushAt ?? 0;
+  const ageMinutes = last === 0 ? Infinity : (now - last) / 60000;
+
   if (queueLength < 15 && ageMinutes >= cfg.lowUsageFlushMinutes) return true;
   if (
     queueLength >= 15 &&
@@ -809,6 +827,22 @@ async function internalFlush(): Promise<void> {
 
   // Respect backoff schedule: if it's not time yet, skip.
   if (meta.nextRetryAt && now < meta.nextRetryAt) {
+    return;
+  }
+
+  // =========================================================================
+  // BLACKOUT WINDOW: 12:00 AM - 1:00 AM (local time)
+  // During this hour, we don't send requests to Cloudflare.
+  // This prevents interference with Worker→Oracle flush at midnight.
+  // Events continue accumulating locally and will be sent after 1:00 AM.
+  // =========================================================================
+  const currentHour = new Date().getHours();
+  if (currentHour === 0) {
+    console.log(
+      '[Analytics] Blackout window (12-1 AM). Holding',
+      queue.length,
+      'events until 1:00 AM.',
+    );
     return;
   }
 

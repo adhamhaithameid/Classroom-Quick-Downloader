@@ -26,6 +26,18 @@ Downloads → Local Queue → Batch (50) → Single Request → Cloudflare
 
 ---
 
+## Blackout Window (12:00 AM - 1:00 AM Local Time)
+
+To ensure system stability during the critical midnight flush from Worker to Oracle:
+
+1. **Extension enters Blackout Mode:** No requests are sent to Cloudflare between 12:00 AM and 1:00 AM local time.
+2. **Local Queueing:** All events generated during this hour are saved to local storage.
+3. **1:00 AM Flush:** At 1:00 AM, the extension wakes up and consolidates ALL pending events (including those from the blackout) into as few requests as possible.
+
+This prevents race conditions and ensures the Worker has a quiet period to flush its buffer to the Oracle backend (which happens at 00:00 UTC).
+
+---
+
 ## Scenarios
 
 ### Scenario 1: Normal Usage (100 downloads)
