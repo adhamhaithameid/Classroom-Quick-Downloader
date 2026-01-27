@@ -101,6 +101,15 @@ func Migrate(db *sql.DB) error {
 
 		`CREATE INDEX IF NOT EXISTS idx_do_state_snapshots_captured_at
 			ON do_state_snapshots(captured_at);`,
+
+		// IP Tracking (Analytic Audit).
+		// Stores a JSON array of unique IPs seen in this batch.
+		`CREATE TABLE IF NOT EXISTS batch_ips (
+			batch_id   TEXT PRIMARY KEY,
+			ip_count   INTEGER,
+			unique_ips TEXT, -- JSON array of strings
+			FOREIGN KEY(batch_id) REFERENCES batches(batch_id)
+		);`,
 	}
 
 	for _, stmt := range stmts {

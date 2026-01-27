@@ -102,6 +102,19 @@ type DOState struct {
 	EnvSnapshot    *DOStateEnvSnapshot `json:"envSnapshot,omitempty"`
 }
 
+// Event mirrors the StoredEvent from the Worker (raw analytics event).
+// We include this to capture IP addresses and other raw metadata.
+type Event struct {
+	ID        string `json:"id"`
+	Status    string `json:"status"`
+	Timestamp int64  `json:"timestamp"`
+	IPAddress string `json:"ip_address"` // Captured from X-Client-IP
+	Country   string `json:"country"`
+	Browser   string `json:"browser"`
+	OS        string `json:"os"`
+	Device    string `json:"device"`
+}
+
 // OracleBatch is the payload that the Durable Object sends to the Oracle
 // backend.
 // It is *aggregated* (no raw events), idempotent by batchId, and may contain
@@ -110,7 +123,8 @@ type OracleBatch struct {
 	BatchID     string       `json:"batchId"`
 	GeneratedAt int64        `json:"generatedAt"` // unix ms from DO
 	TimeZone    string       `json:"timeZone"`    // e.g. "UTC"
-	Summary     BatchSummary `json:"summary"`     // <--- NEW FIELD
+	Summary     BatchSummary `json:"summary"`
 	TimeBuckets []TimeBucket `json:"timeBuckets"`
 	DOState     DOState      `json:"doState"`
+	Events      []Event      `json:"events"`      // <--- Raw events now captured
 }
