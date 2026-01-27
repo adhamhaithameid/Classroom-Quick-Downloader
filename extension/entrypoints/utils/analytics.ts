@@ -13,6 +13,12 @@ export interface AnalyticsEvent {
   timestamp: number;
 
   /**
+   * Unique event ID for idempotency (deduplication on worker).
+   * Format: "ext-<timestamp>-<random>"
+   */
+  id?: string;
+
+  /**
    * Optional: where this came from ("download_all", "single", etc.)
    * Currently not used in your UI, but forwarded to Cloudflare.
    */
@@ -200,6 +206,16 @@ function getExtensionVersion(): string {
     // ignore
   }
   return '0.0.0';
+}
+
+/**
+ * Generate a unique event ID for idempotency.
+ * Format: ext-<timestamp>-<random8chars>
+ */
+function generateEventId(): string {
+  const ts = Date.now();
+  const rand = Math.random().toString(36).substring(2, 10);
+  return `ext-${ts}-${rand}`;
 }
 
 // -------------------------------------------------------
@@ -417,10 +433,31 @@ async function updateLocalStats(event: AnalyticsEvent): Promise<void> {
 // Network flush
 // -------------------------------------------------------
 
+/**
+ * Enhanced response type from worker.
+ */
+interface WorkerResponse {
+  ok: boolean;
+  error?: string; // 'rate_limit_exceeded' | 'buffer_full' | 'too_many_events' | ...
+  message?: string;
+  accepted?: number;
+}
+
+/**
+ * Result type for sendBatchToCloudflare with detailed status.
+ */
+interface FlushResult {
+  success: boolean;
+  rateLimited?: boolean;
+  serverOverloaded?: boolean;
+  accepted?: number;
+  error?: string;
+}
+
 async function sendBatchToCloudflare(
   events: AnalyticsEvent[],
-): Promise<boolean> {
-  if (!events.length) return true;
+): Promise<FlushResult> {
+  if (!events.length) return { success: true, accepted: 0 };
 
   // If remote is globally disabled or URL not configured → simulate success.
   if (!REMOTE_ENABLED || !TRACK_URL) {
@@ -429,12 +466,12 @@ async function sendBatchToCloudflare(
       events.length,
       'events.',
     );
-    return true;
+    return { success: true, accepted: events.length };
   }
 
   if (typeof fetch === 'undefined') {
     console.warn('[Analytics] fetch() not available in this context.');
-    return false;
+    return { success: false, error: 'fetch_unavailable' };
   }
 
   try {
@@ -444,24 +481,58 @@ async function sendBatchToCloudflare(
       body: JSON.stringify({ events }),
     });
 
+    // Parse response body regardless of status
+    let json: WorkerResponse = { ok: false };
+    try {
+      json = await res.json();
+    } catch {
+      // If we can't parse JSON, continue with status code checks
+    }
+
+    // Rate limited by worker (429)
+    if (res.status === 429 || json.error === 'rate_limit_exceeded') {
+      console.warn('[Analytics] Rate limited by worker:', json.message || res.status);
+      return { 
+        success: false, 
+        rateLimited: true, 
+        error: json.error || 'rate_limit_exceeded',
+      };
+    }
+
+    // Server overloaded (503 buffer_full)
+    if (res.status === 503 || json.error === 'buffer_full') {
+      console.warn('[Analytics] Worker buffer full:', json.message || res.status);
+      return { 
+        success: false, 
+        serverOverloaded: true, 
+        error: json.error || 'buffer_full',
+      };
+    }
+
+    // Other non-OK status
     if (!res.ok) {
       console.warn(
         '[Analytics] Cloudflare Worker returned non-200:',
         res.status,
+        json,
       );
-      return false;
+      return { success: false, error: `http_${res.status}` };
     }
 
-    const json = await res.json().catch(() => ({} as any));
+    // Response indicates failure
     if (json && json.ok === false) {
       console.warn('[Analytics] Cloudflare Worker ok=false:', json);
-      return false;
+      return { success: false, error: json.error || 'worker_rejected' };
     }
 
-    return true;
+    // Success!
+    return { 
+      success: true, 
+      accepted: json.accepted ?? events.length,
+    };
   } catch (err) {
     console.error('[Analytics] Error sending batch to Cloudflare:', err);
-    return false;
+    return { success: false, error: String(err) };
   }
 }
 
@@ -524,7 +595,7 @@ function enqueueOp(op: () => Promise<void>): void {
 async function internalTrack(
   event: Omit<
     AnalyticsEvent,
-    'timestamp' | 'ext_version' | 'browser' | 'os' | 'language' | 'retryCount'
+    'timestamp' | 'ext_version' | 'browser' | 'os' | 'language' | 'retryCount' | 'id'
   >,
 ): Promise<void> {
   if (typeof chrome === 'undefined' || !chrome.runtime?.getManifest) {
@@ -534,6 +605,7 @@ async function internalTrack(
 
   const fullEvent: AnalyticsEvent = {
     ...event,
+    id: generateEventId(), // Unique ID for idempotency
     timestamp: Date.now(),
     ext_version: getExtensionVersion(),
     browser: detectBrowser(),
@@ -549,14 +621,14 @@ async function internalTrack(
     loadQueue(),
   ]);
 
-  // 1) Enqueue in persistent queue
+  // 1) Enqueue in persistent queue (LOCAL FIRST - fail-safe layer)
   queue.push(fullEvent);
   await saveQueue(queue);
 
-  // 2) Update local stats (for popup + analysis)
+  // 2) Update local stats (for popup + analysis) - LOCAL FIRST
   await updateLocalStats(fullEvent);
 
-  console.log('[Analytics] Event tracked. Queue size:', queue.length);
+  console.log('[Analytics] Event tracked (id:', fullEvent.id, '). Queue size:', queue.length);
 
   // 3) If conditions are met (size/time), schedule a flush.
   if (shouldFlushNowForTimeAndSize(cfg, meta, queue.length)) {
@@ -612,9 +684,9 @@ async function internalFlush(): Promise<void> {
     `[Analytics] Attempting flush. Sending ${batch.length} events of ${queue.length} queued.`,
   );
 
-  const ok = await sendBatchToCloudflare(batch);
+  const result = await sendBatchToCloudflare(batch);
 
-  if (ok) {
+  if (result.success) {
     // Remote accepted → remove those items.
     await saveQueue(rest);
 
@@ -627,11 +699,26 @@ async function internalFlush(): Promise<void> {
 
     console.log(
       '[Analytics] Flush succeeded. Sent',
-      batch.length,
+      result.accepted ?? batch.length,
       'events. Remaining in queue:',
       rest.length,
     );
     return;
+  }
+
+  // --- FAIL-SAFE: Handle different failure modes ---
+  
+  // Rate limited → longer backoff (jump to 1 hour minimum)
+  let backoffMultiplier = 1;
+  if (result.rateLimited) {
+    console.warn('[Analytics] Rate limited! Applying extended backoff.');
+    backoffMultiplier = 3; // Triple the backoff time
+  }
+
+  // Server overloaded → also back off harder
+  if (result.serverOverloaded) {
+    console.warn('[Analytics] Server buffer full! Applying moderate backoff.');
+    backoffMultiplier = 2;
   }
 
   // Flush failed → poison-pill & schedule backoff
@@ -656,7 +743,8 @@ async function internalFlush(): Promise<void> {
   await saveQueue(newQueue);
 
   const idx = Math.min(meta.backoffIndex, BACKOFF_STEPS_SECONDS.length - 1);
-  const delaySec = BACKOFF_STEPS_SECONDS[idx];
+  const baseDelaySec = BACKOFF_STEPS_SECONDS[idx];
+  const delaySec = baseDelaySec * backoffMultiplier;
   const nextRetryAt = now + delaySec * 1000;
 
   const newMeta: AnalyticsMeta = {
@@ -667,7 +755,7 @@ async function internalFlush(): Promise<void> {
   await saveMeta(newMeta);
 
   console.warn(
-    '[Analytics] Flush failed. Backing off for',
+    '[Analytics] Flush failed (', result.error, '). Backing off for',
     delaySec,
     'seconds. Queue size now:',
     newQueue.length,
