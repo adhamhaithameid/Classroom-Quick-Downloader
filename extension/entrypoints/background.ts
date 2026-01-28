@@ -218,7 +218,8 @@ export default defineBackground(() => {
 
   // Tab updates: Switch icon based on URL
   chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-    if (changeInfo.status === 'loading' || changeInfo.url) {
+    // Trigger on loading, complete, or URL change for reliable SPA navigation detection
+    if (changeInfo.status === 'loading' || changeInfo.status === 'complete' || changeInfo.url) {
       updateTabIcon(tabId, tab.url);
     }
   });
