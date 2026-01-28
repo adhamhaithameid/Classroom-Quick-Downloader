@@ -25,6 +25,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Communication error.',
     modified: 'Modified',
     after_posting: 'after posting',
+    cancel: 'Cancel',
+    cancelled: 'Cancelled',
   },
   ar: {
     download: 'تنزيل',
@@ -47,6 +49,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: 'وقت التشغيل غير متاح',
     startError: 'تعذر البدء.',
     commError: 'خطأ في الاتصال.',
+    cancel: 'إلغاء',
+    cancelled: 'ملغى',
   },
   ja: {
     download: 'ダウンロード',
@@ -69,6 +73,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     startError: '開始できませんでした。',
     commError: '通信エラー。',
     commentSingular: 'コメント',
+    cancel: 'キャンセル',
+    cancelled: 'キャンセル済み',
   },
   es: {
     download: 'Descargar',
@@ -91,6 +97,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Error de comunicación.',
     editedTooltip: 'Días entre la publicación y la última edición',
     commentSingular: 'comentario',
+    cancel: 'Cancelar',
+    cancelled: 'Cancelado',
   },
   hi: {
     download: 'डाउनलोड',
@@ -113,6 +121,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'संचार त्रुटि।',
     editedTooltip: 'पोस्ट करने और अंतिम संपादन के बीच के दिन',
     commentSingular: 'टिप्पणियाँ',
+    cancel: 'रद्द करें',
+    cancelled: 'रद्द',
   },
   pt: {
     download: 'Baixar',
@@ -135,6 +145,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Erro de comunicação.',
     editedTooltip: 'Dias entre a postagem e a última edição',
     commentSingular: 'comentário',
+    cancel: 'Cancelar',
+    cancelled: 'Cancelado',
   },
   'pt-pt': {
     download: 'Descarregar',
@@ -217,6 +229,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Erreur de communication.',
     editedTooltip: 'Jours entre la publication et la dernière modification',
     commentSingular: 'commentaire',
+    cancel: 'Annuler',
+    cancelled: 'Annulé',
   },
   de: {
     download: 'Herunterladen',
@@ -239,6 +253,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     startError: 'Konnte nicht starten.',
     commError: 'Kommunikationsfehler.',
     editedTooltip: 'Tage zwischen Veröffentlichung und letzter Bearbeitung',
+    cancel: 'Abbrechen',
+    cancelled: 'Abgebrochen',
   },
   it: {
     download: 'Scarica',
@@ -261,6 +277,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Errore di comunicazione.',
     editedTooltip: 'Giorni tra la pubblicazione e l\'ultima modifica',
     commentSingular: 'commento',
+    cancel: 'Annulla',
+    cancelled: 'Annullato',
   },
   ru: {
     download: 'Скачать',
@@ -283,6 +301,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Ошибка связи.',
     editedTooltip: 'Дней между публикацией и последним редактированием',
     commentSingular: 'комментарий',
+    cancel: 'Отмена',
+    cancelled: 'Отменено',
   },
   ko: {
     download: '다운로드',
