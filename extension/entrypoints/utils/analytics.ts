@@ -105,6 +105,7 @@ type AnalyticsConfig = {
   midUsageFlushMinutes: number;  // 15 <= queue < 35
   highUsageFlushMinutes: number; // 35 <= queue < 50
   remoteEnabled: boolean;
+  cancelHoldDelayMs: number;  // Time before cancel button is active (default: 1000ms)
 };
 
 /**
@@ -120,6 +121,7 @@ const DEFAULT_CONFIG: AnalyticsConfig = {
   midUsageFlushMinutes: 1440,
   highUsageFlushMinutes: 1440,
   remoteEnabled: REMOTE_ENABLED,
+  cancelHoldDelayMs: 1000,  // 1 second default
 };
 
 /**
@@ -436,6 +438,10 @@ async function loadConfig(): Promise<AnalyticsConfig> {
       typeof stored.remoteEnabled === 'boolean'
         ? stored.remoteEnabled
         : DEFAULT_CONFIG.remoteEnabled,
+    cancelHoldDelayMs:
+      typeof stored.cancelHoldDelayMs === 'number'
+        ? Math.max(0, Math.min(10000, stored.cancelHoldDelayMs))
+        : DEFAULT_CONFIG.cancelHoldDelayMs,
   };
 }
 
@@ -1135,6 +1141,10 @@ export async function refreshRemoteAnalyticsConfig(): Promise<void> {
         typeof data.remoteEnabled === 'boolean'
           ? data.remoteEnabled
           : data.quota?.remoteEnabled ?? DEFAULT_CONFIG.remoteEnabled,
+      cancelHoldDelayMs:
+        typeof data.cancelHoldDelayMs === 'number'
+          ? Math.max(0, Math.min(10000, data.cancelHoldDelayMs))
+          : DEFAULT_CONFIG.cancelHoldDelayMs,
     };
 
     await saveConfig(cfg);
@@ -1151,4 +1161,15 @@ export async function refreshRemoteAnalyticsConfig(): Promise<void> {
     );
     await saveConfig(DEFAULT_CONFIG);
   }
+}
+
+/**
+ * Get the cancel hold delay in milliseconds.
+ * This is the time before the cancel button becomes active after a download starts.
+ * Default: 1000ms (1 second). Range: 0-10000ms.
+ * Configurable via Cloudflare dashboard.
+ */
+export async function getCancelHoldDelayMs(): Promise<number> {
+  const cfg = await loadConfig();
+  return cfg.cancelHoldDelayMs ?? 1000;
 }

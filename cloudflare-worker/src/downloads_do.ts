@@ -87,6 +87,10 @@ type DurableStateShape = {
     mid: number;   // 15-35 events  
     high: number;  // 35+ events
   };
+
+  // Cancel hold delay: time in ms before cancel button becomes active (default: 1000ms)
+  // Range: 0-10000ms. Configurable from dashboard to prevent accidental cancels.
+  configCancelHoldDelayMs: number;
 };
 
 const DEFAULT_COUNTERS: Counters = {
@@ -251,6 +255,7 @@ export class DownloadsDurable {
       configMaxBufferSize: 50000,
       configFlushMode: 'next_day',
       configTimeFlushMinutes: { low: 1440, mid: 1440, high: 1440 }, // 1440 = 24h = next day
+      configCancelHoldDelayMs: 1000, // 1 second default
     };
 
     if (!stored) {
@@ -303,6 +308,7 @@ export class DownloadsDurable {
       configMaxBufferSize: stored.configMaxBufferSize ?? base.configMaxBufferSize,
       configFlushMode: stored.configFlushMode ?? base.configFlushMode,
       configTimeFlushMinutes: stored.configTimeFlushMinutes ?? base.configTimeFlushMinutes,
+      configCancelHoldDelayMs: stored.configCancelHoldDelayMs ?? base.configCancelHoldDelayMs,
     };
 
     // Ensure midnight alarm is scheduled
@@ -758,6 +764,9 @@ export class DownloadsDurable {
       // Remote enabled (can be disabled for emergencies)
       remoteEnabled: quota.remoteEnabled,
       
+      // Cancel hold delay: time before cancel becomes active (default 1000ms)
+      cancelHoldDelayMs: this.d.configCancelHoldDelayMs,
+      
       // Quota info for extension awareness
       quota,
     };
@@ -795,6 +804,7 @@ export class DownloadsDurable {
       configMaxBufferSize: this.d.configMaxBufferSize ?? 50000,
       configFlushMode: this.d.configFlushMode ?? 'next_day' as const,
       configTimeFlushMinutes: this.d.configTimeFlushMinutes ?? { low: 1440, mid: 1440, high: 1440 },
+      configCancelHoldDelayMs: this.d.configCancelHoldDelayMs ?? 1000,
     };
     
     this.data = {
