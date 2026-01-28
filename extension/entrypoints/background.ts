@@ -533,22 +533,62 @@ export default defineBackground(() => {
     if (!message || message.type !== 'CQD_CANCEL_DOWNLOAD') return false;
 
     const requestId = message.requestId as string | undefined;
-    if (!requestId) return false;
+    if (!requestId) {
+      console.log('[CQD Cancel] No requestId provided');
+      return false;
+    }
 
     const pending = pendingByRequestId.get(requestId);
-    if (!pending) return false;
+    if (!pending) {
+      console.log(`[CQD Cancel] No pending download found for requestId: ${requestId}`);
+      return false;
+    }
 
-    // Cancel the download if it has an active download ID
+    console.log(`[CQD Cancel] Cancelling download: requestId=${requestId}, downloadId=${pending.currentDownloadId}`);
+
+    // 1. Cancel the active browser download if it exists
     if (pending.currentDownloadId != null) {
-      cancelledByUs.add(pending.currentDownloadId);
+      const downloadId = pending.currentDownloadId;
+      cancelledByUs.add(downloadId);
+      
       try {
-        chrome.downloads.cancel(pending.currentDownloadId);
-      } catch {
-        // Ignore errors
+        // Cancel the download
+        chrome.downloads.cancel(downloadId, () => {
+          if (chrome.runtime.lastError) {
+            console.log(`[CQD Cancel] chrome.downloads.cancel error: ${chrome.runtime.lastError.message}`);
+          } else {
+            console.log(`[CQD Cancel] Successfully cancelled download ID: ${downloadId}`);
+          }
+          
+          // Erase the partial download from history (removes the entry)
+          chrome.downloads.erase({ id: downloadId }, () => {
+            if (chrome.runtime.lastError) {
+              console.log(`[CQD Cancel] chrome.downloads.erase error: ${chrome.runtime.lastError.message}`);
+            } else {
+              console.log(`[CQD Cancel] Erased download from history: ${downloadId}`);
+            }
+          });
+        });
+      } catch (e) {
+        console.log(`[CQD Cancel] Exception during cancel: ${e}`);
       }
     }
 
-    // Record cancelled analytics
+    // 2. Close any bypass tab (Firefox/fallback)
+    for (const [tabId, p] of pendingByBypassTabId.entries()) {
+      if (p.requestId === requestId) {
+        console.log(`[CQD Cancel] Closing bypass tab: ${tabId}`);
+        try {
+          chrome.tabs.remove(tabId);
+        } catch (e) {
+          console.log(`[CQD Cancel] Error closing bypass tab: ${e}`);
+        }
+        pendingByBypassTabId.delete(tabId);
+        break;
+      }
+    }
+
+    // 3. Record cancelled analytics
     recordDownloadEvent({
       type: pending.fileMeta?.ext || 'unknown',
       status: 'cancelled',
@@ -556,9 +596,10 @@ export default defineBackground(() => {
       bypass_used: pending.fallbackStarted || false,
     });
 
-    // Clean up tracking maps
+    // 4. Clean up all tracking maps
     cleanup(pending);
 
+    console.log(`[CQD Cancel] Cleanup complete for requestId: ${requestId}`);
     return false; // No response needed
   });
 });

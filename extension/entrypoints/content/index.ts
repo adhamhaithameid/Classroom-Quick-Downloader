@@ -716,10 +716,13 @@ function findPendingButtonByElement(button: HTMLButtonElement): PendingButton | 
 async function handleCancelClick(button: HTMLButtonElement): Promise<void> {
   const pending = findPendingButtonByElement(button);
   if (!pending) {
+    console.log('[CQD Cancel] No pending download found for this button');
     // Already finished, just reset
     setButtonState(button, 'idle');
     return;
   }
+
+  console.log(`[CQD Cancel] Sending cancel request for requestId: ${pending.requestId}`);
 
   // Send cancel request to background
   if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
@@ -728,9 +731,12 @@ async function handleCancelClick(button: HTMLButtonElement): Promise<void> {
         type: 'CQD_CANCEL_DOWNLOAD',
         requestId: pending.requestId,
       });
-    } catch {
-      // Ignore errors
+      console.log('[CQD Cancel] Message sent to background script');
+    } catch (e) {
+      console.log(`[CQD Cancel] Error sending message: ${e}`);
     }
+  } else {
+    console.log('[CQD Cancel] chrome.runtime.sendMessage not available');
   }
 
   // Remove from pending
