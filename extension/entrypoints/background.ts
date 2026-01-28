@@ -533,18 +533,10 @@ export default defineBackground(() => {
     if (!message || message.type !== 'CQD_CANCEL_DOWNLOAD') return false;
 
     const requestId = message.requestId as string | undefined;
-    if (!requestId) {
-      console.log('[CQD Cancel] No requestId provided');
-      return false;
-    }
+    if (!requestId) return false;
 
     const pending = pendingByRequestId.get(requestId);
-    if (!pending) {
-      console.log(`[CQD Cancel] No pending download found for requestId: ${requestId}`);
-      return false;
-    }
-
-    console.log(`[CQD Cancel] Cancelling download: requestId=${requestId}, downloadId=${pending.currentDownloadId}`);
+    if (!pending) return false;
 
     // 1. Cancel the active browser download if it exists
     if (pending.currentDownloadId != null) {
@@ -552,36 +544,22 @@ export default defineBackground(() => {
       cancelledByUs.add(downloadId);
       
       try {
-        // Cancel the download
         chrome.downloads.cancel(downloadId, () => {
-          if (chrome.runtime.lastError) {
-            console.log(`[CQD Cancel] chrome.downloads.cancel error: ${chrome.runtime.lastError.message}`);
-          } else {
-            console.log(`[CQD Cancel] Successfully cancelled download ID: ${downloadId}`);
-          }
-          
-          // Erase the partial download from history (removes the entry)
-          chrome.downloads.erase({ id: downloadId }, () => {
-            if (chrome.runtime.lastError) {
-              console.log(`[CQD Cancel] chrome.downloads.erase error: ${chrome.runtime.lastError.message}`);
-            } else {
-              console.log(`[CQD Cancel] Erased download from history: ${downloadId}`);
-            }
-          });
+          // Erase the partial download from history
+          chrome.downloads.erase({ id: downloadId }, () => {});
         });
-      } catch (e) {
-        console.log(`[CQD Cancel] Exception during cancel: ${e}`);
+      } catch {
+        // Ignore errors
       }
     }
 
     // 2. Close any bypass tab (Firefox/fallback)
     for (const [tabId, p] of pendingByBypassTabId.entries()) {
       if (p.requestId === requestId) {
-        console.log(`[CQD Cancel] Closing bypass tab: ${tabId}`);
         try {
           chrome.tabs.remove(tabId);
-        } catch (e) {
-          console.log(`[CQD Cancel] Error closing bypass tab: ${e}`);
+        } catch {
+          // Ignore errors
         }
         pendingByBypassTabId.delete(tabId);
         break;
@@ -599,7 +577,6 @@ export default defineBackground(() => {
     // 4. Clean up all tracking maps
     cleanup(pending);
 
-    console.log(`[CQD Cancel] Cleanup complete for requestId: ${requestId}`);
     return false; // No response needed
   });
 });

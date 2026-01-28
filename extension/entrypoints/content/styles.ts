@@ -1,5 +1,5 @@
 // filepath: entrypoints/content/styles.ts
-import { DOWNLOAD_ICON_SVG_URL, SUCCESS_ICON_SVG_URL } from './icons';
+import { DOWNLOAD_ICON_SVG_URL, SUCCESS_ICON_SVG_URL, CANCEL_ICON_SVG_URL } from './icons';
 
 const STYLE_ID = 'cqd-style';
 const SPINNER_SIZE_PX = 16;
@@ -979,8 +979,18 @@ export function injectStyles(): void {
       background-image: url("${SUCCESS_ICON_SVG_URL}");
     }
 
-    /* Spinner when disabled (Loading) but not success/error */
-    .cqd-download-all-btn[disabled]:not(.cqd-all-success):not(.cqd-all-error) .cqd-download-all-icon {
+    /* Swap icon on cancel/cancelled */
+    .cqd-download-all-btn.cqd-all-cancel .cqd-download-all-icon,
+    .cqd-download-all-btn.cqd-all-cancelled .cqd-download-all-icon {
+      background-image: url("${CANCEL_ICON_SVG_URL}");
+      animation: none;
+      border: none;
+      width: 18px;
+      height: 18px;
+    }
+
+    /* Spinner when disabled (Loading) but not success/error/cancel */
+    .cqd-download-all-btn[disabled]:not(.cqd-all-success):not(.cqd-all-error):not(.cqd-all-cancel):not(.cqd-all-cancelled) .cqd-download-all-icon {
       background-image: none;
       border-radius: 9999px;
       width: ${SPINNER_SIZE_PX}px;

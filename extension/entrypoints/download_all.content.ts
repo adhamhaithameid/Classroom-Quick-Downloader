@@ -813,7 +813,6 @@ function handleCancelAllClick(group: GroupState): void {
     const requestId = (primary.dataset as any).cqdRequestId;
     if (requestId && typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
       try {
-        console.log(`[CQD Cancel All] Cancelling file with requestId: ${requestId}`);
         chrome.runtime.sendMessage({ type: 'CQD_CANCEL_DOWNLOAD', requestId });
       } catch {
         // Ignore errors
