@@ -4,6 +4,7 @@ import {
   DOWNLOAD_ICON_SVG_URL,
   SUCCESS_ICON_SVG_URL,
   ERROR_ICON_SVG_URL,
+  CANCEL_ICON_SVG_URL,
 } from './icons';
 import { injectStyles } from './styles';
 import { t } from './i18n';
@@ -49,7 +50,7 @@ let scanTimeoutId: number | null = null;
 let observer: MutationObserver | null = null;
 let rescanIntervalId: number | null = null;
 
-type ButtonState = 'idle' | 'loading' | 'success' | 'error' | 'trying';
+type ButtonState = 'idle' | 'loading' | 'success' | 'error' | 'trying' | 'cancel' | 'cancelled';
 
 type FileMeta = {
   name?: string;
@@ -526,6 +527,8 @@ function injectButtonIntoAttachment(
 function getButtonState(button: HTMLButtonElement): ButtonState {
   if (button.classList.contains('cqd-loading')) return 'loading';
   if (button.classList.contains('cqd-trying')) return 'trying';
+  if (button.classList.contains('cqd-cancel')) return 'cancel';
+  if (button.classList.contains('cqd-cancelled')) return 'cancelled';
   if (button.classList.contains('cqd-success')) return 'success';
   if (button.classList.contains('cqd-error')) return 'error';
   return 'idle';
@@ -547,6 +550,8 @@ function setButtonState(
     'cqd-trying',
     'cqd-success',
     'cqd-error',
+    'cqd-cancel',
+    'cqd-cancelled',
   );
   icon.classList.remove('cqd-spinner');
   icon.textContent = '';
@@ -570,6 +575,20 @@ function setButtonState(
       icon.style.backgroundImage = 'none';
       break;
     }
+    case 'cancel':
+      button.classList.add('cqd-cancel');
+      button.disabled = false; // Allow click to confirm cancel
+      label.textContent = t('cancel');
+      icon.style.backgroundImage = `url("${CANCEL_ICON_SVG_URL}")`;
+      icon.style.backgroundSize = '20px 20px';
+      break;
+    case 'cancelled':
+      button.classList.add('cqd-cancelled');
+      button.disabled = true;
+      label.textContent = t('cancelled');
+      icon.style.backgroundImage = `url("${CANCEL_ICON_SVG_URL}")`;
+      icon.style.backgroundSize = '20px 20px';
+      break;
     case 'success':
       button.classList.add('cqd-success');
       label.textContent = t('downloaded');
@@ -635,9 +654,44 @@ function createDownloadButton(
   button.appendChild(label);
   button.appendChild(errorDetail);
 
+  // Track if we're in loading state before hover changed it to cancel
+  let wasLoadingBeforeHover = false;
+
+  // Hover handlers for loading → cancel state transition
+  button.addEventListener('mouseenter', () => {
+    const state = getButtonState(button);
+    if (state === 'loading' || state === 'trying') {
+      wasLoadingBeforeHover = true;
+      setButtonState(button, 'cancel');
+    }
+  });
+
+  button.addEventListener('mouseleave', () => {
+    const state = getButtonState(button);
+    if (state === 'cancel' && wasLoadingBeforeHover) {
+      // Only revert if download is still pending
+      const pending = findPendingButtonByElement(button);
+      if (pending) {
+        setButtonState(button, 'loading');
+      }
+      wasLoadingBeforeHover = false;
+    }
+  });
+
   const clickHandler = async (e: Event) => {
     e.preventDefault();
     e.stopPropagation();
+    
+    const currentState = getButtonState(button);
+    
+    // If in cancel state, trigger cancellation
+    if (currentState === 'cancel') {
+      wasLoadingBeforeHover = false;
+      await handleCancelClick(button);
+      return;
+    }
+    
+    // Normal download flow (only works from idle state)
     await handleSingleDownloadClick(button, url, fileMeta);
   };
   button.addEventListener('click', clickHandler);
@@ -646,6 +700,50 @@ function createDownloadButton(
   });
 
   return button;
+}
+
+// Helper to find pending button entry by button element
+function findPendingButtonByElement(button: HTMLButtonElement): PendingButton | undefined {
+  for (const pending of pendingButtons.values()) {
+    if (pending.button === button) {
+      return pending;
+    }
+  }
+  return undefined;
+}
+
+// Handle cancel button click
+async function handleCancelClick(button: HTMLButtonElement): Promise<void> {
+  const pending = findPendingButtonByElement(button);
+  if (!pending) {
+    // Already finished, just reset
+    setButtonState(button, 'idle');
+    return;
+  }
+
+  // Send cancel request to background
+  if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+    try {
+      chrome.runtime.sendMessage({
+        type: 'CQD_CANCEL_DOWNLOAD',
+        requestId: pending.requestId,
+      });
+    } catch {
+      // Ignore errors
+    }
+  }
+
+  // Remove from pending
+  pendingButtons.delete(pending.requestId);
+
+  // Show cancelled state briefly, then return to idle
+  setButtonState(button, 'cancelled');
+  await delay(1500);
+  
+  // Only reset if still in cancelled state
+  if (getButtonState(button) === 'cancelled') {
+    setButtonState(button, 'idle');
+  }
 }
 
 /* -----------------------------------------------------
