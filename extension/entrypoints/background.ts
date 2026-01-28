@@ -524,6 +524,42 @@ export default defineBackground(() => {
 
     return true;
   });
+
+  /* -------------------------------------------------------
+   * 5) CQD_CANCEL_DOWNLOAD HANDLER
+   * -----------------------------------------------------*/
+  chrome.runtime.onMessage.addListener((message) => {
+    if (!message || message.type !== 'CQD_CANCEL_DOWNLOAD') return false;
+
+    const requestId = message.requestId as string | undefined;
+    if (!requestId) return false;
+
+    const pending = pendingByRequestId.get(requestId);
+    if (!pending) return false;
+
+    // Cancel the download if it has an active download ID
+    if (pending.currentDownloadId != null) {
+      cancelledByUs.add(pending.currentDownloadId);
+      try {
+        chrome.downloads.cancel(pending.currentDownloadId);
+      } catch {
+        // Ignore errors
+      }
+    }
+
+    // Record cancelled analytics
+    recordDownloadEvent({
+      type: pending.fileMeta?.ext || 'unknown',
+      status: 'cancelled',
+      duration_ms: Date.now() - pending.startTime,
+      bypass_used: pending.fallbackStarted || false,
+    });
+
+    // Clean up tracking maps
+    cleanup(pending);
+
+    return false; // No response needed
+  });
 });
 
 /* -------------------------------------------------------
