@@ -11,7 +11,7 @@ const INJECTED_ATTR = 'data-cqd-injected';
 const GROUP_FEEDBACK_SUCCESS_MS = 3000;
 const MIN_FILES_FOR_DOWNLOAD_ALL = 2;
 
-type ButtonState = 'idle' | 'loading' | 'trying' | 'success' | 'error';
+type ButtonState = 'idle' | 'loading' | 'trying' | 'success' | 'error' | 'cancel' | 'cancelled';
 
 interface FileEntry {
   key: string;
@@ -27,6 +27,7 @@ interface GroupState {
   downloadAllBtn: HTMLButtonElement | null;
   activated: boolean;
   isBusy: boolean;
+  cancelPending: boolean; // True when cancel has been requested
   resetTimeoutId?: number;
   currentRunId?: number;
 }
@@ -170,6 +171,7 @@ function registerSingleButton(btn: HTMLButtonElement): void {
       downloadAllBtn: null,
       activated: false,
       isBusy: false,
+      cancelPending: false,
     };
     groupStates.set(groupRoot, group);
   }
@@ -582,7 +584,31 @@ function ensureDownloadAllButton(group: GroupState): HTMLButtonElement {
   button.addEventListener('click', (e) => {
     e.preventDefault();
     e.stopPropagation();
-    handleDownloadAllClick(group);
+    // Check if we should cancel (button is in cancel state)
+    if (button.classList.contains('cqd-all-cancel')) {
+      handleCancelAllClick(group);
+    } else {
+      handleDownloadAllClick(group);
+    }
+  });
+
+  // Hover handlers for cancel state
+  button.addEventListener('mouseenter', () => {
+    if (group.isBusy && group.activated && !group.cancelPending) {
+      button.classList.add('cqd-all-cancel');
+      const mainSpan = button.querySelector<HTMLElement>('.cqd-download-all-main');
+      const subSpan = button.querySelector<HTMLElement>('.cqd-download-all-sub');
+      if (mainSpan) mainSpan.textContent = t('cancel') || 'Cancel';
+      if (subSpan) subSpan.textContent = t('downloading') || 'Downloading...';
+    }
+  });
+
+  button.addEventListener('mouseleave', () => {
+    if (button.classList.contains('cqd-all-cancel') && !group.cancelPending) {
+      button.classList.remove('cqd-all-cancel');
+      markGroupDirty(group);
+      scheduleRefresh();
+    }
   });
 
   if (isPostHeader && headerContainer) {
@@ -735,6 +761,74 @@ function handleDownloadAllClick(group: GroupState): void {
 
   markGroupDirty(group);
   scheduleRefresh();
+}
+
+function handleCancelAllClick(group: GroupState): void {
+  if (!group.activated || !group.isBusy) return;
+  if (group.cancelPending) return;
+
+  group.cancelPending = true;
+
+  const btn = group.downloadAllBtn;
+  if (btn) {
+    btn.classList.remove('cqd-all-cancel');
+    btn.classList.add('cqd-all-cancelled');
+    const mainSpan = btn.querySelector<HTMLElement>('.cqd-download-all-main');
+    const subSpan = btn.querySelector<HTMLElement>('.cqd-download-all-sub');
+    if (mainSpan) mainSpan.textContent = t('cancelled') || 'Cancelled';
+    if (subSpan) subSpan.textContent = '';
+    btn.disabled = true;
+  }
+
+  // Send cancel messages for all in-progress files
+  for (const file of group.files.values()) {
+    if (!file.inProgress) continue;
+    const primary = getPrimaryButton(file);
+    if (!primary) continue;
+
+    const requestId = (primary.dataset as any).cqdRequestId;
+    if (requestId) {
+      try {
+        chrome.runtime.sendMessage({ type: 'CQD_CANCEL_DOWNLOAD', requestId });
+      } catch {
+        // Ignore errors
+      }
+    }
+
+    // Also simulate clicking cancel on the individual button if it's in cancel/loading state
+    const state = getSingleButtonState(primary);
+    if (state === 'loading' || state === 'trying' || state === 'cancel') {
+      primary.classList.add('cqd-cancel');
+      primary.click();
+    }
+  }
+
+  // Reset group after a short delay
+  if (group.resetTimeoutId != null) {
+    window.clearTimeout(group.resetTimeoutId);
+  }
+  group.resetTimeoutId = window.setTimeout(() => {
+    group.resetTimeoutId = undefined;
+    group.activated = false;
+    group.isBusy = false;
+    group.cancelPending = false;
+    group.currentRunId = undefined;
+    try {
+      delete group.root.dataset.cqdGroupActive;
+    } catch {
+      /* ignore */
+    }
+    for (const file of group.files.values()) {
+      file.downloaded = false;
+      file.failed = false;
+      file.inProgress = false;
+    }
+    if (btn) {
+      btn.classList.remove('cqd-all-cancelled');
+    }
+    markGroupDirty(group);
+    scheduleRefresh();
+  }, 1500);
 }
 
 function getSingleButtonState(btn: HTMLButtonElement): ButtonState {
