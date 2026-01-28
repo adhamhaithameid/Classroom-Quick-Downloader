@@ -212,6 +212,7 @@ export function injectStyles(): void {
       justify-content: flex-start;
       box-shadow: var(--cqd-shadow-normal);
       width: auto;
+      min-width: 140px; /* Consistent width to prevent hover stuttering */
       max-width: 300px;
       transform: translateY(-50%) scale(1);
     }
@@ -237,6 +238,7 @@ export function injectStyles(): void {
       border-radius: 20px;
       justify-content: flex-start;
       width: auto;
+      min-width: 140px; /* Match loading/trying min-width for smooth transitions */
       max-width: 300px;
       transform: translateY(-50%) scale(1);
     }
@@ -915,6 +917,17 @@ export function injectStyles(): void {
     .cqd-download-all-btn.cqd-all-error {
       background-color: var(--cqd-color-error);
       box-shadow: var(--cqd-shadow-error);
+    }
+
+    /* CANCEL STATE (Orange - hover to cancel during download) */
+    .cqd-download-all-btn.cqd-all-cancel {
+      background-color: var(--cqd-color-cancel);
+      box-shadow: var(--cqd-shadow-cancel);
+    }
+
+    .cqd-download-all-btn.cqd-all-cancelled {
+      background-color: var(--cqd-color-cancel);
+      box-shadow: var(--cqd-shadow-cancel);
     }
 
     /* PROGRESS BAR OVERLAY (Fills up) */
