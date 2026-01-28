@@ -1,7 +1,7 @@
 // filepath: extension/entrypoints/utils/analytics.ts
 
 export interface AnalyticsEvent {
-  status: 'success' | 'fail';
+  status: 'success' | 'fail' | 'cancelled';
   file_type: string;
   browser: string;
   os: string;
@@ -47,6 +47,7 @@ export interface LocalStats {
    */
   success?: number;
   fail?: number;
+  cancelled?: number;
   attempts?: number;
   bySpeed?: {
     fast: number;
@@ -520,10 +521,13 @@ async function saveStats(stats: LocalStats): Promise<void> {
 async function updateLocalStats(event: AnalyticsEvent): Promise<void> {
   const stats = await loadStats();
   const isSuccess = event.status === 'success';
+  const isCancelled = event.status === 'cancelled';
 
   if (isSuccess) {
     stats.success = (stats.success || 0) + 1;
     stats.total = (stats.total || 0) + 1; // keep popup compatible
+  } else if (isCancelled) {
+    stats.cancelled = (stats.cancelled || 0) + 1;
   } else {
     stats.fail = (stats.fail || 0) + 1;
     const key = (event.error_type || 'UNKNOWN').toUpperCase();
@@ -1019,8 +1023,9 @@ export interface RecordDownloadEventInput {
   /**
    * "success" → file actually finished downloading.
    * "fail"    → file definitely failed (interrupted, blocked, etc.).
+   * "cancelled" → user cancelled the download.
    */
-  status: 'success' | 'fail';
+  status: 'success' | 'fail' | 'cancelled';
 
   /**
    * Optional tag: where this came from (download_all, single, etc.).
