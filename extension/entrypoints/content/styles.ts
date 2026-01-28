@@ -36,9 +36,13 @@ export function injectStyles(): void {
       --cqd-shadow-error: 0 12px 28px rgba(255, 64, 54, 0.40);
       --cqd-shadow-error-strong: 0 12px 28px rgba(255, 64, 54, 0.70);
 
-      --cqd-color-trying: #EC6300;
-      --cqd-shadow-trying: 0 12px 28px rgba(236, 99, 0, 0.40);
-      --cqd-shadow-trying-strong: 0 12px 28px rgba(236, 99, 0, 0.70);
+      --cqd-color-trying: #F5A623;
+      --cqd-shadow-trying: 0 12px 28px rgba(245, 166, 35, 0.40);
+      --cqd-shadow-trying-strong: 0 12px 28px rgba(245, 166, 35, 0.70);
+
+      --cqd-color-cancel: #EC6300;
+      --cqd-shadow-cancel: 0 12px 28px rgba(236, 99, 0, 0.40);
+      --cqd-shadow-cancel-strong: 0 12px 28px rgba(236, 99, 0, 0.70);
 
       --cqd-color-comment: #9B00FF;
       --cqd-color-edited: #007F8D;
@@ -63,9 +67,13 @@ export function injectStyles(): void {
       --cqd-shadow-error: 0 12px 28px rgba(255, 64, 54, 0.40);
       --cqd-shadow-error-strong: 0 12px 28px rgba(255, 64, 54, 0.70);
 
-      --cqd-color-trying: #FF9142;
-      --cqd-shadow-trying: 0 12px 28px rgba(255, 145, 66, 0.40);
-      --cqd-shadow-trying-strong: 0 12px 28px rgba(255, 145, 66, 0.70);
+      --cqd-color-trying: #FFD93D;
+      --cqd-shadow-trying: 0 12px 28px rgba(255, 217, 61, 0.40);
+      --cqd-shadow-trying-strong: 0 12px 28px rgba(255, 217, 61, 0.70);
+
+      --cqd-color-cancel: #FF9142;
+      --cqd-shadow-cancel: 0 12px 28px rgba(255, 145, 66, 0.40);
+      --cqd-shadow-cancel-strong: 0 12px 28px rgba(255, 145, 66, 0.70);
 
       --cqd-color-comment: #9B00FF;
       --cqd-color-edited: #00D6EE;
@@ -219,6 +227,29 @@ export function injectStyles(): void {
 
     .cqd-download-btn.cqd-trying:hover {
       box-shadow: var(--cqd-shadow-trying-strong);
+    }
+
+    .cqd-download-btn.cqd-cancel,
+    .cqd-download-btn.cqd-cancelled {
+      background-color: var(--cqd-color-cancel);
+      box-shadow: var(--cqd-shadow-cancel);
+      padding-inline: 12px;
+      border-radius: 20px;
+      justify-content: flex-start;
+      width: auto;
+      max-width: 300px;
+      transform: translateY(-50%) scale(1);
+    }
+
+    .cqd-download-btn.cqd-cancel:hover {
+      box-shadow: var(--cqd-shadow-cancel-strong);
+    }
+
+    .cqd-download-btn.cqd-cancel .cqd-label,
+    .cqd-download-btn.cqd-cancelled .cqd-label {
+      opacity: 1;
+      max-width: 150px;
+      margin-left: 12px;
     }
 
     .cqd-download-btn.cqd-loading .cqd-label,
