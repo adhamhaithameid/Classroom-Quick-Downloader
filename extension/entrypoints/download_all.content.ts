@@ -2,6 +2,7 @@
 import { injectStyles } from './content/styles';
 import { t } from './content/i18n';
 import { isPageDark } from './content/theme';
+import { CANCEL_ICON_SVG_URL } from './content/icons';
 
 
 const DOWNLOAD_BTN_SELECTOR = '.cqd-download-all-btn';
@@ -598,14 +599,26 @@ function ensureDownloadAllButton(group: GroupState): HTMLButtonElement {
       button.classList.add('cqd-all-cancel');
       const mainSpan = button.querySelector<HTMLElement>('.cqd-download-all-main');
       const subSpan = button.querySelector<HTMLElement>('.cqd-download-all-sub');
+      const iconEl = button.querySelector<HTMLElement>('.cqd-download-all-icon');
       if (mainSpan) mainSpan.textContent = t('cancel') || 'Cancel';
-      if (subSpan) subSpan.textContent = t('downloading') || 'Downloading...';
+      if (subSpan) subSpan.textContent = '';
+      // Show X icon for cancel
+      if (iconEl) {
+        iconEl.style.backgroundImage = `url("${CANCEL_ICON_SVG_URL}")`;
+        iconEl.style.backgroundSize = '18px 18px';
+      }
     }
   });
 
   button.addEventListener('mouseleave', () => {
     if (button.classList.contains('cqd-all-cancel') && !group.cancelPending) {
       button.classList.remove('cqd-all-cancel');
+      // Restore original icon
+      const iconEl = button.querySelector<HTMLElement>('.cqd-download-all-icon');
+      if (iconEl) {
+        iconEl.style.backgroundImage = '';
+        iconEl.style.backgroundSize = '';
+      }
       markGroupDirty(group);
       scheduleRefresh();
     }
@@ -775,32 +788,43 @@ function handleCancelAllClick(group: GroupState): void {
     btn.classList.add('cqd-all-cancelled');
     const mainSpan = btn.querySelector<HTMLElement>('.cqd-download-all-main');
     const subSpan = btn.querySelector<HTMLElement>('.cqd-download-all-sub');
+    const iconEl = btn.querySelector<HTMLElement>('.cqd-download-all-icon');
     if (mainSpan) mainSpan.textContent = t('cancelled') || 'Cancelled';
     if (subSpan) subSpan.textContent = '';
+    // Show X icon for cancelled state
+    if (iconEl) {
+      iconEl.style.backgroundImage = `url("${CANCEL_ICON_SVG_URL}")`;
+      iconEl.style.backgroundSize = '18px 18px';
+    }
     btn.disabled = true;
   }
 
-  // Send cancel messages for all in-progress files
+  // Cancel all in-progress files
   for (const file of group.files.values()) {
     if (!file.inProgress) continue;
     const primary = getPrimaryButton(file);
     if (!primary) continue;
 
+    // Mark file as not in progress (cancelled)
+    file.inProgress = false;
+    file.failed = true; // Mark as failed since download was cancelled
+
+    // Send cancel message to background for this file
     const requestId = (primary.dataset as any).cqdRequestId;
-    if (requestId) {
+    if (requestId && typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
       try {
+        console.log(`[CQD Cancel All] Cancelling file with requestId: ${requestId}`);
         chrome.runtime.sendMessage({ type: 'CQD_CANCEL_DOWNLOAD', requestId });
       } catch {
         // Ignore errors
       }
     }
 
-    // Also simulate clicking cancel on the individual button if it's in cancel/loading state
-    const state = getSingleButtonState(primary);
-    if (state === 'loading' || state === 'trying' || state === 'cancel') {
-      primary.classList.add('cqd-cancel');
-      primary.click();
-    }
+    // Update the individual button state to cancelled
+    primary.classList.remove('cqd-loading', 'cqd-trying', 'cqd-cancel');
+    primary.classList.add('cqd-cancelled');
+    const lblEl = primary.querySelector<HTMLElement>('.cqd-label');
+    if (lblEl) lblEl.textContent = t('cancelled') || 'Cancelled';
   }
 
   // Reset group after a short delay

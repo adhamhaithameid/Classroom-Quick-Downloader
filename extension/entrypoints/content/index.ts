@@ -545,6 +545,14 @@ function setButtonState(
 
   if (!icon || !label || !errorDetail) return;
 
+  // Protect cancel state from being overridden by loading/trying
+  // Only success, error, cancelled, and idle can override cancel state
+  const currentState = getButtonState(button);
+  if (currentState === 'cancel' && (state === 'loading' || state === 'trying')) {
+    // Skip state change - cancel takes priority during hover
+    return;
+  }
+
   button.classList.remove(
     'cqd-loading',
     'cqd-trying',
