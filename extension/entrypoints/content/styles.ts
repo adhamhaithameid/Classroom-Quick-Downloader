@@ -36,9 +36,9 @@ export function injectStyles(): void {
       --cqd-shadow-error: 0 12px 28px rgba(255, 64, 54, 0.40);
       --cqd-shadow-error-strong: 0 12px 28px rgba(255, 64, 54, 0.70);
 
-      --cqd-color-trying: #F5A623;
-      --cqd-shadow-trying: 0 12px 28px rgba(245, 166, 35, 0.40);
-      --cqd-shadow-trying-strong: 0 12px 28px rgba(245, 166, 35, 0.70);
+      --cqd-color-trying: #FFD93D;
+      --cqd-shadow-trying: 0 12px 28px rgba(255, 217, 61, 0.40);
+      --cqd-shadow-trying-strong: 0 12px 28px rgba(255, 217, 61, 0.70);
 
       --cqd-color-cancel: #EC6300;
       --cqd-shadow-cancel: 0 12px 28px rgba(236, 99, 0, 0.40);

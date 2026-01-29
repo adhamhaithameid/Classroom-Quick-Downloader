@@ -27,6 +27,7 @@ type DurableStateShape = {
   totalDownloads: number;
   totalSuccess: number;
   totalFail: number;
+  totalCancelled: number;
   pendingEvents: number;
   lastEventAt: number | null;
   lastFlushAt: number | null;
@@ -230,6 +231,7 @@ export class DownloadsDurable {
       totalDownloads: 0,
       totalSuccess: 0,
       totalFail: 0,
+      totalCancelled: 0,
       pendingEvents: 0,
       lastEventAt: null,
       lastFlushAt: null,
@@ -269,6 +271,7 @@ export class DownloadsDurable {
       totalDownloads: stored.totalDownloads ?? base.totalDownloads,
       totalSuccess: stored.totalSuccess ?? base.totalSuccess,
       totalFail: stored.totalFail ?? base.totalFail,
+      totalCancelled: stored.totalCancelled ?? base.totalCancelled,
       pendingEvents: stored.pendingEvents ?? base.pendingEvents,
       lastEventAt: stored.lastEventAt ?? base.lastEventAt,
       lastFlushAt: stored.lastFlushAt ?? base.lastFlushAt,
@@ -574,7 +577,7 @@ export class DownloadsDurable {
       }
 
       // ----- VALIDATION: Required fields -----
-      if (!ev.status || (ev.status !== "success" && ev.status !== "fail")) {
+      if (!ev.status || (ev.status !== "success" && ev.status !== "fail" && ev.status !== "cancelled")) {
         invalidCount++;
         continue;
       }
@@ -602,6 +605,8 @@ export class DownloadsDurable {
 
       if (ev.status === "success") {
         this.d.totalSuccess += 1;
+      } else if (ev.status === "cancelled") {
+        this.d.totalCancelled += 1;
       } else {
         this.d.totalFail += 1;
       }
@@ -713,6 +718,7 @@ export class DownloadsDurable {
       totalDownloads: this.d.totalDownloads ?? 0,
       totalSuccess: this.d.totalSuccess ?? 0,
       totalFail: this.d.totalFail ?? 0,
+      totalCancelled: this.d.totalCancelled ?? 0,
       pendingEvents: this.d.pendingEvents ?? 0,
       lastEventAt: this.d.lastEventAt ?? null,
       lastFlushAt: this.d.lastFlushAt ?? null,
@@ -812,6 +818,7 @@ export class DownloadsDurable {
       totalDownloads: 0,
       totalSuccess: 0,
       totalFail: 0,
+      totalCancelled: 0,
       pendingEvents: 0,
       lastEventAt: null,
       lastFlushAt: null,
