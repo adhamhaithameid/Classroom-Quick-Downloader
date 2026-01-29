@@ -167,6 +167,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: 'Runtime indisponível',
     startError: 'Não foi possível iniciar.',
     commError: 'Erro de comunicação.',
+    cancel: 'Cancelar',
+    cancelled: 'Cancelado',
   },
   'zh-cn': {
     download: '下载',
@@ -187,6 +189,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: '运行时不可用',
     startError: '无法启动。',
     commError: '通信错误。',
+    cancel: '取消',
+    cancelled: '已取消',
   },
   'zh-tw': {
     download: '下載',
@@ -207,6 +211,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: '執行階段無法使用',
     startError: '無法開始。',
     commError: '通訊錯誤。',
+    cancel: '取消',
+    cancelled: '已取消',
   },
   fr: {
     download: 'Télécharger',
@@ -325,6 +331,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: '통신 오류.',
     editedTooltip: '게시와 마지막 수정 사이의 일수',
     commentSingular: '댓글',
+    cancel: '취소',
+    cancelled: '취소됨',
   },
   tr: {
     download: 'İndir',
@@ -347,6 +355,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'İletişim hatası.',
     editedTooltip: 'Gönderi ile son düzenleme arasındaki gün sayısı',
     commentSingular: 'yorum',
+    cancel: 'İptal',
+    cancelled: 'İptal edildi',
   },
   vi: {
     download: 'Tải xuống',
@@ -369,6 +379,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Lỗi giao tiếp.',
     editedTooltip: 'Số ngày giữa lần đăng và lần chỉnh sửa cuối cùng',
     commentSingular: 'bình luận',
+    cancel: 'Hủy',
+    cancelled: 'Đã hủy',
   },
   id: {
     download: 'Download',
@@ -391,6 +403,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Kesalahan komunikasi.',
     editedTooltip: 'Hari antara posting dan pengeditan terakhir',
     commentSingular: 'komentar',
+    cancel: 'Batal',
+    cancelled: 'Dibatalkan',
   },
   th: {
     download: 'ดาวน์โหลด',
@@ -413,6 +427,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'ข้อผิดพลาดในการสื่อสาร',
     editedTooltip: 'วันระหว่างการโพสต์และการแก้ไขครั้งล่าสุด',
     commentSingular: 'ความคิดเห็น',
+    cancel: 'ยกเลิก',
+    cancelled: 'ยกเลิกแล้ว',
   },
   pl: {
     download: 'Pobierz',
@@ -435,6 +451,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Błąd komunikacji.',
     editedTooltip: 'Dni między opublikowaniem a ostatnią edycją',
     commentSingular: 'komentarz',
+    cancel: 'Anuluj',
+    cancelled: 'Anulowano',
   },
   nl: {
     download: 'Downloaden',
@@ -457,6 +475,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Communicatiefout.',
     editedTooltip: 'Dagen tussen plaatsen en laatste bewerking',
     commentSingular: 'opmerking',
+    cancel: 'Annuleren',
+    cancelled: 'Geannuleerd',
   },
   bn: {
     download: 'ডাউনলোড',
@@ -479,6 +499,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'যোগাযোগ ত্রুটি।',
     editedTooltip: 'পোস্ট করা এবং শেষ সম্পাদনার মধ্যে দিন',
     commentSingular: 'টি মন্তব্য',
+    cancel: 'বাতিল',
+    cancelled: 'বাতিল',
   },
   pa: {
     download: 'ਡਾਉਨਲੋਡ',
@@ -501,6 +523,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'ਸੰਚਾਰ ਗਲਤੀ।',
     editedTooltip: 'Days between posting and the last edit',
     commentSingular: 'ਟਿੱਪਣੀਆਂ',
+    cancel: 'ਰੱਦ ਕਰੋ',
+    cancelled: 'ਰੱਦ ਕੀਤਾ',
   },
   te: {
     download: 'డౌన్‌లోడ్',
@@ -523,6 +547,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'కమ్యూనికేషన్ లోపం.',
     editedTooltip: 'పోస్ట్ చేయడానికి మరియు చివరి సవరణకు మధ్య రోజులు',
     commentSingular: 'వ్యాఖ్యలు',
+    cancel: 'రద్దు',
+    cancelled: 'రద్దు చేయబడింది',
   },
   mr: {
     download: 'डाउनलोड',
@@ -545,6 +571,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'संपर्क त्रुटी.',
     editedTooltip: 'पोस्टिंग आणि शेवटच्या संपादानामधील दिवस',
     commentSingular: 'टिप्पण्या',
+    cancel: 'रद्द करा',
+    cancelled: 'रद्द केले',
   },
   ta: {
     download: 'பதிவிறக்கு',
@@ -567,6 +595,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'தொடர்பு பிழை.',
     editedTooltip: 'பதிവിடுவதற்கும் கடைசித் திருத்தத்திற்கும் இடைப்பட்ட நாட்கள்',
     commentSingular: 'கருத்துகள்',
+    cancel: 'ரத்து',
+    cancelled: 'ரத்து செய்யப்பட்டது',
   },
   ur: {
     download: 'ڈاؤن لوڈ',
@@ -589,6 +619,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'مواصلاتی خرابی۔',
     editedTooltip: 'پوسٹنگ اور آخری ترمیم کے درمیان دن',
     commentSingular: 'تبصرے',
+    cancel: 'منسوخ',
+    cancelled: 'منسوخ',
   },
   gu: {
     download: 'ડાઉનલોડ',
@@ -611,6 +643,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'સંચાર ભૂલ.',
     editedTooltip: 'પોસ્ટિંગ અને છેલ્લા ફેરફાર વચ્ચેના દિવસો',
     commentSingular: 'ટિપ્પણીઓ',
+    cancel: 'રદ કરો',
+    cancelled: 'રદ ڪيل',
   },
   kn: {
     download: 'ಡೌನ್‌ಲೋಡ್',
@@ -633,6 +667,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'ಸಂವಹನ ದೋಷ.',
     editedTooltip: 'ಪೋಸ್ಟ್ ಮತ್ತು ಇತ್ತೀಚಿನ ಸಂಪಾದನೆಯ ನಡುವಿನ ದಿನಗಳು',
     commentSingular: 'ಕಾಮೆಂಟ್‌ಗಳು',
+    cancel: 'ರದ್ದು',
+    cancelled: 'ರದ್ದುಗೊಳಿಸಲಾಗಿದೆ',
   },
   ml: {
     download: 'ഡൗൺലോഡ്',
@@ -655,6 +691,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'ആശയവിനിമയ പിശക്.',
     editedTooltip: 'പോസ്റ്റിംഗും അവസാന എഡിറ്റും തമ്മിലുള്ള ദിവസങ്ങൾ',
     commentSingular: 'അഭിപ്രായങ്ങൾ',
+    cancel: 'റദ്ദാക്കുക',
+    cancelled: 'റദ്ദാക്കി',
   },
   uk: {
     download: 'Завантажити',
@@ -677,6 +715,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Помилка зв’язку.',
     editedTooltip: 'Днів між публікацією та останнім редагуванням',
     commentSingular: 'коментарів',
+    cancel: 'Скасувати',
+    cancelled: 'Скасовано',
   },
   el: {
     download: 'Λήψη',
@@ -699,6 +739,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Σφάλμα επικοινωνίας.',
     editedTooltip: 'Ημέρες μεταξύ δημοσίευσης και τελευταίας επεξεργασίας',
     commentSingular: 'σχόλια',
+    cancel: 'Ακύρωση',
+    cancelled: 'Ακυρώθηκε',
   },
   cs: {
     download: 'Stáhnout',
@@ -721,6 +763,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Chyba komunikace.',
     editedTooltip: 'Dny mezi zveřejněním a poslední úpravou',
     commentSingular: 'komentářů',
+    cancel: 'Zrušit',
+    cancelled: 'Zrušeno',
   },
   ro: {
     download: 'Descărcați',
@@ -743,6 +787,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Eroare de comunicare.',
     editedTooltip: 'Zile între postare și ultima editare',
     commentSingular: 'comentarii',
+    cancel: 'Anulare',
+    cancelled: 'Anulat',
   },
   hu: {
     download: 'Letöltés',
@@ -765,6 +811,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Kommunikációs hiba.',
     editedTooltip: 'A közzététel és az utolsó szerkesztés között eltelt napok',
     commentSingular: 'megjegyzés',
+    cancel: 'Mégse',
+    cancelled: 'Megszakítva',
   },
   sv: {
     download: 'Ladda ner',
@@ -787,6 +835,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Kommunikationsfel.',
     editedTooltip: 'Dagar mellan inlägg och senaste redigering',
     commentSingular: 'kommentarer',
+    cancel: 'Avbryt',
+    cancelled: 'Avbruten',
   },
   da: {
     download: 'Hent',
@@ -809,6 +859,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Kommunikationsfejl.',
     editedTooltip: 'Dage mellem opslag og sidste redigering',
     commentSingular: 'kommentarer',
+    cancel: 'Annuller',
+    cancelled: 'Annulleret',
   },
   fi: {
     download: 'Lataa',
@@ -831,8 +883,12 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Yhteysvirhe.',
     editedTooltip: 'Päivät julkaisun ja viimeisen muokkauksen välillä',
     commentSingular: 'kommenttia',
+    cancel: 'Peruuta',
+    cancelled: 'Peruutettu',
   },
   no: {
+    cancel: 'Avbryt',
+    cancelled: 'Avbrutt',
     download: 'Last ned',
     downloading: 'Laster ned…',
     trying: 'Prøver…',
@@ -875,6 +931,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'שגיאת תקשורת.',
     editedTooltip: 'Days between posting and the last edit',
     commentSingular: 'תגובות',
+    cancel: 'ביטול',
+    cancelled: 'בוטל',
   },
   fa: {
     download: 'دانلود',
@@ -897,6 +955,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'خطای ارتباطی.',
     editedTooltip: 'روزهای بین ارسال و آخرین ویرایش',
     commentSingular: 'نظر',
+    cancel: 'لغو',
+    cancelled: 'لغو شد',
   },
   fil: {
     download: 'I-download',
@@ -917,6 +977,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: 'Hindi available ang runtime',
     startError: 'Hindi masimulan.',
     commError: 'Error sa komunikasyon.',
+    cancel: 'Kanselahin',
+    cancelled: 'Kinansela',
   },
   ms: {
     download: 'Muat turun',
@@ -939,8 +1001,12 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Ralat komunikasi.',
     editedTooltip: 'Hari antara posting dan suntingan terakhir',
     commentSingular: 'komen',
+    cancel: 'Batal',
+    cancelled: 'Dibatalkan',
   },
   sr: {
+    cancel: 'Откажи',
+    cancelled: 'Отказано',
     download: 'Преузми',
     downloading: 'Преузимање…',
     trying: 'Покушавам…',
@@ -983,8 +1049,12 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Chyba komunikácie.',
     editedTooltip: 'Dni medzi zverejnením a poslednou úpravou',
     commentSingular: 'komentárov',
+    cancel: 'Zrušiť',
+    cancelled: 'Zrušené',
   },
   bg: {
+    cancel: 'Отказ',
+    cancelled: 'Отказано',
     download: 'Изтегли',
     downloading: 'Изтегляне…',
     trying: 'Опит…',
@@ -1027,6 +1097,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Pogreška u komunikaciji.',
     editedTooltip: 'Dani između objave i zadnjeg uređivanja',
     commentSingular: 'komentara',
+    cancel: 'Odustani',
+    cancelled: 'Otkazano',
   },
   lt: {
     download: 'Atsisiųsti',
@@ -1049,6 +1121,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Ryšio klaida.',
     editedTooltip: 'Dienos nuo paskelbimo iki paskutinio redagavimo',
     commentSingular: 'komentarai',
+    cancel: 'Atšaukti',
+    cancelled: 'Atšaukta',
   },
   lv: {
     download: 'Lejupielādēt',
@@ -1071,6 +1145,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Saziņas kļūda.',
     editedTooltip: 'Dienas starp publicēšanu un pēdējo rediģēšanu',
     commentSingular: 'komentāri',
+    cancel: 'Atcelt',
+    cancelled: 'Atcelts',
   },
   et: {
     download: 'Laadi alla',
@@ -1093,6 +1169,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Sideviga.',
     editedTooltip: 'Päevad postitamise ja viimase muutmise vahel',
     commentSingular: 'kommentaari',
+    cancel: 'Loobu',
+    cancelled: 'Tühistatud',
   },
   sl: {
     download: 'Prenos',
@@ -1115,6 +1193,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Napaka v komunikaciji.',
     editedTooltip: 'Dnevi med objavo in zadnjim urejanjem',
     commentSingular: 'komentarjev',
+    cancel: 'Prekliči',
+    cancelled: 'Preklicano',
   },
   ca: {
     download: 'Descarrega',
@@ -1137,6 +1217,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Communication error.',
     editedTooltip: 'Dies entre la publicació i l’última edició',
     commentSingular: 'comentaris',
+    cancel: 'Cancel·la',
+    cancelled: 'Cancel·lat',
   },
   af: {
     download: 'Aflaai',
@@ -1159,6 +1241,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Kommunikasiefout.',
     editedTooltip: 'Days between posting and the last edit',
     commentSingular: 'kommentare',
+    cancel: 'Kanselleer',
+    cancelled: 'Gekanselleer',
   },
   am: {
     download: 'አውርድ',
@@ -1181,6 +1265,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'የግንኙነት ስህተት።',
     editedTooltip: 'Days between posting and the last edit',
     commentSingular: 'አስተያየቶች',
+    cancel: 'ሰርዝ',
+    cancelled: 'ተሰርዟል',
   },
   hy: {
     download: 'Ներբեռնել',
@@ -1203,6 +1289,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Հաղորդակցման սխալ:',
     editedTooltip: 'Days between posting and the last edit',
     commentSingular: 'մեկնաբանություն',
+    cancel: 'Չեղարկել',
+    cancelled: 'Չեղարկված է',
   },
   as: {
     download: 'ডাউন্লোড',
@@ -1225,6 +1313,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'যোগাযোগৰ ত্ৰুটি।',
     editedTooltip: 'Days between posting and the last edit',
     commentSingular: 'মন্তব্য',
+    cancel: 'বাতিল কৰক',
+    cancelled: 'বাতিল কৰা হ’ল',
   },
   az: {
     download: 'Yüklə',
@@ -1247,6 +1337,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Rabitə xətası.',
     editedTooltip: 'Days between posting and the last edit',
     commentSingular: 'şərh',
+    cancel: 'Ləğv et',
+    cancelled: 'Ləğv edildi',
   },
   eu: {
     download: 'Deskargatu',
@@ -1269,6 +1361,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Komunikazio errorea.',
     editedTooltip: 'Days between posting and the last edit',
     commentSingular: 'iruzkin',
+    cancel: 'Utzi',
+    cancelled: 'Bertan behera',
   },
   my: {
     download: 'ဒေါင်းလုဒ်',
@@ -1291,6 +1385,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'ဆက်သွယ်ရေး အမှား။',
     editedTooltip: 'Days between posting and the last edit',
     commentSingular: 'မှတ်ချက်များ',
+    cancel: 'ပယ်ဖျက်',
+    cancelled: 'ပယ်ဖျက်ပြီး',
   },
   gl: {
     download: 'Descargar',
@@ -1313,6 +1409,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Erro de comunicación.',
     editedTooltip: 'Days between posting and the last edit',
     commentSingular: 'comentarios',
+    cancel: 'Cancelar',
+    cancelled: 'Cancelado',
   },
   ka: {
     download: 'ჩამოტვირთვა',
@@ -1335,6 +1433,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'კავშირის შეცდომა.',
     editedTooltip: 'Days between posting and the last edit',
     commentSingular: 'კომენტარი',
+    cancel: 'გაუქმება',
+    cancelled: 'გაუქმებულია',
   },
   is: {
     download: 'Sækja',
@@ -1357,6 +1457,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Samskiptavilla.',
     editedTooltip: 'Days between posting and the last edit',
     commentSingular: 'ummæli',
+    cancel: 'Hætta við',
+    cancelled: 'Hætt við',
   },
   ga: {
     download: 'Íoslódáil',
@@ -1379,6 +1481,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Earráid chumarsáide.',
     editedTooltip: 'Days between posting and the last edit',
     commentSingular: 'trácht',
+    cancel: 'Cealaigh',
+    cancelled: 'Cealaithe',
   },
   kk: {
     download: 'Жүктеп алу',
@@ -1401,6 +1505,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Байланыс қатесі.',
     editedTooltip: 'Days between posting and the last edit',
     commentSingular: 'пікір',
+    cancel: 'Болдырмау',
+    cancelled: 'Болдырылмады',
   },
   km: {
     download: 'ទាញយក',
@@ -1423,6 +1529,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'កំហុសក្នុងការទំនាក់ទំនង។',
     editedTooltip: 'Days between posting and the last edit',
     commentSingular: 'មតិ',
+    cancel: 'បោះបង់',
+    cancelled: 'បានបោះបង់',
   },
   lo: {
     download: 'ດາວໂຫລດ',
@@ -1445,6 +1553,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'ຂໍ້ຜິດພາດໃນການສື່ສານ.',
     editedTooltip: 'Days between posting and the last edit',
     commentSingular: 'ຄຳເຫັນ',
+    cancel: 'ຍົກເລີກ',
+    cancelled: 'ຍົກເລີກແລ້ວ',
   },
   mk: {
     download: 'Преземи',
@@ -1467,6 +1577,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Грешка во комуникацијата.',
     editedTooltip: 'Days between posting and the last edit',
     commentSingular: 'коментари',
+    cancel: 'Откажи',
+    cancelled: 'Откажано',
   },
   mn: {
     download: 'Татах',
@@ -1489,6 +1601,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Харилцааны алдаа.',
     editedTooltip: 'Days between posting and the last edit',
     commentSingular: 'сэтгэгдэл',
+    cancel: 'Цуцлах',
+    cancelled: 'Цуцлагдсан',
   },
   ne: {
     download: 'डाउनलोड',
@@ -1511,6 +1625,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'सञ्चार त्रुटि।',
     editedTooltip: 'Days between posting and the last edit',
     commentSingular: 'टिप्पणीहरू',
+    cancel: 'रद्द गर्नुहोस्',
+    cancelled: 'रद्द गरियो',
   },
   or: {
     download: 'ଡାଉନଲୋଡ୍',
@@ -1533,6 +1649,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'ଯୋଗାଯୋଗ ତ୍ରୁଟି |',
     editedTooltip: 'Days between posting and the last edit',
     commentSingular: 'ମନ୍ତବ୍ୟ',
+    cancel: 'ବାତିଲ କରନ୍ତୁ',
+    cancelled: 'ବାତିଲ ହେଲା',
   },
   si: {
     download: 'බාගන්න',
@@ -1555,6 +1673,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Communication error.',
     editedTooltip: 'Days between posting and the last edit',
     commentSingular: 'අදහස්',
+    cancel: 'අවලංගු කරන්න',
+    cancelled: 'අවලංගු කරන ලදී',
   },
   sw: {
     download: 'Pakua',
@@ -1577,6 +1697,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Hitilafu ya mawasiliano.',
     editedTooltip: 'Siku kati ya kuchapisha na uhariri wa mwisho',
     commentSingular: 'maoni',
+    cancel: 'Ghairi',
+    cancelled: 'Imeghairiwa',
   },
   uz: {
     download: 'Yuklash',
@@ -1599,6 +1721,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Aloqa xatosi.',
     editedTooltip: 'Days between posting and the last edit',
     commentSingular: 'sharhlar',
+    cancel: 'Bekor qilish',
+    cancelled: 'Bekor qilindi',
   },
   cy: {
     download: 'Lawrlwytho',
@@ -1621,6 +1745,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Gwall cyfathrebu.',
     editedTooltip: 'Days between posting and the last edit',
     commentSingular: 'sylwadau',
+    cancel: 'Canslo',
+    cancelled: 'Wedi\'i ganslo',
   },
   zu: {
     download: 'Landa',
@@ -1643,6 +1769,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Iphutha lokuxhumana.',
     editedTooltip: 'Days between posting and the last edit',
     commentSingular: 'amazwana',
+    cancel: 'Khansela',
+    cancelled: 'Kukhanseliwe',
   },
   sq: {
     download: 'Shkarko',
@@ -1665,6 +1793,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Gabim komunikimi.',
     editedTooltip: 'Days between posting and the last edit',
     commentSingular: 'komente',
+    cancel: 'Anulo',
+    cancelled: 'Anuluar',
   },
   so: {
     download: 'Soo deji',
@@ -1687,6 +1817,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Cilad isgaarsiineed.',
     editedTooltip: 'Days between posting and the last edit',
     commentSingular: 'faallooyin',
+    cancel: 'Jooji',
+    cancelled: 'La joojiyay',
   },
   yo: {
     download: 'Ṣe igbasilẹ',
@@ -1709,6 +1841,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Aṣiṣe ibaraẹnisọrọ.',
     editedTooltip: 'Days between posting and the last edit',
     commentSingular: 'awọn asọye',
+    cancel: 'Fagilee',
+    cancelled: 'Fagilee',
   },
   hmn: {
     download: 'Download',
@@ -1729,6 +1863,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: 'Runtime tsis muaj',
     startError: 'Pib tsis tau.',
     commError: 'Kev sib txuas lus yuam kev.',
+    cancel: 'Tso tseg',
+    cancelled: 'Tso tseg lawm',
   },
   ceb: {
     download: 'Pag-download',
@@ -1749,6 +1885,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: 'Dili magamit ang runtime',
     startError: 'Dili makasugod.',
     commError: 'Sayop sa komunikasyon.',
+    cancel: 'Kanselahon',
+    cancelled: 'Nakansela',
   },
   ny: {
     download: 'Tsitsani',
@@ -1771,6 +1909,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Zolakwika zolumikizirana.',
     editedTooltip: 'Days between posting and the last edit',
     commentSingular: 'ndemanga',
+    cancel: 'Letsani',
+    cancelled: 'Zaletsedwa',
   },
   ha: {
     download: 'Sauke',
@@ -1793,6 +1933,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Kuskuren sadarwa.',
     editedTooltip: 'Days between posting and the last edit',
     commentSingular: 'sharhi',
+    cancel: 'Soke',
+    cancelled: 'An soke',
   },
   ig: {
     download: 'Budata',
@@ -1815,6 +1957,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Mperi nzikọrịta ozi.',
     editedTooltip: 'Days between posting and the last edit',
     commentSingular: 'okwu',
+    cancel: 'Kagbuo',
+    cancelled: 'Akagbuola',
   },
   jw: {
     download: 'Unduh',
@@ -1859,6 +2003,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Hadisoana fifandraisana.',
     editedTooltip: 'Days between posting and the last edit',
     commentSingular: 'hevitra',
+    cancel: 'Aoka indray',
+    cancelled: 'Nofoanana',
   },
   mt: {
     download: 'Niżżel',
@@ -1881,6 +2027,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Żball fil-komunikazzjoni.',
     editedTooltip: 'Days between posting and the last edit',
     commentSingular: 'kummenti',
+    cancel: 'Ikkanċella',
+    cancelled: 'Ikkanċellat',
   },
   mi: {
     download: 'Tikiake',
@@ -1903,6 +2051,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Hapa korero.',
     editedTooltip: 'Days between posting and the last edit',
     commentSingular: 'korero',
+    cancel: 'Whakakore',
+    cancelled: 'Kua whakakorehia',
   },
   sm: {
     download: 'La\'u mai',
@@ -1925,6 +2075,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Fesootaiga sese.',
     editedTooltip: 'Days between posting and the last edit',
     commentSingular: 'fa\'amatalaga',
+    cancel: 'Fa\'aleaogaina',
+    cancelled: 'Ua fa\'aleaogaina',
   },
   gd: {
     download: 'Luchdaich sìos',
@@ -1947,6 +2099,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Mearachd conaltraidh.',
     editedTooltip: 'Days between posting and the last edit',
     commentSingular: 'beachdan',
+    cancel: 'Sguir',
+    cancelled: 'Air a sgur',
   },
   st: {
     download: 'Khoasolla',
@@ -1969,6 +2123,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Phosoto ea puisano.',
     editedTooltip: 'Days between posting and the last edit',
     commentSingular: 'maikutlo',
+    cancel: 'Hlakola',
+    cancelled: 'E hlakotsoe',
   },
   sn: {
     download: 'Dhaunirodha',
@@ -1991,6 +2147,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Kukanganisa kwekutaura.',
     editedTooltip: 'Days between posting and the last edit',
     commentSingular: 'taura',
+    cancel: 'Kanzura',
+    cancelled: 'Yakanzurwa',
   },
   sd: {
     download: 'ڊائون لوڊ',
@@ -2013,6 +2171,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'مواصلاتي غلطي.',
     editedTooltip: 'Days between posting and the last edit',
     commentSingular: 'تبصرا',
+    cancel: 'رد ڪريو',
+    cancelled: 'رد ڪيو ويو',
   },
   su: {
     download: 'Unduh',
@@ -2035,6 +2195,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Kasalahan komunikasi.',
     editedTooltip: 'Days between posting and the last edit',
     commentSingular: 'koméntar',
+    cancel: 'Batal',
+    cancelled: 'Dibatalakeun',
   },
   tg: {
     download: 'Боргирӣ',
@@ -2057,6 +2219,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Хатои алоқа.',
     editedTooltip: 'Days between posting and the last edit',
     commentSingular: 'шарҳҳо',
+    cancel: 'Бекор кардан',
+    cancelled: 'Бекор карда шуд',
   },
   yi: {
     download: 'אראפקאפיע',
@@ -2079,6 +2243,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'קאָמוניקאַציע טעות.',
     editedTooltip: 'Days between posting and the last edit',
     commentSingular: 'באַמערקונגען',
+    cancel: 'באָטל מאַכן',
+    cancelled: 'קאַנסאַלד',
   },
   la: {
     download: 'Download',
@@ -2101,6 +2267,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Communicatio error.',
     editedTooltip: 'Days between posting and the last edit',
     commentSingular: 'commentaria',
+    cancel: 'Cancel',
+    cancelled: 'Cancellatus',
   },
   // === AFRICAN LANGUAGES ===
   ach: { // Acoli - Falls back to English as Google uses English for this
@@ -2124,6 +2292,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: 'Runtime not available',
     startError: 'Could not start.',
     commError: 'Communication error.',
+    cancel: 'Cancel',
+    cancelled: 'Cancelled',
   },
   ak: { // Akan
     download: 'Download',
@@ -2146,6 +2316,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: 'Runtime not available',
     startError: 'Could not start.',
     commError: 'Communication error.',
+    cancel: 'Twe',
+    cancelled: 'Twa mu',
   },
   bem: { // Ichibemba
     download: 'Download',
@@ -2168,6 +2340,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: 'Runtime not available',
     startError: 'Could not start.',
     commError: 'Communication error.',
+    cancel: 'Kansela',
+    cancelled: 'Nakanselwa',
   },
   ee: { // Ewe
     download: 'Download',
@@ -2190,6 +2364,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: 'Runtime not available',
     startError: 'Could not start.',
     commError: 'Communication error.',
+    cancel: 'Tsi',
+    cancelled: 'Wotsie',
   },
   gaa: { // Gã
     download: 'Download',
@@ -2212,6 +2388,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: 'Runtime not available',
     startError: 'Could not start.',
     commError: 'Communication error.',
+    cancel: 'Cancel',
+    cancelled: 'Cancelled',
   },
   kg: { // Kongo
     download: 'Download',
@@ -2234,6 +2412,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: 'Runtime not available',
     startError: 'Could not start.',
     commError: 'Communication error.',
+    cancel: 'Kulula',
+    cancelled: 'Bakuludi',
   },
   kri: { // Krio
     download: 'Download',
@@ -2278,6 +2458,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: 'Runtime ezali te',
     startError: 'Ekoki kobanda te.',
     commError: 'Libunga ya boyokani.',
+    cancel: 'Longola',
+    cancelled: 'Elongolami',
   },
   lg: { // Luganda
     download: 'Dawuniloda',
@@ -2300,6 +2482,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: 'Runtime tekyaliwo',
     startError: 'Tekyasobola kutandika.',
     commError: 'Ensobi yokukwatagana.',
+    cancel: 'Sazaamu',
+    cancelled: 'Kisaziddwamu',
   },
   loz: { // Lozi
     download: 'Download',
@@ -2322,6 +2506,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: 'Runtime not available',
     startError: 'Could not start.',
     commError: 'Communication error.',
+    cancel: 'Kansela',
+    cancelled: 'Kanselilwe',
   },
   lua: { // Luba-Lulua
     download: 'Download',
@@ -2366,6 +2552,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: 'Runtime ga e gona',
     startError: 'E ka se thome.',
     commError: 'Phošo ya kgokagano.',
+    cancel: 'Phumola',
+    cancelled: 'E phumotswe',
   },
   nyn: { // Runyankore
     download: 'Download',
@@ -2410,6 +2598,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: 'Yeroo run hin argamu',
     startError: 'Eegaluu hin dandeenye.',
     commError: 'Dogoggora quunnamtii.',
+    cancel: 'Haqii',
+    cancelled: 'Haqameera',
   },
   pcm: { // Nigerian Pidgin
     download: 'Download',
@@ -2454,6 +2644,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: 'Runtime ntiboneka',
     startError: 'Byanze gutangira.',
     commError: 'Ikosa ryo guhabwa amakuru.',
+    cancel: 'Kureka',
+    cancelled: 'Byaretse',
   },
   rn: { // Kirundi
     download: 'Kuramo',
@@ -2476,6 +2668,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: 'Runtime ntiboneka',
     startError: 'Vyanze gutangura.',
     commError: 'Ikosa ry\'uguhabwa amakuru.',
+    cancel: 'Guhagarika',
+    cancelled: 'Vyahagaze',
   },
   crs: { // Seselwa Creole French
     download: 'Download',
@@ -2520,6 +2714,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: 'ራንታይም ኣይተረኽበን',
     startError: 'ክጅምር ኣይከኣለን።',
     commError: 'ጌጋ ርክብ።',
+    cancel: 'ሰርዝ',
+    cancelled: 'ተሰሪዙ',
   },
   tn: { // Setswana  
     download: 'Tsenya',
@@ -2542,6 +2738,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: 'Runtime ga e teng',
     startError: 'Ga e ka ke ya simolola.',
     commError: 'Phoso ya puisano.',
+    cancel: 'Kansela',
+    cancelled: 'E kasetse',
   },
   tum: { // Tumbuka
     download: 'Download',
@@ -2586,6 +2784,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: 'Runtime amul',
     startError: 'Mënu na tambalee.',
     commError: 'Njuumte ci waxtaan.',
+    cancel: 'Bëy',
+    cancelled: 'Bëy nañu',
   },
   // === EUROPEAN LANGUAGES ===
   bs: { // Bosnian
@@ -2631,6 +2831,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: 'Runtime dihegerz',
     startError: 'N\'haller ket kregiñ.',
     commError: 'Fazi kevreadenn.',
+    cancel: 'Nullañ',
+    cancelled: 'Nullet',
   },
   co: { // Corsican
     download: 'Scaricà',
@@ -2653,6 +2855,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: 'Runtime micca dispunibule',
     startError: 'Ùn pò micca principià.',
     commError: 'Errore di cumunicazione.',
+    cancel: 'Annullà',
+    cancelled: 'Annullatu',
   },
   fo: { // Faroese
     download: 'Tak niður',
@@ -2675,6 +2879,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: 'Runtime tøk ikki',
     startError: 'Kann ikki byrja.',
     commError: 'Samskiftisfeilur.',
+    cancel: 'Angra',
+    cancelled: 'Angrað',
   },
   fy: { // West Frisian
     download: 'Downloade',
@@ -2697,6 +2903,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: 'Runtime net beskikber',
     startError: 'Koe net begjinne.',
     commError: 'Kommunikaasjeflater.',
+    cancel: 'Annulearje',
+    cancelled: 'Annulearre',
   },
   ia: { // Interlingua
     download: 'Discargar',
@@ -2719,6 +2927,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: 'Runtime non disponibile',
     startError: 'Non pote comenciar.',
     commError: 'Error de communication.',
+    cancel: 'Cancellar',
+    cancelled: 'Cancellate',
   },
   nn: { // Norwegian Nynorsk
     download: 'Last ned',
@@ -2763,6 +2973,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: 'Runtime pas disponible',
     startError: 'Pòt pas començar.',
     commError: 'Error de comunicacion.',
+    cancel: 'Anullar',
+    cancelled: 'Anullat',
   },
   rm: { // Romansh
     download: 'Telechargiar',
@@ -2785,6 +2997,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: 'Runtime na disponibel',
     startError: 'Na pudì cumenzar.',
     commError: 'Errur da communicaziun.',
+    cancel: 'Halar',
+    cancelled: 'Halà',
   },
   'sr-latn': { // Serbian Latin
     download: 'Preuzmi',
@@ -2830,6 +3044,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: 'Runtime janiw utjkiti',
     startError: 'Janiw qalltañjamäkiti.',
     commError: 'Aruskipawi pantjawi.',
+    cancel: 'Jan sa',
+    cancelled: 'Jan sata',
   },
   ban: { // Balinese
     download: 'Unduh',
@@ -2852,6 +3068,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: 'Runtime nenten wenten',
     startError: 'Nenten nyidayang ngawit.',
     commError: 'Iwang komunikasi.',
+    cancel: 'Batal',
+    cancelled: 'Kabatalang',
   },
   chr: { // Cherokee
     download: 'ᎠᏨᏍᏔᏅ',
@@ -2874,6 +3092,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: 'Runtime ᏀᎾ ᎣᏏᏳ',
     startError: 'ᏀᎾ ᎪᏪᎳᏅ.',
     commError: 'ᎠᎵᏏᏂᏴᎢ ᎤᏲᏨᎯ.',
+    cancel: 'ᎡᎷᏪ',
+    cancelled: 'ᎡᎷᏪᎢ',
   },
   ckb: { // Central Kurdish / Sorani
     download: 'داگرتن',
@@ -2896,6 +3116,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: 'Runtime بەردەست نییە',
     startError: 'نەتوانرا دەست پێبکات.',
     commError: 'هەڵەی پەیوەندی.',
+    cancel: 'هەڵوەشاندنەوە',
+    cancelled: 'هەڵوەشایەوە',
   },
   gn: { // Guarani
     download: 'Mboguejy',
@@ -2918,6 +3140,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: 'Runtime ndojejuhúi',
     startError: 'Ndaikatúi ñepyrũ.',
     commError: 'Ñeñe\'ẽ rehegua javy.',
+    cancel: 'Mbotove',
+    cancelled: 'Oñembotove',
   },
   haw: { // Hawaiian
     download: 'Hoʻoiho',
@@ -2940,6 +3164,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: 'ʻAʻole loaʻa ka runtime',
     startError: 'ʻAʻole hiki ke hoʻomaka.',
     commError: 'Hewa kamaʻilio.',
+    cancel: 'Hoʻopau',
+    cancelled: 'Ua hoʻopau ʻia',
   },
   ht: { // Haitian Creole
     download: 'Telechaje',
@@ -2962,6 +3188,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: 'Runtime pa disponib',
     startError: 'Pa kapab kòmanse.',
     commError: 'Erè kominikasyon.',
+    cancel: 'Anile',
+    cancelled: 'Anile',
   },
   ku: { // Kurdish (Kurmanji)
     download: 'Daxistin',
@@ -2984,6 +3212,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: 'Runtime ne peyda ye',
     startError: 'Nikarî dest pê bike.',
     commError: 'Çewtiya danûstendinê.',
+    cancel: 'Betal bike',
+    cancelled: 'Hate betalkirin',
   },
   mfe: { // Mauritian Creole
     download: 'Download',
@@ -3028,6 +3258,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: 'Runtime mana kanchu',
     startError: 'Mana qallariyta atiychu.',
     commError: 'Willanakuy pantay.',
+    cancel: 'Tatichiy',
+    cancelled: 'Tatichisqa',
   },
   sa: { // Sanskrit
     download: 'अवतारयतु',
@@ -3050,6 +3282,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: 'Runtime उपलब्धं नास्ति',
     startError: 'आरम्भं कर्तुं न शक्नोति।',
     commError: 'संवादे दोषः।',
+    cancel: 'निरस्तम्',
+    cancelled: 'निरस्तित',
   },
   to: { // Tongan
     download: 'Download',
@@ -3072,6 +3306,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: 'Runtime ʻoku ʻikai maʻu',
     startError: 'ʻIkai lava ke kamata.',
     commError: 'Hala ʻi he fetuʻutaki.',
+    cancel: 'Kaniseli',
+    cancelled: 'Kuo kaniseli',
   },
   yue: { // Cantonese
     download: '下載',
@@ -3116,9 +3352,13 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: 'Runtime उपलब्ध नइखे',
     startError: 'शुरू ना हो पइलस।',
     commError: 'संचार में गलती।',
+    cancel: 'रद्द करीं',
+    cancelled: 'रद्द कइल गइल',
   },
   // === JOKE / NOVELTY LANGUAGES (fallback to English) ===
   'xx-bork': { // Bork bork bork (Swedish Chef)
+    cancel: 'Cuncel',
+    cancelled: 'Cuncelled',
     download: 'Download',
     downloading: 'Downloading…',
     trying: 'Trying…',
@@ -3141,6 +3381,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Communication error.',
   },
   'xx-elmer': { // Elmer Fudd
+    cancel: 'Cancew',
+    cancelled: 'Cancewwed',
     download: 'Download',
     downloading: 'Downloading…',
     trying: 'Twying…',
@@ -3163,6 +3405,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Communication ewwow.',
   },
   tlh: { // Klingon
+    cancel: 'baH',
+    cancelled: "baHta'",
     download: 'Download',
     downloading: 'Downloading…',
     trying: 'Trying…',
@@ -3185,6 +3429,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Communication error.',
   },
   'xx-pirate': { // Pirate
+    cancel: 'Abandon',
+    cancelled: 'Abandoned',
     download: 'Plunder',
     downloading: 'Plunderin\'…',
     trying: 'Tryin\'…',

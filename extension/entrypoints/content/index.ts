@@ -10,6 +10,7 @@ import { injectStyles } from './styles';
 import { t } from './i18n';
 import { isPageDark } from './theme';
 import { subscribeToGlobalState } from './flags';
+import { getCancelHoldDelayMs } from '../utils/analytics';
 
 /* -----------------------------------------------------
  * Constants
@@ -75,6 +76,12 @@ let initialized = false;
 
 // Global ON/OFF flag
 let globalEnabled = true;
+
+// Cached cancel hold delay
+let cancelHoldDelayMs = 1000;
+getCancelHoldDelayMs().then((ms) => {
+  cancelHoldDelayMs = ms;
+}).catch(() => { /* ignore */ });
 
 /* -----------------------------------------------------
  * Effective state broadcast
@@ -664,17 +671,29 @@ function createDownloadButton(
 
   // Track if we're in loading state before hover changed it to cancel
   let wasLoadingBeforeHover = false;
+  let hoverTimeout: number | undefined;
 
   // Hover handlers for loading → cancel state transition
   button.addEventListener('mouseenter', () => {
     const state = getButtonState(button);
     if (state === 'loading' || state === 'trying') {
-      wasLoadingBeforeHover = true;
-      setButtonState(button, 'cancel');
+      if (cancelHoldDelayMs > 0) {
+        hoverTimeout = window.setTimeout(() => {
+          wasLoadingBeforeHover = true; // Set this ONLY when we actually switch
+          setButtonState(button, 'cancel');
+        }, cancelHoldDelayMs);
+      } else {
+        wasLoadingBeforeHover = true; // Set this ONLY when we actually switch
+        setButtonState(button, 'cancel');
+      }
     }
   });
 
   button.addEventListener('mouseleave', () => {
+    if (hoverTimeout) {
+      window.clearTimeout(hoverTimeout);
+      hoverTimeout = undefined;
+    }
     const state = getButtonState(button);
     if (state === 'cancel' && wasLoadingBeforeHover) {
       // Only revert if download is still pending

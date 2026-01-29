@@ -40,6 +40,13 @@ const dirtyGroups = new Set<GroupState>();
 let refreshScheduled = false;
 
 import { subscribeToGlobalState } from './content/flags';
+import { getCancelHoldDelayMs } from './utils/analytics';
+
+// Cached cancel hold delay
+let cancelHoldDelayMs = 1000;
+getCancelHoldDelayMs().then((ms) => {
+  cancelHoldDelayMs = ms;
+}).catch(() => { /* ignore */ });
 
 
 
@@ -593,24 +600,38 @@ function ensureDownloadAllButton(group: GroupState): HTMLButtonElement {
     }
   });
 
+  let hoverTimeout: number | undefined;
+
   // Hover handlers for cancel state
   button.addEventListener('mouseenter', () => {
     if (group.isBusy && group.activated && !group.cancelPending) {
-      button.classList.add('cqd-all-cancel');
-      const mainSpan = button.querySelector<HTMLElement>('.cqd-download-all-main');
-      const subSpan = button.querySelector<HTMLElement>('.cqd-download-all-sub');
-      const iconEl = button.querySelector<HTMLElement>('.cqd-download-all-icon');
-      if (mainSpan) mainSpan.textContent = t('cancel') || 'Cancel';
-      if (subSpan) subSpan.textContent = '';
-      // Show X icon for cancel
-      if (iconEl) {
-        iconEl.style.backgroundImage = `url("${CANCEL_ICON_SVG_URL}")`;
-        iconEl.style.backgroundSize = '18px 18px';
+      const showCancel = () => {
+        button.classList.add('cqd-all-cancel');
+        const mainSpan = button.querySelector<HTMLElement>('.cqd-download-all-main');
+        const subSpan = button.querySelector<HTMLElement>('.cqd-download-all-sub');
+        const iconEl = button.querySelector<HTMLElement>('.cqd-download-all-icon');
+        if (mainSpan) mainSpan.textContent = t('cancel') || 'Cancel';
+        if (subSpan) subSpan.textContent = '';
+        // Show X icon for cancel
+        if (iconEl) {
+          iconEl.style.backgroundImage = `url("${CANCEL_ICON_SVG_URL}")`;
+          iconEl.style.backgroundSize = '18px 18px';
+        }
+      };
+
+      if (cancelHoldDelayMs > 0) {
+        hoverTimeout = window.setTimeout(showCancel, cancelHoldDelayMs);
+      } else {
+        showCancel();
       }
     }
   });
 
   button.addEventListener('mouseleave', () => {
+    if (hoverTimeout) {
+      window.clearTimeout(hoverTimeout);
+      hoverTimeout = undefined;
+    }
     if (button.classList.contains('cqd-all-cancel') && !group.cancelPending) {
       button.classList.remove('cqd-all-cancel');
       // Restore original icon
