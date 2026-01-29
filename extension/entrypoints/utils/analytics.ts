@@ -1066,6 +1066,11 @@ export interface RecordDownloadEventInput {
 export function recordDownloadEvent(input: RecordDownloadEventInput): void {
   const { type, status, source, duration_ms, bypass_used, error_type } = input;
 
+  // Log cancelled events to console for debugging
+  if (status === 'cancelled') {
+    console.log('[CQD] Download cancelled:', { type, duration_ms, bypass_used });
+  }
+
   Analytics.track({
     status,
     file_type: type || 'unknown',
@@ -1172,4 +1177,15 @@ export async function refreshRemoteAnalyticsConfig(): Promise<void> {
 export async function getCancelHoldDelayMs(): Promise<number> {
   const cfg = await loadConfig();
   return cfg.cancelHoldDelayMs ?? 1000;
+}
+
+/**
+ * Get the total number of cancelled downloads from local stats.
+ * This can be used to verify that cancelled downloads are being tracked.
+ */
+export async function getCancelledCount(): Promise<number> {
+  const stats = await loadStats();
+  const count = stats.cancelled ?? 0;
+  console.log('[CQD] Total cancelled downloads:', count);
+  return count;
 }

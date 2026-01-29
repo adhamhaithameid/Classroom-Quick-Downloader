@@ -674,18 +674,13 @@ function createDownloadButton(
   let hoverTimeout: number | undefined;
 
   // Hover handlers for loading → cancel state transition
+  // Cancel button appears IMMEDIATELY on hover (no delay)
   button.addEventListener('mouseenter', () => {
     const state = getButtonState(button);
     if (state === 'loading' || state === 'trying') {
-      if (cancelHoldDelayMs > 0) {
-        hoverTimeout = window.setTimeout(() => {
-          wasLoadingBeforeHover = true; // Set this ONLY when we actually switch
-          setButtonState(button, 'cancel');
-        }, cancelHoldDelayMs);
-      } else {
-        wasLoadingBeforeHover = true; // Set this ONLY when we actually switch
-        setButtonState(button, 'cancel');
-      }
+      // Show cancel immediately - user can cancel anytime
+      wasLoadingBeforeHover = true;
+      setButtonState(button, 'cancel');
     }
   });
 
@@ -791,6 +786,35 @@ async function handleSingleDownloadClick(
   pendingButtons.set(requestId, { button, requestId, fileMeta, startedAt });
 
   setButtonState(button, 'loading');
+
+  // Since the user just clicked, the mouse is still over the button.
+  // Show cancel state immediately - no need to wait for mouseenter event.
+  // Use requestAnimationFrame to ensure the button is in loading state first.
+  requestAnimationFrame(() => {
+    if (getButtonState(button) === 'loading' && pendingButtons.has(requestId)) {
+      setButtonState(button, 'cancel');
+    }
+  });
+
+  // *** PRE-DOWNLOAD DELAY ***
+  // Wait for cancelHoldDelayMs before starting the actual download.
+  // This gives users time to hover and cancel before the file starts downloading.
+  if (cancelHoldDelayMs > 0) {
+    await delay(cancelHoldDelayMs);
+    
+    // Check if user cancelled during the wait
+    if (!pendingButtons.has(requestId)) {
+      // User cancelled - don't start download
+      return;
+    }
+    
+    // Check if button is in cancel/cancelled state
+    const currentState = getButtonState(button);
+    if (currentState === 'cancelled' || currentState === 'idle') {
+      // User cancelled or reset - don't start download
+      return;
+    }
+  }
 
   const startResult = await startBackgroundDownload(requestId, url, fileMeta);
   if (!startResult.ok) {

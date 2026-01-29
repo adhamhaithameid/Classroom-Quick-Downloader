@@ -8,6 +8,7 @@ type BucketTotals struct {
 	TotalDownloads int64 `json:"totalDownloads"`
 	TotalSuccess   int64 `json:"totalSuccess"`
 	TotalFail      int64 `json:"totalFail"`
+	TotalCancelled int64 `json:"totalCancelled"`
 }
 
 // BucketCounters holds per-dimension counters for a time bucket.

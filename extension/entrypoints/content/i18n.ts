@@ -27,6 +27,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     after_posting: 'after posting',
     cancel: 'Cancel',
     cancelled: 'Cancelled',
+    cancelAll: 'Cancel All',
   },
   ar: {
     download: 'تنزيل',
@@ -51,6 +52,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'خطأ في الاتصال.',
     cancel: 'إلغاء',
     cancelled: 'ملغى',
+    cancelAll: 'إلغاء الكل',
   },
   ja: {
     download: 'ダウンロード',
@@ -75,6 +77,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'コメント',
     cancel: 'キャンセル',
     cancelled: 'キャンセル済み',
+    cancelAll: '全てキャンセル',
   },
   es: {
     download: 'Descargar',
@@ -99,6 +102,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'comentario',
     cancel: 'Cancelar',
     cancelled: 'Cancelado',
+    cancelAll: 'Cancelar todo',
   },
   hi: {
     download: 'डाउनलोड',
@@ -123,6 +127,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'टिप्पणियाँ',
     cancel: 'रद्द करें',
     cancelled: 'रद्द',
+    cancelAll: 'सभी रद्द करें',
   },
   pt: {
     download: 'Baixar',
@@ -147,6 +152,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'comentário',
     cancel: 'Cancelar',
     cancelled: 'Cancelado',
+    cancelAll: 'Cancelar todo',
   },
   'pt-pt': {
     download: 'Descarregar',
@@ -169,6 +175,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Erro de comunicação.',
     cancel: 'Cancelar',
     cancelled: 'Cancelado',
+    cancelAll: 'Cancelar todo',
   },
   'zh-cn': {
     download: '下载',
@@ -191,6 +198,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: '通信错误。',
     cancel: '取消',
     cancelled: '已取消',
+    cancelAll: '全部取消',
   },
   'zh-tw': {
     download: '下載',
@@ -213,6 +221,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: '通訊錯誤。',
     cancel: '取消',
     cancelled: '已取消',
+    cancelAll: '全部取消',
   },
   fr: {
     download: 'Télécharger',
@@ -237,6 +246,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'commentaire',
     cancel: 'Annuler',
     cancelled: 'Annulé',
+    cancelAll: 'Tout annuler',
   },
   de: {
     download: 'Herunterladen',
@@ -261,6 +271,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     editedTooltip: 'Tage zwischen Veröffentlichung und letzter Bearbeitung',
     cancel: 'Abbrechen',
     cancelled: 'Abgebrochen',
+    cancelAll: 'Alle abbrechen',
   },
   it: {
     download: 'Scarica',
@@ -285,6 +296,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'commento',
     cancel: 'Annulla',
     cancelled: 'Annullato',
+    cancelAll: 'Annulla tutto',
   },
   ru: {
     download: 'Скачать',
@@ -309,6 +321,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'комментарий',
     cancel: 'Отмена',
     cancelled: 'Отменено',
+    cancelAll: 'Отменить все',
   },
   ko: {
     download: '다운로드',
@@ -333,6 +346,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: '댓글',
     cancel: '취소',
     cancelled: '취소됨',
+    cancelAll: '모두 취소',
   },
   tr: {
     download: 'İndir',
@@ -357,6 +371,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'yorum',
     cancel: 'İptal',
     cancelled: 'İptal edildi',
+    cancelAll: 'Tümünü iptal et',
   },
   vi: {
     download: 'Tải xuống',
@@ -381,6 +396,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'bình luận',
     cancel: 'Hủy',
     cancelled: 'Đã hủy',
+    cancelAll: 'Hủy tất cả',
   },
   id: {
     download: 'Download',
@@ -405,6 +421,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'komentar',
     cancel: 'Batal',
     cancelled: 'Dibatalkan',
+    cancelAll: 'Batalkan semua',
   },
   th: {
     download: 'ดาวน์โหลด',
@@ -429,6 +446,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'ความคิดเห็น',
     cancel: 'ยกเลิก',
     cancelled: 'ยกเลิกแล้ว',
+    cancelAll: 'ยกเลิกทั้งหมด',
   },
   pl: {
     download: 'Pobierz',
@@ -453,6 +471,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'komentarz',
     cancel: 'Anuluj',
     cancelled: 'Anulowano',
+    cancelAll: 'Anuluj wszystko',
   },
   nl: {
     download: 'Downloaden',
@@ -477,6 +496,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'opmerking',
     cancel: 'Annuleren',
     cancelled: 'Geannuleerd',
+    cancelAll: 'Alles annuleren',
   },
   bn: {
     download: 'ডাউনলোড',
@@ -501,6 +521,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'টি মন্তব্য',
     cancel: 'বাতিল',
     cancelled: 'বাতিল',
+    cancelAll: 'সব বাতিল',
   },
   pa: {
     download: 'ਡਾਉਨਲੋਡ',
@@ -525,6 +546,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'ਟਿੱਪਣੀਆਂ',
     cancel: 'ਰੱਦ ਕਰੋ',
     cancelled: 'ਰੱਦ ਕੀਤਾ',
+    cancelAll: 'ਸਭ ਰੱਦ ਕਰੋ',
   },
   te: {
     download: 'డౌన్‌లోడ్',
@@ -549,6 +571,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'వ్యాఖ్యలు',
     cancel: 'రద్దు',
     cancelled: 'రద్దు చేయబడింది',
+    cancelAll: 'అన్నీ రద్దు చేయి',
   },
   mr: {
     download: 'डाउनलोड',
@@ -573,6 +596,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'टिप्पण्या',
     cancel: 'रद्द करा',
     cancelled: 'रद्द केले',
+    cancelAll: 'सर्व रद्द करा',
   },
   ta: {
     download: 'பதிவிறக்கு',
@@ -597,6 +621,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'கருத்துகள்',
     cancel: 'ரத்து',
     cancelled: 'ரத்து செய்யப்பட்டது',
+    cancelAll: 'அனைத்தையும் ரத்து செய்',
   },
   ur: {
     download: 'ڈاؤن لوڈ',
@@ -621,6 +646,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'تبصرے',
     cancel: 'منسوخ',
     cancelled: 'منسوخ',
+    cancelAll: 'سب منسوخ کریں',
   },
   gu: {
     download: 'ડાઉનલોડ',
@@ -645,6 +671,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'ટિપ્પણીઓ',
     cancel: 'રદ કરો',
     cancelled: 'રદ ڪيل',
+    cancelAll: 'سڀ رد ڪريو',
   },
   kn: {
     download: 'ಡೌನ್‌ಲೋಡ್',
@@ -669,6 +696,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'ಕಾಮೆಂಟ್‌ಗಳು',
     cancel: 'ರದ್ದು',
     cancelled: 'ರದ್ದುಗೊಳಿಸಲಾಗಿದೆ',
+    cancelAll: 'ಎಲ್ಲಾ ರದ್ದುಗೊಳಿಸಿ',
   },
   ml: {
     download: 'ഡൗൺലോഡ്',
@@ -693,6 +721,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'അഭിപ്രായങ്ങൾ',
     cancel: 'റദ്ദാക്കുക',
     cancelled: 'റദ്ദാക്കി',
+    cancelAll: 'എല്ലാം റദ്ദാക്കുക',
   },
   uk: {
     download: 'Завантажити',
@@ -717,6 +746,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'коментарів',
     cancel: 'Скасувати',
     cancelled: 'Скасовано',
+    cancelAll: 'Скасувати все',
   },
   el: {
     download: 'Λήψη',
@@ -741,6 +771,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'σχόλια',
     cancel: 'Ακύρωση',
     cancelled: 'Ακυρώθηκε',
+    cancelAll: 'Ακύρωση όλων',
   },
   cs: {
     download: 'Stáhnout',
@@ -765,6 +796,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'komentářů',
     cancel: 'Zrušit',
     cancelled: 'Zrušeno',
+    cancelAll: 'Zrušit vše',
   },
   ro: {
     download: 'Descărcați',
@@ -789,6 +821,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'comentarii',
     cancel: 'Anulare',
     cancelled: 'Anulat',
+    cancelAll: 'Anulează tot',
   },
   hu: {
     download: 'Letöltés',
@@ -813,6 +846,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'megjegyzés',
     cancel: 'Mégse',
     cancelled: 'Megszakítva',
+    cancelAll: 'Mind törlése',
   },
   sv: {
     download: 'Ladda ner',
@@ -837,6 +871,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'kommentarer',
     cancel: 'Avbryt',
     cancelled: 'Avbruten',
+    cancelAll: 'Avbryt alla',
   },
   da: {
     download: 'Hent',
@@ -861,6 +896,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'kommentarer',
     cancel: 'Annuller',
     cancelled: 'Annulleret',
+    cancelAll: 'Annuller alle',
   },
   fi: {
     download: 'Lataa',
@@ -885,10 +921,9 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'kommenttia',
     cancel: 'Peruuta',
     cancelled: 'Peruutettu',
+    cancelAll: 'Peruuta kaikki',
   },
   no: {
-    cancel: 'Avbryt',
-    cancelled: 'Avbrutt',
     download: 'Last ned',
     downloading: 'Laster ned…',
     trying: 'Prøver…',
@@ -909,6 +944,9 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Kommunikasjonsfeil.',
     editedTooltip: 'Dager mellom publisering og siste redigering',
     commentSingular: 'kommentarer',
+    cancel: 'Avbryt',
+    cancelled: 'Avbrutt',
+    cancelAll: 'Avbryt alle',
   },
   he: {
     download: 'הורדה',
@@ -933,6 +971,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'תגובות',
     cancel: 'ביטול',
     cancelled: 'בוטל',
+    cancelAll: 'ביטול הכל',
   },
   fa: {
     download: 'دانلود',
@@ -957,6 +996,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'نظر',
     cancel: 'لغو',
     cancelled: 'لغو شد',
+    cancelAll: 'لغو همه',
   },
   fil: {
     download: 'I-download',
@@ -979,6 +1019,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Error sa komunikasyon.',
     cancel: 'Kanselahin',
     cancelled: 'Kinansela',
+    cancelAll: 'Kanselahin lahat',
   },
   ms: {
     download: 'Muat turun',
@@ -1003,10 +1044,9 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'komen',
     cancel: 'Batal',
     cancelled: 'Dibatalkan',
+    cancelAll: 'Batalkan semua',
   },
   sr: {
-    cancel: 'Откажи',
-    cancelled: 'Отказано',
     download: 'Преузми',
     downloading: 'Преузимање…',
     trying: 'Покушавам…',
@@ -1027,6 +1067,9 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Грешка у комуникацији.',
     editedTooltip: 'Дани између објављивања и последње измене',
     commentSingular: 'коментара',
+    cancel: 'Откажи',
+    cancelled: 'Отказано',
+    cancelAll: 'Откажи све',
   },
   sk: {
     download: 'Stiahnuť',
@@ -1051,10 +1094,9 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'komentárov',
     cancel: 'Zrušiť',
     cancelled: 'Zrušené',
+    cancelAll: 'Zrušiť všetko',
   },
   bg: {
-    cancel: 'Отказ',
-    cancelled: 'Отказано',
     download: 'Изтегли',
     downloading: 'Изтегляне…',
     trying: 'Опит…',
@@ -1075,6 +1117,9 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Грешка в комуникацията.',
     editedTooltip: 'Дни между публикуването и последната редакция',
     commentSingular: 'коментара',
+    cancel: 'Отказ',
+    cancelled: 'Отказано',
+    cancelAll: 'Откажи све',
   },
   hr: {
     download: 'Preuzmi',
@@ -1099,6 +1144,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'komentara',
     cancel: 'Odustani',
     cancelled: 'Otkazano',
+    cancelAll: 'Otkaži sve',
   },
   lt: {
     download: 'Atsisiųsti',
@@ -1123,6 +1169,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'komentarai',
     cancel: 'Atšaukti',
     cancelled: 'Atšaukta',
+    cancelAll: 'Atšaukti viską',
   },
   lv: {
     download: 'Lejupielādēt',
@@ -1147,6 +1194,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'komentāri',
     cancel: 'Atcelt',
     cancelled: 'Atcelts',
+    cancelAll: 'Atcelt visu',
   },
   et: {
     download: 'Laadi alla',
@@ -1171,6 +1219,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'kommentaari',
     cancel: 'Loobu',
     cancelled: 'Tühistatud',
+    cancelAll: 'Tühista kõik',
   },
   sl: {
     download: 'Prenos',
@@ -1195,6 +1244,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'komentarjev',
     cancel: 'Prekliči',
     cancelled: 'Preklicano',
+    cancelAll: 'Prekliči vse',
   },
   ca: {
     download: 'Descarrega',
@@ -1219,6 +1269,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'comentaris',
     cancel: 'Cancel·la',
     cancelled: 'Cancel·lat',
+    cancelAll: 'Cancel All',
   },
   af: {
     download: 'Aflaai',
@@ -1243,6 +1294,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'kommentare',
     cancel: 'Kanselleer',
     cancelled: 'Gekanselleer',
+    cancelAll: 'Cancel All',
   },
   am: {
     download: 'አውርድ',
@@ -1267,6 +1319,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'አስተያየቶች',
     cancel: 'ሰርዝ',
     cancelled: 'ተሰርዟል',
+    cancelAll: 'Cancel All',
   },
   hy: {
     download: 'Ներբեռնել',
@@ -1291,6 +1344,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'մեկնաբանություն',
     cancel: 'Չեղարկել',
     cancelled: 'Չեղարկված է',
+    cancelAll: 'Cancel All',
   },
   as: {
     download: 'ডাউন্লোড',
@@ -1315,6 +1369,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'মন্তব্য',
     cancel: 'বাতিল কৰক',
     cancelled: 'বাতিল কৰা হ’ল',
+    cancelAll: 'Cancel All',
   },
   az: {
     download: 'Yüklə',
@@ -1339,6 +1394,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'şərh',
     cancel: 'Ləğv et',
     cancelled: 'Ləğv edildi',
+    cancelAll: 'Cancel All',
   },
   eu: {
     download: 'Deskargatu',
@@ -1363,6 +1419,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'iruzkin',
     cancel: 'Utzi',
     cancelled: 'Bertan behera',
+    cancelAll: 'Cancel All',
   },
   my: {
     download: 'ဒေါင်းလုဒ်',
@@ -1387,6 +1444,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'မှတ်ချက်များ',
     cancel: 'ပယ်ဖျက်',
     cancelled: 'ပယ်ဖျက်ပြီး',
+    cancelAll: 'Cancel All',
   },
   gl: {
     download: 'Descargar',
@@ -1411,6 +1469,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'comentarios',
     cancel: 'Cancelar',
     cancelled: 'Cancelado',
+    cancelAll: 'Cancelar todo',
   },
   ka: {
     download: 'ჩამოტვირთვა',
@@ -1435,6 +1494,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'კომენტარი',
     cancel: 'გაუქმება',
     cancelled: 'გაუქმებულია',
+    cancelAll: 'Cancel All',
   },
   is: {
     download: 'Sækja',
@@ -1459,6 +1519,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'ummæli',
     cancel: 'Hætta við',
     cancelled: 'Hætt við',
+    cancelAll: 'Cancel All',
   },
   ga: {
     download: 'Íoslódáil',
@@ -1483,6 +1544,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'trácht',
     cancel: 'Cealaigh',
     cancelled: 'Cealaithe',
+    cancelAll: 'Cancel All',
   },
   kk: {
     download: 'Жүктеп алу',
@@ -1507,6 +1569,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'пікір',
     cancel: 'Болдырмау',
     cancelled: 'Болдырылмады',
+    cancelAll: 'Cancel All',
   },
   km: {
     download: 'ទាញយក',
@@ -1531,6 +1594,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'មតិ',
     cancel: 'បោះបង់',
     cancelled: 'បានបោះបង់',
+    cancelAll: 'Cancel All',
   },
   lo: {
     download: 'ດາວໂຫລດ',
@@ -1555,6 +1619,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'ຄຳເຫັນ',
     cancel: 'ຍົກເລີກ',
     cancelled: 'ຍົກເລີກແລ້ວ',
+    cancelAll: 'Cancel All',
   },
   mk: {
     download: 'Преземи',
@@ -1579,6 +1644,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'коментари',
     cancel: 'Откажи',
     cancelled: 'Откажано',
+    cancelAll: 'Cancel All',
   },
   mn: {
     download: 'Татах',
@@ -1603,6 +1669,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'сэтгэгдэл',
     cancel: 'Цуцлах',
     cancelled: 'Цуцлагдсан',
+    cancelAll: 'Cancel All',
   },
   ne: {
     download: 'डाउनलोड',
@@ -1627,6 +1694,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'टिप्पणीहरू',
     cancel: 'रद्द गर्नुहोस्',
     cancelled: 'रद्द गरियो',
+    cancelAll: 'Cancel All',
   },
   or: {
     download: 'ଡାଉନଲୋଡ୍',
@@ -1651,6 +1719,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'ମନ୍ତବ୍ୟ',
     cancel: 'ବାତିଲ କରନ୍ତୁ',
     cancelled: 'ବାତିଲ ହେଲା',
+    cancelAll: 'Cancel All',
   },
   si: {
     download: 'බාගන්න',
@@ -1675,6 +1744,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'අදහස්',
     cancel: 'අවලංගු කරන්න',
     cancelled: 'අවලංගු කරන ලදී',
+    cancelAll: 'Cancel All',
   },
   sw: {
     download: 'Pakua',
@@ -1699,6 +1769,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'maoni',
     cancel: 'Ghairi',
     cancelled: 'Imeghairiwa',
+    cancelAll: 'Cancel All',
   },
   uz: {
     download: 'Yuklash',
@@ -1723,6 +1794,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'sharhlar',
     cancel: 'Bekor qilish',
     cancelled: 'Bekor qilindi',
+    cancelAll: 'Cancel All',
   },
   cy: {
     download: 'Lawrlwytho',
@@ -1747,6 +1819,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'sylwadau',
     cancel: 'Canslo',
     cancelled: 'Wedi\'i ganslo',
+    cancelAll: 'Cancel All',
   },
   zu: {
     download: 'Landa',
@@ -1771,6 +1844,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'amazwana',
     cancel: 'Khansela',
     cancelled: 'Kukhanseliwe',
+    cancelAll: 'Cancel All',
   },
   sq: {
     download: 'Shkarko',
@@ -1795,6 +1869,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'komente',
     cancel: 'Anulo',
     cancelled: 'Anuluar',
+    cancelAll: 'Cancel All',
   },
   so: {
     download: 'Soo deji',
@@ -1819,6 +1894,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'faallooyin',
     cancel: 'Jooji',
     cancelled: 'La joojiyay',
+    cancelAll: 'Cancel All',
   },
   yo: {
     download: 'Ṣe igbasilẹ',
@@ -1843,6 +1919,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'awọn asọye',
     cancel: 'Fagilee',
     cancelled: 'Fagilee',
+    cancelAll: 'Cancel All',
   },
   hmn: {
     download: 'Download',
@@ -1865,6 +1942,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Kev sib txuas lus yuam kev.',
     cancel: 'Tso tseg',
     cancelled: 'Tso tseg lawm',
+    cancelAll: 'Cancel All',
   },
   ceb: {
     download: 'Pag-download',
@@ -1887,6 +1965,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Sayop sa komunikasyon.',
     cancel: 'Kanselahon',
     cancelled: 'Nakansela',
+    cancelAll: 'Cancel All',
   },
   ny: {
     download: 'Tsitsani',
@@ -1911,6 +1990,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'ndemanga',
     cancel: 'Letsani',
     cancelled: 'Zaletsedwa',
+    cancelAll: 'Cancel All',
   },
   ha: {
     download: 'Sauke',
@@ -1935,6 +2015,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'sharhi',
     cancel: 'Soke',
     cancelled: 'An soke',
+    cancelAll: 'Cancel All',
   },
   ig: {
     download: 'Budata',
@@ -1959,6 +2040,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'okwu',
     cancel: 'Kagbuo',
     cancelled: 'Akagbuola',
+    cancelAll: 'Cancel All',
   },
   jw: {
     download: 'Unduh',
@@ -2005,6 +2087,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'hevitra',
     cancel: 'Aoka indray',
     cancelled: 'Nofoanana',
+    cancelAll: 'Cancel All',
   },
   mt: {
     download: 'Niżżel',
@@ -2029,6 +2112,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'kummenti',
     cancel: 'Ikkanċella',
     cancelled: 'Ikkanċellat',
+    cancelAll: 'Cancel All',
   },
   mi: {
     download: 'Tikiake',
@@ -2053,6 +2137,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'korero',
     cancel: 'Whakakore',
     cancelled: 'Kua whakakorehia',
+    cancelAll: 'Cancel All',
   },
   sm: {
     download: 'La\'u mai',
@@ -2077,6 +2162,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'fa\'amatalaga',
     cancel: 'Fa\'aleaogaina',
     cancelled: 'Ua fa\'aleaogaina',
+    cancelAll: 'Cancel All',
   },
   gd: {
     download: 'Luchdaich sìos',
@@ -2101,6 +2187,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'beachdan',
     cancel: 'Sguir',
     cancelled: 'Air a sgur',
+    cancelAll: 'Cancel All',
   },
   st: {
     download: 'Khoasolla',
@@ -2125,6 +2212,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'maikutlo',
     cancel: 'Hlakola',
     cancelled: 'E hlakotsoe',
+    cancelAll: 'Cancel All',
   },
   sn: {
     download: 'Dhaunirodha',
@@ -2149,6 +2237,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'taura',
     cancel: 'Kanzura',
     cancelled: 'Yakanzurwa',
+    cancelAll: 'Cancel All',
   },
   sd: {
     download: 'ڊائون لوڊ',
@@ -2173,6 +2262,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'تبصرا',
     cancel: 'رد ڪريو',
     cancelled: 'رد ڪيو ويو',
+    cancelAll: 'Cancel All',
   },
   su: {
     download: 'Unduh',
@@ -2197,6 +2287,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'koméntar',
     cancel: 'Batal',
     cancelled: 'Dibatalakeun',
+    cancelAll: 'Cancel All',
   },
   tg: {
     download: 'Боргирӣ',
@@ -2221,6 +2312,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'шарҳҳо',
     cancel: 'Бекор кардан',
     cancelled: 'Бекор карда шуд',
+    cancelAll: 'Cancel All',
   },
   yi: {
     download: 'אראפקאפיע',
@@ -2245,6 +2337,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'באַמערקונגען',
     cancel: 'באָטל מאַכן',
     cancelled: 'קאַנסאַלד',
+    cancelAll: 'Cancel All',
   },
   la: {
     download: 'Download',
@@ -2269,6 +2362,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commentSingular: 'commentaria',
     cancel: 'Cancel',
     cancelled: 'Cancellatus',
+    cancelAll: 'Cancel All',
   },
   // === AFRICAN LANGUAGES ===
   ach: { // Acoli - Falls back to English as Google uses English for this
@@ -2294,6 +2388,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Communication error.',
     cancel: 'Cancel',
     cancelled: 'Cancelled',
+    cancelAll: 'Cancel All',
   },
   ak: { // Akan
     download: 'Download',
@@ -2318,6 +2413,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Communication error.',
     cancel: 'Twe',
     cancelled: 'Twa mu',
+    cancelAll: 'Cancel All',
   },
   bem: { // Ichibemba
     download: 'Download',
@@ -2342,6 +2438,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Communication error.',
     cancel: 'Kansela',
     cancelled: 'Nakanselwa',
+    cancelAll: 'Cancel All',
   },
   ee: { // Ewe
     download: 'Download',
@@ -2366,6 +2463,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Communication error.',
     cancel: 'Tsi',
     cancelled: 'Wotsie',
+    cancelAll: 'Cancel All',
   },
   gaa: { // Gã
     download: 'Download',
@@ -2390,6 +2488,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Communication error.',
     cancel: 'Cancel',
     cancelled: 'Cancelled',
+    cancelAll: 'Cancel All',
   },
   kg: { // Kongo
     download: 'Download',
@@ -2414,6 +2513,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Communication error.',
     cancel: 'Kulula',
     cancelled: 'Bakuludi',
+    cancelAll: 'Cancel All',
   },
   kri: { // Krio
     download: 'Download',
@@ -2460,6 +2560,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Libunga ya boyokani.',
     cancel: 'Longola',
     cancelled: 'Elongolami',
+    cancelAll: 'Cancel All',
   },
   lg: { // Luganda
     download: 'Dawuniloda',
@@ -2484,6 +2585,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Ensobi yokukwatagana.',
     cancel: 'Sazaamu',
     cancelled: 'Kisaziddwamu',
+    cancelAll: 'Cancel All',
   },
   loz: { // Lozi
     download: 'Download',
@@ -2508,6 +2610,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Communication error.',
     cancel: 'Kansela',
     cancelled: 'Kanselilwe',
+    cancelAll: 'Cancel All',
   },
   lua: { // Luba-Lulua
     download: 'Download',
@@ -2554,6 +2657,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Phošo ya kgokagano.',
     cancel: 'Phumola',
     cancelled: 'E phumotswe',
+    cancelAll: 'Cancel All',
   },
   nyn: { // Runyankore
     download: 'Download',
@@ -2600,6 +2704,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Dogoggora quunnamtii.',
     cancel: 'Haqii',
     cancelled: 'Haqameera',
+    cancelAll: 'Cancel All',
   },
   pcm: { // Nigerian Pidgin
     download: 'Download',
@@ -2646,6 +2751,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Ikosa ryo guhabwa amakuru.',
     cancel: 'Kureka',
     cancelled: 'Byaretse',
+    cancelAll: 'Cancel All',
   },
   rn: { // Kirundi
     download: 'Kuramo',
@@ -2670,6 +2776,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Ikosa ry\'uguhabwa amakuru.',
     cancel: 'Guhagarika',
     cancelled: 'Vyahagaze',
+    cancelAll: 'Cancel All',
   },
   crs: { // Seselwa Creole French
     download: 'Download',
@@ -2716,6 +2823,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'ጌጋ ርክብ።',
     cancel: 'ሰርዝ',
     cancelled: 'ተሰሪዙ',
+    cancelAll: 'Cancel All',
   },
   tn: { // Setswana  
     download: 'Tsenya',
@@ -2740,6 +2848,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Phoso ya puisano.',
     cancel: 'Kansela',
     cancelled: 'E kasetse',
+    cancelAll: 'Cancel All',
   },
   tum: { // Tumbuka
     download: 'Download',
@@ -2786,6 +2895,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Njuumte ci waxtaan.',
     cancel: 'Bëy',
     cancelled: 'Bëy nañu',
+    cancelAll: 'Cancel All',
   },
   // === EUROPEAN LANGUAGES ===
   bs: { // Bosnian
@@ -2833,6 +2943,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Fazi kevreadenn.',
     cancel: 'Nullañ',
     cancelled: 'Nullet',
+    cancelAll: 'Cancel All',
   },
   co: { // Corsican
     download: 'Scaricà',
@@ -2857,6 +2968,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Errore di cumunicazione.',
     cancel: 'Annullà',
     cancelled: 'Annullatu',
+    cancelAll: 'Cancel All',
   },
   fo: { // Faroese
     download: 'Tak niður',
@@ -2881,6 +2993,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Samskiftisfeilur.',
     cancel: 'Angra',
     cancelled: 'Angrað',
+    cancelAll: 'Cancel All',
   },
   fy: { // West Frisian
     download: 'Downloade',
@@ -2905,6 +3018,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Kommunikaasjeflater.',
     cancel: 'Annulearje',
     cancelled: 'Annulearre',
+    cancelAll: 'Cancel All',
   },
   ia: { // Interlingua
     download: 'Discargar',
@@ -2929,6 +3043,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Error de communication.',
     cancel: 'Cancellar',
     cancelled: 'Cancellate',
+    cancelAll: 'Cancel All',
   },
   nn: { // Norwegian Nynorsk
     download: 'Last ned',
@@ -2975,6 +3090,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Error de comunicacion.',
     cancel: 'Anullar',
     cancelled: 'Anullat',
+    cancelAll: 'Cancel All',
   },
   rm: { // Romansh
     download: 'Telechargiar',
@@ -2999,6 +3115,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Errur da communicaziun.',
     cancel: 'Halar',
     cancelled: 'Halà',
+    cancelAll: 'Cancel All',
   },
   'sr-latn': { // Serbian Latin
     download: 'Preuzmi',
@@ -3046,6 +3163,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Aruskipawi pantjawi.',
     cancel: 'Jan sa',
     cancelled: 'Jan sata',
+    cancelAll: 'Cancel All',
   },
   ban: { // Balinese
     download: 'Unduh',
@@ -3070,6 +3188,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Iwang komunikasi.',
     cancel: 'Batal',
     cancelled: 'Kabatalang',
+    cancelAll: 'Cancel All',
   },
   chr: { // Cherokee
     download: 'ᎠᏨᏍᏔᏅ',
@@ -3094,6 +3213,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'ᎠᎵᏏᏂᏴᎢ ᎤᏲᏨᎯ.',
     cancel: 'ᎡᎷᏪ',
     cancelled: 'ᎡᎷᏪᎢ',
+    cancelAll: 'Cancel All',
   },
   ckb: { // Central Kurdish / Sorani
     download: 'داگرتن',
@@ -3118,6 +3238,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'هەڵەی پەیوەندی.',
     cancel: 'هەڵوەشاندنەوە',
     cancelled: 'هەڵوەشایەوە',
+    cancelAll: 'Cancel All',
   },
   gn: { // Guarani
     download: 'Mboguejy',
@@ -3142,6 +3263,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Ñeñe\'ẽ rehegua javy.',
     cancel: 'Mbotove',
     cancelled: 'Oñembotove',
+    cancelAll: 'Cancel All',
   },
   haw: { // Hawaiian
     download: 'Hoʻoiho',
@@ -3166,6 +3288,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Hewa kamaʻilio.',
     cancel: 'Hoʻopau',
     cancelled: 'Ua hoʻopau ʻia',
+    cancelAll: 'Cancel All',
   },
   ht: { // Haitian Creole
     download: 'Telechaje',
@@ -3190,6 +3313,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Erè kominikasyon.',
     cancel: 'Anile',
     cancelled: 'Anile',
+    cancelAll: 'Cancel All',
   },
   ku: { // Kurdish (Kurmanji)
     download: 'Daxistin',
@@ -3214,6 +3338,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Çewtiya danûstendinê.',
     cancel: 'Betal bike',
     cancelled: 'Hate betalkirin',
+    cancelAll: 'Cancel All',
   },
   mfe: { // Mauritian Creole
     download: 'Download',
@@ -3260,6 +3385,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Willanakuy pantay.',
     cancel: 'Tatichiy',
     cancelled: 'Tatichisqa',
+    cancelAll: 'Cancel All',
   },
   sa: { // Sanskrit
     download: 'अवतारयतु',
@@ -3284,6 +3410,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'संवादे दोषः।',
     cancel: 'निरस्तम्',
     cancelled: 'निरस्तित',
+    cancelAll: 'Cancel All',
   },
   to: { // Tongan
     download: 'Download',
@@ -3308,6 +3435,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Hala ʻi he fetuʻutaki.',
     cancel: 'Kaniseli',
     cancelled: 'Kuo kaniseli',
+    cancelAll: 'Cancel All',
   },
   yue: { // Cantonese
     download: '下載',
@@ -3354,11 +3482,13 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'संचार में गलती।',
     cancel: 'रद्द करीं',
     cancelled: 'रद्द कइल गइल',
+    cancelAll: 'Cancel All',
   },
   // === JOKE / NOVELTY LANGUAGES (fallback to English) ===
   'xx-bork': { // Bork bork bork (Swedish Chef)
     cancel: 'Cuncel',
     cancelled: 'Cuncelled',
+    cancelAll: 'Cancel All',
     download: 'Download',
     downloading: 'Downloading…',
     trying: 'Trying…',
@@ -3383,6 +3513,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
   'xx-elmer': { // Elmer Fudd
     cancel: 'Cancew',
     cancelled: 'Cancewwed',
+    cancelAll: 'Cancel All',
     download: 'Download',
     downloading: 'Downloading…',
     trying: 'Twying…',
@@ -3431,6 +3562,7 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
   'xx-pirate': { // Pirate
     cancel: 'Abandon',
     cancelled: 'Abandoned',
+    cancelAll: 'Cancel All',
     download: 'Plunder',
     downloading: 'Plunderin\'…',
     trying: 'Tryin\'…',

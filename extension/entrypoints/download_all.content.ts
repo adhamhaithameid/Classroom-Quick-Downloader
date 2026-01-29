@@ -396,6 +396,7 @@ function updateGroupState(group: GroupState): void {
     let someSuccess = file.downloaded;
     let someError = file.failed;
     let someLoading = file.inProgress;
+    let someCancelled = false;
 
     for (const b of file.buttons) {
       if (!b.isConnected) continue;
@@ -404,15 +405,19 @@ function updateGroupState(group: GroupState): void {
       const isLoading = cls.contains('cqd-loading') || cls.contains('cqd-trying');
       const isSuccess = cls.contains('cqd-success') || ds.cqdAllDone === 'true';
       const isError = cls.contains('cqd-error');
+      const isCancelled = cls.contains('cqd-cancelled') || cls.contains('cqd-cancel');
 
       if (isLoading) someLoading = true;
       if (isSuccess) someSuccess = true;
       if (isError) someError = true;
+      if (isCancelled) someCancelled = true;
     }
 
     file.downloaded = someSuccess;
-    file.inProgress = someLoading;
-    file.failed = !file.downloaded && someError;
+    // Not in progress if cancelled
+    file.inProgress = someLoading && !someCancelled;
+    // Cancelled counts as failed (incomplete download)
+    file.failed = !file.downloaded && (someError || someCancelled);
 
     if (file.downloaded) downloaded++;
     else if (file.inProgress) inProgress++;
@@ -602,27 +607,19 @@ function ensureDownloadAllButton(group: GroupState): HTMLButtonElement {
 
   let hoverTimeout: number | undefined;
 
-  // Hover handlers for cancel state
+  // Hover handlers for cancel state - shows IMMEDIATELY on hover
   button.addEventListener('mouseenter', () => {
     if (group.isBusy && group.activated && !group.cancelPending) {
-      const showCancel = () => {
-        button.classList.add('cqd-all-cancel');
-        const mainSpan = button.querySelector<HTMLElement>('.cqd-download-all-main');
-        const subSpan = button.querySelector<HTMLElement>('.cqd-download-all-sub');
-        const iconEl = button.querySelector<HTMLElement>('.cqd-download-all-icon');
-        if (mainSpan) mainSpan.textContent = t('cancel') || 'Cancel';
-        if (subSpan) subSpan.textContent = '';
-        // Show X icon for cancel
-        if (iconEl) {
-          iconEl.style.backgroundImage = `url("${CANCEL_ICON_SVG_URL}")`;
-          iconEl.style.backgroundSize = '18px 18px';
-        }
-      };
-
-      if (cancelHoldDelayMs > 0) {
-        hoverTimeout = window.setTimeout(showCancel, cancelHoldDelayMs);
-      } else {
-        showCancel();
+      button.classList.add('cqd-all-cancel');
+      const mainSpan = button.querySelector<HTMLElement>('.cqd-download-all-main');
+      const subSpan = button.querySelector<HTMLElement>('.cqd-download-all-sub');
+      const iconEl = button.querySelector<HTMLElement>('.cqd-download-all-icon');
+      if (mainSpan) mainSpan.textContent = t('cancelAll') || 'Cancel All';
+      if (subSpan) subSpan.textContent = '';
+      // Show X icon for cancel
+      if (iconEl) {
+        iconEl.style.backgroundImage = `url("${CANCEL_ICON_SVG_URL}")`;
+        iconEl.style.backgroundSize = '18px 18px';
       }
     }
   });

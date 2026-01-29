@@ -923,6 +923,7 @@ export function injectStyles(): void {
     .cqd-download-all-btn.cqd-all-cancel {
       background-color: var(--cqd-color-cancel);
       box-shadow: var(--cqd-shadow-cancel);
+      min-width: 140px; /* Keep same width as downloading state */
     }
 
     .cqd-download-all-btn.cqd-all-cancelled {
