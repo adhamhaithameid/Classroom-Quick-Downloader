@@ -12,9 +12,11 @@ interface State {
   errorInfo: ErrorInfo | null;
 }
 
+const GITHUB_ISSUES_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSf-2jzXudj59KSnn5Ht0Ba_eiEqCqJ6h5Nl4YXt8RWcYVp_9w/viewform?pli=1';
+
 /**
- * Error Boundary component to catch React rendering errors and display a fallback UI
- * instead of crashing the entire popup.
+ * Error Boundary component matching extension UI style.
+ * Catches React rendering errors and displays a fallback UI.
  */
 class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
@@ -27,12 +29,10 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   static getDerivedStateFromError(error: Error): Partial<State> {
-    // Update state so the next render will show the fallback UI
     return { hasError: true, error };
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
-    // Log error details for debugging
     console.error('ErrorBoundary caught an error:', error, errorInfo);
     
     this.setState({
@@ -41,157 +41,99 @@ class ErrorBoundary extends Component<Props, State> {
     });
   }
 
-  handleReset = (): void => {
-    // Reset error state and attempt to re-render
-    this.setState({
-      hasError: false,
-      error: null,
-      errorInfo: null,
-    });
+  handleReload = (): void => {
+    window.location.reload();
   };
 
-  handleReload = (): void => {
-    // Reload the popup
-    window.location.reload();
+  handleReportError = (): void => {
+    const { error, errorInfo } = this.state;
+    
+    // Create GitHub issue URL with pre-filled error details
+    const title = encodeURIComponent(`[Bug] Extension Error: ${error?.message || 'Unknown error'}`);
+    const body = encodeURIComponent(
+      `## Error Description\n\nThe extension encountered an unexpected error.\n\n` +
+      `**Error Message:** ${error?.toString() || 'Unknown'}\n\n` +
+      `**Stack Trace:**\n\`\`\`\n${error?.stack || 'Not available'}\n\`\`\`\n\n` +
+      `${errorInfo ? `**Component Stack:**\n\`\`\`\n${errorInfo.componentStack}\n\`\`\`\n\n` : ''}` +
+      `## Steps to Reproduce\n\n1. [Please describe what you were doing when this error occurred]\n2. \n3. \n\n` +
+      `## Additional Context\n\n- Browser: ${navigator.userAgent}\n- Timestamp: ${new Date().toISOString()}`
+    );
+    
+    window.open(`${GITHUB_ISSUES_URL}?title=${title}&body=${body}`, '_blank');
   };
 
   render(): ReactNode {
     if (this.state.hasError) {
-      // Fallback UI when an error occurs
       return (
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            minHeight: '400px',
-            padding: '24px',
-            textAlign: 'center',
-            fontFamily: 'system-ui, -apple-system, sans-serif',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            color: 'white',
-          }}
-        >
-          <div
-            style={{
-              fontSize: '48px',
-              marginBottom: '16px',
-            }}
-          >
-            😕
-          </div>
-          
-          <h2
-            style={{
-              margin: '0 0 8px 0',
-              fontSize: '20px',
-              fontWeight: 600,
-            }}
-          >
-            Oops! Something went wrong
-          </h2>
-          
-          <p
-            style={{
-              margin: '0 0 24px 0',
-              fontSize: '14px',
-              opacity: 0.9,
-              maxWidth: '300px',
-            }}
-          >
-            The extension encountered an unexpected error. Don't worry—your data is safe!
-          </p>
-
-          <div
-            style={{
-              display: 'flex',
-              gap: '12px',
-              flexWrap: 'wrap',
-              justifyContent: 'center',
-            }}
-          >
-            <button
-              onClick={this.handleReset}
-              style={{
-                padding: '10px 20px',
-                fontSize: '14px',
-                fontWeight: 500,
-                color: '#667eea',
-                background: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                transition: 'transform 0.2s ease, box-shadow 0.2s ease',
-                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-2px)';
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.2)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.15)';
-              }}
-            >
-              Try Again
-            </button>
-            
-            <button
-              onClick={this.handleReload}
-              style={{
-                padding: '10px 20px',
-                fontSize: '14px',
-                fontWeight: 500,
-                color: 'white',
-                background: 'rgba(255, 255, 255, 0.2)',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                transition: 'background 0.2s ease',
-                backdropFilter: 'blur(10px)',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
-              }}
-            >
-              Reload Extension
-            </button>
-          </div>
-
-          {/* Show error details in development */}
-          {import.meta.env.DEV && this.state.error && (
-            <details
-              style={{
-                marginTop: '24px',
-                padding: '16px',
-                background: 'rgba(0, 0, 0, 0.2)',
-                borderRadius: '8px',
-                textAlign: 'left',
-                maxWidth: '400px',
-                fontSize: '12px',
-                fontFamily: 'monospace',
-              }}
-            >
-              <summary style={{ cursor: 'pointer', marginBottom: '8px', fontWeight: 600 }}>
-                Error Details (Dev Only)
-              </summary>
-              <div style={{ opacity: 0.9, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                <strong>Error:</strong> {this.state.error.toString()}
-                {this.state.errorInfo && (
-                  <>
-                    <br />
-                    <br />
-                    <strong>Component Stack:</strong>
-                    {this.state.errorInfo.componentStack}
-                  </>
-                )}
+        <div className="cqd-container" style={{ 
+          minHeight: '400px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px'
+        }}>
+          <div className="cqd-panel" style={{ maxWidth: '100%', width: '100%' }}>
+            <div className="cqd-card" style={{
+              textAlign: 'center',
+              padding: '32px 24px'
+            }}>
+              <div style={{
+                fontSize: '56px',
+                marginBottom: '16px',
+                lineHeight: 1
+              }}>
+                😕
               </div>
-            </details>
-          )}
+              
+              <h2 className="cqd-card-title" style={{
+                fontSize: '20px',
+                fontWeight: 600,
+                margin: '0 0 8px 0',
+                color: 'var(--cqd-text-primary, #1a1a1a)'
+              }}>
+                Oops! Something went wrong
+              </h2>
+              
+              <p style={{
+                margin: '0 0 24px 0',
+                fontSize: '14px',
+                color: 'var(--cqd-text-secondary, #666)',
+                lineHeight: 1.5
+              }}>
+                The extension encountered an unexpected error.<br/>
+                
+              </p>
+
+              <div style={{
+                display: 'flex',
+                gap: '12px',
+                flexDirection: 'column',
+                alignItems: 'stretch'
+              }}>
+                <button
+                  className="cqd-button cqd-button-primary"
+                  onClick={this.handleReportError}
+                  style={{
+                    width: '100%',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <span>Report Error on GitHub</span>
+                </button>
+                
+                <button
+                  className="cqd-button cqd-button-ghost"
+                  onClick={this.handleReload}
+                  style={{
+                    width: '100%',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <span>Reload Extension</span>
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       );
     }

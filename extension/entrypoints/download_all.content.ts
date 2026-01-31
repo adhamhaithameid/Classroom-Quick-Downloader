@@ -798,10 +798,12 @@ function handleCancelAllClick(group: GroupState): void {
   if (!group.activated || !group.isBusy) return;
   if (group.cancelPending) return;
 
-  console.log('[CQD] Cancel all requested for group with', group.files.size, 'files');
+  console.log('[CQD] Cancel All clicked - group has', group.files.size, 'files');
 
   group.cancelPending = true;
   let cancelledCount = 0;
+  let requestIdFoundCount = 0;
+  let messagesSentCount = 0;
 
   const btn = group.downloadAllBtn;
   if (btn) {
@@ -827,22 +829,33 @@ function handleCancelAllClick(group: GroupState): void {
     if (!primary) continue;
 
     const fileName = (primary.dataset as any).cqdName || 'unknown';
-    console.log('[CQD] Cancelling individual download:', fileName);
+    console.log('[CQD] Processing file for cancellation:', fileName);
 
     // Mark file as cancelled
     file.inProgress = false;
-    file.failed = true; // Mark as failed since download was cancelled
+    file.failed = true;
     cancelledCount++;
 
-    // Send cancel message directly to background for this file
+    // Check if requestId exists in dataset
     const requestId = (primary.dataset as any).cqdRequestId;
-    if (requestId && typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
-      try {
-        chrome.runtime.sendMessage({ type: 'CQD_CANCEL_DOWNLOAD', requestId });
-        console.log('[CQD] Sent cancel message for requestId:', requestId);
-      } catch (err) {
-        console.warn('[CQD] Failed to send cancel message:', err);
+    console.log('[CQD] Button requestId from dataset:', requestId, '| button:', primary);
+    
+    if (requestId) {
+      requestIdFoundCount++;
+      if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+        try {
+          chrome.runtime.sendMessage({type: 'CQD_CANCEL_DOWNLOAD', requestId });
+          messagesSentCount++;
+          console.log('[CQD] ✅ Sent cancel message for:', fileName, '| requestId:', requestId);
+        } catch (err) {
+          console.error('[CQD] ❌ Failed to send cancel message for:', fileName, '| error:', err);
+        }
+      } else {
+        console.warn('[CQD] ⚠️ chrome.runtime not available');
       }
+    } else {
+      console.error('[CQD] ❌ NO requestId found in button dataset for:', fileName);
+      console.log('[CQD] Button dataset:', primary.dataset);
     }
     
     // Update button visual state to cancelled  
@@ -852,11 +865,14 @@ function handleCancelAllClick(group: GroupState): void {
     // Update button label
     const label = primary.querySelector<HTMLSpanElement>('.cqd-label');
     if (label) {
-      label.textContent = 'Cancelled'; // t('cancelled') would be better but not available here
+      label.textContent = 'Cancelled';
     }
   }
 
-  console.log('[CQD] Cancelled', cancelledCount, 'downloads');
+  console.log('[CQD] Cancel All Summary:');
+  console.log('  - Files processed:', cancelledCount);
+  console.log('  - RequestIDs found:', requestIdFoundCount);
+  console.log('  - Cancel messages sent:', messagesSentCount);
 
   // Update group state immediately to reflect cancellations
   markGroupDirty(group);

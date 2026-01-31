@@ -30,4 +30,3 @@ oracle-backend/docker_data/
 *.db-wal
 .dev.vars
 google-credentials.json
-PRIVATE_NOTES.md

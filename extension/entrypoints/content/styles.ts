@@ -4,7 +4,7 @@ import { DOWNLOAD_ICON_SVG_URL, SUCCESS_ICON_SVG_URL, CANCEL_ICON_SVG_URL } from
 const STYLE_ID = 'cqd-style';
 const SPINNER_SIZE_PX = 16;
 
-const TRANSITION_MS = 150;
+const TRANSITION_MS = 120; // Reduced from 150ms for snappier feel
 const TRANSITION_STR = `${TRANSITION_MS}ms cubic-bezier(0.2, 0, 0, 1)`;
 
 export function injectStyles(): void {
@@ -238,22 +238,48 @@ export function injectStyles(): void {
       border-radius: 20px;
       justify-content: flex-start;
       width: auto;
-      min-width: 140px; /* Match loading/trying min-width for smooth transitions */
+      min-width: 140px;
       max-width: 300px;
       transform: translateY(-50%) scale(1);
-      /* Smooth transition for cancel state */
-      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      transition: all var(--cqd-transition);
       cursor: pointer;
+    }
+
+    /* Cancel state - smooth entry animation when hover starts */
+    .cqd-download-btn.cqd-loading:hover,
+    .cqd-download-btn.cqd-trying:hover {
+      transition: background-color 0.2s ease-out, box-shadow 0.2s ease-out;
     }
 
     .cqd-download-btn.cqd-cancelled {
       cursor: not-allowed;
-      opacity: 0.9;
+      filter: saturate(0.85) brightness(0.95); /* No transparency, just subtle desaturation */
+      /* Click animation class applied via JS */
+    }
+
+    /* Click animation: cancel → cancelled */
+    @keyframes cancelClick {
+      0% {
+        transform: translateY(-50%) scale(1);
+      }
+      30% {
+        transform: translateY(-50%) scale(1.08);
+      }
+      60% {
+        transform: translateY(-50%) scale(0.96);
+      }
+      100% {
+        transform: translateY(-50%) scale(1);
+      }
+    }
+
+    .cqd-download-btn.cqd-cancel-click-anim {
+      animation: cancelClick 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
     }
 
     .cqd-download-btn.cqd-cancel:hover {
       transform: translateY(-50%) scale(1.05);
-      box-shadow: 0 6px 20px rgba(255, 107, 0, 0.4);
+      box-shadow: var(--cqd-shadow-cancel-strong);
     }
 
     .cqd-download-btn.cqd-cancel .cqd-label,

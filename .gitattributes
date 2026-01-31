@@ -2,6 +2,9 @@
 extension/.env.example linguist-documentation
 *.env.example linguist-documentation
 
+# Hide AI documentation folder from language stats
+.ai/** linguist-documentation
+
 # Mark documentation files
 *.md linguist-documentation
 LICENSE linguist-documentation

@@ -23,8 +23,8 @@ const RESCAN_DEBOUNCE_MS = 150;
 const LOADING_MIN_MS = 600;
 const FEEDBACK_SUCCESS_MS = 2000;  // Reduced from 3000ms
 const FEEDBACK_ERROR_MS = 3000;     // Reduced from 4000ms  
-const FEEDBACK_CANCELLED_MS = 1500; // New: Cancelled state timeout
-const MAX_TERMINAL_STATE_MS = 8000; // Force reset after 8s regardless of hover
+const FEEDBACK_CANCELLED_MS = 1500; // Cancelled state timeout
+const MAX_TERMINAL_STATE_MS = 5000; // Force reset after 5s (reduced from 8s)
 
 const DRIVE_ANCHOR_SELECTOR =
   'a[href*="https://drive.google.com"], a[href*="//drive.google.com"], a[href*="classroom.google.com/drive"]';
@@ -566,25 +566,48 @@ function setButtonState(
 
   if (!icon || !label || !errorDetail) return;
 
-  // Enforce state priority - can only transition to same or higher priority state
   const currentState = getButtonState(button);
-  const currentPriority = STATE_PRIORITY[currentState];
-  const newPriority = STATE_PRIORITY[state];
   
-  // Special case: cancel state requires mouse hover
-  // If setting to loading/trying while in cancel state, check if mouse is still over button
-  if (currentState === 'cancel' && (state === 'loading' || state === 'trying')) {
-    const isMouseOver = (button.dataset as any).cqdMouseOver === 'true';
-    if (isMouseOver) {
-      // Mouse still hovering - stay in cancel state
-      return;
-    }
-    // Mouse left - allow transition to loading/trying
+  // Define state categories for better transition logic
+  const HOVER_STATES = ['cancel'] as const;
+  const TERMINAL_STATES = ['success', 'error', 'cancelled'] as const;
+  const ACTIVE_STATES = ['loading', 'trying'] as const;
+  
+  // === STATE TRANSITION RULES ===
+  
+  // Rule 1: Always allow transition to idle (reset)
+  if (state === 'idle') {
+    // Allowed from any state
   }
   
-  // Block lower priority transitions (except for the cancel hover case above)
-  if (newPriority < currentPriority) {
-    return;
+  // Rule 2: Hover states (cancel) can exit to active states when mouse leaves
+  else if ((HOVER_STATES as readonly string[]).includes(currentState) && (ACTIVE_STATES as readonly string[]).includes(state)) {
+    const isMouseOver = (button.dataset as any).cqdMouseOver === 'true';
+    if (isMouseOver) {
+      // Mouse still hovering - block transition, stay in hover state
+      return;
+    }
+    // Mouse left - allow transition back to active state
+  }
+  
+  // Rule 3: Terminal states block all transitions except to idle
+  else if ((TERMINAL_STATES as readonly string[]).includes(currentState) && state !== 'idle') {
+    return; // Block transition
+  }
+  
+  // Rule 4: Active states can transition to hover states, terminal states, or each other
+  else if ((ACTIVE_STATES as readonly string[]).includes(currentState)) {
+    // Allow: loading ↔ trying, loading → cancel, loading → success/error/cancelled
+    // These are all valid
+  }
+  
+  // Rule 5: Use priority as fallback for all other cases
+  else {
+    const currentPriority = STATE_PRIORITY[currentState];
+    const newPriority = STATE_PRIORITY[state];
+    if (newPriority < currentPriority) {
+      return; // Block lower priority transitions
+    }
   }
 
   button.classList.remove(
@@ -766,32 +789,30 @@ function findPendingButtonByElement(button: HTMLButtonElement): PendingButton | 
 
 // Handle cancel button click
 async function handleCancelClick(button: HTMLButtonElement): Promise<void> {
-  const pending = findPendingButtonByElement(button);
-  if (!pending) {
-    // Already finished, just reset
-    setButtonState(button, 'idle');
-    return;
-  }
-
-  console.log('[CQD] Cancel download requested:', { 
-    requestId: pending.requestId, 
-    fileName: pending.fileMeta?.name || 'unknown' 
-  });
-
-  // Send cancel request to background
-  if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
-    try {
-      chrome.runtime.sendMessage({
-        type: 'CQD_CANCEL_DOWNLOAD',
-        requestId: pending.requestId,
-      });
-    } catch {
-      // Ignore errors
+  // Find and cancel the pending download
+  const pending = Array.from(pendingButtons.values()).find((p) => p.button === button);
+  
+  if (pending) {
+    // Remove from pending (prevents background from continuing)
+    pendingButtons.delete(pending.requestId);
+    
+    // Send cancel message to background to abort browser download
+    if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+      try {
+        chrome.runtime.sendMessage({
+          type: 'CQD_CANCEL_DOWNLOAD',
+          requestId: pending.requestId,
+        });
+        console.log('[CQD] Sent cancel message for requestId:', pending.requestId);
+      } catch (err) {
+        console.warn('[CQD] Error sending cancel message:', err);
+      }
     }
   }
 
-  // Remove from pending
-  pendingButtons.delete(pending.requestId);
+  // Apply cancel click animation
+  button.classList.add('cqd-cancel-click-anim');
+  setTimeout(() => button.classList.remove('cqd-cancel-click-anim'), 400);
 
   // Show cancelled state briefly, then return to idle
   setButtonState(button, 'cancelled');
@@ -841,6 +862,13 @@ async function handleSingleDownloadClick(
   const requestId = `cqd-${Date.now()}-${nextRequestSeq++}`;
   const startedAt = Date.now();
   pendingButtons.set(requestId, { button, requestId, fileMeta, startedAt });
+
+  // CRITICAL: Store requestId in button dataset for Cancel All to find it
+  try {
+    (button.dataset as any).cqdRequestId = requestId;
+  } catch {
+    // Ignore dataset errors
+  }
 
   setButtonState(button, 'loading');
 
