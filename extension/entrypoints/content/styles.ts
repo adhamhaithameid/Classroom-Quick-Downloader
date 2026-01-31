@@ -929,6 +929,7 @@ export function injectStyles(): void {
     .cqd-download-all-btn.cqd-all-cancelled {
       background-color: var(--cqd-color-cancel);
       box-shadow: var(--cqd-shadow-cancel);
+      min-width: 140px; /* Match cancel state width */
     }
 
     /* PROGRESS BAR OVERLAY (Fills up) */

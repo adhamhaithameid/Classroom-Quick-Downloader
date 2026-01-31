@@ -798,7 +798,10 @@ function handleCancelAllClick(group: GroupState): void {
   if (!group.activated || !group.isBusy) return;
   if (group.cancelPending) return;
 
+  console.log('[CQD] Cancel all requested for group with', group.files.size, 'files');
+
   group.cancelPending = true;
+  let cancelledCount = 0;
 
   const btn = group.downloadAllBtn;
   if (btn) {
@@ -817,17 +820,33 @@ function handleCancelAllClick(group: GroupState): void {
     btn.disabled = true;
   }
 
-  // Cancel all in-progress files
+  // Cancel all in-progress files by triggering their cancel buttons
   for (const file of group.files.values()) {
     if (!file.inProgress) continue;
     const primary = getPrimaryButton(file);
     if (!primary) continue;
 
+    const fileName = (primary.dataset as any).cqdName || 'unknown';
+    console.log('[CQD] Cancelling individual download:', fileName);
+
     // Mark file as not in progress (cancelled)
     file.inProgress = false;
     file.failed = true; // Mark as failed since download was cancelled
+    cancelledCount++;
 
-    // Send cancel message to background for this file
+    // Try to trigger the cancel by simulating the hover + click behavior
+    // First, check if button is in loading/trying state and has cancel capability
+    const currentState = getSingleButtonState(primary);
+    if (currentState === 'loading' || currentState === 'trying') {
+      // Simulate the cancel click - set cancel state first
+      primary.classList.remove('cqd-loading', 'cqd-trying');
+      primary.classList.add('cqd-cancel');
+      
+      // Now trigger click which should invoke handleCancelClick
+      primary.click();
+    }
+
+    // Send cancel message to background for this file (backup in case click doesn't work)
     const requestId = (primary.dataset as any).cqdRequestId;
     if (requestId && typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
       try {
@@ -836,13 +855,13 @@ function handleCancelAllClick(group: GroupState): void {
         // Ignore errors
       }
     }
-
-    // Update the individual button state to cancelled
-    primary.classList.remove('cqd-loading', 'cqd-trying', 'cqd-cancel');
-    primary.classList.add('cqd-cancelled');
-    const lblEl = primary.querySelector<HTMLElement>('.cqd-label');
-    if (lblEl) lblEl.textContent = t('cancelled') || 'Cancelled';
   }
+
+  console.log('[CQD] Cancelled', cancelledCount, 'downloads');
+
+  // Update group state immediately to reflect cancellations
+  markGroupDirty(group);
+  scheduleRefresh();
 
   // Reset group after a short delay
   if (group.resetTimeoutId != null) {

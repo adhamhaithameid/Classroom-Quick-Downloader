@@ -670,7 +670,6 @@ function createDownloadButton(
   button.appendChild(errorDetail);
 
   // Track if we're in loading state before hover changed it to cancel
-  let wasLoadingBeforeHover = false;
   let hoverTimeout: number | undefined;
 
   // Hover handlers for loading → cancel state transition
@@ -679,7 +678,7 @@ function createDownloadButton(
     const state = getButtonState(button);
     if (state === 'loading' || state === 'trying') {
       // Show cancel immediately - user can cancel anytime
-      wasLoadingBeforeHover = true;
+      (button.dataset as any).cqdWasLoadingBeforeHover = 'true';
       setButtonState(button, 'cancel');
     }
   });
@@ -690,13 +689,14 @@ function createDownloadButton(
       hoverTimeout = undefined;
     }
     const state = getButtonState(button);
+    const wasLoadingBeforeHover = (button.dataset as any).cqdWasLoadingBeforeHover === 'true';
     if (state === 'cancel' && wasLoadingBeforeHover) {
       // Only revert if download is still pending
       const pending = findPendingButtonByElement(button);
       if (pending) {
         setButtonState(button, 'loading');
       }
-      wasLoadingBeforeHover = false;
+      delete (button.dataset as any).cqdWasLoadingBeforeHover;
     }
   });
 
@@ -708,7 +708,7 @@ function createDownloadButton(
     
     // If in cancel state, trigger cancellation
     if (currentState === 'cancel') {
-      wasLoadingBeforeHover = false;
+      delete (button.dataset as any).cqdWasLoadingBeforeHover;
       await handleCancelClick(button);
       return;
     }
@@ -742,6 +742,11 @@ async function handleCancelClick(button: HTMLButtonElement): Promise<void> {
     setButtonState(button, 'idle');
     return;
   }
+
+  console.log('[CQD] Cancel download requested:', { 
+    requestId: pending.requestId, 
+    fileName: pending.fileMeta?.name || 'unknown' 
+  });
 
   // Send cancel request to background
   if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
@@ -792,6 +797,7 @@ async function handleSingleDownloadClick(
   // Use requestAnimationFrame to ensure the button is in loading state first.
   requestAnimationFrame(() => {
     if (getButtonState(button) === 'loading' && pendingButtons.has(requestId)) {
+      (button.dataset as any).cqdWasLoadingBeforeHover = 'true';
       setButtonState(button, 'cancel');
     }
   });
