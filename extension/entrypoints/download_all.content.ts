@@ -820,7 +820,7 @@ function handleCancelAllClick(group: GroupState): void {
     btn.disabled = true;
   }
 
-  // Cancel all in-progress files by triggering their cancel buttons
+  // Cancel all in-progress files by sending cancel messages directly
   for (const file of group.files.values()) {
     if (!file.inProgress) continue;
     const primary = getPrimaryButton(file);
@@ -829,31 +829,30 @@ function handleCancelAllClick(group: GroupState): void {
     const fileName = (primary.dataset as any).cqdName || 'unknown';
     console.log('[CQD] Cancelling individual download:', fileName);
 
-    // Mark file as not in progress (cancelled)
+    // Mark file as cancelled
     file.inProgress = false;
     file.failed = true; // Mark as failed since download was cancelled
     cancelledCount++;
 
-    // Try to trigger the cancel by simulating the hover + click behavior
-    // First, check if button is in loading/trying state and has cancel capability
-    const currentState = getSingleButtonState(primary);
-    if (currentState === 'loading' || currentState === 'trying') {
-      // Simulate the cancel click - set cancel state first
-      primary.classList.remove('cqd-loading', 'cqd-trying');
-      primary.classList.add('cqd-cancel');
-      
-      // Now trigger click which should invoke handleCancelClick
-      primary.click();
-    }
-
-    // Send cancel message to background for this file (backup in case click doesn't work)
+    // Send cancel message directly to background for this file
     const requestId = (primary.dataset as any).cqdRequestId;
     if (requestId && typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
       try {
         chrome.runtime.sendMessage({ type: 'CQD_CANCEL_DOWNLOAD', requestId });
-      } catch {
-        // Ignore errors
+        console.log('[CQD] Sent cancel message for requestId:', requestId);
+      } catch (err) {
+        console.warn('[CQD] Failed to send cancel message:', err);
       }
+    }
+    
+    // Update button visual state to cancelled  
+    primary.classList.remove('cqd-loading', 'cqd-trying', 'cqd-cancel');
+    primary.classList.add('cqd-cancelled');
+    
+    // Update button label
+    const label = primary.querySelector<HTMLSpanElement>('.cqd-label');
+    if (label) {
+      label.textContent = 'Cancelled'; // t('cancelled') would be better but not available here
     }
   }
 

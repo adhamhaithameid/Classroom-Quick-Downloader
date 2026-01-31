@@ -21,8 +21,10 @@ const RESCAN_INTERVAL_MS = 2000;
 // Reduced debounce to make buttons appear snappier after scroll
 const RESCAN_DEBOUNCE_MS = 150; 
 const LOADING_MIN_MS = 600;
-const FEEDBACK_SUCCESS_MS = 3000;
-const FEEDBACK_ERROR_MS = 4000;
+const FEEDBACK_SUCCESS_MS = 2000;  // Reduced from 3000ms
+const FEEDBACK_ERROR_MS = 3000;     // Reduced from 4000ms  
+const FEEDBACK_CANCELLED_MS = 1500; // New: Cancelled state timeout
+const MAX_TERMINAL_STATE_MS = 8000; // Force reset after 8s regardless of hover
 
 const DRIVE_ANCHOR_SELECTOR =
   'a[href*="https://drive.google.com"], a[href*="//drive.google.com"], a[href*="classroom.google.com/drive"]';
@@ -793,7 +795,29 @@ async function handleCancelClick(button: HTMLButtonElement): Promise<void> {
 
   // Show cancelled state briefly, then return to idle
   setButtonState(button, 'cancelled');
-  await delay(1500);
+  
+  // Wait for reset with max timeout
+  const earliestReset = Date.now() + FEEDBACK_CANCELLED_MS;
+  const maxReset = Date.now() + MAX_TERMINAL_STATE_MS;
+  
+  while (true) {
+    await delay(200);
+    
+    // Check if state changed (user might have clicked again)
+    if (getButtonState(button) !== 'cancelled') {
+      return;
+    }
+    
+    // Force reset after max time
+    if (Date.now() >= maxReset) {
+      break;
+    }
+    
+    // Normal reset after earliest time and not hovering
+    if (Date.now() >= earliestReset && !button.matches(':hover')) {
+      break;
+    }
+  }
   
   // Only reset if still in cancelled state
   if (getButtonState(button) === 'cancelled') {
@@ -898,9 +922,19 @@ async function showErrorState(
   setButtonState(button, 'error', { userMessage });
 
   const earliestReset = Date.now() + FEEDBACK_ERROR_MS;
+  const maxReset = Date.now() + MAX_TERMINAL_STATE_MS; // Force reset after max time
+  
   while (true) {
     await delay(200);
     if (getButtonState(button) !== 'error') return;
+    
+    // Force reset if max time exceeded
+    if (Date.now() >= maxReset) {
+      setButtonState(button, 'idle');
+      setPillProgress(button, 0);
+      return;
+    }
+    
     if (Date.now() < earliestReset) continue;
 
     if (!button.matches(':hover')) {
@@ -1051,6 +1085,7 @@ export default defineContentScript({
  * ---------------------------------------------------*/
 async function waitForSuccessReset(button: HTMLButtonElement): Promise<void> {
   const earliestReset = Date.now() + FEEDBACK_SUCCESS_MS;
+  const maxReset = Date.now() + MAX_TERMINAL_STATE_MS; // Force reset after max time
 
   while (true) {
     await delay(200);
@@ -1058,6 +1093,12 @@ async function waitForSuccessReset(button: HTMLButtonElement): Promise<void> {
     if (getButtonState(button) !== 'success') {
       return;
     }
+    
+    // Force reset if max time exceeded
+    if (Date.now() >= maxReset) {
+      break;
+    }
+    
     if (Date.now() < earliestReset) continue;
 
     const postRoot =

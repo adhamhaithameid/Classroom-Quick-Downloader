@@ -298,6 +298,12 @@ function App() {
   const [stats, setStats] = useState<StatItem[]>([]);
   const [totalDownloads, setTotalDownloads] = useState(0);
   const [hoveredStatId, setHoveredStatId] = useState<string | null>(null);
+  
+  // Dev mode: trigger for error boundary test
+  const [triggerError, setTriggerError] = useState(false);
+  if (triggerError) {
+    throw new Error('Test error for ErrorBoundary - you should see the purple error screen!');
+  }
 
   // Track scroll to add blur/shadow under header when not at top
   useEffect(() => {
@@ -604,21 +610,34 @@ function App() {
                 <span className="cqd-brand-status-text">
                   {extensionStatusLabel}
                 </span>
-                {version && (
-                  <button
-                    className="cqd-brand-version"
-                    aria-label={`Version ${version} - View changelog`}
-                    title="View changelog"
-                    onClick={() => {
-                      // TODO: Replace with actual changelog URL when website is created
-                      const changelogUrl = null; // Will be: 'https://cqd.adhamhaitham.dev/changelog'
-                      if (changelogUrl) {
-                        window.open(changelogUrl, '_blank');
-                      }
-                    }}
-                  >
-                    v{version}
-                  </button>
+                 {version && (
+                  <>
+                    <button
+                      className="cqd-brand-version"
+                      aria-label={`Version ${version} - View changelog`}
+                      title="View changelog"
+                      onClick={() => {
+                        // TODO: Replace with actual changelog URL when website is created
+                        const changelogUrl = null; // Will be: 'https://cqd.adhamhaitham.dev/changelog'
+                        if (changelogUrl) {
+                          window.open(changelogUrl, '_blank');
+                        }
+                      }}
+                    >
+                      v{version}
+                    </button>
+                    {import.meta.env.DEV && (
+                      <button
+                        className="cqd-brand-version"
+                        aria-label="Test Error Boundary"
+                        title="Click to test ErrorBoundary (dev only)"
+                        onClick={() => setTriggerError(true)}
+                        style={{ marginLeft: '4px', background: '#dc2626', color: 'white' }}
+                      >
+                        🐛
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             </div>
