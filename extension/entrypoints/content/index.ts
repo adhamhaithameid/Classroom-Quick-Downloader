@@ -531,6 +531,18 @@ function injectButtonIntoAttachment(
 /* -----------------------------------------------------
  * Button state helpers
  * ---------------------------------------------------*/
+
+// State priority (higher number = higher priority)
+const STATE_PRIORITY: Record<ButtonState, number> = {
+  success: 7,    // Terminal state - highest priority
+  error: 6,      // Terminal state
+  cancelled: 5,  // Terminal state
+  cancel: 4,     // Hover state - requires mouse over
+  trying: 3,     // Active download with issues
+  loading: 2,    // Active download
+  idle: 1,       // Default state
+};
+
 function getButtonState(button: HTMLButtonElement): ButtonState {
   if (button.classList.contains('cqd-loading')) return 'loading';
   if (button.classList.contains('cqd-trying')) return 'trying';
@@ -552,11 +564,24 @@ function setButtonState(
 
   if (!icon || !label || !errorDetail) return;
 
-  // Protect cancel state from being overridden by loading/trying
-  // Only success, error, cancelled, and idle can override cancel state
+  // Enforce state priority - can only transition to same or higher priority state
   const currentState = getButtonState(button);
+  const currentPriority = STATE_PRIORITY[currentState];
+  const newPriority = STATE_PRIORITY[state];
+  
+  // Special case: cancel state requires mouse hover
+  // If setting to loading/trying while in cancel state, check if mouse is still over button
   if (currentState === 'cancel' && (state === 'loading' || state === 'trying')) {
-    // Skip state change - cancel takes priority during hover
+    const isMouseOver = (button.dataset as any).cqdMouseOver === 'true';
+    if (isMouseOver) {
+      // Mouse still hovering - stay in cancel state
+      return;
+    }
+    // Mouse left - allow transition to loading/trying
+  }
+  
+  // Block lower priority transitions (except for the cancel hover case above)
+  if (newPriority < currentPriority) {
     return;
   }
 
