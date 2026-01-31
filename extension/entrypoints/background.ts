@@ -231,6 +231,16 @@ export default defineBackground(() => {
   });
 
   /* -------------------------------------------------------
+   * 0) Icon update messages from content scripts
+   * -----------------------------------------------------*/
+  chrome.runtime.onMessage.addListener((message, sender) => {
+    if (message?.type === 'CQD_UPDATE_ICON' && sender.tab?.id != null) {
+      updateTabIcon(sender.tab.id, sender.tab.url);
+      return false;
+    }
+  });
+
+  /* -------------------------------------------------------
    * 1) Messages from drive_bypass.content.ts (Drive tab)
    * -----------------------------------------------------*/
   chrome.runtime.onMessage.addListener((message, sender) => {
