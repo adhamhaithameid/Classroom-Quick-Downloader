@@ -1,0 +1,7 @@
+# Prevent .env.example from being detected as a language on GitHub
+extension/.env.example linguist-documentation
+*.env.example linguist-documentation
+
+# Mark documentation files
+*.md linguist-documentation
+LICENSE linguist-documentation
