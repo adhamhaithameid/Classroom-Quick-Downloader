@@ -597,11 +597,16 @@ function ensureDownloadAllButton(group: GroupState): HTMLButtonElement {
   button.addEventListener('click', (e) => {
     e.preventDefault();
     e.stopPropagation();
-    // Check if we should cancel (button is in cancel state)
-    if (button.classList.contains('cqd-all-cancel')) {
+    
+    // Check actual group state, not just CSS class (user might click without hovering)
+    if (group.isBusy && group.activated && !group.cancelPending) {
+      console.log('[CQD] Cancel All button clicked - calling handler');
       handleCancelAllClick(group);
-    } else {
+    } else if (!group.activated || !group.isBusy) {
+      console.log('[CQD] Download All button clicked - calling handler');
       handleDownloadAllClick(group);
+    } else {
+      console.log('[CQD] Button clicked but already cancelled or not in valid state');
     }
   });
 
