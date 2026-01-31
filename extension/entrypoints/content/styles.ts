@@ -241,10 +241,19 @@ export function injectStyles(): void {
       min-width: 140px; /* Match loading/trying min-width for smooth transitions */
       max-width: 300px;
       transform: translateY(-50%) scale(1);
+      /* Smooth transition for cancel state */
+      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      cursor: pointer;
+    }
+
+    .cqd-download-btn.cqd-cancelled {
+      cursor: not-allowed;
+      opacity: 0.9;
     }
 
     .cqd-download-btn.cqd-cancel:hover {
-      box-shadow: var(--cqd-shadow-cancel-strong);
+      transform: translateY(-50%) scale(1.05);
+      box-shadow: 0 6px 20px rgba(255, 107, 0, 0.4);
     }
 
     .cqd-download-btn.cqd-cancel .cqd-label,
@@ -252,6 +261,20 @@ export function injectStyles(): void {
       opacity: 1;
       max-width: 150px;
       margin-left: 12px;
+    }
+
+    /* Cancel icon pulse animation */
+    .cqd-download-btn.cqd-cancel .cqd-download-icon {
+      animation: cancelPulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes cancelPulse {
+      0%, 100% {
+        transform: scale(1) rotate(0deg);
+      }
+      50% {
+        transform: scale(1.1) rotate(15deg);
+      }
     }
 
     .cqd-download-btn.cqd-loading .cqd-label,
