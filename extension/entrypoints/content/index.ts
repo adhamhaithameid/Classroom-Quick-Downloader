@@ -602,14 +602,11 @@ function setButtonState(
   }
   
   // Rule 5: Use priority as fallback for all other cases
-  else {
-    const currentPriority = STATE_PRIORITY[currentState];
-    const newPriority = STATE_PRIORITY[state];
-    if (newPriority < currentPriority) {
-      return; // Block lower priority transitions
+    return; // Block lower priority transitions
     }
   }
 
+  // Rule 6: Apply new state
   button.classList.remove(
     'cqd-loading',
     'cqd-trying',
@@ -627,28 +624,64 @@ function setButtonState(
   icon.style.backgroundImage = `url("${DOWNLOAD_ICON_SVG_URL}")`;
   icon.style.backgroundSize = '';
 
+  button.classList.add(`cqd-${state}`);
+
   switch (state) {
     case 'idle':
       break;
     case 'loading':
-    case 'trying': {
-      const isTrying = state === 'trying';
-      button.classList.add(isTrying ? 'cqd-trying' : 'cqd-loading');
-      button.disabled = true;
-      label.textContent = isTrying ? t('trying') : t('downloading');
-      icon.classList.add('cqd-spinner');
-      icon.style.backgroundImage = 'none';
+      if (icon) {
+        icon.style.backgroundImage = 'none';
+        icon.className = 'cqd-download-icon cqd-spinner';
+      }
+      if (label) label.textContent = t('downloading');
+      button.disabled = false; // Allow interaction for cancel
+
+      // CRITICAL FIX: If mouse is already over the button, show cancel state IMMEDIATELY
+      // Do not wait for mouseleave/mouseenter cycle
+      if ((button.dataset as any).cqdMouseOver === 'true') {
+        const currentNow = getButtonState(button);
+        // Only transition if we are truly in a cancellable state
+        if (currentNow === 'loading' || currentNow === 'trying') {
+          console.log('[CQD] Mouse already over active button - transitioning to cancel immediately');
+          // Manually trigger the cancel visual state
+          button.classList.add('cqd-cancel');
+          if (label) label.textContent = t('cancel');
+          if (icon) {
+            icon.className = 'cqd-download-icon'; // Stop spin
+            icon.style.backgroundImage = `url("${CANCEL_ICON_SVG_URL}")`;
+            icon.style.backgroundSize = '20px 20px';
+          }
+        }
+      }
       break;
-    }
+    case 'trying':
+      if (icon) {
+        icon.style.backgroundImage = 'none';
+        icon.className = 'cqd-download-icon cqd-spinner';
+      }
+      if (label) label.textContent = options?.userMessage || t('trying');
+      button.disabled = false; // Allow interaction for cancel
+
+      // CRITICAL FIX: Same matching logic for 'trying' state
+      if ((button.dataset as any).cqdMouseOver === 'true') {
+         console.log('[CQD] Mouse over trying button - showing cancel');
+         button.classList.add('cqd-cancel');
+         if (label) label.textContent = t('cancel');
+         if (icon) {
+            icon.className = 'cqd-download-icon';
+            icon.style.backgroundImage = `url("${CANCEL_ICON_SVG_URL}")`;
+            icon.style.backgroundSize = '20px 20px';
+         }
+      }
+      break;
     case 'cancel':
-      button.classList.add('cqd-cancel');
       button.disabled = false; // Allow click to confirm cancel
       label.textContent = t('cancel');
       icon.style.backgroundImage = `url("${CANCEL_ICON_SVG_URL}")`;
       icon.style.backgroundSize = '20px 20px';
       break;
     case 'cancelled':
-      button.classList.add('cqd-cancelled');
       button.disabled = true;
       label.textContent = t('cancelled');
       icon.style.backgroundImage = `url("${CANCEL_ICON_SVG_URL}")`;
@@ -723,37 +756,51 @@ function createDownloadButton(
   let hoverTimeout: number | undefined;
 
   // Hover handlers for loading → cancel state transition
-  // Cancel button appears ONLY when hovering over loading/trying state
+  // Cancel button appears ONLY when hovering over loading  // --- Mouse Listeners ---
+
+  // Track hover state persistently
   button.addEventListener('mouseenter', () => {
     (button.dataset as any).cqdMouseOver = 'true';
-    
-    const state = getButtonState(button);
-    if (state === 'loading' || state === 'trying') {
-      // Show cancel immediately when hovering over active download
-      setButtonState(button, 'cancel');
-    }
-  });
-
-  button.addEventListener('mouseleave', () => {
-    delete (button.dataset as any).cqdMouseOver;
-    
-    if (hoverTimeout) {
-      window.clearTimeout(hoverTimeout);
-      hoverTimeout = undefined;
-    }
-    
-    const state = getButtonState(button);
-    if (state === 'cancel') {
-      // Revert to loading state when mouse leaves
-      // Check if download is still pending
-      const pending = findPendingButtonByElement(button);
-      if (pending) {
-        setButtonState(button, 'loading');
+    const s = getButtonState(button);
+    // If active (loading/trying), switch to cancel visual immediately
+    if (s === 'loading' || s === 'trying') {
+      button.classList.add('cqd-cancel');
+      const label = button.querySelector<HTMLSpanElement>('.cqd-label');
+      const icon = button.querySelector<HTMLElement>('.cqd-download-icon');
+      if (label) label.textContent = t('cancel') || 'Cancel';
+      if (icon) {
+        icon.className = 'cqd-download-icon'; // Stop spinning
+        icon.style.backgroundImage = `url("${CANCEL_ICON_SVG_URL}")`;
       }
     }
   });
 
-  const clickHandler = async (e: Event) => {
+  button.addEventListener('mouseleave', () => {
+    (button.dataset as any).cqdMouseOver = 'false';
+    const s = getButtonState(button);
+    
+    // If we were showing cancel, revert to loading/trying visual
+    if (button.classList.contains('cqd-cancel')) {
+      button.classList.remove('cqd-cancel');
+      // Re-apply state visuals (spinner, text) without changing actual logic state
+      const label = button.querySelector<HTMLSpanElement>('.cqd-label');
+      const icon = button.querySelector<HTMLElement>('.cqd-download-icon');
+      
+      if (s === 'loading') {
+        if (label) label.textContent = t('downloading') || 'Downloading...';
+        if (icon) {
+            icon.className = 'cqd-download-icon cqd-spin';
+            icon.style.backgroundImage = 'none';
+        }
+      } else if (s === 'trying') {
+        if (label) label.textContent = t('trying') || 'Retrying...';
+        if (icon) {
+            icon.className = 'cqd-download-icon cqd-spin';
+            icon.style.backgroundImage = 'none';
+        }
+      }
+    }
+  });const clickHandler = async (e: Event) => {
     e.preventDefault();
     e.stopPropagation();
     
