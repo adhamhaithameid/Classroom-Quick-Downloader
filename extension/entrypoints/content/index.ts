@@ -4,11 +4,13 @@ import {
   DOWNLOAD_ICON_SVG_URL,
   SUCCESS_ICON_SVG_URL,
   ERROR_ICON_SVG_URL,
+  CANCEL_ICON_SVG_URL,
 } from './icons';
 import { injectStyles } from './styles';
 import { t } from './i18n';
 import { isPageDark } from './theme';
 import { subscribeToGlobalState } from './flags';
+import { getCancelHoldDelayMs } from '../utils/analytics';
 
 /* -----------------------------------------------------
  * Constants
@@ -19,8 +21,10 @@ const RESCAN_INTERVAL_MS = 2000;
 // Reduced debounce to make buttons appear snappier after scroll
 const RESCAN_DEBOUNCE_MS = 150; 
 const LOADING_MIN_MS = 600;
-const FEEDBACK_SUCCESS_MS = 3000;
-const FEEDBACK_ERROR_MS = 4000;
+const FEEDBACK_SUCCESS_MS = 2000;  // Reduced from 3000ms
+const FEEDBACK_ERROR_MS = 3000;     // Reduced from 4000ms  
+const FEEDBACK_CANCELLED_MS = 1500; // Cancelled state timeout
+const MAX_TERMINAL_STATE_MS = 5000; // Force reset after 5s (reduced from 8s)
 
 const DRIVE_ANCHOR_SELECTOR =
   'a[href*="https://drive.google.com"], a[href*="//drive.google.com"], a[href*="classroom.google.com/drive"]';
@@ -49,7 +53,7 @@ let scanTimeoutId: number | null = null;
 let observer: MutationObserver | null = null;
 let rescanIntervalId: number | null = null;
 
-type ButtonState = 'idle' | 'loading' | 'success' | 'error' | 'trying';
+type ButtonState = 'idle' | 'loading' | 'success' | 'error' | 'trying' | 'cancel' | 'cancelled';
 
 type FileMeta = {
   name?: string;
@@ -74,6 +78,12 @@ let initialized = false;
 
 // Global ON/OFF flag
 let globalEnabled = true;
+
+// Cached cancel hold delay
+let cancelHoldDelayMs = 1000;
+getCancelHoldDelayMs().then((ms) => {
+  cancelHoldDelayMs = ms;
+}).catch(() => { /* ignore */ });
 
 /* -----------------------------------------------------
  * Effective state broadcast
@@ -523,11 +533,31 @@ function injectButtonIntoAttachment(
 /* -----------------------------------------------------
  * Button state helpers
  * ---------------------------------------------------*/
+
+// State priority (higher number = higher priority)
+const STATE_PRIORITY: Record<ButtonState, number> = {
+  success: 7,    // Terminal state - highest priority
+  error: 6,      // Terminal state
+  cancelled: 5,  // Terminal state
+  cancel: 4,     // Hover state - requires mouse over
+  trying: 3,     // Active download with issues
+  loading: 2,    // Active download
+  idle: 1,       // Default state
+};
+
 function getButtonState(button: HTMLButtonElement): ButtonState {
-  if (button.classList.contains('cqd-loading')) return 'loading';
-  if (button.classList.contains('cqd-trying')) return 'trying';
+  // Check terminal/priority states first
   if (button.classList.contains('cqd-success')) return 'success';
   if (button.classList.contains('cqd-error')) return 'error';
+  if (button.classList.contains('cqd-cancelled')) return 'cancelled';
+  
+  // Check cancel before loading/trying! 
+  // This ensures that if we have both classes (for visual override), we report 'cancel'
+  if (button.classList.contains('cqd-cancel')) return 'cancel';
+  
+  if (button.classList.contains('cqd-loading')) return 'loading';
+  if (button.classList.contains('cqd-trying')) return 'trying';
+  
   return 'idle';
 }
 
@@ -542,13 +572,55 @@ function setButtonState(
 
   if (!icon || !label || !errorDetail) return;
 
+  const currentState = getButtonState(button);
+  
+  // Define state categories for better transition logic
+  const HOVER_STATES = ['cancel'] as const;
+  const TERMINAL_STATES = ['success', 'error', 'cancelled'] as const;
+  const ACTIVE_STATES = ['loading', 'trying'] as const;
+  
+  // === STATE TRANSITION RULES ===
+  
+  // Rule 1: Always allow transition to idle (reset)
+  if (state === 'idle') {
+    // Allowed from any state
+  }
+  
+  // Rule 2: Hover states (cancel) can exit to active states when mouse leaves
+  else if ((HOVER_STATES as readonly string[]).includes(currentState) && (ACTIVE_STATES as readonly string[]).includes(state)) {
+    const isMouseOver = (button.dataset as any).cqdMouseOver === 'true';
+    if (isMouseOver) {
+      // Mouse still hovering - block transition, stay in hover state
+      return;
+    }
+    // Mouse left - allow transition back to active state
+  }
+  
+  // Rule 3: Terminal states block all transitions except to idle
+  else if ((TERMINAL_STATES as readonly string[]).includes(currentState) && state !== 'idle') {
+    return; // Block transition
+  }
+  
+  // Rule 4: Active states can transition to hover states, terminal states, or each other
+  else if ((ACTIVE_STATES as readonly string[]).includes(currentState)) {
+    // Allow: loading ↔ trying, loading → cancel, loading → success/error/cancelled
+    // These are all valid
+  }
+  
+  // Rule 5: Use priority as fallback for all other cases
+  // (Fallthrough allows transition)
+
+  // Rule 6: Apply new state
   button.classList.remove(
     'cqd-loading',
     'cqd-trying',
     'cqd-success',
     'cqd-error',
+    'cqd-cancel',
+    'cqd-cancelled',
   );
-  icon.classList.remove('cqd-spinner');
+  icon.classList.remove('cqd-spinner', 'cqd-spin'); // Remove both potential spinner classes
+  icon.className = 'cqd-download-icon'; // Reset to base class to be safe
   icon.textContent = '';
   button.disabled = false;
   button.style.backgroundColor = '';
@@ -557,19 +629,70 @@ function setButtonState(
   icon.style.backgroundImage = `url("${DOWNLOAD_ICON_SVG_URL}")`;
   icon.style.backgroundSize = '';
 
+  button.classList.add(`cqd-${state}`);
+
   switch (state) {
     case 'idle':
       break;
     case 'loading':
-    case 'trying': {
-      const isTrying = state === 'trying';
-      button.classList.add(isTrying ? 'cqd-trying' : 'cqd-loading');
-      button.disabled = true;
-      label.textContent = isTrying ? t('trying') : t('downloading');
-      icon.classList.add('cqd-spinner');
-      icon.style.backgroundImage = 'none';
+      if (icon) {
+        icon.style.backgroundImage = 'none';
+        icon.className = 'cqd-download-icon cqd-spinner';
+      }
+      if (label) label.textContent = t('downloading');
+      button.disabled = false; // Allow interaction for cancel
+
+      // CRITICAL FIX: If mouse is already over the button, show cancel state IMMEDIATELY
+      // Do not wait for mouseleave/mouseenter cycle
+      if ((button.dataset as any).cqdMouseOver === 'true') {
+        const currentNow = getButtonState(button);
+        // Only transition if we are truly in a cancellable state (loading/trying) OR if we just added the class
+        // Note: getButtonState might now return 'loading' because we haven't added 'cqd-cancel' yet? 
+        // No, we haven't added it yet.
+        
+        console.log('[CQD] Mouse already over active button - transitioning to cancel immediately');
+        // Manually trigger the cancel visual state
+        button.classList.add('cqd-cancel');
+        if (label) label.textContent = t('cancel') || 'Cancel';
+        if (icon) {
+          icon.className = 'cqd-download-icon'; // Stop spin
+          icon.style.backgroundImage = `url("${CANCEL_ICON_SVG_URL}")`;
+          icon.style.backgroundSize = '20px 20px'; // Explicit size
+        }
+      }
       break;
-    }
+    case 'trying':
+      if (icon) {
+        icon.style.backgroundImage = 'none';
+        icon.className = 'cqd-download-icon cqd-spinner';
+      }
+      if (label) label.textContent = options?.userMessage || t('trying') || 'Retrying...';
+      button.disabled = false; // Allow interaction for cancel
+
+      // CRITICAL FIX: Same matching logic for 'trying' state
+      if ((button.dataset as any).cqdMouseOver === 'true') {
+         console.log('[CQD] Mouse over trying button - showing cancel');
+         button.classList.add('cqd-cancel');
+         if (label) label.textContent = t('cancel') || 'Cancel';
+         if (icon) {
+            icon.className = 'cqd-download-icon';
+            icon.style.backgroundImage = `url("${CANCEL_ICON_SVG_URL}")`;
+            icon.style.backgroundSize = '20px 20px';
+         }
+      }
+      break;
+    case 'cancel':
+      button.disabled = false; // Allow click to confirm cancel
+      label.textContent = t('cancel');
+      icon.style.backgroundImage = `url("${CANCEL_ICON_SVG_URL}")`;
+      icon.style.backgroundSize = '20px 20px';
+      break;
+    case 'cancelled':
+      button.disabled = true;
+      label.textContent = t('cancelled');
+      icon.style.backgroundImage = `url("${CANCEL_ICON_SVG_URL}")`;
+      icon.style.backgroundSize = '20px 20px';
+      break;
     case 'success':
       button.classList.add('cqd-success');
       label.textContent = t('downloaded');
@@ -635,9 +758,72 @@ function createDownloadButton(
   button.appendChild(label);
   button.appendChild(errorDetail);
 
-  const clickHandler = async (e: Event) => {
+  // Track if we're in loading state before hover changed it to cancel
+  let hoverTimeout: number | undefined;
+
+  // Hover handlers for loading → cancel state transition
+  // Cancel button appears ONLY when hovering over loading  // --- Mouse Listeners ---
+
+  // Track hover state persistently
+  button.addEventListener('mouseenter', () => {
+    (button.dataset as any).cqdMouseOver = 'true';
+    const s = getButtonState(button);
+    // If active (loading/trying), switch to cancel visual immediately
+    if (s === 'loading' || s === 'trying') {
+      button.classList.add('cqd-cancel');
+      const label = button.querySelector<HTMLSpanElement>('.cqd-label');
+      const icon = button.querySelector<HTMLElement>('.cqd-download-icon');
+      if (label) label.textContent = t('cancel') || 'Cancel';
+      if (icon) {
+        icon.className = 'cqd-download-icon'; // Stop spinning
+        icon.style.backgroundImage = `url("${CANCEL_ICON_SVG_URL}")`;
+      }
+    }
+  });
+
+  button.addEventListener('mouseleave', () => {
+    (button.dataset as any).cqdMouseOver = 'false';
+    const wasCancel = button.classList.contains('cqd-cancel');
+    
+    // Check underlying state explicitly via classes since getButtonState now prioritizes cancel
+    const isUnderlyingLoading = button.classList.contains('cqd-loading');
+    const isUnderlyingTrying = button.classList.contains('cqd-trying');
+    
+    // If we were showing cancel, revert to loading/trying visual
+    if (wasCancel) {
+      button.classList.remove('cqd-cancel');
+      // Re-apply state visuals (spinner, text)
+      const label = button.querySelector<HTMLSpanElement>('.cqd-label');
+      const icon = button.querySelector<HTMLElement>('.cqd-download-icon');
+      
+      if (isUnderlyingLoading) {
+        if (label) label.textContent = t('downloading') || 'Downloading...';
+        if (icon) {
+            icon.className = 'cqd-download-icon cqd-spinner'; // Restoration of spinner class
+            icon.style.backgroundImage = 'none';
+        }
+      } else if (isUnderlyingTrying) {
+        if (label) label.textContent = t('trying') || 'Retrying...';
+        if (icon) {
+             icon.className = 'cqd-download-icon cqd-spinner';
+             icon.style.backgroundImage = 'none';
+        }
+      }
+    }
+  });const clickHandler = async (e: Event) => {
     e.preventDefault();
     e.stopPropagation();
+    
+    const currentState = getButtonState(button);
+    
+    // If in cancel state, trigger cancellation
+    if (currentState === 'cancel') {
+      delete (button.dataset as any).cqdMouseOver;
+      await handleCancelClick(button);
+      return;
+    }
+    
+    // Normal download flow (only works from idle state)
     await handleSingleDownloadClick(button, url, fileMeta);
   };
   button.addEventListener('click', clickHandler);
@@ -646,6 +832,75 @@ function createDownloadButton(
   });
 
   return button;
+}
+
+// Helper to find pending button entry by button element
+function findPendingButtonByElement(button: HTMLButtonElement): PendingButton | undefined {
+  for (const pending of pendingButtons.values()) {
+    if (pending.button === button) {
+      return pending;
+    }
+  }
+  return undefined;
+}
+
+// Handle cancel button click
+async function handleCancelClick(button: HTMLButtonElement): Promise<void> {
+  // Find and cancel the pending download
+  const pending = Array.from(pendingButtons.values()).find((p) => p.button === button);
+  
+  if (pending) {
+    // Remove from pending (prevents background from continuing)
+    pendingButtons.delete(pending.requestId);
+    
+    // Send cancel message to background to abort browser download
+    if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+      try {
+        chrome.runtime.sendMessage({
+          type: 'CQD_CANCEL_DOWNLOAD',
+          requestId: pending.requestId,
+        });
+        console.log('[CQD] Sent cancel message for requestId:', pending.requestId);
+      } catch (err) {
+        console.warn('[CQD] Error sending cancel message:', err);
+      }
+    }
+  }
+
+  // Apply cancel click animation
+  button.classList.add('cqd-cancel-click-anim');
+  setTimeout(() => button.classList.remove('cqd-cancel-click-anim'), 400);
+
+  // Show cancelled state briefly, then return to idle
+  setButtonState(button, 'cancelled');
+  
+  // Wait for reset with max timeout
+  const earliestReset = Date.now() + FEEDBACK_CANCELLED_MS;
+  const maxReset = Date.now() + MAX_TERMINAL_STATE_MS;
+  
+  while (true) {
+    await delay(200);
+    
+    // Check if state changed (user might have clicked again)
+    if (getButtonState(button) !== 'cancelled') {
+      return;
+    }
+    
+    // Force reset after max time
+    if (Date.now() >= maxReset) {
+      break;
+    }
+    
+    // Normal reset after earliest time and not hovering
+    if (Date.now() >= earliestReset && !button.matches(':hover')) {
+      break;
+    }
+  }
+  
+  // Only reset if still in cancelled state
+  if (getButtonState(button) === 'cancelled') {
+    setButtonState(button, 'idle');
+  }
 }
 
 /* -----------------------------------------------------
@@ -665,7 +920,37 @@ async function handleSingleDownloadClick(
   const startedAt = Date.now();
   pendingButtons.set(requestId, { button, requestId, fileMeta, startedAt });
 
+  // CRITICAL: Store requestId in button dataset for Cancel All to find it
+  try {
+    (button.dataset as any).cqdRequestId = requestId;
+  } catch {
+    // Ignore dataset errors
+  }
+
   setButtonState(button, 'loading');
+
+  // Note: Cancel state will only appear if user hovers over the button
+  // No automatic cancel state - respects the new priority system
+
+  // *** PRE-DOWNLOAD DELAY ***
+  // Wait for cancelHoldDelayMs before starting the actual download.
+  // This gives users time to hover and cancel before the file starts downloading.
+  if (cancelHoldDelayMs > 0) {
+    await delay(cancelHoldDelayMs);
+    
+    // Check if user cancelled during the wait
+    if (!pendingButtons.has(requestId)) {
+      // User cancelled - don't start download
+      return;
+    }
+    
+    // Check if button is in cancel/cancelled state
+    const currentState = getButtonState(button);
+    if (currentState === 'cancelled' || currentState === 'idle') {
+      // User cancelled or reset - don't start download
+      return;
+    }
+  }
 
   const startResult = await startBackgroundDownload(requestId, url, fileMeta);
   if (!startResult.ok) {
@@ -722,9 +1007,19 @@ async function showErrorState(
   setButtonState(button, 'error', { userMessage });
 
   const earliestReset = Date.now() + FEEDBACK_ERROR_MS;
+  const maxReset = Date.now() + MAX_TERMINAL_STATE_MS; // Force reset after max time
+  
   while (true) {
     await delay(200);
     if (getButtonState(button) !== 'error') return;
+    
+    // Force reset if max time exceeded
+    if (Date.now() >= maxReset) {
+      setButtonState(button, 'idle');
+      setPillProgress(button, 0);
+      return;
+    }
+    
     if (Date.now() < earliestReset) continue;
 
     if (!button.matches(':hover')) {
@@ -777,15 +1072,10 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
 
       if (message.type === 'CQD_DOWNLOAD_STATUS') {
         const requestId = message.requestId as string | undefined;
-        console.log('[CQD-Content] Received status message:', message.status, 'for requestId:', requestId);
-        
         if (!requestId) return;
 
         const pending = pendingButtons.get(requestId);
-        if (!pending) {
-          console.log('[CQD-Content] No pending button found for requestId:', requestId);
-          return;
-        }
+        if (!pending) return;
         
         const { button, startedAt } = pending;
       (async () => {
@@ -822,6 +1112,14 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
             status === 'interrupted' ||
             status === 'blocked_html'
           ) {
+            // SPECIAL CASE: If button is already visually cancelled (e.g. by "Cancel All"),
+            // ignore the "interrupted" or "error" message so we don't overwrite with "Error" state
+            // and don't trigger a double/conflicting reset timer.
+            if ((status === 'interrupted' || status === 'error') && button.classList.contains('cqd-cancelled')) {
+               pendingButtons.delete(requestId);
+               return;
+            }
+
             if (errorCode === 'AUTH_CHECK') {
               await showErrorState(button, userMessage);
               return;
@@ -842,6 +1140,13 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
  * ---------------------------------------------------*/
 function initContentScript(): void {
   if (!isGoogleClassroom()) return;
+
+  // Request icon update to ensure colored icon on Classroom
+  try {
+    chrome.runtime.sendMessage({ type: 'CQD_UPDATE_ICON' });
+  } catch {
+    // Ignore errors
+  }
 
   // Subscribe to global enable/disable state.
   // This handles both initial state and dynamic changes.
@@ -873,6 +1178,7 @@ export default defineContentScript({
  * ---------------------------------------------------*/
 async function waitForSuccessReset(button: HTMLButtonElement): Promise<void> {
   const earliestReset = Date.now() + FEEDBACK_SUCCESS_MS;
+  const maxReset = Date.now() + MAX_TERMINAL_STATE_MS; // Force reset after max time
 
   while (true) {
     await delay(200);
@@ -880,17 +1186,15 @@ async function waitForSuccessReset(button: HTMLButtonElement): Promise<void> {
     if (getButtonState(button) !== 'success') {
       return;
     }
+    
+    // Force reset if max time exceeded - always allow re-download after 5s
+    if (Date.now() >= maxReset) {
+      break;
+    }
+    
     if (Date.now() < earliestReset) continue;
 
-    const postRoot =
-      button.closest<HTMLElement>('div[data-stream-item-id]') ||
-      button.closest<HTMLElement>('main') ||
-      button.closest<HTMLElement>('div[role="main"]');
-
-    if (postRoot && postRoot.dataset.cqdGroupActive === '1') {
-      continue;
-    }
-
+    // Only extend timeout if user is hovering (let them see the state)
     if (button.matches(':hover')) continue;
 
     break;

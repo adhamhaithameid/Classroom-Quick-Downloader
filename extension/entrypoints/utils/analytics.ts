@@ -1,7 +1,7 @@
 // filepath: extension/entrypoints/utils/analytics.ts
 
 export interface AnalyticsEvent {
-  status: 'success' | 'fail';
+  status: 'success' | 'fail' | 'cancelled';
   file_type: string;
   browser: string;
   os: string;
@@ -47,6 +47,7 @@ export interface LocalStats {
    */
   success?: number;
   fail?: number;
+  cancelled?: number;
   attempts?: number;
   bySpeed?: {
     fast: number;
@@ -104,6 +105,7 @@ type AnalyticsConfig = {
   midUsageFlushMinutes: number;  // 15 <= queue < 35
   highUsageFlushMinutes: number; // 35 <= queue < 50
   remoteEnabled: boolean;
+  cancelHoldDelayMs: number;  // Time before cancel button is active (default: 1000ms)
 };
 
 /**
@@ -119,6 +121,7 @@ const DEFAULT_CONFIG: AnalyticsConfig = {
   midUsageFlushMinutes: 1440,
   highUsageFlushMinutes: 1440,
   remoteEnabled: REMOTE_ENABLED,
+  cancelHoldDelayMs: 1000,  // 1 second default
 };
 
 /**
@@ -435,6 +438,10 @@ async function loadConfig(): Promise<AnalyticsConfig> {
       typeof stored.remoteEnabled === 'boolean'
         ? stored.remoteEnabled
         : DEFAULT_CONFIG.remoteEnabled,
+    cancelHoldDelayMs:
+      typeof stored.cancelHoldDelayMs === 'number'
+        ? Math.max(0, Math.min(10000, stored.cancelHoldDelayMs))
+        : DEFAULT_CONFIG.cancelHoldDelayMs,
   };
 }
 
@@ -520,10 +527,13 @@ async function saveStats(stats: LocalStats): Promise<void> {
 async function updateLocalStats(event: AnalyticsEvent): Promise<void> {
   const stats = await loadStats();
   const isSuccess = event.status === 'success';
+  const isCancelled = event.status === 'cancelled';
 
   if (isSuccess) {
     stats.success = (stats.success || 0) + 1;
     stats.total = (stats.total || 0) + 1; // keep popup compatible
+  } else if (isCancelled) {
+    stats.cancelled = (stats.cancelled || 0) + 1;
   } else {
     stats.fail = (stats.fail || 0) + 1;
     const key = (event.error_type || 'UNKNOWN').toUpperCase();
@@ -1019,8 +1029,9 @@ export interface RecordDownloadEventInput {
   /**
    * "success" → file actually finished downloading.
    * "fail"    → file definitely failed (interrupted, blocked, etc.).
+   * "cancelled" → user cancelled the download.
    */
-  status: 'success' | 'fail';
+  status: 'success' | 'fail' | 'cancelled';
 
   /**
    * Optional tag: where this came from (download_all, single, etc.).
@@ -1054,6 +1065,11 @@ export interface RecordDownloadEventInput {
  */
 export function recordDownloadEvent(input: RecordDownloadEventInput): void {
   const { type, status, source, duration_ms, bypass_used, error_type } = input;
+
+  // Log cancelled events to console for debugging
+  if (status === 'cancelled') {
+    console.log('[CQD] Download cancelled:', { type, duration_ms, bypass_used });
+  }
 
   Analytics.track({
     status,
@@ -1130,6 +1146,10 @@ export async function refreshRemoteAnalyticsConfig(): Promise<void> {
         typeof data.remoteEnabled === 'boolean'
           ? data.remoteEnabled
           : data.quota?.remoteEnabled ?? DEFAULT_CONFIG.remoteEnabled,
+      cancelHoldDelayMs:
+        typeof data.cancelHoldDelayMs === 'number'
+          ? Math.max(0, Math.min(10000, data.cancelHoldDelayMs))
+          : DEFAULT_CONFIG.cancelHoldDelayMs,
     };
 
     await saveConfig(cfg);
@@ -1146,4 +1166,26 @@ export async function refreshRemoteAnalyticsConfig(): Promise<void> {
     );
     await saveConfig(DEFAULT_CONFIG);
   }
+}
+
+/**
+ * Get the cancel hold delay in milliseconds.
+ * This is the time before the cancel button becomes active after a download starts.
+ * Default: 1000ms (1 second). Range: 0-10000ms.
+ * Configurable via Cloudflare dashboard.
+ */
+export async function getCancelHoldDelayMs(): Promise<number> {
+  const cfg = await loadConfig();
+  return cfg.cancelHoldDelayMs ?? 1000;
+}
+
+/**
+ * Get the total number of cancelled downloads from local stats.
+ * This can be used to verify that cancelled downloads are being tracked.
+ */
+export async function getCancelledCount(): Promise<number> {
+  const stats = await loadStats();
+  const count = stats.cancelled ?? 0;
+  console.log('[CQD] Total cancelled downloads:', count);
+  return count;
 }

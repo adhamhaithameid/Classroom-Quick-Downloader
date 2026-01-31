@@ -5,17 +5,20 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "lint": "eslint . --ext .ts",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "audit": "npm audit",
     "validate": "npm run lint && npm run typecheck && npm run audit"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20251209.0",
+    "@eslint/js": "^9.39.2",
+    "@typescript-eslint/eslint-plugin": "^8.54.0",
+    "@typescript-eslint/parser": "^8.54.0",
+    "eslint": "^9.39.2",
+    "globals": "^17.2.0",
     "typescript": "^5.9.3",
-    "wrangler": "^4.59.1",
-    "eslint": "^8.56.0",
-    "@typescript-eslint/parser": "^6.18.0",
-    "@typescript-eslint/eslint-plugin": "^6.18.0"
+    "typescript-eslint": "^8.54.0",
+    "wrangler": "^4.59.1"
   }
 }

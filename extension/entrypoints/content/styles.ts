@@ -1,10 +1,10 @@
 // filepath: entrypoints/content/styles.ts
-import { DOWNLOAD_ICON_SVG_URL, SUCCESS_ICON_SVG_URL } from './icons';
+import { DOWNLOAD_ICON_SVG_URL, SUCCESS_ICON_SVG_URL, CANCEL_ICON_SVG_URL } from './icons';
 
 const STYLE_ID = 'cqd-style';
 const SPINNER_SIZE_PX = 16;
 
-const TRANSITION_MS = 150;
+const TRANSITION_MS = 120; // Reduced from 150ms for snappier feel
 const TRANSITION_STR = `${TRANSITION_MS}ms cubic-bezier(0.2, 0, 0, 1)`;
 
 export function injectStyles(): void {
@@ -36,9 +36,13 @@ export function injectStyles(): void {
       --cqd-shadow-error: 0 12px 28px rgba(255, 64, 54, 0.40);
       --cqd-shadow-error-strong: 0 12px 28px rgba(255, 64, 54, 0.70);
 
-      --cqd-color-trying: #EC6300;
-      --cqd-shadow-trying: 0 12px 28px rgba(236, 99, 0, 0.40);
-      --cqd-shadow-trying-strong: 0 12px 28px rgba(236, 99, 0, 0.70);
+      --cqd-color-trying: #FFD93D;
+      --cqd-shadow-trying: 0 12px 28px rgba(255, 217, 61, 0.40);
+      --cqd-shadow-trying-strong: 0 12px 28px rgba(255, 217, 61, 0.70);
+
+      --cqd-color-cancel: #EC6300;
+      --cqd-shadow-cancel: 0 12px 28px rgba(236, 99, 0, 0.40);
+      --cqd-shadow-cancel-strong: 0 12px 28px rgba(236, 99, 0, 0.70);
 
       --cqd-color-comment: #9B00FF;
       --cqd-color-edited: #007F8D;
@@ -63,9 +67,13 @@ export function injectStyles(): void {
       --cqd-shadow-error: 0 12px 28px rgba(255, 64, 54, 0.40);
       --cqd-shadow-error-strong: 0 12px 28px rgba(255, 64, 54, 0.70);
 
-      --cqd-color-trying: #FF9142;
-      --cqd-shadow-trying: 0 12px 28px rgba(255, 145, 66, 0.40);
-      --cqd-shadow-trying-strong: 0 12px 28px rgba(255, 145, 66, 0.70);
+      --cqd-color-trying: #FFD93D;
+      --cqd-shadow-trying: 0 12px 28px rgba(255, 217, 61, 0.40);
+      --cqd-shadow-trying-strong: 0 12px 28px rgba(255, 217, 61, 0.70);
+
+      --cqd-color-cancel: #FF9142;
+      --cqd-shadow-cancel: 0 12px 28px rgba(255, 145, 66, 0.40);
+      --cqd-shadow-cancel-strong: 0 12px 28px rgba(255, 145, 66, 0.70);
 
       --cqd-color-comment: #9B00FF;
       --cqd-color-edited: #00D6EE;
@@ -204,6 +212,7 @@ export function injectStyles(): void {
       justify-content: flex-start;
       box-shadow: var(--cqd-shadow-normal);
       width: auto;
+      min-width: 140px; /* Consistent width to prevent hover stuttering */
       max-width: 300px;
       transform: translateY(-50%) scale(1);
     }
@@ -219,6 +228,79 @@ export function injectStyles(): void {
 
     .cqd-download-btn.cqd-trying:hover {
       box-shadow: var(--cqd-shadow-trying-strong);
+    }
+
+    .cqd-download-btn.cqd-cancel,
+    .cqd-download-btn.cqd-cancelled {
+      background-color: var(--cqd-color-cancel);
+      box-shadow: var(--cqd-shadow-cancel);
+      padding-inline: 12px;
+      border-radius: 20px;
+      justify-content: flex-start;
+      width: auto;
+      min-width: 140px;
+      max-width: 300px;
+      transform: translateY(-50%) scale(1);
+      transition: all var(--cqd-transition);
+      cursor: pointer;
+    }
+
+    /* Cancel state - smooth entry animation when hover starts */
+    .cqd-download-btn.cqd-loading:hover,
+    .cqd-download-btn.cqd-trying:hover {
+      transition: background-color 0.2s ease-out, box-shadow 0.2s ease-out;
+    }
+
+    .cqd-download-btn.cqd-cancelled {
+      cursor: not-allowed;
+      filter: saturate(0.85) brightness(0.95); /* No transparency, just subtle desaturation */
+      /* Click animation class applied via JS */
+    }
+
+    /* Click animation: cancel → cancelled */
+    @keyframes cancelClick {
+      0% {
+        transform: translateY(-50%) scale(1);
+      }
+      30% {
+        transform: translateY(-50%) scale(1.08);
+      }
+      60% {
+        transform: translateY(-50%) scale(0.96);
+      }
+      100% {
+        transform: translateY(-50%) scale(1);
+      }
+    }
+
+    .cqd-download-btn.cqd-cancel-click-anim {
+      animation: cancelClick 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .cqd-download-btn.cqd-cancel:hover {
+      transform: translateY(-50%) scale(1.05);
+      box-shadow: var(--cqd-shadow-cancel-strong);
+    }
+
+    .cqd-download-btn.cqd-cancel .cqd-label,
+    .cqd-download-btn.cqd-cancelled .cqd-label {
+      opacity: 1;
+      max-width: 150px;
+      margin-left: 12px;
+    }
+
+    /* Cancel icon pulse animation */
+    .cqd-download-btn.cqd-cancel .cqd-download-icon {
+      animation: cancelPulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes cancelPulse {
+      0%, 100% {
+        transform: scale(1) rotate(0deg);
+      }
+      50% {
+        transform: scale(1.1) rotate(15deg);
+      }
     }
 
     .cqd-download-btn.cqd-loading .cqd-label,
@@ -886,6 +968,19 @@ export function injectStyles(): void {
       box-shadow: var(--cqd-shadow-error);
     }
 
+    /* CANCEL STATE (Orange - hover to cancel during download) */
+    .cqd-download-all-btn.cqd-all-cancel {
+      background-color: var(--cqd-color-cancel);
+      box-shadow: var(--cqd-shadow-cancel);
+      min-width: 140px; /* Keep same width as downloading state */
+    }
+
+    .cqd-download-all-btn.cqd-all-cancelled {
+      background-color: var(--cqd-color-cancel);
+      box-shadow: var(--cqd-shadow-cancel);
+      min-width: 140px; /* Match cancel state width */
+    }
+
     /* PROGRESS BAR OVERLAY (Fills up) */
     .cqd-download-all-btn::after {
       content: '';
@@ -928,6 +1023,8 @@ export function injectStyles(): void {
       background-position: center;
       background-size: 18px 18px;
       flex-shrink: 0;
+      /* Smooth icon transitions */
+      transition: background-image 0.2s ease-out, transform 0.2s ease-out;
     }
 
     /* Swap icon on success */
@@ -935,8 +1032,18 @@ export function injectStyles(): void {
       background-image: url("${SUCCESS_ICON_SVG_URL}");
     }
 
-    /* Spinner when disabled (Loading) but not success/error */
-    .cqd-download-all-btn[disabled]:not(.cqd-all-success):not(.cqd-all-error) .cqd-download-all-icon {
+    /* Swap icon on cancel/cancelled with smooth transition */
+    .cqd-download-all-btn.cqd-all-cancel .cqd-download-all-icon,
+    .cqd-download-all-btn.cqd-all-cancelled .cqd-download-all-icon {
+      background-image: url("${CANCEL_ICON_SVG_URL}");
+      animation: none;
+      border: none;
+      width: 18px;
+      height: 18px;
+    }
+
+    /* Spinner when disabled (Loading) but not success/error/cancel */
+    .cqd-download-all-btn[disabled]:not(.cqd-all-success):not(.cqd-all-error):not(.cqd-all-cancel):not(.cqd-all-cancelled) .cqd-download-all-icon {
       background-image: none;
       border-radius: 9999px;
       width: ${SPINNER_SIZE_PX}px;

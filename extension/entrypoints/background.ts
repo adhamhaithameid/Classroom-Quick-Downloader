@@ -49,6 +49,7 @@ type PendingDownload = {
   confirmed403?: boolean;
   confirmedVirus?: boolean;
   finalized?: boolean;
+  isCancelled?: boolean;
 };
 
 // --- GLOBAL STATE ---
@@ -218,7 +219,8 @@ export default defineBackground(() => {
 
   // Tab updates: Switch icon based on URL
   chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-    if (changeInfo.status === 'loading' || changeInfo.url) {
+    // Trigger on loading, complete, or URL change for reliable SPA navigation detection
+    if (changeInfo.status === 'loading' || changeInfo.status === 'complete' || changeInfo.url) {
       updateTabIcon(tabId, tab.url);
     }
   });
@@ -227,6 +229,16 @@ export default defineBackground(() => {
     chrome.tabs.get(activeInfo.tabId, (tab) => {
       updateTabIcon(activeInfo.tabId, tab.url);
     });
+  });
+
+  /* -------------------------------------------------------
+   * 0) Icon update messages from content scripts
+   * -----------------------------------------------------*/
+  chrome.runtime.onMessage.addListener((message, sender) => {
+    if (message?.type === 'CQD_UPDATE_ICON' && sender.tab?.id != null) {
+      updateTabIcon(sender.tab.id, sender.tab.url);
+      return false;
+    }
   });
 
   /* -------------------------------------------------------
@@ -465,6 +477,7 @@ export default defineBackground(() => {
       tabId: sender.tab?.id,
       attemptedAuthUsers: [],
       fallbackStarted: false,
+      isCancelled: false, // New flag to track early cancellation
     };
 
     if (typeof initialAuthUser === 'number') {
@@ -485,7 +498,8 @@ export default defineBackground(() => {
 
     // ====== FIREFOX: Always use bypass tab for Drive ======
     if (IS_FIREFOX && isDrive) {
-      // Use authuser from Classroom URL if available (important for uni/work accounts)
+      if (pending.isCancelled) { cleanup(pending); return true; }
+      
       const bypassUrl = typeof pending.currentAuthUser === 'number'
         ? buildUrlWithAuthUser(pending.baseUrl, pending.currentAuthUser)
         : pending.baseUrl;
@@ -498,11 +512,20 @@ export default defineBackground(() => {
 
     // ====== CHROME/EDGE: Try native download first ======
     if (isDrive) {
+      if (pending.isCancelled) { cleanup(pending); return true; }
+      
       const firstUrl = typeof pending.currentAuthUser === 'number'
         ? buildUrlWithAuthUser(pending.baseUrl, pending.currentAuthUser)
         : pending.baseUrl;
 
       chrome.downloads.download({ url: firstUrl, saveAs: false, conflictAction: 'uniquify' }, (id) => {
+        // RACE CONDITION CHECK:
+        if (pending.isCancelled) {
+          if (id) chrome.downloads.cancel(id);
+          cleanup(pending, id);
+          return;
+        }
+
         if (chrome.runtime.lastError || !id) {
           recordDownloadEvent({ type: pending.fileMeta?.ext || 'unknown', status: 'fail', duration_ms: Date.now() - pending.startTime, bypass_used: true, error_type: 'BROWSER_START_FAIL' });
           if (!pending.fallbackStarted) {
@@ -519,10 +542,63 @@ export default defineBackground(() => {
         respondOnce({ started: true, requestId, downloadId: id });
       });
     } else {
+      if (pending.isCancelled) { cleanup(pending); return true; }
       startSingleAttempt(pending, respondOnce);
     }
-
+    
     return true;
+  });
+
+  /* -------------------------------------------------------
+   * 5) CQD_CANCEL_DOWNLOAD HANDLER
+   * -----------------------------------------------------*/
+  chrome.runtime.onMessage.addListener((message) => {
+    if (!message || message.type !== 'CQD_CANCEL_DOWNLOAD') return false;
+
+    const requestId = message.requestId as string | undefined;
+    if (!requestId) return false;
+
+    const pending = pendingByRequestId.get(requestId);
+    if (!pending) return false;
+    
+    // Mark as cancelled immediately to catch race conditions
+    pending.isCancelled = true;
+
+    // 1. Cancel the active browser download if it exists
+    if (pending.currentDownloadId != null) {
+      const downloadId = pending.currentDownloadId;
+      cancelledByUs.add(downloadId);
+      
+      try {
+        chrome.downloads.cancel(downloadId, () => {
+          chrome.downloads.erase({ id: downloadId }, () => {});
+        });
+      } catch { /* ignore */ }
+    } else {
+      console.log('[CQD] Cancelled before download ID assigned:', requestId);
+    }
+
+    // 2. Close any bypass tab (Firefox/fallback)
+    for (const [tabId, p] of pendingByBypassTabId.entries()) {
+      if (p.requestId === requestId) {
+        try { chrome.tabs.remove(tabId); } catch { /* ignore */ }
+        pendingByBypassTabId.delete(tabId);
+        break;
+      }
+    }
+
+    // 3. Record cancelled analytics
+    recordDownloadEvent({
+      type: pending.fileMeta?.ext || 'unknown',
+      status: 'cancelled',
+      duration_ms: Date.now() - pending.startTime,
+      bypass_used: pending.fallbackStarted || false,
+    });
+
+    // 4. Clean up all tracking maps
+    cleanup(pending);
+
+    return false; // No response needed
   });
 });
 

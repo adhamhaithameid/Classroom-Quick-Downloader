@@ -25,6 +25,7 @@ type SummaryResponse struct {
 		TotalDownloads int64 `json:"totalDownloads"`
 		TotalSuccess   int64 `json:"totalSuccess"`
 		TotalFail      int64 `json:"totalFail"`
+		TotalCancelled int64 `json:"totalCancelled"`
 	} `json:"totals"`
 
 	// Dimensional maps
@@ -92,7 +93,8 @@ func main() {
 		data.Totals.TotalDownloads,         // B: Total Downloads
 		data.Totals.TotalSuccess,           // C: Success Count
 		data.Totals.TotalFail,              // D: Fail Count
-		fmt.Sprintf("%.2f%%", successRate), // E: Success Rate
+		data.Totals.TotalCancelled,         // E: Cancelled Count
+		fmt.Sprintf("%.2f%%", successRate), // F: Success Rate
 
 		// Top Stats
 		data.TopBrowser, // F: Top Browser

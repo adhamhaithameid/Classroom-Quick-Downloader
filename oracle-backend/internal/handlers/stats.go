@@ -122,6 +122,9 @@ func SummaryHandler(db *sql.DB) http.HandlerFunc {
 			case key == "totalFail":
 				resp.Totals.TotalFail = val
 				resp.TotalFail = val // Flat field for Dashboard
+			// Cancelled count comes from status:cancelled
+			case key == "status:cancelled":
+				resp.Totals.TotalCancelled = val
 
 			// Breakdowns (Parsing "prefix:value" keys)
 			case strings.HasPrefix(key, "browser:"):

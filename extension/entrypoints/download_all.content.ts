@@ -2,6 +2,7 @@
 import { injectStyles } from './content/styles';
 import { t } from './content/i18n';
 import { isPageDark } from './content/theme';
+import { CANCEL_ICON_SVG_URL, DOWNLOAD_ICON_SVG_URL } from './content/icons';
 
 
 const DOWNLOAD_BTN_SELECTOR = '.cqd-download-all-btn';
@@ -11,7 +12,7 @@ const INJECTED_ATTR = 'data-cqd-injected';
 const GROUP_FEEDBACK_SUCCESS_MS = 3000;
 const MIN_FILES_FOR_DOWNLOAD_ALL = 2;
 
-type ButtonState = 'idle' | 'loading' | 'trying' | 'success' | 'error';
+type ButtonState = 'idle' | 'loading' | 'trying' | 'success' | 'error' | 'cancel' | 'cancelled';
 
 interface FileEntry {
   key: string;
@@ -27,6 +28,7 @@ interface GroupState {
   downloadAllBtn: HTMLButtonElement | null;
   activated: boolean;
   isBusy: boolean;
+  cancelPending: boolean; // True when cancel has been requested
   resetTimeoutId?: number;
   currentRunId?: number;
 }
@@ -38,6 +40,13 @@ const dirtyGroups = new Set<GroupState>();
 let refreshScheduled = false;
 
 import { subscribeToGlobalState } from './content/flags';
+import { getCancelHoldDelayMs } from './utils/analytics';
+
+// Cached cancel hold delay
+let cancelHoldDelayMs = 1000;
+getCancelHoldDelayMs().then((ms) => {
+  cancelHoldDelayMs = ms;
+}).catch(() => { /* ignore */ });
 
 
 
@@ -170,6 +179,7 @@ function registerSingleButton(btn: HTMLButtonElement): void {
       downloadAllBtn: null,
       activated: false,
       isBusy: false,
+      cancelPending: false,
     };
     groupStates.set(groupRoot, group);
   }
@@ -386,6 +396,7 @@ function updateGroupState(group: GroupState): void {
     let someSuccess = file.downloaded;
     let someError = file.failed;
     let someLoading = file.inProgress;
+    let someCancelled = false;
 
     for (const b of file.buttons) {
       if (!b.isConnected) continue;
@@ -394,15 +405,19 @@ function updateGroupState(group: GroupState): void {
       const isLoading = cls.contains('cqd-loading') || cls.contains('cqd-trying');
       const isSuccess = cls.contains('cqd-success') || ds.cqdAllDone === 'true';
       const isError = cls.contains('cqd-error');
+      const isCancelled = cls.contains('cqd-cancelled') || cls.contains('cqd-cancel');
 
       if (isLoading) someLoading = true;
       if (isSuccess) someSuccess = true;
       if (isError) someError = true;
+      if (isCancelled) someCancelled = true;
     }
 
     file.downloaded = someSuccess;
-    file.inProgress = someLoading;
-    file.failed = !file.downloaded && someError;
+    // Not in progress if cancelled
+    file.inProgress = someLoading && !someCancelled;
+    // Cancelled counts as failed (incomplete download)
+    file.failed = !file.downloaded && (someError || someCancelled);
 
     if (file.downloaded) downloaded++;
     else if (file.inProgress) inProgress++;
@@ -410,6 +425,16 @@ function updateGroupState(group: GroupState): void {
   }
 
   group.isBusy = inProgress > 0;
+  
+  console.log('[CQD] updateDownloadAllButtonState -', {
+    totalFiles,
+    downloaded,
+    failed,
+    inProgress,
+    isBusy: group.isBusy,
+    activated: group.activated,
+    cancelPending: group.cancelPending
+  });
 
   if (group.isBusy && group.resetTimeoutId != null) {
     window.clearTimeout(group.resetTimeoutId);
@@ -420,18 +445,65 @@ function updateGroupState(group: GroupState): void {
   const allSucceeded = downloaded === totalFiles && failed === 0 && totalFiles > 0;
   const allCompleted = downloaded + failed === totalFiles && inProgress === 0 && totalFiles > 0;
 
-  btn.disabled = true;
+  btn.disabled = false; // MUST be enabled to allow Cancel click!
   let mainText: string;
   let subText: string;
   let progressRatio = totalFiles > 0 ? downloaded / totalFiles : 0;
 
-  if (allSucceeded) {
+  // === REVERTED AUTO-SHOW CANCEL ===
+  // User requested to ONLY show cancel state on hover.
+  // BUT: If user IS hovering right now, we must ensure the state reflects that!
+  // Otherwise update() will wipe the hover state.
+  const isHovering = btn.matches(':hover');
+  
+  if (group.cancelPending) {
+    console.log('[CQD] Showing cancelled state');
+    btn.classList.remove('cqd-all-cancel', 'cqd-all-success', 'cqd-all-error');
+    btn.classList.add('cqd-all-cancelled');
+    mainText = t('cancelled') || 'Cancelled';
+    subText = '';
+    
+    // Clear the inline X icon - use cancelled/X icon from CSS class instead
+    const iconEl = btn.querySelector<HTMLElement>('.cqd-download-all-icon');
+    if (iconEl) {
+      iconEl.style.backgroundImage = ''; // Clear inline to let CSS take over
+    }
+    
+    // Schedule reset when all downloads are done (cancelled or otherwise)
+    if (inProgress === 0) {
+      scheduleGroupReset(group);
+    }
+  } else if (group.isBusy && group.activated && isHovering) {
+    // If busy and hovering, FORCE cancel state
+    // This fixes the issue where updates wipe the cancel state
+    btn.classList.remove('cqd-all-success', 'cqd-all-error');
+    btn.classList.add('cqd-all-cancel');
+    mainText = t('cancelAll') || 'Cancel All';
+    subText = '';
+
+    // Update icon to cancel/X
+    const iconEl = btn.querySelector<HTMLElement>('.cqd-download-all-icon');
+    if (iconEl) {
+      iconEl.style.transition = 'all 0.2s ease-out';
+      iconEl.style.backgroundImage = `url("${CANCEL_ICON_SVG_URL}")`;
+      iconEl.style.backgroundSize = '18px 18px';
+    }
+    
+  } else if (allSucceeded) {
+    // Clear inline icon style to revert to default checkmark/icon via class
+    const iconEl = btn.querySelector<HTMLElement>('.cqd-download-all-icon');
+    if (iconEl) iconEl.style.backgroundImage = '';
+    
     mainText = t('downloaded') || 'Downloaded';
     subText = `${downloaded} / ${totalFiles}`;
     btn.classList.add('cqd-all-success');
     progressRatio = 1;
     scheduleGroupReset(group);
   } else if (allCompleted && failed > 0) {
+    // Clear inline icon style
+    const iconEl = btn.querySelector<HTMLElement>('.cqd-download-all-icon');
+    if (iconEl) iconEl.style.backgroundImage = '';
+    
     if (downloaded === 0) {
       mainText = t('error') || 'Error';
       subText = `${failed} failed`;
@@ -444,6 +516,10 @@ function updateGroupState(group: GroupState): void {
     }
     scheduleGroupReset(group);
   } else {
+    // Clear inline icon style
+    const iconEl = btn.querySelector<HTMLElement>('.cqd-download-all-icon');
+    if (iconEl) iconEl.style.backgroundImage = '';
+    
     mainText = t('downloading') || 'Downloading…';
     if (failed === 0) {
       subText = `${downloaded} → ${totalFiles}`;
@@ -463,6 +539,7 @@ function scheduleGroupReset(group: GroupState): void {
     group.resetTimeoutId = undefined;
     group.activated = false;
     group.isBusy = false;
+    group.cancelPending = false; // CRITICAL: Reset cancel flag
     group.currentRunId = undefined;
     try {
       delete group.root.dataset.cqdGroupActive;
@@ -474,9 +551,41 @@ function scheduleGroupReset(group: GroupState): void {
       file.failed = false;
       file.inProgress = false;
     }
+    // Also trigger visual reset (just in case observer missed it or for safety)
+    resetGroupVisuals(group);
+    
     markGroupDirty(group);
     scheduleRefresh();
   }, GROUP_FEEDBACK_SUCCESS_MS);
+}
+
+function resetGroupVisuals(group: GroupState): void {
+  for (const file of group.files.values()) {
+    for (const btn of file.buttons) {
+      if (!btn.isConnected) continue;
+      
+      // Remove all state classes
+      btn.classList.remove('cqd-loading', 'cqd-trying', 'cqd-success', 'cqd-error', 'cqd-cancel', 'cqd-cancelled');
+      btn.disabled = false;
+      
+      // Reset label
+      const label = btn.querySelector<HTMLSpanElement>('.cqd-label');
+      if (label) label.textContent = t('download') || 'Download';
+      
+      // Reset icon to download icon
+      const icon = btn.querySelector<HTMLElement>('.cqd-download-icon');
+      if (icon) {
+        icon.classList.remove('cqd-spinner', 'cqd-spin');
+        icon.className = 'cqd-download-icon';
+        icon.style.backgroundImage = `url("${DOWNLOAD_ICON_SVG_URL}")`;
+        icon.style.backgroundSize = '';
+      }
+      
+      // Clear error detail
+      const errorDetail = btn.querySelector<HTMLElement>('.cqd-error-detail');
+      if (errorDetail) errorDetail.textContent = '';
+    }
+  }
 }
 
 function findHeaderContainer(root: HTMLElement): HTMLElement | null {
@@ -574,6 +683,29 @@ function ensureDownloadAllButton(group: GroupState): HTMLButtonElement {
   button.appendChild(mainSpan);
   button.appendChild(subSpan);
 
+  // Sync Observer: Force individual buttons to reset when Download All button resets
+  const syncObserver = new MutationObserver((mutations) => {
+    for (const m of mutations) {
+      if (m.attributeName === 'class') {
+        const oldClasses = m.oldValue || '';
+        const wasCancelled = oldClasses.includes('cqd-all-cancelled');
+        const wasSuccess = oldClasses.includes('cqd-all-success');
+        const wasError = oldClasses.includes('cqd-all-error');
+        
+        const isCancelled = button.classList.contains('cqd-all-cancelled');
+        const isSuccess = button.classList.contains('cqd-all-success');
+        const isError = button.classList.contains('cqd-all-error');
+        
+        // If transitioned from any terminal state to idle
+        if ((wasCancelled || wasSuccess || wasError) && !isCancelled && !isSuccess && !isError) {
+          console.log('[CQD] Sync reset triggered by class change');
+          resetGroupVisuals(group);
+        }
+      }
+    }
+  });
+  syncObserver.observe(button, { attributes: true, attributeFilter: ['class'], attributeOldValue: true });
+
   const computed = window.getComputedStyle(targetContainer);
   if (computed.position === 'static') {
     targetContainer.style.position = 'relative';
@@ -582,7 +714,63 @@ function ensureDownloadAllButton(group: GroupState): HTMLButtonElement {
   button.addEventListener('click', (e) => {
     e.preventDefault();
     e.stopPropagation();
-    handleDownloadAllClick(group);
+    
+    console.log('[CQD] Button clicked. State:', { 
+      isBusy: group.isBusy, 
+      activated: group.activated, 
+      cancelPending: group.cancelPending,
+      filesInProgress: Array.from(group.files.values()).filter(f => f.inProgress).length
+    });
+    
+    // Check actual group state, not just CSS class (user might click without hovering)
+    if (group.isBusy && group.activated && !group.cancelPending) {
+      console.log('[CQD] ✅ Cancel All button clicked - calling handler');
+      handleCancelAllClick(group);
+    } else if (!group.activated || !group.isBusy) {
+      console.log('[CQD] ✅ Download All button clicked - calling handler');
+      handleDownloadAllClick(group);
+    } else {
+      console.log('[CQD] ⚠️ Button clicked but already cancelled or not in valid state');
+    }
+  });
+
+  let hoverTimeout: number | undefined;
+
+  // Hover handlers for cancel state - shows IMMEDIATELY on hover
+  button.addEventListener('mouseenter', () => {
+    console.log('[CQD] Mouse enter. isBusy:', group.isBusy, 'activated:', group.activated);
+    if (group.isBusy && group.activated && !group.cancelPending) {
+      button.classList.add('cqd-all-cancel');
+      const mainSpan = button.querySelector<HTMLElement>('.cqd-download-all-main');
+      const subSpan = button.querySelector<HTMLElement>('.cqd-download-all-sub');
+      const iconEl = button.querySelector<HTMLElement>('.cqd-download-all-icon');
+      if (mainSpan) mainSpan.textContent = t('cancelAll') || 'Cancel All';
+      if (subSpan) subSpan.textContent = '';
+      // Show X icon for cancel with smooth transition
+      if (iconEl) {
+        iconEl.style.transition = 'all 0.2s ease-out';
+        iconEl.style.backgroundImage = `url("${CANCEL_ICON_SVG_URL}")`;
+        iconEl.style.backgroundSize = '18px 18px';
+      }
+    }
+  });
+
+  button.addEventListener('mouseleave', () => {
+    if (hoverTimeout) {
+      window.clearTimeout(hoverTimeout);
+      hoverTimeout = undefined;
+    }
+    if (button.classList.contains('cqd-all-cancel') && !group.cancelPending) {
+      button.classList.remove('cqd-all-cancel');
+      // Restore original icon
+      const iconEl = button.querySelector<HTMLElement>('.cqd-download-all-icon');
+      if (iconEl) {
+        iconEl.style.backgroundImage = '';
+        iconEl.style.backgroundSize = '';
+      }
+      markGroupDirty(group);
+      scheduleRefresh();
+    }
   });
 
   if (isPostHeader && headerContainer) {
@@ -719,22 +907,142 @@ function handleDownloadAllClick(group: GroupState): void {
   }
 
   const btn = group.downloadAllBtn;
-  if (btn) {
-    btn.disabled = true;
-  }
+  // Note: Don't disable button - user needs to be able to click Cancel All
 
   for (const file of group.files.values()) {
     const primary = getPrimaryButton(file);
     if (!primary) continue;
 
     const s = getSingleButtonState(primary);
-    if (s === 'idle' || s === 'error') {
+    // Include 'cancelled' so previously cancelled downloads can be restarted
+    if (s === 'idle' || s === 'error' || s === 'cancelled') {
       primary.click();
     }
   }
 
   markGroupDirty(group);
   scheduleRefresh();
+}
+
+function handleCancelAllClick(group: GroupState): void {
+  if (!group.activated || !group.isBusy) return;
+  if (group.cancelPending) return;
+
+  console.log('[CQD] Cancel All clicked - group has', group.files.size, 'files');
+
+  group.cancelPending = true;
+  let cancelledCount = 0;
+  let requestIdFoundCount = 0;
+  let messagesSentCount = 0;
+
+  const btn = group.downloadAllBtn;
+  if (btn) {
+    btn.classList.remove('cqd-all-cancel');
+    btn.classList.add('cqd-all-cancelled');
+    const mainSpan = btn.querySelector<HTMLElement>('.cqd-download-all-main');
+    const subSpan = btn.querySelector<HTMLElement>('.cqd-download-all-sub');
+    const iconEl = btn.querySelector<HTMLElement>('.cqd-download-all-icon');
+    if (mainSpan) mainSpan.textContent = t('cancelled') || 'Cancelled';
+    if (subSpan) subSpan.textContent = '';
+    // Show X icon for cancelled state
+    if (iconEl) {
+      iconEl.style.backgroundImage = `url("${CANCEL_ICON_SVG_URL}")`;
+      iconEl.style.backgroundSize = '18px 18px';
+    }
+    // Note: Don't disable button - updateDownloadAllButtonState handles state
+  }
+
+  // Cancel all in-progress files by sending cancel messages directly
+  for (const file of group.files.values()) {
+    if (!file.inProgress) continue;
+    const primary = getPrimaryButton(file);
+    if (!primary) continue;
+
+    const fileName = (primary.dataset as any).cqdName || 'unknown';
+    console.log('[CQD] Processing file for cancellation:', fileName);
+
+    // Mark file as cancelled
+    file.inProgress = false;
+    file.failed = true;
+    cancelledCount++;
+
+    // Check if requestId exists in dataset
+    const requestId = (primary.dataset as any).cqdRequestId;
+    console.log('[CQD] Button requestId from dataset:', requestId, '| button:', primary);
+    
+    if (requestId) {
+      requestIdFoundCount++;
+      if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+        try {
+          chrome.runtime.sendMessage({type: 'CQD_CANCEL_DOWNLOAD', requestId });
+          messagesSentCount++;
+          console.log('[CQD] ✅ Sent cancel message for:', fileName, '| requestId:', requestId);
+        } catch (err) {
+          console.error('[CQD] ❌ Failed to send cancel message for:', fileName, '| error:', err);
+        }
+      } else {
+        console.warn('[CQD] ⚠️ chrome.runtime not available');
+      }
+    } else {
+      console.error('[CQD] ❌ NO requestId found in button dataset for:', fileName);
+      console.log('[CQD] Button dataset:', primary.dataset);
+    }
+    
+    // Update button visual state to cancelled - remove ALL state classes first
+    primary.classList.remove('cqd-loading', 'cqd-trying', 'cqd-cancel', 'cqd-cancelled', 'cqd-success', 'cqd-error');
+    primary.classList.add('cqd-cancelled');
+    
+    // Update button label and icon
+    const label = primary.querySelector<HTMLSpanElement>('.cqd-label');
+    const icon = primary.querySelector<HTMLElement>('.cqd-download-icon');
+    if (label) {
+      label.textContent = t('cancelled') || 'Cancelled';
+    }
+    if (icon) {
+      // Remove spinner animation classes
+      icon.classList.remove('cqd-spinner', 'cqd-spin');
+      icon.className = 'cqd-download-icon'; // Reset to base class
+      // Set cancel/X icon
+      icon.style.backgroundImage = `url("${CANCEL_ICON_SVG_URL}")`;
+      icon.style.backgroundSize = '20px 20px';
+    }
+  }
+
+  console.log('[CQD] Cancel All Summary:');
+  console.log('  - Files processed:', cancelledCount);
+  console.log('  - RequestIDs found:', requestIdFoundCount);
+  console.log('  - Cancel messages sent:', messagesSentCount);
+
+  // Update group state immediately to reflect cancellations
+  markGroupDirty(group);
+  scheduleRefresh();
+
+  // Reset group after a short delay
+  if (group.resetTimeoutId != null) {
+    window.clearTimeout(group.resetTimeoutId);
+  }
+  group.resetTimeoutId = window.setTimeout(() => {
+    group.resetTimeoutId = undefined;
+    group.activated = false;
+    group.isBusy = false;
+    group.cancelPending = false;
+    group.currentRunId = undefined;
+    try {
+      delete group.root.dataset.cqdGroupActive;
+    } catch {
+      /* ignore */
+    }
+    for (const file of group.files.values()) {
+      file.downloaded = false;
+      file.failed = false;
+      file.inProgress = false;
+    }
+    if (btn) {
+      btn.classList.remove('cqd-all-cancelled');
+    }
+    markGroupDirty(group);
+    scheduleRefresh();
+  }, 1500);
 }
 
 function getSingleButtonState(btn: HTMLButtonElement): ButtonState {

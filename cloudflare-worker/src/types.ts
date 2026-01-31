@@ -5,7 +5,7 @@
  * This matches what the browser extension sends to /track.
  */
 export interface StoredEvent {
-  status: "success" | "fail";
+  status: "success" | "fail" | "cancelled";
   file_type: string;
   browser: string;
   os: string;

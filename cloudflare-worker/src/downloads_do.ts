@@ -27,6 +27,7 @@ type DurableStateShape = {
   totalDownloads: number;
   totalSuccess: number;
   totalFail: number;
+  totalCancelled: number;
   pendingEvents: number;
   lastEventAt: number | null;
   lastFlushAt: number | null;
@@ -87,6 +88,10 @@ type DurableStateShape = {
     mid: number;   // 15-35 events  
     high: number;  // 35+ events
   };
+
+  // Cancel hold delay: time in ms before cancel button becomes active (default: 1000ms)
+  // Range: 0-10000ms. Configurable from dashboard to prevent accidental cancels.
+  configCancelHoldDelayMs: number;
 };
 
 const DEFAULT_COUNTERS: Counters = {
@@ -226,6 +231,7 @@ export class DownloadsDurable {
       totalDownloads: 0,
       totalSuccess: 0,
       totalFail: 0,
+      totalCancelled: 0,
       pendingEvents: 0,
       lastEventAt: null,
       lastFlushAt: null,
@@ -251,6 +257,7 @@ export class DownloadsDurable {
       configMaxBufferSize: 50000,
       configFlushMode: 'next_day',
       configTimeFlushMinutes: { low: 1440, mid: 1440, high: 1440 }, // 1440 = 24h = next day
+      configCancelHoldDelayMs: 1000, // 1 second default
     };
 
     if (!stored) {
@@ -264,6 +271,7 @@ export class DownloadsDurable {
       totalDownloads: stored.totalDownloads ?? base.totalDownloads,
       totalSuccess: stored.totalSuccess ?? base.totalSuccess,
       totalFail: stored.totalFail ?? base.totalFail,
+      totalCancelled: stored.totalCancelled ?? base.totalCancelled,
       pendingEvents: stored.pendingEvents ?? base.pendingEvents,
       lastEventAt: stored.lastEventAt ?? base.lastEventAt,
       lastFlushAt: stored.lastFlushAt ?? base.lastFlushAt,
@@ -303,6 +311,7 @@ export class DownloadsDurable {
       configMaxBufferSize: stored.configMaxBufferSize ?? base.configMaxBufferSize,
       configFlushMode: stored.configFlushMode ?? base.configFlushMode,
       configTimeFlushMinutes: stored.configTimeFlushMinutes ?? base.configTimeFlushMinutes,
+      configCancelHoldDelayMs: stored.configCancelHoldDelayMs ?? base.configCancelHoldDelayMs,
     };
 
     // Ensure midnight alarm is scheduled
@@ -568,7 +577,7 @@ export class DownloadsDurable {
       }
 
       // ----- VALIDATION: Required fields -----
-      if (!ev.status || (ev.status !== "success" && ev.status !== "fail")) {
+      if (!ev.status || (ev.status !== "success" && ev.status !== "fail" && ev.status !== "cancelled")) {
         invalidCount++;
         continue;
       }
@@ -596,6 +605,8 @@ export class DownloadsDurable {
 
       if (ev.status === "success") {
         this.d.totalSuccess += 1;
+      } else if (ev.status === "cancelled") {
+        this.d.totalCancelled += 1;
       } else {
         this.d.totalFail += 1;
       }
@@ -707,6 +718,7 @@ export class DownloadsDurable {
       totalDownloads: this.d.totalDownloads ?? 0,
       totalSuccess: this.d.totalSuccess ?? 0,
       totalFail: this.d.totalFail ?? 0,
+      totalCancelled: this.d.totalCancelled ?? 0,
       pendingEvents: this.d.pendingEvents ?? 0,
       lastEventAt: this.d.lastEventAt ?? null,
       lastFlushAt: this.d.lastFlushAt ?? null,
@@ -758,6 +770,9 @@ export class DownloadsDurable {
       // Remote enabled (can be disabled for emergencies)
       remoteEnabled: quota.remoteEnabled,
       
+      // Cancel hold delay: time before cancel becomes active (default 1000ms)
+      cancelHoldDelayMs: this.d.configCancelHoldDelayMs,
+      
       // Quota info for extension awareness
       quota,
     };
@@ -795,6 +810,7 @@ export class DownloadsDurable {
       configMaxBufferSize: this.d.configMaxBufferSize ?? 50000,
       configFlushMode: this.d.configFlushMode ?? 'next_day' as const,
       configTimeFlushMinutes: this.d.configTimeFlushMinutes ?? { low: 1440, mid: 1440, high: 1440 },
+      configCancelHoldDelayMs: this.d.configCancelHoldDelayMs ?? 1000,
     };
     
     this.data = {
@@ -802,6 +818,7 @@ export class DownloadsDurable {
       totalDownloads: 0,
       totalSuccess: 0,
       totalFail: 0,
+      totalCancelled: 0,
       pendingEvents: 0,
       lastEventAt: null,
       lastFlushAt: null,
