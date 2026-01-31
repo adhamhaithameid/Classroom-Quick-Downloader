@@ -1023,6 +1023,8 @@ export function injectStyles(): void {
       background-position: center;
       background-size: 18px 18px;
       flex-shrink: 0;
+      /* Smooth icon transitions */
+      transition: background-image 0.2s ease-out, transform 0.2s ease-out;
     }
 
     /* Swap icon on success */
@@ -1030,7 +1032,7 @@ export function injectStyles(): void {
       background-image: url("${SUCCESS_ICON_SVG_URL}");
     }
 
-    /* Swap icon on cancel/cancelled */
+    /* Swap icon on cancel/cancelled with smooth transition */
     .cqd-download-all-btn.cqd-all-cancel .cqd-download-all-icon,
     .cqd-download-all-btn.cqd-all-cancelled .cqd-download-all-icon {
       background-image: url("${CANCEL_ICON_SVG_URL}");

@@ -598,15 +598,22 @@ function ensureDownloadAllButton(group: GroupState): HTMLButtonElement {
     e.preventDefault();
     e.stopPropagation();
     
+    console.log('[CQD] Button clicked. State:', { 
+      isBusy: group.isBusy, 
+      activated: group.activated, 
+      cancelPending: group.cancelPending,
+      filesInProgress: Array.from(group.files.values()).filter(f => f.inProgress).length
+    });
+    
     // Check actual group state, not just CSS class (user might click without hovering)
     if (group.isBusy && group.activated && !group.cancelPending) {
-      console.log('[CQD] Cancel All button clicked - calling handler');
+      console.log('[CQD] ✅ Cancel All button clicked - calling handler');
       handleCancelAllClick(group);
     } else if (!group.activated || !group.isBusy) {
-      console.log('[CQD] Download All button clicked - calling handler');
+      console.log('[CQD] ✅ Download All button clicked - calling handler');
       handleDownloadAllClick(group);
     } else {
-      console.log('[CQD] Button clicked but already cancelled or not in valid state');
+      console.log('[CQD] ⚠️ Button clicked but already cancelled or not in valid state');
     }
   });
 
@@ -614,6 +621,7 @@ function ensureDownloadAllButton(group: GroupState): HTMLButtonElement {
 
   // Hover handlers for cancel state - shows IMMEDIATELY on hover
   button.addEventListener('mouseenter', () => {
+    console.log('[CQD] Mouse enter. isBusy:', group.isBusy, 'activated:', group.activated);
     if (group.isBusy && group.activated && !group.cancelPending) {
       button.classList.add('cqd-all-cancel');
       const mainSpan = button.querySelector<HTMLElement>('.cqd-download-all-main');
@@ -621,8 +629,9 @@ function ensureDownloadAllButton(group: GroupState): HTMLButtonElement {
       const iconEl = button.querySelector<HTMLElement>('.cqd-download-all-icon');
       if (mainSpan) mainSpan.textContent = t('cancelAll') || 'Cancel All';
       if (subSpan) subSpan.textContent = '';
-      // Show X icon for cancel
+      // Show X icon for cancel with smooth transition
       if (iconEl) {
+        iconEl.style.transition = 'all 0.2s ease-out';
         iconEl.style.backgroundImage = `url("${CANCEL_ICON_SVG_URL}")`;
         iconEl.style.backgroundSize = '18px 18px';
       }
