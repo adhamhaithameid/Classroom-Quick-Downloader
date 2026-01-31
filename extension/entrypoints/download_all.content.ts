@@ -425,6 +425,16 @@ function updateGroupState(group: GroupState): void {
   }
 
   group.isBusy = inProgress > 0;
+  
+  console.log('[CQD] updateDownloadAllButtonState -', {
+    totalFiles,
+    downloaded,
+    failed,
+    inProgress,
+    isBusy: group.isBusy,
+    activated: group.activated,
+    cancelPending: group.cancelPending
+  });
 
   if (group.isBusy && group.resetTimeoutId != null) {
     window.clearTimeout(group.resetTimeoutId);
@@ -440,7 +450,29 @@ function updateGroupState(group: GroupState): void {
   let subText: string;
   let progressRatio = totalFiles > 0 ? downloaded / totalFiles : 0;
 
-  if (allSucceeded) {
+  // === AUTO-SHOW CANCEL STATE WHEN DOWNLOADS ARE ACTIVE ===
+  // Critical UX fix: Show cancel immediately, don't wait for hover
+  if (group.isBusy && group.activated && !group.cancelPending && inProgress > 0) {
+    console.log('[CQD] Auto-showing cancel state - downloads in progress');
+    btn.classList.remove('cqd-all-success', 'cqd-all-error');
+    btn.classList.add('cqd-all-cancel');
+    mainText = t('cancelAll') || 'Cancel All';
+    subText = `${inProgress} in progress`;
+    
+    // Update icon to cancel/X
+    const iconEl = btn.querySelector<HTMLElement>('.cqd-download-all-icon');
+    if (iconEl) {
+      iconEl.style.transition = 'all 0.2s ease-out';
+      iconEl.style.backgroundImage = `url("${CANCEL_ICON_SVG_URL}")`;
+      iconEl.style.backgroundSize = '18px 18px';
+    }
+  } else if (group.cancelPending) {
+    console.log('[CQD] Showing cancelled state');
+    btn.classList.remove('cqd-all-cancel', 'cqd-all-success', 'cqd-all-error');
+    btn.classList.add('cqd-all-cancelled');
+    mainText = t('cancelled') || 'Cancelled';
+    subText = '';
+  } else if (allSucceeded) {
     mainText = t('downloaded') || 'Downloaded';
     subText = `${downloaded} / ${totalFiles}`;
     btn.classList.add('cqd-all-success');
