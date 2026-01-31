@@ -698,30 +698,33 @@ function createDownloadButton(
   let hoverTimeout: number | undefined;
 
   // Hover handlers for loading → cancel state transition
-  // Cancel button appears IMMEDIATELY on hover (no delay)
+  // Cancel button appears ONLY when hovering over loading/trying state
   button.addEventListener('mouseenter', () => {
+    (button.dataset as any).cqdMouseOver = 'true';
+    
     const state = getButtonState(button);
     if (state === 'loading' || state === 'trying') {
-      // Show cancel immediately - user can cancel anytime
-      (button.dataset as any).cqdWasLoadingBeforeHover = 'true';
+      // Show cancel immediately when hovering over active download
       setButtonState(button, 'cancel');
     }
   });
 
   button.addEventListener('mouseleave', () => {
+    delete (button.dataset as any).cqdMouseOver;
+    
     if (hoverTimeout) {
       window.clearTimeout(hoverTimeout);
       hoverTimeout = undefined;
     }
+    
     const state = getButtonState(button);
-    const wasLoadingBeforeHover = (button.dataset as any).cqdWasLoadingBeforeHover === 'true';
-    if (state === 'cancel' && wasLoadingBeforeHover) {
-      // Only revert if download is still pending
+    if (state === 'cancel') {
+      // Revert to loading state when mouse leaves
+      // Check if download is still pending
       const pending = findPendingButtonByElement(button);
       if (pending) {
         setButtonState(button, 'loading');
       }
-      delete (button.dataset as any).cqdWasLoadingBeforeHover;
     }
   });
 
@@ -733,7 +736,7 @@ function createDownloadButton(
     
     // If in cancel state, trigger cancellation
     if (currentState === 'cancel') {
-      delete (button.dataset as any).cqdWasLoadingBeforeHover;
+      delete (button.dataset as any).cqdMouseOver;
       await handleCancelClick(button);
       return;
     }
@@ -817,15 +820,8 @@ async function handleSingleDownloadClick(
 
   setButtonState(button, 'loading');
 
-  // Since the user just clicked, the mouse is still over the button.
-  // Show cancel state immediately - no need to wait for mouseenter event.
-  // Use requestAnimationFrame to ensure the button is in loading state first.
-  requestAnimationFrame(() => {
-    if (getButtonState(button) === 'loading' && pendingButtons.has(requestId)) {
-      (button.dataset as any).cqdWasLoadingBeforeHover = 'true';
-      setButtonState(button, 'cancel');
-    }
-  });
+  // Note: Cancel state will only appear if user hovers over the button
+  // No automatic cancel state - respects the new priority system
 
   // *** PRE-DOWNLOAD DELAY ***
   // Wait for cancelHoldDelayMs before starting the actual download.
@@ -1017,6 +1013,13 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
  * ---------------------------------------------------*/
 function initContentScript(): void {
   if (!isGoogleClassroom()) return;
+
+  // Request icon update to ensure colored icon on Classroom
+  try {
+    chrome.runtime.sendMessage({ type: 'CQD_UPDATE_ICON' });
+  } catch {
+    // Ignore errors
+  }
 
   // Subscribe to global enable/disable state.
   // This handles both initial state and dynamic changes.
