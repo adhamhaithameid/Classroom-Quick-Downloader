@@ -450,23 +450,10 @@ function updateGroupState(group: GroupState): void {
   let subText: string;
   let progressRatio = totalFiles > 0 ? downloaded / totalFiles : 0;
 
-  // === AUTO-SHOW CANCEL STATE WHEN DOWNLOADS ARE ACTIVE ===
-  // Critical UX fix: Show cancel immediately, don't wait for hover
-  if (group.isBusy && group.activated && !group.cancelPending && inProgress > 0) {
-    console.log('[CQD] Auto-showing cancel state - downloads in progress');
-    btn.classList.remove('cqd-all-success', 'cqd-all-error');
-    btn.classList.add('cqd-all-cancel');
-    mainText = t('cancelAll') || 'Cancel All';
-    subText = `${inProgress} in progress`;
-    
-    // Update icon to cancel/X
-    const iconEl = btn.querySelector<HTMLElement>('.cqd-download-all-icon');
-    if (iconEl) {
-      iconEl.style.transition = 'all 0.2s ease-out';
-      iconEl.style.backgroundImage = `url("${CANCEL_ICON_SVG_URL}")`;
-      iconEl.style.backgroundSize = '18px 18px';
-    }
-  } else if (group.cancelPending) {
+  // === REVERTED AUTO-SHOW CANCEL ===
+  // User requested to ONLY show cancel state on hover
+  // So we don't force 'cqd-all-cancel' unless user is hovering
+  if (group.cancelPending) {
     console.log('[CQD] Showing cancelled state');
     btn.classList.remove('cqd-all-cancel', 'cqd-all-success', 'cqd-all-error');
     btn.classList.add('cqd-all-cancelled');

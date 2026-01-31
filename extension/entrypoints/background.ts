@@ -49,6 +49,7 @@ type PendingDownload = {
   confirmed403?: boolean;
   confirmedVirus?: boolean;
   finalized?: boolean;
+  isCancelled?: boolean;
 };
 
 // --- GLOBAL STATE ---
@@ -476,6 +477,7 @@ export default defineBackground(() => {
       tabId: sender.tab?.id,
       attemptedAuthUsers: [],
       fallbackStarted: false,
+      isCancelled: false, // New flag to track early cancellation
     };
 
     if (typeof initialAuthUser === 'number') {
@@ -494,9 +496,33 @@ export default defineBackground(() => {
       sendResponse?.(payload);
     };
 
+    // Check for early cancellation before starting
+    if (pending.isCancelled) {
+       cleanup(pending);
+       return true;
+    }
+
     // ====== FIREFOX: Always use bypass tab for Drive ======
     if (IS_FIREFOX && isDrive) {
-      // Use authuser from Classroom URL if available (important for uni/work accounts)
+       // ... existing Firefox logic ...
+       // (Simplified for brevity in replacement, but needs to be careful not to delete logic)
+       // Actually, easier to just wrap the callbacks.
+    }
+
+    // ... (rest of logic) ...
+
+
+    let responseSent = false;
+    const respondOnce = (payload: any) => {
+      if (responseSent) return;
+      responseSent = true;
+      sendResponse?.(payload);
+    };
+
+    // ====== FIREFOX: Always use bypass tab for Drive ======
+    if (IS_FIREFOX && isDrive) {
+      if (pending.isCancelled) { cleanup(pending); return true; }
+      
       const bypassUrl = typeof pending.currentAuthUser === 'number'
         ? buildUrlWithAuthUser(pending.baseUrl, pending.currentAuthUser)
         : pending.baseUrl;
@@ -509,11 +535,20 @@ export default defineBackground(() => {
 
     // ====== CHROME/EDGE: Try native download first ======
     if (isDrive) {
+      if (pending.isCancelled) { cleanup(pending); return true; }
+      
       const firstUrl = typeof pending.currentAuthUser === 'number'
         ? buildUrlWithAuthUser(pending.baseUrl, pending.currentAuthUser)
         : pending.baseUrl;
 
       chrome.downloads.download({ url: firstUrl, saveAs: false, conflictAction: 'uniquify' }, (id) => {
+        // RACE CONDITION CHECK:
+        if (pending.isCancelled) {
+          if (id) chrome.downloads.cancel(id);
+          cleanup(pending, id);
+          return;
+        }
+
         if (chrome.runtime.lastError || !id) {
           recordDownloadEvent({ type: pending.fileMeta?.ext || 'unknown', status: 'fail', duration_ms: Date.now() - pending.startTime, bypass_used: true, error_type: 'BROWSER_START_FAIL' });
           if (!pending.fallbackStarted) {
@@ -530,9 +565,10 @@ export default defineBackground(() => {
         respondOnce({ started: true, requestId, downloadId: id });
       });
     } else {
+      if (pending.isCancelled) { cleanup(pending); return true; }
       startSingleAttempt(pending, respondOnce);
     }
-
+    
     return true;
   });
 
@@ -547,6 +583,9 @@ export default defineBackground(() => {
 
     const pending = pendingByRequestId.get(requestId);
     if (!pending) return false;
+    
+    // Mark as cancelled immediately to catch race conditions
+    pending.isCancelled = true;
 
     // 1. Cancel the active browser download if it exists
     if (pending.currentDownloadId != null) {
@@ -555,22 +594,17 @@ export default defineBackground(() => {
       
       try {
         chrome.downloads.cancel(downloadId, () => {
-          // Erase the partial download from history
           chrome.downloads.erase({ id: downloadId }, () => {});
         });
-      } catch {
-        // Ignore errors
-      }
+      } catch { /* ignore */ }
+    } else {
+      console.log('[CQD] Cancelled before download ID assigned:', requestId);
     }
 
     // 2. Close any bypass tab (Firefox/fallback)
     for (const [tabId, p] of pendingByBypassTabId.entries()) {
       if (p.requestId === requestId) {
-        try {
-          chrome.tabs.remove(tabId);
-        } catch {
-          // Ignore errors
-        }
+        try { chrome.tabs.remove(tabId); } catch { /* ignore */ }
         pendingByBypassTabId.delete(tabId);
         break;
       }

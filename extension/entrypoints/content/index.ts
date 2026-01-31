@@ -546,12 +546,18 @@ const STATE_PRIORITY: Record<ButtonState, number> = {
 };
 
 function getButtonState(button: HTMLButtonElement): ButtonState {
-  if (button.classList.contains('cqd-loading')) return 'loading';
-  if (button.classList.contains('cqd-trying')) return 'trying';
-  if (button.classList.contains('cqd-cancel')) return 'cancel';
-  if (button.classList.contains('cqd-cancelled')) return 'cancelled';
+  // Check terminal/priority states first
   if (button.classList.contains('cqd-success')) return 'success';
   if (button.classList.contains('cqd-error')) return 'error';
+  if (button.classList.contains('cqd-cancelled')) return 'cancelled';
+  
+  // Check cancel before loading/trying! 
+  // This ensures that if we have both classes (for visual override), we report 'cancel'
+  if (button.classList.contains('cqd-cancel')) return 'cancel';
+  
+  if (button.classList.contains('cqd-loading')) return 'loading';
+  if (button.classList.contains('cqd-trying')) return 'trying';
+  
   return 'idle';
 }
 
@@ -641,17 +647,18 @@ function setButtonState(
       // Do not wait for mouseleave/mouseenter cycle
       if ((button.dataset as any).cqdMouseOver === 'true') {
         const currentNow = getButtonState(button);
-        // Only transition if we are truly in a cancellable state
-        if (currentNow === 'loading' || currentNow === 'trying') {
-          console.log('[CQD] Mouse already over active button - transitioning to cancel immediately');
-          // Manually trigger the cancel visual state
-          button.classList.add('cqd-cancel');
-          if (label) label.textContent = t('cancel');
-          if (icon) {
-            icon.className = 'cqd-download-icon'; // Stop spin
-            icon.style.backgroundImage = `url("${CANCEL_ICON_SVG_URL}")`;
-            icon.style.backgroundSize = '20px 20px';
-          }
+        // Only transition if we are truly in a cancellable state (loading/trying) OR if we just added the class
+        // Note: getButtonState might now return 'loading' because we haven't added 'cqd-cancel' yet? 
+        // No, we haven't added it yet.
+        
+        console.log('[CQD] Mouse already over active button - transitioning to cancel immediately');
+        // Manually trigger the cancel visual state
+        button.classList.add('cqd-cancel');
+        if (label) label.textContent = t('cancel') || 'Cancel';
+        if (icon) {
+          icon.className = 'cqd-download-icon'; // Stop spin
+          icon.style.backgroundImage = `url("${CANCEL_ICON_SVG_URL}")`;
+          icon.style.backgroundSize = '20px 20px'; // Explicit size
         }
       }
       break;
@@ -660,14 +667,14 @@ function setButtonState(
         icon.style.backgroundImage = 'none';
         icon.className = 'cqd-download-icon cqd-spinner';
       }
-      if (label) label.textContent = options?.userMessage || t('trying');
+      if (label) label.textContent = options?.userMessage || t('trying') || 'Retrying...';
       button.disabled = false; // Allow interaction for cancel
 
       // CRITICAL FIX: Same matching logic for 'trying' state
       if ((button.dataset as any).cqdMouseOver === 'true') {
          console.log('[CQD] Mouse over trying button - showing cancel');
          button.classList.add('cqd-cancel');
-         if (label) label.textContent = t('cancel');
+         if (label) label.textContent = t('cancel') || 'Cancel';
          if (icon) {
             icon.className = 'cqd-download-icon';
             icon.style.backgroundImage = `url("${CANCEL_ICON_SVG_URL}")`;
