@@ -1187,22 +1187,14 @@ async function waitForSuccessReset(button: HTMLButtonElement): Promise<void> {
       return;
     }
     
-    // Force reset if max time exceeded
+    // Force reset if max time exceeded - always allow re-download after 5s
     if (Date.now() >= maxReset) {
       break;
     }
     
     if (Date.now() < earliestReset) continue;
 
-    const postRoot =
-      button.closest<HTMLElement>('div[data-stream-item-id]') ||
-      button.closest<HTMLElement>('main') ||
-      button.closest<HTMLElement>('div[role="main"]');
-
-    if (postRoot && postRoot.dataset.cqdGroupActive === '1') {
-      continue;
-    }
-
+    // Only extend timeout if user is hovering (let them see the state)
     if (button.matches(':hover')) continue;
 
     break;
