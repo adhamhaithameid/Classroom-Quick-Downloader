@@ -608,9 +608,7 @@ function setButtonState(
   }
   
   // Rule 5: Use priority as fallback for all other cases
-    return; // Block lower priority transitions
-    }
-  }
+  // (Fallthrough allows transition)
 
   // Rule 6: Apply new state
   button.classList.remove(
@@ -621,7 +619,8 @@ function setButtonState(
     'cqd-cancel',
     'cqd-cancelled',
   );
-  icon.classList.remove('cqd-spinner');
+  icon.classList.remove('cqd-spinner', 'cqd-spin'); // Remove both potential spinner classes
+  icon.className = 'cqd-download-icon'; // Reset to base class to be safe
   icon.textContent = '';
   button.disabled = false;
   button.style.backgroundColor = '';
@@ -784,26 +783,30 @@ function createDownloadButton(
 
   button.addEventListener('mouseleave', () => {
     (button.dataset as any).cqdMouseOver = 'false';
-    const s = getButtonState(button);
+    const wasCancel = button.classList.contains('cqd-cancel');
+    
+    // Check underlying state explicitly via classes since getButtonState now prioritizes cancel
+    const isUnderlyingLoading = button.classList.contains('cqd-loading');
+    const isUnderlyingTrying = button.classList.contains('cqd-trying');
     
     // If we were showing cancel, revert to loading/trying visual
-    if (button.classList.contains('cqd-cancel')) {
+    if (wasCancel) {
       button.classList.remove('cqd-cancel');
-      // Re-apply state visuals (spinner, text) without changing actual logic state
+      // Re-apply state visuals (spinner, text)
       const label = button.querySelector<HTMLSpanElement>('.cqd-label');
       const icon = button.querySelector<HTMLElement>('.cqd-download-icon');
       
-      if (s === 'loading') {
+      if (isUnderlyingLoading) {
         if (label) label.textContent = t('downloading') || 'Downloading...';
         if (icon) {
-            icon.className = 'cqd-download-icon cqd-spin';
+            icon.className = 'cqd-download-icon cqd-spinner'; // Restoration of spinner class
             icon.style.backgroundImage = 'none';
         }
-      } else if (s === 'trying') {
+      } else if (isUnderlyingTrying) {
         if (label) label.textContent = t('trying') || 'Retrying...';
         if (icon) {
-            icon.className = 'cqd-download-icon cqd-spin';
-            icon.style.backgroundImage = 'none';
+             icon.className = 'cqd-download-icon cqd-spinner';
+             icon.style.backgroundImage = 'none';
         }
       }
     }

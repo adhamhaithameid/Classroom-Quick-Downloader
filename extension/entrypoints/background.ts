@@ -496,29 +496,6 @@ export default defineBackground(() => {
       sendResponse?.(payload);
     };
 
-    // Check for early cancellation before starting
-    if (pending.isCancelled) {
-       cleanup(pending);
-       return true;
-    }
-
-    // ====== FIREFOX: Always use bypass tab for Drive ======
-    if (IS_FIREFOX && isDrive) {
-       // ... existing Firefox logic ...
-       // (Simplified for brevity in replacement, but needs to be careful not to delete logic)
-       // Actually, easier to just wrap the callbacks.
-    }
-
-    // ... (rest of logic) ...
-
-
-    let responseSent = false;
-    const respondOnce = (payload: any) => {
-      if (responseSent) return;
-      responseSent = true;
-      sendResponse?.(payload);
-    };
-
     // ====== FIREFOX: Always use bypass tab for Drive ======
     if (IS_FIREFOX && isDrive) {
       if (pending.isCancelled) { cleanup(pending); return true; }

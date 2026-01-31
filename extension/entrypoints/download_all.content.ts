@@ -445,27 +445,65 @@ function updateGroupState(group: GroupState): void {
   const allSucceeded = downloaded === totalFiles && failed === 0 && totalFiles > 0;
   const allCompleted = downloaded + failed === totalFiles && inProgress === 0 && totalFiles > 0;
 
-  btn.disabled = true;
+  btn.disabled = false; // MUST be enabled to allow Cancel click!
   let mainText: string;
   let subText: string;
   let progressRatio = totalFiles > 0 ? downloaded / totalFiles : 0;
 
   // === REVERTED AUTO-SHOW CANCEL ===
-  // User requested to ONLY show cancel state on hover
-  // So we don't force 'cqd-all-cancel' unless user is hovering
+  // User requested to ONLY show cancel state on hover.
+  // BUT: If user IS hovering right now, we must ensure the state reflects that!
+  // Otherwise update() will wipe the hover state.
+  const isHovering = btn.matches(':hover');
+  
   if (group.cancelPending) {
     console.log('[CQD] Showing cancelled state');
     btn.classList.remove('cqd-all-cancel', 'cqd-all-success', 'cqd-all-error');
     btn.classList.add('cqd-all-cancelled');
     mainText = t('cancelled') || 'Cancelled';
     subText = '';
+    
+    // Clear the inline X icon - use cancelled/X icon from CSS class instead
+    const iconEl = btn.querySelector<HTMLElement>('.cqd-download-all-icon');
+    if (iconEl) {
+      iconEl.style.backgroundImage = ''; // Clear inline to let CSS take over
+    }
+    
+    // Schedule reset when all downloads are done (cancelled or otherwise)
+    if (inProgress === 0) {
+      scheduleGroupReset(group);
+    }
+  } else if (group.isBusy && group.activated && isHovering) {
+    // If busy and hovering, FORCE cancel state
+    // This fixes the issue where updates wipe the cancel state
+    btn.classList.remove('cqd-all-success', 'cqd-all-error');
+    btn.classList.add('cqd-all-cancel');
+    mainText = t('cancelAll') || 'Cancel All';
+    subText = '';
+
+    // Update icon to cancel/X
+    const iconEl = btn.querySelector<HTMLElement>('.cqd-download-all-icon');
+    if (iconEl) {
+      iconEl.style.transition = 'all 0.2s ease-out';
+      iconEl.style.backgroundImage = `url("${CANCEL_ICON_SVG_URL}")`;
+      iconEl.style.backgroundSize = '18px 18px';
+    }
+    
   } else if (allSucceeded) {
+    // Clear inline icon style to revert to default checkmark/icon via class
+    const iconEl = btn.querySelector<HTMLElement>('.cqd-download-all-icon');
+    if (iconEl) iconEl.style.backgroundImage = '';
+    
     mainText = t('downloaded') || 'Downloaded';
     subText = `${downloaded} / ${totalFiles}`;
     btn.classList.add('cqd-all-success');
     progressRatio = 1;
     scheduleGroupReset(group);
   } else if (allCompleted && failed > 0) {
+    // Clear inline icon style
+    const iconEl = btn.querySelector<HTMLElement>('.cqd-download-all-icon');
+    if (iconEl) iconEl.style.backgroundImage = '';
+    
     if (downloaded === 0) {
       mainText = t('error') || 'Error';
       subText = `${failed} failed`;
@@ -478,6 +516,10 @@ function updateGroupState(group: GroupState): void {
     }
     scheduleGroupReset(group);
   } else {
+    // Clear inline icon style
+    const iconEl = btn.querySelector<HTMLElement>('.cqd-download-all-icon');
+    if (iconEl) iconEl.style.backgroundImage = '';
+    
     mainText = t('downloading') || 'Downloading…';
     if (failed === 0) {
       subText = `${downloaded} → ${totalFiles}`;
@@ -497,6 +539,7 @@ function scheduleGroupReset(group: GroupState): void {
     group.resetTimeoutId = undefined;
     group.activated = false;
     group.isBusy = false;
+    group.cancelPending = false; // CRITICAL: Reset cancel flag
     group.currentRunId = undefined;
     try {
       delete group.root.dataset.cqdGroupActive;
@@ -852,7 +895,7 @@ function handleCancelAllClick(group: GroupState): void {
       iconEl.style.backgroundImage = `url("${CANCEL_ICON_SVG_URL}")`;
       iconEl.style.backgroundSize = '18px 18px';
     }
-    btn.disabled = true;
+    // Note: Don't disable button - updateDownloadAllButtonState handles state
   }
 
   // Cancel all in-progress files by sending cancel messages directly
@@ -895,10 +938,19 @@ function handleCancelAllClick(group: GroupState): void {
     primary.classList.remove('cqd-loading', 'cqd-trying', 'cqd-cancel');
     primary.classList.add('cqd-cancelled');
     
-    // Update button label
+    // Update button label and icon
     const label = primary.querySelector<HTMLSpanElement>('.cqd-label');
+    const icon = primary.querySelector<HTMLElement>('.cqd-download-icon');
     if (label) {
-      label.textContent = 'Cancelled';
+      label.textContent = t('cancelled') || 'Cancelled';
+    }
+    if (icon) {
+      // Remove spinner animation classes
+      icon.classList.remove('cqd-spinner', 'cqd-spin');
+      icon.className = 'cqd-download-icon'; // Reset to base class
+      // Set cancel/X icon
+      icon.style.backgroundImage = `url("${CANCEL_ICON_SVG_URL}")`;
+      icon.style.backgroundSize = '20px 20px';
     }
   }
 
