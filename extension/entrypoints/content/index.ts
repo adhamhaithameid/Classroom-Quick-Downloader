@@ -1112,6 +1112,14 @@ if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
             status === 'interrupted' ||
             status === 'blocked_html'
           ) {
+            // SPECIAL CASE: If button is already visually cancelled (e.g. by "Cancel All"),
+            // ignore the "interrupted" or "error" message so we don't overwrite with "Error" state
+            // and don't trigger a double/conflicting reset timer.
+            if ((status === 'interrupted' || status === 'error') && button.classList.contains('cqd-cancelled')) {
+               pendingButtons.delete(requestId);
+               return;
+            }
+
             if (errorCode === 'AUTH_CHECK') {
               await showErrorState(button, userMessage);
               return;

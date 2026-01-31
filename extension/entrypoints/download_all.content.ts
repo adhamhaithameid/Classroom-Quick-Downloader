@@ -2,7 +2,7 @@
 import { injectStyles } from './content/styles';
 import { t } from './content/i18n';
 import { isPageDark } from './content/theme';
-import { CANCEL_ICON_SVG_URL } from './content/icons';
+import { CANCEL_ICON_SVG_URL, DOWNLOAD_ICON_SVG_URL } from './content/icons';
 
 
 const DOWNLOAD_BTN_SELECTOR = '.cqd-download-all-btn';
@@ -551,9 +551,41 @@ function scheduleGroupReset(group: GroupState): void {
       file.failed = false;
       file.inProgress = false;
     }
+    // Also trigger visual reset (just in case observer missed it or for safety)
+    resetGroupVisuals(group);
+    
     markGroupDirty(group);
     scheduleRefresh();
   }, GROUP_FEEDBACK_SUCCESS_MS);
+}
+
+function resetGroupVisuals(group: GroupState): void {
+  for (const file of group.files.values()) {
+    for (const btn of file.buttons) {
+      if (!btn.isConnected) continue;
+      
+      // Remove all state classes
+      btn.classList.remove('cqd-loading', 'cqd-trying', 'cqd-success', 'cqd-error', 'cqd-cancel', 'cqd-cancelled');
+      btn.disabled = false;
+      
+      // Reset label
+      const label = btn.querySelector<HTMLSpanElement>('.cqd-label');
+      if (label) label.textContent = t('download') || 'Download';
+      
+      // Reset icon to download icon
+      const icon = btn.querySelector<HTMLElement>('.cqd-download-icon');
+      if (icon) {
+        icon.classList.remove('cqd-spinner', 'cqd-spin');
+        icon.className = 'cqd-download-icon';
+        icon.style.backgroundImage = `url("${DOWNLOAD_ICON_SVG_URL}")`;
+        icon.style.backgroundSize = '';
+      }
+      
+      // Clear error detail
+      const errorDetail = btn.querySelector<HTMLElement>('.cqd-error-detail');
+      if (errorDetail) errorDetail.textContent = '';
+    }
+  }
 }
 
 function findHeaderContainer(root: HTMLElement): HTMLElement | null {
@@ -650,6 +682,29 @@ function ensureDownloadAllButton(group: GroupState): HTMLButtonElement {
   button.appendChild(iconWrapper);
   button.appendChild(mainSpan);
   button.appendChild(subSpan);
+
+  // Sync Observer: Force individual buttons to reset when Download All button resets
+  const syncObserver = new MutationObserver((mutations) => {
+    for (const m of mutations) {
+      if (m.attributeName === 'class') {
+        const oldClasses = m.oldValue || '';
+        const wasCancelled = oldClasses.includes('cqd-all-cancelled');
+        const wasSuccess = oldClasses.includes('cqd-all-success');
+        const wasError = oldClasses.includes('cqd-all-error');
+        
+        const isCancelled = button.classList.contains('cqd-all-cancelled');
+        const isSuccess = button.classList.contains('cqd-all-success');
+        const isError = button.classList.contains('cqd-all-error');
+        
+        // If transitioned from any terminal state to idle
+        if ((wasCancelled || wasSuccess || wasError) && !isCancelled && !isSuccess && !isError) {
+          console.log('[CQD] Sync reset triggered by class change');
+          resetGroupVisuals(group);
+        }
+      }
+    }
+  });
+  syncObserver.observe(button, { attributes: true, attributeFilter: ['class'], attributeOldValue: true });
 
   const computed = window.getComputedStyle(targetContainer);
   if (computed.position === 'static') {
@@ -852,16 +907,15 @@ function handleDownloadAllClick(group: GroupState): void {
   }
 
   const btn = group.downloadAllBtn;
-  if (btn) {
-    btn.disabled = true;
-  }
+  // Note: Don't disable button - user needs to be able to click Cancel All
 
   for (const file of group.files.values()) {
     const primary = getPrimaryButton(file);
     if (!primary) continue;
 
     const s = getSingleButtonState(primary);
-    if (s === 'idle' || s === 'error') {
+    // Include 'cancelled' so previously cancelled downloads can be restarted
+    if (s === 'idle' || s === 'error' || s === 'cancelled') {
       primary.click();
     }
   }
@@ -934,8 +988,8 @@ function handleCancelAllClick(group: GroupState): void {
       console.log('[CQD] Button dataset:', primary.dataset);
     }
     
-    // Update button visual state to cancelled  
-    primary.classList.remove('cqd-loading', 'cqd-trying', 'cqd-cancel');
+    // Update button visual state to cancelled - remove ALL state classes first
+    primary.classList.remove('cqd-loading', 'cqd-trying', 'cqd-cancel', 'cqd-cancelled', 'cqd-success', 'cqd-error');
     primary.classList.add('cqd-cancelled');
     
     // Update button label and icon
