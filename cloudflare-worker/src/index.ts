@@ -154,6 +154,8 @@ export default {
       (pathname === "/stats" && request.method === "GET") ||
       (pathname === "/config" && request.method === "GET") ||
       (pathname === "/health" && request.method === "GET") ||
+      (pathname === "/changelog" && request.method === "GET") ||
+      (pathname === "/admin/changelog" && request.method === "POST") ||
       (pathname === "/track" && request.method === "POST") ||
       (pathname === "/debug/flush" && request.method === "POST") ||
       (pathname === "/debug/reset" && request.method === "POST") ||
