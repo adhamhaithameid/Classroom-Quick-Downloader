@@ -145,29 +145,22 @@ WXT uses a **file-system based routing** convention. Files in `entrypoints/` are
 
 ```
 extension/
+├── src/                          # Application Logic
+│   ├── background/               # Service worker modules (10 files)
+│   ├── detection/                # File detection logic
+│   ├── download/                 # Single download modules
+│   ├── download-all/             # Batch download modules
+│   ├── i18n/                     # Internationalization
+│   ├── shared/                   # Shared utilities (analytics, state)
+│   └── ui/                       # UI components & styles
 ├── entrypoints/
-│   ├── background.ts                  # Service worker (always running)
-│   ├── popup/
-│   │   ├── index.html                 # Popup entry HTML
-│   │   ├── main.tsx                   # React mount point
-│   │   ├── App.tsx                    # Main popup component
-│   │   └── App.css                    # Popup styles
-│   ├── download_all.content.ts        # Content script: Download All button
-│   ├── drive_bypass.content.ts        # Content script: Drive confirmation
-│   ├── comment_frame.content.ts       # Content script: Comment handling
-│   ├── edited_frame.content.ts        # Content script: Edited docs
-│   └── utils/
-│       └── analytics.ts               # Analytics module
-├── assets/
-│   ├── CQD.png                        # Color logo
-│   └── CQD-gray.png                   # Grayscale logo (non-Classroom)
-├── public/
-│   ├── icon/                          # Extension icons (16, 32, 48, 96, 128)
-│   ├── logo.svg                       # SVG logo
-│   └── bmc-logo.svg                   # Buy Me a Coffee logo
-├── wxt.config.ts                      # WXT configuration + manifest
-├── package.json                       # Dependencies and scripts
-└── tsconfig.json                      # TypeScript configuration
+│   ├── background.ts             # Service worker entry
+│   ├── popup/                    # UI popup
+│   ├── download_all.content.ts   # Content script entry
+│   └── ...                       # Other entry points
+├── assets/                       # Static assets
+├── wxt.config.ts                 # WXT config
+└── package.json                  # Dependencies
 ```
 
 ### WXT File Conventions
