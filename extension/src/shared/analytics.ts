@@ -1,17 +1,15 @@
-// filepath: extension/entrypoints/utils/analytics.ts
+// filepath: extension/src/shared/analytics.ts
 /**
- * Analytics module - Re-exports from modularized structure.
- * This file maintains backward compatibility while delegating to
- * the new modular analytics implementation.
+ * Analytics module - Re-exports from the canonical entrypoints location.
  */
 
-// Re-export everything from the modular analytics module
+// Re-export everything from the entrypoints analytics module
 export {
   Analytics,
   recordDownloadEvent,
   refreshRemoteAnalyticsConfig,
   getCancelHoldDelayMs,
-} from './analytics/index';
+} from '../../entrypoints/utils/analytics/index';
 
 // Re-export types for consumers
 export type {
@@ -21,4 +19,4 @@ export type {
   AnalyticsMeta,
   RecordDownloadEventInput,
   DownloadSource,
-} from './analytics/types';
+} from '../../entrypoints/utils/analytics/types';
