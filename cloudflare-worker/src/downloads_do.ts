@@ -14,6 +14,8 @@ import {
   BucketCounters,
   DOStateBatch,
   BatchSummary,
+  ChangelogEntry,
+  ChangelogConfig,
 } from "./types";
 
 export interface Env {
@@ -57,6 +59,12 @@ type DurableStateShape = {
   
   // Burst tracking (legacy, kept for compatibility)
   burstCounts: Record<string, { count: number; minute: number }>;
+
+  // =========================================================================
+  // CHANGELOG & CONFIG
+  // =========================================================================
+  changelog: ChangelogEntry[];
+  changelogConfig: ChangelogConfig;
 
   // =========================================================================
   // REMOTE CONFIG - Controllable from Cloudflare Dashboard
@@ -258,6 +266,14 @@ export class DownloadsDurable {
       configFlushMode: 'next_day',
       configTimeFlushMinutes: { low: 1440, mid: 1440, high: 1440 }, // 1440 = 24h = next day
       configCancelHoldDelayMs: 1000, // 1 second default
+
+      // Changelog defaults
+      changelog: [],
+      changelogConfig: {
+        customPill: false,
+        showNotification: false,
+        lastUpdated: Date.now(),
+      },
     };
 
     if (!stored) {
@@ -312,6 +328,9 @@ export class DownloadsDurable {
       configFlushMode: stored.configFlushMode ?? base.configFlushMode,
       configTimeFlushMinutes: stored.configTimeFlushMinutes ?? base.configTimeFlushMinutes,
       configCancelHoldDelayMs: stored.configCancelHoldDelayMs ?? base.configCancelHoldDelayMs,
+
+      changelog: Array.isArray(stored.changelog) ? stored.changelog : base.changelog,
+      changelogConfig: stored.changelogConfig ?? base.changelogConfig,
     };
 
     // Ensure midnight alarm is scheduled
@@ -417,6 +436,16 @@ export class DownloadsDurable {
 
     if (pathname === "/admin/full-sync" && request.method === "POST") {
       return this.handleAdminFullSync(request);
+    }
+
+    // Public Changelog
+    if (pathname === "/changelog" && request.method === "GET") {
+      return this.handleGetChangelog();
+    }
+
+    // Admin Changelog Update
+    if (pathname === "/admin/changelog" && request.method === "POST") {
+      return this.handleAdminUpdateChangelog(request);
     }
 
     return new Response("Not found (DO)", { status: 404 });
@@ -757,6 +786,10 @@ export class DownloadsDurable {
       requestsToday: this.d.reqCountToday ?? 0,
       requestDate: this.d.reqCountDate ?? null,
       uniqueIpsToday: Object.keys(this.d.ipCounts ?? {}).length,
+      
+      // NEW: Changelog data
+      changelog: this.d.changelog,
+      changelogConfig: this.d.changelogConfig,
     };
 
     return json(payload);
@@ -796,6 +829,9 @@ export class DownloadsDurable {
       
       // Quota info for extension awareness
       quota,
+      
+      // NEW: Changelog config for extension
+      changelogConfig: this.d.changelogConfig,
     };
 
     return json(config);
@@ -832,6 +868,14 @@ export class DownloadsDurable {
       configFlushMode: this.d.configFlushMode ?? 'next_day' as const,
       configTimeFlushMinutes: this.d.configTimeFlushMinutes ?? { low: 1440, mid: 1440, high: 1440 },
       configCancelHoldDelayMs: this.d.configCancelHoldDelayMs ?? 1000,
+      
+      // Preserve Changelog
+      changelog: this.d.changelog ?? [],
+      changelogConfig: this.d.changelogConfig ?? {
+        customPill: false,
+        showNotification: false,
+        lastUpdated: Date.now(),
+      },
     };
     
     this.data = {
@@ -1346,6 +1390,62 @@ export class DownloadsDurable {
       await this.scheduleRetry();
       await this.persist();
       return { ok: false, sent: 0, error: msg };
+    }
+  }
+  /**
+   * Public endpoint for the extension to fetch the changelog.
+   * Returns sorted entries and current config.
+   */
+  private async handleGetChangelog(): Promise<Response> {
+    const sorted = [...this.d.changelog].sort((a, b) => 
+      new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
+
+    return json({
+      ok: true,
+      entries: sorted,
+      config: this.d.changelogConfig,
+    });
+  }
+
+  /**
+   * Admin endpoint to update changelog or config.
+   * Expects JSON body with `changelog` (array) or `config` (object) or both.
+   */
+  private async handleAdminUpdateChangelog(request: Request): Promise<Response> {
+    if (!this.isAuthorizedAdmin(request)) {
+      return json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+
+    try {
+      const body = await request.json() as { 
+        changelog?: ChangelogEntry[]; 
+        config?: ChangelogConfig;
+      };
+
+      let updated = false;
+
+      if (Array.isArray(body.changelog)) {
+        this.d.changelog = body.changelog;
+        updated = true;
+      }
+
+      if (body.config) {
+        this.d.changelogConfig = {
+          ...this.d.changelogConfig,
+          ...body.config,
+          lastUpdated: Date.now(),
+        };
+        updated = true;
+      }
+
+      if (updated) {
+        await this.persist();
+      }
+
+      return json({ ok: true, updated });
+    } catch (e) {
+      return json({ ok: false, error: "invalid_payload" }, { status: 400 });
     }
   }
 }

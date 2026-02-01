@@ -137,6 +137,8 @@ export interface ConfigResponse {
   };
   remoteEnabled: boolean;
   quota: QuotaDescriptor;
+  // NEW: Changelog config
+  changelogConfig?: ChangelogConfig;
 }
 
 /**
@@ -148,6 +150,62 @@ export interface Env {
   DO_SHARED_SECRET: string;
   ORACLE_ENDPOINT: string;
   MAX_BATCH_EVENTS: string;
+}
+
+/**
+ * Changelog entry for manual updates.
+ */
+export interface ChangelogEntry {
+  id: string; // UUID or timestamp based
+  version: string;
+  date: string; // ISO date string
+  changes: string[]; // List of changes
+  isImportant?: boolean; // Highlight in UI?
+}
+
+/**
+ * Configuration for the "Version Pill" in the extension.
+ */
+export interface ChangelogConfig {
+  customPill: boolean; // Enable custom styling
+  pillColor?: string; // Optional custom color (hex)
+  showNotification: boolean; // Show "!" icon
+  lastUpdated?: number; // Timestamp of last config/changelog update
+}
+
+/**
+ * Snapshot of environment variables for the dashboard to display.
+ */
+export interface EnvSnapshot {
+  maxBatchEvents: string;
+  oracleEndpoint: string;
+}
+
+/**
+ * Response payload for /stats (DO -> Worker -> dashboard).
+ */
+export interface StatsResponse {
+  ok: boolean;
+
+  totalEvents: number;
+  totalDownloads: number;
+  totalSuccess: number;
+  totalFail: number;
+  pendingEvents: number;
+
+  lastEventAt: number | null;
+  lastFlushAt: number | null;
+
+  counters: Counters;
+  retryState: RetryState | null;
+
+  quota: QuotaDescriptor;
+
+  envSnapshot: EnvSnapshot;
+  
+  // NEW: Changelog data for dashboard
+  changelog: ChangelogEntry[];
+  changelogConfig: ChangelogConfig;
 }
 
 // ---------------------------------------------------------------------------

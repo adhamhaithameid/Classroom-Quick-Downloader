@@ -1054,6 +1054,173 @@ body {
   transition: transform 0.2s ease;
 }
 
+
 .cqd-share-copy-btn:hover svg {
   transform: scale(1.1);
+}
+
+/* ===============================
+ * Changelog Overlay & Notification
+ * =============================== */
+
+/* Red pulsing effect for unseen updates */
+@keyframes pill-glow-red {
+  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6); }
+  70% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+.cqd-version-glow {
+  /* Removed pulsing for stored config - just static blue now */
+  background: var(--cqd-blue);
+  color: white;
+  border: 1px solid rgba(255,255,255,0.2);
+}
+
+/* Red background for unseen updates */
+.cqd-version-unseen {
+  background: var(--cqd-red) !important;
+  color: white !important;
+  border-color: rgba(255,255,255,0.4) !important;
+  animation: pill-glow-red 2s infinite; 
+}
+
+.cqd-notification-dot {
+  /* Deprecated: using red background instead */
+  display: none; 
+}
+
+/* Overlay Styling */
+.cqd-changelog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  padding: 20px;
+}
+
+.cqd-changelog-overlay.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.cqd-changelog-card {
+  background: white;
+  width: 100%;
+  max-height: 90%;
+  border-radius: 16px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--cqd-border-subtle);
+  transform: translateY(10px);
+  transition: transform 0.25s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.cqd-changelog-overlay.open .cqd-changelog-card {
+  transform: translateY(0);
+}
+
+.cqd-cl-header {
+  padding: 16px;
+  background: var(--cqd-surface);
+  border-bottom: 1px solid var(--cqd-border-subtle);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cqd-cl-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--cqd-text-main);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cqd-cl-close {
+  background: transparent;
+  border: none;
+  font-size: 20px;
+  color: var(--cqd-text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  transition: background 0.15s;
+}
+
+.cqd-cl-close:hover {
+  background: rgba(0,0,0,0.05);
+  color: var(--cqd-text-main);
+}
+
+.cqd-cl-body {
+  padding: 0 16px 16px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.cqd-cl-entry {
+  padding: 16px 0;
+  border-bottom: 1px dashed var(--cqd-border-subtle);
+}
+
+.cqd-cl-entry:last-child {
+  border-bottom: none;
+}
+
+.cqd-cl-ver-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+
+.cqd-cl-version {
+  font-weight: 700;
+  color: var(--cqd-blue);
+  font-size: 14px;
+}
+
+.cqd-cl-date {
+  font-size: 11px;
+  color: var(--cqd-text-muted);
+}
+
+.cqd-cl-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  color: var(--cqd-text-main);
+  line-height: 1.5;
+}
+
+.cqd-cl-list li {
+  margin-bottom: 4px;
+}
+
+.cqd-cl-empty {
+  padding: 40px;
+  text-align: center;
+  color: var(--cqd-text-muted);
+  font-size: 13px;
 }

@@ -59,6 +59,7 @@ export const BACKOFF_STEPS_SECONDS = [
 const WORKER_URL = import.meta.env.VITE_WORKER_URL as string || '';
 export const WORKER_BASE_URL = WORKER_URL.replace(/\/+track$/, '');
 export const CONFIG_URL = WORKER_BASE_URL ? `${WORKER_BASE_URL}/config` : '';
+export const CHANGELOG_URL = WORKER_BASE_URL ? `${WORKER_BASE_URL}/changelog` : '';
 export const TRACK_URL = WORKER_URL;
 
 // --- Rate Limits ---
