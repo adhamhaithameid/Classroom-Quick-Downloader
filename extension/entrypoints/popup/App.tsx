@@ -621,12 +621,17 @@ function App() {
                 {version && (
                   <button
                     className={`cqd-brand-version ${
-                      // Priority: 1. Unseen (Red) -> 2. Custom Config (Glow) -> 3. Standard
+                      // Priority: 1. Update Available (Red Pulse) -> 2. Unseen (Red Static) -> 3. Custom Config (Glow) -> 4. Standard
+                      (changelogData?.config?.latestVersion && version !== 'dev' && changelogData.config.latestVersion !== version) ? 'cqd-version-update' :
                       hasNotification ? 'cqd-version-unseen' : 
                       (changelogData?.config?.customPill ? 'cqd-version-glow' : '')
                     }`}
                     aria-label={`Version ${version} - View changelog`}
-                    title={getLatestChange(changelogData) ? `Latest: ${getLatestChange(changelogData)}` : "View changelog"}
+                    title={
+                      (changelogData?.config?.latestVersion && version !== 'dev' && changelogData.config.latestVersion !== version) 
+                        ? `Update available: v${changelogData.config.latestVersion}`
+                        : (getLatestChange(changelogData) ? `Latest: ${getLatestChange(changelogData)}` : "View changelog")
+                    }
                     onClick={() => {
                       setShowChangelog(true);
                       if (hasNotification && version) {
@@ -635,7 +640,10 @@ function App() {
                       }
                     }}
                   >
-                    v{version}
+                    {(changelogData?.config?.latestVersion && version !== 'dev' && changelogData.config.latestVersion !== version)
+                      ? `Update to v${changelogData.config.latestVersion}`
+                      : `v${version}`
+                    }
                   </button>
                 )}
               </div>

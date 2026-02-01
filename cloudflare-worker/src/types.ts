@@ -171,6 +171,7 @@ export interface ChangelogConfig {
   pillColor?: string; // Optional custom color (hex)
   showNotification: boolean; // Show "!" icon
   lastUpdated?: number; // Timestamp of last config/changelog update
+  latestVersion?: string; // Broadcast latest version to extensions
 }
 
 /**

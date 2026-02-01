@@ -14,6 +14,7 @@ export interface ChangelogConfig {
   pillColor?: string;
   showNotification: boolean;
   lastUpdated?: number;
+  latestVersion?: string;
 }
 
 export interface ChangelogData {

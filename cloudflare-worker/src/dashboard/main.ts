@@ -289,6 +289,11 @@ function renderChangelogSection(entries: ChangelogEntry[], config: ChangelogConf
               <span class="label-text">Show Notification Dot (Red)</span>
             </label>
           </div>
+          
+          <div class="input-group" style="margin-top: 10px;">
+             <label style="display: block; font-size: 0.85em; color: var(--text-soft); margin-bottom: 4px;">Latest Broadcast Version</label>
+             <input type="text" id="cl-latest-ver" value="${config.latestVersion || ""}" placeholder="e.g. 1.2.4" class="input-field" style="width: 100%; padding: 8px; background: var(--bg-elevated); border: 1px solid var(--border-subtle); color: var(--text-main); border-radius: 6px;">
+          </div>
 
           <hr style="border: 0; border-top: 1px dashed var(--border-subtle); margin: 8px 0;">
 
@@ -2179,9 +2184,10 @@ ${rawStatsJson}
           // 1. Gather Config
           const customPill = document.getElementById("cl-custom-pill").checked;
           const showNotification = document.getElementById("cl-notification").checked;
+          const latestVersion = document.getElementById("cl-latest-ver").value.trim();
           
           const payload = {
-            config: { customPill, showNotification }
+            config: { customPill, showNotification, latestVersion }
           };
 
           // 2. Gather New/Edit Release (if ANY text entered)
