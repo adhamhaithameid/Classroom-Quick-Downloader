@@ -234,7 +234,7 @@ npm run zip:firefox     # Web Store ZIP
 
 ### Analytics Endpoint
 
-The analytics module sends data to the Cloudflare Worker. The endpoint is configured in `entrypoints/utils/analytics.ts`:
+The analytics module sends data to the Cloudflare Worker. The endpoint is configured in `src/shared/analytics.ts`:
 
 ```typescript
 // For LOCAL TESTING:
