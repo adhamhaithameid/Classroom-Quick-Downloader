@@ -522,6 +522,27 @@ export class DownloadsDurable {
       );
     }
 
+    // =========================================================================
+    // LAYER 2: EVENT SIZE VALIDATION (Prevent memory exhaustion via oversized payloads)
+    // =========================================================================
+    const MAX_EVENT_SIZE_BYTES = 10 * 1024; // 10KB per event
+    for (const ev of events) {
+      try {
+        const eventSize = JSON.stringify(ev).length;
+        if (eventSize > MAX_EVENT_SIZE_BYTES) {
+          return json(
+            { ok: false, error: "event_too_large", maxBytes: MAX_EVENT_SIZE_BYTES },
+            { status: 400 }
+          );
+        }
+      } catch {
+        return json(
+          { ok: false, error: "invalid_event_structure" },
+          { status: 400 }
+        );
+      }
+    }
+
     if (this.d.buffer.length >= MAX_BUFFER_SIZE) {
       return json(
         { ok: false, error: "buffer_full", bufferSize: this.d.buffer.length },
