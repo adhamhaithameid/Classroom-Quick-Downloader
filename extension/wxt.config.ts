@@ -3,16 +3,16 @@ import { defineConfig } from 'wxt';
 
 // the runner should be webExt
 export default defineConfig({
-  runner: {
+  webExt: {
     // Only configure custom browser if environment variable is set
-    ...(import.meta.env.VITE_DEV_BROWSER_PATH && {
+    ...(process.env.VITE_DEV_BROWSER_PATH && {
       binaries: {
-        chrome: import.meta.env.VITE_DEV_BROWSER_PATH,
+        chrome: process.env.VITE_DEV_BROWSER_PATH,
       },
     }),
     // Optional: Custom user data directory for dev profile
-    ...(import.meta.env.VITE_DEV_USER_DATA_DIR && {
-      chromiumArgs: [`--user-data-dir=${import.meta.env.VITE_DEV_USER_DATA_DIR}`],
+    ...(process.env.VITE_DEV_USER_DATA_DIR && {
+      chromiumArgs: [`--user-data-dir=${process.env.VITE_DEV_USER_DATA_DIR}`],
     }),
     startUrls: ['https://classroom.google.com'],
   },
