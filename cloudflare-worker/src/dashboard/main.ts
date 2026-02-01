@@ -1,5 +1,5 @@
 // filepath: cloudflare-worker/src/dashboard/main.ts
-import type { StatsResponse, QuotaDescriptor } from "../types";
+import type { StatsResponse, QuotaDescriptor, ChangelogEntry, ChangelogConfig } from "../types";
 import { FAVICON_PNG_DATA_URI } from "../assets";
 
 function formatTs(ts: number | null): string {
@@ -240,10 +240,87 @@ export function renderLoginPage(errorMessage?: string): string {
       <button class="login-button" type="submit">Unlock →</button>
     </div>
     ${errorMessage ? `<div class="login-error">${errorMessage}</div>` : ""}
-  </form>
   <script>document.getElementById("password-input")?.focus();</script>
 </body>
 </html>`;
+}
+
+function renderChangelogSection(entries: ChangelogEntry[], config: ChangelogConfig): string {
+  const sorted = [...entries].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  
+  const historyHtml = sorted.map(e => `
+    <div class="cl-history-item" style="border-bottom: 1px dashed var(--border-subtle); padding: 12px 0;">
+      <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px;">
+        <div>
+          <span style="font-weight: 700; color: var(--accent);">${e.version}</span>
+          <span style="font-size: 0.8em; color: var(--text-soft); margin-left: 8px;">${new Date(e.date).toLocaleDateString()}</span>
+        </div>
+        <div style="display: flex; gap: 8px;">
+           <button class="btn-xs edit-cl-btn" data-id="${e.id}" style="opacity: 0.7;">✏️</button>
+           <button class="btn-xs delete-cl-btn" data-id="${e.id}" style="opacity: 0.7;">🗑</button>
+        </div>
+      </div>
+      <ul style="margin: 0; padding-left: 20px; font-size: 0.9em; color: var(--text-muted);">
+        ${e.changes.map(c => `<li>${c}</li>`).join('')}
+      </ul>
+    </div>
+  `).join('') || '<div style="text-align: center; color: var(--text-soft); padding: 20px;">No releases yet</div>';
+
+  return `
+    <section class="card config-card" style="border-color: #3b82f6;">
+      <h2 style="color: #3b82f6; display: flex; align-items: center; gap: 8px;">
+        <span>📜</span> Changelog Management
+      </h2>
+
+      <div class="split-layout" style="display: flex; gap: 24px; flex-wrap: wrap;">
+        <!-- LEFT: Config & New Entry -->
+        <div style="flex: 1; min-width: 300px; display: flex; flex-direction: column; gap: 16px;">
+          
+          <div class="metric-sub" style="margin-bottom: 4px;">Global Configuration</div>
+          <div class="config-row">
+            <label class="switch-label">
+              <input type="checkbox" id="cl-custom-pill" ${config.customPill ? "checked" : ""}>
+              <span class="label-text">Custom Version Pill (Blue Glow)</span>
+            </label>
+          </div>
+          <div class="config-row">
+            <label class="switch-label">
+              <input type="checkbox" id="cl-notification" ${config.showNotification ? "checked" : ""}>
+              <span class="label-text">Show Notification Dot (Red)</span>
+            </label>
+          </div>
+
+          <hr style="border: 0; border-top: 1px dashed var(--border-subtle); margin: 8px 0;">
+
+          <div class="metric-sub" style="margin-bottom: 4px;">Add New Release</div>
+          <div class="input-group">
+            <label style="display: block; font-size: 0.85em; color: var(--text-soft); margin-bottom: 4px;">Version</label>
+            <input type="hidden" id="edit-cl-id" value="">
+            <input type="text" id="new-cl-version" placeholder="e.g. 1.2.0" class="input-field" style="width: 100%; padding: 8px; background: var(--bg-elevated); border: 1px solid var(--border-subtle); color: var(--text-main); border-radius: 6px;">
+          </div>
+          <div class="input-group">
+            <label style="display: block; font-size: 0.85em; color: var(--text-soft); margin-bottom: 4px;">Changes (one per line)</label>
+            <textarea id="new-cl-changes" rows="5" class="input-field" placeholder="- Added cool feature\n- Fixed annoying bug" style="width: 100%; padding: 8px; background: var(--bg-elevated); border: 1px solid var(--border-subtle); color: var(--text-main); border-radius: 6px;"></textarea>
+          </div>
+          
+          <div style="margin-top: 8px;">
+            <button id="btn-save-all" class="btn btn-primary" style="width: 100%; padding: 10px; background: var(--accent); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">
+              💾 Save Changes (Config & Release)
+            </button>
+          </div>
+
+        </div>
+
+        <!-- RIGHT: History -->
+        <div style="flex: 1; min-width: 300px; border-left: 1px solid var(--border-subtle); padding-left: 24px;">
+          <div class="metric-sub" style="margin-bottom: 12px;">Release History</div>
+          <div class="cl-history-list" style="max-height: 500px; overflow-y: auto;">
+            ${historyHtml}
+          </div>
+        </div>
+      </div>
+    </section>
+  `;
 }
 
 export function renderDashboard(stats: StatsResponse): string {
@@ -489,6 +566,18 @@ export function renderDashboard(stats: StatsResponse): string {
       justify-content: center;
       font-size: 0.85rem;
     }
+
+    /* Changelog Styles */
+    .cl-ver { font-weight: 700; color: var(--accent); }
+    .cl-date { font-size: 0.75rem; color: var(--text-soft); }
+    .cl-changes { padding-left: 16px; margin: 0; color: #d1d5db; }
+    .cl-changes li { margin-bottom: 4px; }
+    .btn-xs { padding: 4px 8px; font-size: 0.75rem; border-radius: 4px; background: rgba(239,68,68,0.1); color: #fca5a5; border: 1px solid rgba(239,68,68,0.3); cursor: pointer; }
+    .btn-xs:hover { background: rgba(239,68,68,0.2); }
+    
+    .field-row { margin-bottom: 12px; }
+    .input-sm { padding: 6px 10px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); color: white; border-radius: 6px; width: 100%; }
+    .input-area { padding: 8px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); color: white; border-radius: 6px; width: 100%; height: 80px; resize: vertical; margin-bottom: 8px; }
 
     main {
       display: flex;
@@ -1487,6 +1576,8 @@ export function renderDashboard(stats: StatsResponse): string {
         </div>
         <pre id="raw-stats-json" class="code-block code-block-large">${rawStatsJson}</pre>
       </section>
+
+      ${renderChangelogSection(stats.changelog || [], stats.changelogConfig || {})}
     </main>
 
     <!-- Context Modal -->
@@ -1571,6 +1662,9 @@ export function renderDashboard(stats: StatsResponse): string {
     </div>
   </div>
 
+  <script id="raw-stats-json" type="application/json">
+${rawStatsJson}
+  </script>
   <script>
     (function () {
       let lastRefreshAt = 0;
@@ -2039,6 +2133,123 @@ export function renderDashboard(stats: StatsResponse): string {
       if (btnReload) {
         btnReload.onclick = refreshStats;
       }
+
+      if (btnReload) {
+        btnReload.onclick = refreshStats;
+      }
+
+      // Changelog Logic
+      const btnSaveAll = document.getElementById("btn-save-all");
+      
+      async function sendChangelogUpdate(payload) {
+        const pwd = prompt("Enter Admin Password:");
+        if (!pwd) return;
+        
+        try {
+          const res = await fetch("/admin/changelog", {
+            method: "POST",
+            headers: { 
+              "Content-Type": "application/json",
+              "X-Admin-Secret": pwd
+            },
+            body: JSON.stringify(payload)
+          });
+          const data = await res.json();
+          if (data.ok) {
+            refreshStats();
+            // Clear inputs ONLY if successful
+            const verInput = document.getElementById("new-cl-version");
+            const txtInput = document.getElementById("new-cl-changes");
+            const idInput = document.getElementById("edit-cl-id");
+            if (verInput) verInput.value = "";
+            if (txtInput) txtInput.value = "";
+            if (idInput) idInput.value = "";
+            const btn = document.getElementById("btn-save-all");
+            if (btn) btn.innerHTML = "💾 Save Changes (Config & Release)";
+          } else {
+            alert("Error: " + (data.error || "Unknown"));
+          }
+        } catch(e) {
+          alert("Network error");
+        }
+      }
+
+      if (btnSaveAll) {
+        btnSaveAll.onclick = () => {
+          // 1. Gather Config
+          const customPill = document.getElementById("cl-custom-pill").checked;
+          const showNotification = document.getElementById("cl-notification").checked;
+          
+          const payload = {
+            config: { customPill, showNotification }
+          };
+
+          // 2. Gather New/Edit Release (if ANY text entered)
+          const ver = document.getElementById("new-cl-version").value.trim();
+          const text = document.getElementById("new-cl-changes").value.trim();
+          const editId = document.getElementById("edit-cl-id").value;
+          
+          if (ver && text) {
+            const changes = text.split("\\n").map(l => l.trim()).filter(Boolean);
+            
+            // Access raw stats to append/update
+            const statsEl = document.getElementById("raw-stats-json");
+            const currentEntries = statsEl ? (JSON.parse(statsEl.textContent).changelog || []) : [];
+            
+            if (editId) {
+               // UPDATE existing
+               const updated = currentEntries.map(e => e.id === editId ? { ...e, version: ver, changes } : e);
+               payload.changelog = updated;
+            } else {
+               // CREATE new
+               const newEntry = {
+                 id: crypto.randomUUID(),
+                 version: ver,
+                 date: new Date().toISOString(),
+                 changes: changes,
+                 isImportant: false
+               };
+               payload.changelog = [newEntry, ...currentEntries];
+            }
+
+          } else if (ver || text) {
+             // If partially filled, warn user? Or just ignore? 
+             // Let's warn to be safe
+             if (!confirm("Release fields are partially filled but will NOT be saved. Proceed with saving ONLY config?")) {
+               return;
+             }
+          }
+
+          sendChangelogUpdate(payload);
+        };
+      }
+
+      document.querySelectorAll(".edit-cl-btn").forEach(btn => {
+        btn.onclick = (e) => {
+           const id = e.target.dataset.id;
+           const currentEntries = JSON.parse(document.getElementById("raw-stats-json").textContent).changelog || [];
+           const entry = currentEntries.find(x => x.id === id);
+           if (!entry) return;
+           
+           document.getElementById("new-cl-version").value = entry.version;
+           document.getElementById("new-cl-changes").value = entry.changes.join("\\n");
+           document.getElementById("edit-cl-id").value = entry.id;
+           
+           document.getElementById("btn-save-all").innerHTML = "💾 Update Release & Save Config";
+           // scroll to top of form
+           document.querySelector(".config-card").scrollIntoView({ behavior: "smooth" });
+        };
+      });
+
+      document.querySelectorAll(".delete-cl-btn").forEach(btn => {
+        btn.onclick = (e) => {
+          if(!confirm("Delete this release?")) return;
+          const id = e.target.dataset.id;
+          const currentEntries = JSON.parse(document.getElementById("raw-stats-json").textContent).changelog || [];
+          const updated = currentEntries.filter(x => x.id !== id);
+          sendChangelogUpdate({ changelog: updated });
+        };
+      });
 
       // 2. Info modal logic
       const modal = document.getElementById("info-modal");
