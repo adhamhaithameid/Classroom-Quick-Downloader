@@ -670,8 +670,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     editedTooltip: 'પોસ્ટિંગ અને છેલ્લા ફેરફાર વચ્ચેના દિવસો',
     commentSingular: 'ટિપ્પણીઓ',
     cancel: 'રદ કરો',
-    cancelled: 'રદ ڪيل',
-    cancelAll: 'સڀ رد ڪريو',
+    cancelled: 'રદ્દ કરાયેલ',
+    cancelAll: 'બધું રદ કરો',
   },
   kn: {
     download: 'ಡೌನ್‌ಲೋಡ್',

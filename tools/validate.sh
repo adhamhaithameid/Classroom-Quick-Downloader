@@ -12,12 +12,12 @@ echo -e "${GREEN}Starting Codebase Validation...${NC}"
 cd "$(dirname "$0")/../cloudflare-worker"
 
 echo -e "\n${GREEN}1. Running Static Analysis (Lint, Typecheck, Audit)...${NC}"
-npm run validate
+pnpm run validate
 
 echo -e "\n${GREEN}2. Starting Local Preview (wrangler dev)...${NC}"
 # Start wrangler dev in background
 # Use port 8788 to avoid conflicts with other dev servers if any
-npx wrangler dev --port 8788 > /dev/null 2>&1 &
+pnpm wrangler dev --port 8788 > /dev/null 2>&1 &
 WRANGLER_PID=$!
 
 # Function to cleanup

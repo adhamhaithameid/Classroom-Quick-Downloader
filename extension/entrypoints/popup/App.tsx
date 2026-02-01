@@ -4,10 +4,10 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import './App.css';
 import logoSrc from '../../assets/CQD.png';
 import logoGraySrc from '../../assets/CQD-gray.png';
-import bmcLogoSrc from '../../src/bmc-logo.svg';
-import chromeSvg from '../../src/Chrome.svg';
-import firefoxSvg from '../../src/Firefox.svg';
-import edgeSvg from '../../src/Edge.svg';
+import bmcLogoSrc from '../../assets/bmc-logo.svg';
+import chromeSvg from '../../assets/Chrome.svg';
+import firefoxSvg from '../../assets/Firefox.svg';
+import edgeSvg from '../../assets/Edge.svg';
 
 // External Links
 const SURVEY_URL = 'https://forms.gle/wPU2b1Qxa7svHqJa6';

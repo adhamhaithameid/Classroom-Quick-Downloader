@@ -13,16 +13,19 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v3
+      with:
+        version: 9
+
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
         node-version: '20'
+        cache: 'pnpm'
 
-    # We still need to install dependencies first
     - name: Install Dependencies
-      run: |
-        cd cloudflare-worker
-        npm ci
+      run: pnpm install
 
     # Make sure the script is executable (Linux permissions)
     - name: Make Script Executable
