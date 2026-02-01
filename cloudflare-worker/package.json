@@ -7,8 +7,8 @@
     "deploy": "wrangler deploy",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "audit": "npm audit",
-    "validate": "npm run lint && npm run typecheck && npm run audit"
+    "audit": "pnpm audit",
+    "validate": "pnpm run lint && pnpm run typecheck && pnpm run audit"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20251209.0",
