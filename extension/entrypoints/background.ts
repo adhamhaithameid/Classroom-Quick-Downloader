@@ -63,6 +63,40 @@ const recentDownloads = new Map<string, number>();
 const AUTHUSER_CANDIDATES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 const CLASSROOM_URL_PATTERN = /^https:\/\/classroom\.google\.com\//;
 
+// --- TTL CLEANUP CONSTANTS (Fix: memory leak prevention) ---
+const PENDING_DOWNLOAD_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const CLEANUP_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Periodic cleanup of orphaned pending downloads to prevent memory leaks.
+ * Entries older than PENDING_DOWNLOAD_TTL_MS are considered stale and removed.
+ */
+function cleanupOrphanedPendingDownloads(): void {
+  const now = Date.now();
+  const staleThreshold = now - PENDING_DOWNLOAD_TTL_MS;
+  
+  for (const [requestId, pending] of pendingByRequestId.entries()) {
+    if (pending.startTime < staleThreshold) {
+      console.log(`[CQD] Cleaning up stale pending download: ${requestId}`);
+      cleanup(pending);
+    }
+  }
+  
+  // Also clean recentDownloads older than TTL
+  for (const [filename, timestamp] of recentDownloads.entries()) {
+    if (timestamp < staleThreshold) {
+      recentDownloads.delete(filename);
+    }
+  }
+  
+  // Clean cancelledByUs set (entries that weren't removed normally)
+  // Can't easily track age here, so just limit size
+  if (cancelledByUs.size > 100) {
+    const entries = Array.from(cancelledByUs);
+    entries.slice(0, entries.length - 50).forEach(id => cancelledByUs.delete(id));
+  }
+}
+
 // --- BROWSER DETECTION ---
 function isFirefox(): boolean {
   if (typeof navigator === 'undefined') return false;
@@ -172,6 +206,11 @@ export default defineBackground(() => {
 
   ensureAnalyticsAlarm();
   refreshRemoteAnalyticsConfig().catch(() => {});
+
+  // --- Memory Leak Prevention: Periodic cleanup of orphaned pending downloads ---
+  setInterval(cleanupOrphanedPendingDownloads, CLEANUP_INTERVAL_MS);
+  // Run once after 1 minute to clean any startup orphans
+  setTimeout(cleanupOrphanedPendingDownloads, 60 * 1000);
 
   // --- Icon Logic (Global + Tab Context) ---
   let isExtensionEnabled = true;
