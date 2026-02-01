@@ -8,6 +8,7 @@ import bmcLogoSrc from '../../assets/bmc-logo.svg';
 import chromeSvg from '../../assets/Chrome.svg';
 import firefoxSvg from '../../assets/Firefox.svg';
 import edgeSvg from '../../assets/Edge.svg';
+import { fetchChangelog, shouldShowNotification, markAsSeen, getLatestChange, type ChangelogData } from '../utils/changelog';
 
 // External Links
 const SURVEY_URL = 'https://forms.gle/wPU2b1Qxa7svHqJa6';
@@ -299,6 +300,11 @@ function App() {
   const [totalDownloads, setTotalDownloads] = useState(0);
   const [hoveredStatId, setHoveredStatId] = useState<string | null>(null);
 
+  // CHANGELOG STATE
+  const [changelogData, setChangelogData] = useState<ChangelogData | null>(null);
+  const [showChangelog, setShowChangelog] = useState(false);
+  const [hasNotification, setHasNotification] = useState(false);
+
   // Track scroll to add blur/shadow under header when not at top
   useEffect(() => {
     const el = scrollRef.current;
@@ -445,7 +451,15 @@ function App() {
     }
   }, []);
 
-  // --- GLOBAL SETTINGS LOGIC ---
+  // --- CHANGELOG LOADING ---
+  useEffect(() => {
+    fetchChangelog().then(async (data) => {
+      setChangelogData(data);
+      const notify = await shouldShowNotification(data);
+      setHasNotification(notify);
+    });
+  }, []);
+
   // --- GLOBAL SETTINGS LOGIC ---
   useEffect(() => {
     // Safety check for non-extension environment (e.g. pnpm dev)
@@ -606,14 +620,18 @@ function App() {
                 </span>
                 {version && (
                   <button
-                    className="cqd-brand-version"
+                    className={`cqd-brand-version ${
+                      // Priority: 1. Unseen (Red) -> 2. Custom Config (Glow) -> 3. Standard
+                      hasNotification ? 'cqd-version-unseen' : 
+                      (changelogData?.config?.customPill ? 'cqd-version-glow' : '')
+                    }`}
                     aria-label={`Version ${version} - View changelog`}
-                    title="View changelog"
+                    title={getLatestChange(changelogData) ? `Latest: ${getLatestChange(changelogData)}` : "View changelog"}
                     onClick={() => {
-                      // TODO: Replace with actual changelog URL when website is created
-                      const changelogUrl = null; // Will be: 'https://cqd.adhamhaitham.dev/changelog'
-                      if (changelogUrl) {
-                        window.open(changelogUrl, '_blank');
+                      setShowChangelog(true);
+                      if (hasNotification && version) {
+                        markAsSeen(version);
+                        setHasNotification(false);
                       }
                     }}
                   >
@@ -626,6 +644,39 @@ function App() {
         </header>
 
         <div className="cqd-content-area">
+          {/* ChangeLog Overlay */}
+          <div className={`cqd-changelog-overlay ${showChangelog ? 'open' : ''}`} onClick={(e) => {
+             if (e.target === e.currentTarget) setShowChangelog(false);
+          }}>
+            <div className="cqd-changelog-card">
+              <div className="cqd-cl-header">
+                <h3 className="cqd-cl-title">
+                  <span className="btn-bullet">📜</span> What's New
+                </h3>
+                <button className="cqd-cl-close" onClick={() => setShowChangelog(false)}>×</button>
+              </div>
+              <div className="cqd-cl-body">
+                {changelogData?.entries?.length ? (
+                  changelogData.entries.map((entry) => (
+                    <div key={entry.id} className="cqd-cl-entry">
+                      <div className="cqd-cl-ver-row">
+                         <span className="cqd-cl-version">v{entry.version}</span>
+                         <span className="cqd-cl-date">{new Date(entry.date).toLocaleDateString()}</span>
+                      </div>
+                      <ul className="cqd-cl-list">
+                        {entry.changes.map((change, i) => (
+                          <li key={i}>{change}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))
+                ) : (
+                  <div className="cqd-cl-empty">No changelog entries found.</div>
+                )}
+              </div>
+            </div>
+          </div>
+
           {/* Error banner */}
           {error && (
             <div className="cqd-banner cqd-banner-error" role="alert">
