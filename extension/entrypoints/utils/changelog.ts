@@ -23,7 +23,7 @@ export interface ChangelogData {
 }
 
 const STORAGE_KEY = 'cqd_changelog_v1';
-const CACHE_duration_MS = 60 * 60 * 1000; // 1 hour
+const CACHE_duration_MS = 0; // Always fetch on reload
 
 /**
  * Fetch changelog from storage or network.
