@@ -5,11 +5,17 @@
   "packageManager": "pnpm@10.26.1",
   "scripts": {
     "dev:ext": "pnpm --filter extension dev",
-    "build:ext": "pnpm --filter extension build"
+    "build:ext": "pnpm --filter extension build",
+    "prepare": "husky"
   },
   "pnpm": {
     "overrides": {
       "undici": ">=7.18.2"
     }
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^20.4.1",
+    "@commitlint/config-conventional": "^20.4.1",
+    "husky": "^9.1.7"
   }
 }
