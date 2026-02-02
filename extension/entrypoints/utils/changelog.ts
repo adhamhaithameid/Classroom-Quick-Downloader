@@ -12,8 +12,8 @@ export interface ChangelogEntry {
 export interface NotificationRule {
   id: string;
   target: string;
-  glow: boolean;
-  showDot: boolean;
+  priority: 'normal' | 'minor' | 'major';
+  effect: 'none' | 'glow' | 'pulse';
 }
 
 export interface ChangelogConfig {
@@ -86,9 +86,27 @@ const SEEN_KEY = 'cqd_changelog_seen_v1';
 /**
  * Mark the current version as seen.
  */
+/**
+ * Mark a version as seen.
+ */
 export async function markAsSeen(version: string): Promise<void> {
   if (!version) return;
-  await chrome.storage.local.set({ [SEEN_KEY]: version });
+  const data = await chrome.storage.local.get(SEEN_KEY);
+  const seen = (data[SEEN_KEY] as string[]) || [];
+  if (!seen.includes(version)) {
+    const newSeen = [...seen, version];
+    await chrome.storage.local.set({ [SEEN_KEY]: newSeen });
+  }
+}
+
+/**
+ * Check if a version has been seen.
+ */
+export async function isVersionSeen(version: string): Promise<boolean> {
+  if (!version) return false;
+  const data = await chrome.storage.local.get(SEEN_KEY);
+  const seen = (data[SEEN_KEY] as string[]) || [];
+  return seen.includes(version);
 }
 
 /**
@@ -109,20 +127,30 @@ export function getMatchingRule(config: ChangelogConfig | undefined, currentVers
   return null;
 }
 
-/**
- * Check if we should show a notification dot based on ACTIVE RULE.
- * (This is slightly different from before - now the rule fully controls the UI)
- */
-export function shouldShowDot(rule: NotificationRule | null): boolean {
-  return rule ? rule.showDot : false;
-}
+
 
 /**
- * Helper: Get pill CSS classes based on rule
+ * Helper: Get pill CSS classes based on rule & seen state
  */
-export function getRuleClasses(rule: NotificationRule | null): string {
+export function getRuleClasses(rule: NotificationRule | null, isSeen: boolean): string {
   if (!rule) return '';
+  if (isSeen) return ''; // Default / Normal style if seen
+
   const classes = [];
-  if (rule.glow) classes.push('cqd-version-glow');
+  
+  // Priority (Color)
+  if (rule.priority === 'minor') classes.push('cqd-pill-minor');
+  if (rule.priority === 'major') classes.push('cqd-pill-major');
+  
+  // Effect
+  // Glow: Minor=Blue, Major=Red
+  if (rule.effect === 'glow') {
+    classes.push(rule.priority === 'major' ? 'cqd-effect-glow-red' : 'cqd-effect-glow-blue');
+  }
+  // Pulse: Minor=Blue, Major=Red
+  if (rule.effect === 'pulse') {
+    classes.push(rule.priority === 'major' ? 'cqd-effect-pulse-red' : 'cqd-effect-pulse-blue');
+  }
+
   return classes.join(' ');
 }

@@ -166,8 +166,8 @@ export interface ChangelogEntry {
 export interface NotificationRule {
   id: string;
   target: string; // "all" or specific version "1.2.3"
-  glow: boolean;
-  showDot: boolean;
+  priority: 'normal' | 'minor' | 'major';
+  effect: 'none' | 'glow' | 'pulse';
 }
 
 /**
