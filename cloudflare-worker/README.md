@@ -154,7 +154,19 @@ This secret must match the `DO_SHARED_SECRET` environment variable on your Oracl
 
 ---
 
-## 📡 API Reference
+## � Notification Rules Engine (v1.1)
+
+The Worker also hosts a **Notification Rules Engine** to control the "Update Available" styling in the extension.
+
+- **Admin Dashboard**: Manage styling rules via the `/stats` dashboard.
+  - **Granular Control**: Target "All" versions or specific versions (e.g., `1.2.3`).
+  - **Visual Effects**: Toggle "Glow" (Blue Pulse) or "Dot" (Red Indicator).
+  - **Priority System**: Specific rules (e.g., `1.2.3`) override global wildcard rules (`all`).
+- **Extension Integration**: The extension fetches these rules via `GET /config` and dynamically styles the version pill.
+
+---
+
+## �📡 API Reference
 
 ### `POST /track` — Ingest Events
 
