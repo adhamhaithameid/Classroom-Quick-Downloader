@@ -22,18 +22,18 @@
     "zip:all": "wxt zip -b chrome && wxt zip -b firefox && wxt zip -b safari && wxt zip -b edge"
   },
   "dependencies": {
-    "react": "^19.2.3",
-    "react-dom": "^19.2.3"
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
   },
   "devDependencies": {
     "@testing-library/dom": "^10.4.1",
     "@types/chrome": "^0.1.36",
     "@types/jsdom": "^27.0.0",
-    "@types/react": "^19.2.8",
+    "@types/react": "^19.2.10",
     "@types/react-dom": "^19.2.3",
     "@vitest/coverage-v8": "^4.0.18",
     "@wxt-dev/module-react": "^1.1.5",
-    "happy-dom": "^20.3.7",
+    "happy-dom": "^20.4.0",
     "jsdom": "^27.4.0",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18",

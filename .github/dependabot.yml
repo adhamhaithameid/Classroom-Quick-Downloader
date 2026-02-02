@@ -4,10 +4,34 @@ updates:
   - package-ecosystem: "npm"
     directory: "/extension"
     schedule:
-      interval: "weekly"
+      interval: "daily"
     commit-message:
       prefix: "chore(deps)"
     labels:
       - "dependencies"
-      - "npm"
+      - "extension"
+    open-pull-requests-limit: 10
+
+  # npm dependencies for the cloudflare worker
+  - package-ecosystem: "npm"
+    directory: "/cloudflare-worker"
+    schedule:
+      interval: "daily"
+    commit-message:
+      prefix: "chore(deps)"
+    labels:
+      - "dependencies"
+      - "worker"
+    open-pull-requests-limit: 10
+
+  # npm dependencies for the oracle backend
+  - package-ecosystem: "npm"
+    directory: "/oracle-backend"
+    schedule:
+      interval: "daily"
+    commit-message:
+      prefix: "chore(deps)"
+    labels:
+      - "dependencies"
+      - "backend"
     open-pull-requests-limit: 10
