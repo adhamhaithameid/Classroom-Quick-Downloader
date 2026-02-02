@@ -9,10 +9,15 @@ export interface ChangelogEntry {
   isImportant?: boolean;
 }
 
+export interface NotificationRule {
+  id: string;
+  target: string;
+  priority: 'normal' | 'minor' | 'major';
+  effect: 'none' | 'glow' | 'pulse';
+}
+
 export interface ChangelogConfig {
-  customPill: boolean;
-  pillColor?: string;
-  showNotification: boolean;
+  rules: NotificationRule[];
   lastUpdated?: number;
 }
 
@@ -23,7 +28,7 @@ export interface ChangelogData {
 }
 
 const STORAGE_KEY = 'cqd_changelog_v1';
-const CACHE_duration_MS = 60 * 60 * 1000; // 1 hour
+const CACHE_duration_MS = 0; // Always fetch on reload
 
 /**
  * Fetch changelog from storage or network.
@@ -81,29 +86,71 @@ const SEEN_KEY = 'cqd_changelog_seen_v1';
 /**
  * Mark the current version as seen.
  */
+/**
+ * Mark a version as seen.
+ */
 export async function markAsSeen(version: string): Promise<void> {
   if (!version) return;
-  await chrome.storage.local.set({ [SEEN_KEY]: version });
+  const data = await chrome.storage.local.get(SEEN_KEY);
+  const seen = (data[SEEN_KEY] as string[]) || [];
+  if (!seen.includes(version)) {
+    const newSeen = [...seen, version];
+    await chrome.storage.local.set({ [SEEN_KEY]: newSeen });
+  }
 }
 
 /**
- * Check if we should show a notification (e.g. unread update).
- * Logic: 
- * 1. Global config.showNotification must be true.
- * 2. AND current extension version must NOT match the last "seen" version.
- * 3. AND we must have fetched data.
+ * Check if a version has been seen.
  */
-export async function shouldShowNotification(data: ChangelogData | null): Promise<boolean> {
-  if (!data || !data.config || !data.config.showNotification) return false;
+export async function isVersionSeen(version: string): Promise<boolean> {
+  if (!version) return false;
+  const data = await chrome.storage.local.get(SEEN_KEY);
+  const seen = (data[SEEN_KEY] as string[]) || [];
+  return seen.includes(version);
+}
+
+/**
+ * Get the matching rule for a given version.
+ * Priority: Exact Match > "all" > null
+ */
+export function getMatchingRule(config: ChangelogConfig | undefined, currentVersion: string): NotificationRule | null {
+  if (!config || !config.rules || !config.rules.length) return null;
+
+  // 1. Exact Match
+  const exact = config.rules.find(r => r.target === currentVersion);
+  if (exact) return exact;
+
+  // 2. Wildcard "all"
+  const all = config.rules.find(r => r.target === 'all');
+  if (all) return all;
+
+  return null;
+}
+
+
+
+/**
+ * Helper: Get pill CSS classes based on rule & seen state
+ */
+export function getRuleClasses(rule: NotificationRule | null, isSeen: boolean): string {
+  if (!rule) return '';
+  if (isSeen) return ''; // Default / Normal style if seen
+
+  const classes = [];
   
-  const currentVer = getExtensionVersion();
-  // If we have no data, or extension version is unknown, don't show
-  if (!currentVer) return false;
+  // Priority (Color)
+  if (rule.priority === 'minor') classes.push('cqd-pill-minor');
+  if (rule.priority === 'major') classes.push('cqd-pill-major');
+  
+  // Effect
+  // Glow: Minor=Blue, Major=Red
+  if (rule.effect === 'glow') {
+    classes.push(rule.priority === 'major' ? 'cqd-effect-glow-red' : 'cqd-effect-glow-blue');
+  }
+  // Pulse: Minor=Blue, Major=Red
+  if (rule.effect === 'pulse') {
+    classes.push(rule.priority === 'major' ? 'cqd-effect-pulse-red' : 'cqd-effect-pulse-blue');
+  }
 
-  // Check what user has seen
-  const stored = await chrome.storage.local.get(SEEN_KEY);
-  const seenVer = stored[SEEN_KEY];
-
-  // If user hasn't seen this version yet, show notification
-  return seenVer !== currentVer;
+  return classes.join(' ');
 }

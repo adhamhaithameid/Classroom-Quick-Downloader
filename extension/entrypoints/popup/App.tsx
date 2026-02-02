@@ -8,7 +8,7 @@ import bmcLogoSrc from '../../assets/bmc-logo.svg';
 import chromeSvg from '../../assets/Chrome.svg';
 import firefoxSvg from '../../assets/Firefox.svg';
 import edgeSvg from '../../assets/Edge.svg';
-import { fetchChangelog, shouldShowNotification, markAsSeen, getLatestChange, type ChangelogData } from '../utils/changelog';
+import { fetchChangelog, getMatchingRule, getRuleClasses, isVersionSeen, markAsSeen, getLatestChange, type ChangelogData } from '../utils/changelog';
 
 // External Links
 const SURVEY_URL = 'https://forms.gle/wPU2b1Qxa7svHqJa6';
@@ -303,7 +303,6 @@ function App() {
   // CHANGELOG STATE
   const [changelogData, setChangelogData] = useState<ChangelogData | null>(null);
   const [showChangelog, setShowChangelog] = useState(false);
-  const [hasNotification, setHasNotification] = useState(false);
 
   // Track scroll to add blur/shadow under header when not at top
   useEffect(() => {
@@ -453,12 +452,18 @@ function App() {
 
   // --- CHANGELOG LOADING ---
   useEffect(() => {
-    fetchChangelog().then(async (data) => {
+    fetchChangelog().then((data) => {
       setChangelogData(data);
-      const notify = await shouldShowNotification(data);
-      setHasNotification(notify);
     });
   }, []);
+
+  // --- SEEN STATE ---
+  const [seen, setSeen] = useState(false);
+  useEffect(() => {
+    if (version) {
+       isVersionSeen(version).then(setSeen);
+    }
+  }, [version]);
 
   // --- GLOBAL SETTINGS LOGIC ---
   useEffect(() => {
@@ -620,22 +625,18 @@ function App() {
                 </span>
                 {version && (
                   <button
-                    className={`cqd-brand-version ${
-                      // Priority: 1. Unseen (Red) -> 2. Custom Config (Glow) -> 3. Standard
-                      hasNotification ? 'cqd-version-unseen' : 
-                      (changelogData?.config?.customPill ? 'cqd-version-glow' : '')
-                    }`}
+                    className={`cqd-brand-version ${getRuleClasses(getMatchingRule(changelogData?.config, version), seen)}`}
                     aria-label={`Version ${version} - View changelog`}
                     title={getLatestChange(changelogData) ? `Latest: ${getLatestChange(changelogData)}` : "View changelog"}
-                    onClick={() => {
-                      setShowChangelog(true);
-                      if (hasNotification && version) {
-                        markAsSeen(version);
-                        setHasNotification(false);
-                      }
+                    onClick={async () => {
+                       setShowChangelog(true);
+                       if (version) {
+                         await markAsSeen(version);
+                         setSeen(true);
+                       }
                     }}
                   >
-                    v{version}
+                    <span>v{version}</span>
                   </button>
                 )}
               </div>
@@ -673,6 +674,18 @@ function App() {
                 ) : (
                   <div className="cqd-cl-empty">No changelog entries found.</div>
                 )}
+              </div>
+              
+              {/* Footer Link */}
+              <div className="cqd-cl-footer">
+                <a 
+                  href={SURVEY_URL} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="cqd-cl-footer-link"
+                >
+                  💡 Request a feature / Report a bug ↗
+                </a>
               </div>
             </div>
           </div>

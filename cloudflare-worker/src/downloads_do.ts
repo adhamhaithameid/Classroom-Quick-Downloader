@@ -3,8 +3,6 @@
 import {
   Counters,
   RetryState,
-  StatsResponse,
-  ConfigResponse,
   QuotaDescriptor,
   StoredEvent,
   EnvSnapshot,
@@ -270,8 +268,7 @@ export class DownloadsDurable {
       // Changelog defaults
       changelog: [],
       changelogConfig: {
-        customPill: false,
-        showNotification: false,
+        rules: [],
         lastUpdated: Date.now(),
       },
     };
@@ -582,7 +579,7 @@ export class DownloadsDurable {
     // =========================================================================
     // LAYER 4: ROBUST IDEMPOTENCY (Set-based O(1) lookup + timestamp validation)
     // =========================================================================
-    const MAX_PROCESSED_IDS = 5000;
+    // const MAX_PROCESSED_IDS = 5000;
     const MAX_EVENT_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
     const MIN_EVENT_TIME = now - MAX_EVENT_AGE_MS;
     const MAX_FUTURE_DRIFT_MS = 5 * 60 * 1000; // 5 minutes
@@ -1444,7 +1441,7 @@ export class DownloadsDurable {
       }
 
       return json({ ok: true, updated });
-    } catch (e) {
+    } catch {
       return json({ ok: false, error: "invalid_payload" }, { status: 400 });
     }
   }
