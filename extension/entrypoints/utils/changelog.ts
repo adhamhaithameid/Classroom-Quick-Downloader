@@ -9,12 +9,16 @@ export interface ChangelogEntry {
   isImportant?: boolean;
 }
 
+export interface NotificationRule {
+  id: string;
+  target: string;
+  glow: boolean;
+  showDot: boolean;
+}
+
 export interface ChangelogConfig {
-  customPill: boolean;
-  pillColor?: string;
-  showNotification: boolean;
+  rules: NotificationRule[];
   lastUpdated?: number;
-  latestVersion?: string;
 }
 
 export interface ChangelogData {
@@ -88,23 +92,37 @@ export async function markAsSeen(version: string): Promise<void> {
 }
 
 /**
- * Check if we should show a notification (e.g. unread update).
- * Logic: 
- * 1. Global config.showNotification must be true.
- * 2. AND current extension version must NOT match the last "seen" version.
- * 3. AND we must have fetched data.
+ * Get the matching rule for a given version.
+ * Priority: Exact Match > "all" > null
  */
-export async function shouldShowNotification(data: ChangelogData | null): Promise<boolean> {
-  if (!data || !data.config || !data.config.showNotification) return false;
-  
-  const currentVer = getExtensionVersion();
-  // If we have no data, or extension version is unknown, don't show
-  if (!currentVer) return false;
+export function getMatchingRule(config: ChangelogConfig | undefined, currentVersion: string): NotificationRule | null {
+  if (!config || !config.rules || !config.rules.length) return null;
 
-  // Check what user has seen
-  const stored = await chrome.storage.local.get(SEEN_KEY);
-  const seenVer = stored[SEEN_KEY];
+  // 1. Exact Match
+  const exact = config.rules.find(r => r.target === currentVersion);
+  if (exact) return exact;
 
-  // If user hasn't seen this version yet, show notification
-  return seenVer !== currentVer;
+  // 2. Wildcard "all"
+  const all = config.rules.find(r => r.target === 'all');
+  if (all) return all;
+
+  return null;
+}
+
+/**
+ * Check if we should show a notification dot based on ACTIVE RULE.
+ * (This is slightly different from before - now the rule fully controls the UI)
+ */
+export function shouldShowDot(rule: NotificationRule | null): boolean {
+  return rule ? rule.showDot : false;
+}
+
+/**
+ * Helper: Get pill CSS classes based on rule
+ */
+export function getRuleClasses(rule: NotificationRule | null): string {
+  if (!rule) return '';
+  const classes = [];
+  if (rule.glow) classes.push('cqd-version-glow');
+  return classes.join(' ');
 }

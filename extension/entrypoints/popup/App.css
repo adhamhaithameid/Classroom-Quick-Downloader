@@ -204,6 +204,13 @@ body {
   box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
 }
 
+.cqd-version-glow {
+  color: #fff !important;
+  border-color: #00d2ff !important;
+  box-shadow: 0 0 10px #00d2ff, 0 0 5px #007bff !important;
+  background: linear-gradient(135deg, rgba(0, 210, 255, 0.2) 0%, rgba(58, 123, 213, 0.2) 100%) !important;
+}
+
 /* ===============================
  * Content Area / Panels
  * =============================== */

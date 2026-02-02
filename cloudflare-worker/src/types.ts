@@ -163,15 +163,19 @@ export interface ChangelogEntry {
   isImportant?: boolean; // Highlight in UI?
 }
 
+export interface NotificationRule {
+  id: string;
+  target: string; // "all" or specific version "1.2.3"
+  glow: boolean;
+  showDot: boolean;
+}
+
 /**
  * Configuration for the "Version Pill" in the extension.
  */
 export interface ChangelogConfig {
-  customPill: boolean; // Enable custom styling
-  pillColor?: string; // Optional custom color (hex)
-  showNotification: boolean; // Show "!" icon
-  lastUpdated?: number; // Timestamp of last config/changelog update
-  latestVersion?: string; // Broadcast latest version to extensions
+  rules: NotificationRule[];
+  lastUpdated?: number;
 }
 
 /**

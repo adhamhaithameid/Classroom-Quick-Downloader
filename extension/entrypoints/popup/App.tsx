@@ -8,7 +8,7 @@ import bmcLogoSrc from '../../assets/bmc-logo.svg';
 import chromeSvg from '../../assets/Chrome.svg';
 import firefoxSvg from '../../assets/Firefox.svg';
 import edgeSvg from '../../assets/Edge.svg';
-import { fetchChangelog, shouldShowNotification, markAsSeen, getLatestChange, type ChangelogData } from '../utils/changelog';
+import { fetchChangelog, getMatchingRule, getRuleClasses, shouldShowDot, getLatestChange, type ChangelogData } from '../utils/changelog';
 
 // External Links
 const SURVEY_URL = 'https://forms.gle/wPU2b1Qxa7svHqJa6';
@@ -303,7 +303,6 @@ function App() {
   // CHANGELOG STATE
   const [changelogData, setChangelogData] = useState<ChangelogData | null>(null);
   const [showChangelog, setShowChangelog] = useState(false);
-  const [hasNotification, setHasNotification] = useState(false);
 
   // Track scroll to add blur/shadow under header when not at top
   useEffect(() => {
@@ -453,10 +452,8 @@ function App() {
 
   // --- CHANGELOG LOADING ---
   useEffect(() => {
-    fetchChangelog().then(async (data) => {
+    fetchChangelog().then((data) => {
       setChangelogData(data);
-      const notify = await shouldShowNotification(data);
-      setHasNotification(notify);
     });
   }, []);
 
@@ -620,30 +617,15 @@ function App() {
                 </span>
                 {version && (
                   <button
-                    className={`cqd-brand-version ${
-                      // Priority: 1. Update Available (Red Pulse) -> 2. Unseen (Red Static) -> 3. Custom Config (Glow) -> 4. Standard
-                      (changelogData?.config?.latestVersion && version !== 'dev' && changelogData.config.latestVersion !== version) ? 'cqd-version-update' :
-                      hasNotification ? 'cqd-version-unseen' : 
-                      (changelogData?.config?.customPill ? 'cqd-version-glow' : '')
-                    }`}
+                    className={`cqd-brand-version ${getRuleClasses(getMatchingRule(changelogData?.config, version))}`}
                     aria-label={`Version ${version} - View changelog`}
-                    title={
-                      (changelogData?.config?.latestVersion && version !== 'dev' && changelogData.config.latestVersion !== version) 
-                        ? `Update available: v${changelogData.config.latestVersion}`
-                        : (getLatestChange(changelogData) ? `Latest: ${getLatestChange(changelogData)}` : "View changelog")
-                    }
-                    onClick={() => {
-                      setShowChangelog(true);
-                      if (hasNotification && version) {
-                        markAsSeen(version);
-                        setHasNotification(false);
-                      }
-                    }}
+                    title={getLatestChange(changelogData) ? `Latest: ${getLatestChange(changelogData)}` : "View changelog"}
+                    onClick={() => setShowChangelog(true)}
                   >
-                    {(changelogData?.config?.latestVersion && version !== 'dev' && changelogData.config.latestVersion !== version)
-                      ? `Update to v${changelogData.config.latestVersion}`
-                      : `v${version}`
-                    }
+                    <span>v{version}</span>
+                    {shouldShowDot(getMatchingRule(changelogData?.config, version)) && (
+                       <span className="cqd-notification-dot-inline" />
+                    )}
                   </button>
                 )}
               </div>
