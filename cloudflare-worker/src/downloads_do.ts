@@ -270,8 +270,7 @@ export class DownloadsDurable {
       // Changelog defaults
       changelog: [],
       changelogConfig: {
-        customPill: false,
-        showNotification: false,
+        rules: [],
         lastUpdated: Date.now(),
       },
     };
