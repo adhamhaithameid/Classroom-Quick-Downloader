@@ -276,7 +276,7 @@ function renderChangelogSection(entries: ChangelogEntry[], config: ChangelogConf
 
   const rulesJson = JSON.stringify(config.rules || []);
 
-  // EXACT CSS FROM EXTENSION (App.css)
+  // EXACT CSS FROM EXTENSION (App.css) - WITH HOVER EFFECTS
   const extensionStyles = `
     /* Base version pill */
     .cqd-brand-version {
@@ -285,11 +285,17 @@ function renderChangelogSection(entries: ChangelogEntry[], config: ChangelogConf
       background: #e3edff; /* cqd-blue-soft */
       padding: 2px 8px;
       border-radius: 999px;
-      font-size: 11px; /* Slightly larger for dashboard visibility */
-      border: 1px solid transparent; /* Explicit border for consistency */
-      cursor: default;
+      font-size: 11px;
+      border: 1px solid transparent;
+      cursor: pointer;
       transition: all 0.2s ease;
       display: inline-block;
+    }
+    .cqd-brand-version:hover {
+      background: #005dd7;
+      color: white;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
     }
     
     /* STATES */
@@ -297,9 +303,20 @@ function renderChangelogSection(entries: ChangelogEntry[], config: ChangelogConf
       background: #005dd7 !important;
       color: #fff !important;
     }
+    .cqd-pill-minor:hover {
+      background: #2563eb !important;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 8px rgba(59, 130, 246, 0.4) !important;
+    }
+    
     .cqd-pill-major {
       background: #ef4444 !important;
       color: #fff !important;
+    }
+    .cqd-pill-major:hover {
+      background: #dc2626 !important;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 8px rgba(239, 68, 68, 0.4) !important;
     }
 
     /* EFFECTS */
@@ -308,10 +325,17 @@ function renderChangelogSection(entries: ChangelogEntry[], config: ChangelogConf
       box-shadow: 0 0 10px #00d2ff, 0 0 5px #007bff !important;
       border-color: #00d2ff !important;
     }
+    .cqd-effect-glow-blue:hover {
+      box-shadow: 0 0 15px #00d2ff, 0 0 10px #007bff, 0 4px 8px rgba(0, 210, 255, 0.3) !important;
+    }
+    
     /* Glow (Red) */
     .cqd-effect-glow-red {
       box-shadow: 0 0 10px #f87171, 0 0 5px #ef4444 !important;
       border-color: #f87171 !important;
+    }
+    .cqd-effect-glow-red:hover {
+      box-shadow: 0 0 15px #f87171, 0 0 10px #ef4444, 0 4px 8px rgba(248, 113, 113, 0.3) !important;
     }
 
     /* Pulse (Blue) */
@@ -323,6 +347,9 @@ function renderChangelogSection(entries: ChangelogEntry[], config: ChangelogConf
     .cqd-effect-pulse-blue {
       animation: pulse-blue 2s infinite;
     }
+    .cqd-effect-pulse-blue:hover {
+      animation: pulse-blue 1s infinite;
+    }
 
     /* Pulse (Red) */
     @keyframes pulse-red {
@@ -332,6 +359,9 @@ function renderChangelogSection(entries: ChangelogEntry[], config: ChangelogConf
     }
     .cqd-effect-pulse-red {
       animation: pulse-red 2s infinite;
+    }
+    .cqd-effect-pulse-red:hover {
+      animation: pulse-red 1s infinite;
     }
   `;
 

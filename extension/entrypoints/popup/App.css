@@ -211,11 +211,21 @@ body {
   background: var(--cqd-blue) !important;
   color: #fff !important;
 }
+.cqd-pill-minor:hover {
+  background: #2563eb !important; /* Darker blue on hover */
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(59, 130, 246, 0.4) !important;
+}
 
 /* Major: Red BG, White Text */
 .cqd-pill-major {
   background: var(--cqd-red) !important;
   color: #fff !important;
+}
+.cqd-pill-major:hover {
+  background: #dc2626 !important; /* Darker red on hover */
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(239, 68, 68, 0.4) !important;
 }
 
 /* --- EFFECTS --- */
@@ -225,11 +235,17 @@ body {
   box-shadow: 0 0 10px #00d2ff, 0 0 5px #007bff !important;
   border-color: #00d2ff !important;
 }
+.cqd-effect-glow-blue:hover {
+  box-shadow: 0 0 15px #00d2ff, 0 0 10px #007bff, 0 4px 8px rgba(0, 210, 255, 0.3) !important;
+}
 
 /* Glow (Red) - For Major */
 .cqd-effect-glow-red {
   box-shadow: 0 0 10px #f87171, 0 0 5px #ef4444 !important;
   border-color: #f87171 !important;
+}
+.cqd-effect-glow-red:hover {
+  box-shadow: 0 0 15px #f87171, 0 0 10px #ef4444, 0 4px 8px rgba(248, 113, 113, 0.3) !important;
 }
 
 /* Pulse (Blue) */
@@ -241,6 +257,9 @@ body {
 .cqd-effect-pulse-blue {
   animation: pulse-blue 2s infinite;
 }
+.cqd-effect-pulse-blue:hover {
+  animation: pulse-blue 1s infinite; /* Faster pulse on hover */
+}
 
 /* Pulse (Red) */
 @keyframes pulse-red {
@@ -250,6 +269,9 @@ body {
 }
 .cqd-effect-pulse-red {
   animation: pulse-red 2s infinite;
+}
+.cqd-effect-pulse-red:hover {
+  animation: pulse-red 1s infinite; /* Faster pulse on hover */
 }
 
 /* ===============================
