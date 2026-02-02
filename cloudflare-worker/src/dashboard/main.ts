@@ -245,9 +245,17 @@ export function renderLoginPage(errorMessage?: string): string {
 </html>`;
 }
 
+// Notification Rules Engine UI
 function renderChangelogSection(entries: ChangelogEntry[], config: ChangelogConfig): string {
   const sorted = [...entries].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   
+  // Versions for DataList
+  const knownVersions = Array.from(new Set(sorted.map(e => e.version)));
+  const dataListOptions = [
+    '<option value="all">Global (All Versions)</option>',
+    ...knownVersions.map(v => `<option value="${v}">v${v}</option>`)
+  ].join('');
+
   const historyHtml = sorted.map(e => `
     <div class="cl-history-item" style="border-bottom: 1px dashed var(--border-subtle); padding: 12px 0;">
       <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px;">
@@ -266,62 +274,122 @@ function renderChangelogSection(entries: ChangelogEntry[], config: ChangelogConf
     </div>
   `).join('') || '<div style="text-align: center; color: var(--text-soft); padding: 20px;">No releases yet</div>';
 
+  const rulesJson = JSON.stringify(config.rules || []);
+
   return `
     <section class="card config-card" style="border-color: #3b82f6;">
       <h2 style="color: #3b82f6; display: flex; align-items: center; gap: 8px;">
-        <span>📜</span> Changelog Management
+        <span>📜</span> Notification Rules Engine
       </h2>
 
+      <!-- Inject Server State -->
+      <script>window.CURRENT_RULES = ${rulesJson};</script>
+
       <div class="split-layout" style="display: flex; gap: 24px; flex-wrap: wrap;">
-        <!-- LEFT: Config & New Entry -->
-        <div style="flex: 1; min-width: 300px; display: flex; flex-direction: column; gap: 16px;">
+        <!-- LEFT: Rules Engine -->
+        <div style="flex: 1; min-width: 300px; display: flex; flex-direction: column; gap: 20px;">
           
-          <div class="metric-sub" style="margin-bottom: 4px;">Global Configuration</div>
-          <div class="config-row">
-            <label class="switch-label">
-              <input type="checkbox" id="cl-custom-pill" ${config.customPill ? "checked" : ""}>
-              <span class="label-text">Custom Version Pill (Blue Glow)</span>
-            </label>
-          </div>
-          <div class="config-row">
-            <label class="switch-label">
-              <input type="checkbox" id="cl-notification" ${config.showNotification ? "checked" : ""}>
-              <span class="label-text">Show Notification Dot (Red)</span>
-            </label>
-          </div>
+          <div class="metric-sub">Manage Version Notification Rules</div>
           
-          <div class="input-group" style="margin-top: 10px;">
-             <label style="display: block; font-size: 0.85em; color: var(--text-soft); margin-bottom: 4px;">Latest Broadcast Version</label>
-             <input type="text" id="cl-latest-ver" value="${config.latestVersion || ""}" placeholder="e.g. 1.2.4" class="input-field" style="width: 100%; padding: 8px; background: var(--bg-elevated); border: 1px solid var(--border-subtle); color: var(--text-main); border-radius: 6px;">
-          </div>
+          <!-- Rule Form -->
+          <div style="padding: 16px; background: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid var(--border-subtle);">
+            <div style="font-weight: 600; font-size: 0.85em; margin-bottom: 12px; color: var(--text-main);">Add New Rule</div>
+            
+            <div class="grid-2" style="display: grid; grid-template-columns: 1fr; gap: 12px; margin-bottom: 12px;">
+               <div class="input-group">
+                 <label style="font-size: 0.75em; color: var(--text-soft);">Target Version</label>
+                 <!-- Datalist for suggestions + typing -->
+                 <input list="known-versions" id="rule-target" placeholder="Select version or type 'all'" class="input-field" style="width: 100%; padding: 6px; background: var(--bg-elevated); border: 1px solid var(--border-subtle); color: white; border-radius: 4px;">
+                 <datalist id="known-versions">
+                   ${dataListOptions}
+                 </datalist>
+                 <div style="font-size: 0.7em; color: var(--text-muted); margin-top: 4px;">Type "all" for global rule. "v" prefix ignored.</div>
+               </div>
+            </div>
+            
+            <div style="border-top: 1px dashed var(--border-subtle); margin: 8px 0; padding-top: 8px;">
+              <label style="font-size: 0.75em; color: var(--text-soft); display: block; margin-bottom: 8px;">Visual Effects</label>
+              <div style="display: flex; gap: 16px; margin-bottom: 16px;">
+                 <label class="switch-label" style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                   <input type="checkbox" id="rule-glow" checked>
+                   <span style="font-size: 0.85em; color: var(--text-muted); display:flex; align-items:center; gap:4px;">
+                     ✨ Use Glow
+                   </span>
+                 </label>
+                 <label class="switch-label" style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                   <input type="checkbox" id="rule-dot">
+                   <span style="font-size: 0.85em; color: var(--text-muted); display:flex; align-items:center; gap:4px;">
+                     🔴 Show Dot
+                   </span>
+                 </label>
+              </div>
+            </div>
 
-          <hr style="border: 0; border-top: 1px dashed var(--border-subtle); margin: 8px 0;">
+            <!-- Preview -->
+            <div style="display: flex; align-items: center; gap: 12px; padding: 12px; background: #050816; border-radius: 6px; margin-bottom: 16px;">
+               <span style="font-size: 0.75em; color: var(--text-soft);">LIVE PREVIEW:</span>
+               
+               <!-- Preview Pill (matches Extension CSS) -->
+               <button id="rule-preview-pill" style="
+                 margin-left: auto;
+                 font-weight: 600;
+                 color: var(--cqd-blue);
+                 background: var(--cqd-blue-soft);
+                 padding: 2px 8px;
+                 border-radius: 999px;
+                 font-size: 10px;
+                 border: none;
+                 cursor: pointer;
+                 transition: all 0.2s ease;
+               ">
+                 vX.X.X
+               </button>
+               
+               <span id="rule-preview-dot" style="width: 8px; height: 8px; border-radius: 50%; background: #ef4444; display: none;"></span>
+            </div>
 
-          <div class="metric-sub" style="margin-bottom: 4px;">Add New Release</div>
-          <div class="input-group">
-            <label style="display: block; font-size: 0.85em; color: var(--text-soft); margin-bottom: 4px;">Version</label>
-            <input type="hidden" id="edit-cl-id" value="">
-            <input type="text" id="new-cl-version" placeholder="e.g. 1.2.0" class="input-field" style="width: 100%; padding: 8px; background: var(--bg-elevated); border: 1px solid var(--border-subtle); color: var(--text-main); border-radius: 6px;">
-          </div>
-          <div class="input-group">
-            <label style="display: block; font-size: 0.85em; color: var(--text-soft); margin-bottom: 4px;">Changes (one per line)</label>
-            <textarea id="new-cl-changes" rows="5" class="input-field" placeholder="- Added cool feature\n- Fixed annoying bug" style="width: 100%; padding: 8px; background: var(--bg-elevated); border: 1px solid var(--border-subtle); color: var(--text-main); border-radius: 6px;"></textarea>
-          </div>
-          
-          <div style="margin-top: 8px;">
-            <button id="btn-save-all" class="btn btn-primary" style="width: 100%; padding: 10px; background: var(--accent); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">
-              💾 Save Changes (Config & Release)
+            <button id="btn-add-rule" class="btn" style="width: 100%; justify-content: center; background: rgba(34, 197, 94, 0.15); border-color: rgba(34, 197, 94, 0.4); color: #4ade80;">
+               + Add Rule to List
             </button>
           </div>
 
+          <!-- Rules List -->
+          <div style="flex: 1;">
+            <div class="metric-sub" style="margin-bottom: 8px; display: flex; justify-content: space-between;">
+               <span>Active Rules Priority: Specific > All</span>
+               <span id="rules-count" style="color: var(--text-main);">0 rules</span>
+            </div>
+            <div id="rules-list-container" style="display: flex; flex-direction: column; gap: 8px; max-height: 300px; overflow-y: auto;">
+               <!-- JS renders here -->
+               <div style="padding: 12px; text-align: center; color: var(--text-soft); font-style: italic;">No rules defined. Default styling applies.</div>
+            </div>
+          </div>
+
+          <hr style="border: 0; border-top: 1px dashed var(--border-subtle); margin: 8px 0;">
+          
+          <button id="btn-save-all" class="btn btn-primary" style="width: 100%; padding: 12px; background: var(--accent); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 1rem;">
+             💾 SAVE ALL CHANGES
+          </button>
+
         </div>
 
-        <!-- RIGHT: History -->
+        <!-- RIGHT: History and Release Form -->
         <div style="flex: 1; min-width: 300px; border-left: 1px solid var(--border-subtle); padding-left: 24px;">
-          <div class="metric-sub" style="margin-bottom: 12px;">Release History</div>
-          <div class="cl-history-list" style="max-height: 500px; overflow-y: auto;">
-            ${historyHtml}
-          </div>
+           
+           <!-- New Release Form (Collapsed by default? No, let's keep it visible) -->
+           <div class="metric-sub" style="margin-bottom: 8px;">Publish New Release</div>
+           <div class="input-group" style="margin-bottom: 12px;">
+              <input type="hidden" id="edit-cl-id" value="">
+              <input type="text" id="new-cl-version" placeholder="Version (e.g. 1.2.4)" class="input-field" style="width: 100%; padding: 8px; background: var(--bg-elevated); border: 1px solid var(--border-subtle); color: var(--text-main); border-radius: 6px;">
+           </div>
+           <div class="input-group" style="margin-bottom: 12px;">
+              <textarea id="new-cl-changes" rows="3" class="input-field" placeholder="- Changes..." style="width: 100%; padding: 8px; background: var(--bg-elevated); border: 1px solid var(--border-subtle); color: var(--text-main); border-radius: 6px;"></textarea>
+           </div>
+           
+           <div class="metric-sub" style="margin-bottom: 12px; margin-top: 24px;">Release History</div>
+           <div class="cl-history-list" style="max-height: 400px; overflow-y: auto;">
+             ${historyHtml}
+           </div>
         </div>
       </div>
     </section>
@@ -2179,15 +2247,140 @@ ${rawStatsJson}
         }
       }
 
+      // --- NEW RULES ENGINE LOGIC ---
+      
+      // Init rules from server state
+      let activeRules = window.CURRENT_RULES || [];
+      
+      function renderRulesList() {
+         const container = document.getElementById("rules-list-container");
+         const countEl = document.getElementById("rules-count");
+         if (!container) return;
+         
+         if (countEl) countEl.textContent = activeRules.length + " rules";
+
+         if (activeRules.length === 0) {
+            container.innerHTML = '<div style="padding: 12px; text-align: center; color: var(--text-soft); font-style: italic;">No rules defined. Default styling applies.</div>';
+            return;
+         }
+
+         container.innerHTML = activeRules.map((rule, idx) => \`
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-subtle); border-radius: 6px;">
+               <div style="display: flex; align-items: center; gap: 12px;">
+                 <span style="font-family: monospace; font-size: 0.9em; background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px; color: \${rule.target === 'all' ? '#fbbf24' : '#fff'};\সামরিক">\${rule.target}</span>
+                 
+                 <!-- Preview Mini -->
+                 <span style="
+                   font-size: 0.75rem; padding: 2px 8px; border-radius: 99px;
+                   color: \${rule.glow ? '#fff' : '#3b82f6'};
+                   background: \${rule.glow ? 'linear-gradient(135deg, rgba(0, 210, 255, 0.2) 0%, rgba(58, 123, 213, 0.2) 100%)' : 'rgba(59, 130, 246, 0.1)'};
+                   border: \${rule.glow ? '1px solid #00d2ff' : 'none'};
+                   \${rule.glow ? \`box-shadow: 0 0 6px #00d2ff;\` : ''}
+                 ">
+                   vX.X
+                 </span>
+                 \${rule.showDot ? '<span style="width:6px; height:6px; border-radius:50%; background:#ef4444;"></span>' : ''}
+               </div>
+               <button type="button" class="btn-xs delete-rule-btn" data-idx="\${idx}" style="color: #fca5a5; border-color: rgba(239,68,68,0.3);">✕</button>
+            </div>
+         \`).join('');
+         
+         // Attach delete listeners
+         container.querySelectorAll(".delete-rule-btn").forEach(btn => {
+            btn.onclick = () => {
+               const idx = parseInt(btn.dataset.idx);
+               activeRules.splice(idx, 1);
+               renderRulesList();
+            };
+         });
+      }
+
+      // Initial Render
+      renderRulesList();
+
+      // Rule Form Inputs
+      const inputTarget = document.getElementById("rule-target");
+      const checkGlow = document.getElementById("rule-glow");
+      const checkDot = document.getElementById("rule-dot");
+      const previewPill = document.getElementById("rule-preview-pill");
+      const previewDot = document.getElementById("rule-preview-dot");
+      const btnAddRule = document.getElementById("btn-add-rule");
+
+      // Listeners for preview
+      [inputTarget, checkGlow, checkDot].forEach(el => {
+         if(el) el.oninput = updatePreview;
+      });
+
+      function updatePreview() {
+         if (!previewPill) return;
+         const glow = checkGlow.checked;
+         const dot = checkDot.checked;
+         
+         // Match App.css .cqd-brand-version and .cqd-version-glow
+         if (glow) {
+             previewPill.style.color = "#fff";
+             previewPill.style.borderColor = "#00d2ff";
+             previewPill.style.boxShadow = "0 0 10px #00d2ff, 0 0 5px #007bff";
+             previewPill.style.background = "linear-gradient(135deg, rgba(0, 210, 255, 0.2) 0%, rgba(58, 123, 213, 0.2) 100%)";
+         } else {
+             // Standard Style
+             previewPill.style.color = "var(--cqd-blue)";
+             previewPill.style.borderColor = "transparent";
+             previewPill.style.boxShadow = "none";
+             previewPill.style.background = "var(--cqd-blue-soft)";
+         }
+         
+         if (previewDot) previewDot.style.display = dot ? "block" : "none";
+      }
+
+      // Listeners for preview
+      [inputTarget, checkGlow, checkDot].forEach(el => {
+         if(el) el.oninput = updatePreview;
+      });
+      
+      // Init preview
+      updatePreview();
+
+      // Add Rule Action
+      if (btnAddRule) {
+         btnAddRule.onclick = () => {
+            let target = inputTarget.value.trim();
+            // Normalization: strip leading 'v'
+            if (target.toLowerCase().startsWith('v')) {
+               target = target.substring(1);
+            }
+            // Basic version validation (simple check)
+            if (!target) return;
+            
+            const glow = checkGlow.checked;
+            const showDot = checkDot.checked;
+            
+            // Dedupe matching targets
+            const existingIdx = activeRules.findIndex(r => r.target === target);
+            // Remove color property
+            const newRule = { id: crypto.randomUUID(), target, glow, showDot };
+            
+            if (existingIdx >= 0) {
+               if(confirm(\`Rule for "\${target}" already exists. Overwrite?\`)) {
+                  activeRules[existingIdx] = newRule;
+               } else {
+                  return;
+               }
+            } else {
+               activeRules.push(newRule);
+            }
+            
+            // Clear input
+            inputTarget.value = "";
+            renderRulesList();
+         };
+      }
+
       if (btnSaveAll) {
         btnSaveAll.onclick = () => {
-          // 1. Gather Config
-          const customPill = document.getElementById("cl-custom-pill").checked;
-          const showNotification = document.getElementById("cl-notification").checked;
-          const latestVersion = document.getElementById("cl-latest-ver").value.trim();
-          
+          // 1. Gather Config (Active Rules)
           const payload = {
-            config: { customPill, showNotification, latestVersion }
+            config: { rules: activeRules }
           };
 
           // 2. Gather New/Edit Release (if ANY text entered)
@@ -2219,8 +2412,6 @@ ${rawStatsJson}
             }
 
           } else if (ver || text) {
-             // If partially filled, warn user? Or just ignore? 
-             // Let's warn to be safe
              if (!confirm("Release fields are partially filled but will NOT be saved. Proceed with saving ONLY config?")) {
                return;
              }
