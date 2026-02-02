@@ -204,11 +204,52 @@ body {
   box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
 }
 
-.cqd-version-glow {
+/* --- STATES --- */
+
+/* Minor: Blue BG, White Text */
+.cqd-pill-minor {
+  background: var(--cqd-blue) !important;
   color: #fff !important;
-  border-color: #00d2ff !important;
+}
+
+/* Major: Red BG, White Text */
+.cqd-pill-major {
+  background: var(--cqd-red) !important;
+  color: #fff !important;
+}
+
+/* --- EFFECTS --- */
+
+/* Glow (Blue) - For Minor */
+.cqd-effect-glow-blue {
   box-shadow: 0 0 10px #00d2ff, 0 0 5px #007bff !important;
-  background: linear-gradient(135deg, rgba(0, 210, 255, 0.2) 0%, rgba(58, 123, 213, 0.2) 100%) !important;
+  border-color: #00d2ff !important;
+}
+
+/* Glow (Red) - For Major */
+.cqd-effect-glow-red {
+  box-shadow: 0 0 10px #f87171, 0 0 5px #ef4444 !important;
+  border-color: #f87171 !important;
+}
+
+/* Pulse (Blue) */
+@keyframes pulse-blue {
+  0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+  70% { box-shadow: 0 0 0 6px rgba(59, 130, 246, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+}
+.cqd-effect-pulse-blue {
+  animation: pulse-blue 2s infinite;
+}
+
+/* Pulse (Red) */
+@keyframes pulse-red {
+  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+  70% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+.cqd-effect-pulse-red {
+  animation: pulse-red 2s infinite;
 }
 
 /* ===============================
@@ -1090,23 +1131,6 @@ body {
   color: white !important;
   border-color: rgba(255,255,255,0.4) !important;
   animation: pill-glow-red 2s infinite; 
-}
-
-/* Red PULSE for "Update available" prompt */
-.cqd-version-update {
-  background: #dc2626 !important; /* Stronger red */
-  color: white !important;
-  border: 1px solid rgba(255,255,255,0.6) !important;
-  box-shadow: 0 0 12px rgba(220, 38, 38, 0.6) !important;
-  animation: pill-update-pulse 1.5s infinite !important;
-  font-weight: 800 !important;
-  min-width: 90px;
-}
-
-@keyframes pill-update-pulse {
-  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); }
-  70% { transform: scale(1.05); box-shadow: 0 0 0 6px rgba(220, 38, 38, 0); }
-  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
 }
 
 .cqd-notification-dot {
