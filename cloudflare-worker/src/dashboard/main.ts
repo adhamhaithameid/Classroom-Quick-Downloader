@@ -2425,7 +2425,7 @@ ${rawStatsJson}
          container.innerHTML = activeRules.map((rule, idx) => \`
             <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-subtle); border-radius: 6px;">
                <div style="display: flex; align-items: center; gap: 12px;">
-                 <span style="font-family: monospace; font-size: 0.9em; background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px; color: \${rule.target === 'all' ? '#fbbf24' : '#fff'};\সামরিক">\${rule.target}</span>
+                 <span style="font-family: monospace; font-size: 0.9em; background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px; color: \${rule.target === 'all' ? '#fbbf24' : '#fff'};">\${rule.target}</span>
                  
                  <span style="font-size: 0.8em; color: var(--text-muted);">
                     \${rule.priority} + \${rule.effect}
