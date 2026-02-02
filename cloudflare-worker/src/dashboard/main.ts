@@ -276,122 +276,250 @@ function renderChangelogSection(entries: ChangelogEntry[], config: ChangelogConf
 
   const rulesJson = JSON.stringify(config.rules || []);
 
+  // EXACT CSS FROM EXTENSION (App.css)
+  const extensionStyles = `
+    /* Base version pill */
+    .cqd-brand-version {
+      font-weight: 600;
+      color: #005dd7; /* cqd-blue */
+      background: #e3edff; /* cqd-blue-soft */
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 11px; /* Slightly larger for dashboard visibility */
+      border: 1px solid transparent; /* Explicit border for consistency */
+      cursor: default;
+      transition: all 0.2s ease;
+      display: inline-block;
+    }
+    
+    /* STATES */
+    .cqd-pill-minor {
+      background: #005dd7 !important;
+      color: #fff !important;
+    }
+    .cqd-pill-major {
+      background: #ef4444 !important;
+      color: #fff !important;
+    }
+
+    /* EFFECTS */
+    /* Glow (Blue) */
+    .cqd-effect-glow-blue {
+      box-shadow: 0 0 10px #00d2ff, 0 0 5px #007bff !important;
+      border-color: #00d2ff !important;
+    }
+    /* Glow (Red) */
+    .cqd-effect-glow-red {
+      box-shadow: 0 0 10px #f87171, 0 0 5px #ef4444 !important;
+      border-color: #f87171 !important;
+    }
+
+    /* Pulse (Blue) */
+    @keyframes pulse-blue {
+      0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+      70% { box-shadow: 0 0 0 6px rgba(59, 130, 246, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+    }
+    .cqd-effect-pulse-blue {
+      animation: pulse-blue 2s infinite;
+    }
+
+    /* Pulse (Red) */
+    @keyframes pulse-red {
+      0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+      70% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+    }
+    .cqd-effect-pulse-red {
+      animation: pulse-red 2s infinite;
+    }
+  `;
+
   return `
     <section class="card config-card" style="border-color: #3b82f6;">
       <h2 style="color: #3b82f6; display: flex; align-items: center; gap: 8px;">
-        <span>📜</span> Notification Rules Engine
+        <span>📜</span> Notification & Release Manager
       </h2>
 
-      <!-- Inject Server State -->
+      <!-- Inject Server State & Styles -->
       <script>window.CURRENT_RULES = ${rulesJson};</script>
+      <style>${extensionStyles}</style>
 
-      <div class="split-layout" style="display: flex; gap: 24px; flex-wrap: wrap;">
-        <!-- LEFT: Rules Engine -->
-        <div style="flex: 1; min-width: 300px; display: flex; flex-direction: column; gap: 20px;">
+      <div class="split-layout" style="display: flex; gap: 40px; flex-wrap: wrap;">
+        
+        <!-- =======================
+             LEFT: NOTIFICATION STYLING
+             ======================= -->
+        <div style="flex: 1; min-width: 350px; display: flex; flex-direction: column; gap: 20px;">
+          <div class="section-header" style="color: var(--accent);">1. Notification Styling</div>
+          <div style="font-size: 0.85em; color: var(--text-soft); margin-bottom: 12px;">
+            Define how the extension badge looks for specific versions.
+          </div>
           
-          <div class="metric-sub">Manage Version Notification Rules</div>
-          
-          <!-- Rule Form -->
-          <div style="padding: 16px; background: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid var(--border-subtle);">
-            <div style="font-weight: 600; font-size: 0.85em; margin-bottom: 12px; color: var(--text-main);">Add New Rule</div>
+          <div style="padding: 20px; background: rgba(0,0,0,0.2); border-radius: 12px; border: 1px solid var(--border-subtle);">
             
-            <div class="grid-2" style="display: grid; grid-template-columns: 1fr; gap: 12px; margin-bottom: 12px;">
-               <div class="input-group">
-                 <label style="font-size: 0.75em; color: var(--text-soft);">Target Version</label>
-                 <!-- Datalist for suggestions + typing -->
-                 <input list="known-versions" id="rule-target" placeholder="Select version or type 'all'" class="input-field" style="width: 100%; padding: 6px; background: var(--bg-elevated); border: 1px solid var(--border-subtle); color: white; border-radius: 4px;">
-                 <datalist id="known-versions">
-                   ${dataListOptions}
-                 </datalist>
-                 <div style="font-size: 0.7em; color: var(--text-muted); margin-top: 4px;">Type "all" for global rule. "v" prefix ignored.</div>
-               </div>
+            <!-- Target Selection -->
+            <div style="margin-bottom: 16px;">
+               <label style="font-size: 0.75em; color: var(--text-soft); display: block; margin-bottom: 6px;">Target Version</label>
+               <input list="known-versions" id="rule-target" placeholder="e.g. 1.2.3 or 'all'" class="input-field" style="width: 100%; padding: 8px; background: var(--bg-elevated); border: 1px solid var(--border-subtle); color: white; border-radius: 6px;" oninput="window.updatePreview && window.updatePreview()">
+               <datalist id="known-versions">
+                 ${dataListOptions}
+               </datalist>
+               <div style="font-size: 0.7em; color: var(--text-muted); margin-top: 4px;">Select from history or type new.</div>
             </div>
             
-            <div style="border-top: 1px dashed var(--border-subtle); margin: 8px 0; padding-top: 8px;">
-              <label style="font-size: 0.75em; color: var(--text-soft); display: block; margin-bottom: 8px;">Visual Effects</label>
-              <div style="display: flex; gap: 16px; margin-bottom: 16px;">
-                 <label class="switch-label" style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                   <input type="checkbox" id="rule-glow" checked>
-                   <span style="font-size: 0.85em; color: var(--text-muted); display:flex; align-items:center; gap:4px;">
-                     ✨ Use Glow
-                   </span>
-                 </label>
-                 <label class="switch-label" style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                   <input type="checkbox" id="rule-dot">
-                   <span style="font-size: 0.85em; color: var(--text-muted); display:flex; align-items:center; gap:4px;">
-                     🔴 Show Dot
-                   </span>
-                 </label>
+            <div style="border-top: 1px dashed var(--border-subtle); margin: 16px 0; padding-top: 16px;">
+              <!-- Priority -->
+              <label style="font-size: 0.75em; color: var(--text-soft); display: block; margin-bottom: 8px;">Priority (Color Scheme)</label>
+              <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+                <label style="cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: rgba(255,255,255,0.05); border-radius: 6px;">
+                  <input type="radio" name="rule-priority" value="normal" checked onclick="window.updatePreview && window.updatePreview()">
+                  <span style="font-size: 0.85em;">Normal</span>
+                </label>
+                <label style="cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: rgba(59,130,246,0.1); border-radius: 6px;">
+                  <input type="radio" name="rule-priority" value="minor" onclick="window.updatePreview && window.updatePreview()">
+                  <span style="font-size: 0.85em; color: #60a5fa;">Minor (Blue)</span>
+                </label>
+                <label style="cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: rgba(239,68,68,0.1); border-radius: 6px;">
+                  <input type="radio" name="rule-priority" value="major" onclick="window.updatePreview && window.updatePreview()">
+                  <span style="font-size: 0.85em; color: #f87171; font-weight: 600;">Major (Red)</span>
+                </label>
+              </div>
+
+              <!-- Effect -->
+              <label style="font-size: 0.75em; color: var(--text-soft); display: block; margin-bottom: 8px;">Animation Effect</label>
+              <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+                <label style="cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                  <input type="radio" name="rule-effect" value="none" checked onclick="window.updatePreview && window.updatePreview()">
+                  <span>None</span>
+                </label>
+                <label style="cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                  <input type="radio" name="rule-effect" value="glow" onclick="window.updatePreview && window.updatePreview()">
+                  <span>✨ Glow</span>
+                </label>
+                <label style="cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                  <input type="radio" name="rule-effect" value="pulse" onclick="window.updatePreview && window.updatePreview()">
+                  <span>📡 Pulse</span>
+                </label>
               </div>
             </div>
 
-            <!-- Preview -->
-            <div style="display: flex; align-items: center; gap: 12px; padding: 12px; background: #050816; border-radius: 6px; margin-bottom: 16px;">
-               <span style="font-size: 0.75em; color: var(--text-soft);">LIVE PREVIEW:</span>
-               
-               <!-- Preview Pill (matches Extension CSS) -->
-               <button id="rule-preview-pill" style="
-                 margin-left: auto;
-                 font-weight: 600;
-                 color: var(--cqd-blue);
-                 background: var(--cqd-blue-soft);
-                 padding: 2px 8px;
-                 border-radius: 999px;
-                 font-size: 10px;
-                 border: none;
-                 cursor: pointer;
-                 transition: all 0.2s ease;
-               ">
-                 vX.X.X
-               </button>
-               
-               <span id="rule-preview-dot" style="width: 8px; height: 8px; border-radius: 50%; background: #ef4444; display: none;"></span>
+            <!-- LIVE PREVIEW CONTAINER -->
+            <div style="background: #000; padding: 16px; border-radius: 8px; text-align: center; border: 1px solid #333; margin-bottom: 16px;">
+               <div style="font-size: 0.7em; color: #666; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;">Live Extension Preview</div>
+               <span id="rule-preview-pill" class="cqd-brand-version">v1.2.3</span>
             </div>
+            
+            <!-- INLINE SCRIPT: Simple if/else preview logic -->
+            <script>
+            (function() {
+              var pill = document.getElementById('rule-preview-pill');
+              
+              function updatePreview() {
+                if (!pill) return;
+                
+                // Get selected values
+                var priorityInputs = document.getElementsByName('rule-priority');
+                var effectInputs = document.getElementsByName('rule-effect');
+                
+                var priority = 'normal';
+                var effect = 'none';
+                
+                for (var i = 0; i < priorityInputs.length; i++) {
+                  if (priorityInputs[i].checked) { priority = priorityInputs[i].value; break; }
+                }
+                for (var i = 0; i < effectInputs.length; i++) {
+                  if (effectInputs[i].checked) { effect = effectInputs[i].value; break; }
+                }
+                
+                // Build class string - simple if/else
+                var cls = 'cqd-brand-version';
+                
+                if (priority === 'minor') cls += ' cqd-pill-minor';
+                if (priority === 'major') cls += ' cqd-pill-major';
+                
+                if (effect === 'glow') {
+                  cls += (priority === 'major') ? ' cqd-effect-glow-red' : ' cqd-effect-glow-blue';
+                }
+                if (effect === 'pulse') {
+                  cls += (priority === 'major') ? ' cqd-effect-pulse-red' : ' cqd-effect-pulse-blue';
+                }
+                
+                pill.className = cls;
+              }
+              
+              // Attach to radio buttons
+              var allRadios = document.querySelectorAll('input[name="rule-priority"], input[name="rule-effect"]');
+              for (var i = 0; i < allRadios.length; i++) {
+                allRadios[i].onclick = updatePreview;
+              }
+              
+              // Make global
+              window.updatePreview = updatePreview;
+              
+              // Initial call
+              updatePreview();
+            })();
+            </script>
 
-            <button id="btn-add-rule" class="btn" style="width: 100%; justify-content: center; background: rgba(34, 197, 94, 0.15); border-color: rgba(34, 197, 94, 0.4); color: #4ade80;">
-               + Add Rule to List
+            <button id="btn-add-rule" class="btn" style="width: 100%; justify-content: center; background: var(--accent); color: white; border: none; padding: 10px; border-radius: 6px; font-weight: 600; cursor: pointer;">
+               Append Rule
             </button>
           </div>
 
           <!-- Rules List -->
-          <div style="flex: 1;">
+          <div>
             <div class="metric-sub" style="margin-bottom: 8px; display: flex; justify-content: space-between;">
-               <span>Active Rules Priority: Specific > All</span>
-               <span id="rules-count" style="color: var(--text-main);">0 rules</span>
+               <span>Active Rules Priority: Specific versions override 'all'</span>
+               <span id="rules-count">0 rules</span>
             </div>
-            <div id="rules-list-container" style="display: flex; flex-direction: column; gap: 8px; max-height: 300px; overflow-y: auto;">
+            <div id="rules-list-container" style="display: flex; flex-direction: column; gap: 8px; max-height: 250px; overflow-y: auto;">
                <!-- JS renders here -->
-               <div style="padding: 12px; text-align: center; color: var(--text-soft); font-style: italic;">No rules defined. Default styling applies.</div>
             </div>
           </div>
-
-          <hr style="border: 0; border-top: 1px dashed var(--border-subtle); margin: 8px 0;">
-          
-          <button id="btn-save-all" class="btn btn-primary" style="width: 100%; padding: 12px; background: var(--accent); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 1rem;">
-             💾 SAVE ALL CHANGES
-          </button>
-
         </div>
 
-        <!-- RIGHT: History and Release Form -->
-        <div style="flex: 1; min-width: 300px; border-left: 1px solid var(--border-subtle); padding-left: 24px;">
+        <!-- =======================
+             RIGHT: RELEASE PUBLISHING
+             ======================= -->
+        <div style="flex: 1; min-width: 350px; border-left: 1px solid var(--border-subtle); padding-left: 40px; display: flex; flex-direction: column; gap: 20px;">
            
-           <!-- New Release Form (Collapsed by default? No, let's keep it visible) -->
-           <div class="metric-sub" style="margin-bottom: 8px;">Publish New Release</div>
-           <div class="input-group" style="margin-bottom: 12px;">
+           <div class="section-header" style="color: var(--warning);">2. Release Publishing</div>
+           <div style="font-size: 0.85em; color: var(--text-soft); margin-bottom: 12px;">
+             Publish a new changelog entry. This text appears when users click the version pill.
+           </div>
+
+           <div style="background: rgba(255,255,255,0.03); padding: 20px; border-radius: 12px; border: 1px solid var(--border-subtle);">
               <input type="hidden" id="edit-cl-id" value="">
-              <input type="text" id="new-cl-version" placeholder="Version (e.g. 1.2.4)" class="input-field" style="width: 100%; padding: 8px; background: var(--bg-elevated); border: 1px solid var(--border-subtle); color: var(--text-main); border-radius: 6px;">
-           </div>
-           <div class="input-group" style="margin-bottom: 12px;">
-              <textarea id="new-cl-changes" rows="3" class="input-field" placeholder="- Changes..." style="width: 100%; padding: 8px; background: var(--bg-elevated); border: 1px solid var(--border-subtle); color: var(--text-main); border-radius: 6px;"></textarea>
+              
+              <div style="margin-bottom: 12px;">
+                 <label style="font-size: 0.75em; color: var(--text-soft); display: block; margin-bottom: 6px;">Version</label>
+                 <!-- Reusing the same datalist for convenience -->
+                 <input list="known-versions" id="new-cl-version" placeholder="e.g. 1.2.4" class="input-field" style="width: 100%; padding: 10px; background: var(--bg-elevated); border: 1px solid var(--border-subtle); color: white; border-radius: 6px;">
+              </div>
+
+              <div style="margin-bottom: 12px;">
+                 <label style="font-size: 0.75em; color: var(--text-soft); display: block; margin-bottom: 6px;">Changes (Markdown-ish)</label>
+                 <textarea id="new-cl-changes" rows="4" class="input-field" placeholder="- Added new feature..." style="width: 100%; padding: 10px; background: var(--bg-elevated); border: 1px solid var(--border-subtle); color: white; border-radius: 6px;"></textarea>
+              </div>
            </div>
            
-           <div class="metric-sub" style="margin-bottom: 12px; margin-top: 24px;">Release History</div>
-           <div class="cl-history-list" style="max-height: 400px; overflow-y: auto;">
-             ${historyHtml}
+           <div style="flex: 1; display: flex; flex-direction: column;">
+             <div class="metric-sub" style="margin-bottom: 12px;">Historical Releases</div>
+             <div class="cl-history-list" style="flex: 1; overflow-y: auto; max-height: 400px; padding-right: 8px;">
+               ${historyHtml}
+             </div>
            </div>
+
         </div>
       </div>
+      
+      <hr style="border: 0; border-top: 1px solid var(--border-subtle); margin: 24px 0 16px;">
+      
+      <button id="btn-save-all" class="btn btn-primary" style="width: 100%; padding: 16px; background: #22c55e; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 1.1rem; text-transform: uppercase; letter-spacing: 0.05em; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">
+         💾 Save Configuration & Publish
+      </button>
+
     </section>
   `;
 }
@@ -2269,17 +2397,9 @@ ${rawStatsJson}
                <div style="display: flex; align-items: center; gap: 12px;">
                  <span style="font-family: monospace; font-size: 0.9em; background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px; color: \${rule.target === 'all' ? '#fbbf24' : '#fff'};\সামরিক">\${rule.target}</span>
                  
-                 <!-- Preview Mini -->
-                 <span style="
-                   font-size: 0.75rem; padding: 2px 8px; border-radius: 99px;
-                   color: \${rule.glow ? '#fff' : '#3b82f6'};
-                   background: \${rule.glow ? 'linear-gradient(135deg, rgba(0, 210, 255, 0.2) 0%, rgba(58, 123, 213, 0.2) 100%)' : 'rgba(59, 130, 246, 0.1)'};
-                   border: \${rule.glow ? '1px solid #00d2ff' : 'none'};
-                   \${rule.glow ? \`box-shadow: 0 0 6px #00d2ff;\` : ''}
-                 ">
-                   vX.X
+                 <span style="font-size: 0.8em; color: var(--text-muted);">
+                    \${rule.priority} + \${rule.effect}
                  </span>
-                 \${rule.showDot ? '<span style="width:6px; height:6px; border-radius:50%; background:#ef4444;"></span>' : ''}
                </div>
                <button type="button" class="btn-xs delete-rule-btn" data-idx="\${idx}" style="color: #fca5a5; border-color: rgba(239,68,68,0.3);">✕</button>
             </div>
@@ -2300,46 +2420,71 @@ ${rawStatsJson}
 
       // Rule Form Inputs
       const inputTarget = document.getElementById("rule-target");
-      const checkGlow = document.getElementById("rule-glow");
-      const checkDot = document.getElementById("rule-dot");
       const previewPill = document.getElementById("rule-preview-pill");
-      const previewDot = document.getElementById("rule-preview-dot");
       const btnAddRule = document.getElementById("btn-add-rule");
-
-      // Listeners for preview
-      [inputTarget, checkGlow, checkDot].forEach(el => {
-         if(el) el.oninput = updatePreview;
+      const btnSaveAll = document.getElementById("btn-save-all");
+      
+      // Bind Events - Use input AND change for radios to be safe across browsers
+      if (inputTarget) {
+        inputTarget.addEventListener("input", updatePreview);
+      }
+      const allRadios = [
+        ...document.querySelectorAll('input[name="rule-priority"]'), 
+        ...document.querySelectorAll('input[name="rule-effect"]')
+      ];
+      allRadios.forEach(el => {
+         el.addEventListener('change', updatePreview);
+         el.addEventListener('input', updatePreview); // Redundant but safe
       });
 
       function updatePreview() {
-         if (!previewPill) return;
-         const glow = checkGlow.checked;
-         const dot = checkDot.checked;
-         
-         // Match App.css .cqd-brand-version and .cqd-version-glow
-         if (glow) {
-             previewPill.style.color = "#fff";
-             previewPill.style.borderColor = "#00d2ff";
-             previewPill.style.boxShadow = "0 0 10px #00d2ff, 0 0 5px #007bff";
-             previewPill.style.background = "linear-gradient(135deg, rgba(0, 210, 255, 0.2) 0%, rgba(58, 123, 213, 0.2) 100%)";
-         } else {
-             // Standard Style
-             previewPill.style.color = "var(--cqd-blue)";
-             previewPill.style.borderColor = "transparent";
-             previewPill.style.boxShadow = "none";
-             previewPill.style.background = "var(--cqd-blue-soft)";
+         // Query dynamically each time to handle late DOM availability
+         const pill = document.getElementById("rule-preview-pill");
+         if (!pill) {
+            console.warn('Preview pill not found');
+            return;
          }
          
-         if (previewDot) previewDot.style.display = dot ? "block" : "none";
+         // 1. Get Values
+         const priorityEl = document.querySelector('input[name="rule-priority"]:checked') as HTMLInputElement;
+         const effectEl = document.querySelector('input[name="rule-effect"]:checked') as HTMLInputElement;
+         
+         const priority = priorityEl ? priorityEl.value : 'normal';
+         const effect = effectEl ? effectEl.value : 'none';
+         
+         // 2. Build Class List (always start fresh)
+         // Matches App.css .cqd-brand-version base
+         const classes = ["cqd-brand-version"];
+         
+         // 3. Priority Logic
+         if (priority === 'minor') {
+            classes.push('cqd-pill-minor');
+         } else if (priority === 'major') {
+            classes.push('cqd-pill-major');
+         }
+         
+         // 4. Effect Logic
+         if (effect === 'glow') {
+            // Blue Glow for Normal/Minor, Red Glow for Major
+            classes.push(priority === 'major' ? 'cqd-effect-glow-red' : 'cqd-effect-glow-blue');
+         } else if (effect === 'pulse') {
+            // Blue Pulse for Normal/Minor, Red Pulse for Major
+            classes.push(priority === 'major' ? 'cqd-effect-pulse-red' : 'cqd-effect-pulse-blue');
+         }
+         
+         // 5. Apply to DOM
+         pill.className = classes.join(" ");
+         
+         // 6. Debug log (check console)
+         console.log('Preview Update:', { priority, effect, classes: pill.className });
       }
 
-      // Listeners for preview
-      [inputTarget, checkGlow, checkDot].forEach(el => {
-         if(el) el.oninput = updatePreview;
-      });
-      
-      // Init preview
-      updatePreview();
+      // Expose globally for inline event handlers
+      (window as any).updatePreview = updatePreview;
+
+
+      // Initial Call
+      setTimeout(updatePreview, 100); // Slight delay to ensure DOM settle
 
       // Add Rule Action
       if (btnAddRule) {
@@ -2349,16 +2494,15 @@ ${rawStatsJson}
             if (target.toLowerCase().startsWith('v')) {
                target = target.substring(1);
             }
-            // Basic version validation (simple check)
+            // Basic version validation
             if (!target) return;
             
-            const glow = checkGlow.checked;
-            const showDot = checkDot.checked;
+            const priority = (document.querySelector('input[name="rule-priority"]:checked') as HTMLInputElement)?.value || 'normal';
+            const effect = (document.querySelector('input[name="rule-effect"]:checked') as HTMLInputElement)?.value || 'none';
             
             // Dedupe matching targets
             const existingIdx = activeRules.findIndex(r => r.target === target);
-            // Remove color property
-            const newRule = { id: crypto.randomUUID(), target, glow, showDot };
+            const newRule = { id: crypto.randomUUID(), target, priority, effect };
             
             if (existingIdx >= 0) {
                if(confirm(\`Rule for "\${target}" already exists. Overwrite?\`)) {
