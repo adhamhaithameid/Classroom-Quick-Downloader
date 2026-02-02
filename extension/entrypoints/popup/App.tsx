@@ -677,27 +677,14 @@ function App() {
               </div>
               
               {/* Footer Link */}
-              <div style={{
-                 marginTop: 'auto',
-                 paddingTop: '12px',
-                 borderTop: '1px dashed var(--cqd-border-subtle)',
-                 textAlign: 'center'
-              }}>
+              <div className="cqd-cl-footer">
                 <a 
                   href={SURVEY_URL} 
                   target="_blank" 
                   rel="noopener noreferrer"
-                  style={{
-                    fontSize: '11px',
-                    color: 'var(--cqd-blue)',
-                    textDecoration: 'none',
-                    fontWeight: 600,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}
+                  className="cqd-cl-footer-link"
                 >
-                  Request a feature / Report a bug ↗
+                  💡 Request a feature / Report a bug ↗
                 </a>
               </div>
             </div>

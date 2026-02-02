@@ -1167,17 +1167,17 @@ body {
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   z-index: 1000;
   display: flex;
   align-items: center;
   justify-content: center;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.2s ease;
-  padding: 20px;
+  transition: opacity 0.25s ease;
+  padding: 16px;
 }
 
 .cqd-changelog-overlay.open {
@@ -1186,106 +1186,239 @@ body {
 }
 
 .cqd-changelog-card {
-  background: white;
+  background: linear-gradient(to bottom, #ffffff, #f8fafc);
   width: 100%;
-  max-height: 90%;
-  border-radius: 16px;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+  max-height: 85%;
+  border-radius: 20px;
+  box-shadow: 
+    0 25px 50px -12px rgba(0, 0, 0, 0.25),
+    0 0 0 1px rgba(255, 255, 255, 0.1);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid var(--cqd-border-subtle);
-  transform: translateY(10px);
-  transition: transform 0.25s cubic-bezier(0.2, 0, 0, 1);
+  transform: translateY(20px) scale(0.95);
+  opacity: 0;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .cqd-changelog-overlay.open .cqd-changelog-card {
-  transform: translateY(0);
+  transform: translateY(0) scale(1);
+  opacity: 1;
 }
 
+/* Header with gradient */
 .cqd-cl-header {
-  padding: 16px;
-  background: var(--cqd-surface);
-  border-bottom: 1px solid var(--cqd-border-subtle);
+  padding: 16px 20px;
+  background: linear-gradient(135deg, var(--cqd-blue) 0%, #3b82f6 100%);
   display: flex;
   justify-content: space-between;
   align-items: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.cqd-cl-header::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(to right, transparent 0%, rgba(255,255,255,0.1) 50%, transparent 100%);
+  pointer-events: none;
 }
 
 .cqd-cl-title {
   margin: 0;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
-  color: var(--cqd-text-main);
+  color: white;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.cqd-cl-title .btn-bullet {
+  font-size: 18px;
+  filter: drop-shadow(0 1px 1px rgba(0,0,0,0.1));
 }
 
 .cqd-cl-close {
-  background: transparent;
+  background: rgba(255, 255, 255, 0.2);
   border: none;
-  font-size: 20px;
-  color: var(--cqd-text-muted);
+  font-size: 18px;
+  color: white;
   cursor: pointer;
-  padding: 4px;
+  padding: 0;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  transition: background 0.15s;
+  width: 28px;
+  height: 28px;
+  transition: all 0.15s ease;
+  font-weight: 300;
 }
 
 .cqd-cl-close:hover {
-  background: rgba(0,0,0,0.05);
-  color: var(--cqd-text-main);
+  background: rgba(255, 255, 255, 0.35);
+  transform: rotate(90deg);
 }
 
+/* Body with custom scrollbar */
 .cqd-cl-body {
-  padding: 0 16px 16px;
+  padding: 16px 16px 8px;
   overflow-y: auto;
   flex: 1;
+  scrollbar-width: thin;
+  scrollbar-color: var(--cqd-blue-soft) transparent;
 }
 
+.cqd-cl-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.cqd-cl-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.cqd-cl-body::-webkit-scrollbar-thumb {
+  background: var(--cqd-blue-soft);
+  border-radius: 3px;
+}
+
+.cqd-cl-body::-webkit-scrollbar-thumb:hover {
+  background: var(--cqd-blue);
+}
+
+/* Entry cards */
 .cqd-cl-entry {
-  padding: 16px 0;
-  border-bottom: 1px dashed var(--cqd-border-subtle);
+  padding: 14px;
+  margin-bottom: 12px;
+  background: white;
+  border-radius: 12px;
+  border: 1px solid var(--cqd-border-subtle);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s ease;
 }
 
 .cqd-cl-entry:last-child {
-  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.cqd-cl-entry:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-color: var(--cqd-blue-soft);
 }
 
 .cqd-cl-ver-row {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
-  margin-bottom: 8px;
+  align-items: center;
+  margin-bottom: 10px;
 }
 
 .cqd-cl-version {
   font-weight: 700;
-  color: var(--cqd-blue);
-  font-size: 14px;
+  color: white;
+  font-size: 12px;
+  background: linear-gradient(135deg, var(--cqd-blue) 0%, #3b82f6 100%);
+  padding: 4px 10px;
+  border-radius: 999px;
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
 }
 
 .cqd-cl-date {
   font-size: 11px;
   color: var(--cqd-text-muted);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
+.cqd-cl-date::before {
+  content: '📅';
+  font-size: 10px;
+}
+
+/* Change list with custom bullets */
 .cqd-cl-list {
   margin: 0;
-  padding-left: 18px;
-  font-size: 13px;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
   color: var(--cqd-text-main);
-  line-height: 1.5;
+  line-height: 1.6;
 }
 
 .cqd-cl-list li {
-  margin-bottom: 4px;
+  margin-bottom: 6px;
+  padding-left: 20px;
+  position: relative;
+}
+
+.cqd-cl-list li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 7px;
+  width: 8px;
+  height: 8px;
+  background: linear-gradient(135deg, var(--cqd-green) 0%, #22c55e 100%);
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(34, 197, 94, 0.3);
+}
+
+.cqd-cl-list li:last-child {
+  margin-bottom: 0;
+}
+
+/* Empty state */
+.cqd-cl-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--cqd-text-muted);
+  font-size: 13px;
+}
+
+.cqd-cl-empty::before {
+  content: '📭';
+  display: block;
+  font-size: 32px;
+  margin-bottom: 12px;
+  opacity: 0.6;
+}
+
+/* Footer link styling */
+.cqd-cl-footer {
+  margin-top: auto;
+  padding: 12px 16px;
+  border-top: 1px solid var(--cqd-border-subtle);
+  background: var(--cqd-surface);
+  text-align: center;
+}
+
+.cqd-cl-footer-link {
+  font-size: 11px;
+  color: var(--cqd-blue);
+  text-decoration: none;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: var(--cqd-blue-soft);
+  border-radius: 999px;
+  transition: all 0.2s ease;
+}
+
+.cqd-cl-footer-link:hover {
+  background: var(--cqd-blue);
+  color: white;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
 }
 
 .cqd-cl-empty {
