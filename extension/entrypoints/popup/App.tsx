@@ -8,7 +8,7 @@ import bmcLogoSrc from '../../assets/bmc-logo.svg';
 import chromeSvg from '../../assets/Chrome.svg';
 import firefoxSvg from '../../assets/Firefox.svg';
 import edgeSvg from '../../assets/Edge.svg';
-import { fetchChangelog, getMatchingRule, getRuleClasses, shouldShowDot, getLatestChange, type ChangelogData } from '../utils/changelog';
+import { fetchChangelog, getMatchingRule, getRuleClasses, isVersionSeen, markAsSeen, getLatestChange, type ChangelogData } from '../utils/changelog';
 
 // External Links
 const SURVEY_URL = 'https://forms.gle/wPU2b1Qxa7svHqJa6';
@@ -457,6 +457,14 @@ function App() {
     });
   }, []);
 
+  // --- SEEN STATE ---
+  const [seen, setSeen] = useState(false);
+  useEffect(() => {
+    if (version) {
+       isVersionSeen(version).then(setSeen);
+    }
+  }, [version]);
+
   // --- GLOBAL SETTINGS LOGIC ---
   useEffect(() => {
     // Safety check for non-extension environment (e.g. pnpm dev)
@@ -617,15 +625,18 @@ function App() {
                 </span>
                 {version && (
                   <button
-                    className={`cqd-brand-version ${getRuleClasses(getMatchingRule(changelogData?.config, version))}`}
+                    className={`cqd-brand-version ${getRuleClasses(getMatchingRule(changelogData?.config, version), seen)}`}
                     aria-label={`Version ${version} - View changelog`}
                     title={getLatestChange(changelogData) ? `Latest: ${getLatestChange(changelogData)}` : "View changelog"}
-                    onClick={() => setShowChangelog(true)}
+                    onClick={async () => {
+                       setShowChangelog(true);
+                       if (version) {
+                         await markAsSeen(version);
+                         setSeen(true);
+                       }
+                    }}
                   >
                     <span>v{version}</span>
-                    {shouldShowDot(getMatchingRule(changelogData?.config, version)) && (
-                       <span className="cqd-notification-dot-inline" />
-                    )}
                   </button>
                 )}
               </div>
@@ -663,6 +674,31 @@ function App() {
                 ) : (
                   <div className="cqd-cl-empty">No changelog entries found.</div>
                 )}
+              </div>
+              
+              {/* Footer Link */}
+              <div style={{
+                 marginTop: 'auto',
+                 paddingTop: '12px',
+                 borderTop: '1px dashed var(--cqd-border-subtle)',
+                 textAlign: 'center'
+              }}>
+                <a 
+                  href={SURVEY_URL} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  style={{
+                    fontSize: '11px',
+                    color: 'var(--cqd-blue)',
+                    textDecoration: 'none',
+                    fontWeight: 600,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  Request a feature / Report a bug ↗
+                </a>
               </div>
             </div>
           </div>
