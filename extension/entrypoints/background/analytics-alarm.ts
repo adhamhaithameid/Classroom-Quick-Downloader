@@ -24,7 +24,18 @@ export function ensureAnalyticsAlarm(): void {
 
     chrome.alarms.onAlarm.addListener((alarm) => {
       if (alarm.name === 'CQD_ANALYTICS_FLUSH') {
-        Analytics.flush();
+        const now = new Date();
+        const hours = now.getHours();
+        const minutes = now.getMinutes();
+        
+        // Restricted window: 11:55 PM (23:55) to 12:05 AM (00:05)
+        const isRestrictedTime = 
+          (hours === 23 && minutes >= 55) || 
+          (hours === 0 && minutes <= 5);
+
+        if (!isRestrictedTime) {
+          Analytics.flush();
+        }
       } else if (alarm.name === 'CQD_ANALYTICS_CONFIG') {
         refreshRemoteAnalyticsConfig().catch(() => {});
       }
