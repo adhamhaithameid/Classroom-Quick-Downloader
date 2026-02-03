@@ -352,9 +352,13 @@ function App() {
       if (tabs && tabs.length > 0) {
         const url = tabs[0].url || '';
         setTabId(tabs[0].id || null);
-        if (url.includes('classroom.google.com')) {
-          setIsClassroomTab(true);
-        } else {
+        // Use proper URL parsing to avoid security issues with substring matching
+        try {
+          const parsedUrl = new URL(url);
+          const hostname = parsedUrl.hostname.toLowerCase();
+          setIsClassroomTab(hostname === 'classroom.google.com');
+        } catch {
+          // Invalid URL, not a Classroom tab
           setIsClassroomTab(false);
         }
       }

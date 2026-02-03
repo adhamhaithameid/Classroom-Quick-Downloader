@@ -64,10 +64,19 @@ function startBypassFeature() {
     }
 
     // 3) Hard 403
+    // Use proper URL parsing to avoid security issues with substring matching
+    let isDriveUrl = false;
+    try {
+      const parsedUrl = new URL(url);
+      const hostname = parsedUrl.hostname.toLowerCase();
+      isDriveUrl = hostname === 'drive.google.com' || 
+                   hostname === 'drive.usercontent.google.com';
+    } catch {
+      // Invalid URL, not a Drive URL
+    }
     if (
       !auth403Reported &&
-      (url.includes('drive.google.com') ||
-        url.includes('drive.usercontent.google.com')) &&
+      isDriveUrl &&
       isAccessDeniedPage(bodyText)
     ) {
       auth403Reported = true;

@@ -62,7 +62,8 @@ export async function sendBatchToCloudflare(events: AnalyticsEvent[]): Promise<F
 export function shouldFlushNowForTimeAndSize(
   cfg: AnalyticsConfig,
   _meta: AnalyticsMeta,
-  queueLength: number
+  queueLength: number,
+  oldestEventTime: number | null
 ): boolean {
   if (queueLength === 0) return false;
 
@@ -75,7 +76,21 @@ export function shouldFlushNowForTimeAndSize(
     return true;
   }
 
-  // Batch size threshold
+  // 1. Flush if queue size reaches 50 (User Request)
+  if (queueLength >= 50) {
+    return true;
+  }
+  
+  // 2. Flush if events are stale (> 1 day old) (User Request)
+  if (oldestEventTime !== null) {
+    const ageMs = now.getTime() - oldestEventTime;
+    const oneDayMs = 24 * 60 * 60 * 1000;
+    if (ageMs > oneDayMs) {
+      return true;
+    }
+  }
+
+  // Batch size threshold from config (fallback)
   if (queueLength >= cfg.batchSize) {
     return true;
   }
@@ -87,9 +102,9 @@ export function shouldFlushNowForTimeAndSize(
       : queueLength < 35
         ? cfg.midUsageFlushMinutes
         : cfg.highUsageFlushMinutes;
-
-    // We'd need lastFlushAt from meta for accurate time-based check
-    // For now, batch size is primary trigger
+    
+    // Simplification: if we have waited long enough since last flush?
+    // This part is incomplete in original code, but we keep the structure.
   }
 
   return false;
@@ -155,7 +170,10 @@ export async function internalFlush(): Promise<void> {
   }
 
   // Check if we should flush
-  if (!shouldFlushNowForTimeAndSize(cfg, meta, queue.length)) {
+  // Get time of oldest event if any
+  const oldestEventTime = queue.length > 0 && queue[0].timestamp ? queue[0].timestamp : null;
+
+  if (!shouldFlushNowForTimeAndSize(cfg, meta, queue.length, oldestEventTime)) {
     return;
   }
 

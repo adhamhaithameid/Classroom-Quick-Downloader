@@ -710,7 +710,7 @@ export class DownloadsDurable {
 
     // Size-based flush to Oracle
     const maxBatch =
-      parseInt(this.env.MAX_BATCH_EVENTS || "500", 10) || 500;
+      parseInt(this.env.MAX_BATCH_EVENTS || "10000", 10) || 10000;
 
     if (this.d.buffer.length >= maxBatch) {
       await this.flushToOracle(false);
@@ -1327,7 +1327,7 @@ export class DownloadsDurable {
     }
 
     const maxBatchEnv =
-      parseInt(this.env.MAX_BATCH_EVENTS || "500", 10) || 500;
+      parseInt(this.env.MAX_BATCH_EVENTS || "10000", 10) || 10000;
     // FIX: even "force" should chunk; force just means "try now / bypass gating"
     const eventsToFlush = this.d.buffer.slice(0, maxBatchEnv);
 
