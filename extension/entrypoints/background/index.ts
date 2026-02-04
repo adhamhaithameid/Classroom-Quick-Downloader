@@ -37,8 +37,6 @@ import { t } from '../content/i18n';
 // =====================================================
 
 export default defineBackground(() => {
-  console.log(`[CQD] Background ready - ${IS_FIREFOX ? 'FIREFOX' : 'CHROME/EDGE'}`);
-
   // Initialize analytics alarms
   ensureAnalyticsAlarm();
   refreshRemoteAnalyticsConfig().catch(() => {});
@@ -123,7 +121,6 @@ export default defineBackground(() => {
       } catch {}
 
       if (IS_FIREFOX) {
-        console.log('[CQD-FF] 403 in bypass tab - failing immediately');
         sendStatusToTab(pending, 'error', 'Access denied. Try opening the file directly.', 'ACCESS_DENIED');
         recordDownloadEvent({
           type: pending.fileMeta?.ext || 'unknown',
@@ -213,8 +210,6 @@ export default defineBackground(() => {
   // 2b) onCreated (Firefox)
   if (IS_FIREFOX && chrome.downloads && chrome.downloads.onCreated) {
     chrome.downloads.onCreated.addListener((item) => {
-      console.log('[CQD-FF] onCreated:', { id: item.id, url: item.url });
-
       let pending = pendingByDownloadId.get(item.id);
 
       if (!pending && item.url) {
@@ -226,7 +221,6 @@ export default defineBackground(() => {
               extractDriveFileId(p.baseUrl) || extractDriveFileId(p.originalUrl);
             if (pendingFileId === downloadFileId) {
               pending = p;
-              console.log('[CQD-FF] Matched by Drive ID (bypass):', downloadFileId);
               break;
             }
           }
@@ -239,7 +233,6 @@ export default defineBackground(() => {
                 extractDriveFileId(p.originalUrl);
               if (pendingFileId === downloadFileId) {
                 pending = p;
-                console.log('[CQD-FF] Matched by Drive ID (url map):', downloadFileId);
                 break;
               }
             }
@@ -251,7 +244,6 @@ export default defineBackground(() => {
                 extractDriveFileId(p.baseUrl) || extractDriveFileId(p.originalUrl);
               if (pendingFileId === downloadFileId) {
                 pending = p;
-                console.log('[CQD-FF] Matched by Drive ID (request):', downloadFileId);
                 break;
               }
             }
@@ -260,7 +252,6 @@ export default defineBackground(() => {
         // Fallback: URL map exact match
         if (!pending) {
           pending = pendingByUrl.get(item.url);
-          if (pending) console.log('[CQD-FF] Matched by URL map');
         }
       }
 
@@ -344,7 +335,7 @@ export default defineBackground(() => {
         });
       } catch {}
     } else {
-      console.log('[CQD] Cancelled before download ID assigned:', requestId);
+      // Cancelled before download ID assigned
     }
 
     for (const [tabId, p] of pendingByBypassTabId.entries()) {
