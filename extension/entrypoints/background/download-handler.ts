@@ -170,7 +170,6 @@ export function handleDownloadRequest(
       typeof pending.currentAuthUser === 'number'
         ? buildUrlWithAuthUser(pending.baseUrl, pending.currentAuthUser)
         : pending.baseUrl;
-    console.log('[CQD-FF] Using bypass tab for Drive download, authuser:', pending.currentAuthUser);
     pending.fallbackStarted = true;
     openDriveBypassTab(pending, bypassUrl);
     respondOnce({ started: true, requestId, userMessage: 'Opening Drive tab…' });

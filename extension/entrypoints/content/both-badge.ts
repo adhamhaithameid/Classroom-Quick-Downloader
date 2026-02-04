@@ -77,7 +77,12 @@ export function upgradeCombinedBadge(post: HTMLElement): void {
       finalOverlay.classList.add('cqd-theme-dark');
     }
 
-    finalOverlay.style.borderRadius = computed.borderRadius || '8px';
+    // Get parent's border-radius, ensure minimum of 16px for squircle look
+    const parentRadius = computed.borderRadius || '0px';
+    const radiusValue = parseInt(parentRadius) || 0;
+    const finalRadius = Math.max(radiusValue, 16);
+    finalOverlay.style.setProperty('--cqd-overlay-radius', `${finalRadius}px`);
+    
     finalOverlay.setAttribute(INJECTED_ATTR, 'true');
 
     finalOverlay.addEventListener('click', (e) => {

@@ -3710,10 +3710,9 @@ if (typeof chrome !== 'undefined') {
       const lang = await languageController.getCurrentLanguage();
       if (lang) {
         detectedLanguage = lang;
-        console.log('[CQD i18n] Language initialized via controller:', lang);
       }
     } catch (e) {
-      console.warn('[CQD i18n] Controller init failed:', e);
+      // Controller init failed - silently ignored
     } finally {
       isInitializing = false;
     }
@@ -3775,13 +3774,11 @@ function _detectLanguageDirectInternal(): string {
     if (!c) continue;
     if (TRANSLATIONS[c]) {
       detectedLanguage = c;
-      console.log('[CQD i18n] Language detected and cached:', c, '| pageLang:', pageLang, '| browserLangs:', browserLangs);
       return c; // Return immediately once found
     }
   }
 
   // Fallback to English if no match found
-  console.warn('[CQD i18n] No matching language found, defaulting to English. Candidates tried:', candidates);
   detectedLanguage = 'en';
   return 'en';
 }

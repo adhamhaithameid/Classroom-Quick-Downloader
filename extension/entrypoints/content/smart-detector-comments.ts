@@ -112,7 +112,113 @@ function extractCount(text: string): number | null {
 }
 
 // ============================================================================
-// LAYER 1: ACCESSIBILITY SCAN (HIGHEST PRIORITY)
+// LAYER 0: DOM TRUTH (ABSOLUTE AUTHORITY)
+// Targets the specific Classwork tab comment container that Google renders.
+// When this structure exists, it is the AUTHORITATIVE source and overrides all
+// fuzzy matching or nuclear scan results.
+// 
+// TARGET STRUCTURE (per spec):
+// <div class="qCWAqb seqYL" ...>
+//     <div class="gmNu1d huI6Cb Cx437e">
+//         <i class="google-symbols">comment</i> 1
+//     </div>
+// </div>
+//
+// Primary Selector: .qCWAqb .huI6Cb
+// The count is extracted from the textContent of .huI6Cb (contains icon + number)
+// ============================================================================
+
+function executeLayer0_DOMTruth(post: HTMLElement): LayerResult {
+  // PRIMARY: Target .qCWAqb .huI6Cb per spec
+  // This is the most reliable selector for the Classwork comment indicator
+  const huI6CbElement = post.querySelector<HTMLElement>('.qCWAqb .huI6Cb');
+  
+  if (huI6CbElement) {
+    // Extract text content - will be like "comment 1" or just "1"
+    const rawText = huI6CbElement.textContent?.trim() || '';
+    const normalizedText = normalizeText(rawText);
+    
+    // Parse the number from the text
+    const count = extractCount(normalizedText);
+    if (count !== null && count > 0) {
+      return {
+        score: 100, // Maximum authority score - this is THE truth source
+        count,
+        matchedText: normalizedText,
+        details: `Layer0-DOMTruth: Found "${normalizedText}" via .qCWAqb .huI6Cb (count: ${count})`,
+      };
+    }
+  }
+  
+  // FALLBACK 1: Try .qCWAqb.seqYL container with various child selectors
+  const commentContainer = post.querySelector<HTMLElement>('.qCWAqb.seqYL');
+  
+  if (commentContainer) {
+    // Strategy 1: Find the text span with the comment count (e.g., "1 comment" or "3 class comments")
+    const textSpan = commentContainer.querySelector<HTMLElement>('.mUIrbf-vQzf8d, .jzdBjc, span[aria-hidden="true"]');
+    
+    if (textSpan) {
+      const rawText = textSpan.textContent?.trim() || '';
+      const text = normalizeText(rawText);
+      const count = extractCount(text);
+      if (count !== null && count > 0) {
+        return {
+          score: 100,
+          count,
+          matchedText: text,
+          details: `Layer0-DOMTruth: Found "${text}" in .qCWAqb.seqYL span (count: ${count})`,
+        };
+      }
+    }
+    
+    // Strategy 2: Look for .huI6Cb within the container (without .qCWAqb prefix)
+    const iconDiv = commentContainer.querySelector<HTMLElement>('.huI6Cb');
+    if (iconDiv) {
+      const iconDivText = normalizeText(iconDiv.textContent || '');
+      const count = extractCount(iconDivText);
+      if (count !== null && count > 0) {
+        return {
+          score: 100,
+          count,
+          matchedText: iconDivText,
+          details: `Layer0-DOMTruth: Found "${iconDivText}" via .huI6Cb icon sibling (count: ${count})`,
+        };
+      }
+    }
+    
+    // Strategy 3: Direct text content extraction from container
+    const directText = normalizeText(commentContainer.textContent || '');
+    const directCount = extractCount(directText);
+    if (directCount !== null && directCount > 0 && directCount < 1000) {
+      return {
+        score: 100,
+        count: directCount,
+        matchedText: directText,
+        details: `Layer0-DOMTruth: Found "${directText}" in container (count: ${directCount})`,
+      };
+    }
+  }
+  
+  // FALLBACK 2: Check for .seqYL class alone (without qCWAqb)
+  const seqYL = post.querySelector<HTMLElement>('.seqYL');
+  if (seqYL && seqYL !== commentContainer) {
+    const text = normalizeText(seqYL.textContent || '');
+    const count = extractCount(text);
+    if (count !== null && count > 0 && count < 1000) {
+      return {
+        score: 95,
+        count,
+        matchedText: text,
+        details: `Layer0-DOMTruth: Found "${text}" via .seqYL (count: ${count})`,
+      };
+    }
+  }
+  
+  return { score: 0, count: null, matchedText: null, details: 'Layer0: No DOM truth element found' };
+}
+
+// ============================================================================
+// LAYER 1: ACCESSIBILITY SCAN (HIGHEST PRIORITY after DOM Truth)
 // Scans aria-label and title attributes for comment patterns
 // ============================================================================
 
@@ -233,24 +339,90 @@ function executeLayer3_GoldenSelectors(post: HTMLElement, keywords: CommentKeywo
     try {
       const elements = post.querySelectorAll<HTMLElement>(selector);
       for (const element of elements) {
-        const rawText = element.textContent || '';
-        const text = normalizeText(rawText);
+        // STRATEGY: To avoid double-counting ("3 class comments" → "33 class comments")
+        // we need to be very careful about how we extract the count.
         
-        if (!text || text.length < 2) continue;
-        if (isExcludedCommentPattern(text)) continue;
-        if (isActionButton(text)) continue;
+        // Priority 1: Check aria-label first (single source of truth)
+        const ariaLabel = element.getAttribute('aria-label');
+        if (ariaLabel) {
+          const normalizedLabel = normalizeText(ariaLabel);
+          if (!isExcludedCommentPattern(normalizedLabel) && !isActionButton(normalizedLabel)) {
+            const matchedKeyword = containsCommentKeyword(normalizedLabel, keywords);
+            if (matchedKeyword) {
+              const count = extractCount(normalizedLabel);
+              if (count !== null && count > 0) {
+                return {
+                  score: CONFIDENCE_WEIGHTS.LAYER_1_GOLDEN + CONFIDENCE_WEIGHTS.NUMBER_PRESENT_BONUS,
+                  count,
+                  matchedText: normalizedLabel,
+                  details: `Layer3-Golden-Aria: Found "${matchedKeyword}" via "${selector}" (count: ${count})`,
+                };
+              }
+            }
+          }
+        }
         
-        const matchedKeyword = containsCommentKeyword(text, keywords);
-        if (matchedKeyword) {
-          const count = extractCount(text);
-          // CRITICAL: Only match if we have an actual count
-          if (count !== null && count > 0) {
-            return {
-              score: CONFIDENCE_WEIGHTS.LAYER_1_GOLDEN + CONFIDENCE_WEIGHTS.NUMBER_PRESENT_BONUS,
-              count,
-              matchedText: text,
-              details: `Layer3-Golden: Found "${matchedKeyword}" via "${selector}" (count: ${count})`,
-            };
+        // Priority 2: Find a child element that is ONLY a number (like a badge)
+        // This avoids reading "3 class comments" twice
+        for (const child of element.querySelectorAll<HTMLElement>('span, div')) {
+          const childText = normalizeText(child.textContent || '');
+          // Check if this child ONLY contains a number (e.g., "3" or "20")
+          if (/^\d+$/.test(childText.trim()) && child.children.length === 0) {
+            const count = parseInt(childText.trim(), 10);
+            if (count > 0 && count < 10000) {
+              // Found a pure number element, now check if parent has comment keyword
+              const parentText = normalizeText(element.textContent || '');
+              const matchedKeyword = containsCommentKeyword(parentText, keywords);
+              if (matchedKeyword) {
+                return {
+                  score: CONFIDENCE_WEIGHTS.LAYER_1_GOLDEN + CONFIDENCE_WEIGHTS.NUMBER_PRESENT_BONUS,
+                  count,
+                  matchedText: `${count} (${matchedKeyword})`,
+                  details: `Layer3-Golden-Badge: Found "${matchedKeyword}" via "${selector}" (count: ${count})`,
+                };
+              }
+            }
+          }
+        }
+        
+        // Priority 3: Look for jzdBjc span (Classwork comment label like "3 class comments")
+        const classworkLabel = element.querySelector<HTMLElement>('.jzdBjc');
+        if (classworkLabel) {
+          const labelText = normalizeText(classworkLabel.textContent || '');
+          if (!isExcludedCommentPattern(labelText) && !isActionButton(labelText)) {
+            const matchedKeyword = containsCommentKeyword(labelText, keywords);
+            if (matchedKeyword) {
+              const count = extractCount(labelText);
+              if (count !== null && count > 0) {
+                return {
+                  score: CONFIDENCE_WEIGHTS.LAYER_1_GOLDEN + CONFIDENCE_WEIGHTS.NUMBER_PRESENT_BONUS,
+                  count,
+                  matchedText: labelText,
+                  details: `Layer3-Golden-Label: Found "${matchedKeyword}" via jzdBjc (count: ${count})`,
+                };
+              }
+            }
+          }
+        }
+        
+        // Priority 4: Only if element is a leaf node (no children), use its text
+        if (element.children.length === 0) {
+          const text = normalizeText(element.textContent || '');
+          if (!text || text.length < 2) continue;
+          if (isExcludedCommentPattern(text)) continue;
+          if (isActionButton(text)) continue;
+          
+          const matchedKeyword = containsCommentKeyword(text, keywords);
+          if (matchedKeyword) {
+            const count = extractCount(text);
+            if (count !== null && count > 0) {
+              return {
+                score: CONFIDENCE_WEIGHTS.LAYER_1_GOLDEN + CONFIDENCE_WEIGHTS.NUMBER_PRESENT_BONUS,
+                count,
+                matchedText: text,
+                details: `Layer3-Golden-Leaf: Found "${matchedKeyword}" via "${selector}" (count: ${count})`,
+              };
+            }
           }
         }
       }
@@ -354,17 +526,42 @@ export function detectComments(post: HTMLElement, pageLang: string): CommentDete
     classComment: [...new Set([...keywords.classComment, ...englishKeywords.classComment, ...arabicKeywords.classComment])],
   };
   
-  // Execute 4-Layer Nuclear Fallback Strategy
+  // LAYER 0: DOM TRUTH (ABSOLUTE AUTHORITY)
+  // If the specific Classwork comment container exists, its value is the AUTHORITY
+  // and overrides all fuzzy matching or nuclear scan results.
+  const layer0 = executeLayer0_DOMTruth(post);
+  
+  // If Layer 0 found a match, return immediately with high confidence
+  if (layer0.score > 0 && layer0.count !== null && layer0.count > 0) {
+    return {
+      hasComments: true,
+      count: layer0.count,
+      confidence: 'high',
+      confidenceScore: layer0.score,
+      matchedText: layer0.matchedText,
+      detectionLayer: 0,
+      debugInfo: {
+        layer1Score: 0,
+        layer2Score: 0,
+        layer3Score: 0,
+        layer4Score: 0,
+        exclusionPenalty: 0,
+        matchDetails: [layer0.details],
+      },
+    };
+  }
+  
+  // Execute remaining layers as fallback (5-Layer Nuclear Fallback Strategy)
   const layer1 = executeLayer1_AccessibilityScan(post, combinedKeywords);
   const layer2 = executeLayer2_ButtonHeuristic(post, combinedKeywords);
   const layer3 = executeLayer3_GoldenSelectors(post, combinedKeywords);
   const layer4 = executeLayer4_NuclearScan(post, combinedKeywords);
   
-  // Find best match using ACCESSIBILITY-FIRST priority
+  // Find best match using priority order
   let primaryMatch: LayerResult = { score: 0, count: null, matchedText: null, details: '' };
   let primaryLayer = 0;
   
-  // Layer 1 (Accessibility) takes absolute priority
+  // Layer 1 (Accessibility) takes priority
   if (layer1.score > 0 && layer1.count !== null && layer1.count > 0) { 
     primaryMatch = layer1; 
     primaryLayer = 1; 

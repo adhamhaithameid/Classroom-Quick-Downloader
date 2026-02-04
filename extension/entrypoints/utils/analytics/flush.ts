@@ -180,7 +180,6 @@ export async function internalFlush(): Promise<void> {
   // Rate limit check
   const rateCheck = await checkAndIncrementRateLimit();
   if (!rateCheck.allowed) {
-    console.log('[CQD Analytics] Rate limit exceeded for today');
     return;
   }
 
@@ -191,8 +190,7 @@ export async function internalFlush(): Promise<void> {
 
   for (const event of queue) {
     if ((event.retryCount ?? 0) > maxRetry) {
-      // Poison pill - drop it
-      console.log('[CQD Analytics] Dropping event with too many retries:', event.id);
+      // Poison pill - drop it (too many retries)
       continue;
     }
     if (toSend.length < cfg.batchSize) {
@@ -217,7 +215,6 @@ export async function internalFlush(): Promise<void> {
     meta.backoffIndex = 0;
     await saveMeta(meta);
     await saveQueue(toKeep);
-    console.log(`[CQD Analytics] Flushed ${toSend.length} events`);
   } else {
     // Failure - increment retry counts and apply backoff
     const retriedEvents = toSend.map((e) => ({
@@ -233,6 +230,5 @@ export async function internalFlush(): Promise<void> {
 
     await saveMeta(meta);
     await saveQueue([...retriedEvents, ...toKeep]);
-    console.log(`[CQD Analytics] Flush failed, backing off ${backoffSeconds}s:`, result.error);
   }
 }

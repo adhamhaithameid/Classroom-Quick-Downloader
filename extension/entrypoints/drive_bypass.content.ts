@@ -41,9 +41,6 @@ function startBypassFeature() {
 
     // 1) Virus / large file warning
     if (!virusHandled && isVirusWarningPage(bodyText)) {
-      console.log(
-        '[CQD] Virus / large-file warning detected. Auto-clicking "Download anyway"...',
-      );
       if (handleVirusBypassClick()) {
         virusHandled = true;
         notifySuccessFlood();
@@ -56,9 +53,6 @@ function startBypassFeature() {
       const clicked = clickDriveToolbarDownload();
       if (clicked) {
         previewClicked = true;
-        console.log(
-          '[CQD] Drive preview toolbar Download clicked. Notifying background success…',
-        );
         notifySuccessFlood();
       }
     }
@@ -80,9 +74,6 @@ function startBypassFeature() {
       isAccessDeniedPage(bodyText)
     ) {
       auth403Reported = true;
-      console.log(
-        '[CQD] Hard 403 in Drive tab. Reporting CQD_403_SEEN to background…',
-      );
       try {
         chrome.runtime.sendMessage({ type: 'CQD_403_SEEN' });
       } catch {
@@ -94,7 +85,6 @@ function startBypassFeature() {
     if (url.includes('export=download') && !virusHandled) {
           if (document.readyState === 'complete' || document.readyState === 'interactive') {
               if (!isVirusWarningPage(bodyText) && !isAccessDeniedPage(bodyText)) {
-                  console.log('[CQD] Direct download URL detected. Signaling success...');
                   notifySuccessFlood();
                   virusHandled = true; 
               }
@@ -207,12 +197,6 @@ function handleVirusBypassClick(): boolean {
         break;
       }
     }
-  }
-
-  if (clicked) {
-    console.log(
-      '[CQD] "Download anyway" / virus-bypass action triggered successfully.',
-    );
   }
 
   return clicked;

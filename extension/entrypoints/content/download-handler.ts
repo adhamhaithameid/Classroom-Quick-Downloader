@@ -56,9 +56,8 @@ export async function handleCancelClick(button: HTMLButtonElement): Promise<void
           type: 'CQD_CANCEL_DOWNLOAD',
           requestId: pending.requestId,
         });
-        console.log('[CQD] Sent cancel message for requestId:', pending.requestId);
       } catch (err) {
-        console.warn('[CQD] Error sending cancel message:', err);
+        // Error sending cancel message
       }
     }
   }

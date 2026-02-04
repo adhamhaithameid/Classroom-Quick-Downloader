@@ -8,8 +8,9 @@ import { subscribeToGlobalState, createEditedBadge } from './content/flags';
 import { triggerPostClick, upgradeCombinedBadge, ATTR_EDIT_DIFF } from './content/both-badge';
 import { triggerPulseEffect, markTargetElements } from './content/pulse-effect';
 
-// Selector for the main stream card
-const POST_SELECTOR = 'div[data-stream-item-id]';
+// Selector for the main stream card (works for both Stream and Classwork tabs)
+// Stream: div[data-stream-item-id], Classwork: li[data-stream-item-id]
+const POST_SELECTOR = '[data-stream-item-id]';
 const EDITED_ATTR = 'data-cqd-edited-processed';
 const INJECTED_ATTR = 'data-cqd-injected';
 

@@ -15,30 +15,18 @@ export function isFirefox(): boolean {
 
 /**
  * Log a debug message only when running in Firefox.
+ * NOTE: Currently disabled to prevent console output.
  */
-export function logFirefox(category: string, message: string, data?: unknown): void {
-  if (!isFirefox()) return;
-  
-  const prefix = `[CQD:Firefox:${category}]`;
-  if (data !== undefined) {
-    console.log(prefix, message, data);
-  } else {
-    console.log(prefix, message);
-  }
+export function logFirefox(_category: string, _message: string, _data?: unknown): void {
+  // No-op: console logging disabled
 }
 
 /**
  * Log a warning message only when running in Firefox.
+ * NOTE: Currently disabled to prevent console output.
  */
-export function warnFirefox(category: string, message: string, data?: unknown): void {
-  if (!isFirefox()) return;
-  
-  const prefix = `[CQD:Firefox:${category}]`;
-  if (data !== undefined) {
-    console.warn(prefix, message, data);
-  } else {
-    console.warn(prefix, message);
-  }
+export function warnFirefox(_category: string, _message: string, _data?: unknown): void {
+  // No-op: console logging disabled
 }
 
 /**

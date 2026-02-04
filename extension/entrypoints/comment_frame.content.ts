@@ -8,8 +8,9 @@ import { subscribeToGlobalState, createCommentBadge } from './content/flags';
 import { triggerPostClick, upgradeCombinedBadge, ATTR_COMMENT_COUNT } from './content/both-badge';
 import { triggerPulseEffect, markTargetElements } from './content/pulse-effect';
 
-// Selector for the main stream card
-const POST_SELECTOR = 'div[data-stream-item-id]';
+// Selector for the main stream card (works for both Stream and Classwork tabs)
+// Stream: div[data-stream-item-id], Classwork: li[data-stream-item-id]
+const POST_SELECTOR = '[data-stream-item-id]';
 
 // IMPORTANT: use a comments-specific flag, not the generic one
 const PROCESSED_ATTR = 'data-cqd-comments-processed';
@@ -215,7 +216,6 @@ function createOverlay(post: HTMLElement, count: number) {
   }
 
   const computed = window.getComputedStyle(post);
-  const borderRadius = computed.borderRadius || '8px';
   if (computed.position === 'static') {
     post.style.position = 'relative';
   }
@@ -225,7 +225,13 @@ function createOverlay(post: HTMLElement, count: number) {
   if (!overlay) {
     overlay = document.createElement('div');
     overlay.className = 'cqd-overlay-container';
-    overlay.style.borderRadius = borderRadius;
+    
+    // Get parent's border-radius, ensure minimum of 16px for squircle look
+    const parentRadius = computed.borderRadius || '0px';
+    const radiusValue = parseInt(parentRadius) || 0;
+    const finalRadius = Math.max(radiusValue, 16);
+    overlay.style.setProperty('--cqd-overlay-radius', `${finalRadius}px`);
+    
     overlay.setAttribute(INJECTED_ATTR, 'true');
     if (isPageDark()) overlay.classList.add('cqd-theme-dark');
     overlay.addEventListener('click', (e) => {

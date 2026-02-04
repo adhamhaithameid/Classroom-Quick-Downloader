@@ -188,7 +188,12 @@ export function createEditedBadge(
     overlay = document.createElement("div");
     overlay.className = "cqd-overlay-container cqd-edited";
     overlay.setAttribute(INJECTED_ATTR, "true");
-    overlay.style.borderRadius = computed.borderRadius || "8px";
+    
+    // Get parent's border-radius, ensure minimum of 16px for squircle look
+    const parentRadius = computed.borderRadius || "0px";
+    const radiusValue = parseInt(parentRadius) || 0;
+    const finalRadius = Math.max(radiusValue, 16);
+    overlay.style.setProperty('--cqd-overlay-radius', `${finalRadius}px`);
 
     if (
       document.body.classList.contains("cqd-theme-dark") ||
