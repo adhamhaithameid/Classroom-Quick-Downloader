@@ -49,7 +49,6 @@ export function cleanupOrphanedPendingDownloads(): void {
 
   for (const [requestId, pending] of pendingByRequestId.entries()) {
     if (pending.startTime < staleThreshold) {
-      console.log(`[CQD] Cleaning up stale pending download: ${requestId}`);
       cleanup(pending);
     }
   }
