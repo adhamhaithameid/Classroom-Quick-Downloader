@@ -88,6 +88,34 @@ export function injectStyles(): void {
       z-index: 1;
     }
 
+    /* Classwork tab: li elements with data-stream-item-id */
+    li[data-stream-item-id] {
+      overflow: visible !important;
+      contain: none !important;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Classwork tab: ensure header row has proper flex display for button placement */
+    li[data-stream-item-id] .jWCzBe.gmNu1d {
+      display: flex !important;
+      flex-wrap: wrap !important;
+      align-items: center !important;
+    }
+
+    /* Classwork tab: button styling within header */
+    li[data-stream-item-id] .cqd-download-all-btn {
+      margin-inline-end: 8px;
+    }
+
+    /* Classwork tab: flag badges positioning */
+    li[data-stream-item-id] .cqd-flag,
+    li[data-stream-item-id] .cqd-comment-badge,
+    li[data-stream-item-id] .cqd-edited-badge,
+    li[data-stream-item-id] .cqd-both-badge {
+      z-index: 9999;
+    }
+
     /* ===============================
      * 1. DOWNLOAD BUTTON (Single)
      * =============================== */
@@ -406,7 +434,9 @@ export function injectStyles(): void {
       pointer-events: none;
       z-index: 10;
       box-sizing: border-box;
-      border-radius: inherit;
+      /* Default squircle border-radius - 16px like Google's Material Design */
+      /* Use inherit when parent has border-radius, fallback to 16px */
+      border-radius: var(--cqd-overlay-radius, 16px);
       overflow: visible !important; /* Allow pulse to go outside */
       box-shadow:
         inset 0 0 0 2px var(--cqd-color-comment),
@@ -917,12 +947,20 @@ export function injectStyles(): void {
       gap: 6px;
       white-space: nowrap;
       overflow: hidden;
+      opacity: 1;
       transition:
         box-shadow 0.2s ease,
         transform 0.1s ease,
         background-color 0.3s ease,
-        padding-inline 0.2s ease;
+        padding-inline 0.2s ease,
+        opacity 0.25s ease-out;
       transform: translateZ(0);
+    }
+    
+    /* Hidden state with fade-out transition */
+    .cqd-download-all-btn.cqd-hidden {
+      opacity: 0;
+      pointer-events: none;
     }
 
     /* When injected into the header flex structure */
@@ -936,6 +974,29 @@ export function injectStyles(): void {
       margin-inline-end: 8px;
       flex-shrink: 0;
       align-self: center;
+      /* Prevent text overlap on hover */
+      z-index: 100;
+      isolation: isolate;
+      background-clip: padding-box;
+      /* Ensure button doesn't expand beyond its container */
+      max-width: fit-content;
+    }
+
+    /* Classwork header button: ensure proper positioning next to three-dots */
+    .cqd-download-all-btn.cqd-classwork-header {
+      position: relative;
+      transform: none;
+      flex-shrink: 0;
+      z-index: 100;
+      /* Prevent text overlap */
+      isolation: isolate;
+      background-clip: padding-box;
+    }
+
+    /* Ensure button hover doesn't overlap adjacent elements */
+    .cqd-download-all-btn.cqd-in-header:hover,
+    .cqd-download-all-btn.cqd-classwork-header:hover {
+      z-index: 101;
     }
 
     /* RTL fallback only for non-header cases (absolute positioned at top corner) */
