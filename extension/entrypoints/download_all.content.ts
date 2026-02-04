@@ -3,11 +3,13 @@ import { injectStyles } from './content/styles';
 import { t } from './content/i18n';
 import { isPageDark } from './content/theme';
 import { CANCEL_ICON_SVG_URL, DOWNLOAD_ICON_SVG_URL } from './content/icons';
+import { isClassworkPost, isTopicView } from './content/tab-detector';
 
 
 const DOWNLOAD_BTN_SELECTOR = '.cqd-download-all-btn';
 const SINGLE_BTN_SELECTOR = '.cqd-download-btn';
-const GROUP_SELECTOR = 'div[data-stream-item-id]';
+// Updated to match both Stream (div) and Classwork (li) posts
+const GROUP_SELECTOR = '[data-stream-item-id]';
 const INJECTED_ATTR = 'data-cqd-injected';
 const GROUP_FEEDBACK_SUCCESS_MS = 3000;
 const MIN_FILES_FOR_DOWNLOAD_ALL = 2;
@@ -94,12 +96,53 @@ function startDownloadAllFeature() {
         });
       } else if (m.type === 'attributes') {
         const target = m.target as HTMLElement;
+        
+        // Handle download button attribute changes
         if (
           target instanceof HTMLButtonElement &&
           target.classList.contains('cqd-download-btn')
         ) {
           const group = ensureButtonRegistered(target);
           if (group) markGroupDirty(group);
+        }
+        
+        // Handle Classwork post fold/unfold (class changes on li elements)
+        // When user opens/closes a post, the class changes from AZd1I to lXuxY (or vice versa)
+        if (
+          m.attributeName === 'class' &&
+          target.matches('li[data-stream-item-id]')
+        ) {
+          // Check if this post has a Download All button
+          const downloadAllBtn = target.querySelector<HTMLButtonElement>('.cqd-download-all-btn');
+          if (downloadAllBtn) {
+            const isCollapsed = isPostCollapsed(target);
+            if (isCollapsed) {
+              // Hide the button when post is folded (with fade-out)
+              downloadAllBtn.classList.add('cqd-hidden');
+            } else {
+              // Show the button when post is unfolded (with fade-in)
+              downloadAllBtn.classList.remove('cqd-hidden');
+            }
+          }
+        }
+        
+        // Handle aria-expanded changes (also indicates fold/unfold)
+        if (
+          m.attributeName === 'aria-expanded' &&
+          target.closest('li[data-stream-item-id]')
+        ) {
+          const postRoot = target.closest<HTMLElement>('li[data-stream-item-id]');
+          if (postRoot) {
+            const downloadAllBtn = postRoot.querySelector<HTMLButtonElement>('.cqd-download-all-btn');
+            if (downloadAllBtn) {
+              const isCollapsed = isPostCollapsed(postRoot);
+              if (isCollapsed) {
+                downloadAllBtn.classList.add('cqd-hidden');
+              } else {
+                downloadAllBtn.classList.remove('cqd-hidden');
+              }
+            }
+          }
         }
       }
     }
@@ -111,7 +154,7 @@ function startDownloadAllFeature() {
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ['class', 'data-cqd-all-done'],
+      attributeFilter: ['class', 'data-cqd-all-done', 'aria-expanded'],
     });
   }
 
@@ -252,6 +295,53 @@ function findGroupRoot(btn: HTMLElement): HTMLElement | null {
   if (main) return main;
 
   return null;
+}
+
+/**
+ * Checks if a Classwork post is collapsed (folded).
+ * 
+ * TOPIC VIEW (/tc/ URLs):
+ * - Posts are ALWAYS expanded, never fold
+ * - Uses div.etr9pd or div.i8Wprc elements
+ * - Always return false (not collapsed)
+ * 
+ * LIST VIEW (/t/ URLs):
+ * - OPEN posts have: aria-expanded="true" on the expand button AND class "lXuxY" on the li
+ * - CLOSED posts have: aria-expanded="false" on the expand button AND class "AZd1I" on the li
+ * 
+ * @param postRoot The root element of the post
+ * @returns True if the post is collapsed/folded
+ */
+function isPostCollapsed(postRoot: HTMLElement): boolean {
+  // Only applies to Classwork posts
+  if (!isClassworkPost(postRoot)) return false;
+  
+  // Topic view pages (/tc/ URLs) - posts are always expanded
+  if (isTopicView()) {
+    return false;
+  }
+  
+  // For non-li elements (topic view posts), they're always expanded
+  if (!postRoot.matches('li')) {
+    return false;
+  }
+  
+  // LIST VIEW: Check for aria-expanded attribute (most reliable)
+  const expandButton = postRoot.querySelector<HTMLElement>('[aria-expanded]');
+  if (expandButton) {
+    const isExpanded = expandButton.getAttribute('aria-expanded') === 'true';
+    if (!isExpanded) {
+      return true; // Post is collapsed
+    }
+  }
+  
+  // LIST VIEW: Check for the lXuxY class (present when expanded)
+  // Open posts have class "lXuxY", closed posts have "AZd1I"
+  if (postRoot.classList.contains('AZd1I') || !postRoot.classList.contains('lXuxY')) {
+    return true; // Post is collapsed
+  }
+  
+  return false; // Post is expanded/open
 }
 
 function getCanonicalFileKey(btn: HTMLButtonElement): string {
@@ -425,16 +515,6 @@ function updateGroupState(group: GroupState): void {
   }
 
   group.isBusy = inProgress > 0;
-  
-  console.log('[CQD] updateDownloadAllButtonState -', {
-    totalFiles,
-    downloaded,
-    failed,
-    inProgress,
-    isBusy: group.isBusy,
-    activated: group.activated,
-    cancelPending: group.cancelPending
-  });
 
   if (group.isBusy && group.resetTimeoutId != null) {
     window.clearTimeout(group.resetTimeoutId);
@@ -457,7 +537,6 @@ function updateGroupState(group: GroupState): void {
   const isHovering = btn.matches(':hover');
   
   if (group.cancelPending) {
-    console.log('[CQD] Showing cancelled state');
     btn.classList.remove('cqd-all-cancel', 'cqd-all-success', 'cqd-all-error');
     btn.classList.add('cqd-all-cancelled');
     mainText = t('cancelled') || 'Cancelled';
@@ -589,9 +668,26 @@ function resetGroupVisuals(group: GroupState): void {
 }
 
 function findHeaderContainer(root: HTMLElement): HTMLElement | null {
+  // Stream view: .N5dSp header
   const n5dsp = root.querySelector<HTMLElement>('.N5dSp');
   if (n5dsp) return n5dsp;
 
+  // Topic View / Classwork: Find the header row (.RcHwO) which contains all header elements
+  // This is the proper parent for button placement
+  const headerRow = root.querySelector<HTMLElement>('.RcHwO');
+  if (headerRow) return headerRow;
+
+  // Classwork List View: The span with nZCyt class that contains data-stream-item-id
+  // This is the main title row: icon, title "NN & CNN", comment count, date, three-dots
+  const classworkTitleSpan = root.querySelector<HTMLElement>('span.nZCyt');
+  if (classworkTitleSpan) return classworkTitleSpan;
+
+  // Classwork view: header row within the collapsible list item
+  // This is the row containing the assignment icon, title, and menu
+  const classworkHeader = root.querySelector<HTMLElement>('.jWCzBe.gmNu1d');
+  if (classworkHeader) return classworkHeader;
+
+  // Stream view alternative: internal header
   const internalHeader =
     root.querySelector<HTMLElement>('.JZicYb.gmNu1d') ||
     root.querySelector<HTMLElement>('.JZicYb');
@@ -608,7 +704,7 @@ function findHeaderContainer(root: HTMLElement): HTMLElement | null {
 
     const headers = Array.from(
       parent.querySelectorAll<HTMLElement>(
-        '.N5dSp, .JZicYb.gmNu1d, .N5dSp, .JZicYb',
+        '.N5dSp, .JZicYb.gmNu1d, .jWCzBe.gmNu1d, .nZCyt, .vFkiub.kpDQ8, .JZicYb',
       ),
     );
 
@@ -636,18 +732,39 @@ function findHeaderContainer(root: HTMLElement): HTMLElement | null {
 
 function ensureDownloadAllButton(group: GroupState): HTMLButtonElement {
   const existing = group.downloadAllBtn;
+  const root = group.root;
+  
+  // Check if this is a collapsed Classwork post - hide button if so
+  if (isPostCollapsed(root)) {
+    if (existing && existing.isConnected) {
+      // Hide the existing button (with fade-out transition)
+      existing.classList.add('cqd-hidden');
+    }
+    // Return existing or create a hidden placeholder
+    if (existing) return existing;
+  } else if (existing && existing.isConnected) {
+    // Post is expanded - ensure button is visible (with fade-in transition)
+    existing.classList.remove('cqd-hidden');
+    return existing;
+  }
+  
   if (existing && existing.isConnected) return existing;
 
-  const root = group.root;
   const headerContainer = findHeaderContainer(root);
-  const isStreamView = root.matches(GROUP_SELECTOR);
+  const isClasswork = isClassworkPost(root);
+  const isStreamView = root.matches('div[data-stream-item-id]');
   const isPostHeader = !!headerContainer && headerContainer.classList.contains('N5dSp');
+  const isClassworkHeader = !!headerContainer && headerContainer.classList.contains('jWCzBe');
   const targetContainer = headerContainer || root;
   const isInHeader = !!headerContainer;
 
   targetContainer.style.setProperty('flex-wrap', 'wrap', 'important');
   targetContainer.style.setProperty('align-items', 'center', 'important');
   if (targetContainer.classList.contains('N5dSp')) {
+    targetContainer.style.display = 'flex';
+  }
+  // Classwork header needs flex too
+  if (targetContainer.classList.contains('jWCzBe')) {
     targetContainer.style.display = 'flex';
   }
 
@@ -657,6 +774,9 @@ function ensureDownloadAllButton(group: GroupState): HTMLButtonElement {
   
   if (isInHeader) {
     button.classList.add('cqd-in-header');
+  }
+  if (isClasswork) {
+    button.classList.add('cqd-classwork');
   }
   button.setAttribute(INJECTED_ATTR, 'true');
   if (isPageDark()) {
@@ -698,7 +818,6 @@ function ensureDownloadAllButton(group: GroupState): HTMLButtonElement {
         
         // If transitioned from any terminal state to idle
         if ((wasCancelled || wasSuccess || wasError) && !isCancelled && !isSuccess && !isError) {
-          console.log('[CQD] Sync reset triggered by class change');
           resetGroupVisuals(group);
         }
       }
@@ -715,22 +834,11 @@ function ensureDownloadAllButton(group: GroupState): HTMLButtonElement {
     e.preventDefault();
     e.stopPropagation();
     
-    console.log('[CQD] Button clicked. State:', { 
-      isBusy: group.isBusy, 
-      activated: group.activated, 
-      cancelPending: group.cancelPending,
-      filesInProgress: Array.from(group.files.values()).filter(f => f.inProgress).length
-    });
-    
     // Check actual group state, not just CSS class (user might click without hovering)
     if (group.isBusy && group.activated && !group.cancelPending) {
-      console.log('[CQD] ✅ Cancel All button clicked - calling handler');
       handleCancelAllClick(group);
     } else if (!group.activated || !group.isBusy) {
-      console.log('[CQD] ✅ Download All button clicked - calling handler');
       handleDownloadAllClick(group);
-    } else {
-      console.log('[CQD] ⚠️ Button clicked but already cancelled or not in valid state');
     }
   });
 
@@ -738,7 +846,6 @@ function ensureDownloadAllButton(group: GroupState): HTMLButtonElement {
 
   // Hover handlers for cancel state - shows IMMEDIATELY on hover
   button.addEventListener('mouseenter', () => {
-    console.log('[CQD] Mouse enter. isBusy:', group.isBusy, 'activated:', group.activated);
     if (group.isBusy && group.activated && !group.cancelPending) {
       button.classList.add('cqd-all-cancel');
       const mainSpan = button.querySelector<HTMLElement>('.cqd-download-all-main');
@@ -773,7 +880,10 @@ function ensureDownloadAllButton(group: GroupState): HTMLButtonElement {
     }
   });
 
-  if (isPostHeader && headerContainer) {
+  // Determine placement based on view type
+  if (isClasswork && headerContainer) {
+    placeDownloadButtonForClassworkView(button, root, headerContainer);
+  } else if (isPostHeader && headerContainer) {
     placeDownloadButtonForPostView(button, headerContainer);
   } else if (isStreamView) {
     placeDownloadButtonForStreamView(button, headerContainer || root);
@@ -782,8 +892,76 @@ function ensureDownloadAllButton(group: GroupState): HTMLButtonElement {
     button.style.marginInlineStart = '8px';
   }
 
+  // Attach per-button visibility observer for accordion state (aria-expanded)
+  // This ensures button hides when post is collapsed
+  attachVisibilityObserver(root, button);
+
   group.downloadAllBtn = button;
   return button;
+}
+
+/**
+ * Attaches a MutationObserver to manage button visibility based on post accordion state.
+ * 
+ * Per spec: The button must ONLY be visible when the post is EXPANDED (aria-expanded="true").
+ * When the post is collapsed (aria-expanded="false"), the button is hidden.
+ * 
+ * Target: div[role="button"][aria-expanded] (Classes: .SFCE1b, .JUr7jb)
+ * 
+ * IMPORTANT: In Classwork List View, the postElement is div.sVNOQ (attachments container)
+ * but the toggle is in the parent <li> element. We need to search upward.
+ */
+function attachVisibilityObserver(postElement: HTMLElement, button: HTMLElement): void {
+  // Determine the search scope - for sVNOQ, search from parent li element
+  let searchScope: HTMLElement = postElement;
+  
+  // If postElement is sVNOQ (Classwork/Topic view), the toggle is in parent li
+  if (postElement.classList.contains('sVNOQ') || postElement.matches('div[data-stream-item-id]')) {
+    const parentLi = postElement.closest<HTMLElement>('li[data-stream-item-id]');
+    if (parentLi) {
+      searchScope = parentLi;
+    }
+  }
+  
+  // Find the expansion trigger (accordion toggle button)
+  const toggle = searchScope.querySelector<HTMLElement>('div[role="button"][aria-expanded]');
+  
+  if (!toggle) {
+    // No accordion toggle found - button stays visible by default
+    // This is normal for Stream view posts and Topic view which don't have accordions
+    button.classList.remove('cqd-hidden');
+    return;
+  }
+  
+  // Function to update button visibility based on aria-expanded state
+  // Uses CSS class toggle for smooth opacity transition
+  const updateVisibility = () => {
+    const isExpanded = toggle.getAttribute('aria-expanded') === 'true';
+    if (isExpanded) {
+      // Post is expanded - show button with fade-in
+      button.classList.remove('cqd-hidden');
+    } else {
+      // Post is collapsed - hide button with fade-out
+      button.classList.add('cqd-hidden');
+    }
+  };
+  
+  // Set initial visibility state
+  updateVisibility();
+  
+  // Watch for aria-expanded attribute changes
+  const observer = new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      if (mutation.type === 'attributes' && mutation.attributeName === 'aria-expanded') {
+        updateVisibility();
+      }
+    }
+  });
+  
+  observer.observe(toggle, { 
+    attributes: true,
+    attributeFilter: ['aria-expanded']
+  });
 }
 
 function placeDownloadButtonForPostView(
@@ -842,6 +1020,163 @@ function placeDownloadButtonForStreamView(
   } else {
     targetContainer.appendChild(button);
     button.style.marginInlineStart = '8px';
+  }
+}
+
+/**
+ * Places the Download All button in Classwork/Topic view posts.
+ * 
+ * REVISED STRATEGY (based on debug logs):
+ * - headerContainer is often .vFkiub.kpDQ8 which IS the three-dots container
+ * - We need to find the actual dots button INSIDE headerContainer
+ * - Insert button BEFORE the dots button (not after/append)
+ */
+function placeDownloadButtonForClassworkView(
+  button: HTMLButtonElement,
+  root: HTMLElement,
+  headerContainer: HTMLElement,
+): void {
+  // Style button for Classwork compact view
+  button.classList.add('cqd-classwork-header');
+  button.style.marginInlineEnd = '8px';
+  button.style.flexShrink = '0';
+  button.style.alignSelf = 'center';
+  
+
+  
+  // =========================================================================
+  // STRATEGY 1: headerContainer is the dots container (.vFkiub.kpDQ8 or .kpDQ8)
+  // This is the most common case in Topic View - headerContainer CONTAINS the dots
+  // =========================================================================
+  
+  if (headerContainer.classList.contains('kpDQ8') || headerContainer.classList.contains('vFkiub')) {
+
+    
+    // The dots container is often absolutely positioned, so we should NOT put button inside it
+    // Instead, insert button as a SIBLING in the PARENT row
+    const parentRow = headerContainer.parentElement;
+    
+    if (parentRow) {
+
+      
+      // Ensure parent is flex for horizontal layout
+      parentRow.style.setProperty('display', 'flex', 'important');
+      parentRow.style.setProperty('align-items', 'center', 'important');
+      parentRow.style.setProperty('flex-wrap', 'nowrap', 'important');
+      parentRow.style.setProperty('justify-content', 'flex-end', 'important');
+      
+      // Add margin to separate from dots
+      button.style.marginInlineEnd = '8px';
+      
+      // Insert button as sibling BEFORE the dots container
+      parentRow.insertBefore(button, headerContainer);
+
+      return;
+    }
+    
+    // Fallback: insert inside headerContainer if parent not available
+    const dotsButton = headerContainer.querySelector<HTMLElement>(
+      '[jscontroller="h38nBf"], [jscontroller="ZvHseb"], [jscontroller="PIVayb"], ' +
+      '[aria-label*="More"], [aria-label*="more"], [aria-haspopup="menu"], ' +
+      'div[role="button"], button'
+    );
+    
+    if (dotsButton) {
+      headerContainer.style.setProperty('display', 'flex', 'important');
+      headerContainer.style.setProperty('align-items', 'center', 'important');
+      headerContainer.insertBefore(button, dotsButton);
+
+      return;
+    }
+    
+    // No specific dots button found, insert as first child
+    const firstChild = headerContainer.firstElementChild;
+    if (firstChild) {
+      headerContainer.insertBefore(button, firstChild);
+
+    } else {
+      headerContainer.appendChild(button);
+
+    }
+    return;
+  }
+  
+  // =========================================================================
+  // STRATEGY 2: Search parent containers for the dots
+  // =========================================================================
+  
+  // Get the parent chain to search
+  let searchContainer: HTMLElement = root;
+  if (root.classList.contains('sVNOQ') && root.parentElement) {
+    searchContainer = root.parentElement;
+    if (searchContainer.parentElement) {
+      // Go up another level to find the full post wrapper
+      searchContainer = searchContainer.parentElement;
+    }
+
+  }
+  
+  const threeDotsSelectors = [
+    '[jscontroller="h38nBf"]',
+    '[jscontroller="ZvHseb"]',
+    '[jscontroller="PIVayb"]',
+    '[aria-label*="More"]',
+    '[aria-label*="more"]',
+    '[aria-haspopup="menu"]',
+    '.vFkiub.kpDQ8',
+    '.kpDQ8',
+  ].join(', ');
+  
+  const threeDotsElement = searchContainer.querySelector<HTMLElement>(threeDotsSelectors);
+  
+  if (threeDotsElement) {
+
+    
+    const dotsParent = threeDotsElement.parentElement;
+    if (dotsParent) {
+      dotsParent.style.setProperty('display', 'flex', 'important');
+      dotsParent.style.setProperty('align-items', 'center', 'important');
+      dotsParent.insertBefore(button, threeDotsElement);
+
+      return;
+    }
+  }
+  
+  // =========================================================================
+  // STRATEGY 3: Known container selectors
+  // =========================================================================
+  
+  const topicHeader = searchContainer.querySelector<HTMLElement>('.jWCzBe');
+  if (topicHeader) {
+    const topicMenu = topicHeader.querySelector<HTMLElement>('.WyjGac, .kpDQ8');
+    if (topicMenu) {
+      topicHeader.insertBefore(button, topicMenu);
+
+      return;
+    }
+    topicHeader.appendChild(button);
+
+    return;
+  }
+  
+  const headerRow = searchContainer.querySelector<HTMLElement>('.RcHwO');
+  if (headerRow) {
+    headerRow.appendChild(button);
+
+    return;
+  }
+  
+  // =========================================================================
+  // LAST RESORT: Append to headerContainer
+  // =========================================================================
+
+  
+  // Try to prepend rather than append
+  const firstElement = headerContainer.firstElementChild;
+  if (firstElement) {
+    headerContainer.insertBefore(button, firstElement);
+  } else {
+    headerContainer.appendChild(button);
   }
 }
 
@@ -928,8 +1263,6 @@ function handleCancelAllClick(group: GroupState): void {
   if (!group.activated || !group.isBusy) return;
   if (group.cancelPending) return;
 
-  console.log('[CQD] Cancel All clicked - group has', group.files.size, 'files');
-
   group.cancelPending = true;
   let cancelledCount = 0;
   let requestIdFoundCount = 0;
@@ -959,7 +1292,6 @@ function handleCancelAllClick(group: GroupState): void {
     if (!primary) continue;
 
     const fileName = (primary.dataset as any).cqdName || 'unknown';
-    console.log('[CQD] Processing file for cancellation:', fileName);
 
     // Mark file as cancelled
     file.inProgress = false;
@@ -968,7 +1300,6 @@ function handleCancelAllClick(group: GroupState): void {
 
     // Check if requestId exists in dataset
     const requestId = (primary.dataset as any).cqdRequestId;
-    console.log('[CQD] Button requestId from dataset:', requestId, '| button:', primary);
     
     if (requestId) {
       requestIdFoundCount++;
@@ -976,16 +1307,10 @@ function handleCancelAllClick(group: GroupState): void {
         try {
           chrome.runtime.sendMessage({type: 'CQD_CANCEL_DOWNLOAD', requestId });
           messagesSentCount++;
-          console.log('[CQD] ✅ Sent cancel message for:', fileName, '| requestId:', requestId);
         } catch (err) {
-          console.error('[CQD] ❌ Failed to send cancel message for:', fileName, '| error:', err);
+          // Failed to send cancel message
         }
-      } else {
-        console.warn('[CQD] ⚠️ chrome.runtime not available');
       }
-    } else {
-      console.error('[CQD] ❌ NO requestId found in button dataset for:', fileName);
-      console.log('[CQD] Button dataset:', primary.dataset);
     }
     
     // Update button visual state to cancelled - remove ALL state classes first
@@ -1007,11 +1332,6 @@ function handleCancelAllClick(group: GroupState): void {
       icon.style.backgroundSize = '20px 20px';
     }
   }
-
-  console.log('[CQD] Cancel All Summary:');
-  console.log('  - Files processed:', cancelledCount);
-  console.log('  - RequestIDs found:', requestIdFoundCount);
-  console.log('  - Cancel messages sent:', messagesSentCount);
 
   // Update group state immediately to reflect cancellations
   markGroupDirty(group);
