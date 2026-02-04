@@ -169,7 +169,6 @@ function applyHoverCancelVisual(
   icon: HTMLElement,
   label: HTMLSpanElement
 ): void {
-  console.log('[CQD] Mouse over active button - showing cancel');
   button.classList.add('cqd-cancel');
   label.textContent = t('cancel') || 'Cancel';
   icon.className = 'cqd-download-icon';
