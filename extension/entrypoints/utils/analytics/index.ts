@@ -25,8 +25,8 @@ export type {
 let opChain: Promise<void> = Promise.resolve();
 
 function enqueueOp(op: () => Promise<void>): void {
-  opChain = opChain.then(op).catch((err) => {
-    console.error('[CQD Analytics] Operation error:', err);
+  opChain = opChain.then(op).catch(() => {
+    // Analytics operation error - silently ignored
   });
 }
 
@@ -134,9 +134,8 @@ export async function refreshRemoteAnalyticsConfig(): Promise<void> {
     }
 
     await saveConfig(updated);
-    console.log('[CQD Analytics] Config refreshed from remote');
   } catch (err) {
-    console.warn('[CQD Analytics] Failed to refresh config:', err);
+    // Failed to refresh config - silently ignored
   }
 }
 
