@@ -256,33 +256,50 @@ function renderChangelogSection(entries: ChangelogEntry[], config: ChangelogConf
     ...knownVersions.map(v => `<option value="${v}">v${v}</option>`)
   ].join('');
 
+  const releaseCount = sorted.length;
   const historyHtml = sorted.map(e => `
-    <div class="cl-history-item" style="border-bottom: 1px dashed var(--border-subtle); padding: 12px 0;">
-      <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px;">
-        <div>
-          <span style="font-weight: 700; color: var(--accent);">${e.version}</span>
-          <span style="font-size: 0.8em; color: var(--text-soft); margin-left: 8px;">${new Date(e.date).toLocaleDateString()}</span>
+    <div class="cl-history-item" data-release-id="${e.id}">
+      <div class="cl-history-header">
+        <div class="cl-history-meta">
+          <span class="cl-version-badge">v${e.version}</span>
+          <span class="cl-date">${new Date(e.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
         </div>
-        <div style="display: flex; gap: 8px;">
-           <button class="btn-xs edit-cl-btn" data-id="${e.id}" style="opacity: 0.7;">✏️</button>
-           <button class="btn-xs delete-cl-btn" data-id="${e.id}" style="opacity: 0.7;">🗑</button>
+        <div class="cl-actions">
+           <button class="cl-action-btn edit-cl-btn" data-id="${e.id}" title="Edit release">
+             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+           </button>
+           <button class="cl-action-btn delete-cl-btn" data-id="${e.id}" title="Delete release">
+             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+           </button>
         </div>
       </div>
-      <ul style="margin: 0; padding-left: 20px; font-size: 0.9em; color: var(--text-muted);">
+      <ul class="cl-changes-list">
         ${e.changes.map(c => `<li>${c}</li>`).join('')}
       </ul>
     </div>
-  `).join('') || '<div style="text-align: center; color: var(--text-soft); padding: 20px;">No releases yet</div>';
+  `).join('') || `
+    <div class="cl-empty-state">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.3">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <line x1="16" y1="13" x2="8" y2="13"/>
+        <line x1="16" y1="17" x2="8" y2="17"/>
+        <polyline points="10 9 9 9 8 9"/>
+      </svg>
+      <p>No releases published yet</p>
+      <span>Create your first release using the form above</span>
+    </div>
+  `;
 
   const rulesJson = JSON.stringify(config.rules || []);
 
-  // EXACT CSS FROM EXTENSION (App.css) - WITH HOVER EFFECTS
+  // Enhanced CSS with all improvements
   const extensionStyles = `
     /* Base version pill */
     .cqd-brand-version {
       font-weight: 600;
-      color: #005dd7; /* cqd-blue */
-      background: #e3edff; /* cqd-blue-soft */
+      color: #005dd7;
+      background: #e3edff;
       padding: 2px 8px;
       border-radius: 999px;
       font-size: 11px;
@@ -320,7 +337,6 @@ function renderChangelogSection(entries: ChangelogEntry[], config: ChangelogConf
     }
 
     /* EFFECTS */
-    /* Glow (Blue) */
     .cqd-effect-glow-blue {
       box-shadow: 0 0 10px #00d2ff, 0 0 5px #007bff !important;
       border-color: #00d2ff !important;
@@ -329,7 +345,6 @@ function renderChangelogSection(entries: ChangelogEntry[], config: ChangelogConf
       box-shadow: 0 0 15px #00d2ff, 0 0 10px #007bff, 0 4px 8px rgba(0, 210, 255, 0.3) !important;
     }
     
-    /* Glow (Red) */
     .cqd-effect-glow-red {
       box-shadow: 0 0 10px #f87171, 0 0 5px #ef4444 !important;
       border-color: #f87171 !important;
@@ -338,30 +353,243 @@ function renderChangelogSection(entries: ChangelogEntry[], config: ChangelogConf
       box-shadow: 0 0 15px #f87171, 0 0 10px #ef4444, 0 4px 8px rgba(248, 113, 113, 0.3) !important;
     }
 
-    /* Pulse (Blue) */
     @keyframes pulse-blue {
       0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
       70% { box-shadow: 0 0 0 6px rgba(59, 130, 246, 0); }
       100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
     }
-    .cqd-effect-pulse-blue {
-      animation: pulse-blue 2s infinite;
-    }
-    .cqd-effect-pulse-blue:hover {
-      animation: pulse-blue 1s infinite;
-    }
+    .cqd-effect-pulse-blue { animation: pulse-blue 2s infinite; }
+    .cqd-effect-pulse-blue:hover { animation: pulse-blue 1s infinite; }
 
-    /* Pulse (Red) */
     @keyframes pulse-red {
       0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
       70% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
       100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
     }
-    .cqd-effect-pulse-red {
-      animation: pulse-red 2s infinite;
+    .cqd-effect-pulse-red { animation: pulse-red 2s infinite; }
+    .cqd-effect-pulse-red:hover { animation: pulse-red 1s infinite; }
+
+    /* Release Manager Enhanced Styles */
+    .cl-history-item {
+      padding: 16px;
+      background: rgba(255,255,255,0.02);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      margin-bottom: 12px;
+      transition: all 0.2s ease;
     }
-    .cqd-effect-pulse-red:hover {
-      animation: pulse-red 1s infinite;
+    .cl-history-item:hover {
+      background: rgba(255,255,255,0.04);
+      border-color: rgba(59, 130, 246, 0.3);
+    }
+    .cl-history-item.editing {
+      border-color: #f59e0b;
+      background: rgba(245, 158, 11, 0.05);
+    }
+    .cl-history-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .cl-history-meta {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .cl-version-badge {
+      font-weight: 700;
+      color: #fff;
+      background: linear-gradient(135deg, #3b82f6, #6366f1);
+      padding: 3px 10px;
+      border-radius: 6px;
+      font-size: 0.85em;
+    }
+    .cl-date {
+      font-size: 0.8em;
+      color: var(--text-soft);
+    }
+    .cl-actions {
+      display: flex;
+      gap: 6px;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .cl-history-item:hover .cl-actions {
+      opacity: 1;
+    }
+    .cl-action-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      border: 1px solid var(--border-subtle);
+      background: rgba(255,255,255,0.05);
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+    }
+    .cl-action-btn:hover {
+      background: rgba(255,255,255,0.1);
+      color: #fff;
+      transform: translateY(-1px);
+    }
+    .cl-action-btn.edit-cl-btn:hover {
+      border-color: #3b82f6;
+      color: #60a5fa;
+    }
+    .cl-action-btn.delete-cl-btn:hover {
+      border-color: #ef4444;
+      color: #f87171;
+    }
+    .cl-changes-list {
+      margin: 0;
+      padding-left: 18px;
+      font-size: 0.9em;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+    .cl-changes-list li {
+      margin-bottom: 4px;
+    }
+    .cl-empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--text-soft);
+    }
+    .cl-empty-state p {
+      margin: 12px 0 4px;
+      font-size: 1em;
+      color: var(--text-muted);
+    }
+    .cl-empty-state span {
+      font-size: 0.85em;
+    }
+
+    /* Edit Mode Indicator */
+    .edit-mode-banner {
+      display: none;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(245, 158, 11, 0.05));
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      border-radius: 8px;
+      margin-bottom: 16px;
+      animation: slideIn 0.2s ease;
+    }
+    .edit-mode-banner.active {
+      display: flex;
+    }
+    .edit-mode-banner svg {
+      color: #f59e0b;
+    }
+    .edit-mode-banner .edit-mode-text {
+      flex: 1;
+      font-size: 0.9em;
+      color: #fbbf24;
+    }
+    .edit-mode-banner .edit-mode-text strong {
+      color: #fcd34d;
+    }
+    .btn-cancel-edit {
+      padding: 5px 12px;
+      font-size: 0.8em;
+      background: transparent;
+      border: 1px solid rgba(245, 158, 11, 0.5);
+      color: #fbbf24;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-cancel-edit:hover {
+      background: rgba(245, 158, 11, 0.2);
+      border-color: #f59e0b;
+    }
+
+    /* Character Counter */
+    .textarea-wrapper {
+      position: relative;
+    }
+    .char-counter {
+      position: absolute;
+      bottom: 8px;
+      right: 10px;
+      font-size: 0.7em;
+      color: var(--text-soft);
+      pointer-events: none;
+    }
+    .char-counter.warning { color: #f59e0b; }
+    .char-counter.error { color: #ef4444; }
+
+    /* Loading State */
+    .btn-loading {
+      position: relative;
+      pointer-events: none;
+      opacity: 0.8;
+    }
+    .btn-loading::after {
+      content: '';
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      border: 2px solid transparent;
+      border-top-color: currentColor;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-left: 8px;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Release Count Badge */
+    .release-count-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 22px;
+      height: 22px;
+      padding: 0 6px;
+      font-size: 0.75em;
+      font-weight: 600;
+      background: rgba(59, 130, 246, 0.2);
+      color: #60a5fa;
+      border-radius: 999px;
+      margin-left: 8px;
+    }
+
+    /* Unsaved Changes Indicator */
+    .unsaved-dot {
+      display: none;
+      width: 8px;
+      height: 8px;
+      background: #f59e0b;
+      border-radius: 50%;
+      margin-left: 8px;
+      animation: pulse-orange 2s infinite;
+    }
+    .unsaved-dot.active {
+      display: inline-block;
+    }
+    @keyframes pulse-orange {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    /* Rule Preview in List */
+    .rule-preview-mini {
+      display: inline-block;
+      font-size: 9px;
+      padding: 1px 5px;
+      border-radius: 3px;
+      margin-left: 6px;
     }
   `;
 
@@ -369,6 +597,7 @@ function renderChangelogSection(entries: ChangelogEntry[], config: ChangelogConf
     <section class="card config-card" style="border-color: #3b82f6;">
       <h2 style="color: #3b82f6; display: flex; align-items: center; gap: 8px;">
         <span>📜</span> Notification & Release Manager
+        <span class="unsaved-dot" id="unsaved-indicator" title="Unsaved changes"></span>
       </h2>
 
       <!-- Inject Server State & Styles -->
@@ -391,56 +620,56 @@ function renderChangelogSection(entries: ChangelogEntry[], config: ChangelogConf
             <!-- Target Selection -->
             <div style="margin-bottom: 16px;">
                <label style="font-size: 0.75em; color: var(--text-soft); display: block; margin-bottom: 6px;">Target Version</label>
-               <input list="known-versions" id="rule-target" placeholder="e.g. 1.2.3 or 'all'" class="input-field" style="width: 100%; padding: 8px; background: var(--bg-elevated); border: 1px solid var(--border-subtle); color: white; border-radius: 6px;" oninput="window.updatePreview && window.updatePreview()">
+               <input list="known-versions" id="rule-target" placeholder="e.g. 1.2.3 or 'all'" class="input-field" style="width: 100%; padding: 10px 12px; background: var(--bg-elevated); border: 1px solid var(--border-subtle); color: white; border-radius: 8px; font-size: 0.95em;" oninput="window.updatePreview && window.updatePreview()">
                <datalist id="known-versions">
                  ${dataListOptions}
                </datalist>
-               <div style="font-size: 0.7em; color: var(--text-muted); margin-top: 4px;">Select from history or type new.</div>
+               <div style="font-size: 0.7em; color: var(--text-muted); margin-top: 6px;">Select from history or type new version.</div>
             </div>
             
             <div style="border-top: 1px dashed var(--border-subtle); margin: 16px 0; padding-top: 16px;">
               <!-- Priority -->
-              <label style="font-size: 0.75em; color: var(--text-soft); display: block; margin-bottom: 8px;">Priority (Color Scheme)</label>
-              <div style="display: flex; gap: 12px; margin-bottom: 16px;">
-                <label style="cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: rgba(255,255,255,0.05); border-radius: 6px;">
-                  <input type="radio" name="rule-priority" value="normal" checked onclick="window.updatePreview && window.updatePreview()">
-                  <span style="font-size: 0.85em;">Normal</span>
+              <label style="font-size: 0.75em; color: var(--text-soft); display: block; margin-bottom: 10px;">Priority (Color Scheme)</label>
+              <div style="display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap;">
+                <label class="priority-option" style="cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 8px 14px; background: rgba(255,255,255,0.05); border-radius: 8px; border: 1px solid transparent; transition: all 0.15s;">
+                  <input type="radio" name="rule-priority" value="normal" checked style="accent-color: #6b7280;">
+                  <span style="font-size: 0.9em;">Normal</span>
                 </label>
-                <label style="cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: rgba(59,130,246,0.1); border-radius: 6px;">
-                  <input type="radio" name="rule-priority" value="minor" onclick="window.updatePreview && window.updatePreview()">
-                  <span style="font-size: 0.85em; color: #60a5fa;">Minor (Blue)</span>
+                <label class="priority-option" style="cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 8px 14px; background: rgba(59,130,246,0.1); border-radius: 8px; border: 1px solid rgba(59,130,246,0.3); transition: all 0.15s;">
+                  <input type="radio" name="rule-priority" value="minor" style="accent-color: #3b82f6;">
+                  <span style="font-size: 0.9em; color: #60a5fa;">Minor (Blue)</span>
                 </label>
-                <label style="cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: rgba(239,68,68,0.1); border-radius: 6px;">
-                  <input type="radio" name="rule-priority" value="major" onclick="window.updatePreview && window.updatePreview()">
-                  <span style="font-size: 0.85em; color: #f87171; font-weight: 600;">Major (Red)</span>
+                <label class="priority-option" style="cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 8px 14px; background: rgba(239,68,68,0.1); border-radius: 8px; border: 1px solid rgba(239,68,68,0.3); transition: all 0.15s;">
+                  <input type="radio" name="rule-priority" value="major" style="accent-color: #ef4444;">
+                  <span style="font-size: 0.9em; color: #f87171; font-weight: 600;">Major (Red)</span>
                 </label>
               </div>
 
               <!-- Effect -->
-              <label style="font-size: 0.75em; color: var(--text-soft); display: block; margin-bottom: 8px;">Animation Effect</label>
-              <div style="display: flex; gap: 12px; margin-bottom: 16px;">
-                <label style="cursor: pointer; display: flex; align-items: center; gap: 8px;">
-                  <input type="radio" name="rule-effect" value="none" checked onclick="window.updatePreview && window.updatePreview()">
-                  <span>None</span>
+              <label style="font-size: 0.75em; color: var(--text-soft); display: block; margin-bottom: 10px;">Animation Effect</label>
+              <div style="display: flex; gap: 12px; margin-bottom: 18px; flex-wrap: wrap;">
+                <label style="cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; transition: background 0.15s;">
+                  <input type="radio" name="rule-effect" value="none" checked>
+                  <span style="font-size: 0.9em;">None</span>
                 </label>
-                <label style="cursor: pointer; display: flex; align-items: center; gap: 8px;">
-                  <input type="radio" name="rule-effect" value="glow" onclick="window.updatePreview && window.updatePreview()">
-                  <span>✨ Glow</span>
+                <label style="cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; transition: background 0.15s;">
+                  <input type="radio" name="rule-effect" value="glow">
+                  <span style="font-size: 0.9em;">✨ Glow</span>
                 </label>
-                <label style="cursor: pointer; display: flex; align-items: center; gap: 8px;">
-                  <input type="radio" name="rule-effect" value="pulse" onclick="window.updatePreview && window.updatePreview()">
-                  <span>📡 Pulse</span>
+                <label style="cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; transition: background 0.15s;">
+                  <input type="radio" name="rule-effect" value="pulse">
+                  <span style="font-size: 0.9em;">📡 Pulse</span>
                 </label>
               </div>
             </div>
 
             <!-- LIVE PREVIEW CONTAINER -->
-            <div style="background: #000; padding: 16px; border-radius: 8px; text-align: center; border: 1px solid #333; margin-bottom: 16px;">
-               <div style="font-size: 0.7em; color: #666; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;">Live Extension Preview</div>
+            <div style="background: linear-gradient(145deg, #0a0a0a, #1a1a2e); padding: 20px; border-radius: 10px; text-align: center; border: 1px solid #2a2a3e; margin-bottom: 18px;">
+               <div style="font-size: 0.7em; color: #555; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1.5px;">Live Extension Preview</div>
                <span id="rule-preview-pill" class="cqd-brand-version">v1.2.3</span>
             </div>
-            
-            <!-- INLINE SCRIPT: Simple if/else preview logic -->
+
+            <!-- INLINE SCRIPT: Preview logic -->
             <script>
             (function() {
               var pill = document.getElementById('rule-preview-pill');
@@ -448,7 +677,6 @@ function renderChangelogSection(entries: ChangelogEntry[], config: ChangelogConf
               function updatePreview() {
                 if (!pill) return;
                 
-                // Get selected values
                 var priorityInputs = document.getElementsByName('rule-priority');
                 var effectInputs = document.getElementsByName('rule-effect');
                 
@@ -462,7 +690,6 @@ function renderChangelogSection(entries: ChangelogEntry[], config: ChangelogConf
                   if (effectInputs[i].checked) { effect = effectInputs[i].value; break; }
                 }
                 
-                // Build class string - simple if/else
                 var cls = 'cqd-brand-version';
                 
                 if (priority === 'minor') cls += ' cqd-pill-minor';
@@ -481,29 +708,26 @@ function renderChangelogSection(entries: ChangelogEntry[], config: ChangelogConf
               // Attach to radio buttons
               var allRadios = document.querySelectorAll('input[name="rule-priority"], input[name="rule-effect"]');
               for (var i = 0; i < allRadios.length; i++) {
-                allRadios[i].onclick = updatePreview;
+                allRadios[i].onchange = updatePreview;
               }
               
-              // Make global
               window.updatePreview = updatePreview;
-              
-              // Initial call
               updatePreview();
             })();
             </script>
 
-            <button id="btn-add-rule" class="btn" style="width: 100%; justify-content: center; background: var(--accent); color: white; border: none; padding: 10px; border-radius: 6px; font-weight: 600; cursor: pointer;">
-               Append Rule
+            <button id="btn-add-rule" class="btn" style="width: 100%; justify-content: center; background: linear-gradient(135deg, #3b82f6, #6366f1); color: white; border: none; padding: 12px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 0.95em; transition: all 0.2s; box-shadow: 0 2px 8px rgba(59,130,246,0.3);">
+               + Add Rule
             </button>
           </div>
 
           <!-- Rules List -->
           <div>
-            <div class="metric-sub" style="margin-bottom: 8px; display: flex; justify-content: space-between;">
-               <span>Active Rules Priority: Specific versions override 'all'</span>
-               <span id="rules-count">0 rules</span>
+            <div style="margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+               <span style="font-size: 0.85em; color: var(--text-soft);">Active Rules <span style="font-size: 0.8em; opacity: 0.7;">(specific versions override 'all')</span></span>
+               <span id="rules-count" style="font-size: 0.8em; color: var(--text-muted); background: rgba(255,255,255,0.05); padding: 2px 8px; border-radius: 4px;">0 rules</span>
             </div>
-            <div id="rules-list-container" style="display: flex; flex-direction: column; gap: 8px; max-height: 250px; overflow-y: auto;">
+            <div id="rules-list-container" style="display: flex; flex-direction: column; gap: 8px; max-height: 280px; overflow-y: auto; padding-right: 4px;">
                <!-- JS renders here -->
             </div>
           </div>
@@ -514,28 +738,43 @@ function renderChangelogSection(entries: ChangelogEntry[], config: ChangelogConf
              ======================= -->
         <div style="flex: 1; min-width: 350px; border-left: 1px solid var(--border-subtle); padding-left: 40px; display: flex; flex-direction: column; gap: 20px;">
            
-           <div class="section-header" style="color: var(--warning);">2. Release Publishing</div>
-           <div style="font-size: 0.85em; color: var(--text-soft); margin-bottom: 12px;">
+           <div class="section-header" style="color: var(--warning); display: flex; align-items: center;">
+             2. Release Publishing
+             <span class="release-count-badge">${releaseCount}</span>
+           </div>
+           <div style="font-size: 0.85em; color: var(--text-soft); margin-bottom: 8px;">
              Publish a new changelog entry. This text appears when users click the version pill.
+           </div>
+
+           <!-- Edit Mode Banner -->
+           <div id="edit-mode-banner" class="edit-mode-banner">
+             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+             <span class="edit-mode-text">Editing <strong id="edit-mode-version">v1.0.0</strong></span>
+             <button id="btn-cancel-edit" class="btn-cancel-edit">Cancel</button>
            </div>
 
            <div style="background: rgba(255,255,255,0.03); padding: 20px; border-radius: 12px; border: 1px solid var(--border-subtle);">
               <input type="hidden" id="edit-cl-id" value="">
               
-              <div style="margin-bottom: 12px;">
+              <div style="margin-bottom: 14px;">
                  <label style="font-size: 0.75em; color: var(--text-soft); display: block; margin-bottom: 6px;">Version</label>
-                 <!-- Reusing the same datalist for convenience -->
-                 <input list="known-versions" id="new-cl-version" placeholder="e.g. 1.2.4" class="input-field" style="width: 100%; padding: 10px; background: var(--bg-elevated); border: 1px solid var(--border-subtle); color: white; border-radius: 6px;">
+                 <input list="known-versions" id="new-cl-version" placeholder="e.g. 1.2.4" class="input-field" style="width: 100%; padding: 10px 12px; background: var(--bg-elevated); border: 1px solid var(--border-subtle); color: white; border-radius: 8px; font-size: 0.95em;">
               </div>
 
-              <div style="margin-bottom: 12px;">
-                 <label style="font-size: 0.75em; color: var(--text-soft); display: block; margin-bottom: 6px;">Changes (Markdown-ish)</label>
-                 <textarea id="new-cl-changes" rows="4" class="input-field" placeholder="- Added new feature..." style="width: 100%; padding: 10px; background: var(--bg-elevated); border: 1px solid var(--border-subtle); color: white; border-radius: 6px;"></textarea>
+              <div style="margin-bottom: 6px;">
+                 <label style="font-size: 0.75em; color: var(--text-soft); display: block; margin-bottom: 6px;">Changes (one per line)</label>
+                 <div class="textarea-wrapper">
+                   <textarea id="new-cl-changes" rows="5" class="input-field" placeholder="- Added new feature X&#10;- Fixed bug with Y&#10;- Improved performance" style="width: 100%; padding: 10px 12px; background: var(--bg-elevated); border: 1px solid var(--border-subtle); color: white; border-radius: 8px; font-size: 0.9em; line-height: 1.5; resize: vertical;"></textarea>
+                   <span id="char-counter" class="char-counter">0 / 500</span>
+                 </div>
               </div>
            </div>
            
            <div style="flex: 1; display: flex; flex-direction: column;">
-             <div class="metric-sub" style="margin-bottom: 12px;">Historical Releases</div>
+             <div style="margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
+               <span style="font-size: 0.85em; color: var(--text-soft);">Historical Releases</span>
+               <span style="font-size: 0.75em; color: var(--text-muted);">${releaseCount} releases</span>
+             </div>
              <div class="cl-history-list" style="flex: 1; overflow-y: auto; max-height: 400px; padding-right: 8px;">
                ${historyHtml}
              </div>
@@ -544,11 +783,18 @@ function renderChangelogSection(entries: ChangelogEntry[], config: ChangelogConf
         </div>
       </div>
       
-      <hr style="border: 0; border-top: 1px solid var(--border-subtle); margin: 24px 0 16px;">
+      <hr style="border: 0; border-top: 1px solid var(--border-subtle); margin: 28px 0 20px;">
       
-      <button id="btn-save-all" class="btn btn-primary" style="width: 100%; padding: 16px; background: #22c55e; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 1.1rem; text-transform: uppercase; letter-spacing: 0.05em; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">
-         💾 Save Configuration & Publish
-      </button>
+      <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+        <button id="btn-save-all" class="btn btn-primary" style="flex: 1; min-width: 200px; padding: 16px 24px; background: linear-gradient(135deg, #22c55e, #16a34a); color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: 700; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.05em; box-shadow: 0 4px 12px rgba(34,197,94,0.3); display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s;">
+           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+           <span id="btn-save-text">Save Configuration & Publish</span>
+        </button>
+      </div>
+
+      <div style="margin-top: 12px; font-size: 0.75em; color: var(--text-soft); text-align: center;">
+        💡 Tip: Press <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Ctrl+Enter</kbd> to save quickly
+      </div>
 
     </section>
   `;
@@ -2370,11 +2616,41 @@ ${rawStatsJson}
       }
 
       // Changelog Logic
+      /*
+       * ===========================================================================
+       * IMPORTANT: Browser-Side JavaScript Rules
+       * ===========================================================================
+       * This script runs IN THE BROWSER, not on the server. You MUST follow these
+       * rules to avoid breaking the entire dashboard:
+       *
+       * 1. NO TypeScript syntax allowed (e.g., "as HTMLInputElement", "as any")
+       *    ❌ const el = document.querySelector('.foo') as HTMLInputElement;
+       *    ✅ const el = document.querySelector('.foo');
+       *    ✅ const value = el ? el.value : 'default';
+       *
+       * 2. NO TypeScript type annotations (e.g., "x: string", "fn(): void")
+       *    ❌ function foo(x: string): void { ... }
+       *    ✅ function foo(x) { ... }
+       *
+       * 3. Use optional chaining (?) and nullish coalescing (??) carefully
+       *    These are supported in modern browsers but combine with explicit checks
+       *
+       * 4. Test in browser DevTools console for syntax errors after changes
+       * ===========================================================================
+       */
       const btnSaveAll = document.getElementById("btn-save-all");
+      const btnSaveText = document.getElementById("btn-save-text");
       
       async function sendChangelogUpdate(payload) {
         const pwd = prompt("Enter Admin Password:");
         if (!pwd) return;
+        
+        // Show loading state
+        if (btnSaveAll) {
+          btnSaveAll.classList.add("btn-loading");
+          btnSaveAll.style.pointerEvents = "none";
+        }
+        if (btnSaveText) btnSaveText.textContent = "Saving...";
         
         try {
           const res = await fetch("/admin/changelog", {
@@ -2387,21 +2663,25 @@ ${rawStatsJson}
           });
           const data = await res.json();
           if (data.ok) {
-            refreshStats();
-            // Clear inputs ONLY if successful
-            const verInput = document.getElementById("new-cl-version");
-            const txtInput = document.getElementById("new-cl-changes");
-            const idInput = document.getElementById("edit-cl-id");
-            if (verInput) verInput.value = "";
-            if (txtInput) txtInput.value = "";
-            if (idInput) idInput.value = "";
-            const btn = document.getElementById("btn-save-all");
-            if (btn) btn.innerHTML = "💾 Save Changes (Config & Release)";
+            // Reload the page to show updated changelog/releases
+            window.location.reload();
           } else {
             alert("Error: " + (data.error || "Unknown"));
+            // Reset button state
+            if (btnSaveAll) {
+              btnSaveAll.classList.remove("btn-loading");
+              btnSaveAll.style.pointerEvents = "";
+            }
+            if (btnSaveText) btnSaveText.textContent = "Save Configuration & Publish";
           }
         } catch(e) {
           alert("Network error");
+          // Reset button state
+          if (btnSaveAll) {
+            btnSaveAll.classList.remove("btn-loading");
+            btnSaveAll.style.pointerEvents = "";
+          }
+          if (btnSaveText) btnSaveText.textContent = "Save Configuration & Publish";
         }
       }
 
@@ -2452,7 +2732,7 @@ ${rawStatsJson}
       const inputTarget = document.getElementById("rule-target");
       const previewPill = document.getElementById("rule-preview-pill");
       const btnAddRule = document.getElementById("btn-add-rule");
-      const btnSaveAll = document.getElementById("btn-save-all");
+      // btnSaveAll is already declared above
       
       // Bind Events - Use input AND change for radios to be safe across browsers
       if (inputTarget) {
@@ -2476,8 +2756,8 @@ ${rawStatsJson}
          }
          
          // 1. Get Values
-         const priorityEl = document.querySelector('input[name="rule-priority"]:checked') as HTMLInputElement;
-         const effectEl = document.querySelector('input[name="rule-effect"]:checked') as HTMLInputElement;
+         const priorityEl = document.querySelector('input[name="rule-priority"]:checked');
+         const effectEl = document.querySelector('input[name="rule-effect"]:checked');
          
          const priority = priorityEl ? priorityEl.value : 'normal';
          const effect = effectEl ? effectEl.value : 'none';
@@ -2510,7 +2790,7 @@ ${rawStatsJson}
       }
 
       // Expose globally for inline event handlers
-      (window as any).updatePreview = updatePreview;
+      window.updatePreview = updatePreview;
 
 
       // Initial Call
@@ -2527,8 +2807,10 @@ ${rawStatsJson}
             // Basic version validation
             if (!target) return;
             
-            const priority = (document.querySelector('input[name="rule-priority"]:checked') as HTMLInputElement)?.value || 'normal';
-            const effect = (document.querySelector('input[name="rule-effect"]:checked') as HTMLInputElement)?.value || 'none';
+            const priorityEl = document.querySelector('input[name="rule-priority"]:checked');
+            const effectEl = document.querySelector('input[name="rule-effect"]:checked');
+            const priority = priorityEl ? priorityEl.value : 'normal';
+            const effect = effectEl ? effectEl.value : 'none';
             
             // Dedupe matching targets
             const existingIdx = activeRules.findIndex(r => r.target === target);
@@ -2558,7 +2840,11 @@ ${rawStatsJson}
           };
 
           // 2. Gather New/Edit Release (if ANY text entered)
-          const ver = document.getElementById("new-cl-version").value.trim();
+          let ver = document.getElementById("new-cl-version").value.trim();
+          // Normalize version: strip leading 'v' or 'V' to prevent double-v display (e.g., "vv1.2.3")
+          if (ver.toLowerCase().startsWith('v')) {
+            ver = ver.substring(1);
+          }
           const text = document.getElementById("new-cl-changes").value.trim();
           const editId = document.getElementById("edit-cl-id").value;
           
@@ -2595,32 +2881,135 @@ ${rawStatsJson}
         };
       }
 
+      // --- ENHANCED RELEASE MANAGEMENT ---
+      
+      // Elements for edit mode
+      const editModeBanner = document.getElementById("edit-mode-banner");
+      const editModeVersion = document.getElementById("edit-mode-version");
+      const btnCancelEdit = document.getElementById("btn-cancel-edit");
+      const charCounter = document.getElementById("char-counter");
+      const changesTextarea = document.getElementById("new-cl-changes");
+      const versionInput = document.getElementById("new-cl-version");
+      const editIdInput = document.getElementById("edit-cl-id");
+      
+      // Character counter
+      function updateCharCounter() {
+        if (!changesTextarea || !charCounter) return;
+        const len = changesTextarea.value.length;
+        const max = 500;
+        charCounter.textContent = len + " / " + max;
+        charCounter.classList.remove("warning", "error");
+        if (len > max) {
+          charCounter.classList.add("error");
+        } else if (len > max * 0.8) {
+          charCounter.classList.add("warning");
+        }
+      }
+      
+      if (changesTextarea) {
+        changesTextarea.addEventListener("input", updateCharCounter);
+        updateCharCounter(); // Initial
+      }
+      
+      // Enter edit mode
+      function enterEditMode(entry) {
+        if (!entry) return;
+        
+        if (versionInput) versionInput.value = entry.version;
+        if (changesTextarea) {
+          changesTextarea.value = entry.changes.join("\\n");
+          updateCharCounter();
+        }
+        if (editIdInput) editIdInput.value = entry.id;
+        
+        // Show edit mode banner
+        if (editModeBanner) editModeBanner.classList.add("active");
+        if (editModeVersion) editModeVersion.textContent = "v" + entry.version;
+        if (btnSaveText) btnSaveText.textContent = "Update Release & Save Config";
+        
+        // Highlight the item being edited
+        document.querySelectorAll(".cl-history-item").forEach(item => {
+          item.classList.remove("editing");
+          if (item.dataset.releaseId === entry.id) {
+            item.classList.add("editing");
+          }
+        });
+        
+        // Scroll to form
+        const configCard = document.querySelector(".config-card");
+        if (configCard) configCard.scrollIntoView({ behavior: "smooth" });
+      }
+      
+      // Exit edit mode
+      function exitEditMode() {
+        if (versionInput) versionInput.value = "";
+        if (changesTextarea) {
+          changesTextarea.value = "";
+          updateCharCounter();
+        }
+        if (editIdInput) editIdInput.value = "";
+        
+        // Hide edit mode banner
+        if (editModeBanner) editModeBanner.classList.remove("active");
+        if (btnSaveText) btnSaveText.textContent = "Save Configuration & Publish";
+        
+        // Remove editing highlight
+        document.querySelectorAll(".cl-history-item.editing").forEach(item => {
+          item.classList.remove("editing");
+        });
+      }
+      
+      // Cancel edit button
+      if (btnCancelEdit) {
+        btnCancelEdit.onclick = () => exitEditMode();
+      }
+      
+      // Keyboard shortcuts
+      document.addEventListener("keydown", (e) => {
+        // Ctrl+Enter to save
+        if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+          e.preventDefault();
+          if (btnSaveAll) btnSaveAll.click();
+        }
+        // Escape to cancel edit
+        if (e.key === "Escape" && editIdInput && editIdInput.value) {
+          exitEditMode();
+        }
+      });
+
       document.querySelectorAll(".edit-cl-btn").forEach(btn => {
         btn.onclick = (e) => {
-           const id = e.target.dataset.id;
-           const currentEntries = JSON.parse(document.getElementById("raw-stats-json").textContent).changelog || [];
+           const id = btn.dataset.id;
+           const rawEl = document.getElementById("raw-stats-json");
+           if (!rawEl) return;
+           const currentEntries = JSON.parse(rawEl.textContent).changelog || [];
            const entry = currentEntries.find(x => x.id === id);
            if (!entry) return;
            
-           document.getElementById("new-cl-version").value = entry.version;
-           document.getElementById("new-cl-changes").value = entry.changes.join("\\n");
-           document.getElementById("edit-cl-id").value = entry.id;
-           
-           document.getElementById("btn-save-all").innerHTML = "💾 Update Release & Save Config";
-           // scroll to top of form
-           document.querySelector(".config-card").scrollIntoView({ behavior: "smooth" });
+           enterEditMode(entry);
         };
       });
 
       document.querySelectorAll(".delete-cl-btn").forEach(btn => {
         btn.onclick = (e) => {
-          if(!confirm("Delete this release?")) return;
-          const id = e.target.dataset.id;
-          const currentEntries = JSON.parse(document.getElementById("raw-stats-json").textContent).changelog || [];
+          const id = btn.dataset.id;
+          const rawEl = document.getElementById("raw-stats-json");
+          if (!rawEl) return;
+          const currentEntries = JSON.parse(rawEl.textContent).changelog || [];
+          const entry = currentEntries.find(x => x.id === id);
+          
+          // Enhanced confirmation with release details
+          const confirmMsg = entry 
+            ? "Delete release v" + entry.version + "?\\n\\nChanges:\\n" + entry.changes.slice(0, 3).map(c => "• " + c).join("\\n") + (entry.changes.length > 3 ? "\\n... and " + (entry.changes.length - 3) + " more" : "")
+            : "Delete this release?";
+          
+          if (!confirm(confirmMsg)) return;
+          
           const updated = currentEntries.filter(x => x.id !== id);
           sendChangelogUpdate({ changelog: updated });
         };
       });
+
 
       // 2. Info modal logic
       const modal = document.getElementById("info-modal");
