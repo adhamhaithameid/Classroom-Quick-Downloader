@@ -876,7 +876,6 @@ export function getDetectionKeywords(lang: string): DetectionKeywords {
   }
   
   // Default to English
-  console.log(`[CQD Keywords] No keywords for "${lang}", using English fallback`);
   return DETECTION_KEYWORDS.en;
 }
 
