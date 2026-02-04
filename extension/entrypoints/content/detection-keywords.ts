@@ -590,18 +590,28 @@ export const DATE_PATTERNS: RegExp[] = [
 
 export const GOLDEN_SELECTORS = {
   dateContainer: [
+    // Stream tab selectors
     '.IMvYId.dDKhVc.Vu2fZd',
     '.IMvYId.Vu2fZd',
     '.IMvYId',
     '.jzdBjc',
     '.EZrbnd',
+    // Classwork tab selectors (expanded post content area)
+    '.vGGYOe.Vu2fZd',  // "Posted Dec 10, 2025 (Edited Dec 14, 2025)"
+    '.vGGYOe',
+    'li[data-stream-item-id] .Vu2fZd',
   ],
   commentContainer: [
-    // Primary selectors (current Classroom structure)
+    // Primary selectors (current Classroom structure - Stream tab)
     '.asQXV.QRiHXd',
     '.mUIrbf-vQzf8d',
     '.z3vRcc-aD1xae',
     '.z3vRcc',
+    // Classwork tab selectors (comment indicator in header)
+    '.qCWAqb.seqYL',  // Comment indicator with google-symbols icon
+    '.qCWAqb',
+    '.huI6Cb.Cx437e', // Container with comment icon and count
+    'li[data-stream-item-id] .seqYL',
     // Additional potential selectors
     '[data-stream-item-id] .asQXV',
     '[jsname="z3vRcc"]',
