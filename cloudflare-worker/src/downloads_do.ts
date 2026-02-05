@@ -1559,4 +1559,36 @@ export class DownloadsDurable {
       attemptsRemaining: MAX_ATTEMPTS - 1 
     });
   }
+
+  // ---------------------------------------------------------------------------
+  // IP Allowlist Handlers
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Check if an IP is allowed to access the dashboard.
+   * POST /auth/check-ip-allowlist
+   * Body: { ip: string }
+   * 
+   * Returns: { allowed: boolean }
+   */
+  private async handleCheckIpAllowlist(request: Request): Promise<Response> {
+    let body: { ip?: string };
+    try {
+      body = await request.json();
+    } catch {
+      return json({ allowed: true }); // Allow on parse error to prevent lockout
+    }
+
+    const ip = body.ip || "unknown";
+
+    // If allowlist is disabled, allow all
+    if (!this.d.ipAllowlistEnabled || this.d.ipAllowlist.length === 0) {
+      return json({ allowed: true });
+    }
+
+    // Check exact match
+    const isAllowed = this.d.ipAllowlist.includes(ip);
+    
+    return json({ allowed: isAllowed });
+  }
 }
