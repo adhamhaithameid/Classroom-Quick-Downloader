@@ -370,12 +370,7 @@ async function handleProtectedStats(request: Request, env: WorkerEnv): Promise<R
   return proxyToDO(request, env);
 }
 
-// ---------------------------------------------------------------------------
-// Proxy to Durable Object
-// ---------------------------------------------------------------------------
 
-  return proxyToDO(request, env);
-}
 
 // ---------------------------------------------------------------------------
 // Protected Admin Endpoint (requires session, injects X-Admin-Secret for DO)
@@ -470,24 +465,58 @@ export default {
       return handleOptions(request);
     }
 
+    // Login page
     if (pathname === "/") {
       return handleRoot(request, env);
     }
 
+    // Dashboard (requires session)
+    if (pathname === "/dashboard") {
+      return handleDashboard(request, env);
+    }
+
+    // Logout
+    if (pathname === "/logout") {
+      return handleLogout(request);
+    }
+
+    // Danger password verification
+    if (pathname === "/auth/verify-danger") {
+      return handleVerifyDangerPassword(request, env);
+    }
+
+    // Protected stats endpoint (requires session or X-Admin-Secret)
+    if (pathname === "/stats" && request.method === "GET") {
+      return handleProtectedStats(request, env);
+    }
+
+    // Public endpoints (no auth required)
     if (
-      (pathname === "/stats" && request.method === "GET") ||
       (pathname === "/config" && request.method === "GET") ||
       (pathname === "/health" && request.method === "GET") ||
       (pathname === "/changelog" && request.method === "GET") ||
+      (pathname === "/track" && request.method === "POST")
+    ) {
+      return proxyToDO(request, env);
+    }
+
+    // Admin endpoints (require session OR X-Admin-Secret - session injects secret for DO)
+    if (
       (pathname === "/admin/changelog" && request.method === "POST") ||
-      (pathname === "/track" && request.method === "POST") ||
       (pathname === "/debug/flush" && request.method === "POST") ||
       (pathname === "/debug/reset" && request.method === "POST") ||
       pathname === "/admin/force-flush" ||
       pathname === "/admin/cut-power" ||
       pathname === "/admin/restore-power" ||
-      pathname === "/admin/full-sync"
+      pathname === "/admin/full-sync" ||
+      pathname === "/admin/update-config" ||
+      pathname === "/admin/ip-allowlist"
     ) {
+      return handleProtectedAdminEndpoint(request, env);
+    }
+
+    // Auth endpoints (internal use)
+    if (pathname.startsWith("/auth/")) {
       return proxyToDO(request, env);
     }
 
