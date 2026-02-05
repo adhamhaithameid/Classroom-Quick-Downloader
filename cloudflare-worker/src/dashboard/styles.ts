@@ -86,4 +86,162 @@ body {
 }
 
 .hidden { display: none; }
+
+/* ===== HEADER ===== */
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-4);
+  padding-bottom: var(--space-5);
+  border-bottom: 1px solid var(--border);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.header-logo {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+}
+
+.title-block h1 {
+  margin: 0;
+  font-size: 1.375rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.title-block p {
+  margin: var(--space-1) 0 0;
+  font-size: 0.875rem;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.live-wrapper {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.refresh-indicator {
+  text-align: right;
+  font-size: 0.75rem;
+}
+
+.refresh-label {
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.65rem;
+  color: var(--text-disabled);
+}
+
+.refresh-value {
+  color: var(--text-secondary);
+  font-feature-settings: "tnum" 1;
+}
+
+/* Live Indicator - Slow Pulse */
+.live-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--success);
+}
+
+.live-label { font-weight: 600; }
+
+@keyframes live-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+.live-indicator[data-state="live"] .live-dot {
+  animation: live-pulse 2.5s ease-in-out infinite;
+}
+
+.live-indicator[data-state="stale"] .live-dot {
+  background: var(--warning);
+  animation: none;
+}
+
+.live-indicator[data-state="cold"] .live-dot {
+  background: var(--danger);
+  animation: none;
+}
+
+/* Info Button */
+.info-btn {
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.info-btn:hover {
+  border-color: var(--border-muted);
+  color: var(--text-secondary);
+  background: var(--zinc-800);
+}
+
+.info-pill {
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+
+.info-pill-flag {
+  border-color: rgba(34, 197, 94, 0.4);
+  color: var(--success);
+}
+
+.info-icon {
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+}
+
 `;
