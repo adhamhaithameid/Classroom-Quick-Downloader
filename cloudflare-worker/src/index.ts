@@ -344,6 +344,36 @@ async function handleVerifyDangerPassword(request: Request, env: WorkerEnv): Pro
   }
 }
 
+// ---------------------------------------------------------------------------
+// Protected Stats Endpoint (requires session or X-Admin-Secret)
+// ---------------------------------------------------------------------------
+
+async function handleProtectedStats(request: Request, env: WorkerEnv): Promise<Response> {
+  const clientIp = request.headers.get("CF-Connecting-IP") || "unknown";
+  const adminSecret = request.headers.get("X-Admin-Secret");
+  const sessionToken = getSessionCookie(request);
+
+  // Check X-Admin-Secret header first (for API access)
+  const hasValidSecret = adminSecret === env.DO_SHARED_SECRET;
+  
+  // Check session token (for browser/dashboard access)
+  const hasValidSession = sessionToken && 
+    await verifySessionToken(sessionToken, env.DO_SHARED_SECRET, clientIp);
+
+  if (!hasValidSecret && !hasValidSession) {
+    return withCors(request, new Response(
+      JSON.stringify({ ok: false, error: "unauthorized", message: "Valid session or X-Admin-Secret required" }),
+      { status: 401, headers: { "content-type": "application/json" } }
+    ));
+  }
+
+  return proxyToDO(request, env);
+}
+
+// ---------------------------------------------------------------------------
+// Proxy to Durable Object
+// ---------------------------------------------------------------------------
+
 async function proxyToDO(request: Request, env: WorkerEnv): Promise<Response> {
   const stub = getDownloadsStub(env);
   
