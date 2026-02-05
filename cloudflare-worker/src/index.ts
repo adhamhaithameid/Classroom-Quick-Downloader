@@ -268,6 +268,61 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
   return new Response("Method Not Allowed", { status: 405 });
 }
 
+// ---------------------------------------------------------------------------
+// Dashboard View (requires valid session)
+// ---------------------------------------------------------------------------
+
+async function handleDashboard(request: Request, env: WorkerEnv): Promise<Response> {
+  const clientIp = request.headers.get("CF-Connecting-IP") || "unknown";
+  const sessionToken = getSessionCookie(request);
+
+  if (!sessionToken || !await verifySessionToken(sessionToken, env.DO_SHARED_SECRET, clientIp)) {
+    // Invalid or missing session - redirect to login
+    return new Response(null, {
+      status: 302,
+      headers: {
+        "Location": "/",
+        "Set-Cookie": clearSessionCookieHeader(),
+      },
+    });
+  }
+
+  const stub = getDownloadsStub(env);
+  const url = new URL(request.url);
+  url.pathname = "/stats";
+
+  const statsRes = await stub.fetch(url.toString(), { method: "GET" });
+  if (!statsRes.ok) {
+    const text = await statsRes.text().catch(() => "");
+    return new Response(
+      `Failed to load stats from Durable Object.\n\n${statsRes.status} ${statsRes.statusText}\n${text}`,
+      { status: 500 }
+    );
+  }
+
+  const stats = (await statsRes.json()) as StatsResponse;
+  const html = renderDashboard(stats);
+
+  return new Response(html, {
+    status: 200,
+    headers: { "content-type": "text/html; charset=utf-8" },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Logout Handler
+// ---------------------------------------------------------------------------
+
+function handleLogout(request: Request): Response {
+  return new Response(null, {
+    status: 302,
+    headers: {
+      "Location": "/",
+      "Set-Cookie": clearSessionCookieHeader(),
+    },
+  });
+}
+
 async function proxyToDO(request: Request, env: WorkerEnv): Promise<Response> {
   const stub = getDownloadsStub(env);
   
