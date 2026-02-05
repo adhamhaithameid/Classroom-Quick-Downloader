@@ -201,8 +201,50 @@ function topKey(data?: Record<string, number>): string {
 }
 
 export function renderLoginPage(errorMessage?: string): string {
-  return "";
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>CQD Analytics – Admin Login</title>
+  <link rel="icon" href="${FAVICON_PNG_DATA_URI}">
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root { color-scheme: dark; --bg: #0a0f1a; --accent: #3b82f6; --text-main: #f1f5f9; --text-soft: #64748b; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { min-height: 100vh; font-family: system-ui, sans-serif; background: var(--bg); color: var(--text-main); display: flex; align-items: center; justify-content: center; padding: 16px; }
+    .login-card { width: 100%; max-width: 380px; border-radius: 12px; padding: 24px 22px 20px; background: #1a2332; border: 1px solid #2d3a4d; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+    .login-title { font-size: 1.35rem; font-weight: 600; margin-bottom: 4px; }
+    .login-subtitle { font-size: 0.85rem; color: var(--text-soft); margin-bottom: 16px; }
+    .login-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 6px; border: 1px solid #2d3a4d; background: rgba(59,130,246,0.1); font-size: 0.75rem; text-transform: uppercase; color: #94a3b8; margin-bottom: 10px; }
+    .login-badge-dot { width: 7px; height: 7px; border-radius: 999px; background: var(--accent); }
+    .login-row { display: flex; align-items: center; gap: 8px; margin-top: 16px; }
+    .field { display: flex; flex-direction: column; gap: 4px; flex: 1; margin: 0; }
+    .field input { width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid #2d3a4d; background: #141c2b; color: #f9fafb; outline: none; transition: all 0.2s; }
+    .field input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(59,130,246,0.25); }
+    .login-error { margin-top: 12px; padding: 6px 8px; border-radius: 8px; font-size: 0.78rem; color: #fecaca; background: rgba(248,113,113,0.12); border: 1px solid rgba(248,113,113,0.6); }
+    .login-button { padding: 10px 16px; border-radius: 8px; border: none; cursor: pointer; font-size: 0.9rem; font-weight: 600; background: var(--accent); color: #f9fafb; display: inline-flex; align-items: center; transition: all 0.2s; white-space: nowrap; height: 100%; }
+    .login-button:hover { background: #2563eb; }
+    .login-button:active { background: #1d4ed8; }
+  </style>
+</head>
+<body>
+  <form class="login-card" method="POST" action="/">
+    <div class="login-badge"><span class="login-badge-dot"></span><span>CQD Analytics Admin</span></div>
+    <h1 class="login-title">Enter admin password</h1>
+    <p class="login-subtitle">Unlock analytics dashboard & danger controls.</p>
+    
+    <div class="login-row">
+      <div class="field">
+        <input id="password-input" name="password" type="password" placeholder="Password..." autofocus required />
+      </div>
+      <button class="login-button" type="submit">Unlock →</button>
+    </div>
+    ${errorMessage ? `<div class="login-error">${errorMessage}</div>` : ""}
+  <script>document.getElementById("password-input")?.focus();</script>
+</body>
+</html>`;
 }
+
 
 export function renderDashboard(stats: StatsResponse): string {
   return "";
