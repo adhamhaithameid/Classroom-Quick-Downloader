@@ -2,6 +2,83 @@
 import { renderDashboard, renderLoginPage } from "./dashboard";
 import type { Env as WorkerEnv, StatsResponse } from "./types";
 
+// ---------------------------------------------------------------------------
+// Session Token Utilities (HMAC-SHA256 based)
+// ---------------------------------------------------------------------------
+
+const SESSION_DURATION_MS = 60 * 60 * 1000; // 1 hour
+const COOKIE_NAME = "cqd_session";
+
+interface SessionPayload {
+  ip: string;
+  exp: number; // Expiration timestamp
+  iat: number; // Issued at timestamp
+}
+
+async function createSessionToken(secret: string, ip: string): Promise<string> {
+  const payload: SessionPayload = {
+    ip,
+    exp: Date.now() + SESSION_DURATION_MS,
+    iat: Date.now(),
+  };
+  
+  const payloadB64 = btoa(JSON.stringify(payload));
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    encoder.encode(payloadB64)
+  );
+  
+  const sigB64 = btoa(String.fromCharCode(...new Uint8Array(signature)));
+  return `${payloadB64}.${sigB64}`;
+}
+
+async function verifySessionToken(token: string, secret: string, clientIp: string): Promise<boolean> {
+  try {
+    const [payloadB64, sigB64] = token.split(".");
+    if (!payloadB64 || !sigB64) return false;
+    
+    const encoder = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+      "raw",
+      encoder.encode(secret),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["verify"]
+    );
+    
+    const signature = Uint8Array.from(atob(sigB64), c => c.charCodeAt(0));
+    const isValid = await crypto.subtle.verify(
+      "HMAC",
+      key,
+      signature,
+      encoder.encode(payloadB64)
+    );
+    
+    if (!isValid) return false;
+    
+    const payload: SessionPayload = JSON.parse(atob(payloadB64));
+    
+    // Check expiration
+    if (Date.now() > payload.exp) return false;
+    
+    // Optional: Check IP binding (disabled for now to allow mobile switching)
+    // if (payload.ip !== clientIp) return false;
+    
+    return true;
+  } catch {
+    return false;
+  }
+}
 function getDownloadsStub(env: WorkerEnv): DurableObjectStub {
   const id = env.DOWNLOADS_DO.idFromName("downloads");
   return env.DOWNLOADS_DO.get(id);
