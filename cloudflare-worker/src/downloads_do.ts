@@ -1608,4 +1608,68 @@ export class DownloadsDurable {
       allowlist: this.d.ipAllowlist,
     });
   }
+
+  /**
+   * Update IP allowlist configuration.
+   * POST /admin/ip-allowlist
+   * Body: { enabled?: boolean, allowlist?: string[], add?: string, remove?: string }
+   * Requires X-Admin-Secret
+   */
+  private async handleAdminIpAllowlist(request: Request): Promise<Response> {
+    if (!this.isAuthorizedAdmin(request)) {
+      return json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+
+    let body: { 
+      enabled?: boolean; 
+      allowlist?: string[]; 
+      add?: string; 
+      remove?: string 
+    };
+    try {
+      body = await request.json();
+    } catch {
+      return json({ ok: false, error: "invalid_json" }, { status: 400 });
+    }
+
+    let updated = false;
+
+    // Set enabled state
+    if (typeof body.enabled === "boolean") {
+      this.d.ipAllowlistEnabled = body.enabled;
+      updated = true;
+    }
+
+    // Replace entire allowlist
+    if (Array.isArray(body.allowlist)) {
+      this.d.ipAllowlist = body.allowlist.filter(ip => typeof ip === "string" && ip.length > 0);
+      updated = true;
+    }
+
+    // Add single IP
+    if (body.add && typeof body.add === "string" && !this.d.ipAllowlist.includes(body.add)) {
+      this.d.ipAllowlist.push(body.add);
+      updated = true;
+    }
+
+    // Remove single IP
+    if (body.remove && typeof body.remove === "string") {
+      const idx = this.d.ipAllowlist.indexOf(body.remove);
+      if (idx !== -1) {
+        this.d.ipAllowlist.splice(idx, 1);
+        updated = true;
+      }
+    }
+
+    if (updated) {
+      await this.persist();
+    }
+
+    return json({
+      ok: true,
+      updated,
+      enabled: this.d.ipAllowlistEnabled,
+      allowlist: this.d.ipAllowlist,
+    });
+  }
 }
