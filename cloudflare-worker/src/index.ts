@@ -79,6 +79,50 @@ async function verifySessionToken(token: string, secret: string, clientIp: strin
     return false;
   }
 }
+function getSessionCookie(request: Request): string | null {
+  const cookieHeader = request.headers.get("Cookie") || "";
+  const cookies = cookieHeader.split(";").map(c => c.trim());
+  for (const cookie of cookies) {
+    const eqIndex = cookie.indexOf("=");
+    if (eqIndex === -1) continue;
+    const name = cookie.substring(0, eqIndex);
+    const value = cookie.substring(eqIndex + 1);
+    if (name === COOKIE_NAME) return value;
+  }
+  return null;
+}
+
+function createSessionCookieHeader(token: string): string {
+  // HttpOnly, SameSite=Lax for security (no Secure flag to allow localhost HTTP)
+  return `${COOKIE_NAME}=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=3600`;
+}
+
+function clearSessionCookieHeader(): string {
+  return `${COOKIE_NAME}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0`;
+}
+
+// ---------------------------------------------------------------------------
+// IP Allowlist Check (optional - returns true if no allowlist configured)
+// ---------------------------------------------------------------------------
+
+async function isIpAllowed(stub: DurableObjectStub, ip: string): Promise<boolean> {
+  try {
+    const res = await stub.fetch(new Request("http://internal/auth/check-ip-allowlist", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ip }),
+    }));
+    const data = await res.json() as { allowed: boolean };
+    return data.allowed !== false; // Allow by default if no response
+  } catch {
+    return true; // Allow on error to prevent lockout
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Core Helpers
+// ---------------------------------------------------------------------------
+
 function getDownloadsStub(env: WorkerEnv): DurableObjectStub {
   const id = env.DOWNLOADS_DO.idFromName("downloads");
   return env.DOWNLOADS_DO.get(id);
