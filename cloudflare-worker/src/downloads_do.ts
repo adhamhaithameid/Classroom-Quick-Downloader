@@ -452,6 +452,24 @@ export class DownloadsDurable {
       return this.handleAdminUpdateChangelog(request);
     }
 
+    // Login rate limiting - used by worker to check/record attempts
+    if (pathname === "/auth/login-attempt" && request.method === "POST") {
+      return this.handleLoginAttempt(request);
+    }
+
+    // IP Allowlist check - used by worker before login
+    if (pathname === "/auth/check-ip-allowlist" && request.method === "POST") {
+      return this.handleCheckIpAllowlist(request);
+    }
+
+    // Admin IP Allowlist management
+    if (pathname === "/admin/ip-allowlist" && request.method === "POST") {
+      return this.handleAdminIpAllowlist(request);
+    }
+    if (pathname === "/admin/ip-allowlist" && request.method === "GET") {
+      return this.handleGetIpAllowlist(request);
+    }
+
     return new Response("Not found (DO)", { status: 404 });
   }
 
