@@ -163,19 +163,28 @@ function handleOptions(request: Request): Response {
 }
 
 // ---------------------------------------------------------------------------
-// Dashboard (GET / shows login every time, POST / validates password & renders)
+// Dashboard Login (POST / validates password, sets session cookie)
 // ---------------------------------------------------------------------------
 
 async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
   const method = request.method.toUpperCase();
+  const clientIp = request.headers.get("CF-Connecting-IP") || "unknown";
+  const stub = getDownloadsStub(env);
 
+  // GET: Show login page OR redirect to dashboard if valid session
   if (method === "GET") {
+    const sessionToken = getSessionCookie(request);
+    if (sessionToken && await verifySessionToken(sessionToken, env.DO_SHARED_SECRET, clientIp)) {
+      // Valid session - redirect to dashboard
+      return Response.redirect(new URL("/dashboard", request.url).toString(), 302);
+    }
     return new Response(renderLoginPage(), {
       status: 200,
       headers: { "content-type": "text/html; charset=utf-8" },
     });
   }
 
+  // POST: Handle login
   if (method === "POST") {
     const contentType = request.headers.get("content-type") || "";
     if (
@@ -184,6 +193,22 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
     ) {
       return new Response("Unsupported content type", { status: 400 });
     }
+
+    // IP Allowlist check
+    const ipAllowed = await isIpAllowed(stub, clientIp);
+    if (!ipAllowed) {
+      return new Response(
+        renderLoginPage("Access denied: your IP is not in the allowlist."),
+        { status: 403, headers: { "content-type": "text/html; charset=utf-8" } }
+      );
+    }
+
+    // Rate limit check
+    const rateLimitReq = new Request(new URL("/auth/login-attempt", request.url).toString(), {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Client-IP": clientIp },
+      body: JSON.stringify({ ip: clientIp, success: false }),
+    });
 
     const form = await request.formData();
     const password = (form.get("password") || "").toString();
@@ -195,32 +220,48 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
       );
     }
 
+    // Validate password
     if (password !== env.DO_SHARED_SECRET) {
-      return new Response(renderLoginPage("Invalid password."), {
-        status: 401,
-        headers: { "content-type": "text/html; charset=utf-8" },
-      });
-    }
+      const rateLimitRes = await stub.fetch(rateLimitReq);
+      const rateLimitData = await rateLimitRes.json() as {
+        allowed: boolean;
+        attemptsRemaining?: number;
+        blockedForSeconds?: number;
+      };
 
-    const stub = getDownloadsStub(env);
-    const url = new URL(request.url);
-    url.pathname = "/stats";
+      if (!rateLimitData.allowed) {
+        const mins = Math.ceil((rateLimitData.blockedForSeconds || 900) / 60);
+        return new Response(
+          renderLoginPage(`Too many failed attempts. Please try again in ${mins} minutes.`),
+          { status: 429, headers: { "content-type": "text/html; charset=utf-8" } }
+        );
+      }
 
-    const statsRes = await stub.fetch(url.toString(), { method: "GET" });
-    if (!statsRes.ok) {
-      const text = await statsRes.text().catch(() => "");
+      const remaining = rateLimitData.attemptsRemaining ?? 4;
       return new Response(
-        `Failed to load stats from Durable Object.\n\n${statsRes.status} ${statsRes.statusText}\n${text}`,
-        { status: 500 },
+        renderLoginPage(`Invalid password. ${remaining} attempts remaining.`),
+        { status: 401, headers: { "content-type": "text/html; charset=utf-8" } }
       );
     }
 
-    const stats = (await statsRes.json()) as StatsResponse;
-    const html = renderDashboard(stats);
+    // Successful login - clear rate limit and create session
+    const successReq = new Request(new URL("/auth/login-attempt", request.url).toString(), {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Client-IP": clientIp },
+      body: JSON.stringify({ ip: clientIp, success: true }),
+    });
+    await stub.fetch(successReq);
 
-    return new Response(html, {
-      status: 200,
-      headers: { "content-type": "text/html; charset=utf-8" },
+    // Create session token and set cookie
+    const sessionToken = await createSessionToken(env.DO_SHARED_SECRET, clientIp);
+
+    // Redirect to dashboard with session cookie
+    return new Response(null, {
+      status: 302,
+      headers: {
+        "Location": "/dashboard",
+        "Set-Cookie": createSessionCookieHeader(sessionToken),
+      },
     });
   }
 
