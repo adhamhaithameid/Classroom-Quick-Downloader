@@ -313,14 +313,35 @@ async function handleDashboard(request: Request, env: WorkerEnv): Promise<Respon
 // Logout Handler
 // ---------------------------------------------------------------------------
 
-function handleLogout(request: Request): Response {
-  return new Response(null, {
-    status: 302,
-    headers: {
-      "Location": "/",
-      "Set-Cookie": clearSessionCookieHeader(),
-    },
-  });
+// ---------------------------------------------------------------------------
+// Danger Password Verification (separate from login password)
+// ---------------------------------------------------------------------------
+
+async function handleVerifyDangerPassword(request: Request, env: WorkerEnv): Promise<Response> {
+  if (request.method !== "POST") {
+    return new Response("Method Not Allowed", { status: 405 });
+  }
+
+  try {
+    const { password } = await request.json() as { password: string };
+    
+    if (!password || password !== env.DANGER_PASSWORD) {
+      return withCors(request, new Response(
+        JSON.stringify({ ok: false, error: "Invalid danger password" }),
+        { status: 401, headers: { "content-type": "application/json" } }
+      ));
+    }
+
+    return withCors(request, new Response(
+      JSON.stringify({ ok: true }),
+      { status: 200, headers: { "content-type": "application/json" } }
+    ));
+  } catch {
+    return withCors(request, new Response(
+      JSON.stringify({ ok: false, error: "Invalid request body" }),
+      { status: 400, headers: { "content-type": "application/json" } }
+    ));
+  }
 }
 
 async function proxyToDO(request: Request, env: WorkerEnv): Promise<Response> {
