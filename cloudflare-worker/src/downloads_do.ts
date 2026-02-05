@@ -58,6 +58,13 @@ type DurableStateShape = {
   // Burst tracking (legacy, kept for compatibility)
   burstCounts: Record<string, { count: number; minute: number }>;
 
+  // Login attempts for rate limiting
+  loginAttempts: Record<string, { attempts: number; firstAttemptAt: number }>;
+
+  // IP Allowlist configuration
+  ipAllowlistEnabled: boolean;
+  ipAllowlist: string[];
+
   // =========================================================================
   // CHANGELOG & CONFIG
   // =========================================================================
@@ -893,7 +900,11 @@ export class DownloadsDurable {
       batchSeq: 0,
       ipCounts: {},
       processedIds: [],
+      processedIds: [],
       burstCounts: {},
+      loginAttempts: {},
+      ipAllowlistEnabled: false,
+      ipAllowlist: [],
       ...preservedConfig,
     };
     await this.state.storage.delete(STORAGE_KEY);
