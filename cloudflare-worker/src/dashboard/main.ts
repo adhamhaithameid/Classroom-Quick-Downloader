@@ -1637,6 +1637,48 @@ export function renderDashboard(stats: StatsResponse): string {
     .btn-danger:active {
       background: var(--danger-hover);
     }
+    
+    .btn-primary {
+      padding: 8px 16px;
+      border-radius: 6px;
+      border: 1px solid var(--accent);
+      background: var(--accent);
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+    .btn-primary:hover { background: #2563eb; }
+    .btn-primary:active { background: #1d4ed8; }
+
+    .btn-secondary {
+      padding: 8px 16px;
+      border-radius: 6px;
+      border: 1px solid var(--border-subtle);
+      background: rgba(255,255,255,0.05);
+      color: var(--text-main);
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+    .btn-secondary:hover { background: rgba(255,255,255,0.1); }
+
+    .auth-btn {
+      padding: 8px 16px;
+      border-radius: 6px;
+      border: 1px solid var(--border-subtle);
+      background: rgba(255,255,255,0.05);
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .auth-btn:hover { background: rgba(255,255,255,0.1); color: var(--text-main); }
 
     .auth-bar {
       display: flex;
@@ -2896,12 +2938,8 @@ export function renderDashboard(stats: StatsResponse): string {
         <button class="close-modal" id="close-danger-modal" type="button">×</button>
         <h3 id="danger-modal-title">Confirm admin action</h3>
         <p id="danger-modal-desc" style="font-size:0.85rem; color:var(--text-muted); margin-top:4px;">
-          Enter your admin password to run this Danger Zone action.
+          This action requires active session authorization.
         </p>
-        <div class="field" style="margin-top:12px;">
-          <label for="danger-password-input">Admin password</label>
-          <input id="danger-password-input" type="password" autocomplete="current-password" />
-        </div>
         <div id="danger-modal-error" class="login-error" style="display:none; margin-top:8px;"></div>
         <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:16px;">
           <button type="button" class="auth-btn" id="danger-cancel-btn">Cancel</button>
@@ -3435,6 +3473,11 @@ ${rawStatsJson}
             // Reload the page to show updated changelog/releases
             window.location.reload();
           } else {
+            // Check for unauthorized/IP block
+            if (res.status === 403 || res.status === 401) {
+              window.location.reload(); // Likely session expired
+              return;
+            }
             alert("Error: " + (data.error || "Unknown"));
             // Reset button state
             if (btnSaveAll) {
