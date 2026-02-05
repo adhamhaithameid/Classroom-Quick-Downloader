@@ -304,5 +304,81 @@ main {
   gap: var(--space-5);
 }
 
+/* ===== METRIC CARDS (KPI) ===== */
+.metric {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-radius: var(--radius);
+  background: var(--bg-surface);
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.metric:hover {
+  border-color: var(--border);
+}
+
+.metric-compact {
+  padding: var(--space-3);
+}
+
+.metric-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.metric-value {
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.metric-sub {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: var(--space-1);
+}
+
+.metric-good .metric-value { color: var(--success); }
+.metric-warn .metric-value { color: var(--warning); }
+.metric-bad .metric-value { color: var(--danger); }
+
+.empty-state {
+  margin-top: var(--space-3);
+  font-size: 0.8rem;
+  color: var(--text-disabled);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-sm);
+  border: 1px dashed var(--border);
+  background: var(--bg-surface);
+}
+
+/* Update Animations */
+@keyframes flash-green {
+  0% { background-color: var(--success-muted); }
+  100% { background-color: transparent; }
+}
+
+@keyframes text-flash {
+  0% { color: #fff; }
+  100% { color: inherit; }
+}
+
+.updated { animation: flash-green 1.5s ease-out; }
+.updated .metric-value,
+.updated strong,
+.updated .quota-val,
+.updated .live-dot {
+  animation: text-flash 1.5s ease-out;
+}
+
+
 
 `;
