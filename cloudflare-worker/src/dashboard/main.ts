@@ -3414,9 +3414,6 @@ ${rawStatsJson}
       const btnSaveText = document.getElementById("btn-save-text");
       
       async function sendChangelogUpdate(payload) {
-        const pwd = prompt("Enter Admin Password:");
-        if (!pwd) return;
-        
         // Show loading state
         if (btnSaveAll) {
           btnSaveAll.classList.add("btn-loading");
@@ -3428,9 +3425,9 @@ ${rawStatsJson}
           const res = await fetch("/admin/changelog", {
             method: "POST",
             headers: { 
-              "Content-Type": "application/json",
-              "X-Admin-Secret": pwd
+              "Content-Type": "application/json"
             },
+            credentials: "same-origin",
             body: JSON.stringify(payload)
           });
           const data = await res.json();
@@ -3858,12 +3855,7 @@ ${rawStatsJson}
 
       if (dangerConfirm) {
         dangerConfirm.onclick = function () {
-          if (!dangerActionPath || !dangerPwdInput) {
-            return;
-          }
-          const pwd = dangerPwdInput.value.trim();
-          if (!pwd) {
-            showDangerError("Password is required.");
+          if (!dangerActionPath) {
             return;
           }
           dangerConfirm.disabled = true;
@@ -3872,8 +3864,8 @@ ${rawStatsJson}
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              "X-Admin-Secret": pwd,
             },
+            credentials: "same-origin",
           })
             .then(function (r) {
               return r
