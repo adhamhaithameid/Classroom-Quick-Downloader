@@ -211,6 +211,7 @@ Every download attempt in the [Extension](./extension/) triggers an analytics ev
 * Persists events in memory (survives Worker restarts).
 * Aggregates counters: by browser, by OS, by country, by file type.
 * Calculates "Top" stats: most common browser, most active country, etc.
+* Manages security state: IP allowlists and login rate limits.
 
 4. **🚀 Flush (Edge → Backend)** — When the buffer exceeds `MAX_BATCH_EVENTS` or an alarm fires, the DO sends a pre-aggregated JSON payload to the [Oracle Backend](./oracle-backend/).
 5. **💾 Store (Backend)** — The [Backend](./oracle-backend/) receives the batch, deduplicates by `batchId`, and stores:
