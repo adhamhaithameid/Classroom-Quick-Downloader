@@ -1456,4 +1456,107 @@ export class DownloadsDurable {
       return json({ ok: false, error: "invalid_payload" }, { status: 400 });
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // Login Rate Limiting
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Handles login attempt tracking for rate limiting.
+   * POST /auth/login-attempt
+   * Body: { ip: string, success: boolean }
+   * 
+   * On failed attempt: increment counter, check if blocked
+   * On success: clear attempts for that IP
+   * 
+   * Returns: { allowed: boolean, attemptsRemaining?: number, blockedUntil?: number }
+   */
+  private async handleLoginAttempt(request: Request): Promise<Response> {
+    const MAX_ATTEMPTS = 5;
+    const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+
+    let body: { ip?: string; success?: boolean };
+    try {
+      body = await request.json();
+    } catch {
+      return json({ ok: false, error: "invalid_json" }, { status: 400 });
+    }
+
+    const ip = body.ip || request.headers.get("X-Client-IP") || "unknown";
+    const isSuccess = body.success === true;
+
+    // Initialize if not present
+    if (!this.d.loginAttempts) {
+      this.d.loginAttempts = {};
+    }
+
+    const now = Date.now();
+    const record = this.d.loginAttempts[ip];
+
+    // On successful login, clear attempts
+    if (isSuccess) {
+      delete this.d.loginAttempts[ip];
+      await this.persist();
+      return json({ ok: true, allowed: true, attemptsRemaining: MAX_ATTEMPTS });
+    }
+
+    // Check if currently locked out
+    if (record) {
+      const elapsed = now - record.firstAttemptAt;
+      
+      // If lockout period expired, reset
+      if (elapsed >= LOCKOUT_DURATION_MS) {
+        this.d.loginAttempts[ip] = { attempts: 1, firstAttemptAt: now };
+        await this.persist();
+        return json({ 
+          ok: true, 
+          allowed: true, 
+          attemptsRemaining: MAX_ATTEMPTS - 1 
+        });
+      }
+
+      // Already at max attempts, deny
+      if (record.attempts >= MAX_ATTEMPTS) {
+        const blockedUntil = record.firstAttemptAt + LOCKOUT_DURATION_MS;
+        return json({ 
+          ok: true, 
+          allowed: false, 
+          blockedUntil,
+          blockedForSeconds: Math.ceil((blockedUntil - now) / 1000),
+          message: "Too many failed login attempts. Try again later."
+        });
+      }
+
+      // Increment and check
+      record.attempts += 1;
+      await this.persist();
+
+      if (record.attempts >= MAX_ATTEMPTS) {
+        const blockedUntil = record.firstAttemptAt + LOCKOUT_DURATION_MS;
+        return json({ 
+          ok: true, 
+          allowed: false, 
+          blockedUntil,
+          blockedForSeconds: Math.ceil((blockedUntil - now) / 1000),
+          message: "Too many failed login attempts. Try again later."
+        });
+      }
+
+      return json({ 
+        ok: true, 
+        allowed: true, 
+        attemptsRemaining: MAX_ATTEMPTS - record.attempts 
+      });
+    }
+
+    // First failed attempt for this IP
+    this.d.loginAttempts[ip] = { attempts: 1, firstAttemptAt: now };
+    await this.persist();
+    
+    return json({ 
+      ok: true, 
+      allowed: true, 
+      attemptsRemaining: MAX_ATTEMPTS - 1 
+    });
+  }
 }
