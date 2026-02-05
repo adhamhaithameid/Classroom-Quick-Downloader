@@ -373,6 +373,125 @@ function renderNotificationSection(entries: ChangelogEntry[], config: ChangelogC
   `;
 }
 
+// Notification Rules Engine UI
+function renderNotificationSection(entries: ChangelogEntry[], config: ChangelogConfig): string {
+  // ... (existing content preserved via context matching? no, I should use insertion)
+  // To avoid re-pasting huge block, I will target the END of renderNotificationSection or START of renderDashboard.
+  // renderDashboard matches `export function renderDashboard`
+  return `
+    <section class="card config-card" id="config">
+      <!-- ... (previous content) ... -->
+      </div>
+    </section>
+  `;
+}
+
+function renderReleaseManagementSection(entries: ChangelogEntry[], config: ChangelogConfig): string {
+  const sorted = [...entries].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  
+  // Versions for DataList
+  const knownVersions = Array.from(new Set(sorted.map(e => e.version)));
+  const dataListOptions = [
+    '<option value="all">Global (All Versions)</option>',
+    ...knownVersions.map(v => `<option value="${v}">v${v}</option>`)
+  ].join('');
+
+  const releaseCount = sorted.length;
+  const historyHtml = sorted.map(e => `
+    <div class="cl-history-item" data-release-id="${e.id}">
+      <div class="cl-history-header">
+        <div class="cl-history-meta">
+          <span class="cl-version-badge">v${e.version}</span>
+          <span class="cl-date">${new Date(e.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+        </div>
+        <div class="cl-actions">
+           <button class="cl-action-btn edit-cl-btn" data-id="${e.id}" title="Edit release">
+             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+           </button>
+           <button class="cl-action-btn delete-cl-btn" data-id="${e.id}" title="Delete release">
+             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+           </button>
+        </div>
+      </div>
+      <ul class="cl-changes-list">
+        ${e.changes.map(c => `<li>${c}</li>`).join('')}
+      </ul>
+    </div>
+  `).join('') || `
+    <div class="cl-empty-state">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.3">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <line x1="16" y1="13" x2="8" y2="13"/>
+        <line x1="16" y1="17" x2="8" y2="17"/>
+        <polyline points="10 9 9 9 8 9"/>
+      </svg>
+      <p>No releases published yet</p>
+      <span>Create your first release using the form above</span>
+    </div>
+  `;
+
+  return `
+    <section class="card config-card" id="release">
+       <h2>
+         <span>📢</span> Release Publishing
+         <span class="release-count-badge">${releaseCount}</span>
+       </h2>
+       <div class="section-subtitle">
+         Publish a new changelog entry. This text appears when users click the version pill.
+       </div>
+
+       <!-- Edit Mode Banner -->
+       <div id="edit-mode-banner" class="edit-mode-banner">
+         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+         <span class="edit-mode-text">Editing <strong id="edit-mode-version">v1.0.0</strong></span>
+         <button id="btn-cancel-edit" class="btn-cancel-edit">Cancel</button>
+       </div>
+
+       <div style="background: rgba(255,255,255,0.03); padding: 20px; border-radius: 12px; border: 1px solid var(--border-subtle); margin-bottom: 20px;">
+          <input type="hidden" id="edit-cl-id" value="">
+          
+          <div style="margin-bottom: 14px;">
+             <label style="font-size: 0.75em; color: var(--text-soft); display: block; margin-bottom: 6px;">Version</label>
+             <input list="known-versions-release" id="new-cl-version" placeholder="e.g. 1.2.4" class="input-field" style="width: 100%; padding: 10px 12px; background: var(--bg-elevated); border: 1px solid var(--border-subtle); color: white; border-radius: 8px; font-size: 0.95em;">
+             <datalist id="known-versions-release">
+               ${dataListOptions}
+             </datalist>
+          </div>
+
+          <div style="margin-bottom: 6px;">
+             <label style="font-size: 0.75em; color: var(--text-soft); display: block; margin-bottom: 6px;">Changes (one per line)</label>
+             <div class="textarea-wrapper">
+               <textarea id="new-cl-changes" rows="5" class="input-field" placeholder="- Added new feature X&#10;- Fixed bug with Y&#10;- Improved performance" style="width: 100%; padding: 10px 12px; background: var(--bg-elevated); border: 1px solid var(--border-subtle); color: white; border-radius: 8px; font-size: 0.9em; line-height: 1.5; resize: vertical;"></textarea>
+               <span id="char-counter" class="char-counter">0 / 500</span>
+             </div>
+          </div>
+       </div>
+       
+       <div style="margin-bottom: 24px;">
+         <div style="margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
+           <span style="font-size: 0.85em; color: var(--text-soft);">Historical Releases</span>
+           <span style="font-size: 0.75em; color: var(--text-muted);">${releaseCount} releases</span>
+         </div>
+         <div class="cl-history-list" style="overflow-y: auto; max-height: 400px; padding-right: 8px;">
+           ${historyHtml}
+         </div>
+       </div>
+
+       <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+         <button id="btn-save-all" class="btn btn-primary" style="flex: 1; min-width: 200px; padding: 16px 24px; background: var(--success); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            <span id="btn-save-text">Save Configuration & Publish</span>
+         </button>
+       </div>
+
+       <div style="margin-top: 12px; font-size: 0.75em; color: var(--text-soft); text-align: center;">
+         💡 Tip: Press <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Ctrl+Enter</kbd> to save quickly
+       </div>
+    </section>
+  `;
+}
+
 export function renderDashboard(stats: StatsResponse): string {
   return "";
 }
