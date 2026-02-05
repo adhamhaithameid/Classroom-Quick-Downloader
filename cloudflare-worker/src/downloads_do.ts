@@ -1591,4 +1591,21 @@ export class DownloadsDurable {
     
     return json({ allowed: isAllowed });
   }
+
+  /**
+   * Get current IP allowlist configuration.
+   * GET /admin/ip-allowlist
+   * Requires X-Admin-Secret
+   */
+  private async handleGetIpAllowlist(request: Request): Promise<Response> {
+    if (!this.isAuthorizedAdmin(request)) {
+      return json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+
+    return json({
+      ok: true,
+      enabled: this.d.ipAllowlistEnabled,
+      allowlist: this.d.ipAllowlist,
+    });
+  }
 }
