@@ -246,6 +246,133 @@ export function renderLoginPage(errorMessage?: string): string {
 }
 
 
+// Notification Rules Engine UI
+function renderNotificationSection(entries: ChangelogEntry[], config: ChangelogConfig): string {
+  const sorted = [...entries].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const knownVersions = Array.from(new Set(sorted.map(e => e.version)));
+  const dataListOptions = [
+    '<option value="all">Global (All Versions)</option>',
+    ...knownVersions.map(v => `<option value="${v}">v${v}</option>`)
+  ].join('');
+
+  const rulesJson = JSON.stringify(config.rules || []);
+
+  return `
+    <section class="card config-card" id="config">
+      <h2>
+        <span>🔔</span> Notification Styling
+        <span class="unsaved-dot" id="unsaved-indicator" title="Unsaved changes"></span>
+      </h2>
+      
+      <script>window.CURRENT_RULES = ${rulesJson};</script>
+      
+      <div style="display: flex; flex-direction: column; gap: 20px;">
+        <div style="font-size: 0.85em; color: var(--text-soft); margin-bottom: 12px;">
+          Define how the extension badge looks for specific versions.
+        </div>
+        
+        <div style="padding: 20px; background: rgba(0,0,0,0.2); border-radius: 12px; border: 1px solid var(--border-subtle);">
+          <!-- Target Selection -->
+          <div style="margin-bottom: 16px;">
+             <label style="font-size: 0.75em; color: var(--text-soft); display: block; margin-bottom: 6px;">Target Version</label>
+             <input list="known-versions" id="rule-target" placeholder="e.g. 1.2.3 or 'all'" class="input-field" style="width: 100%; padding: 10px 12px; background: var(--bg-elevated); border: 1px solid var(--border-subtle); color: white; border-radius: 8px; font-size: 0.95em;" oninput="window.updatePreview && window.updatePreview()">
+             <datalist id="known-versions">
+               ${dataListOptions}
+             </datalist>
+             <div style="font-size: 0.7em; color: var(--text-muted); margin-top: 6px;">Select from history or type new version.</div>
+          </div>
+          
+          <div style="border-top: 1px dashed var(--border-subtle); margin: 16px 0; padding-top: 16px;">
+             <!-- Priority -->
+             <label style="font-size: 0.75em; color: var(--text-soft); display: block; margin-bottom: 10px;">Priority (Color Scheme)</label>
+             <div style="display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap;">
+               <label class="priority-option" style="cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 8px 14px; background: rgba(255,255,255,0.05); border-radius: 8px; border: 1px solid transparent; transition: all 0.15s;">
+                 <input type="radio" name="rule-priority" value="normal" checked style="accent-color: #6b7280;">
+                 <span style="font-size: 0.9em;">Normal</span>
+               </label>
+               <label class="priority-option" style="cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 8px 14px; background: rgba(59,130,246,0.1); border-radius: 8px; border: 1px solid rgba(59,130,246,0.3); transition: all 0.15s;">
+                 <input type="radio" name="rule-priority" value="minor" style="accent-color: #3b82f6;">
+                 <span style="font-size: 0.9em; color: #60a5fa;">Minor (Blue)</span>
+               </label>
+               <label class="priority-option" style="cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 8px 14px; background: rgba(239,68,68,0.1); border-radius: 8px; border: 1px solid rgba(239,68,68,0.3); transition: all 0.15s;">
+                 <input type="radio" name="rule-priority" value="major" style="accent-color: #ef4444;">
+                 <span style="font-size: 0.9em; color: #f87171; font-weight: 600;">Major (Red)</span>
+               </label>
+             </div>
+
+             <!-- Effect -->
+             <label style="font-size: 0.75em; color: var(--text-soft); display: block; margin-bottom: 10px;">Animation Effect</label>
+             <div style="display: flex; gap: 12px; margin-bottom: 18px; flex-wrap: wrap;">
+               <label style="cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; transition: background 0.15s;">
+                 <input type="radio" name="rule-effect" value="none" checked>
+                 <span style="font-size: 0.9em;">None</span>
+               </label>
+               <label style="cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; transition: background 0.15s;">
+                 <input type="radio" name="rule-effect" value="glow">
+                 <span style="font-size: 0.9em;">✨ Glow</span>
+               </label>
+               <label style="cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; transition: background 0.15s;">
+                 <input type="radio" name="rule-effect" value="pulse">
+                 <span style="font-size: 0.9em;">📡 Pulse</span>
+               </label>
+             </div>
+          </div>
+          
+          <div style="background: #0f1419; padding: 20px; border-radius: 10px; text-align: center; border: 1px solid #2d3a4d; margin-bottom: 18px;">
+             <div style="font-size: 0.7em; color: #555; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1.5px;">Live Extension Preview</div>
+             <span id="rule-preview-pill" class="cqd-brand-version">v1.2.3</span>
+          </div>
+          
+          <script>
+            (function() {
+              var pill = document.getElementById('rule-preview-pill');
+              function updatePreview() {
+                if (!pill) return;
+                var priorityInputs = document.getElementsByName('rule-priority');
+                var effectInputs = document.getElementsByName('rule-effect');
+                var priority = 'normal';
+                var effect = 'none';
+                for (var i = 0; i < priorityInputs.length; i++) {
+                  if (priorityInputs[i].checked) { priority = priorityInputs[i].value; break; }
+                }
+                for (var i = 0; i < effectInputs.length; i++) {
+                  if (effectInputs[i].checked) { effect = effectInputs[i].value; break; }
+                }
+                var cls = 'cqd-brand-version';
+                if (priority === 'minor') cls += ' cqd-pill-minor';
+                if (priority === 'major') cls += ' cqd-pill-major';
+                if (effect === 'glow') cls += (priority === 'major') ? ' cqd-effect-glow-red' : ' cqd-effect-glow-blue';
+                if (effect === 'pulse') cls += (priority === 'major') ? ' cqd-effect-pulse-red' : ' cqd-effect-pulse-blue';
+                pill.className = cls;
+              }
+              var allRadios = document.querySelectorAll('input[name="rule-priority"], input[name="rule-effect"]');
+              for (var i = 0; i < allRadios.length; i++) {
+                allRadios[i].onchange = updatePreview;
+              }
+              window.updatePreview = updatePreview;
+              updatePreview();
+            })();
+          </script>
+          
+          <button id="btn-add-rule" class="btn" style="width: 100%; justify-content: center; background: var(--accent); color: white; border: none; padding: 12px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 0.95em; transition: all 0.2s;">
+             + Add Rule
+          </button>
+        </div>
+        
+        <div>
+          <div style="margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+             <span style="font-size: 0.85em; color: var(--text-soft);">Active Rules <span style="font-size: 0.8em; opacity: 0.7;">(specific versions override 'all')</span></span>
+             <span id="rules-count" style="font-size: 0.8em; color: var(--text-muted); background: rgba(255,255,255,0.05); padding: 2px 8px; border-radius: 4px;">0 rules</span>
+          </div>
+          <div id="rules-list-container" style="display: flex; flex-direction: column; gap: 8px; max-height: 280px; overflow-y: auto; padding-right: 4px;">
+             <!-- Renders via JS -->
+          </div>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
 export function renderDashboard(stats: StatsResponse): string {
   return "";
 }
