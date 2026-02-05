@@ -244,4 +244,65 @@ header {
   font-size: 0.85rem;
 }
 
+/* ===== MAIN CONTENT ===== */
+main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+/* Cards - Clean Zinc Surface */
+.card {
+  background: var(--bg-elevated);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  padding: var(--space-6);
+  transition: border-color 0.2s ease;
+}
+
+.card:hover {
+  border-color: var(--border-muted);
+}
+
+.card h2 {
+  margin: 0 0 var(--space-5);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.section-header {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-disabled);
+  margin-bottom: var(--space-2);
+  font-weight: 600;
+}
+
+/* Grid Layouts */
+.grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-4);
+}
+
+.grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-4);
+}
+
+.split-section {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-5);
+}
+
+
 `;
