@@ -374,6 +374,62 @@ async function handleProtectedStats(request: Request, env: WorkerEnv): Promise<R
 // Proxy to Durable Object
 // ---------------------------------------------------------------------------
 
+  return proxyToDO(request, env);
+}
+
+// ---------------------------------------------------------------------------
+// Protected Admin Endpoint (requires session, injects X-Admin-Secret for DO)
+// Used by dashboard to call admin endpoints without exposing the secret
+// ---------------------------------------------------------------------------
+
+async function handleProtectedAdminEndpoint(request: Request, env: WorkerEnv): Promise<Response> {
+  const clientIp = request.headers.get("CF-Connecting-IP") || "unknown";
+  const adminSecret = request.headers.get("X-Admin-Secret");
+  const sessionToken = getSessionCookie(request);
+
+  // Check X-Admin-Secret header first (for direct API access)
+  const hasValidSecret = adminSecret === env.DO_SHARED_SECRET;
+  
+  // Check session token (for browser/dashboard access)
+  const hasValidSession = sessionToken && 
+    await verifySessionToken(sessionToken, env.DO_SHARED_SECRET, clientIp);
+
+  if (!hasValidSecret && !hasValidSession) {
+    return withCors(request, new Response(
+      JSON.stringify({ ok: false, error: "unauthorized", message: "Valid session or X-Admin-Secret required" }),
+      { status: 401, headers: { "content-type": "application/json" } }
+    ));
+  }
+
+  // If session-based auth but no secret header, inject the secret for DO
+  const stub = getDownloadsStub(env);
+  const country = (request.cf as unknown as { country?: string })?.country;
+  const headers = new Headers(request.headers);
+  
+  // CRITICAL: Inject the real admin secret for DO authorization
+  if (!hasValidSecret) {
+    headers.set("X-Admin-Secret", env.DO_SHARED_SECRET);
+  }
+  
+  if (country) {
+    headers.set("X-Geo-Country", country);
+  }
+
+  const newReq = new Request(request.url, {
+    method: request.method,
+    headers: headers,
+    body: request.body,
+    redirect: request.redirect,
+  });
+
+  const res = await stub.fetch(newReq);
+  return withCors(request, res);
+}
+
+// ---------------------------------------------------------------------------
+// Proxy to Durable Object
+// ---------------------------------------------------------------------------
+
 async function proxyToDO(request: Request, env: WorkerEnv): Promise<Response> {
   const stub = getDownloadsStub(env);
   
