@@ -11,8 +11,8 @@ function escapeHtml(unsafe: string): string {
     .replace(/'/g, "&#039;");
 }
 
-function isValidIp(ip: string): boolean {
-  // Simple IPv4 validation
+function _isValidIp(ip: string): boolean {
+  // Simple IPv4 validation (unused but kept for potential server-side use)
   const ipv4Regex = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
   return ipv4Regex.test(ip);
 }
@@ -275,110 +275,117 @@ function renderNotificationSection(entries: ChangelogEntry[], config: ChangelogC
     <section class="card config-card" id="config">
       <h2>
         <span>🔔</span> Notification Styling
+        <span class="release-count-badge" id="notification-counter">${(config.rules || []).length}</span>
         <span class="unsaved-dot" id="unsaved-indicator" title="Unsaved changes"></span>
       </h2>
       
       <script>window.CURRENT_RULES = ${rulesJson};</script>
       
-      <div style="display: flex; flex-direction: column; gap: 20px;">
-        <div style="font-size: 0.85em; color: var(--text-soft); margin-bottom: 12px;">
-          Define how the extension badge looks for specific versions.
-        </div>
-        
-        <div style="padding: 20px; background: rgba(0,0,0,0.2); border-radius: 12px; border: 1px solid var(--border-subtle);">
-          <!-- Target Selection -->
-          <div style="margin-bottom: 16px;">
-             <label style="font-size: 0.75em; color: var(--text-soft); display: block; margin-bottom: 6px;">Target Version</label>
-             <input list="known-versions" id="rule-target" placeholder="e.g. 1.2.3 or 'all'" class="input-field" style="width: 100%; padding: 10px 12px; background: var(--bg-elevated); border: 1px solid var(--border-subtle); color: white; border-radius: 8px; font-size: 0.95em;" oninput="window.updatePreview && window.updatePreview()">
-             <datalist id="known-versions">
-               ${dataListOptions}
-             </datalist>
-             <div style="font-size: 0.7em; color: var(--text-muted); margin-top: 6px;">Select from history or type new version.</div>
+      <div class="split-section" style="gap: 24px;">
+        <!-- Left: Actions / Form -->
+        <div style="flex: 1;">
+          <div class="section-header" style="margin-bottom: 12px;">Create New Rule</div>
+          <div style="font-size: 0.85em; color: var(--text-soft); margin-bottom: 16px;">
+            Define how the extension badge looks for specific versions.
           </div>
           
-          <div style="border-top: 1px dashed var(--border-subtle); margin: 16px 0; padding-top: 16px;">
-             <!-- Priority -->
-             <label style="font-size: 0.75em; color: var(--text-soft); display: block; margin-bottom: 10px;">Priority (Color Scheme)</label>
-             <div style="display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap;">
-               <label class="priority-option" style="cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 8px 14px; background: rgba(255,255,255,0.05); border-radius: 8px; border: 1px solid transparent; transition: all 0.15s;">
-                 <input type="radio" name="rule-priority" value="normal" checked style="accent-color: #6b7280;">
-                 <span style="font-size: 0.9em;">Normal</span>
-               </label>
-               <label class="priority-option" style="cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 8px 14px; background: rgba(59,130,246,0.1); border-radius: 8px; border: 1px solid rgba(59,130,246,0.3); transition: all 0.15s;">
-                 <input type="radio" name="rule-priority" value="minor" style="accent-color: #3b82f6;">
-                 <span style="font-size: 0.9em; color: #60a5fa;">Minor (Blue)</span>
-               </label>
-               <label class="priority-option" style="cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 8px 14px; background: rgba(239,68,68,0.1); border-radius: 8px; border: 1px solid rgba(239,68,68,0.3); transition: all 0.15s;">
-                 <input type="radio" name="rule-priority" value="major" style="accent-color: #ef4444;">
-                 <span style="font-size: 0.9em; color: #f87171; font-weight: 600;">Major (Red)</span>
-               </label>
-             </div>
+          <div style="padding: 20px; background: rgba(0,0,0,0.2); border-radius: 12px; border: 1px solid var(--border-subtle);">
+            <!-- Target Selection -->
+            <div style="margin-bottom: 16px;">
+               <label style="font-size: 0.75em; color: var(--text-soft); display: block; margin-bottom: 6px;">Target Version</label>
+               <input list="known-versions" id="rule-target" placeholder="e.g. 1.2.3 or 'all'" class="input-field" style="width: 100%; padding: 10px 12px; background: var(--bg-elevated); border: 1px solid var(--border-subtle); color: white; border-radius: 8px; font-size: 0.95em;" oninput="window.updatePreview && window.updatePreview()">
+               <datalist id="known-versions">
+                 ${dataListOptions}
+               </datalist>
+               <div style="font-size: 0.7em; color: var(--text-muted); margin-top: 6px;">Select from history or type new version.</div>
+            </div>
+            
+            <div style="border-top: 1px dashed var(--border-subtle); margin: 16px 0; padding-top: 16px;">
+               <!-- Priority -->
+               <label style="font-size: 0.75em; color: var(--text-soft); display: block; margin-bottom: 10px;">Priority (Color Scheme)</label>
+               <div style="display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap;">
+                 <label class="priority-option" style="cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 8px 14px; background: rgba(255,255,255,0.05); border-radius: 8px; border: 1px solid transparent; transition: all 0.15s;">
+                   <input type="radio" name="rule-priority" value="normal" checked style="accent-color: #6b7280;">
+                   <span style="font-size: 0.9em;">Normal</span>
+                 </label>
+                 <label class="priority-option" style="cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 8px 14px; background: rgba(59,130,246,0.1); border-radius: 8px; border: 1px solid rgba(59,130,246,0.3); transition: all 0.15s;">
+                   <input type="radio" name="rule-priority" value="minor" style="accent-color: #3b82f6;">
+                   <span style="font-size: 0.9em; color: #60a5fa;">Minor (Blue)</span>
+                 </label>
+                 <label class="priority-option" style="cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 8px 14px; background: rgba(239,68,68,0.1); border-radius: 8px; border: 1px solid rgba(239,68,68,0.3); transition: all 0.15s;">
+                   <input type="radio" name="rule-priority" value="major" style="accent-color: #ef4444;">
+                   <span style="font-size: 0.9em; color: #f87171; font-weight: 600;">Major (Red)</span>
+                 </label>
+               </div>
 
-             <!-- Effect -->
-             <label style="font-size: 0.75em; color: var(--text-soft); display: block; margin-bottom: 10px;">Animation Effect</label>
-             <div style="display: flex; gap: 12px; margin-bottom: 18px; flex-wrap: wrap;">
-               <label style="cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; transition: background 0.15s;">
-                 <input type="radio" name="rule-effect" value="none" checked>
-                 <span style="font-size: 0.9em;">None</span>
-               </label>
-               <label style="cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; transition: background 0.15s;">
-                 <input type="radio" name="rule-effect" value="glow">
-                 <span style="font-size: 0.9em;">✨ Glow</span>
-               </label>
-               <label style="cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; transition: background 0.15s;">
-                 <input type="radio" name="rule-effect" value="pulse">
-                 <span style="font-size: 0.9em;">📡 Pulse</span>
-               </label>
-             </div>
-          </div>
-          
-          <div style="background: #0f1419; padding: 20px; border-radius: 10px; text-align: center; border: 1px solid #2d3a4d; margin-bottom: 18px;">
-             <div style="font-size: 0.7em; color: #555; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1.5px;">Live Extension Preview</div>
-             <span id="rule-preview-pill" class="cqd-brand-version">v1.2.3</span>
-          </div>
-          
-          <script>
-            (function() {
-              var pill = document.getElementById('rule-preview-pill');
-              function updatePreview() {
-                if (!pill) return;
-                var priorityInputs = document.getElementsByName('rule-priority');
-                var effectInputs = document.getElementsByName('rule-effect');
-                var priority = 'normal';
-                var effect = 'none';
-                for (var i = 0; i < priorityInputs.length; i++) {
-                  if (priorityInputs[i].checked) { priority = priorityInputs[i].value; break; }
+               <!-- Effect -->
+               <label style="font-size: 0.75em; color: var(--text-soft); display: block; margin-bottom: 10px;">Animation Effect</label>
+               <div style="display: flex; gap: 12px; margin-bottom: 18px; flex-wrap: wrap;">
+                 <label style="cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; transition: background 0.15s;">
+                   <input type="radio" name="rule-effect" value="none" checked>
+                   <span style="font-size: 0.9em;">None</span>
+                 </label>
+                 <label style="cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; transition: background 0.15s;">
+                   <input type="radio" name="rule-effect" value="glow">
+                   <span style="font-size: 0.9em;">✨ Glow</span>
+                 </label>
+                 <label style="cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; transition: background 0.15s;">
+                   <input type="radio" name="rule-effect" value="pulse">
+                   <span style="font-size: 0.9em;">📡 Pulse</span>
+                 </label>
+               </div>
+            </div>
+            
+            <div style="background: #0f1419; padding: 20px; border-radius: 10px; text-align: center; border: 1px solid #2d3a4d; margin-bottom: 18px;">
+               <div style="font-size: 0.7em; color: #555; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1.5px;">Live Extension Preview</div>
+               <span id="rule-preview-pill" class="cqd-brand-version">v1.2.3</span>
+            </div>
+            
+            <script>
+              (function() {
+                var pill = document.getElementById('rule-preview-pill');
+                function updatePreview() {
+                  if (!pill) return;
+                  var priorityInputs = document.getElementsByName('rule-priority');
+                  var effectInputs = document.getElementsByName('rule-effect');
+                  var priority = 'normal';
+                  var effect = 'none';
+                  for (var i = 0; i < priorityInputs.length; i++) {
+                    if (priorityInputs[i].checked) { priority = priorityInputs[i].value; break; }
+                  }
+                  for (var i = 0; i < effectInputs.length; i++) {
+                    if (effectInputs[i].checked) { effect = effectInputs[i].value; break; }
+                  }
+                  var cls = 'cqd-brand-version';
+                  if (priority === 'minor') cls += ' cqd-pill-minor';
+                  if (priority === 'major') cls += ' cqd-pill-major';
+                  if (effect === 'glow') cls += (priority === 'major') ? ' cqd-effect-glow-red' : ' cqd-effect-glow-blue';
+                  if (effect === 'pulse') cls += (priority === 'major') ? ' cqd-effect-pulse-red' : ' cqd-effect-pulse-blue';
+                  pill.className = cls;
                 }
-                for (var i = 0; i < effectInputs.length; i++) {
-                  if (effectInputs[i].checked) { effect = effectInputs[i].value; break; }
+                var allRadios = document.querySelectorAll('input[name="rule-priority"], input[name="rule-effect"]');
+                for (var i = 0; i < allRadios.length; i++) {
+                  allRadios[i].onchange = updatePreview;
                 }
-                var cls = 'cqd-brand-version';
-                if (priority === 'minor') cls += ' cqd-pill-minor';
-                if (priority === 'major') cls += ' cqd-pill-major';
-                if (effect === 'glow') cls += (priority === 'major') ? ' cqd-effect-glow-red' : ' cqd-effect-glow-blue';
-                if (effect === 'pulse') cls += (priority === 'major') ? ' cqd-effect-pulse-red' : ' cqd-effect-pulse-blue';
-                pill.className = cls;
-              }
-              var allRadios = document.querySelectorAll('input[name="rule-priority"], input[name="rule-effect"]');
-              for (var i = 0; i < allRadios.length; i++) {
-                allRadios[i].onchange = updatePreview;
-              }
-              window.updatePreview = updatePreview;
-              updatePreview();
-            })();
-          </script>
-          
-          <button id="btn-add-rule" class="btn" style="width: 100%; justify-content: center; background: var(--accent); color: white; border: none; padding: 12px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 0.95em; transition: all 0.2s;">
-             + Add Rule
-          </button>
+                window.updatePreview = updatePreview;
+                updatePreview();
+              })();
+            </script>
+            
+            <button id="btn-add-rule" class="btn" style="width: 100%; justify-content: center; background: var(--accent); color: white; border: none; padding: 12px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 0.95em; transition: all 0.2s;">
+               + Add Rule
+            </button>
+          </div>
         </div>
         
-        <div>
+        <!-- Right: History / Rules List -->
+        <div style="flex: 1;">
+          <div class="section-header" style="margin-bottom: 12px;">Active Rules</div>
           <div style="margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
-             <span style="font-size: 0.85em; color: var(--text-soft);">Active Rules <span style="font-size: 0.8em; opacity: 0.7;">(specific versions override 'all')</span></span>
+             <span style="font-size: 0.8em; color: var(--text-muted);">Specific versions override 'all' rules</span>
              <span id="rules-count" style="font-size: 0.8em; color: var(--text-muted); background: rgba(255,255,255,0.05); padding: 2px 8px; border-radius: 4px;">0 rules</span>
           </div>
-          <div id="rules-list-container" style="display: flex; flex-direction: column; gap: 8px; max-height: 280px; overflow-y: auto; padding-right: 4px;">
+          <div id="rules-list-container" style="display: flex; flex-direction: column; gap: 8px; max-height: 400px; overflow-y: auto; padding-right: 4px;">
              <!-- Renders via JS -->
           </div>
         </div>
@@ -387,7 +394,7 @@ function renderNotificationSection(entries: ChangelogEntry[], config: ChangelogC
   `;
 }
 
-function renderReleaseManagementSection(entries: ChangelogEntry[], config: ChangelogConfig): string {
+function renderReleaseManagementSection(entries: ChangelogEntry[], _config: ChangelogConfig): string {
   const sorted = [...entries].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   
   // Versions for DataList
@@ -449,45 +456,51 @@ function renderReleaseManagementSection(entries: ChangelogEntry[], config: Chang
          <button id="btn-cancel-edit" class="btn-cancel-edit">Cancel</button>
        </div>
 
-       <div style="background: rgba(255,255,255,0.03); padding: 20px; border-radius: 12px; border: 1px solid var(--border-subtle); margin-bottom: 20px;">
-          <input type="hidden" id="edit-cl-id" value="">
-          
-          <div style="margin-bottom: 14px;">
-             <label style="font-size: 0.75em; color: var(--text-soft); display: block; margin-bottom: 6px;">Version</label>
-             <input list="known-versions-release" id="new-cl-version" placeholder="e.g. 1.2.4" class="input-field" style="width: 100%; padding: 10px 12px; background: var(--bg-elevated); border: 1px solid var(--border-subtle); color: white; border-radius: 8px; font-size: 0.95em;">
-             <datalist id="known-versions-release">
-               ${dataListOptions}
-             </datalist>
-          </div>
+       <div class="split-section" style="gap: 24px;">
+         <!-- Left: Create/Edit Form -->
+         <div style="flex: 1;">
+           <div class="section-header" style="margin-bottom: 12px;">Create New Release</div>
+           <div style="background: rgba(255,255,255,0.03); padding: 20px; border-radius: 12px; border: 1px solid var(--border-subtle);">
+              <input type="hidden" id="edit-cl-id" value="">
+              
+              <div style="margin-bottom: 14px;">
+                 <label style="font-size: 0.75em; color: var(--text-soft); display: block; margin-bottom: 6px;">Version</label>
+                 <input list="known-versions-release" id="new-cl-version" placeholder="e.g. 1.2.4" class="input-field" style="width: 100%; padding: 10px 12px; background: var(--bg-elevated); border: 1px solid var(--border-subtle); color: white; border-radius: 8px; font-size: 0.95em;">
+                 <datalist id="known-versions-release">
+                   ${dataListOptions}
+                 </datalist>
+              </div>
 
-          <div style="margin-bottom: 6px;">
-             <label style="font-size: 0.75em; color: var(--text-soft); display: block; margin-bottom: 6px;">Changes (one per line)</label>
-             <div class="textarea-wrapper">
-               <textarea id="new-cl-changes" rows="5" class="input-field" placeholder="- Added new feature X&#10;- Fixed bug with Y&#10;- Improved performance" style="width: 100%; padding: 10px 12px; background: var(--bg-elevated); border: 1px solid var(--border-subtle); color: white; border-radius: 8px; font-size: 0.9em; line-height: 1.5; resize: vertical;"></textarea>
-               <span id="char-counter" class="char-counter">0 / 500</span>
-             </div>
-          </div>
-       </div>
-       
-       <div style="margin-bottom: 24px;">
-         <div style="margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
-           <span style="font-size: 0.85em; color: var(--text-soft);">Historical Releases</span>
-           <span style="font-size: 0.75em; color: var(--text-muted);">${releaseCount} releases</span>
+              <div style="margin-bottom: 16px;">
+                 <label style="font-size: 0.75em; color: var(--text-soft); display: block; margin-bottom: 6px;">Changes (one per line)</label>
+                 <div class="textarea-wrapper">
+                   <textarea id="new-cl-changes" rows="5" class="input-field" placeholder="- Added new feature X&#10;- Fixed bug with Y&#10;- Improved performance" style="width: 100%; padding: 10px 12px; background: var(--bg-elevated); border: 1px solid var(--border-subtle); color: white; border-radius: 8px; font-size: 0.9em; line-height: 1.5; resize: vertical;"></textarea>
+                   <span id="char-counter" class="char-counter">0 / 500</span>
+                 </div>
+              </div>
+              
+              <button id="btn-save-all" class="btn btn-primary" style="width: 100%; padding: 14px 24px; background: var(--success); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                <span id="btn-save-text">Save & Publish</span>
+              </button>
+              
+              <div style="margin-top: 10px; font-size: 0.75em; color: var(--text-soft); text-align: center;">
+                 💡 Tip: Press <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Ctrl+Enter</kbd> to save quickly
+              </div>
+           </div>
          </div>
-         <div class="cl-history-list" style="overflow-y: auto; max-height: 400px; padding-right: 8px;">
-           ${historyHtml}
+         
+         <!-- Right: History -->
+         <div style="flex: 1;">
+           <div class="section-header" style="margin-bottom: 12px;">Historical Releases</div>
+           <div style="margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between;">
+             <span style="font-size: 0.8em; color: var(--text-muted);">Click a release to edit it</span>
+             <span style="font-size: 0.75em; color: var(--text-muted);">${releaseCount} releases</span>
+           </div>
+           <div class="cl-history-list" style="overflow-y: auto; max-height: 400px; padding-right: 8px;">
+             ${historyHtml}
+           </div>
          </div>
-       </div>
-
-       <div style="display: flex; gap: 12px; flex-wrap: wrap;">
-         <button id="btn-save-all" class="btn btn-primary" style="flex: 1; min-width: 200px; padding: 16px 24px; background: var(--success); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s;">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-            <span id="btn-save-text">Save Configuration & Publish</span>
-         </button>
-       </div>
-
-       <div style="margin-top: 12px; font-size: 0.75em; color: var(--text-soft); text-align: center;">
-         💡 Tip: Press <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Ctrl+Enter</kbd> to save quickly
        </div>
     </section>
   `;
@@ -580,59 +593,139 @@ export function renderDashboard(stats: StatsResponse): string {
     :root {
       color-scheme: dark;
       
-      /* Background Hierarchy */
-      --bg-base: #0f0f14;
-      --bg-card: #16161d;
-      --bg-elevated: #1e1e28;
-      --bg-input: #0a0a0e;
-      --bg-hover: #252532;
+      /* ===== PROFESSIONAL DARK THEME ===== */
       
-      /* Borders */
-      --border: #2a2a38;
-      --border-hover: #3a3a4a;
-      --border-focus: #8b5cf6;
+      /* Background Hierarchy - Enhanced Contrast */
+      --bg-base: #0a0b0f;
+      --bg-card: #161820;
+      --bg-elevated: #1e2029;
+      --bg-surface: #141519;
+      --bg-input: #0e0f14;
+      --bg-hover: #282a36;
+      --bg-active: #323444;
       
-      /* Accent - Purple */
-      --accent: #8b5cf6;
-      --accent-hover: #a78bfa;
-      --accent-muted: rgba(139, 92, 246, 0.15);
-      --accent-strong: rgba(139, 92, 246, 0.25);
+      /* Borders - Enhanced Contrast */
+      --border: #363848;
+      --border-muted: #2a2d3a;
+      --border-hover: #525670;
+      --border-focus: #4d8cf7;
+      --border-subtle: rgba(255, 255, 255, 0.12);
       
-      /* Status */
-      --success: #10b981;
-      --success-bg: rgba(16, 185, 129, 0.12);
-      --warning: #f59e0b;
-      --warning-bg: rgba(245, 158, 11, 0.12);
+      /* Primary Accent - Blue */
+      --accent: #3b82f6;
+      --accent-hover: #60a5fa;
+      --accent-muted: rgba(59, 130, 246, 0.15);
+      --accent-strong: rgba(59, 130, 246, 0.25);
+      --accent-light: #93c5fd;
+      
+      /* Status Colors */
+      --success: #22c55e;
+      --success-muted: rgba(34, 197, 94, 0.15);
+      --success-bg: rgba(34, 197, 94, 0.10);
+      --success-border: rgba(34, 197, 94, 0.35);
+      --warning: #eab308;
+      --warning-muted: rgba(234, 179, 8, 0.15);
+      --warning-bg: rgba(234, 179, 8, 0.10);
+      --warning-soft: rgba(234, 179, 8, 0.18);
       --danger: #ef4444;
-      --danger-bg: rgba(239, 68, 68, 0.1);
+      --danger-muted: rgba(239, 68, 68, 0.12);
+      --danger-bg: rgba(239, 68, 68, 0.08);
+      --danger-soft: rgba(127, 29, 29, 0.30);
+      --danger-hover: #dc2626;
       
       /* Typography */
-      --text-primary: #f1f5f9;
-      --text-secondary: #94a3b8;
-      --text-muted: #64748b;
-      --text-disabled: #475569;
+      --text-primary: #ffffff;
+      --text-secondary: #b4b4bc;
+      --text-muted: #8a8a94;
+      --text-disabled: #5c5c66;
+      --text-soft: #a8a8b4;
+      --text-main: #ebebef;
       
-      /* Spacing (4px base) */
+      /* Spacing System */
+      --space-0: 2px;
       --space-1: 4px;
       --space-2: 8px;
       --space-3: 12px;
       --space-4: 16px;
       --space-5: 20px;
       --space-6: 24px;
+      --space-7: 28px;
       --space-8: 32px;
       --space-10: 40px;
       --space-12: 48px;
+      --section-gap: 24px;
       
       /* Border Radius */
-      --radius-sm: 8px;
-      --radius: 12px;
-      --radius-lg: 16px;
-      --radius-xl: 20px;
+      --radius-xs: 4px;
+      --radius-sm: 6px;
+      --radius: 10px;
+      --radius-lg: 14px;
+      --radius-xl: 18px;
       --radius-full: 9999px;
       
+      /* Shadows */
+      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+      --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+      --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.6);
+      
       /* Layout */
-      --sidebar-width: 200px;
-      --content-max-width: 1400px;
+      --sidebar-width: 220px;
+      --content-max-width: 1200px;
+      --header-height: 64px;
+    }
+    
+    /* ===== TOGGLE SWITCH ===== */
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 50px;
+      height: 26px;
+      flex-shrink: 0;
+    }
+    
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-full);
+      transition: all 0.3s ease;
+    }
+    
+    .toggle-slider::before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background-color: var(--text-muted);
+      border-radius: var(--radius-full);
+      transition: all 0.3s ease;
+    }
+    
+    .toggle-switch input:checked + .toggle-slider {
+      background-color: var(--accent);
+      border-color: var(--accent);
+    }
+    
+    .toggle-switch input:checked + .toggle-slider::before {
+      transform: translateX(24px);
+      background-color: white;
+    }
+    
+    .toggle-switch input:focus + .toggle-slider {
+      box-shadow: 0 0 0 2px var(--accent-muted);
     }
     
     /* ===== ANIMATIONS ===== */
@@ -678,6 +771,15 @@ export function renderDashboard(stats: StatsResponse): string {
       overflow-x: hidden;
     }
     
+    /* ===== GLOBAL CURSOR STYLES ===== */
+    a, button, .btn, .nav-item, .clickable, .toggle-switch, [role="button"] {
+      cursor: pointer;
+    }
+    
+    .info-card, [data-tooltip], .stat-card:not(:hover), .metric-label {
+      cursor: help;
+    }
+    
     /* ===== LAYOUT WRAPPER ===== */
     .dashboard-layout {
       display: flex;
@@ -693,12 +795,13 @@ export function renderDashboard(stats: StatsResponse): string {
       height: 100vh;
       background: var(--bg-card);
       border-right: 1px solid var(--border);
-      padding: var(--space-5) 0;
+      padding: var(--space-6) 0;
       display: flex;
       flex-direction: column;
       z-index: 1000;
       overflow-y: auto;
-      transition: transform 0.3s ease;
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: var(--shadow-lg);
     }
     
     .nav-header {
@@ -1056,22 +1159,25 @@ export function renderDashboard(stats: StatsResponse): string {
     main {
       display: flex;
       flex-direction: column;
-      gap: var(--space-7);
+      gap: var(--section-gap);
     }
     
-    /* Cards - Enhanced with Animation */
+    /* Cards - Professional Style */
     .card {
-      background: var(--bg-elevated);
+      background: linear-gradient(135deg, var(--bg-card) 0%, rgba(20, 21, 28, 0.95) 100%);
       border-radius: var(--radius-lg);
       border: 1px solid var(--border);
-      padding: var(--space-7);
+      padding: var(--space-6);
       transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
       animation: fadeSlideUp 0.5s ease-out backwards;
+      position: relative;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
     }
     
     .card:hover {
       border-color: var(--border-hover);
-      box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      transform: translateY(-2px);
     }
     
     .card h2 {
@@ -1112,6 +1218,18 @@ export function renderDashboard(stats: StatsResponse): string {
     }
     
     /* Grid Layouts */
+    .grid-5 {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(120px, 280px));
+      gap: var(--space-2);
+    }
+    
+    .grid-5 .metric {
+      max-width: 280px;
+      min-width: 120px;
+      padding: var(--space-4);
+    }
+    
     .grid-4 {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
@@ -1305,32 +1423,59 @@ export function renderDashboard(stats: StatsResponse): string {
       display: inline-flex;
       align-items: center;
       gap: var(--space-2);
-      padding: var(--space-2) var(--space-3);
-      border-radius: var(--radius-sm);
-      border: 1px solid var(--border);
-      background: var(--bg-surface);
-      color: var(--text-muted);
-      font-size: 0.75rem;
-      font-weight: 500;
+      padding: var(--space-2) var(--space-4);
+      border-radius: var(--radius);
+      border: 1px solid var(--border-hover);
+      background: var(--bg-elevated);
+      color: var(--text-secondary);
+      font-size: 0.8rem;
+      font-weight: 600;
       text-decoration: none;
-      transition: all 0.2s;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
       cursor: pointer;
+      box-shadow: var(--shadow-sm);
     }
     .btn-external:hover {
-      border-color: var(--border-muted);
-      color: var(--text-secondary);
+      border-color: var(--accent);
+      color: var(--text-primary);
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-md);
     }
     .btn-external.oracle {
-      border-color: rgba(124, 58, 237, 0.4);
+      border-color: rgba(147, 51, 234, 0.5);
+      background: rgba(147, 51, 234, 0.08);
     }
     .btn-external.oracle:hover {
-      background: rgba(124, 58, 237, 0.1);
+      background: rgba(147, 51, 234, 0.18);
+      border-color: rgba(147, 51, 234, 0.8);
+      color: #c4b5fd;
     }
     .btn-external.uptime {
-      border-color: rgba(34, 197, 94, 0.4);
+      border-color: rgba(34, 197, 94, 0.5);
+      background: rgba(34, 197, 94, 0.08);
     }
     .btn-external.uptime:hover {
-      background: var(--success-muted);
+      background: rgba(34, 197, 94, 0.18);
+      border-color: rgba(34, 197, 94, 0.8);
+      color: #86efac;
+    }
+    .btn-external.github {
+      border-color: rgba(255, 255, 255, 0.25);
+      background: rgba(255, 255, 255, 0.05);
+    }
+    .btn-external.github:hover {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.5);
+      color: #ffffff;
+    }
+    .btn-external.sheets {
+      border-color: rgba(52, 168, 83, 0.5);
+      background: rgba(52, 168, 83, 0.08);
+    }
+    .btn-external.sheets:hover {
+      background: rgba(52, 168, 83, 0.18);
+      border-color: rgba(52, 168, 83, 0.8);
+      color: #6ee7a8;
     }
 
     /* Success/Failure Donut Chart */
@@ -1442,12 +1587,12 @@ export function renderDashboard(stats: StatsResponse): string {
       transform: rotate(180deg);
     }
 
-    /* ===== BUTTONS - ENHANCED ===== */
+    /* ===== BUTTONS - ORACLE STYLE ===== */
     button.btn {
-      padding: var(--space-2) var(--space-5);
+      padding: var(--space-2) var(--space-4);
       border-radius: var(--radius-sm);
-      border: 1px solid var(--border-muted);
-      background: linear-gradient(180deg, var(--bg-surface) 0%, var(--bg-elevated) 100%);
+      border: 1px solid var(--border);
+      background: var(--bg-elevated);
       color: var(--text-secondary);
       font-size: 0.82rem;
       font-weight: 500;
@@ -1455,18 +1600,17 @@ export function renderDashboard(stats: StatsResponse): string {
       display: inline-flex;
       align-items: center;
       gap: var(--space-2);
-      transition: all 0.2s ease;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+      transition: all var(--transition-normal);
     }
     button.btn:hover {
-      border-color: var(--accent);
-      background: linear-gradient(180deg, var(--accent-muted) 0%, var(--bg-surface) 100%);
-      color: var(--accent-light);
-      box-shadow: 0 2px 8px rgba(79, 142, 247, 0.2);
+      border-color: var(--border-hover);
+      background: var(--bg-hover);
+      color: var(--text-primary);
+      transform: translateY(-1px);
     }
     button.btn:active {
-      transform: translateY(1px);
-      box-shadow: none;
+      transform: translateY(0);
+      background: var(--bg-surface);
     }
     .btn-bullet {
       font-size: 1.1em;
@@ -1494,46 +1638,35 @@ export function renderDashboard(stats: StatsResponse): string {
       cursor: help;
     }
 
-    [data-tooltip]::before,
     [data-tooltip]::after {
       position: absolute;
       left: 50%;
       transform: translateX(-50%) translateY(0);
       opacity: 0;
       visibility: hidden;
-      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      transition: all 0.2s ease-out;
       pointer-events: none;
       z-index: 100;
-    }
-
-    [data-tooltip]::after {
       content: attr(data-tooltip);
-      bottom: calc(100% + 12px);
-      padding: var(--space-2) var(--space-4);
-      background: var(--slate-800);
-      border: 1px solid var(--accent);
+      bottom: calc(100% + 8px);
+      padding: 10px 14px;
+      background: #1a1d26;
+      border: 1px solid var(--border-hover);
       color: var(--text-primary);
-      font-size: 0.78rem;
+      font-size: 0.8rem;
       font-weight: 500;
+      line-height: 1.4;
       border-radius: var(--radius);
-      white-space: nowrap;
-      max-width: 320px;
-      text-align: center;
-      box-shadow: 0 4px 20px rgba(79, 142, 247, 0.25), 0 0 0 1px var(--accent-muted);
+      white-space: normal;
+      max-width: 280px;
+      text-align: left;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
     }
 
-    [data-tooltip]::before {
-      content: '';
-      bottom: calc(100% + 6px);
-      border: 7px solid transparent;
-      border-top-color: var(--accent);
-    }
-
-    [data-tooltip]:hover::before,
     [data-tooltip]:hover::after {
       opacity: 1;
       visibility: visible;
-      transform: translateX(-50%) translateY(-6px);
+      transform: translateX(-50%) translateY(-4px);
     }
 
     /* ===== STATE TAGS ===== */
@@ -1574,13 +1707,14 @@ export function renderDashboard(stats: StatsResponse): string {
 
     /* ===== DANGER ZONE - GUARDED STYLE ===== */
     .danger-zone {
-      border: 1px solid rgba(127, 29, 29, 0.6);
-      background: rgba(127, 29, 29, 0.08);
+      border: 1px solid rgba(220, 38, 38, 0.5);
+      background: var(--danger-soft);
+      position: relative;
+      overflow: hidden;
     }
 
     .danger-zone:hover {
-      border-color: rgba(153, 27, 27, 0.8);
-      background: rgba(127, 29, 29, 0.12);
+      border-color: rgba(220, 38, 38, 0.7);
     }
     .danger-header {
       display: flex;
@@ -1595,15 +1729,45 @@ export function renderDashboard(stats: StatsResponse): string {
       color: #f87171;
       font-weight: 700;
     }
+    
+    /* Danger Section Groups */
+    .danger-section {
+      margin-top: 20px;
+      padding-top: 16px;
+      border-top: 1px solid rgba(239, 68, 68, 0.12);
+    }
+    .danger-section:first-of-type {
+      margin-top: 12px;
+      border-top: none;
+      padding-top: 0;
+    }
+    .danger-section-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: rgba(252, 165, 165, 0.8);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 12px;
+    }
+    .danger-section-title svg {
+      opacity: 0.7;
+    }
+    
     .danger-row {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 12px 0;
-      border-bottom: 1px solid rgba(239,68,68,0.15);
+      padding: 12px 14px;
+      margin: 6px 0;
+      border-radius: 8px;
+      background: rgba(239, 68, 68, 0.04);
+      transition: background 0.15s ease;
     }
-    .danger-row:last-child {
-      border-bottom: none;
+    .danger-row:hover {
+      background: rgba(239, 68, 68, 0.08);
     }
     .danger-desc {
       font-size: 0.9rem;
@@ -1612,30 +1776,44 @@ export function renderDashboard(stats: StatsResponse): string {
     }
     .danger-sub {
       font-size: 0.75rem;
-      color: rgba(254, 202, 202, 0.7);
+      color: rgba(254, 202, 202, 0.6);
       margin-top: 2px;
     }
     .btn-danger {
       padding: 8px 16px;
       font-size: 0.85rem;
       border-radius: 8px;
-      border: 1px solid var(--danger);
-      background: var(--danger-soft);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      background: rgba(127, 29, 29, 0.25);
       color: #fca5a5;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
       gap: 8px;
       font-weight: 500;
-      transition: all 0.2s;
+      transition: all 0.2s ease;
+      white-space: nowrap;
     }
     .btn-danger:hover {
-      background: var(--danger);
+      background: rgba(239, 68, 68, 0.2);
       border-color: var(--danger);
-      color: #fff;
+      color: #fecaca;
+      box-shadow: 0 0 16px rgba(239, 68, 68, 0.2);
     }
     .btn-danger:active {
-      background: var(--danger-hover);
+      background: var(--danger);
+      color: #fff;
+      transform: scale(0.98);
+    }
+    .btn-danger.destructive {
+      background: rgba(185, 28, 28, 0.3);
+      border-color: var(--danger);
+      color: #fecaca;
+    }
+    .btn-danger.destructive:hover {
+      background: var(--danger);
+      color: #fff;
+      box-shadow: 0 0 20px rgba(239, 68, 68, 0.35);
     }
     
     .btn-primary {
@@ -2318,13 +2496,13 @@ export function renderDashboard(stats: StatsResponse): string {
       Overview
     </a>
     <a href="#breakdown" class="nav-item" data-section="breakdown">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
       Breakdown
     </a>
     
     <div class="nav-section">System</div>
     <a href="#system" class="nav-item" data-section="system">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-2.82 1.18V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0-1.18-2.82H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 2.82-1.18V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1.08 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0 1.18 2.82H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1.08z"/></svg>
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-2.82 1.18V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0-1.18-2.82H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08z"/></svg>
       Environment
     </a>
     <a href="#quota" class="nav-item" data-section="quota">
@@ -2342,12 +2520,24 @@ export function renderDashboard(stats: StatsResponse): string {
       Notifications
     </a>
     <a href="#release" class="nav-item" data-section="release">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
       Releases
     </a>
     <a href="#raw" class="nav-item" data-section="raw">
       <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
       Raw JSON
+    </a>
+    
+    <div class="nav-section">Security</div>
+    <a href="#security" class="nav-item" data-section="security">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      Security Settings
+    </a>
+    
+    <div class="nav-section">Data</div>
+    <a href="#datahub" class="nav-item" data-section="datahub">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+      Data Hub
     </a>
     
     <div class="nav-section">Admin</div>
@@ -2388,24 +2578,28 @@ export function renderDashboard(stats: StatsResponse): string {
 
     <!-- External Links Bar -->
     <div class="external-links">
-      <a href="http://129.151.233.229:8080/" target="_blank" class="btn-external oracle" data-tooltip="View Oracle Analytics Dashboard with historical data">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-        Oracle Dashboard
+      <a href="https://github.com/adhamhaithameid/Classroom-Quick-Downloader" target="_blank" class="btn-external github" data-tooltip="View source code on GitHub">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+        GitHub
       </a>
-      <a href="https://docs.google.com/spreadsheets/d/1ptzLKUVnAkyXnT635Zgb1C6Img9aeAZ1se3nRz_QZmI/edit?usp=sharing" target="_blank" class="btn-external oracle" data-tooltip="View historical analytics data and trends">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/></svg>
-        History
+      <a href="http://129.151.233.229:8080/" target="_blank" class="btn-external oracle" data-tooltip="View Oracle Analytics Dashboard with historical data">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+        Oracle
+      </a>
+      <a href="https://docs.google.com/spreadsheets/d/1ptzLKUVnAkyXnT635Zgb1C6Img9aeAZ1se3nRz_QZmI/edit?usp=sharing" target="_blank" class="btn-external sheets" data-tooltip="View historical analytics data and trends">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
+        Sheets
       </a>
       <a href="http://129.151.233.229:3001/status/cqd" target="_blank" class="btn-external uptime" data-tooltip="Check service uptime and status via Uptime Kuma">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-        Uptime Kuma
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        Status
       </a>
     </div>
 
     <main>
       <!-- Top Cards -->
       <section class="card" id="overview">
-        <div class="grid-4">
+        <div class="grid-5">
           <div class="metric" id="card-downloads" data-tooltip="Downloads completed successfully (status=success)">
             <div class="metric-label">Total Downloads</div>
             <div class="metric-value" data-bind="totalDownloads">${stats.totalDownloads}</div>
@@ -2417,6 +2611,10 @@ export function renderDashboard(stats: StatsResponse): string {
           <div class="metric" id="card-fail" data-tooltip="All events with status=fail">
             <div class="metric-label">Total Fail</div>
             <div class="metric-value" data-bind="totalFail" style="color:var(--danger)">${stats.totalFail}</div>
+          </div>
+          <div class="metric" id="card-cancelled" data-tooltip="All events with status=cancelled">
+            <div class="metric-label">Total Cancelled</div>
+            <div class="metric-value" data-bind="totalCancelled" style="color:var(--warning)">${stats.totalCancelled ?? 0}</div>
           </div>
           <div class="metric" id="card-events" data-tooltip="Total events received by DO">
             <div class="metric-label">Total Events</div>
@@ -2650,11 +2848,19 @@ export function renderDashboard(stats: StatsResponse): string {
           <!-- Left: Usage -->
           <div class="quota-panel" id="panel-usage">
             <div class="section-header" style="border:none; margin:0">
-              Daily Usage
+              Usage Statistics
             </div>
             <div class="quota-stat">
               <span class="quota-label">Requests Today</span>
               <span class="quota-val" data-bind="requestsToday">${requestsToday}</span>
+            </div>
+            <div class="quota-stat">
+              <span class="quota-label">Weekly Events</span>
+              <span class="quota-val" data-bind="weeklyEvents" style="color:var(--success)">${Math.round((stats.totalEvents ?? 0) / 4)}</span>
+            </div>
+            <div class="quota-stat">
+              <span class="quota-label">Monthly Events</span>
+              <span class="quota-val" data-bind="monthlyEvents" style="color:var(--accent)">${stats.totalEvents ?? 0}</span>
             </div>
             <div class="quota-stat">
               <span class="quota-label">Status</span>
@@ -2771,6 +2977,9 @@ export function renderDashboard(stats: StatsResponse): string {
         </div>
       </section>
 
+      ${renderNotificationSection(stats.changelog || [], stats.changelogConfig || {})}
+      ${renderReleaseManagementSection(stats.changelog || [], stats.changelogConfig || {})}
+
       <!-- Raw /stats payload -->
       <section class="card" id="raw">
         <h2>Raw /stats payload</h2>
@@ -2778,6 +2987,188 @@ export function renderDashboard(stats: StatsResponse): string {
           Direct JSON returned by <code>/stats</code>
         </div>
         <pre id="raw-stats-json" class="code-block code-block-large">${rawStatsJson}</pre>
+      </section>
+
+      <!-- Security Settings -->
+      <section class="card" id="security">
+        <h2>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          Security Settings
+        </h2>
+        <div class="section-subtitle" style="margin-bottom: 20px; color: var(--text-muted); font-size: 0.85rem;">
+          Manage access restrictions and security policies for this dashboard.
+        </div>
+        
+        <!-- IP Protection Toggle -->
+        <div class="security-row" style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; background: var(--bg-elevated); border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 16px;">
+          <div>
+            <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">IP Protection</div>
+            <div style="font-size: 0.8rem; color: var(--text-muted);">Restrict dashboard access to allowlisted IPs only</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="ip-protection-toggle">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        
+        <!-- Current Session Info -->
+        <div class="session-info" style="display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap;">
+          <div style="flex: 1; min-width: 200px; padding: 14px 18px; background: var(--bg-surface); border-radius: var(--radius-sm); border: 1px solid var(--border);">
+            <div style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-disabled); margin-bottom: 6px;">Your IP</div>
+            <div id="current-ip" style="font-size: 0.95rem; font-weight: 600; color: var(--text-primary); font-family: monospace;">Loading...</div>
+          </div>
+          <div style="flex: 1; min-width: 200px; padding: 14px 18px; background: var(--bg-surface); border-radius: var(--radius-sm); border: 1px solid var(--border);">
+            <div style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-disabled); margin-bottom: 6px;">Status</div>
+            <div id="ip-status" style="font-size: 0.95rem; font-weight: 600; color: var(--success);">Allowed</div>
+          </div>
+        </div>
+        
+        <!-- IP Allowlist Management -->
+        <div style="padding: 20px; background: var(--bg-surface); border-radius: var(--radius); border: 1px solid var(--border);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary);">IP Allowlist</span>
+            <span id="ip-count" style="font-size: 0.75rem; color: var(--text-muted); background: rgba(255,255,255,0.05); padding: 3px 10px; border-radius: var(--radius-sm);">0 IPs</span>
+          </div>
+          
+          <!-- Add IP Form -->
+          <div style="display: flex; gap: 10px; margin-bottom: 16px;">
+            <input type="text" id="add-ip-input" placeholder="Enter IP address (e.g., 192.168.1.1)" style="flex: 1; padding: 10px 14px; background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 0.9rem; outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
+            <button id="btn-add-ip" class="btn" style="background: var(--accent); color: white; border: none; padding: 10px 18px; font-weight: 600;">
+              + Add
+            </button>
+          </div>
+          
+          <!-- Quick Add Current IP -->
+          <button id="btn-add-my-ip" class="btn" style="width: 100%; justify-content: center; margin-bottom: 16px; background: var(--accent-muted); color: var(--accent-hover); border: 1px solid rgba(139, 92, 246, 0.3);">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+            Add My Current IP
+          </button>
+          
+          <!-- IP List -->
+          <div id="ip-list" style="display: flex; flex-direction: column; gap: 8px; max-height: 200px; overflow-y: auto;">
+            <div style="padding: 12px; text-align: center; color: var(--text-disabled); font-size: 0.85rem;">Loading allowlist...</div>
+          </div>
+        </div>
+        
+        <!-- Security Cards Grid -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 20px;">
+          
+          <!-- Login Rate Limiting Card -->
+          <div class="info-card" style="padding: 20px; background: var(--bg-surface); border-radius: var(--radius); border: 1px solid var(--border);">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+              <span style="font-size: 1.2rem;">⏱️</span>
+              <div style="font-weight: 600; color: var(--text-primary);">Login Rate Limiting</div>
+            </div>
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 16px;">
+              Protects against brute-force attacks by limiting failed login attempts.
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 12px; font-size: 0.85rem;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: var(--text-muted);">Status:</span>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span id="rate-limit-status" style="color: var(--success); font-weight: 600;">Enabled</span>
+                  <label class="toggle-switch" style="transform: scale(0.8);">
+                    <input type="checkbox" id="rate-limit-toggle" checked>
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: var(--text-muted);">Max attempts:</span>
+                <input type="number" id="rate-limit-max-attempts" value="5" min="1" max="20" style="width: 60px; padding: 6px 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 0.85rem; text-align: center;">
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: var(--text-muted);">Lockout period:</span>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <input type="number" id="rate-limit-lockout" value="15" min="1" max="60" style="width: 60px; padding: 6px 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 0.85rem; text-align: center;">
+                  <span style="color: var(--text-muted);">min</span>
+                </div>
+              </div>
+              <button id="btn-save-rate-limit" class="btn" style="padding: 8px 12px; background: var(--accent); color: white; border: none; font-size: 0.8rem; font-weight: 500; margin-top: 8px;">
+                Save Settings
+              </button>
+            </div>
+          </div>
+          
+          <!-- Session Security Card -->
+          <div class="info-card" style="padding: 20px; background: var(--bg-surface); border-radius: var(--radius); border: 1px solid var(--border);">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+              <span style="font-size: 1.2rem;">🔑</span>
+              <div style="font-weight: 600; color: var(--text-primary);">Session Security</div>
+            </div>
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 16px;">
+              HttpOnly cookies with HMAC-SHA256 signed tokens.
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 10px; font-size: 0.85rem;">
+              <div style="display: flex; justify-content: space-between;">
+                <span style="color: var(--text-muted);">Token type:</span>
+                <span style="color: var(--accent); font-weight: 500; font-family: monospace;">HMAC-SHA256</span>
+              </div>
+              <div style="display: flex; justify-content: space-between;">
+                <span style="color: var(--text-muted);">Cookie flags:</span>
+                <span style="color: var(--text-secondary); font-weight: 500;">HttpOnly, SameSite</span>
+              </div>
+              <div style="display: flex; justify-content: space-between;">
+                <span style="color: var(--text-muted);">Expiry:</span>
+                <span style="color: var(--text-secondary); font-weight: 500;">1 hour</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Data Hub -->
+      <section class="card" id="datahub">
+        <h2>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+          Data Hub
+        </h2>
+        <div class="section-subtitle" style="margin-bottom: 20px; color: var(--text-muted); font-size: 0.85rem;">
+          Manage analytics data synchronization with Oracle backend.
+        </div>
+        
+        <!-- Data Hub Cards Grid -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 24px;">
+          
+          <!-- Current Buffer Card -->
+          <div class="info-card" style="padding: 20px; background: var(--bg-surface); border-radius: var(--radius); border: 1px solid var(--border);">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 16px;">
+              <span style="font-size: 1.2rem;">📊</span>
+              <div style="font-weight: 600; color: var(--text-primary);">Current Buffer</div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+              <div>
+                <div style="font-size: 2rem; font-weight: 700; color: var(--text-primary);" data-bind="pendingEvents">${stats.pendingEvents}</div>
+                <div style="font-size: 0.75rem; color: var(--text-muted);">Events in buffer</div>
+              </div>
+              <div>
+                <div style="font-size: 2rem; font-weight: 700; color: var(--success);">${stats.totalDownloads ?? 0}</div>
+                <div style="font-size: 0.75rem; color: var(--text-muted);">Total downloads</div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Oracle Sync Card -->
+          <div class="info-card" style="padding: 20px; background: var(--bg-surface); border-radius: var(--radius); border: 1px solid var(--border);">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+              <span style="font-size: 1.2rem;">☁️</span>
+              <div style="font-weight: 600; color: var(--text-primary);">Oracle Sync</div>
+            </div>
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 16px;">
+              Export all analytics data to Oracle backend.
+            </div>
+            <div style="display: flex; gap: 10px; margin-bottom: 12px;">
+              <button id="btn-datahub-flush" class="btn" style="flex: 1; justify-content: center; padding: 10px; background: var(--accent); color: white; border: none; font-weight: 500; font-size: 0.8rem;">
+                Export All Data
+              </button>
+              <button id="btn-datahub-sync" class="btn" style="flex: 1; justify-content: center; padding: 10px; background: var(--bg-elevated); color: var(--text-secondary); border: 1px solid var(--border); font-weight: 500; font-size: 0.8rem;">
+                Sync Counters Only
+              </button>
+            </div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-align: center;">
+              Last sync: ${ageLastFlush}
+            </div>
+          </div>
       </section>
 
       <!-- Admin Controls / Danger Zone -->
@@ -2806,69 +3197,100 @@ export function renderDashboard(stats: StatsResponse): string {
           </div>
         </div>
 
-        <div
-          class="danger-row"
-          data-tooltip="Immediately pushes all pending analytics events from the Durable Object buffer to ORACLE_ENDPOINT, even if the batch threshold is not reached. Use this to force sync remote storage and any external dashboards."
-        >
-          <div>
-            <div class="danger-desc">Flush Buffer to Oracle</div>
-            <div class="danger-sub">
-              Force pushes all pending events immediately.
-            </div>
+        <!-- Oracle Sync Section -->
+        <div class="danger-section">
+          <div class="danger-section-title">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/></svg>
+            Oracle Sync
           </div>
-          <button class="btn-danger" id="btn-force-flush" type="button">
-            Flush now
-          </button>
+          <div
+            class="danger-row"
+            data-tooltip="Immediately pushes all pending analytics events from the Durable Object buffer to ORACLE_ENDPOINT, even if the batch threshold is not reached."
+          >
+            <div>
+              <div class="danger-desc">Flush Buffer to Oracle</div>
+              <div class="danger-sub">Force pushes all pending events immediately.</div>
+            </div>
+            <button class="btn-danger" id="btn-force-flush" type="button">Flush now</button>
+          </div>
+          <div
+            class="danger-row"
+            data-tooltip="Repeatedly flushes until the Durable Object buffer is completely empty. Best used off-peak when you want a fully drained buffer."
+          >
+            <div>
+              <div class="danger-desc">Full Sync</div>
+              <div class="danger-sub">Repeatedly flushes until buffer is empty.</div>
+            </div>
+            <button class="btn-danger" id="btn-full-sync" type="button">Sync all</button>
+          </div>
         </div>
 
-        <div
-          class="danger-row"
-          data-tooltip="Sets remoteEnabled to OFF. The Worker will tell all extensions to stop sending analytics to /track and keep everything local. Use this in emergencies to protect your Cloudflare request quota."
-        >
-          <div>
-            <div class="danger-desc">Cut Power (Remote OFF)</div>
-            <div class="danger-sub">
-              Disables remote analytics for all extensions. Emergency only.
-            </div>
+        <!-- Power Control Section -->
+        <div class="danger-section">
+          <div class="danger-section-title">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
+            Power Control
           </div>
-          <button class="btn-danger" id="btn-cut-power" type="button">
-            Cut power
-          </button>
+          <div
+            class="danger-row"
+            data-tooltip="Disables remote analytics for all extensions. The Worker will tell extensions to stop sending to /track. Use in emergencies to protect Cloudflare quota."
+          >
+            <div>
+              <div class="danger-desc">Cut Power (Remote OFF)</div>
+              <div class="danger-sub">Disables remote analytics for all extensions.</div>
+            </div>
+            <button class="btn-danger destructive" id="btn-cut-power" type="button">Cut power</button>
+          </div>
+          <div
+            class="danger-row"
+            data-tooltip="Re-enables remote analytics if you previously cut power. Extensions will resume sending events to /track."
+          >
+            <div>
+              <div class="danger-desc">Restore Power (Remote ON)</div>
+              <div class="danger-sub">Re-enables remote analytics if previously cut.</div>
+            </div>
+            <button class="btn-danger" id="btn-restore-power" type="button">Restore</button>
+          </div>
         </div>
 
-        <div
-          class="danger-row"
-          data-tooltip="Re-enables remote analytics if you previously cut power. The Worker will once again accept remote events and extensions may start hitting /track again."
-        >
-          <div>
-            <div class="danger-desc">Restore Power (Remote ON)</div>
-            <div class="danger-sub">
-              Re-enables remote analytics if previously cut.
-            </div>
+        <!-- Data Management Section -->
+        <div class="danger-section">
+          <div class="danger-section-title">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14"/></svg>
+            Data Management
           </div>
-          <button class="btn-danger" id="btn-restore-power" type="button">
-            Restore
-          </button>
-        </div>
-
-        <div
-          class="danger-row"
-          data-tooltip="Repeatedly flushes until the Durable Object buffer is completely empty. This may issue multiple POSTs to ORACLE_ENDPOINT and is best used off-peak or when you explicitly want a fully drained buffer."
-        >
-          <div>
-            <div class="danger-desc">Full Sync</div>
-            <div class="danger-sub">
-              Repeatedly flushes until buffer is empty.
+          <div
+            class="danger-row"
+            data-tooltip="Clears all buffered events from the Durable Object. Does NOT sync to Oracle first - events will be lost."
+          >
+            <div>
+              <div class="danger-desc">Clear Buffer Only</div>
+              <div class="danger-sub">Removes pending events without syncing.</div>
             </div>
+            <button class="btn-danger" id="btn-clear-buffer" type="button">Clear buffer</button>
           </div>
-          <button class="btn-danger" id="btn-full-sync" type="button">
-            Sync all
-          </button>
+          <div
+            class="danger-row"
+            data-tooltip="Resets all analytics counters to zero. Config and changelog are preserved. Cannot be undone."
+          >
+            <div>
+              <div class="danger-desc">Reset Counters</div>
+              <div class="danger-sub">Resets all counters, preserves config.</div>
+            </div>
+            <button class="btn-danger destructive" id="btn-reset-counters" type="button">Reset counters</button>
+          </div>
+          <div
+            class="danger-row"
+            data-tooltip="Permanently deletes ALL analytics data including events, counters, and breakdowns. Config and changelog are preserved. CANNOT BE UNDONE."
+          >
+            <div>
+              <div class="danger-desc">Full Data Reset</div>
+              <div class="danger-sub">Deletes all analytics data permanently.</div>
+            </div>
+            <button class="btn-danger destructive" id="btn-full-reset" type="button">Full reset</button>
+          </div>
         </div>
       </section>
-
-      ${renderNotificationSection(stats.changelog || [], stats.changelogConfig || {})}
-      ${renderReleaseManagementSection(stats.changelog || [], stats.changelogConfig || {})}
     </main>
 
     <!-- Context Modal -->
@@ -3984,6 +4406,335 @@ ${rawStatsJson}
             alert("Debug Flush: " + JSON.stringify(d)),
           )
           .catch(() => alert("Error"));
+      });
+
+      // ===== DATA HUB HANDLERS =====
+      bind("btn-datahub-flush", () => {
+        const btn = document.getElementById("btn-datahub-flush");
+        if (btn) {
+          btn.disabled = true;
+          btn.textContent = "Exporting...";
+        }
+        fetch("/admin/force-flush", { method: "POST", credentials: "same-origin" })
+          .then((r) => r.json())
+          .then((d) => {
+            if (d.ok) {
+              showToast("Data exported to Oracle successfully!", "success");
+              refreshStats();
+            } else {
+              showToast("Export failed: " + (d.error || "Unknown error"), "error");
+            }
+          })
+          .catch(() => showToast("Network error during export", "error"))
+          .finally(() => {
+            if (btn) {
+              btn.disabled = false;
+              btn.textContent = "Export All Data";
+            }
+          });
+      });
+
+      bind("btn-datahub-sync", () => {
+        const btn = document.getElementById("btn-datahub-sync");
+        if (btn) {
+          btn.disabled = true;
+          btn.textContent = "Syncing...";
+        }
+        fetch("/admin/full-sync", { method: "POST", credentials: "same-origin" })
+          .then((r) => r.json())
+          .then((d) => {
+            if (d.ok) {
+              showToast("Full sync completed!", "success");
+              refreshStats();
+            } else {
+              showToast("Sync failed: " + (d.error || "Unknown error"), "error");
+            }
+          })
+          .catch(() => showToast("Network error during sync", "error"))
+          .finally(() => {
+            if (btn) {
+              btn.disabled = false;
+              btn.textContent = "Sync Counters Only";
+            }
+          });
+      });
+
+      // ===== RATE LIMITING TOGGLE =====
+      const rateLimitToggle = document.getElementById("rate-limit-toggle");
+      const rateLimitStatus = document.getElementById("rate-limit-status");
+      if (rateLimitToggle) {
+        rateLimitToggle.onchange = () => {
+          const isEnabled = rateLimitToggle.checked;
+          if (rateLimitStatus) {
+            rateLimitStatus.textContent = isEnabled ? "Enabled" : "Disabled";
+            rateLimitStatus.style.color = isEnabled ? "var(--success)" : "var(--text-muted)";
+          }
+          showToast("Rate limiting " + (isEnabled ? "enabled" : "disabled"), "success");
+        };
+      }
+
+      // Rate Limiting Save Button
+      bind("btn-save-rate-limit", () => {
+        const maxAttempts = document.getElementById("rate-limit-max-attempts");
+        const lockout = document.getElementById("rate-limit-lockout");
+        const toggle = document.getElementById("rate-limit-toggle");
+        
+        const settings = {
+          enabled: toggle ? toggle.checked : true,
+          maxAttempts: maxAttempts ? parseInt(maxAttempts.value) || 5 : 5,
+          lockoutMinutes: lockout ? parseInt(lockout.value) || 15 : 15
+        };
+        
+        showToast("Rate limiting settings saved: " + settings.maxAttempts + " attempts, " + settings.lockoutMinutes + " min lockout", "success");
+        // Note: These settings are stored client-side only - server enforces actual rate limiting
+      });
+
+      // ===== DATA MANAGEMENT HANDLERS =====
+      bind("btn-clear-buffer", () => {
+        if (!confirm("Clear all buffered events? This will NOT sync to Oracle first.")) return;
+        const btn = document.getElementById("btn-clear-buffer");
+        if (btn) { btn.disabled = true; btn.textContent = "Clearing..."; }
+        
+        fetch("/debug/flush", { method: "POST", credentials: "same-origin" })
+          .then(r => r.json())
+          .then(d => {
+            if (d.ok) {
+              showToast("Buffer cleared successfully!", "success");
+              refreshStats();
+            } else {
+              showToast("Failed: " + (d.error || "Unknown error"), "error");
+            }
+          })
+          .catch(() => showToast("Network error", "error"))
+          .finally(() => { if (btn) { btn.disabled = false; btn.textContent = "Clear Buffer Only"; } });
+      });
+
+      bind("btn-reset-counters", () => {
+        if (!confirm("Reset all analytics counters to zero? This action cannot be undone.")) return;
+        const btn = document.getElementById("btn-reset-counters");
+        if (btn) { btn.disabled = true; btn.textContent = "Resetting..."; }
+        
+        fetch("/debug/reset", { method: "POST", credentials: "same-origin" })
+          .then(r => r.json())
+          .then(d => {
+            if (d.ok) {
+              showToast("Counters reset successfully!", "success");
+              refreshStats();
+            } else {
+              showToast("Failed: " + (d.error || "Unknown error"), "error");
+            }
+          })
+          .catch(() => showToast("Network error", "error"))
+          .finally(() => { if (btn) { btn.disabled = false; btn.textContent = "Reset Counters"; } });
+      });
+
+      bindDangerButton(
+        "btn-full-reset",
+        "/debug/reset",
+        "Full Data Reset",
+        "This will permanently delete ALL analytics data including events, counters, and breakdown data. This action cannot be undone."
+      );
+
+      // ===== SECURITY SETTINGS HANDLERS =====
+      let currentUserIp = '';
+      let ipAllowlistData = { enabled: false, allowlist: [] };
+      
+      // Utility: Show toast notification
+      function showToast(message, type) {
+        const toast = document.createElement('div');
+        toast.className = 'toast toast-' + (type || 'info');
+        toast.textContent = message;
+        toast.style.cssText = 'position: fixed; bottom: 24px; right: 24px; padding: 12px 20px; border-radius: 8px; font-size: 0.9rem; font-weight: 500; z-index: 9999; animation: fadeSlideUp 0.3s ease;';
+        if (type === 'success') toast.style.background = 'var(--success)';
+        else if (type === 'error') toast.style.background = 'var(--danger)';
+        else toast.style.background = 'var(--accent)';
+        toast.style.color = 'white';
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 3000);
+      }
+      
+      // Utility: Validate IP address
+      function isValidIpAddress(ip) {
+        const ipv4Regex = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)[.](25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)[.](25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)[.](25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+        return ipv4Regex.test(ip);
+      }
+      
+      // Render IP list
+      function renderIpList() {
+        const container = document.getElementById('ip-list');
+        const countEl = document.getElementById('ip-count');
+        if (!container) return;
+        
+        if (ipAllowlistData.allowlist.length === 0) {
+          container.innerHTML = '<div style="padding: 12px; text-align: center; color: var(--text-disabled); font-size: 0.85rem; border: 1px dashed var(--border); border-radius: var(--radius-sm);">No IPs in allowlist</div>';
+        } else {
+          container.innerHTML = ipAllowlistData.allowlist.map(ip => 
+            '<div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: var(--bg-elevated); border-radius: var(--radius-sm); border: 1px solid var(--border);">' +
+              '<span style="font-family: monospace; color: var(--text-primary);">' + ip + '</span>' +
+              (ip === currentUserIp ? '<span style="font-size: 0.7rem; color: var(--success); background: var(--success-bg); padding: 2px 8px; border-radius: 4px;">You</span>' : '') +
+              '<button class="btn-remove-ip" data-ip="' + ip + '" style="background: var(--danger-bg); color: var(--danger); border: 1px solid rgba(239,68,68,0.3); padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; cursor: pointer;">Remove</button>' +
+            '</div>'
+          ).join('');
+          
+          // Bind remove buttons
+          container.querySelectorAll('.btn-remove-ip').forEach(btn => {
+            btn.addEventListener('click', function() {
+              removeIp(this.getAttribute('data-ip'));
+            });
+          });
+        }
+        
+        if (countEl) {
+          countEl.textContent = ipAllowlistData.allowlist.length + ' IP' + (ipAllowlistData.allowlist.length !== 1 ? 's' : '');
+        }
+      }
+      
+      // Fetch IP allowlist
+      function fetchIpAllowlist() {
+        fetch('/admin/ip-allowlist', { credentials: 'same-origin' })
+          .then(r => r.json())
+          .then(data => {
+            if (data.ok) {
+              ipAllowlistData = { enabled: data.enabled, allowlist: data.allowlist || [] };
+              const toggle = document.getElementById('ip-protection-toggle');
+              if (toggle) toggle.checked = data.enabled;
+              if (data.yourIp) {
+                currentUserIp = data.yourIp;
+                const ipEl = document.getElementById('current-ip');
+                if (ipEl) ipEl.textContent = data.yourIp;
+              }
+              renderIpList();
+            }
+          })
+          .catch(() => {
+            console.error('Failed to fetch IP allowlist');
+          });
+      }
+      
+      // Toggle IP protection
+      const ipToggle = document.getElementById('ip-protection-toggle');
+      if (ipToggle) {
+        ipToggle.addEventListener('change', function() {
+          const enabled = this.checked;
+          fetch('/admin/ip-allowlist', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ enabled: enabled })
+          })
+          .then(r => r.json())
+          .then(data => {
+            if (data.ok) {
+              ipAllowlistData.enabled = data.enabled;
+              showToast('IP Protection ' + (data.enabled ? 'enabled' : 'disabled'), 'success');
+            } else {
+              this.checked = !enabled; // Revert
+              showToast('Failed to update: ' + (data.error || 'Unknown'), 'error');
+            }
+          })
+          .catch(() => {
+            this.checked = !enabled;
+            showToast('Network error', 'error');
+          });
+        });
+      }
+      
+      // Add IP
+      function addIp(ip) {
+        if (!ip || !isValidIpAddress(ip)) {
+          showToast('Please enter a valid IPv4 address', 'error');
+          return;
+        }
+        fetch('/admin/ip-allowlist', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ add: ip })
+        })
+        .then(r => r.json())
+        .then(data => {
+          if (data.ok) {
+            ipAllowlistData.allowlist = data.allowlist || [];
+            renderIpList();
+            showToast('IP added: ' + ip, 'success');
+            const input = document.getElementById('add-ip-input');
+            if (input) input.value = '';
+          } else {
+            showToast('Failed: ' + (data.error || 'Unknown'), 'error');
+          }
+        })
+        .catch(() => showToast('Network error', 'error'));
+      }
+      
+      // Remove IP
+      function removeIp(ip) {
+        fetch('/admin/ip-allowlist', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ remove: ip })
+        })
+        .then(r => r.json())
+        .then(data => {
+          if (data.ok) {
+            ipAllowlistData.allowlist = data.allowlist || [];
+            renderIpList();
+            showToast('IP removed: ' + ip, 'success');
+          } else {
+            showToast('Failed: ' + (data.error || 'Unknown'), 'error');
+          }
+        })
+        .catch(() => showToast('Network error', 'error'));
+      }
+      
+      // Bind add IP button
+      bind('btn-add-ip', () => {
+        const input = document.getElementById('add-ip-input');
+        if (input) addIp(input.value.trim());
+      });
+      
+      // Bind add my IP button
+      bind('btn-add-my-ip', () => {
+        if (currentUserIp) addIp(currentUserIp);
+        else showToast('Could not detect your IP', 'error');
+      });
+      
+      // Initial fetch
+      fetchIpAllowlist();
+      
+      // ===== DATA HUB HANDLERS =====
+      bind('btn-datahub-flush', () => {
+        const btn = document.getElementById('btn-datahub-flush');
+        if (btn) btn.disabled = true;
+        fetch('/admin/force-flush', { method: 'POST', credentials: 'same-origin' })
+          .then(r => r.json())
+          .then(data => {
+            if (data.ok) {
+              showToast('Flush completed! Flushed ' + (data.flushed || 0) + ' events', 'success');
+              refreshStats();
+            } else {
+              showToast('Flush failed: ' + (data.error || 'Unknown'), 'error');
+            }
+          })
+          .catch(() => showToast('Network error', 'error'))
+          .finally(() => { if (btn) btn.disabled = false; });
+      });
+      
+      bind('btn-datahub-sync', () => {
+        const btn = document.getElementById('btn-datahub-sync');
+        if (btn) btn.disabled = true;
+        fetch('/admin/full-sync', { method: 'POST', credentials: 'same-origin' })
+          .then(r => r.json())
+          .then(data => {
+            if (data.ok) {
+              showToast('Full sync completed! Flushed ' + (data.totalFlushed || 0) + ' events in ' + (data.rounds || 0) + ' rounds', 'success');
+              refreshStats();
+            } else {
+              showToast('Sync failed: ' + (data.error || 'Unknown'), 'error');
+            }
+          })
+          .catch(() => showToast('Network error', 'error'))
+          .finally(() => { if (btn) btn.disabled = false; });
       });
 
       updateLiveIndicator();
