@@ -111,6 +111,7 @@ export interface StatsResponse {
   totalDownloads: number;
   totalSuccess: number;
   totalFail: number;
+  totalCancelled?: number;
   pendingEvents: number;
 
   lastEventAt: number | null;
@@ -148,6 +149,7 @@ export interface ConfigResponse {
 export interface Env {
   DOWNLOADS_DO: DurableObjectNamespace;
   DO_SHARED_SECRET: string;
+  DANGER_PASSWORD: string;
   ORACLE_ENDPOINT: string;
   MAX_BATCH_EVENTS: string;
 }

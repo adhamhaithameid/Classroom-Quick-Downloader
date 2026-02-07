@@ -211,6 +211,7 @@ Every download attempt in the [Extension](./extension/) triggers an analytics ev
 * Persists events in memory (survives Worker restarts).
 * Aggregates counters: by browser, by OS, by country, by file type.
 * Calculates "Top" stats: most common browser, most active country, etc.
+* Manages security state: IP allowlists and login rate limits.
 
 4. **🚀 Flush (Edge → Backend)** — When the buffer exceeds `MAX_BATCH_EVENTS` or an alarm fires, the DO sends a pre-aggregated JSON payload to the [Oracle Backend](./oracle-backend/).
 5. **💾 Store (Backend)** — The [Backend](./oracle-backend/) receives the batch, deduplicates by `batchId`, and stores:
@@ -223,6 +224,23 @@ Every download attempt in the [Extension](./extension/) triggers an analytics ev
 
 * Fetches the current summary from the local API.
 * Appends a row to Google Sheets with all dimension breakdowns.
+
+
+---
+
+## 🛡️ Security Architecture
+
+CQD employs a defense-in-depth strategy to protect analytics integrity and admin interfaces.
+
+### 🔐 Session-Based Authentication
+* **HttpOnly Cookies**: Session tokens are stored in `HttpOnly`, `Secure`, `SameSite=Strict` cookies, preventing XSS access.
+* **HMAC-SHA256 Signatures**: Tokens are signed with a high-entropy secret, preventing tampering.
+* **Short-Lived Sessions**: Sessions expire automatically to minimize exposure.
+
+### 🏰 Edge-Side Verification
+* **IP Allowlisting**: Critical administrative actions are restricted to a dynamic list of allowed IPs, managed via the Durable Object state.
+* **Rate Limiting**: Login attempts are rate-limited at the edge to prevent brute-force attacks.
+* **Admin Proxy Pattern**: The browser *never* sees the `DO_SHARED_SECRET`. The Cloudflare Worker validates the user's session and "injects" the secret into requests before forwarding them to the Durable Object.
 
 ---
 

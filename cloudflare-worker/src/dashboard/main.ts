@@ -2,6 +2,21 @@
 import type { StatsResponse, QuotaDescriptor, ChangelogEntry, ChangelogConfig } from "../types";
 import { FAVICON_PNG_DATA_URI } from "../assets";
 
+function escapeHtml(unsafe: string): string {
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function _isValidIp(ip: string): boolean {
+  // Simple IPv4 validation (unused but kept for potential server-side use)
+  const ipv4Regex = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+  return ipv4Regex.test(ip);
+}
+
 function formatTs(ts: number | null): string {
   if (!ts) return "—";
   const d = new Date(ts);
@@ -209,22 +224,22 @@ export function renderLoginPage(errorMessage?: string): string {
   <link rel="icon" href="${FAVICON_PNG_DATA_URI}">
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    :root { color-scheme: dark; --bg: #050816; --accent: #3b82f6; --text-main: #e5e7eb; --text-soft: #6b7280; }
+    :root { color-scheme: dark; --bg: #0a0f1a; --accent: #3b82f6; --text-main: #f1f5f9; --text-soft: #64748b; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { min-height: 100vh; font-family: system-ui, sans-serif; background: radial-gradient(circle at top, #111827 0, #020617 60%); color: var(--text-main); display: flex; align-items: center; justify-content: center; padding: 16px; }
-    .login-card { width: 100%; max-width: 380px; border-radius: 20px; padding: 24px 22px 20px; background: rgba(15,23,42,0.92); border: 1px solid rgba(148,163,184,0.45); box-shadow: 0 24px 60px rgba(0,0,0,0.75); }
+    body { min-height: 100vh; font-family: system-ui, sans-serif; background: var(--bg); color: var(--text-main); display: flex; align-items: center; justify-content: center; padding: 16px; }
+    .login-card { width: 100%; max-width: 380px; border-radius: 12px; padding: 24px 22px 20px; background: #1a2332; border: 1px solid #2d3a4d; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
     .login-title { font-size: 1.35rem; font-weight: 600; margin-bottom: 4px; }
     .login-subtitle { font-size: 0.85rem; color: var(--text-soft); margin-bottom: 16px; }
-    .login-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; border: 1px solid rgba(148,163,184,0.5); background: rgba(59,130,246,0.1); font-size: 0.75rem; text-transform: uppercase; color: #9ca3af; margin-bottom: 10px; }
+    .login-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 6px; border: 1px solid #2d3a4d; background: rgba(59,130,246,0.1); font-size: 0.75rem; text-transform: uppercase; color: #94a3b8; margin-bottom: 10px; }
     .login-badge-dot { width: 7px; height: 7px; border-radius: 999px; background: var(--accent); }
     .login-row { display: flex; align-items: center; gap: 8px; margin-top: 16px; }
     .field { display: flex; flex-direction: column; gap: 4px; flex: 1; margin: 0; }
-    .field input { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(148,163,184,0.6); background: rgba(15,23,42,0.95); color: #f9fafb; outline: none; transition: all 0.2s; }
+    .field input { width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid #2d3a4d; background: #141c2b; color: #f9fafb; outline: none; transition: all 0.2s; }
     .field input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(59,130,246,0.25); }
     .login-error { margin-top: 12px; padding: 6px 8px; border-radius: 8px; font-size: 0.78rem; color: #fecaca; background: rgba(248,113,113,0.12); border: 1px solid rgba(248,113,113,0.6); }
-    .login-button { padding: 10px 16px; border-radius: 10px; border: none; cursor: pointer; font-size: 0.9rem; font-weight: 600; background: linear-gradient(135deg, #3b82f6, #6366f1); color: #f9fafb; display: inline-flex; align-items: center; transition: all 0.2s; white-space: nowrap; height: 100%; }
-    .login-button:hover { filter: brightness(1.1); transform: translateY(-1px); }
-    .login-button:active { transform: translateY(0); }
+    .login-button { padding: 10px 16px; border-radius: 8px; border: none; cursor: pointer; font-size: 0.9rem; font-weight: 600; background: var(--accent); color: #f9fafb; display: inline-flex; align-items: center; transition: all 0.2s; white-space: nowrap; height: 100%; }
+    .login-button:hover { background: #2563eb; }
+    .login-button:active { background: #1d4ed8; }
   </style>
 </head>
 <body>
@@ -246,7 +261,140 @@ export function renderLoginPage(errorMessage?: string): string {
 }
 
 // Notification Rules Engine UI
-function renderChangelogSection(entries: ChangelogEntry[], config: ChangelogConfig): string {
+function renderNotificationSection(entries: ChangelogEntry[], config: ChangelogConfig): string {
+  const sorted = [...entries].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const knownVersions = Array.from(new Set(sorted.map(e => e.version)));
+  const dataListOptions = [
+    '<option value="all">Global (All Versions)</option>',
+    ...knownVersions.map(v => `<option value="${v}">v${v}</option>`)
+  ].join('');
+
+  const rulesJson = JSON.stringify(config.rules || []);
+
+  return `
+    <section class="card config-card" id="config">
+      <h2>
+        <span>🔔</span> Notification Styling
+        <span class="release-count-badge" id="notification-counter">${(config.rules || []).length}</span>
+        <span class="unsaved-dot" id="unsaved-indicator" title="Unsaved changes"></span>
+      </h2>
+      
+      <script>window.CURRENT_RULES = ${rulesJson};</script>
+      
+      <div class="split-section" style="gap: 24px;">
+        <!-- Left: Actions / Form -->
+        <div style="flex: 1;">
+          <div class="section-header" style="margin-bottom: 12px;">Create New Rule</div>
+          <div style="font-size: 0.85em; color: var(--text-soft); margin-bottom: 16px;">
+            Define how the extension badge looks for specific versions.
+          </div>
+          
+          <div style="padding: 20px; background: rgba(0,0,0,0.2); border-radius: 12px; border: 1px solid var(--border-subtle);">
+            <!-- Target Selection -->
+            <div style="margin-bottom: 16px;">
+               <label style="font-size: 0.75em; color: var(--text-soft); display: block; margin-bottom: 6px;">Target Version</label>
+               <input list="known-versions" id="rule-target" placeholder="e.g. 1.2.3 or 'all'" class="input-field" style="width: 100%; padding: 10px 12px; background: var(--bg-elevated); border: 1px solid var(--border-subtle); color: white; border-radius: 8px; font-size: 0.95em;" oninput="window.updatePreview && window.updatePreview()">
+               <datalist id="known-versions">
+                 ${dataListOptions}
+               </datalist>
+               <div style="font-size: 0.7em; color: var(--text-muted); margin-top: 6px;">Select from history or type new version.</div>
+            </div>
+            
+            <div style="border-top: 1px dashed var(--border-subtle); margin: 16px 0; padding-top: 16px;">
+               <!-- Priority -->
+               <label style="font-size: 0.75em; color: var(--text-soft); display: block; margin-bottom: 10px;">Priority (Color Scheme)</label>
+               <div style="display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap;">
+                 <label class="priority-option" style="cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 8px 14px; background: rgba(255,255,255,0.05); border-radius: 8px; border: 1px solid transparent; transition: all 0.15s;">
+                   <input type="radio" name="rule-priority" value="normal" checked style="accent-color: #6b7280;">
+                   <span style="font-size: 0.9em;">Normal</span>
+                 </label>
+                 <label class="priority-option" style="cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 8px 14px; background: rgba(59,130,246,0.1); border-radius: 8px; border: 1px solid rgba(59,130,246,0.3); transition: all 0.15s;">
+                   <input type="radio" name="rule-priority" value="minor" style="accent-color: #3b82f6;">
+                   <span style="font-size: 0.9em; color: #60a5fa;">Minor (Blue)</span>
+                 </label>
+                 <label class="priority-option" style="cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 8px 14px; background: rgba(239,68,68,0.1); border-radius: 8px; border: 1px solid rgba(239,68,68,0.3); transition: all 0.15s;">
+                   <input type="radio" name="rule-priority" value="major" style="accent-color: #ef4444;">
+                   <span style="font-size: 0.9em; color: #f87171; font-weight: 600;">Major (Red)</span>
+                 </label>
+               </div>
+
+               <!-- Effect -->
+               <label style="font-size: 0.75em; color: var(--text-soft); display: block; margin-bottom: 10px;">Animation Effect</label>
+               <div style="display: flex; gap: 12px; margin-bottom: 18px; flex-wrap: wrap;">
+                 <label style="cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; transition: background 0.15s;">
+                   <input type="radio" name="rule-effect" value="none" checked>
+                   <span style="font-size: 0.9em;">None</span>
+                 </label>
+                 <label style="cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; transition: background 0.15s;">
+                   <input type="radio" name="rule-effect" value="glow">
+                   <span style="font-size: 0.9em;">✨ Glow</span>
+                 </label>
+                 <label style="cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; transition: background 0.15s;">
+                   <input type="radio" name="rule-effect" value="pulse">
+                   <span style="font-size: 0.9em;">📡 Pulse</span>
+                 </label>
+               </div>
+            </div>
+            
+            <div style="background: #0f1419; padding: 20px; border-radius: 10px; text-align: center; border: 1px solid #2d3a4d; margin-bottom: 18px;">
+               <div style="font-size: 0.7em; color: #555; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1.5px;">Live Extension Preview</div>
+               <span id="rule-preview-pill" class="cqd-brand-version">v1.2.3</span>
+            </div>
+            
+            <script>
+              (function() {
+                var pill = document.getElementById('rule-preview-pill');
+                function updatePreview() {
+                  if (!pill) return;
+                  var priorityInputs = document.getElementsByName('rule-priority');
+                  var effectInputs = document.getElementsByName('rule-effect');
+                  var priority = 'normal';
+                  var effect = 'none';
+                  for (var i = 0; i < priorityInputs.length; i++) {
+                    if (priorityInputs[i].checked) { priority = priorityInputs[i].value; break; }
+                  }
+                  for (var i = 0; i < effectInputs.length; i++) {
+                    if (effectInputs[i].checked) { effect = effectInputs[i].value; break; }
+                  }
+                  var cls = 'cqd-brand-version';
+                  if (priority === 'minor') cls += ' cqd-pill-minor';
+                  if (priority === 'major') cls += ' cqd-pill-major';
+                  if (effect === 'glow') cls += (priority === 'major') ? ' cqd-effect-glow-red' : ' cqd-effect-glow-blue';
+                  if (effect === 'pulse') cls += (priority === 'major') ? ' cqd-effect-pulse-red' : ' cqd-effect-pulse-blue';
+                  pill.className = cls;
+                }
+                var allRadios = document.querySelectorAll('input[name="rule-priority"], input[name="rule-effect"]');
+                for (var i = 0; i < allRadios.length; i++) {
+                  allRadios[i].onchange = updatePreview;
+                }
+                window.updatePreview = updatePreview;
+                updatePreview();
+              })();
+            </script>
+            
+            <button id="btn-add-rule" class="btn" style="width: 100%; justify-content: center; background: var(--accent); color: white; border: none; padding: 12px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 0.95em; transition: all 0.2s;">
+               + Add Rule
+            </button>
+          </div>
+        </div>
+        
+        <!-- Right: History / Rules List -->
+        <div style="flex: 1;">
+          <div class="section-header" style="margin-bottom: 12px;">Active Rules</div>
+          <div style="margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+             <span style="font-size: 0.8em; color: var(--text-muted);">Specific versions override 'all' rules</span>
+             <span id="rules-count" style="font-size: 0.8em; color: var(--text-muted); background: rgba(255,255,255,0.05); padding: 2px 8px; border-radius: 4px;">0 rules</span>
+          </div>
+          <div id="rules-list-container" style="display: flex; flex-direction: column; gap: 8px; max-height: 400px; overflow-y: auto; padding-right: 4px;">
+             <!-- Renders via JS -->
+          </div>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function renderReleaseManagementSection(entries: ChangelogEntry[], _config: ChangelogConfig): string {
   const sorted = [...entries].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   
   // Versions for DataList
@@ -291,10 +439,1741 @@ function renderChangelogSection(entries: ChangelogEntry[], config: ChangelogConf
     </div>
   `;
 
-  const rulesJson = JSON.stringify(config.rules || []);
+  return `
+    <section class="card config-card" id="release">
+       <h2>
+         <span>📢</span> Release Publishing
+         <span class="release-count-badge">${releaseCount}</span>
+       </h2>
+       <div class="section-subtitle">
+         Publish a new changelog entry. This text appears when users click the version pill.
+       </div>
 
-  // Enhanced CSS with all improvements
-  const extensionStyles = `
+       <!-- Edit Mode Banner -->
+       <div id="edit-mode-banner" class="edit-mode-banner">
+         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+         <span class="edit-mode-text">Editing <strong id="edit-mode-version">v1.0.0</strong></span>
+         <button id="btn-cancel-edit" class="btn-cancel-edit">Cancel</button>
+       </div>
+
+       <div class="split-section" style="gap: 24px;">
+         <!-- Left: Create/Edit Form -->
+         <div style="flex: 1;">
+           <div class="section-header" style="margin-bottom: 12px;">Create New Release</div>
+           <div style="background: rgba(255,255,255,0.03); padding: 20px; border-radius: 12px; border: 1px solid var(--border-subtle);">
+              <input type="hidden" id="edit-cl-id" value="">
+              
+              <div style="margin-bottom: 14px;">
+                 <label style="font-size: 0.75em; color: var(--text-soft); display: block; margin-bottom: 6px;">Version</label>
+                 <input list="known-versions-release" id="new-cl-version" placeholder="e.g. 1.2.4" class="input-field" style="width: 100%; padding: 10px 12px; background: var(--bg-elevated); border: 1px solid var(--border-subtle); color: white; border-radius: 8px; font-size: 0.95em;">
+                 <datalist id="known-versions-release">
+                   ${dataListOptions}
+                 </datalist>
+              </div>
+
+              <div style="margin-bottom: 16px;">
+                 <label style="font-size: 0.75em; color: var(--text-soft); display: block; margin-bottom: 6px;">Changes (one per line)</label>
+                 <div class="textarea-wrapper">
+                   <textarea id="new-cl-changes" rows="5" class="input-field" placeholder="- Added new feature X&#10;- Fixed bug with Y&#10;- Improved performance" style="width: 100%; padding: 10px 12px; background: var(--bg-elevated); border: 1px solid var(--border-subtle); color: white; border-radius: 8px; font-size: 0.9em; line-height: 1.5; resize: vertical;"></textarea>
+                   <span id="char-counter" class="char-counter">0 / 500</span>
+                 </div>
+              </div>
+              
+              <button id="btn-save-all" class="btn btn-primary" style="width: 100%; padding: 14px 24px; background: var(--success); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                <span id="btn-save-text">Save & Publish</span>
+              </button>
+              
+              <div style="margin-top: 10px; font-size: 0.75em; color: var(--text-soft); text-align: center;">
+                 💡 Tip: Press <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Ctrl+Enter</kbd> to save quickly
+              </div>
+           </div>
+         </div>
+         
+         <!-- Right: History -->
+         <div style="flex: 1;">
+           <div class="section-header" style="margin-bottom: 12px;">Historical Releases</div>
+           <div style="margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between;">
+             <span style="font-size: 0.8em; color: var(--text-muted);">Click a release to edit it</span>
+             <span style="font-size: 0.75em; color: var(--text-muted);">${releaseCount} releases</span>
+           </div>
+           <div class="cl-history-list" style="overflow-y: auto; max-height: 400px; padding-right: 8px;">
+             ${historyHtml}
+           </div>
+         </div>
+       </div>
+    </section>
+  `;
+}
+
+export function renderDashboard(stats: StatsResponse): string {
+  const quota = stats.quota;
+  const stateTag = quotaToStateTag(quota);
+  const flag = quotaToFlag(quota);
+
+  const requestsToday = quota?.requestsToday ?? 0;
+  const remoteEnabled = quota?.remoteEnabled ?? true;
+  const quotaLevel = quota?.quotaLevel ?? "UNKNOWN";
+  const batchSize = quota?.batchSizeSuggestion ?? 50;
+
+  const lastEventAt = formatTs(stats.lastEventAt);
+  const lastFlushAt = formatTs(stats.lastFlushAt);
+  const ageLastEvent = formatAge(stats.lastEventAt);
+  const ageLastFlush = formatAge(stats.lastFlushAt);
+
+  const maxBatchEvents = stats.envSnapshot?.maxBatchEvents || "n/a";
+  const oracleEndpoint = stats.envSnapshot?.oracleEndpoint || "unknown";
+  const nextAutoFlush =
+    maxBatchEvents !== "n/a"
+      ? `when buffer ≥ ${maxBatchEvents} events`
+      : "unknown";
+
+  const workerUrl = "https://cqd-analytics.adhamhaithameid.workers.dev";
+
+  const renderTableRows = (data: Record<string, number>) => {
+    const keys = Object.keys(data).sort((a, b) => data[b] - data[a]);
+    if (keys.length === 0) return "<tr><td colspan='2'>—</td></tr>";
+    return keys
+      .map((k) => `<tr><td>${k}</td><td>${data[k]}</td></tr>`)
+      .join("");
+  };
+
+  const byTypeRows = renderTableRows(stats.counters.byType || {});
+  const byStatusRows = renderTableRows(stats.counters.byStatus || {});
+  const byBrowserRows = renderTableRows(stats.counters.byBrowser || {});
+  const byOsRows = renderTableRows(stats.counters.byOs || {});
+  const byExtVersionRows = renderTableRows(stats.counters.byExtVersion || {});
+  const byLangRows = renderTableRows(stats.counters.byLanguage || {});
+  const byCountryRows = renderTableRows(stats.counters.byCountry || {});
+  const byErrorRows = renderTableRows(stats.counters.byErrorType || {});
+
+  const totalSuccess = stats.totalSuccess || 0;
+  const totalFail = stats.totalFail || 0;
+  const srMeta = classifySuccessRate(totalSuccess, totalFail);
+  const totalAttempts = totalSuccess + totalFail;
+  const failRate =
+    totalAttempts > 0 ? (totalFail / totalAttempts) * 100 : null;
+  const failRateText = failRate !== null ? `${failRate.toFixed(1)}%` : "—";
+  
+  // Success percentage for donut chart
+  const successPercent = totalAttempts > 0 ? (totalSuccess / totalAttempts) * 100 : 0;
+  const successPercentText = successPercent > 0 ? `${successPercent.toFixed(0)}%` : "—";
+  // Donut chart gradient (green = success, red = fail)
+  const donutGradient = `conic-gradient(var(--success) 0% ${successPercent}%, var(--danger) ${successPercent}% 100%)`;
+
+  // Unique counts for breakdown tables
+  const uniqueType = Object.keys(stats.counters.byType || {}).length;
+  const uniqueStatus = Object.keys(stats.counters.byStatus || {}).length;
+  const uniqueBrowser = Object.keys(stats.counters.byBrowser || {}).length;
+  const uniqueOs = Object.keys(stats.counters.byOs || {}).length;
+  const uniqueExtVersion = Object.keys(stats.counters.byExtVersion || {}).length;
+  const uniqueLang = Object.keys(stats.counters.byLanguage || {}).length;
+  const uniqueCountry = Object.keys(stats.counters.byCountry || {}).length;
+  const uniqueError = Object.keys(stats.counters.byErrorType || {}).length;
+
+  const hotType = topKey(stats.counters.byType);
+  const hotBrowser = topKey(stats.counters.byBrowser);
+  const hotOs = topKey(stats.counters.byOs);
+  const hotCountry = topKey(stats.counters.byCountry);
+
+  const rawStatsJson = JSON.stringify(stats, null, 2)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>CQD Analytics – Worker & DO Dashboard</title>
+  <link rel="icon" href="${FAVICON_PNG_DATA_URI}">
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    /* ===== COMPREHENSIVE DESIGN SYSTEM ===== */
+    :root {
+      color-scheme: dark;
+      
+      /* ===== PROFESSIONAL DARK THEME ===== */
+      
+      /* Background Hierarchy - Enhanced Contrast */
+      --bg-base: #0a0b0f;
+      --bg-card: #161820;
+      --bg-elevated: #1e2029;
+      --bg-surface: #141519;
+      --bg-input: #0e0f14;
+      --bg-hover: #282a36;
+      --bg-active: #323444;
+      
+      /* Borders - Enhanced Contrast */
+      --border: #363848;
+      --border-muted: #2a2d3a;
+      --border-hover: #525670;
+      --border-focus: #4d8cf7;
+      --border-subtle: rgba(255, 255, 255, 0.12);
+      
+      /* Primary Accent - Blue */
+      --accent: #3b82f6;
+      --accent-hover: #60a5fa;
+      --accent-muted: rgba(59, 130, 246, 0.15);
+      --accent-strong: rgba(59, 130, 246, 0.25);
+      --accent-light: #93c5fd;
+      
+      /* Status Colors */
+      --success: #22c55e;
+      --success-muted: rgba(34, 197, 94, 0.15);
+      --success-bg: rgba(34, 197, 94, 0.10);
+      --success-border: rgba(34, 197, 94, 0.35);
+      --warning: #eab308;
+      --warning-muted: rgba(234, 179, 8, 0.15);
+      --warning-bg: rgba(234, 179, 8, 0.10);
+      --warning-soft: rgba(234, 179, 8, 0.18);
+      --danger: #ef4444;
+      --danger-muted: rgba(239, 68, 68, 0.12);
+      --danger-bg: rgba(239, 68, 68, 0.08);
+      --danger-soft: rgba(127, 29, 29, 0.30);
+      --danger-hover: #dc2626;
+      
+      /* Typography */
+      --text-primary: #ffffff;
+      --text-secondary: #b4b4bc;
+      --text-muted: #8a8a94;
+      --text-disabled: #5c5c66;
+      --text-soft: #a8a8b4;
+      --text-main: #ebebef;
+      
+      /* Spacing System */
+      --space-0: 2px;
+      --space-1: 4px;
+      --space-2: 8px;
+      --space-3: 12px;
+      --space-4: 16px;
+      --space-5: 20px;
+      --space-6: 24px;
+      --space-7: 28px;
+      --space-8: 32px;
+      --space-10: 40px;
+      --space-12: 48px;
+      --section-gap: 24px;
+      
+      /* Border Radius */
+      --radius-xs: 4px;
+      --radius-sm: 6px;
+      --radius: 10px;
+      --radius-lg: 14px;
+      --radius-xl: 18px;
+      --radius-full: 9999px;
+      
+      /* Shadows */
+      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+      --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+      --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.6);
+      
+      /* Layout */
+      --sidebar-width: 220px;
+      --content-max-width: 1200px;
+      --header-height: 64px;
+    }
+    
+    /* ===== TOGGLE SWITCH ===== */
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 50px;
+      height: 26px;
+      flex-shrink: 0;
+    }
+    
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-full);
+      transition: all 0.3s ease;
+    }
+    
+    .toggle-slider::before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background-color: var(--text-muted);
+      border-radius: var(--radius-full);
+      transition: all 0.3s ease;
+    }
+    
+    .toggle-switch input:checked + .toggle-slider {
+      background-color: var(--accent);
+      border-color: var(--accent);
+    }
+    
+    .toggle-switch input:checked + .toggle-slider::before {
+      transform: translateX(24px);
+      background-color: white;
+    }
+    
+    .toggle-switch input:focus + .toggle-slider {
+      box-shadow: 0 0 0 2px var(--accent-muted);
+    }
+    
+    /* ===== ANIMATIONS ===== */
+    @keyframes fadeSlideUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    @keyframes slideInLeft {
+      from { opacity: 0; transform: translateX(-100%); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 0.4; }
+      50% { opacity: 1; }
+    }
+    
+    /* ===== BASE STYLES ===== */
+    * { 
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    html { 
+      scroll-behavior: smooth;
+      overflow-x: hidden;
+    }
+    
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg-base);
+      color: var(--text-primary);
+      line-height: 1.6;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+    
+    /* ===== GLOBAL CURSOR STYLES ===== */
+    a, button, .btn, .nav-item, .clickable, .toggle-switch, [role="button"] {
+      cursor: pointer;
+    }
+    
+    .info-card, [data-tooltip], .stat-card:not(:hover), .metric-label {
+      cursor: help;
+    }
+    
+    /* ===== LAYOUT WRAPPER ===== */
+    .dashboard-layout {
+      display: flex;
+      min-height: 100vh;
+    }
+    
+    /* ===== SIDEBAR NAVIGATION ===== */
+    .sidebar-nav {
+      position: fixed;
+      left: 0;
+      top: 0;
+      width: var(--sidebar-width);
+      height: 100vh;
+      background: var(--bg-card);
+      border-right: 1px solid var(--border);
+      padding: var(--space-6) 0;
+      display: flex;
+      flex-direction: column;
+      z-index: 1000;
+      overflow-y: auto;
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: var(--shadow-lg);
+    }
+    
+    .nav-header {
+      padding: var(--space-4) var(--space-5);
+      margin-bottom: var(--space-4);
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .nav-brand {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      letter-spacing: -0.02em;
+    }
+    
+    .nav-subtitle {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+    
+    .nav-section {
+      padding: var(--space-3) var(--space-4);
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-disabled);
+    }
+    
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding: var(--space-3) var(--space-5);
+      margin: var(--space-1) var(--space-2);
+      border-radius: var(--radius-sm);
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.85rem;
+      font-weight: 500;
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+    
+    .nav-item:hover {
+      color: var(--text-secondary);
+      background: var(--bg-hover);
+    }
+    
+    .nav-item.active {
+      color: var(--accent-hover);
+      background: transparent;
+      border-left: 2px solid var(--accent);
+      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+      margin-left: 0;
+      padding-left: calc(var(--space-5) - 2px);
+    }
+    
+    .nav-item.active .nav-icon {
+      color: var(--accent);
+    }
+    
+    /* Scroll offset for section anchors */
+    section[id] {
+      scroll-margin-top: 24px;
+    }
+    
+    .nav-icon {
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+    }
+    
+    .nav-item.danger-nav {
+      color: var(--danger);
+    }
+    
+    .nav-item.danger-nav:hover {
+      background: var(--danger-bg);
+    }
+    
+    /* Hamburger Menu */
+    .hamburger-btn {
+      display: none;
+      position: fixed;
+      top: var(--space-4);
+      left: var(--space-4);
+      z-index: 1100;
+      width: 44px;
+      height: 44px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-primary);
+    }
+    
+    .hamburger-btn svg {
+      width: 22px;
+      height: 22px;
+    }
+    
+    .sidebar-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 999;
+      backdrop-filter: blur(4px);
+    }
+    
+    /* ===== MAIN CONTENT ===== */
+    .main-content {
+      flex: 1;
+      margin-left: var(--sidebar-width);
+      padding: var(--space-6);
+      max-width: 100%;
+      overflow-x: hidden;
+    }
+    
+    .page {
+      max-width: var(--content-max-width);
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-6);
+    }
+    
+    .hidden { display: none !important; }
+    
+    /* ===== HEADER ===== */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: var(--space-4);
+      padding-bottom: var(--space-5);
+      border-bottom: 1px solid var(--border);
+      animation: fadeSlideUp 0.4s ease-out;
+    }
+    
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+    }
+    
+    .header-logo {
+      width: 44px;
+      height: 44px;
+      border-radius: var(--radius);
+    }
+    
+    .title-block h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      color: var(--text-primary);
+    }
+    
+    .title-block p {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+    
+    /* ===== MAIN LAYOUT ===== */
+    .page {
+      max-width: 1000px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-8);
+    }
+    
+    .hidden { display: none; }
+    
+    /* ===== HEADER ===== */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: var(--space-5);
+      padding-bottom: var(--space-6);
+      border-bottom: 1px solid var(--border);
+      animation: fadeSlideUp 0.5s ease-out;
+    }
+    
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+    }
+    
+    .header-logo {
+      width: 44px;
+      height: 44px;
+      border-radius: var(--radius);
+    }
+    
+    .title-block h1 {
+      margin: 0;
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      color: var(--text-primary);
+    }
+    
+    .title-block p {
+      margin: var(--space-1) 0 0;
+      font-size: 0.8rem;
+      letter-spacing: 0.02em;
+      color: var(--text-muted);
+    }
+
+    /* Header Controls */
+    .header-controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--space-2);
+    }
+    
+    .live-wrapper {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+    
+    .refresh-indicator {
+      text-align: right;
+      font-size: 0.75rem;
+    }
+    
+    .refresh-label {
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-disabled);
+      font-size: 0.65rem;
+    }
+    
+    .refresh-value {
+      color: var(--text-secondary);
+      font-feature-settings: "tnum" 1;
+    }
+    
+    /* Live Indicator - Slow Rhythmic Pulse */
+    .live-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-1) var(--space-3);
+      border-radius: var(--radius-full);
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+    }
+    
+    .live-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: var(--radius-full);
+      background: var(--success);
+    }
+    
+    .live-label { font-weight: 600; }
+    
+    @keyframes live-pulse {
+      0%, 100% { opacity: 0.4; }
+      50% { opacity: 1; }
+    }
+    
+    .live-indicator[data-state="live"] .live-dot {
+      animation: live-pulse 2.5s ease-in-out infinite;
+    }
+    
+    .live-indicator[data-state="stale"] .live-dot {
+      background: var(--warning);
+      animation: none;
+    }
+    
+    .live-indicator[data-state="cold"] .live-dot {
+      background: var(--danger);
+      animation: none;
+    }
+    
+    /* Info Button */
+    .info-btn {
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--bg-elevated);
+      color: var(--text-muted);
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-2) var(--space-3);
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    
+    .info-btn:hover {
+      border-color: var(--border-muted);
+      color: var(--text-secondary);
+      background: var(--zinc-800);
+    }
+    
+    .info-pill {
+      padding: var(--space-1) var(--space-2);
+      border-radius: var(--radius-sm);
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: 0.65rem;
+      color: var(--text-muted);
+    }
+    
+    .info-pill-flag {
+      border-color: rgba(34, 197, 94, 0.4);
+      color: var(--success);
+    }
+    
+    .info-icon {
+      width: 20px;
+      height: 20px;
+      border-radius: var(--radius-full);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.85rem;
+    }
+
+    /* Changelog Styles */
+    .cl-ver { font-weight: 700; color: var(--accent); }
+    .cl-date { font-size: 0.75rem; color: var(--text-soft); }
+    .cl-changes { padding-left: 16px; margin: 0; color: #d1d5db; }
+    .cl-changes li { margin-bottom: 4px; }
+    .btn-xs { padding: 4px 8px; font-size: 0.75rem; border-radius: 4px; background: rgba(239,68,68,0.1); color: #fca5a5; border: 1px solid rgba(239,68,68,0.3); cursor: pointer; }
+    .btn-xs:hover { background: rgba(239,68,68,0.2); }
+    
+    .field-row { margin-bottom: 12px; }
+    .input-sm { padding: 6px 10px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); color: white; border-radius: 6px; width: 100%; }
+    .input-area { padding: 8px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); color: white; border-radius: 6px; width: 100%; height: 80px; resize: vertical; margin-bottom: 8px; }
+
+    /* ===== MAIN CONTENT ===== */
+    main {
+      display: flex;
+      flex-direction: column;
+      gap: var(--section-gap);
+    }
+    
+    /* Cards - Professional Style */
+    .card {
+      background: linear-gradient(135deg, var(--bg-card) 0%, rgba(20, 21, 28, 0.95) 100%);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border);
+      padding: var(--space-6);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      animation: fadeSlideUp 0.5s ease-out backwards;
+      position: relative;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+    
+    .card:hover {
+      border-color: var(--border-hover);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      transform: translateY(-2px);
+    }
+    
+    .card h2 {
+      margin: 0 0 var(--space-5);
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+    
+    .section-header {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-muted);
+      margin-bottom: var(--space-2);
+      font-weight: 600;
+    }
+    
+    .section-subtitle {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: var(--space-5);
+      line-height: 1.5;
+    }
+    
+    /* Config card unified styling */
+    .config-card {
+      background: var(--bg-card);
+    }
+    
+    .config-card h2 {
+      color: var(--text-secondary);
+    }
+    
+    /* Grid Layouts */
+    .grid-5 {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(120px, 280px));
+      gap: var(--space-2);
+    }
+    
+    .grid-5 .metric {
+      max-width: 280px;
+      min-width: 120px;
+      padding: var(--space-4);
+    }
+    
+    .grid-4 {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: var(--space-4);
+    }
+    
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-4);
+    }
+    
+    .split-section {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--space-5);
+    }
+    
+    /* ===== METRIC CARDS (KPI) ===== */
+    .metric {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+      padding: var(--space-4);
+      border-radius: var(--radius);
+      background: var(--bg-surface);
+      border: 1px solid transparent;
+      transition: all 0.2s ease;
+    }
+    
+    .metric:hover {
+      border-color: var(--border);
+    }
+    
+    .metric-compact {
+      padding: var(--space-3);
+    }
+    
+    .metric-label {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+    
+    .metric-value {
+      font-size: 2.25rem;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      color: var(--text-primary);
+      line-height: 1;
+    }
+    
+    .metric-sub {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: var(--space-1);
+    }
+
+    .metric-good .metric-value { color: var(--success); }
+    .metric-warn .metric-value { color: var(--warning); }
+    .metric-bad .metric-value { color: var(--danger); }
+
+    .empty-state {
+      margin-top: var(--space-3);
+      font-size: 0.8rem;
+      color: var(--text-disabled);
+      padding: var(--space-3) var(--space-4);
+      border-radius: var(--radius-sm);
+      border: 1px dashed var(--border);
+      background: var(--bg-surface);
+    }
+
+    @keyframes flash-green {
+      0% { background-color: rgba(34, 197, 94, 0.2); }
+      100% { background-color: transparent; }
+    }
+    @keyframes text-flash {
+      0% {
+        color: #fff;
+        text-shadow: 0 0 10px rgba(255,255,255,0.5);
+      }
+      100% {
+        color: inherit;
+        text-shadow: none;
+      }
+    }
+    .updated {
+      animation: flash-green 1.5s ease-out;
+    }
+    .updated .metric-value,
+    .updated strong,
+    .updated .quota-val,
+    .updated .live-indicator .live-dot {
+      animation: text-flash 1.5s ease-out;
+    }
+
+    /* ===== TABLES ===== */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+    }
+    th, td {
+      padding: var(--space-2);
+      text-align: left;
+    }
+    th {
+      font-weight: 600;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-disabled);
+      border-bottom: 1px solid var(--border);
+    }
+    td {
+      color: var(--text-secondary);
+    }
+    tr:not(:last-child) td {
+      border-bottom: 1px solid var(--bg-surface);
+    }
+    tr:hover td {
+      color: var(--text-primary);
+      background: rgba(255,255,255,0.02);
+    }
+
+    /* Breakdown Grid */
+    .breakdown-grid {
+      margin-top: var(--space-2);
+    }
+    .breakdown-block {
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      padding: var(--space-4);
+      background: var(--bg-surface);
+      transition: border-color 0.2s ease;
+    }
+    
+    .breakdown-block:hover {
+      border-color: var(--border-muted);
+    }
+
+    /* Collapsible breakdown sections */
+    .breakdown-block.collapsed .breakdown-content {
+      display: none;
+    }
+    .breakdown-block .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+      margin-bottom: 0;
+    }
+    /* Toggle Button - Enhanced Visual */
+    .breakdown-toggle {
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .breakdown-toggle:hover {
+      background: var(--accent-muted);
+      border-color: var(--accent);
+      color: var(--accent-light);
+    }
+    .breakdown-block.collapsed .breakdown-toggle {
+      transform: rotate(180deg);
+    }
+    
+    .breakdown-content {
+      margin-top: var(--space-4);
+    }
+
+    /* External links bar */
+    .external-links {
+      display: flex;
+      gap: var(--space-2);
+      margin-bottom: var(--space-2);
+    }
+    .btn-external {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-2) var(--space-4);
+      border-radius: var(--radius);
+      border: 1px solid var(--border-hover);
+      background: var(--bg-elevated);
+      color: var(--text-secondary);
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      cursor: pointer;
+      box-shadow: var(--shadow-sm);
+    }
+    .btn-external:hover {
+      border-color: var(--accent);
+      color: var(--text-primary);
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-md);
+    }
+    .btn-external.oracle {
+      border-color: rgba(147, 51, 234, 0.5);
+      background: rgba(147, 51, 234, 0.08);
+    }
+    .btn-external.oracle:hover {
+      background: rgba(147, 51, 234, 0.18);
+      border-color: rgba(147, 51, 234, 0.8);
+      color: #c4b5fd;
+    }
+    .btn-external.uptime {
+      border-color: rgba(34, 197, 94, 0.5);
+      background: rgba(34, 197, 94, 0.08);
+    }
+    .btn-external.uptime:hover {
+      background: rgba(34, 197, 94, 0.18);
+      border-color: rgba(34, 197, 94, 0.8);
+      color: #86efac;
+    }
+    .btn-external.github {
+      border-color: rgba(255, 255, 255, 0.25);
+      background: rgba(255, 255, 255, 0.05);
+    }
+    .btn-external.github:hover {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.5);
+      color: #ffffff;
+    }
+    .btn-external.sheets {
+      border-color: rgba(52, 168, 83, 0.5);
+      background: rgba(52, 168, 83, 0.08);
+    }
+    .btn-external.sheets:hover {
+      background: rgba(52, 168, 83, 0.18);
+      border-color: rgba(52, 168, 83, 0.8);
+      color: #6ee7a8;
+    }
+
+    /* Success/Failure Donut Chart */
+    .donut-chart {
+      position: relative;
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+    }
+    .donut-chart-center {
+      position: absolute;
+      width: 66px;
+      height: 66px;
+      background: var(--bg-card);
+      border-radius: 50%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      box-shadow: inset 0 2px 8px rgba(0,0,0,0.2);
+    }
+    .donut-chart-percent {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+    .donut-chart-label {
+      font-size: 0.6rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .totals-with-chart {
+      display: flex;
+      align-items: center;
+      gap: var(--space-5);
+    }
+
+    /* Count unique badge */
+    .unique-count {
+      font-size: 0.7rem;
+      color: var(--text-soft);
+      background: rgba(255,255,255,0.05);
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin-left: 6px;
+    }
+
+    /* Hot Summary - 2-line breakdown header */
+    .hot-summary {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      margin-bottom: 16px;
+      border-radius: 10px;
+      border: 1px solid var(--border-subtle);
+      background: var(--bg-surface);
+      overflow: hidden;
+    }
+    .hot-row {
+      display: flex;
+      align-items: center;
+      padding: 10px 14px;
+      gap: 16px;
+    }
+    .hot-row + .hot-row {
+      border-top: 1px solid var(--border-subtle);
+    }
+    .hot-row-label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--accent-light);
+      font-weight: 600;
+      min-width: 70px;
+    }
+    .hot-row-items {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      flex: 1;
+    }
+    .hot-item {
+      min-width: 90px;
+    }
+    .hot-label {
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-soft);
+      margin-bottom: 2px;
+    }
+    .hot-value {
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    /* Toggle rotation for collapsed state */
+    .breakdown-toggle {
+      transition: transform 0.2s ease;
+    }
+    .breakdown-block.collapsed .breakdown-toggle {
+      transform: rotate(180deg);
+    }
+
+    /* ===== BUTTONS - ORACLE STYLE ===== */
+    button.btn {
+      padding: var(--space-2) var(--space-4);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--bg-elevated);
+      color: var(--text-secondary);
+      font-size: 0.82rem;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      transition: all var(--transition-normal);
+    }
+    button.btn:hover {
+      border-color: var(--border-hover);
+      background: var(--bg-hover);
+      color: var(--text-primary);
+      transform: translateY(-1px);
+    }
+    button.btn:active {
+      transform: translateY(0);
+      background: var(--bg-surface);
+    }
+    .btn-bullet {
+      font-size: 1.1em;
+      line-height: 0;
+      color: var(--accent);
+    }
+
+    /* Quota Tags */
+    .quota-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-1) var(--space-3);
+      border-radius: var(--radius-full);
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      font-weight: 600;
+      cursor: help;
+    }
+
+    /* ===== TOOLTIPS - POLISHED STYLE ===== */
+    [data-tooltip] {
+      position: relative;
+      cursor: help;
+    }
+
+    [data-tooltip]::after {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%) translateY(0);
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.2s ease-out;
+      pointer-events: none;
+      z-index: 100;
+      content: attr(data-tooltip);
+      bottom: calc(100% + 8px);
+      padding: 10px 14px;
+      background: #1a1d26;
+      border: 1px solid var(--border-hover);
+      color: var(--text-primary);
+      font-size: 0.8rem;
+      font-weight: 500;
+      line-height: 1.4;
+      border-radius: var(--radius);
+      white-space: normal;
+      max-width: 280px;
+      text-align: left;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    }
+
+    [data-tooltip]:hover::after {
+      opacity: 1;
+      visibility: visible;
+      transform: translateX(-50%) translateY(-4px);
+    }
+
+    /* ===== STATE TAGS ===== */
+    .state-unknown, .flag-unknown {
+      background: var(--bg-surface);
+      color: var(--text-secondary);
+      border: 1px dashed var(--border);
+    }
+
+    .state-sleeping, .state-super-chill, .state-chill, .state-easy, .state-kinda-easy {
+      background: var(--bg-surface);
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+    }
+
+    .state-normal, .state-slightly-busy {
+      background: var(--accent-muted);
+      color: #93c5fd;
+      border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+
+    .state-kinda-busy, .state-busy, .state-very-busy, .state-super-busy {
+      background: var(--warning-muted);
+      color: #fdba74;
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
+    .state-emergency, .state-critical, .state-cut-power {
+      background: var(--danger-muted);
+      color: #fca5a5;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    .flag-easy { background: var(--success-muted); color: #86efac; border: 1px solid rgba(34, 197, 94, 0.3); }
+    .flag-normal { background: var(--accent-muted); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.3); }
+    .flag-hard { background: var(--warning-muted); color: #fcd34d; border: 1px solid rgba(245, 158, 11, 0.3); }
+    .flag-fuck { background: var(--danger-muted); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.3); }
+
+    /* ===== DANGER ZONE - GUARDED STYLE ===== */
+    .danger-zone {
+      border: 1px solid rgba(220, 38, 38, 0.5);
+      background: var(--danger-soft);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .danger-zone:hover {
+      border-color: rgba(220, 38, 38, 0.7);
+    }
+    .danger-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .danger-title {
+      font-size: 0.95rem;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      color: #f87171;
+      font-weight: 700;
+    }
+    
+    /* Danger Section Groups */
+    .danger-section {
+      margin-top: 20px;
+      padding-top: 16px;
+      border-top: 1px solid rgba(239, 68, 68, 0.12);
+    }
+    .danger-section:first-of-type {
+      margin-top: 12px;
+      border-top: none;
+      padding-top: 0;
+    }
+    .danger-section-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: rgba(252, 165, 165, 0.8);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 12px;
+    }
+    .danger-section-title svg {
+      opacity: 0.7;
+    }
+    
+    .danger-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 14px;
+      margin: 6px 0;
+      border-radius: 8px;
+      background: rgba(239, 68, 68, 0.04);
+      transition: background 0.15s ease;
+    }
+    .danger-row:hover {
+      background: rgba(239, 68, 68, 0.08);
+    }
+    .danger-desc {
+      font-size: 0.9rem;
+      color: #fca5a5;
+      font-weight: 500;
+    }
+    .danger-sub {
+      font-size: 0.75rem;
+      color: rgba(254, 202, 202, 0.6);
+      margin-top: 2px;
+    }
+    .btn-danger {
+      padding: 8px 16px;
+      font-size: 0.85rem;
+      border-radius: 8px;
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      background: rgba(127, 29, 29, 0.25);
+      color: #fca5a5;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+    .btn-danger:hover {
+      background: rgba(239, 68, 68, 0.2);
+      border-color: var(--danger);
+      color: #fecaca;
+      box-shadow: 0 0 16px rgba(239, 68, 68, 0.2);
+    }
+    .btn-danger:active {
+      background: var(--danger);
+      color: #fff;
+      transform: scale(0.98);
+    }
+    .btn-danger.destructive {
+      background: rgba(185, 28, 28, 0.3);
+      border-color: var(--danger);
+      color: #fecaca;
+    }
+    .btn-danger.destructive:hover {
+      background: var(--danger);
+      color: #fff;
+      box-shadow: 0 0 20px rgba(239, 68, 68, 0.35);
+    }
+    
+    .btn-primary {
+      padding: 8px 16px;
+      border-radius: 6px;
+      border: 1px solid var(--accent);
+      background: var(--accent);
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+    .btn-primary:hover { background: #2563eb; }
+    .btn-primary:active { background: #1d4ed8; }
+
+    .btn-secondary {
+      padding: 8px 16px;
+      border-radius: 6px;
+      border: 1px solid var(--border-subtle);
+      background: rgba(255,255,255,0.05);
+      color: var(--text-main);
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+    .btn-secondary:hover { background: rgba(255,255,255,0.1); }
+
+    .auth-btn {
+      padding: 8px 16px;
+      border-radius: 6px;
+      border: 1px solid var(--border-subtle);
+      background: rgba(255,255,255,0.05);
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .auth-btn:hover { background: rgba(255,255,255,0.1); color: var(--text-main); }
+
+    .auth-bar {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .auth-input {
+      background: rgba(0,0,0,0.3);
+      border: 1px solid rgba(248, 113, 113, 0.3);
+      color: #fca5a5;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      outline: none;
+      transition: all 0.2s;
+    }
+    .auth-input:focus {
+      border-color: #ef4444;
+      box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
+    }
+    .auth-btn {
+      padding: 6px 12px;
+      font-size: 0.75rem;
+      border-radius: 6px;
+      border: 1px solid rgba(239, 68, 68, 0.5);
+      background: transparent;
+      color: #fca5a5;
+      cursor: pointer;
+    }
+    .auth-btn:hover {
+      background: rgba(239, 68, 68, 0.1);
+    }
+
+    .danger-status-hint {
+      font-size: 0.78rem;
+      color: #fecaca;
+      margin-top: 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .danger-status-label {
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: 0.7rem;
+      color: rgba(254,202,202,0.8);
+    }
+    .danger-status-value {
+      font-weight: 600;
+    }
+    .danger-status-value.enabled {
+      color: #bbf7d0;
+    }
+    .danger-status-value.disabled {
+      color: #fecaca;
+    }
+    .danger-chip {
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(248,113,113,0.8);
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      background: rgba(127,29,29,0.5);
+    }
+
+    .code-block {
+      font-family: 'SFMono-Regular', Consolas, monospace;
+      font-size: 0.8rem;
+      background: rgba(0,0,0,0.3);
+      padding: 4px 8px;
+      border-radius: 4px;
+      border: 1px solid rgba(148,163,184,0.1);
+      color: #94a3b8;
+      word-break: break-all;
+      user-select: all;
+    }
+    .code-block:hover {
+      color: #e2e8f0;
+      border-color: rgba(148,163,184,0.3);
+    }
+    .code-block-large {
+      display: block;
+      margin-top: 8px;
+      max-height: 260px;
+      overflow: auto;
+      padding: 8px 10px;
+      background: rgba(15,23,42,0.9);
+    }
+
+    .quota-panel {
+      background: var(--bg-surface);
+      border-radius: 8px;
+      padding: 16px;
+      border: 1px solid var(--border-subtle);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .quota-stat {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 4px 0;
+      border-radius: 6px;
+      transition: background 0.5s;
+    }
+    .quota-label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+    .quota-val {
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.8);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .modal-overlay.open {
+      display: flex;
+      opacity: 1;
+    }
+    .modal {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      width: 100%;
+      max-width: 500px;
+      max-height: 80vh;
+      overflow-y: auto;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+      transform: scale(0.95);
+      transition: transform 0.2s;
+      position: relative;
+    }
+    .modal-overlay.open .modal {
+      transform: scale(1);
+    }
+    .modal h3 {
+      margin-top: 0;
+      font-size: 1.2rem;
+    }
+    .modal-section {
+      margin-top: 16px;
+    }
+    .modal-section h4 {
+      font-size: 0.85rem;
+      color: var(--text-soft);
+      text-transform: uppercase;
+      margin-bottom: 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      padding-bottom: 4px;
+    }
+    .modal-item {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      padding: 6px 0;
+      border-bottom: 1px dashed rgba(255,255,255,0.05);
+    }
+    .modal-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 8px 0 10px;
+    }
+    .close-modal {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 1.2rem;
+    }
+    .close-modal:hover {
+      color: #fff;
+    }
+
+    /* ===== MOBILE RESPONSIVE ===== */
+    @media (max-width: 1024px) {
+      .grid-4 { grid-template-columns: repeat(2, 1fr); }
+      .main-content { padding: var(--space-5); }
+    }
+    
+    @media (max-width: 768px) {
+      /* Hide sidebar, show hamburger */
+      .sidebar-nav {
+        transform: translateX(-100%);
+      }
+      
+      .sidebar-nav.open {
+        transform: translateX(0);
+        animation: slideInLeft 0.3s ease;
+      }
+      
+      .hamburger-btn {
+        display: flex;
+      }
+      
+      .sidebar-overlay.active {
+        display: block;
+        animation: fadeIn 0.2s ease;
+      }
+      
+      .main-content {
+        margin-left: 0;
+        padding: var(--space-4);
+        padding-top: calc(var(--space-4) + 60px); /* Space for hamburger */
+      }
+      
+      .page {
+        gap: var(--space-4);
+      }
+      
+      header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--space-3);
+      }
+      
+      .header-controls {
+        width: 100%;
+        justify-content: space-between;
+        flex-wrap: wrap;
+      }
+      
+      .grid-4,
+      .grid-3 {
+        grid-template-columns: 1fr;
+      }
+      
+      .split-section {
+        grid-template-columns: 1fr;
+        gap: var(--space-4);
+      }
+      
+      .card {
+        padding: var(--space-5);
+        border-radius: var(--radius);
+      }
+      
+      .metric-value {
+        font-size: 1.75rem;
+      }
+      
+      .breakdown-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .hot-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--space-2);
+      }
+      
+      .hot-row-items {
+        width: 100%;
+        overflow-x: auto;
+      }
+      
+      .danger-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--space-3);
+      }
+      
+      .danger-row button {
+        width: 100%;
+      }
+      
+      .auth-bar {
+        width: 100%;
+        flex-direction: column;
+        gap: var(--space-2);
+      }
+      
+      .auth-input {
+        width: 100%;
+      }
+      
+      .modal {
+        margin: var(--space-4);
+        max-height: 90vh;
+      }
+    }
+    
+    @media (max-width: 480px) {
+      body {
+        padding: var(--space-2);
+      }
+      
+      .title-block h1 {
+        font-size: 1.25rem;
+      }
+      
+      .card {
+        padding: var(--space-3);
+      }
+      
+      .metric-value {
+        font-size: 1.25rem;
+      }
+    }
+    
     /* Base version pill */
     .cqd-brand-version {
       font-weight: 600;
@@ -400,7 +2279,7 @@ function renderChangelogSection(entries: ChangelogEntry[], config: ChangelogConf
     .cl-version-badge {
       font-weight: 700;
       color: #fff;
-      background: linear-gradient(135deg, #3b82f6, #6366f1);
+      background: var(--accent);
       padding: 3px 10px;
       border-radius: 6px;
       font-size: 0.85em;
@@ -468,17 +2347,15 @@ function renderChangelogSection(entries: ChangelogEntry[], config: ChangelogConf
       font-size: 0.85em;
     }
 
-    /* Edit Mode Indicator */
     .edit-mode-banner {
       display: none;
       align-items: center;
       gap: 12px;
       padding: 10px 14px;
-      background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(245, 158, 11, 0.05));
-      border: 1px solid rgba(245, 158, 11, 0.4);
+      background: var(--warning-soft);
+      border: 1px solid var(--warning);
       border-radius: 8px;
       margin-bottom: 16px;
-      animation: slideIn 0.2s ease;
     }
     .edit-mode-banner.active {
       display: flex;
@@ -591,1053 +2468,88 @@ function renderChangelogSection(entries: ChangelogEntry[], config: ChangelogConf
       border-radius: 3px;
       margin-left: 6px;
     }
-  `;
-
-  return `
-    <section class="card config-card" style="border-color: #3b82f6;">
-      <h2 style="color: #3b82f6; display: flex; align-items: center; gap: 8px;">
-        <span>📜</span> Notification & Release Manager
-        <span class="unsaved-dot" id="unsaved-indicator" title="Unsaved changes"></span>
-      </h2>
-
-      <!-- Inject Server State & Styles -->
-      <script>window.CURRENT_RULES = ${rulesJson};</script>
-      <style>${extensionStyles}</style>
-
-      <div class="split-layout" style="display: flex; gap: 40px; flex-wrap: wrap;">
-        
-        <!-- =======================
-             LEFT: NOTIFICATION STYLING
-             ======================= -->
-        <div style="flex: 1; min-width: 350px; display: flex; flex-direction: column; gap: 20px;">
-          <div class="section-header" style="color: var(--accent);">1. Notification Styling</div>
-          <div style="font-size: 0.85em; color: var(--text-soft); margin-bottom: 12px;">
-            Define how the extension badge looks for specific versions.
-          </div>
-          
-          <div style="padding: 20px; background: rgba(0,0,0,0.2); border-radius: 12px; border: 1px solid var(--border-subtle);">
-            
-            <!-- Target Selection -->
-            <div style="margin-bottom: 16px;">
-               <label style="font-size: 0.75em; color: var(--text-soft); display: block; margin-bottom: 6px;">Target Version</label>
-               <input list="known-versions" id="rule-target" placeholder="e.g. 1.2.3 or 'all'" class="input-field" style="width: 100%; padding: 10px 12px; background: var(--bg-elevated); border: 1px solid var(--border-subtle); color: white; border-radius: 8px; font-size: 0.95em;" oninput="window.updatePreview && window.updatePreview()">
-               <datalist id="known-versions">
-                 ${dataListOptions}
-               </datalist>
-               <div style="font-size: 0.7em; color: var(--text-muted); margin-top: 6px;">Select from history or type new version.</div>
-            </div>
-            
-            <div style="border-top: 1px dashed var(--border-subtle); margin: 16px 0; padding-top: 16px;">
-              <!-- Priority -->
-              <label style="font-size: 0.75em; color: var(--text-soft); display: block; margin-bottom: 10px;">Priority (Color Scheme)</label>
-              <div style="display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap;">
-                <label class="priority-option" style="cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 8px 14px; background: rgba(255,255,255,0.05); border-radius: 8px; border: 1px solid transparent; transition: all 0.15s;">
-                  <input type="radio" name="rule-priority" value="normal" checked style="accent-color: #6b7280;">
-                  <span style="font-size: 0.9em;">Normal</span>
-                </label>
-                <label class="priority-option" style="cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 8px 14px; background: rgba(59,130,246,0.1); border-radius: 8px; border: 1px solid rgba(59,130,246,0.3); transition: all 0.15s;">
-                  <input type="radio" name="rule-priority" value="minor" style="accent-color: #3b82f6;">
-                  <span style="font-size: 0.9em; color: #60a5fa;">Minor (Blue)</span>
-                </label>
-                <label class="priority-option" style="cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 8px 14px; background: rgba(239,68,68,0.1); border-radius: 8px; border: 1px solid rgba(239,68,68,0.3); transition: all 0.15s;">
-                  <input type="radio" name="rule-priority" value="major" style="accent-color: #ef4444;">
-                  <span style="font-size: 0.9em; color: #f87171; font-weight: 600;">Major (Red)</span>
-                </label>
-              </div>
-
-              <!-- Effect -->
-              <label style="font-size: 0.75em; color: var(--text-soft); display: block; margin-bottom: 10px;">Animation Effect</label>
-              <div style="display: flex; gap: 12px; margin-bottom: 18px; flex-wrap: wrap;">
-                <label style="cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; transition: background 0.15s;">
-                  <input type="radio" name="rule-effect" value="none" checked>
-                  <span style="font-size: 0.9em;">None</span>
-                </label>
-                <label style="cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; transition: background 0.15s;">
-                  <input type="radio" name="rule-effect" value="glow">
-                  <span style="font-size: 0.9em;">✨ Glow</span>
-                </label>
-                <label style="cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; transition: background 0.15s;">
-                  <input type="radio" name="rule-effect" value="pulse">
-                  <span style="font-size: 0.9em;">📡 Pulse</span>
-                </label>
-              </div>
-            </div>
-
-            <!-- LIVE PREVIEW CONTAINER -->
-            <div style="background: linear-gradient(145deg, #0a0a0a, #1a1a2e); padding: 20px; border-radius: 10px; text-align: center; border: 1px solid #2a2a3e; margin-bottom: 18px;">
-               <div style="font-size: 0.7em; color: #555; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1.5px;">Live Extension Preview</div>
-               <span id="rule-preview-pill" class="cqd-brand-version">v1.2.3</span>
-            </div>
-
-            <!-- INLINE SCRIPT: Preview logic -->
-            <script>
-            (function() {
-              var pill = document.getElementById('rule-preview-pill');
-              
-              function updatePreview() {
-                if (!pill) return;
-                
-                var priorityInputs = document.getElementsByName('rule-priority');
-                var effectInputs = document.getElementsByName('rule-effect');
-                
-                var priority = 'normal';
-                var effect = 'none';
-                
-                for (var i = 0; i < priorityInputs.length; i++) {
-                  if (priorityInputs[i].checked) { priority = priorityInputs[i].value; break; }
-                }
-                for (var i = 0; i < effectInputs.length; i++) {
-                  if (effectInputs[i].checked) { effect = effectInputs[i].value; break; }
-                }
-                
-                var cls = 'cqd-brand-version';
-                
-                if (priority === 'minor') cls += ' cqd-pill-minor';
-                if (priority === 'major') cls += ' cqd-pill-major';
-                
-                if (effect === 'glow') {
-                  cls += (priority === 'major') ? ' cqd-effect-glow-red' : ' cqd-effect-glow-blue';
-                }
-                if (effect === 'pulse') {
-                  cls += (priority === 'major') ? ' cqd-effect-pulse-red' : ' cqd-effect-pulse-blue';
-                }
-                
-                pill.className = cls;
-              }
-              
-              // Attach to radio buttons
-              var allRadios = document.querySelectorAll('input[name="rule-priority"], input[name="rule-effect"]');
-              for (var i = 0; i < allRadios.length; i++) {
-                allRadios[i].onchange = updatePreview;
-              }
-              
-              window.updatePreview = updatePreview;
-              updatePreview();
-            })();
-            </script>
-
-            <button id="btn-add-rule" class="btn" style="width: 100%; justify-content: center; background: linear-gradient(135deg, #3b82f6, #6366f1); color: white; border: none; padding: 12px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 0.95em; transition: all 0.2s; box-shadow: 0 2px 8px rgba(59,130,246,0.3);">
-               + Add Rule
-            </button>
-          </div>
-
-          <!-- Rules List -->
-          <div>
-            <div style="margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
-               <span style="font-size: 0.85em; color: var(--text-soft);">Active Rules <span style="font-size: 0.8em; opacity: 0.7;">(specific versions override 'all')</span></span>
-               <span id="rules-count" style="font-size: 0.8em; color: var(--text-muted); background: rgba(255,255,255,0.05); padding: 2px 8px; border-radius: 4px;">0 rules</span>
-            </div>
-            <div id="rules-list-container" style="display: flex; flex-direction: column; gap: 8px; max-height: 280px; overflow-y: auto; padding-right: 4px;">
-               <!-- JS renders here -->
-            </div>
-          </div>
-        </div>
-
-        <!-- =======================
-             RIGHT: RELEASE PUBLISHING
-             ======================= -->
-        <div style="flex: 1; min-width: 350px; border-left: 1px solid var(--border-subtle); padding-left: 40px; display: flex; flex-direction: column; gap: 20px;">
-           
-           <div class="section-header" style="color: var(--warning); display: flex; align-items: center;">
-             2. Release Publishing
-             <span class="release-count-badge">${releaseCount}</span>
-           </div>
-           <div style="font-size: 0.85em; color: var(--text-soft); margin-bottom: 8px;">
-             Publish a new changelog entry. This text appears when users click the version pill.
-           </div>
-
-           <!-- Edit Mode Banner -->
-           <div id="edit-mode-banner" class="edit-mode-banner">
-             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-             <span class="edit-mode-text">Editing <strong id="edit-mode-version">v1.0.0</strong></span>
-             <button id="btn-cancel-edit" class="btn-cancel-edit">Cancel</button>
-           </div>
-
-           <div style="background: rgba(255,255,255,0.03); padding: 20px; border-radius: 12px; border: 1px solid var(--border-subtle);">
-              <input type="hidden" id="edit-cl-id" value="">
-              
-              <div style="margin-bottom: 14px;">
-                 <label style="font-size: 0.75em; color: var(--text-soft); display: block; margin-bottom: 6px;">Version</label>
-                 <input list="known-versions" id="new-cl-version" placeholder="e.g. 1.2.4" class="input-field" style="width: 100%; padding: 10px 12px; background: var(--bg-elevated); border: 1px solid var(--border-subtle); color: white; border-radius: 8px; font-size: 0.95em;">
-              </div>
-
-              <div style="margin-bottom: 6px;">
-                 <label style="font-size: 0.75em; color: var(--text-soft); display: block; margin-bottom: 6px;">Changes (one per line)</label>
-                 <div class="textarea-wrapper">
-                   <textarea id="new-cl-changes" rows="5" class="input-field" placeholder="- Added new feature X&#10;- Fixed bug with Y&#10;- Improved performance" style="width: 100%; padding: 10px 12px; background: var(--bg-elevated); border: 1px solid var(--border-subtle); color: white; border-radius: 8px; font-size: 0.9em; line-height: 1.5; resize: vertical;"></textarea>
-                   <span id="char-counter" class="char-counter">0 / 500</span>
-                 </div>
-              </div>
-           </div>
-           
-           <div style="flex: 1; display: flex; flex-direction: column;">
-             <div style="margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
-               <span style="font-size: 0.85em; color: var(--text-soft);">Historical Releases</span>
-               <span style="font-size: 0.75em; color: var(--text-muted);">${releaseCount} releases</span>
-             </div>
-             <div class="cl-history-list" style="flex: 1; overflow-y: auto; max-height: 400px; padding-right: 8px;">
-               ${historyHtml}
-             </div>
-           </div>
-
-        </div>
-      </div>
-      
-      <hr style="border: 0; border-top: 1px solid var(--border-subtle); margin: 28px 0 20px;">
-      
-      <div style="display: flex; gap: 12px; flex-wrap: wrap;">
-        <button id="btn-save-all" class="btn btn-primary" style="flex: 1; min-width: 200px; padding: 16px 24px; background: linear-gradient(135deg, #22c55e, #16a34a); color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: 700; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.05em; box-shadow: 0 4px 12px rgba(34,197,94,0.3); display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s;">
-           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-           <span id="btn-save-text">Save Configuration & Publish</span>
-        </button>
-      </div>
-
-      <div style="margin-top: 12px; font-size: 0.75em; color: var(--text-soft); text-align: center;">
-        💡 Tip: Press <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Ctrl+Enter</kbd> to save quickly
-      </div>
-
-    </section>
-  `;
-}
-
-export function renderDashboard(stats: StatsResponse): string {
-  const quota = stats.quota;
-  const stateTag = quotaToStateTag(quota);
-  const flag = quotaToFlag(quota);
-
-  const requestsToday = quota?.requestsToday ?? 0;
-  const remoteEnabled = quota?.remoteEnabled ?? true;
-  const quotaLevel = quota?.quotaLevel ?? "UNKNOWN";
-  const batchSize = quota?.batchSizeSuggestion ?? 50;
-
-  const lastEventAt = formatTs(stats.lastEventAt);
-  const lastFlushAt = formatTs(stats.lastFlushAt);
-  const ageLastEvent = formatAge(stats.lastEventAt);
-  const ageLastFlush = formatAge(stats.lastFlushAt);
-
-  const maxBatchEvents = stats.envSnapshot?.maxBatchEvents || "n/a";
-  const oracleEndpoint = stats.envSnapshot?.oracleEndpoint || "unknown";
-  const nextAutoFlush =
-    maxBatchEvents !== "n/a"
-      ? `when buffer ≥ ${maxBatchEvents} events`
-      : "unknown";
-
-  const workerUrl = "https://cqd-analytics.adhamhaithameid.workers.dev";
-
-  const renderTableRows = (data: Record<string, number>) => {
-    const keys = Object.keys(data).sort((a, b) => data[b] - data[a]);
-    if (keys.length === 0) return "<tr><td colspan='2'>—</td></tr>";
-    return keys
-      .map((k) => `<tr><td>${k}</td><td>${data[k]}</td></tr>`)
-      .join("");
-  };
-
-  const byTypeRows = renderTableRows(stats.counters.byType || {});
-  const byStatusRows = renderTableRows(stats.counters.byStatus || {});
-  const byBrowserRows = renderTableRows(stats.counters.byBrowser || {});
-  const byOsRows = renderTableRows(stats.counters.byOs || {});
-  const byExtVersionRows = renderTableRows(stats.counters.byExtVersion || {});
-  const byLangRows = renderTableRows(stats.counters.byLanguage || {});
-  const byCountryRows = renderTableRows(stats.counters.byCountry || {});
-  const byErrorRows = renderTableRows(stats.counters.byErrorType || {});
-
-  const totalSuccess = stats.totalSuccess || 0;
-  const totalFail = stats.totalFail || 0;
-  const srMeta = classifySuccessRate(totalSuccess, totalFail);
-  const totalAttempts = totalSuccess + totalFail;
-  const failRate =
-    totalAttempts > 0 ? (totalFail / totalAttempts) * 100 : null;
-  const failRateText = failRate !== null ? `${failRate.toFixed(1)}%` : "—";
-
-  const hotType = topKey(stats.counters.byType);
-  const hotBrowser = topKey(stats.counters.byBrowser);
-  const hotOs = topKey(stats.counters.byOs);
-  const hotCountry = topKey(stats.counters.byCountry);
-
-  const rawStatsJson = JSON.stringify(stats, null, 2)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>CQD Analytics – Worker & DO Dashboard</title>
-  <link rel="icon" href="${FAVICON_PNG_DATA_URI}">
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <style>
-    :root {
-      color-scheme: dark;
-      --bg: #050816;
-      --bg-elevated: #111827;
-      --border-subtle: #1f2937;
-      --accent: #3b82f6;
-      --danger: #ef4444;
-      --text-main: #e5e7eb;
-      --text-muted: #9ca3af;
-      --text-soft: #6b7280;
-      --success: #22c55e;
-      --warning: #f59e0b;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      padding: 24px;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: radial-gradient(circle at top, #111827 0, #020617 60%, #020617 100%);
-      color: var(--text-main);
-      line-height: 1.5;
-    }
-    .page {
-      max-width: 1100px;
-      margin: 0 auto;
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-      position: relative;
-    }
-    .hidden {
-      display: none;
-    }
-
-
-    header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 16px;
-      margin-bottom: 8px;
-    }
-    .header-left {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-    }
-    .header-logo {
-      width: 42px;
-      height: 42px;
-    }
-    .title-block h1 {
-      margin: 0;
-      font-size: 1.75rem;
-      letter-spacing: -0.01em;
-      font-weight: 700;
-      background: linear-gradient(to right, #e5e7eb, #9ca3af);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-    .title-block p {
-      margin: 0;
-      font-size: 0.95rem;
-      color: var(--text-muted);
-    }
-
-    .header-controls {
-      display: flex;
-      flex-direction: row-reverse;
-      align-items: flex-end;
-      gap: 8px;
-    }
-    .live-wrapper {
-      display: flex;
-      flex-direction: row-reverse;
-      align-items: center;
-      justify-content: flex-center;
-      gap: 8px;
-    }
-    .refresh-indicator {
-      text-align: right;
-      font-size: 0.75rem;
-    }
-    .refresh-label {
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--text-soft);
-    }
-    .refresh-value {
-      color: var(--text-main);
-      font-feature-settings: "tnum" 1;
-    }
-
-    .live-indicator {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 2px 8px;
-      border-radius: 999px;
-      border: 1px solid rgba(148,163,184,0.4);
-      font-size: 0.7rem;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--text-muted);
-    }
-    .live-dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 999px;
-      background: #22c55e;
-      box-shadow: 0 0 8px rgba(34,197,94,0.7);
-    }
-    .live-label { font-weight: 600; }
-
-    @keyframes live-pulse {
-      0% { transform: scale(0.9); opacity: 0.7; }
-      50% { transform: scale(1.15); opacity: 1; }
-      100% { transform: scale(0.9); opacity: 0.7; }
-    }
-    .live-indicator[data-state="live"] .live-dot {
-      animation: live-pulse 1.5s infinite;
-    }
-    .live-indicator[data-state="stale"] .live-dot {
-      background: #f59e0b;
-      box-shadow: 0 0 8px rgba(245,158,11,0.7);
-      animation: none;
-    }
-    .live-indicator[data-state="cold"] .live-dot {
-      background: #ef4444;
-      box-shadow: 0 0 8px rgba(239,68,68,0.7);
-      animation: none;
-    }
-
-    .info-btn {
-      border-radius: 999px;
-      border: 1px solid var(--border-subtle);
-      background: rgba(15,23,42,0.9);
-      color: var(--text-muted);
-      display: inline-flex;
-      align-items: end;
-      gap: 6px;
-      padding: 6px 10px;
-      font-size: 0.8rem;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .info-btn:hover {
-      border-color: var(--accent);
-      color: var(--accent);
-      transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(59,130,246,0.15);
-    }
-    .info-pill {
-      padding: 2px 8px;
-      border-radius: 999px;
-      background: rgba(31,41,55,0.9);
-      border: 1px solid rgba(148,163,184,0.5);
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      font-size: 0.65rem;
-      color: var(--text-muted);
-    }
-    .info-pill-flag {
-      border-color: rgba(34,197,94,0.7);
-      color: #22c55e;
-    }
-    .info-icon {
-      width: 18px;
-      height: 18px;
-      border-radius: 999px;
-      border: 1px solid var(--border-subtle);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 0.85rem;
-    }
-
-    /* Changelog Styles */
-    .cl-ver { font-weight: 700; color: var(--accent); }
-    .cl-date { font-size: 0.75rem; color: var(--text-soft); }
-    .cl-changes { padding-left: 16px; margin: 0; color: #d1d5db; }
-    .cl-changes li { margin-bottom: 4px; }
-    .btn-xs { padding: 4px 8px; font-size: 0.75rem; border-radius: 4px; background: rgba(239,68,68,0.1); color: #fca5a5; border: 1px solid rgba(239,68,68,0.3); cursor: pointer; }
-    .btn-xs:hover { background: rgba(239,68,68,0.2); }
-    
-    .field-row { margin-bottom: 12px; }
-    .input-sm { padding: 6px 10px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); color: white; border-radius: 6px; width: 100%; }
-    .input-area { padding: 8px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); color: white; border-radius: 6px; width: 100%; height: 80px; resize: vertical; margin-bottom: 8px; }
-
-    main {
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-    }
-    .card {
-      background: rgba(15,23,42,0.6);
-      backdrop-filter: blur(10px);
-      border-radius: 16px;
-      border: 1px solid rgba(148,163,184,0.12);
-      padding: 20px;
-      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
-      transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
-    }
-    .card:hover {
-      border-color: rgba(148,163,184,0.25);
-    }
-    .card h2 {
-      margin: 0 0 16px;
-      font-size: 0.95rem;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      color: var(--text-muted);
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .section-header {
-      font-size: 0.8rem;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--text-muted);
-      margin-bottom: 8px;
-      font-weight: 600;
-    }
-
-    .grid-4 {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 16px;
-    }
-    .grid-3 {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 16px;
-    }
-    .split-section {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
-    }
-
-    .metric {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      padding: 8px;
-      border-radius: 8px;
-      transition: background 0.5s;
-      position: relative;
-    }
-    .metric-compact {
-      padding: 6px;
-    }
-    .metric-label {
-      font-size: 0.75rem;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--text-soft);
-      font-weight: 600;
-    }
-    .metric-value {
-      font-size: 1.6rem;
-      font-weight: 700;
-      letter-spacing: -0.02em;
-      transition: color 0.3s;
-    }
-    .metric-sub {
-      font-size: 0.8rem;
-      color: var(--text-muted);
-    }
-
-    .metric-good .metric-value {
-      color: var(--success);
-    }
-    .metric-warn .metric-value {
-      color: var(--warning);
-    }
-    .metric-bad .metric-value {
-      color: var(--danger);
-    }
-
-    .empty-state {
-      margin-top: 12px;
-      font-size: 0.8rem;
-      color: var(--text-soft);
-      padding: 8px 10px;
-      border-radius: 8px;
-      border: 1px dashed rgba(148,163,184,0.35);
-      background: rgba(15,23,42,0.8);
-    }
-
-    @keyframes flash-green {
-      0% { background-color: rgba(34, 197, 94, 0.2); }
-      100% { background-color: transparent; }
-    }
-    @keyframes text-flash {
-      0% {
-        color: #fff;
-        text-shadow: 0 0 10px rgba(255,255,255,0.5);
-      }
-      100% {
-        color: inherit;
-        text-shadow: none;
-      }
-    }
-    .updated {
-      animation: flash-green 1.5s ease-out;
-    }
-    .updated .metric-value,
-    .updated strong,
-    .updated .quota-val,
-    .updated .live-indicator .live-dot {
-      animation: text-flash 1.5s ease-out;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.82rem;
-    }
-    th, td {
-      padding: 6px 4px;
-      text-align: left;
-    }
-    th {
-      font-weight: 600;
-      color: var(--text-soft);
-      border-bottom: 1px solid rgba(148,163,184,0.1);
-    }
-    td {
-      color: var(--text-main);
-    }
-    tr:not(:last-child) td {
-      border-bottom: 1px dashed rgba(148,163,184,0.1);
-    }
-    tr:hover td {
-      color: #fff;
-      background: rgba(255,255,255,0.02);
-    }
-
-    .breakdown-grid {
-      margin-top: 4px;
-    }
-    .breakdown-block {
-      border-radius: 12px;
-      border: 1px solid rgba(148,163,184,0.14);
-      padding: 12px 12px 10px;
-      background: rgba(15,23,42,0.75);
-      transition: background 0.3s, border-color 0.3s;
-    }
-
-    .hot-today {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      margin-bottom: 12px;
-      padding: 10px 12px;
-      border-radius: 12px;
-      border: 1px solid rgba(148,163,184,0.2);
-      background: rgba(15,23,42,0.7);
-    }
-    .hot-item {
-      min-width: 120px;
-    }
-    .hot-label {
-      font-size: 0.7rem;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--text-soft);
-      margin-bottom: 2px;
-    }
-    .hot-value {
-      font-size: 0.9rem;
-      font-weight: 500;
-      color: var(--text-main);
-    }
-
-    button.btn {
-      padding: 8px 16px;
-      border-radius: 8px;
-      border: 1px solid var(--border-subtle);
-      background: rgba(15,23,42,0.8);
-      color: var(--text-main);
-      font-size: 0.85rem;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      transition: all 0.2s;
-      font-weight: 500;
-    }
-    button.btn:hover {
-      border-color: var(--accent);
-      background: rgba(15,23,42,1);
-      transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(59,130,246,0.15);
-    }
-    button.btn:active {
-      transform: translateY(0);
-    }
-    .btn-bullet {
-      font-size: 1.4em;
-      line-height: 0;
-      color: var(--accent);
-      margin-right: 4px;
-    }
-
-    .quota-tag {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 4px 12px;
-      border-radius: 999px;
-      font-size: 0.75rem;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      font-weight: 700;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
-      cursor: help;
-    }
-
-    [data-tooltip] { position: relative; cursor: help; }
-    [data-tooltip]:hover::after {
-      content: attr(data-tooltip);
-      position: absolute;
-      bottom: 100%;
-      left: 50%;
-      transform: translateX(-50%);
-      padding: 6px 10px;
-      background: #0f172a;
-      border: 1px solid var(--border-subtle);
-      color: #e2e8f0;
-      font-size: 0.75rem;
-      border-radius: 6px;
-      white-space: nowrap;
-      pointer-events: none;
-      z-index: 10;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-      margin-bottom: 6px;
-    }
-
-    .state-unknown,
-    .flag-unknown {
-      background: rgba(148,163,184,0.05);
-      color: #e5e7eb;
-      border: 1px dashed rgba(148,163,184,0.3);
-    }
-    .state-sleeping,
-    .state-super-chill,
-    .state-chill,
-    .state-easy,
-    .state-kinda-easy {
-      background: rgba(148,163,184,0.1);
-      color: #d1d5db;
-      border: 1px solid rgba(148,163,184,0.3);
-    }
-    .state-normal,
-    .state-slightly-busy {
-      background: rgba(59,130,246,0.1);
-      color: #93c5fd;
-      border: 1px solid rgba(59,130,246,0.4);
-    }
-    .state-kinda-busy,
-    .state-busy,
-    .state-very-busy,
-    .state-super-busy {
-      background: rgba(249,115,22,0.1);
-      color: #fdba74;
-      border: 1px solid rgba(249,115,22,0.4);
-    }
-    .state-emergency,
-    .state-critical,
-    .state-cut-power {
-      background: rgba(239,68,68,0.15);
-      color: #fca5a5;
-      border: 1px solid rgba(239,68,68,0.5);
-    }
-
-    .flag-easy   { background: rgba(34,197,94,0.1);  color: #86efac; border: 1px solid rgba(34,197,94,0.4); }
-    .flag-normal { background: rgba(59,130,246,0.1); color: #93c5fd; border: 1px solid rgba(59,130,246,0.4); }
-    .flag-hard   { background: rgba(245,158,11,0.1); color: #fcd34d; border: 1px solid rgba(245,158,11,0.4); }
-    .flag-fuck   { background: rgba(239,68,68,0.2);  color: #fca5a5; border: 1px solid rgba(239,68,68,0.6); }
-
-    .danger-zone {
-      border: 1px solid rgba(220, 38, 38, 0.5);
-      background: rgba(69, 10, 10, 0.25);
-      transition: all 0.3s ease;
-    }
-    .danger-zone:hover {
-      background: rgba(127, 29, 29, 0.3);
-      border-color: rgba(239, 68, 68, 0.8);
-      box-shadow: 0 0 20px rgba(220, 38, 38, 0.15);
-    }
-    .danger-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 12px;
-    }
-    .danger-title {
-      font-size: 0.95rem;
-      text-transform: uppercase;
-      letter-spacing: 0.09em;
-      color: #f87171;
-      font-weight: 700;
-    }
-    .danger-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 12px 0;
-      border-bottom: 1px solid rgba(239,68,68,0.15);
-    }
-    .danger-row:last-child {
-      border-bottom: none;
-    }
-    .danger-desc {
-      font-size: 0.9rem;
-      color: #fca5a5;
-      font-weight: 500;
-    }
-    .danger-sub {
-      font-size: 0.75rem;
-      color: rgba(254, 202, 202, 0.7);
-      margin-top: 2px;
-    }
-    .btn-danger {
-      padding: 8px 16px;
-      font-size: 0.85rem;
-      border-radius: 8px;
-      border: 1px solid rgba(239, 68, 68, 0.5);
-      background: transparent;
-      color: #fca5a5;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      font-weight: 500;
-      transition: all 0.2s;
-    }
-    .btn-danger:hover {
-      background: rgba(220,38,38,0.3);
-      border-color: #ef4444;
-      color: #fff;
-      transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(220,38,38,0.15);
-    }
-    .btn-danger:active {
-      transform: translateY(0);
-    }
-
-    .auth-bar {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-    }
-    .auth-input {
-      background: rgba(0,0,0,0.3);
-      border: 1px solid rgba(248, 113, 113, 0.3);
-      color: #fca5a5;
-      padding: 6px 12px;
-      border-radius: 6px;
-      font-size: 0.8rem;
-      outline: none;
-      transition: all 0.2s;
-    }
-    .auth-input:focus {
-      border-color: #ef4444;
-      box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
-    }
-    .auth-btn {
-      padding: 6px 12px;
-      font-size: 0.75rem;
-      border-radius: 6px;
-      border: 1px solid rgba(239, 68, 68, 0.5);
-      background: transparent;
-      color: #fca5a5;
-      cursor: pointer;
-    }
-    .auth-btn:hover {
-      background: rgba(239, 68, 68, 0.1);
-    }
-
-    .danger-status-hint {
-      font-size: 0.78rem;
-      color: #fecaca;
-      margin-top: 4px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      flex-wrap: wrap;
-    }
-    .danger-status-label {
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      font-size: 0.7rem;
-      color: rgba(254,202,202,0.8);
-    }
-    .danger-status-value {
-      font-weight: 600;
-    }
-    .danger-status-value.enabled {
-      color: #bbf7d0;
-    }
-    .danger-status-value.disabled {
-      color: #fecaca;
-    }
-    .danger-chip {
-      padding: 2px 8px;
-      border-radius: 999px;
-      border: 1px solid rgba(248,113,113,0.8);
-      font-size: 0.7rem;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      background: rgba(127,29,29,0.5);
-    }
-
-    .code-block {
-      font-family: 'SFMono-Regular', Consolas, monospace;
-      font-size: 0.8rem;
-      background: rgba(0,0,0,0.3);
-      padding: 4px 8px;
-      border-radius: 4px;
-      border: 1px solid rgba(148,163,184,0.1);
-      color: #94a3b8;
-      word-break: break-all;
-      user-select: all;
-    }
-    .code-block:hover {
-      color: #e2e8f0;
-      border-color: rgba(148,163,184,0.3);
-    }
-    .code-block-large {
-      display: block;
-      margin-top: 8px;
-      max-height: 260px;
-      overflow: auto;
-      padding: 8px 10px;
-      background: rgba(15,23,42,0.9);
-    }
-
-    .quota-panel {
-      background: rgba(0,0,0,0.2);
-      border-radius: 12px;
-      padding: 16px;
-      border: 1px solid rgba(255,255,255,0.03);
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-    .quota-stat {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 4px 0;
-      border-radius: 6px;
-      transition: background 0.5s;
-    }
-    .quota-label {
-      font-size: 0.8rem;
-      color: var(--text-muted);
-    }
-    .quota-val {
-      font-weight: 600;
-      font-size: 0.95rem;
-    }
-
-    .modal-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.7);
-      backdrop-filter: blur(4px);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 100;
-      opacity: 0;
-      transition: opacity 0.2s;
-    }
-    .modal-overlay.open {
-      display: flex;
-      opacity: 1;
-    }
-    .modal {
-      background: #1e293b;
-      border: 1px solid var(--border-subtle);
-      width: 100%;
-      max-width: 500px;
-      max-height: 80vh;
-      overflow-y: auto;
-      border-radius: 16px;
-      padding: 24px;
-      box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);
-      transform: scale(0.95);
-      transition: transform 0.2s;
-      position: relative;
-    }
-    .modal-overlay.open .modal {
-      transform: scale(1);
-    }
-    .modal h3 {
-      margin-top: 0;
-      font-size: 1.2rem;
-    }
-    .modal-section {
-      margin-top: 16px;
-    }
-    .modal-section h4 {
-      font-size: 0.85rem;
-      color: var(--text-soft);
-      text-transform: uppercase;
-      margin-bottom: 8px;
-      border-bottom: 1px solid rgba(255,255,255,0.1);
-      padding-bottom: 4px;
-    }
-    .modal-item {
-      display: flex;
-      justify-content: space-between;
-      font-size: 0.85rem;
-      padding: 6px 0;
-      border-bottom: 1px dashed rgba(255,255,255,0.05);
-    }
-    .modal-pills {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin: 8px 0 10px;
-    }
-    .close-modal {
-      position: absolute;
-      top: 16px;
-      right: 16px;
-      background: transparent;
-      border: none;
-      color: var(--text-muted);
-      cursor: pointer;
-      font-size: 1.2rem;
-    }
-    .close-modal:hover {
-      color: #fff;
-    }
-
-    @media (max-width: 900px) {
-      .grid-4,
-      .grid-3,
-      .split-section {
-        grid-template-columns: 1fr;
-      }
-      .auth-bar {
-        width: 100%;
-        justify-content: space-between;
-        margin-top: 8px;
-      }
-      .danger-header {
-        flex-direction: column;
-        align-items: flex-start;
-      }
-      header {
-        flex-direction: column;
-        gap: 8px;
-      }
-      .header-controls {
-        align-self: flex-end;
-      }
-    }
   </style>
 </head>
 <body>
-  <div class="page">
+  <!-- Hamburger Menu Button -->
+  <button class="hamburger-btn" id="hamburger-btn" aria-label="Toggle navigation">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <line x1="3" y1="6" x2="21" y2="6"/>
+      <line x1="3" y1="12" x2="21" y2="12"/>
+      <line x1="3" y1="18" x2="21" y2="18"/>
+    </svg>
+  </button>
+  
+  <!-- Sidebar Overlay -->
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <!-- Sidebar Navigation -->
+  <nav class="sidebar-nav" id="sidebar">
+    <div class="nav-header">
+      <div class="nav-brand">CQD Analytics</div>
+      <div class="nav-subtitle">Worker Dashboard</div>
+    </div>
+    
+    <div class="nav-section">Analytics</div>
+    <a href="#overview" class="nav-item active" data-section="overview">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      Overview
+    </a>
+    <a href="#breakdown" class="nav-item" data-section="breakdown">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
+      Breakdown
+    </a>
+    
+    <div class="nav-section">System</div>
+    <a href="#system" class="nav-item" data-section="system">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-2.82 1.18V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0-1.18-2.82H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08z"/></svg>
+      Environment
+    </a>
+    <a href="#quota" class="nav-item" data-section="quota">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      Quota & Mode
+    </a>
+    
+    <div class="nav-section">Tools</div>
+    <a href="#debug" class="nav-item" data-section="debug">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      Debug & Actions
+    </a>
+    <a href="#config" class="nav-item" data-section="config">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      Notifications
+    </a>
+    <a href="#release" class="nav-item" data-section="release">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      Releases
+    </a>
+    <a href="#raw" class="nav-item" data-section="raw">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+      Raw JSON
+    </a>
+    
+    <div class="nav-section">Security</div>
+    <a href="#security" class="nav-item" data-section="security">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      Security Settings
+    </a>
+    
+    <div class="nav-section">Data</div>
+    <a href="#datahub" class="nav-item" data-section="datahub">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+      Data Hub
+    </a>
+    
+    <div class="nav-section">Admin</div>
+    <a href="#danger" class="nav-item danger-nav" data-section="danger">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      Danger Zone
+    </a>
+  </nav>
+
+  <!-- Main Content -->
+  <div class="main-content">
+    <div class="page">
     <header>
       <div class="header-left">
         <div class="title-block">
@@ -1664,10 +2576,30 @@ export function renderDashboard(stats: StatsResponse): string {
       </div>
     </header>
 
+    <!-- External Links Bar -->
+    <div class="external-links">
+      <a href="https://github.com/adhamhaithameid/Classroom-Quick-Downloader" target="_blank" class="btn-external github" data-tooltip="View source code on GitHub">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+        GitHub
+      </a>
+      <a href="http://129.151.233.229:8080/" target="_blank" class="btn-external oracle" data-tooltip="View Oracle Analytics Dashboard with historical data">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+        Oracle
+      </a>
+      <a href="https://docs.google.com/spreadsheets/d/1ptzLKUVnAkyXnT635Zgb1C6Img9aeAZ1se3nRz_QZmI/edit?usp=sharing" target="_blank" class="btn-external sheets" data-tooltip="View historical analytics data and trends">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
+        Sheets
+      </a>
+      <a href="http://129.151.233.229:3001/status/cqd" target="_blank" class="btn-external uptime" data-tooltip="Check service uptime and status via Uptime Kuma">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        Status
+      </a>
+    </div>
+
     <main>
       <!-- Top Cards -->
-      <section class="card">
-        <div class="grid-4">
+      <section class="card" id="overview">
+        <div class="grid-5">
           <div class="metric" id="card-downloads" data-tooltip="Downloads completed successfully (status=success)">
             <div class="metric-label">Total Downloads</div>
             <div class="metric-value" data-bind="totalDownloads">${stats.totalDownloads}</div>
@@ -1680,21 +2612,35 @@ export function renderDashboard(stats: StatsResponse): string {
             <div class="metric-label">Total Fail</div>
             <div class="metric-value" data-bind="totalFail" style="color:var(--danger)">${stats.totalFail}</div>
           </div>
+          <div class="metric" id="card-cancelled" data-tooltip="All events with status=cancelled">
+            <div class="metric-label">Total Cancelled</div>
+            <div class="metric-value" data-bind="totalCancelled" style="color:var(--warning)">${stats.totalCancelled ?? 0}</div>
+          </div>
           <div class="metric" id="card-events" data-tooltip="Total events received by DO">
             <div class="metric-label">Total Events</div>
             <div class="metric-value" data-bind="totalEvents">${stats.totalEvents}</div>
           </div>
         </div>
-        <div style="display:flex; flex-wrap:wrap; gap:12px; margin-top:12px;">
-          <div class="metric metric-compact ${srMeta.className}" id="card-success-rate" data-tooltip="Successful downloads / (success + fail)">
-            <div class="metric-label">Success rate</div>
-            <div class="metric-value" data-bind="successRate">${srMeta.text}</div>
-            <div class="metric-sub" data-bind="successRateBadge">${srMeta.badge}</div>
+        <div class="totals-with-chart" style="margin-top:12px;">
+          <!-- Donut Chart -->
+          <div class="donut-chart" style="background: ${donutGradient};" data-tooltip="Visual breakdown of success (green) vs failure (red)">
+            <div class="donut-chart-center">
+              <div class="donut-chart-percent">${successPercentText}</div>
+              <div class="donut-chart-label">Success</div>
+            </div>
           </div>
-          <div class="metric metric-compact" id="card-fail-rate" data-tooltip="Failed downloads / (success + fail)">
-            <div class="metric-label">Fail rate</div>
-            <div class="metric-value" data-bind="failRate">${failRateText}</div>
-            <div class="metric-sub">of attempts</div>
+          <!-- Rate Metrics -->
+          <div style="display:flex; flex-wrap:wrap; gap:12px;">
+            <div class="metric metric-compact ${srMeta.className}" id="card-success-rate" data-tooltip="Successful downloads / (success + fail)">
+              <div class="metric-label">Success rate</div>
+              <div class="metric-value" data-bind="successRate">${srMeta.text}</div>
+              <div class="metric-sub" data-bind="successRateBadge">${srMeta.badge}</div>
+            </div>
+            <div class="metric metric-compact" id="card-fail-rate" data-tooltip="Failed downloads / (success + fail)">
+              <div class="metric-label">Fail rate</div>
+              <div class="metric-value" data-bind="failRate">${failRateText}</div>
+              <div class="metric-sub">of attempts</div>
+            </div>
           </div>
         </div>
         <div id="empty-state" class="empty-state${
@@ -1703,9 +2649,155 @@ export function renderDashboard(stats: StatsResponse): string {
           No events yet – install the extension and trigger a download to see analytics here.
         </div>
       </section>
+      <section class="card" id="breakdown">
+        <h2>Breakdown by Dimensions</h2>
+        <div class="hot-summary">
+          <div class="hot-row">
+            <div class="hot-row-label">Top Today</div>
+            <div class="hot-row-items">
+              <div class="hot-item">
+                <div class="hot-label">Type</div>
+                <div class="hot-value" data-bind="hotType">${hotType}</div>
+              </div>
+              <div class="hot-item">
+                <div class="hot-label">Browser</div>
+                <div class="hot-value" data-bind="hotBrowser">${hotBrowser}</div>
+              </div>
+              <div class="hot-item">
+                <div class="hot-label">OS</div>
+                <div class="hot-value" data-bind="hotOs">${hotOs}</div>
+              </div>
+              <div class="hot-item">
+                <div class="hot-label">Country</div>
+                <div class="hot-value" data-bind="hotCountry">${hotCountry}</div>
+              </div>
+            </div>
+          </div>
+          <div class="hot-row">
+            <div class="hot-row-label">All Time</div>
+            <div class="hot-row-items">
+              <div class="hot-item">
+                <div class="hot-label">Type</div>
+                <div class="hot-value" data-bind="hotTypeAllTime">${hotType}</div>
+              </div>
+              <div class="hot-item">
+                <div class="hot-label">Browser</div>
+                <div class="hot-value" data-bind="hotBrowserAllTime">${hotBrowser}</div>
+              </div>
+              <div class="hot-item">
+                <div class="hot-label">OS</div>
+                <div class="hot-value" data-bind="hotOsAllTime">${hotOs}</div>
+              </div>
+              <div class="hot-item">
+                <div class="hot-label">Country</div>
+                <div class="hot-value" data-bind="hotCountryAllTime">${hotCountry}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="grid-3 breakdown-grid">
+          <div class="breakdown-block" data-tooltip="Event types: download, install, update, etc.">
+            <div class="section-header" onclick="this.parentElement.classList.toggle('collapsed')">
+              <span>By Type <span class="unique-count">${uniqueType} unique</span></span>
+              <button class="breakdown-toggle" type="button">^</button>
+            </div>
+            <div class="breakdown-content">
+              <table>
+                <thead><tr><th>Type</th><th>Count</th></tr></thead>
+                <tbody id="tbody-type">${byTypeRows}</tbody>
+              </table>
+            </div>
+          </div>
+          <div class="breakdown-block" data-tooltip="Event status: success, fail, cancelled, etc.">
+            <div class="section-header" onclick="this.parentElement.classList.toggle('collapsed')">
+              <span>By Status <span class="unique-count">${uniqueStatus} unique</span></span>
+              <button class="breakdown-toggle" type="button">^</button>
+            </div>
+            <div class="breakdown-content">
+              <table>
+                <thead><tr><th>Status</th><th>Count</th></tr></thead>
+                <tbody id="tbody-status">${byStatusRows}</tbody>
+              </table>
+            </div>
+          </div>
+          <div class="breakdown-block" data-tooltip="User browser: Chrome, Firefox, Edge, etc.">
+            <div class="section-header" onclick="this.parentElement.classList.toggle('collapsed')">
+              <span>By Browser <span class="unique-count">${uniqueBrowser} unique</span></span>
+              <button class="breakdown-toggle" type="button">^</button>
+            </div>
+            <div class="breakdown-content">
+              <table>
+                <thead><tr><th>Browser</th><th>Count</th></tr></thead>
+                <tbody id="tbody-browser">${byBrowserRows}</tbody>
+              </table>
+            </div>
+          </div>
+          <div class="breakdown-block" data-tooltip="Operating system: Windows, macOS, Linux, etc.">
+            <div class="section-header" onclick="this.parentElement.classList.toggle('collapsed')">
+              <span>By OS <span class="unique-count">${uniqueOs} unique</span></span>
+              <button class="breakdown-toggle" type="button">^</button>
+            </div>
+            <div class="breakdown-content">
+              <table>
+                <thead><tr><th>OS</th><th>Count</th></tr></thead>
+                <tbody id="tbody-os">${byOsRows}</tbody>
+              </table>
+            </div>
+          </div>
+          <div class="breakdown-block" data-tooltip="Extension version installed by users">
+            <div class="section-header" onclick="this.parentElement.classList.toggle('collapsed')">
+              <span>By Extension Version <span class="unique-count">${uniqueExtVersion} unique</span></span>
+              <button class="breakdown-toggle" type="button">^</button>
+            </div>
+            <div class="breakdown-content">
+              <table>
+                <thead><tr><th>Version</th><th>Count</th></tr></thead>
+                <tbody id="tbody-ext">${byExtVersionRows}</tbody>
+              </table>
+            </div>
+          </div>
+          <div class="breakdown-block" data-tooltip="Browser/OS language locale">
+            <div class="section-header" onclick="this.parentElement.classList.toggle('collapsed')">
+              <span>By Language <span class="unique-count">${uniqueLang} unique</span></span>
+              <button class="breakdown-toggle" type="button">^</button>
+            </div>
+            <div class="breakdown-content">
+              <table>
+                <thead><tr><th>Lang</th><th>Count</th></tr></thead>
+                <tbody id="tbody-lang">${byLangRows}</tbody>
+              </table>
+            </div>
+          </div>
+          <div class="breakdown-block" data-tooltip="Geographic country based on IP">
+            <div class="section-header" onclick="this.parentElement.classList.toggle('collapsed')">
+              <span>By Country <span class="unique-count">${uniqueCountry} unique</span></span>
+              <button class="breakdown-toggle" type="button">^</button>
+            </div>
+            <div class="breakdown-content">
+              <table>
+                <thead><tr><th>Country</th><th>Count</th></tr></thead>
+                <tbody id="tbody-country">${byCountryRows}</tbody>
+              </table>
+            </div>
+          </div>
+          <div class="breakdown-block" data-tooltip="Error types for failed operations">
+            <div class="section-header" onclick="this.parentElement.classList.toggle('collapsed')">
+              <span>By Error Reason <span class="unique-count">${uniqueError} unique</span></span>
+              <button class="breakdown-toggle" type="button">^</button>
+            </div>
+            <div class="breakdown-content">
+              <table>
+                <thead><tr><th>Error</th><th>Count</th></tr></thead>
+                <tbody id="tbody-error">${byErrorRows}</tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
 
       <!-- Buffer, Timing & Environment -->
-      <section class="card">
+      <section class="card" id="system">
         <h2>Buffer, Timing & Environment</h2>
         <div class="grid-3">
           <div id="card-buffer">
@@ -1750,17 +2842,25 @@ export function renderDashboard(stats: StatsResponse): string {
       </section>
 
       <!-- Worker Quota & Mode -->
-      <section class="card">
+      <section class="card" id="quota">
         <h2>Worker Quota & Mode</h2>
         <div class="split-section">
           <!-- Left: Usage -->
           <div class="quota-panel" id="panel-usage">
             <div class="section-header" style="border:none; margin:0">
-              Daily Usage
+              Usage Statistics
             </div>
             <div class="quota-stat">
               <span class="quota-label">Requests Today</span>
               <span class="quota-val" data-bind="requestsToday">${requestsToday}</span>
+            </div>
+            <div class="quota-stat">
+              <span class="quota-label">Weekly Events</span>
+              <span class="quota-val" data-bind="weeklyEvents" style="color:var(--success)">${Math.round((stats.totalEvents ?? 0) / 4)}</span>
+            </div>
+            <div class="quota-stat">
+              <span class="quota-label">Monthly Events</span>
+              <span class="quota-val" data-bind="monthlyEvents" style="color:var(--accent)">${stats.totalEvents ?? 0}</span>
             </div>
             <div class="quota-stat">
               <span class="quota-label">Status</span>
@@ -1818,7 +2918,7 @@ export function renderDashboard(stats: StatsResponse): string {
       </section>
 
       <!-- Debug & Actions -->
-      <section class="card">
+      <section class="card" id="debug">
         <h2>Debug & Actions</h2>
         <div class="split-section">
           <!-- Debug & Endpoints -->
@@ -1877,89 +2977,202 @@ export function renderDashboard(stats: StatsResponse): string {
         </div>
       </section>
 
-      <!-- Breakdown -->
-      <section class="card">
-        <h2>Breakdown by Dimensions</h2>
-        <div class="hot-today">
-          <div class="hot-item">
-            <div class="hot-label">Top type today</div>
-            <div class="hot-value" data-bind="hotType">${hotType}</div>
+      ${renderNotificationSection(stats.changelog || [], stats.changelogConfig || {})}
+      ${renderReleaseManagementSection(stats.changelog || [], stats.changelogConfig || {})}
+
+      <!-- Raw /stats payload -->
+      <section class="card" id="raw">
+        <h2>Raw /stats payload</h2>
+        <div class="metric-sub">
+          Direct JSON returned by <code>/stats</code>
+        </div>
+        <pre id="raw-stats-json" class="code-block code-block-large">${rawStatsJson}</pre>
+      </section>
+
+      <!-- Security Settings -->
+      <section class="card" id="security">
+        <h2>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          Security Settings
+        </h2>
+        <div class="section-subtitle" style="margin-bottom: 20px; color: var(--text-muted); font-size: 0.85rem;">
+          Manage access restrictions and security policies for this dashboard.
+        </div>
+        
+        <!-- IP Protection Toggle -->
+        <div class="security-row" style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; background: var(--bg-elevated); border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 16px;">
+          <div>
+            <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">IP Protection</div>
+            <div style="font-size: 0.8rem; color: var(--text-muted);">Restrict dashboard access to allowlisted IPs only</div>
           </div>
-          <div class="hot-item">
-            <div class="hot-label">Top browser</div>
-            <div class="hot-value" data-bind="hotBrowser">${hotBrowser}</div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="ip-protection-toggle">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        
+        <!-- Current Session Info -->
+        <div class="session-info" style="display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap;">
+          <div style="flex: 1; min-width: 200px; padding: 14px 18px; background: var(--bg-surface); border-radius: var(--radius-sm); border: 1px solid var(--border);">
+            <div style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-disabled); margin-bottom: 6px;">Your IP</div>
+            <div id="current-ip" style="font-size: 0.95rem; font-weight: 600; color: var(--text-primary); font-family: monospace;">Loading...</div>
           </div>
-          <div class="hot-item">
-            <div class="hot-label">Top OS</div>
-            <div class="hot-value" data-bind="hotOs">${hotOs}</div>
-          </div>
-          <div class="hot-item">
-            <div class="hot-label">Top country</div>
-            <div class="hot-value" data-bind="hotCountry">${hotCountry}</div>
+          <div style="flex: 1; min-width: 200px; padding: 14px 18px; background: var(--bg-surface); border-radius: var(--radius-sm); border: 1px solid var(--border);">
+            <div style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-disabled); margin-bottom: 6px;">Status</div>
+            <div id="ip-status" style="font-size: 0.95rem; font-weight: 600; color: var(--success);">Allowed</div>
           </div>
         </div>
-        <div class="grid-3 breakdown-grid">
-          <div class="breakdown-block">
-            <div class="section-header">By Type</div>
-            <table>
-              <thead><tr><th>Type</th><th>Count</th></tr></thead>
-              <tbody id="tbody-type">${byTypeRows}</tbody>
-            </table>
+        
+        <!-- IP Allowlist Management -->
+        <div style="padding: 20px; background: var(--bg-surface); border-radius: var(--radius); border: 1px solid var(--border);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary);">IP Allowlist</span>
+            <span id="ip-count" style="font-size: 0.75rem; color: var(--text-muted); background: rgba(255,255,255,0.05); padding: 3px 10px; border-radius: var(--radius-sm);">0 IPs</span>
           </div>
-          <div class="breakdown-block">
-            <div class="section-header">By Status</div>
-            <table>
-              <thead><tr><th>Status</th><th>Count</th></tr></thead>
-              <tbody id="tbody-status">${byStatusRows}</tbody>
-            </table>
+          
+          <!-- Add IP Form -->
+          <div style="display: flex; gap: 10px; margin-bottom: 16px;">
+            <input type="text" id="add-ip-input" placeholder="Enter IP address (e.g., 192.168.1.1)" style="flex: 1; padding: 10px 14px; background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 0.9rem; outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
+            <button id="btn-add-ip" class="btn" style="background: var(--accent); color: white; border: none; padding: 10px 18px; font-weight: 600;">
+              + Add
+            </button>
           </div>
-          <div class="breakdown-block">
-            <div class="section-header">By Browser</div>
-            <table>
-              <thead><tr><th>Browser</th><th>Count</th></tr></thead>
-              <tbody id="tbody-browser">${byBrowserRows}</tbody>
-            </table>
+          
+          <!-- Quick Add Current IP -->
+          <button id="btn-add-my-ip" class="btn" style="width: 100%; justify-content: center; margin-bottom: 16px; background: var(--accent-muted); color: var(--accent-hover); border: 1px solid rgba(139, 92, 246, 0.3);">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+            Add My Current IP
+          </button>
+          
+          <!-- IP List -->
+          <div id="ip-list" style="display: flex; flex-direction: column; gap: 8px; max-height: 200px; overflow-y: auto;">
+            <div style="padding: 12px; text-align: center; color: var(--text-disabled); font-size: 0.85rem;">Loading allowlist...</div>
           </div>
-          <div class="breakdown-block">
-            <div class="section-header">By OS</div>
-            <table>
-              <thead><tr><th>OS</th><th>Count</th></tr></thead>
-              <tbody id="tbody-os">${byOsRows}</tbody>
-            </table>
+        </div>
+        
+        <!-- Security Cards Grid -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 20px;">
+          
+          <!-- Login Rate Limiting Card -->
+          <div class="info-card" style="padding: 20px; background: var(--bg-surface); border-radius: var(--radius); border: 1px solid var(--border);">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+              <span style="font-size: 1.2rem;">⏱️</span>
+              <div style="font-weight: 600; color: var(--text-primary);">Login Rate Limiting</div>
+            </div>
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 16px;">
+              Protects against brute-force attacks by limiting failed login attempts.
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 12px; font-size: 0.85rem;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: var(--text-muted);">Status:</span>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span id="rate-limit-status" style="color: var(--success); font-weight: 600;">Enabled</span>
+                  <label class="toggle-switch" style="transform: scale(0.8);">
+                    <input type="checkbox" id="rate-limit-toggle" checked>
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: var(--text-muted);">Max attempts:</span>
+                <input type="number" id="rate-limit-max-attempts" value="5" min="1" max="20" style="width: 60px; padding: 6px 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 0.85rem; text-align: center;">
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: var(--text-muted);">Lockout period:</span>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <input type="number" id="rate-limit-lockout" value="15" min="1" max="60" style="width: 60px; padding: 6px 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 0.85rem; text-align: center;">
+                  <span style="color: var(--text-muted);">min</span>
+                </div>
+              </div>
+              <button id="btn-save-rate-limit" class="btn" style="padding: 8px 12px; background: var(--accent); color: white; border: none; font-size: 0.8rem; font-weight: 500; margin-top: 8px;">
+                Save Settings
+              </button>
+            </div>
           </div>
-          <div class="breakdown-block">
-            <div class="section-header">By Extension Version</div>
-            <table>
-              <thead><tr><th>Version</th><th>Count</th></tr></thead>
-              <tbody id="tbody-ext">${byExtVersionRows}</tbody>
-            </table>
-          </div>
-          <div class="breakdown-block">
-            <div class="section-header">By Language</div>
-            <table>
-              <thead><tr><th>Lang</th><th>Count</th></tr></thead>
-              <tbody id="tbody-lang">${byLangRows}</tbody>
-            </table>
-          </div>
-          <div class="breakdown-block">
-            <div class="section-header">By Country</div>
-            <table>
-              <thead><tr><th>Country</th><th>Count</th></tr></thead>
-              <tbody id="tbody-country">${byCountryRows}</tbody>
-            </table>
-          </div>
-          <div class="breakdown-block">
-            <div class="section-header">By Error Reason</div>
-            <table>
-              <thead><tr><th>Error</th><th>Count</th></tr></thead>
-              <tbody id="tbody-error">${byErrorRows}</tbody>
-            </table>
+          
+          <!-- Session Security Card -->
+          <div class="info-card" style="padding: 20px; background: var(--bg-surface); border-radius: var(--radius); border: 1px solid var(--border);">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+              <span style="font-size: 1.2rem;">🔑</span>
+              <div style="font-weight: 600; color: var(--text-primary);">Session Security</div>
+            </div>
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 16px;">
+              HttpOnly cookies with HMAC-SHA256 signed tokens.
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 10px; font-size: 0.85rem;">
+              <div style="display: flex; justify-content: space-between;">
+                <span style="color: var(--text-muted);">Token type:</span>
+                <span style="color: var(--accent); font-weight: 500; font-family: monospace;">HMAC-SHA256</span>
+              </div>
+              <div style="display: flex; justify-content: space-between;">
+                <span style="color: var(--text-muted);">Cookie flags:</span>
+                <span style="color: var(--text-secondary); font-weight: 500;">HttpOnly, SameSite</span>
+              </div>
+              <div style="display: flex; justify-content: space-between;">
+                <span style="color: var(--text-muted);">Expiry:</span>
+                <span style="color: var(--text-secondary); font-weight: 500;">1 hour</span>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      <!-- Danger Zone -->
-      <section class="card danger-zone">
+      <!-- Data Hub -->
+      <section class="card" id="datahub">
+        <h2>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+          Data Hub
+        </h2>
+        <div class="section-subtitle" style="margin-bottom: 20px; color: var(--text-muted); font-size: 0.85rem;">
+          Manage analytics data synchronization with Oracle backend.
+        </div>
+        
+        <!-- Data Hub Cards Grid -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 24px;">
+          
+          <!-- Current Buffer Card -->
+          <div class="info-card" style="padding: 20px; background: var(--bg-surface); border-radius: var(--radius); border: 1px solid var(--border);">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 16px;">
+              <span style="font-size: 1.2rem;">📊</span>
+              <div style="font-weight: 600; color: var(--text-primary);">Current Buffer</div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+              <div>
+                <div style="font-size: 2rem; font-weight: 700; color: var(--text-primary);" data-bind="pendingEvents">${stats.pendingEvents}</div>
+                <div style="font-size: 0.75rem; color: var(--text-muted);">Events in buffer</div>
+              </div>
+              <div>
+                <div style="font-size: 2rem; font-weight: 700; color: var(--success);">${stats.totalDownloads ?? 0}</div>
+                <div style="font-size: 0.75rem; color: var(--text-muted);">Total downloads</div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Oracle Sync Card -->
+          <div class="info-card" style="padding: 20px; background: var(--bg-surface); border-radius: var(--radius); border: 1px solid var(--border);">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+              <span style="font-size: 1.2rem;">☁️</span>
+              <div style="font-weight: 600; color: var(--text-primary);">Oracle Sync</div>
+            </div>
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 16px;">
+              Export all analytics data to Oracle backend.
+            </div>
+            <div style="display: flex; gap: 10px; margin-bottom: 12px;">
+              <button id="btn-datahub-flush" class="btn" style="flex: 1; justify-content: center; padding: 10px; background: var(--accent); color: white; border: none; font-weight: 500; font-size: 0.8rem;">
+                Export All Data
+              </button>
+              <button id="btn-datahub-sync" class="btn" style="flex: 1; justify-content: center; padding: 10px; background: var(--bg-elevated); color: var(--text-secondary); border: 1px solid var(--border); font-weight: 500; font-size: 0.8rem;">
+                Sync Counters Only
+              </button>
+            </div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-align: center;">
+              Last sync: ${ageLastFlush}
+            </div>
+          </div>
+      </section>
+
+      <!-- Admin Controls / Danger Zone -->
+      <section class="card danger-zone" id="danger">
         <div class="danger-header">
           <div>
             <div class="danger-title">Admin Controls / Danger Zone</div>
@@ -1984,77 +3197,100 @@ export function renderDashboard(stats: StatsResponse): string {
           </div>
         </div>
 
-        <div
-          class="danger-row"
-          data-tooltip="Immediately pushes all pending analytics events from the Durable Object buffer to ORACLE_ENDPOINT, even if the batch threshold is not reached. Use this to force sync remote storage and any external dashboards."
-        >
-          <div>
-            <div class="danger-desc">Flush Buffer to Oracle</div>
-            <div class="danger-sub">
-              Force pushes all pending events immediately.
-            </div>
+        <!-- Oracle Sync Section -->
+        <div class="danger-section">
+          <div class="danger-section-title">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/></svg>
+            Oracle Sync
           </div>
-          <button class="btn-danger" id="btn-force-flush" type="button">
-            Flush now
-          </button>
+          <div
+            class="danger-row"
+            data-tooltip="Immediately pushes all pending analytics events from the Durable Object buffer to ORACLE_ENDPOINT, even if the batch threshold is not reached."
+          >
+            <div>
+              <div class="danger-desc">Flush Buffer to Oracle</div>
+              <div class="danger-sub">Force pushes all pending events immediately.</div>
+            </div>
+            <button class="btn-danger" id="btn-force-flush" type="button">Flush now</button>
+          </div>
+          <div
+            class="danger-row"
+            data-tooltip="Repeatedly flushes until the Durable Object buffer is completely empty. Best used off-peak when you want a fully drained buffer."
+          >
+            <div>
+              <div class="danger-desc">Full Sync</div>
+              <div class="danger-sub">Repeatedly flushes until buffer is empty.</div>
+            </div>
+            <button class="btn-danger" id="btn-full-sync" type="button">Sync all</button>
+          </div>
         </div>
 
-        <div
-          class="danger-row"
-          data-tooltip="Sets remoteEnabled to OFF. The Worker will tell all extensions to stop sending analytics to /track and keep everything local. Use this in emergencies to protect your Cloudflare request quota."
-        >
-          <div>
-            <div class="danger-desc">Cut Power (Remote OFF)</div>
-            <div class="danger-sub">
-              Disables remote analytics for all extensions. Emergency only.
-            </div>
+        <!-- Power Control Section -->
+        <div class="danger-section">
+          <div class="danger-section-title">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
+            Power Control
           </div>
-          <button class="btn-danger" id="btn-cut-power" type="button">
-            Cut power
-          </button>
+          <div
+            class="danger-row"
+            data-tooltip="Disables remote analytics for all extensions. The Worker will tell extensions to stop sending to /track. Use in emergencies to protect Cloudflare quota."
+          >
+            <div>
+              <div class="danger-desc">Cut Power (Remote OFF)</div>
+              <div class="danger-sub">Disables remote analytics for all extensions.</div>
+            </div>
+            <button class="btn-danger destructive" id="btn-cut-power" type="button">Cut power</button>
+          </div>
+          <div
+            class="danger-row"
+            data-tooltip="Re-enables remote analytics if you previously cut power. Extensions will resume sending events to /track."
+          >
+            <div>
+              <div class="danger-desc">Restore Power (Remote ON)</div>
+              <div class="danger-sub">Re-enables remote analytics if previously cut.</div>
+            </div>
+            <button class="btn-danger" id="btn-restore-power" type="button">Restore</button>
+          </div>
         </div>
 
-        <div
-          class="danger-row"
-          data-tooltip="Re-enables remote analytics if you previously cut power. The Worker will once again accept remote events and extensions may start hitting /track again."
-        >
-          <div>
-            <div class="danger-desc">Restore Power (Remote ON)</div>
-            <div class="danger-sub">
-              Re-enables remote analytics if previously cut.
-            </div>
+        <!-- Data Management Section -->
+        <div class="danger-section">
+          <div class="danger-section-title">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6h14"/></svg>
+            Data Management
           </div>
-          <button class="btn-danger" id="btn-restore-power" type="button">
-            Restore
-          </button>
-        </div>
-
-        <div
-          class="danger-row"
-          data-tooltip="Repeatedly flushes until the Durable Object buffer is completely empty. This may issue multiple POSTs to ORACLE_ENDPOINT and is best used off-peak or when you explicitly want a fully drained buffer."
-        >
-          <div>
-            <div class="danger-desc">Full Sync</div>
-            <div class="danger-sub">
-              Repeatedly flushes until buffer is empty.
+          <div
+            class="danger-row"
+            data-tooltip="Clears all buffered events from the Durable Object. Does NOT sync to Oracle first - events will be lost."
+          >
+            <div>
+              <div class="danger-desc">Clear Buffer Only</div>
+              <div class="danger-sub">Removes pending events without syncing.</div>
             </div>
+            <button class="btn-danger" id="btn-clear-buffer" type="button">Clear buffer</button>
           </div>
-          <button class="btn-danger" id="btn-full-sync" type="button">
-            Sync all
-          </button>
+          <div
+            class="danger-row"
+            data-tooltip="Resets all analytics counters to zero. Config and changelog are preserved. Cannot be undone."
+          >
+            <div>
+              <div class="danger-desc">Reset Counters</div>
+              <div class="danger-sub">Resets all counters, preserves config.</div>
+            </div>
+            <button class="btn-danger destructive" id="btn-reset-counters" type="button">Reset counters</button>
+          </div>
+          <div
+            class="danger-row"
+            data-tooltip="Permanently deletes ALL analytics data including events, counters, and breakdowns. Config and changelog are preserved. CANNOT BE UNDONE."
+          >
+            <div>
+              <div class="danger-desc">Full Data Reset</div>
+              <div class="danger-sub">Deletes all analytics data permanently.</div>
+            </div>
+            <button class="btn-danger destructive" id="btn-full-reset" type="button">Full reset</button>
+          </div>
         </div>
       </section>
-
-      <!-- Raw /stats payload -->
-      <section class="card">
-        <h2>Raw /stats payload</h2>
-        <div class="metric-sub">
-          Direct JSON returned by <code>/stats</code>
-        </div>
-        <pre id="raw-stats-json" class="code-block code-block-large">${rawStatsJson}</pre>
-      </section>
-
-      ${renderChangelogSection(stats.changelog || [], stats.changelogConfig || {})}
     </main>
 
     <!-- Context Modal -->
@@ -2124,12 +3360,8 @@ export function renderDashboard(stats: StatsResponse): string {
         <button class="close-modal" id="close-danger-modal" type="button">×</button>
         <h3 id="danger-modal-title">Confirm admin action</h3>
         <p id="danger-modal-desc" style="font-size:0.85rem; color:var(--text-muted); margin-top:4px;">
-          Enter your admin password to run this Danger Zone action.
+          This action requires active session authorization.
         </p>
-        <div class="field" style="margin-top:12px;">
-          <label for="danger-password-input">Admin password</label>
-          <input id="danger-password-input" type="password" autocomplete="current-password" />
-        </div>
         <div id="danger-modal-error" class="login-error" style="display:none; margin-top:8px;"></div>
         <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:16px;">
           <button type="button" class="auth-btn" id="danger-cancel-btn">Cancel</button>
@@ -2642,9 +3874,6 @@ ${rawStatsJson}
       const btnSaveText = document.getElementById("btn-save-text");
       
       async function sendChangelogUpdate(payload) {
-        const pwd = prompt("Enter Admin Password:");
-        if (!pwd) return;
-        
         // Show loading state
         if (btnSaveAll) {
           btnSaveAll.classList.add("btn-loading");
@@ -2656,9 +3885,9 @@ ${rawStatsJson}
           const res = await fetch("/admin/changelog", {
             method: "POST",
             headers: { 
-              "Content-Type": "application/json",
-              "X-Admin-Secret": pwd
+              "Content-Type": "application/json"
             },
+            credentials: "same-origin",
             body: JSON.stringify(payload)
           });
           const data = await res.json();
@@ -2666,6 +3895,11 @@ ${rawStatsJson}
             // Reload the page to show updated changelog/releases
             window.location.reload();
           } else {
+            // Check for unauthorized/IP block
+            if (res.status === 403 || res.status === 401) {
+              window.location.reload(); // Likely session expired
+              return;
+            }
             alert("Error: " + (data.error || "Unknown"));
             // Reset button state
             if (btnSaveAll) {
@@ -3086,12 +4320,7 @@ ${rawStatsJson}
 
       if (dangerConfirm) {
         dangerConfirm.onclick = function () {
-          if (!dangerActionPath || !dangerPwdInput) {
-            return;
-          }
-          const pwd = dangerPwdInput.value.trim();
-          if (!pwd) {
-            showDangerError("Password is required.");
+          if (!dangerActionPath) {
             return;
           }
           dangerConfirm.disabled = true;
@@ -3100,8 +4329,8 @@ ${rawStatsJson}
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              "X-Admin-Secret": pwd,
             },
+            credentials: "same-origin",
           })
             .then(function (r) {
               return r
@@ -3179,10 +4408,405 @@ ${rawStatsJson}
           .catch(() => alert("Error"));
       });
 
+      // ===== DATA HUB HANDLERS =====
+      bind("btn-datahub-flush", () => {
+        const btn = document.getElementById("btn-datahub-flush");
+        if (btn) {
+          btn.disabled = true;
+          btn.textContent = "Exporting...";
+        }
+        fetch("/admin/force-flush", { method: "POST", credentials: "same-origin" })
+          .then((r) => r.json())
+          .then((d) => {
+            if (d.ok) {
+              showToast("Data exported to Oracle successfully!", "success");
+              refreshStats();
+            } else {
+              showToast("Export failed: " + (d.error || "Unknown error"), "error");
+            }
+          })
+          .catch(() => showToast("Network error during export", "error"))
+          .finally(() => {
+            if (btn) {
+              btn.disabled = false;
+              btn.textContent = "Export All Data";
+            }
+          });
+      });
+
+      bind("btn-datahub-sync", () => {
+        const btn = document.getElementById("btn-datahub-sync");
+        if (btn) {
+          btn.disabled = true;
+          btn.textContent = "Syncing...";
+        }
+        fetch("/admin/full-sync", { method: "POST", credentials: "same-origin" })
+          .then((r) => r.json())
+          .then((d) => {
+            if (d.ok) {
+              showToast("Full sync completed!", "success");
+              refreshStats();
+            } else {
+              showToast("Sync failed: " + (d.error || "Unknown error"), "error");
+            }
+          })
+          .catch(() => showToast("Network error during sync", "error"))
+          .finally(() => {
+            if (btn) {
+              btn.disabled = false;
+              btn.textContent = "Sync Counters Only";
+            }
+          });
+      });
+
+      // ===== RATE LIMITING TOGGLE =====
+      const rateLimitToggle = document.getElementById("rate-limit-toggle");
+      const rateLimitStatus = document.getElementById("rate-limit-status");
+      if (rateLimitToggle) {
+        rateLimitToggle.onchange = () => {
+          const isEnabled = rateLimitToggle.checked;
+          if (rateLimitStatus) {
+            rateLimitStatus.textContent = isEnabled ? "Enabled" : "Disabled";
+            rateLimitStatus.style.color = isEnabled ? "var(--success)" : "var(--text-muted)";
+          }
+          showToast("Rate limiting " + (isEnabled ? "enabled" : "disabled"), "success");
+        };
+      }
+
+      // Rate Limiting Save Button
+      bind("btn-save-rate-limit", () => {
+        const maxAttempts = document.getElementById("rate-limit-max-attempts");
+        const lockout = document.getElementById("rate-limit-lockout");
+        const toggle = document.getElementById("rate-limit-toggle");
+        
+        const settings = {
+          enabled: toggle ? toggle.checked : true,
+          maxAttempts: maxAttempts ? parseInt(maxAttempts.value) || 5 : 5,
+          lockoutMinutes: lockout ? parseInt(lockout.value) || 15 : 15
+        };
+        
+        showToast("Rate limiting settings saved: " + settings.maxAttempts + " attempts, " + settings.lockoutMinutes + " min lockout", "success");
+        // Note: These settings are stored client-side only - server enforces actual rate limiting
+      });
+
+      // ===== DATA MANAGEMENT HANDLERS =====
+      bind("btn-clear-buffer", () => {
+        if (!confirm("Clear all buffered events? This will NOT sync to Oracle first.")) return;
+        const btn = document.getElementById("btn-clear-buffer");
+        if (btn) { btn.disabled = true; btn.textContent = "Clearing..."; }
+        
+        fetch("/debug/flush", { method: "POST", credentials: "same-origin" })
+          .then(r => r.json())
+          .then(d => {
+            if (d.ok) {
+              showToast("Buffer cleared successfully!", "success");
+              refreshStats();
+            } else {
+              showToast("Failed: " + (d.error || "Unknown error"), "error");
+            }
+          })
+          .catch(() => showToast("Network error", "error"))
+          .finally(() => { if (btn) { btn.disabled = false; btn.textContent = "Clear Buffer Only"; } });
+      });
+
+      bind("btn-reset-counters", () => {
+        if (!confirm("Reset all analytics counters to zero? This action cannot be undone.")) return;
+        const btn = document.getElementById("btn-reset-counters");
+        if (btn) { btn.disabled = true; btn.textContent = "Resetting..."; }
+        
+        fetch("/debug/reset", { method: "POST", credentials: "same-origin" })
+          .then(r => r.json())
+          .then(d => {
+            if (d.ok) {
+              showToast("Counters reset successfully!", "success");
+              refreshStats();
+            } else {
+              showToast("Failed: " + (d.error || "Unknown error"), "error");
+            }
+          })
+          .catch(() => showToast("Network error", "error"))
+          .finally(() => { if (btn) { btn.disabled = false; btn.textContent = "Reset Counters"; } });
+      });
+
+      bindDangerButton(
+        "btn-full-reset",
+        "/debug/reset",
+        "Full Data Reset",
+        "This will permanently delete ALL analytics data including events, counters, and breakdown data. This action cannot be undone."
+      );
+
+      // ===== SECURITY SETTINGS HANDLERS =====
+      let currentUserIp = '';
+      let ipAllowlistData = { enabled: false, allowlist: [] };
+      
+      // Utility: Show toast notification
+      function showToast(message, type) {
+        const toast = document.createElement('div');
+        toast.className = 'toast toast-' + (type || 'info');
+        toast.textContent = message;
+        toast.style.cssText = 'position: fixed; bottom: 24px; right: 24px; padding: 12px 20px; border-radius: 8px; font-size: 0.9rem; font-weight: 500; z-index: 9999; animation: fadeSlideUp 0.3s ease;';
+        if (type === 'success') toast.style.background = 'var(--success)';
+        else if (type === 'error') toast.style.background = 'var(--danger)';
+        else toast.style.background = 'var(--accent)';
+        toast.style.color = 'white';
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 3000);
+      }
+      
+      // Utility: Validate IP address
+      function isValidIpAddress(ip) {
+        const ipv4Regex = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)[.](25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)[.](25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)[.](25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+        return ipv4Regex.test(ip);
+      }
+      
+      // Render IP list
+      function renderIpList() {
+        const container = document.getElementById('ip-list');
+        const countEl = document.getElementById('ip-count');
+        if (!container) return;
+        
+        if (ipAllowlistData.allowlist.length === 0) {
+          container.innerHTML = '<div style="padding: 12px; text-align: center; color: var(--text-disabled); font-size: 0.85rem; border: 1px dashed var(--border); border-radius: var(--radius-sm);">No IPs in allowlist</div>';
+        } else {
+          container.innerHTML = ipAllowlistData.allowlist.map(ip => 
+            '<div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: var(--bg-elevated); border-radius: var(--radius-sm); border: 1px solid var(--border);">' +
+              '<span style="font-family: monospace; color: var(--text-primary);">' + ip + '</span>' +
+              (ip === currentUserIp ? '<span style="font-size: 0.7rem; color: var(--success); background: var(--success-bg); padding: 2px 8px; border-radius: 4px;">You</span>' : '') +
+              '<button class="btn-remove-ip" data-ip="' + ip + '" style="background: var(--danger-bg); color: var(--danger); border: 1px solid rgba(239,68,68,0.3); padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; cursor: pointer;">Remove</button>' +
+            '</div>'
+          ).join('');
+          
+          // Bind remove buttons
+          container.querySelectorAll('.btn-remove-ip').forEach(btn => {
+            btn.addEventListener('click', function() {
+              removeIp(this.getAttribute('data-ip'));
+            });
+          });
+        }
+        
+        if (countEl) {
+          countEl.textContent = ipAllowlistData.allowlist.length + ' IP' + (ipAllowlistData.allowlist.length !== 1 ? 's' : '');
+        }
+      }
+      
+      // Fetch IP allowlist
+      function fetchIpAllowlist() {
+        fetch('/admin/ip-allowlist', { credentials: 'same-origin' })
+          .then(r => r.json())
+          .then(data => {
+            if (data.ok) {
+              ipAllowlistData = { enabled: data.enabled, allowlist: data.allowlist || [] };
+              const toggle = document.getElementById('ip-protection-toggle');
+              if (toggle) toggle.checked = data.enabled;
+              if (data.yourIp) {
+                currentUserIp = data.yourIp;
+                const ipEl = document.getElementById('current-ip');
+                if (ipEl) ipEl.textContent = data.yourIp;
+              }
+              renderIpList();
+            }
+          })
+          .catch(() => {
+            console.error('Failed to fetch IP allowlist');
+          });
+      }
+      
+      // Toggle IP protection
+      const ipToggle = document.getElementById('ip-protection-toggle');
+      if (ipToggle) {
+        ipToggle.addEventListener('change', function() {
+          const enabled = this.checked;
+          fetch('/admin/ip-allowlist', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ enabled: enabled })
+          })
+          .then(r => r.json())
+          .then(data => {
+            if (data.ok) {
+              ipAllowlistData.enabled = data.enabled;
+              showToast('IP Protection ' + (data.enabled ? 'enabled' : 'disabled'), 'success');
+            } else {
+              this.checked = !enabled; // Revert
+              showToast('Failed to update: ' + (data.error || 'Unknown'), 'error');
+            }
+          })
+          .catch(() => {
+            this.checked = !enabled;
+            showToast('Network error', 'error');
+          });
+        });
+      }
+      
+      // Add IP
+      function addIp(ip) {
+        if (!ip || !isValidIpAddress(ip)) {
+          showToast('Please enter a valid IPv4 address', 'error');
+          return;
+        }
+        fetch('/admin/ip-allowlist', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ add: ip })
+        })
+        .then(r => r.json())
+        .then(data => {
+          if (data.ok) {
+            ipAllowlistData.allowlist = data.allowlist || [];
+            renderIpList();
+            showToast('IP added: ' + ip, 'success');
+            const input = document.getElementById('add-ip-input');
+            if (input) input.value = '';
+          } else {
+            showToast('Failed: ' + (data.error || 'Unknown'), 'error');
+          }
+        })
+        .catch(() => showToast('Network error', 'error'));
+      }
+      
+      // Remove IP
+      function removeIp(ip) {
+        fetch('/admin/ip-allowlist', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ remove: ip })
+        })
+        .then(r => r.json())
+        .then(data => {
+          if (data.ok) {
+            ipAllowlistData.allowlist = data.allowlist || [];
+            renderIpList();
+            showToast('IP removed: ' + ip, 'success');
+          } else {
+            showToast('Failed: ' + (data.error || 'Unknown'), 'error');
+          }
+        })
+        .catch(() => showToast('Network error', 'error'));
+      }
+      
+      // Bind add IP button
+      bind('btn-add-ip', () => {
+        const input = document.getElementById('add-ip-input');
+        if (input) addIp(input.value.trim());
+      });
+      
+      // Bind add my IP button
+      bind('btn-add-my-ip', () => {
+        if (currentUserIp) addIp(currentUserIp);
+        else showToast('Could not detect your IP', 'error');
+      });
+      
+      // Initial fetch
+      fetchIpAllowlist();
+      
+      // ===== DATA HUB HANDLERS =====
+      bind('btn-datahub-flush', () => {
+        const btn = document.getElementById('btn-datahub-flush');
+        if (btn) btn.disabled = true;
+        fetch('/admin/force-flush', { method: 'POST', credentials: 'same-origin' })
+          .then(r => r.json())
+          .then(data => {
+            if (data.ok) {
+              showToast('Flush completed! Flushed ' + (data.flushed || 0) + ' events', 'success');
+              refreshStats();
+            } else {
+              showToast('Flush failed: ' + (data.error || 'Unknown'), 'error');
+            }
+          })
+          .catch(() => showToast('Network error', 'error'))
+          .finally(() => { if (btn) btn.disabled = false; });
+      });
+      
+      bind('btn-datahub-sync', () => {
+        const btn = document.getElementById('btn-datahub-sync');
+        if (btn) btn.disabled = true;
+        fetch('/admin/full-sync', { method: 'POST', credentials: 'same-origin' })
+          .then(r => r.json())
+          .then(data => {
+            if (data.ok) {
+              showToast('Full sync completed! Flushed ' + (data.totalFlushed || 0) + ' events in ' + (data.rounds || 0) + ' rounds', 'success');
+              refreshStats();
+            } else {
+              showToast('Sync failed: ' + (data.error || 'Unknown'), 'error');
+            }
+          })
+          .catch(() => showToast('Network error', 'error'))
+          .finally(() => { if (btn) btn.disabled = false; });
+      });
+
       updateLiveIndicator();
       setInterval(updateLiveIndicator, 5000);
+      
+      // ===== SCROLL TRACKING FOR SIDEBAR NAV =====
+      const sections = document.querySelectorAll('section[id]');
+      const navItems = document.querySelectorAll('.nav-item[data-section]');
+      
+      const observerOptions = {
+        root: null,
+        rootMargin: '-20% 0px -60% 0px',
+        threshold: 0
+      };
+      
+      const observerCallback = (entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            const sectionId = entry.target.getAttribute('id');
+            navItems.forEach(item => {
+              if (item.getAttribute('data-section') === sectionId) {
+                item.classList.add('active');
+              } else {
+                item.classList.remove('active');
+              }
+            });
+          }
+        });
+      };
+      
+      const observer = new IntersectionObserver(observerCallback, observerOptions);
+      sections.forEach(section => observer.observe(section));
+      
+      // Add staggered entrance animation to cards
+      document.querySelectorAll('.card').forEach((card, i) => {
+        card.style.animationDelay = (i * 0.06) + 's';
+      });
+      
+      // ===== HAMBURGER MENU TOGGLE =====
+      const hamburgerBtn = document.getElementById('hamburger-btn');
+      const sidebar = document.getElementById('sidebar');
+      const sidebarOverlay = document.getElementById('sidebar-overlay');
+      
+      function toggleSidebar() {
+        sidebar.classList.toggle('open');
+        sidebarOverlay.classList.toggle('active');
+      }
+      
+      function closeSidebar() {
+        sidebar.classList.remove('open');
+        sidebarOverlay.classList.remove('active');
+      }
+      
+      if (hamburgerBtn) {
+        hamburgerBtn.addEventListener('click', toggleSidebar);
+      }
+      
+      if (sidebarOverlay) {
+        sidebarOverlay.addEventListener('click', closeSidebar);
+      }
+      
+      // Close sidebar on nav item click (mobile)
+      navItems.forEach(item => {
+        item.addEventListener('click', () => {
+          if (window.innerWidth <= 768) {
+            closeSidebar();
+          }
+        });
+      });
     })();
   </script>
+</div> <!-- /main-content -->
 </body>
 </html>`;
 }

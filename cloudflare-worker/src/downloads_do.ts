@@ -58,6 +58,13 @@ type DurableStateShape = {
   // Burst tracking (legacy, kept for compatibility)
   burstCounts: Record<string, { count: number; minute: number }>;
 
+  // Login attempts for rate limiting
+  loginAttempts: Record<string, { attempts: number; firstAttemptAt: number }>;
+
+  // IP Allowlist configuration
+  ipAllowlistEnabled: boolean;
+  ipAllowlist: string[];
+
   // =========================================================================
   // CHANGELOG & CONFIG
   // =========================================================================
@@ -255,6 +262,11 @@ export class DownloadsDurable {
       processedIds: [],
       burstCounts: {},
 
+      // Auth-related state
+      loginAttempts: {},
+      ipAllowlistEnabled: false,
+      ipAllowlist: [],
+
       // Remote config defaults
       configBatchSize: 50,
       configMaxDailyRequests: 50,
@@ -315,6 +327,11 @@ export class DownloadsDurable {
       ipCounts: stored.ipCounts ?? {},
       processedIds: Array.isArray(stored.processedIds) ? stored.processedIds : [],
       burstCounts: stored.burstCounts ?? {},
+
+      // Auth-related state
+      loginAttempts: stored.loginAttempts ?? base.loginAttempts,
+      ipAllowlistEnabled: stored.ipAllowlistEnabled ?? base.ipAllowlistEnabled,
+      ipAllowlist: Array.isArray(stored.ipAllowlist) ? stored.ipAllowlist : base.ipAllowlist,
 
       // Remote config - preserve stored values or use defaults
       configBatchSize: stored.configBatchSize ?? base.configBatchSize,
@@ -443,6 +460,24 @@ export class DownloadsDurable {
     // Admin Changelog Update
     if (pathname === "/admin/changelog" && request.method === "POST") {
       return this.handleAdminUpdateChangelog(request);
+    }
+
+    // Login rate limiting - used by worker to check/record attempts
+    if (pathname === "/auth/login-attempt" && request.method === "POST") {
+      return this.handleLoginAttempt(request);
+    }
+
+    // IP Allowlist check - used by worker before login
+    if (pathname === "/auth/check-ip-allowlist" && request.method === "POST") {
+      return this.handleCheckIpAllowlist(request);
+    }
+
+    // Admin IP Allowlist management
+    if (pathname === "/admin/ip-allowlist" && request.method === "POST") {
+      return this.handleAdminIpAllowlist(request);
+    }
+    if (pathname === "/admin/ip-allowlist" && request.method === "GET") {
+      return this.handleGetIpAllowlist(request);
     }
 
     return new Response("Not found (DO)", { status: 404 });
@@ -597,15 +632,16 @@ export class DownloadsDurable {
         continue;
       }
 
-      // ----- VALIDATION: Event ID format (ext-<timestamp>-<random>) -----
-      const idMatch = ev.id.match(/^ext-(\d+)-([a-z0-9]+)$/);
+      // ----- VALIDATION: Event ID format (ext-<base36_timestamp>-<random>) -----
+      // Extension uses Date.now().toString(36) which produces alphanumeric base-36
+      const idMatch = ev.id.match(/^ext-([a-z0-9]+)-([a-z0-9]+)$/i);
       if (!idMatch) {
         invalidCount++;
         continue;
       }
 
-      // ----- VALIDATION: Timestamp must be reasonable -----
-      const idTimestamp = parseInt(idMatch[1], 10);
+      // ----- VALIDATION: Timestamp must be reasonable (parse as base-36) -----
+      const idTimestamp = parseInt(idMatch[1], 36);
       if (isNaN(idTimestamp) || idTimestamp < MIN_EVENT_TIME || idTimestamp > now + MAX_FUTURE_DRIFT_MS) {
         invalidCount++;
         continue;
@@ -894,6 +930,9 @@ export class DownloadsDurable {
       ipCounts: {},
       processedIds: [],
       burstCounts: {},
+      loginAttempts: {},
+      ipAllowlistEnabled: false,
+      ipAllowlist: [],
       ...preservedConfig,
     };
     await this.state.storage.delete(STORAGE_KEY);
@@ -1444,5 +1483,228 @@ export class DownloadsDurable {
     } catch {
       return json({ ok: false, error: "invalid_payload" }, { status: 400 });
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Login Rate Limiting
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Handles login attempt tracking for rate limiting.
+   * POST /auth/login-attempt
+   * Body: { ip: string, success: boolean }
+   * 
+   * On failed attempt: increment counter, check if blocked
+   * On success: clear attempts for that IP
+   * 
+   * Returns: { allowed: boolean, attemptsRemaining?: number, blockedUntil?: number }
+   */
+  private async handleLoginAttempt(request: Request): Promise<Response> {
+    const MAX_ATTEMPTS = 5;
+    const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+
+    let body: { ip?: string; success?: boolean };
+    try {
+      body = await request.json();
+    } catch {
+      return json({ ok: false, error: "invalid_json" }, { status: 400 });
+    }
+
+    const ip = body.ip || request.headers.get("X-Client-IP") || "unknown";
+    const isSuccess = body.success === true;
+
+    // Initialize if not present
+    if (!this.d.loginAttempts) {
+      this.d.loginAttempts = {};
+    }
+
+    const now = Date.now();
+    const record = this.d.loginAttempts[ip];
+
+    // On successful login, clear attempts
+    if (isSuccess) {
+      delete this.d.loginAttempts[ip];
+      await this.persist();
+      return json({ ok: true, allowed: true, attemptsRemaining: MAX_ATTEMPTS });
+    }
+
+    // Check if currently locked out
+    if (record) {
+      const elapsed = now - record.firstAttemptAt;
+      
+      // If lockout period expired, reset
+      if (elapsed >= LOCKOUT_DURATION_MS) {
+        this.d.loginAttempts[ip] = { attempts: 1, firstAttemptAt: now };
+        await this.persist();
+        return json({ 
+          ok: true, 
+          allowed: true, 
+          attemptsRemaining: MAX_ATTEMPTS - 1 
+        });
+      }
+
+      // Already at max attempts, deny
+      if (record.attempts >= MAX_ATTEMPTS) {
+        const blockedUntil = record.firstAttemptAt + LOCKOUT_DURATION_MS;
+        return json({ 
+          ok: true, 
+          allowed: false, 
+          blockedUntil,
+          blockedForSeconds: Math.ceil((blockedUntil - now) / 1000),
+          message: "Too many failed login attempts. Try again later."
+        });
+      }
+
+      // Increment and check
+      record.attempts += 1;
+      await this.persist();
+
+      if (record.attempts >= MAX_ATTEMPTS) {
+        const blockedUntil = record.firstAttemptAt + LOCKOUT_DURATION_MS;
+        return json({ 
+          ok: true, 
+          allowed: false, 
+          blockedUntil,
+          blockedForSeconds: Math.ceil((blockedUntil - now) / 1000),
+          message: "Too many failed login attempts. Try again later."
+        });
+      }
+
+      return json({ 
+        ok: true, 
+        allowed: true, 
+        attemptsRemaining: MAX_ATTEMPTS - record.attempts 
+      });
+    }
+
+    // First failed attempt for this IP
+    this.d.loginAttempts[ip] = { attempts: 1, firstAttemptAt: now };
+    await this.persist();
+    
+    return json({ 
+      ok: true, 
+      allowed: true, 
+      attemptsRemaining: MAX_ATTEMPTS - 1 
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // IP Allowlist Handlers
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Check if an IP is allowed to access the dashboard.
+   * POST /auth/check-ip-allowlist
+   * Body: { ip: string }
+   * 
+   * Returns: { allowed: boolean }
+   */
+  private async handleCheckIpAllowlist(request: Request): Promise<Response> {
+    let body: { ip?: string };
+    try {
+      body = await request.json();
+    } catch {
+      return json({ allowed: true }); // Allow on parse error to prevent lockout
+    }
+
+    const ip = body.ip || "unknown";
+
+    // If allowlist is disabled, allow all
+    if (!this.d.ipAllowlistEnabled || this.d.ipAllowlist.length === 0) {
+      return json({ allowed: true });
+    }
+
+    // Check exact match
+    const isAllowed = this.d.ipAllowlist.includes(ip);
+    
+    return json({ allowed: isAllowed });
+  }
+
+  /**
+   * Get current IP allowlist configuration.
+   * GET /admin/ip-allowlist
+   * Requires X-Admin-Secret
+   */
+  private async handleGetIpAllowlist(request: Request): Promise<Response> {
+    if (!this.isAuthorizedAdmin(request)) {
+      return json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+
+    // Get the client IP from request headers
+    const clientIp = request.headers.get("CF-Connecting-IP") ||
+      request.headers.get("X-Forwarded-For")?.split(",")[0]?.trim() ||
+      request.headers.get("X-Real-IP") ||
+      "unknown";
+
+    return json({
+      ok: true,
+      enabled: this.d.ipAllowlistEnabled,
+      allowlist: this.d.ipAllowlist,
+      yourIp: clientIp,
+    });
+  }
+
+  /**
+   * Update IP allowlist configuration.
+   * POST /admin/ip-allowlist
+   * Body: { enabled?: boolean, allowlist?: string[], add?: string, remove?: string }
+   * Requires X-Admin-Secret
+   */
+  private async handleAdminIpAllowlist(request: Request): Promise<Response> {
+    if (!this.isAuthorizedAdmin(request)) {
+      return json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+
+    let body: { 
+      enabled?: boolean; 
+      allowlist?: string[]; 
+      add?: string; 
+      remove?: string 
+    };
+    try {
+      body = await request.json();
+    } catch {
+      return json({ ok: false, error: "invalid_json" }, { status: 400 });
+    }
+
+    let updated = false;
+
+    // Set enabled state
+    if (typeof body.enabled === "boolean") {
+      this.d.ipAllowlistEnabled = body.enabled;
+      updated = true;
+    }
+
+    // Replace entire allowlist
+    if (Array.isArray(body.allowlist)) {
+      this.d.ipAllowlist = body.allowlist.filter(ip => typeof ip === "string" && ip.length > 0);
+      updated = true;
+    }
+
+    // Add single IP
+    if (body.add && typeof body.add === "string" && !this.d.ipAllowlist.includes(body.add)) {
+      this.d.ipAllowlist.push(body.add);
+      updated = true;
+    }
+
+    // Remove single IP
+    if (body.remove && typeof body.remove === "string") {
+      const idx = this.d.ipAllowlist.indexOf(body.remove);
+      if (idx !== -1) {
+        this.d.ipAllowlist.splice(idx, 1);
+        updated = true;
+      }
+    }
+
+    if (updated) {
+      await this.persist();
+    }
+
+    return json({
+      ok: true,
+      updated,
+      enabled: this.d.ipAllowlistEnabled,
+      allowlist: this.d.ipAllowlist,
+    });
   }
 }
