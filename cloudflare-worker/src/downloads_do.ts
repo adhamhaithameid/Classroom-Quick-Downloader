@@ -262,6 +262,11 @@ export class DownloadsDurable {
       processedIds: [],
       burstCounts: {},
 
+      // Auth-related state
+      loginAttempts: {},
+      ipAllowlistEnabled: false,
+      ipAllowlist: [],
+
       // Remote config defaults
       configBatchSize: 50,
       configMaxDailyRequests: 50,
@@ -322,6 +327,11 @@ export class DownloadsDurable {
       ipCounts: stored.ipCounts ?? {},
       processedIds: Array.isArray(stored.processedIds) ? stored.processedIds : [],
       burstCounts: stored.burstCounts ?? {},
+
+      // Auth-related state
+      loginAttempts: stored.loginAttempts ?? base.loginAttempts,
+      ipAllowlistEnabled: stored.ipAllowlistEnabled ?? base.ipAllowlistEnabled,
+      ipAllowlist: Array.isArray(stored.ipAllowlist) ? stored.ipAllowlist : base.ipAllowlist,
 
       // Remote config - preserve stored values or use defaults
       configBatchSize: stored.configBatchSize ?? base.configBatchSize,
@@ -622,15 +632,16 @@ export class DownloadsDurable {
         continue;
       }
 
-      // ----- VALIDATION: Event ID format (ext-<timestamp>-<random>) -----
-      const idMatch = ev.id.match(/^ext-(\d+)-([a-z0-9]+)$/);
+      // ----- VALIDATION: Event ID format (ext-<base36_timestamp>-<random>) -----
+      // Extension uses Date.now().toString(36) which produces alphanumeric base-36
+      const idMatch = ev.id.match(/^ext-([a-z0-9]+)-([a-z0-9]+)$/i);
       if (!idMatch) {
         invalidCount++;
         continue;
       }
 
-      // ----- VALIDATION: Timestamp must be reasonable -----
-      const idTimestamp = parseInt(idMatch[1], 10);
+      // ----- VALIDATION: Timestamp must be reasonable (parse as base-36) -----
+      const idTimestamp = parseInt(idMatch[1], 36);
       if (isNaN(idTimestamp) || idTimestamp < MIN_EVENT_TIME || idTimestamp > now + MAX_FUTURE_DRIFT_MS) {
         invalidCount++;
         continue;
@@ -917,7 +928,6 @@ export class DownloadsDurable {
       buffer: [],
       batchSeq: 0,
       ipCounts: {},
-      processedIds: [],
       processedIds: [],
       burstCounts: {},
       loginAttempts: {},
@@ -1620,10 +1630,17 @@ export class DownloadsDurable {
       return json({ ok: false, error: "unauthorized" }, { status: 401 });
     }
 
+    // Get the client IP from request headers
+    const clientIp = request.headers.get("CF-Connecting-IP") ||
+      request.headers.get("X-Forwarded-For")?.split(",")[0]?.trim() ||
+      request.headers.get("X-Real-IP") ||
+      "unknown";
+
     return json({
       ok: true,
       enabled: this.d.ipAllowlistEnabled,
       allowlist: this.d.ipAllowlist,
+      yourIp: clientIp,
     });
   }
 
