@@ -111,6 +111,7 @@ export interface StatsResponse {
   totalDownloads: number;
   totalSuccess: number;
   totalFail: number;
+  totalCancelled?: number;
   pendingEvents: number;
 
   lastEventAt: number | null;
