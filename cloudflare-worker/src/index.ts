@@ -42,7 +42,7 @@ async function createSessionToken(secret: string, ip: string): Promise<string> {
   return `${payloadB64}.${sigB64}`;
 }
 
-async function verifySessionToken(token: string, secret: string, clientIp: string): Promise<boolean> {
+async function verifySessionToken(token: string, secret: string, _clientIp: string): Promise<boolean> {
   try {
     const [payloadB64, sigB64] = token.split(".");
     if (!payloadB64 || !sigB64) return false;
@@ -312,6 +312,16 @@ async function handleDashboard(request: Request, env: WorkerEnv): Promise<Respon
 // ---------------------------------------------------------------------------
 // Logout Handler
 // ---------------------------------------------------------------------------
+
+function handleLogout(_request: Request): Response {
+  return new Response(null, {
+    status: 302,
+    headers: {
+      "Location": "/",
+      "Set-Cookie": clearSessionCookieHeader(),
+    },
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Danger Password Verification (separate from login password)
