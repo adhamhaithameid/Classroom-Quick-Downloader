@@ -7,8 +7,8 @@
 import type { AnalyticsEvent, RecordDownloadEventInput, AnalyticsConfig } from './types';
 import { DEFAULT_CONFIG, CONFIG_URL } from './constants';
 import { detectBrowser, detectOS, detectLanguage, getExtensionVersion, generateEventId } from './detection';
-import { loadQueue, saveQueue, loadConfig, saveConfig, loadStats } from './storage';
-import { internalFlush, updateLocalStats } from './flush';
+import { loadQueue, saveQueue, loadConfig, saveConfig, loadStats, loadMeta, saveMeta } from './storage';
+import { internalFlush, updateLocalStats, getSafeUtcNowMs } from './flush';
 
 // Re-export types
 export type {
@@ -35,9 +35,15 @@ function enqueueOp(op: () => Promise<void>): void {
 async function internalTrack(
   event: Omit<AnalyticsEvent, 'timestamp' | 'ext_version' | 'browser' | 'os' | 'language' | 'retryCount' | 'id'>
 ): Promise<void> {
+  const meta = await loadMeta();
+  const safeTime = getSafeUtcNowMs(meta);
+  if (safeTime.changed) {
+    await saveMeta(safeTime.meta);
+  }
+
   const fullEvent: AnalyticsEvent = {
     ...event,
-    timestamp: Date.now(),
+    timestamp: safeTime.nowMs || Date.now(),
     ext_version: getExtensionVersion(),
     browser: detectBrowser(),
     os: await detectOS(),
@@ -123,8 +129,12 @@ export async function refreshRemoteAnalyticsConfig(): Promise<void> {
     const updated: AnalyticsConfig = {
       ...current,
       batchSize: json.batchSize ?? current.batchSize,
+      maxDailyRequests: json.maxDailyRequests ?? current.maxDailyRequests,
+      maxRetry: json.maxRetry ?? current.maxRetry,
+      flushMode: json.flushMode ?? current.flushMode,
       remoteEnabled: json.remoteEnabled ?? current.remoteEnabled,
       cancelHoldDelayMs: json.cancelHoldDelayMs ?? current.cancelHoldDelayMs,
+      maxEventsPerRequest: json.maxEventsPerRequest ?? current.maxEventsPerRequest,
     };
 
     if (json.timeFlushMinutes) {
