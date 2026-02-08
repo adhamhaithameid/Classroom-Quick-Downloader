@@ -47,12 +47,21 @@ export interface AnalyticsConfig {
   highUsageFlushMinutes: number;
   remoteEnabled: boolean;
   cancelHoldDelayMs: number;
+  /**
+   * Max events allowed per request (worker-side limit).
+   * Defaults to 5000 if not provided by remote config.
+   */
+  maxEventsPerRequest?: number;
 }
 
 export interface AnalyticsMeta {
   lastFlushAt: number | null;
   nextRetryAt: number | null;
   backoffIndex: number;
+  lastDailyFlushUtcDate?: string | null;
+  dailyFlushOffsetMinutes?: number | null;
+  lastKnownUtcMs?: number | null;
+  lastPerfMs?: number | null;
 }
 
 export interface RateLimitState {
@@ -65,6 +74,9 @@ export interface WorkerResponse {
   error?: string;
   message?: string;
   accepted?: number;
+  acceptedIds?: string[];
+  duplicateIds?: string[];
+  invalidIds?: string[];
 }
 
 export interface FlushResult {
@@ -72,6 +84,9 @@ export interface FlushResult {
   rateLimited?: boolean;
   serverOverloaded?: boolean;
   accepted?: number;
+  acceptedIds?: string[];
+  duplicateIds?: string[];
+  invalidIds?: string[];
   error?: string;
 }
 

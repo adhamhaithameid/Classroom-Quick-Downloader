@@ -21,6 +21,7 @@ export const STORAGE_KEYS = {
 const BATCH_SIZE = 50;
 const MAX_RETRY = 5;
 const REMOTE_ENABLED = true;
+const MAX_EVENTS_PER_REQUEST = 5000;
 
 export const DEFAULT_CONFIG: AnalyticsConfig = {
   batchSize: BATCH_SIZE,
@@ -32,12 +33,17 @@ export const DEFAULT_CONFIG: AnalyticsConfig = {
   highUsageFlushMinutes: 1440,
   remoteEnabled: REMOTE_ENABLED,
   cancelHoldDelayMs: 1000,
+  maxEventsPerRequest: MAX_EVENTS_PER_REQUEST,
 };
 
 export const DEFAULT_META: AnalyticsMeta = {
   lastFlushAt: null,
   nextRetryAt: null,
   backoffIndex: 0,
+  lastDailyFlushUtcDate: null,
+  dailyFlushOffsetMinutes: null,
+  lastKnownUtcMs: null,
+  lastPerfMs: null,
 };
 
 // --- Backoff Steps (seconds) ---
