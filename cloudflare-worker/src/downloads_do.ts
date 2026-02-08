@@ -48,9 +48,16 @@ type DurableStateShape = {
   // Only incremented after successful flush to Oracle
   batchSeq: number;
 
-  // --- Security / Anti-Abuse ---
-  // Tracks requests per IP (for monitoring, not enforcement)
+  // --- Privacy / Anti-Abuse ---
+  // IP tracking is disabled for privacy compliance. These fields are kept
+  // for backward compatibility but are always cleared.
   ipCounts: Record<string, number>;
+  
+  // Legacy cached size (always 0 when IP tracking is disabled)
+  ipCountsSize: number;
+  
+  // Derived counter (always 0 when IP tracking is disabled)
+  uniqueRequestsToday: number;
   
   // Set of recently processed event IDs for O(1) idempotency lookup
   processedIds: string[];
@@ -216,6 +223,18 @@ function json<T>(obj: T, init: ResponseInit = {}): Response {
   });
 }
 
+type LogLevel = "info" | "warn" | "error";
+
+function logEvent(level: LogLevel, message: string, fields?: Record<string, unknown>): void {
+  const payload = {
+    level,
+    message,
+    ts: new Date().toISOString(),
+    ...fields,
+  };
+  console.log(JSON.stringify(payload));
+}
+
 // ---------------------------------------------------------------------------
 // Durable Object class
 // ---------------------------------------------------------------------------
@@ -259,6 +278,8 @@ export class DownloadsDurable {
       batchSeq: 0,
       
       ipCounts: {},
+      ipCountsSize: 0,
+      uniqueRequestsToday: 0,
       processedIds: [],
       burstCounts: {},
 
@@ -324,7 +345,9 @@ export class DownloadsDurable {
       buffer: Array.isArray(stored.buffer) ? stored.buffer : [],
       batchSeq: stored.batchSeq ?? 0,
 
-      ipCounts: stored.ipCounts ?? {},
+      ipCounts: {},
+      ipCountsSize: 0,
+      uniqueRequestsToday: 0,
       processedIds: Array.isArray(stored.processedIds) ? stored.processedIds : [],
       burstCounts: stored.burstCounts ?? {},
 
@@ -346,6 +369,27 @@ export class DownloadsDurable {
       changelog: Array.isArray(stored.changelog) ? stored.changelog : base.changelog,
       changelogConfig: stored.changelogConfig ?? base.changelogConfig,
     };
+
+    // PRIVACY: IP tracking disabled. Clear any persisted IP data on load.
+    const hadLegacyIps = !!stored.ipCounts && Object.keys(stored.ipCounts).length > 0;
+    this.data.ipCounts = {};
+    this.data.ipCountsSize = 0;
+    this.data.uniqueRequestsToday = 0;
+
+    // Strip any persisted ip_address fields from buffered events
+    let strippedEventIps = false;
+    if (Array.isArray(this.data.buffer)) {
+      for (const ev of this.data.buffer) {
+        if (ev && typeof ev === "object" && "ip_address" in ev) {
+          delete ev.ip_address;
+          strippedEventIps = true;
+        }
+      }
+    }
+
+    if (hadLegacyIps || strippedEventIps) {
+      await this.persist();
+    }
 
     // Ensure midnight alarm is scheduled
     await this.scheduleNextMidnightAlarm();
@@ -370,14 +414,22 @@ export class DownloadsDurable {
   /**
    * Ensure reqCountToday is for the current UTC day. Resets counters
    * when the day changes.
+   * 
+   * LIFECYCLE CRITICAL: This method manages daily-bounded state variables.
+   * IP tracking is disabled for privacy. We still reset legacy fields to
+   * guarantee no stale IP data persists across days.
    */
   private ensureRequestDay(): void {
     const today = todayUtcDate();
     if (this.d.reqCountDate !== today) {
       this.d.reqCountDate = today;
       this.d.reqCountToday = 0;
-      // Reset daily IP counters
+      
+      // PRIVACY RESET: Clear legacy IP tracking fields every day
       this.d.ipCounts = {};
+      this.d.ipCountsSize = 0;
+      this.d.uniqueRequestsToday = 0;
+      
       // hardRemoteOff is NOT reset automatically here.
     }
   }
@@ -549,12 +601,6 @@ export class DownloadsDurable {
         ? countryHeader
         : undefined;
 
-    // --- IP Extraction (for audit logging only, not rate limiting) ---
-    const ip = request.headers.get("X-Client-IP") || "unknown";
-    
-    // Track IP for monitoring (no enforcement - extension handles rate limiting)
-    this.d.ipCounts[ip] = (this.d.ipCounts[ip] || 0) + 1;
-
     // =========================================================================
     // LAYER 1: PAYLOAD VALIDATION
     // =========================================================================
@@ -562,6 +608,7 @@ export class DownloadsDurable {
     try {
       body = await request.json();
     } catch {
+      logEvent("warn", "track_invalid_json");
       await this.persist();
       return json({ ok: false, error: "invalid_json" }, { status: 400 });
     }
@@ -573,12 +620,13 @@ export class DownloadsDurable {
     }
 
     // Allow large batches to support next-day consolidation (extension sends all pending at once)
-    const MAX_EVENTS_PER_REQUEST = 5000;
-    const MAX_BUFFER_SIZE = 50_000;
+    const MAX_EVENTS_PER_REQUEST = this.d.configMaxEventsPerRequest || 5000;
+    const MAX_BUFFER_SIZE = this.d.configMaxBufferSize || 50_000;
 
     if (events.length > MAX_EVENTS_PER_REQUEST) {
+      logEvent("warn", "track_too_many_events", { count: events.length, max: MAX_EVENTS_PER_REQUEST });
       return json(
-        { ok: false, error: "too_many_events", max: MAX_EVENTS_PER_REQUEST, message: "Max 10 events per request." },
+        { ok: false, error: "too_many_events", max: MAX_EVENTS_PER_REQUEST, message: `Max ${MAX_EVENTS_PER_REQUEST} events per request.` },
         { status: 400 }
       );
     }
@@ -587,9 +635,10 @@ export class DownloadsDurable {
     // LAYER 2: EVENT SIZE VALIDATION (Prevent memory exhaustion via oversized payloads)
     // =========================================================================
     const MAX_EVENT_SIZE_BYTES = 10 * 1024; // 10KB per event
+    const encoder = new TextEncoder();
     for (const ev of events) {
       try {
-        const eventSize = JSON.stringify(ev).length;
+        const eventSize = encoder.encode(JSON.stringify(ev)).length;
         if (eventSize > MAX_EVENT_SIZE_BYTES) {
           return json(
             { ok: false, error: "event_too_large", maxBytes: MAX_EVENT_SIZE_BYTES },
@@ -604,7 +653,8 @@ export class DownloadsDurable {
       }
     }
 
-    if (this.d.buffer.length >= MAX_BUFFER_SIZE) {
+    if (this.d.buffer.length + events.length > MAX_BUFFER_SIZE) {
+      logEvent("warn", "track_buffer_full", { bufferSize: this.d.buffer.length, incoming: events.length, max: MAX_BUFFER_SIZE });
       return json(
         { ok: false, error: "buffer_full", bufferSize: this.d.buffer.length },
         { status: 503 }
@@ -612,23 +662,25 @@ export class DownloadsDurable {
     }
 
     // =========================================================================
-    // LAYER 4: ROBUST IDEMPOTENCY (Set-based O(1) lookup + timestamp validation)
+    // LAYER 3: ROBUST IDEMPOTENCY (Set-based O(1) lookup + timestamp validation)
     // =========================================================================
     // const MAX_PROCESSED_IDS = 5000;
-    const MAX_EVENT_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
-    const MIN_EVENT_TIME = now - MAX_EVENT_AGE_MS;
-    const MAX_FUTURE_DRIFT_MS = 5 * 60 * 1000; // 5 minutes
+    const MAX_FUTURE_DRIFT_MS = 7 * 24 * 60 * 60 * 1000; // 7 days (tolerate client clock skew)
 
     // Use Set for O(1) lookup
     const processedSet = new Set(this.d.processedIds);
     let acceptedCount = 0;
     let duplicateCount = 0;
     let invalidCount = 0;
+    const acceptedIds: string[] = [];
+    const duplicateIds: string[] = [];
+    const invalidIds: string[] = [];
 
     for (const ev of events) {
       // ----- VALIDATION: Event ID required -----
       if (!ev.id || typeof ev.id !== "string" || ev.id.length < 10) {
         invalidCount++;
+        if (ev?.id) invalidIds.push(ev.id);
         continue;
       }
 
@@ -642,26 +694,30 @@ export class DownloadsDurable {
 
       // ----- VALIDATION: Timestamp must be reasonable (parse as base-36) -----
       const idTimestamp = parseInt(idMatch[1], 36);
-      if (isNaN(idTimestamp) || idTimestamp < MIN_EVENT_TIME || idTimestamp > now + MAX_FUTURE_DRIFT_MS) {
+      if (isNaN(idTimestamp) || idTimestamp > now + MAX_FUTURE_DRIFT_MS) {
         invalidCount++;
+        invalidIds.push(ev.id);
         continue;
       }
 
       // ----- IDEMPOTENCY: Skip duplicates -----
       if (processedSet.has(ev.id)) {
         duplicateCount++;
+        duplicateIds.push(ev.id);
         continue;
       }
 
       // ----- VALIDATION: Timestamp sanity -----
-      if (typeof ev.timestamp !== "number" || ev.timestamp < MIN_EVENT_TIME || ev.timestamp > now + MAX_FUTURE_DRIFT_MS) {
+      if (typeof ev.timestamp !== "number" || ev.timestamp > now + MAX_FUTURE_DRIFT_MS) {
         invalidCount++;
+        invalidIds.push(ev.id);
         continue;
       }
 
       // ----- VALIDATION: Required fields -----
       if (!ev.status || (ev.status !== "success" && ev.status !== "fail" && ev.status !== "cancelled")) {
         invalidCount++;
+        invalidIds.push(ev.id);
         continue;
       }
 
@@ -674,14 +730,13 @@ export class DownloadsDurable {
         ev.country = countryFromRequest;
       }
 
-      // Store IP for audit
-      if (!ev.ip_address) {
-        ev.ip_address = ip;
-      }
+      // PRIVACY: Never persist IPs. Strip any client-provided ip_address.
+      delete ev.ip_address;
 
       this.d.buffer.push(ev);
       this.d.totalEvents += 1;
       acceptedCount++;
+      acceptedIds.push(ev.id);
       
       // totalDownloads = all download attempts (success + fail)
       this.d.totalDownloads += 1;
@@ -757,6 +812,9 @@ export class DownloadsDurable {
       accepted: acceptedCount,
       duplicates: duplicateCount,
       invalid: invalidCount,
+      acceptedIds,
+      duplicateIds,
+      invalidIds,
     }, { status: 202 });
   }
 
@@ -818,7 +876,11 @@ export class DownloadsDurable {
       // Request tracking (for monitoring)
       requestsToday: this.d.reqCountToday ?? 0,
       requestDate: this.d.reqCountDate ?? null,
-      uniqueIpsToday: Object.keys(this.d.ipCounts ?? {}).length,
+      uniqueRequestsToday: this.d.uniqueRequestsToday ?? 0,
+      // BACKWARDS COMPATIBILITY: Legacy dashboard uses uniqueIpsToday
+      uniqueIpsToday: this.d.uniqueRequestsToday ?? 0,
+      // IP tracking disabled -> unique counts are not approximated
+      isApproximated: false,
       
       // NEW: Changelog data
       changelog: this.d.changelog,
@@ -847,6 +909,7 @@ export class DownloadsDurable {
       batchSize: this.d.configBatchSize,
       maxDailyRequests: this.d.configMaxDailyRequests,
       maxRetry: this.d.configMaxRetry,
+      maxEventsPerRequest: this.d.configMaxEventsPerRequest,
       
       // Flush mode: 'next_day' (default) or 'time_based'
       flushMode: this.d.configFlushMode,
@@ -928,6 +991,8 @@ export class DownloadsDurable {
       buffer: [],
       batchSeq: 0,
       ipCounts: {},
+      ipCountsSize: 0,
+      uniqueRequestsToday: 0,
       processedIds: [],
       burstCounts: {},
       loginAttempts: {},
@@ -1260,14 +1325,25 @@ export class DownloadsDurable {
     // Generate stable batch ID using sequence number (doesn't change on retry)
     const batchId = `do-seq${this.d.batchSeq}-${events.length}ev`;
 
+    // PRIVACY FIX: IP collection disabled per PRIVACY.md policy
+    // The privacy policy states IPs are never stored, so we don't send them to Oracle
+    // This disables the Geo Map feature but aligns code with documented privacy claims
+    // To re-enable, update PRIVACY.md to disclose IP storage and uncomment the code below
+    const uniqueIps: string[] = [];  // Disabled for privacy compliance
+
+    // LEAN INGESTION: Only send summaries, NOT raw events or IPs
+    // This reduces payload size and maintains privacy compliance
     return {
       batchId,
       generatedAt: now,
       timeZone: "UTC",
-      summary,     // <--- The new big JSON object
-      timeBuckets, // <--- Still useful for hourly charts
-      doState,
+      summary,      // Aggregated counters
+      timeBuckets,  // Hourly aggregates
+      doState,      // DO health snapshot
+      uniqueIps,    // Empty - IPs not collected per privacy policy
+      // NOTE: Raw events intentionally excluded to reduce payload size
     };
+
   }
 
   private aggregateBucket(hourStart: string, events: StoredEvent[]): TimeBucket {
@@ -1359,6 +1435,7 @@ export class DownloadsDurable {
       if (!this.d.retryState) this.d.retryState = { ...DEFAULT_RETRY_STATE };
       this.d.retryState.lastError = msg;
       this.d.retryState.lastFlushAttemptAt = now;
+      logEvent("error", "oracle_flush_misconfigured", { error: msg });
       // Don't schedule retries if endpoint is missing - just report error
       await this.state.storage.deleteAlarm();
       await this.persist();
@@ -1400,6 +1477,7 @@ export class DownloadsDurable {
         const msg = `Oracle responded ${res.status} ${res.statusText} ${text}`;
         this.d.retryState.lastError = msg;
         this.d.retryState.consecutiveFailures += 1;
+        logEvent("warn", "oracle_flush_failed", { status: res.status, statusText: res.statusText });
         await this.scheduleRetry();
         await this.persist();
         return { ok: false, sent: 0, error: msg };
@@ -1423,6 +1501,7 @@ export class DownloadsDurable {
       if (!this.d.retryState) this.d.retryState = { ...DEFAULT_RETRY_STATE };
       this.d.retryState.lastError = msg;
       this.d.retryState.consecutiveFailures += 1;
+      logEvent("error", "oracle_flush_exception", { error: String(err) });
       await this.scheduleRetry();
       await this.persist();
       return { ok: false, sent: 0, error: msg };
@@ -1500,10 +1579,13 @@ export class DownloadsDurable {
    * Returns: { allowed: boolean, attemptsRemaining?: number, blockedUntil?: number }
    */
   private async handleLoginAttempt(request: Request): Promise<Response> {
+    if (!this.isAuthorizedAdmin(request)) {
+      return json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
     const MAX_ATTEMPTS = 5;
     const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 
-    let body: { ip?: string; success?: boolean };
+    let body: { ip?: string; success?: boolean; checkOnly?: boolean };
     try {
       body = await request.json();
     } catch {
@@ -1512,6 +1594,7 @@ export class DownloadsDurable {
 
     const ip = body.ip || request.headers.get("X-Client-IP") || "unknown";
     const isSuccess = body.success === true;
+    const checkOnly = body.checkOnly === true;
 
     // Initialize if not present
     if (!this.d.loginAttempts) {
@@ -1520,6 +1603,40 @@ export class DownloadsDurable {
 
     const now = Date.now();
     const record = this.d.loginAttempts[ip];
+
+    // Check-only mode: return current lockout state without mutating
+    if (checkOnly) {
+      if (record) {
+        const elapsed = now - record.firstAttemptAt;
+        if (elapsed >= LOCKOUT_DURATION_MS) {
+          return json({
+            ok: true,
+            allowed: true,
+            attemptsRemaining: MAX_ATTEMPTS,
+          });
+        }
+        if (record.attempts >= MAX_ATTEMPTS) {
+          const blockedUntil = record.firstAttemptAt + LOCKOUT_DURATION_MS;
+          return json({
+            ok: true,
+            allowed: false,
+            blockedUntil,
+            blockedForSeconds: Math.ceil((blockedUntil - now) / 1000),
+            message: "Too many failed login attempts. Try again later.",
+          });
+        }
+        return json({
+          ok: true,
+          allowed: true,
+          attemptsRemaining: MAX_ATTEMPTS - record.attempts,
+        });
+      }
+      return json({
+        ok: true,
+        allowed: true,
+        attemptsRemaining: MAX_ATTEMPTS,
+      });
+    }
 
     // On successful login, clear attempts
     if (isSuccess) {
@@ -1600,6 +1717,9 @@ export class DownloadsDurable {
    * Returns: { allowed: boolean }
    */
   private async handleCheckIpAllowlist(request: Request): Promise<Response> {
+    if (!this.isAuthorizedAdmin(request)) {
+      return json({ allowed: false, error: "unauthorized" }, { status: 401 });
+    }
     let body: { ip?: string };
     try {
       body = await request.json();
