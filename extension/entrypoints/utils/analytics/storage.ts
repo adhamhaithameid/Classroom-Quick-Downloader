@@ -75,9 +75,8 @@ async function loadQueueWithIntegrity(): Promise<{ queue: AnalyticsEvent[]; vali
   const computed = computeChecksum(data);
 
   if (storedChecksum && storedChecksum !== computed) {
-    console.warn('[CQD Analytics] Queue integrity check failed, resetting queue');
-    await saveQueueWithIntegrity([]);
-    return { queue: [], valid: false };
+    console.warn('[CQD Analytics] Queue integrity check failed; keeping raw queue to avoid data loss');
+    return { queue: raw, valid: false };
   }
 
   return { queue: raw, valid: true };
