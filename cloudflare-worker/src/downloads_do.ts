@@ -16,6 +16,8 @@ import {
   ChangelogConfig,
 } from "./types";
 
+import { safeCompare } from "./utils";
+
 export interface Env {
   ORACLE_ENDPOINT: string;
   DO_SHARED_SECRET: string;
@@ -386,7 +388,7 @@ export class DownloadsDurable {
     const header = request.headers.get("X-Admin-Secret") || "";
     const expected = this.env.DO_SHARED_SECRET;
     if (!expected) return false;
-    return header === expected;
+    return safeCompare(header, expected);
   }
 
   // ---------------------------------------------------------------------------
