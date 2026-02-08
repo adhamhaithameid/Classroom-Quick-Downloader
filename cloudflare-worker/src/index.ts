@@ -1,6 +1,7 @@
 // filepath: cloudflare-worker/src/index.ts
 import { renderDashboard, renderLoginPage } from "./dashboard";
 import type { Env as WorkerEnv, StatsResponse } from "./types";
+import { safeCompare } from "./utils";
 
 // ---------------------------------------------------------------------------
 // Session Token Utilities (HMAC-SHA256 based)
@@ -221,7 +222,7 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
     }
 
     // Validate password
-    if (password !== env.DO_SHARED_SECRET) {
+    if (!(await safeCompare(password, env.DO_SHARED_SECRET))) {
       const rateLimitRes = await stub.fetch(rateLimitReq);
       const rateLimitData = await rateLimitRes.json() as {
         allowed: boolean;
@@ -335,7 +336,7 @@ async function handleVerifyDangerPassword(request: Request, env: WorkerEnv): Pro
   try {
     const { password } = await request.json() as { password: string };
     
-    if (!password || password !== env.DANGER_PASSWORD) {
+    if (!password || !(await safeCompare(password, env.DANGER_PASSWORD))) {
       return withCors(request, new Response(
         JSON.stringify({ ok: false, error: "Invalid danger password" }),
         { status: 401, headers: { "content-type": "application/json" } }
@@ -364,7 +365,7 @@ async function handleProtectedStats(request: Request, env: WorkerEnv): Promise<R
   const sessionToken = getSessionCookie(request);
 
   // Check X-Admin-Secret header first (for API access)
-  const hasValidSecret = adminSecret === env.DO_SHARED_SECRET;
+  const hasValidSecret = await safeCompare(adminSecret || "", env.DO_SHARED_SECRET);
   
   // Check session token (for browser/dashboard access)
   const hasValidSession = sessionToken && 
@@ -393,7 +394,7 @@ async function handleProtectedAdminEndpoint(request: Request, env: WorkerEnv): P
   const sessionToken = getSessionCookie(request);
 
   // Check X-Admin-Secret header first (for direct API access)
-  const hasValidSecret = adminSecret === env.DO_SHARED_SECRET;
+  const hasValidSecret = await safeCompare(adminSecret || "", env.DO_SHARED_SECRET);
   
   // Check session token (for browser/dashboard access)
   const hasValidSession = sessionToken && 

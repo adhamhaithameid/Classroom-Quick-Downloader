@@ -15,6 +15,7 @@ import {
   ChangelogEntry,
   ChangelogConfig,
 } from "./types";
+import { safeCompare } from "./utils";
 
 export interface Env {
   ORACLE_ENDPOINT: string;
@@ -382,11 +383,11 @@ export class DownloadsDurable {
     }
   }
 
-  private isAuthorizedAdmin(request: Request): boolean {
+  private async isAuthorizedAdmin(request: Request): Promise<boolean> {
     const header = request.headers.get("X-Admin-Secret") || "";
     const expected = this.env.DO_SHARED_SECRET;
     if (!expected) return false;
-    return header === expected;
+    return await safeCompare(header, expected);
   }
 
   // ---------------------------------------------------------------------------
@@ -417,7 +418,7 @@ export class DownloadsDurable {
 
     if (pathname === "/debug/flush" && request.method === "POST") {
       // Require admin auth for debug endpoints
-      if (!this.isAuthorizedAdmin(request)) {
+      if (!(await this.isAuthorizedAdmin(request))) {
         return json({ ok: false, error: "unauthorized" }, { status: 401 });
       }
       return this.handleDebugFlush();
@@ -425,7 +426,7 @@ export class DownloadsDurable {
 
     if (pathname === "/debug/reset" && request.method === "POST") {
       // Require admin auth for debug endpoints
-      if (!this.isAuthorizedAdmin(request)) {
+      if (!(await this.isAuthorizedAdmin(request))) {
         return json({ ok: false, error: "unauthorized" }, { status: 401 });
       }
       return this.handleDebugReset();
@@ -942,7 +943,7 @@ export class DownloadsDurable {
   }
 
   private async handleAdminForceFlush(request: Request): Promise<Response> {
-    if (!this.isAuthorizedAdmin(request)) {
+    if (!(await this.isAuthorizedAdmin(request))) {
       return json({ ok: false, error: "unauthorized" }, { status: 401 });
     }
 
@@ -976,7 +977,7 @@ export class DownloadsDurable {
    *         timeFlushMinutes?: { low: number, mid: number, high: number } }
    */
   private async handleAdminUpdateConfig(request: Request): Promise<Response> {
-    if (!this.isAuthorizedAdmin(request)) {
+    if (!(await this.isAuthorizedAdmin(request))) {
       return json({ ok: false, error: "unauthorized" }, { status: 401 });
     }
 
@@ -1042,7 +1043,7 @@ export class DownloadsDurable {
   }
 
   private async handleAdminCutPower(request: Request): Promise<Response> {
-    if (!this.isAuthorizedAdmin(request)) {
+    if (!(await this.isAuthorizedAdmin(request))) {
       return json({ ok: false, error: "unauthorized" }, { status: 401 });
     }
 
@@ -1063,7 +1064,7 @@ export class DownloadsDurable {
   }
 
   private async handleAdminRestorePower(request: Request): Promise<Response> {
-    if (!this.isAuthorizedAdmin(request)) {
+    if (!(await this.isAuthorizedAdmin(request))) {
       return json({ ok: false, error: "unauthorized" }, { status: 401 });
     }
 
@@ -1084,7 +1085,7 @@ export class DownloadsDurable {
   }
 
   private async handleAdminFullSync(request: Request): Promise<Response> {
-    if (!this.isAuthorizedAdmin(request)) {
+    if (!(await this.isAuthorizedAdmin(request))) {
       return json({ ok: false, error: "unauthorized" }, { status: 401 });
     }
 
@@ -1449,7 +1450,7 @@ export class DownloadsDurable {
    * Expects JSON body with `changelog` (array) or `config` (object) or both.
    */
   private async handleAdminUpdateChangelog(request: Request): Promise<Response> {
-    if (!this.isAuthorizedAdmin(request)) {
+    if (!(await this.isAuthorizedAdmin(request))) {
       return json({ ok: false, error: "unauthorized" }, { status: 401 });
     }
 
@@ -1626,7 +1627,7 @@ export class DownloadsDurable {
    * Requires X-Admin-Secret
    */
   private async handleGetIpAllowlist(request: Request): Promise<Response> {
-    if (!this.isAuthorizedAdmin(request)) {
+    if (!(await this.isAuthorizedAdmin(request))) {
       return json({ ok: false, error: "unauthorized" }, { status: 401 });
     }
 
@@ -1651,7 +1652,7 @@ export class DownloadsDurable {
    * Requires X-Admin-Secret
    */
   private async handleAdminIpAllowlist(request: Request): Promise<Response> {
-    if (!this.isAuthorizedAdmin(request)) {
+    if (!(await this.isAuthorizedAdmin(request))) {
       return json({ ok: false, error: "unauthorized" }, { status: 401 });
     }
 
