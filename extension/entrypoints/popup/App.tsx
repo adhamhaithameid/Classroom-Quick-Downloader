@@ -666,7 +666,7 @@ function App() {
                     <div key={entry.id} className="cqd-cl-entry">
                       <div className="cqd-cl-ver-row">
                          <span className="cqd-cl-version">v{entry.version}</span>
-                         <span className="cqd-cl-date">{new Date(entry.date).toLocaleDateString()}</span>
+                        <span className="cqd-cl-date">{new Date(entry.date).toLocaleDateString('en-US', { timeZone: 'UTC' })}</span>
                       </div>
                       <ul className="cqd-cl-list">
                         {entry.changes.map((change, i) => (
