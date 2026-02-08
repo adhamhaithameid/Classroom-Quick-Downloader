@@ -1,7 +1,13 @@
 // filepath: entrypoints/popup/App.tsx
 
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import './App.css';
+import {
+  getStoredColorAssignments,
+  resolveColorForType,
+  saveColorAssignments,
+  isColorDark,
+} from '../../src/ui/colors';
 import logoSrc from '../../assets/CQD.png';
 import logoGraySrc from '../../assets/CQD-gray.png';
 import bmcLogoSrc from '../../assets/bmc-logo.svg';
@@ -76,206 +82,17 @@ type ToggleRowProps = {
 
 type StatItem = { id: string; label: string; value: number; color: string };
 
-// Base colors - vibrant starting points for triadic harmony generation
-const BASE_COLORS = [
-  '#dc2626', // Red
-  '#ea580c', // Orange
-  '#d97706', // Amber
-  '#65a30d', // Lime
-  '#16a34a', // Green
-  '#059669', // Emerald
-  '#0d9488', // Teal
-  '#0891b2', // Cyan
-  '#0284c7', // Sky
-  '#2563eb', // Blue
-  '#4f46e5', // Indigo
-  '#7c3aed', // Violet
-  '#9333ea', // Purple
-  '#c026d3', // Fuchsia
-  '#db2777', // Pink
-  '#e11d48', // Rose
-  '#78350f', // Brown
-  '#1e3a8a', // Navy
-  '#064e3b', // Forest
-  '#7f1d1d', // Maroon
-];
 
-// LocalStorage key for persistent color assignments
-const COLOR_STORAGE_KEY = 'cqd_type_color_assignments_v2';
+const BROWSER_ICONS: Record<BrowserType, React.ReactNode> = {
+  chrome: <img src={chromeSvg} alt="Chrome" width="20" height="20" />,
+  firefox: <img src={firefoxSvg} alt="Firefox" width="20" height="20" />,
+  edge: <img src={edgeSvg} alt="Edge" width="20" height="20" />,
+};
 
-/**
- * Convert hex to HSL
- */
-function hexToHsl(hex: string): { h: number; s: number; l: number } {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  if (!result) return { h: 0, s: 70, l: 50 };
-  
-  let r = parseInt(result[1], 16) / 255;
-  let g = parseInt(result[2], 16) / 255;
-  let b = parseInt(result[3], 16) / 255;
-  
-  const max = Math.max(r, g, b), min = Math.min(r, g, b);
-  let h = 0, s = 0;
-  const l = (max + min) / 2;
-
-  if (max !== min) {
-    const d = max - min;
-    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-    switch (max) {
-      case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
-      case g: h = ((b - r) / d + 2) / 6; break;
-      case b: h = ((r - g) / d + 4) / 6; break;
-    }
-  }
-  
-  return { h: Math.round(h * 360), s: Math.round(s * 100), l: Math.round(l * 100) };
-}
-
-/**
- * Convert HSL to hex
- */
-function hslToHex(h: number, s: number, l: number): string {
-  s /= 100;
-  l /= 100;
-  const a = s * Math.min(l, 1 - l);
-  const f = (n: number) => {
-    const k = (n + h / 30) % 12;
-    const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
-    return Math.round(255 * color).toString(16).padStart(2, '0');
-  };
-  return `#${f(0)}${f(8)}${f(4)}`;
-}
-
-/**
- * Generate triadic color - rotate hue by 120° or 240° (complementary positions on color wheel)
- */
-function getTriadicColor(baseHex: string, position: number): string {
-  const hsl = hexToHsl(baseHex);
-  // Rotate hue by 120° * position for triadic harmony
-  const newHue = (hsl.h + (120 * position)) % 360;
-  return hslToHex(newHue, Math.min(hsl.s + 5, 85), Math.max(hsl.l, 40));
-}
-
-/**
- * Simple hash function to convert string to number
- */
-function hashString(str: string): number {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
-  }
-  return Math.abs(hash);
-}
-
-/**
- * Determine if a hex color is dark (needs white border) or light (needs black border)
- */
-function isColorDark(hexColor: string): boolean {
-  const hex = hexColor.replace('#', '');
-  const r = parseInt(hex.substring(0, 2), 16);
-  const g = parseInt(hex.substring(2, 4), 16);
-  const b = parseInt(hex.substring(4, 6), 16);
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return luminance < 0.5;
-}
-
-/**
- * Calculate distance between two hex colors (simple RGB Euclidean distance)
- * Returns value between 0 (identical) and ~441 (opposite)
- */
-function getColorDistance(hex1: string, hex2: string): number {
-  const c1 = hexToHsl(hex1); // Use HSL for better perceptual tracking? Actually RGB is easier for simple diff
-  // Let's use RGB for distance
-  const r1 = parseInt(hex1.slice(1, 3), 16);
-  const g1 = parseInt(hex1.slice(3, 5), 16);
-  const b1 = parseInt(hex1.slice(5, 7), 16);
-  
-  const r2 = parseInt(hex2.slice(1, 3), 16);
-  const g2 = parseInt(hex2.slice(3, 5), 16);
-  const b2 = parseInt(hex2.slice(5, 7), 16);
-  
-  return Math.sqrt(
-    Math.pow(r1 - r2, 2) +
-    Math.pow(g1 - g2, 2) +
-    Math.pow(b1 - b2, 2)
-  );
-}
-
-/**
- * Get distinct color for a file type, ensuring no collisions with already used colors
- * @param typeId - file type ID
- * @param position - position in the list (for triadic harmony)
- * @param usedColors - set of already assigned colors to avoid
- */
-function getDistinctColorForTypeAtPosition(
-  typeId: string, 
-  position: number, 
-  usedColors: Set<string>
-): string {
-  // Try to load existing assignments
-  let assignments: Record<string, string> = {};
-  try {
-    const stored = localStorage.getItem(COLOR_STORAGE_KEY);
-    assignments = stored ? JSON.parse(stored) : {};
-  } catch {
-    assignments = {};
-  }
-  
-  const key = `${typeId}_pos${position}`;
-  
-  // Deterministic candidate generation
-  const baseIndex = hashString(typeId) % BASE_COLORS.length;
-  let baseColor = BASE_COLORS[baseIndex];
-  let candidate = getTriadicColor(baseColor, position);
-  
-  // Use stored if available AND distinct enough from *others* in the current used list
-  // Note: We prioritize the *stored* color if it exists, but we MUST check collision
-  if (assignments[key]) {
-    candidate = assignments[key];
-  }
-  
-  // Conflict resolution: if candidate is too close to any used color, shift it
-  // Threshold 100 is roughly "visually distinct"
-  let attempts = 0;
-  let isdistinct = false;
-  
-  while (!isdistinct && attempts < 20) {
-    let collision = false;
-    for (const used of usedColors) {
-      if (getColorDistance(candidate, used) < 100) { // Collision threshold
-        collision = true;
-        break;
-      }
-    }
-    
-    if (collision) {
-      // Rotate hue by 45 degrees to find a free spot
-      const hsl = hexToHsl(candidate);
-      candidate = hslToHex((hsl.h + 45) % 360, hsl.s, hsl.l);
-      attempts++;
-    } else {
-      isdistinct = true;
-    }
-  }
-  
-  // If we still have collision after rotations (crowded), try lightening/darkening
-  if (!isdistinct) {
-     const hsl = hexToHsl(candidate);
-     candidate = hslToHex(hsl.h, hsl.s, Math.max(20, Math.min(80, hsl.l + (attempts % 2 === 0 ? 20 : -20))));
-  }
-  
-  // Save the resolved color
-  assignments[key] = candidate;
-  try {
-    localStorage.setItem(COLOR_STORAGE_KEY, JSON.stringify(assignments));
-  } catch {
-    // Ignore
-  }
-  
-  return candidate;
-}
+const CHART_RADIUS = 40;
+const CHART_CIRCUMFERENCE = 2 * Math.PI * CHART_RADIUS;
+const CHART_GAP_ANGLE = 3;
+const CHART_GAP_LENGTH = (CHART_GAP_ANGLE / 360) * CHART_CIRCUMFERENCE;
 
 function App() {
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -404,10 +221,11 @@ function App() {
         const others = entries.slice(4);
         const otherCount = others.reduce((acc, curr) => acc + curr[1], 0);
 
+        const assignments = getStoredColorAssignments();
         const usedColors = new Set<string>();
 
         const mapped: StatItem[] = top.map(([key, val], index) => {
-          const color = getDistinctColorForTypeAtPosition(key, index, usedColors);
+          const color = resolveColorForType(key, index, assignments, usedColors);
           usedColors.add(color);
           return {
             id: key,
@@ -418,7 +236,7 @@ function App() {
         });
 
         if (otherCount > 0) {
-          const otherColor = getDistinctColorForTypeAtPosition('other', mapped.length, usedColors);
+          const otherColor = resolveColorForType('other', mapped.length, assignments, usedColors);
           usedColors.add(otherColor);
           mapped.push({
             id: 'other',
@@ -427,6 +245,8 @@ function App() {
             color: otherColor
           });
         }
+
+        saveColorAssignments(assignments);
 
         setStats(mapped);
 
@@ -552,37 +372,29 @@ function App() {
     }
   };
 
-  const browserIcons: Record<BrowserType, React.ReactNode> = {
-    chrome: <img src={chromeSvg} alt="Chrome" width="20" height="20" />,
-    firefox: <img src={firefoxSvg} alt="Firefox" width="20" height="20" />,
-    edge: <img src={edgeSvg} alt="Edge" width="20" height="20" />,
-  };
-
   // --- Donut chart calculation (Dynamic) ---
-  const radius = 40;
-  const circumference = 2 * Math.PI * radius;
-  const gapAngle = 3; // Gap angle in degrees between segments
-  const gapLength = (gapAngle / 360) * circumference; // Convert gap to stroke units
-  let cumulativeOffset = 0;
+  const chartSegments = useMemo(() => {
+    let cumulativeOffset = 0;
 
-  const chartSegments = stats.map((stat, index) => {
-    const percentage = totalDownloads === 0 ? 0 : stat.value / totalDownloads;
-    const fullStrokeLength = percentage * circumference;
-    
-    // Each segment gets reduced by one gap (shown after it)
-    const strokeLength = Math.max(0, fullStrokeLength - gapLength);
-    
-    // Offset includes cumulative length plus half gap to center the segment
-    const offset = cumulativeOffset + (gapLength / 2);
-    cumulativeOffset += fullStrokeLength;
+    return stats.map((stat, index) => {
+      const percentage = totalDownloads === 0 ? 0 : stat.value / totalDownloads;
+      const fullStrokeLength = percentage * CHART_CIRCUMFERENCE;
 
-    return {
-      ...stat,
-      strokeLength,
-      offset: -offset,
-      index,
-    };
-  });
+      // Each segment gets reduced by one gap (shown after it)
+      const strokeLength = Math.max(0, fullStrokeLength - CHART_GAP_LENGTH);
+
+      // Offset includes cumulative length plus half gap to center the segment
+      const offset = cumulativeOffset + (CHART_GAP_LENGTH / 2);
+      cumulativeOffset += fullStrokeLength;
+
+      return {
+        ...stat,
+        strokeLength,
+        offset: -offset,
+        index,
+      };
+    });
+  }, [stats, totalDownloads]);
 
   const isLoadingSettings = loadingState || settings == null;
   const isEnabled = settings?.extensionEnabled ?? true;
@@ -740,7 +552,7 @@ function App() {
                         <circle
                           cx="50"
                           cy="50"
-                          r={radius}
+                          r={CHART_RADIUS}
                           fill="none"
                           stroke="var(--cqd-surface)"
                           strokeWidth="10"
@@ -751,11 +563,11 @@ function App() {
                               key={seg.id}
                               cx="50"
                               cy="50"
-                              r={radius}
+                              r={CHART_RADIUS}
                               fill="none"
                               stroke={seg.color}
                               strokeWidth={hoveredStatId === seg.id ? '12' : '10'}
-                              strokeDasharray={`${seg.strokeLength} ${circumference}`}
+                              strokeDasharray={`${seg.strokeLength} ${CHART_CIRCUMFERENCE}`}
                               strokeDashoffset={seg.offset}
                               className={`cqd-ring-segment ${hoveredStatId === seg.id ? 'hovered' : ''}`}
                               style={{ cursor: 'pointer', transition: 'stroke-width 0.15s ease' }}
@@ -770,7 +582,7 @@ function App() {
                           <circle
                             cx="50"
                             cy="50"
-                            r={radius}
+                            r={CHART_RADIUS}
                             fill="none"
                             stroke="#e5e7eb"
                             strokeWidth="10"
@@ -989,7 +801,7 @@ function App() {
                         className="cqd-share-browser-icon"
                         title={`Open ${browser.charAt(0).toUpperCase() + browser.slice(1)} Web Store`}
                       >
-                        {browserIcons[browser]}
+                        {BROWSER_ICONS[browser]}
                       </a>
                       <span className="cqd-share-browser-name">
                         {browser.charAt(0).toUpperCase() + browser.slice(1)}
