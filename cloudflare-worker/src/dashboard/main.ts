@@ -21,6 +21,7 @@ function formatTs(ts: number | null): string {
   if (!ts) return "—";
   const d = new Date(ts);
   return d.toLocaleString("en-US", {
+    timeZone: "UTC",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -410,7 +411,7 @@ function renderReleaseManagementSection(entries: ChangelogEntry[], _config: Chan
       <div class="cl-history-header">
         <div class="cl-history-meta">
           <span class="cl-version-badge">v${e.version}</span>
-          <span class="cl-date">${new Date(e.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+          <span class="cl-date">${new Date(e.date).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric', year: 'numeric' })}</span>
         </div>
         <div class="cl-actions">
            <button class="cl-action-btn edit-cl-btn" data-id="${e.id}" title="Edit release">
@@ -529,12 +530,19 @@ export function renderDashboard(stats: StatsResponse): string {
       : "unknown";
 
   const workerUrl = "https://cqd-analytics.adhamhaithameid.workers.dev";
+  
+  // Unique IPs tracking with cap indicator
+  const uniqueIpsCount = stats.uniqueRequestsToday ?? stats.uniqueIpsToday ?? 0;
+  const isApproximated = stats.isApproximated ?? false;
+  const uniqueIpsDisplay = isApproximated 
+    ? `${uniqueIpsCount.toLocaleString()}+ (capped)`
+    : uniqueIpsCount.toLocaleString();
 
   const renderTableRows = (data: Record<string, number>) => {
     const keys = Object.keys(data).sort((a, b) => data[b] - data[a]);
     if (keys.length === 0) return "<tr><td colspan='2'>—</td></tr>";
     return keys
-      .map((k) => `<tr><td>${k}</td><td>${data[k]}</td></tr>`)
+      .map((k) => `<tr><td>${escapeHtml(k)}</td><td>${data[k]}</td></tr>`)
       .join("");
   };
 
@@ -2657,19 +2665,19 @@ export function renderDashboard(stats: StatsResponse): string {
             <div class="hot-row-items">
               <div class="hot-item">
                 <div class="hot-label">Type</div>
-                <div class="hot-value" data-bind="hotType">${hotType}</div>
+                <div class="hot-value" data-bind="hotType">${escapeHtml(hotType)}</div>
               </div>
               <div class="hot-item">
                 <div class="hot-label">Browser</div>
-                <div class="hot-value" data-bind="hotBrowser">${hotBrowser}</div>
+                <div class="hot-value" data-bind="hotBrowser">${escapeHtml(hotBrowser)}</div>
               </div>
               <div class="hot-item">
                 <div class="hot-label">OS</div>
-                <div class="hot-value" data-bind="hotOs">${hotOs}</div>
+                <div class="hot-value" data-bind="hotOs">${escapeHtml(hotOs)}</div>
               </div>
               <div class="hot-item">
                 <div class="hot-label">Country</div>
-                <div class="hot-value" data-bind="hotCountry">${hotCountry}</div>
+                <div class="hot-value" data-bind="hotCountry">${escapeHtml(hotCountry)}</div>
               </div>
             </div>
           </div>
@@ -2678,19 +2686,19 @@ export function renderDashboard(stats: StatsResponse): string {
             <div class="hot-row-items">
               <div class="hot-item">
                 <div class="hot-label">Type</div>
-                <div class="hot-value" data-bind="hotTypeAllTime">${hotType}</div>
+                <div class="hot-value" data-bind="hotTypeAllTime">${escapeHtml(hotType)}</div>
               </div>
               <div class="hot-item">
                 <div class="hot-label">Browser</div>
-                <div class="hot-value" data-bind="hotBrowserAllTime">${hotBrowser}</div>
+                <div class="hot-value" data-bind="hotBrowserAllTime">${escapeHtml(hotBrowser)}</div>
               </div>
               <div class="hot-item">
                 <div class="hot-label">OS</div>
-                <div class="hot-value" data-bind="hotOsAllTime">${hotOs}</div>
+                <div class="hot-value" data-bind="hotOsAllTime">${escapeHtml(hotOs)}</div>
               </div>
               <div class="hot-item">
                 <div class="hot-label">Country</div>
-                <div class="hot-value" data-bind="hotCountryAllTime">${hotCountry}</div>
+                <div class="hot-value" data-bind="hotCountryAllTime">${escapeHtml(hotCountry)}</div>
               </div>
             </div>
           </div>
@@ -2853,6 +2861,10 @@ export function renderDashboard(stats: StatsResponse): string {
             <div class="quota-stat">
               <span class="quota-label">Requests Today</span>
               <span class="quota-val" data-bind="requestsToday">${requestsToday}</span>
+            </div>
+            <div class="quota-stat">
+              <span class="quota-label">Unique IPs</span>
+              <span class="quota-val" data-bind="uniqueIps" style="color:${isApproximated ? 'var(--warning)' : 'inherit'}">${uniqueIpsDisplay}</span>
             </div>
             <div class="quota-stat">
               <span class="quota-label">Weekly Events</span>
@@ -3376,12 +3388,23 @@ ${rawStatsJson}
   </script>
   <script>
     (function () {
+      // XSS prevention: HTML escape for untrusted data
+      function escapeHtmlJS(unsafe) {
+        if (typeof unsafe !== 'string') return String(unsafe);
+        return unsafe
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#039;');
+      }
       let lastRefreshAt = 0;
 
       function formatTs(ts) {
         if (!ts) return "—";
         const d = new Date(ts);
         return d.toLocaleString("en-US", {
+          timeZone: "UTC",
           year: "numeric",
           month: "2-digit",
           day: "2-digit",
@@ -3463,7 +3486,7 @@ ${rawStatsJson}
         entries.sort((a, b) => b[1] - a[1]);
         return entries
           .map(function ([k, v]) {
-            return "<tr><td>" + k + "</td><td>" + v + "</td></tr>";
+            return "<tr><td>" + escapeHtmlJS(k) + "</td><td>" + v + "</td></tr>";
           })
           .join("");
       }
@@ -3703,6 +3726,13 @@ ${rawStatsJson}
           map.quotaLevel = stats.quota.quotaLevel || "UNKNOWN";
           map.batchSize = stats.quota.batchSizeSuggestion || 0;
         }
+        
+        // APPROXIMATION-AWARE: Format unique IPs with capped indicator
+        const uniqueIpsCount = stats.uniqueRequestsToday || stats.uniqueIpsToday || 0;
+        const isApproximated = stats.isApproximated || false;
+        map.uniqueIps = isApproximated 
+          ? uniqueIpsCount.toLocaleString() + "+ (capped)"
+          : uniqueIpsCount.toLocaleString();
 
         for (const [key, val] of Object.entries(map)) {
           const els = document.querySelectorAll('[data-bind="' + key + '"]');
@@ -3711,6 +3741,10 @@ ${rawStatsJson}
             const next = String(val);
             if (current !== next) {
               el.textContent = next;
+              // APPROXIMATION-AWARE: Apply warning color for capped unique IPs
+              if (key === "uniqueIps") {
+                el.style.color = isApproximated ? "var(--warning)" : "inherit";
+              }
               const parent =
                 el.closest(".metric, .quota-stat, .quota-panel") ||
                 el.parentElement;
@@ -3939,15 +3973,16 @@ ${rawStatsJson}
          container.innerHTML = activeRules.map((rule, idx) => \`
             <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-subtle); border-radius: 6px;">
                <div style="display: flex; align-items: center; gap: 12px;">
-                 <span style="font-family: monospace; font-size: 0.9em; background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px; color: \${rule.target === 'all' ? '#fbbf24' : '#fff'};">\${rule.target}</span>
+                 <span style="font-family: monospace; font-size: 0.9em; background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px; color: \${rule.target === 'all' ? '#fbbf24' : '#fff'};">\${escapeHtmlJS(rule.target)}</span>
                  
                  <span style="font-size: 0.8em; color: var(--text-muted);">
-                    \${rule.priority} + \${rule.effect}
+                    \${escapeHtmlJS(rule.priority)} + \${escapeHtmlJS(rule.effect)}
                  </span>
                </div>
                <button type="button" class="btn-xs delete-rule-btn" data-idx="\${idx}" style="color: #fca5a5; border-color: rgba(239,68,68,0.3);">✕</button>
             </div>
          \`).join('');
+
          
          // Attach delete listeners
          container.querySelectorAll(".delete-rule-btn").forEach(btn => {
@@ -4570,11 +4605,12 @@ ${rawStatsJson}
         } else {
           container.innerHTML = ipAllowlistData.allowlist.map(ip => 
             '<div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: var(--bg-elevated); border-radius: var(--radius-sm); border: 1px solid var(--border);">' +
-              '<span style="font-family: monospace; color: var(--text-primary);">' + ip + '</span>' +
+              '<span style="font-family: monospace; color: var(--text-primary);">' + escapeHtmlJS(ip) + '</span>' +
               (ip === currentUserIp ? '<span style="font-size: 0.7rem; color: var(--success); background: var(--success-bg); padding: 2px 8px; border-radius: 4px;">You</span>' : '') +
-              '<button class="btn-remove-ip" data-ip="' + ip + '" style="background: var(--danger-bg); color: var(--danger); border: 1px solid rgba(239,68,68,0.3); padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; cursor: pointer;">Remove</button>' +
+              '<button class="btn-remove-ip" data-ip="' + escapeHtmlJS(ip) + '" style="background: var(--danger-bg); color: var(--danger); border: 1px solid rgba(239,68,68,0.3); padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; cursor: pointer;">Remove</button>' +
             '</div>'
           ).join('');
+
           
           // Bind remove buttons
           container.querySelectorAll('.btn-remove-ip').forEach(btn => {

@@ -9,6 +9,7 @@ export function formatTs(ts: number | null): string {
   if (!ts) return "—";
   const d = new Date(ts);
   return d.toLocaleString("en-US", {
+    timeZone: "UTC",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
