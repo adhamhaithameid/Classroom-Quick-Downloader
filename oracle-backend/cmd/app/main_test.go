@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -24,11 +25,11 @@ func TestAPIHealthHandler(t *testing.T) {
 			status, http.StatusOK)
 	}
 
-	// You might check the body here too if you know what it returns
-	expected := `{"status":"ok"}`
-	if rr.Body.String() != expected {
-		t.Logf("handler returned unexpected body: %v", rr.Body.String())
-		// Not failing the test on body mismatch to avoid brittleness,
-		// but useful for debugging.
+	var payload map[string]any
+	if err := json.Unmarshal(rr.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("invalid json response: %v", err)
+	}
+	if ok, _ := payload["ok"].(bool); !ok {
+		t.Fatalf("expected ok=true, got %v", payload["ok"])
 	}
 }
