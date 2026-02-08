@@ -228,14 +228,10 @@ export function parseUnicodeDate(dateString: string): { date: Date; raw: string;
   if (!dateString) return null;
   const clean = normalizeText(dateString).toLowerCase();
 
-  // Try standard Date.parse first (ISO, English)
-  const timestamp = Date.parse(clean);
-  if (!isNaN(timestamp)) {
-    return { date: new Date(timestamp), raw: dateString, confidence: 'high' };
-  }
+  // NOTE: Avoid Date.parse to prevent local-time interpretation. We parse into UTC manually.
 
   // Extract all digit sequences
-  const normalized = normalizeText(dateString);
+  const normalized = normalizeText(dateString).toLowerCase();
   const parts = normalized.split(/[\s\/\-\.,،年月日]+/).filter(Boolean);
   const numbers = parts.map(p => {
     const n = parseUnicodeInteger(p);
@@ -245,11 +241,15 @@ export function parseUnicodeDate(dateString: string): { date: Date; raw: string;
   const words = parts.filter(p => parseUnicodeInteger(p) === null);
 
   let day: number | undefined, month: number | undefined, year: number | undefined;
+  let confidence: 'high' | 'medium' | 'low' = 'medium';
 
   // 3 numbers: try to infer format
   if (numbers.length >= 3) {
     const [a, b, c] = numbers;
-    if (a > 1000) { year = a; month = b - 1; day = c; } // YYYY-MM-DD
+    if (a > 1000) {
+      year = a; month = b - 1; day = c;
+      confidence = 'high'; // ISO-like (YYYY-MM-DD)
+    } // YYYY-MM-DD
     else if (c > 1000) { year = c; month = b - 1; day = a; } // DD-MM-YYYY
     else if (c > 31) { year = c + 2000; month = a - 1; day = b; } // MM/DD/YY
     else { year = c + 2000; month = b - 1; day = a; } // DD/MM/YY
@@ -274,9 +274,9 @@ export function parseUnicodeDate(dateString: string): { date: Date; raw: string;
   }
 
   if (year && month !== undefined && day) {
-    const d = new Date(year, month, day);
+    const d = new Date(Date.UTC(year, month, day));
     if (!isNaN(d.getTime())) {
-      return { date: d, raw: dateString, confidence: 'medium' };
+      return { date: d, raw: dateString, confidence };
     }
   }
 
