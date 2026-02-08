@@ -120,6 +120,7 @@ type Event struct {
 // backend.
 // It is *aggregated* (no raw events), idempotent by batchId, and may contain
 // multiple time buckets (e.g. per hour).
+// LEAN INGESTION: Only contains uniqueIps, NOT raw events to reduce payload size.
 type OracleBatch struct {
 	BatchID     string       `json:"batchId"`
 	GeneratedAt int64        `json:"generatedAt"` // unix ms from DO
@@ -127,5 +128,5 @@ type OracleBatch struct {
 	Summary     BatchSummary `json:"summary"`
 	TimeBuckets []TimeBucket `json:"timeBuckets"`
 	DOState     DOState      `json:"doState"`
-	Events      []Event      `json:"events"`      // <--- Raw events now captured
+	UniqueIps   []string     `json:"uniqueIps"` // For Geo Map persistence
 }
