@@ -18,12 +18,10 @@ import { checkAndIncrementRateLimit } from './rate-limiter';
 import { bucketDuration, generateEventId } from './detection';
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-const DAILY_FLUSH_UTC_START_HOUR = 1;
-const DAILY_FLUSH_WINDOW_HOURS = 2;
-const DAILY_FLUSH_WINDOW_MINUTES = DAILY_FLUSH_WINDOW_HOURS * 60;
 const OVERFLOW_QUEUE_THRESHOLD = 500;
 const OVERFLOW_BATCH_SIZE = 500;
 const DEFAULT_MAX_EVENTS_PER_REQUEST = 5000;
+const MAX_DAILY_WINDOW_MINUTES = 24 * 60;
 
 function getRandomInt(maxExclusive: number): number {
   if (maxExclusive <= 0) return 0;
@@ -37,7 +35,11 @@ function getRandomInt(maxExclusive: number): number {
 }
 
 export function getSafeUtcNowMs(meta: AnalyticsMeta): { nowMs: number; meta: AnalyticsMeta; changed: boolean } {
-  const now = Date.now();
+  const serverOffset = typeof meta.serverTimeOffsetMs === 'number' && Number.isFinite(meta.serverTimeOffsetMs)
+    ? meta.serverTimeOffsetMs
+    : 0;
+  const rawNow = Date.now();
+  const now = Number.isFinite(rawNow) ? rawNow + serverOffset : rawNow;
   let updated = meta;
   let changed = false;
   if (Number.isFinite(now)) {
@@ -69,7 +71,7 @@ export function getSafeUtcNowMs(meta: AnalyticsMeta): { nowMs: number; meta: Ana
   }
 
   if (perfNow != null && typeof performance !== 'undefined' && Number.isFinite(performance.timeOrigin)) {
-    const fallbackNow = performance.timeOrigin + perfNow;
+    const fallbackNow = performance.timeOrigin + perfNow + serverOffset;
     updated = {
       ...meta,
       lastKnownUtcMs: fallbackNow,
@@ -87,12 +89,18 @@ function getUtcDateString(nowMs: number): string {
 
 export function getDailyFlushScheduleUtcMs(
   nowMs: number,
-  meta: AnalyticsMeta
+  meta: AnalyticsMeta,
+  cfg: AnalyticsConfig
 ): { scheduleMs: number; meta: AnalyticsMeta; changed: boolean } {
   const now = new Date(nowMs);
   const dayStartMs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-  const startMs = dayStartMs + DAILY_FLUSH_UTC_START_HOUR * 60 * 60 * 1000;
-  const windowMinutes = DAILY_FLUSH_WINDOW_MINUTES;
+  const startHour = Number.isFinite(cfg.dailyFlushWindowStartUtc)
+    ? Math.min(23, Math.max(0, Math.floor(cfg.dailyFlushWindowStartUtc)))
+    : 1;
+  const windowMinutes = Number.isFinite(cfg.dailyFlushWindowMinutes)
+    ? Math.min(MAX_DAILY_WINDOW_MINUTES, Math.max(1, Math.floor(cfg.dailyFlushWindowMinutes)))
+    : 120;
+  const startMs = dayStartMs + startHour * 60 * 60 * 1000;
 
   let offset = meta.dailyFlushOffsetMinutes;
   let changed = false;
@@ -143,7 +151,10 @@ type FlushDecision = {
 /**
  * Send a batch of events to Cloudflare Worker.
  */
-export async function sendBatchToCloudflare(events: AnalyticsEvent[]): Promise<FlushResult> {
+export async function sendBatchToCloudflare(
+  events: AnalyticsEvent[],
+  clientBatchId?: string
+): Promise<FlushResult> {
   if (!TRACK_URL || events.length === 0) {
     return { success: false, error: 'No URL or empty batch' };
   }
@@ -152,7 +163,7 @@ export async function sendBatchToCloudflare(events: AnalyticsEvent[]): Promise<F
     const resp = await fetch(TRACK_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ events }),
+      body: JSON.stringify({ events, clientBatchId }),
     });
 
     if (resp.status === 429) {
@@ -174,11 +185,70 @@ export async function sendBatchToCloudflare(events: AnalyticsEvent[]): Promise<F
       acceptedIds: Array.isArray(json.acceptedIds) ? json.acceptedIds : undefined,
       duplicateIds: Array.isArray(json.duplicateIds) ? json.duplicateIds : undefined,
       invalidIds: Array.isArray(json.invalidIds) ? json.invalidIds : undefined,
+      acceptedSeqs: Array.isArray(json.acceptedSeqs) ? json.acceptedSeqs : undefined,
+      committedSeq: typeof json.committedSeq === 'number' ? json.committedSeq : undefined,
+      clientBatchId: typeof json.clientBatchId === 'string' ? json.clientBatchId : undefined,
+      ackId: typeof json.ackId === 'string' ? json.ackId : undefined,
+      receivedAt: typeof json.receivedAt === 'number' ? json.receivedAt : undefined,
       error: json.error,
     };
   } catch (err) {
     return { success: false, error: String(err) };
   }
+}
+
+export function buildAckRemovalSet(result: FlushResult): Set<string> {
+  const removal = new Set<string>();
+  const addAll = (items?: string[]) => {
+    if (Array.isArray(items)) {
+      for (const id of items) removal.add(id);
+    }
+  };
+  // Always drop invalid and duplicate events (DO already rejected/has them).
+  addAll(result.duplicateIds);
+  addAll(result.invalidIds);
+  return removal;
+}
+
+export function isAckValidForBatch(result: FlushResult, clientBatchId?: string): boolean {
+  if (!clientBatchId) return true;
+  if (!result.clientBatchId || result.clientBatchId !== clientBatchId) {
+    return false;
+  }
+  if (!result.ackId || typeof result.ackId !== 'string' || result.ackId.length < 6) {
+    return false;
+  }
+  return true;
+}
+
+export function applyRetryCap(events: AnalyticsEvent[], maxRetry: number): AnalyticsEvent[] {
+  const cap = Math.max(0, Math.floor(maxRetry));
+  return events.filter((ev) => (ev.retryCount ?? 0) <= cap);
+}
+
+export function applyCommitSeqs(
+  queue: AnalyticsEvent[],
+  acceptedSeqs?: Array<[string, number]>
+): AnalyticsEvent[] {
+  if (!Array.isArray(acceptedSeqs) || acceptedSeqs.length === 0) return queue;
+  const map = new Map<string, number>(acceptedSeqs.map(([id, seq]) => [id, seq]));
+  return queue.map((ev) => {
+    if (!ev.id) return ev;
+    const seq = map.get(ev.id);
+    if (seq == null) return ev;
+    return { ...ev, commitSeq: seq };
+  });
+}
+
+export function pruneCommittedEvents(
+  queue: AnalyticsEvent[],
+  committedSeq?: number | null
+): AnalyticsEvent[] {
+  if (typeof committedSeq !== 'number') return queue;
+  return queue.filter((ev) => {
+    if (typeof ev.commitSeq !== 'number') return true;
+    return ev.commitSeq > committedSeq;
+  });
 }
 
 /**
@@ -207,7 +277,7 @@ function getFlushDecision(
   let metaChanged = time.changed;
   const nowMs = time.nowMs;
 
-  const schedule = getDailyFlushScheduleUtcMs(nowMs, updatedMeta);
+  const schedule = getDailyFlushScheduleUtcMs(nowMs, updatedMeta, cfg);
   updatedMeta = schedule.meta;
   metaChanged = metaChanged || schedule.changed;
 
@@ -300,10 +370,20 @@ export async function internalFlush(): Promise<void> {
   let meta = await loadMeta();
   let queue = await loadQueue();
 
-  if (queue.length === 0) return;
+  queue = pruneCommittedEvents(queue, meta.lastCommittedSeq);
+  if (queue.length === 0) {
+    await saveQueue(queue);
+    return;
+  }
 
-  const oldestEventTime = queue[0]?.timestamp ?? null;
-  const decision = getFlushDecision(cfg, meta, queue.length, oldestEventTime);
+  const sendable = queue.filter((ev) => typeof ev.commitSeq !== 'number');
+  if (sendable.length === 0) {
+    await saveQueue(queue);
+    return;
+  }
+
+  const oldestEventTime = sendable[0]?.timestamp ?? null;
+  const decision = getFlushDecision(cfg, meta, sendable.length, oldestEventTime);
   meta = decision.meta;
   const nowMs = decision.nowMs;
   const metaDirty = decision.metaChanged;
@@ -351,28 +431,38 @@ export async function internalFlush(): Promise<void> {
   });
 
   const maxPerRequest = resolveMaxEventsPerRequest(cfg);
-  let batchSize = resolveBatchSize(cfg, queue.length);
+  let batchSize = resolveBatchSize(cfg, sendable.length);
   if (decision.isUrgent) {
-    batchSize = Math.min(queue.length, maxPerRequest);
+    batchSize = Math.min(sendable.length, maxPerRequest);
   }
-  const toSend = queue.slice(0, batchSize);
-  const toKeep = queue.slice(batchSize);
+  const toSend = sendable.slice(0, batchSize);
+  const toSendIds = new Set<string>(toSend.map((ev) => ev.id ?? ''));
 
   // Send batch
-  const result = await sendBatchToCloudflare(toSend);
+  const clientBatchId = generateEventId();
+  let result = await sendBatchToCloudflare(toSend, clientBatchId);
+  if (result.success && !isAckValidForBatch(result, clientBatchId)) {
+    result = { success: false, error: 'ack_mismatch' };
+  }
 
   if (result.success) {
     const ackInfoProvided =
       Array.isArray(result.acceptedIds) ||
       Array.isArray(result.duplicateIds) ||
       Array.isArray(result.invalidIds);
-    const acceptedIds = new Set<string>([
-      ...(result.acceptedIds ?? []),
-      ...(result.duplicateIds ?? []),
-    ]);
-    const remainingQueue = ackInfoProvided
-      ? queue.filter((ev) => !acceptedIds.has(ev.id ?? ''))
-      : toKeep;
+    let remainingQueue = queue;
+    if (ackInfoProvided) {
+      const removal = buildAckRemovalSet(result);
+      remainingQueue = remainingQueue.filter((ev) => !removal.has(ev.id ?? ''));
+      remainingQueue = applyCommitSeqs(remainingQueue, result.acceptedSeqs);
+    } else {
+      remainingQueue = remainingQueue.filter((ev) => !toSendIds.has(ev.id ?? ''));
+    }
+
+    if (typeof result.committedSeq === 'number') {
+      meta.lastCommittedSeq = Math.max(meta.lastCommittedSeq ?? 0, result.committedSeq);
+      remainingQueue = pruneCommittedEvents(remainingQueue, meta.lastCommittedSeq);
+    }
 
     // Success - remove sent events (ack-based)
     meta.lastFlushAt = nowMs;
@@ -385,10 +475,15 @@ export async function internalFlush(): Promise<void> {
     await saveQueue(remainingQueue);
   } else {
     // Failure - increment retry counts and apply backoff
-    const retriedEvents = toSend.map((e) => ({
-      ...e,
-      retryCount: (e.retryCount ?? 0) + 1,
-    }));
+    const maxRetry = Number.isFinite(cfg.maxRetry) ? cfg.maxRetry : 0;
+    const updatedQueue = queue.map((ev) => {
+      if (!toSendIds.has(ev.id ?? '')) return ev;
+      return { ...ev, retryCount: (ev.retryCount ?? 0) + 1 };
+    });
+    const cappedQueue = updatedQueue.filter((ev) => {
+      if (!toSendIds.has(ev.id ?? '')) return true;
+      return (ev.retryCount ?? 0) <= maxRetry;
+    });
 
     const backoffSeconds = BACKOFF_STEPS_SECONDS[
       Math.min(meta.backoffIndex, BACKOFF_STEPS_SECONDS.length - 1)
@@ -397,7 +492,7 @@ export async function internalFlush(): Promise<void> {
     meta.backoffIndex++;
 
     await saveMeta(meta);
-    await saveQueue([...retriedEvents, ...toKeep]);
+    await saveQueue(cappedQueue);
   }
 
 }
