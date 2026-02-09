@@ -131,6 +131,10 @@ type DurableStateShape = {
   // Cancel hold delay: time in ms before cancel button becomes active (default: 1000ms)
   // Range: 0-10000ms. Configurable from dashboard to prevent accidental cancels.
   configCancelHoldDelayMs: number;
+
+  // Legacy compatibility: allow missing/invalid event IDs by assigning new IDs
+  // Default: true (temporary migration support)
+  configAllowLegacyEvents: boolean;
 };
 
 type PendingOracleBatch = {
@@ -336,6 +340,18 @@ function generateAckId(): string {
   return `ack-${Date.now().toString(36)}-${rand}`;
 }
 
+function generateEventId(): string {
+  try {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+      return `legacy-${crypto.randomUUID()}`;
+    }
+  } catch {
+    // ignore and fallback
+  }
+  const rand = Math.random().toString(36).slice(2, 10);
+  return `legacy-${Date.now().toString(36)}-${rand}`;
+}
+
 // ---------------------------------------------------------------------------
 // Durable Object class
 // ---------------------------------------------------------------------------
@@ -405,6 +421,7 @@ export class DownloadsDurable {
       configDailyFlushWindowMinutes: DEFAULT_DAILY_FLUSH_WINDOW_MINUTES,
       configTimeFlushMinutes: { low: 1440, mid: 1440, high: 1440 }, // 1440 = 24h = next day
       configCancelHoldDelayMs: 1000, // 1 second default
+      configAllowLegacyEvents: true,
 
       // Changelog defaults
       changelog: [],
@@ -480,6 +497,10 @@ export class DownloadsDurable {
       configDailyFlushWindowMinutes: stored.configDailyFlushWindowMinutes ?? base.configDailyFlushWindowMinutes,
       configTimeFlushMinutes: stored.configTimeFlushMinutes ?? base.configTimeFlushMinutes,
       configCancelHoldDelayMs: stored.configCancelHoldDelayMs ?? base.configCancelHoldDelayMs,
+      configAllowLegacyEvents:
+        typeof stored.configAllowLegacyEvents === "boolean"
+          ? stored.configAllowLegacyEvents
+          : base.configAllowLegacyEvents,
 
       changelog: Array.isArray(stored.changelog) ? stored.changelog : base.changelog,
       changelogConfig: stored.changelogConfig ?? base.changelogConfig,
@@ -520,6 +541,10 @@ export class DownloadsDurable {
       24 * 60,
       base.configDailyFlushWindowMinutes
     );
+    if (typeof this.data.configAllowLegacyEvents !== "boolean") {
+      this.data.configAllowLegacyEvents = base.configAllowLegacyEvents;
+      configDirty = true;
+    }
     if (!this.data.configTimeFlushMinutes || typeof this.data.configTimeFlushMinutes !== "object") {
       this.data.configTimeFlushMinutes = { ...base.configTimeFlushMinutes };
       configDirty = true;
@@ -558,6 +583,7 @@ export class DownloadsDurable {
       this.data.configDailyFlushWindowStartUtc !== stored.configDailyFlushWindowStartUtc ||
       this.data.configDailyFlushWindowMinutes !== stored.configDailyFlushWindowMinutes ||
       this.data.configCancelHoldDelayMs !== stored.configCancelHoldDelayMs ||
+      this.data.configAllowLegacyEvents !== stored.configAllowLegacyEvents ||
       this.data.configFlushMode !== stored.configFlushMode ||
       JSON.stringify(this.data.configTimeFlushMinutes) !== JSON.stringify(stored.configTimeFlushMinutes)
     ) {
@@ -950,16 +976,27 @@ export class DownloadsDurable {
 
     for (const ev of events) {
       // ----- VALIDATION: Event ID required -----
-      if (!ev.id || typeof ev.id !== "string" || ev.id.length < 6 || ev.id.length > 200) {
+      const hasValidId =
+        typeof ev.id === "string" && ev.id.length >= 6 && ev.id.length <= 200;
+      if (!hasValidId) {
+        if (this.d.configAllowLegacyEvents) {
+          ev.id = generateEventId();
+        } else {
+          invalidCount++;
+          if (typeof ev.id === "string") invalidIds.push(ev.id);
+          continue;
+        }
+      }
+      const eventId = typeof ev.id === "string" ? ev.id : undefined;
+      if (!eventId) {
         invalidCount++;
-        if (ev?.id) invalidIds.push(ev.id);
         continue;
       }
 
       // ----- IDEMPOTENCY: Skip duplicates -----
-      if (processedSet.has(ev.id)) {
+      if (processedSet.has(eventId)) {
         duplicateCount++;
-        duplicateIds.push(ev.id);
+        duplicateIds.push(eventId);
         continue;
       }
 
@@ -974,13 +1011,13 @@ export class DownloadsDurable {
       // ----- VALIDATION: Required fields -----
       if (!ev.status || (ev.status !== "success" && ev.status !== "fail" && ev.status !== "cancelled")) {
         invalidCount++;
-        invalidIds.push(ev.id);
+        invalidIds.push(eventId);
         continue;
       }
 
       // Add to processed set and array
-      processedSet.add(ev.id);
-      this.d.processedIds.push(ev.id);
+      processedSet.add(eventId);
+      this.d.processedIds.push(eventId);
 
       this.d.eventSeq += 1;
       ev.seq = this.d.eventSeq;
@@ -1011,8 +1048,8 @@ export class DownloadsDurable {
       this.d.buffer.push(ev);
       this.d.totalEvents += 1;
       acceptedCount++;
-      acceptedIds.push(ev.id);
-      acceptedSeqs.push([ev.id, ev.seq]);
+      acceptedIds.push(eventId);
+      acceptedSeqs.push([eventId, ev.seq]);
       
       // totalDownloads = all download attempts (success + fail)
       this.d.totalDownloads += 1;
@@ -1129,6 +1166,7 @@ export class DownloadsDurable {
       dailyFlushWindowStartUtc: this.d.configDailyFlushWindowStartUtc ?? DEFAULT_DAILY_FLUSH_WINDOW_START_UTC,
       dailyFlushWindowMinutes: this.d.configDailyFlushWindowMinutes ?? DEFAULT_DAILY_FLUSH_WINDOW_MINUTES,
       cancelHoldDelayMs: this.d.configCancelHoldDelayMs ?? 1000,
+      allowLegacyEvents: this.d.configAllowLegacyEvents ?? true,
       remoteEnabledReason: "ok",
       hardRemoteOff: this.d.hardRemoteOff ?? false,
     };
@@ -1232,6 +1270,9 @@ export class DownloadsDurable {
       // Cancel hold delay: time before cancel becomes active (default 1000ms)
       cancelHoldDelayMs: this.d.configCancelHoldDelayMs,
 
+      // Legacy acceptance flag (worker-side only, exposed for visibility)
+      allowLegacyEvents: this.d.configAllowLegacyEvents,
+
       // Server UTC time for drift correction
       serverTimeUtc: Date.now(),
 
@@ -1282,6 +1323,7 @@ export class DownloadsDurable {
       configDailyFlushWindowMinutes: this.d.configDailyFlushWindowMinutes ?? DEFAULT_DAILY_FLUSH_WINDOW_MINUTES,
       configTimeFlushMinutes: this.d.configTimeFlushMinutes ?? { low: 1440, mid: 1440, high: 1440 },
       configCancelHoldDelayMs: this.d.configCancelHoldDelayMs ?? 1000,
+      configAllowLegacyEvents: this.d.configAllowLegacyEvents ?? true,
       
       // Preserve Changelog
       changelog: this.d.changelog ?? [],
@@ -1362,7 +1404,7 @@ export class DownloadsDurable {
    *         flushMode?: 'next_day' | 'time_based',
    *         timeFlushMinutes?: { low: number, mid: number, high: number },
    *         dailyFlushWindowStartUtc?: number, dailyFlushWindowMinutes?: number,
-   *         cancelHoldDelayMs?: number }
+   *         cancelHoldDelayMs?: number, allowLegacyEvents?: boolean }
    */
   private async handleAdminUpdateConfig(request: Request): Promise<Response> {
     if (!this.isAuthorizedAdmin(request)) {
@@ -1395,6 +1437,15 @@ export class DownloadsDurable {
       }
       errors.push(key);
     };
+    const applyBool = (key: string, setter: (value: boolean) => void) => {
+      if (!(key in body)) return;
+      const value = body[key];
+      if (typeof value === "boolean") {
+        setter(value);
+        return;
+      }
+      errors.push(key);
+    };
 
     applyNumber("batchSize", 1, 1000, (value) => {
       this.d.configBatchSize = value;
@@ -1416,6 +1467,9 @@ export class DownloadsDurable {
     });
     applyNumber("dailyFlushWindowMinutes", 1, 24 * 60, (value) => {
       this.d.configDailyFlushWindowMinutes = value;
+    });
+    applyBool("allowLegacyEvents", (value) => {
+      this.d.configAllowLegacyEvents = value;
     });
 
     if ("flushMode" in body) {
@@ -1478,6 +1532,7 @@ export class DownloadsDurable {
         dailyFlushWindowMinutes: this.d.configDailyFlushWindowMinutes,
         timeFlushMinutes: this.d.configTimeFlushMinutes,
         cancelHoldDelayMs: this.d.configCancelHoldDelayMs,
+        allowLegacyEvents: this.d.configAllowLegacyEvents,
       },
     });
   }
