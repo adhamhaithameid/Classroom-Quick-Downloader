@@ -17,6 +17,7 @@ export interface AnalyticsEvent {
   id?: string;
   source?: string;
   retryCount?: number;
+  commitSeq?: number;
 }
 
 export interface LocalStats {
@@ -38,6 +39,7 @@ export interface LocalStats {
 }
 
 export interface AnalyticsConfig {
+  configVersion: number;
   batchSize: number;
   maxDailyRequests: number;
   maxRetry: number;
@@ -47,6 +49,8 @@ export interface AnalyticsConfig {
   highUsageFlushMinutes: number;
   remoteEnabled: boolean;
   cancelHoldDelayMs: number;
+  dailyFlushWindowStartUtc: number;
+  dailyFlushWindowMinutes: number;
   /**
    * Max events allowed per request (worker-side limit).
    * Defaults to 5000 if not provided by remote config.
@@ -62,6 +66,8 @@ export interface AnalyticsMeta {
   dailyFlushOffsetMinutes?: number | null;
   lastKnownUtcMs?: number | null;
   lastPerfMs?: number | null;
+  serverTimeOffsetMs?: number | null;
+  lastCommittedSeq?: number | null;
 }
 
 export interface RateLimitState {
@@ -77,6 +83,11 @@ export interface WorkerResponse {
   acceptedIds?: string[];
   duplicateIds?: string[];
   invalidIds?: string[];
+  acceptedSeqs?: Array<[string, number]>;
+  committedSeq?: number;
+  clientBatchId?: string;
+  ackId?: string;
+  receivedAt?: number;
 }
 
 export interface FlushResult {
@@ -87,6 +98,11 @@ export interface FlushResult {
   acceptedIds?: string[];
   duplicateIds?: string[];
   invalidIds?: string[];
+  acceptedSeqs?: Array<[string, number]>;
+  committedSeq?: number;
+  clientBatchId?: string;
+  ackId?: string;
+  receivedAt?: number;
   error?: string;
 }
 
