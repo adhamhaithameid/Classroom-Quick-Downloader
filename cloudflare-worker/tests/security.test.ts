@@ -187,6 +187,15 @@ async function callDOGet(obj: DownloadsDurable, path: string) {
   }));
 }
 
+async function callDOGetWithAdmin(obj: DownloadsDurable, path: string) {
+  return obj.fetch(new Request(`http://do${path}`, {
+    method: "GET",
+    headers: {
+      "X-Admin-Secret": "secret",
+    },
+  }));
+}
+
 describe("Worker security helpers", () => {
   it("detects local environments", () => {
     expect(isLocalEnvironment("localhost")).toBe(true);
@@ -634,7 +643,7 @@ describe("Durable Object security behaviors", () => {
       configMaxBufferSize: 50000,
     });
 
-    const res = await callDOGet(obj, "/pipeline-health");
+    const res = await callDOGetWithAdmin(obj, "/pipeline-health");
     expect(res.status).toBe(200);
     await state.drain();
 
@@ -684,6 +693,27 @@ describe("Durable Object security behaviors", () => {
     expect(payload.reasons || []).toContain("pending_batches_elevated");
   });
 
+  it("does not trigger alert webhook from public pipeline-health", async () => {
+    const webhookUrl = "https://alert.example.com";
+    const fetchSpy = vi.fn(async () => new Response("ok"));
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const { obj, state } = makeDOWithEnv({ ALERT_WEBHOOK_URL: webhookUrl }, {
+      pendingBatches: [],
+      retryState: { consecutiveFailures: 0 },
+      lastFlushAt: Date.now(),
+      buffer: [],
+      configMaxBufferSize: 50000,
+    });
+    const res = await callDOGet(obj, "/pipeline-health");
+    expect(res.status).toBe(200);
+    await state.drain();
+
+    const webhookCalls = fetchSpy.mock.calls.filter((call) => String(call[0] ?? "").includes("alert.example.com"));
+    expect(webhookCalls.length).toBe(0);
+    vi.unstubAllGlobals();
+  });
+
   it("uses configured pipeline health thresholds", async () => {
     const { obj } = makeDOWithStored({
       configHealthWarnPendingBatches: 2,
@@ -712,5 +742,45 @@ describe("Durable Object security behaviors", () => {
     expect(payload.thresholds?.criticalStaleMs).toBe(2000);
     expect(payload.thresholds?.warnBufferUtil).toBe(0.4);
     expect(payload.thresholds?.criticalBufferUtil).toBe(0.6);
+  });
+
+  it("compacts pending batches when all attempts are non-zero", async () => {
+    const pendingBatch = {
+      batch: {
+        batchId: "seed",
+        generatedAt: Date.now(),
+        timeZone: "UTC",
+        summary: {
+          totals: { totalEvents: 0, totalDownloads: 0, totalSuccess: 0, totalFail: 0 },
+          browsers: {},
+          os: {},
+          countries: {},
+          languages: {},
+          versions: {},
+          types: {},
+          errorReasons: {},
+          topBrowser: "unknown",
+          topOs: "unknown",
+          topCountry: "unknown",
+          topType: "unknown",
+        },
+        timeBuckets: [],
+      },
+      eventCount: 0,
+      maxSeq: 0,
+      attempts: 2,
+      createdAt: Date.now() - 60 * 1000,
+    };
+    const stored = {
+      pendingBatches: Array.from({ length: 55 }, () => ({ ...pendingBatch })),
+      retryState: { consecutiveFailures: 3 },
+      lastFlushAt: Date.now() - 8 * 60 * 60 * 1000,
+      buffer: [],
+      configMaxBufferSize: 50000,
+    };
+    const { state, obj } = makeDOWithStored(stored);
+    await obj.fetch(new Request("http://do/health", { method: "GET" }));
+    const next = await state.storage.get<StoredState>(STORAGE_KEY);
+    expect(next?.pendingBatches?.length ?? 0).toBeLessThanOrEqual(50);
   });
 });

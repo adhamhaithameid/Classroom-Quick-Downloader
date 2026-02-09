@@ -788,6 +788,9 @@ export class DownloadsDurable {
     } else {
       this.data.pendingBatches = [];
     }
+    const pendingBefore = this.data.pendingBatches.length;
+    this.mergePendingBatchesIfNeeded();
+    const pendingCompacted = this.data.pendingBatches.length !== pendingBefore;
 
     // Normalize config values and ensure schema version
     let configDirty = false;
@@ -1010,7 +1013,7 @@ export class DownloadsDurable {
       }
     }
 
-    if (hadLegacyIps || strippedEventIps || configDirty) {
+    if (hadLegacyIps || strippedEventIps || configDirty || pendingCompacted) {
       await this.persist();
     }
 
@@ -1127,7 +1130,7 @@ export class DownloadsDurable {
     }
 
     if (pathname === "/pipeline-health" && request.method === "GET") {
-      return this.handlePipelineHealth();
+      return this.handlePipelineHealth(request);
     }
 
     if (pathname === "/debug/flush" && request.method === "POST") {
@@ -1205,6 +1208,7 @@ export class DownloadsDurable {
   async alarm(): Promise<void> {
     await this.loaded;
     const now = Date.now();
+    this.ensureRequestDay();
 
     // =========================================================================
     // SCHEDULED MIDNIGHT FLUSH TO ORACLE
@@ -1224,6 +1228,9 @@ export class DownloadsDurable {
     if (this.d.retryState && this.d.retryState.nextRetryAt && now >= this.d.retryState.nextRetryAt) {
       await this.flushToOracle(false);
     }
+
+    const health = this.buildPipelineHealthPayload(now);
+    this.state.waitUntil(this.notifyHealthIfNeeded(health).catch(() => {}));
   }
 
   /**
@@ -1745,9 +1752,8 @@ export class DownloadsDurable {
     });
   }
 
-  private async handlePipelineHealth(): Promise<Response> {
-    this.ensureRequestDay();
-    const now = Date.now();
+  private buildPipelineHealthPayload(nowOverride?: number): PipelineHealthResponse {
+    const now = typeof nowOverride === "number" ? nowOverride : Date.now();
     const bufferLen = this.d.buffer.length;
     const maxBuffer = this.d.configMaxBufferSize || 50000;
     const bufferUtil = maxBuffer > 0 ? bufferLen / maxBuffer : 0;
@@ -1808,7 +1814,7 @@ export class DownloadsDurable {
       addWarn("buffer_util_elevated");
     }
 
-    const payload: PipelineHealthResponse = {
+    return {
       ok: true,
       status,
       reasons,
@@ -1834,8 +1840,14 @@ export class DownloadsDurable {
         criticalBufferUtil: critBufferUtil,
       },
     };
+  }
 
-    this.notifyHealthIfNeeded(payload).catch(() => {});
+  private async handlePipelineHealth(request: Request): Promise<Response> {
+    this.ensureRequestDay();
+    const payload = this.buildPipelineHealthPayload();
+    if (this.isAuthorizedAdmin(request)) {
+      this.state.waitUntil(this.notifyHealthIfNeeded(payload).catch(() => {}));
+    }
     return json(payload);
   }
 
@@ -2448,16 +2460,21 @@ export class DownloadsDurable {
 
   private mergePendingBatchesIfNeeded(): void {
     while (this.d.pendingBatches.length > MAX_PENDING_BATCHES) {
-      const firstIdx = this.d.pendingBatches.findIndex((b) => (b.attempts ?? 0) === 0);
-      const secondIdx = this.d.pendingBatches.findIndex(
+      let firstIdx = this.d.pendingBatches.findIndex((b) => (b.attempts ?? 0) === 0);
+      let secondIdx = this.d.pendingBatches.findIndex(
         (b, idx) => idx > firstIdx && (b.attempts ?? 0) === 0,
       );
       if (firstIdx === -1 || secondIdx === -1) {
-        // Avoid merging batches that have already been attempted (idempotency risk).
-        break;
+        // Fallback: merge the two oldest batches to enforce a hard cap during outages.
+        const sorted = this.d.pendingBatches
+          .map((b, idx) => ({ idx, createdAt: b.createdAt || 0 }))
+          .sort((a, b) => a.createdAt - b.createdAt);
+        if (sorted.length < 2) break;
+        firstIdx = sorted[0].idx;
+        secondIdx = sorted[1].idx;
       }
       const [second] = this.d.pendingBatches.splice(secondIdx, 1);
-      const [first] = this.d.pendingBatches.splice(firstIdx, 1);
+      const [first] = this.d.pendingBatches.splice(firstIdx > secondIdx ? firstIdx - 1 : firstIdx, 1);
       if (!first || !second) break;
       const mergedSummary = {
         totals: {
@@ -2496,8 +2513,8 @@ export class DownloadsDurable {
         batch: mergedBatch,
         eventCount: first.eventCount + second.eventCount,
         maxSeq: Math.max(first.maxSeq, second.maxSeq),
-        attempts: 0,
-        createdAt: Date.now(),
+        attempts: Math.max(first.attempts ?? 0, second.attempts ?? 0),
+        createdAt: Math.min(first.createdAt || Date.now(), second.createdAt || Date.now()),
       };
       this.d.pendingBatches.unshift(merged);
     }

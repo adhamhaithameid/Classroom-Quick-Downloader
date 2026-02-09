@@ -4761,6 +4761,12 @@ export function renderDashboard(stats: StatsResponse): string {
         return Math.round(num / 3600000);
       }
 
+      function msToMinutes(valueMs, fallback) {
+        const num = Number(valueMs);
+        if (!Number.isFinite(num) || num < 0) return fallback;
+        return Math.round(num / 60000);
+      }
+
       function ratioToPercent(value, fallback) {
         const num = Number(value);
         if (!Number.isFinite(num) || num < 0) return fallback;
@@ -4835,8 +4841,8 @@ export function renderDashboard(stats: StatsResponse): string {
         setValue("cfg-health-stale-critical", msToHours(merged.healthThresholds.criticalStaleMs, 24));
         setValue("cfg-health-buffer-warn", ratioToPercent(merged.healthThresholds.warnBufferUtil, 80));
         setValue("cfg-health-buffer-critical", ratioToPercent(merged.healthThresholds.criticalBufferUtil, 95));
-        setValue("cfg-health-notify-warn", msToHours(merged.healthNotifyIntervalsMs.warn, 30));
-        setValue("cfg-health-notify-critical", msToHours(merged.healthNotifyIntervalsMs.critical, 10));
+        setValue("cfg-health-notify-warn", msToMinutes(merged.healthNotifyIntervalsMs.warn, 30));
+        setValue("cfg-health-notify-critical", msToMinutes(merged.healthNotifyIntervalsMs.critical, 10));
 
         const flushEl = document.getElementById("cfg-flush-mode");
         if (flushEl) flushEl.value = merged.flushMode;
@@ -4904,6 +4910,11 @@ export function renderDashboard(stats: StatsResponse): string {
       function readHoursMs(id, fallbackMs) {
         const hours = readFloat(id, 0, 720, fallbackMs / 3600000);
         return Math.round(hours * 3600000);
+      }
+
+      function readMinutesMs(id, fallbackMs) {
+        const minutes = readFloat(id, 1, 1440, fallbackMs / 60000);
+        return Math.round(minutes * 60000);
       }
 
       function readPercentRatio(id, fallbackRatio) {
@@ -5043,8 +5054,8 @@ export function renderDashboard(stats: StatsResponse): string {
               criticalBufferUtil: readPercentRatio("cfg-health-buffer-critical", cfgDefaults.healthThresholds.criticalBufferUtil),
             },
             healthNotifyIntervalsMs: {
-              warn: readHoursMs("cfg-health-notify-warn", cfgDefaults.healthNotifyIntervalsMs.warn),
-              critical: readHoursMs("cfg-health-notify-critical", cfgDefaults.healthNotifyIntervalsMs.critical),
+              warn: readMinutesMs("cfg-health-notify-warn", cfgDefaults.healthNotifyIntervalsMs.warn),
+              critical: readMinutesMs("cfg-health-notify-critical", cfgDefaults.healthNotifyIntervalsMs.critical),
             },
           };
           sendRemoteConfigUpdate(payload);

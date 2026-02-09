@@ -110,4 +110,11 @@ describe("Dashboard pipeline health UI", () => {
     expect(html).toContain('id="cfg-health-notify-warn"');
     expect(html).toContain('id="cfg-health-notify-critical"');
   });
+
+  it("uses minute-based conversions for health notify intervals", () => {
+    const html = renderDashboard(makeStats());
+    expect(html).toContain("function msToMinutes");
+    expect(html).toContain("readMinutesMs(\"cfg-health-notify-warn\"");
+    expect(html).toContain("msToMinutes(merged.healthNotifyIntervalsMs.warn");
+  });
 });
