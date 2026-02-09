@@ -75,8 +75,11 @@ export function bucketDuration(durationMs: number): 'fast' | 'medium' | 'slow' {
  * Generate cryptographically strong unique event ID.
  * Format: ext-<timestamp>-<random12chars>
  */
-export function generateEventId(): string {
-  const ts = Date.now().toString(36);
+export function generateEventId(nowMs?: number): string {
+  const safeNow = typeof nowMs === 'number' && Number.isFinite(nowMs)
+    ? nowMs
+    : Date.now();
+  const ts = safeNow.toString(36);
   let rand = '';
   try {
     const arr = new Uint8Array(8);
