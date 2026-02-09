@@ -94,6 +94,12 @@ async function callDOWithoutAdmin(obj: DownloadsDurable, path: string, body: any
   }));
 }
 
+async function callDOGet(obj: DownloadsDurable, path: string) {
+  return obj.fetch(new Request(`http://do${path}`, {
+    method: "GET",
+  }));
+}
+
 describe("Worker security helpers", () => {
   it("detects local environments", () => {
     expect(isLocalEnvironment("localhost")).toBe(true);
@@ -182,6 +188,18 @@ describe("Durable Object security behaviors", () => {
     expect(stored.uniqueRequestsToday).toBe(0);
   });
 
+  it("echoes clientBatchId and returns ackId on /track", async () => {
+    const { obj } = makeDO();
+    const res = await callDO(obj, "/track", {
+      clientBatchId: "client-123",
+      events: [makeEvent()],
+    });
+    expect(res.status).toBe(202);
+    const payload = await res.json() as { clientBatchId?: string; ackId?: string };
+    expect(payload.clientBatchId).toBe("client-123");
+    expect(typeof payload.ackId).toBe("string");
+  });
+
   it("enforces max events per request from config", async () => {
     const { obj } = makeDO();
     await callDO(obj, "/admin/update-config", {
@@ -194,8 +212,8 @@ describe("Durable Object security behaviors", () => {
     expect(res.status).toBe(400);
   });
 
-  it("enforces buffer size from config", async () => {
-    const { obj } = makeDO();
+  it("compacts when buffer size is constrained by config", async () => {
+    const { obj, state } = makeDO();
     await callDO(obj, "/admin/update-config", {
       maxBufferSize: 1,
     }, { "X-Admin-Secret": "secret" });
@@ -203,6 +221,129 @@ describe("Durable Object security behaviors", () => {
     const first = await callDO(obj, "/track", { events: [makeEvent()] });
     expect(first.status).toBe(202);
     const second = await callDO(obj, "/track", { events: [makeEvent()] });
-    expect(second.status).toBe(503);
+    expect(second.status).toBe(202);
+    const stored = await state.storage.get<any>(STORAGE_KEY);
+    expect(stored.buffer?.length ?? 0).toBeLessThanOrEqual(1);
+    expect(stored.pendingBatches?.length ?? 0).toBeGreaterThan(0);
+  });
+
+  it("rejects invalid track payloads", async () => {
+    const { obj } = makeDO();
+    const res = await callDO(obj, "/track", { events: "nope" });
+    expect(res.status).toBe(400);
+  });
+
+  it("requires oracle ack with matching batchId", async () => {
+    const { obj, state } = makeDO();
+    await callDO(obj, "/track", { events: [makeEvent()] });
+    const expectedBatchId = "do-seq0-1ev";
+
+    const fetchSpy = vi.fn(async (_input: any, _init: any) => {
+      const parsed = JSON.parse(String(_init?.body || '{}'));
+      expect(parsed.summary).toBeTruthy();
+      expect(parsed.timeBuckets).toBeTruthy();
+      expect(parsed.events).toBeUndefined();
+      return new Response(
+        JSON.stringify({ ok: true, batchId: expectedBatchId, ingestedAt: Date.now() }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    });
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const res = await callDO(obj, "/admin/force-flush", {});
+    expect(res.status).toBe(200);
+
+    const stored = await state.storage.get<any>(STORAGE_KEY);
+    expect(stored.buffer?.length ?? 0).toBe(0);
+    vi.unstubAllGlobals();
+  });
+
+  it("rejects oracle ack with mismatched batchId", async () => {
+    const { obj, state } = makeDO();
+    await callDO(obj, "/track", { events: [makeEvent()] });
+
+    const fetchSpy = vi.fn(async (_input: any, _init: any) => {
+      return new Response(
+        JSON.stringify({ ok: true, batchId: "wrong-batch", ingestedAt: Date.now() }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    });
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const res = await callDO(obj, "/admin/force-flush", {});
+    expect(res.status).toBe(500);
+
+    const stored = await state.storage.get<any>(STORAGE_KEY);
+    expect(stored.buffer?.length ?? 0).toBe(1);
+    vi.unstubAllGlobals();
+  });
+
+  it("rejects invalid config updates", async () => {
+    const { obj } = makeDO();
+    const res = await callDO(obj, "/admin/update-config", {
+      batchSize: "nope",
+    }, { "X-Admin-Secret": "secret" });
+    expect(res.status).toBe(400);
+    const payload = await res.json() as { error?: string };
+    expect(payload.error).toBe("invalid_config");
+  });
+
+  it("includes server time and daily flush window in config", async () => {
+    const { obj } = makeDO();
+    const res = await callDOGet(obj, "/config");
+    expect(res.status).toBe(200);
+    const payload = await res.json() as { serverTimeUtc?: number; dailyFlushWindowStartUtc?: number; dailyFlushWindowMinutes?: number; committedSeq?: number };
+    expect(typeof payload.serverTimeUtc).toBe("number");
+    expect(payload.dailyFlushWindowStartUtc).toBe(1);
+    expect(payload.dailyFlushWindowMinutes).toBe(120);
+    expect(typeof payload.committedSeq).toBe("number");
+  });
+
+  it("updates daily flush window config", async () => {
+    const { obj } = makeDO();
+    const res = await callDO(obj, "/admin/update-config", {
+      dailyFlushWindowStartUtc: 3,
+      dailyFlushWindowMinutes: 90,
+    }, { "X-Admin-Secret": "secret" });
+    expect(res.status).toBe(200);
+    const payload = await res.json() as { config?: { dailyFlushWindowStartUtc?: number; dailyFlushWindowMinutes?: number } };
+    expect(payload.config?.dailyFlushWindowStartUtc).toBe(3);
+    expect(payload.config?.dailyFlushWindowMinutes).toBe(90);
+  });
+
+  it("returns accepted sequences for track", async () => {
+    const { obj } = makeDO();
+    const res = await callDO(obj, "/track", { events: [makeEvent()] });
+    expect(res.status).toBe(202);
+    const payload = await res.json() as { acceptedSeqs?: Array<[string, number]>; committedSeq?: number };
+    expect(Array.isArray(payload.acceptedSeqs)).toBe(true);
+    expect(typeof payload.committedSeq).toBe("number");
+    const seq = payload.acceptedSeqs?.[0]?.[1];
+    expect(typeof seq).toBe("number");
+  });
+
+  it("accepts future-skewed timestamps by clamping", async () => {
+    const { obj } = makeDO();
+    const future = Date.now() + 10 * 365 * 24 * 60 * 60 * 1000;
+    const res = await callDO(obj, "/track", { events: [makeEvent({ timestamp: future })] });
+    expect(res.status).toBe(202);
+    const payload = await res.json() as { accepted?: number };
+    expect(payload.accepted).toBe(1);
+  });
+
+  it("accepts legacy id formats without rejecting", async () => {
+    const { obj } = makeDO();
+    const res = await callDO(obj, "/track", { events: [makeEvent({ id: "legacy-123456" })] });
+    expect(res.status).toBe(202);
+  });
+
+  it("rate limits excessive track requests per IP", async () => {
+    const { obj } = makeDO();
+    let lastStatus = 0;
+    for (let i = 0; i < 121; i++) {
+      const res = await callDO(obj, "/track", { events: [makeEvent()] }, { "X-Client-IP": "9.9.9.9" });
+      lastStatus = res.status;
+    }
+    expect(lastStatus).toBe(429);
   });
 });
