@@ -600,6 +600,10 @@ export function renderDashboard(stats: StatsResponse): string {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
+  const rawHealthJson = JSON.stringify({ ok: true, status: "loading" }, null, 2)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -1468,6 +1472,42 @@ export function renderDashboard(stats: StatsResponse): string {
       gap: 6px;
     }
 
+    .health-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .health-chip {
+      font-size: 0.65rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text-muted);
+    }
+
+    .health-chip.ok {
+      color: var(--success);
+      border-color: rgba(34, 197, 94, 0.45);
+      background: rgba(34, 197, 94, 0.12);
+    }
+
+    .health-chip.warn {
+      color: var(--warning);
+      border-color: rgba(234, 179, 8, 0.55);
+      background: rgba(234, 179, 8, 0.12);
+    }
+
+    .health-chip.critical {
+      color: var(--danger);
+      border-color: rgba(239, 68, 68, 0.55);
+      background: rgba(239, 68, 68, 0.12);
+    }
+
     .health-banner.ok {
       border-color: rgba(34, 197, 94, 0.45);
       background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(34, 197, 94, 0.04));
@@ -1515,6 +1555,29 @@ export function renderDashboard(stats: StatsResponse): string {
       display: block;
       color: var(--text-primary);
       font-size: 0.9rem;
+    }
+
+    .health-details {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .health-detail {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: rgba(255,255,255,0.02);
+      padding: 10px 12px;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .health-detail strong {
+      display: block;
+      margin-top: 4px;
+      font-size: 0.9rem;
+      color: var(--text-primary);
     }
     
     /* Grid Layouts */
@@ -2977,7 +3040,10 @@ export function renderDashboard(stats: StatsResponse): string {
         </div>
       </section>
       <section class="card" id="pipeline-health">
-        <h2>Pipeline Health</h2>
+        <div class="health-header">
+          <h2>Pipeline Health</h2>
+          <span class="health-chip ok" id="pipeline-health-chip">OK</span>
+        </div>
         <div class="section-subtitle" style="margin-bottom: 14px; color: var(--text-muted); font-size: 0.85rem;">
           Derived from <code>${pipelineHealthUrl}</code>. Tracks backlog, failures, and flush staleness.
         </div>
@@ -3001,6 +3067,24 @@ export function renderDashboard(stats: StatsResponse): string {
               <span>Failures</span>
               <strong id="pipeline-health-failures">0</strong>
             </div>
+          </div>
+        </div>
+        <div class="health-details">
+          <div class="health-detail">
+            Last Flush (UTC)
+            <strong id="pipeline-health-last-flush">—</strong>
+          </div>
+          <div class="health-detail">
+            Last Event (UTC)
+            <strong id="pipeline-health-last-event">—</strong>
+          </div>
+          <div class="health-detail">
+            Committed Seq
+            <strong id="pipeline-health-committed">—</strong>
+          </div>
+          <div class="health-detail">
+            Max Buffer
+            <strong id="pipeline-health-max-buffer">—</strong>
           </div>
         </div>
       </section>
@@ -3437,6 +3521,13 @@ export function renderDashboard(stats: StatsResponse): string {
               >
                 <span class="btn-bullet">•</span> Open /health
               </button>
+              <button
+                class="btn"
+                onclick="window.open('/pipeline-health', '_blank')"
+                type="button"
+              >
+                <span class="btn-bullet">•</span> Open /pipeline-health
+              </button>
               <button class="btn" id="btn-debug-flush-action" type="button">
                 <span class="btn-bullet">•</span> POST /debug/flush
               </button>
@@ -3455,6 +3546,13 @@ export function renderDashboard(stats: StatsResponse): string {
           Direct JSON returned by <code>/stats</code>
         </div>
         <pre id="raw-stats-json" class="code-block code-block-large">${rawStatsJson}</pre>
+      </section>
+      <section class="card" id="raw-pipeline-health">
+        <h2>Raw /pipeline-health payload</h2>
+        <div class="metric-sub">
+          Direct JSON returned by <code>/pipeline-health</code>
+        </div>
+        <pre id="raw-health-json" class="code-block code-block-large">${rawHealthJson}</pre>
       </section>
 
       <!-- Security Settings -->
@@ -4418,10 +4516,16 @@ export function renderDashboard(stats: StatsResponse): string {
         const banner = document.getElementById("pipeline-health-banner");
         const statusEl = document.getElementById("pipeline-health-status");
         const reasonsEl = document.getElementById("pipeline-health-reasons");
+        const chipEl = document.getElementById("pipeline-health-chip");
         const pendingEl = document.getElementById("pipeline-health-pending");
         const oldestEl = document.getElementById("pipeline-health-oldest");
         const bufferEl = document.getElementById("pipeline-health-buffer");
         const failuresEl = document.getElementById("pipeline-health-failures");
+        const lastFlushEl = document.getElementById("pipeline-health-last-flush");
+        const lastEventEl = document.getElementById("pipeline-health-last-event");
+        const committedEl = document.getElementById("pipeline-health-committed");
+        const maxBufferEl = document.getElementById("pipeline-health-max-buffer");
+        const rawEl = document.getElementById("raw-health-json");
 
         if (!banner || !statusEl || !reasonsEl) return;
         const ok = !(health && health.ok === false);
@@ -4435,6 +4539,14 @@ export function renderDashboard(stats: StatsResponse): string {
         else if (status === "warn") banner.classList.add("warn");
         else if (status === "ok") banner.classList.add("ok");
         else banner.classList.add("warn");
+
+        if (chipEl) {
+          chipEl.classList.remove("ok", "warn", "critical");
+          if (status === "critical") chipEl.classList.add("critical");
+          else if (status === "warn") chipEl.classList.add("warn");
+          else if (status === "ok") chipEl.classList.add("ok");
+          chipEl.textContent = String(status).toUpperCase();
+        }
 
         statusEl.textContent = "Pipeline Health: " + String(status).toUpperCase();
         const reasons = Array.isArray(health?.reasons) ? health.reasons : [];
@@ -4456,6 +4568,25 @@ export function renderDashboard(stats: StatsResponse): string {
         }
         if (failuresEl) {
           failuresEl.textContent = ok ? String(health?.consecutiveFailures ?? "—") : "—";
+        }
+        if (lastFlushEl) {
+          lastFlushEl.textContent = ok ? formatTs(health?.lastFlushAt ?? null) : "—";
+        }
+        if (lastEventEl) {
+          lastEventEl.textContent = ok ? formatTs(health?.lastEventAt ?? null) : "—";
+        }
+        if (committedEl) {
+          committedEl.textContent = ok ? String(health?.committedSeq ?? "—") : "—";
+        }
+        if (maxBufferEl) {
+          maxBufferEl.textContent = ok ? String(health?.maxBufferSize ?? "—") : "—";
+        }
+        if (rawEl) {
+          const payload = ok ? health : { ok: false, status: "unknown" };
+          const next = JSON.stringify(payload, null, 2);
+          if (rawEl.textContent !== next) {
+            rawEl.textContent = next;
+          }
         }
       }
 

@@ -99,3 +99,12 @@ describe("Dashboard legacy toggle UI", () => {
     expect(html).toContain("Disabled — events without IDs will be rejected.");
   });
 });
+
+describe("Dashboard pipeline health UI", () => {
+  it("renders the pipeline health card and raw payload block", () => {
+    const html = renderDashboard(makeStats());
+    expect(html).toContain('id="pipeline-health"');
+    expect(html).toContain('id="pipeline-health-chip"');
+    expect(html).toContain('id="raw-health-json"');
+  });
+});
