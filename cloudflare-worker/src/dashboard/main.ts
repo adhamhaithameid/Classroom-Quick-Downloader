@@ -4203,6 +4203,17 @@ export function renderDashboard(stats: StatsResponse): string {
       // 1. Reload logic
       const btnReload = document.getElementById("btn-reload");
 
+      function fetchPipelineHealth() {
+        return fetch("/pipeline-health")
+          .then((r) =>
+            r
+              .json()
+              .catch(() => ({ ok: false })),
+          )
+          .then((h) => updatePipelineHealth(h))
+          .catch(() => updatePipelineHealth({ ok: false }));
+      }
+
       async function refreshStats() {
         if (!btnReload) return;
         btnReload.textContent = "Loading...";
@@ -4211,10 +4222,7 @@ export function renderDashboard(stats: StatsResponse): string {
           const data = await res.json();
           if (!data.ok) throw new Error("Stats fetch failed");
           updateUI(data);
-          fetch("/pipeline-health")
-            .then((r) => r.json())
-            .then((h) => updatePipelineHealth(h))
-            .catch(() => {});
+          fetchPipelineHealth();
           btnReload.innerHTML =
             '<span class="btn-bullet">•</span> Reload stats';
         } catch (e) {
@@ -4416,23 +4424,39 @@ export function renderDashboard(stats: StatsResponse): string {
         const failuresEl = document.getElementById("pipeline-health-failures");
 
         if (!banner || !statusEl || !reasonsEl) return;
-        const status = health?.status || "unknown";
+        const ok = !(health && health.ok === false);
+        const statusRaw = ok ? (health?.status || "unknown") : "unknown";
+        const status =
+          statusRaw === "critical" || statusRaw === "warn" || statusRaw === "ok"
+            ? statusRaw
+            : "unknown";
         banner.classList.remove("ok", "warn", "critical");
         if (status === "critical") banner.classList.add("critical");
         else if (status === "warn") banner.classList.add("warn");
-        else banner.classList.add("ok");
+        else if (status === "ok") banner.classList.add("ok");
+        else banner.classList.add("warn");
 
         statusEl.textContent = "Pipeline Health: " + String(status).toUpperCase();
         const reasons = Array.isArray(health?.reasons) ? health.reasons : [];
-        reasonsEl.textContent = reasons.length ? reasons.join(", ") : "No issues detected.";
+        reasonsEl.textContent = ok
+          ? reasons.length
+            ? reasons.join(", ")
+            : "No issues detected."
+          : "Unable to load pipeline health.";
 
-        if (pendingEl) pendingEl.textContent = String(health?.pendingBatches ?? "—");
-        if (oldestEl) oldestEl.textContent = formatDuration(health?.oldestPendingAgeMs ?? null);
+        if (pendingEl) pendingEl.textContent = ok ? String(health?.pendingBatches ?? "—") : "—";
+        if (oldestEl) {
+          oldestEl.textContent = ok
+            ? formatDuration(health?.oldestPendingAgeMs ?? null)
+            : "—";
+        }
         if (bufferEl) {
-          const util = health?.bufferUtilization;
+          const util = ok ? health?.bufferUtilization : null;
           bufferEl.textContent = Number.isFinite(util) ? Math.round(util * 100) + "%" : "—";
         }
-        if (failuresEl) failuresEl.textContent = String(health?.consecutiveFailures ?? "—");
+        if (failuresEl) {
+          failuresEl.textContent = ok ? String(health?.consecutiveFailures ?? "—") : "—";
+        }
       }
 
       if (btnReload) {
@@ -5635,6 +5659,8 @@ export function renderDashboard(stats: StatsResponse): string {
 
       updateLiveIndicator();
       setInterval(updateLiveIndicator, 5000);
+      fetchPipelineHealth();
+      setInterval(fetchPipelineHealth, 60000);
       
       // ===== SCROLL TRACKING FOR SIDEBAR NAV =====
       const sections = document.querySelectorAll('section[id]');
