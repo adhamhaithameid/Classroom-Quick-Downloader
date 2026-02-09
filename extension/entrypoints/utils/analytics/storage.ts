@@ -100,9 +100,8 @@ function migrateConfig(raw: any): AnalyticsConfig {
 
 // --- Queue Helpers ---
 
-export async function loadQueue(): Promise<AnalyticsEvent[]> {
-  const { queue } = await loadQueueWithIntegrity();
-  return queue;
+export async function loadQueue(): Promise<{ queue: AnalyticsEvent[]; valid: boolean }> {
+  return loadQueueWithIntegrity();
 }
 
 export async function saveQueue(queue: AnalyticsEvent[]): Promise<void> {

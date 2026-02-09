@@ -94,7 +94,10 @@ async function internalTrack(
   await updateLocalStats(fullEvent);
 
   // Add to queue
-  const queue = await loadQueue();
+  const { queue, valid } = await loadQueue();
+  if (!valid) {
+    console.warn('[CQD Analytics] Queue integrity check failed; persisting new checksum after append');
+  }
   queue.push(fullEvent);
   await saveQueue(queue);
 

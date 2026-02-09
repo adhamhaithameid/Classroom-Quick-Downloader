@@ -368,7 +368,12 @@ export async function updateLocalStats(event: AnalyticsEvent): Promise<void> {
 export async function internalFlush(): Promise<void> {
   const cfg = await loadConfig();
   let meta = await loadMeta();
-  let queue = await loadQueue();
+  const loaded = await loadQueue();
+  let queue = loaded.queue;
+  if (!loaded.valid) {
+    console.warn('[CQD Analytics] Queue integrity check failed; re-saving queue to restore checksum');
+    await saveQueue(queue);
+  }
 
   queue = pruneCommittedEvents(queue, meta.lastCommittedSeq);
   if (queue.length === 0) {
