@@ -18,25 +18,25 @@ describe("safeCompare", () => {
   it("should return false when one input is null or undefined", async () => {
     expect(await safeCompare("hello", null)).toBe(false);
     expect(await safeCompare("hello", undefined)).toBe(false);
-    // @ts-ignore
+    // @ts-expect-error - Testing invalid input
     expect(await safeCompare(null, "hello")).toBe(false);
-    // @ts-ignore
+    // @ts-expect-error - Testing invalid input
     expect(await safeCompare(undefined, "hello")).toBe(false);
   });
 
   it("should return true when both inputs are null or undefined (matching)", async () => {
-    // @ts-ignore
+    // @ts-expect-error - Testing invalid input
     expect(await safeCompare(null, null)).toBe(true);
-    // @ts-ignore
+    // @ts-expect-error - Testing invalid input
     expect(await safeCompare(undefined, undefined)).toBe(true);
   });
 
   it("should return false when inputs are null and undefined", async () => {
       // In JS `null == undefined` is true, but `null === undefined` is false.
       // My implementation uses `a === b` for non-strings.
-      // @ts-ignore
+      // @ts-expect-error - Testing invalid input
       expect(await safeCompare(null, undefined)).toBe(false);
-      // @ts-ignore
+      // @ts-expect-error - Testing invalid input
       expect(await safeCompare(undefined, null)).toBe(false);
   });
 });
