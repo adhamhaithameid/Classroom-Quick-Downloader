@@ -193,7 +193,7 @@ sequenceDiagram
     Ext->>Ext: Queue in chrome.storage
 
     Note over Ext,Worker: Phase 2: Batch & Send
-    Ext->>Ext: Check: queue >= 50 OR time > 30min?
+    Ext->>Ext: Check flush triggers (batch size, daily UTC window, stale ≥ 24h)
     Ext->>Worker: POST /track { events: [...] }
   
     Note over Worker,DO: Phase 3: Edge Processing
@@ -575,6 +575,14 @@ journey
         Batched to edge: 5: Worker
         Stored in DB: 5: Backend
 ```
+
+---
+
+### Analytics Reliability (UTC + End-to-End ACK)
+
+- **UTC Everywhere**: All timestamps are stored and compared in UTC. The extension applies `serverTimeUtc` from `/config` to correct client clock drift.
+- **End-to-End ACK**: The Worker assigns event sequences and returns `acceptedSeqs`. Events are only dropped after `committedSeq` confirms Oracle flush.
+- **Backpressure + Compaction**: When buffers get high or Oracle fails, `remoteEnabledReason` tells extensions to pause and the DO compacts backlog into aggregated batches.
 
 ---
 

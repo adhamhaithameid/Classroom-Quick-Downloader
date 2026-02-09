@@ -113,10 +113,12 @@ The `entrypoints/utils/analytics.ts` module provides secure, privacy-respecting 
 │   └─────────────────────────────┬────────────────────────────────┘  │
 │                                 │                                   │
 │   ┌────────────────────────────▼────────────────────────────────┐  │
-│   │                     Flush Triggers                           │  │
+│   │                  Flush Triggers (UTC)                        │  │
 │   │   1. Queue >= batchSize (default: 50)                        │  │
-│   │   2. Time-based: 30min (high), 60min (mid), 120min (low)     │  │
-│   │   3. chrome.alarms every 5 minutes                           │  │
+│   │   2. Daily randomized window (default 01:00–03:00 UTC)       │  │
+│   │   3. Stale events >= 24h                                     │  │
+│   │   4. Time-based thresholds (optional low/mid/high minutes)   │  │
+│   │   5. chrome.alarms every 5 minutes                           │  │
 │   └─────────────────────────────┬────────────────────────────────┘  │
 │                                 │                                   │
 └─────────────────────────────────┼───────────────────────────────────┘
@@ -134,7 +136,9 @@ The `entrypoints/utils/analytics.ts` module provides secure, privacy-respecting 
 - **Batching**: Events are queued and sent in batches to reduce network requests.
 - **Exponential Backoff**: Failed flushes retry with increasing delays (1m → 5m → 15m → ... → 24h).
 - **Poison Pill Protection**: Events that fail 5+ times are dropped to prevent infinite retries.
-- **Dynamic Config**: Batch size and flush intervals are fetched from the Worker's `/config` endpoint.
+- **Dynamic Config**: Batch size, daily windows, retry caps, and rate limits are fetched from the Worker's `/config` endpoint.
+- **UTC Time Sync**: Uses `serverTimeUtc` to keep timestamps and windows aligned in UTC.
+- **End-to-End ACK**: Events are removed only after the Worker confirms Oracle commit.
 - **Privacy**: No personally identifiable information is collected.
 
 ---
@@ -234,11 +238,11 @@ npm run zip:firefox     # Web Store ZIP
 
 ### Analytics Endpoint
 
-The analytics module sends data to the Cloudflare Worker. The endpoint is configured in `src/shared/analytics.ts`:
+The analytics module sends data to the Cloudflare Worker. The endpoint is configured via `VITE_WORKER_URL` and read in `entrypoints/utils/analytics/constants.ts`:
 
 ```typescript
 // For LOCAL TESTING:
-const WORKER_URL = 'http://localhost:8787/track';
+const VITE_WORKER_URL = 'http://localhost:8787/track';
 ```
 
 The remote can be disabled entirely by setting `WORKER_URL` to an empty string.
@@ -248,8 +252,14 @@ The remote can be disabled entirely by setting `WORKER_URL` to an empty string.
 The extension fetches configuration from the Worker's `/config` endpoint:
 
 - **Batch Size**: How many events to send per request.
-- **Flush Intervals**: Time-based flush thresholds.
-- **Remote Enabled**: Emergency kill switch for analytics.
+- **Max Daily Requests**: Per-extension cap on flushes per UTC day.
+- **Max Retry**: Retry cap before dropping permanently failing events.
+- **Flush Mode**: `next_day` (daily UTC window) or `time_based`.
+- **Daily Window (UTC)**: Start hour + window length for randomized daily flush.
+- **Time Flush Minutes**: Low/mid/high thresholds when `time_based` is enabled.
+- **Max Events / Request**: Worker-side cap for payload size.
+- **Cancel Hold Delay**: UI safety delay before cancel becomes active.
+- **Remote Enabled**: Backpressure switch (can pause remote analytics).
 
 Configuration is refreshed:
 

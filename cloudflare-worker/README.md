@@ -64,8 +64,11 @@ The **CQD Analytics Worker** is a high-performance, edge-deployed analytics inge
 │     • buffer[]         - Raw events awaiting flush                            │
 │     • counters         - Live aggregated stats (by browser, OS, country...)   │
 │     • batchSeq         - Monotonic batch ID for idempotency                   │
+│     • eventSeq         - Monotonic event sequence for end-to-end ACK          │
+│     • committedSeq     - Highest sequence confirmed flushed to Oracle         │
 │     • retryState       - Backoff tracking for failed flushes                  │
 │     • reqCountToday    - Daily request quota tracking                         │
+│     • pendingBatches   - Compacted batches waiting on Oracle                  │
 │                                                                               │
 │   BUFFERING:                                                                  │
 │     • Events accumulate in `buffer[]`                                         │
@@ -131,12 +134,14 @@ cloudflare-worker/
 All configuration is defined in `wrangler.toml`:
 
 
-| Variable           | Type                           | Description                                                                                        | Example                       |
-| ------------------ | ------------------------------ | -------------------------------------------------------------------------------------------------- | ----------------------------- |
-| `ORACLE_ENDPOINT`  | `[vars]`                       | Base URL of the Oracle backend. Do not include`/ingest-batch`.                                     | `http://your-server.com:8080` |
-| `MAX_BATCH_EVENTS` | `[vars]`                       | Maximum events per flush. When buffer reaches this size, a flush is triggered.                     | `10000`                       |
-| `DO_SHARED_SECRET` | **Secret**                     | Shared secret for authorizing admin endpoints and Oracle communication.**Do NOT put in `[vars]`**. | —                            |
-| `DOWNLOADS_DO`     | `[[durable_objects.bindings]]` | The binding name for the Durable Object.                                                           | `DOWNLOADS_DO`                |
+| Variable              | Type                           | Description                                                                                         | Example                       |
+| --------------------- | ------------------------------ | --------------------------------------------------------------------------------------------------- | ----------------------------- |
+| `ORACLE_ENDPOINT`     | `[vars]`                       | Base URL of the Oracle backend. Do not include`/ingest-batch`.                                      | `http://your-server.com:8080` |
+| `MAX_BATCH_EVENTS`    | `[vars]`                       | Maximum events per flush. When buffer reaches this size, a flush is triggered.                      | `10000`                       |
+| `DO_SHARED_SECRET`    | **Secret**                     | Shared secret for admin endpoints + Oracle communication. **Do NOT put in `[vars]`**.              | —                            |
+| `DASHBOARD_PASSWORD`  | **Secret**                     | Password for the Worker dashboard login/session tokens (separate from `DO_SHARED_SECRET`).         | —                            |
+| `DANGER_PASSWORD`     | **Secret**                     | Password for Danger Zone actions.                                                                   | —                            |
+| `DOWNLOADS_DO`        | `[[durable_objects.bindings]]` | The binding name for the Durable Object.                                                            | `DOWNLOADS_DO`                |
 
 ### 🔐 Setting `DO_SHARED_SECRET` Securely
 
@@ -151,6 +156,8 @@ npx wrangler secret put DO_SHARED_SECRET
 ```
 
 This secret must match the `DO_SHARED_SECRET` environment variable on your Oracle backend.
+
+**Dashboard Login:** Use `DASHBOARD_PASSWORD` (separate secret) for Worker dashboard access.
 
 ---
 
@@ -172,12 +179,16 @@ The Worker also hosts a **Notification Rules Engine** to control the "Update Ava
 
 The primary endpoint called by the browser extension. Accepts a batch of download events.
 
+**Rate limiting:** The Durable Object applies a per-IP, per-minute request cap to prevent abuse.  
+If the limit is exceeded, the endpoint returns `429` with `retryAfterSec`.
+
 **Request:**
 
 ```bash
 curl -X POST https://cqd-analytics.your-subdomain.workers.dev/track \
   -H "Content-Type: application/json" \
   -d '{
+    "clientBatchId": "client-123",
     "events": [
       {
         "status": "success",
@@ -210,8 +221,23 @@ curl -X POST https://cqd-analytics.your-subdomain.workers.dev/track \
 **Response:**
 
 ```json
-{ "ok": true, "accepted": 2 }
+{
+  "ok": true,
+  "accepted": 2,
+  "acceptedIds": ["ext-abc-123", "ext-def-456"],
+  "duplicateIds": [],
+  "invalidIds": [],
+  "acceptedSeqs": [["ext-abc-123", 1201], ["ext-def-456", 1202]],
+  "committedSeq": 1180,
+  "clientBatchId": "client-123",
+  "ackId": "ack-1702732800-xyz",
+  "receivedAt": 1702732800000
+}
 ```
+
+`acceptedSeqs` lets the extension mark which events were accepted by the DO.
+`committedSeq` indicates the latest sequence the Worker has safely flushed to Oracle.
+`clientBatchId` echoes the extension's request ID so the client can verify the ACK.
 
 **Event Schema (`StoredEvent`):**
 
@@ -281,11 +307,36 @@ curl https://cqd-analytics.your-subdomain.workers.dev/stats
 
 ### `GET /config` — Extension Configuration
 
-Returns configuration hints for the browser extension (batch size, remote enabled, etc.).
+Returns configuration hints for the browser extension (batch size, daily window, retry caps, etc.).
 
 ```bash
 curl https://cqd-analytics.your-subdomain.workers.dev/config
 ```
+
+**Response (example):**
+
+```json
+{
+  "ok": true,
+  "configVersion": 2,
+  "batchSize": 50,
+  "maxDailyRequests": 50,
+  "maxRetry": 5,
+  "maxEventsPerRequest": 5000,
+  "flushMode": "next_day",
+  "dailyFlushWindowStartUtc": 1,
+  "dailyFlushWindowMinutes": 120,
+  "timeFlushMinutes": { "low": 1440, "mid": 1440, "high": 1440 },
+  "remoteEnabled": true,
+  "remoteEnabledReason": "ok",
+  "cancelHoldDelayMs": 1000,
+  "serverTimeUtc": 1702732800000,
+  "committedSeq": 1180,
+  "quota": { "requestsToday": 1500, "quotaLevel": "BELOW_LIMITS", "modeLabel": "chill", "remoteEnabled": true }
+}
+```
+
+`serverTimeUtc` is used by the extension to correct clock drift and keep all scheduling in UTC.
 
 ---
 

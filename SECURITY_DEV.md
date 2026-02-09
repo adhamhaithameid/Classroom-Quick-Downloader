@@ -4,12 +4,12 @@
 
 All analytics systems now work together in harmony:
 
-| Time | System | Action |
-|------|--------|--------|
-| 12:00-12:59 AM | Extension | **BLACKOUT** - No requests to Cloudflare |
-| 12:00 AM UTC | Worker | Alarm → flush buffer to Oracle |
-| 12:15 AM | Oracle | Scheduler → flush DB to Google Sheets |
-| 1:00 AM+ | Extension | Send ALL accumulated events |
+| Time (UTC) | System | Action |
+|------------|--------|--------|
+| 00:00 | Worker | Alarm → flush buffer to Oracle |
+| 00:15 | Oracle | Scheduler → flush DB to Google Sheets |
+| 01:00–03:00 | Extension | Randomized daily flush window (configurable) |
+| Ongoing | Extension | Stale events (≥24h) or time-based flush (if enabled) |
 
 ---
 
@@ -24,6 +24,9 @@ All analytics systems now work together in harmony:
 | `maxBufferSize` | 50000 | Max events in Worker buffer |
 | `flushMode` | `next_day` | When to send |
 | `timeFlushMinutes` | {low:1440, mid:1440, high:1440} | Time-based intervals |
+| `dailyFlushWindowStartUtc` | 1 | Daily window start hour (UTC) |
+| `dailyFlushWindowMinutes` | 120 | Daily window length (minutes) |
+| `cancelHoldDelayMs` | 1000 | UI safety delay before cancel |
 
 ---
 
@@ -55,10 +58,15 @@ curl -X POST .../admin/restore-power -H "X-Admin-Secret: SECRET"
 
 ### Worker
 - `DO_SHARED_SECRET`: Admin auth secret
+- `DASHBOARD_PASSWORD`: Worker dashboard login secret (separate from `DO_SHARED_SECRET`)
 - `ORACLE_ENDPOINT`: Oracle backend URL
+- `DANGER_PASSWORD`: Danger Zone password
 
 ### Oracle
 - `SHEETS_ID`: Google Sheets spreadsheet ID
 - `GOOGLE_CREDS_PATH`: Service account JSON path
 - `KUMA_PUSH_URL`: Uptime Kuma push URL (optional)
 - `ARCHIVER_PATH`: Path to archiver binary
+- `ARCHIVER_SHARED_SECRET`: Secret header for the archiver (required when dashboard auth is enabled)
+- `ALLOW_LOOPBACK_BYPASS`: Set to `true` to allow loopback auth bypass (dev only)
+- `ALLOW_EMPTY_DASHBOARD_PASSWORD`: Set to `true` to allow an empty dashboard password (dev only)
