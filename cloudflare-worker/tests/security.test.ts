@@ -407,11 +407,13 @@ describe("Durable Object security behaviors", () => {
     const { obj } = makeDO();
     const res = await callDOGet(obj, "/config");
     expect(res.status).toBe(200);
-    const payload = await res.json() as { serverTimeUtc?: number; dailyFlushWindowStartUtc?: number; dailyFlushWindowMinutes?: number; committedSeq?: number };
+    const payload = await res.json() as { serverTimeUtc?: number; dailyFlushWindowStartUtc?: number; dailyFlushWindowMinutes?: number; committedSeq?: number; healthNotifyIntervalsMs?: { warn?: number; critical?: number } };
     expect(typeof payload.serverTimeUtc).toBe("number");
     expect(payload.dailyFlushWindowStartUtc).toBe(1);
     expect(payload.dailyFlushWindowMinutes).toBe(120);
     expect(typeof payload.committedSeq).toBe("number");
+    expect(typeof payload.healthNotifyIntervalsMs?.warn).toBe("number");
+    expect(typeof payload.healthNotifyIntervalsMs?.critical).toBe("number");
   });
 
   it("updates daily flush window config", async () => {
@@ -424,6 +426,47 @@ describe("Durable Object security behaviors", () => {
     const payload = await res.json() as { config?: { dailyFlushWindowStartUtc?: number; dailyFlushWindowMinutes?: number } };
     expect(payload.config?.dailyFlushWindowStartUtc).toBe(3);
     expect(payload.config?.dailyFlushWindowMinutes).toBe(90);
+  });
+
+  it("updates health notification intervals", async () => {
+    const { obj } = makeDO();
+    const res = await callDO(obj, "/admin/update-config", {
+      healthNotifyIntervalsMs: { warn: 45 * 60 * 1000, critical: 15 * 60 * 1000 },
+    }, { "X-Admin-Secret": "secret" });
+    expect(res.status).toBe(200);
+    const payload = await res.json() as { config?: { healthNotifyIntervalsMs?: { warn?: number; critical?: number } } };
+    expect(payload.config?.healthNotifyIntervalsMs?.warn).toBe(45 * 60 * 1000);
+    expect(payload.config?.healthNotifyIntervalsMs?.critical).toBe(15 * 60 * 1000);
+    const configRes = await callDOGet(obj, "/config");
+    const cfgPayload = await configRes.json() as { healthNotifyIntervalsMs?: { warn?: number; critical?: number } };
+    expect(cfgPayload.healthNotifyIntervalsMs?.warn).toBe(45 * 60 * 1000);
+    expect(cfgPayload.healthNotifyIntervalsMs?.critical).toBe(15 * 60 * 1000);
+  });
+
+  it("round-trips health thresholds into stats for dashboard", async () => {
+    const { obj } = makeDO();
+    const updateRes = await callDO(obj, "/admin/update-config", {
+      healthThresholds: {
+        warnPendingBatches: 4,
+        criticalPendingBatches: 8,
+        warnFailures: 2,
+        criticalFailures: 4,
+        warnStaleMs: 2 * 60 * 60 * 1000,
+        criticalStaleMs: 6 * 60 * 60 * 1000,
+        warnBufferUtil: 0.75,
+        criticalBufferUtil: 0.9,
+      },
+      healthNotifyIntervalsMs: { warn: 60 * 60 * 1000, critical: 20 * 60 * 1000 },
+    }, { "X-Admin-Secret": "secret" });
+    expect(updateRes.status).toBe(200);
+
+    const statsRes = await callDOGet(obj, "/stats");
+    expect(statsRes.status).toBe(200);
+    const payload = await statsRes.json() as { remoteConfig?: { healthThresholds?: Record<string, unknown>; healthNotifyIntervalsMs?: { warn?: number; critical?: number } } };
+    expect(payload.remoteConfig?.healthThresholds?.warnPendingBatches).toBe(4);
+    expect(payload.remoteConfig?.healthThresholds?.criticalPendingBatches).toBe(8);
+    expect(payload.remoteConfig?.healthNotifyIntervalsMs?.warn).toBe(60 * 60 * 1000);
+    expect(payload.remoteConfig?.healthNotifyIntervalsMs?.critical).toBe(20 * 60 * 1000);
   });
 
   it("persists allowLegacyEvents in config", async () => {

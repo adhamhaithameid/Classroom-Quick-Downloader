@@ -166,6 +166,10 @@ export interface StatsResponse {
       warnBufferUtil: number;
       criticalBufferUtil: number;
     };
+    healthNotifyIntervalsMs?: {
+      warn: number;
+      critical: number;
+    };
     remoteEnabledReason?: string;
     hardRemoteOff: boolean;
   };
@@ -215,6 +219,10 @@ export interface ConfigResponse {
     criticalStaleMs: number;
     warnBufferUtil: number;
     criticalBufferUtil: number;
+  };
+  healthNotifyIntervalsMs?: {
+    warn: number;
+    critical: number;
   };
   serverTimeUtc?: number;
   committedSeq?: number;

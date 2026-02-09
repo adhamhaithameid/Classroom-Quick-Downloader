@@ -146,6 +146,8 @@ type DurableStateShape = {
   configHealthCriticalStaleMs: number;
   configHealthWarnBufferUtil: number;
   configHealthCriticalBufferUtil: number;
+  configHealthNotifyWarnIntervalMs: number;
+  configHealthNotifyCritIntervalMs: number;
 
   // Pipeline health notification state
   lastHealthStatus?: PipelineHealthStatus;
@@ -663,6 +665,8 @@ export class DownloadsDurable {
       configHealthCriticalStaleMs: HEALTH_CRIT_STALE_MS,
       configHealthWarnBufferUtil: HEALTH_WARN_BUFFER_UTIL,
       configHealthCriticalBufferUtil: HEALTH_CRIT_BUFFER_UTIL,
+      configHealthNotifyWarnIntervalMs: HEALTH_NOTIFY_WARN_INTERVAL_MS,
+      configHealthNotifyCritIntervalMs: HEALTH_NOTIFY_CRIT_INTERVAL_MS,
 
       // Changelog defaults
       changelog: [],
@@ -761,6 +765,10 @@ export class DownloadsDurable {
         stored.configHealthWarnBufferUtil ?? base.configHealthWarnBufferUtil,
       configHealthCriticalBufferUtil:
         stored.configHealthCriticalBufferUtil ?? base.configHealthCriticalBufferUtil,
+      configHealthNotifyWarnIntervalMs:
+        stored.configHealthNotifyWarnIntervalMs ?? base.configHealthNotifyWarnIntervalMs,
+      configHealthNotifyCritIntervalMs:
+        stored.configHealthNotifyCritIntervalMs ?? base.configHealthNotifyCritIntervalMs,
 
       changelog: Array.isArray(stored.changelog) ? stored.changelog : base.changelog,
       changelogConfig: stored.changelogConfig ?? base.changelogConfig,
@@ -880,13 +888,26 @@ export class DownloadsDurable {
       1,
       base.configHealthCriticalBufferUtil,
     );
+    const warnNotify = clampInt(
+      this.data.configHealthNotifyWarnIntervalMs,
+      60 * 1000,
+      24 * 60 * 60 * 1000,
+      base.configHealthNotifyWarnIntervalMs,
+    );
+    const critNotify = clampInt(
+      this.data.configHealthNotifyCritIntervalMs,
+      60 * 1000,
+      24 * 60 * 60 * 1000,
+      base.configHealthNotifyCritIntervalMs,
+    );
 
     const pendingOk = warnPending <= critPending;
     const failuresOk = warnFailures <= critFailures;
     const staleOk = warnStaleMs <= critStaleMs;
     const bufferOk = warnBuffer <= critBuffer;
+    const notifyOk = warnNotify >= critNotify;
 
-    if (!pendingOk || !failuresOk || !staleOk || !bufferOk) {
+    if (!pendingOk || !failuresOk || !staleOk || !bufferOk || !notifyOk) {
       this.data.configHealthWarnPendingBatches = base.configHealthWarnPendingBatches;
       this.data.configHealthCriticalPendingBatches = base.configHealthCriticalPendingBatches;
       this.data.configHealthWarnFailures = base.configHealthWarnFailures;
@@ -895,6 +916,8 @@ export class DownloadsDurable {
       this.data.configHealthCriticalStaleMs = base.configHealthCriticalStaleMs;
       this.data.configHealthWarnBufferUtil = base.configHealthWarnBufferUtil;
       this.data.configHealthCriticalBufferUtil = base.configHealthCriticalBufferUtil;
+      this.data.configHealthNotifyWarnIntervalMs = base.configHealthNotifyWarnIntervalMs;
+      this.data.configHealthNotifyCritIntervalMs = base.configHealthNotifyCritIntervalMs;
       configDirty = true;
     } else {
       if (warnPending !== this.data.configHealthWarnPendingBatches) {
@@ -929,6 +952,14 @@ export class DownloadsDurable {
         this.data.configHealthCriticalBufferUtil = critBuffer;
         configDirty = true;
       }
+      if (warnNotify !== this.data.configHealthNotifyWarnIntervalMs) {
+        this.data.configHealthNotifyWarnIntervalMs = warnNotify;
+        configDirty = true;
+      }
+      if (critNotify !== this.data.configHealthNotifyCritIntervalMs) {
+        this.data.configHealthNotifyCritIntervalMs = critNotify;
+        configDirty = true;
+      }
     }
 
     if (this.data.configFlushMode !== "next_day" && this.data.configFlushMode !== "time_based") {
@@ -955,7 +986,9 @@ export class DownloadsDurable {
       this.data.configHealthWarnStaleMs !== stored.configHealthWarnStaleMs ||
       this.data.configHealthCriticalStaleMs !== stored.configHealthCriticalStaleMs ||
       this.data.configHealthWarnBufferUtil !== stored.configHealthWarnBufferUtil ||
-      this.data.configHealthCriticalBufferUtil !== stored.configHealthCriticalBufferUtil
+      this.data.configHealthCriticalBufferUtil !== stored.configHealthCriticalBufferUtil ||
+      this.data.configHealthNotifyWarnIntervalMs !== stored.configHealthNotifyWarnIntervalMs ||
+      this.data.configHealthNotifyCritIntervalMs !== stored.configHealthNotifyCritIntervalMs
     ) {
       configDirty = true;
     }
@@ -1560,6 +1593,10 @@ export class DownloadsDurable {
         warnBufferUtil: this.d.configHealthWarnBufferUtil ?? HEALTH_WARN_BUFFER_UTIL,
         criticalBufferUtil: this.d.configHealthCriticalBufferUtil ?? HEALTH_CRIT_BUFFER_UTIL,
       },
+      healthNotifyIntervalsMs: {
+        warn: this.d.configHealthNotifyWarnIntervalMs ?? HEALTH_NOTIFY_WARN_INTERVAL_MS,
+        critical: this.d.configHealthNotifyCritIntervalMs ?? HEALTH_NOTIFY_CRIT_INTERVAL_MS,
+      },
       remoteEnabledReason: "ok",
       hardRemoteOff: this.d.hardRemoteOff ?? false,
     };
@@ -1676,6 +1713,10 @@ export class DownloadsDurable {
         criticalStaleMs: this.d.configHealthCriticalStaleMs ?? HEALTH_CRIT_STALE_MS,
         warnBufferUtil: this.d.configHealthWarnBufferUtil ?? HEALTH_WARN_BUFFER_UTIL,
         criticalBufferUtil: this.d.configHealthCriticalBufferUtil ?? HEALTH_CRIT_BUFFER_UTIL,
+      },
+      healthNotifyIntervalsMs: {
+        warn: this.d.configHealthNotifyWarnIntervalMs ?? HEALTH_NOTIFY_WARN_INTERVAL_MS,
+        critical: this.d.configHealthNotifyCritIntervalMs ?? HEALTH_NOTIFY_CRIT_INTERVAL_MS,
       },
 
       // Server UTC time for drift correction
@@ -1806,7 +1847,9 @@ export class DownloadsDurable {
     const lastNotifyAt = this.d.lastHealthNotifyAt ?? 0;
     const now = Date.now();
     const interval =
-      payload.status === "critical" ? HEALTH_NOTIFY_CRIT_INTERVAL_MS : HEALTH_NOTIFY_WARN_INTERVAL_MS;
+      payload.status === "critical"
+        ? (this.d.configHealthNotifyCritIntervalMs ?? HEALTH_NOTIFY_CRIT_INTERVAL_MS)
+        : (this.d.configHealthNotifyWarnIntervalMs ?? HEALTH_NOTIFY_WARN_INTERVAL_MS);
     const shouldNotify =
       payload.status !== "ok" &&
       (payload.status !== prevStatus || now - lastNotifyAt >= interval);
@@ -1876,6 +1919,8 @@ export class DownloadsDurable {
       configHealthCriticalStaleMs: this.d.configHealthCriticalStaleMs ?? HEALTH_CRIT_STALE_MS,
       configHealthWarnBufferUtil: this.d.configHealthWarnBufferUtil ?? HEALTH_WARN_BUFFER_UTIL,
       configHealthCriticalBufferUtil: this.d.configHealthCriticalBufferUtil ?? HEALTH_CRIT_BUFFER_UTIL,
+      configHealthNotifyWarnIntervalMs: this.d.configHealthNotifyWarnIntervalMs ?? HEALTH_NOTIFY_WARN_INTERVAL_MS,
+      configHealthNotifyCritIntervalMs: this.d.configHealthNotifyCritIntervalMs ?? HEALTH_NOTIFY_CRIT_INTERVAL_MS,
       
       // Preserve Changelog
       changelog: this.d.changelog ?? [],
@@ -2174,6 +2219,38 @@ export class DownloadsDurable {
       }
     }
 
+    if ("healthNotifyIntervalsMs" in body) {
+      if (!isPlainObject(body.healthNotifyIntervalsMs)) {
+        errors.push("healthNotifyIntervalsMs");
+      } else {
+        const hi = body.healthNotifyIntervalsMs as Record<string, unknown>;
+        const intervalErrors: string[] = [];
+        const readInterval = (
+          key: string,
+          fallback: number,
+        ) => {
+          if (!(key in hi)) return fallback;
+          const value = hi[key];
+          if (typeof value === "number" && Number.isFinite(value)) {
+            return Math.min(24 * 60 * 60 * 1000, Math.max(60 * 1000, Math.floor(value)));
+          }
+          intervalErrors.push(`healthNotifyIntervalsMs.${key}`);
+          return fallback;
+        };
+        const nextWarn = readInterval("warn", this.d.configHealthNotifyWarnIntervalMs);
+        const nextCrit = readInterval("critical", this.d.configHealthNotifyCritIntervalMs);
+        if (nextWarn < nextCrit) {
+          intervalErrors.push("healthNotifyIntervalsMs.order");
+        }
+        if (intervalErrors.length > 0) {
+          errors.push(...intervalErrors);
+        } else {
+          this.d.configHealthNotifyWarnIntervalMs = nextWarn;
+          this.d.configHealthNotifyCritIntervalMs = nextCrit;
+        }
+      }
+    }
+
     if (errors.length > 0) {
       return json({ ok: false, error: "invalid_config", fields: errors }, { status: 400 });
     }
@@ -2206,6 +2283,10 @@ export class DownloadsDurable {
           criticalStaleMs: this.d.configHealthCriticalStaleMs,
           warnBufferUtil: this.d.configHealthWarnBufferUtil,
           criticalBufferUtil: this.d.configHealthCriticalBufferUtil,
+        },
+        healthNotifyIntervalsMs: {
+          warn: this.d.configHealthNotifyWarnIntervalMs,
+          critical: this.d.configHealthNotifyCritIntervalMs,
         },
       },
     });

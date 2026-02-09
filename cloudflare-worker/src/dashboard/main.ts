@@ -567,6 +567,12 @@ export function renderDashboard(stats: StatsResponse): string {
   const cfgHealthCritStaleHours = Math.round((cfgHealth.criticalStaleMs ?? 86400000) / 3600000);
   const cfgHealthWarnBufferPct = Math.round((cfgHealth.warnBufferUtil ?? 0.8) * 100);
   const cfgHealthCritBufferPct = Math.round((cfgHealth.criticalBufferUtil ?? 0.95) * 100);
+  const cfgHealthNotify = remoteConfig.healthNotifyIntervalsMs || {
+    warn: 30 * 60 * 1000,
+    critical: 10 * 60 * 1000,
+  };
+  const cfgHealthNotifyWarnMin = Math.round((cfgHealthNotify.warn ?? 1800000) / 60000);
+  const cfgHealthNotifyCritMin = Math.round((cfgHealthNotify.critical ?? 600000) / 60000);
 
   const renderTableRows = (data: Record<string, number>) => {
     const keys = Object.keys(data).sort((a, b) => data[b] - data[a]);
@@ -3541,6 +3547,23 @@ export function renderDashboard(stats: StatsResponse): string {
             <div class="rc-hint">Critical when buffer ≥ this percent.</div>
           </div>
         </div>
+        <div class="rc-section-title">Health Alert Timing</div>
+        <div class="rc-section-desc">
+          Controls how often the alert webhook can fire for WARN and CRITICAL states. Shorter intervals increase noise.
+          Recommended defaults: Warn 30 min, Critical 10 min.
+        </div>
+        <div class="rc-grid">
+          <div class="rc-field" data-tooltip="Minimum minutes between WARN alerts.">
+            <label>Warn Alert Interval (min)</label>
+            <input class="rc-input" type="number" id="cfg-health-notify-warn" min="1" max="1440" value="${cfgHealthNotifyWarnMin}">
+            <div class="rc-hint">Lower values notify more frequently.</div>
+          </div>
+          <div class="rc-field" data-tooltip="Minimum minutes between CRITICAL alerts.">
+            <label>Critical Alert Interval (min)</label>
+            <input class="rc-input" type="number" id="cfg-health-notify-critical" min="1" max="1440" value="${cfgHealthNotifyCritMin}">
+            <div class="rc-hint">Recommended shorter than WARN.</div>
+          </div>
+        </div>
         <div class="rc-actions">
           <button class="btn" id="btn-config-reset" type="button" data-tooltip="Load default values locally. Click Save to publish.">
             <span class="btn-bullet">•</span> Reset to defaults
@@ -4714,6 +4737,10 @@ export function renderDashboard(stats: StatsResponse): string {
           warnBufferUtil: 0.8,
           criticalBufferUtil: 0.95,
         },
+        healthNotifyIntervalsMs: {
+          warn: 30 * 60 * 1000,
+          critical: 10 * 60 * 1000,
+        },
       };
 
       function clampInt(value, min, max, fallback) {
@@ -4784,6 +4811,7 @@ export function renderDashboard(stats: StatsResponse): string {
           dailyFlushWindowMinutes: cfg.dailyFlushWindowMinutes ?? cfgDefaults.dailyFlushWindowMinutes,
           cancelHoldDelayMs: cfg.cancelHoldDelayMs ?? cfgDefaults.cancelHoldDelayMs,
           healthThresholds: cfg.healthThresholds || cfgDefaults.healthThresholds,
+          healthNotifyIntervalsMs: cfg.healthNotifyIntervalsMs || cfgDefaults.healthNotifyIntervalsMs,
           configVersion: cfg.configVersion,
         };
 
@@ -4807,6 +4835,8 @@ export function renderDashboard(stats: StatsResponse): string {
         setValue("cfg-health-stale-critical", msToHours(merged.healthThresholds.criticalStaleMs, 24));
         setValue("cfg-health-buffer-warn", ratioToPercent(merged.healthThresholds.warnBufferUtil, 80));
         setValue("cfg-health-buffer-critical", ratioToPercent(merged.healthThresholds.criticalBufferUtil, 95));
+        setValue("cfg-health-notify-warn", msToHours(merged.healthNotifyIntervalsMs.warn, 30));
+        setValue("cfg-health-notify-critical", msToHours(merged.healthNotifyIntervalsMs.critical, 10));
 
         const flushEl = document.getElementById("cfg-flush-mode");
         if (flushEl) flushEl.value = merged.flushMode;
@@ -4939,6 +4969,8 @@ export function renderDashboard(stats: StatsResponse): string {
         "cfg-health-stale-critical",
         "cfg-health-buffer-warn",
         "cfg-health-buffer-critical",
+        "cfg-health-notify-warn",
+        "cfg-health-notify-critical",
       ];
       cfgInputs.forEach((id) => {
         const el = document.getElementById(id);
@@ -5009,6 +5041,10 @@ export function renderDashboard(stats: StatsResponse): string {
               criticalStaleMs: readHoursMs("cfg-health-stale-critical", cfgDefaults.healthThresholds.criticalStaleMs),
               warnBufferUtil: readPercentRatio("cfg-health-buffer-warn", cfgDefaults.healthThresholds.warnBufferUtil),
               criticalBufferUtil: readPercentRatio("cfg-health-buffer-critical", cfgDefaults.healthThresholds.criticalBufferUtil),
+            },
+            healthNotifyIntervalsMs: {
+              warn: readHoursMs("cfg-health-notify-warn", cfgDefaults.healthNotifyIntervalsMs.warn),
+              critical: readHoursMs("cfg-health-notify-critical", cfgDefaults.healthNotifyIntervalsMs.critical),
             },
           };
           sendRemoteConfigUpdate(payload);
