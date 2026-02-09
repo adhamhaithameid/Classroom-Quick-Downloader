@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"net"
 	"net/http"
 	"strconv"
 	"time"
@@ -15,8 +16,10 @@ import (
 )
 
 type ingestResponse struct {
-	OK      bool   `json:"ok"`
-	Message string `json:"message,omitempty"`
+	OK         bool   `json:"ok"`
+	Message    string `json:"message,omitempty"`
+	BatchID    string `json:"batchId,omitempty"`
+	IngestedAt int64  `json:"ingestedAt,omitempty"`
 }
 
 // IngestBatchHandler handles POST /ingest-batch (and /storeBatch alias).
@@ -34,6 +37,9 @@ func IngestBatchHandler(db *sql.DB, sharedSecret string) http.HandlerFunc {
 		}
 
 		if sharedSecret == "" {
+			logEvent("error", "ingest_misconfigured", map[string]interface{}{
+				"reason": "DO_SHARED_SECRET missing",
+			})
 			http.Error(w, "server misconfigured: DO_SHARED_SECRET not set", http.StatusInternalServerError)
 			return
 		}
@@ -44,30 +50,43 @@ func IngestBatchHandler(db *sql.DB, sharedSecret string) http.HandlerFunc {
 		// Constant-time comparison for secret to prevent timing attacks
 		headerSecret := r.Header.Get("X-DO-SECRET")
 		if headerSecret == "" || subtle.ConstantTimeCompare([]byte(headerSecret), []byte(sharedSecret)) != 1 {
+			logEvent("warn", "ingest_unauthorized", map[string]interface{}{
+				"reason": "missing_or_invalid_secret",
+			})
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
 
 		var batch model.OracleBatch
 		if err := json.NewDecoder(r.Body).Decode(&batch); err != nil {
+			logEvent("warn", "ingest_invalid_json", map[string]interface{}{
+				"error": err.Error(),
+			})
 			http.Error(w, "invalid JSON", http.StatusBadRequest)
 			return
 		}
 		if batch.BatchID == "" {
+			logEvent("warn", "ingest_missing_batch_id", nil)
 			http.Error(w, "missing batchId", http.StatusBadRequest)
 			return
 		}
 
 		ctx := r.Context()
 		if err := ingestBatch(ctx, db, &batch); err != nil {
+			logEvent("error", "ingest_failed", map[string]interface{}{
+				"error":   err.Error(),
+				"batchId": batch.BatchID,
+			})
 			http.Error(w, "failed to ingest batch: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(ingestResponse{
-			OK:      true,
-			Message: "ingested",
+			OK:         true,
+			Message:    "ingested",
+			BatchID:    batch.BatchID,
+			IngestedAt: time.Now().UnixMilli(),
 		})
 	}
 }
@@ -139,48 +158,92 @@ func ingestBatch(ctx context.Context, db *sql.DB, batch *model.OracleBatch) erro
 		return err
 	}
 
-	// Insert unique IPs from raw events.
-	if err := insertBatchIPs(ctx, tx, batch); err != nil {
-		return err
-	}
+	// PRIVACY FIX: IP storage disabled per PRIVACY.md policy
+	// The privacy policy states IPs are never stored. Geo Map feature is disabled.
+	// To re-enable, update PRIVACY.md to disclose IP storage and uncomment the code below.
+	// if err := insertBatchIPs(ctx, tx, batch); err != nil {
+	// 	return err
+	// }
+
 
 	return tx.Commit()
 }
 
+// insertBatchIPs stores unique IPs for the Geo Map feature
+// DEFENSIVE DEDUPLICATION: Don't trust edge - dedupe before DB writes
+// CANONICALIZATION: Collapses equivalent IP representations (e.g., ::1 and 0:0:0:0:0:0:0:1)
+// ROW-SIZE OPTIMIZATION: Summarize if >500 IPs to prevent SQLite bloat
 func insertBatchIPs(ctx context.Context, tx *sql.Tx, batch *model.OracleBatch) error {
-	// 1. Extract unique IPs
-	ipSet := make(map[string]bool)
-	for _, ev := range batch.Events {
-		if ev.IPAddress != "" {
-			ipSet[ev.IPAddress] = true
+	// 1. Defensive deduplication with CANONICALIZATION
+	// Uses net.ParseIP().String() to collapse equivalent representations
+	ipSet := make(map[string]struct{})
+	for _, ip := range batch.UniqueIps {
+		if ip == "" || ip == "unknown" {
+			continue
 		}
+		// CANONICALIZATION: Parse and re-serialize to canonical form
+		// This ensures ::1 and 0:0:0:0:0:0:0:1 become the same key
+		parsed := net.ParseIP(ip)
+		if parsed == nil {
+			continue // Invalid IP, skip
+		}
+		canonical := parsed.String()
+		ipSet[canonical] = struct{}{}
 	}
 
-	// 2. Convert to list
-	ips := make([]string, 0, len(ipSet))
-	for ip := range ipSet {
-		ips = append(ips, ip)
-	}
-
-	if len(ips) == 0 {
+	if len(ipSet) == 0 {
 		return nil
 	}
 
-	// 3. Serialize to JSON
-	raw, err := json.Marshal(ips)
+	// 2. Convert to slice (already validated via net.ParseIP)
+	validIps := make([]string, 0, len(ipSet))
+	for ip := range ipSet {
+		validIps = append(validIps, ip)
+	}
+
+	const maxIpsPerRow = 500
+
+	if len(validIps) == 0 {
+		return nil
+	}
+
+	// 4. CONSISTENT JSON SCHEMA: Always store as object with same keys
+	// Eliminates Array vs Object divergence in database
+	isTruncated := len(validIps) > maxIpsPerRow
+	storedIps := validIps
+	if isTruncated {
+		storedIps = validIps[:maxIpsPerRow]
+	}
+
+	payload := map[string]interface{}{
+		"ips":          storedIps,
+		"count":        len(validIps),
+		"is_truncated": isTruncated,
+	}
+
+	raw, err := json.Marshal(payload)
 	if err != nil {
 		return err
 	}
 
-	// 4. Insert
+	// 5. Insert
 	_, err = tx.ExecContext(
 		ctx,
 		`INSERT INTO batch_ips (batch_id, ip_count, unique_ips) VALUES (?, ?, ?)`,
 		batch.BatchID,
-		len(ips),
+		len(validIps), // True count of valid IPs
 		string(raw),
 	)
 	return err
+}
+
+// isValidIP performs lightweight IP validation in backend (defense-in-depth)
+func isValidIP(ip string) bool {
+	if ip == "" || ip == "unknown" {
+		return false
+	}
+	// Use Go's net.ParseIP for standard-compliant validation
+	return net.ParseIP(ip) != nil
 }
 
 func insertHourly(ctx context.Context, tx *sql.Tx, batch *model.OracleBatch) error {

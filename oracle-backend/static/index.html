@@ -1391,13 +1391,59 @@
       let batchTab = 'info';
 
       // Helpers
+      let authInFlight = null;
+
+      async function ensureAuth() {
+        if (authInFlight) return authInFlight;
+        authInFlight = (async () => {
+          try {
+            const checkRes = await fetch('/api/auth/check');
+            if (!checkRes.ok) return false;
+            const check = await checkRes.json();
+            if (check.authRequired === false || check.authenticated === true) {
+              return true;
+            }
+            const password = prompt('Enter dashboard password');
+            if (!password) return false;
+            const loginRes = await fetch('/api/auth/login', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ password: password })
+            });
+            return loginRes.ok;
+          } catch {
+            return false;
+          }
+        })();
+        const ok = await authInFlight;
+        authInFlight = null;
+        return ok;
+      }
+
       async function fetchJSON(url) {
-        const res = await fetch(url);
+        let res = await fetch(url);
+        if (res.status === 401) {
+          const ok = await ensureAuth();
+          if (!ok) throw new Error("HTTP 401");
+          res = await fetch(url);
+        }
         if (!res.ok) throw new Error("HTTP " + res.status);
         return res.json();
       }
 
       function fmtPct(v) { return (v * 100).toFixed(1) + "%"; }
+
+      // XSS prevention: escape untrusted strings for HTML context
+      function escapeHtml(str) {
+        if (typeof str !== 'string') return String(str);
+        return str
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#039;');
+      }
+
       
       function fmtNumber(n) {
         if (n >= 1000000) return (n / 1000000).toFixed(1) + "M";
@@ -1411,32 +1457,35 @@
         if (isNaN(date.getTime())) return ts;
         
         const now = new Date();
-        const isToday = date.toDateString() === now.toDateString();
+        const todayKey = now.toISOString().slice(0, 10);
+        const dateKey = date.toISOString().slice(0, 10);
         const yesterday = new Date(now);
-        yesterday.setDate(yesterday.getDate() - 1);
-        const isYesterday = date.toDateString() === yesterday.toDateString();
+        yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+        const yesterdayKey = yesterday.toISOString().slice(0, 10);
+        const isToday = dateKey === todayKey;
+        const isYesterday = dateKey === yesterdayKey;
         
         if (granularity === 'hour') {
-          const hours = date.getHours();
+          const hours = date.getUTCHours();
           const ampm = hours >= 12 ? 'PM' : 'AM';
           const h = hours % 12 || 12;
           const timeStr = h + ':00 ' + ampm;
           if (isToday) return 'Today, ' + timeStr;
           if (isYesterday) return 'Yesterday, ' + timeStr;
-          return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', ' + timeStr;
+          return date.toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' }) + ', ' + timeStr;
         }
         
         if (isToday) return 'Today';
         if (isYesterday) return 'Yesterday';
-        return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+        return date.toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'short', month: 'short', day: 'numeric' });
       }
 
       function fmtShortTime(ts) {
         if (!ts) return '';
         const date = new Date(ts.includes('T') ? ts : ts + 'T00:00:00Z');
         if (isNaN(date.getTime())) return ts.slice(-5);
-        if (ts.includes('T')) return date.getHours() + ':00';
-        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        if (ts.includes('T')) return date.getUTCHours() + ':00';
+        return date.toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' });
       }
 
       function fmtFullDateTime(ts) {
@@ -1444,6 +1493,7 @@
         const date = new Date(ts);
         if (isNaN(date.getTime())) return ts;
         return date.toLocaleString('en-US', {
+          timeZone: 'UTC',
           weekday: 'short', month: 'short', day: 'numeric', 
           hour: 'numeric', minute: '2-digit', hour12: true
         });
@@ -1468,7 +1518,7 @@
         const today = new Date();
         const to = today.toISOString().slice(0, 10); // inclusive end (today)
         const fromDate = new Date(today);
-        if (days > 1) fromDate.setDate(fromDate.getDate() - (days - 1));
+        if (days > 1) fromDate.setUTCDate(fromDate.getUTCDate() - (days - 1));
         const from = fromDate.toISOString().slice(0, 10);
         return { from: from, to: to };
       }
@@ -1605,7 +1655,7 @@
           document.getElementById("stat-success").textContent = fmtNumber(data.totalSuccess);
           document.getElementById("stat-fail").textContent = fmtNumber(data.totalFail);
           document.getElementById("stat-rate").textContent = fmtPct(data.successRate || 0);
-          document.getElementById("last-updated").textContent = "Last updated: " + new Date().toLocaleTimeString();
+          document.getElementById("last-updated").textContent = "Last updated: " + new Date().toLocaleTimeString('en-US', { timeZone: 'UTC' });
         } catch (e) {
           document.getElementById("sidebar-status").className = "status-dot error";
           document.getElementById("sidebar-status-text").textContent = "Error";
@@ -1707,7 +1757,7 @@
           renderEnhancedLog(data.points, granularity);
 
         } catch (e) {
-          chartContainer.innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed: ' + e.message + '</div>';
+          chartContainer.innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed: ' + escapeHtml(e.message) + '</div>';
           logContainer.innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed</div>';
         }
       }
@@ -1888,7 +1938,7 @@
             var html = '<div class="breakdown-bars">';
             data.values.slice(0, 5).forEach(function(v) {
               var pct = (v.count / maxCount) * 100;
-              html += '<div class="breakdown-bar-item"><span class="breakdown-bar-label">' + (v.value || 'Unknown') + '</span>';
+              html += '<div class="breakdown-bar-item"><span class="breakdown-bar-label">' + escapeHtml(v.value || 'Unknown') + '</span>';
               html += '<div class="breakdown-bar-track"><div class="breakdown-bar-fill ' + colors[i] + '" style="width:' + pct + '%"><span class="breakdown-bar-value">' + Math.round(pct) + '%</span></div></div>';
               html += '<span class="breakdown-bar-count">' + fmtNumber(v.count) + '</span></div>';
             });
@@ -1934,33 +1984,33 @@
         if (currentComparisonMode === 'week') {
           // This week vs Last week
           var today = new Date(now);
-          var dayOfWeek = today.getDay() || 7; // Sunday = 7
+          var dayOfWeek = today.getUTCDay() || 7; // Sunday = 7
           
           // This week (Mon - Today)
           var thisWeekStart = new Date(today);
-          thisWeekStart.setDate(today.getDate() - dayOfWeek + 1);
+          thisWeekStart.setUTCDate(today.getUTCDate() - dayOfWeek + 1);
           to2 = fmtDate(today);
           from2 = fmtDate(thisWeekStart);
           label2 = 'This Week';
 
           // Last week (Mon - Sun)
           var lastWeekEnd = new Date(thisWeekStart);
-          lastWeekEnd.setDate(thisWeekStart.getDate() - 1);
+          lastWeekEnd.setUTCDate(thisWeekStart.getUTCDate() - 1);
           var lastWeekStart = new Date(lastWeekEnd);
-          lastWeekStart.setDate(lastWeekEnd.getDate() - 6);
+          lastWeekStart.setUTCDate(lastWeekEnd.getUTCDate() - 6);
           to1 = fmtDate(lastWeekEnd);
           from1 = fmtDate(lastWeekStart);
           label1 = 'Last Week';
         } else {
           // This month vs Last month
-          var thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+          var thisMonthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
           from2 = fmtDate(thisMonthStart);
           to2 = fmtDate(now);
           label2 = 'This Month';
 
           var lastMonthEnd = new Date(thisMonthStart);
-          lastMonthEnd.setDate(lastMonthEnd.getDate() - 1);
-          var lastMonthStart = new Date(lastMonthEnd.getFullYear(), lastMonthEnd.getMonth(), 1);
+          lastMonthEnd.setUTCDate(lastMonthEnd.getUTCDate() - 1);
+          var lastMonthStart = new Date(Date.UTC(lastMonthEnd.getUTCFullYear(), lastMonthEnd.getUTCMonth(), 1));
           from1 = fmtDate(lastMonthStart);
           to1 = fmtDate(lastMonthEnd);
           label1 = 'Last Month';
@@ -2018,7 +2068,7 @@
 
           container.innerHTML = html;
         } catch (e) {
-          container.innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed to load: ' + e.message + '</div>';
+          container.innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed to load: ' + escapeHtml(e.message) + '</div>';
         }
       }
 
@@ -2061,7 +2111,7 @@
               btn.classList.add('btn-warning');
             } else {
               icon.textContent = '✅';
-              btn.setAttribute('data-tooltip', 'Commit: ' + data.message + ' - Deployed: ' + new Date(data.deployed_at).toLocaleString());
+              btn.setAttribute('data-tooltip', 'Commit: ' + data.message + ' - Deployed: ' + new Date(data.deployed_at).toLocaleString('en-US', { timeZone: 'UTC' }));
             }
           } else {
             commit.textContent = 'Unknown';

@@ -247,9 +247,9 @@ describe('parseUnicodeDate()', () => {
     const result = parseUnicodeDate('2026-01-20');
     expect(result).not.toBeNull();
     expect(result?.date).toBeInstanceOf(Date);
-    expect(result?.date.getFullYear()).toBe(2026);
-    expect(result?.date.getMonth()).toBe(0); // January
-    expect(result?.date.getDate()).toBe(20);
+    expect(result?.date.getUTCFullYear()).toBe(2026);
+    expect(result?.date.getUTCMonth()).toBe(0); // January
+    expect(result?.date.getUTCDate()).toBe(20);
     expect(result?.confidence).toBe('high');
   });
 
@@ -257,7 +257,7 @@ describe('parseUnicodeDate()', () => {
     const result = parseUnicodeDate('Jan 20, 2026');
     expect(result).not.toBeNull();
     if (result) {
-      expect(result.date.getFullYear()).toBe(2026);
+      expect(result.date.getUTCFullYear()).toBe(2026);
       expect(result.raw).toBe('Jan 20, 2026');
     }
   });

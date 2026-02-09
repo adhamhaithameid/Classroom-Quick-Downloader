@@ -15,7 +15,8 @@ services:
       - ADDR=:8080
       - DB_PATH=/data/analytics.db
       - STATIC_DIR=/app/static
-      - DO_SHARED_SECRET=${DO_SHARED_SECRET:-your-secure-secret-here}
+      - DO_SHARED_SECRET=${DO_SHARED_SECRET:?DO_SHARED_SECRET is required}
+      - DASHBOARD_PASSWORD=${DASHBOARD_PASSWORD:?DASHBOARD_PASSWORD is required}
     volumes:
       - oracle_data:/data
       - ./google-credentials.json:/app/google-credentials.json:ro

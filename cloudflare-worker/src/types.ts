@@ -36,6 +36,11 @@ export interface StoredEvent {
    * Optional tag: where this came from (download_all, single, etc.).
    */
   source?: string;
+
+  /**
+   * Internal monotonic sequence assigned by the DO for commit tracking.
+   */
+  seq?: number;
 }
 
 /**
@@ -88,6 +93,11 @@ export interface QuotaDescriptor {
   remoteEnabled: boolean;
 
   /**
+   * Reason remote analytics is enabled/disabled.
+   */
+  remoteEnabledReason?: string;
+
+  /**
    * Suggested batch size for extensions (events per POST).
    */
   batchSizeSuggestion: number;
@@ -123,6 +133,45 @@ export interface StatsResponse {
   quota: QuotaDescriptor;
 
   envSnapshot: EnvSnapshot;
+  
+  // Request tracking
+  requestsToday: number;
+  requestDate: string | null;
+  uniqueRequestsToday: number;
+  uniqueIpsToday: number; // Backwards compatibility
+  // CAP INDICATOR: true when unique counts are approximated (10,000+ capped)
+  isApproximated: boolean;
+  
+  // Remote config for dashboard display
+  remoteConfig: {
+    batchSize: number;
+    maxDailyRequests: number;
+    maxRetry: number;
+    maxEventsPerRequest: number;
+    maxBufferSize: number;
+    flushMode: string;
+    timeFlushMinutes: { low: number; mid: number; high: number };
+    dailyFlushWindowStartUtc?: number;
+    dailyFlushWindowMinutes?: number;
+    configVersion?: number;
+    cancelHoldDelayMs?: number;
+    allowLegacyEvents?: boolean;
+    remoteEnabledReason?: string;
+    hardRemoteOff: boolean;
+  };
+  
+  // Buffer utilization
+  bufferStatus: {
+    currentSize: number;
+    maxSize: number;
+    utilizationPercent: string;
+  };
+  
+  nextAlarmAt: string | null;
+  
+  // Changelog data for dashboard
+  changelog: ChangelogEntry[];
+  changelogConfig: ChangelogConfig;
 }
 
 /**
@@ -130,15 +179,27 @@ export interface StatsResponse {
  */
 export interface ConfigResponse {
   ok: boolean;
+  configVersion?: number;
   batchSize: number;
+  maxDailyRequests: number;
+  maxRetry: number;
+  maxEventsPerRequest: number;
+  flushMode: string;
   timeFlushMinutes: {
     low: number;
     mid: number;
     high: number;
   };
+  dailyFlushWindowStartUtc?: number;
+  dailyFlushWindowMinutes?: number;
   remoteEnabled: boolean;
+  remoteEnabledReason?: string;
+  cancelHoldDelayMs?: number;
+  allowLegacyEvents?: boolean;
+  serverTimeUtc?: number;
+  committedSeq?: number;
   quota: QuotaDescriptor;
-  // NEW: Changelog config
+  // Changelog config
   changelogConfig?: ChangelogConfig;
 }
 
@@ -149,9 +210,15 @@ export interface ConfigResponse {
 export interface Env {
   DOWNLOADS_DO: DurableObjectNamespace;
   DO_SHARED_SECRET: string;
+  DASHBOARD_PASSWORD?: string;
   DANGER_PASSWORD: string;
   ORACLE_ENDPOINT: string;
   MAX_BATCH_EVENTS: string;
+  /**
+   * Optional: Set to "true" to allow HTTP cookies on non-loopback hosts.
+   * Use for LAN development only. Production should never set this.
+   */
+  ALLOW_INSECURE_COOKIES?: string;
 }
 
 /**
@@ -180,40 +247,7 @@ export interface ChangelogConfig {
   lastUpdated?: number;
 }
 
-/**
- * Snapshot of environment variables for the dashboard to display.
- */
-export interface EnvSnapshot {
-  maxBatchEvents: string;
-  oracleEndpoint: string;
-}
-
-/**
- * Response payload for /stats (DO -> Worker -> dashboard).
- */
-export interface StatsResponse {
-  ok: boolean;
-
-  totalEvents: number;
-  totalDownloads: number;
-  totalSuccess: number;
-  totalFail: number;
-  pendingEvents: number;
-
-  lastEventAt: number | null;
-  lastFlushAt: number | null;
-
-  counters: Counters;
-  retryState: RetryState | null;
-
-  quota: QuotaDescriptor;
-
-  envSnapshot: EnvSnapshot;
-  
-  // NEW: Changelog data for dashboard
-  changelog: ChangelogEntry[];
-  changelogConfig: ChangelogConfig;
-}
+// Duplicate interfaces removed for type safety - see definitions above
 
 // ---------------------------------------------------------------------------
 // OracleBatch types (sent to Oracle backend)
@@ -304,4 +338,8 @@ export interface OracleBatch {
   
   timeBuckets: TimeBucket[];
   doState: DOStateBatch;
+  
+  // LEAN INGESTION: Unique IPs for Geo Map persistence
+  // Raw events are intentionally excluded to reduce payload size
+  uniqueIps: string[];
 }

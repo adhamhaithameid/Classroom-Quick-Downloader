@@ -140,6 +140,11 @@ All configuration is done via environment variables, defined in `docker-compose.
 | `DB_PATH` | `/data/analytics.db` | Path to the SQLite database file. |
 | `STATIC_DIR` | `/app/static` | Directory containing dashboard static files. |
 | `DO_SHARED_SECRET` | *(required)* | Shared secret for authenticating Cloudflare Durable Object requests. |
+| `DASHBOARD_PASSWORD` | *(required)* | Password for dashboard login (enables auth). |
+| `ARCHIVER_SHARED_SECRET` | *(required when auth enabled)* | Secret header for the archiver to read stats. |
+| `ALLOW_LOOPBACK_BYPASS` | `false` | Set `true` to allow loopback auth bypass (dev only). |
+| `ALLOW_INSECURE_COOKIES` | `false` | Set `true` to allow cookies over HTTP (HTTP-only deployments). |
+| `ALLOW_EMPTY_DASHBOARD_PASSWORD` | `false` | Set `true` to allow an empty dashboard password (dev only). |
 
 ### 🔐 Setting `DO_SHARED_SECRET`
 
@@ -205,7 +210,12 @@ curl -X POST http://localhost:8080/ingest-batch \
 
 **Response:**
 ```json
-{ "ok": true, "message": "ingested" }
+{
+  "ok": true,
+  "message": "ingested",
+  "batchId": "do-seq15-500ev",
+  "ingestedAt": 1702732800123
+}
 ```
 
 **Idempotency:** If a `batchId` already exists, the request is silently ignored (returns success without duplicating data).

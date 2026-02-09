@@ -7,8 +7,8 @@
 import type { AnalyticsEvent, RecordDownloadEventInput, AnalyticsConfig } from './types';
 import { DEFAULT_CONFIG, CONFIG_URL } from './constants';
 import { detectBrowser, detectOS, detectLanguage, getExtensionVersion, generateEventId } from './detection';
-import { loadQueue, saveQueue, loadConfig, saveConfig, loadStats } from './storage';
-import { internalFlush, updateLocalStats } from './flush';
+import { loadQueue, saveQueue, loadConfig, saveConfig, loadStats, loadMeta, saveMeta } from './storage';
+import { internalFlush, updateLocalStats, getSafeUtcNowMs } from './flush';
 
 // Re-export types
 export type {
@@ -30,19 +30,63 @@ function enqueueOp(op: () => Promise<void>): void {
   });
 }
 
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function clampInt(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, Math.floor(value)));
+}
+
+function sanitizeField(value: string, maxLen: number, pattern?: RegExp, fallback = 'unknown'): string {
+  if (typeof value !== 'string') return fallback;
+  const trimmed = value.trim().toLowerCase();
+  if (!trimmed) return fallback;
+  if (trimmed.length > maxLen) return fallback;
+  if (pattern && !pattern.test(trimmed)) return fallback;
+  return trimmed;
+}
+
+const FIELD_PATTERNS = {
+  type: /^[a-z0-9._-]+$/,
+  browser: /^[a-z0-9._-]+$/,
+  os: /^[a-z0-9._-]+$/,
+  language: /^[a-z0-9-]+$/,
+  error: /^[a-z0-9._-]+$/,
+  source: /^[a-z0-9._-]+$/,
+};
+
 // --- Internal Track ---
 
 async function internalTrack(
   event: Omit<AnalyticsEvent, 'timestamp' | 'ext_version' | 'browser' | 'os' | 'language' | 'retryCount' | 'id'>
 ): Promise<void> {
+  const meta = await loadMeta();
+  const safeTime = getSafeUtcNowMs(meta);
+  if (safeTime.changed) {
+    await saveMeta(safeTime.meta);
+  }
+
+  const fileType = sanitizeField(event.file_type || 'unknown', 24, FIELD_PATTERNS.type);
+  const browser = sanitizeField(detectBrowser(), 24, FIELD_PATTERNS.browser);
+  const os = sanitizeField(await detectOS(), 24, FIELD_PATTERNS.os);
+  const language = sanitizeField(detectLanguage(), 10, FIELD_PATTERNS.language);
+  const errorType = event.error_type
+    ? sanitizeField(event.error_type, 32, FIELD_PATTERNS.error)
+    : undefined;
+  const source = event.source ? sanitizeField(event.source, 32, FIELD_PATTERNS.source) : undefined;
+
   const fullEvent: AnalyticsEvent = {
     ...event,
-    timestamp: Date.now(),
+    timestamp: safeTime.nowMs || Date.now(),
     ext_version: getExtensionVersion(),
-    browser: detectBrowser(),
-    os: await detectOS(),
-    language: detectLanguage(),
-    id: generateEventId(),
+    browser,
+    os,
+    language,
+    file_type: fileType,
+    error_type: errorType,
+    source,
+    id: generateEventId(safeTime.nowMs || Date.now()),
     retryCount: 0,
   };
 
@@ -50,7 +94,10 @@ async function internalTrack(
   await updateLocalStats(fullEvent);
 
   // Add to queue
-  const queue = await loadQueue();
+  const { queue, valid } = await loadQueue();
+  if (!valid) {
+    console.warn('[CQD Analytics] Queue integrity check failed; persisting new checksum after append');
+  }
   queue.push(fullEvent);
   await saveQueue(queue);
 
@@ -120,20 +167,69 @@ export async function refreshRemoteAnalyticsConfig(): Promise<void> {
     if (!json.ok) return;
 
     const current = await loadConfig();
-    const updated: AnalyticsConfig = {
-      ...current,
-      batchSize: json.batchSize ?? current.batchSize,
-      remoteEnabled: json.remoteEnabled ?? current.remoteEnabled,
-      cancelHoldDelayMs: json.cancelHoldDelayMs ?? current.cancelHoldDelayMs,
-    };
+    const meta = await loadMeta();
+    const updates: Partial<AnalyticsConfig> = {};
 
-    if (json.timeFlushMinutes) {
-      updated.lowUsageFlushMinutes = json.timeFlushMinutes.low ?? current.lowUsageFlushMinutes;
-      updated.midUsageFlushMinutes = json.timeFlushMinutes.mid ?? current.midUsageFlushMinutes;
-      updated.highUsageFlushMinutes = json.timeFlushMinutes.high ?? current.highUsageFlushMinutes;
+    if (isFiniteNumber(json.batchSize)) {
+      updates.batchSize = clampInt(json.batchSize, 1, 1000);
+    }
+    if (isFiniteNumber(json.maxDailyRequests)) {
+      updates.maxDailyRequests = clampInt(json.maxDailyRequests, 1, 1000);
+    }
+    if (isFiniteNumber(json.maxRetry)) {
+      updates.maxRetry = clampInt(json.maxRetry, 0, 20);
+    }
+    if (json.flushMode === 'next_day' || json.flushMode === 'time_based') {
+      updates.flushMode = json.flushMode;
+    }
+    if (typeof json.remoteEnabled === 'boolean') {
+      updates.remoteEnabled = json.remoteEnabled;
+    }
+    if (isFiniteNumber(json.cancelHoldDelayMs)) {
+      updates.cancelHoldDelayMs = clampInt(json.cancelHoldDelayMs, 0, 10000);
+    }
+    if (isFiniteNumber(json.maxEventsPerRequest)) {
+      updates.maxEventsPerRequest = clampInt(json.maxEventsPerRequest, 1, 50_000);
+    }
+    if (isFiniteNumber(json.dailyFlushWindowStartUtc)) {
+      updates.dailyFlushWindowStartUtc = clampInt(json.dailyFlushWindowStartUtc, 0, 23);
+    }
+    if (isFiniteNumber(json.dailyFlushWindowMinutes)) {
+      updates.dailyFlushWindowMinutes = clampInt(json.dailyFlushWindowMinutes, 1, 24 * 60);
     }
 
-    await saveConfig(updated);
+    if (json.timeFlushMinutes && typeof json.timeFlushMinutes === 'object') {
+      const tfm = json.timeFlushMinutes as Record<string, unknown>;
+      if (isFiniteNumber(tfm.low)) {
+        updates.lowUsageFlushMinutes = clampInt(tfm.low, 1, 10080);
+      }
+      if (isFiniteNumber(tfm.mid)) {
+        updates.midUsageFlushMinutes = clampInt(tfm.mid, 1, 10080);
+      }
+      if (isFiniteNumber(tfm.high)) {
+        updates.highUsageFlushMinutes = clampInt(tfm.high, 1, 10080);
+      }
+    }
+
+    let nextMeta = meta;
+    let metaChanged = false;
+    if (isFiniteNumber(json.serverTimeUtc)) {
+      const offset = json.serverTimeUtc - Date.now();
+      nextMeta = { ...nextMeta, serverTimeOffsetMs: offset };
+      metaChanged = true;
+    }
+
+    if (isFiniteNumber(json.committedSeq)) {
+      const nextCommitted = Math.max(nextMeta.lastCommittedSeq ?? 0, Math.floor(json.committedSeq));
+      nextMeta = { ...nextMeta, lastCommittedSeq: nextCommitted };
+      metaChanged = true;
+    }
+
+    if (metaChanged) {
+      await saveMeta(nextMeta);
+    }
+
+    await saveConfig({ ...current, ...updates });
   } catch (err) {
     // Failed to refresh config - silently ignored
   }

@@ -15,7 +15,11 @@ interface SessionPayload {
   iat: number; // Issued at timestamp
 }
 
-async function createSessionToken(secret: string, ip: string): Promise<string> {
+function getDashboardSecret(env: WorkerEnv): string | null {
+  return env.DASHBOARD_PASSWORD || env.DO_SHARED_SECRET || null;
+}
+
+export async function createSessionToken(secret: string, ip: string): Promise<string> {
   const payload: SessionPayload = {
     ip,
     exp: Date.now() + SESSION_DURATION_MS,
@@ -42,7 +46,7 @@ async function createSessionToken(secret: string, ip: string): Promise<string> {
   return `${payloadB64}.${sigB64}`;
 }
 
-async function verifySessionToken(token: string, secret: string, _clientIp: string): Promise<boolean> {
+export async function verifySessionToken(token: string, secret: string, _clientIp: string): Promise<boolean> {
   try {
     const [payloadB64, sigB64] = token.split(".");
     if (!payloadB64 || !sigB64) return false;
@@ -92,30 +96,92 @@ function getSessionCookie(request: Request): string | null {
   return null;
 }
 
-function createSessionCookieHeader(token: string): string {
-  // HttpOnly, SameSite=Lax for security (no Secure flag to allow localhost HTTP)
-  return `${COOKIE_NAME}=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=3600`;
+/**
+ * Checks if hostname represents a local development environment.
+ * SECURITY: Only loopback addresses disable Secure cookie flag.
+ * Private IPs (10.*, 192.168.*, etc.) may serve HTTPS and need Secure flag.
+ */
+export function isLocalEnvironment(hostname: string): boolean {
+  if (!hostname) return false;
+  
+  // Standard localhost aliases
+  if (hostname === 'localhost' || hostname === '127.0.0.1') return true;
+  
+  // IPv6 loopback
+  if (hostname === '::1' || hostname === '[::1]') return true;
+  
+  // Null/any address (dev servers bound to 0.0.0.0)
+  if (hostname === '0.0.0.0') return true;
+  
+  // IPv4 loopback range (127.0.0.0/8)
+  if (hostname.startsWith('127.')) return true;
+  
+  // NOTE: Private ranges (10.*, 172.16-31.*, 192.168.*) are NOT included
+  // They may serve HTTPS and should retain Secure cookie flag
+  
+  return false;
 }
 
-function clearSessionCookieHeader(): string {
-  return `${COOKIE_NAME}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0`;
+export function createSessionCookieHeader(token: string, url?: URL, env?: WorkerEnv): string {
+  // SECURITY: Only disable Secure flag for loopback OR explicit override
+  // For production (Cloudflare Workers serve HTTPS), use Secure; SameSite=Strict
+  const isLoopback = url && isLocalEnvironment(url.hostname);
+  const allowInsecure = env?.ALLOW_INSECURE_COOKIES === 'true';
+  const isLocalDev = isLoopback || allowInsecure;
+  
+  if (isLocalDev) {
+    // Development: SameSite=Lax without Secure for HTTP compatibility
+    return `${COOKIE_NAME}=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=3600`;
+  }
+  // Production: Full security with Secure flag
+  return `${COOKIE_NAME}=${token}; HttpOnly; SameSite=Strict; Secure; Path=/; Max-Age=3600`;
+}
+
+export function clearSessionCookieHeader(url?: URL, env?: WorkerEnv): string {
+  const isLoopback = url && isLocalEnvironment(url.hostname);
+  const allowInsecure = env?.ALLOW_INSECURE_COOKIES === 'true';
+  const isLocalDev = isLoopback || allowInsecure;
+  
+  if (isLocalDev) {
+    return `${COOKIE_NAME}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0`;
+  }
+  return `${COOKIE_NAME}=; HttpOnly; SameSite=Strict; Secure; Path=/; Max-Age=0`;
 }
 
 // ---------------------------------------------------------------------------
-// IP Allowlist Check (optional - returns true if no allowlist configured)
+// IP Allowlist Check (Fail-Safe with Graceful Degradation)
+// Returns: { allowed: boolean, error?: string } for proper 503 handling
 // ---------------------------------------------------------------------------
 
-async function isIpAllowed(stub: DurableObjectStub, ip: string): Promise<boolean> {
+type IpAllowResult = { allowed: boolean; error?: string; serviceDown?: boolean };
+
+async function isIpAllowed(stub: DurableObjectStub, ip: string, env: WorkerEnv): Promise<IpAllowResult> {
   try {
     const res = await stub.fetch(new Request("http://internal/auth/check-ip-allowlist", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { 
+        "Content-Type": "application/json",
+        "X-Admin-Secret": env.DO_SHARED_SECRET,
+      },
       body: JSON.stringify({ ip }),
     }));
-    const data = await res.json() as { allowed: boolean };
-    return data.allowed !== false; // Allow by default if no response
-  } catch {
-    return true; // Allow on error to prevent lockout
+    const data = await res.json() as { allowed: boolean; enabled?: boolean };
+    
+    // If allowlist is not enabled, allow all IPs
+    if (data.enabled === false) {
+      return { allowed: true };
+    }
+    
+    return { allowed: data.allowed !== false };
+  } catch (err) {
+    // Graceful Degradation: Signal service unavailable instead of hard lockout
+    // This prevents admins from being locked out during transient DO failures
+    console.error("[isIpAllowed] DO check failed:", err);
+    return { 
+      allowed: false, 
+      serviceDown: true,
+      error: "IP allowlist service temporarily unavailable. Please try again shortly."
+    };
   }
 }
 
@@ -170,11 +236,12 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
   const method = request.method.toUpperCase();
   const clientIp = request.headers.get("CF-Connecting-IP") || "unknown";
   const stub = getDownloadsStub(env);
+  const dashboardSecret = getDashboardSecret(env);
 
   // GET: Show login page OR redirect to dashboard if valid session
   if (method === "GET") {
     const sessionToken = getSessionCookie(request);
-    if (sessionToken && await verifySessionToken(sessionToken, env.DO_SHARED_SECRET, clientIp)) {
+    if (sessionToken && dashboardSecret && await verifySessionToken(sessionToken, dashboardSecret, clientIp)) {
       // Valid session - redirect to dashboard
       return Response.redirect(new URL("/dashboard", request.url).toString(), 302);
     }
@@ -194,9 +261,39 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
       return new Response("Unsupported content type", { status: 400 });
     }
 
-    // IP Allowlist check
-    const ipAllowed = await isIpAllowed(stub, clientIp);
-    if (!ipAllowed) {
+    if (!dashboardSecret) {
+      return new Response(
+        renderLoginPage("Server misconfigured: DASHBOARD_PASSWORD missing."),
+        { status: 500, headers: { "content-type": "text/html; charset=utf-8" } },
+      );
+    }
+    if (!env.DO_SHARED_SECRET) {
+      return new Response(
+        renderLoginPage("Server misconfigured: DO_SHARED_SECRET missing."),
+        { status: 500, headers: { "content-type": "text/html; charset=utf-8" } },
+      );
+    }
+
+    // IP Allowlist check (Fail-Safe with Graceful Degradation)
+    const ipCheckResult = await isIpAllowed(stub, clientIp, env);
+    
+    // Handle service degradation: return 503 instead of hard lockout
+    if (ipCheckResult.serviceDown) {
+      return new Response(
+        renderLoginPage(ipCheckResult.error || "Service temporarily unavailable. Please try again."),
+        { 
+          status: 503, 
+          headers: { 
+            "content-type": "text/html; charset=utf-8",
+            "Retry-After": "30",
+            "X-Dependency-Error": "durable-object-unavailable"
+          } 
+        }
+      );
+    }
+    
+    // Handle explicit deny (allowlist enabled and IP not in list)
+    if (!ipCheckResult.allowed) {
       return new Response(
         renderLoginPage("Access denied: your IP is not in the allowlist."),
         { status: 403, headers: { "content-type": "text/html; charset=utf-8" } }
@@ -206,22 +303,19 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
     // Rate limit check
     const rateLimitReq = new Request(new URL("/auth/login-attempt", request.url).toString(), {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-Client-IP": clientIp },
+      headers: { 
+        "Content-Type": "application/json", 
+        "X-Client-IP": clientIp,
+        "X-Admin-Secret": env.DO_SHARED_SECRET,
+      },
       body: JSON.stringify({ ip: clientIp, success: false }),
     });
 
     const form = await request.formData();
     const password = (form.get("password") || "").toString();
 
-    if (!env.DO_SHARED_SECRET) {
-      return new Response(
-        renderLoginPage("Server misconfigured: DO_SHARED_SECRET missing."),
-        { status: 500, headers: { "content-type": "text/html; charset=utf-8" } },
-      );
-    }
-
     // Validate password
-    if (password !== env.DO_SHARED_SECRET) {
+    if (password !== dashboardSecret) {
       const rateLimitRes = await stub.fetch(rateLimitReq);
       const rateLimitData = await rateLimitRes.json() as {
         allowed: boolean;
@@ -247,20 +341,25 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
     // Successful login - clear rate limit and create session
     const successReq = new Request(new URL("/auth/login-attempt", request.url).toString(), {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-Client-IP": clientIp },
+      headers: { 
+        "Content-Type": "application/json", 
+        "X-Client-IP": clientIp,
+        "X-Admin-Secret": env.DO_SHARED_SECRET,
+      },
       body: JSON.stringify({ ip: clientIp, success: true }),
     });
     await stub.fetch(successReq);
 
     // Create session token and set cookie
-    const sessionToken = await createSessionToken(env.DO_SHARED_SECRET, clientIp);
+    const sessionToken = await createSessionToken(dashboardSecret, clientIp);
 
     // Redirect to dashboard with session cookie
+    const loginUrl = new URL(request.url);
     return new Response(null, {
       status: 302,
       headers: {
         "Location": "/dashboard",
-        "Set-Cookie": createSessionCookieHeader(sessionToken),
+        "Set-Cookie": createSessionCookieHeader(sessionToken, loginUrl, env),
       },
     });
   }
@@ -275,14 +374,16 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
 async function handleDashboard(request: Request, env: WorkerEnv): Promise<Response> {
   const clientIp = request.headers.get("CF-Connecting-IP") || "unknown";
   const sessionToken = getSessionCookie(request);
+  const dashboardSecret = getDashboardSecret(env);
 
-  if (!sessionToken || !await verifySessionToken(sessionToken, env.DO_SHARED_SECRET, clientIp)) {
+  if (!dashboardSecret || !sessionToken || !await verifySessionToken(sessionToken, dashboardSecret, clientIp)) {
     // Invalid or missing session - redirect to login
+    const logoutUrl = new URL(request.url);
     return new Response(null, {
       status: 302,
       headers: {
         "Location": "/",
-        "Set-Cookie": clearSessionCookieHeader(),
+        "Set-Cookie": clearSessionCookieHeader(logoutUrl, env),
       },
     });
   }
@@ -313,12 +414,13 @@ async function handleDashboard(request: Request, env: WorkerEnv): Promise<Respon
 // Logout Handler
 // ---------------------------------------------------------------------------
 
-function handleLogout(_request: Request): Response {
+function handleLogout(request: Request, env: WorkerEnv): Response {
+  const logoutUrl = new URL(request.url);
   return new Response(null, {
     status: 302,
     headers: {
       "Location": "/",
-      "Set-Cookie": clearSessionCookieHeader(),
+      "Set-Cookie": clearSessionCookieHeader(logoutUrl, env),
     },
   });
 }
@@ -332,15 +434,77 @@ async function handleVerifyDangerPassword(request: Request, env: WorkerEnv): Pro
     return new Response("Method Not Allowed", { status: 405 });
   }
 
+  const clientIp = request.headers.get("CF-Connecting-IP") || "unknown";
+
+  // Rate limit check via DO (reuses login attempt tracking with "danger:" prefix)
+  const stub = getDownloadsStub(env);
+  
+  // First check if this IP is rate limited for danger password attempts
+  const rateLimitReq = new Request("https://do/auth/login-attempt", {
+    method: "POST",
+    headers: { 
+      "Content-Type": "application/json",
+      "X-Admin-Secret": env.DO_SHARED_SECRET,
+    },
+    body: JSON.stringify({ ip: `danger:${clientIp}`, success: false, checkOnly: true }),
+  });
+  const rateLimitRes = await stub.fetch(rateLimitReq);
+  if (!rateLimitRes.ok) {
+    return withCors(request, new Response(
+      JSON.stringify({ ok: false, error: "Rate limit service unavailable. Try again later." }),
+      { status: 503, headers: { "content-type": "application/json" } }
+    ));
+  }
+  let rateLimitData: { ok: boolean; allowed: boolean; blockedForSeconds?: number };
+  try {
+    rateLimitData = await rateLimitRes.json();
+  } catch {
+    return withCors(request, new Response(
+      JSON.stringify({ ok: false, error: "Rate limit service unavailable. Try again later." }),
+      { status: 503, headers: { "content-type": "application/json" } }
+    ));
+  }
+  
+  if (!rateLimitData.allowed) {
+    return withCors(request, new Response(
+      JSON.stringify({ 
+        ok: false, 
+        error: "Too many failed attempts. Try again later.",
+        blockedForSeconds: rateLimitData.blockedForSeconds 
+      }),
+      { status: 429, headers: { "content-type": "application/json" } }
+    ));
+  }
+
   try {
     const { password } = await request.json() as { password: string };
     
     if (!password || password !== env.DANGER_PASSWORD) {
+      // Record failed attempt
+      await stub.fetch(new Request("https://do/auth/login-attempt", {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "X-Admin-Secret": env.DO_SHARED_SECRET,
+        },
+        body: JSON.stringify({ ip: `danger:${clientIp}`, success: false }),
+      }));
+      
       return withCors(request, new Response(
         JSON.stringify({ ok: false, error: "Invalid danger password" }),
         { status: 401, headers: { "content-type": "application/json" } }
       ));
     }
+
+    // Clear attempts on success
+    await stub.fetch(new Request("https://do/auth/login-attempt", {
+      method: "POST",
+      headers: { 
+        "Content-Type": "application/json",
+        "X-Admin-Secret": env.DO_SHARED_SECRET,
+      },
+      body: JSON.stringify({ ip: `danger:${clientIp}`, success: true }),
+    }));
 
     return withCors(request, new Response(
       JSON.stringify({ ok: true }),
@@ -354,6 +518,7 @@ async function handleVerifyDangerPassword(request: Request, env: WorkerEnv): Pro
   }
 }
 
+
 // ---------------------------------------------------------------------------
 // Protected Stats Endpoint (requires session or X-Admin-Secret)
 // ---------------------------------------------------------------------------
@@ -362,13 +527,14 @@ async function handleProtectedStats(request: Request, env: WorkerEnv): Promise<R
   const clientIp = request.headers.get("CF-Connecting-IP") || "unknown";
   const adminSecret = request.headers.get("X-Admin-Secret");
   const sessionToken = getSessionCookie(request);
+  const dashboardSecret = getDashboardSecret(env);
 
   // Check X-Admin-Secret header first (for API access)
   const hasValidSecret = adminSecret === env.DO_SHARED_SECRET;
   
   // Check session token (for browser/dashboard access)
-  const hasValidSession = sessionToken && 
-    await verifySessionToken(sessionToken, env.DO_SHARED_SECRET, clientIp);
+  const hasValidSession = !!dashboardSecret && sessionToken &&
+    await verifySessionToken(sessionToken, dashboardSecret, clientIp);
 
   if (!hasValidSecret && !hasValidSession) {
     return withCors(request, new Response(
@@ -391,13 +557,14 @@ async function handleProtectedAdminEndpoint(request: Request, env: WorkerEnv): P
   const clientIp = request.headers.get("CF-Connecting-IP") || "unknown";
   const adminSecret = request.headers.get("X-Admin-Secret");
   const sessionToken = getSessionCookie(request);
+  const dashboardSecret = getDashboardSecret(env);
 
   // Check X-Admin-Secret header first (for direct API access)
   const hasValidSecret = adminSecret === env.DO_SHARED_SECRET;
   
   // Check session token (for browser/dashboard access)
-  const hasValidSession = sessionToken && 
-    await verifySessionToken(sessionToken, env.DO_SHARED_SECRET, clientIp);
+  const hasValidSession = !!dashboardSecret && sessionToken &&
+    await verifySessionToken(sessionToken, dashboardSecret, clientIp);
 
   if (!hasValidSecret && !hasValidSession) {
     return withCors(request, new Response(
@@ -487,7 +654,7 @@ export default {
 
     // Logout
     if (pathname === "/logout") {
-      return handleLogout(request);
+      return handleLogout(request, env);
     }
 
     // Danger password verification
@@ -523,11 +690,6 @@ export default {
       pathname === "/admin/ip-allowlist"
     ) {
       return handleProtectedAdminEndpoint(request, env);
-    }
-
-    // Auth endpoints (internal use)
-    if (pathname.startsWith("/auth/")) {
-      return proxyToDO(request, env);
     }
 
     return new Response("Not found (worker)", { status: 404 });

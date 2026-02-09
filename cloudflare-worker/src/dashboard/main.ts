@@ -11,16 +11,11 @@ function escapeHtml(unsafe: string): string {
     .replace(/'/g, "&#039;");
 }
 
-function _isValidIp(ip: string): boolean {
-  // Simple IPv4 validation (unused but kept for potential server-side use)
-  const ipv4Regex = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
-  return ipv4Regex.test(ip);
-}
-
 function formatTs(ts: number | null): string {
   if (!ts) return "—";
   const d = new Date(ts);
   return d.toLocaleString("en-US", {
+    timeZone: "UTC",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -410,7 +405,7 @@ function renderReleaseManagementSection(entries: ChangelogEntry[], _config: Chan
       <div class="cl-history-header">
         <div class="cl-history-meta">
           <span class="cl-version-badge">v${e.version}</span>
-          <span class="cl-date">${new Date(e.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+          <span class="cl-date">${new Date(e.date).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric', year: 'numeric' })}</span>
         </div>
         <div class="cl-actions">
            <button class="cl-action-btn edit-cl-btn" data-id="${e.id}" title="Edit release">
@@ -465,7 +460,7 @@ function renderReleaseManagementSection(entries: ChangelogEntry[], _config: Chan
               
               <div style="margin-bottom: 14px;">
                  <label style="font-size: 0.75em; color: var(--text-soft); display: block; margin-bottom: 6px;">Version</label>
-                 <input list="known-versions-release" id="new-cl-version" placeholder="e.g. 1.2.4" class="input-field" style="width: 100%; padding: 10px 12px; background: var(--bg-elevated); border: 1px solid var(--border-subtle); color: white; border-radius: 8px; font-size: 0.95em;">
+                 <input list="known-versions-release" id="new-cl-version" placeholder="e.g. 1.2.4" class="input-field" style="width: 100%; padding: 10px 12px; background: var(--bg-surface); border: 1px solid var(--border-subtle); color: white; border-radius: 8px; font-size: 0.95em;">
                  <datalist id="known-versions-release">
                    ${dataListOptions}
                  </datalist>
@@ -474,7 +469,7 @@ function renderReleaseManagementSection(entries: ChangelogEntry[], _config: Chan
               <div style="margin-bottom: 16px;">
                  <label style="font-size: 0.75em; color: var(--text-soft); display: block; margin-bottom: 6px;">Changes (one per line)</label>
                  <div class="textarea-wrapper">
-                   <textarea id="new-cl-changes" rows="5" class="input-field" placeholder="- Added new feature X&#10;- Fixed bug with Y&#10;- Improved performance" style="width: 100%; padding: 10px 12px; background: var(--bg-elevated); border: 1px solid var(--border-subtle); color: white; border-radius: 8px; font-size: 0.9em; line-height: 1.5; resize: vertical;"></textarea>
+                   <textarea id="new-cl-changes" rows="5" class="input-field" placeholder="- Added new feature X&#10;- Fixed bug with Y&#10;- Improved performance" style="width: 100%; padding: 10px 12px; background: var(--bg-surface); border: 1px solid var(--border-subtle); color: white; border-radius: 8px; font-size: 0.9em; line-height: 1.5; resize: vertical;"></textarea>
                    <span id="char-counter" class="char-counter">0 / 500</span>
                  </div>
               </div>
@@ -529,12 +524,36 @@ export function renderDashboard(stats: StatsResponse): string {
       : "unknown";
 
   const workerUrl = "https://cqd-analytics.adhamhaithameid.workers.dev";
+  
+  // Unique IPs tracking with cap indicator
+  const uniqueIpsCount = stats.uniqueRequestsToday ?? stats.uniqueIpsToday ?? 0;
+  const isApproximated = stats.isApproximated ?? false;
+  const uniqueIpsDisplay = isApproximated 
+    ? `${uniqueIpsCount.toLocaleString()}+ (capped)`
+    : uniqueIpsCount.toLocaleString();
+
+  const remoteConfig = stats.remoteConfig || {};
+  const cfgVersion = remoteConfig.configVersion ?? 1;
+  const cfgBatchSize = remoteConfig.batchSize ?? 50;
+  const cfgMaxDaily = remoteConfig.maxDailyRequests ?? 50;
+  const cfgMaxRetry = remoteConfig.maxRetry ?? 5;
+  const cfgMaxEvents = remoteConfig.maxEventsPerRequest ?? 5000;
+  const cfgMaxBuffer = remoteConfig.maxBufferSize ?? 50000;
+  const cfgFlushMode = remoteConfig.flushMode ?? "next_day";
+  const cfgTimeLow = remoteConfig.timeFlushMinutes?.low ?? 1440;
+  const cfgTimeMid = remoteConfig.timeFlushMinutes?.mid ?? 1440;
+  const cfgTimeHigh = remoteConfig.timeFlushMinutes?.high ?? 1440;
+  const cfgDailyStart = remoteConfig.dailyFlushWindowStartUtc ?? 1;
+  const cfgDailyMinutes = remoteConfig.dailyFlushWindowMinutes ?? 120;
+  const cfgCancelHold = remoteConfig.cancelHoldDelayMs ?? 1000;
+  const cfgAllowLegacy = remoteConfig.allowLegacyEvents ?? true;
+  const cfgRemoteReason = remoteConfig.remoteEnabledReason ?? "ok";
 
   const renderTableRows = (data: Record<string, number>) => {
     const keys = Object.keys(data).sort((a, b) => data[b] - data[a]);
     if (keys.length === 0) return "<tr><td colspan='2'>—</td></tr>";
     return keys
-      .map((k) => `<tr><td>${k}</td><td>${data[k]}</td></tr>`)
+      .map((k) => `<tr><td>${escapeHtml(k)}</td><td>${data[k]}</td></tr>`)
       .join("");
   };
 
@@ -700,6 +719,7 @@ export function renderDashboard(stats: StatsResponse): string {
       border: 1px solid var(--border);
       border-radius: var(--radius-full);
       transition: all 0.3s ease;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03);
     }
     
     .toggle-slider::before {
@@ -712,6 +732,7 @@ export function renderDashboard(stats: StatsResponse): string {
       background-color: var(--text-muted);
       border-radius: var(--radius-full);
       transition: all 0.3s ease;
+      box-shadow: 0 6px 12px rgba(0,0,0,0.4);
     }
     
     .toggle-switch input:checked + .toggle-slider {
@@ -795,7 +816,7 @@ export function renderDashboard(stats: StatsResponse): string {
       height: 100vh;
       background: var(--bg-card);
       border-right: 1px solid var(--border);
-      padding: var(--space-6) 0;
+      padding: 0;
       display: flex;
       flex-direction: column;
       z-index: 1000;
@@ -805,9 +826,14 @@ export function renderDashboard(stats: StatsResponse): string {
     }
     
     .nav-header {
-      padding: var(--space-4) var(--space-5);
+      padding: var(--space-2) var(--space-2);
       margin-bottom: var(--space-4);
       border-bottom: 1px solid var(--border);
+    }
+
+    @keyframes pulse-accent {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.6; transform: scale(0.85); }
     }
     
     .nav-brand {
@@ -815,6 +841,58 @@ export function renderDashboard(stats: StatsResponse): string {
       font-weight: 700;
       color: var(--text-primary);
       letter-spacing: -0.02em;
+    }
+
+    .nav-utc {
+      display: flex;
+      flex-direction: row;
+      gap: 10px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-variant-numeric: tabular-nums;
+      font-size: 0.95rem;
+      color: var(--text-primary);
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border-subtle);
+      background: linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .nav-utc-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .nav-utc-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: var(--accent);
+      box-shadow: 0 0 10px rgba(59,130,246,0.8);
+      animation: pulse-accent 2s infinite;
+    }
+
+    .nav-utc small {
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .nav-utc-time {
+      font-size: 1.5rem;
+      color: var(--text-primary);
+      letter-spacing: 0.06em;
+      white-space: nowrap;
+      transition: font-size 0.2s ease;
+    }
+
+    .nav-utc-time.is-12h {
+      font-size: 1.1rem;
     }
     
     .nav-subtitle {
@@ -854,7 +932,7 @@ export function renderDashboard(stats: StatsResponse): string {
     
     .nav-item.active {
       color: var(--accent-hover);
-      background: transparent;
+      background: rgba(59, 130, 246, 0.3);
       border-left: 2px solid var(--accent);
       border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
       margin-left: 0;
@@ -1201,6 +1279,55 @@ export function renderDashboard(stats: StatsResponse): string {
       font-weight: 600;
     }
     
+    .section-title-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: var(--space-4);
+    }
+    
+    .section-title-row h2 {
+      margin-bottom: 0;
+    }
+    
+    .btn-toggle-all {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-2) var(--space-3);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--bg-surface);
+      color: var(--text-secondary);
+      font-size: 0.75rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    
+    .btn-toggle-all:hover {
+      background: var(--accent-muted);
+      border-color: var(--accent);
+      color: var(--accent-light);
+    }
+    
+    .btn-toggle-all svg {
+      width: 14px;
+      height: 14px;
+    }
+    
+    .btn-toggle-all .icon-expand {
+      display: none;
+    }
+    
+    .btn-toggle-all[data-expanded="false"] .icon-collapse {
+      display: none;
+    }
+    
+    .btn-toggle-all[data-expanded="false"] .icon-expand {
+      display: block;
+    }
+    
     .section-subtitle {
       font-size: 0.85rem;
       color: var(--text-muted);
@@ -1212,9 +1339,120 @@ export function renderDashboard(stats: StatsResponse): string {
     .config-card {
       background: var(--bg-card);
     }
-    
+
     .config-card h2 {
       color: var(--text-secondary);
+    }
+
+    /* Remote Config Form */
+    .rc-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: var(--space-4);
+    }
+
+    .rc-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: var(--space-4);
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-muted);
+      border-radius: var(--radius);
+      transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .rc-field:hover {
+      border-color: var(--border-hover);
+      transform: translateY(-1px);
+      box-shadow: 0 10px 24px rgba(0,0,0,0.25);
+    }
+
+    .rc-field label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .rc-input, .rc-select {
+      padding: 10px 12px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.2s ease;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .rc-input:focus, .rc-select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(59,130,246,0.18);
+    }
+
+    .rc-hint {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    .rc-actions {
+      display: flex;
+      gap: var(--space-3);
+      margin-top: var(--space-4);
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .rc-status {
+      margin-top: var(--space-3);
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .rc-status.ok {
+      color: var(--success);
+    }
+
+    .rc-status.err {
+      color: var(--danger);
+    }
+
+    .rc-warning {
+      margin-top: var(--space-3);
+      margin-bottom: var(--space-3);
+      padding: 12px 14px;
+      border-radius: var(--radius);
+      border: 1px solid rgba(234, 179, 8, 0.55);
+      background: linear-gradient(135deg, rgba(234, 179, 8, 0.12), rgba(234, 179, 8, 0.06));
+      color: #fcd34d;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-4);
+      box-shadow: inset 0 0 0 1px rgba(234, 179, 8, 0.08);
+    }
+
+    .rc-warning.is-off {
+      border-color: var(--border);
+      background: var(--bg-surface);
+      color: var(--text-muted);
+    }
+
+    .rc-warning-title {
+      font-weight: 600;
+      font-size: 0.85rem;
+      letter-spacing: 0.02em;
+    }
+
+    .rc-warning-body {
+      font-size: 0.78rem;
+      color: inherit;
+      margin-top: 2px;
+      line-height: 1.4;
     }
     
     /* Grid Layouts */
@@ -1360,23 +1598,26 @@ export function renderDashboard(stats: StatsResponse): string {
     /* Breakdown Grid */
     .breakdown-grid {
       margin-top: var(--space-2);
+      align-items: start;
     }
     .breakdown-block {
       border-radius: var(--radius);
       border: 1px solid var(--border);
       padding: var(--space-4);
       background: var(--bg-surface);
-      transition: border-color 0.2s ease;
+      transition: border-color 0.2s ease, padding 0.3s ease;
+      height: auto;
+    }
+    
+    .breakdown-block.collapsed {
+      padding-bottom: var(--space-4);
     }
     
     .breakdown-block:hover {
       border-color: var(--border-muted);
     }
 
-    /* Collapsible breakdown sections */
-    .breakdown-block.collapsed .breakdown-content {
-      display: none;
-    }
+    /* Collapsible breakdown sections - animations handled via max-height */
     .breakdown-block .section-header {
       display: flex;
       justify-content: space-between;
@@ -1396,9 +1637,14 @@ export function renderDashboard(stats: StatsResponse): string {
       border: 1px solid var(--border);
       border-radius: var(--radius-sm);
       color: var(--text-muted);
-      font-size: 0.8rem;
       cursor: pointer;
-      transition: all 0.2s ease;
+      transition: all 0.25s ease;
+      flex-shrink: 0;
+    }
+    .breakdown-toggle svg {
+      width: 14px;
+      height: 14px;
+      transition: transform 0.25s ease;
     }
     .breakdown-toggle:hover {
       background: var(--accent-muted);
@@ -1406,11 +1652,21 @@ export function renderDashboard(stats: StatsResponse): string {
       color: var(--accent-light);
     }
     .breakdown-block.collapsed .breakdown-toggle {
-      transform: rotate(180deg);
+      transform: rotate(90deg);
     }
     
     .breakdown-content {
       margin-top: var(--space-4);
+      max-height: 600px;
+      overflow: hidden;
+      opacity: 1;
+      transition: max-height 0.3s ease, opacity 0.25s ease, margin-top 0.3s ease;
+    }
+    
+    .breakdown-block.collapsed .breakdown-content {
+      max-height: 0;
+      opacity: 0;
+      margin-top: 0;
     }
 
     /* External links bar */
@@ -2486,8 +2742,13 @@ export function renderDashboard(stats: StatsResponse): string {
   <!-- Sidebar Navigation -->
   <nav class="sidebar-nav" id="sidebar">
     <div class="nav-header">
-      <div class="nav-brand">CQD Analytics</div>
-      <div class="nav-subtitle">Worker Dashboard</div>
+      <div class="nav-brand nav-utc" id="nav-utc-clock" data-tooltip="Current UTC time. All analytics and flush windows use UTC.">
+        <div class="nav-utc-row">
+          <span class="nav-utc-dot"></span>
+          <small>UTC</small>
+        </div>
+        <span class="nav-utc-time">--:--:--</span>
+      </div>
     </div>
     
     <div class="nav-section">Analytics</div>
@@ -2508,6 +2769,10 @@ export function renderDashboard(stats: StatsResponse): string {
     <a href="#quota" class="nav-item" data-section="quota">
       <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
       Quota & Mode
+    </a>
+    <a href="#remote-config" class="nav-item" data-section="remote-config">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v6"/><path d="M12 17v6"/><path d="M4.22 4.22l4.24 4.24"/><path d="M15.54 15.54l4.24 4.24"/><path d="M1 12h6"/><path d="M17 12h6"/><path d="M4.22 19.78l4.24-4.24"/><path d="M15.54 8.46l4.24-4.24"/></svg>
+      Remote Config
     </a>
     
     <div class="nav-section">Tools</div>
@@ -2650,26 +2915,33 @@ export function renderDashboard(stats: StatsResponse): string {
         </div>
       </section>
       <section class="card" id="breakdown">
-        <h2>Breakdown by Dimensions</h2>
+        <div class="section-title-row">
+          <h2>Breakdown by Dimensions</h2>
+          <button id="breakdown-toggle-all" class="btn-toggle-all" type="button" data-expanded="false">
+            <svg class="icon-collapse" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 14 10 14 10 20"></polyline><polyline points="20 10 14 10 14 4"></polyline><line x1="14" y1="10" x2="21" y2="3"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+            <svg class="icon-expand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+            <span class="btn-label">Expand All</span>
+          </button>
+        </div>
         <div class="hot-summary">
           <div class="hot-row">
             <div class="hot-row-label">Top Today</div>
             <div class="hot-row-items">
               <div class="hot-item">
                 <div class="hot-label">Type</div>
-                <div class="hot-value" data-bind="hotType">${hotType}</div>
+                <div class="hot-value" data-bind="hotType">${escapeHtml(hotType)}</div>
               </div>
               <div class="hot-item">
                 <div class="hot-label">Browser</div>
-                <div class="hot-value" data-bind="hotBrowser">${hotBrowser}</div>
+                <div class="hot-value" data-bind="hotBrowser">${escapeHtml(hotBrowser)}</div>
               </div>
               <div class="hot-item">
                 <div class="hot-label">OS</div>
-                <div class="hot-value" data-bind="hotOs">${hotOs}</div>
+                <div class="hot-value" data-bind="hotOs">${escapeHtml(hotOs)}</div>
               </div>
               <div class="hot-item">
                 <div class="hot-label">Country</div>
-                <div class="hot-value" data-bind="hotCountry">${hotCountry}</div>
+                <div class="hot-value" data-bind="hotCountry">${escapeHtml(hotCountry)}</div>
               </div>
             </div>
           </div>
@@ -2678,28 +2950,28 @@ export function renderDashboard(stats: StatsResponse): string {
             <div class="hot-row-items">
               <div class="hot-item">
                 <div class="hot-label">Type</div>
-                <div class="hot-value" data-bind="hotTypeAllTime">${hotType}</div>
+                <div class="hot-value" data-bind="hotTypeAllTime">${escapeHtml(hotType)}</div>
               </div>
               <div class="hot-item">
                 <div class="hot-label">Browser</div>
-                <div class="hot-value" data-bind="hotBrowserAllTime">${hotBrowser}</div>
+                <div class="hot-value" data-bind="hotBrowserAllTime">${escapeHtml(hotBrowser)}</div>
               </div>
               <div class="hot-item">
                 <div class="hot-label">OS</div>
-                <div class="hot-value" data-bind="hotOsAllTime">${hotOs}</div>
+                <div class="hot-value" data-bind="hotOsAllTime">${escapeHtml(hotOs)}</div>
               </div>
               <div class="hot-item">
                 <div class="hot-label">Country</div>
-                <div class="hot-value" data-bind="hotCountryAllTime">${hotCountry}</div>
+                <div class="hot-value" data-bind="hotCountryAllTime">${escapeHtml(hotCountry)}</div>
               </div>
             </div>
           </div>
         </div>
         <div class="grid-3 breakdown-grid">
-          <div class="breakdown-block" data-tooltip="Event types: download, install, update, etc.">
+          <div class="breakdown-block collapsed" data-tooltip="Event types: download, install, update, etc.">
             <div class="section-header" onclick="this.parentElement.classList.toggle('collapsed')">
               <span>By Type <span class="unique-count">${uniqueType} unique</span></span>
-              <button class="breakdown-toggle" type="button">^</button>
+              <button class="breakdown-toggle" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg></button>
             </div>
             <div class="breakdown-content">
               <table>
@@ -2708,10 +2980,10 @@ export function renderDashboard(stats: StatsResponse): string {
               </table>
             </div>
           </div>
-          <div class="breakdown-block" data-tooltip="Event status: success, fail, cancelled, etc.">
+          <div class="breakdown-block collapsed" data-tooltip="Event status: success, fail, cancelled, etc.">
             <div class="section-header" onclick="this.parentElement.classList.toggle('collapsed')">
               <span>By Status <span class="unique-count">${uniqueStatus} unique</span></span>
-              <button class="breakdown-toggle" type="button">^</button>
+              <button class="breakdown-toggle" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg></button>
             </div>
             <div class="breakdown-content">
               <table>
@@ -2720,10 +2992,10 @@ export function renderDashboard(stats: StatsResponse): string {
               </table>
             </div>
           </div>
-          <div class="breakdown-block" data-tooltip="User browser: Chrome, Firefox, Edge, etc.">
+          <div class="breakdown-block collapsed" data-tooltip="User browser: Chrome, Firefox, Edge, etc.">
             <div class="section-header" onclick="this.parentElement.classList.toggle('collapsed')">
               <span>By Browser <span class="unique-count">${uniqueBrowser} unique</span></span>
-              <button class="breakdown-toggle" type="button">^</button>
+              <button class="breakdown-toggle" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg></button>
             </div>
             <div class="breakdown-content">
               <table>
@@ -2732,10 +3004,10 @@ export function renderDashboard(stats: StatsResponse): string {
               </table>
             </div>
           </div>
-          <div class="breakdown-block" data-tooltip="Operating system: Windows, macOS, Linux, etc.">
+          <div class="breakdown-block collapsed" data-tooltip="Operating system: Windows, macOS, Linux, etc.">
             <div class="section-header" onclick="this.parentElement.classList.toggle('collapsed')">
               <span>By OS <span class="unique-count">${uniqueOs} unique</span></span>
-              <button class="breakdown-toggle" type="button">^</button>
+              <button class="breakdown-toggle" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg></button>
             </div>
             <div class="breakdown-content">
               <table>
@@ -2744,10 +3016,10 @@ export function renderDashboard(stats: StatsResponse): string {
               </table>
             </div>
           </div>
-          <div class="breakdown-block" data-tooltip="Extension version installed by users">
+          <div class="breakdown-block collapsed" data-tooltip="Extension version installed by users">
             <div class="section-header" onclick="this.parentElement.classList.toggle('collapsed')">
               <span>By Extension Version <span class="unique-count">${uniqueExtVersion} unique</span></span>
-              <button class="breakdown-toggle" type="button">^</button>
+              <button class="breakdown-toggle" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg></button>
             </div>
             <div class="breakdown-content">
               <table>
@@ -2756,10 +3028,10 @@ export function renderDashboard(stats: StatsResponse): string {
               </table>
             </div>
           </div>
-          <div class="breakdown-block" data-tooltip="Browser/OS language locale">
+          <div class="breakdown-block collapsed" data-tooltip="Browser/OS language locale">
             <div class="section-header" onclick="this.parentElement.classList.toggle('collapsed')">
               <span>By Language <span class="unique-count">${uniqueLang} unique</span></span>
-              <button class="breakdown-toggle" type="button">^</button>
+              <button class="breakdown-toggle" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg></button>
             </div>
             <div class="breakdown-content">
               <table>
@@ -2768,10 +3040,10 @@ export function renderDashboard(stats: StatsResponse): string {
               </table>
             </div>
           </div>
-          <div class="breakdown-block" data-tooltip="Geographic country based on IP">
+          <div class="breakdown-block collapsed" data-tooltip="Geographic country based on IP">
             <div class="section-header" onclick="this.parentElement.classList.toggle('collapsed')">
               <span>By Country <span class="unique-count">${uniqueCountry} unique</span></span>
-              <button class="breakdown-toggle" type="button">^</button>
+              <button class="breakdown-toggle" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg></button>
             </div>
             <div class="breakdown-content">
               <table>
@@ -2780,10 +3052,10 @@ export function renderDashboard(stats: StatsResponse): string {
               </table>
             </div>
           </div>
-          <div class="breakdown-block" data-tooltip="Error types for failed operations">
+          <div class="breakdown-block collapsed" data-tooltip="Error types for failed operations">
             <div class="section-header" onclick="this.parentElement.classList.toggle('collapsed')">
               <span>By Error Reason <span class="unique-count">${uniqueError} unique</span></span>
-              <button class="breakdown-toggle" type="button">^</button>
+              <button class="breakdown-toggle" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg></button>
             </div>
             <div class="breakdown-content">
               <table>
@@ -2855,6 +3127,10 @@ export function renderDashboard(stats: StatsResponse): string {
               <span class="quota-val" data-bind="requestsToday">${requestsToday}</span>
             </div>
             <div class="quota-stat">
+              <span class="quota-label">Unique IPs</span>
+              <span class="quota-val" data-bind="uniqueIps" style="color:${isApproximated ? 'var(--warning)' : 'inherit'}">${uniqueIpsDisplay}</span>
+            </div>
+            <div class="quota-stat">
               <span class="quota-label">Weekly Events</span>
               <span class="quota-val" data-bind="weeklyEvents" style="color:var(--success)">${Math.round((stats.totalEvents ?? 0) / 4)}</span>
             </div>
@@ -2915,6 +3191,108 @@ export function renderDashboard(stats: StatsResponse): string {
             </div>
           </div>
         </div>
+      </section>
+
+      <!-- Remote Config -->
+      <section class="card" id="remote-config">
+        <h2>Remote Config</h2>
+        <div class="section-subtitle">
+          Controls pushed to the extension. Changes apply on the next config fetch.
+          <span style="display:inline-block; margin-left:8px; color:var(--text-disabled); font-size:0.78rem;">
+            Config v<span id="cfg-version">${cfgVersion}</span>
+          </span>
+        </div>
+        <div class="rc-status" id="remote-enabled-status" data-tooltip="Reason remote analytics is enabled or paused by backpressure.">
+          Remote analytics: <strong>${remoteEnabled ? "ENABLED" : "PAUSED"}</strong> · Reason: <span id="remote-enabled-reason">${cfgRemoteReason}</span>
+        </div>
+        <div class="rc-warning ${cfgAllowLegacy ? "" : "is-off"}" id="legacy-warning">
+          <div>
+            <div class="rc-warning-title">Legacy Event Acceptance</div>
+            <div class="rc-warning-body" id="legacy-warning-text">
+              ${cfgAllowLegacy
+                ? "Enabled — missing event IDs will be auto-assigned. Disable after clients update."
+                : "Disabled — events without IDs will be rejected."}
+            </div>
+          </div>
+          <label class="toggle-switch" title="Toggle legacy event acceptance">
+            <input type="checkbox" id="cfg-allow-legacy" ${cfgAllowLegacy ? "checked" : ""}>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="rc-grid">
+          <div class="rc-field" data-tooltip="Events per POST from the extension. Higher values reduce requests but increase payload size.">
+            <label>Batch Size</label>
+            <input class="rc-input" type="number" id="cfg-batch-size" min="1" max="1000" value="${cfgBatchSize}">
+            <div class="rc-hint">Events per POST from the extension.</div>
+          </div>
+          <div class="rc-field" data-tooltip="Upper bound for extension flushes per UTC day. Prevents runaway requests.">
+            <label>Max Daily Requests</label>
+            <input class="rc-input" type="number" id="cfg-max-daily" min="1" max="1000" value="${cfgMaxDaily}">
+            <div class="rc-hint">Upper bound for extension flushes per UTC day.</div>
+          </div>
+          <div class="rc-field" data-tooltip="Drop events after this many failed retries. Use 0 to disable retries.">
+            <label>Max Retry</label>
+            <input class="rc-input" type="number" id="cfg-max-retry" min="0" max="20" value="${cfgMaxRetry}">
+            <div class="rc-hint">Drop events after this many failed retries.</div>
+          </div>
+          <div class="rc-field" data-tooltip="Hard limit enforced on /track requests. Protects the worker and DO memory.">
+            <label>Max Events / Request</label>
+            <input class="rc-input" type="number" id="cfg-max-events" min="1" max="50000" value="${cfgMaxEvents}">
+            <div class="rc-hint">Worker-side request limit enforced on /track.</div>
+          </div>
+          <div class="rc-field" data-tooltip="Durable Object buffer capacity. When full, /track is rejected to prevent overload.">
+            <label>Max Buffer Size</label>
+            <input class="rc-input" type="number" id="cfg-max-buffer" min="1" max="500000" value="${cfgMaxBuffer}">
+            <div class="rc-hint">Durable Object buffer capacity before rejecting /track.</div>
+          </div>
+          <div class="rc-field" data-tooltip="Choose daily window flush (UTC) or time-based thresholds.">
+            <label>Flush Mode</label>
+            <select class="rc-select" id="cfg-flush-mode">
+              <option value="next_day" ${cfgFlushMode === "next_day" ? "selected" : ""}>Next Day (UTC window)</option>
+              <option value="time_based" ${cfgFlushMode === "time_based" ? "selected" : ""}>Time Based</option>
+            </select>
+            <div class="rc-hint">Controls whether daily window or time-based flushes are used.</div>
+          </div>
+          <div class="rc-field" data-tooltip="Minutes between flushes when the queue is small (< 15 events).">
+            <label>Time Flush (Low)</label>
+            <input class="rc-input" type="number" id="cfg-time-low" min="1" max="10080" value="${cfgTimeLow}">
+            <div class="rc-hint">Minutes when queue &lt; 15 events.</div>
+          </div>
+          <div class="rc-field" data-tooltip="Minutes between flushes for mid-size queues (15–35).">
+            <label>Time Flush (Mid)</label>
+            <input class="rc-input" type="number" id="cfg-time-mid" min="1" max="10080" value="${cfgTimeMid}">
+            <div class="rc-hint">Minutes when queue is 15–35 events.</div>
+          </div>
+          <div class="rc-field" data-tooltip="Minutes between flushes for large queues (> 35).">
+            <label>Time Flush (High)</label>
+            <input class="rc-input" type="number" id="cfg-time-high" min="1" max="10080" value="${cfgTimeHigh}">
+            <div class="rc-hint">Minutes when queue &gt; 35 events.</div>
+          </div>
+          <div class="rc-field" data-tooltip="UTC hour when the daily randomized flush window begins.">
+            <label>Daily Window Start (UTC hour)</label>
+            <input class="rc-input" type="number" id="cfg-window-start" min="0" max="23" value="${cfgDailyStart}">
+            <div class="rc-hint">Start hour for daily flush window in UTC.</div>
+          </div>
+          <div class="rc-field" data-tooltip="Length of the daily randomized flush window in minutes.">
+            <label>Daily Window Minutes</label>
+            <input class="rc-input" type="number" id="cfg-window-minutes" min="1" max="1440" value="${cfgDailyMinutes}">
+            <div class="rc-hint">Window length in minutes for randomized daily flushes.</div>
+          </div>
+          <div class="rc-field" data-tooltip="Delay before the cancel button becomes active. Helps prevent accidental cancels.">
+            <label>Cancel Hold Delay (ms)</label>
+            <input class="rc-input" type="number" id="cfg-cancel-hold" min="0" max="10000" value="${cfgCancelHold}">
+            <div class="rc-hint">Delay before cancel button becomes active.</div>
+          </div>
+        </div>
+        <div class="rc-actions">
+          <button class="btn" id="btn-config-reset" type="button" data-tooltip="Load default values locally. Click Save to publish.">
+            <span class="btn-bullet">•</span> Reset to defaults
+          </button>
+          <button class="btn" id="btn-config-save" type="button" data-tooltip="Publish these config values to all extensions.">
+            <span class="btn-bullet">•</span> Save Remote Config
+          </button>
+        </div>
+        <div class="rc-status" id="config-status" data-tooltip="Status of the last config operation.">Idle</div>
       </section>
 
       <!-- Debug & Actions -->
@@ -3000,7 +3378,7 @@ export function renderDashboard(stats: StatsResponse): string {
         </div>
         
         <!-- IP Protection Toggle -->
-        <div class="security-row" style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; background: var(--bg-elevated); border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 16px;">
+        <div class="security-row" style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; background: var(--bg-surface); border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 16px;">
           <div>
             <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">IP Protection</div>
             <div style="font-size: 0.8rem; color: var(--text-muted);">Restrict dashboard access to allowlisted IPs only</div>
@@ -3371,17 +3749,26 @@ export function renderDashboard(stats: StatsResponse): string {
     </div>
   </div>
 
-  <script id="raw-stats-json" type="application/json">
-${rawStatsJson}
-  </script>
   <script>
     (function () {
+      // XSS prevention: HTML escape for untrusted data
+      function escapeHtmlJS(unsafe) {
+        if (typeof unsafe !== 'string') return String(unsafe);
+        return unsafe
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#039;');
+      }
       let lastRefreshAt = 0;
+      let configDirty = false;
 
       function formatTs(ts) {
         if (!ts) return "—";
         const d = new Date(ts);
         return d.toLocaleString("en-US", {
+          timeZone: "UTC",
           year: "numeric",
           month: "2-digit",
           day: "2-digit",
@@ -3402,6 +3789,67 @@ ${rawStatsJson}
         if (hr > 0) return hr + "h";
         if (min > 0) return min + "m";
         return sec + "s";
+      }
+
+      var clockIs24 = localStorage.getItem("cqd_clock_24h") !== "false";
+
+      function formatUtcClock(ts) {
+        const d = new Date(ts);
+        return d.toLocaleTimeString("en-US", {
+          timeZone: "UTC",
+          hour12: !clockIs24,
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        });
+      }
+
+      function updateUtcClock() {
+        const wrap = document.getElementById("nav-utc-clock");
+        if (!wrap) return;
+        const label = wrap.querySelector(".nav-utc-time");
+        if (!label) return;
+        const now = Date.now();
+        const next = formatUtcClock(now);
+        if (label.textContent !== next) {
+          label.textContent = next;
+        }
+        // Dynamic size: smaller for 12h format (has AM/PM)
+        if (clockIs24) {
+          label.classList.remove("is-12h");
+        } else {
+          label.classList.add("is-12h");
+        }
+      }
+
+      updateUtcClock();
+      setInterval(updateUtcClock, 1000);
+
+      const utcClock = document.getElementById("nav-utc-clock");
+      if (utcClock) {
+        utcClock.addEventListener("click", () => {
+          clockIs24 = !clockIs24;
+          localStorage.setItem("cqd_clock_24h", clockIs24 ? "true" : "false");
+          updateUtcClock();
+        });
+      }
+
+      // Breakdown toggle all button
+      const toggleAllBtn = document.getElementById("breakdown-toggle-all");
+      if (toggleAllBtn) {
+        toggleAllBtn.addEventListener("click", () => {
+          const isExpanded = toggleAllBtn.getAttribute("data-expanded") === "true";
+          const blocks = document.querySelectorAll(".breakdown-grid .breakdown-block");
+          blocks.forEach((block) => {
+            if (isExpanded) {
+              block.classList.add("collapsed");
+            } else {
+              block.classList.remove("collapsed");
+            }
+          });
+          toggleAllBtn.setAttribute("data-expanded", isExpanded ? "false" : "true");
+          toggleAllBtn.querySelector(".btn-label").textContent = isExpanded ? "Expand All" : "Collapse All";
+        });
       }
 
       function quotaStateFromRequests(n) {
@@ -3463,7 +3911,7 @@ ${rawStatsJson}
         entries.sort((a, b) => b[1] - a[1]);
         return entries
           .map(function ([k, v]) {
-            return "<tr><td>" + k + "</td><td>" + v + "</td></tr>";
+            return "<tr><td>" + escapeHtmlJS(k) + "</td><td>" + v + "</td></tr>";
           })
           .join("");
       }
@@ -3703,6 +4151,13 @@ ${rawStatsJson}
           map.quotaLevel = stats.quota.quotaLevel || "UNKNOWN";
           map.batchSize = stats.quota.batchSizeSuggestion || 0;
         }
+        
+        // APPROXIMATION-AWARE: Format unique IPs with capped indicator
+        const uniqueIpsCount = stats.uniqueRequestsToday ?? stats.uniqueIpsToday ?? 0;
+        const isApproximated = stats.isApproximated ?? false;
+        map.uniqueIps = isApproximated 
+          ? uniqueIpsCount.toLocaleString() + "+ (capped)"
+          : uniqueIpsCount.toLocaleString();
 
         for (const [key, val] of Object.entries(map)) {
           const els = document.querySelectorAll('[data-bind="' + key + '"]');
@@ -3711,6 +4166,10 @@ ${rawStatsJson}
             const next = String(val);
             if (current !== next) {
               el.textContent = next;
+              // APPROXIMATION-AWARE: Apply warning color for capped unique IPs
+              if (key === "uniqueIps") {
+                el.style.color = isApproximated ? "var(--warning)" : "inherit";
+              }
               const parent =
                 el.closest(".metric, .quota-stat, .quota-panel") ||
                 el.parentElement;
@@ -3837,6 +4296,7 @@ ${rawStatsJson}
         updateQuotaChips(stats.quota);
         updateBreakdowns(stats.counters);
         updateLastRefreshLabel();
+        updateRemoteConfigForm(stats.remoteConfig || {}, stats.quota || {});
       }
 
       if (btnReload) {
@@ -3845,6 +4305,272 @@ ${rawStatsJson}
 
       if (btnReload) {
         btnReload.onclick = refreshStats;
+      }
+
+      // --- Remote Config Logic ---
+      const cfgDefaults = {
+        batchSize: 50,
+        maxDailyRequests: 50,
+        maxRetry: 5,
+        maxEventsPerRequest: 5000,
+        maxBufferSize: 50000,
+        allowLegacyEvents: true,
+        flushMode: "next_day",
+        timeFlushMinutes: { low: 1440, mid: 1440, high: 1440 },
+        dailyFlushWindowStartUtc: 1,
+        dailyFlushWindowMinutes: 120,
+        cancelHoldDelayMs: 1000,
+      };
+
+      function clampInt(value, min, max, fallback) {
+        const num = Number(value);
+        if (!Number.isFinite(num)) return fallback;
+        return Math.min(max, Math.max(min, Math.floor(num)));
+      }
+
+      function setConfigStatus(text, cls) {
+        const el = document.getElementById("config-status");
+        if (!el) return;
+        el.textContent = text;
+        el.classList.remove("ok", "err");
+        if (cls) el.classList.add(cls);
+      }
+
+      function setConfigDirty(flag) {
+        configDirty = flag;
+        if (configDirty) {
+          setConfigStatus("Unsaved changes", "");
+        }
+      }
+
+      function setValue(id, value) {
+        const el = document.getElementById(id);
+        if (el) el.value = String(value);
+      }
+
+      function setToggle(id, checked) {
+        const el = document.getElementById(id);
+        if (el && typeof checked === "boolean") {
+          el.checked = checked;
+        }
+      }
+
+      function setConfigFromRemote(cfg, force) {
+        if (configDirty && !force) return;
+        const merged = {
+          batchSize: cfg.batchSize ?? cfgDefaults.batchSize,
+          maxDailyRequests: cfg.maxDailyRequests ?? cfgDefaults.maxDailyRequests,
+          maxRetry: cfg.maxRetry ?? cfgDefaults.maxRetry,
+          maxEventsPerRequest: cfg.maxEventsPerRequest ?? cfgDefaults.maxEventsPerRequest,
+          maxBufferSize: cfg.maxBufferSize ?? cfgDefaults.maxBufferSize,
+          allowLegacyEvents: typeof cfg.allowLegacyEvents === "boolean"
+            ? cfg.allowLegacyEvents
+            : cfgDefaults.allowLegacyEvents,
+          flushMode: cfg.flushMode ?? cfgDefaults.flushMode,
+          timeFlushMinutes: cfg.timeFlushMinutes || cfgDefaults.timeFlushMinutes,
+          dailyFlushWindowStartUtc: cfg.dailyFlushWindowStartUtc ?? cfgDefaults.dailyFlushWindowStartUtc,
+          dailyFlushWindowMinutes: cfg.dailyFlushWindowMinutes ?? cfgDefaults.dailyFlushWindowMinutes,
+          cancelHoldDelayMs: cfg.cancelHoldDelayMs ?? cfgDefaults.cancelHoldDelayMs,
+          configVersion: cfg.configVersion,
+        };
+
+        setValue("cfg-batch-size", merged.batchSize);
+        setValue("cfg-max-daily", merged.maxDailyRequests);
+        setValue("cfg-max-retry", merged.maxRetry);
+        setValue("cfg-max-events", merged.maxEventsPerRequest);
+        setValue("cfg-max-buffer", merged.maxBufferSize);
+        setToggle("cfg-allow-legacy", merged.allowLegacyEvents);
+        setValue("cfg-time-low", merged.timeFlushMinutes.low);
+        setValue("cfg-time-mid", merged.timeFlushMinutes.mid);
+        setValue("cfg-time-high", merged.timeFlushMinutes.high);
+        setValue("cfg-window-start", merged.dailyFlushWindowStartUtc);
+        setValue("cfg-window-minutes", merged.dailyFlushWindowMinutes);
+        setValue("cfg-cancel-hold", merged.cancelHoldDelayMs);
+
+        const flushEl = document.getElementById("cfg-flush-mode");
+        if (flushEl) flushEl.value = merged.flushMode;
+        toggleTimeFields(merged.flushMode);
+
+        const versionEl = document.getElementById("cfg-version");
+        if (versionEl && merged.configVersion != null) {
+          versionEl.textContent = String(merged.configVersion);
+        }
+
+        setConfigStatus("Loaded", "ok");
+        configDirty = false;
+      }
+
+      function updateRemoteConfigForm(cfg, quota) {
+        setConfigFromRemote(cfg, false);
+        const enabled = quota && typeof quota.remoteEnabled === "boolean"
+          ? quota.remoteEnabled
+          : true;
+        const reason = (cfg && cfg.remoteEnabledReason) ? cfg.remoteEnabledReason : "ok";
+        const statusEl = document.getElementById("remote-enabled-status");
+        const reasonEl = document.getElementById("remote-enabled-reason");
+        const legacyEnabled = cfg && typeof cfg.allowLegacyEvents === "boolean"
+          ? cfg.allowLegacyEvents
+          : cfgDefaults.allowLegacyEvents;
+        const legacyEl = document.getElementById("legacy-warning");
+        const legacyText = document.getElementById("legacy-warning-text");
+        if (legacyEl) {
+          legacyEl.classList.toggle("is-off", !legacyEnabled);
+        }
+        if (legacyText) {
+          legacyText.textContent = legacyEnabled
+            ? "Enabled — missing event IDs will be auto-assigned. Disable after clients update."
+            : "Disabled — events without IDs will be rejected.";
+        }
+        if (statusEl) {
+          statusEl.classList.remove("ok", "err");
+          statusEl.classList.add(enabled ? "ok" : "err");
+          statusEl.innerHTML = 'Remote analytics: <strong>' + (enabled ? "ENABLED" : "PAUSED") + '</strong> · Reason: <span id="remote-enabled-reason">' + escapeHtmlJS(reason) + '</span>';
+        } else if (reasonEl) {
+          reasonEl.textContent = reason;
+        }
+      }
+
+      function toggleTimeFields(mode) {
+        const disable = mode !== "time_based";
+        ["cfg-time-low", "cfg-time-mid", "cfg-time-high"].forEach((id) => {
+          const el = document.getElementById(id);
+          if (el) el.disabled = disable;
+        });
+      }
+
+      function readNum(id, min, max, fallback) {
+        const el = document.getElementById(id);
+        if (!el) return fallback;
+        return clampInt(el.value, min, max, fallback);
+      }
+
+      async function sendRemoteConfigUpdate(payload) {
+        const btnSave = document.getElementById("btn-config-save");
+        if (btnSave) {
+          btnSave.classList.add("btn-loading");
+          btnSave.style.pointerEvents = "none";
+        }
+        setConfigStatus("Saving...", "");
+
+        try {
+          const res = await fetch("/admin/update-config", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify(payload),
+          });
+          const data = await res.json();
+          if (!data.ok) {
+            setConfigStatus("Error: " + (data.error || "unknown"), "err");
+          } else {
+            setConfigStatus("Saved", "ok");
+            setConfigDirty(false);
+            if (data.config) {
+              setConfigFromRemote(data.config, true);
+            }
+            refreshStats();
+          }
+        } catch (e) {
+          setConfigStatus("Network error", "err");
+        } finally {
+          if (btnSave) {
+            btnSave.classList.remove("btn-loading");
+            btnSave.style.pointerEvents = "";
+          }
+        }
+      }
+
+      const cfgInputs = [
+        "cfg-batch-size",
+        "cfg-max-daily",
+        "cfg-max-retry",
+        "cfg-max-events",
+        "cfg-max-buffer",
+        "cfg-allow-legacy",
+        "cfg-flush-mode",
+        "cfg-time-low",
+        "cfg-time-mid",
+        "cfg-time-high",
+        "cfg-window-start",
+        "cfg-window-minutes",
+        "cfg-cancel-hold",
+      ];
+      cfgInputs.forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.addEventListener("input", () => setConfigDirty(true));
+          el.addEventListener("change", () => {
+            if (id === "cfg-flush-mode") {
+              toggleTimeFields(el.value);
+            }
+            if (id === "cfg-allow-legacy") {
+              const legacyEl = document.getElementById("legacy-warning");
+              const legacyText = document.getElementById("legacy-warning-text");
+              const enabled = !!el.checked;
+              if (legacyEl) {
+                legacyEl.classList.toggle("is-off", !enabled);
+              }
+              if (legacyText) {
+                legacyText.textContent = enabled
+                  ? "Enabled — missing event IDs will be auto-assigned. Disable after clients update."
+                  : "Disabled — events without IDs will be rejected.";
+              }
+            }
+            setConfigDirty(true);
+          });
+        }
+      });
+
+      const btnCfgReset = document.getElementById("btn-config-reset");
+      if (btnCfgReset) {
+        btnCfgReset.onclick = () => {
+          setConfigFromRemote(cfgDefaults, true);
+          setConfigDirty(true);
+          setConfigStatus("Defaults loaded (not saved)", "");
+        };
+      }
+
+      const btnCfgSave = document.getElementById("btn-config-save");
+      if (btnCfgSave) {
+        btnCfgSave.onclick = () => {
+          const flushEl = document.getElementById("cfg-flush-mode");
+          const flushModeValue = flushEl ? flushEl.value : cfgDefaults.flushMode;
+          const legacyEl = document.getElementById("cfg-allow-legacy");
+          const allowLegacyEvents = legacyEl
+            ? !!legacyEl.checked
+            : cfgDefaults.allowLegacyEvents;
+          const payload = {
+            batchSize: readNum("cfg-batch-size", 1, 1000, cfgDefaults.batchSize),
+            maxDailyRequests: readNum("cfg-max-daily", 1, 1000, cfgDefaults.maxDailyRequests),
+            maxRetry: readNum("cfg-max-retry", 0, 20, cfgDefaults.maxRetry),
+            maxEventsPerRequest: readNum("cfg-max-events", 1, 50000, cfgDefaults.maxEventsPerRequest),
+            maxBufferSize: readNum("cfg-max-buffer", 1, 500000, cfgDefaults.maxBufferSize),
+            allowLegacyEvents,
+            flushMode: flushModeValue,
+            timeFlushMinutes: {
+              low: readNum("cfg-time-low", 1, 10080, cfgDefaults.timeFlushMinutes.low),
+              mid: readNum("cfg-time-mid", 1, 10080, cfgDefaults.timeFlushMinutes.mid),
+              high: readNum("cfg-time-high", 1, 10080, cfgDefaults.timeFlushMinutes.high),
+            },
+            dailyFlushWindowStartUtc: readNum("cfg-window-start", 0, 23, cfgDefaults.dailyFlushWindowStartUtc),
+            dailyFlushWindowMinutes: readNum("cfg-window-minutes", 1, 1440, cfgDefaults.dailyFlushWindowMinutes),
+            cancelHoldDelayMs: readNum("cfg-cancel-hold", 0, 10000, cfgDefaults.cancelHoldDelayMs),
+          };
+          sendRemoteConfigUpdate(payload);
+        };
+      }
+
+      const statsEl = document.getElementById("raw-stats-json");
+      if (statsEl) {
+        try {
+          const initialStats = JSON.parse(statsEl.textContent || "{}");
+          if (initialStats && initialStats.remoteConfig) {
+            setConfigFromRemote(initialStats.remoteConfig, true);
+            updateRemoteConfigForm(initialStats.remoteConfig, initialStats.quota || {});
+          }
+        } catch (e) {
+          setConfigStatus("Config load error", "err");
+        }
       }
 
       // Changelog Logic
@@ -3939,15 +4665,16 @@ ${rawStatsJson}
          container.innerHTML = activeRules.map((rule, idx) => \`
             <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-subtle); border-radius: 6px;">
                <div style="display: flex; align-items: center; gap: 12px;">
-                 <span style="font-family: monospace; font-size: 0.9em; background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px; color: \${rule.target === 'all' ? '#fbbf24' : '#fff'};">\${rule.target}</span>
+                 <span style="font-family: monospace; font-size: 0.9em; background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px; color: \${rule.target === 'all' ? '#fbbf24' : '#fff'};">\${escapeHtmlJS(rule.target)}</span>
                  
                  <span style="font-size: 0.8em; color: var(--text-muted);">
-                    \${rule.priority} + \${rule.effect}
+                    \${escapeHtmlJS(rule.priority)} + \${escapeHtmlJS(rule.effect)}
                  </span>
                </div>
                <button type="button" class="btn-xs delete-rule-btn" data-idx="\${idx}" style="color: #fca5a5; border-color: rgba(239,68,68,0.3);">✕</button>
             </div>
          \`).join('');
+
          
          // Attach delete listeners
          container.querySelectorAll(".delete-rule-btn").forEach(btn => {
@@ -4570,11 +5297,12 @@ ${rawStatsJson}
         } else {
           container.innerHTML = ipAllowlistData.allowlist.map(ip => 
             '<div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: var(--bg-elevated); border-radius: var(--radius-sm); border: 1px solid var(--border);">' +
-              '<span style="font-family: monospace; color: var(--text-primary);">' + ip + '</span>' +
+              '<span style="font-family: monospace; color: var(--text-primary);">' + escapeHtmlJS(ip) + '</span>' +
               (ip === currentUserIp ? '<span style="font-size: 0.7rem; color: var(--success); background: var(--success-bg); padding: 2px 8px; border-radius: 4px;">You</span>' : '') +
-              '<button class="btn-remove-ip" data-ip="' + ip + '" style="background: var(--danger-bg); color: var(--danger); border: 1px solid rgba(239,68,68,0.3); padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; cursor: pointer;">Remove</button>' +
+              '<button class="btn-remove-ip" data-ip="' + escapeHtmlJS(ip) + '" style="background: var(--danger-bg); color: var(--danger); border: 1px solid rgba(239,68,68,0.3); padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; cursor: pointer;">Remove</button>' +
             '</div>'
           ).join('');
+
           
           // Bind remove buttons
           container.querySelectorAll('.btn-remove-ip').forEach(btn => {

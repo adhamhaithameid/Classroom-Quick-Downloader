@@ -17,9 +17,10 @@ func Init(dbPath string) (*sql.DB, error) {
 		return nil, err
 	}
 
-	// Single writer is good for SQLite.
-	database.SetMaxOpenConns(1)
-	database.SetMaxIdleConns(1)
+	// WAL mode allows concurrent readers with single writer.
+	// Increase pool for better read concurrency.
+	database.SetMaxOpenConns(5)
+	database.SetMaxIdleConns(3)
 
 	if err := Migrate(database); err != nil {
 		_ = database.Close()
@@ -102,12 +103,14 @@ func Migrate(db *sql.DB) error {
 		`CREATE INDEX IF NOT EXISTS idx_do_state_snapshots_captured_at
 			ON do_state_snapshots(captured_at);`,
 
-		// IP Tracking (Analytic Audit).
-		// Stores a JSON array of unique IPs seen in this batch.
+		// IP Tracking for Geo Map feature (required for dashboard's geographical map view)
+		// NOTE: This is internal/trusted network traffic. Deploy behind VPN/Tunnel for security.
+		// unique_ips format: {"ips": [...], "count": N, "is_truncated": boolean}
+		// Legacy rows may contain JSON array of strings (backwards compatible)
 		`CREATE TABLE IF NOT EXISTS batch_ips (
 			batch_id   TEXT PRIMARY KEY,
 			ip_count   INTEGER,
-			unique_ips TEXT, -- JSON array of strings
+			unique_ips TEXT, -- JSON object: {"ips": [], "count": N, "is_truncated": bool}
 			FOREIGN KEY(batch_id) REFERENCES batches(batch_id)
 		);`,
 	}

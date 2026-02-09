@@ -18,6 +18,28 @@ import (
 	"google.golang.org/api/sheets/v4"
 )
 
+type logPayload struct {
+	Level   string                 `json:"level"`
+	Message string                 `json:"message"`
+	Time    string                 `json:"time"`
+	Fields  map[string]interface{} `json:"fields,omitempty"`
+}
+
+func logEvent(level string, message string, fields map[string]interface{}) {
+	payload := logPayload{
+		Level:   level,
+		Message: message,
+		Time:    time.Now().UTC().Format(time.RFC3339),
+		Fields:  fields,
+	}
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		log.Printf("[logEvent] marshal error: %v", err)
+		return
+	}
+	log.Println(string(encoded))
+}
+
 // SummaryResponse matches the FULL JSON structure from your backend
 type SummaryResponse struct {
 	Totals struct {
@@ -48,28 +70,54 @@ func main() {
 	sheetID := flag.String("sheet", "", "Google Sheet ID")
 	credsPath := flag.String("creds", "/app/google-credentials.json", "Path to Service Account JSON")
 	apiURL := flag.String("api", "http://localhost:8080/api/stats/summary", "URL to fetch stats from")
+	secret := flag.String("secret", os.Getenv("ARCHIVER_SHARED_SECRET"), "Shared secret for authenticated stats (optional)")
 	kumaPushURL := flag.String("kuma", "", "Uptime Kuma Push URL (optional)")
 	flag.Parse()
 
 	if *sheetID == "" {
+		logEvent("error", "archiver_missing_sheet_id", nil)
 		log.Fatal("Please provide a --sheet ID")
 	}
 
 	// 1. Fetch Stats
 	log.Printf("Fetching stats from %s...", *apiURL)
-	resp, err := http.Get(*apiURL)
+	req, err := http.NewRequest(http.MethodGet, *apiURL, nil)
 	if err != nil {
+		logEvent("error", "archiver_request_build_failed", map[string]interface{}{
+			"error": err.Error(),
+		})
+		log.Fatalf("Failed to build request: %v", err)
+	}
+	if *secret != "" {
+		req.Header.Set("X-Archiver-Secret", *secret)
+	}
+
+	httpClient := &http.Client{Timeout: 15 * time.Second}
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		logEvent("error", "archiver_stats_fetch_failed", map[string]interface{}{
+			"error": err.Error(),
+		})
 		log.Fatalf("Failed to fetch stats: %v", err)
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		logEvent("error", "archiver_stats_bad_status", map[string]interface{}{
+			"status": resp.Status,
+		})
+		log.Fatalf("Stats request failed: %s", resp.Status)
+	}
 
 	var data SummaryResponse
 	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		logEvent("error", "archiver_stats_decode_failed", map[string]interface{}{
+			"error": err.Error(),
+		})
 		log.Fatalf("Failed to decode JSON: %v", err)
 	}
 
-	// 2. Prepare Data
-	today := time.Now().Format("2006-01-02")
+	// 2. Prepare Data (UTC)
+	today := time.Now().UTC().Format("2006-01-02")
 
 	// Helper to format map as readable string
 	formatMap := func(m map[string]int64) string {
@@ -116,17 +164,26 @@ func main() {
 	ctx := context.Background()
 	b, err := os.ReadFile(*credsPath)
 	if err != nil {
+		logEvent("error", "archiver_creds_read_failed", map[string]interface{}{
+			"error": err.Error(),
+		})
 		log.Fatalf("Unable to read client secret file: %v", err)
 	}
 
 	config, err := google.JWTConfigFromJSON(b, sheets.SpreadsheetsScope)
 	if err != nil {
+		logEvent("error", "archiver_creds_parse_failed", map[string]interface{}{
+			"error": err.Error(),
+		})
 		log.Fatalf("Unable to parse client secret file to config: %v", err)
 	}
 	client := config.Client(ctx)
 
 	srv, err := sheets.NewService(ctx, option.WithHTTPClient(client))
 	if err != nil {
+		logEvent("error", "archiver_sheets_client_failed", map[string]interface{}{
+			"error": err.Error(),
+		})
 		log.Fatalf("Unable to retrieve Sheets client: %v", err)
 	}
 
@@ -135,11 +192,17 @@ func main() {
 		Values: [][]interface{}{row},
 	}
 
-	_, err = srv.Spreadsheets.Values.Append(*sheetID, rangeData, rb).ValueInputOption("USER_ENTERED").Do()
+	_, err = srv.Spreadsheets.Values.Append(*sheetID, rangeData, rb).ValueInputOption("RAW").Do()
 	if err != nil {
+		logEvent("error", "archiver_sheet_append_failed", map[string]interface{}{
+			"error": err.Error(),
+		})
 		log.Fatalf("Unable to append data to sheet: %v", err)
 	}
 
+	logEvent("info", "archiver_success", map[string]interface{}{
+		"date": today,
+	})
 	log.Printf("Successfully archived FULL stats for %s", today)
 
 	// 5. Notify Uptime Kuma (Push Monitor)

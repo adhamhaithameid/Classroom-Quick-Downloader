@@ -8,7 +8,8 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "audit": "pnpm audit",
-    "validate": "pnpm run lint && pnpm run typecheck && pnpm run audit"
+    "validate": "pnpm run lint && pnpm run typecheck && pnpm run audit",
+    "test": "vitest run"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260203.0",
@@ -19,6 +20,7 @@
     "globals": "^17.3.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.54.0",
-    "wrangler": "^4.62.0"
+    "wrangler": "^4.62.0",
+    "vitest": "^4.0.18"
   }
 }

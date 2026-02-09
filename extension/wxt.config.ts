@@ -24,6 +24,7 @@ export default defineConfig({
       'downloads',
       'tabs',
       'storage',
+      'unlimitedStorage',
       'alarms'
     ],
     host_permissions: [

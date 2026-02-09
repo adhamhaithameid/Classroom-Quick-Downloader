@@ -12,6 +12,8 @@ extension/.wxt/
 **/.vite/
 .wrangler/
 .dev.vars
+AI/
+ai/
 oracle-backend/data/
 oracle-backend/docker_data/
 *.db
