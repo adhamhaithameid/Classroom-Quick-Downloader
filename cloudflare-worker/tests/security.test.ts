@@ -7,18 +7,42 @@ import {
   isLocalEnvironment,
 } from "../src/index";
 import { DownloadsDurable } from "../src/downloads_do";
+import type { Env } from "../src/types";
+import type { DurableObjectState } from "@cloudflare/workers-types";
 
 const STORAGE_KEY = "analytics_state";
 
+type StoredState = {
+  loginAttempts?: Record<string, unknown>;
+  buffer?: Array<Record<string, unknown>>;
+  ipCountsSize?: number;
+  uniqueRequestsToday?: number;
+  pendingBatches?: Array<unknown>;
+};
+
+type TestEvent = {
+  id: string;
+  status: "success" | "fail" | "cancelled";
+  file_type: string;
+  browser: string;
+  os: string;
+  ext_version: string;
+  duration_ms: number;
+  bypass_used: boolean;
+  language: string;
+  timestamp: number;
+  [key: string]: unknown;
+};
+
 class MockStorage {
-  private map = new Map<string, any>();
+  private map = new Map<string, unknown>();
   private alarm: number | null = null;
 
   async get<T>(key: string): Promise<T | undefined> {
     return this.map.get(key);
   }
 
-  async put(key: string, value: any): Promise<void> {
+  async put(key: string, value: unknown): Promise<void> {
     this.map.set(key, value);
   }
 
@@ -45,16 +69,16 @@ class MockState {
 
 function makeDO() {
   const state = new MockState();
-  const env = {
+  const env: Env = {
     ORACLE_ENDPOINT: "http://example.com",
     DO_SHARED_SECRET: "secret",
     MAX_BATCH_EVENTS: "10000",
-  };
-  const obj = new DownloadsDurable(state as any, env as any);
+  } as Env;
+  const obj = new DownloadsDurable(state as unknown as DurableObjectState, env);
   return { obj, state };
 }
 
-function makeEvent(overrides: Partial<any> = {}) {
+function makeEvent(overrides: Partial<TestEvent> = {}): TestEvent {
   const now = Date.now();
   return {
     id: `ext-${now.toString(36)}-abcdef123456`,
@@ -71,7 +95,7 @@ function makeEvent(overrides: Partial<any> = {}) {
   };
 }
 
-async function callDO(obj: DownloadsDurable, path: string, body: any, headers?: Record<string, string>) {
+async function callDO(obj: DownloadsDurable, path: string, body: unknown, headers?: Record<string, string>) {
   return obj.fetch(new Request(`http://do${path}`, {
     method: "POST",
     headers: {
@@ -83,7 +107,7 @@ async function callDO(obj: DownloadsDurable, path: string, body: any, headers?: 
   }));
 }
 
-async function callDOWithoutAdmin(obj: DownloadsDurable, path: string, body: any, headers?: Record<string, string>) {
+async function callDOWithoutAdmin(obj: DownloadsDurable, path: string, body: unknown, headers?: Record<string, string>) {
   return obj.fetch(new Request(`http://do${path}`, {
     method: "POST",
     headers: {
@@ -142,7 +166,7 @@ describe("Durable Object security behaviors", () => {
       checkOnly: true,
     });
     expect(res.status).toBe(200);
-    const stored = await state.storage.get<any>(STORAGE_KEY);
+    const stored = await state.storage.get<StoredState>(STORAGE_KEY);
     expect(stored?.loginAttempts?.["1.1.1.1"]).toBeUndefined();
   });
 
@@ -182,7 +206,7 @@ describe("Durable Object security behaviors", () => {
       events: [makeEvent({ ip_address: "5.5.5.5" })],
     }, { "X-Client-IP": "5.5.5.5" });
     expect(res.status).toBe(202);
-    const stored = await state.storage.get<any>(STORAGE_KEY);
+    const stored = await state.storage.get<StoredState>(STORAGE_KEY);
     expect(stored.buffer?.[0]?.ip_address).toBeUndefined();
     expect(stored.ipCountsSize).toBe(0);
     expect(stored.uniqueRequestsToday).toBe(0);
@@ -222,7 +246,7 @@ describe("Durable Object security behaviors", () => {
     expect(first.status).toBe(202);
     const second = await callDO(obj, "/track", { events: [makeEvent()] });
     expect(second.status).toBe(202);
-    const stored = await state.storage.get<any>(STORAGE_KEY);
+    const stored = await state.storage.get<StoredState>(STORAGE_KEY);
     expect(stored.buffer?.length ?? 0).toBeLessThanOrEqual(1);
     expect(stored.pendingBatches?.length ?? 0).toBeGreaterThan(0);
   });
@@ -238,7 +262,7 @@ describe("Durable Object security behaviors", () => {
     await callDO(obj, "/track", { events: [makeEvent()] });
     const expectedBatchId = "do-seq0-1ev";
 
-    const fetchSpy = vi.fn(async (_input: any, _init: any) => {
+    const fetchSpy = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => {
       const parsed = JSON.parse(String(_init?.body || '{}'));
       expect(parsed.summary).toBeTruthy();
       expect(parsed.timeBuckets).toBeTruthy();
@@ -253,7 +277,7 @@ describe("Durable Object security behaviors", () => {
     const res = await callDO(obj, "/admin/force-flush", {});
     expect(res.status).toBe(200);
 
-    const stored = await state.storage.get<any>(STORAGE_KEY);
+    const stored = await state.storage.get<StoredState>(STORAGE_KEY);
     expect(stored.buffer?.length ?? 0).toBe(0);
     vi.unstubAllGlobals();
   });
@@ -262,7 +286,7 @@ describe("Durable Object security behaviors", () => {
     const { obj, state } = makeDO();
     await callDO(obj, "/track", { events: [makeEvent()] });
 
-    const fetchSpy = vi.fn(async (_input: any, _init: any) => {
+    const fetchSpy = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => {
       return new Response(
         JSON.stringify({ ok: true, batchId: "wrong-batch", ingestedAt: Date.now() }),
         { status: 200, headers: { "Content-Type": "application/json" } },
@@ -273,7 +297,7 @@ describe("Durable Object security behaviors", () => {
     const res = await callDO(obj, "/admin/force-flush", {});
     expect(res.status).toBe(500);
 
-    const stored = await state.storage.get<any>(STORAGE_KEY);
+    const stored = await state.storage.get<StoredState>(STORAGE_KEY);
     expect(stored.buffer?.length ?? 0).toBe(1);
     vi.unstubAllGlobals();
   });

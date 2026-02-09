@@ -1700,7 +1700,7 @@ export class DownloadsDurable {
     }
 
     const target = Math.floor(maxBuffer * COMPACT_TARGET_UTIL);
-    let toCompact = this.d.buffer.length - target;
+    const toCompact = this.d.buffer.length - target;
     if (toCompact <= 0) return;
 
     const sliceCount = Math.min(toCompact, COMPACT_MAX_BATCH);

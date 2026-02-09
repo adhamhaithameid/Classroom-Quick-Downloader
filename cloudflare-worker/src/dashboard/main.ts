@@ -11,12 +11,6 @@ function escapeHtml(unsafe: string): string {
     .replace(/'/g, "&#039;");
 }
 
-function _isValidIp(ip: string): boolean {
-  // Simple IPv4 validation (unused but kept for potential server-side use)
-  const ipv4Regex = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
-  return ipv4Regex.test(ip);
-}
-
 function formatTs(ts: number | null): string {
   if (!ts) return "—";
   const d = new Date(ts);
