@@ -548,6 +548,7 @@ export function renderDashboard(stats: StatsResponse): string {
   const cfgCancelHold = remoteConfig.cancelHoldDelayMs ?? 1000;
   const cfgAllowLegacy = remoteConfig.allowLegacyEvents ?? true;
   const cfgRemoteReason = remoteConfig.remoteEnabledReason ?? "ok";
+  const pipelineHealthUrl = `${workerUrl}/pipeline-health`;
 
   const renderTableRows = (data: Record<string, number>) => {
     const keys = Object.keys(data).sort((a, b) => data[b] - data[a]);
@@ -1453,6 +1454,67 @@ export function renderDashboard(stats: StatsResponse): string {
       color: inherit;
       margin-top: 2px;
       line-height: 1.4;
+    }
+
+    .health-banner {
+      margin-top: var(--space-4);
+      margin-bottom: var(--space-4);
+      padding: 14px 16px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: var(--bg-surface);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .health-banner.ok {
+      border-color: rgba(34, 197, 94, 0.45);
+      background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(34, 197, 94, 0.04));
+    }
+
+    .health-banner.warn {
+      border-color: rgba(234, 179, 8, 0.55);
+      background: linear-gradient(135deg, rgba(234, 179, 8, 0.12), rgba(234, 179, 8, 0.04));
+    }
+
+    .health-banner.critical {
+      border-color: rgba(239, 68, 68, 0.55);
+      background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(239, 68, 68, 0.05));
+    }
+
+    .health-status {
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      font-size: 0.72rem;
+    }
+
+    .health-reasons {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .health-metrics {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 8px;
+      margin-top: 6px;
+    }
+
+    .health-metric {
+      background: rgba(255,255,255,0.03);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      padding: 8px 10px;
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+    }
+
+    .health-metric strong {
+      display: block;
+      color: var(--text-primary);
+      font-size: 0.9rem;
     }
     
     /* Grid Layouts */
@@ -2914,6 +2976,34 @@ export function renderDashboard(stats: StatsResponse): string {
           No events yet – install the extension and trigger a download to see analytics here.
         </div>
       </section>
+      <section class="card" id="pipeline-health">
+        <h2>Pipeline Health</h2>
+        <div class="section-subtitle" style="margin-bottom: 14px; color: var(--text-muted); font-size: 0.85rem;">
+          Derived from <code>${pipelineHealthUrl}</code>. Tracks backlog, failures, and flush staleness.
+        </div>
+        <div class="health-banner ok" id="pipeline-health-banner">
+          <div class="health-status" id="pipeline-health-status">Pipeline Health: OK</div>
+          <div class="health-reasons" id="pipeline-health-reasons">No issues detected.</div>
+          <div class="health-metrics" id="pipeline-health-metrics">
+            <div class="health-metric">
+              <span>Pending Batches</span>
+              <strong id="pipeline-health-pending">0</strong>
+            </div>
+            <div class="health-metric">
+              <span>Oldest Pending</span>
+              <strong id="pipeline-health-oldest">—</strong>
+            </div>
+            <div class="health-metric">
+              <span>Buffer Util</span>
+              <strong id="pipeline-health-buffer">—</strong>
+            </div>
+            <div class="health-metric">
+              <span>Failures</span>
+              <strong id="pipeline-health-failures">0</strong>
+            </div>
+          </div>
+        </div>
+      </section>
       <section class="card" id="breakdown">
         <div class="section-title-row">
           <h2>Breakdown by Dimensions</h2>
@@ -4121,6 +4211,10 @@ export function renderDashboard(stats: StatsResponse): string {
           const data = await res.json();
           if (!data.ok) throw new Error("Stats fetch failed");
           updateUI(data);
+          fetch("/pipeline-health")
+            .then((r) => r.json())
+            .then((h) => updatePipelineHealth(h))
+            .catch(() => {});
           btnReload.innerHTML =
             '<span class="btn-bullet">•</span> Reload stats';
         } catch (e) {
@@ -4297,6 +4391,48 @@ export function renderDashboard(stats: StatsResponse): string {
         updateBreakdowns(stats.counters);
         updateLastRefreshLabel();
         updateRemoteConfigForm(stats.remoteConfig || {}, stats.quota || {});
+      }
+
+      function formatDuration(ms) {
+        if (ms == null) return "—";
+        if (!Number.isFinite(ms) || ms < 0) return "—";
+        const sec = Math.floor(ms / 1000);
+        const min = Math.floor(sec / 60);
+        const hr = Math.floor(min / 60);
+        const day = Math.floor(hr / 24);
+        if (day > 0) return day + "d";
+        if (hr > 0) return hr + "h";
+        if (min > 0) return min + "m";
+        return sec + "s";
+      }
+
+      function updatePipelineHealth(health) {
+        const banner = document.getElementById("pipeline-health-banner");
+        const statusEl = document.getElementById("pipeline-health-status");
+        const reasonsEl = document.getElementById("pipeline-health-reasons");
+        const pendingEl = document.getElementById("pipeline-health-pending");
+        const oldestEl = document.getElementById("pipeline-health-oldest");
+        const bufferEl = document.getElementById("pipeline-health-buffer");
+        const failuresEl = document.getElementById("pipeline-health-failures");
+
+        if (!banner || !statusEl || !reasonsEl) return;
+        const status = health?.status || "unknown";
+        banner.classList.remove("ok", "warn", "critical");
+        if (status === "critical") banner.classList.add("critical");
+        else if (status === "warn") banner.classList.add("warn");
+        else banner.classList.add("ok");
+
+        statusEl.textContent = "Pipeline Health: " + String(status).toUpperCase();
+        const reasons = Array.isArray(health?.reasons) ? health.reasons : [];
+        reasonsEl.textContent = reasons.length ? reasons.join(", ") : "No issues detected.";
+
+        if (pendingEl) pendingEl.textContent = String(health?.pendingBatches ?? "—");
+        if (oldestEl) oldestEl.textContent = formatDuration(health?.oldestPendingAgeMs ?? null);
+        if (bufferEl) {
+          const util = health?.bufferUtilization;
+          bufferEl.textContent = Number.isFinite(util) ? Math.round(util * 100) + "%" : "—";
+        }
+        if (failuresEl) failuresEl.textContent = String(health?.consecutiveFailures ?? "—");
       }
 
       if (btnReload) {
