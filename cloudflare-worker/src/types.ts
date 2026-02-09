@@ -36,6 +36,11 @@ export interface StoredEvent {
    * Optional tag: where this came from (download_all, single, etc.).
    */
   source?: string;
+
+  /**
+   * Internal monotonic sequence assigned by the DO for commit tracking.
+   */
+  seq?: number;
 }
 
 /**
@@ -86,6 +91,11 @@ export interface QuotaDescriptor {
    * Whether remote analytics should be considered enabled.
    */
   remoteEnabled: boolean;
+
+  /**
+   * Reason remote analytics is enabled/disabled.
+   */
+  remoteEnabledReason?: string;
 
   /**
    * Suggested batch size for extensions (events per POST).
@@ -141,6 +151,11 @@ export interface StatsResponse {
     maxBufferSize: number;
     flushMode: string;
     timeFlushMinutes: { low: number; mid: number; high: number };
+    dailyFlushWindowStartUtc?: number;
+    dailyFlushWindowMinutes?: number;
+    configVersion?: number;
+    cancelHoldDelayMs?: number;
+    remoteEnabledReason?: string;
     hardRemoteOff: boolean;
   };
   
@@ -163,6 +178,7 @@ export interface StatsResponse {
  */
 export interface ConfigResponse {
   ok: boolean;
+  configVersion?: number;
   batchSize: number;
   maxDailyRequests: number;
   maxRetry: number;
@@ -173,8 +189,13 @@ export interface ConfigResponse {
     mid: number;
     high: number;
   };
+  dailyFlushWindowStartUtc?: number;
+  dailyFlushWindowMinutes?: number;
   remoteEnabled: boolean;
+  remoteEnabledReason?: string;
   cancelHoldDelayMs?: number;
+  serverTimeUtc?: number;
+  committedSeq?: number;
   quota: QuotaDescriptor;
   // Changelog config
   changelogConfig?: ChangelogConfig;
@@ -187,6 +208,7 @@ export interface ConfigResponse {
 export interface Env {
   DOWNLOADS_DO: DurableObjectNamespace;
   DO_SHARED_SECRET: string;
+  DASHBOARD_PASSWORD?: string;
   DANGER_PASSWORD: string;
   ORACLE_ENDPOINT: string;
   MAX_BATCH_EVENTS: string;

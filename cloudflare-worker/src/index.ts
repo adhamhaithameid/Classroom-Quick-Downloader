@@ -15,6 +15,10 @@ interface SessionPayload {
   iat: number; // Issued at timestamp
 }
 
+function getDashboardSecret(env: WorkerEnv): string | null {
+  return env.DASHBOARD_PASSWORD || env.DO_SHARED_SECRET || null;
+}
+
 export async function createSessionToken(secret: string, ip: string): Promise<string> {
   const payload: SessionPayload = {
     ip,
@@ -232,11 +236,12 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
   const method = request.method.toUpperCase();
   const clientIp = request.headers.get("CF-Connecting-IP") || "unknown";
   const stub = getDownloadsStub(env);
+  const dashboardSecret = getDashboardSecret(env);
 
   // GET: Show login page OR redirect to dashboard if valid session
   if (method === "GET") {
     const sessionToken = getSessionCookie(request);
-    if (sessionToken && await verifySessionToken(sessionToken, env.DO_SHARED_SECRET, clientIp)) {
+    if (sessionToken && dashboardSecret && await verifySessionToken(sessionToken, dashboardSecret, clientIp)) {
       // Valid session - redirect to dashboard
       return Response.redirect(new URL("/dashboard", request.url).toString(), 302);
     }
@@ -256,6 +261,12 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
       return new Response("Unsupported content type", { status: 400 });
     }
 
+    if (!dashboardSecret) {
+      return new Response(
+        renderLoginPage("Server misconfigured: DASHBOARD_PASSWORD missing."),
+        { status: 500, headers: { "content-type": "text/html; charset=utf-8" } },
+      );
+    }
     if (!env.DO_SHARED_SECRET) {
       return new Response(
         renderLoginPage("Server misconfigured: DO_SHARED_SECRET missing."),
@@ -304,7 +315,7 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
     const password = (form.get("password") || "").toString();
 
     // Validate password
-    if (password !== env.DO_SHARED_SECRET) {
+    if (password !== dashboardSecret) {
       const rateLimitRes = await stub.fetch(rateLimitReq);
       const rateLimitData = await rateLimitRes.json() as {
         allowed: boolean;
@@ -340,7 +351,7 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
     await stub.fetch(successReq);
 
     // Create session token and set cookie
-    const sessionToken = await createSessionToken(env.DO_SHARED_SECRET, clientIp);
+    const sessionToken = await createSessionToken(dashboardSecret, clientIp);
 
     // Redirect to dashboard with session cookie
     const loginUrl = new URL(request.url);
@@ -363,8 +374,9 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
 async function handleDashboard(request: Request, env: WorkerEnv): Promise<Response> {
   const clientIp = request.headers.get("CF-Connecting-IP") || "unknown";
   const sessionToken = getSessionCookie(request);
+  const dashboardSecret = getDashboardSecret(env);
 
-  if (!sessionToken || !await verifySessionToken(sessionToken, env.DO_SHARED_SECRET, clientIp)) {
+  if (!dashboardSecret || !sessionToken || !await verifySessionToken(sessionToken, dashboardSecret, clientIp)) {
     // Invalid or missing session - redirect to login
     const logoutUrl = new URL(request.url);
     return new Response(null, {
@@ -516,13 +528,14 @@ async function handleProtectedStats(request: Request, env: WorkerEnv): Promise<R
   const clientIp = request.headers.get("CF-Connecting-IP") || "unknown";
   const adminSecret = request.headers.get("X-Admin-Secret");
   const sessionToken = getSessionCookie(request);
+  const dashboardSecret = getDashboardSecret(env);
 
   // Check X-Admin-Secret header first (for API access)
   const hasValidSecret = adminSecret === env.DO_SHARED_SECRET;
   
   // Check session token (for browser/dashboard access)
-  const hasValidSession = sessionToken && 
-    await verifySessionToken(sessionToken, env.DO_SHARED_SECRET, clientIp);
+  const hasValidSession = !!dashboardSecret && sessionToken &&
+    await verifySessionToken(sessionToken, dashboardSecret, clientIp);
 
   if (!hasValidSecret && !hasValidSession) {
     return withCors(request, new Response(
@@ -545,13 +558,14 @@ async function handleProtectedAdminEndpoint(request: Request, env: WorkerEnv): P
   const clientIp = request.headers.get("CF-Connecting-IP") || "unknown";
   const adminSecret = request.headers.get("X-Admin-Secret");
   const sessionToken = getSessionCookie(request);
+  const dashboardSecret = getDashboardSecret(env);
 
   // Check X-Admin-Secret header first (for direct API access)
   const hasValidSecret = adminSecret === env.DO_SHARED_SECRET;
   
   // Check session token (for browser/dashboard access)
-  const hasValidSession = sessionToken && 
-    await verifySessionToken(sessionToken, env.DO_SHARED_SECRET, clientIp);
+  const hasValidSession = !!dashboardSecret && sessionToken &&
+    await verifySessionToken(sessionToken, dashboardSecret, clientIp);
 
   if (!hasValidSecret && !hasValidSession) {
     return withCors(request, new Response(
