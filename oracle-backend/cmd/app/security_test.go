@@ -22,6 +22,12 @@ func resetSessionStore() {
 	sessionStore.Unlock()
 }
 
+func resetLoginRateStore() {
+	loginRateStore.Lock()
+	loginRateStore.attempts = make(map[string]*loginAttempt)
+	loginRateStore.Unlock()
+}
+
 func TestSpaHandler_AllowsStaticFilesAndBlocksTraversal(t *testing.T) {
 	dir := t.TempDir()
 	indexPath := filepath.Join(dir, "index.html")
@@ -52,7 +58,7 @@ func TestSpaHandler_AllowsStaticFilesAndBlocksTraversal(t *testing.T) {
 
 func TestAuthMiddleware_EnforcesSessionWhenEnabled(t *testing.T) {
 	resetSessionStore()
-	protected := requireAuth("secret", "")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	protected := requireAuth("secret", "", false)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -66,7 +72,7 @@ func TestAuthMiddleware_EnforcesSessionWhenEnabled(t *testing.T) {
 
 func TestAuthMiddleware_AllowsArchiverSecret(t *testing.T) {
 	resetSessionStore()
-	protected := requireAuth("secret", "arch-secret")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	protected := requireAuth("secret", "arch-secret", false)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -81,6 +87,7 @@ func TestAuthMiddleware_AllowsArchiverSecret(t *testing.T) {
 
 func TestLoginHandler_SetsSecureCookieOnSuccess(t *testing.T) {
 	resetSessionStore()
+	resetLoginRateStore()
 	h := loginHandler("secret", false)
 
 	body := bytes.NewBufferString(`{"password":"secret"}`)
@@ -113,6 +120,7 @@ func TestLoginHandler_SetsSecureCookieOnSuccess(t *testing.T) {
 
 func TestLoginHandler_AllowsInsecureCookieOnHttpWhenAllowed(t *testing.T) {
 	resetSessionStore()
+	resetLoginRateStore()
 	h := loginHandler("secret", true)
 
 	body := bytes.NewBufferString(`{"password":"secret"}`)
@@ -142,6 +150,7 @@ func TestLoginHandler_AllowsInsecureCookieOnHttpWhenAllowed(t *testing.T) {
 
 func TestAuthCheckHandler_ReflectsSessionState(t *testing.T) {
 	resetSessionStore()
+	resetLoginRateStore()
 	login := loginHandler("secret", false)
 	body := bytes.NewBufferString(`{"password":"secret"}`)
 	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", body)
@@ -198,6 +207,31 @@ func TestIngestBatchHandler_RejectsInvalidSecret(t *testing.T) {
 	}
 }
 
+func TestLoginHandler_RateLimitsAfterFailures(t *testing.T) {
+	resetSessionStore()
+	resetLoginRateStore()
+	h := loginHandler("secret", false)
+
+	for i := 0; i < loginMaxAttempts; i++ {
+		body := bytes.NewBufferString(`{"password":"wrong"}`)
+		req := httptest.NewRequest(http.MethodPost, "/api/auth/login", body)
+		req.RemoteAddr = "1.2.3.4:1234"
+		req.Header.Set("Content-Type", "application/json")
+		rr := httptest.NewRecorder()
+		h.ServeHTTP(rr, req)
+	}
+
+	body := bytes.NewBufferString(`{"password":"wrong"}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", body)
+	req.RemoteAddr = "1.2.3.4:1234"
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+	if rr.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected 429 after too many attempts, got %d", rr.Code)
+	}
+}
+
 func TestIngestBatchHandler_AcceptsValidBatch(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "test.db")
 	sqlDB, err := db.Init(dbPath)
@@ -246,5 +280,18 @@ func TestIngestBatchHandler_AcceptsValidBatch(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(rr.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("invalid json response: %v", err)
+	}
+	if ok, _ := payload["ok"].(bool); !ok {
+		t.Fatalf("expected ok=true, got %v", payload["ok"])
+	}
+	if batchID, _ := payload["batchId"].(string); batchID != "batch-1" {
+		t.Fatalf("expected batchId=batch-1, got %v", payload["batchId"])
+	}
+	if ingestedAt, ok := payload["ingestedAt"].(float64); !ok || ingestedAt <= 0 {
+		t.Fatalf("expected ingestedAt > 0, got %v", payload["ingestedAt"])
 	}
 }
