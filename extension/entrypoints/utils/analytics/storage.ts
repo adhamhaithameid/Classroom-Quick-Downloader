@@ -5,7 +5,7 @@
  */
 
 import type { AnalyticsEvent, LocalStats, AnalyticsConfig, AnalyticsMeta } from './types';
-import { STORAGE_KEYS, DEFAULT_CONFIG, DEFAULT_META } from './constants';
+import { STORAGE_KEYS, DEFAULT_CONFIG, DEFAULT_META, CONFIG_VERSION } from './constants';
 
 // --- Core Storage Helpers ---
 
@@ -13,6 +13,11 @@ export async function storageGet(key: string): Promise<any> {
   return new Promise((resolve) => {
     try {
       chrome.storage.local.get([key], (result) => {
+        if (chrome.runtime?.lastError) {
+          console.warn('[CQD Analytics] storageGet failed:', chrome.runtime.lastError.message);
+          resolve(undefined);
+          return;
+        }
         resolve(result?.[key]);
       });
     } catch {
@@ -21,14 +26,76 @@ export async function storageGet(key: string): Promise<any> {
   });
 }
 
-export async function storageSet(items: Record<string, any>): Promise<void> {
+export async function storageSet(items: Record<string, any>): Promise<boolean> {
   return new Promise((resolve) => {
     try {
-      chrome.storage.local.set(items, () => resolve());
+      chrome.storage.local.set(items, () => {
+        if (chrome.runtime?.lastError) {
+          console.warn('[CQD Analytics] storageSet failed:', chrome.runtime.lastError.message);
+          resolve(false);
+          return;
+        }
+        resolve(true);
+      });
     } catch {
-      resolve();
+      resolve(false);
     }
   });
+}
+
+// --- Config Migration / Normalization ---
+
+function clampInt(value: unknown, min: number, max: number, fallback: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
+  return Math.min(max, Math.max(min, Math.floor(value)));
+}
+
+function normalizeConfig(cfg: AnalyticsConfig): AnalyticsConfig {
+  return {
+    ...cfg,
+    configVersion: CONFIG_VERSION,
+    batchSize: clampInt(cfg.batchSize, 1, 1000, DEFAULT_CONFIG.batchSize),
+    maxDailyRequests: clampInt(cfg.maxDailyRequests, 1, 1000, DEFAULT_CONFIG.maxDailyRequests),
+    maxRetry: clampInt(cfg.maxRetry, 0, 20, DEFAULT_CONFIG.maxRetry),
+    flushMode: cfg.flushMode === 'time_based' ? 'time_based' : 'next_day',
+    lowUsageFlushMinutes: clampInt(cfg.lowUsageFlushMinutes, 1, 10080, DEFAULT_CONFIG.lowUsageFlushMinutes),
+    midUsageFlushMinutes: clampInt(cfg.midUsageFlushMinutes, 1, 10080, DEFAULT_CONFIG.midUsageFlushMinutes),
+    highUsageFlushMinutes: clampInt(cfg.highUsageFlushMinutes, 1, 10080, DEFAULT_CONFIG.highUsageFlushMinutes),
+    remoteEnabled: typeof cfg.remoteEnabled === 'boolean' ? cfg.remoteEnabled : DEFAULT_CONFIG.remoteEnabled,
+    cancelHoldDelayMs: clampInt(cfg.cancelHoldDelayMs, 0, 10000, DEFAULT_CONFIG.cancelHoldDelayMs),
+    dailyFlushWindowStartUtc: clampInt(
+      cfg.dailyFlushWindowStartUtc,
+      0,
+      23,
+      DEFAULT_CONFIG.dailyFlushWindowStartUtc
+    ),
+    dailyFlushWindowMinutes: clampInt(
+      cfg.dailyFlushWindowMinutes,
+      1,
+      24 * 60,
+      DEFAULT_CONFIG.dailyFlushWindowMinutes
+    ),
+    maxEventsPerRequest: clampInt(
+      cfg.maxEventsPerRequest ?? DEFAULT_CONFIG.maxEventsPerRequest,
+      1,
+      50_000,
+      DEFAULT_CONFIG.maxEventsPerRequest ?? 5000
+    ),
+  };
+}
+
+function migrateConfig(raw: any): AnalyticsConfig {
+  const version = typeof raw?.configVersion === 'number' ? raw.configVersion : 0;
+  const merged = {
+    ...DEFAULT_CONFIG,
+    ...(raw && typeof raw === 'object' ? raw : {}),
+  } as AnalyticsConfig;
+
+  const normalized = normalizeConfig(merged);
+  if (version < CONFIG_VERSION) {
+    return { ...normalized, configVersion: CONFIG_VERSION };
+  }
+  return normalized;
 }
 
 // --- Queue Helpers ---
@@ -54,13 +121,23 @@ function computeChecksum(data: string): string {
   return Math.abs(hash).toString(36);
 }
 
+let inMemoryQueue: AnalyticsEvent[] | null = null;
+let inMemoryChecksum: string | null = null;
+
 async function saveQueueWithIntegrity(queue: AnalyticsEvent[]): Promise<void> {
   const data = JSON.stringify(queue);
   const checksum = computeChecksum(data);
-  await storageSet({
+  const ok = await storageSet({
     [STORAGE_KEYS.QUEUE]: queue,
     [STORAGE_KEYS.INTEGRITY]: checksum,
   });
+  if (!ok) {
+    inMemoryQueue = queue.slice();
+    inMemoryChecksum = checksum;
+  } else {
+    inMemoryQueue = null;
+    inMemoryChecksum = null;
+  }
 }
 
 async function loadQueueWithIntegrity(): Promise<{ queue: AnalyticsEvent[]; valid: boolean }> {
@@ -68,6 +145,9 @@ async function loadQueueWithIntegrity(): Promise<{ queue: AnalyticsEvent[]; vali
   const storedChecksum = await storageGet(STORAGE_KEYS.INTEGRITY);
 
   if (!raw || !Array.isArray(raw)) {
+    if (inMemoryQueue) {
+      return { queue: inMemoryQueue.slice(), valid: inMemoryChecksum != null };
+    }
     return { queue: [], valid: true };
   }
 
@@ -76,9 +156,13 @@ async function loadQueueWithIntegrity(): Promise<{ queue: AnalyticsEvent[]; vali
 
   if (storedChecksum && storedChecksum !== computed) {
     console.warn('[CQD Analytics] Queue integrity check failed; keeping raw queue to avoid data loss');
+    inMemoryQueue = raw.slice();
+    inMemoryChecksum = computed;
     return { queue: raw, valid: false };
   }
 
+  inMemoryQueue = raw.slice();
+  inMemoryChecksum = computed;
   return { queue: raw, valid: true };
 }
 
@@ -87,11 +171,11 @@ async function loadQueueWithIntegrity(): Promise<{ queue: AnalyticsEvent[]; vali
 export async function loadConfig(): Promise<AnalyticsConfig> {
   const raw = await storageGet(STORAGE_KEYS.CONFIG);
   if (!raw) return { ...DEFAULT_CONFIG };
-  return { ...DEFAULT_CONFIG, ...raw };
+  return migrateConfig(raw);
 }
 
 export async function saveConfig(cfg: AnalyticsConfig): Promise<void> {
-  await storageSet({ [STORAGE_KEYS.CONFIG]: cfg });
+  await storageSet({ [STORAGE_KEYS.CONFIG]: normalizeConfig(cfg) });
 }
 
 export async function loadMeta(): Promise<AnalyticsMeta> {
