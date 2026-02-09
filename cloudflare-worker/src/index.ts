@@ -1,5 +1,6 @@
 // filepath: cloudflare-worker/src/index.ts
 import { renderDashboard, renderLoginPage } from "./dashboard";
+import { safeCompare } from "./utils";
 import type { Env as WorkerEnv, StatsResponse } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -315,7 +316,7 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
     const password = (form.get("password") || "").toString();
 
     // Validate password
-    if (password !== dashboardSecret) {
+    if (!await safeCompare(password, dashboardSecret)) {
       const rateLimitRes = await stub.fetch(rateLimitReq);
       const rateLimitData = await rateLimitRes.json() as {
         allowed: boolean;
@@ -479,7 +480,7 @@ async function handleVerifyDangerPassword(request: Request, env: WorkerEnv): Pro
   try {
     const { password } = await request.json() as { password: string };
     
-    if (!password || password !== env.DANGER_PASSWORD) {
+    if (!password || !await safeCompare(password, env.DANGER_PASSWORD)) {
       // Record failed attempt
       await stub.fetch(new Request("https://do/auth/login-attempt", {
         method: "POST",
@@ -530,7 +531,7 @@ async function handleProtectedStats(request: Request, env: WorkerEnv): Promise<R
   const dashboardSecret = getDashboardSecret(env);
 
   // Check X-Admin-Secret header first (for API access)
-  const hasValidSecret = adminSecret === env.DO_SHARED_SECRET;
+  const hasValidSecret = await safeCompare(adminSecret, env.DO_SHARED_SECRET);
   
   // Check session token (for browser/dashboard access)
   const hasValidSession = !!dashboardSecret && sessionToken &&
@@ -560,7 +561,7 @@ async function handleProtectedAdminEndpoint(request: Request, env: WorkerEnv): P
   const dashboardSecret = getDashboardSecret(env);
 
   // Check X-Admin-Secret header first (for direct API access)
-  const hasValidSecret = adminSecret === env.DO_SHARED_SECRET;
+  const hasValidSecret = await safeCompare(adminSecret, env.DO_SHARED_SECRET);
   
   // Check session token (for browser/dashboard access)
   const hasValidSession = !!dashboardSecret && sessionToken &&
