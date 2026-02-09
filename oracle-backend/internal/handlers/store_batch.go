@@ -16,8 +16,10 @@ import (
 )
 
 type ingestResponse struct {
-	OK      bool   `json:"ok"`
-	Message string `json:"message,omitempty"`
+	OK         bool   `json:"ok"`
+	Message    string `json:"message,omitempty"`
+	BatchID    string `json:"batchId,omitempty"`
+	IngestedAt int64  `json:"ingestedAt,omitempty"`
 }
 
 // IngestBatchHandler handles POST /ingest-batch (and /storeBatch alias).
@@ -81,8 +83,10 @@ func IngestBatchHandler(db *sql.DB, sharedSecret string) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(ingestResponse{
-			OK:      true,
-			Message: "ingested",
+			OK:         true,
+			Message:    "ingested",
+			BatchID:    batch.BatchID,
+			IngestedAt: time.Now().UnixMilli(),
 		})
 	}
 }

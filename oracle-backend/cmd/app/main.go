@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -30,6 +31,8 @@ func main() {
 	doSecret := os.Getenv("DO_SHARED_SECRET")
 	dashboardPassword := os.Getenv("DASHBOARD_PASSWORD")
 	archiverSecret := os.Getenv("ARCHIVER_SHARED_SECRET")
+	allowLoopbackBypass := os.Getenv("ALLOW_LOOPBACK_BYPASS") == "true"
+	allowEmptyDashboardPassword := os.Getenv("ALLOW_EMPTY_DASHBOARD_PASSWORD") == "true"
 	// HTTP mode note: if your Oracle deployment is HTTP-only, cookies are non-Secure.
 	// This keeps the dashboard usable but provides no transport confidentiality.
 	allowInsecureCookies := os.Getenv("ALLOW_INSECURE_COOKIES") == "true"
@@ -38,13 +41,19 @@ func main() {
 		log.Println("[WARN] DO_SHARED_SECRET is empty – /ingest-batch will reject requests")
 	}
 
-	if dashboardPassword == "" {
-		log.Println("[WARN] DASHBOARD_PASSWORD is empty – dashboard is PUBLIC (no auth)")
+	if dashboardPassword == "" && !allowEmptyDashboardPassword {
+		log.Fatal("[FATAL] DASHBOARD_PASSWORD is required for dashboard access")
+	}
+	if dashboardPassword == "" && allowEmptyDashboardPassword {
+		log.Println("[WARN] ALLOW_EMPTY_DASHBOARD_PASSWORD is true – dashboard is PUBLIC (dev only)")
 	} else {
 		log.Println("[INFO] Dashboard authentication enabled")
 	}
 	if dashboardPassword != "" && archiverSecret == "" {
 		log.Println("[WARN] ARCHIVER_SHARED_SECRET is empty – archiver will fail when auth is enabled")
+	}
+	if allowLoopbackBypass {
+		log.Println("[WARN] ALLOW_LOOPBACK_BYPASS is true – loopback requests can bypass auth (dev only)")
 	}
 	if !allowInsecureCookies {
 		log.Println("[INFO] ALLOW_INSECURE_COOKIES is false – HTTP dashboards will use non-secure cookies")
@@ -76,7 +85,7 @@ func main() {
 	mux.HandleFunc("/storeBatch", handlers.IngestBatchHandler(sqlDB, doSecret))
 
 	// Analytics API endpoints (protected by auth when DASHBOARD_PASSWORD is set).
-	authMiddleware := requireAuth(dashboardPassword, archiverSecret)
+	authMiddleware := requireAuth(dashboardPassword, archiverSecret, allowLoopbackBypass)
 	mux.Handle("/api/stats/summary", authMiddleware(handlers.SummaryHandler(sqlDB)))
 	mux.Handle("/api/stats/timeseries", authMiddleware(handlers.TimeSeriesHandler(sqlDB)))
 	mux.Handle("/api/stats/breakdown", authMiddleware(handlers.BreakdownHandler(sqlDB)))
@@ -264,6 +273,20 @@ var sessionStore = struct {
 const sessionDuration = 24 * time.Hour
 const sessionCookieName = "oracle_session"
 
+type loginAttempt struct {
+	attempts       int
+	firstAttemptAt time.Time
+	blockedUntil   time.Time
+}
+
+var loginRateStore = struct {
+	sync.Mutex
+	attempts map[string]*loginAttempt
+}{attempts: make(map[string]*loginAttempt)}
+
+const loginMaxAttempts = 5
+const loginLockout = 15 * time.Minute
+
 // generateToken creates a cryptographically secure session token.
 func generateToken() (string, error) {
 	b := make([]byte, 32)
@@ -281,7 +304,7 @@ func hashPassword(password string) string {
 
 // requireAuth returns middleware that checks for valid session cookie.
 // If dashboardPassword is empty, all requests are allowed (no auth).
-func requireAuth(dashboardPassword, archiverSecret string) func(http.Handler) http.Handler {
+func requireAuth(dashboardPassword, archiverSecret string, allowLoopbackBypass bool) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// No auth required if DASHBOARD_PASSWORD is not set
@@ -290,7 +313,7 @@ func requireAuth(dashboardPassword, archiverSecret string) func(http.Handler) ht
 				return
 			}
 
-			if archiverSecret == "" && isLoopbackAddr(r.RemoteAddr) && !hasForwardedIp(r) {
+			if allowLoopbackBypass && archiverSecret == "" && isLoopbackAddr(r.RemoteAddr) && !hasForwardedIp(r) {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -335,6 +358,86 @@ func isValidSession(token string) bool {
 	return true
 }
 
+func getClientIP(r *http.Request) string {
+	if r == nil {
+		return "unknown"
+	}
+	if ip := r.Header.Get("X-Real-IP"); ip != "" {
+		return ip
+	}
+	if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
+		parts := strings.Split(fwd, ",")
+		if len(parts) > 0 {
+			return strings.TrimSpace(parts[0])
+		}
+	}
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
+}
+
+func allowLoginAttempt(ip string) (bool, int, int) {
+	now := time.Now()
+	loginRateStore.Lock()
+	defer loginRateStore.Unlock()
+
+	rec := loginRateStore.attempts[ip]
+	if rec == nil {
+		return true, loginMaxAttempts, 0
+	}
+
+	if !rec.blockedUntil.IsZero() && now.Before(rec.blockedUntil) {
+		retryAfter := int(time.Until(rec.blockedUntil).Seconds())
+		if retryAfter < 1 {
+			retryAfter = 1
+		}
+		return false, 0, retryAfter
+	}
+
+	if now.Sub(rec.firstAttemptAt) > loginLockout {
+		delete(loginRateStore.attempts, ip)
+		return true, loginMaxAttempts, 0
+	}
+
+	remaining := loginMaxAttempts - rec.attempts
+	if remaining < 0 {
+		remaining = 0
+	}
+	return true, remaining, 0
+}
+
+func recordLoginFailure(ip string) (blocked bool, retryAfter int) {
+	now := time.Now()
+	loginRateStore.Lock()
+	defer loginRateStore.Unlock()
+
+	rec := loginRateStore.attempts[ip]
+	if rec == nil || now.Sub(rec.firstAttemptAt) > loginLockout {
+		rec = &loginAttempt{attempts: 0, firstAttemptAt: now}
+		loginRateStore.attempts[ip] = rec
+	}
+
+	rec.attempts++
+	if rec.attempts >= loginMaxAttempts {
+		rec.blockedUntil = now.Add(loginLockout)
+		retryAfter = int(time.Until(rec.blockedUntil).Seconds())
+		if retryAfter < 1 {
+			retryAfter = 1
+		}
+		return true, retryAfter
+	}
+
+	return false, 0
+}
+
+func clearLoginFailures(ip string) {
+	loginRateStore.Lock()
+	defer loginRateStore.Unlock()
+	delete(loginRateStore.attempts, ip)
+}
+
 // loginHandler handles POST /api/auth/login
 func loginHandler(dashboardPassword string, allowInsecureCookies bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -351,6 +454,14 @@ func loginHandler(dashboardPassword string, allowInsecureCookies bool) http.Hand
 			return
 		}
 
+		clientIP := getClientIP(r)
+		allowed, _, retryAfter := allowLoginAttempt(clientIP)
+		if !allowed {
+			w.Header().Set("Retry-After", strconv.Itoa(retryAfter))
+			http.Error(w, `{"error":"too many attempts"}`, http.StatusTooManyRequests)
+			return
+		}
+
 		var req struct {
 			Password string `json:"password"`
 		}
@@ -360,10 +471,20 @@ func loginHandler(dashboardPassword string, allowInsecureCookies bool) http.Hand
 		}
 
 		// Timing-safe comparison via SHA256
-		if hashPassword(req.Password) != hashPassword(dashboardPassword) {
+		hashedInput := hashPassword(req.Password)
+		hashedStored := hashPassword(dashboardPassword)
+		if subtle.ConstantTimeCompare([]byte(hashedInput), []byte(hashedStored)) != 1 {
+			blocked, retryAfter := recordLoginFailure(clientIP)
+			if blocked {
+				w.Header().Set("Retry-After", strconv.Itoa(retryAfter))
+				http.Error(w, `{"error":"too many attempts"}`, http.StatusTooManyRequests)
+				return
+			}
 			http.Error(w, `{"error":"invalid password"}`, http.StatusUnauthorized)
 			return
 		}
+
+		clearLoginFailures(clientIP)
 
 		// Create session
 		token, err := generateToken()

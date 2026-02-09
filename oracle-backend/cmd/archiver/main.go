@@ -89,7 +89,8 @@ func main() {
 		req.Header.Set("X-Archiver-Secret", *secret)
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	httpClient := &http.Client{Timeout: 15 * time.Second}
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		logEvent("error", "archiver_stats_fetch_failed", map[string]interface{}{
 			"error": err.Error(),
