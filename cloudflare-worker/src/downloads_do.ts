@@ -1,5 +1,6 @@
 // filepath: cloudflare-worker/src/downloads_do.ts
 
+import { aggregateEvents, getTopKey } from "./aggregation";
 import {
   Counters,
   RetryState,
@@ -1641,18 +1642,6 @@ export class DownloadsDurable {
   /**
    * Helper to find the key with the highest count in a record
    */
-  private getTopKey(record: Record<string, number>): string {
-    let topKey = "unknown";
-    let max = -1;
-    for (const [key, val] of Object.entries(record)) {
-      if (val > max) {
-        max = val;
-        topKey = key;
-      }
-    }
-    return topKey;
-  }
-
   private mergeCounts(target: Record<string, number>, source: Record<string, number>): Record<string, number> {
     for (const [key, val] of Object.entries(source)) {
       target[key] = (target[key] || 0) + (val || 0);
@@ -1723,10 +1712,10 @@ export class DownloadsDurable {
         topCountry: "unknown",
         topType: "unknown",
       };
-      mergedSummary.topBrowser = this.getTopKey(mergedSummary.browsers);
-      mergedSummary.topOs = this.getTopKey(mergedSummary.os);
-      mergedSummary.topCountry = this.getTopKey(mergedSummary.countries);
-      mergedSummary.topType = this.getTopKey(mergedSummary.types);
+      mergedSummary.topBrowser = getTopKey(mergedSummary.browsers);
+      mergedSummary.topOs = getTopKey(mergedSummary.os);
+      mergedSummary.topCountry = getTopKey(mergedSummary.countries);
+      mergedSummary.topType = getTopKey(mergedSummary.types);
 
       const mergedBatch: OracleBatch = {
         batchId: `do-merge-${Date.now()}`,
@@ -1783,81 +1772,7 @@ export class DownloadsDurable {
    */
   private buildOracleBatch(events: StoredEvent[], batchIdOverride?: string): OracleBatch {
     const now = Date.now();
-    
-    // 1. Group events by hour bucket (Keep logic for historical data)
-    const hourBuckets = new Map<string, StoredEvent[]>();
-    for (const ev of events) {
-      const ts = ev.timestamp || now;
-      const d = new Date(ts);
-      // Truncate to hour: "2025-12-11T03:00:00Z"
-      const hourKey = d.toISOString().slice(0, 13) + ":00:00Z";
-      if (!hourBuckets.has(hourKey)) {
-        hourBuckets.set(hourKey, []);
-      }
-      hourBuckets.get(hourKey)!.push(ev);
-    }
-
-    // Aggregate each hour bucket
-    const timeBuckets: TimeBucket[] = [];
-    for (const [hourStart, evs] of hourBuckets) {
-      const bucket = this.aggregateBucket(hourStart, evs);
-      timeBuckets.push(bucket);
-    }
-    timeBuckets.sort((a, b) => a.bucketStart.localeCompare(b.bucketStart));
-
-    // 2. Build Full Batch Summary (Aggregates EVERYTHING)
-    const summary: BatchSummary = {
-      totals: { totalEvents: 0, totalDownloads: 0, totalSuccess: 0, totalFail: 0 },
-      browsers: {},
-      os: {},
-      countries: {},
-      languages: {},
-      versions: {},
-      types: {},
-      errorReasons: {},
-      topBrowser: "unknown",
-      topOs: "unknown",
-      topCountry: "unknown",
-      topType: "unknown"
-    };
-
-    for (const ev of events) {
-      summary.totals.totalEvents++;
-      summary.totals.totalDownloads++; // Assuming every event is a download attempt
-      
-      if (ev.status === "success") summary.totals.totalSuccess++;
-      else summary.totals.totalFail++;
-
-      // Aggregations
-      const browser = (ev.browser || "unknown").toLowerCase();
-      summary.browsers[browser] = (summary.browsers[browser] || 0) + 1;
-
-      const os = (ev.os || "unknown").toLowerCase();
-      summary.os[os] = (summary.os[os] || 0) + 1;
-
-      const country = (ev.country || "unknown").toLowerCase();
-      summary.countries[country] = (summary.countries[country] || 0) + 1;
-
-      const lang = (ev.language || "unknown").toLowerCase();
-      summary.languages[lang] = (summary.languages[lang] || 0) + 1;
-
-      const ver = ev.ext_version || "0.0.0";
-      summary.versions[ver] = (summary.versions[ver] || 0) + 1;
-
-      const type = (ev.file_type || "unknown").toLowerCase();
-      summary.types[type] = (summary.types[type] || 0) + 1;
-
-      if (ev.status === "fail") {
-        const err = (ev.error_type || "unknown").toLowerCase();
-        summary.errorReasons[err] = (summary.errorReasons[err] || 0) + 1;
-      }
-    }
-
-    // Calculate "Top" stats
-    summary.topBrowser = this.getTopKey(summary.browsers);
-    summary.topOs = this.getTopKey(summary.os);
-    summary.topCountry = this.getTopKey(summary.countries);
-    summary.topType = this.getTopKey(summary.types);
+    const { summary, timeBuckets } = aggregateEvents(events, now);
 
     // 3. Build DO state snapshot
     const quota = computeQuotaDescriptor(this.d.reqCountToday, this.d.hardRemoteOff);
@@ -1899,76 +1814,6 @@ export class DownloadsDurable {
       // NOTE: Raw events intentionally excluded to reduce payload size
     };
 
-  }
-
-  private aggregateBucket(hourStart: string, events: StoredEvent[]): TimeBucket {
-    const totals: BucketTotals = {
-      totalEvents: events.length,
-      totalDownloads: 0,
-      totalSuccess: 0,
-      totalFail: 0,
-    };
-
-    const counters: BucketCounters = {
-      byStatus: {},
-      byType: {},
-      byBrowser: {},
-      byOs: {},
-      byExtVersion: {},
-      byLanguage: {},
-      byCountry: {},
-      byErrorType: {},
-    };
-
-    for (const ev of events) {
-      // totalDownloads = all download attempts (success + fail)
-      totals.totalDownloads++;
-      
-      if (ev.status === "success") {
-        totals.totalSuccess++;
-      } else {
-        totals.totalFail++;
-      }
-
-      // Aggregate counters
-      const status = ev.status || "unknown";
-      counters.byStatus[status] = (counters.byStatus[status] || 0) + 1;
-
-      const type = (ev.file_type || "unknown").toLowerCase();
-      counters.byType[type] = (counters.byType[type] || 0) + 1;
-
-      const browser = (ev.browser || "unknown").toLowerCase();
-      counters.byBrowser[browser] = (counters.byBrowser[browser] || 0) + 1;
-
-      const os = (ev.os || "unknown").toLowerCase();
-      counters.byOs[os] = (counters.byOs[os] || 0) + 1;
-
-      const extVer = ev.ext_version || "0.0.0";
-      counters.byExtVersion[extVer] = (counters.byExtVersion[extVer] || 0) + 1;
-
-      const lang = (ev.language || "unknown").toLowerCase();
-      counters.byLanguage[lang] = (counters.byLanguage[lang] || 0) + 1;
-
-      const country = (ev.country || "unknown").toLowerCase();
-      counters.byCountry[country] = (counters.byCountry[country] || 0) + 1;
-
-      if (ev.status === "fail") {
-        const errType = (ev.error_type || "unknown").toLowerCase();
-        counters.byErrorType[errType] = (counters.byErrorType[errType] || 0) + 1;
-      }
-    }
-
-    // Calculate bucket end (1 hour later)
-    const startDate = new Date(hourStart);
-    const endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
-    const bucketEnd = endDate.toISOString().slice(0, 19) + "Z";
-
-    return {
-      bucketStart: hourStart,
-      bucketEnd,
-      totals,
-      counters,
-    };
   }
 
   private async flushToOracle(
