@@ -546,6 +546,7 @@ export function renderDashboard(stats: StatsResponse): string {
   const cfgDailyStart = remoteConfig.dailyFlushWindowStartUtc ?? 1;
   const cfgDailyMinutes = remoteConfig.dailyFlushWindowMinutes ?? 120;
   const cfgCancelHold = remoteConfig.cancelHoldDelayMs ?? 1000;
+  const cfgAllowLegacy = remoteConfig.allowLegacyEvents ?? true;
   const cfgRemoteReason = remoteConfig.remoteEnabledReason ?? "ok";
 
   const renderTableRows = (data: Record<string, number>) => {
@@ -1418,6 +1419,40 @@ export function renderDashboard(stats: StatsResponse): string {
 
     .rc-status.err {
       color: var(--danger);
+    }
+
+    .rc-warning {
+      margin-top: var(--space-3);
+      margin-bottom: var(--space-3);
+      padding: 12px 14px;
+      border-radius: var(--radius);
+      border: 1px solid rgba(234, 179, 8, 0.55);
+      background: linear-gradient(135deg, rgba(234, 179, 8, 0.12), rgba(234, 179, 8, 0.06));
+      color: #fcd34d;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-4);
+      box-shadow: inset 0 0 0 1px rgba(234, 179, 8, 0.08);
+    }
+
+    .rc-warning.is-off {
+      border-color: var(--border);
+      background: var(--bg-surface);
+      color: var(--text-muted);
+    }
+
+    .rc-warning-title {
+      font-weight: 600;
+      font-size: 0.85rem;
+      letter-spacing: 0.02em;
+    }
+
+    .rc-warning-body {
+      font-size: 0.78rem;
+      color: inherit;
+      margin-top: 2px;
+      line-height: 1.4;
     }
     
     /* Grid Layouts */
@@ -3170,6 +3205,20 @@ export function renderDashboard(stats: StatsResponse): string {
         <div class="rc-status" id="remote-enabled-status" data-tooltip="Reason remote analytics is enabled or paused by backpressure.">
           Remote analytics: <strong>${remoteEnabled ? "ENABLED" : "PAUSED"}</strong> · Reason: <span id="remote-enabled-reason">${cfgRemoteReason}</span>
         </div>
+        <div class="rc-warning ${cfgAllowLegacy ? "" : "is-off"}" id="legacy-warning">
+          <div>
+            <div class="rc-warning-title">Legacy Event Acceptance</div>
+            <div class="rc-warning-body" id="legacy-warning-text">
+              ${cfgAllowLegacy
+                ? "Enabled — missing event IDs will be auto-assigned. Disable after clients update."
+                : "Disabled — events without IDs will be rejected."}
+            </div>
+          </div>
+          <label class="toggle-switch" title="Toggle legacy event acceptance">
+            <input type="checkbox" id="cfg-allow-legacy" ${cfgAllowLegacy ? "checked" : ""}>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
         <div class="rc-grid">
           <div class="rc-field" data-tooltip="Events per POST from the extension. Higher values reduce requests but increase payload size.">
             <label>Batch Size</label>
@@ -4265,6 +4314,7 @@ export function renderDashboard(stats: StatsResponse): string {
         maxRetry: 5,
         maxEventsPerRequest: 5000,
         maxBufferSize: 50000,
+        allowLegacyEvents: true,
         flushMode: "next_day",
         timeFlushMinutes: { low: 1440, mid: 1440, high: 1440 },
         dailyFlushWindowStartUtc: 1,
@@ -4298,6 +4348,13 @@ export function renderDashboard(stats: StatsResponse): string {
         if (el) el.value = String(value);
       }
 
+      function setToggle(id, checked) {
+        const el = document.getElementById(id);
+        if (el && typeof checked === "boolean") {
+          el.checked = checked;
+        }
+      }
+
       function setConfigFromRemote(cfg, force) {
         if (configDirty && !force) return;
         const merged = {
@@ -4306,6 +4363,9 @@ export function renderDashboard(stats: StatsResponse): string {
           maxRetry: cfg.maxRetry ?? cfgDefaults.maxRetry,
           maxEventsPerRequest: cfg.maxEventsPerRequest ?? cfgDefaults.maxEventsPerRequest,
           maxBufferSize: cfg.maxBufferSize ?? cfgDefaults.maxBufferSize,
+          allowLegacyEvents: typeof cfg.allowLegacyEvents === "boolean"
+            ? cfg.allowLegacyEvents
+            : cfgDefaults.allowLegacyEvents,
           flushMode: cfg.flushMode ?? cfgDefaults.flushMode,
           timeFlushMinutes: cfg.timeFlushMinutes || cfgDefaults.timeFlushMinutes,
           dailyFlushWindowStartUtc: cfg.dailyFlushWindowStartUtc ?? cfgDefaults.dailyFlushWindowStartUtc,
@@ -4319,6 +4379,7 @@ export function renderDashboard(stats: StatsResponse): string {
         setValue("cfg-max-retry", merged.maxRetry);
         setValue("cfg-max-events", merged.maxEventsPerRequest);
         setValue("cfg-max-buffer", merged.maxBufferSize);
+        setToggle("cfg-allow-legacy", merged.allowLegacyEvents);
         setValue("cfg-time-low", merged.timeFlushMinutes.low);
         setValue("cfg-time-mid", merged.timeFlushMinutes.mid);
         setValue("cfg-time-high", merged.timeFlushMinutes.high);
@@ -4347,6 +4408,19 @@ export function renderDashboard(stats: StatsResponse): string {
         const reason = (cfg && cfg.remoteEnabledReason) ? cfg.remoteEnabledReason : "ok";
         const statusEl = document.getElementById("remote-enabled-status");
         const reasonEl = document.getElementById("remote-enabled-reason");
+        const legacyEnabled = cfg && typeof cfg.allowLegacyEvents === "boolean"
+          ? cfg.allowLegacyEvents
+          : cfgDefaults.allowLegacyEvents;
+        const legacyEl = document.getElementById("legacy-warning");
+        const legacyText = document.getElementById("legacy-warning-text");
+        if (legacyEl) {
+          legacyEl.classList.toggle("is-off", !legacyEnabled);
+        }
+        if (legacyText) {
+          legacyText.textContent = legacyEnabled
+            ? "Enabled — missing event IDs will be auto-assigned. Disable after clients update."
+            : "Disabled — events without IDs will be rejected.";
+        }
         if (statusEl) {
           statusEl.classList.remove("ok", "err");
           statusEl.classList.add(enabled ? "ok" : "err");
@@ -4412,6 +4486,7 @@ export function renderDashboard(stats: StatsResponse): string {
         "cfg-max-retry",
         "cfg-max-events",
         "cfg-max-buffer",
+        "cfg-allow-legacy",
         "cfg-flush-mode",
         "cfg-time-low",
         "cfg-time-mid",
@@ -4427,6 +4502,19 @@ export function renderDashboard(stats: StatsResponse): string {
           el.addEventListener("change", () => {
             if (id === "cfg-flush-mode") {
               toggleTimeFields(el.value);
+            }
+            if (id === "cfg-allow-legacy") {
+              const legacyEl = document.getElementById("legacy-warning");
+              const legacyText = document.getElementById("legacy-warning-text");
+              const enabled = !!el.checked;
+              if (legacyEl) {
+                legacyEl.classList.toggle("is-off", !enabled);
+              }
+              if (legacyText) {
+                legacyText.textContent = enabled
+                  ? "Enabled — missing event IDs will be auto-assigned. Disable after clients update."
+                  : "Disabled — events without IDs will be rejected.";
+              }
             }
             setConfigDirty(true);
           });
@@ -4447,12 +4535,17 @@ export function renderDashboard(stats: StatsResponse): string {
         btnCfgSave.onclick = () => {
           const flushEl = document.getElementById("cfg-flush-mode");
           const flushModeValue = flushEl ? flushEl.value : cfgDefaults.flushMode;
+          const legacyEl = document.getElementById("cfg-allow-legacy");
+          const allowLegacyEvents = legacyEl
+            ? !!legacyEl.checked
+            : cfgDefaults.allowLegacyEvents;
           const payload = {
             batchSize: readNum("cfg-batch-size", 1, 1000, cfgDefaults.batchSize),
             maxDailyRequests: readNum("cfg-max-daily", 1, 1000, cfgDefaults.maxDailyRequests),
             maxRetry: readNum("cfg-max-retry", 0, 20, cfgDefaults.maxRetry),
             maxEventsPerRequest: readNum("cfg-max-events", 1, 50000, cfgDefaults.maxEventsPerRequest),
             maxBufferSize: readNum("cfg-max-buffer", 1, 500000, cfgDefaults.maxBufferSize),
+            allowLegacyEvents,
             flushMode: flushModeValue,
             timeFlushMinutes: {
               low: readNum("cfg-time-low", 1, 10080, cfgDefaults.timeFlushMinutes.low),

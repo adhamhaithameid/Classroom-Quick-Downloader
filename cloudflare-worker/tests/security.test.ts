@@ -335,6 +335,17 @@ describe("Durable Object security behaviors", () => {
     expect(payload.config?.dailyFlushWindowMinutes).toBe(90);
   });
 
+  it("persists allowLegacyEvents in config", async () => {
+    const { obj } = makeDO();
+    const res = await callDO(obj, "/admin/update-config", {
+      allowLegacyEvents: false,
+    }, { "X-Admin-Secret": "secret" });
+    expect(res.status).toBe(200);
+    const configRes = await callDOGet(obj, "/config");
+    const payload = await configRes.json() as { allowLegacyEvents?: boolean };
+    expect(payload.allowLegacyEvents).toBe(false);
+  });
+
   it("returns accepted sequences for track", async () => {
     const { obj } = makeDO();
     const res = await callDO(obj, "/track", { events: [makeEvent()] });
@@ -359,6 +370,32 @@ describe("Durable Object security behaviors", () => {
     const { obj } = makeDO();
     const res = await callDO(obj, "/track", { events: [makeEvent({ id: "legacy-123456" })] });
     expect(res.status).toBe(202);
+  });
+
+  it("accepts legacy events without id when allowLegacyEvents is enabled", async () => {
+    const { obj } = makeDO();
+    const legacyEvent = { ...makeEvent() } as Record<string, unknown>;
+    delete legacyEvent.id;
+    const res = await callDO(obj, "/track", { events: [legacyEvent] });
+    expect(res.status).toBe(202);
+    const payload = await res.json() as { accepted?: number; acceptedIds?: string[] };
+    expect(payload.accepted).toBe(1);
+    expect(Array.isArray(payload.acceptedIds)).toBe(true);
+    expect(payload.acceptedIds?.length ?? 0).toBe(1);
+  });
+
+  it("rejects legacy events without id when allowLegacyEvents is disabled", async () => {
+    const { obj } = makeDO();
+    await callDO(obj, "/admin/update-config", {
+      allowLegacyEvents: false,
+    }, { "X-Admin-Secret": "secret" });
+    const legacyEvent = { ...makeEvent() } as Record<string, unknown>;
+    delete legacyEvent.id;
+    const res = await callDO(obj, "/track", { events: [legacyEvent] });
+    expect(res.status).toBe(202);
+    const payload = await res.json() as { accepted?: number; invalid?: number };
+    expect(payload.accepted).toBe(0);
+    expect(payload.invalid).toBe(1);
   });
 
   it("rate limits excessive track requests per IP", async () => {

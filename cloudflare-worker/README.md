@@ -330,13 +330,15 @@ curl https://cqd-analytics.your-subdomain.workers.dev/config
   "remoteEnabled": true,
   "remoteEnabledReason": "ok",
   "cancelHoldDelayMs": 1000,
+  "allowLegacyEvents": true,
   "serverTimeUtc": 1702732800000,
   "committedSeq": 1180,
   "quota": { "requestsToday": 1500, "quotaLevel": "BELOW_LIMITS", "modeLabel": "chill", "remoteEnabled": true }
 }
 ```
 
-`serverTimeUtc` is used by the extension to correct clock drift and keep all scheduling in UTC.
+`serverTimeUtc` is used by the extension to correct clock drift and keep all scheduling in UTC.  
+`allowLegacyEvents` temporarily accepts events missing IDs by assigning new IDs server-side (disable once all clients are updated).
 
 ---
 

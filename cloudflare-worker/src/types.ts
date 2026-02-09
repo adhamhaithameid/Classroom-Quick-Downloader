@@ -155,6 +155,7 @@ export interface StatsResponse {
     dailyFlushWindowMinutes?: number;
     configVersion?: number;
     cancelHoldDelayMs?: number;
+    allowLegacyEvents?: boolean;
     remoteEnabledReason?: string;
     hardRemoteOff: boolean;
   };
@@ -194,6 +195,7 @@ export interface ConfigResponse {
   remoteEnabled: boolean;
   remoteEnabledReason?: string;
   cancelHoldDelayMs?: number;
+  allowLegacyEvents?: boolean;
   serverTimeUtc?: number;
   committedSeq?: number;
   quota: QuotaDescriptor;
