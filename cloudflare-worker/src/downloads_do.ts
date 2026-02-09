@@ -48,6 +48,15 @@ type DurableStateShape = {
   // Only incremented after successful flush to Oracle
   batchSeq: number;
 
+  // Monotonic sequence for event commit tracking
+  eventSeq: number;
+
+  // Highest event sequence confirmed committed to Oracle
+  committedSeq: number;
+
+  // Durable queue of aggregated batches waiting for Oracle
+  pendingBatches: PendingOracleBatch[];
+
   // --- Privacy / Anti-Abuse ---
   // IP tracking is disabled for privacy compliance. These fields are kept
   // for backward compatibility but are always cleared.
@@ -72,6 +81,9 @@ type DurableStateShape = {
   ipAllowlistEnabled: boolean;
   ipAllowlist: string[];
 
+  // Track endpoint rate limiting (per-IP, per-minute)
+  trackRates: Record<string, { count: number; minute: number }>;
+
   // =========================================================================
   // CHANGELOG & CONFIG
   // =========================================================================
@@ -82,6 +94,9 @@ type DurableStateShape = {
   // REMOTE CONFIG - Controllable from Cloudflare Dashboard
   // =========================================================================
   
+  // Config schema version for migrations
+  configVersion: number;
+
   // Extension batching: downloads per request (default: 50)
   configBatchSize: number;
   
@@ -98,9 +113,13 @@ type DurableStateShape = {
   configMaxBufferSize: number;
   
   // Flush mode: 'next_day' | 'time_based' (default: 'next_day')
-  // next_day: Only flush at 1:00 AM local time
+  // next_day: Flush in a daily UTC window
   // time_based: Flush based on timeFlushMinutes
   configFlushMode: 'next_day' | 'time_based';
+
+  // Daily flush window (UTC)
+  configDailyFlushWindowStartUtc: number;
+  configDailyFlushWindowMinutes: number;
   
   // Time-based flush intervals (only used if flushMode is 'time_based')
   configTimeFlushMinutes: {
@@ -112,6 +131,14 @@ type DurableStateShape = {
   // Cancel hold delay: time in ms before cancel button becomes active (default: 1000ms)
   // Range: 0-10000ms. Configurable from dashboard to prevent accidental cancels.
   configCancelHoldDelayMs: number;
+};
+
+type PendingOracleBatch = {
+  batch: OracleBatch;
+  eventCount: number;
+  maxSeq: number;
+  attempts: number;
+  createdAt: number;
 };
 
 const DEFAULT_COUNTERS: Counters = {
@@ -129,6 +156,10 @@ const DEFAULT_RETRY_STATE: RetryState = {
   consecutiveFailures: 0,
 };
 
+const CONFIG_VERSION = 2;
+const DEFAULT_DAILY_FLUSH_WINDOW_START_UTC = 1;
+const DEFAULT_DAILY_FLUSH_WINDOW_MINUTES = 120;
+
 // Quota thresholds (approx. Cloudflare daily request quotas)
 const QUOTA_VERY_SOFT_LIMIT = 30_000;
 const QUOTA_SOFT_LIMIT = 40_000;
@@ -138,12 +169,52 @@ const QUOTA_HARD_NORMAL_LIMIT = 70_000;
 const QUOTA_HARD_LIMIT = 80_000;
 const QUOTA_VERY_HARD_LIMIT = 90_000;
 
+// Backpressure thresholds to prevent cascading failures
+const REMOTE_DISABLE_BUFFER_UTIL = 0.9;
+const REMOTE_DISABLE_FAILURES = 5;
+const COMPACT_TRIGGER_UTIL = 0.8;
+const COMPACT_TARGET_UTIL = 0.5;
+const COMPACT_MAX_BATCH = 5000;
+const MAX_PENDING_BATCHES = 50;
+
+// Track endpoint rate limits (per IP per minute)
+const TRACK_RATE_LIMIT_PER_MIN = 120;
+const TRACK_RATE_PRUNE_AFTER_MIN = 10;
+const TRACK_RATE_MAX_KEYS = 5000;
+
 // Storage key inside DO storage
 const STORAGE_KEY = "analytics_state";
 
 function todayUtcDate(): string {
   return new Date().toISOString().slice(0, 10); // YYYY-MM-DD
 }
+
+function clampInt(value: unknown, min: number, max: number, fallback: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
+  return Math.min(max, Math.max(min, Math.floor(value)));
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function sanitizeString(
+  value: unknown,
+  maxLen: number,
+  pattern?: RegExp,
+  fallback = "unknown",
+): string {
+  if (typeof value !== "string") return fallback;
+  const trimmed = value.trim().toLowerCase();
+  if (!trimmed || trimmed.length > maxLen) return fallback;
+  if (pattern && !pattern.test(trimmed)) return fallback;
+  return trimmed;
+}
+
+const FIELD_PATTERNS = {
+  generic: /^[a-z0-9._-]+$/,
+  language: /^[a-z0-9-]+$/,
+};
 
 /**
  * Decide quota level, mode label, remoteEnabled and batchSizeSuggestion
@@ -213,6 +284,24 @@ function computeQuotaDescriptor(
   };
 }
 
+function computeRemoteEnabled(
+  quotaEnabled: boolean,
+  bufferLen: number,
+  maxBuffer: number,
+  retryState: RetryState | null,
+): { enabled: boolean; reason: string } {
+  if (!quotaEnabled) {
+    return { enabled: false, reason: "quota_or_admin" };
+  }
+  if (maxBuffer > 0 && bufferLen >= maxBuffer * REMOTE_DISABLE_BUFFER_UTIL) {
+    return { enabled: false, reason: "buffer_high" };
+  }
+  if (retryState && retryState.consecutiveFailures >= REMOTE_DISABLE_FAILURES) {
+    return { enabled: false, reason: "oracle_failures" };
+  }
+  return { enabled: true, reason: "ok" };
+}
+
 function json<T>(obj: T, init: ResponseInit = {}): Response {
   return new Response(JSON.stringify(obj), {
     ...init,
@@ -233,6 +322,18 @@ function logEvent(level: LogLevel, message: string, fields?: Record<string, unkn
     ...fields,
   };
   console.log(JSON.stringify(payload));
+}
+
+function generateAckId(): string {
+  try {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+      return `ack-${crypto.randomUUID()}`;
+    }
+  } catch {
+    // ignore and fallback
+  }
+  const rand = Math.random().toString(36).slice(2, 10);
+  return `ack-${Date.now().toString(36)}-${rand}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -276,6 +377,9 @@ export class DownloadsDurable {
 
       buffer: [],
       batchSeq: 0,
+      eventSeq: 0,
+      committedSeq: 0,
+      pendingBatches: [],
       
       ipCounts: {},
       ipCountsSize: 0,
@@ -287,14 +391,18 @@ export class DownloadsDurable {
       loginAttempts: {},
       ipAllowlistEnabled: false,
       ipAllowlist: [],
+      trackRates: {},
 
       // Remote config defaults
+      configVersion: CONFIG_VERSION,
       configBatchSize: 50,
       configMaxDailyRequests: 50,
       configMaxRetry: 5,
       configMaxEventsPerRequest: 5000,
       configMaxBufferSize: 50000,
       configFlushMode: 'next_day',
+      configDailyFlushWindowStartUtc: DEFAULT_DAILY_FLUSH_WINDOW_START_UTC,
+      configDailyFlushWindowMinutes: DEFAULT_DAILY_FLUSH_WINDOW_MINUTES,
       configTimeFlushMinutes: { low: 1440, mid: 1440, high: 1440 }, // 1440 = 24h = next day
       configCancelHoldDelayMs: 1000, // 1 second default
 
@@ -344,6 +452,9 @@ export class DownloadsDurable {
 
       buffer: Array.isArray(stored.buffer) ? stored.buffer : [],
       batchSeq: stored.batchSeq ?? 0,
+      eventSeq: stored.eventSeq ?? 0,
+      committedSeq: stored.committedSeq ?? 0,
+      pendingBatches: Array.isArray(stored.pendingBatches) ? stored.pendingBatches : [],
 
       ipCounts: {},
       ipCountsSize: 0,
@@ -355,20 +466,103 @@ export class DownloadsDurable {
       loginAttempts: stored.loginAttempts ?? base.loginAttempts,
       ipAllowlistEnabled: stored.ipAllowlistEnabled ?? base.ipAllowlistEnabled,
       ipAllowlist: Array.isArray(stored.ipAllowlist) ? stored.ipAllowlist : base.ipAllowlist,
+      trackRates: stored.trackRates && typeof stored.trackRates === "object" ? stored.trackRates : base.trackRates,
 
       // Remote config - preserve stored values or use defaults
+      configVersion: stored.configVersion ?? base.configVersion,
       configBatchSize: stored.configBatchSize ?? base.configBatchSize,
       configMaxDailyRequests: stored.configMaxDailyRequests ?? base.configMaxDailyRequests,
       configMaxRetry: stored.configMaxRetry ?? base.configMaxRetry,
       configMaxEventsPerRequest: stored.configMaxEventsPerRequest ?? base.configMaxEventsPerRequest,
       configMaxBufferSize: stored.configMaxBufferSize ?? base.configMaxBufferSize,
       configFlushMode: stored.configFlushMode ?? base.configFlushMode,
+      configDailyFlushWindowStartUtc: stored.configDailyFlushWindowStartUtc ?? base.configDailyFlushWindowStartUtc,
+      configDailyFlushWindowMinutes: stored.configDailyFlushWindowMinutes ?? base.configDailyFlushWindowMinutes,
       configTimeFlushMinutes: stored.configTimeFlushMinutes ?? base.configTimeFlushMinutes,
       configCancelHoldDelayMs: stored.configCancelHoldDelayMs ?? base.configCancelHoldDelayMs,
 
       changelog: Array.isArray(stored.changelog) ? stored.changelog : base.changelog,
       changelogConfig: stored.changelogConfig ?? base.changelogConfig,
     };
+
+    if (Array.isArray(this.data.pendingBatches)) {
+      this.data.pendingBatches = this.data.pendingBatches
+        .filter((b) => b && typeof b === "object" && b.batch)
+        .map((b) => ({
+          ...b,
+          attempts: typeof b.attempts === "number" ? b.attempts : 0,
+          createdAt: typeof b.createdAt === "number" ? b.createdAt : Date.now(),
+        }));
+    } else {
+      this.data.pendingBatches = [];
+    }
+
+    // Normalize config values and ensure schema version
+    let configDirty = false;
+    if (!Number.isFinite(this.data.configVersion) || this.data.configVersion < CONFIG_VERSION) {
+      this.data.configVersion = CONFIG_VERSION;
+      configDirty = true;
+    }
+    this.data.configBatchSize = clampInt(this.data.configBatchSize, 1, 1000, base.configBatchSize);
+    this.data.configMaxDailyRequests = clampInt(this.data.configMaxDailyRequests, 1, 1000, base.configMaxDailyRequests);
+    this.data.configMaxRetry = clampInt(this.data.configMaxRetry, 0, 20, base.configMaxRetry);
+    this.data.configMaxEventsPerRequest = clampInt(this.data.configMaxEventsPerRequest, 1, 50_000, base.configMaxEventsPerRequest);
+    this.data.configMaxBufferSize = clampInt(this.data.configMaxBufferSize, 1, 500_000, base.configMaxBufferSize);
+    this.data.configDailyFlushWindowStartUtc = clampInt(
+      this.data.configDailyFlushWindowStartUtc,
+      0,
+      23,
+      base.configDailyFlushWindowStartUtc
+    );
+    this.data.configDailyFlushWindowMinutes = clampInt(
+      this.data.configDailyFlushWindowMinutes,
+      1,
+      24 * 60,
+      base.configDailyFlushWindowMinutes
+    );
+    if (!this.data.configTimeFlushMinutes || typeof this.data.configTimeFlushMinutes !== "object") {
+      this.data.configTimeFlushMinutes = { ...base.configTimeFlushMinutes };
+      configDirty = true;
+    } else {
+      const tfm = this.data.configTimeFlushMinutes;
+      const nextLow = clampInt(tfm.low, 1, 10080, base.configTimeFlushMinutes.low);
+      const nextMid = clampInt(tfm.mid, 1, 10080, base.configTimeFlushMinutes.mid);
+      const nextHigh = clampInt(tfm.high, 1, 10080, base.configTimeFlushMinutes.high);
+      if (nextLow !== tfm.low || nextMid !== tfm.mid || nextHigh !== tfm.high) {
+        this.data.configTimeFlushMinutes = { low: nextLow, mid: nextMid, high: nextHigh };
+        configDirty = true;
+      }
+    }
+    const nextCancelHold = clampInt(
+      this.data.configCancelHoldDelayMs,
+      0,
+      10000,
+      base.configCancelHoldDelayMs
+    );
+    if (nextCancelHold !== this.data.configCancelHoldDelayMs) {
+      this.data.configCancelHoldDelayMs = nextCancelHold;
+      configDirty = true;
+    }
+
+    if (this.data.configFlushMode !== "next_day" && this.data.configFlushMode !== "time_based") {
+      this.data.configFlushMode = base.configFlushMode;
+      configDirty = true;
+    }
+
+    if (
+      this.data.configBatchSize !== stored.configBatchSize ||
+      this.data.configMaxDailyRequests !== stored.configMaxDailyRequests ||
+      this.data.configMaxRetry !== stored.configMaxRetry ||
+      this.data.configMaxEventsPerRequest !== stored.configMaxEventsPerRequest ||
+      this.data.configMaxBufferSize !== stored.configMaxBufferSize ||
+      this.data.configDailyFlushWindowStartUtc !== stored.configDailyFlushWindowStartUtc ||
+      this.data.configDailyFlushWindowMinutes !== stored.configDailyFlushWindowMinutes ||
+      this.data.configCancelHoldDelayMs !== stored.configCancelHoldDelayMs ||
+      this.data.configFlushMode !== stored.configFlushMode ||
+      JSON.stringify(this.data.configTimeFlushMinutes) !== JSON.stringify(stored.configTimeFlushMinutes)
+    ) {
+      configDirty = true;
+    }
 
     // PRIVACY: IP tracking disabled. Clear any persisted IP data on load.
     const hadLegacyIps = !!stored.ipCounts && Object.keys(stored.ipCounts).length > 0;
@@ -387,7 +581,7 @@ export class DownloadsDurable {
       }
     }
 
-    if (hadLegacyIps || strippedEventIps) {
+    if (hadLegacyIps || strippedEventIps || configDirty) {
       await this.persist();
     }
 
@@ -429,9 +623,49 @@ export class DownloadsDurable {
       this.d.ipCounts = {};
       this.d.ipCountsSize = 0;
       this.d.uniqueRequestsToday = 0;
+      this.d.trackRates = {};
       
       // hardRemoteOff is NOT reset automatically here.
     }
+  }
+
+  private getClientIp(request: Request): string {
+    return (
+      request.headers.get("X-Client-IP") ||
+      request.headers.get("CF-Connecting-IP") ||
+      "unknown"
+    );
+  }
+
+  private checkTrackRateLimit(ip: string, nowMs: number): { allowed: boolean; retryAfterSec?: number } {
+    const minute = Math.floor(nowMs / 60000);
+    const entry = this.d.trackRates[ip];
+
+    if (!entry || entry.minute !== minute) {
+      this.d.trackRates[ip] = { count: 1, minute };
+    } else {
+      entry.count += 1;
+      if (entry.count > TRACK_RATE_LIMIT_PER_MIN) {
+        const nextMinuteMs = (minute + 1) * 60000;
+        return { allowed: false, retryAfterSec: Math.max(1, Math.ceil((nextMinuteMs - nowMs) / 1000)) };
+      }
+    }
+
+    // Prune old entries to prevent unbounded growth.
+    if (Object.keys(this.d.trackRates).length > TRACK_RATE_MAX_KEYS) {
+      const minMinute = minute - TRACK_RATE_PRUNE_AFTER_MIN;
+      for (const [k, v] of Object.entries(this.d.trackRates)) {
+        if (!v || v.minute < minMinute) {
+          delete this.d.trackRates[k];
+        }
+      }
+      if (Object.keys(this.d.trackRates).length > TRACK_RATE_MAX_KEYS) {
+        // Emergency reset to avoid unbounded memory growth under abuse.
+        this.d.trackRates = {};
+      }
+    }
+
+    return { allowed: true };
   }
 
   private isAuthorizedAdmin(request: Request): boolean {
@@ -593,6 +827,16 @@ export class DownloadsDurable {
     this.d.reqCountToday += 1;
 
     const now = Date.now();
+    const clientIp = this.getClientIp(request);
+
+    const rate = this.checkTrackRateLimit(clientIp, now);
+    if (!rate.allowed) {
+      await this.persist();
+      return json(
+        { ok: false, error: "rate_limited", retryAfterSec: rate.retryAfterSec ?? 60 },
+        { status: 429 },
+      );
+    }
 
     // --- Country from CF header ---
     const countryHeader = request.headers.get("X-Geo-Country");
@@ -604,7 +848,7 @@ export class DownloadsDurable {
     // =========================================================================
     // LAYER 1: PAYLOAD VALIDATION
     // =========================================================================
-    let body: { events?: StoredEvent[] } | null = null;
+    let body: { events?: StoredEvent[]; clientBatchId?: string } | null = null;
     try {
       body = await request.json();
     } catch {
@@ -613,10 +857,37 @@ export class DownloadsDurable {
       return json({ ok: false, error: "invalid_json" }, { status: 400 });
     }
 
-    const events = body?.events;
-    if (!Array.isArray(events) || events.length === 0) {
+    if (!isPlainObject(body) || !Array.isArray(body.events)) {
+      logEvent("warn", "track_invalid_payload");
       await this.persist();
-      return json({ ok: true, accepted: 0 }, { status: 202 });
+      return json({ ok: false, error: "invalid_payload" }, { status: 400 });
+    }
+
+    const events = body.events;
+    const clientBatchId =
+      typeof body.clientBatchId === "string" && body.clientBatchId.length <= 200
+        ? body.clientBatchId
+        : undefined;
+    if (events.length === 0) {
+      await this.persist();
+      return json(
+        {
+          ok: true,
+          accepted: 0,
+          clientBatchId,
+          ackId: generateAckId(),
+          receivedAt: now,
+        },
+        { status: 202 },
+      );
+    }
+
+    for (const ev of events) {
+      if (!isPlainObject(ev)) {
+        logEvent("warn", "track_invalid_event_payload");
+        await this.persist();
+        return json({ ok: false, error: "invalid_event_payload" }, { status: 400 });
+      }
     }
 
     // Allow large batches to support next-day consolidation (extension sends all pending at once)
@@ -665,7 +936,7 @@ export class DownloadsDurable {
     // LAYER 3: ROBUST IDEMPOTENCY (Set-based O(1) lookup + timestamp validation)
     // =========================================================================
     // const MAX_PROCESSED_IDS = 5000;
-    const MAX_FUTURE_DRIFT_MS = 7 * 24 * 60 * 60 * 1000; // 7 days (tolerate client clock skew)
+    const MAX_FUTURE_DRIFT_MS = 7 * 24 * 60 * 60 * 1000; // used for clamping, not rejection
 
     // Use Set for O(1) lookup
     const processedSet = new Set(this.d.processedIds);
@@ -675,28 +946,13 @@ export class DownloadsDurable {
     const acceptedIds: string[] = [];
     const duplicateIds: string[] = [];
     const invalidIds: string[] = [];
+    const acceptedSeqs: Array<[string, number]> = [];
 
     for (const ev of events) {
       // ----- VALIDATION: Event ID required -----
-      if (!ev.id || typeof ev.id !== "string" || ev.id.length < 10) {
+      if (!ev.id || typeof ev.id !== "string" || ev.id.length < 6 || ev.id.length > 200) {
         invalidCount++;
         if (ev?.id) invalidIds.push(ev.id);
-        continue;
-      }
-
-      // ----- VALIDATION: Event ID format (ext-<base36_timestamp>-<random>) -----
-      // Extension uses Date.now().toString(36) which produces alphanumeric base-36
-      const idMatch = ev.id.match(/^ext-([a-z0-9]+)-([a-z0-9]+)$/i);
-      if (!idMatch) {
-        invalidCount++;
-        continue;
-      }
-
-      // ----- VALIDATION: Timestamp must be reasonable (parse as base-36) -----
-      const idTimestamp = parseInt(idMatch[1], 36);
-      if (isNaN(idTimestamp) || idTimestamp > now + MAX_FUTURE_DRIFT_MS) {
-        invalidCount++;
-        invalidIds.push(ev.id);
         continue;
       }
 
@@ -708,10 +964,11 @@ export class DownloadsDurable {
       }
 
       // ----- VALIDATION: Timestamp sanity -----
-      if (typeof ev.timestamp !== "number" || ev.timestamp > now + MAX_FUTURE_DRIFT_MS) {
-        invalidCount++;
-        invalidIds.push(ev.id);
-        continue;
+      if (typeof ev.timestamp !== "number" || !Number.isFinite(ev.timestamp)) {
+        ev.timestamp = now;
+      }
+      if (ev.timestamp > now + MAX_FUTURE_DRIFT_MS) {
+        ev.timestamp = now;
       }
 
       // ----- VALIDATION: Required fields -----
@@ -725,9 +982,27 @@ export class DownloadsDurable {
       processedSet.add(ev.id);
       this.d.processedIds.push(ev.id);
 
+      this.d.eventSeq += 1;
+      ev.seq = this.d.eventSeq;
+
       // Hydrate country from CF geo if missing
       if (!ev.country && countryFromRequest) {
         ev.country = countryFromRequest;
+      }
+
+      // Sanitize high-cardinality fields to prevent unbounded growth
+      ev.file_type = sanitizeString(ev.file_type, 24, FIELD_PATTERNS.generic);
+      ev.browser = sanitizeString(ev.browser, 24, FIELD_PATTERNS.generic);
+      ev.os = sanitizeString(ev.os, 24, FIELD_PATTERNS.generic);
+      ev.language = sanitizeString(ev.language, 10, FIELD_PATTERNS.language);
+      if (ev.error_type) {
+        ev.error_type = sanitizeString(ev.error_type, 32, FIELD_PATTERNS.generic);
+      }
+      if (ev.source) {
+        ev.source = sanitizeString(ev.source, 32, FIELD_PATTERNS.generic);
+      }
+      if (ev.country) {
+        ev.country = sanitizeString(ev.country, 2, FIELD_PATTERNS.language);
       }
 
       // PRIVACY: Never persist IPs. Strip any client-provided ip_address.
@@ -737,6 +1012,7 @@ export class DownloadsDurable {
       this.d.totalEvents += 1;
       acceptedCount++;
       acceptedIds.push(ev.id);
+      acceptedSeqs.push([ev.id, ev.seq]);
       
       // totalDownloads = all download attempts (success + fail)
       this.d.totalDownloads += 1;
@@ -797,6 +1073,7 @@ export class DownloadsDurable {
       this.d.processedIds = this.d.processedIds.slice(-MAX_PROCESSED_IDS_TRIM);
     }
 
+    this.maybeCompactBuffer();
     await this.persist();
 
     // Size-based flush to Oracle
@@ -815,6 +1092,11 @@ export class DownloadsDurable {
       acceptedIds,
       duplicateIds,
       invalidIds,
+      acceptedSeqs,
+      committedSeq: this.d.committedSeq ?? 0,
+      clientBatchId,
+      ackId: generateAckId(),
+      receivedAt: now,
     }, { status: 202 });
   }
 
@@ -836,6 +1118,7 @@ export class DownloadsDurable {
 
     // Remote config with null-safe values for dashboard display
     const remoteConfig = {
+      configVersion: this.d.configVersion ?? CONFIG_VERSION,
       batchSize: this.d.configBatchSize ?? 50,
       maxDailyRequests: this.d.configMaxDailyRequests ?? 50,
       maxRetry: this.d.configMaxRetry ?? 5,
@@ -843,8 +1126,22 @@ export class DownloadsDurable {
       maxBufferSize: this.d.configMaxBufferSize ?? 50000,
       flushMode: this.d.configFlushMode ?? 'next_day',
       timeFlushMinutes: this.d.configTimeFlushMinutes ?? { low: 1440, mid: 1440, high: 1440 },
+      dailyFlushWindowStartUtc: this.d.configDailyFlushWindowStartUtc ?? DEFAULT_DAILY_FLUSH_WINDOW_START_UTC,
+      dailyFlushWindowMinutes: this.d.configDailyFlushWindowMinutes ?? DEFAULT_DAILY_FLUSH_WINDOW_MINUTES,
+      cancelHoldDelayMs: this.d.configCancelHoldDelayMs ?? 1000,
+      remoteEnabledReason: "ok",
       hardRemoteOff: this.d.hardRemoteOff ?? false,
     };
+
+    const remoteGate = computeRemoteEnabled(
+      quota.remoteEnabled,
+      this.d.buffer?.length ?? 0,
+      remoteConfig.maxBufferSize,
+      this.d.retryState ?? null,
+    );
+    quota.remoteEnabled = remoteGate.enabled;
+    quota.remoteEnabledReason = remoteGate.reason;
+    remoteConfig.remoteEnabledReason = remoteGate.reason;
 
     // Buffer status for dashboard
     const bufferStatus = {
@@ -900,10 +1197,17 @@ export class DownloadsDurable {
       this.d.reqCountToday,
       this.d.hardRemoteOff,
     );
+    const remoteGate = computeRemoteEnabled(
+      quota.remoteEnabled,
+      this.d.buffer?.length ?? 0,
+      this.d.configMaxBufferSize ?? 50000,
+      this.d.retryState ?? null,
+    );
 
     // Return all remote-controllable config values
     const config = {
       ok: true,
+      configVersion: this.d.configVersion ?? CONFIG_VERSION,
       
       // Batching config
       batchSize: this.d.configBatchSize,
@@ -913,15 +1217,26 @@ export class DownloadsDurable {
       
       // Flush mode: 'next_day' (default) or 'time_based'
       flushMode: this.d.configFlushMode,
+
+      // Daily flush window (UTC)
+      dailyFlushWindowStartUtc: this.d.configDailyFlushWindowStartUtc,
+      dailyFlushWindowMinutes: this.d.configDailyFlushWindowMinutes,
       
       // Time-based flush intervals (only used if flushMode is 'time_based')
       timeFlushMinutes: this.d.configTimeFlushMinutes,
       
-      // Remote enabled (can be disabled for emergencies)
-      remoteEnabled: quota.remoteEnabled,
+      // Remote enabled (can be disabled for emergencies or backpressure)
+      remoteEnabled: remoteGate.enabled,
+      remoteEnabledReason: remoteGate.reason,
       
       // Cancel hold delay: time before cancel becomes active (default 1000ms)
       cancelHoldDelayMs: this.d.configCancelHoldDelayMs,
+
+      // Server UTC time for drift correction
+      serverTimeUtc: Date.now(),
+
+      // Highest committed event sequence
+      committedSeq: this.d.committedSeq ?? 0,
       
       // Quota info for extension awareness
       quota,
@@ -956,12 +1271,15 @@ export class DownloadsDurable {
     const today = todayUtcDate();
     // Preserve config settings during reset
     const preservedConfig = {
+      configVersion: this.d.configVersion ?? CONFIG_VERSION,
       configBatchSize: this.d.configBatchSize ?? 50,
       configMaxDailyRequests: this.d.configMaxDailyRequests ?? 50,
       configMaxRetry: this.d.configMaxRetry ?? 5,
       configMaxEventsPerRequest: this.d.configMaxEventsPerRequest ?? 5000,
       configMaxBufferSize: this.d.configMaxBufferSize ?? 50000,
       configFlushMode: this.d.configFlushMode ?? 'next_day' as const,
+      configDailyFlushWindowStartUtc: this.d.configDailyFlushWindowStartUtc ?? DEFAULT_DAILY_FLUSH_WINDOW_START_UTC,
+      configDailyFlushWindowMinutes: this.d.configDailyFlushWindowMinutes ?? DEFAULT_DAILY_FLUSH_WINDOW_MINUTES,
       configTimeFlushMinutes: this.d.configTimeFlushMinutes ?? { low: 1440, mid: 1440, high: 1440 },
       configCancelHoldDelayMs: this.d.configCancelHoldDelayMs ?? 1000,
       
@@ -990,6 +1308,9 @@ export class DownloadsDurable {
       hardRemoteOff: false,
       buffer: [],
       batchSeq: 0,
+      eventSeq: 0,
+      committedSeq: 0,
+      pendingBatches: [],
       ipCounts: {},
       ipCountsSize: 0,
       uniqueRequestsToday: 0,
@@ -998,6 +1319,7 @@ export class DownloadsDurable {
       loginAttempts: {},
       ipAllowlistEnabled: false,
       ipAllowlist: [],
+      trackRates: {},
       ...preservedConfig,
     };
     await this.state.storage.delete(STORAGE_KEY);
@@ -1038,7 +1360,9 @@ export class DownloadsDurable {
    * Body: { batchSize?: number, maxDailyRequests?: number, maxRetry?: number, 
    *         maxEventsPerRequest?: number, maxBufferSize?: number,
    *         flushMode?: 'next_day' | 'time_based',
-   *         timeFlushMinutes?: { low: number, mid: number, high: number } }
+   *         timeFlushMinutes?: { low: number, mid: number, high: number },
+   *         dailyFlushWindowStartUtc?: number, dailyFlushWindowMinutes?: number,
+   *         cancelHoldDelayMs?: number }
    */
   private async handleAdminUpdateConfig(request: Request): Promise<Response> {
     if (!this.isAuthorizedAdmin(request)) {
@@ -1052,40 +1376,88 @@ export class DownloadsDurable {
       return json({ ok: false, error: "invalid_json" }, { status: 400 });
     }
 
-    // Update each config field if provided and valid
-    if (typeof body.batchSize === 'number' && body.batchSize > 0 && body.batchSize <= 1000) {
-      this.d.configBatchSize = body.batchSize;
+    if (!isPlainObject(body)) {
+      return json({ ok: false, error: "invalid_payload" }, { status: 400 });
     }
-    
-    if (typeof body.maxDailyRequests === 'number' && body.maxDailyRequests > 0 && body.maxDailyRequests <= 1000) {
-      this.d.configMaxDailyRequests = body.maxDailyRequests;
-    }
-    
-    if (typeof body.maxRetry === 'number' && body.maxRetry >= 0 && body.maxRetry <= 20) {
-      this.d.configMaxRetry = body.maxRetry;
-    }
-    
-    if (typeof body.maxEventsPerRequest === 'number' && body.maxEventsPerRequest > 0 && body.maxEventsPerRequest <= 50000) {
-      this.d.configMaxEventsPerRequest = body.maxEventsPerRequest;
-    }
-    
-    if (typeof body.maxBufferSize === 'number' && body.maxBufferSize > 0 && body.maxBufferSize <= 500000) {
-      this.d.configMaxBufferSize = body.maxBufferSize;
-    }
-    
-    if (body.flushMode === 'next_day' || body.flushMode === 'time_based') {
-      this.d.configFlushMode = body.flushMode;
-    }
-    
-    if (body.timeFlushMinutes && typeof body.timeFlushMinutes === 'object') {
-      const tfm = body.timeFlushMinutes as Record<string, unknown>;
-      if (typeof tfm.low === 'number' && typeof tfm.mid === 'number' && typeof tfm.high === 'number') {
-        this.d.configTimeFlushMinutes = {
-          low: Math.max(1, Math.min(10080, tfm.low)),   // 1 min to 7 days
-          mid: Math.max(1, Math.min(10080, tfm.mid)),
-          high: Math.max(1, Math.min(10080, tfm.high)),
-        };
+
+    const errors: string[] = [];
+    const applyNumber = (
+      key: string,
+      min: number,
+      max: number,
+      setter: (value: number) => void,
+    ) => {
+      if (!(key in body)) return;
+      const value = body[key];
+      if (typeof value === "number" && Number.isFinite(value)) {
+        setter(Math.min(max, Math.max(min, Math.floor(value))));
+        return;
       }
+      errors.push(key);
+    };
+
+    applyNumber("batchSize", 1, 1000, (value) => {
+      this.d.configBatchSize = value;
+    });
+    applyNumber("maxDailyRequests", 1, 1000, (value) => {
+      this.d.configMaxDailyRequests = value;
+    });
+    applyNumber("maxRetry", 0, 20, (value) => {
+      this.d.configMaxRetry = value;
+    });
+    applyNumber("maxEventsPerRequest", 1, 50000, (value) => {
+      this.d.configMaxEventsPerRequest = value;
+    });
+    applyNumber("maxBufferSize", 1, 500000, (value) => {
+      this.d.configMaxBufferSize = value;
+    });
+    applyNumber("dailyFlushWindowStartUtc", 0, 23, (value) => {
+      this.d.configDailyFlushWindowStartUtc = value;
+    });
+    applyNumber("dailyFlushWindowMinutes", 1, 24 * 60, (value) => {
+      this.d.configDailyFlushWindowMinutes = value;
+    });
+
+    if ("flushMode" in body) {
+      if (body.flushMode === "next_day" || body.flushMode === "time_based") {
+        this.d.configFlushMode = body.flushMode;
+      } else {
+        errors.push("flushMode");
+      }
+    }
+
+    if ("timeFlushMinutes" in body) {
+      if (isPlainObject(body.timeFlushMinutes)) {
+        const tfm = body.timeFlushMinutes as Record<string, unknown>;
+        if (
+          typeof tfm.low === "number" &&
+          typeof tfm.mid === "number" &&
+          typeof tfm.high === "number" &&
+          Number.isFinite(tfm.low) &&
+          Number.isFinite(tfm.mid) &&
+          Number.isFinite(tfm.high)
+        ) {
+          this.d.configTimeFlushMinutes = {
+            low: Math.max(1, Math.min(10080, Math.floor(tfm.low))),   // 1 min to 7 days
+            mid: Math.max(1, Math.min(10080, Math.floor(tfm.mid))),
+            high: Math.max(1, Math.min(10080, Math.floor(tfm.high))),
+          };
+        } else {
+          errors.push("timeFlushMinutes");
+        }
+      } else {
+        errors.push("timeFlushMinutes");
+      }
+    }
+
+    if ("cancelHoldDelayMs" in body) {
+      applyNumber("cancelHoldDelayMs", 0, 10000, (value) => {
+        this.d.configCancelHoldDelayMs = value;
+      });
+    }
+
+    if (errors.length > 0) {
+      return json({ ok: false, error: "invalid_config", fields: errors }, { status: 400 });
     }
 
     await this.persist();
@@ -1095,13 +1467,17 @@ export class DownloadsDurable {
       ok: true,
       message: "Config updated. Extensions will pick up changes on next config fetch.",
       config: {
+        configVersion: this.d.configVersion ?? CONFIG_VERSION,
         batchSize: this.d.configBatchSize,
         maxDailyRequests: this.d.configMaxDailyRequests,
         maxRetry: this.d.configMaxRetry,
         maxEventsPerRequest: this.d.configMaxEventsPerRequest,
         maxBufferSize: this.d.configMaxBufferSize,
         flushMode: this.d.configFlushMode,
+        dailyFlushWindowStartUtc: this.d.configDailyFlushWindowStartUtc,
+        dailyFlushWindowMinutes: this.d.configDailyFlushWindowMinutes,
         timeFlushMinutes: this.d.configTimeFlushMinutes,
+        cancelHoldDelayMs: this.d.configCancelHoldDelayMs,
       },
     });
   }
@@ -1222,11 +1598,135 @@ export class DownloadsDurable {
     return topKey;
   }
 
+  private mergeCounts<T extends Record<string, number>>(target: T, source: T): T {
+    for (const [key, val] of Object.entries(source)) {
+      target[key] = (target[key] || 0) + (val || 0);
+    }
+    return target;
+  }
+
+  private mergeTimeBuckets(a: TimeBucket[], b: TimeBucket[]): TimeBucket[] {
+    const map = new Map<string, TimeBucket>();
+    const addBucket = (bucket: TimeBucket) => {
+      const existing = map.get(bucket.bucketStart);
+      if (!existing) {
+        map.set(bucket.bucketStart, {
+          bucketStart: bucket.bucketStart,
+          bucketEnd: bucket.bucketEnd,
+          totals: { ...bucket.totals },
+          counters: { ...bucket.counters },
+        });
+        return;
+      }
+      existing.totals.totalEvents += bucket.totals.totalEvents;
+      existing.totals.totalDownloads += bucket.totals.totalDownloads;
+      existing.totals.totalSuccess += bucket.totals.totalSuccess;
+      existing.totals.totalFail += bucket.totals.totalFail;
+      this.mergeCounts(existing.counters.byStatus, bucket.counters.byStatus);
+      this.mergeCounts(existing.counters.byType, bucket.counters.byType);
+      this.mergeCounts(existing.counters.byBrowser, bucket.counters.byBrowser);
+      this.mergeCounts(existing.counters.byOs, bucket.counters.byOs);
+      this.mergeCounts(existing.counters.byExtVersion, bucket.counters.byExtVersion);
+      this.mergeCounts(existing.counters.byLanguage, bucket.counters.byLanguage);
+      this.mergeCounts(existing.counters.byCountry, bucket.counters.byCountry);
+      this.mergeCounts(existing.counters.byErrorType, bucket.counters.byErrorType);
+    };
+    a.forEach(addBucket);
+    b.forEach(addBucket);
+    return Array.from(map.values()).sort((x, y) => x.bucketStart.localeCompare(y.bucketStart));
+  }
+
+  private mergePendingBatchesIfNeeded(): void {
+    while (this.d.pendingBatches.length > MAX_PENDING_BATCHES) {
+      const firstIdx = this.d.pendingBatches.findIndex((b) => (b.attempts ?? 0) === 0);
+      const secondIdx = this.d.pendingBatches.findIndex(
+        (b, idx) => idx > firstIdx && (b.attempts ?? 0) === 0,
+      );
+      if (firstIdx === -1 || secondIdx === -1) {
+        // Avoid merging batches that have already been attempted (idempotency risk).
+        break;
+      }
+      const [second] = this.d.pendingBatches.splice(secondIdx, 1);
+      const [first] = this.d.pendingBatches.splice(firstIdx, 1);
+      if (!first || !second) break;
+      const mergedSummary = {
+        totals: {
+          totalEvents: first.batch.summary.totals.totalEvents + second.batch.summary.totals.totalEvents,
+          totalDownloads: first.batch.summary.totals.totalDownloads + second.batch.summary.totals.totalDownloads,
+          totalSuccess: first.batch.summary.totals.totalSuccess + second.batch.summary.totals.totalSuccess,
+          totalFail: first.batch.summary.totals.totalFail + second.batch.summary.totals.totalFail,
+        },
+        browsers: this.mergeCounts({ ...first.batch.summary.browsers }, second.batch.summary.browsers),
+        os: this.mergeCounts({ ...first.batch.summary.os }, second.batch.summary.os),
+        countries: this.mergeCounts({ ...first.batch.summary.countries }, second.batch.summary.countries),
+        languages: this.mergeCounts({ ...first.batch.summary.languages }, second.batch.summary.languages),
+        versions: this.mergeCounts({ ...first.batch.summary.versions }, second.batch.summary.versions),
+        types: this.mergeCounts({ ...first.batch.summary.types }, second.batch.summary.types),
+        errorReasons: this.mergeCounts({ ...first.batch.summary.errorReasons }, second.batch.summary.errorReasons),
+        topBrowser: "unknown",
+        topOs: "unknown",
+        topCountry: "unknown",
+        topType: "unknown",
+      };
+      mergedSummary.topBrowser = this.getTopKey(mergedSummary.browsers);
+      mergedSummary.topOs = this.getTopKey(mergedSummary.os);
+      mergedSummary.topCountry = this.getTopKey(mergedSummary.countries);
+      mergedSummary.topType = this.getTopKey(mergedSummary.types);
+
+      const mergedBatch: OracleBatch = {
+        batchId: `do-merge-${Date.now()}`,
+        generatedAt: Date.now(),
+        timeZone: "UTC",
+        summary: mergedSummary,
+        timeBuckets: this.mergeTimeBuckets(first.batch.timeBuckets, second.batch.timeBuckets),
+        doState: first.batch.doState,
+        uniqueIps: [],
+      };
+      const merged: PendingOracleBatch = {
+        batch: mergedBatch,
+        eventCount: first.eventCount + second.eventCount,
+        maxSeq: Math.max(first.maxSeq, second.maxSeq),
+        attempts: 0,
+        createdAt: Date.now(),
+      };
+      this.d.pendingBatches.unshift(merged);
+    }
+  }
+
+  private maybeCompactBuffer(): void {
+    const maxBuffer = this.d.configMaxBufferSize || 50_000;
+    if (this.d.buffer.length < Math.floor(maxBuffer * COMPACT_TRIGGER_UTIL)) {
+      return;
+    }
+
+    const target = Math.floor(maxBuffer * COMPACT_TARGET_UTIL);
+    let toCompact = this.d.buffer.length - target;
+    if (toCompact <= 0) return;
+
+    const sliceCount = Math.min(toCompact, COMPACT_MAX_BATCH);
+    const events = this.d.buffer.slice(0, sliceCount);
+    if (events.length === 0) return;
+
+    const batchId = `do-compact-${Date.now()}-${events.length}ev`;
+    const batch = this.buildOracleBatch(events, batchId);
+    const maxSeq = events.reduce((m, ev) => Math.max(m, ev.seq || 0), this.d.committedSeq || 0);
+    this.d.pendingBatches.push({
+      batch,
+      eventCount: events.length,
+      maxSeq,
+      attempts: 0,
+      createdAt: Date.now(),
+    });
+    this.d.buffer = this.d.buffer.slice(sliceCount);
+
+    this.mergePendingBatchesIfNeeded();
+  }
+
   /**
    * Build an aggregated OracleBatch from raw events in buffer.
    * Groups events by hour and aggregates counters.
    */
-  private buildOracleBatch(events: StoredEvent[]): OracleBatch {
+  private buildOracleBatch(events: StoredEvent[], batchIdOverride?: string): OracleBatch {
     const now = Date.now();
     
     // 1. Group events by hour bucket (Keep logic for historical data)
@@ -1323,7 +1823,7 @@ export class DownloadsDurable {
     };
 
     // Generate stable batch ID using sequence number (doesn't change on retry)
-    const batchId = `do-seq${this.d.batchSeq}-${events.length}ev`;
+    const batchId = batchIdOverride || `do-seq${this.d.batchSeq}-${events.length}ev`;
 
     // PRIVACY FIX: IP collection disabled per PRIVACY.md policy
     // The privacy policy states IPs are never stored, so we don't send them to Oracle
@@ -1421,11 +1921,11 @@ export class DownloadsDurable {
   ): Promise<{ ok: boolean; sent: number; error?: string }> {
     const now = Date.now();
 
-    if (!this.d.buffer.length) {
+    if (!this.d.buffer.length && this.d.pendingBatches.length === 0) {
       // Nothing to flush; clear retry state + alarm.
       this.d.lastFlushAt = now;
       this.d.retryState = { ...DEFAULT_RETRY_STATE };
-      await this.state.storage.deleteAlarm();
+      await this.scheduleNextMidnightAlarm();
       await this.persist();
       return { ok: true, sent: 0 };
     }
@@ -1445,9 +1945,22 @@ export class DownloadsDurable {
     const maxBatchEnv =
       parseInt(this.env.MAX_BATCH_EVENTS || "10000", 10) || 10000;
     // FIX: even "force" should chunk; force just means "try now / bypass gating"
-    const eventsToFlush = this.d.buffer.slice(0, maxBatchEnv);
+    let eventsToFlush: StoredEvent[] = [];
+    let oracleBatch: OracleBatch | null = null;
+    let pendingMeta: PendingOracleBatch | null = null;
+
+    if (this.d.pendingBatches.length > 0) {
+      pendingMeta = this.d.pendingBatches[0];
+      oracleBatch = pendingMeta.batch;
+      pendingMeta.attempts = (pendingMeta.attempts ?? 0) + 1;
+    } else {
+      eventsToFlush = this.d.buffer.slice(0, maxBatchEnv);
+      oracleBatch = this.buildOracleBatch(eventsToFlush);
+    }
 
     // --- LOGGING for Debugging ---
+    // HTTP mode note: Oracle free-tier deployment may be HTTP-only.
+    // Keep transport protected via network controls if TLS is unavailable.
     const targetUrl = this.env.ORACLE_ENDPOINT + "/ingest-batch";
     console.log("------------------------------------------------");
     console.log("Attempting Flush to:", targetUrl);
@@ -1456,9 +1969,6 @@ export class DownloadsDurable {
 
     if (!this.d.retryState) this.d.retryState = { ...DEFAULT_RETRY_STATE };
     this.d.retryState.lastFlushAttemptAt = now;
-
-    // Build aggregated batch (groups by hour, aggregates counters)
-    const oracleBatch = this.buildOracleBatch(eventsToFlush);
 
     try {
       // Send to /ingest-batch endpoint (aggregated format)
@@ -1483,19 +1993,49 @@ export class DownloadsDurable {
         return { ok: false, sent: 0, error: msg };
       }
 
-      // Success: drop the sent events and increment batch sequence
-      this.d.buffer = this.d.buffer.slice(eventsToFlush.length);
-      this.d.pendingEvents = Math.max(
-        0,
-        this.d.pendingEvents - eventsToFlush.length,
-      );
+      const ack = await res
+        .json()
+        .catch(() => null) as { ok?: boolean; batchId?: string; ingestedAt?: number } | null;
+      if (!ack || ack.ok !== true) {
+        const msg = "Oracle ACK invalid or missing ok=true";
+        this.d.retryState.lastError = msg;
+        this.d.retryState.consecutiveFailures += 1;
+        logEvent("warn", "oracle_flush_ack_invalid", { error: msg });
+        await this.scheduleRetry();
+        await this.persist();
+        return { ok: false, sent: 0, error: msg };
+      }
+      if (!ack.batchId || ack.batchId !== oracleBatch.batchId) {
+        const msg = `Oracle ACK batchId mismatch (expected ${oracleBatch.batchId}, got ${ack.batchId || "missing"})`;
+        this.d.retryState.lastError = msg;
+        this.d.retryState.consecutiveFailures += 1;
+        logEvent("warn", "oracle_flush_ack_mismatch", { error: msg });
+        await this.scheduleRetry();
+        await this.persist();
+        return { ok: false, sent: 0, error: msg };
+      }
+
+      // Success: drop the sent events or pending batch and increment batch sequence
+      if (pendingMeta) {
+        this.d.pendingBatches.shift();
+        this.d.pendingEvents = Math.max(0, this.d.pendingEvents - pendingMeta.eventCount);
+        this.d.committedSeq = Math.max(this.d.committedSeq, pendingMeta.maxSeq);
+      } else {
+        const maxSeq = eventsToFlush.reduce((m, ev) => Math.max(m, ev.seq || 0), this.d.committedSeq || 0);
+        this.d.buffer = this.d.buffer.slice(eventsToFlush.length);
+        this.d.pendingEvents = Math.max(
+          0,
+          this.d.pendingEvents - eventsToFlush.length,
+        );
+        this.d.committedSeq = Math.max(this.d.committedSeq, maxSeq);
+      }
       this.d.lastFlushAt = now;
       this.d.batchSeq += 1; // Increment so next batch gets new ID
       this.d.retryState = { ...DEFAULT_RETRY_STATE };
-      await this.state.storage.deleteAlarm();
+      await this.scheduleNextMidnightAlarm();
       await this.persist();
 
-      return { ok: true, sent: eventsToFlush.length };
+      return { ok: true, sent: pendingMeta ? pendingMeta.eventCount : eventsToFlush.length };
     } catch (err: unknown) {
       const msg = `Oracle flush error: ${String(err)}`;
       if (!this.d.retryState) this.d.retryState = { ...DEFAULT_RETRY_STATE };
