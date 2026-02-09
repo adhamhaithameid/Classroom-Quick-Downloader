@@ -72,6 +72,16 @@ class MockStorage {
 
 class MockState {
   storage = new MockStorage();
+  pending: Promise<unknown>[] = [];
+
+  waitUntil(promise: Promise<unknown>) {
+    this.pending.push(promise.catch(() => {}));
+  }
+
+  async drain(): Promise<void> {
+    await Promise.all(this.pending);
+    this.pending = [];
+  }
 }
 
 function makeDO() {
@@ -92,6 +102,21 @@ function makeDOWithStored(stored: StoredState) {
     ORACLE_ENDPOINT: "http://example.com",
     DO_SHARED_SECRET: "secret",
     MAX_BATCH_EVENTS: "10000",
+  } as Env;
+  const obj = new DownloadsDurable(state as unknown as DurableObjectState, env);
+  return { obj, state };
+}
+
+function makeDOWithEnv(envOverride: Partial<Env>, stored?: StoredState) {
+  const state = new MockState();
+  if (stored) {
+    state.storage.seed(STORAGE_KEY, stored);
+  }
+  const env: Env = {
+    ORACLE_ENDPOINT: "http://example.com",
+    DO_SHARED_SECRET: "secret",
+    MAX_BATCH_EVENTS: "10000",
+    ...envOverride,
   } as Env;
   const obj = new DownloadsDurable(state as unknown as DurableObjectState, env);
   return { obj, state };
@@ -498,6 +523,55 @@ describe("Durable Object security behaviors", () => {
     const payload = await res.json() as { status?: string; reasons?: string[] };
     expect(payload.status).toBe("ok");
     expect(Array.isArray(payload.reasons)).toBe(true);
+  });
+
+  it("notifies webhook on critical pipeline health", async () => {
+    const webhookUrl = "https://alert.example.com";
+    const fetchSpy = vi.fn(async () => new Response("ok"));
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const pendingBatch = {
+      batch: {
+        batchId: "seed",
+        generatedAt: Date.now(),
+        timeZone: "UTC",
+        summary: {
+          totals: { totalEvents: 0, totalDownloads: 0, totalSuccess: 0, totalFail: 0 },
+          browsers: {},
+          os: {},
+          countries: {},
+          languages: {},
+          versions: {},
+          types: {},
+          errorReasons: {},
+          topBrowser: "unknown",
+          topOs: "unknown",
+          topCountry: "unknown",
+          topType: "unknown",
+        },
+        timeBuckets: [],
+      },
+      eventCount: 0,
+      maxSeq: 0,
+      attempts: 0,
+      createdAt: Date.now() - 30 * 60 * 60 * 1000,
+    };
+    const { obj, state } = makeDOWithEnv({ ALERT_WEBHOOK_URL: webhookUrl }, {
+      pendingBatches: Array.from({ length: 30 }, () => ({ ...pendingBatch })),
+      retryState: { consecutiveFailures: 10 },
+      lastFlushAt: Date.now() - 48 * 60 * 60 * 1000,
+      buffer: [],
+      configMaxBufferSize: 50000,
+    });
+
+    const res = await callDOGet(obj, "/pipeline-health");
+    expect(res.status).toBe(200);
+    await state.drain();
+
+    expect(fetchSpy).toHaveBeenCalled();
+    const calledUrl = String(fetchSpy.mock.calls[0]?.[0] ?? "");
+    expect(calledUrl).toBe(webhookUrl);
+    vi.unstubAllGlobals();
   });
 
   it("warns when pending batches exceed thresholds", async () => {

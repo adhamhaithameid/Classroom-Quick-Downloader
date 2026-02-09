@@ -20,6 +20,7 @@ export interface Env {
   ORACLE_ENDPOINT: string;
   DO_SHARED_SECRET: string;
   MAX_BATCH_EVENTS: string;
+  ALERT_WEBHOOK_URL?: string;
 }
 
 type DurableStateShape = {
@@ -135,6 +136,10 @@ type DurableStateShape = {
   // Legacy compatibility: allow missing/invalid event IDs by assigning new IDs
   // Default: true (temporary migration support)
   configAllowLegacyEvents: boolean;
+
+  // Pipeline health notification state
+  lastHealthStatus?: PipelineHealthStatus;
+  lastHealthNotifyAt?: number | null;
 };
 
 type PendingOracleBatch = {
@@ -189,6 +194,8 @@ const HEALTH_WARN_STALE_MS = 6 * 60 * 60 * 1000;
 const HEALTH_CRIT_STALE_MS = 24 * 60 * 60 * 1000;
 const HEALTH_WARN_BUFFER_UTIL = 0.8;
 const HEALTH_CRIT_BUFFER_UTIL = 0.95;
+const HEALTH_NOTIFY_WARN_INTERVAL_MS = 30 * 60 * 1000;
+const HEALTH_NOTIFY_CRIT_INTERVAL_MS = 10 * 60 * 1000;
 
 // Track endpoint rate limits (per IP per minute)
 const TRACK_RATE_LIMIT_PER_MIN = 120;
@@ -391,6 +398,12 @@ type PipelineHealthResponse = {
     warnBufferUtil: number;
     criticalBufferUtil: number;
   };
+};
+
+type PipelineHealthNotification = PipelineHealthResponse & {
+  previousStatus?: PipelineHealthStatus;
+  notifiedAt: number;
+  source: "pipeline-health";
 };
 
 async function readJsonBody<T>(
@@ -633,6 +646,9 @@ export class DownloadsDurable {
         rules: [],
         lastUpdated: Date.now(),
       },
+
+      lastHealthStatus: "ok",
+      lastHealthNotifyAt: null,
     };
 
     if (!stored) {
@@ -708,6 +724,9 @@ export class DownloadsDurable {
 
       changelog: Array.isArray(stored.changelog) ? stored.changelog : base.changelog,
       changelogConfig: stored.changelogConfig ?? base.changelogConfig,
+
+      lastHealthStatus: stored.lastHealthStatus ?? base.lastHealthStatus,
+      lastHealthNotifyAt: stored.lastHealthNotifyAt ?? base.lastHealthNotifyAt,
     };
 
     if (Array.isArray(this.data.pendingBatches)) {
@@ -1596,7 +1615,53 @@ export class DownloadsDurable {
       },
     };
 
+    this.notifyHealthIfNeeded(payload).catch(() => {});
     return json(payload);
+  }
+
+  private async notifyHealthIfNeeded(payload: PipelineHealthResponse): Promise<void> {
+    const webhook = this.env.ALERT_WEBHOOK_URL;
+    if (!webhook) return;
+
+    const prevStatus = this.d.lastHealthStatus ?? "ok";
+    const lastNotifyAt = this.d.lastHealthNotifyAt ?? 0;
+    const now = Date.now();
+    const interval =
+      payload.status === "critical" ? HEALTH_NOTIFY_CRIT_INTERVAL_MS : HEALTH_NOTIFY_WARN_INTERVAL_MS;
+    const shouldNotify =
+      payload.status !== "ok" &&
+      (payload.status !== prevStatus || now - lastNotifyAt >= interval);
+    const shouldRecoverNotify = payload.status === "ok" && prevStatus !== "ok";
+
+    if (!shouldNotify && !shouldRecoverNotify) {
+      if (payload.status !== prevStatus) {
+        this.d.lastHealthStatus = payload.status;
+        await this.persist();
+      }
+      return;
+    }
+
+    const notification: PipelineHealthNotification = {
+      ...payload,
+      previousStatus: prevStatus,
+      notifiedAt: now,
+      source: "pipeline-health",
+    };
+
+    const res = await fetch(webhook, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(notification),
+    });
+
+    if (!res.ok) {
+      logEvent("warn", "health_webhook_failed", { status: res.status });
+      return;
+    }
+
+    this.d.lastHealthStatus = payload.status;
+    this.d.lastHealthNotifyAt = now;
+    await this.persist();
   }
 
   private async handleDebugFlush(): Promise<Response> {

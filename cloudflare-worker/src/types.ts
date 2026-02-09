@@ -240,6 +240,7 @@ export interface Env {
   DANGER_PASSWORD: string;
   ORACLE_ENDPOINT: string;
   MAX_BATCH_EVENTS: string;
+  ALERT_WEBHOOK_URL?: string;
   /**
    * Optional: Set to "true" to allow HTTP cookies on non-loopback hosts.
    * Use for LAN development only. Production should never set this.
