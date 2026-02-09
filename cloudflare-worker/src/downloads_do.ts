@@ -220,6 +220,173 @@ const FIELD_PATTERNS = {
   language: /^[a-z0-9-]+$/,
 };
 
+type ParsedIp = { kind: "v4" | "v6"; value: bigint };
+type ParsedCidr = { ip: ParsedIp; prefix: number };
+
+function normalizeIp(input: string): string {
+  const ip = (input || "").trim();
+  if (!ip) return "";
+  if (ip.startsWith("[")) {
+    const end = ip.indexOf("]");
+    if (end > 0) {
+      return ip.slice(1, end);
+    }
+  }
+  const colonCount = (ip.match(/:/g) || []).length;
+  if (colonCount === 1 && ip.includes(".") && ip.includes(":")) {
+    return ip.split(":")[0];
+  }
+  return ip;
+}
+
+function parseIPv4Bytes(ip: string): number[] | null {
+  const parts = ip.split(".");
+  if (parts.length !== 4) return null;
+  const nums = parts.map((part) => {
+    if (!/^\d{1,3}$/.test(part)) return -1;
+    const num = Number(part);
+    return num >= 0 && num <= 255 ? num : -1;
+  });
+  if (nums.some((n) => n < 0)) return null;
+  return nums;
+}
+
+function parseIPv4(ip: string): ParsedIp | null {
+  const bytes = parseIPv4Bytes(ip);
+  if (!bytes) return null;
+  const value =
+    (bytes[0] << 24) +
+    (bytes[1] << 16) +
+    (bytes[2] << 8) +
+    bytes[3];
+  return { kind: "v4", value: BigInt(value >>> 0) };
+}
+
+function parseIPv6(input: string): ParsedIp | null {
+  let ip = input.toLowerCase();
+  const zoneIdx = ip.indexOf("%");
+  if (zoneIdx !== -1) {
+    ip = ip.slice(0, zoneIdx);
+  }
+
+  // IPv4-mapped IPv6 (e.g., ::ffff:192.0.2.1)
+  if (ip.includes(".")) {
+    const lastColon = ip.lastIndexOf(":");
+    if (lastColon === -1) return null;
+    const v4Part = ip.slice(lastColon + 1);
+    const bytes = parseIPv4Bytes(v4Part);
+    if (!bytes) return null;
+    const part1 = ((bytes[0] << 8) | bytes[1]).toString(16);
+    const part2 = ((bytes[2] << 8) | bytes[3]).toString(16);
+    ip = `${ip.slice(0, lastColon)}:${part1}:${part2}`;
+  }
+
+  const pieces = ip.split("::");
+  if (pieces.length > 2) return null;
+  const head = pieces[0] ? pieces[0].split(":").filter(Boolean) : [];
+  const tail = pieces[1] ? pieces[1].split(":").filter(Boolean) : [];
+  if (pieces.length === 1 && head.length !== 8) return null;
+
+  const missing = 8 - (head.length + tail.length);
+  if (missing < 0) return null;
+  const full = [...head, ...Array(missing).fill("0"), ...tail];
+  if (full.length !== 8) return null;
+
+  let value = 0n;
+  for (const part of full) {
+    if (!/^[0-9a-f]{1,4}$/.test(part)) return null;
+    const num = Number.parseInt(part, 16);
+    if (!Number.isFinite(num) || num < 0 || num > 0xffff) return null;
+    value = (value << 16n) + BigInt(num);
+  }
+  return { kind: "v6", value };
+}
+
+function parseIp(input: string): ParsedIp | null {
+  const normalized = normalizeIp(input);
+  if (!normalized) return null;
+  if (normalized.includes(":")) {
+    return parseIPv6(normalized);
+  }
+  return parseIPv4(normalized);
+}
+
+function parseCidr(entry: string): ParsedCidr | null {
+  const trimmed = entry.trim();
+  if (!trimmed) return null;
+  const [ipPart, prefixPart] = trimmed.split("/");
+  const parsed = parseIp(ipPart);
+  if (!parsed) return null;
+  const bits = parsed.kind === "v4" ? 32 : 128;
+  const prefix = prefixPart == null || prefixPart === ""
+    ? bits
+    : Number(prefixPart);
+  if (!Number.isFinite(prefix) || prefix < 0 || prefix > bits) return null;
+  return { ip: parsed, prefix: Math.floor(prefix) };
+}
+
+function cidrContains(cidr: ParsedCidr, ip: ParsedIp): boolean {
+  if (cidr.ip.kind !== ip.kind) return false;
+  const bits = cidr.ip.kind === "v4" ? 32 : 128;
+  const prefix = cidr.prefix;
+  if (prefix <= 0) return true;
+  const shift = BigInt(bits - prefix);
+  const fullMask = (1n << BigInt(bits)) - 1n;
+  const mask = fullMask ^ ((1n << shift) - 1n);
+  return (cidr.ip.value & mask) === (ip.value & mask);
+}
+
+function normalizeAllowlistEntry(entry: unknown): string | null {
+  if (typeof entry !== "string") return null;
+  const trimmed = entry.trim();
+  if (!trimmed) return null;
+  return trimmed;
+}
+
+function isIpAllowed(ip: string, allowlist: string[]): boolean {
+  const parsedIp = parseIp(ip);
+  if (!parsedIp) return false;
+  for (const entry of allowlist) {
+    const parsedCidr = parseCidr(entry);
+    if (!parsedCidr) continue;
+    if (cidrContains(parsedCidr, parsedIp)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+async function readJsonBody<T>(
+  request: Request,
+  maxBytes: number,
+): Promise<{ ok: true; value: T } | { ok: false; error: "invalid_json" | "body_too_large"; size?: number }> {
+  const contentLength = request.headers.get("Content-Length");
+  if (contentLength) {
+    const size = Number(contentLength);
+    if (Number.isFinite(size) && size > maxBytes) {
+      return { ok: false, error: "body_too_large", size };
+    }
+  }
+
+  let buffer: ArrayBuffer;
+  try {
+    buffer = await request.arrayBuffer();
+  } catch {
+    return { ok: false, error: "invalid_json" };
+  }
+
+  if (buffer.byteLength > maxBytes) {
+    return { ok: false, error: "body_too_large", size: buffer.byteLength };
+  }
+
+  const text = new TextDecoder().decode(buffer);
+  try {
+    return { ok: true, value: JSON.parse(text) as T };
+  } catch {
+    return { ok: false, error: "invalid_json" };
+  }
+}
+
 /**
  * Decide quota level, mode label, remoteEnabled and batchSizeSuggestion
  * from the current daily request count.
@@ -656,11 +823,7 @@ export class DownloadsDurable {
   }
 
   private getClientIp(request: Request): string {
-    return (
-      request.headers.get("X-Client-IP") ||
-      request.headers.get("CF-Connecting-IP") ||
-      "unknown"
-    );
+    return request.headers.get("CF-Connecting-IP") || "unknown";
   }
 
   private checkTrackRateLimit(ip: string, nowMs: number): { allowed: boolean; retryAfterSec?: number } {
@@ -865,23 +1028,36 @@ export class DownloadsDurable {
     }
 
     // --- Country from CF header ---
-    const countryHeader = request.headers.get("X-Geo-Country");
+    const countryHeader =
+      request.headers.get("CF-IPCountry") ||
+      request.headers.get("X-Geo-Country");
     const countryFromRequest =
-      countryHeader && countryHeader.length > 0
+      countryHeader && countryHeader.length > 0 && countryHeader !== "XX"
         ? countryHeader
         : undefined;
 
     // =========================================================================
     // LAYER 1: PAYLOAD VALIDATION
     // =========================================================================
-    let body: { events?: StoredEvent[]; clientBatchId?: string } | null = null;
-    try {
-      body = await request.json();
-    } catch {
+    const MAX_TRACK_BODY_BYTES = 5 * 1024 * 1024; // 5MB hard limit before parsing
+    const parsedBody = await readJsonBody<{ events?: StoredEvent[]; clientBatchId?: string }>(
+      request,
+      MAX_TRACK_BODY_BYTES,
+    );
+    if (!parsedBody.ok) {
+      if (parsedBody.error === "body_too_large") {
+        logEvent("warn", "track_body_too_large", { size: parsedBody.size ?? -1, maxBytes: MAX_TRACK_BODY_BYTES });
+        await this.persist();
+        return json(
+          { ok: false, error: "body_too_large", maxBytes: MAX_TRACK_BODY_BYTES },
+          { status: 413 },
+        );
+      }
       logEvent("warn", "track_invalid_json");
       await this.persist();
       return json({ ok: false, error: "invalid_json" }, { status: 400 });
     }
+    const body = parsedBody.value;
 
     if (!isPlainObject(body) || !Array.isArray(body.events)) {
       logEvent("warn", "track_invalid_payload");
@@ -2187,7 +2363,7 @@ export class DownloadsDurable {
       return json({ ok: false, error: "invalid_json" }, { status: 400 });
     }
 
-    const ip = body.ip || request.headers.get("X-Client-IP") || "unknown";
+    const ip = body.ip || request.headers.get("CF-Connecting-IP") || "unknown";
     const isSuccess = body.success === true;
     const checkOnly = body.checkOnly === true;
 
@@ -2322,15 +2498,15 @@ export class DownloadsDurable {
       return json({ allowed: true }); // Allow on parse error to prevent lockout
     }
 
-    const ip = body.ip || "unknown";
+    const ip = normalizeIp(body.ip || "");
 
     // If allowlist is disabled, allow all
     if (!this.d.ipAllowlistEnabled || this.d.ipAllowlist.length === 0) {
       return json({ allowed: true });
     }
 
-    // Check exact match
-    const isAllowed = this.d.ipAllowlist.includes(ip);
+    // Check CIDR/IP match
+    const isAllowed = ip ? isIpAllowed(ip, this.d.ipAllowlist) : false;
     
     return json({ allowed: isAllowed });
   }
@@ -2345,11 +2521,8 @@ export class DownloadsDurable {
       return json({ ok: false, error: "unauthorized" }, { status: 401 });
     }
 
-    // Get the client IP from request headers
-    const clientIp = request.headers.get("CF-Connecting-IP") ||
-      request.headers.get("X-Forwarded-For")?.split(",")[0]?.trim() ||
-      request.headers.get("X-Real-IP") ||
-      "unknown";
+    // Get the client IP from request headers (Cloudflare-provided)
+    const clientIp = this.getClientIp(request);
 
     return json({
       ok: true,
@@ -2392,19 +2565,27 @@ export class DownloadsDurable {
 
     // Replace entire allowlist
     if (Array.isArray(body.allowlist)) {
-      this.d.ipAllowlist = body.allowlist.filter(ip => typeof ip === "string" && ip.length > 0);
+      const normalized = body.allowlist
+        .map((entry) => normalizeAllowlistEntry(entry))
+        .filter((entry): entry is string => !!entry)
+        .filter((entry) => parseCidr(entry) !== null);
+      this.d.ipAllowlist = normalized;
       updated = true;
     }
 
     // Add single IP
-    if (body.add && typeof body.add === "string" && !this.d.ipAllowlist.includes(body.add)) {
-      this.d.ipAllowlist.push(body.add);
-      updated = true;
+    if (body.add && typeof body.add === "string") {
+      const entry = normalizeAllowlistEntry(body.add);
+      if (entry && parseCidr(entry) && !this.d.ipAllowlist.includes(entry)) {
+        this.d.ipAllowlist.push(entry);
+        updated = true;
+      }
     }
 
     // Remove single IP
     if (body.remove && typeof body.remove === "string") {
-      const idx = this.d.ipAllowlist.indexOf(body.remove);
+      const entry = normalizeAllowlistEntry(body.remove);
+      const idx = entry ? this.d.ipAllowlist.indexOf(entry) : -1;
       if (idx !== -1) {
         this.d.ipAllowlist.splice(idx, 1);
         updated = true;

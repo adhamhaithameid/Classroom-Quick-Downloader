@@ -1598,10 +1598,10 @@
         var lb = lastBatchData.lastBatch;
         var ds = lastBatchData.doState;
         var html = '<div class="batch-info-grid">';
-        html += '<div class="batch-info-row"><span class="batch-info-label">Status</span><span class="batch-info-value">' + (lastBatchData.status || 'Unknown') + '</span></div>';
+        html += '<div class="batch-info-row"><span class="batch-info-label">Status</span><span class="batch-info-value">' + escapeHtml(lastBatchData.status || 'Unknown') + '</span></div>';
         
         if (lb) {
-          html += '<div class="batch-info-row"><span class="batch-info-label">Last Batch ID</span><span class="batch-info-value" style="font-family:monospace;font-size:11px">' + (lb.batchId || '--') + '</span></div>';
+          html += '<div class="batch-info-row"><span class="batch-info-label">Last Batch ID</span><span class="batch-info-value" style="font-family:monospace;font-size:11px">' + escapeHtml(lb.batchId || '--') + '</span></div>';
           html += '<div class="batch-info-row"><span class="batch-info-label">Received</span><span class="batch-info-value">' + fmtFullDateTime(lb.ingestedAt) + ' (' + timeAgo(lb.ingestedAt) + ')</span></div>';
           html += '<div class="batch-info-row"><span class="batch-info-label">Generated</span><span class="batch-info-value">' + fmtFullDateTime(lb.generatedAt) + '</span></div>';
           html += '<div class="batch-info-row"><span class="batch-info-label">Events</span><span class="batch-info-value">' + fmtNumber(lb.eventsCount) + '</span></div>';
@@ -1837,7 +1837,7 @@
           var rowClass = i === peakIdx ? 'log-row-highlight' : '';
           
           tableHtml += '<tr class="' + rowClass + '">';
-          tableHtml += '<td class="td-primary">' + fmtTimestamp(p.timestamp, granularity) + badges + '</td>';
+          tableHtml += '<td class="td-primary">' + escapeHtml(fmtTimestamp(p.timestamp, granularity)) + badges + '</td>';
           tableHtml += '<td><div class="mini-bar"><div class="mini-bar-fill" style="width:' + barWidth + '%"></div></div>' + fmtNumber(p.downloads) + '</td>';
           tableHtml += '<td style="color:var(--success)">' + fmtNumber(p.success) + '</td>';
           tableHtml += '<td style="color:var(--danger)">' + fmtNumber(p.fail) + '</td>';
@@ -1902,7 +1902,7 @@
         var step = Math.ceil(points.length / 8);
         points.forEach(function(p, i) {
           var label = i % step === 0 ? fmtShortTime(p.timestamp) : '';
-          html += '<span class="chart-x-label">' + label + '</span>';
+          html += '<span class="chart-x-label">' + escapeHtml(label) + '</span>';
         });
         html += '</div></div>';
         container.innerHTML = html;
@@ -1911,11 +1911,11 @@
       function handleBarHover(e) { handleBarMove(e); }
       function handleBarMove(e) {
         var data = JSON.parse(e.target.dataset.point);
-        var html = '<div class="tooltip-title">' + data.time + '</div>';
+        var html = '<div class="tooltip-title">' + escapeHtml(data.time) + '</div>';
         html += '<div class="tooltip-row"><span class="tooltip-label">Downloads</span><span class="tooltip-value">' + fmtNumber(data.downloads) + '</span></div>';
         html += '<div class="tooltip-row"><span class="tooltip-label">Success</span><span class="tooltip-value tooltip-success">' + fmtNumber(data.success) + '</span></div>';
         html += '<div class="tooltip-row"><span class="tooltip-label">Failed</span><span class="tooltip-value tooltip-fail">' + fmtNumber(data.fail) + '</span></div>';
-        html += '<div class="tooltip-row"><span class="tooltip-label">Rate</span><span class="tooltip-value">' + data.rate + '</span></div>';
+        html += '<div class="tooltip-row"><span class="tooltip-label">Rate</span><span class="tooltip-value">' + escapeHtml(data.rate) + '</span></div>';
         showTooltip(e, html);
       }
 

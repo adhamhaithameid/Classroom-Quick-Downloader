@@ -3410,7 +3410,7 @@ export function renderDashboard(stats: StatsResponse): string {
           
           <!-- Add IP Form -->
           <div style="display: flex; gap: 10px; margin-bottom: 16px;">
-            <input type="text" id="add-ip-input" placeholder="Enter IP address (e.g., 192.168.1.1)" style="flex: 1; padding: 10px 14px; background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 0.9rem; outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
+            <input type="text" id="add-ip-input" placeholder="Enter IP/CIDR (e.g., 192.168.1.1, 10.0.0.0/8, 2001:db8::/32)" style="flex: 1; padding: 10px 14px; background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 0.9rem; outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
             <button id="btn-add-ip" class="btn" style="background: var(--accent); color: white; border: none; padding: 10px 18px; font-weight: 600;">
               + Add
             </button>
@@ -5280,10 +5280,42 @@ export function renderDashboard(stats: StatsResponse): string {
         setTimeout(() => toast.remove(), 3000);
       }
       
-      // Utility: Validate IP address
+      // Utility: Validate IP address or CIDR (IPv4/IPv6)
       function isValidIpAddress(ip) {
-        const ipv4Regex = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)[.](25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)[.](25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)[.](25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
-        return ipv4Regex.test(ip);
+        if (!ip || typeof ip !== "string") return false;
+        const value = ip.trim();
+        if (!value) return false;
+        const parts = value.split("/");
+        if (parts.length > 2) return false;
+        const addr = parts[0];
+        const prefix = parts[1];
+        const isV4 = addr.includes(".") && !addr.includes(":");
+        const isV6 = addr.includes(":");
+        if (!isV4 && !isV6) return false;
+
+        if (prefix != null && prefix !== "") {
+          const p = Number(prefix);
+          if (!Number.isFinite(p)) return false;
+          if (isV4 && (p < 0 || p > 32)) return false;
+          if (isV6 && (p < 0 || p > 128)) return false;
+        }
+
+        if (isV4) {
+          const ipv4Regex = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}$/;
+          return ipv4Regex.test(addr);
+        }
+
+        // Basic IPv6 validation with support for :: compression
+        if (addr.includes("::")) {
+          if ((addr.match(/::/g) || []).length > 1) return false;
+        }
+        const groups = addr.split("::");
+        const head = groups[0] ? groups[0].split(":").filter(Boolean) : [];
+        const tail = groups[1] ? groups[1].split(":").filter(Boolean) : [];
+        if (groups.length === 1 && head.length !== 8) return false;
+        if (head.length + tail.length > 8) return false;
+        const all = head.concat(tail);
+        return all.every(part => /^[0-9a-fA-F]{1,4}$/.test(part));
       }
       
       // Render IP list

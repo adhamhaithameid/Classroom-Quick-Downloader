@@ -118,6 +118,17 @@ async function callDOWithoutAdmin(obj: DownloadsDurable, path: string, body: unk
   }));
 }
 
+async function callDORaw(obj: DownloadsDurable, path: string, body: string, headers?: Record<string, string>) {
+  return obj.fetch(new Request(`http://do${path}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(headers ?? {}),
+    },
+    body,
+  }));
+}
+
 async function callDOGet(obj: DownloadsDurable, path: string) {
   return obj.fetch(new Request(`http://do${path}`, {
     method: "GET",
@@ -204,7 +215,7 @@ describe("Durable Object security behaviors", () => {
     const { obj, state } = makeDO();
     const res = await callDO(obj, "/track", {
       events: [makeEvent({ ip_address: "5.5.5.5" })],
-    }, { "X-Client-IP": "5.5.5.5" });
+    }, { "CF-Connecting-IP": "5.5.5.5" });
     expect(res.status).toBe(202);
     const stored = await state.storage.get<StoredState>(STORAGE_KEY);
     expect(stored.buffer?.[0]?.ip_address).toBeUndefined();
@@ -255,6 +266,15 @@ describe("Durable Object security behaviors", () => {
     const { obj } = makeDO();
     const res = await callDO(obj, "/track", { events: "nope" });
     expect(res.status).toBe(400);
+  });
+
+  it("rejects oversized track bodies before parsing", async () => {
+    const { obj } = makeDO();
+    const bigBody = "a".repeat(5 * 1024 * 1024 + 64);
+    const res = await callDORaw(obj, "/track", bigBody, {
+      "Content-Length": String(bigBody.length),
+    });
+    expect(res.status).toBe(413);
   });
 
   it("requires oracle ack with matching batchId", async () => {
@@ -402,9 +422,53 @@ describe("Durable Object security behaviors", () => {
     const { obj } = makeDO();
     let lastStatus = 0;
     for (let i = 0; i < 121; i++) {
-      const res = await callDO(obj, "/track", { events: [makeEvent()] }, { "X-Client-IP": "9.9.9.9" });
+      const res = await callDO(obj, "/track", { events: [makeEvent()] }, { "CF-Connecting-IP": "9.9.9.9" });
       lastStatus = res.status;
     }
     expect(lastStatus).toBe(429);
+  });
+
+  it("ignores X-Client-IP when rate limiting /track", async () => {
+    const { obj } = makeDO();
+    let lastStatus = 0;
+    for (let i = 0; i < 121; i++) {
+      const res = await callDO(obj, "/track", { events: [makeEvent()] }, {
+        "CF-Connecting-IP": "7.7.7.7",
+        "X-Client-IP": `1.2.3.${i}`,
+      });
+      lastStatus = res.status;
+    }
+    expect(lastStatus).toBe(429);
+  });
+
+  it("accepts CF-IPCountry fallback for track country", async () => {
+    const { obj, state } = makeDO();
+    const res = await callDO(obj, "/track", { events: [makeEvent()] }, {
+      "CF-Connecting-IP": "3.3.3.3",
+      "CF-IPCountry": "GB",
+    });
+    expect(res.status).toBe(202);
+    const stored = await state.storage.get<StoredState>(STORAGE_KEY);
+    expect(stored.buffer?.[0]?.country).toBe("gb");
+  });
+
+  it("supports IPv4/IPv6 CIDR entries in allowlist", async () => {
+    const { obj } = makeDO();
+    await callDO(obj, "/admin/ip-allowlist", {
+      enabled: true,
+      allowlist: ["10.0.0.0/8", "2001:db8::/32"],
+    }, { "X-Admin-Secret": "secret" });
+
+    const v4Allowed = await callDO(obj, "/auth/check-ip-allowlist", { ip: "10.1.2.3" });
+    const v4Payload = await v4Allowed.json() as { allowed: boolean };
+    expect(v4Payload.allowed).toBe(true);
+
+    const v6Allowed = await callDO(obj, "/auth/check-ip-allowlist", { ip: "2001:db8::1" });
+    const v6Payload = await v6Allowed.json() as { allowed: boolean };
+    expect(v6Payload.allowed).toBe(true);
+
+    const denied = await callDO(obj, "/auth/check-ip-allowlist", { ip: "192.168.1.1" });
+    const deniedPayload = await denied.json() as { allowed: boolean };
+    expect(deniedPayload.allowed).toBe(false);
   });
 });

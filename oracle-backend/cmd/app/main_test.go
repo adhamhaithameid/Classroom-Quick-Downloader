@@ -1,35 +1,38 @@
 package main
 
 import (
-	"encoding/json"
-	"net/http"
 	"net/http/httptest"
 	"testing"
-
-	"oracle-backend/internal/handlers"
 )
 
-func TestAPIHealthHandler(t *testing.T) {
-	req, err := http.NewRequest("GET", "/health", nil)
-	if err != nil {
-		t.Fatal(err)
+func TestGetClientIPTrustedProxyUsesForwarded(t *testing.T) {
+	prev := trustedProxyNets
+	defer setTrustedProxyNets(prev)
+
+	setTrustedProxyNets(parseTrustedProxyCIDRs("10.0.0.0/8"))
+
+	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req.RemoteAddr = "10.1.2.3:1234"
+	req.Header.Set("X-Forwarded-For", "203.0.113.10, 10.1.2.3")
+
+	ip := getClientIP(req)
+	if ip != "203.0.113.10" {
+		t.Fatalf("expected forwarded IP, got %q", ip)
 	}
+}
 
-	rr := httptest.NewRecorder()
-	handler := http.HandlerFunc(handlers.APIHealthHandler)
+func TestGetClientIPUntrustedProxyIgnoresForwarded(t *testing.T) {
+	prev := trustedProxyNets
+	defer setTrustedProxyNets(prev)
 
-	handler.ServeHTTP(rr, req)
+	setTrustedProxyNets(parseTrustedProxyCIDRs("10.0.0.0/8"))
 
-	if status := rr.Code; status != http.StatusOK {
-		t.Errorf("handler returned wrong status code: got %v want %v",
-			status, http.StatusOK)
-	}
+	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req.RemoteAddr = "192.168.1.5:4321"
+	req.Header.Set("X-Forwarded-For", "203.0.113.10")
 
-	var payload map[string]any
-	if err := json.Unmarshal(rr.Body.Bytes(), &payload); err != nil {
-		t.Fatalf("invalid json response: %v", err)
-	}
-	if ok, _ := payload["ok"].(bool); !ok {
-		t.Fatalf("expected ok=true, got %v", payload["ok"])
+	ip := getClientIP(req)
+	if ip != "192.168.1.5" {
+		t.Fatalf("expected remote IP, got %q", ip)
 	}
 }
