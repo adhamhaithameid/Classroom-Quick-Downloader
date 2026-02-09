@@ -549,6 +549,24 @@ export function renderDashboard(stats: StatsResponse): string {
   const cfgAllowLegacy = remoteConfig.allowLegacyEvents ?? true;
   const cfgRemoteReason = remoteConfig.remoteEnabledReason ?? "ok";
   const pipelineHealthUrl = `${workerUrl}/pipeline-health`;
+  const cfgHealth = remoteConfig.healthThresholds || {
+    warnPendingBatches: 10,
+    criticalPendingBatches: 25,
+    warnFailures: 3,
+    criticalFailures: 5,
+    warnStaleMs: 6 * 60 * 60 * 1000,
+    criticalStaleMs: 24 * 60 * 60 * 1000,
+    warnBufferUtil: 0.8,
+    criticalBufferUtil: 0.95,
+  };
+  const cfgHealthWarnPending = cfgHealth.warnPendingBatches ?? 10;
+  const cfgHealthCritPending = cfgHealth.criticalPendingBatches ?? 25;
+  const cfgHealthWarnFailures = cfgHealth.warnFailures ?? 3;
+  const cfgHealthCritFailures = cfgHealth.criticalFailures ?? 5;
+  const cfgHealthWarnStaleHours = Math.round((cfgHealth.warnStaleMs ?? 21600000) / 3600000);
+  const cfgHealthCritStaleHours = Math.round((cfgHealth.criticalStaleMs ?? 86400000) / 3600000);
+  const cfgHealthWarnBufferPct = Math.round((cfgHealth.warnBufferUtil ?? 0.8) * 100);
+  const cfgHealthCritBufferPct = Math.round((cfgHealth.criticalBufferUtil ?? 0.95) * 100);
 
   const renderTableRows = (data: Record<string, number>) => {
     const keys = Object.keys(data).sort((a, b) => data[b] - data[a]);
@@ -1402,6 +1420,21 @@ export function renderDashboard(stats: StatsResponse): string {
       font-size: 0.75rem;
       color: var(--text-muted);
       line-height: 1.4;
+    }
+
+    .rc-section-title {
+      margin-top: var(--space-4);
+      margin-bottom: var(--space-2);
+      font-size: 0.75rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-disabled);
+    }
+
+    .rc-section-desc {
+      margin-bottom: var(--space-4);
+      font-size: 0.8rem;
+      color: var(--text-muted);
     }
 
     .rc-actions {
@@ -3079,6 +3112,10 @@ export function renderDashboard(stats: StatsResponse): string {
             <strong id="pipeline-health-last-event">—</strong>
           </div>
           <div class="health-detail">
+            Last Health Alert (UTC)
+            <strong id="pipeline-health-last-alert">—</strong>
+          </div>
+          <div class="health-detail">
             Committed Seq
             <strong id="pipeline-health-committed">—</strong>
           </div>
@@ -3456,6 +3493,52 @@ export function renderDashboard(stats: StatsResponse): string {
             <label>Cancel Hold Delay (ms)</label>
             <input class="rc-input" type="number" id="cfg-cancel-hold" min="0" max="10000" value="${cfgCancelHold}">
             <div class="rc-hint">Delay before cancel button becomes active.</div>
+          </div>
+        </div>
+        <div class="rc-section-title">Pipeline Health Thresholds</div>
+        <div class="rc-section-desc">
+          Control when <code>/pipeline-health</code> flips to warn/critical based on backlog, failures, and staleness.
+        </div>
+        <div class="rc-grid">
+          <div class="rc-field" data-tooltip="Warn when pending batch count reaches this number.">
+            <label>Pending Batches (Warn)</label>
+            <input class="rc-input" type="number" id="cfg-health-pending-warn" min="0" max="1000" value="${cfgHealthWarnPending}">
+            <div class="rc-hint">Warn when pending batches ≥ this value.</div>
+          </div>
+          <div class="rc-field" data-tooltip="Critical when pending batch count reaches this number.">
+            <label>Pending Batches (Critical)</label>
+            <input class="rc-input" type="number" id="cfg-health-pending-critical" min="0" max="2000" value="${cfgHealthCritPending}">
+            <div class="rc-hint">Critical when pending batches ≥ this value.</div>
+          </div>
+          <div class="rc-field" data-tooltip="Warn when consecutive Oracle failures reach this number.">
+            <label>Failures (Warn)</label>
+            <input class="rc-input" type="number" id="cfg-health-fail-warn" min="0" max="100" value="${cfgHealthWarnFailures}">
+            <div class="rc-hint">Warn when failures ≥ this value.</div>
+          </div>
+          <div class="rc-field" data-tooltip="Critical when consecutive Oracle failures reach this number.">
+            <label>Failures (Critical)</label>
+            <input class="rc-input" type="number" id="cfg-health-fail-critical" min="0" max="100" value="${cfgHealthCritFailures}">
+            <div class="rc-hint">Critical when failures ≥ this value.</div>
+          </div>
+          <div class="rc-field" data-tooltip="Warn when the time since last flush exceeds this many hours.">
+            <label>Flush Stale (Warn, hours)</label>
+            <input class="rc-input" type="number" id="cfg-health-stale-warn" min="0" max="720" value="${cfgHealthWarnStaleHours}">
+            <div class="rc-hint">Warn if no flush for this many hours.</div>
+          </div>
+          <div class="rc-field" data-tooltip="Critical when the time since last flush exceeds this many hours.">
+            <label>Flush Stale (Critical, hours)</label>
+            <input class="rc-input" type="number" id="cfg-health-stale-critical" min="0" max="720" value="${cfgHealthCritStaleHours}">
+            <div class="rc-hint">Critical if no flush for this many hours.</div>
+          </div>
+          <div class="rc-field" data-tooltip="Warn when buffer utilization reaches this percentage.">
+            <label>Buffer Util (Warn %)</label>
+            <input class="rc-input" type="number" id="cfg-health-buffer-warn" min="0" max="100" value="${cfgHealthWarnBufferPct}">
+            <div class="rc-hint">Warn when buffer ≥ this percent.</div>
+          </div>
+          <div class="rc-field" data-tooltip="Critical when buffer utilization reaches this percentage.">
+            <label>Buffer Util (Critical %)</label>
+            <input class="rc-input" type="number" id="cfg-health-buffer-critical" min="0" max="100" value="${cfgHealthCritBufferPct}">
+            <div class="rc-hint">Critical when buffer ≥ this percent.</div>
           </div>
         </div>
         <div class="rc-actions">
@@ -4523,6 +4606,7 @@ export function renderDashboard(stats: StatsResponse): string {
         const failuresEl = document.getElementById("pipeline-health-failures");
         const lastFlushEl = document.getElementById("pipeline-health-last-flush");
         const lastEventEl = document.getElementById("pipeline-health-last-event");
+        const lastAlertEl = document.getElementById("pipeline-health-last-alert");
         const committedEl = document.getElementById("pipeline-health-committed");
         const maxBufferEl = document.getElementById("pipeline-health-max-buffer");
         const rawEl = document.getElementById("raw-health-json");
@@ -4575,6 +4659,15 @@ export function renderDashboard(stats: StatsResponse): string {
         if (lastEventEl) {
           lastEventEl.textContent = ok ? formatTs(health?.lastEventAt ?? null) : "—";
         }
+        if (lastAlertEl) {
+          if (!ok) {
+            lastAlertEl.textContent = "—";
+          } else if (health?.lastHealthNotifyAt) {
+            lastAlertEl.textContent = formatTs(health.lastHealthNotifyAt);
+          } else {
+            lastAlertEl.textContent = "Never";
+          }
+        }
         if (committedEl) {
           committedEl.textContent = ok ? String(health?.committedSeq ?? "—") : "—";
         }
@@ -4611,12 +4704,40 @@ export function renderDashboard(stats: StatsResponse): string {
         dailyFlushWindowStartUtc: 1,
         dailyFlushWindowMinutes: 120,
         cancelHoldDelayMs: 1000,
+        healthThresholds: {
+          warnPendingBatches: 10,
+          criticalPendingBatches: 25,
+          warnFailures: 3,
+          criticalFailures: 5,
+          warnStaleMs: 6 * 60 * 60 * 1000,
+          criticalStaleMs: 24 * 60 * 60 * 1000,
+          warnBufferUtil: 0.8,
+          criticalBufferUtil: 0.95,
+        },
       };
 
       function clampInt(value, min, max, fallback) {
         const num = Number(value);
         if (!Number.isFinite(num)) return fallback;
         return Math.min(max, Math.max(min, Math.floor(num)));
+      }
+
+      function clampFloat(value, min, max, fallback) {
+        const num = Number(value);
+        if (!Number.isFinite(num)) return fallback;
+        return Math.min(max, Math.max(min, num));
+      }
+
+      function msToHours(valueMs, fallback) {
+        const num = Number(valueMs);
+        if (!Number.isFinite(num) || num < 0) return fallback;
+        return Math.round(num / 3600000);
+      }
+
+      function ratioToPercent(value, fallback) {
+        const num = Number(value);
+        if (!Number.isFinite(num) || num < 0) return fallback;
+        return Math.round(num * 100);
       }
 
       function setConfigStatus(text, cls) {
@@ -4662,6 +4783,7 @@ export function renderDashboard(stats: StatsResponse): string {
           dailyFlushWindowStartUtc: cfg.dailyFlushWindowStartUtc ?? cfgDefaults.dailyFlushWindowStartUtc,
           dailyFlushWindowMinutes: cfg.dailyFlushWindowMinutes ?? cfgDefaults.dailyFlushWindowMinutes,
           cancelHoldDelayMs: cfg.cancelHoldDelayMs ?? cfgDefaults.cancelHoldDelayMs,
+          healthThresholds: cfg.healthThresholds || cfgDefaults.healthThresholds,
           configVersion: cfg.configVersion,
         };
 
@@ -4677,6 +4799,14 @@ export function renderDashboard(stats: StatsResponse): string {
         setValue("cfg-window-start", merged.dailyFlushWindowStartUtc);
         setValue("cfg-window-minutes", merged.dailyFlushWindowMinutes);
         setValue("cfg-cancel-hold", merged.cancelHoldDelayMs);
+        setValue("cfg-health-pending-warn", merged.healthThresholds.warnPendingBatches);
+        setValue("cfg-health-pending-critical", merged.healthThresholds.criticalPendingBatches);
+        setValue("cfg-health-fail-warn", merged.healthThresholds.warnFailures);
+        setValue("cfg-health-fail-critical", merged.healthThresholds.criticalFailures);
+        setValue("cfg-health-stale-warn", msToHours(merged.healthThresholds.warnStaleMs, 6));
+        setValue("cfg-health-stale-critical", msToHours(merged.healthThresholds.criticalStaleMs, 24));
+        setValue("cfg-health-buffer-warn", ratioToPercent(merged.healthThresholds.warnBufferUtil, 80));
+        setValue("cfg-health-buffer-critical", ratioToPercent(merged.healthThresholds.criticalBufferUtil, 95));
 
         const flushEl = document.getElementById("cfg-flush-mode");
         if (flushEl) flushEl.value = merged.flushMode;
@@ -4735,6 +4865,22 @@ export function renderDashboard(stats: StatsResponse): string {
         return clampInt(el.value, min, max, fallback);
       }
 
+      function readFloat(id, min, max, fallback) {
+        const el = document.getElementById(id);
+        if (!el) return fallback;
+        return clampFloat(el.value, min, max, fallback);
+      }
+
+      function readHoursMs(id, fallbackMs) {
+        const hours = readFloat(id, 0, 720, fallbackMs / 3600000);
+        return Math.round(hours * 3600000);
+      }
+
+      function readPercentRatio(id, fallbackRatio) {
+        const pct = readFloat(id, 0, 100, fallbackRatio * 100);
+        return pct / 100;
+      }
+
       async function sendRemoteConfigUpdate(payload) {
         const btnSave = document.getElementById("btn-config-save");
         if (btnSave) {
@@ -4785,6 +4931,14 @@ export function renderDashboard(stats: StatsResponse): string {
         "cfg-window-start",
         "cfg-window-minutes",
         "cfg-cancel-hold",
+        "cfg-health-pending-warn",
+        "cfg-health-pending-critical",
+        "cfg-health-fail-warn",
+        "cfg-health-fail-critical",
+        "cfg-health-stale-warn",
+        "cfg-health-stale-critical",
+        "cfg-health-buffer-warn",
+        "cfg-health-buffer-critical",
       ];
       cfgInputs.forEach((id) => {
         const el = document.getElementById(id);
@@ -4846,6 +5000,16 @@ export function renderDashboard(stats: StatsResponse): string {
             dailyFlushWindowStartUtc: readNum("cfg-window-start", 0, 23, cfgDefaults.dailyFlushWindowStartUtc),
             dailyFlushWindowMinutes: readNum("cfg-window-minutes", 1, 1440, cfgDefaults.dailyFlushWindowMinutes),
             cancelHoldDelayMs: readNum("cfg-cancel-hold", 0, 10000, cfgDefaults.cancelHoldDelayMs),
+            healthThresholds: {
+              warnPendingBatches: readNum("cfg-health-pending-warn", 0, 1000, cfgDefaults.healthThresholds.warnPendingBatches),
+              criticalPendingBatches: readNum("cfg-health-pending-critical", 0, 2000, cfgDefaults.healthThresholds.criticalPendingBatches),
+              warnFailures: readNum("cfg-health-fail-warn", 0, 100, cfgDefaults.healthThresholds.warnFailures),
+              criticalFailures: readNum("cfg-health-fail-critical", 0, 100, cfgDefaults.healthThresholds.criticalFailures),
+              warnStaleMs: readHoursMs("cfg-health-stale-warn", cfgDefaults.healthThresholds.warnStaleMs),
+              criticalStaleMs: readHoursMs("cfg-health-stale-critical", cfgDefaults.healthThresholds.criticalStaleMs),
+              warnBufferUtil: readPercentRatio("cfg-health-buffer-warn", cfgDefaults.healthThresholds.warnBufferUtil),
+              criticalBufferUtil: readPercentRatio("cfg-health-buffer-critical", cfgDefaults.healthThresholds.criticalBufferUtil),
+            },
           };
           sendRemoteConfigUpdate(payload);
         };

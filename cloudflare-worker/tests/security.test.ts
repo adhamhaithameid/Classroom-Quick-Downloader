@@ -21,6 +21,14 @@ type StoredState = {
   retryState?: { consecutiveFailures?: number };
   lastFlushAt?: number;
   configMaxBufferSize?: number;
+  configHealthWarnPendingBatches?: number;
+  configHealthCriticalPendingBatches?: number;
+  configHealthWarnFailures?: number;
+  configHealthCriticalFailures?: number;
+  configHealthWarnStaleMs?: number;
+  configHealthCriticalStaleMs?: number;
+  configHealthWarnBufferUtil?: number;
+  configHealthCriticalBufferUtil?: number;
 };
 
 type TestEvent = {
@@ -631,5 +639,35 @@ describe("Durable Object security behaviors", () => {
     const payload = await res.json() as { status?: string; reasons?: string[] };
     expect(payload.status).toBe("warn");
     expect(payload.reasons || []).toContain("pending_batches_elevated");
+  });
+
+  it("uses configured pipeline health thresholds", async () => {
+    const { obj } = makeDOWithStored({
+      configHealthWarnPendingBatches: 2,
+      configHealthCriticalPendingBatches: 4,
+      configHealthWarnFailures: 1,
+      configHealthCriticalFailures: 2,
+      configHealthWarnStaleMs: 1000,
+      configHealthCriticalStaleMs: 2000,
+      configHealthWarnBufferUtil: 0.4,
+      configHealthCriticalBufferUtil: 0.6,
+      buffer: [],
+      pendingBatches: [],
+      retryState: { consecutiveFailures: 0 },
+      lastFlushAt: Date.now(),
+      configMaxBufferSize: 50000,
+    });
+
+    const res = await callDOGet(obj, "/pipeline-health");
+    expect(res.status).toBe(200);
+    const payload = await res.json() as { thresholds?: Record<string, unknown> };
+    expect(payload.thresholds?.warnPendingBatches).toBe(2);
+    expect(payload.thresholds?.criticalPendingBatches).toBe(4);
+    expect(payload.thresholds?.warnFailures).toBe(1);
+    expect(payload.thresholds?.criticalFailures).toBe(2);
+    expect(payload.thresholds?.warnStaleMs).toBe(1000);
+    expect(payload.thresholds?.criticalStaleMs).toBe(2000);
+    expect(payload.thresholds?.warnBufferUtil).toBe(0.4);
+    expect(payload.thresholds?.criticalBufferUtil).toBe(0.6);
   });
 });

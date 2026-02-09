@@ -106,5 +106,6 @@ describe("Dashboard pipeline health UI", () => {
     expect(html).toContain('id="pipeline-health"');
     expect(html).toContain('id="pipeline-health-chip"');
     expect(html).toContain('id="raw-health-json"');
+    expect(html).toContain('id="pipeline-health-last-alert"');
   });
 });

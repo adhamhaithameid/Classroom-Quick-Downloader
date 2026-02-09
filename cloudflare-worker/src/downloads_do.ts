@@ -137,6 +137,16 @@ type DurableStateShape = {
   // Default: true (temporary migration support)
   configAllowLegacyEvents: boolean;
 
+  // Pipeline health thresholds (configurable from dashboard)
+  configHealthWarnPendingBatches: number;
+  configHealthCriticalPendingBatches: number;
+  configHealthWarnFailures: number;
+  configHealthCriticalFailures: number;
+  configHealthWarnStaleMs: number;
+  configHealthCriticalStaleMs: number;
+  configHealthWarnBufferUtil: number;
+  configHealthCriticalBufferUtil: number;
+
   // Pipeline health notification state
   lastHealthStatus?: PipelineHealthStatus;
   lastHealthNotifyAt?: number | null;
@@ -212,6 +222,11 @@ function todayUtcDate(): string {
 function clampInt(value: unknown, min: number, max: number, fallback: number): number {
   if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
   return Math.min(max, Math.max(min, Math.floor(value)));
+}
+
+function clampFloat(value: unknown, min: number, max: number, fallback: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
+  return Math.min(max, Math.max(min, value));
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -388,6 +403,7 @@ type PipelineHealthResponse = {
   lastFlushAt: number | null;
   lastEventAt: number | null;
   committedSeq: number;
+  lastHealthNotifyAt: number | null;
   thresholds: {
     warnPendingBatches: number;
     criticalPendingBatches: number;
@@ -639,6 +655,14 @@ export class DownloadsDurable {
       configTimeFlushMinutes: { low: 1440, mid: 1440, high: 1440 }, // 1440 = 24h = next day
       configCancelHoldDelayMs: 1000, // 1 second default
       configAllowLegacyEvents: true,
+      configHealthWarnPendingBatches: HEALTH_WARN_PENDING_BATCHES,
+      configHealthCriticalPendingBatches: HEALTH_CRIT_PENDING_BATCHES,
+      configHealthWarnFailures: HEALTH_WARN_FAILURES,
+      configHealthCriticalFailures: HEALTH_CRIT_FAILURES,
+      configHealthWarnStaleMs: HEALTH_WARN_STALE_MS,
+      configHealthCriticalStaleMs: HEALTH_CRIT_STALE_MS,
+      configHealthWarnBufferUtil: HEALTH_WARN_BUFFER_UTIL,
+      configHealthCriticalBufferUtil: HEALTH_CRIT_BUFFER_UTIL,
 
       // Changelog defaults
       changelog: [],
@@ -721,6 +745,22 @@ export class DownloadsDurable {
         typeof stored.configAllowLegacyEvents === "boolean"
           ? stored.configAllowLegacyEvents
           : base.configAllowLegacyEvents,
+      configHealthWarnPendingBatches:
+        stored.configHealthWarnPendingBatches ?? base.configHealthWarnPendingBatches,
+      configHealthCriticalPendingBatches:
+        stored.configHealthCriticalPendingBatches ?? base.configHealthCriticalPendingBatches,
+      configHealthWarnFailures:
+        stored.configHealthWarnFailures ?? base.configHealthWarnFailures,
+      configHealthCriticalFailures:
+        stored.configHealthCriticalFailures ?? base.configHealthCriticalFailures,
+      configHealthWarnStaleMs:
+        stored.configHealthWarnStaleMs ?? base.configHealthWarnStaleMs,
+      configHealthCriticalStaleMs:
+        stored.configHealthCriticalStaleMs ?? base.configHealthCriticalStaleMs,
+      configHealthWarnBufferUtil:
+        stored.configHealthWarnBufferUtil ?? base.configHealthWarnBufferUtil,
+      configHealthCriticalBufferUtil:
+        stored.configHealthCriticalBufferUtil ?? base.configHealthCriticalBufferUtil,
 
       changelog: Array.isArray(stored.changelog) ? stored.changelog : base.changelog,
       changelogConfig: stored.changelogConfig ?? base.changelogConfig,
@@ -792,6 +832,105 @@ export class DownloadsDurable {
       configDirty = true;
     }
 
+    const warnPending = clampInt(
+      this.data.configHealthWarnPendingBatches,
+      0,
+      1000,
+      base.configHealthWarnPendingBatches,
+    );
+    const critPending = clampInt(
+      this.data.configHealthCriticalPendingBatches,
+      0,
+      2000,
+      base.configHealthCriticalPendingBatches,
+    );
+    const warnFailures = clampInt(
+      this.data.configHealthWarnFailures,
+      0,
+      100,
+      base.configHealthWarnFailures,
+    );
+    const critFailures = clampInt(
+      this.data.configHealthCriticalFailures,
+      0,
+      100,
+      base.configHealthCriticalFailures,
+    );
+    const warnStaleMs = clampInt(
+      this.data.configHealthWarnStaleMs,
+      0,
+      30 * 24 * 60 * 60 * 1000,
+      base.configHealthWarnStaleMs,
+    );
+    const critStaleMs = clampInt(
+      this.data.configHealthCriticalStaleMs,
+      0,
+      30 * 24 * 60 * 60 * 1000,
+      base.configHealthCriticalStaleMs,
+    );
+    const warnBuffer = clampFloat(
+      this.data.configHealthWarnBufferUtil,
+      0,
+      1,
+      base.configHealthWarnBufferUtil,
+    );
+    const critBuffer = clampFloat(
+      this.data.configHealthCriticalBufferUtil,
+      0,
+      1,
+      base.configHealthCriticalBufferUtil,
+    );
+
+    const pendingOk = warnPending <= critPending;
+    const failuresOk = warnFailures <= critFailures;
+    const staleOk = warnStaleMs <= critStaleMs;
+    const bufferOk = warnBuffer <= critBuffer;
+
+    if (!pendingOk || !failuresOk || !staleOk || !bufferOk) {
+      this.data.configHealthWarnPendingBatches = base.configHealthWarnPendingBatches;
+      this.data.configHealthCriticalPendingBatches = base.configHealthCriticalPendingBatches;
+      this.data.configHealthWarnFailures = base.configHealthWarnFailures;
+      this.data.configHealthCriticalFailures = base.configHealthCriticalFailures;
+      this.data.configHealthWarnStaleMs = base.configHealthWarnStaleMs;
+      this.data.configHealthCriticalStaleMs = base.configHealthCriticalStaleMs;
+      this.data.configHealthWarnBufferUtil = base.configHealthWarnBufferUtil;
+      this.data.configHealthCriticalBufferUtil = base.configHealthCriticalBufferUtil;
+      configDirty = true;
+    } else {
+      if (warnPending !== this.data.configHealthWarnPendingBatches) {
+        this.data.configHealthWarnPendingBatches = warnPending;
+        configDirty = true;
+      }
+      if (critPending !== this.data.configHealthCriticalPendingBatches) {
+        this.data.configHealthCriticalPendingBatches = critPending;
+        configDirty = true;
+      }
+      if (warnFailures !== this.data.configHealthWarnFailures) {
+        this.data.configHealthWarnFailures = warnFailures;
+        configDirty = true;
+      }
+      if (critFailures !== this.data.configHealthCriticalFailures) {
+        this.data.configHealthCriticalFailures = critFailures;
+        configDirty = true;
+      }
+      if (warnStaleMs !== this.data.configHealthWarnStaleMs) {
+        this.data.configHealthWarnStaleMs = warnStaleMs;
+        configDirty = true;
+      }
+      if (critStaleMs !== this.data.configHealthCriticalStaleMs) {
+        this.data.configHealthCriticalStaleMs = critStaleMs;
+        configDirty = true;
+      }
+      if (warnBuffer !== this.data.configHealthWarnBufferUtil) {
+        this.data.configHealthWarnBufferUtil = warnBuffer;
+        configDirty = true;
+      }
+      if (critBuffer !== this.data.configHealthCriticalBufferUtil) {
+        this.data.configHealthCriticalBufferUtil = critBuffer;
+        configDirty = true;
+      }
+    }
+
     if (this.data.configFlushMode !== "next_day" && this.data.configFlushMode !== "time_based") {
       this.data.configFlushMode = base.configFlushMode;
       configDirty = true;
@@ -808,7 +947,15 @@ export class DownloadsDurable {
       this.data.configCancelHoldDelayMs !== stored.configCancelHoldDelayMs ||
       this.data.configAllowLegacyEvents !== stored.configAllowLegacyEvents ||
       this.data.configFlushMode !== stored.configFlushMode ||
-      JSON.stringify(this.data.configTimeFlushMinutes) !== JSON.stringify(stored.configTimeFlushMinutes)
+      JSON.stringify(this.data.configTimeFlushMinutes) !== JSON.stringify(stored.configTimeFlushMinutes) ||
+      this.data.configHealthWarnPendingBatches !== stored.configHealthWarnPendingBatches ||
+      this.data.configHealthCriticalPendingBatches !== stored.configHealthCriticalPendingBatches ||
+      this.data.configHealthWarnFailures !== stored.configHealthWarnFailures ||
+      this.data.configHealthCriticalFailures !== stored.configHealthCriticalFailures ||
+      this.data.configHealthWarnStaleMs !== stored.configHealthWarnStaleMs ||
+      this.data.configHealthCriticalStaleMs !== stored.configHealthCriticalStaleMs ||
+      this.data.configHealthWarnBufferUtil !== stored.configHealthWarnBufferUtil ||
+      this.data.configHealthCriticalBufferUtil !== stored.configHealthCriticalBufferUtil
     ) {
       configDirty = true;
     }
@@ -1403,6 +1550,16 @@ export class DownloadsDurable {
       dailyFlushWindowMinutes: this.d.configDailyFlushWindowMinutes ?? DEFAULT_DAILY_FLUSH_WINDOW_MINUTES,
       cancelHoldDelayMs: this.d.configCancelHoldDelayMs ?? 1000,
       allowLegacyEvents: this.d.configAllowLegacyEvents ?? true,
+      healthThresholds: {
+        warnPendingBatches: this.d.configHealthWarnPendingBatches ?? HEALTH_WARN_PENDING_BATCHES,
+        criticalPendingBatches: this.d.configHealthCriticalPendingBatches ?? HEALTH_CRIT_PENDING_BATCHES,
+        warnFailures: this.d.configHealthWarnFailures ?? HEALTH_WARN_FAILURES,
+        criticalFailures: this.d.configHealthCriticalFailures ?? HEALTH_CRIT_FAILURES,
+        warnStaleMs: this.d.configHealthWarnStaleMs ?? HEALTH_WARN_STALE_MS,
+        criticalStaleMs: this.d.configHealthCriticalStaleMs ?? HEALTH_CRIT_STALE_MS,
+        warnBufferUtil: this.d.configHealthWarnBufferUtil ?? HEALTH_WARN_BUFFER_UTIL,
+        criticalBufferUtil: this.d.configHealthCriticalBufferUtil ?? HEALTH_CRIT_BUFFER_UTIL,
+      },
       remoteEnabledReason: "ok",
       hardRemoteOff: this.d.hardRemoteOff ?? false,
     };
@@ -1509,6 +1666,18 @@ export class DownloadsDurable {
       // Legacy acceptance flag (worker-side only, exposed for visibility)
       allowLegacyEvents: this.d.configAllowLegacyEvents,
 
+      // Pipeline health thresholds (dashboard-configurable)
+      healthThresholds: {
+        warnPendingBatches: this.d.configHealthWarnPendingBatches ?? HEALTH_WARN_PENDING_BATCHES,
+        criticalPendingBatches: this.d.configHealthCriticalPendingBatches ?? HEALTH_CRIT_PENDING_BATCHES,
+        warnFailures: this.d.configHealthWarnFailures ?? HEALTH_WARN_FAILURES,
+        criticalFailures: this.d.configHealthCriticalFailures ?? HEALTH_CRIT_FAILURES,
+        warnStaleMs: this.d.configHealthWarnStaleMs ?? HEALTH_WARN_STALE_MS,
+        criticalStaleMs: this.d.configHealthCriticalStaleMs ?? HEALTH_CRIT_STALE_MS,
+        warnBufferUtil: this.d.configHealthWarnBufferUtil ?? HEALTH_WARN_BUFFER_UTIL,
+        criticalBufferUtil: this.d.configHealthCriticalBufferUtil ?? HEALTH_CRIT_BUFFER_UTIL,
+      },
+
       // Server UTC time for drift correction
       serverTimeUtc: Date.now(),
 
@@ -1551,6 +1720,15 @@ export class DownloadsDurable {
     const lastEventAt = this.d.lastEventAt ?? null;
     const sinceFlushMs = lastFlushAt != null ? now - lastFlushAt : null;
 
+    const warnPending = this.d.configHealthWarnPendingBatches ?? HEALTH_WARN_PENDING_BATCHES;
+    const critPending = this.d.configHealthCriticalPendingBatches ?? HEALTH_CRIT_PENDING_BATCHES;
+    const warnFailures = this.d.configHealthWarnFailures ?? HEALTH_WARN_FAILURES;
+    const critFailures = this.d.configHealthCriticalFailures ?? HEALTH_CRIT_FAILURES;
+    const warnStaleMs = this.d.configHealthWarnStaleMs ?? HEALTH_WARN_STALE_MS;
+    const critStaleMs = this.d.configHealthCriticalStaleMs ?? HEALTH_CRIT_STALE_MS;
+    const warnBufferUtil = this.d.configHealthWarnBufferUtil ?? HEALTH_WARN_BUFFER_UTIL;
+    const critBufferUtil = this.d.configHealthCriticalBufferUtil ?? HEALTH_CRIT_BUFFER_UTIL;
+
     const reasons: string[] = [];
     let status: PipelineHealthStatus = "ok";
 
@@ -1563,29 +1741,29 @@ export class DownloadsDurable {
       reasons.push(reason);
     };
 
-    if (pendingBatches >= HEALTH_CRIT_PENDING_BATCHES) {
+    if (pendingBatches >= critPending) {
       addCritical("pending_batches_high");
-    } else if (pendingBatches >= HEALTH_WARN_PENDING_BATCHES) {
+    } else if (pendingBatches >= warnPending) {
       addWarn("pending_batches_elevated");
     }
 
-    if (failures >= HEALTH_CRIT_FAILURES) {
+    if (failures >= critFailures) {
       addCritical("oracle_failures_high");
-    } else if (failures >= HEALTH_WARN_FAILURES) {
+    } else if (failures >= warnFailures) {
       addWarn("oracle_failures_elevated");
     }
 
     if (sinceFlushMs != null) {
-      if (sinceFlushMs >= HEALTH_CRIT_STALE_MS) {
+      if (sinceFlushMs >= critStaleMs) {
         addCritical("flush_stale");
-      } else if (sinceFlushMs >= HEALTH_WARN_STALE_MS) {
+      } else if (sinceFlushMs >= warnStaleMs) {
         addWarn("flush_delayed");
       }
     }
 
-    if (bufferUtil >= HEALTH_CRIT_BUFFER_UTIL) {
+    if (bufferUtil >= critBufferUtil) {
       addCritical("buffer_util_high");
-    } else if (bufferUtil >= HEALTH_WARN_BUFFER_UTIL) {
+    } else if (bufferUtil >= warnBufferUtil) {
       addWarn("buffer_util_elevated");
     }
 
@@ -1603,15 +1781,16 @@ export class DownloadsDurable {
       lastFlushAt,
       lastEventAt,
       committedSeq: this.d.committedSeq,
+      lastHealthNotifyAt: this.d.lastHealthNotifyAt ?? null,
       thresholds: {
-        warnPendingBatches: HEALTH_WARN_PENDING_BATCHES,
-        criticalPendingBatches: HEALTH_CRIT_PENDING_BATCHES,
-        warnFailures: HEALTH_WARN_FAILURES,
-        criticalFailures: HEALTH_CRIT_FAILURES,
-        warnStaleMs: HEALTH_WARN_STALE_MS,
-        criticalStaleMs: HEALTH_CRIT_STALE_MS,
-        warnBufferUtil: HEALTH_WARN_BUFFER_UTIL,
-        criticalBufferUtil: HEALTH_CRIT_BUFFER_UTIL,
+        warnPendingBatches: warnPending,
+        criticalPendingBatches: critPending,
+        warnFailures,
+        criticalFailures: critFailures,
+        warnStaleMs,
+        criticalStaleMs: critStaleMs,
+        warnBufferUtil,
+        criticalBufferUtil: critBufferUtil,
       },
     };
 
@@ -1689,6 +1868,14 @@ export class DownloadsDurable {
       configTimeFlushMinutes: this.d.configTimeFlushMinutes ?? { low: 1440, mid: 1440, high: 1440 },
       configCancelHoldDelayMs: this.d.configCancelHoldDelayMs ?? 1000,
       configAllowLegacyEvents: this.d.configAllowLegacyEvents ?? true,
+      configHealthWarnPendingBatches: this.d.configHealthWarnPendingBatches ?? HEALTH_WARN_PENDING_BATCHES,
+      configHealthCriticalPendingBatches: this.d.configHealthCriticalPendingBatches ?? HEALTH_CRIT_PENDING_BATCHES,
+      configHealthWarnFailures: this.d.configHealthWarnFailures ?? HEALTH_WARN_FAILURES,
+      configHealthCriticalFailures: this.d.configHealthCriticalFailures ?? HEALTH_CRIT_FAILURES,
+      configHealthWarnStaleMs: this.d.configHealthWarnStaleMs ?? HEALTH_WARN_STALE_MS,
+      configHealthCriticalStaleMs: this.d.configHealthCriticalStaleMs ?? HEALTH_CRIT_STALE_MS,
+      configHealthWarnBufferUtil: this.d.configHealthWarnBufferUtil ?? HEALTH_WARN_BUFFER_UTIL,
+      configHealthCriticalBufferUtil: this.d.configHealthCriticalBufferUtil ?? HEALTH_CRIT_BUFFER_UTIL,
       
       // Preserve Changelog
       changelog: this.d.changelog ?? [],
@@ -1875,6 +2062,118 @@ export class DownloadsDurable {
       });
     }
 
+    if ("healthThresholds" in body) {
+      if (!isPlainObject(body.healthThresholds)) {
+        errors.push("healthThresholds");
+      } else {
+        const ht = body.healthThresholds as Record<string, unknown>;
+        const thresholdErrors: string[] = [];
+        const readIntField = (
+          key: string,
+          min: number,
+          max: number,
+          fallback: number,
+        ) => {
+          if (!(key in ht)) return fallback;
+          const value = ht[key];
+          if (typeof value === "number" && Number.isFinite(value)) {
+            return Math.min(max, Math.max(min, Math.floor(value)));
+          }
+          thresholdErrors.push(`healthThresholds.${key}`);
+          return fallback;
+        };
+        const readFloatField = (
+          key: string,
+          min: number,
+          max: number,
+          fallback: number,
+        ) => {
+          if (!(key in ht)) return fallback;
+          const value = ht[key];
+          if (typeof value === "number" && Number.isFinite(value)) {
+            return Math.min(max, Math.max(min, value));
+          }
+          thresholdErrors.push(`healthThresholds.${key}`);
+          return fallback;
+        };
+
+        const nextWarnPending = readIntField(
+          "warnPendingBatches",
+          0,
+          1000,
+          this.d.configHealthWarnPendingBatches,
+        );
+        const nextCritPending = readIntField(
+          "criticalPendingBatches",
+          0,
+          2000,
+          this.d.configHealthCriticalPendingBatches,
+        );
+        const nextWarnFailures = readIntField(
+          "warnFailures",
+          0,
+          100,
+          this.d.configHealthWarnFailures,
+        );
+        const nextCritFailures = readIntField(
+          "criticalFailures",
+          0,
+          100,
+          this.d.configHealthCriticalFailures,
+        );
+        const nextWarnStale = readIntField(
+          "warnStaleMs",
+          0,
+          30 * 24 * 60 * 60 * 1000,
+          this.d.configHealthWarnStaleMs,
+        );
+        const nextCritStale = readIntField(
+          "criticalStaleMs",
+          0,
+          30 * 24 * 60 * 60 * 1000,
+          this.d.configHealthCriticalStaleMs,
+        );
+        const nextWarnBuffer = readFloatField(
+          "warnBufferUtil",
+          0,
+          1,
+          this.d.configHealthWarnBufferUtil,
+        );
+        const nextCritBuffer = readFloatField(
+          "criticalBufferUtil",
+          0,
+          1,
+          this.d.configHealthCriticalBufferUtil,
+        );
+
+        if (nextWarnPending > nextCritPending) {
+          thresholdErrors.push("healthThresholds.pendingBatches");
+        }
+        if (nextWarnFailures > nextCritFailures) {
+          thresholdErrors.push("healthThresholds.failures");
+        }
+        if (nextWarnStale > nextCritStale) {
+          thresholdErrors.push("healthThresholds.staleMs");
+        }
+        if (nextWarnBuffer > nextCritBuffer) {
+          thresholdErrors.push("healthThresholds.bufferUtil");
+        }
+
+        if (thresholdErrors.length > 0) {
+          errors.push(...thresholdErrors);
+        } else {
+          this.d.configHealthWarnPendingBatches = nextWarnPending;
+          this.d.configHealthCriticalPendingBatches = nextCritPending;
+          this.d.configHealthWarnFailures = nextWarnFailures;
+          this.d.configHealthCriticalFailures = nextCritFailures;
+          this.d.configHealthWarnStaleMs = nextWarnStale;
+          this.d.configHealthCriticalStaleMs = nextCritStale;
+          this.d.configHealthWarnBufferUtil = nextWarnBuffer;
+          this.d.configHealthCriticalBufferUtil = nextCritBuffer;
+        }
+      }
+    }
+
     if (errors.length > 0) {
       return json({ ok: false, error: "invalid_config", fields: errors }, { status: 400 });
     }
@@ -1898,6 +2197,16 @@ export class DownloadsDurable {
         timeFlushMinutes: this.d.configTimeFlushMinutes,
         cancelHoldDelayMs: this.d.configCancelHoldDelayMs,
         allowLegacyEvents: this.d.configAllowLegacyEvents,
+        healthThresholds: {
+          warnPendingBatches: this.d.configHealthWarnPendingBatches,
+          criticalPendingBatches: this.d.configHealthCriticalPendingBatches,
+          warnFailures: this.d.configHealthWarnFailures,
+          criticalFailures: this.d.configHealthCriticalFailures,
+          warnStaleMs: this.d.configHealthWarnStaleMs,
+          criticalStaleMs: this.d.configHealthCriticalStaleMs,
+          warnBufferUtil: this.d.configHealthWarnBufferUtil,
+          criticalBufferUtil: this.d.configHealthCriticalBufferUtil,
+        },
       },
     });
   }

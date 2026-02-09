@@ -156,6 +156,16 @@ export interface StatsResponse {
     configVersion?: number;
     cancelHoldDelayMs?: number;
     allowLegacyEvents?: boolean;
+    healthThresholds?: {
+      warnPendingBatches: number;
+      criticalPendingBatches: number;
+      warnFailures: number;
+      criticalFailures: number;
+      warnStaleMs: number;
+      criticalStaleMs: number;
+      warnBufferUtil: number;
+      criticalBufferUtil: number;
+    };
     remoteEnabledReason?: string;
     hardRemoteOff: boolean;
   };
@@ -196,6 +206,16 @@ export interface ConfigResponse {
   remoteEnabledReason?: string;
   cancelHoldDelayMs?: number;
   allowLegacyEvents?: boolean;
+  healthThresholds?: {
+    warnPendingBatches: number;
+    criticalPendingBatches: number;
+    warnFailures: number;
+    criticalFailures: number;
+    warnStaleMs: number;
+    criticalStaleMs: number;
+    warnBufferUtil: number;
+    criticalBufferUtil: number;
+  };
   serverTimeUtc?: number;
   committedSeq?: number;
   quota: QuotaDescriptor;
@@ -217,6 +237,7 @@ export interface PipelineHealthResponse {
   lastFlushAt: number | null;
   lastEventAt: number | null;
   committedSeq: number;
+  lastHealthNotifyAt: number | null;
   thresholds: {
     warnPendingBatches: number;
     criticalPendingBatches: number;
