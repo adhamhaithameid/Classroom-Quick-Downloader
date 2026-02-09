@@ -665,6 +665,7 @@ export default {
     if (
       (pathname === "/config" && request.method === "GET") ||
       (pathname === "/health" && request.method === "GET") ||
+      (pathname === "/pipeline-health" && request.method === "GET") ||
       (pathname === "/changelog" && request.method === "GET") ||
       (pathname === "/track" && request.method === "POST")
     ) {

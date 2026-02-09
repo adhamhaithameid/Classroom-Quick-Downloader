@@ -181,6 +181,15 @@ const COMPACT_TARGET_UTIL = 0.5;
 const COMPACT_MAX_BATCH = 5000;
 const MAX_PENDING_BATCHES = 50;
 
+const HEALTH_WARN_PENDING_BATCHES = 10;
+const HEALTH_CRIT_PENDING_BATCHES = 25;
+const HEALTH_WARN_FAILURES = 3;
+const HEALTH_CRIT_FAILURES = 5;
+const HEALTH_WARN_STALE_MS = 6 * 60 * 60 * 1000;
+const HEALTH_CRIT_STALE_MS = 24 * 60 * 60 * 1000;
+const HEALTH_WARN_BUFFER_UTIL = 0.8;
+const HEALTH_CRIT_BUFFER_UTIL = 0.95;
+
 // Track endpoint rate limits (per IP per minute)
 const TRACK_RATE_LIMIT_PER_MIN = 120;
 const TRACK_RATE_PRUNE_AFTER_MIN = 10;
@@ -355,6 +364,34 @@ function isIpAllowed(ip: string, allowlist: string[]): boolean {
   }
   return false;
 }
+
+type PipelineHealthStatus = "ok" | "warn" | "critical";
+
+type PipelineHealthResponse = {
+  ok: boolean;
+  status: PipelineHealthStatus;
+  reasons: string[];
+  now: number;
+  bufferSize: number;
+  maxBufferSize: number;
+  bufferUtilization: number;
+  pendingBatches: number;
+  oldestPendingAgeMs: number | null;
+  consecutiveFailures: number;
+  lastFlushAt: number | null;
+  lastEventAt: number | null;
+  committedSeq: number;
+  thresholds: {
+    warnPendingBatches: number;
+    criticalPendingBatches: number;
+    warnFailures: number;
+    criticalFailures: number;
+    warnStaleMs: number;
+    criticalStaleMs: number;
+    warnBufferUtil: number;
+    criticalBufferUtil: number;
+  };
+};
 
 async function readJsonBody<T>(
   request: Request,
@@ -888,6 +925,10 @@ export class DownloadsDurable {
 
     if (pathname === "/health" && request.method === "GET") {
       return this.handleHealth();
+    }
+
+    if (pathname === "/pipeline-health" && request.method === "GET") {
+      return this.handlePipelineHealth();
     }
 
     if (pathname === "/debug/flush" && request.method === "POST") {
@@ -1473,6 +1514,89 @@ export class DownloadsDurable {
       lastEventAt: this.d.lastEventAt,
       lastFlushAt: this.d.lastFlushAt,
     });
+  }
+
+  private async handlePipelineHealth(): Promise<Response> {
+    this.ensureRequestDay();
+    const now = Date.now();
+    const bufferLen = this.d.buffer.length;
+    const maxBuffer = this.d.configMaxBufferSize || 50000;
+    const bufferUtil = maxBuffer > 0 ? bufferLen / maxBuffer : 0;
+    const pendingBatches = this.d.pendingBatches.length;
+    const oldestPending = pendingBatches
+      ? Math.min(...this.d.pendingBatches.map((b) => b.createdAt || now))
+      : null;
+    const oldestAgeMs = oldestPending != null ? Math.max(0, now - oldestPending) : null;
+    const failures = this.d.retryState?.consecutiveFailures ?? 0;
+    const lastFlushAt = this.d.lastFlushAt ?? null;
+    const lastEventAt = this.d.lastEventAt ?? null;
+    const sinceFlushMs = lastFlushAt != null ? now - lastFlushAt : null;
+
+    const reasons: string[] = [];
+    let status: PipelineHealthStatus = "ok";
+
+    const addWarn = (reason: string) => {
+      if (status === "ok") status = "warn";
+      reasons.push(reason);
+    };
+    const addCritical = (reason: string) => {
+      status = "critical";
+      reasons.push(reason);
+    };
+
+    if (pendingBatches >= HEALTH_CRIT_PENDING_BATCHES) {
+      addCritical("pending_batches_high");
+    } else if (pendingBatches >= HEALTH_WARN_PENDING_BATCHES) {
+      addWarn("pending_batches_elevated");
+    }
+
+    if (failures >= HEALTH_CRIT_FAILURES) {
+      addCritical("oracle_failures_high");
+    } else if (failures >= HEALTH_WARN_FAILURES) {
+      addWarn("oracle_failures_elevated");
+    }
+
+    if (sinceFlushMs != null) {
+      if (sinceFlushMs >= HEALTH_CRIT_STALE_MS) {
+        addCritical("flush_stale");
+      } else if (sinceFlushMs >= HEALTH_WARN_STALE_MS) {
+        addWarn("flush_delayed");
+      }
+    }
+
+    if (bufferUtil >= HEALTH_CRIT_BUFFER_UTIL) {
+      addCritical("buffer_util_high");
+    } else if (bufferUtil >= HEALTH_WARN_BUFFER_UTIL) {
+      addWarn("buffer_util_elevated");
+    }
+
+    const payload: PipelineHealthResponse = {
+      ok: true,
+      status,
+      reasons,
+      now,
+      bufferSize: bufferLen,
+      maxBufferSize: maxBuffer,
+      bufferUtilization: Number(bufferUtil.toFixed(3)),
+      pendingBatches,
+      oldestPendingAgeMs: oldestAgeMs,
+      consecutiveFailures: failures,
+      lastFlushAt,
+      lastEventAt,
+      committedSeq: this.d.committedSeq,
+      thresholds: {
+        warnPendingBatches: HEALTH_WARN_PENDING_BATCHES,
+        criticalPendingBatches: HEALTH_CRIT_PENDING_BATCHES,
+        warnFailures: HEALTH_WARN_FAILURES,
+        criticalFailures: HEALTH_CRIT_FAILURES,
+        warnStaleMs: HEALTH_WARN_STALE_MS,
+        criticalStaleMs: HEALTH_CRIT_STALE_MS,
+        warnBufferUtil: HEALTH_WARN_BUFFER_UTIL,
+        criticalBufferUtil: HEALTH_CRIT_BUFFER_UTIL,
+      },
+    };
+
+    return json(payload);
   }
 
   private async handleDebugFlush(): Promise<Response> {

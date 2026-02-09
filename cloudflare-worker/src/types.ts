@@ -203,6 +203,32 @@ export interface ConfigResponse {
   changelogConfig?: ChangelogConfig;
 }
 
+export interface PipelineHealthResponse {
+  ok: boolean;
+  status: "ok" | "warn" | "critical";
+  reasons: string[];
+  now: number;
+  bufferSize: number;
+  maxBufferSize: number;
+  bufferUtilization: number;
+  pendingBatches: number;
+  oldestPendingAgeMs: number | null;
+  consecutiveFailures: number;
+  lastFlushAt: number | null;
+  lastEventAt: number | null;
+  committedSeq: number;
+  thresholds: {
+    warnPendingBatches: number;
+    criticalPendingBatches: number;
+    warnFailures: number;
+    criticalFailures: number;
+    warnStaleMs: number;
+    criticalStaleMs: number;
+    warnBufferUtil: number;
+    criticalBufferUtil: number;
+  };
+}
+
 /**
  * Worker Env shape (bindings injected by Cloudflare).
  * This is used by index.ts (not the Durable Object itself).

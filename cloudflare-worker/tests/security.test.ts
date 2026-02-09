@@ -18,6 +18,9 @@ type StoredState = {
   ipCountsSize?: number;
   uniqueRequestsToday?: number;
   pendingBatches?: Array<unknown>;
+  retryState?: { consecutiveFailures?: number };
+  lastFlushAt?: number;
+  configMaxBufferSize?: number;
 };
 
 type TestEvent = {
@@ -37,6 +40,10 @@ type TestEvent = {
 class MockStorage {
   private map = new Map<string, unknown>();
   private alarm: number | null = null;
+
+  seed(key: string, value: unknown): void {
+    this.map.set(key, value);
+  }
 
   async get<T>(key: string): Promise<T | undefined> {
     return this.map.get(key);
@@ -69,6 +76,18 @@ class MockState {
 
 function makeDO() {
   const state = new MockState();
+  const env: Env = {
+    ORACLE_ENDPOINT: "http://example.com",
+    DO_SHARED_SECRET: "secret",
+    MAX_BATCH_EVENTS: "10000",
+  } as Env;
+  const obj = new DownloadsDurable(state as unknown as DurableObjectState, env);
+  return { obj, state };
+}
+
+function makeDOWithStored(stored: StoredState) {
+  const state = new MockState();
+  state.storage.seed(STORAGE_KEY, stored);
   const env: Env = {
     ORACLE_ENDPOINT: "http://example.com",
     DO_SHARED_SECRET: "secret",
@@ -470,5 +489,54 @@ describe("Durable Object security behaviors", () => {
     const denied = await callDO(obj, "/auth/check-ip-allowlist", { ip: "192.168.1.1" });
     const deniedPayload = await denied.json() as { allowed: boolean };
     expect(deniedPayload.allowed).toBe(false);
+  });
+
+  it("returns pipeline health status", async () => {
+    const { obj } = makeDO();
+    const res = await callDOGet(obj, "/pipeline-health");
+    expect(res.status).toBe(200);
+    const payload = await res.json() as { status?: string; reasons?: string[] };
+    expect(payload.status).toBe("ok");
+    expect(Array.isArray(payload.reasons)).toBe(true);
+  });
+
+  it("warns when pending batches exceed thresholds", async () => {
+    const pendingBatch = {
+      batch: {
+        batchId: "seed",
+        generatedAt: Date.now(),
+        timeZone: "UTC",
+        summary: {
+          totals: { totalEvents: 0, totalDownloads: 0, totalSuccess: 0, totalFail: 0 },
+          browsers: {},
+          os: {},
+          countries: {},
+          languages: {},
+          versions: {},
+          types: {},
+          errorReasons: {},
+          topBrowser: "unknown",
+          topOs: "unknown",
+          topCountry: "unknown",
+          topType: "unknown",
+        },
+        timeBuckets: [],
+      },
+      eventCount: 0,
+      maxSeq: 0,
+      attempts: 0,
+      createdAt: Date.now() - 7 * 60 * 60 * 1000,
+    };
+    const { obj } = makeDOWithStored({
+      pendingBatches: Array.from({ length: 12 }, () => ({ ...pendingBatch })),
+      retryState: { consecutiveFailures: 0 },
+      lastFlushAt: Date.now() - 2 * 60 * 60 * 1000,
+      buffer: [],
+      configMaxBufferSize: 50000,
+    });
+    const res = await callDOGet(obj, "/pipeline-health");
+    const payload = await res.json() as { status?: string; reasons?: string[] };
+    expect(payload.status).toBe("warn");
+    expect(payload.reasons || []).toContain("pending_batches_elevated");
   });
 });
