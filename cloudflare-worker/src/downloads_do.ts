@@ -2378,6 +2378,23 @@ export class DownloadsDurable {
       oracleBatch = this.buildOracleBatch(eventsToFlush);
     }
 
+    const stashFailedBatch = () => {
+      if (pendingMeta || !oracleBatch || eventsToFlush.length === 0) return;
+      const maxSeq = eventsToFlush.reduce(
+        (m, ev) => Math.max(m, ev.seq || 0),
+        this.d.committedSeq || 0,
+      );
+      this.d.pendingBatches.push({
+        batch: oracleBatch,
+        eventCount: eventsToFlush.length,
+        maxSeq,
+        attempts: 1,
+        createdAt: now,
+      });
+      this.d.buffer = this.d.buffer.slice(eventsToFlush.length);
+      this.mergePendingBatchesIfNeeded();
+    };
+
     // --- LOGGING for Debugging ---
     // HTTP mode note: Oracle free-tier deployment may be HTTP-only.
     // Keep transport protected via network controls if TLS is unavailable.
@@ -2408,6 +2425,7 @@ export class DownloadsDurable {
         this.d.retryState.lastError = msg;
         this.d.retryState.consecutiveFailures += 1;
         logEvent("warn", "oracle_flush_failed", { status: res.status, statusText: res.statusText });
+        stashFailedBatch();
         await this.scheduleRetry();
         await this.persist();
         return { ok: false, sent: 0, error: msg };
@@ -2421,6 +2439,7 @@ export class DownloadsDurable {
         this.d.retryState.lastError = msg;
         this.d.retryState.consecutiveFailures += 1;
         logEvent("warn", "oracle_flush_ack_invalid", { error: msg });
+        stashFailedBatch();
         await this.scheduleRetry();
         await this.persist();
         return { ok: false, sent: 0, error: msg };
@@ -2430,6 +2449,7 @@ export class DownloadsDurable {
         this.d.retryState.lastError = msg;
         this.d.retryState.consecutiveFailures += 1;
         logEvent("warn", "oracle_flush_ack_mismatch", { error: msg });
+        stashFailedBatch();
         await this.scheduleRetry();
         await this.persist();
         return { ok: false, sent: 0, error: msg };
@@ -2462,6 +2482,7 @@ export class DownloadsDurable {
       this.d.retryState.lastError = msg;
       this.d.retryState.consecutiveFailures += 1;
       logEvent("error", "oracle_flush_exception", { error: String(err) });
+      stashFailedBatch();
       await this.scheduleRetry();
       await this.persist();
       return { ok: false, sent: 0, error: msg };

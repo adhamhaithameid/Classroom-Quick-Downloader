@@ -362,7 +362,26 @@ describe("Durable Object security behaviors", () => {
     expect(res.status).toBe(500);
 
     const stored = await state.storage.get<StoredState>(STORAGE_KEY);
-    expect(stored.buffer?.length ?? 0).toBe(1);
+    expect(stored.buffer?.length ?? 0).toBe(0);
+    expect(stored.pendingBatches?.length ?? 0).toBe(1);
+    vi.unstubAllGlobals();
+  });
+
+  it("moves failed oracle batches into the pending replay queue", async () => {
+    const { obj, state } = makeDO();
+    await callDO(obj, "/track", { events: [makeEvent(), makeEvent()] });
+
+    const fetchSpy = vi.fn(async () => {
+      return new Response("oracle down", { status: 503 });
+    });
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const res = await callDO(obj, "/admin/force-flush", {});
+    expect(res.status).toBe(500);
+
+    const stored = await state.storage.get<StoredState>(STORAGE_KEY);
+    expect(stored.buffer?.length ?? 0).toBe(0);
+    expect(stored.pendingBatches?.length ?? 0).toBe(1);
     vi.unstubAllGlobals();
   });
 
