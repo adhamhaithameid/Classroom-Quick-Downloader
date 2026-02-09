@@ -1598,7 +1598,7 @@ export class DownloadsDurable {
     return topKey;
   }
 
-  private mergeCounts<T extends Record<string, number>>(target: T, source: T): T {
+  private mergeCounts(target: Record<string, number>, source: Record<string, number>): Record<string, number> {
     for (const [key, val] of Object.entries(source)) {
       target[key] = (target[key] || 0) + (val || 0);
     }
