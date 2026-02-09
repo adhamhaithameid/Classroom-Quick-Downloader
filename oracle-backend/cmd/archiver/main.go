@@ -83,6 +83,9 @@ func main() {
 	log.Printf("Fetching stats from %s...", *apiURL)
 	req, err := http.NewRequest(http.MethodGet, *apiURL, nil)
 	if err != nil {
+		logEvent("error", "archiver_request_build_failed", map[string]interface{}{
+			"error": err.Error(),
+		})
 		log.Fatalf("Failed to build request: %v", err)
 	}
 	if *secret != "" {

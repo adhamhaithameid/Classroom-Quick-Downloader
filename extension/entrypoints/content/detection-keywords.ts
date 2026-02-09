@@ -226,7 +226,6 @@ const MONTH_MAP: Record<string, number> = {
  */
 export function parseUnicodeDate(dateString: string): { date: Date; raw: string; confidence: 'high' | 'medium' | 'low' } | null {
   if (!dateString) return null;
-  const clean = normalizeText(dateString).toLowerCase();
 
   // NOTE: Avoid Date.parse to prevent local-time interpretation. We parse into UTC manually.
 

@@ -4110,8 +4110,8 @@ export function renderDashboard(stats: StatsResponse): string {
         }
         
         // APPROXIMATION-AWARE: Format unique IPs with capped indicator
-        const uniqueIpsCount = stats.uniqueRequestsToday || stats.uniqueIpsToday || 0;
-        const isApproximated = stats.isApproximated || false;
+        const uniqueIpsCount = stats.uniqueRequestsToday ?? stats.uniqueIpsToday ?? 0;
+        const isApproximated = stats.isApproximated ?? false;
         map.uniqueIps = isApproximated 
           ? uniqueIpsCount.toLocaleString() + "+ (capped)"
           : uniqueIpsCount.toLocaleString();

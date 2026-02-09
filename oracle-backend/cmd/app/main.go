@@ -313,7 +313,7 @@ func requireAuth(dashboardPassword, archiverSecret string, allowLoopbackBypass b
 				return
 			}
 
-			if allowLoopbackBypass && archiverSecret == "" && isLoopbackAddr(r.RemoteAddr) && !hasForwardedIp(r) {
+			if allowLoopbackBypass && archiverSecret == "" && isLoopbackAddr(r.RemoteAddr) && isLoopbackHost(r.Host) && !hasForwardedIp(r) {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -440,6 +440,10 @@ func clearLoginFailures(ip string) {
 
 // loginHandler handles POST /api/auth/login
 func loginHandler(dashboardPassword string, allowInsecureCookies bool) http.HandlerFunc {
+	storedHash := ""
+	if dashboardPassword != "" {
+		storedHash = hashPassword(dashboardPassword)
+	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		
@@ -470,10 +474,9 @@ func loginHandler(dashboardPassword string, allowInsecureCookies bool) http.Hand
 			return
 		}
 
-		// Timing-safe comparison via SHA256
+		// Timing-safe comparison via SHA256 (stored hash precomputed)
 		hashedInput := hashPassword(req.Password)
-		hashedStored := hashPassword(dashboardPassword)
-		if subtle.ConstantTimeCompare([]byte(hashedInput), []byte(hashedStored)) != 1 {
+		if subtle.ConstantTimeCompare([]byte(hashedInput), []byte(storedHash)) != 1 {
 			blocked, retryAfter := recordLoginFailure(clientIP)
 			if blocked {
 				w.Header().Set("Retry-After", strconv.Itoa(retryAfter))
@@ -566,6 +569,18 @@ func isLoopbackAddr(remoteAddr string) bool {
 
 func hasForwardedIp(r *http.Request) bool {
 	return r.Header.Get("X-Forwarded-For") != "" || r.Header.Get("X-Real-IP") != ""
+}
+
+func isLoopbackHost(hostport string) bool {
+	host := hostport
+	if h, _, err := net.SplitHostPort(hostport); err == nil {
+		host = h
+	}
+	if host == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 

@@ -437,8 +437,7 @@ async function handleVerifyDangerPassword(request: Request, env: WorkerEnv): Pro
   const clientIp = request.headers.get("CF-Connecting-IP") || "unknown";
 
   // Rate limit check via DO (reuses login attempt tracking with "danger:" prefix)
-  const doId = env.DOWNLOADS_DO.idFromName("singleton");
-  const stub = env.DOWNLOADS_DO.get(doId);
+  const stub = getDownloadsStub(env);
   
   // First check if this IP is rate limited for danger password attempts
   const rateLimitReq = new Request("https://do/auth/login-attempt", {
