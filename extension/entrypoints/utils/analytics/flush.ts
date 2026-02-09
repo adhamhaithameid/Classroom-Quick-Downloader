@@ -4,7 +4,7 @@
  */
 
 import type { AnalyticsEvent, AnalyticsConfig, AnalyticsMeta, FlushResult } from './types';
-import { TRACK_URL, BACKOFF_STEPS_SECONDS } from './constants';
+import { TRACK_URL, BACKOFF_STEPS_SECONDS, DEFAULT_CONFIG } from './constants';
 import {
   loadQueue,
   saveQueue,
@@ -94,12 +94,14 @@ export function getDailyFlushScheduleUtcMs(
 ): { scheduleMs: number; meta: AnalyticsMeta; changed: boolean } {
   const now = new Date(nowMs);
   const dayStartMs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-  const startHour = Number.isFinite(cfg.dailyFlushWindowStartUtc)
-    ? Math.min(23, Math.max(0, Math.floor(cfg.dailyFlushWindowStartUtc)))
-    : 1;
-  const windowMinutes = Number.isFinite(cfg.dailyFlushWindowMinutes)
-    ? Math.min(MAX_DAILY_WINDOW_MINUTES, Math.max(1, Math.floor(cfg.dailyFlushWindowMinutes)))
-    : 120;
+  const startHour = Math.min(
+    23,
+    Math.max(0, Math.floor(cfg.dailyFlushWindowStartUtc ?? DEFAULT_CONFIG.dailyFlushWindowStartUtc))
+  );
+  const windowMinutes = Math.min(
+    MAX_DAILY_WINDOW_MINUTES,
+    Math.max(1, Math.floor(cfg.dailyFlushWindowMinutes ?? DEFAULT_CONFIG.dailyFlushWindowMinutes))
+  );
   const startMs = dayStartMs + startHour * 60 * 60 * 1000;
 
   let offset = meta.dailyFlushOffsetMinutes;
@@ -381,6 +383,14 @@ export async function internalFlush(): Promise<void> {
     return;
   }
 
+  // Normalize queue events (ensure IDs exist for idempotency)
+  queue = queue.map((event) => {
+    if (!event.id) {
+      return { ...event, id: generateEventId() };
+    }
+    return event;
+  });
+
   const sendable = queue.filter((ev) => typeof ev.commitSeq !== 'number');
   if (sendable.length === 0) {
     await saveQueue(queue);
@@ -426,14 +436,6 @@ export async function internalFlush(): Promise<void> {
       return;
     }
   }
-
-  // Normalize queue events (ensure IDs exist for idempotency)
-  queue = queue.map((event) => {
-    if (!event.id) {
-      return { ...event, id: generateEventId() };
-    }
-    return event;
-  });
 
   const maxPerRequest = resolveMaxEventsPerRequest(cfg);
   let batchSize = resolveBatchSize(cfg, sendable.length);
