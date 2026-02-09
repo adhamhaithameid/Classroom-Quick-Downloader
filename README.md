@@ -46,7 +46,7 @@
 
 **Downloading files from Google Classroom shouldn't feel like a chore.** CQD transforms bulk file downloads into a single click while powering an enterprise-grade analytics pipeline that tracks millions of download events at the edge.
 
-[📦 Get the Extension](#-installation) · [📖 Documentation](#-documentation) · [🏗️ Architecture](ARCHITECTURE.md) · [🔒 Privacy](PRIVACY.md)
+[📦 Get the Extension](#-installation) · [📖 Documentation](#-documentation) · [📝 Changelog](CHANGELOG.md) · [🏗️ Architecture](ARCHITECTURE.md) · [🔒 Privacy](PRIVACY.md)
 
 </div>
 
