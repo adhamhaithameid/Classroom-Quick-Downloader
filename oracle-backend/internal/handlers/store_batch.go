@@ -26,7 +26,14 @@ type ingestResponse struct {
 //   - batches
 //   - downloads_hourly
 //   - downloads_totals
-//   - do_state_snapshots
+// IngestBatchHandler returns an HTTP handler that ingests a JSON-encoded model.OracleBatch into the database.
+//
+// The handler accepts only POST requests, enforces a 5MB request-body limit, and authenticates requests using the
+// X-DO-SECRET header compared against the provided sharedSecret (constant-time comparison). It decodes the request
+// body into an OracleBatch, requires a non-empty BatchID, invokes ingestBatch to persist the batch, and responds
+// with a JSON success payload on success. On failure it responds with appropriate 4xx/5xx status codes.
+//
+// If sharedSecret is empty the handler will respond with an internal server error.
 func IngestBatchHandler(db *sql.DB, sharedSecret string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -87,6 +94,15 @@ func IngestBatchHandler(db *sql.DB, sharedSecret string) http.HandlerFunc {
 	}
 }
 
+// ingestBatch inserts a single OracleBatch into the database and updates related aggregates.
+// 
+// ingestBatch begins a transaction and ensures idempotent behavior: if a row with the same
+// batch_id already exists the transaction is committed and the function returns with no change.
+// When absent, it aggregates totals from the batch's time buckets, inserts a row into the
+// batches table, writes per-hour rows, updates lifetime totals, and records a DO state snapshot.
+// IP storage is intentionally disabled for privacy.
+// 
+// Any database error during the process aborts the operation and is returned.
 func ingestBatch(ctx context.Context, db *sql.DB, batch *model.OracleBatch) error {
 	tx, err := db.BeginTx(ctx, &sql.TxOptions{})
 	if err != nil {
@@ -168,7 +184,8 @@ func ingestBatch(ctx context.Context, db *sql.DB, batch *model.OracleBatch) erro
 // insertBatchIPs stores unique IPs for the Geo Map feature
 // DEFENSIVE DEDUPLICATION: Don't trust edge - dedupe before DB writes
 // CANONICALIZATION: Collapses equivalent IP representations (e.g., ::1 and 0:0:0:0:0:0:0:1)
-// ROW-SIZE OPTIMIZATION: Summarize if >500 IPs to prevent SQLite bloat
+// insertBatchIPs stores a canonicalized, deduplicated snapshot of unique IPs for a batch in the batch_ips table.
+// It ignores empty, "unknown", or otherwise invalid IP values, canonicalizes addresses (via net.ParseIP) to collapse equivalent forms, and records a JSON payload with keys `ips`, `count`, and `is_truncated`. The stored `ips` array is truncated to at most 500 entries while `count` reflects the true number of valid unique IPs. Returns any error from JSON marshaling or the database insert. No-op if there are no valid IPs.
 func insertBatchIPs(ctx context.Context, tx *sql.Tx, batch *model.OracleBatch) error {
 	// 1. Defensive deduplication with CANONICALIZATION
 	// Uses net.ParseIP().String() to collapse equivalent representations
@@ -233,7 +250,8 @@ func insertBatchIPs(ctx context.Context, tx *sql.Tx, batch *model.OracleBatch) e
 	return err
 }
 
-// isValidIP performs lightweight IP validation in backend (defense-in-depth)
+// isValidIP reports whether s is a syntactically valid IP address.
+// It returns false for the empty string or the literal "unknown"; otherwise it returns true if net.ParseIP parses the value.
 func isValidIP(ip string) bool {
 	if ip == "" || ip == "unknown" {
 		return false
@@ -242,6 +260,12 @@ func isValidIP(ip string) bool {
 	return net.ParseIP(ip) != nil
 }
 
+// insertHourly inserts per-hour aggregated metrics from the provided OracleBatch into the
+// downloads_hourly table.
+//
+// It marshals each TimeBucket's dimension counters to JSON and inserts one row per bucket
+// within the supplied transaction. Returns any error encountered while preparing the
+// statement or executing the inserts.
 func insertHourly(ctx context.Context, tx *sql.Tx, batch *model.OracleBatch) error {
 	stmt, err := tx.PrepareContext(ctx, `
 		INSERT INTO downloads_hourly (
@@ -431,6 +455,13 @@ func upsertTotal(ctx context.Context, tx *sql.Tx, key string, delta int64) error
 	return err
 }
 
+// insertDOStateSnapshot inserts a snapshot of the batch's DOState into the do_state_snapshots table.
+//
+// The snapshot includes a JSON-encoded raw DOState, captured_at (using batch.GeneratedAt or the current time
+// if zero), aggregate counters (total events/downloads/success/fail and pending events), optional timestamps
+// (last event and last flush) and quota/environment-derived fields (requests today, quota level, mode label,
+// remote enabled flag, batch size suggestion, and parsed max batch events). It returns any error encountered
+// when writing the snapshot.
 func insertDOStateSnapshot(ctx context.Context, tx *sql.Tx, batch *model.OracleBatch) error {
 	raw, _ := json.Marshal(batch.DOState)
 

@@ -63,6 +63,14 @@ async function saveQueueWithIntegrity(queue: AnalyticsEvent[]): Promise<void> {
   });
 }
 
+/**
+ * Loads the stored analytics queue and verifies its integrity against the stored checksum.
+ *
+ * If no queue is present or the stored value is not an array, returns an empty queue with `valid = true`.
+ * If a checksum exists and does not match the computed checksum, returns the raw stored queue with `valid = false` (preserving data to avoid loss).
+ *
+ * @returns An object containing `queue` (the stored analytics events or an empty array) and `valid` (`true` if the checksum matched or no checksum was present, `false` if a mismatch was detected).
+ */
 async function loadQueueWithIntegrity(): Promise<{ queue: AnalyticsEvent[]; valid: boolean }> {
   const raw = await storageGet(STORAGE_KEYS.QUEUE);
   const storedChecksum = await storageGet(STORAGE_KEYS.INTEGRITY);

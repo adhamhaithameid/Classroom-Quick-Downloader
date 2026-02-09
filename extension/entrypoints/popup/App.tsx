@@ -277,6 +277,13 @@ function getDistinctColorForTypeAtPosition(
   return candidate;
 }
 
+/**
+ * Render the Classroom Quick Downloader extension popup UI and manage its interactive state and behaviors.
+ *
+ * This component loads and displays extension settings, per-tab enable/disable controls, download analytics, changelog entries, and share links; it also detects whether the active tab is Google Classroom and adapts the UI accordingly.
+ *
+ * @returns The component's JSX element representing the extension popup UI.
+ */
 function App() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [tabId, setTabId] = useState<number | null>(null);
@@ -1063,7 +1070,20 @@ function App() {
   );
 }
 
-// --- Subcomponents ---
+/**
+ * Renders an accessible toggle row with label, optional description, and a visual switch.
+ *
+ * The switch supports click and keyboard activation (Enter or Space) when not disabled.
+ *
+ * @param label - Visible label for the toggle; also used as the switch's accessible name.
+ * @param description - Optional explanatory text displayed under the label.
+ * @param checked - Whether the switch is currently on.
+ * @param onToggle - Callback invoked when the user activates the switch.
+ * @param disabled - When true, disables user interaction and marks the control as disabled.
+ * @param loading - When true, shows a loading state and prevents interaction.
+ * @param primary - When true, applies primary styling to the row.
+ * @returns The rendered toggle row element.
+ */
 
 function ToggleRow({
   label,

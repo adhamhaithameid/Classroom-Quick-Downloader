@@ -9,9 +9,13 @@ import { IS_FIREFOX, recentDownloads } from './state';
 let analyticsAlarmInitialized = false;
 
 /**
- * Set up Chrome alarms for periodic analytics operations.
- * - Flush events every 5 minutes
- * - Refresh remote config every 3 hours
+ * Ensure periodic analytics-related Chrome alarms are created and listened for.
+ *
+ * No-ops if already initialized or if the Chrome alarms API is unavailable. Creates two alarms:
+ * - `CQD_ANALYTICS_FLUSH` (every 5 minutes) — triggers `Analytics.flush()`.
+ * - `CQD_ANALYTICS_CONFIG` (every 180 minutes) — triggers `refreshRemoteAnalyticsConfig()`; promise rejections are ignored.
+ *
+ * Errors thrown during alarm setup are swallowed to allow execution in contexts where alarms are unavailable.
  */
 export function ensureAnalyticsAlarm(): void {
   if (analyticsAlarmInitialized) return;

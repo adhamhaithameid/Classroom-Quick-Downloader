@@ -15,6 +15,13 @@ interface SessionPayload {
   iat: number; // Issued at timestamp
 }
 
+/**
+ * Create a signed session token that embeds the client IP and expiry.
+ *
+ * @param secret - Secret key used to compute the HMAC-SHA256 signature
+ * @param ip - Client IP address to include in the token payload
+ * @returns A string in the format `payload.sig` where `payload` is base64-encoded JSON containing `ip`, `iat`, and `exp`, and `sig` is the base64-encoded HMAC-SHA256 signature of the payload
+ */
 export async function createSessionToken(secret: string, ip: string): Promise<string> {
   const payload: SessionPayload = {
     ip,
@@ -42,6 +49,14 @@ export async function createSessionToken(secret: string, ip: string): Promise<st
   return `${payloadB64}.${sigB64}`;
 }
 
+/**
+ * Validates a session token by verifying its HMAC-SHA256 signature and expiry.
+ *
+ * @param token - Session token in the format `payloadBase64.signatureBase64`, where the payload decodes to a JSON object containing `exp` (expiry in ms).
+ * @param secret - Shared HMAC secret used to verify the token signature.
+ * @param _clientIp - Client IP address (currently ignored; IP binding is not enforced).
+ * @returns `true` if the token's signature is valid and the payload has not expired, `false` otherwise.
+ */
 export async function verifySessionToken(token: string, secret: string, _clientIp: string): Promise<boolean> {
   try {
     const [payloadB64, sigB64] = token.split(".");
@@ -79,6 +94,12 @@ export async function verifySessionToken(token: string, secret: string, _clientI
     return false;
   }
 }
+/**
+ * Extracts the session cookie value named by `COOKIE_NAME` from a request's Cookie header.
+ *
+ * @param request - The incoming HTTP request to inspect for cookies
+ * @returns The session cookie value if present, `null` otherwise
+ */
 function getSessionCookie(request: Request): string | null {
   const cookieHeader = request.headers.get("Cookie") || "";
   const cookies = cookieHeader.split(";").map(c => c.trim());
@@ -93,9 +114,11 @@ function getSessionCookie(request: Request): string | null {
 }
 
 /**
- * Checks if hostname represents a local development environment.
- * SECURITY: Only loopback addresses disable Secure cookie flag.
- * Private IPs (10.*, 192.168.*, etc.) may serve HTTPS and need Secure flag.
+ * Determines whether a hostname represents a local development (loopback) environment.
+ *
+ * Only loopback names/addresses (localhost, 127.0.0.1, 127.* range, ::1, 0.0.0.0) are treated as local; private IPv4 ranges (e.g., 10.*, 172.16-31.*, 192.168.*) are not considered local.
+ *
+ * @returns `true` if the hostname is a loopback/local development address, `false` otherwise.
  */
 export function isLocalEnvironment(hostname: string): boolean {
   if (!hostname) return false;
@@ -118,6 +141,13 @@ export function isLocalEnvironment(hostname: string): boolean {
   return false;
 }
 
+/**
+ * Builds a Set-Cookie header value for the session cookie, adapting SameSite and Secure flags for local development versus production.
+ *
+ * @param token - The session token value to store in the cookie
+ * @param url - Optional request URL; when present, its hostname is checked to detect loopback/local environments
+ * @param env - Optional environment bindings; if `env.ALLOW_INSECURE_COOKIES === 'true'` the cookie will be allowed insecurely for local testing
+ * @returns A Set-Cookie header string for the session cookie. In local/dev mode the cookie uses `SameSite=Lax` and omits `Secure`; in production it uses `SameSite=Strict` and includes `Secure`.
 export function createSessionCookieHeader(token: string, url?: URL, env?: WorkerEnv): string {
   // SECURITY: Only disable Secure flag for loopback OR explicit override
   // For production (Cloudflare Workers serve HTTPS), use Secure; SameSite=Strict
@@ -133,6 +163,13 @@ export function createSessionCookieHeader(token: string, url?: URL, env?: Worker
   return `${COOKIE_NAME}=${token}; HttpOnly; SameSite=Strict; Secure; Path=/; Max-Age=3600`;
 }
 
+/**
+ * Builds a Set-Cookie header value that clears the session cookie, adapting cookie security attributes for local development.
+ *
+ * @param url - Optional request URL; its hostname is treated as local if it is a loopback address and will cause a less-restrictive cookie to be produced.
+ * @param env - Optional worker environment; when `env.ALLOW_INSECURE_COOKIES === 'true'` this forces the local/dev cookie policy.
+ * @returns The Set-Cookie header value that clears the session cookie (`cqd_session`) with appropriate SameSite and Secure attributes.
+ */
 export function clearSessionCookieHeader(url?: URL, env?: WorkerEnv): string {
   const isLoopback = url && isLocalEnvironment(url.hostname);
   const allowInsecure = env?.ALLOW_INSECURE_COOKIES === 'true';
@@ -151,6 +188,12 @@ export function clearSessionCookieHeader(url?: URL, env?: WorkerEnv): string {
 
 type IpAllowResult = { allowed: boolean; error?: string; serviceDown?: boolean };
 
+/**
+ * Checks whether a client IP is permitted by the remote IP allowlist service.
+ *
+ * @param ip - The client IP address to evaluate (IPv4 or IPv6).
+ * @returns An object with `allowed` indicating whether the IP is permitted. If the allowlist service reports it is disabled, `allowed` will be `true`. If the allowlist service is unreachable, returns `allowed: false` with `serviceDown: true` and an `error` message. 
+ */
 async function isIpAllowed(stub: DurableObjectStub, ip: string, env: WorkerEnv): Promise<IpAllowResult> {
   try {
     const res = await stub.fetch(new Request("http://internal/auth/check-ip-allowlist", {
@@ -226,7 +269,26 @@ function handleOptions(request: Request): Response {
 
 // ---------------------------------------------------------------------------
 // Dashboard Login (POST / validates password, sets session cookie)
-// ---------------------------------------------------------------------------
+/**
+ * Handle requests to the root ("/") route: serve the login page, perform login, or redirect authenticated users to the dashboard.
+ *
+ * This handler:
+ * - On GET, returns the login HTML or redirects to /dashboard when a valid session exists.
+ * - On POST, validates form content, enforces an IP allowlist (with graceful degradation), consults a login rate-limiter, verifies the provided password against the shared secret, creates a session on success, and returns a redirect with a Set-Cookie header.
+ *
+ * @param request - The incoming Request for the root route. The handler reads cookies, the CF-Connecting-IP header, and form-encoded body on POST.
+ * @param env - Worker environment providing configuration and Durable Object access (e.g., `DO_SHARED_SECRET`, downloads DO stub, and cookie policy flags).
+ * @returns An HTTP Response for the root route:
+ * - `200` with login page HTML for unauthenticated GET,
+ * - `302` redirect to `/dashboard` when authenticated or after successful login (includes `Set-Cookie` on successful login),
+ * - `400` for unsupported content types,
+ * - `401` for invalid credentials (when not rate-limited),
+ * - `403` if the IP is explicitly not allowed,
+ * - `429` when blocked by rate limiting,
+ * - `500` for server misconfiguration (missing secret) or internal errors,
+ * - `503` when the allowlist service is unavailable (graceful degradation),
+ * - `405` for unsupported HTTP methods.
+ */
 
 async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
   const method = request.method.toUpperCase();
@@ -358,7 +420,14 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
 
 // ---------------------------------------------------------------------------
 // Dashboard View (requires valid session)
-// ---------------------------------------------------------------------------
+/**
+ * Serve the dashboard page for an authenticated session or redirect to login and clear the session cookie.
+ *
+ * @returns A Response:
+ * - 200: HTML dashboard when the session is valid.
+ * - 302: Redirect to `/` with a Set-Cookie that clears the session when the session is missing or invalid.
+ * - 500: Plain-text diagnostic error when retrieving stats from the Durable Object fails.
+ */
 
 async function handleDashboard(request: Request, env: WorkerEnv): Promise<Response> {
   const clientIp = request.headers.get("CF-Connecting-IP") || "unknown";
@@ -400,7 +469,13 @@ async function handleDashboard(request: Request, env: WorkerEnv): Promise<Respon
 
 // ---------------------------------------------------------------------------
 // Logout Handler
-// ---------------------------------------------------------------------------
+/**
+ * Redirects the client to the root path and clears the session cookie.
+ *
+ * @param request - Incoming request; its URL is used when constructing the cookie-clear header
+ * @param env - Worker environment used to determine cookie attributes when clearing the session
+ * @returns A 302 Response that redirects to `/` and includes a `Set-Cookie` header which clears the session cookie
+ */
 
 function handleLogout(request: Request, env: WorkerEnv): Response {
   const logoutUrl = new URL(request.url);
@@ -415,7 +490,22 @@ function handleLogout(request: Request, env: WorkerEnv): Response {
 
 // ---------------------------------------------------------------------------
 // Danger Password Verification (separate from login password)
-// ---------------------------------------------------------------------------
+/**
+ * Verify the danger password (rate-limited) and return an authenticated JSON result.
+ *
+ * @param request - Incoming HTTP request; must be a POST with JSON body `{ password: string }`.
+ * @param env - Worker environment providing:
+ *   - `DANGER_PASSWORD` (the secret danger password to validate),
+ *   - `DOWNLOADS_DO` (Durable Object namespace used for rate-limiting calls),
+ *   - `DO_SHARED_SECRET` (admin secret required by the Durable Object).
+ * @returns A Response with a JSON body.
+ *   - Success: `{ "ok": true }` with status 200.
+ *   - Invalid request body: `{ "ok": false, "error": "Invalid request body" }` with status 400.
+ *   - Wrong password: `{ "ok": false, "error": "Invalid danger password" }` with status 401.
+ *   - Rate limited: `{ "ok": false, "error": "Too many failed attempts. Try again later.", "blockedForSeconds": number }` with status 429.
+ *   - Rate-limit service unavailable: `{ "ok": false, "error": "Rate limit service unavailable. Try again later." }` with status 503.
+ *   - Method not allowed (non-POST): plain text "Method Not Allowed" with status 405.
+ */
 
 async function handleVerifyDangerPassword(request: Request, env: WorkerEnv): Promise<Response> {
   if (request.method !== "POST") {

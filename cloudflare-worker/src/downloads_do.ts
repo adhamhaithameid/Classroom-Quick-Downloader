@@ -213,6 +213,15 @@ function computeQuotaDescriptor(
   };
 }
 
+/**
+ * Create an HTTP Response whose body is the JSON serialization of the provided value and whose
+ * Content-Type header is set to `application/json; charset=utf-8`.
+ *
+ * @param obj - The value to serialize as the JSON response body.
+ * @param init - Optional ResponseInit values to apply to the response; provided headers are merged,
+ *               with `content-type` ensured to be `application/json; charset=utf-8`.
+ * @returns A Response containing the JSON-encoded `obj` and the merged response initialization. 
+ */
 function json<T>(obj: T, init: ResponseInit = {}): Response {
   return new Response(JSON.stringify(obj), {
     ...init,
@@ -225,6 +234,13 @@ function json<T>(obj: T, init: ResponseInit = {}): Response {
 
 type LogLevel = "info" | "warn" | "error";
 
+/**
+ * Logs a structured event as a single-line JSON object.
+ *
+ * @param level - Severity level for the event (e.g., "info", "warn", "error")
+ * @param message - Human-readable message describing the event
+ * @param fields - Optional additional key-value data to include in the logged payload
+ */
 function logEvent(level: LogLevel, message: string, fields?: Record<string, unknown>): void {
   const payload = {
     level,

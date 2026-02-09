@@ -1,8 +1,9 @@
 // IP validation and canonicalization utilities shared across worker modules.
 
 /**
- * Validates IPv4 address with strict octet checking (0-255).
- * Rejects malformed strings like 999.1.1.1
+ * Validate an IPv4 address using strict octet rules.
+ *
+ * @returns `true` if `ip` consists of four decimal octets (0–255) with no leading zeros (except "0"), `false` otherwise.
  */
 export function isValidIpv4(ip: string): boolean {
   const parts = ip.split(".");
@@ -18,9 +19,13 @@ export function isValidIpv4(ip: string): boolean {
 }
 
 /**
- * Validates IPv6 hextet structure with compression support.
- * @param ip - The IPv6 address string
- * @param maxHextets - Maximum allowed hextets (8 for pure IPv6, 6 for IPv4-mapped)
+ * Validates an IPv6 address's hextet structure, permitting a single `::` zero-compression.
+ *
+ * Checks that hextets are 1–4 hexadecimal digits, rejects improper leading/trailing single colons, allows at most one `::`, and enforces hextet count constraints depending on compression.
+ *
+ * @param ip - The IPv6 address string to validate
+ * @param maxHextets - Maximum allowed hextets (use `8` for full IPv6, `6` for an IPv6 prefix that precedes an embedded IPv4)
+ * @returns `true` if `ip` conforms to the hextet and compression rules, `false` otherwise
  */
 export function isValidIpv6Hextets(ip: string, maxHextets: number): boolean {
   const hextetPattern = /^[0-9a-fA-F]{1,4}$/;
@@ -63,8 +68,12 @@ export function isValidIpv6Hextets(ip: string, maxHextets: number): boolean {
 }
 
 /**
- * Protocol-complete IPv6 validation with hextet counting.
- * Supports: full form, zero-compression (::), embedded IPv4, loopback (::1).
+ * Validate whether a string is a syntactically valid IPv6 address.
+ *
+ * Supports full form, zero-compression (`::`), embedded IPv4 suffixes, and the loopback form.
+ *
+ * @param ip - The input string to validate as an IPv6 address
+ * @returns `true` if `ip` is a valid IPv6 address, `false` otherwise
  */
 export function isValidIpv6(ip: string): boolean {
   if (!ip || typeof ip !== "string") return false;
@@ -95,14 +104,23 @@ export function isValidIpv6(ip: string): boolean {
 }
 
 /**
- * Validates if a string is a valid IPv4 or IPv6 address.
- * Filters out "unknown", empty strings, and malformed IPs.
+ * Determines whether a string is a valid IPv4 or IPv6 address.
+ *
+ * @returns `true` if `ip` is a valid IPv4 or IPv6 address, `false` otherwise.
  */
 export function isValidIp(ip: string): boolean {
   if (!ip || ip === "unknown") return false;
   return isValidIpv4(ip) || isValidIpv6(ip);
 }
 
+/**
+ * Expand an IPv6 address into its eight lowercase hextets.
+ *
+ * Handles addresses with or without `::` zero-compression and validates each hextet; returns `null` for invalid input.
+ *
+ * @param ip - The IPv6 address string to expand (may include `::` compression)
+ * @returns An array of eight lowercase hextet strings (no leading zeros), or `null` if `ip` is not a valid IPv6 address
+ */
 function expandIpv6ToHextets(ip: string): string[] | null {
   const hextetPattern = /^[0-9a-fA-F]{1,4}$/;
 
@@ -135,6 +153,12 @@ function expandIpv6ToHextets(ip: string): string[] | null {
   return hextets.map((h) => (parseInt(h, 16) || 0).toString(16));
 }
 
+/**
+ * Compresses an IPv6 address represented as an array of hextets by replacing the longest consecutive run of `"0"` hextets with `"::"`.
+ *
+ * @param hextets - Array of IPv6 hextets (expected length: 8), each as a lowercase hex string without leading zeros (e.g., `"0"`, `"1"`, `"abcd"`).
+ * @returns The compressed IPv6 string using `"::"` for the longest zero run when that run has length 2 or more; otherwise the hextets joined with `":"`. If the entire address is zeros, returns `"::"`.
+ */
 function compressIpv6Hextets(hextets: string[]): string {
   let maxStart = -1;
   let maxLen = 0;
@@ -172,10 +196,18 @@ function compressIpv6Hextets(hextets: string[]): string {
 }
 
 /**
- * Canonicalizes an IP address to a standard format.
- * IPv4: unchanged if valid
- * IPv6: expands to full form, then compresses optimally (like Go's net.ParseIP().String())
- * Returns null if invalid.
+ * Produce a canonical representation of an IP address.
+ *
+ * For a valid IPv4 address, returns the original IPv4 string. For a valid IPv6
+ * address, returns the canonical compressed IPv6 form (lowercase, with the
+ * longest run of zero hextets replaced by `::`). If the IPv6 address contains
+ * an embedded IPv4 and is an IPv4-compatible or IPv4-mapped form, returns the
+ * embedded IPv4 string instead. Returns `null` for invalid input or the
+ * literal string `"unknown"`. If an unexpected error occurs during processing,
+ * returns the input converted to lowercase.
+ *
+ * @param ip - The input IP address string to canonicalize.
+ * @returns The canonical IPv4 or IPv6 string, or `null` if the input is invalid.
  */
 export function canonicalizeIp(ip: string): string | null {
   if (!ip || ip === "unknown") return null;

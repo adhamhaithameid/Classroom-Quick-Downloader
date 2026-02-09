@@ -221,8 +221,10 @@ const MONTH_MAP: Record<string, number> = {
 };
 
 /**
- * Parses a localized date string into a JS Date.
- * Returns {date, raw, confidence} or null.
+ * Parse a localized date string (supports Unicode digits, multilingual month names, and common separators) into a UTC date with a confidence score.
+ *
+ * @param dateString - The input date text to parse; may contain Unicode digits, month words, or separators like "-", "/", ".", "年", "月", "日", etc.
+ * @returns An object with `date` (UTC Date constructed from the parsed values), `raw` (the original input string), and `confidence` (`'high' | 'medium' | 'low'`) indicating parsing certainty, or `null` if the input cannot be parsed.
  */
 export function parseUnicodeDate(dateString: string): { date: Date; raw: string; confidence: 'high' | 'medium' | 'low' } | null {
   if (!dateString) return null;

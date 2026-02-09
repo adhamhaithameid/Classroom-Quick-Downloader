@@ -30,7 +30,11 @@ function enqueueOp(op: () => Promise<void>): void {
   });
 }
 
-// --- Internal Track ---
+/**
+ * Record an analytics event by enriching it with runtime metadata, updating local stats, persisting it to the local queue, and triggering a flush when thresholds are met.
+ *
+ * @param event - The event payload provided by callers; fields `timestamp`, `ext_version`, `browser`, `os`, `language`, `retryCount`, and `id` are omitted and will be populated by this function.
+ */
 
 async function internalTrack(
   event: Omit<AnalyticsEvent, 'timestamp' | 'ext_version' | 'browser' | 'os' | 'language' | 'retryCount' | 'id'>
@@ -113,7 +117,19 @@ export function recordDownloadEvent(input: RecordDownloadEventInput): void {
 // --- Remote Config ---
 
 /**
- * Fetch and update config from Cloudflare Worker.
+ * Refreshes analytics configuration from the remote CONFIG_URL and persists any updates.
+ *
+ * Loads the current local config, fetches remote configuration from CONFIG_URL (if set),
+ * and merges provided remote fields into the local config before saving. Recognized remote
+ * fields include `batchSize`, `maxDailyRequests`, `maxRetry`, `flushMode`, `remoteEnabled`,
+ * `cancelHoldDelayMs`, and `maxEventsPerRequest`. If `timeFlushMinutes` is present it updates
+ * the per-usage flush thresholds (`lowUsageFlushMinutes`, `midUsageFlushMinutes`,
+ * `highUsageFlushMinutes`) from `timeFlushMinutes.low|mid|high` when provided. Missing remote
+ * fields preserve the current local values.
+ *
+ * The function is best-effort: if CONFIG_URL is not defined, the fetch response is not OK,
+ * the remote payload is not valid, or any error occurs during refresh, no changes are made
+ * and the function completes silently.
  */
 export async function refreshRemoteAnalyticsConfig(): Promise<void> {
   if (!CONFIG_URL) return;

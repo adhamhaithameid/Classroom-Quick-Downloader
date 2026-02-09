@@ -8,7 +8,8 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-// Init opens the SQLite database and runs all migrations.
+// Init opens a SQLite database at the given path, enables WAL and a 5000ms busy timeout via the DSN, configures the connection pool for read concurrency, runs migrations, and returns the ready *sql.DB.
+// If migrations fail the database is closed and the migration error is returned.
 func Init(dbPath string) (*sql.DB, error) {
 	// Use WAL + busy_timeout via DSN.
 	dsn := fmt.Sprintf("file:%s?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)", dbPath)
@@ -30,7 +31,9 @@ func Init(dbPath string) (*sql.DB, error) {
 	return database, nil
 }
 
-// Migrate ensures all tables/indices exist.
+// Migrate ensures required database pragmas, tables, and indices are present.
+// It runs a series of idempotent SQL statements (PRAGMA and CREATE ... IF NOT EXISTS)
+// and returns the first error encountered while executing them.
 func Migrate(db *sql.DB) error {
 	stmts := []string{
 		`PRAGMA journal_mode = WAL;`,

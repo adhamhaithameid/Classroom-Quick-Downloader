@@ -23,6 +23,10 @@ import (
 	"oracle-backend/internal/handlers"
 )
 
+// main initializes configuration and runtime components, registers HTTP routes
+// (health, DB health, ingest, analytics API with optional auth, auth endpoints,
+// and SPA static serving), schedules the daily Google Sheets archiver, and
+// starts the HTTP server.
 func main() {
 	addr := getenv("ADDR", ":8080")
 	dbPath := getenv("DB_PATH", "./data/analytics.db")
@@ -136,7 +140,7 @@ func HealthDBHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-// loggingMiddleware logs basic request info.
+// loggingMiddleware returns an http.Handler that wraps the given handler and logs the request method, URL path, and processing duration.
 func loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
@@ -145,7 +149,11 @@ func loggingMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// spaHandler serves static files with SPA fallback for client-side routing.
+// spaHandler returns an http.Handler that serves files from the provided staticDir,
+// falling back to index.html for single-page app routes. It rejects requests for
+// API and health endpoints (so those can be handled elsewhere), prevents path
+// traversal by ensuring resolved paths remain inside staticDir, and serves an
+// existing file directly when present.
 func spaHandler(staticDir string) http.Handler {
 	fs := http.FileServer(http.Dir(staticDir))
 
@@ -193,7 +201,11 @@ func spaHandler(staticDir string) http.Handler {
 // Configure with environment variables:
 // - SHEETS_ID: Google Sheets spreadsheet ID
 // - GOOGLE_CREDS_PATH: Path to service account JSON (default: /app/google-credentials.json)
-// - KUMA_PUSH_URL: Optional Uptime Kuma push URL
+// scheduleSheetsArchiver schedules and runs the archiver to export data to Google Sheets daily at 00:15 UTC.
+// If SHEETS_ID is unset the scheduler is disabled and returns immediately.
+// It reads GOOGLE_CREDS_PATH (defaulting to /app/google-credentials.json), KUMA_PUSH_URL and ARCHIVER_SHARED_SECRET from the environment,
+// logs the enabled configuration, and repeatedly sleeps until the next 00:15 UTC then calls runArchiver with those values.
+// This function blocks (runs an infinite loop) and is intended to be started in a separate goroutine.
 func scheduleSheetsArchiver() {
 	sheetsID := os.Getenv("SHEETS_ID")
 	if sheetsID == "" {
@@ -226,7 +238,13 @@ func scheduleSheetsArchiver() {
 }
 
 // runArchiver executes the archiver binary with the given parameters.
-// This calls the archiver as a subprocess to maintain separation of concerns.
+// runArchiver executes the external archiver binary to export analytics to the specified
+// Google Sheet and logs the result.
+//
+// sheetsID is the target Google Sheet ID. credsPath is the filesystem path to the
+// service account credentials JSON. kumaPushURL, if non-empty, is forwarded to the
+// archiver as a -kuma argument. archiverSecret, if non-empty, is forwarded as a
+// -secret argument.
 func runArchiver(sheetsID, credsPath, kumaPushURL, archiverSecret string) {
 	args := []string{"-sheet", sheetsID, "-creds", credsPath, "-api", "http://localhost:8080/api/stats/summary"}
 	if kumaPushURL != "" {
@@ -273,14 +291,19 @@ func generateToken() (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
-// hashPassword creates a SHA256 hash for timing-safe comparison.
+// hashPassword returns the SHA-256 hash of password encoded as a hexadecimal string.
+// The resulting hex string is suitable for use in constant-time comparisons when verifying credentials.
 func hashPassword(password string) string {
 	h := sha256.Sum256([]byte(password))
 	return hex.EncodeToString(h[:])
 }
 
 // requireAuth returns middleware that checks for valid session cookie.
-// If dashboardPassword is empty, all requests are allowed (no auth).
+// requireAuth returns middleware that enforces dashboard authentication for protected handlers.
+// If dashboardPassword is empty, the middleware allows all requests.
+// If archiverSecret is non-empty, a matching X-Archiver-Secret header grants access.
+// When archiverSecret is empty, requests originating from loopback addresses without forwarded IP headers are allowed.
+// Otherwise the middleware requires a valid session cookie (sessionCookieName) and responds with HTTP 401 and a JSON error on failure.
 func requireAuth(dashboardPassword, archiverSecret string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -314,7 +337,8 @@ func requireAuth(dashboardPassword, archiverSecret string) func(http.Handler) ht
 	}
 }
 
-// isValidSession checks if token is in store and not expired.
+// isValidSession reports whether the provided session token exists and has not expired.
+// If the token is expired it is removed from the store asynchronously.
 func isValidSession(token string) bool {
 	sessionStore.RLock()
 	defer sessionStore.RUnlock()
@@ -335,7 +359,9 @@ func isValidSession(token string) bool {
 	return true
 }
 
-// loginHandler handles POST /api/auth/login
+// loginHandler returns an http.HandlerFunc that handles POST /api/auth/login and creates an authenticated session cookie when a dashboard password is configured.
+// It validates a JSON body containing a `password` field using a timing-safe SHA-256 comparison, generates a cryptographically secure session token, stores the token with a 24-hour expiry in the in-memory session store, and sets the session cookie with attributes determined by cookieSecurityPolicy.
+// If no dashboard password is configured the handler responds with `{"ok":true,"authRequired":false}`; on success it responds with `{"ok":true}` and on failure it responds with an appropriate HTTP status and JSON error message.
 func loginHandler(dashboardPassword string, allowInsecureCookies bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -391,7 +417,14 @@ func loginHandler(dashboardPassword string, allowInsecureCookies bool) http.Hand
 	}
 }
 
-// logoutHandler handles POST /api/auth/logout
+// logoutHandler returns an HTTP handler that invalidates the current session and clears the session cookie.
+// 
+// The handler accepts only POST requests; other methods receive a 405 response with a JSON error payload.
+// If a session cookie is present, its token is removed from the in-memory session store. The handler then
+// clears the session cookie (empty value and MaxAge -1) using the Secure/SameSite policy determined by
+// cookieSecurityPolicy and responds with JSON `{"ok": true}`.
+// 
+// The allowInsecureCookies parameter controls cookie security policy for non-TLS requests.
 func logoutHandler(allowInsecureCookies bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -424,6 +457,10 @@ func logoutHandler(allowInsecureCookies bool) http.HandlerFunc {
 	}
 }
 
+// cookieSecurityPolicy determines whether the session cookie should be marked Secure
+// and which SameSite mode to use based on the incoming request and the
+// allowInsecure flag. If the request is over TLS it returns Secure=true and
+// SameSiteStrictMode; otherwise it returns Secure=false and SameSiteLaxMode.
 func cookieSecurityPolicy(r *http.Request, allowInsecure bool) (bool, http.SameSite) {
 	if r.TLS != nil {
 		return true, http.SameSiteStrictMode
@@ -434,6 +471,9 @@ func cookieSecurityPolicy(r *http.Request, allowInsecure bool) (bool, http.SameS
 	return false, http.SameSiteLaxMode
 }
 
+// isLoopbackAddr reports whether the provided remote network address refers to a loopback IP.
+// The input may be in "host:port" form or a plain host/IP; the function parses the host portion
+// and returns true if it is a valid IP address that is a loopback address.
 func isLoopbackAddr(remoteAddr string) bool {
 	host, _, err := net.SplitHostPort(remoteAddr)
 	if err != nil {
@@ -443,12 +483,13 @@ func isLoopbackAddr(remoteAddr string) bool {
 	return ip != nil && ip.IsLoopback()
 }
 
+// hasForwardedIp reports whether the request contains a non-empty X-Forwarded-For or X-Real-IP header.
 func hasForwardedIp(r *http.Request) bool {
 	return r.Header.Get("X-Forwarded-For") != "" || r.Header.Get("X-Real-IP") != ""
 }
 
 
-// authCheckHandler handles GET /api/auth/check
+//   - "authRequired": `false` when no dashboard password is configured (authentication disabled), `true` otherwise.
 func authCheckHandler(dashboardPassword string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

@@ -17,6 +17,12 @@ function _isValidIp(ip: string): boolean {
   return ipv4Regex.test(ip);
 }
 
+/**
+ * Format a Unix timestamp (milliseconds) into an en-US date and time string in UTC.
+ *
+ * @param ts - Timestamp in milliseconds since the Unix epoch, or `null`
+ * @returns A UTC-formatted en-US date/time string (for example, `02/09/2026, 04:05:06 PM`), or `"—"` if `ts` is null or falsy
+ */
 function formatTs(ts: number | null): string {
   if (!ts) return "—";
   const d = new Date(ts);
@@ -395,6 +401,12 @@ function renderNotificationSection(entries: ChangelogEntry[], config: ChangelogC
   `;
 }
 
+/**
+ * Render the Release Publishing section of the admin dashboard as an HTML string.
+ *
+ * @param entries - Array of changelog entries to display; each entry should include `id`, `version`, `date`, and `changes` (array of strings). Entries are rendered newest-first.
+ * @returns The complete HTML markup for the Release Publishing UI (create/edit form and historical releases list).
+ */
 function renderReleaseManagementSection(entries: ChangelogEntry[], _config: ChangelogConfig): string {
   const sorted = [...entries].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   
@@ -507,6 +519,16 @@ function renderReleaseManagementSection(entries: ChangelogEntry[], _config: Chan
   `;
 }
 
+/**
+ * Render the complete HTML analytics dashboard for a provided stats snapshot.
+ *
+ * Produces a full, self-contained HTML document that visualizes metrics, breakdowns,
+ * environment and admin controls based on `stats`. Timestamps are formatted in UTC
+ * and untrusted text inserted into the page is HTML-escaped to mitigate XSS.
+ *
+ * @param stats - Aggregated analytics snapshot and configuration used to populate the dashboard (counters, totals, quota, changelog, envSnapshot, etc.).
+ * @returns The rendered HTML document as a string ready to be sent to a browser.
+ */
 export function renderDashboard(stats: StatsResponse): string {
   const quota = stats.quota;
   const stateTag = quotaToStateTag(quota);

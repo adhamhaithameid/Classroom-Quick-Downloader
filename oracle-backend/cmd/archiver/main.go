@@ -25,6 +25,10 @@ type logPayload struct {
 	Fields  map[string]interface{} `json:"fields,omitempty"`
 }
 
+// logEvent emits a structured JSON log entry with a UTC RFC3339 timestamp.
+// 
+// The entry contains the provided level, message, and optional fields map.
+// If encoding fails, a plain text warning is written to the standard logger and the function returns.
 func logEvent(level string, message string, fields map[string]interface{}) {
 	payload := logPayload{
 		Level:   level,
@@ -66,6 +70,9 @@ type SummaryResponse struct {
 	TopType    string `json:"topType"`
 }
 
+// main fetches a summary of stats from a configured API, formats those stats into a single row,
+// appends that row to a specified Google Sheet, and optionally notifies Uptime Kuma.
+// It emits structured JSON log events for key operations and exits on fatal failures.
 func main() {
 	sheetID := flag.String("sheet", "", "Google Sheet ID")
 	credsPath := flag.String("creds", "/app/google-credentials.json", "Path to Service Account JSON")

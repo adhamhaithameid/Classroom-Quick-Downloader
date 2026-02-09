@@ -9,7 +9,9 @@ import { storageGet, storageSet } from './storage';
 import type { RateLimitState } from './types';
 
 /**
- * Get the rate limit date string (resets at 1:00 AM UTC).
+ * Get the UTC date string representing the current rate-limit day, which resets at 1:00 AM UTC.
+ *
+ * @returns The date in `YYYY-MM-DD` for the rate-limit day; if current UTC hour is before 01:00, returns the previous UTC day.
  */
 function getRateLimitDate(): string {
   const now = new Date();
@@ -21,7 +23,13 @@ function getRateLimitDate(): string {
 }
 
 /**
- * Check if we can make a request today and increment counter.
+ * Determine whether a request is allowed under the daily analytics rate limit and update the stored counter.
+ *
+ * @param maxDailyRequests - Maximum requests allowed per UTC day; fractional values are floored and values less than 1 are treated as 1. Defaults to the module's MAX_DAILY_REQUESTS.
+ * @returns An object with:
+ *  - `allowed`: `true` if the request is permitted and the counter was incremented, `false` if the daily limit has been reached.
+ *  - `remaining`: the number of requests remaining for the current UTC day after this call.
+ *  - `isNewDay`: `true` if the daily counter was reset for a new UTC day before incrementing.
  */
 export async function checkAndIncrementRateLimit(maxDailyRequests = MAX_DAILY_REQUESTS): Promise<{
   allowed: boolean;

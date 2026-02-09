@@ -5,6 +5,12 @@
 
 import type { QuotaDescriptor } from "../types";
 
+/**
+ * Format a Unix timestamp into an en-US UTC date-time string or return a placeholder when no timestamp is provided.
+ *
+ * @param ts - Timestamp in milliseconds since the Unix epoch (or `null`/falsy) to format.
+ * @returns `"—"` if `ts` is falsy; otherwise an en-US UTC date-time string with 2-digit month/day/year and time components (e.g., `MM/DD/YYYY, HH:MM:SS`).
+ */
 export function formatTs(ts: number | null): string {
   if (!ts) return "—";
   const d = new Date(ts);
