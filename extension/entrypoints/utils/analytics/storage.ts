@@ -116,30 +116,28 @@ function sanitizeQueue(rawQueue: unknown): { queue: AnalyticsEvent[]; changed: b
       changed = true;
       continue;
     }
-    if (raw && typeof raw === 'object') {
-      const candidate = raw as Record<string, unknown>;
-      const same =
-        candidate.status === ev.status &&
-        candidate.file_type === ev.file_type &&
-        candidate.browser === ev.browser &&
-        candidate.os === ev.os &&
-        candidate.ext_version === ev.ext_version &&
-        candidate.duration_ms === ev.duration_ms &&
-        candidate.bypass_used === ev.bypass_used &&
-        candidate.error_type === ev.error_type &&
-        candidate.language === ev.language &&
-        candidate.timestamp === ev.timestamp &&
-        candidate.id === ev.id &&
-        candidate.source === ev.source &&
-        candidate.retryCount === ev.retryCount &&
-        candidate.commitSeq === ev.commitSeq &&
-        candidate.count === ev.count &&
-        candidate.rollup === ev.rollup;
-      if (!same) changed = true;
-    }
+    const candidate = raw as Record<string, unknown>;
+    const same =
+      candidate.status === ev.status &&
+      candidate.file_type === ev.file_type &&
+      candidate.browser === ev.browser &&
+      candidate.os === ev.os &&
+      candidate.ext_version === ev.ext_version &&
+      candidate.duration_ms === ev.duration_ms &&
+      candidate.bypass_used === ev.bypass_used &&
+      candidate.error_type === ev.error_type &&
+      candidate.language === ev.language &&
+      candidate.timestamp === ev.timestamp &&
+      candidate.id === ev.id &&
+      candidate.source === ev.source &&
+      candidate.retryCount === ev.retryCount &&
+      candidate.commitSeq === ev.commitSeq &&
+      candidate.count === ev.count &&
+      candidate.rollup === ev.rollup;
+    if (!same) changed = true;
     queue.push(ev);
   }
-  queue.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+  queue.sort((a, b) => a.timestamp - b.timestamp);
   if (queue.length !== rawQueue.length) changed = true;
   return { queue, changed };
 }
@@ -243,7 +241,7 @@ function rollupEvents(events: AnalyticsEvent[], coarse = false): AnalyticsEvent[
 
   const rollups: AnalyticsEvent[] = [];
   for (const entry of map.values()) {
-    const avgDuration = entry.count > 0 ? Math.round(entry.totalDuration / entry.count) : 0;
+    const avgDuration = Math.round(entry.totalDuration / entry.count);
     const sample = entry.sample;
     rollups.push({
       status: sample.status,
@@ -264,7 +262,7 @@ function rollupEvents(events: AnalyticsEvent[], coarse = false): AnalyticsEvent[
     });
   }
 
-  rollups.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+  rollups.sort((a, b) => a.timestamp - b.timestamp);
   return rollups;
 }
 
@@ -286,13 +284,13 @@ export function compactQueueForBudget(queue: AnalyticsEvent[]): { queue: Analyti
     const older = compactable.slice(0, compactable.length - preserve);
     const rollups = rollupEvents(older, false);
     let nextQueue = [...rollups, ...protectedEvents, ...newer];
-    nextQueue.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+    nextQueue.sort((a, b) => a.timestamp - b.timestamp);
 
     if (nextQueue.length <= QUEUE_BUDGET_EVENTS || preserve === 0) {
       if (nextQueue.length > QUEUE_BUDGET_EVENTS) {
         const coarseRollups = rollupEvents(compactable, true);
         nextQueue = [...coarseRollups, ...protectedEvents];
-        nextQueue.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+        nextQueue.sort((a, b) => a.timestamp - b.timestamp);
       }
       return { queue: nextQueue, compacted: true };
     }
@@ -345,6 +343,10 @@ function clampInt(value: unknown, min: number, max: number, fallback: number): n
 }
 
 function normalizeConfig(cfg: AnalyticsConfig): AnalyticsConfig {
+  const maxEventsPerRequestDefault = DEFAULT_CONFIG.maxEventsPerRequest ?? 5000;
+  const maxEventsPerRequestInput = cfg.maxEventsPerRequest == null
+    ? maxEventsPerRequestDefault
+    : cfg.maxEventsPerRequest;
   return {
     ...cfg,
     configVersion: CONFIG_VERSION,
@@ -369,12 +371,7 @@ function normalizeConfig(cfg: AnalyticsConfig): AnalyticsConfig {
       24 * 60,
       DEFAULT_CONFIG.dailyFlushWindowMinutes
     ),
-    maxEventsPerRequest: clampInt(
-      cfg.maxEventsPerRequest ?? DEFAULT_CONFIG.maxEventsPerRequest,
-      1,
-      50_000,
-      DEFAULT_CONFIG.maxEventsPerRequest ?? 5000
-    ),
+    maxEventsPerRequest: clampInt(maxEventsPerRequestInput, 1, 50_000, maxEventsPerRequestDefault),
   };
 }
 
@@ -422,7 +419,7 @@ export async function saveQueue(queue: AnalyticsEvent[]): Promise<void> {
     }
     return ev;
   });
-  normalized.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+  normalized.sort((a, b) => a.timestamp - b.timestamp);
   const compacted = compactQueueForBudget(normalized);
   const nextQueue = compacted.queue;
   const savedToIdb = await replaceQueueInIdb(nextQueue);
@@ -536,45 +533,31 @@ export async function saveMeta(meta: AnalyticsMeta): Promise<void> {
 // --- Stats Helpers ---
 
 export function normalizeStats(raw: any): LocalStats {
-  const stats: LocalStats = {
-    total: 0,
-    byType: {},
-    success: 0,
-    fail: 0,
-    cancelled: 0,
-    attempts: 0,
-    bySpeed: { fast: 0, medium: 0, slow: 0 },
-    bypassCount: 0,
-    failByErrorType: {},
-    byLanguage: {},
-    lastUpdated: Date.now(),
+  const source = raw && typeof raw === 'object' ? raw : {};
+  const byType = source.byType && typeof source.byType === 'object' ? source.byType : {};
+  const bySpeed = source.bySpeed && typeof source.bySpeed === 'object' ? source.bySpeed : {};
+  const failByErrorType = source.failByErrorType && typeof source.failByErrorType === 'object'
+    ? source.failByErrorType
+    : {};
+  const byLanguage = source.byLanguage && typeof source.byLanguage === 'object' ? source.byLanguage : {};
+
+  return {
+    total: typeof source.total === 'number' ? source.total : 0,
+    byType,
+    success: typeof source.success === 'number' ? source.success : 0,
+    fail: typeof source.fail === 'number' ? source.fail : 0,
+    cancelled: typeof source.cancelled === 'number' ? source.cancelled : 0,
+    attempts: typeof source.attempts === 'number' ? source.attempts : 0,
+    bySpeed: {
+      fast: typeof bySpeed.fast === 'number' ? bySpeed.fast : 0,
+      medium: typeof bySpeed.medium === 'number' ? bySpeed.medium : 0,
+      slow: typeof bySpeed.slow === 'number' ? bySpeed.slow : 0,
+    },
+    bypassCount: typeof source.bypassCount === 'number' ? source.bypassCount : 0,
+    failByErrorType,
+    byLanguage,
+    lastUpdated: typeof source.lastUpdated === 'number' ? source.lastUpdated : Date.now(),
   };
-
-  if (!raw) return stats;
-
-  if (typeof raw.total === 'number') stats.total = raw.total;
-  if (raw.byType && typeof raw.byType === 'object') stats.byType = raw.byType;
-  if (typeof raw.success === 'number') stats.success = raw.success;
-  if (typeof raw.fail === 'number') stats.fail = raw.fail;
-  if (typeof raw.cancelled === 'number') stats.cancelled = raw.cancelled;
-  if (typeof raw.attempts === 'number') stats.attempts = raw.attempts;
-  if (raw.bySpeed && typeof raw.bySpeed === 'object') {
-    stats.bySpeed = {
-      fast: raw.bySpeed.fast ?? 0,
-      medium: raw.bySpeed.medium ?? 0,
-      slow: raw.bySpeed.slow ?? 0,
-    };
-  }
-  if (typeof raw.bypassCount === 'number') stats.bypassCount = raw.bypassCount;
-  if (raw.failByErrorType && typeof raw.failByErrorType === 'object') {
-    stats.failByErrorType = raw.failByErrorType;
-  }
-  if (raw.byLanguage && typeof raw.byLanguage === 'object') {
-    stats.byLanguage = raw.byLanguage;
-  }
-  if (typeof raw.lastUpdated === 'number') stats.lastUpdated = raw.lastUpdated;
-
-  return stats;
 }
 
 export async function loadStats(): Promise<LocalStats> {
@@ -585,3 +568,19 @@ export async function loadStats(): Promise<LocalStats> {
 export async function saveStats(stats: LocalStats): Promise<void> {
   await storageSet({ [STORAGE_KEYS.STATS]: stats });
 }
+
+// Test-only exports for deterministic branch coverage of private helpers.
+export const __storageTestInternals = {
+  openQueueDb,
+  sanitizeEvent,
+  sanitizeQueue,
+  getEventCount,
+  buildRollupKey,
+  rollupEvents,
+  clampInt,
+  normalizeConfig,
+  migrateConfig,
+  computeChecksum,
+  saveQueueWithIntegrity,
+  loadQueueWithIntegrity,
+};
