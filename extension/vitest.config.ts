@@ -40,10 +40,10 @@ function getCoverageConfig() {
       include: criticalCoverageInclude,
       exclude: ['**/*.d.ts', '**/node_modules/**'],
       thresholds: {
-        lines: 95,
-        functions: 95,
-        branches: 75,
-        statements: 95,
+        lines: 100,
+        functions: 100,
+        branches: 100,
+        statements: 100,
       },
     };
   }
@@ -56,10 +56,10 @@ function getCoverageConfig() {
       include: runtimeCoverageInclude,
       exclude: runtimeCoverageExclude,
       thresholds: {
-        lines: 90,
-        functions: 90,
-        branches: 75,
-        statements: 90,
+        lines: 100,
+        functions: 100,
+        branches: 100,
+        statements: 100,
       },
     };
   }
