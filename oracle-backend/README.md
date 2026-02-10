@@ -146,6 +146,8 @@ All configuration is done via environment variables, defined in `docker-compose.
 | `ALLOW_INSECURE_COOKIES` | `false` | Set `true` to allow cookies over HTTP (HTTP-only deployments). |
 | `ALLOW_EMPTY_DASHBOARD_PASSWORD` | `false` | Set `true` to allow an empty dashboard password (dev only). |
 
+When `DASHBOARD_PASSWORD` is set, the Oracle dashboard prompts for authentication using an **in-page login modal form** (not a browser-native prompt), matching the Cloudflare dashboard workflow.
+
 ### 🔐 Setting `DO_SHARED_SECRET`
 
 > **⚠️ WARNING: Never commit secrets to version control.**
@@ -315,6 +317,32 @@ Exports time-series data as JSON or CSV.
 # CSV download
 curl "http://localhost:8080/api/stats/export?format=csv&from=2024-12-01" -o analytics.csv
 ```
+
+---
+
+### `GET /api/pipeline/metrics` — Delivery Chain Metrics
+
+Returns end-to-end delivery counters (`accepted`, `stored`, `forwarded`, `committed`), stage gaps, daily rollups, and recent delivery records.
+
+**Request:**
+```bash
+curl "http://localhost:8080/api/pipeline/metrics?days=14&limit=100"
+```
+
+**Auth:** Protected by dashboard session middleware.
+
+---
+
+### `GET /api/pipeline/failures` — Structured Failure Sink
+
+Returns recent structured failure logs and daily grouped summaries (`source`, `stage`, `error_code`, `sample_count`).
+
+**Request:**
+```bash
+curl "http://localhost:8080/api/pipeline/failures?days=14&limit=200"
+```
+
+**Auth:** Protected by dashboard session middleware.
 
 ---
 

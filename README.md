@@ -211,6 +211,8 @@ Every download attempt in the [Extension](./extension/) triggers an analytics ev
 * Persists events in memory (survives Worker restarts).
 * Aggregates counters: by browser, by OS, by country, by file type.
 * Calculates "Top" stats: most common browser, most active country, etc.
+* Tracks delivery-stage counters (`accepted → stored → forwarded → committed`) for end-to-end verification.
+* Rolls up structured failures (stage, code, detail, samples) for durable debugging.
 * Manages security state: IP allowlists and login rate limits.
 
 4. **🚀 Flush (Edge → Backend)** — When the buffer exceeds `MAX_BATCH_EVENTS` or an alarm fires, the DO sends a pre-aggregated JSON payload to the [Oracle Backend](./oracle-backend/).
@@ -219,6 +221,8 @@ Every download attempt in the [Extension](./extension/) triggers an analytics ev
 * Raw batch metadata in `batches` table.
 * Hourly aggregates in `downloads_hourly` table.
 * Lifetime totals in `downloads_totals` key-value table.
+* Delivery chain metrics in `pipeline_stage_daily` and `pipeline_delivery_events`.
+* Structured failure sink logs in `pipeline_failure_logs` with retention cleanup.
 
 6. **📊 Archive (Backend → Sheets)** — At midnight UTC, a cron job runs the [Archiver](./oracle-backend/README.md%23-google-sheets-archiver), which:
 

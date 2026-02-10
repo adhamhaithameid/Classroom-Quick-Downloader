@@ -299,9 +299,37 @@ curl https://cqd-analytics.your-subdomain.workers.dev/stats
   "envSnapshot": {
     "maxBatchEvents": "10000",
     "oracleEndpoint": "http://..."
+  },
+  "deliveryMetrics": {
+    "totals": {
+      "accepted": 12500,
+      "stored": 12500,
+      "forwarded": 12490,
+      "committed": 12490
+    },
+    "recent": [
+      {
+        "deliveryId": "dlv-do-seq101-50ev",
+        "batchId": "do-seq101-50ev",
+        "accepted": 50,
+        "stored": 50,
+        "forwarded": 50,
+        "committed": 50,
+        "status": "committed",
+        "createdAt": 1702732800000,
+        "updatedAt": 1702732810000
+      }
+    ]
+  },
+  "failureSink": {
+    "totalRollups": 12,
+    "unsentRollups": 0
   }
 }
 ```
+
+`deliveryMetrics` provides stage-chain observability (`accepted → stored → forwarded → committed`) for end-to-end verification.  
+`failureSink` exposes structured Cloudflare DO failure rollups that are also forwarded to Oracle on successful flush.
 
 ---
 
@@ -353,6 +381,18 @@ curl https://cqd-analytics.your-subdomain.workers.dev/health
 ```json
 { "ok": true, "pendingEvents": 350, "lastEventAt": 1702732800000, "lastFlushAt": 1702732500000 }
 ```
+
+---
+
+### `GET /pipeline-health` — Pipeline Backlog Health
+
+Returns queue/flush health used by dashboard health cards and external monitoring.
+
+```bash
+curl https://cqd-analytics.your-subdomain.workers.dev/pipeline-health
+```
+
+> Alert dispatch is admin-gated. Public reads are allowed, but webhook notifications are triggered only when `X-Admin-Secret` is present.
 
 ---
 
