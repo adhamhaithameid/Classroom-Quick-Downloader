@@ -304,8 +304,7 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
     const rateLimitReq = new Request(new URL("/auth/login-attempt", request.url).toString(), {
       method: "POST",
       headers: { 
-        "Content-Type": "application/json", 
-        "X-Client-IP": clientIp,
+        "Content-Type": "application/json",
         "X-Admin-Secret": env.DO_SHARED_SECRET,
       },
       body: JSON.stringify({ ip: clientIp, success: false }),
@@ -342,8 +341,7 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
     const successReq = new Request(new URL("/auth/login-attempt", request.url).toString(), {
       method: "POST",
       headers: { 
-        "Content-Type": "application/json", 
-        "X-Client-IP": clientIp,
+        "Content-Type": "application/json",
         "X-Admin-Secret": env.DO_SHARED_SECRET,
       },
       body: JSON.stringify({ ip: clientIp, success: true }),
@@ -584,6 +582,7 @@ async function handleProtectedAdminEndpoint(request: Request, env: WorkerEnv): P
   }
   
   if (country) {
+    headers.set("CF-IPCountry", country);
     headers.set("X-Geo-Country", country);
   }
 
@@ -611,13 +610,8 @@ async function proxyToDO(request: Request, env: WorkerEnv): Promise<Response> {
   // Create a new request based on the original, but with the added header
   const headers = new Headers(request.headers);
   if (country) {
+    headers.set("CF-IPCountry", country);
     headers.set("X-Geo-Country", country);
-  }
-
-  // Pass Client IP to DO for rate limiting
-  const clientIp = request.headers.get("CF-Connecting-IP");
-  if (clientIp) {
-    headers.set("X-Client-IP", clientIp);
   }
 
   // We need to create a new Request object to modify headers locally before fetching the Stub
@@ -671,6 +665,7 @@ export default {
     if (
       (pathname === "/config" && request.method === "GET") ||
       (pathname === "/health" && request.method === "GET") ||
+      (pathname === "/pipeline-health" && request.method === "GET") ||
       (pathname === "/changelog" && request.method === "GET") ||
       (pathname === "/track" && request.method === "POST")
     ) {

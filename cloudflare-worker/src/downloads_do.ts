@@ -20,6 +20,7 @@ export interface Env {
   ORACLE_ENDPOINT: string;
   DO_SHARED_SECRET: string;
   MAX_BATCH_EVENTS: string;
+  ALERT_WEBHOOK_URL?: string;
 }
 
 type DurableStateShape = {
@@ -135,6 +136,22 @@ type DurableStateShape = {
   // Legacy compatibility: allow missing/invalid event IDs by assigning new IDs
   // Default: true (temporary migration support)
   configAllowLegacyEvents: boolean;
+
+  // Pipeline health thresholds (configurable from dashboard)
+  configHealthWarnPendingBatches: number;
+  configHealthCriticalPendingBatches: number;
+  configHealthWarnFailures: number;
+  configHealthCriticalFailures: number;
+  configHealthWarnStaleMs: number;
+  configHealthCriticalStaleMs: number;
+  configHealthWarnBufferUtil: number;
+  configHealthCriticalBufferUtil: number;
+  configHealthNotifyWarnIntervalMs: number;
+  configHealthNotifyCritIntervalMs: number;
+
+  // Pipeline health notification state
+  lastHealthStatus?: PipelineHealthStatus;
+  lastHealthNotifyAt?: number | null;
 };
 
 type PendingOracleBatch = {
@@ -181,6 +198,17 @@ const COMPACT_TARGET_UTIL = 0.5;
 const COMPACT_MAX_BATCH = 5000;
 const MAX_PENDING_BATCHES = 50;
 
+const HEALTH_WARN_PENDING_BATCHES = 10;
+const HEALTH_CRIT_PENDING_BATCHES = 25;
+const HEALTH_WARN_FAILURES = 3;
+const HEALTH_CRIT_FAILURES = 5;
+const HEALTH_WARN_STALE_MS = 6 * 60 * 60 * 1000;
+const HEALTH_CRIT_STALE_MS = 24 * 60 * 60 * 1000;
+const HEALTH_WARN_BUFFER_UTIL = 0.8;
+const HEALTH_CRIT_BUFFER_UTIL = 0.95;
+const HEALTH_NOTIFY_WARN_INTERVAL_MS = 30 * 60 * 1000;
+const HEALTH_NOTIFY_CRIT_INTERVAL_MS = 10 * 60 * 1000;
+
 // Track endpoint rate limits (per IP per minute)
 const TRACK_RATE_LIMIT_PER_MIN = 120;
 const TRACK_RATE_PRUNE_AFTER_MIN = 10;
@@ -196,6 +224,11 @@ function todayUtcDate(): string {
 function clampInt(value: unknown, min: number, max: number, fallback: number): number {
   if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
   return Math.min(max, Math.max(min, Math.floor(value)));
+}
+
+function clampFloat(value: unknown, min: number, max: number, fallback: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
+  return Math.min(max, Math.max(min, value));
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -219,6 +252,208 @@ const FIELD_PATTERNS = {
   generic: /^[a-z0-9._-]+$/,
   language: /^[a-z0-9-]+$/,
 };
+
+type ParsedIp = { kind: "v4" | "v6"; value: bigint };
+type ParsedCidr = { ip: ParsedIp; prefix: number };
+
+function normalizeIp(input: string): string {
+  const ip = (input || "").trim();
+  if (!ip) return "";
+  if (ip.startsWith("[")) {
+    const end = ip.indexOf("]");
+    if (end > 0) {
+      return ip.slice(1, end);
+    }
+  }
+  const colonCount = (ip.match(/:/g) || []).length;
+  if (colonCount === 1 && ip.includes(".") && ip.includes(":")) {
+    return ip.split(":")[0];
+  }
+  return ip;
+}
+
+function parseIPv4Bytes(ip: string): number[] | null {
+  const parts = ip.split(".");
+  if (parts.length !== 4) return null;
+  const nums = parts.map((part) => {
+    if (!/^\d{1,3}$/.test(part)) return -1;
+    const num = Number(part);
+    return num >= 0 && num <= 255 ? num : -1;
+  });
+  if (nums.some((n) => n < 0)) return null;
+  return nums;
+}
+
+function parseIPv4(ip: string): ParsedIp | null {
+  const bytes = parseIPv4Bytes(ip);
+  if (!bytes) return null;
+  const value =
+    (bytes[0] << 24) +
+    (bytes[1] << 16) +
+    (bytes[2] << 8) +
+    bytes[3];
+  return { kind: "v4", value: BigInt(value >>> 0) };
+}
+
+function parseIPv6(input: string): ParsedIp | null {
+  let ip = input.toLowerCase();
+  const zoneIdx = ip.indexOf("%");
+  if (zoneIdx !== -1) {
+    ip = ip.slice(0, zoneIdx);
+  }
+
+  // IPv4-mapped IPv6 (e.g., ::ffff:192.0.2.1)
+  if (ip.includes(".")) {
+    const lastColon = ip.lastIndexOf(":");
+    if (lastColon === -1) return null;
+    const v4Part = ip.slice(lastColon + 1);
+    const bytes = parseIPv4Bytes(v4Part);
+    if (!bytes) return null;
+    const part1 = ((bytes[0] << 8) | bytes[1]).toString(16);
+    const part2 = ((bytes[2] << 8) | bytes[3]).toString(16);
+    ip = `${ip.slice(0, lastColon)}:${part1}:${part2}`;
+  }
+
+  const pieces = ip.split("::");
+  if (pieces.length > 2) return null;
+  const head = pieces[0] ? pieces[0].split(":").filter(Boolean) : [];
+  const tail = pieces[1] ? pieces[1].split(":").filter(Boolean) : [];
+  if (pieces.length === 1 && head.length !== 8) return null;
+
+  const missing = 8 - (head.length + tail.length);
+  if (missing < 0) return null;
+  const full = [...head, ...Array(missing).fill("0"), ...tail];
+  if (full.length !== 8) return null;
+
+  let value = 0n;
+  for (const part of full) {
+    if (!/^[0-9a-f]{1,4}$/.test(part)) return null;
+    const num = Number.parseInt(part, 16);
+    if (!Number.isFinite(num) || num < 0 || num > 0xffff) return null;
+    value = (value << 16n) + BigInt(num);
+  }
+  return { kind: "v6", value };
+}
+
+function parseIp(input: string): ParsedIp | null {
+  const normalized = normalizeIp(input);
+  if (!normalized) return null;
+  if (normalized.includes(":")) {
+    return parseIPv6(normalized);
+  }
+  return parseIPv4(normalized);
+}
+
+function parseCidr(entry: string): ParsedCidr | null {
+  const trimmed = entry.trim();
+  if (!trimmed) return null;
+  const [ipPart, prefixPart] = trimmed.split("/");
+  const parsed = parseIp(ipPart);
+  if (!parsed) return null;
+  const bits = parsed.kind === "v4" ? 32 : 128;
+  const prefix = prefixPart == null || prefixPart === ""
+    ? bits
+    : Number(prefixPart);
+  if (!Number.isFinite(prefix) || prefix < 0 || prefix > bits) return null;
+  return { ip: parsed, prefix: Math.floor(prefix) };
+}
+
+function cidrContains(cidr: ParsedCidr, ip: ParsedIp): boolean {
+  if (cidr.ip.kind !== ip.kind) return false;
+  const bits = cidr.ip.kind === "v4" ? 32 : 128;
+  const prefix = cidr.prefix;
+  if (prefix <= 0) return true;
+  const shift = BigInt(bits - prefix);
+  const fullMask = (1n << BigInt(bits)) - 1n;
+  const mask = fullMask ^ ((1n << shift) - 1n);
+  return (cidr.ip.value & mask) === (ip.value & mask);
+}
+
+function normalizeAllowlistEntry(entry: unknown): string | null {
+  if (typeof entry !== "string") return null;
+  const trimmed = entry.trim();
+  if (!trimmed) return null;
+  return trimmed;
+}
+
+function isIpAllowed(ip: string, allowlist: string[]): boolean {
+  const parsedIp = parseIp(ip);
+  if (!parsedIp) return false;
+  for (const entry of allowlist) {
+    const parsedCidr = parseCidr(entry);
+    if (!parsedCidr) continue;
+    if (cidrContains(parsedCidr, parsedIp)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+type PipelineHealthStatus = "ok" | "warn" | "critical";
+
+type PipelineHealthResponse = {
+  ok: boolean;
+  status: PipelineHealthStatus;
+  reasons: string[];
+  now: number;
+  bufferSize: number;
+  maxBufferSize: number;
+  bufferUtilization: number;
+  pendingBatches: number;
+  oldestPendingAgeMs: number | null;
+  consecutiveFailures: number;
+  lastFlushAt: number | null;
+  lastEventAt: number | null;
+  committedSeq: number;
+  lastHealthNotifyAt: number | null;
+  thresholds: {
+    warnPendingBatches: number;
+    criticalPendingBatches: number;
+    warnFailures: number;
+    criticalFailures: number;
+    warnStaleMs: number;
+    criticalStaleMs: number;
+    warnBufferUtil: number;
+    criticalBufferUtil: number;
+  };
+};
+
+type PipelineHealthNotification = PipelineHealthResponse & {
+  previousStatus?: PipelineHealthStatus;
+  notifiedAt: number;
+  source: "pipeline-health";
+};
+
+async function readJsonBody<T>(
+  request: Request,
+  maxBytes: number,
+): Promise<{ ok: true; value: T } | { ok: false; error: "invalid_json" | "body_too_large"; size?: number }> {
+  const contentLength = request.headers.get("Content-Length");
+  if (contentLength) {
+    const size = Number(contentLength);
+    if (Number.isFinite(size) && size > maxBytes) {
+      return { ok: false, error: "body_too_large", size };
+    }
+  }
+
+  let buffer: ArrayBuffer;
+  try {
+    buffer = await request.arrayBuffer();
+  } catch {
+    return { ok: false, error: "invalid_json" };
+  }
+
+  if (buffer.byteLength > maxBytes) {
+    return { ok: false, error: "body_too_large", size: buffer.byteLength };
+  }
+
+  const text = new TextDecoder().decode(buffer);
+  try {
+    return { ok: true, value: JSON.parse(text) as T };
+  } catch {
+    return { ok: false, error: "invalid_json" };
+  }
+}
 
 /**
  * Decide quota level, mode label, remoteEnabled and batchSizeSuggestion
@@ -422,6 +657,16 @@ export class DownloadsDurable {
       configTimeFlushMinutes: { low: 1440, mid: 1440, high: 1440 }, // 1440 = 24h = next day
       configCancelHoldDelayMs: 1000, // 1 second default
       configAllowLegacyEvents: true,
+      configHealthWarnPendingBatches: HEALTH_WARN_PENDING_BATCHES,
+      configHealthCriticalPendingBatches: HEALTH_CRIT_PENDING_BATCHES,
+      configHealthWarnFailures: HEALTH_WARN_FAILURES,
+      configHealthCriticalFailures: HEALTH_CRIT_FAILURES,
+      configHealthWarnStaleMs: HEALTH_WARN_STALE_MS,
+      configHealthCriticalStaleMs: HEALTH_CRIT_STALE_MS,
+      configHealthWarnBufferUtil: HEALTH_WARN_BUFFER_UTIL,
+      configHealthCriticalBufferUtil: HEALTH_CRIT_BUFFER_UTIL,
+      configHealthNotifyWarnIntervalMs: HEALTH_NOTIFY_WARN_INTERVAL_MS,
+      configHealthNotifyCritIntervalMs: HEALTH_NOTIFY_CRIT_INTERVAL_MS,
 
       // Changelog defaults
       changelog: [],
@@ -429,6 +674,9 @@ export class DownloadsDurable {
         rules: [],
         lastUpdated: Date.now(),
       },
+
+      lastHealthStatus: "ok",
+      lastHealthNotifyAt: null,
     };
 
     if (!stored) {
@@ -501,9 +749,32 @@ export class DownloadsDurable {
         typeof stored.configAllowLegacyEvents === "boolean"
           ? stored.configAllowLegacyEvents
           : base.configAllowLegacyEvents,
+      configHealthWarnPendingBatches:
+        stored.configHealthWarnPendingBatches ?? base.configHealthWarnPendingBatches,
+      configHealthCriticalPendingBatches:
+        stored.configHealthCriticalPendingBatches ?? base.configHealthCriticalPendingBatches,
+      configHealthWarnFailures:
+        stored.configHealthWarnFailures ?? base.configHealthWarnFailures,
+      configHealthCriticalFailures:
+        stored.configHealthCriticalFailures ?? base.configHealthCriticalFailures,
+      configHealthWarnStaleMs:
+        stored.configHealthWarnStaleMs ?? base.configHealthWarnStaleMs,
+      configHealthCriticalStaleMs:
+        stored.configHealthCriticalStaleMs ?? base.configHealthCriticalStaleMs,
+      configHealthWarnBufferUtil:
+        stored.configHealthWarnBufferUtil ?? base.configHealthWarnBufferUtil,
+      configHealthCriticalBufferUtil:
+        stored.configHealthCriticalBufferUtil ?? base.configHealthCriticalBufferUtil,
+      configHealthNotifyWarnIntervalMs:
+        stored.configHealthNotifyWarnIntervalMs ?? base.configHealthNotifyWarnIntervalMs,
+      configHealthNotifyCritIntervalMs:
+        stored.configHealthNotifyCritIntervalMs ?? base.configHealthNotifyCritIntervalMs,
 
       changelog: Array.isArray(stored.changelog) ? stored.changelog : base.changelog,
       changelogConfig: stored.changelogConfig ?? base.changelogConfig,
+
+      lastHealthStatus: stored.lastHealthStatus ?? base.lastHealthStatus,
+      lastHealthNotifyAt: stored.lastHealthNotifyAt ?? base.lastHealthNotifyAt,
     };
 
     if (Array.isArray(this.data.pendingBatches)) {
@@ -517,6 +788,9 @@ export class DownloadsDurable {
     } else {
       this.data.pendingBatches = [];
     }
+    const pendingBefore = this.data.pendingBatches.length;
+    this.mergePendingBatchesIfNeeded();
+    const pendingCompacted = this.data.pendingBatches.length !== pendingBefore;
 
     // Normalize config values and ensure schema version
     let configDirty = false;
@@ -569,6 +843,128 @@ export class DownloadsDurable {
       configDirty = true;
     }
 
+    const warnPending = clampInt(
+      this.data.configHealthWarnPendingBatches,
+      0,
+      1000,
+      base.configHealthWarnPendingBatches,
+    );
+    const critPending = clampInt(
+      this.data.configHealthCriticalPendingBatches,
+      0,
+      2000,
+      base.configHealthCriticalPendingBatches,
+    );
+    const warnFailures = clampInt(
+      this.data.configHealthWarnFailures,
+      0,
+      100,
+      base.configHealthWarnFailures,
+    );
+    const critFailures = clampInt(
+      this.data.configHealthCriticalFailures,
+      0,
+      100,
+      base.configHealthCriticalFailures,
+    );
+    const warnStaleMs = clampInt(
+      this.data.configHealthWarnStaleMs,
+      0,
+      30 * 24 * 60 * 60 * 1000,
+      base.configHealthWarnStaleMs,
+    );
+    const critStaleMs = clampInt(
+      this.data.configHealthCriticalStaleMs,
+      0,
+      30 * 24 * 60 * 60 * 1000,
+      base.configHealthCriticalStaleMs,
+    );
+    const warnBuffer = clampFloat(
+      this.data.configHealthWarnBufferUtil,
+      0,
+      1,
+      base.configHealthWarnBufferUtil,
+    );
+    const critBuffer = clampFloat(
+      this.data.configHealthCriticalBufferUtil,
+      0,
+      1,
+      base.configHealthCriticalBufferUtil,
+    );
+    const warnNotify = clampInt(
+      this.data.configHealthNotifyWarnIntervalMs,
+      60 * 1000,
+      24 * 60 * 60 * 1000,
+      base.configHealthNotifyWarnIntervalMs,
+    );
+    const critNotify = clampInt(
+      this.data.configHealthNotifyCritIntervalMs,
+      60 * 1000,
+      24 * 60 * 60 * 1000,
+      base.configHealthNotifyCritIntervalMs,
+    );
+
+    const pendingOk = warnPending <= critPending;
+    const failuresOk = warnFailures <= critFailures;
+    const staleOk = warnStaleMs <= critStaleMs;
+    const bufferOk = warnBuffer <= critBuffer;
+    const notifyOk = warnNotify >= critNotify;
+
+    if (!pendingOk || !failuresOk || !staleOk || !bufferOk || !notifyOk) {
+      this.data.configHealthWarnPendingBatches = base.configHealthWarnPendingBatches;
+      this.data.configHealthCriticalPendingBatches = base.configHealthCriticalPendingBatches;
+      this.data.configHealthWarnFailures = base.configHealthWarnFailures;
+      this.data.configHealthCriticalFailures = base.configHealthCriticalFailures;
+      this.data.configHealthWarnStaleMs = base.configHealthWarnStaleMs;
+      this.data.configHealthCriticalStaleMs = base.configHealthCriticalStaleMs;
+      this.data.configHealthWarnBufferUtil = base.configHealthWarnBufferUtil;
+      this.data.configHealthCriticalBufferUtil = base.configHealthCriticalBufferUtil;
+      this.data.configHealthNotifyWarnIntervalMs = base.configHealthNotifyWarnIntervalMs;
+      this.data.configHealthNotifyCritIntervalMs = base.configHealthNotifyCritIntervalMs;
+      configDirty = true;
+    } else {
+      if (warnPending !== this.data.configHealthWarnPendingBatches) {
+        this.data.configHealthWarnPendingBatches = warnPending;
+        configDirty = true;
+      }
+      if (critPending !== this.data.configHealthCriticalPendingBatches) {
+        this.data.configHealthCriticalPendingBatches = critPending;
+        configDirty = true;
+      }
+      if (warnFailures !== this.data.configHealthWarnFailures) {
+        this.data.configHealthWarnFailures = warnFailures;
+        configDirty = true;
+      }
+      if (critFailures !== this.data.configHealthCriticalFailures) {
+        this.data.configHealthCriticalFailures = critFailures;
+        configDirty = true;
+      }
+      if (warnStaleMs !== this.data.configHealthWarnStaleMs) {
+        this.data.configHealthWarnStaleMs = warnStaleMs;
+        configDirty = true;
+      }
+      if (critStaleMs !== this.data.configHealthCriticalStaleMs) {
+        this.data.configHealthCriticalStaleMs = critStaleMs;
+        configDirty = true;
+      }
+      if (warnBuffer !== this.data.configHealthWarnBufferUtil) {
+        this.data.configHealthWarnBufferUtil = warnBuffer;
+        configDirty = true;
+      }
+      if (critBuffer !== this.data.configHealthCriticalBufferUtil) {
+        this.data.configHealthCriticalBufferUtil = critBuffer;
+        configDirty = true;
+      }
+      if (warnNotify !== this.data.configHealthNotifyWarnIntervalMs) {
+        this.data.configHealthNotifyWarnIntervalMs = warnNotify;
+        configDirty = true;
+      }
+      if (critNotify !== this.data.configHealthNotifyCritIntervalMs) {
+        this.data.configHealthNotifyCritIntervalMs = critNotify;
+        configDirty = true;
+      }
+    }
+
     if (this.data.configFlushMode !== "next_day" && this.data.configFlushMode !== "time_based") {
       this.data.configFlushMode = base.configFlushMode;
       configDirty = true;
@@ -585,7 +981,17 @@ export class DownloadsDurable {
       this.data.configCancelHoldDelayMs !== stored.configCancelHoldDelayMs ||
       this.data.configAllowLegacyEvents !== stored.configAllowLegacyEvents ||
       this.data.configFlushMode !== stored.configFlushMode ||
-      JSON.stringify(this.data.configTimeFlushMinutes) !== JSON.stringify(stored.configTimeFlushMinutes)
+      JSON.stringify(this.data.configTimeFlushMinutes) !== JSON.stringify(stored.configTimeFlushMinutes) ||
+      this.data.configHealthWarnPendingBatches !== stored.configHealthWarnPendingBatches ||
+      this.data.configHealthCriticalPendingBatches !== stored.configHealthCriticalPendingBatches ||
+      this.data.configHealthWarnFailures !== stored.configHealthWarnFailures ||
+      this.data.configHealthCriticalFailures !== stored.configHealthCriticalFailures ||
+      this.data.configHealthWarnStaleMs !== stored.configHealthWarnStaleMs ||
+      this.data.configHealthCriticalStaleMs !== stored.configHealthCriticalStaleMs ||
+      this.data.configHealthWarnBufferUtil !== stored.configHealthWarnBufferUtil ||
+      this.data.configHealthCriticalBufferUtil !== stored.configHealthCriticalBufferUtil ||
+      this.data.configHealthNotifyWarnIntervalMs !== stored.configHealthNotifyWarnIntervalMs ||
+      this.data.configHealthNotifyCritIntervalMs !== stored.configHealthNotifyCritIntervalMs
     ) {
       configDirty = true;
     }
@@ -607,7 +1013,7 @@ export class DownloadsDurable {
       }
     }
 
-    if (hadLegacyIps || strippedEventIps || configDirty) {
+    if (hadLegacyIps || strippedEventIps || configDirty || pendingCompacted) {
       await this.persist();
     }
 
@@ -656,11 +1062,7 @@ export class DownloadsDurable {
   }
 
   private getClientIp(request: Request): string {
-    return (
-      request.headers.get("X-Client-IP") ||
-      request.headers.get("CF-Connecting-IP") ||
-      "unknown"
-    );
+    return request.headers.get("CF-Connecting-IP") || "unknown";
   }
 
   private checkTrackRateLimit(ip: string, nowMs: number): { allowed: boolean; retryAfterSec?: number } {
@@ -725,6 +1127,10 @@ export class DownloadsDurable {
 
     if (pathname === "/health" && request.method === "GET") {
       return this.handleHealth();
+    }
+
+    if (pathname === "/pipeline-health" && request.method === "GET") {
+      return this.handlePipelineHealth(request);
     }
 
     if (pathname === "/debug/flush" && request.method === "POST") {
@@ -802,6 +1208,7 @@ export class DownloadsDurable {
   async alarm(): Promise<void> {
     await this.loaded;
     const now = Date.now();
+    this.ensureRequestDay();
 
     // =========================================================================
     // SCHEDULED MIDNIGHT FLUSH TO ORACLE
@@ -821,6 +1228,9 @@ export class DownloadsDurable {
     if (this.d.retryState && this.d.retryState.nextRetryAt && now >= this.d.retryState.nextRetryAt) {
       await this.flushToOracle(false);
     }
+
+    const health = this.buildPipelineHealthPayload(now);
+    this.state.waitUntil(this.notifyHealthIfNeeded(health).catch(() => {}));
   }
 
   /**
@@ -865,23 +1275,36 @@ export class DownloadsDurable {
     }
 
     // --- Country from CF header ---
-    const countryHeader = request.headers.get("X-Geo-Country");
+    const countryHeader =
+      request.headers.get("CF-IPCountry") ||
+      request.headers.get("X-Geo-Country");
     const countryFromRequest =
-      countryHeader && countryHeader.length > 0
+      countryHeader && countryHeader.length > 0 && countryHeader !== "XX"
         ? countryHeader
         : undefined;
 
     // =========================================================================
     // LAYER 1: PAYLOAD VALIDATION
     // =========================================================================
-    let body: { events?: StoredEvent[]; clientBatchId?: string } | null = null;
-    try {
-      body = await request.json();
-    } catch {
+    const MAX_TRACK_BODY_BYTES = 5 * 1024 * 1024; // 5MB hard limit before parsing
+    const parsedBody = await readJsonBody<{ events?: StoredEvent[]; clientBatchId?: string }>(
+      request,
+      MAX_TRACK_BODY_BYTES,
+    );
+    if (!parsedBody.ok) {
+      if (parsedBody.error === "body_too_large") {
+        logEvent("warn", "track_body_too_large", { size: parsedBody.size ?? -1, maxBytes: MAX_TRACK_BODY_BYTES });
+        await this.persist();
+        return json(
+          { ok: false, error: "body_too_large", maxBytes: MAX_TRACK_BODY_BYTES },
+          { status: 413 },
+        );
+      }
       logEvent("warn", "track_invalid_json");
       await this.persist();
       return json({ ok: false, error: "invalid_json" }, { status: 400 });
     }
+    const body = parsedBody.value;
 
     if (!isPlainObject(body) || !Array.isArray(body.events)) {
       logEvent("warn", "track_invalid_payload");
@@ -1167,6 +1590,20 @@ export class DownloadsDurable {
       dailyFlushWindowMinutes: this.d.configDailyFlushWindowMinutes ?? DEFAULT_DAILY_FLUSH_WINDOW_MINUTES,
       cancelHoldDelayMs: this.d.configCancelHoldDelayMs ?? 1000,
       allowLegacyEvents: this.d.configAllowLegacyEvents ?? true,
+      healthThresholds: {
+        warnPendingBatches: this.d.configHealthWarnPendingBatches ?? HEALTH_WARN_PENDING_BATCHES,
+        criticalPendingBatches: this.d.configHealthCriticalPendingBatches ?? HEALTH_CRIT_PENDING_BATCHES,
+        warnFailures: this.d.configHealthWarnFailures ?? HEALTH_WARN_FAILURES,
+        criticalFailures: this.d.configHealthCriticalFailures ?? HEALTH_CRIT_FAILURES,
+        warnStaleMs: this.d.configHealthWarnStaleMs ?? HEALTH_WARN_STALE_MS,
+        criticalStaleMs: this.d.configHealthCriticalStaleMs ?? HEALTH_CRIT_STALE_MS,
+        warnBufferUtil: this.d.configHealthWarnBufferUtil ?? HEALTH_WARN_BUFFER_UTIL,
+        criticalBufferUtil: this.d.configHealthCriticalBufferUtil ?? HEALTH_CRIT_BUFFER_UTIL,
+      },
+      healthNotifyIntervalsMs: {
+        warn: this.d.configHealthNotifyWarnIntervalMs ?? HEALTH_NOTIFY_WARN_INTERVAL_MS,
+        critical: this.d.configHealthNotifyCritIntervalMs ?? HEALTH_NOTIFY_CRIT_INTERVAL_MS,
+      },
       remoteEnabledReason: "ok",
       hardRemoteOff: this.d.hardRemoteOff ?? false,
     };
@@ -1273,6 +1710,22 @@ export class DownloadsDurable {
       // Legacy acceptance flag (worker-side only, exposed for visibility)
       allowLegacyEvents: this.d.configAllowLegacyEvents,
 
+      // Pipeline health thresholds (dashboard-configurable)
+      healthThresholds: {
+        warnPendingBatches: this.d.configHealthWarnPendingBatches ?? HEALTH_WARN_PENDING_BATCHES,
+        criticalPendingBatches: this.d.configHealthCriticalPendingBatches ?? HEALTH_CRIT_PENDING_BATCHES,
+        warnFailures: this.d.configHealthWarnFailures ?? HEALTH_WARN_FAILURES,
+        criticalFailures: this.d.configHealthCriticalFailures ?? HEALTH_CRIT_FAILURES,
+        warnStaleMs: this.d.configHealthWarnStaleMs ?? HEALTH_WARN_STALE_MS,
+        criticalStaleMs: this.d.configHealthCriticalStaleMs ?? HEALTH_CRIT_STALE_MS,
+        warnBufferUtil: this.d.configHealthWarnBufferUtil ?? HEALTH_WARN_BUFFER_UTIL,
+        criticalBufferUtil: this.d.configHealthCriticalBufferUtil ?? HEALTH_CRIT_BUFFER_UTIL,
+      },
+      healthNotifyIntervalsMs: {
+        warn: this.d.configHealthNotifyWarnIntervalMs ?? HEALTH_NOTIFY_WARN_INTERVAL_MS,
+        critical: this.d.configHealthNotifyCritIntervalMs ?? HEALTH_NOTIFY_CRIT_INTERVAL_MS,
+      },
+
       // Server UTC time for drift correction
       serverTimeUtc: Date.now(),
 
@@ -1297,6 +1750,152 @@ export class DownloadsDurable {
       lastEventAt: this.d.lastEventAt,
       lastFlushAt: this.d.lastFlushAt,
     });
+  }
+
+  private buildPipelineHealthPayload(nowOverride?: number): PipelineHealthResponse {
+    const now = typeof nowOverride === "number" ? nowOverride : Date.now();
+    const bufferLen = this.d.buffer.length;
+    const maxBuffer = this.d.configMaxBufferSize || 50000;
+    const bufferUtil = maxBuffer > 0 ? bufferLen / maxBuffer : 0;
+    const pendingBatches = this.d.pendingBatches.length;
+    const oldestPending = pendingBatches
+      ? Math.min(...this.d.pendingBatches.map((b) => b.createdAt || now))
+      : null;
+    const oldestAgeMs = oldestPending != null ? Math.max(0, now - oldestPending) : null;
+    const failures = this.d.retryState?.consecutiveFailures ?? 0;
+    const lastFlushAt = this.d.lastFlushAt ?? null;
+    const lastEventAt = this.d.lastEventAt ?? null;
+    const sinceFlushMs = lastFlushAt != null ? now - lastFlushAt : null;
+
+    const warnPending = this.d.configHealthWarnPendingBatches ?? HEALTH_WARN_PENDING_BATCHES;
+    const critPending = this.d.configHealthCriticalPendingBatches ?? HEALTH_CRIT_PENDING_BATCHES;
+    const warnFailures = this.d.configHealthWarnFailures ?? HEALTH_WARN_FAILURES;
+    const critFailures = this.d.configHealthCriticalFailures ?? HEALTH_CRIT_FAILURES;
+    const warnStaleMs = this.d.configHealthWarnStaleMs ?? HEALTH_WARN_STALE_MS;
+    const critStaleMs = this.d.configHealthCriticalStaleMs ?? HEALTH_CRIT_STALE_MS;
+    const warnBufferUtil = this.d.configHealthWarnBufferUtil ?? HEALTH_WARN_BUFFER_UTIL;
+    const critBufferUtil = this.d.configHealthCriticalBufferUtil ?? HEALTH_CRIT_BUFFER_UTIL;
+
+    const reasons: string[] = [];
+    let status: PipelineHealthStatus = "ok";
+
+    const addWarn = (reason: string) => {
+      if (status === "ok") status = "warn";
+      reasons.push(reason);
+    };
+    const addCritical = (reason: string) => {
+      status = "critical";
+      reasons.push(reason);
+    };
+
+    if (pendingBatches >= critPending) {
+      addCritical("pending_batches_high");
+    } else if (pendingBatches >= warnPending) {
+      addWarn("pending_batches_elevated");
+    }
+
+    if (failures >= critFailures) {
+      addCritical("oracle_failures_high");
+    } else if (failures >= warnFailures) {
+      addWarn("oracle_failures_elevated");
+    }
+
+    if (sinceFlushMs != null) {
+      if (sinceFlushMs >= critStaleMs) {
+        addCritical("flush_stale");
+      } else if (sinceFlushMs >= warnStaleMs) {
+        addWarn("flush_delayed");
+      }
+    }
+
+    if (bufferUtil >= critBufferUtil) {
+      addCritical("buffer_util_high");
+    } else if (bufferUtil >= warnBufferUtil) {
+      addWarn("buffer_util_elevated");
+    }
+
+    return {
+      ok: true,
+      status,
+      reasons,
+      now,
+      bufferSize: bufferLen,
+      maxBufferSize: maxBuffer,
+      bufferUtilization: Number(bufferUtil.toFixed(3)),
+      pendingBatches,
+      oldestPendingAgeMs: oldestAgeMs,
+      consecutiveFailures: failures,
+      lastFlushAt,
+      lastEventAt,
+      committedSeq: this.d.committedSeq,
+      lastHealthNotifyAt: this.d.lastHealthNotifyAt ?? null,
+      thresholds: {
+        warnPendingBatches: warnPending,
+        criticalPendingBatches: critPending,
+        warnFailures,
+        criticalFailures: critFailures,
+        warnStaleMs,
+        criticalStaleMs: critStaleMs,
+        warnBufferUtil,
+        criticalBufferUtil: critBufferUtil,
+      },
+    };
+  }
+
+  private async handlePipelineHealth(request: Request): Promise<Response> {
+    this.ensureRequestDay();
+    const payload = this.buildPipelineHealthPayload();
+    if (this.isAuthorizedAdmin(request)) {
+      this.state.waitUntil(this.notifyHealthIfNeeded(payload).catch(() => {}));
+    }
+    return json(payload);
+  }
+
+  private async notifyHealthIfNeeded(payload: PipelineHealthResponse): Promise<void> {
+    const webhook = this.env.ALERT_WEBHOOK_URL;
+    if (!webhook) return;
+
+    const prevStatus = this.d.lastHealthStatus ?? "ok";
+    const lastNotifyAt = this.d.lastHealthNotifyAt ?? 0;
+    const now = Date.now();
+    const interval =
+      payload.status === "critical"
+        ? (this.d.configHealthNotifyCritIntervalMs ?? HEALTH_NOTIFY_CRIT_INTERVAL_MS)
+        : (this.d.configHealthNotifyWarnIntervalMs ?? HEALTH_NOTIFY_WARN_INTERVAL_MS);
+    const shouldNotify =
+      payload.status !== "ok" &&
+      (payload.status !== prevStatus || now - lastNotifyAt >= interval);
+    const shouldRecoverNotify = payload.status === "ok" && prevStatus !== "ok";
+
+    if (!shouldNotify && !shouldRecoverNotify) {
+      if (payload.status !== prevStatus) {
+        this.d.lastHealthStatus = payload.status;
+        await this.persist();
+      }
+      return;
+    }
+
+    const notification: PipelineHealthNotification = {
+      ...payload,
+      previousStatus: prevStatus,
+      notifiedAt: now,
+      source: "pipeline-health",
+    };
+
+    const res = await fetch(webhook, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(notification),
+    });
+
+    if (!res.ok) {
+      logEvent("warn", "health_webhook_failed", { status: res.status });
+      return;
+    }
+
+    this.d.lastHealthStatus = payload.status;
+    this.d.lastHealthNotifyAt = now;
+    await this.persist();
   }
 
   private async handleDebugFlush(): Promise<Response> {
@@ -1324,6 +1923,16 @@ export class DownloadsDurable {
       configTimeFlushMinutes: this.d.configTimeFlushMinutes ?? { low: 1440, mid: 1440, high: 1440 },
       configCancelHoldDelayMs: this.d.configCancelHoldDelayMs ?? 1000,
       configAllowLegacyEvents: this.d.configAllowLegacyEvents ?? true,
+      configHealthWarnPendingBatches: this.d.configHealthWarnPendingBatches ?? HEALTH_WARN_PENDING_BATCHES,
+      configHealthCriticalPendingBatches: this.d.configHealthCriticalPendingBatches ?? HEALTH_CRIT_PENDING_BATCHES,
+      configHealthWarnFailures: this.d.configHealthWarnFailures ?? HEALTH_WARN_FAILURES,
+      configHealthCriticalFailures: this.d.configHealthCriticalFailures ?? HEALTH_CRIT_FAILURES,
+      configHealthWarnStaleMs: this.d.configHealthWarnStaleMs ?? HEALTH_WARN_STALE_MS,
+      configHealthCriticalStaleMs: this.d.configHealthCriticalStaleMs ?? HEALTH_CRIT_STALE_MS,
+      configHealthWarnBufferUtil: this.d.configHealthWarnBufferUtil ?? HEALTH_WARN_BUFFER_UTIL,
+      configHealthCriticalBufferUtil: this.d.configHealthCriticalBufferUtil ?? HEALTH_CRIT_BUFFER_UTIL,
+      configHealthNotifyWarnIntervalMs: this.d.configHealthNotifyWarnIntervalMs ?? HEALTH_NOTIFY_WARN_INTERVAL_MS,
+      configHealthNotifyCritIntervalMs: this.d.configHealthNotifyCritIntervalMs ?? HEALTH_NOTIFY_CRIT_INTERVAL_MS,
       
       // Preserve Changelog
       changelog: this.d.changelog ?? [],
@@ -1510,6 +2119,150 @@ export class DownloadsDurable {
       });
     }
 
+    if ("healthThresholds" in body) {
+      if (!isPlainObject(body.healthThresholds)) {
+        errors.push("healthThresholds");
+      } else {
+        const ht = body.healthThresholds as Record<string, unknown>;
+        const thresholdErrors: string[] = [];
+        const readIntField = (
+          key: string,
+          min: number,
+          max: number,
+          fallback: number,
+        ) => {
+          if (!(key in ht)) return fallback;
+          const value = ht[key];
+          if (typeof value === "number" && Number.isFinite(value)) {
+            return Math.min(max, Math.max(min, Math.floor(value)));
+          }
+          thresholdErrors.push(`healthThresholds.${key}`);
+          return fallback;
+        };
+        const readFloatField = (
+          key: string,
+          min: number,
+          max: number,
+          fallback: number,
+        ) => {
+          if (!(key in ht)) return fallback;
+          const value = ht[key];
+          if (typeof value === "number" && Number.isFinite(value)) {
+            return Math.min(max, Math.max(min, value));
+          }
+          thresholdErrors.push(`healthThresholds.${key}`);
+          return fallback;
+        };
+
+        const nextWarnPending = readIntField(
+          "warnPendingBatches",
+          0,
+          1000,
+          this.d.configHealthWarnPendingBatches,
+        );
+        const nextCritPending = readIntField(
+          "criticalPendingBatches",
+          0,
+          2000,
+          this.d.configHealthCriticalPendingBatches,
+        );
+        const nextWarnFailures = readIntField(
+          "warnFailures",
+          0,
+          100,
+          this.d.configHealthWarnFailures,
+        );
+        const nextCritFailures = readIntField(
+          "criticalFailures",
+          0,
+          100,
+          this.d.configHealthCriticalFailures,
+        );
+        const nextWarnStale = readIntField(
+          "warnStaleMs",
+          0,
+          30 * 24 * 60 * 60 * 1000,
+          this.d.configHealthWarnStaleMs,
+        );
+        const nextCritStale = readIntField(
+          "criticalStaleMs",
+          0,
+          30 * 24 * 60 * 60 * 1000,
+          this.d.configHealthCriticalStaleMs,
+        );
+        const nextWarnBuffer = readFloatField(
+          "warnBufferUtil",
+          0,
+          1,
+          this.d.configHealthWarnBufferUtil,
+        );
+        const nextCritBuffer = readFloatField(
+          "criticalBufferUtil",
+          0,
+          1,
+          this.d.configHealthCriticalBufferUtil,
+        );
+
+        if (nextWarnPending > nextCritPending) {
+          thresholdErrors.push("healthThresholds.pendingBatches");
+        }
+        if (nextWarnFailures > nextCritFailures) {
+          thresholdErrors.push("healthThresholds.failures");
+        }
+        if (nextWarnStale > nextCritStale) {
+          thresholdErrors.push("healthThresholds.staleMs");
+        }
+        if (nextWarnBuffer > nextCritBuffer) {
+          thresholdErrors.push("healthThresholds.bufferUtil");
+        }
+
+        if (thresholdErrors.length > 0) {
+          errors.push(...thresholdErrors);
+        } else {
+          this.d.configHealthWarnPendingBatches = nextWarnPending;
+          this.d.configHealthCriticalPendingBatches = nextCritPending;
+          this.d.configHealthWarnFailures = nextWarnFailures;
+          this.d.configHealthCriticalFailures = nextCritFailures;
+          this.d.configHealthWarnStaleMs = nextWarnStale;
+          this.d.configHealthCriticalStaleMs = nextCritStale;
+          this.d.configHealthWarnBufferUtil = nextWarnBuffer;
+          this.d.configHealthCriticalBufferUtil = nextCritBuffer;
+        }
+      }
+    }
+
+    if ("healthNotifyIntervalsMs" in body) {
+      if (!isPlainObject(body.healthNotifyIntervalsMs)) {
+        errors.push("healthNotifyIntervalsMs");
+      } else {
+        const hi = body.healthNotifyIntervalsMs as Record<string, unknown>;
+        const intervalErrors: string[] = [];
+        const readInterval = (
+          key: string,
+          fallback: number,
+        ) => {
+          if (!(key in hi)) return fallback;
+          const value = hi[key];
+          if (typeof value === "number" && Number.isFinite(value)) {
+            return Math.min(24 * 60 * 60 * 1000, Math.max(60 * 1000, Math.floor(value)));
+          }
+          intervalErrors.push(`healthNotifyIntervalsMs.${key}`);
+          return fallback;
+        };
+        const nextWarn = readInterval("warn", this.d.configHealthNotifyWarnIntervalMs);
+        const nextCrit = readInterval("critical", this.d.configHealthNotifyCritIntervalMs);
+        if (nextWarn < nextCrit) {
+          intervalErrors.push("healthNotifyIntervalsMs.order");
+        }
+        if (intervalErrors.length > 0) {
+          errors.push(...intervalErrors);
+        } else {
+          this.d.configHealthNotifyWarnIntervalMs = nextWarn;
+          this.d.configHealthNotifyCritIntervalMs = nextCrit;
+        }
+      }
+    }
+
     if (errors.length > 0) {
       return json({ ok: false, error: "invalid_config", fields: errors }, { status: 400 });
     }
@@ -1533,6 +2286,20 @@ export class DownloadsDurable {
         timeFlushMinutes: this.d.configTimeFlushMinutes,
         cancelHoldDelayMs: this.d.configCancelHoldDelayMs,
         allowLegacyEvents: this.d.configAllowLegacyEvents,
+        healthThresholds: {
+          warnPendingBatches: this.d.configHealthWarnPendingBatches,
+          criticalPendingBatches: this.d.configHealthCriticalPendingBatches,
+          warnFailures: this.d.configHealthWarnFailures,
+          criticalFailures: this.d.configHealthCriticalFailures,
+          warnStaleMs: this.d.configHealthWarnStaleMs,
+          criticalStaleMs: this.d.configHealthCriticalStaleMs,
+          warnBufferUtil: this.d.configHealthWarnBufferUtil,
+          criticalBufferUtil: this.d.configHealthCriticalBufferUtil,
+        },
+        healthNotifyIntervalsMs: {
+          warn: this.d.configHealthNotifyWarnIntervalMs,
+          critical: this.d.configHealthNotifyCritIntervalMs,
+        },
       },
     });
   }
@@ -1693,16 +2460,21 @@ export class DownloadsDurable {
 
   private mergePendingBatchesIfNeeded(): void {
     while (this.d.pendingBatches.length > MAX_PENDING_BATCHES) {
-      const firstIdx = this.d.pendingBatches.findIndex((b) => (b.attempts ?? 0) === 0);
-      const secondIdx = this.d.pendingBatches.findIndex(
+      let firstIdx = this.d.pendingBatches.findIndex((b) => (b.attempts ?? 0) === 0);
+      let secondIdx = this.d.pendingBatches.findIndex(
         (b, idx) => idx > firstIdx && (b.attempts ?? 0) === 0,
       );
       if (firstIdx === -1 || secondIdx === -1) {
-        // Avoid merging batches that have already been attempted (idempotency risk).
-        break;
+        // Fallback: merge the two oldest batches to enforce a hard cap during outages.
+        const sorted = this.d.pendingBatches
+          .map((b, idx) => ({ idx, createdAt: b.createdAt || 0 }))
+          .sort((a, b) => a.createdAt - b.createdAt);
+        if (sorted.length < 2) break;
+        firstIdx = sorted[0].idx;
+        secondIdx = sorted[1].idx;
       }
       const [second] = this.d.pendingBatches.splice(secondIdx, 1);
-      const [first] = this.d.pendingBatches.splice(firstIdx, 1);
+      const [first] = this.d.pendingBatches.splice(firstIdx > secondIdx ? firstIdx - 1 : firstIdx, 1);
       if (!first || !second) break;
       const mergedSummary = {
         totals: {
@@ -1741,8 +2513,8 @@ export class DownloadsDurable {
         batch: mergedBatch,
         eventCount: first.eventCount + second.eventCount,
         maxSeq: Math.max(first.maxSeq, second.maxSeq),
-        attempts: 0,
-        createdAt: Date.now(),
+        attempts: Math.max(first.attempts ?? 0, second.attempts ?? 0),
+        createdAt: Math.min(first.createdAt || Date.now(), second.createdAt || Date.now()),
       };
       this.d.pendingBatches.unshift(merged);
     }
@@ -2013,6 +2785,23 @@ export class DownloadsDurable {
       oracleBatch = this.buildOracleBatch(eventsToFlush);
     }
 
+    const stashFailedBatch = () => {
+      if (pendingMeta || !oracleBatch || eventsToFlush.length === 0) return;
+      const maxSeq = eventsToFlush.reduce(
+        (m, ev) => Math.max(m, ev.seq || 0),
+        this.d.committedSeq || 0,
+      );
+      this.d.pendingBatches.push({
+        batch: oracleBatch,
+        eventCount: eventsToFlush.length,
+        maxSeq,
+        attempts: 1,
+        createdAt: now,
+      });
+      this.d.buffer = this.d.buffer.slice(eventsToFlush.length);
+      this.mergePendingBatchesIfNeeded();
+    };
+
     // --- LOGGING for Debugging ---
     // HTTP mode note: Oracle free-tier deployment may be HTTP-only.
     // Keep transport protected via network controls if TLS is unavailable.
@@ -2043,6 +2832,7 @@ export class DownloadsDurable {
         this.d.retryState.lastError = msg;
         this.d.retryState.consecutiveFailures += 1;
         logEvent("warn", "oracle_flush_failed", { status: res.status, statusText: res.statusText });
+        stashFailedBatch();
         await this.scheduleRetry();
         await this.persist();
         return { ok: false, sent: 0, error: msg };
@@ -2056,6 +2846,7 @@ export class DownloadsDurable {
         this.d.retryState.lastError = msg;
         this.d.retryState.consecutiveFailures += 1;
         logEvent("warn", "oracle_flush_ack_invalid", { error: msg });
+        stashFailedBatch();
         await this.scheduleRetry();
         await this.persist();
         return { ok: false, sent: 0, error: msg };
@@ -2065,6 +2856,7 @@ export class DownloadsDurable {
         this.d.retryState.lastError = msg;
         this.d.retryState.consecutiveFailures += 1;
         logEvent("warn", "oracle_flush_ack_mismatch", { error: msg });
+        stashFailedBatch();
         await this.scheduleRetry();
         await this.persist();
         return { ok: false, sent: 0, error: msg };
@@ -2097,6 +2889,7 @@ export class DownloadsDurable {
       this.d.retryState.lastError = msg;
       this.d.retryState.consecutiveFailures += 1;
       logEvent("error", "oracle_flush_exception", { error: String(err) });
+      stashFailedBatch();
       await this.scheduleRetry();
       await this.persist();
       return { ok: false, sent: 0, error: msg };
@@ -2187,7 +2980,7 @@ export class DownloadsDurable {
       return json({ ok: false, error: "invalid_json" }, { status: 400 });
     }
 
-    const ip = body.ip || request.headers.get("X-Client-IP") || "unknown";
+    const ip = body.ip || request.headers.get("CF-Connecting-IP") || "unknown";
     const isSuccess = body.success === true;
     const checkOnly = body.checkOnly === true;
 
@@ -2322,15 +3115,15 @@ export class DownloadsDurable {
       return json({ allowed: true }); // Allow on parse error to prevent lockout
     }
 
-    const ip = body.ip || "unknown";
+    const ip = normalizeIp(body.ip || "");
 
     // If allowlist is disabled, allow all
     if (!this.d.ipAllowlistEnabled || this.d.ipAllowlist.length === 0) {
       return json({ allowed: true });
     }
 
-    // Check exact match
-    const isAllowed = this.d.ipAllowlist.includes(ip);
+    // Check CIDR/IP match
+    const isAllowed = ip ? isIpAllowed(ip, this.d.ipAllowlist) : false;
     
     return json({ allowed: isAllowed });
   }
@@ -2345,11 +3138,8 @@ export class DownloadsDurable {
       return json({ ok: false, error: "unauthorized" }, { status: 401 });
     }
 
-    // Get the client IP from request headers
-    const clientIp = request.headers.get("CF-Connecting-IP") ||
-      request.headers.get("X-Forwarded-For")?.split(",")[0]?.trim() ||
-      request.headers.get("X-Real-IP") ||
-      "unknown";
+    // Get the client IP from request headers (Cloudflare-provided)
+    const clientIp = this.getClientIp(request);
 
     return json({
       ok: true,
@@ -2392,19 +3182,27 @@ export class DownloadsDurable {
 
     // Replace entire allowlist
     if (Array.isArray(body.allowlist)) {
-      this.d.ipAllowlist = body.allowlist.filter(ip => typeof ip === "string" && ip.length > 0);
+      const normalized = body.allowlist
+        .map((entry) => normalizeAllowlistEntry(entry))
+        .filter((entry): entry is string => !!entry)
+        .filter((entry) => parseCidr(entry) !== null);
+      this.d.ipAllowlist = normalized;
       updated = true;
     }
 
     // Add single IP
-    if (body.add && typeof body.add === "string" && !this.d.ipAllowlist.includes(body.add)) {
-      this.d.ipAllowlist.push(body.add);
-      updated = true;
+    if (body.add && typeof body.add === "string") {
+      const entry = normalizeAllowlistEntry(body.add);
+      if (entry && parseCidr(entry) && !this.d.ipAllowlist.includes(entry)) {
+        this.d.ipAllowlist.push(entry);
+        updated = true;
+      }
     }
 
     // Remove single IP
     if (body.remove && typeof body.remove === "string") {
-      const idx = this.d.ipAllowlist.indexOf(body.remove);
+      const entry = normalizeAllowlistEntry(body.remove);
+      const idx = entry ? this.d.ipAllowlist.indexOf(entry) : -1;
       if (idx !== -1) {
         this.d.ipAllowlist.splice(idx, 1);
         updated = true;

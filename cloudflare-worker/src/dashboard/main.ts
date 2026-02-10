@@ -548,6 +548,31 @@ export function renderDashboard(stats: StatsResponse): string {
   const cfgCancelHold = remoteConfig.cancelHoldDelayMs ?? 1000;
   const cfgAllowLegacy = remoteConfig.allowLegacyEvents ?? true;
   const cfgRemoteReason = remoteConfig.remoteEnabledReason ?? "ok";
+  const pipelineHealthUrl = `${workerUrl}/pipeline-health`;
+  const cfgHealth = remoteConfig.healthThresholds || {
+    warnPendingBatches: 10,
+    criticalPendingBatches: 25,
+    warnFailures: 3,
+    criticalFailures: 5,
+    warnStaleMs: 6 * 60 * 60 * 1000,
+    criticalStaleMs: 24 * 60 * 60 * 1000,
+    warnBufferUtil: 0.8,
+    criticalBufferUtil: 0.95,
+  };
+  const cfgHealthWarnPending = cfgHealth.warnPendingBatches ?? 10;
+  const cfgHealthCritPending = cfgHealth.criticalPendingBatches ?? 25;
+  const cfgHealthWarnFailures = cfgHealth.warnFailures ?? 3;
+  const cfgHealthCritFailures = cfgHealth.criticalFailures ?? 5;
+  const cfgHealthWarnStaleHours = Math.round((cfgHealth.warnStaleMs ?? 21600000) / 3600000);
+  const cfgHealthCritStaleHours = Math.round((cfgHealth.criticalStaleMs ?? 86400000) / 3600000);
+  const cfgHealthWarnBufferPct = Math.round((cfgHealth.warnBufferUtil ?? 0.8) * 100);
+  const cfgHealthCritBufferPct = Math.round((cfgHealth.criticalBufferUtil ?? 0.95) * 100);
+  const cfgHealthNotify = remoteConfig.healthNotifyIntervalsMs || {
+    warn: 30 * 60 * 1000,
+    critical: 10 * 60 * 1000,
+  };
+  const cfgHealthNotifyWarnMin = Math.round((cfgHealthNotify.warn ?? 1800000) / 60000);
+  const cfgHealthNotifyCritMin = Math.round((cfgHealthNotify.critical ?? 600000) / 60000);
 
   const renderTableRows = (data: Record<string, number>) => {
     const keys = Object.keys(data).sort((a, b) => data[b] - data[a]);
@@ -596,6 +621,10 @@ export function renderDashboard(stats: StatsResponse): string {
   const hotCountry = topKey(stats.counters.byCountry);
 
   const rawStatsJson = JSON.stringify(stats, null, 2)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+  const rawHealthJson = JSON.stringify({ ok: true, status: "loading" }, null, 2)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
@@ -1399,6 +1428,21 @@ export function renderDashboard(stats: StatsResponse): string {
       line-height: 1.4;
     }
 
+    .rc-section-title {
+      margin-top: var(--space-4);
+      margin-bottom: var(--space-2);
+      font-size: 0.75rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-disabled);
+    }
+
+    .rc-section-desc {
+      margin-bottom: var(--space-4);
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
     .rc-actions {
       display: flex;
       gap: var(--space-3);
@@ -1453,6 +1497,126 @@ export function renderDashboard(stats: StatsResponse): string {
       color: inherit;
       margin-top: 2px;
       line-height: 1.4;
+    }
+
+    .health-banner {
+      margin-top: var(--space-4);
+      margin-bottom: var(--space-4);
+      padding: 14px 16px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: var(--bg-surface);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .health-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .health-chip {
+      font-size: 0.65rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text-muted);
+    }
+
+    .health-chip.ok {
+      color: var(--success);
+      border-color: rgba(34, 197, 94, 0.45);
+      background: rgba(34, 197, 94, 0.12);
+    }
+
+    .health-chip.warn {
+      color: var(--warning);
+      border-color: rgba(234, 179, 8, 0.55);
+      background: rgba(234, 179, 8, 0.12);
+    }
+
+    .health-chip.critical {
+      color: var(--danger);
+      border-color: rgba(239, 68, 68, 0.55);
+      background: rgba(239, 68, 68, 0.12);
+    }
+
+    .health-banner.ok {
+      border-color: rgba(34, 197, 94, 0.45);
+      background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(34, 197, 94, 0.04));
+    }
+
+    .health-banner.warn {
+      border-color: rgba(234, 179, 8, 0.55);
+      background: linear-gradient(135deg, rgba(234, 179, 8, 0.12), rgba(234, 179, 8, 0.04));
+    }
+
+    .health-banner.critical {
+      border-color: rgba(239, 68, 68, 0.55);
+      background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(239, 68, 68, 0.05));
+    }
+
+    .health-status {
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      font-size: 0.72rem;
+    }
+
+    .health-reasons {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .health-metrics {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 8px;
+      margin-top: 6px;
+    }
+
+    .health-metric {
+      background: rgba(255,255,255,0.03);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      padding: 8px 10px;
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+    }
+
+    .health-metric strong {
+      display: block;
+      color: var(--text-primary);
+      font-size: 0.9rem;
+    }
+
+    .health-details {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .health-detail {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: rgba(255,255,255,0.02);
+      padding: 10px 12px;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .health-detail strong {
+      display: block;
+      margin-top: 4px;
+      font-size: 0.9rem;
+      color: var(--text-primary);
     }
     
     /* Grid Layouts */
@@ -2914,6 +3078,59 @@ export function renderDashboard(stats: StatsResponse): string {
           No events yet – install the extension and trigger a download to see analytics here.
         </div>
       </section>
+      <section class="card" id="pipeline-health">
+        <div class="health-header">
+          <h2>Pipeline Health</h2>
+          <span class="health-chip ok" id="pipeline-health-chip">OK</span>
+        </div>
+        <div class="section-subtitle" style="margin-bottom: 14px; color: var(--text-muted); font-size: 0.85rem;">
+          Derived from <code>${pipelineHealthUrl}</code>. Tracks backlog, failures, and flush staleness.
+        </div>
+        <div class="health-banner ok" id="pipeline-health-banner">
+          <div class="health-status" id="pipeline-health-status">Pipeline Health: OK</div>
+          <div class="health-reasons" id="pipeline-health-reasons">No issues detected.</div>
+          <div class="health-metrics" id="pipeline-health-metrics">
+            <div class="health-metric">
+              <span>Pending Batches</span>
+              <strong id="pipeline-health-pending">0</strong>
+            </div>
+            <div class="health-metric">
+              <span>Oldest Pending</span>
+              <strong id="pipeline-health-oldest">—</strong>
+            </div>
+            <div class="health-metric">
+              <span>Buffer Util</span>
+              <strong id="pipeline-health-buffer">—</strong>
+            </div>
+            <div class="health-metric">
+              <span>Failures</span>
+              <strong id="pipeline-health-failures">0</strong>
+            </div>
+          </div>
+        </div>
+        <div class="health-details">
+          <div class="health-detail">
+            Last Flush (UTC)
+            <strong id="pipeline-health-last-flush">—</strong>
+          </div>
+          <div class="health-detail">
+            Last Event (UTC)
+            <strong id="pipeline-health-last-event">—</strong>
+          </div>
+          <div class="health-detail">
+            Last Health Alert (UTC)
+            <strong id="pipeline-health-last-alert">—</strong>
+          </div>
+          <div class="health-detail">
+            Committed Seq
+            <strong id="pipeline-health-committed">—</strong>
+          </div>
+          <div class="health-detail">
+            Max Buffer
+            <strong id="pipeline-health-max-buffer">—</strong>
+          </div>
+        </div>
+      </section>
       <section class="card" id="breakdown">
         <div class="section-title-row">
           <h2>Breakdown by Dimensions</h2>
@@ -3284,6 +3501,69 @@ export function renderDashboard(stats: StatsResponse): string {
             <div class="rc-hint">Delay before cancel button becomes active.</div>
           </div>
         </div>
+        <div class="rc-section-title">Pipeline Health Thresholds</div>
+        <div class="rc-section-desc">
+          Control when <code>/pipeline-health</code> flips to warn/critical based on backlog, failures, and staleness.
+        </div>
+        <div class="rc-grid">
+          <div class="rc-field" data-tooltip="Warn when pending batch count reaches this number.">
+            <label>Pending Batches (Warn)</label>
+            <input class="rc-input" type="number" id="cfg-health-pending-warn" min="0" max="1000" value="${cfgHealthWarnPending}">
+            <div class="rc-hint">Warn when pending batches ≥ this value.</div>
+          </div>
+          <div class="rc-field" data-tooltip="Critical when pending batch count reaches this number.">
+            <label>Pending Batches (Critical)</label>
+            <input class="rc-input" type="number" id="cfg-health-pending-critical" min="0" max="2000" value="${cfgHealthCritPending}">
+            <div class="rc-hint">Critical when pending batches ≥ this value.</div>
+          </div>
+          <div class="rc-field" data-tooltip="Warn when consecutive Oracle failures reach this number.">
+            <label>Failures (Warn)</label>
+            <input class="rc-input" type="number" id="cfg-health-fail-warn" min="0" max="100" value="${cfgHealthWarnFailures}">
+            <div class="rc-hint">Warn when failures ≥ this value.</div>
+          </div>
+          <div class="rc-field" data-tooltip="Critical when consecutive Oracle failures reach this number.">
+            <label>Failures (Critical)</label>
+            <input class="rc-input" type="number" id="cfg-health-fail-critical" min="0" max="100" value="${cfgHealthCritFailures}">
+            <div class="rc-hint">Critical when failures ≥ this value.</div>
+          </div>
+          <div class="rc-field" data-tooltip="Warn when the time since last flush exceeds this many hours.">
+            <label>Flush Stale (Warn, hours)</label>
+            <input class="rc-input" type="number" id="cfg-health-stale-warn" min="0" max="720" value="${cfgHealthWarnStaleHours}">
+            <div class="rc-hint">Warn if no flush for this many hours.</div>
+          </div>
+          <div class="rc-field" data-tooltip="Critical when the time since last flush exceeds this many hours.">
+            <label>Flush Stale (Critical, hours)</label>
+            <input class="rc-input" type="number" id="cfg-health-stale-critical" min="0" max="720" value="${cfgHealthCritStaleHours}">
+            <div class="rc-hint">Critical if no flush for this many hours.</div>
+          </div>
+          <div class="rc-field" data-tooltip="Warn when buffer utilization reaches this percentage.">
+            <label>Buffer Util (Warn %)</label>
+            <input class="rc-input" type="number" id="cfg-health-buffer-warn" min="0" max="100" value="${cfgHealthWarnBufferPct}">
+            <div class="rc-hint">Warn when buffer ≥ this percent.</div>
+          </div>
+          <div class="rc-field" data-tooltip="Critical when buffer utilization reaches this percentage.">
+            <label>Buffer Util (Critical %)</label>
+            <input class="rc-input" type="number" id="cfg-health-buffer-critical" min="0" max="100" value="${cfgHealthCritBufferPct}">
+            <div class="rc-hint">Critical when buffer ≥ this percent.</div>
+          </div>
+        </div>
+        <div class="rc-section-title">Health Alert Timing</div>
+        <div class="rc-section-desc">
+          Controls how often the alert webhook can fire for WARN and CRITICAL states. Shorter intervals increase noise.
+          Recommended defaults: Warn 30 min, Critical 10 min.
+        </div>
+        <div class="rc-grid">
+          <div class="rc-field" data-tooltip="Minimum minutes between WARN alerts.">
+            <label>Warn Alert Interval (min)</label>
+            <input class="rc-input" type="number" id="cfg-health-notify-warn" min="1" max="1440" value="${cfgHealthNotifyWarnMin}">
+            <div class="rc-hint">Lower values notify more frequently.</div>
+          </div>
+          <div class="rc-field" data-tooltip="Minimum minutes between CRITICAL alerts.">
+            <label>Critical Alert Interval (min)</label>
+            <input class="rc-input" type="number" id="cfg-health-notify-critical" min="1" max="1440" value="${cfgHealthNotifyCritMin}">
+            <div class="rc-hint">Recommended shorter than WARN.</div>
+          </div>
+        </div>
         <div class="rc-actions">
           <button class="btn" id="btn-config-reset" type="button" data-tooltip="Load default values locally. Click Save to publish.">
             <span class="btn-bullet">•</span> Reset to defaults
@@ -3347,6 +3627,13 @@ export function renderDashboard(stats: StatsResponse): string {
               >
                 <span class="btn-bullet">•</span> Open /health
               </button>
+              <button
+                class="btn"
+                onclick="window.open('/pipeline-health', '_blank')"
+                type="button"
+              >
+                <span class="btn-bullet">•</span> Open /pipeline-health
+              </button>
               <button class="btn" id="btn-debug-flush-action" type="button">
                 <span class="btn-bullet">•</span> POST /debug/flush
               </button>
@@ -3365,6 +3652,13 @@ export function renderDashboard(stats: StatsResponse): string {
           Direct JSON returned by <code>/stats</code>
         </div>
         <pre id="raw-stats-json" class="code-block code-block-large">${rawStatsJson}</pre>
+      </section>
+      <section class="card" id="raw-pipeline-health">
+        <h2>Raw /pipeline-health payload</h2>
+        <div class="metric-sub">
+          Direct JSON returned by <code>/pipeline-health</code>
+        </div>
+        <pre id="raw-health-json" class="code-block code-block-large">${rawHealthJson}</pre>
       </section>
 
       <!-- Security Settings -->
@@ -3410,7 +3704,7 @@ export function renderDashboard(stats: StatsResponse): string {
           
           <!-- Add IP Form -->
           <div style="display: flex; gap: 10px; margin-bottom: 16px;">
-            <input type="text" id="add-ip-input" placeholder="Enter IP address (e.g., 192.168.1.1)" style="flex: 1; padding: 10px 14px; background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 0.9rem; outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
+            <input type="text" id="add-ip-input" placeholder="Enter IP/CIDR (e.g., 192.168.1.1, 10.0.0.0/8, 2001:db8::/32)" style="flex: 1; padding: 10px 14px; background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 0.9rem; outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
             <button id="btn-add-ip" class="btn" style="background: var(--accent); color: white; border: none; padding: 10px 18px; font-weight: 600;">
               + Add
             </button>
@@ -4113,6 +4407,17 @@ export function renderDashboard(stats: StatsResponse): string {
       // 1. Reload logic
       const btnReload = document.getElementById("btn-reload");
 
+      function fetchPipelineHealth() {
+        return fetch("/pipeline-health")
+          .then((r) =>
+            r
+              .json()
+              .catch(() => ({ ok: false })),
+          )
+          .then((h) => updatePipelineHealth(h))
+          .catch(() => updatePipelineHealth({ ok: false }));
+      }
+
       async function refreshStats() {
         if (!btnReload) return;
         btnReload.textContent = "Loading...";
@@ -4121,6 +4426,7 @@ export function renderDashboard(stats: StatsResponse): string {
           const data = await res.json();
           if (!data.ok) throw new Error("Stats fetch failed");
           updateUI(data);
+          fetchPipelineHealth();
           btnReload.innerHTML =
             '<span class="btn-bullet">•</span> Reload stats';
         } catch (e) {
@@ -4299,6 +4605,107 @@ export function renderDashboard(stats: StatsResponse): string {
         updateRemoteConfigForm(stats.remoteConfig || {}, stats.quota || {});
       }
 
+      function formatDuration(ms) {
+        if (ms == null) return "—";
+        if (!Number.isFinite(ms) || ms < 0) return "—";
+        const sec = Math.floor(ms / 1000);
+        const min = Math.floor(sec / 60);
+        const hr = Math.floor(min / 60);
+        const day = Math.floor(hr / 24);
+        if (day > 0) return day + "d";
+        if (hr > 0) return hr + "h";
+        if (min > 0) return min + "m";
+        return sec + "s";
+      }
+
+      function updatePipelineHealth(health) {
+        const banner = document.getElementById("pipeline-health-banner");
+        const statusEl = document.getElementById("pipeline-health-status");
+        const reasonsEl = document.getElementById("pipeline-health-reasons");
+        const chipEl = document.getElementById("pipeline-health-chip");
+        const pendingEl = document.getElementById("pipeline-health-pending");
+        const oldestEl = document.getElementById("pipeline-health-oldest");
+        const bufferEl = document.getElementById("pipeline-health-buffer");
+        const failuresEl = document.getElementById("pipeline-health-failures");
+        const lastFlushEl = document.getElementById("pipeline-health-last-flush");
+        const lastEventEl = document.getElementById("pipeline-health-last-event");
+        const lastAlertEl = document.getElementById("pipeline-health-last-alert");
+        const committedEl = document.getElementById("pipeline-health-committed");
+        const maxBufferEl = document.getElementById("pipeline-health-max-buffer");
+        const rawEl = document.getElementById("raw-health-json");
+
+        if (!banner || !statusEl || !reasonsEl) return;
+        const ok = !(health && health.ok === false);
+        const statusRaw = ok ? (health?.status || "unknown") : "unknown";
+        const status =
+          statusRaw === "critical" || statusRaw === "warn" || statusRaw === "ok"
+            ? statusRaw
+            : "unknown";
+        banner.classList.remove("ok", "warn", "critical");
+        if (status === "critical") banner.classList.add("critical");
+        else if (status === "warn") banner.classList.add("warn");
+        else if (status === "ok") banner.classList.add("ok");
+        else banner.classList.add("warn");
+
+        if (chipEl) {
+          chipEl.classList.remove("ok", "warn", "critical");
+          if (status === "critical") chipEl.classList.add("critical");
+          else if (status === "warn") chipEl.classList.add("warn");
+          else if (status === "ok") chipEl.classList.add("ok");
+          chipEl.textContent = String(status).toUpperCase();
+        }
+
+        statusEl.textContent = "Pipeline Health: " + String(status).toUpperCase();
+        const reasons = Array.isArray(health?.reasons) ? health.reasons : [];
+        reasonsEl.textContent = ok
+          ? reasons.length
+            ? reasons.join(", ")
+            : "No issues detected."
+          : "Unable to load pipeline health.";
+
+        if (pendingEl) pendingEl.textContent = ok ? String(health?.pendingBatches ?? "—") : "—";
+        if (oldestEl) {
+          oldestEl.textContent = ok
+            ? formatDuration(health?.oldestPendingAgeMs ?? null)
+            : "—";
+        }
+        if (bufferEl) {
+          const util = ok ? health?.bufferUtilization : null;
+          bufferEl.textContent = Number.isFinite(util) ? Math.round(util * 100) + "%" : "—";
+        }
+        if (failuresEl) {
+          failuresEl.textContent = ok ? String(health?.consecutiveFailures ?? "—") : "—";
+        }
+        if (lastFlushEl) {
+          lastFlushEl.textContent = ok ? formatTs(health?.lastFlushAt ?? null) : "—";
+        }
+        if (lastEventEl) {
+          lastEventEl.textContent = ok ? formatTs(health?.lastEventAt ?? null) : "—";
+        }
+        if (lastAlertEl) {
+          if (!ok) {
+            lastAlertEl.textContent = "—";
+          } else if (health?.lastHealthNotifyAt) {
+            lastAlertEl.textContent = formatTs(health.lastHealthNotifyAt);
+          } else {
+            lastAlertEl.textContent = "Never";
+          }
+        }
+        if (committedEl) {
+          committedEl.textContent = ok ? String(health?.committedSeq ?? "—") : "—";
+        }
+        if (maxBufferEl) {
+          maxBufferEl.textContent = ok ? String(health?.maxBufferSize ?? "—") : "—";
+        }
+        if (rawEl) {
+          const payload = ok ? health : { ok: false, status: "unknown" };
+          const next = JSON.stringify(payload, null, 2);
+          if (rawEl.textContent !== next) {
+            rawEl.textContent = next;
+          }
+        }
+      }
+
       if (btnReload) {
         btnReload.onclick = refreshStats;
       }
@@ -4320,12 +4727,50 @@ export function renderDashboard(stats: StatsResponse): string {
         dailyFlushWindowStartUtc: 1,
         dailyFlushWindowMinutes: 120,
         cancelHoldDelayMs: 1000,
+        healthThresholds: {
+          warnPendingBatches: 10,
+          criticalPendingBatches: 25,
+          warnFailures: 3,
+          criticalFailures: 5,
+          warnStaleMs: 6 * 60 * 60 * 1000,
+          criticalStaleMs: 24 * 60 * 60 * 1000,
+          warnBufferUtil: 0.8,
+          criticalBufferUtil: 0.95,
+        },
+        healthNotifyIntervalsMs: {
+          warn: 30 * 60 * 1000,
+          critical: 10 * 60 * 1000,
+        },
       };
 
       function clampInt(value, min, max, fallback) {
         const num = Number(value);
         if (!Number.isFinite(num)) return fallback;
         return Math.min(max, Math.max(min, Math.floor(num)));
+      }
+
+      function clampFloat(value, min, max, fallback) {
+        const num = Number(value);
+        if (!Number.isFinite(num)) return fallback;
+        return Math.min(max, Math.max(min, num));
+      }
+
+      function msToHours(valueMs, fallback) {
+        const num = Number(valueMs);
+        if (!Number.isFinite(num) || num < 0) return fallback;
+        return Math.round(num / 3600000);
+      }
+
+      function msToMinutes(valueMs, fallback) {
+        const num = Number(valueMs);
+        if (!Number.isFinite(num) || num < 0) return fallback;
+        return Math.round(num / 60000);
+      }
+
+      function ratioToPercent(value, fallback) {
+        const num = Number(value);
+        if (!Number.isFinite(num) || num < 0) return fallback;
+        return Math.round(num * 100);
       }
 
       function setConfigStatus(text, cls) {
@@ -4371,6 +4816,8 @@ export function renderDashboard(stats: StatsResponse): string {
           dailyFlushWindowStartUtc: cfg.dailyFlushWindowStartUtc ?? cfgDefaults.dailyFlushWindowStartUtc,
           dailyFlushWindowMinutes: cfg.dailyFlushWindowMinutes ?? cfgDefaults.dailyFlushWindowMinutes,
           cancelHoldDelayMs: cfg.cancelHoldDelayMs ?? cfgDefaults.cancelHoldDelayMs,
+          healthThresholds: cfg.healthThresholds || cfgDefaults.healthThresholds,
+          healthNotifyIntervalsMs: cfg.healthNotifyIntervalsMs || cfgDefaults.healthNotifyIntervalsMs,
           configVersion: cfg.configVersion,
         };
 
@@ -4386,6 +4833,16 @@ export function renderDashboard(stats: StatsResponse): string {
         setValue("cfg-window-start", merged.dailyFlushWindowStartUtc);
         setValue("cfg-window-minutes", merged.dailyFlushWindowMinutes);
         setValue("cfg-cancel-hold", merged.cancelHoldDelayMs);
+        setValue("cfg-health-pending-warn", merged.healthThresholds.warnPendingBatches);
+        setValue("cfg-health-pending-critical", merged.healthThresholds.criticalPendingBatches);
+        setValue("cfg-health-fail-warn", merged.healthThresholds.warnFailures);
+        setValue("cfg-health-fail-critical", merged.healthThresholds.criticalFailures);
+        setValue("cfg-health-stale-warn", msToHours(merged.healthThresholds.warnStaleMs, 6));
+        setValue("cfg-health-stale-critical", msToHours(merged.healthThresholds.criticalStaleMs, 24));
+        setValue("cfg-health-buffer-warn", ratioToPercent(merged.healthThresholds.warnBufferUtil, 80));
+        setValue("cfg-health-buffer-critical", ratioToPercent(merged.healthThresholds.criticalBufferUtil, 95));
+        setValue("cfg-health-notify-warn", msToMinutes(merged.healthNotifyIntervalsMs.warn, 30));
+        setValue("cfg-health-notify-critical", msToMinutes(merged.healthNotifyIntervalsMs.critical, 10));
 
         const flushEl = document.getElementById("cfg-flush-mode");
         if (flushEl) flushEl.value = merged.flushMode;
@@ -4444,6 +4901,27 @@ export function renderDashboard(stats: StatsResponse): string {
         return clampInt(el.value, min, max, fallback);
       }
 
+      function readFloat(id, min, max, fallback) {
+        const el = document.getElementById(id);
+        if (!el) return fallback;
+        return clampFloat(el.value, min, max, fallback);
+      }
+
+      function readHoursMs(id, fallbackMs) {
+        const hours = readFloat(id, 0, 720, fallbackMs / 3600000);
+        return Math.round(hours * 3600000);
+      }
+
+      function readMinutesMs(id, fallbackMs) {
+        const minutes = readFloat(id, 1, 1440, fallbackMs / 60000);
+        return Math.round(minutes * 60000);
+      }
+
+      function readPercentRatio(id, fallbackRatio) {
+        const pct = readFloat(id, 0, 100, fallbackRatio * 100);
+        return pct / 100;
+      }
+
       async function sendRemoteConfigUpdate(payload) {
         const btnSave = document.getElementById("btn-config-save");
         if (btnSave) {
@@ -4494,6 +4972,16 @@ export function renderDashboard(stats: StatsResponse): string {
         "cfg-window-start",
         "cfg-window-minutes",
         "cfg-cancel-hold",
+        "cfg-health-pending-warn",
+        "cfg-health-pending-critical",
+        "cfg-health-fail-warn",
+        "cfg-health-fail-critical",
+        "cfg-health-stale-warn",
+        "cfg-health-stale-critical",
+        "cfg-health-buffer-warn",
+        "cfg-health-buffer-critical",
+        "cfg-health-notify-warn",
+        "cfg-health-notify-critical",
       ];
       cfgInputs.forEach((id) => {
         const el = document.getElementById(id);
@@ -4555,6 +5043,20 @@ export function renderDashboard(stats: StatsResponse): string {
             dailyFlushWindowStartUtc: readNum("cfg-window-start", 0, 23, cfgDefaults.dailyFlushWindowStartUtc),
             dailyFlushWindowMinutes: readNum("cfg-window-minutes", 1, 1440, cfgDefaults.dailyFlushWindowMinutes),
             cancelHoldDelayMs: readNum("cfg-cancel-hold", 0, 10000, cfgDefaults.cancelHoldDelayMs),
+            healthThresholds: {
+              warnPendingBatches: readNum("cfg-health-pending-warn", 0, 1000, cfgDefaults.healthThresholds.warnPendingBatches),
+              criticalPendingBatches: readNum("cfg-health-pending-critical", 0, 2000, cfgDefaults.healthThresholds.criticalPendingBatches),
+              warnFailures: readNum("cfg-health-fail-warn", 0, 100, cfgDefaults.healthThresholds.warnFailures),
+              criticalFailures: readNum("cfg-health-fail-critical", 0, 100, cfgDefaults.healthThresholds.criticalFailures),
+              warnStaleMs: readHoursMs("cfg-health-stale-warn", cfgDefaults.healthThresholds.warnStaleMs),
+              criticalStaleMs: readHoursMs("cfg-health-stale-critical", cfgDefaults.healthThresholds.criticalStaleMs),
+              warnBufferUtil: readPercentRatio("cfg-health-buffer-warn", cfgDefaults.healthThresholds.warnBufferUtil),
+              criticalBufferUtil: readPercentRatio("cfg-health-buffer-critical", cfgDefaults.healthThresholds.criticalBufferUtil),
+            },
+            healthNotifyIntervalsMs: {
+              warn: readMinutesMs("cfg-health-notify-warn", cfgDefaults.healthNotifyIntervalsMs.warn),
+              critical: readMinutesMs("cfg-health-notify-critical", cfgDefaults.healthNotifyIntervalsMs.critical),
+            },
           };
           sendRemoteConfigUpdate(payload);
         };
@@ -5280,10 +5782,42 @@ export function renderDashboard(stats: StatsResponse): string {
         setTimeout(() => toast.remove(), 3000);
       }
       
-      // Utility: Validate IP address
+      // Utility: Validate IP address or CIDR (IPv4/IPv6)
       function isValidIpAddress(ip) {
-        const ipv4Regex = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)[.](25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)[.](25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)[.](25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
-        return ipv4Regex.test(ip);
+        if (!ip || typeof ip !== "string") return false;
+        const value = ip.trim();
+        if (!value) return false;
+        const parts = value.split("/");
+        if (parts.length > 2) return false;
+        const addr = parts[0];
+        const prefix = parts[1];
+        const isV4 = addr.includes(".") && !addr.includes(":");
+        const isV6 = addr.includes(":");
+        if (!isV4 && !isV6) return false;
+
+        if (prefix != null && prefix !== "") {
+          const p = Number(prefix);
+          if (!Number.isFinite(p)) return false;
+          if (isV4 && (p < 0 || p > 32)) return false;
+          if (isV6 && (p < 0 || p > 128)) return false;
+        }
+
+        if (isV4) {
+          const ipv4Regex = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}$/;
+          return ipv4Regex.test(addr);
+        }
+
+        // Basic IPv6 validation with support for :: compression
+        if (addr.includes("::")) {
+          if ((addr.match(/::/g) || []).length > 1) return false;
+        }
+        const groups = addr.split("::");
+        const head = groups[0] ? groups[0].split(":").filter(Boolean) : [];
+        const tail = groups[1] ? groups[1].split(":").filter(Boolean) : [];
+        if (groups.length === 1 && head.length !== 8) return false;
+        if (head.length + tail.length > 8) return false;
+        const all = head.concat(tail);
+        return all.every(part => /^[0-9a-fA-F]{1,4}$/.test(part));
       }
       
       // Render IP list
@@ -5467,6 +6001,8 @@ export function renderDashboard(stats: StatsResponse): string {
 
       updateLiveIndicator();
       setInterval(updateLiveIndicator, 5000);
+      fetchPipelineHealth();
+      setInterval(fetchPipelineHealth, 60000);
       
       // ===== SCROLL TRACKING FOR SIDEBAR NAV =====
       const sections = document.querySelectorAll('section[id]');

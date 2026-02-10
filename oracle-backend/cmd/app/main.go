@@ -33,6 +33,7 @@ func main() {
 	archiverSecret := os.Getenv("ARCHIVER_SHARED_SECRET")
 	allowLoopbackBypass := os.Getenv("ALLOW_LOOPBACK_BYPASS") == "true"
 	allowEmptyDashboardPassword := os.Getenv("ALLOW_EMPTY_DASHBOARD_PASSWORD") == "true"
+	trustedProxyNets = parseTrustedProxyCIDRs(os.Getenv("TRUSTED_PROXY_CIDRS"))
 	// HTTP mode note: if your Oracle deployment is HTTP-only, cookies are non-Secure.
 	// This keeps the dashboard usable but provides no transport confidentiality.
 	allowInsecureCookies := os.Getenv("ALLOW_INSECURE_COOKIES") == "true"
@@ -57,6 +58,9 @@ func main() {
 	}
 	if !allowInsecureCookies {
 		log.Println("[INFO] ALLOW_INSECURE_COOKIES is false – HTTP dashboards will use non-secure cookies")
+	}
+	if len(trustedProxyNets) > 0 {
+		log.Printf("[INFO] Trusted proxy CIDRs loaded: %d", len(trustedProxyNets))
 	}
 
 	// Ensure data directory exists.
@@ -287,6 +291,73 @@ var loginRateStore = struct {
 const loginMaxAttempts = 5
 const loginLockout = 15 * time.Minute
 
+var trustedProxyNets []*net.IPNet
+
+func setTrustedProxyNets(nets []*net.IPNet) {
+	trustedProxyNets = nets
+}
+
+func parseTrustedProxyCIDRs(input string) []*net.IPNet {
+	if input == "" {
+		return nil
+	}
+	var nets []*net.IPNet
+	for _, part := range strings.Split(input, ",") {
+		entry := strings.TrimSpace(part)
+		if entry == "" {
+			continue
+		}
+		if strings.Contains(entry, "/") {
+			_, network, err := net.ParseCIDR(entry)
+			if err != nil {
+				log.Printf("[WARN] invalid trusted proxy CIDR: %s", entry)
+				continue
+			}
+			nets = append(nets, network)
+			continue
+		}
+		ip := net.ParseIP(entry)
+		if ip == nil {
+			log.Printf("[WARN] invalid trusted proxy IP: %s", entry)
+			continue
+		}
+		bits := 32
+		if ip.To4() == nil {
+			bits = 128
+		}
+		mask := net.CIDRMask(bits, bits)
+		nets = append(nets, &net.IPNet{IP: ip, Mask: mask})
+	}
+	return nets
+}
+
+func isTrustedProxy(remoteIP string) bool {
+	if remoteIP == "" || len(trustedProxyNets) == 0 {
+		return false
+	}
+	ip := net.ParseIP(remoteIP)
+	if ip == nil {
+		return false
+	}
+	for _, network := range trustedProxyNets {
+		if network.Contains(ip) {
+			return true
+		}
+	}
+	return false
+}
+
+func extractRemoteIP(addr string) string {
+	if addr == "" {
+		return ""
+	}
+	host, _, err := net.SplitHostPort(addr)
+	if err == nil && host != "" {
+		return host
+	}
+	return addr
+}
+
 // generateToken creates a cryptographically secure session token.
 func generateToken() (string, error) {
 	b := make([]byte, 32)
@@ -362,20 +433,22 @@ func getClientIP(r *http.Request) string {
 	if r == nil {
 		return "unknown"
 	}
-	if ip := r.Header.Get("X-Real-IP"); ip != "" {
-		return ip
-	}
-	if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
-		parts := strings.Split(fwd, ",")
-		if len(parts) > 0 {
-			return strings.TrimSpace(parts[0])
+	remoteIP := extractRemoteIP(r.RemoteAddr)
+	if isTrustedProxy(remoteIP) {
+		if ip := strings.TrimSpace(r.Header.Get("X-Real-IP")); ip != "" {
+			return ip
+		}
+		if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
+			parts := strings.Split(fwd, ",")
+			if len(parts) > 0 {
+				return strings.TrimSpace(parts[0])
+			}
 		}
 	}
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return r.RemoteAddr
+	if remoteIP != "" {
+		return remoteIP
 	}
-	return host
+	return r.RemoteAddr
 }
 
 func allowLoginAttempt(ip string) (bool, int, int) {

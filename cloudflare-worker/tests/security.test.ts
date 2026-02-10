@@ -18,6 +18,17 @@ type StoredState = {
   ipCountsSize?: number;
   uniqueRequestsToday?: number;
   pendingBatches?: Array<unknown>;
+  retryState?: { consecutiveFailures?: number };
+  lastFlushAt?: number;
+  configMaxBufferSize?: number;
+  configHealthWarnPendingBatches?: number;
+  configHealthCriticalPendingBatches?: number;
+  configHealthWarnFailures?: number;
+  configHealthCriticalFailures?: number;
+  configHealthWarnStaleMs?: number;
+  configHealthCriticalStaleMs?: number;
+  configHealthWarnBufferUtil?: number;
+  configHealthCriticalBufferUtil?: number;
 };
 
 type TestEvent = {
@@ -37,6 +48,10 @@ type TestEvent = {
 class MockStorage {
   private map = new Map<string, unknown>();
   private alarm: number | null = null;
+
+  seed(key: string, value: unknown): void {
+    this.map.set(key, value);
+  }
 
   async get<T>(key: string): Promise<T | undefined> {
     return this.map.get(key);
@@ -65,6 +80,16 @@ class MockStorage {
 
 class MockState {
   storage = new MockStorage();
+  pending: Promise<unknown>[] = [];
+
+  waitUntil(promise: Promise<unknown>) {
+    this.pending.push(promise.catch(() => {}));
+  }
+
+  async drain(): Promise<void> {
+    await Promise.all(this.pending);
+    this.pending = [];
+  }
 }
 
 function makeDO() {
@@ -73,6 +98,33 @@ function makeDO() {
     ORACLE_ENDPOINT: "http://example.com",
     DO_SHARED_SECRET: "secret",
     MAX_BATCH_EVENTS: "10000",
+  } as Env;
+  const obj = new DownloadsDurable(state as unknown as DurableObjectState, env);
+  return { obj, state };
+}
+
+function makeDOWithStored(stored: StoredState) {
+  const state = new MockState();
+  state.storage.seed(STORAGE_KEY, stored);
+  const env: Env = {
+    ORACLE_ENDPOINT: "http://example.com",
+    DO_SHARED_SECRET: "secret",
+    MAX_BATCH_EVENTS: "10000",
+  } as Env;
+  const obj = new DownloadsDurable(state as unknown as DurableObjectState, env);
+  return { obj, state };
+}
+
+function makeDOWithEnv(envOverride: Partial<Env>, stored?: StoredState) {
+  const state = new MockState();
+  if (stored) {
+    state.storage.seed(STORAGE_KEY, stored);
+  }
+  const env: Env = {
+    ORACLE_ENDPOINT: "http://example.com",
+    DO_SHARED_SECRET: "secret",
+    MAX_BATCH_EVENTS: "10000",
+    ...envOverride,
   } as Env;
   const obj = new DownloadsDurable(state as unknown as DurableObjectState, env);
   return { obj, state };
@@ -118,9 +170,29 @@ async function callDOWithoutAdmin(obj: DownloadsDurable, path: string, body: unk
   }));
 }
 
+async function callDORaw(obj: DownloadsDurable, path: string, body: string, headers?: Record<string, string>) {
+  return obj.fetch(new Request(`http://do${path}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(headers ?? {}),
+    },
+    body,
+  }));
+}
+
 async function callDOGet(obj: DownloadsDurable, path: string) {
   return obj.fetch(new Request(`http://do${path}`, {
     method: "GET",
+  }));
+}
+
+async function callDOGetWithAdmin(obj: DownloadsDurable, path: string) {
+  return obj.fetch(new Request(`http://do${path}`, {
+    method: "GET",
+    headers: {
+      "X-Admin-Secret": "secret",
+    },
   }));
 }
 
@@ -204,7 +276,7 @@ describe("Durable Object security behaviors", () => {
     const { obj, state } = makeDO();
     const res = await callDO(obj, "/track", {
       events: [makeEvent({ ip_address: "5.5.5.5" })],
-    }, { "X-Client-IP": "5.5.5.5" });
+    }, { "CF-Connecting-IP": "5.5.5.5" });
     expect(res.status).toBe(202);
     const stored = await state.storage.get<StoredState>(STORAGE_KEY);
     expect(stored.buffer?.[0]?.ip_address).toBeUndefined();
@@ -257,6 +329,15 @@ describe("Durable Object security behaviors", () => {
     expect(res.status).toBe(400);
   });
 
+  it("rejects oversized track bodies before parsing", async () => {
+    const { obj } = makeDO();
+    const bigBody = "a".repeat(5 * 1024 * 1024 + 64);
+    const res = await callDORaw(obj, "/track", bigBody, {
+      "Content-Length": String(bigBody.length),
+    });
+    expect(res.status).toBe(413);
+  });
+
   it("requires oracle ack with matching batchId", async () => {
     const { obj, state } = makeDO();
     await callDO(obj, "/track", { events: [makeEvent()] });
@@ -298,7 +379,26 @@ describe("Durable Object security behaviors", () => {
     expect(res.status).toBe(500);
 
     const stored = await state.storage.get<StoredState>(STORAGE_KEY);
-    expect(stored.buffer?.length ?? 0).toBe(1);
+    expect(stored.buffer?.length ?? 0).toBe(0);
+    expect(stored.pendingBatches?.length ?? 0).toBe(1);
+    vi.unstubAllGlobals();
+  });
+
+  it("moves failed oracle batches into the pending replay queue", async () => {
+    const { obj, state } = makeDO();
+    await callDO(obj, "/track", { events: [makeEvent(), makeEvent()] });
+
+    const fetchSpy = vi.fn(async () => {
+      return new Response("oracle down", { status: 503 });
+    });
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const res = await callDO(obj, "/admin/force-flush", {});
+    expect(res.status).toBe(500);
+
+    const stored = await state.storage.get<StoredState>(STORAGE_KEY);
+    expect(stored.buffer?.length ?? 0).toBe(0);
+    expect(stored.pendingBatches?.length ?? 0).toBe(1);
     vi.unstubAllGlobals();
   });
 
@@ -316,11 +416,13 @@ describe("Durable Object security behaviors", () => {
     const { obj } = makeDO();
     const res = await callDOGet(obj, "/config");
     expect(res.status).toBe(200);
-    const payload = await res.json() as { serverTimeUtc?: number; dailyFlushWindowStartUtc?: number; dailyFlushWindowMinutes?: number; committedSeq?: number };
+    const payload = await res.json() as { serverTimeUtc?: number; dailyFlushWindowStartUtc?: number; dailyFlushWindowMinutes?: number; committedSeq?: number; healthNotifyIntervalsMs?: { warn?: number; critical?: number } };
     expect(typeof payload.serverTimeUtc).toBe("number");
     expect(payload.dailyFlushWindowStartUtc).toBe(1);
     expect(payload.dailyFlushWindowMinutes).toBe(120);
     expect(typeof payload.committedSeq).toBe("number");
+    expect(typeof payload.healthNotifyIntervalsMs?.warn).toBe("number");
+    expect(typeof payload.healthNotifyIntervalsMs?.critical).toBe("number");
   });
 
   it("updates daily flush window config", async () => {
@@ -333,6 +435,47 @@ describe("Durable Object security behaviors", () => {
     const payload = await res.json() as { config?: { dailyFlushWindowStartUtc?: number; dailyFlushWindowMinutes?: number } };
     expect(payload.config?.dailyFlushWindowStartUtc).toBe(3);
     expect(payload.config?.dailyFlushWindowMinutes).toBe(90);
+  });
+
+  it("updates health notification intervals", async () => {
+    const { obj } = makeDO();
+    const res = await callDO(obj, "/admin/update-config", {
+      healthNotifyIntervalsMs: { warn: 45 * 60 * 1000, critical: 15 * 60 * 1000 },
+    }, { "X-Admin-Secret": "secret" });
+    expect(res.status).toBe(200);
+    const payload = await res.json() as { config?: { healthNotifyIntervalsMs?: { warn?: number; critical?: number } } };
+    expect(payload.config?.healthNotifyIntervalsMs?.warn).toBe(45 * 60 * 1000);
+    expect(payload.config?.healthNotifyIntervalsMs?.critical).toBe(15 * 60 * 1000);
+    const configRes = await callDOGet(obj, "/config");
+    const cfgPayload = await configRes.json() as { healthNotifyIntervalsMs?: { warn?: number; critical?: number } };
+    expect(cfgPayload.healthNotifyIntervalsMs?.warn).toBe(45 * 60 * 1000);
+    expect(cfgPayload.healthNotifyIntervalsMs?.critical).toBe(15 * 60 * 1000);
+  });
+
+  it("round-trips health thresholds into stats for dashboard", async () => {
+    const { obj } = makeDO();
+    const updateRes = await callDO(obj, "/admin/update-config", {
+      healthThresholds: {
+        warnPendingBatches: 4,
+        criticalPendingBatches: 8,
+        warnFailures: 2,
+        criticalFailures: 4,
+        warnStaleMs: 2 * 60 * 60 * 1000,
+        criticalStaleMs: 6 * 60 * 60 * 1000,
+        warnBufferUtil: 0.75,
+        criticalBufferUtil: 0.9,
+      },
+      healthNotifyIntervalsMs: { warn: 60 * 60 * 1000, critical: 20 * 60 * 1000 },
+    }, { "X-Admin-Secret": "secret" });
+    expect(updateRes.status).toBe(200);
+
+    const statsRes = await callDOGet(obj, "/stats");
+    expect(statsRes.status).toBe(200);
+    const payload = await statsRes.json() as { remoteConfig?: { healthThresholds?: Record<string, unknown>; healthNotifyIntervalsMs?: { warn?: number; critical?: number } } };
+    expect(payload.remoteConfig?.healthThresholds?.warnPendingBatches).toBe(4);
+    expect(payload.remoteConfig?.healthThresholds?.criticalPendingBatches).toBe(8);
+    expect(payload.remoteConfig?.healthNotifyIntervalsMs?.warn).toBe(60 * 60 * 1000);
+    expect(payload.remoteConfig?.healthNotifyIntervalsMs?.critical).toBe(20 * 60 * 1000);
   });
 
   it("persists allowLegacyEvents in config", async () => {
@@ -402,9 +545,249 @@ describe("Durable Object security behaviors", () => {
     const { obj } = makeDO();
     let lastStatus = 0;
     for (let i = 0; i < 121; i++) {
-      const res = await callDO(obj, "/track", { events: [makeEvent()] }, { "X-Client-IP": "9.9.9.9" });
+      const res = await callDO(obj, "/track", { events: [makeEvent()] }, { "CF-Connecting-IP": "9.9.9.9" });
       lastStatus = res.status;
     }
     expect(lastStatus).toBe(429);
+  });
+
+  it("ignores X-Client-IP when rate limiting /track", async () => {
+    const { obj } = makeDO();
+    let lastStatus = 0;
+    for (let i = 0; i < 121; i++) {
+      const res = await callDO(obj, "/track", { events: [makeEvent()] }, {
+        "CF-Connecting-IP": "7.7.7.7",
+        "X-Client-IP": `1.2.3.${i}`,
+      });
+      lastStatus = res.status;
+    }
+    expect(lastStatus).toBe(429);
+  });
+
+  it("accepts CF-IPCountry fallback for track country", async () => {
+    const { obj, state } = makeDO();
+    const res = await callDO(obj, "/track", { events: [makeEvent()] }, {
+      "CF-Connecting-IP": "3.3.3.3",
+      "CF-IPCountry": "GB",
+    });
+    expect(res.status).toBe(202);
+    const stored = await state.storage.get<StoredState>(STORAGE_KEY);
+    expect(stored.buffer?.[0]?.country).toBe("gb");
+  });
+
+  it("supports IPv4/IPv6 CIDR entries in allowlist", async () => {
+    const { obj } = makeDO();
+    await callDO(obj, "/admin/ip-allowlist", {
+      enabled: true,
+      allowlist: ["10.0.0.0/8", "2001:db8::/32"],
+    }, { "X-Admin-Secret": "secret" });
+
+    const v4Allowed = await callDO(obj, "/auth/check-ip-allowlist", { ip: "10.1.2.3" });
+    const v4Payload = await v4Allowed.json() as { allowed: boolean };
+    expect(v4Payload.allowed).toBe(true);
+
+    const v6Allowed = await callDO(obj, "/auth/check-ip-allowlist", { ip: "2001:db8::1" });
+    const v6Payload = await v6Allowed.json() as { allowed: boolean };
+    expect(v6Payload.allowed).toBe(true);
+
+    const denied = await callDO(obj, "/auth/check-ip-allowlist", { ip: "192.168.1.1" });
+    const deniedPayload = await denied.json() as { allowed: boolean };
+    expect(deniedPayload.allowed).toBe(false);
+  });
+
+  it("returns pipeline health status", async () => {
+    const { obj } = makeDO();
+    const res = await callDOGet(obj, "/pipeline-health");
+    expect(res.status).toBe(200);
+    const payload = await res.json() as { status?: string; reasons?: string[] };
+    expect(payload.status).toBe("ok");
+    expect(Array.isArray(payload.reasons)).toBe(true);
+  });
+
+  it("notifies webhook on critical pipeline health", async () => {
+    const webhookUrl = "https://alert.example.com";
+    const fetchSpy = vi.fn(async () => new Response("ok"));
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const pendingBatch = {
+      batch: {
+        batchId: "seed",
+        generatedAt: Date.now(),
+        timeZone: "UTC",
+        summary: {
+          totals: { totalEvents: 0, totalDownloads: 0, totalSuccess: 0, totalFail: 0 },
+          browsers: {},
+          os: {},
+          countries: {},
+          languages: {},
+          versions: {},
+          types: {},
+          errorReasons: {},
+          topBrowser: "unknown",
+          topOs: "unknown",
+          topCountry: "unknown",
+          topType: "unknown",
+        },
+        timeBuckets: [],
+      },
+      eventCount: 0,
+      maxSeq: 0,
+      attempts: 0,
+      createdAt: Date.now() - 30 * 60 * 60 * 1000,
+    };
+    const { obj, state } = makeDOWithEnv({ ALERT_WEBHOOK_URL: webhookUrl }, {
+      pendingBatches: Array.from({ length: 30 }, () => ({ ...pendingBatch })),
+      retryState: { consecutiveFailures: 10 },
+      lastFlushAt: Date.now() - 48 * 60 * 60 * 1000,
+      buffer: [],
+      configMaxBufferSize: 50000,
+    });
+
+    const res = await callDOGetWithAdmin(obj, "/pipeline-health");
+    expect(res.status).toBe(200);
+    await state.drain();
+
+    expect(fetchSpy).toHaveBeenCalled();
+    const calledUrl = String(fetchSpy.mock.calls[0]?.[0] ?? "");
+    expect(calledUrl).toBe(webhookUrl);
+    vi.unstubAllGlobals();
+  });
+
+  it("warns when pending batches exceed thresholds", async () => {
+    const pendingBatch = {
+      batch: {
+        batchId: "seed",
+        generatedAt: Date.now(),
+        timeZone: "UTC",
+        summary: {
+          totals: { totalEvents: 0, totalDownloads: 0, totalSuccess: 0, totalFail: 0 },
+          browsers: {},
+          os: {},
+          countries: {},
+          languages: {},
+          versions: {},
+          types: {},
+          errorReasons: {},
+          topBrowser: "unknown",
+          topOs: "unknown",
+          topCountry: "unknown",
+          topType: "unknown",
+        },
+        timeBuckets: [],
+      },
+      eventCount: 0,
+      maxSeq: 0,
+      attempts: 0,
+      createdAt: Date.now() - 7 * 60 * 60 * 1000,
+    };
+    const { obj } = makeDOWithStored({
+      pendingBatches: Array.from({ length: 12 }, () => ({ ...pendingBatch })),
+      retryState: { consecutiveFailures: 0 },
+      lastFlushAt: Date.now() - 2 * 60 * 60 * 1000,
+      buffer: [],
+      configMaxBufferSize: 50000,
+    });
+    const res = await callDOGet(obj, "/pipeline-health");
+    const payload = await res.json() as { status?: string; reasons?: string[] };
+    expect(payload.status).toBe("warn");
+    expect(payload.reasons || []).toContain("pending_batches_elevated");
+  });
+
+  it("does not trigger alert webhook from public pipeline-health", async () => {
+    const webhookUrl = "https://alert.example.com";
+    const fetchSpy = vi.fn(async () => new Response("ok"));
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const { obj, state } = makeDOWithEnv({ ALERT_WEBHOOK_URL: webhookUrl }, {
+      pendingBatches: [],
+      retryState: { consecutiveFailures: 0 },
+      lastFlushAt: Date.now(),
+      buffer: [],
+      configMaxBufferSize: 50000,
+    });
+    const res = await callDOGet(obj, "/pipeline-health");
+    expect(res.status).toBe(200);
+    await state.drain();
+
+    const webhookCalls = fetchSpy.mock.calls.filter((call) => {
+      try {
+        const url = new URL(String(call[0] ?? ""));
+        return url.hostname === "alert.example.com";
+      } catch {
+        return false;
+      }
+    });
+    expect(webhookCalls.length).toBe(0);
+    vi.unstubAllGlobals();
+  });
+
+  it("uses configured pipeline health thresholds", async () => {
+    const { obj } = makeDOWithStored({
+      configHealthWarnPendingBatches: 2,
+      configHealthCriticalPendingBatches: 4,
+      configHealthWarnFailures: 1,
+      configHealthCriticalFailures: 2,
+      configHealthWarnStaleMs: 1000,
+      configHealthCriticalStaleMs: 2000,
+      configHealthWarnBufferUtil: 0.4,
+      configHealthCriticalBufferUtil: 0.6,
+      buffer: [],
+      pendingBatches: [],
+      retryState: { consecutiveFailures: 0 },
+      lastFlushAt: Date.now(),
+      configMaxBufferSize: 50000,
+    });
+
+    const res = await callDOGet(obj, "/pipeline-health");
+    expect(res.status).toBe(200);
+    const payload = await res.json() as { thresholds?: Record<string, unknown> };
+    expect(payload.thresholds?.warnPendingBatches).toBe(2);
+    expect(payload.thresholds?.criticalPendingBatches).toBe(4);
+    expect(payload.thresholds?.warnFailures).toBe(1);
+    expect(payload.thresholds?.criticalFailures).toBe(2);
+    expect(payload.thresholds?.warnStaleMs).toBe(1000);
+    expect(payload.thresholds?.criticalStaleMs).toBe(2000);
+    expect(payload.thresholds?.warnBufferUtil).toBe(0.4);
+    expect(payload.thresholds?.criticalBufferUtil).toBe(0.6);
+  });
+
+  it("compacts pending batches when all attempts are non-zero", async () => {
+    const pendingBatch = {
+      batch: {
+        batchId: "seed",
+        generatedAt: Date.now(),
+        timeZone: "UTC",
+        summary: {
+          totals: { totalEvents: 0, totalDownloads: 0, totalSuccess: 0, totalFail: 0 },
+          browsers: {},
+          os: {},
+          countries: {},
+          languages: {},
+          versions: {},
+          types: {},
+          errorReasons: {},
+          topBrowser: "unknown",
+          topOs: "unknown",
+          topCountry: "unknown",
+          topType: "unknown",
+        },
+        timeBuckets: [],
+      },
+      eventCount: 0,
+      maxSeq: 0,
+      attempts: 2,
+      createdAt: Date.now() - 60 * 1000,
+    };
+    const stored = {
+      pendingBatches: Array.from({ length: 55 }, () => ({ ...pendingBatch })),
+      retryState: { consecutiveFailures: 3 },
+      lastFlushAt: Date.now() - 8 * 60 * 60 * 1000,
+      buffer: [],
+      configMaxBufferSize: 50000,
+    };
+    const { state, obj } = makeDOWithStored(stored);
+    await obj.fetch(new Request("http://do/health", { method: "GET" }));
+    const next = await state.storage.get<StoredState>(STORAGE_KEY);
+    expect(next?.pendingBatches?.length ?? 0).toBeLessThanOrEqual(50);
   });
 });

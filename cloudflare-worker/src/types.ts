@@ -156,6 +156,20 @@ export interface StatsResponse {
     configVersion?: number;
     cancelHoldDelayMs?: number;
     allowLegacyEvents?: boolean;
+    healthThresholds?: {
+      warnPendingBatches: number;
+      criticalPendingBatches: number;
+      warnFailures: number;
+      criticalFailures: number;
+      warnStaleMs: number;
+      criticalStaleMs: number;
+      warnBufferUtil: number;
+      criticalBufferUtil: number;
+    };
+    healthNotifyIntervalsMs?: {
+      warn: number;
+      critical: number;
+    };
     remoteEnabledReason?: string;
     hardRemoteOff: boolean;
   };
@@ -196,11 +210,52 @@ export interface ConfigResponse {
   remoteEnabledReason?: string;
   cancelHoldDelayMs?: number;
   allowLegacyEvents?: boolean;
+  healthThresholds?: {
+    warnPendingBatches: number;
+    criticalPendingBatches: number;
+    warnFailures: number;
+    criticalFailures: number;
+    warnStaleMs: number;
+    criticalStaleMs: number;
+    warnBufferUtil: number;
+    criticalBufferUtil: number;
+  };
+  healthNotifyIntervalsMs?: {
+    warn: number;
+    critical: number;
+  };
   serverTimeUtc?: number;
   committedSeq?: number;
   quota: QuotaDescriptor;
   // Changelog config
   changelogConfig?: ChangelogConfig;
+}
+
+export interface PipelineHealthResponse {
+  ok: boolean;
+  status: "ok" | "warn" | "critical";
+  reasons: string[];
+  now: number;
+  bufferSize: number;
+  maxBufferSize: number;
+  bufferUtilization: number;
+  pendingBatches: number;
+  oldestPendingAgeMs: number | null;
+  consecutiveFailures: number;
+  lastFlushAt: number | null;
+  lastEventAt: number | null;
+  committedSeq: number;
+  lastHealthNotifyAt: number | null;
+  thresholds: {
+    warnPendingBatches: number;
+    criticalPendingBatches: number;
+    warnFailures: number;
+    criticalFailures: number;
+    warnStaleMs: number;
+    criticalStaleMs: number;
+    warnBufferUtil: number;
+    criticalBufferUtil: number;
+  };
 }
 
 /**
@@ -214,6 +269,7 @@ export interface Env {
   DANGER_PASSWORD: string;
   ORACLE_ENDPOINT: string;
   MAX_BATCH_EVENTS: string;
+  ALERT_WEBHOOK_URL?: string;
   /**
    * Optional: Set to "true" to allow HTTP cookies on non-loopback hosts.
    * Use for LAN development only. Production should never set this.

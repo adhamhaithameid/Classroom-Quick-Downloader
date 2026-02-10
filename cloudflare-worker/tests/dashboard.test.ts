@@ -99,3 +99,22 @@ describe("Dashboard legacy toggle UI", () => {
     expect(html).toContain("Disabled — events without IDs will be rejected.");
   });
 });
+
+describe("Dashboard pipeline health UI", () => {
+  it("renders the pipeline health card and raw payload block", () => {
+    const html = renderDashboard(makeStats());
+    expect(html).toContain('id="pipeline-health"');
+    expect(html).toContain('id="pipeline-health-chip"');
+    expect(html).toContain('id="raw-health-json"');
+    expect(html).toContain('id="pipeline-health-last-alert"');
+    expect(html).toContain('id="cfg-health-notify-warn"');
+    expect(html).toContain('id="cfg-health-notify-critical"');
+  });
+
+  it("uses minute-based conversions for health notify intervals", () => {
+    const html = renderDashboard(makeStats());
+    expect(html).toContain("function msToMinutes");
+    expect(html).toContain("readMinutesMs(\"cfg-health-notify-warn\"");
+    expect(html).toContain("msToMinutes(merged.healthNotifyIntervalsMs.warn");
+  });
+});
