@@ -505,7 +505,8 @@ describe('analytics flush runtime', () => {
   });
 
   it('internalFlush treats ACK mismatch as failure and schedules retry', async () => {
-    const old = Date.now() - 2 * 24 * 60 * 60 * 1000;
+    const old = Date.now() - 1000;
+    const today = new Date(Date.now()).toISOString().slice(0, 10);
     const state: FlushTestState = {
       cfg: {
         configVersion: 2,
@@ -527,7 +528,7 @@ describe('analytics flush runtime', () => {
         nextRetryAt: null,
         backoffIndex: 0,
         dailyFlushOffsetMinutes: 0,
-        lastDailyFlushUtcDate: null,
+        lastDailyFlushUtcDate: today,
       },
       queue: [makeEvent({ id: 'ack-1', timestamp: old })],
       stats: {
@@ -601,6 +602,57 @@ describe('analytics flush runtime', () => {
     expect(state.queue.some((ev) => ev.id === 'drop-1')).toBe(false);
   });
 
+  it('internalFlush marks daily flush date when daily window flush succeeds and queue drains', async () => {
+    const now = Date.now();
+    const yesterday = new Date(now - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const state: FlushTestState = {
+      cfg: {
+        configVersion: 2,
+        batchSize: 9999,
+        maxDailyRequests: 50,
+        maxRetry: 2,
+        flushMode: 'next_day',
+        lowUsageFlushMinutes: 1440,
+        midUsageFlushMinutes: 1440,
+        highUsageFlushMinutes: 1440,
+        remoteEnabled: true,
+        cancelHoldDelayMs: 1000,
+        dailyFlushWindowStartUtc: 0,
+        dailyFlushWindowMinutes: 1439,
+        maxEventsPerRequest: 5000,
+      },
+      meta: {
+        lastFlushAt: null,
+        nextRetryAt: null,
+        backoffIndex: 0,
+        dailyFlushOffsetMinutes: 0,
+        lastDailyFlushUtcDate: yesterday,
+        lastCommittedSeq: null,
+      },
+      queue: [makeEvent({ id: 'daily-1', timestamp: now - 1000 })],
+      stats: {
+        total: 0,
+        byType: {},
+      },
+      validQueue: true,
+    };
+    vi.mocked(fetch).mockImplementationOnce(async (_url, init) => {
+      const body = JSON.parse((init?.body as string) || '{}') as { clientBatchId?: string };
+      return new Response(JSON.stringify({
+        ok: true,
+        acceptedIds: [],
+        duplicateIds: ['daily-1'],
+        invalidIds: [],
+        clientBatchId: body.clientBatchId,
+        ackId: 'ack-daily-1',
+      }), { status: 202, headers: { 'Content-Type': 'application/json' } });
+    });
+    const { mod } = await loadFlushModule(state, true);
+    await mod.internalFlush();
+    expect(state.queue).toHaveLength(0);
+    expect(state.meta.lastDailyFlushUtcDate).toBe(new Date(now).toISOString().slice(0, 10));
+  });
+
   it('internalFlush normalizes missing IDs and preserves non-sent events during retry failures', async () => {
     const old = Date.now() - 2 * 24 * 60 * 60 * 1000;
     const state: FlushTestState = {
@@ -642,6 +694,49 @@ describe('analytics flush runtime', () => {
     await mod.internalFlush();
     expect(state.queue.some((ev) => ev.id === 'keep-3')).toBe(true);
     expect(state.queue.some((ev) => typeof ev.id === 'string')).toBe(true);
+  });
+
+  it('internalFlush applies zero retry cap when maxRetry is not finite', async () => {
+    const old = Date.now() - 1000;
+    const today = new Date(Date.now()).toISOString().slice(0, 10);
+    const state: FlushTestState = {
+      cfg: {
+        configVersion: 2,
+        batchSize: 1,
+        maxDailyRequests: 50,
+        maxRetry: Number.NaN as unknown as number,
+        flushMode: 'next_day',
+        lowUsageFlushMinutes: 1440,
+        midUsageFlushMinutes: 1440,
+        highUsageFlushMinutes: 1440,
+        remoteEnabled: true,
+        cancelHoldDelayMs: 1000,
+        dailyFlushWindowStartUtc: 1,
+        dailyFlushWindowMinutes: 120,
+        maxEventsPerRequest: 5000,
+      },
+      meta: {
+        lastFlushAt: null,
+        nextRetryAt: null,
+        backoffIndex: 0,
+        dailyFlushOffsetMinutes: 0,
+        lastDailyFlushUtcDate: today,
+      },
+      queue: [
+        makeEvent({ id: 'drop-me', timestamp: old }),
+        makeEvent({ id: 'keep-me', timestamp: old + 1000 }),
+      ],
+      stats: {
+        total: 0,
+        byType: {},
+      },
+      validQueue: true,
+    };
+    vi.mocked(fetch).mockResolvedValueOnce(new Response('server overload', { status: 503 }));
+    const { mod } = await loadFlushModule(state, true);
+    await mod.internalFlush();
+    expect(state.queue.map((ev) => ev.id)).toContain('keep-me');
+    expect(state.queue.map((ev) => ev.id)).not.toContain('drop-me');
   });
 
   it('updateLocalStats tracks status counters and buckets', async () => {

@@ -101,6 +101,15 @@ describe('analytics flush helpers', () => {
     expect(removal.has('c')).toBe(true);
   });
 
+  it('buildAckRemovalSet ignores non-array ack fields', () => {
+    const removal = buildAckRemovalSet({
+      success: true,
+      duplicateIds: undefined,
+      invalidIds: undefined,
+    });
+    expect(removal.size).toBe(0);
+  });
+
   it('applyRetryCap drops events over maxRetry', () => {
     const events = [
       makeEvent({ id: 'a', retryCount: 0 }),
@@ -109,6 +118,16 @@ describe('analytics flush helpers', () => {
     ];
     const capped = applyRetryCap(events, 1);
     expect(capped.map((ev) => ev.id)).toEqual(['a', 'b']);
+  });
+
+  it('applyRetryCap clamps negative cap to zero and keeps undefined retry counts', () => {
+    const events = [
+      makeEvent({ id: 'u', retryCount: undefined }),
+      makeEvent({ id: 'z', retryCount: 0 }),
+      makeEvent({ id: 'o', retryCount: 1 }),
+    ];
+    const capped = applyRetryCap(events, -10);
+    expect(capped.map((ev) => ev.id)).toEqual(['u', 'z']);
   });
 
   it('applyCommitSeqs assigns commit sequences to accepted events', () => {
@@ -250,6 +269,21 @@ describe('analytics flush helpers', () => {
     Object.defineProperty(performance, 'timeOrigin', { value: originalTimeOrigin, configurable: true });
   });
 
+  it('getSafeUtcNowMs stores null perf timestamp when performance.now is invalid', () => {
+    const perfSpy = vi.spyOn(performance, 'now').mockReturnValue(Number.NaN);
+    const meta: AnalyticsMeta = {
+      lastFlushAt: null,
+      nextRetryAt: null,
+      backoffIndex: 0,
+      lastKnownUtcMs: null,
+      lastPerfMs: undefined,
+      serverTimeOffsetMs: 0,
+    };
+    const result = getSafeUtcNowMs(meta);
+    expect(result.meta.lastPerfMs).toBeNull();
+    perfSpy.mockRestore();
+  });
+
   it('applyCommitSeqs returns original queue for missing accepted seqs and id-less events', () => {
     const queue = [
       makeEvent({ id: undefined }),
@@ -259,5 +293,25 @@ describe('analytics flush helpers', () => {
     const updated = applyCommitSeqs(queue, [['known', 10]]);
     expect(updated[0].commitSeq).toBeUndefined();
     expect(updated[1].commitSeq).toBe(10);
+  });
+
+  it('__flushTestInternals.getFlushDecision covers high-usage time-based threshold', () => {
+    const now = Date.now();
+    const cfg: AnalyticsConfig = {
+      ...DEFAULT_CONFIG,
+      flushMode: 'time_based',
+      lowUsageFlushMinutes: 9999,
+      midUsageFlushMinutes: 9999,
+      highUsageFlushMinutes: 1,
+    };
+    const meta: AnalyticsMeta = {
+      lastFlushAt: now - 2 * 60 * 1000,
+      nextRetryAt: null,
+      backoffIndex: 0,
+      dailyFlushOffsetMinutes: 0,
+      lastDailyFlushUtcDate: new Date(now).toISOString().slice(0, 10),
+    };
+    const decision = __flushTestInternals.getFlushDecision(cfg, meta, 40, now - 2 * 60 * 1000);
+    expect(decision.shouldFlush).toBe(true);
   });
 });
