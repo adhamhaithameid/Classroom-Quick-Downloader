@@ -323,11 +323,11 @@ Results appear in the **Security** tab of the GitHub repository.
 
 ### 3. Oracle Deployment (`deploy-oracle.yml`)
 
-> **Trigger:** Merged PRs to `main`, manual `workflow_dispatch`
+> **Trigger:** Pushes to `main` that touch `oracle-backend/**`, manual `workflow_dispatch`
 
 | Step | What It Does |
 |------|--------------|
-| SSH into Oracle Cloud VM | Pulls latest code, stops containers, rebuilds, verifies `/health` endpoint |
+| SSH into Oracle Cloud VM | Ensures repo clone exists, checks out target `main` SHA, exports deploy metadata, rebuilds stack, verifies `/health` |
 
 ### 4. Release Drafter (`release-drafter.yml`)
 
@@ -402,6 +402,20 @@ Located in the `tools/` directory. These are used for local development and manu
 
 > [!IMPORTANT]
 > Requires Docker to be installed for the build verification step (skipped gracefully if Docker is not available).
+
+### 5. `oracle-backend/scripts/deploy_main_inplace.sh` — Oracle Production Deploy Helper
+
+```bash
+ssh ubuntu@<your-oracle-host>
+bash ~/Classroom-Quick-Downloader/oracle-backend/scripts/deploy_main_inplace.sh
+```
+
+**What it does:**
+1. Ensures the monorepo clone exists on the VM and checks out `origin/main` (or `TARGET_REF` override)
+2. Copies legacy `.env` / `google-credentials.json` forward once (if needed)
+3. Preserves the currently-running backend image under a rollback tag
+4. Rebuilds and recreates only `oracle-backend` service (no global `down`, no image prune)
+5. Verifies `/health` before reporting success
 
 ---
 
@@ -478,7 +492,7 @@ pnpm --filter cloudflare-worker test && \
 |-------------|---------|---------|
 | `ci.yml` | Push / PR to `main` | Full test suite + coverage gates + validation |
 | `codeql.yml` | Push / PR / Weekly | Static security analysis (SAST) |
-| `deploy-oracle.yml` | Merged PR / Manual | Production deployment |
+| `deploy-oracle.yml` | Push to `main` (`oracle-backend/**`) / Manual | Oracle production deployment |
 | `release-drafter.yml` | Push to `main` | Draft release notes |
 
 | Manual Script | Purpose |
@@ -487,3 +501,4 @@ pnpm --filter cloudflare-worker test && \
 | `test_analytics.sh` | 15-event pipeline test |
 | `test_pipeline.sh` | 6-event E2E smoke test |
 | `verify_oracle.sh` | Go vet + tests + Docker build |
+| `oracle-backend/scripts/deploy_main_inplace.sh` | In-place Oracle production deploy with rollback image tag |

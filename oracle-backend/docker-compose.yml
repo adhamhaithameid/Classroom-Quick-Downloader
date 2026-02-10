@@ -17,6 +17,8 @@ services:
       - STATIC_DIR=/app/static
       - DO_SHARED_SECRET=${DO_SHARED_SECRET:?DO_SHARED_SECRET is required}
       - DASHBOARD_PASSWORD=${DASHBOARD_PASSWORD:?DASHBOARD_PASSWORD is required}
+      - GIT_COMMIT=${GIT_COMMIT:-unknown}
+      - DEPLOY_TIME=${DEPLOY_TIME:-}
     volumes:
       - oracle_data:/data
       - ./google-credentials.json:/app/google-credentials.json:ro
