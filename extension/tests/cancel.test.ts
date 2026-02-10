@@ -107,13 +107,12 @@ describe('Cancel Message Passing', () => {
 
   beforeEach(() => {
     sendMessageSpy = vi.fn();
-    // @ts-expect-error - Mock chrome
-    globalThis.chrome = {
+    (globalThis as { chrome: unknown }).chrome = {
       runtime: {
         sendMessage: sendMessageSpy,
-        lastError: null,
+        lastError: undefined,
       },
-    };
+    } as unknown;
   });
 
   afterEach(() => {
@@ -246,16 +245,15 @@ describe('Chrome Downloads Cancel API', () => {
     cancelSpy = vi.fn((id, callback) => callback?.());
     eraseSpy = vi.fn((query, callback) => callback?.([]));
     
-    // @ts-expect-error - Mock chrome
-    globalThis.chrome = {
+    (globalThis as { chrome: unknown }).chrome = {
       downloads: {
         cancel: cancelSpy,
         erase: eraseSpy,
       },
       runtime: {
-        lastError: null,
+        lastError: undefined,
       },
-    };
+    } as unknown;
   });
 
   afterEach(() => {
