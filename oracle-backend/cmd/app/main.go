@@ -79,7 +79,7 @@ func main() {
 	// Health endpoints.
 	mux.HandleFunc("/health", handlers.APIHealthHandler)
 	mux.HandleFunc("/health/api", handlers.APIHealthHandler)
-	
+
 	// Updated: Use the local HealthDBHandler for granular SQLite monitoring
 	mux.HandleFunc("/health/db", HealthDBHandler(sqlDB))
 
@@ -201,7 +201,6 @@ func spaHandler(staticDir string) http.Handler {
 	})
 }
 
-
 // scheduleSheetsArchiver runs a scheduled task at 00:15 daily to export stats to Google Sheets.
 // Configure with environment variables:
 // - SHEETS_ID: Google Sheets spreadsheet ID
@@ -217,9 +216,9 @@ func scheduleSheetsArchiver() {
 	credsPath := getenv("GOOGLE_CREDS_PATH", "/app/google-credentials.json")
 	kumaPushURL := os.Getenv("KUMA_PUSH_URL")
 	archiverSecret := os.Getenv("ARCHIVER_SHARED_SECRET")
-	
+
 	log.Printf("[Scheduler] Sheets archiver enabled: sheet=%s, creds=%s", sheetsID, credsPath)
-	
+
 	for {
 		// Calculate time until next 00:15 UTC
 		now := time.Now().UTC()
@@ -228,10 +227,10 @@ func scheduleSheetsArchiver() {
 			next = next.Add(24 * time.Hour)
 		}
 		sleepDuration := time.Until(next)
-		
+
 		log.Printf("[Scheduler] Next Sheets export at %s (in %s)", next.Format(time.RFC3339), sleepDuration.Round(time.Minute))
 		time.Sleep(sleepDuration)
-		
+
 		// Run the archiver
 		log.Println("[Scheduler] Running scheduled Sheets export...")
 		runArchiver(sheetsID, credsPath, kumaPushURL, archiverSecret)
@@ -248,15 +247,15 @@ func runArchiver(sheetsID, credsPath, kumaPushURL, archiverSecret string) {
 	if archiverSecret != "" {
 		args = append(args, "-secret", archiverSecret)
 	}
-	
+
 	// Note: In production, the archiver binary should be at /app/archiver
 	// For development, set ARCHIVER_PATH env var
 	archiverPath := getenv("ARCHIVER_PATH", "/app/archiver")
-	
+
 	cmd := exec.Command(archiverPath, args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	
+
 	if err := cmd.Run(); err != nil {
 		log.Printf("[Scheduler] Archiver failed: %v", err)
 	} else {
@@ -412,7 +411,7 @@ func requireAuth(dashboardPassword, archiverSecret string, allowLoopbackBypass b
 func isValidSession(token string) bool {
 	sessionStore.RLock()
 	defer sessionStore.RUnlock()
-	
+
 	expiry, exists := sessionStore.tokens[token]
 	if !exists {
 		return false
@@ -519,7 +518,7 @@ func loginHandler(dashboardPassword string, allowInsecureCookies bool) http.Hand
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		
+
 		if r.Method != http.MethodPost {
 			http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
 			return
@@ -592,7 +591,7 @@ func loginHandler(dashboardPassword string, allowInsecureCookies bool) http.Hand
 func logoutHandler(allowInsecureCookies bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		
+
 		if r.Method != http.MethodPost {
 			http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
 			return
@@ -655,7 +654,6 @@ func isLoopbackHost(hostport string) bool {
 	ip := net.ParseIP(host)
 	return ip != nil && ip.IsLoopback()
 }
-
 
 // authCheckHandler handles GET /api/auth/check
 func authCheckHandler(dashboardPassword string) http.HandlerFunc {

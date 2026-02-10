@@ -165,7 +165,6 @@ func ingestBatch(ctx context.Context, db *sql.DB, batch *model.OracleBatch) erro
 	// 	return err
 	// }
 
-
 	return tx.Commit()
 }
 
@@ -350,89 +349,96 @@ func updateTotals(ctx context.Context, tx *sql.Tx, batch *model.OracleBatch) err
 		}
 	}
 
+	// Prepare the statement once for all upserts.
+	stmt, err := tx.PrepareContext(ctx, `
+		INSERT INTO downloads_totals (key, value)
+		VALUES (?, ?)
+		ON CONFLICT(key) DO UPDATE SET value = downloads_totals.value + excluded.value
+	`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	upsert := func(key string, delta int64) error {
+		if delta == 0 {
+			return nil
+		}
+		_, err := stmt.ExecContext(ctx, key, delta)
+		return err
+	}
+
 	// Lifetime totals (global).
-	if err := upsertTotal(ctx, tx, "totalEvents", aggEvents); err != nil {
+	if err := upsert("totalEvents", aggEvents); err != nil {
 		return err
 	}
-	if err := upsertTotal(ctx, tx, "totalDownloads", aggDownloads); err != nil {
+	if err := upsert("totalDownloads", aggDownloads); err != nil {
 		return err
 	}
-	if err := upsertTotal(ctx, tx, "totalSuccess", aggSuccess); err != nil {
+	if err := upsert("totalSuccess", aggSuccess); err != nil {
 		return err
 	}
-	if err := upsertTotal(ctx, tx, "totalFail", aggFail); err != nil {
+	if err := upsert("totalFail", aggFail); err != nil {
 		return err
 	}
 
 	// Per-status.
 	for status, v := range aggStatus {
-		if err := upsertTotal(ctx, tx, "status:"+status, v); err != nil {
+		if err := upsert("status:"+status, v); err != nil {
 			return err
 		}
 	}
 
 	// Per-type.
 	for t, v := range aggType {
-		if err := upsertTotal(ctx, tx, "type:"+t, v); err != nil {
+		if err := upsert("type:"+t, v); err != nil {
 			return err
 		}
 	}
 
 	// Per-browser.
 	for br, v := range aggBrowser {
-		if err := upsertTotal(ctx, tx, "browser:"+br, v); err != nil {
+		if err := upsert("browser:"+br, v); err != nil {
 			return err
 		}
 	}
 
 	// Per-OS.
 	for osName, v := range aggOs {
-		if err := upsertTotal(ctx, tx, "os:"+osName, v); err != nil {
+		if err := upsert("os:"+osName, v); err != nil {
 			return err
 		}
 	}
 
 	// Per extension version.
 	for ver, v := range aggExtVer {
-		if err := upsertTotal(ctx, tx, "extVer:"+ver, v); err != nil {
+		if err := upsert("extVer:"+ver, v); err != nil {
 			return err
 		}
 	}
 
 	// Per language.
 	for lang, v := range aggLang {
-		if err := upsertTotal(ctx, tx, "lang:"+lang, v); err != nil {
+		if err := upsert("lang:"+lang, v); err != nil {
 			return err
 		}
 	}
 
 	// Per country.
 	for c, v := range aggCountry {
-		if err := upsertTotal(ctx, tx, "country:"+c, v); err != nil {
+		if err := upsert("country:"+c, v); err != nil {
 			return err
 		}
 	}
 
 	// Per error type.
 	for e, v := range aggErrorType {
-		if err := upsertTotal(ctx, tx, "errorType:"+e, v); err != nil {
+		if err := upsert("errorType:"+e, v); err != nil {
 			return err
 		}
 	}
 
 	return nil
-}
-
-func upsertTotal(ctx context.Context, tx *sql.Tx, key string, delta int64) error {
-	if delta == 0 {
-		return nil
-	}
-	_, err := tx.ExecContext(ctx, `
-		INSERT INTO downloads_totals (key, value)
-		VALUES (?, ?)
-		ON CONFLICT(key) DO UPDATE SET value = downloads_totals.value + excluded.value
-	`, key, delta)
-	return err
 }
 
 func insertDOStateSnapshot(ctx context.Context, tx *sql.Tx, batch *model.OracleBatch) error {

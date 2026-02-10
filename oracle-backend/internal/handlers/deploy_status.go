@@ -25,7 +25,7 @@ type DeployStatus struct {
 func DeployStatusHandler() http.HandlerFunc {
 	// Cache the deployment info at startup
 	status := getDeployStatus()
-	
+
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Cache-Control", "no-cache")
@@ -41,7 +41,7 @@ func getDeployStatus() DeployStatus {
 		DeployedAt: time.Now().UTC().Format(time.RFC3339),
 		Stale:      false,
 	}
-	
+
 	// Try to get git info from environment (set during deploy)
 	if commit := os.Getenv("GIT_COMMIT"); commit != "" {
 		status.CommitFull = commit
@@ -62,21 +62,21 @@ func getDeployStatus() DeployStatus {
 			}
 		}
 	}
-	
+
 	// Get commit message
 	if out, err := exec.Command("git", "log", "-1", "--pretty=%s").Output(); err == nil {
 		status.Message = strings.TrimSpace(string(out))
 	}
-	
+
 	// Get branch
 	if out, err := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD").Output(); err == nil {
 		status.Branch = strings.TrimSpace(string(out))
 	}
-	
+
 	// Check deploy time from environment or file
 	if deployTime := os.Getenv("DEPLOY_TIME"); deployTime != "" {
 		status.DeployedAt = deployTime
-		
+
 		// Check if deployment is stale (>24h old)
 		if t, err := time.Parse(time.RFC3339, deployTime); err == nil {
 			if time.Since(t) > 24*time.Hour {
@@ -84,6 +84,6 @@ func getDeployStatus() DeployStatus {
 			}
 		}
 	}
-	
+
 	return status
 }
