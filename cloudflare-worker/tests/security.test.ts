@@ -338,6 +338,26 @@ describe("Durable Object security behaviors", () => {
     expect(res.status).toBe(413);
   });
 
+  it("rejects individual events exceeding size limit", async () => {
+    const { obj } = makeDO();
+    // 10KB + 100 bytes to be sure (JSON overhead)
+    const bigString = "a".repeat(10 * 1024 + 100);
+    const bigEvent = makeEvent({ source: bigString });
+    const res = await callDO(obj, "/track", { events: [bigEvent] });
+    expect(res.status).toBe(400);
+    const payload = await res.json() as { error?: string };
+    expect(payload.error).toBe("event_too_large");
+  });
+
+  it("accepts large events within size limit", async () => {
+    const { obj } = makeDO();
+    // 9KB string - should pass fast reject, fail fast accept, pass slow check
+    const bigString = "a".repeat(9 * 1024);
+    const bigEvent = makeEvent({ source: bigString });
+    const res = await callDO(obj, "/track", { events: [bigEvent] });
+    expect(res.status).toBe(202);
+  });
+
   it("requires oracle ack with matching batchId", async () => {
     const { obj, state } = makeDO();
     await callDO(obj, "/track", { events: [makeEvent()] });

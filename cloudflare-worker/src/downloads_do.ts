@@ -1355,10 +1355,31 @@ export class DownloadsDurable {
     // LAYER 2: EVENT SIZE VALIDATION (Prevent memory exhaustion via oversized payloads)
     // =========================================================================
     const MAX_EVENT_SIZE_BYTES = 10 * 1024; // 10KB per event
+    // Fast path threshold: if JS string length <= MAX / 3, it is guaranteed
+    // to fit within MAX bytes because UTF-8 expansion is at most 3x for any valid JS string content.
+    const SAFE_CHAR_LENGTH = Math.floor(MAX_EVENT_SIZE_BYTES / 3);
     const encoder = new TextEncoder();
+
     for (const ev of events) {
       try {
-        const eventSize = encoder.encode(JSON.stringify(ev)).length;
+        const jsonStr = JSON.stringify(ev);
+        const len = jsonStr.length;
+
+        // 1. Fast reject: If string length > MAX_EVENT_SIZE_BYTES, byte length is definitely > MAX
+        if (len > MAX_EVENT_SIZE_BYTES) {
+          return json(
+            { ok: false, error: "event_too_large", maxBytes: MAX_EVENT_SIZE_BYTES },
+            { status: 400 }
+          );
+        }
+
+        // 2. Fast accept: If string length is small enough, it is safe
+        if (len <= SAFE_CHAR_LENGTH) {
+          continue;
+        }
+
+        // 3. Slow check: Precise byte measurement for borderline cases
+        const eventSize = encoder.encode(jsonStr).length;
         if (eventSize > MAX_EVENT_SIZE_BYTES) {
           return json(
             { ok: false, error: "event_too_large", maxBytes: MAX_EVENT_SIZE_BYTES },
