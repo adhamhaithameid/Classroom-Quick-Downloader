@@ -1013,6 +1013,92 @@
 
       .batch-info-label { color: var(--text-muted); font-size: 12px; }
       .batch-info-value { color: var(--text-primary); font-weight: 500; font-size: 13px; }
+
+      /* In-page auth modal */
+      .auth-modal {
+        width: 100%;
+        max-width: 420px;
+        margin: 0 16px;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-secondary);
+        border-radius: 14px;
+        box-shadow: 0 14px 38px rgba(0,0,0,0.45);
+        transform: scale(0.95);
+        transition: transform 0.2s ease;
+      }
+
+      .modal-overlay.visible .auth-modal { transform: scale(1); }
+
+      .auth-modal-head {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding: 20px 20px 14px;
+        border-bottom: 1px solid var(--border-primary);
+      }
+
+      .auth-modal-title {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--text-primary);
+      }
+
+      .auth-modal-subtitle {
+        margin: 0;
+        font-size: 13px;
+        color: var(--text-muted);
+      }
+
+      .auth-modal-body {
+        padding: 16px 20px 20px;
+      }
+
+      .auth-form {
+        display: grid;
+        gap: 10px;
+      }
+
+      .auth-input {
+        width: 100%;
+        border: 1px solid var(--border-secondary);
+        background: var(--bg-tertiary);
+        color: var(--text-primary);
+        padding: 10px 12px;
+        border-radius: 10px;
+        font-size: 14px;
+        outline: none;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+      }
+
+      .auth-input:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+      }
+
+      .auth-submit {
+        border: none;
+        border-radius: 10px;
+        background: linear-gradient(135deg, var(--accent), #2563eb);
+        color: white;
+        font-weight: 600;
+        padding: 10px 14px;
+        cursor: pointer;
+        transition: transform 0.12s ease, opacity 0.15s ease;
+      }
+
+      .auth-submit:hover { transform: translateY(-1px); }
+      .auth-submit:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+      .auth-error {
+        display: none;
+        border: 1px solid rgba(239,68,68,0.45);
+        background: rgba(239,68,68,0.12);
+        color: #fecaca;
+        border-radius: 10px;
+        padding: 8px 10px;
+        font-size: 12px;
+      }
     </style>
   </head>
   <body>
@@ -1383,6 +1469,29 @@
       </div>
     </div>
 
+    <div class="modal-overlay" id="auth-modal" aria-hidden="true">
+      <div class="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title">
+        <div class="auth-modal-head">
+          <h2 class="auth-modal-title" id="auth-modal-title">Enter dashboard password</h2>
+          <p class="auth-modal-subtitle">This dashboard is protected. Authenticate to continue.</p>
+        </div>
+        <div class="auth-modal-body">
+          <form class="auth-form" id="auth-form">
+            <input
+              id="auth-password-input"
+              class="auth-input"
+              type="password"
+              autocomplete="current-password"
+              placeholder="Password"
+              required
+            />
+            <button id="auth-password-submit" class="auth-submit" type="submit">Unlock dashboard</button>
+            <div id="auth-error" class="auth-error"></div>
+          </form>
+        </div>
+      </div>
+    </div>
+
     <script>
       // State
       let currentPage = 'overview';
@@ -1392,6 +1501,101 @@
 
       // Helpers
       let authInFlight = null;
+      let authModalPromise = null;
+      let authModalResolve = null;
+      let authModalInitialized = false;
+
+      function setAuthError(message) {
+        const errorEl = document.getElementById('auth-error');
+        if (!errorEl) return;
+        if (!message) {
+          errorEl.textContent = '';
+          errorEl.style.display = 'none';
+          return;
+        }
+        errorEl.textContent = message;
+        errorEl.style.display = 'block';
+      }
+
+      function showAuthModal() {
+        const modal = document.getElementById('auth-modal');
+        const input = document.getElementById('auth-password-input');
+        if (!modal || !input) return;
+        modal.classList.add('visible');
+        modal.setAttribute('aria-hidden', 'false');
+        input.value = '';
+        setAuthError('');
+        setTimeout(function() { input.focus(); }, 0);
+      }
+
+      function hideAuthModal() {
+        const modal = document.getElementById('auth-modal');
+        if (!modal) return;
+        modal.classList.remove('visible');
+        modal.setAttribute('aria-hidden', 'true');
+        setAuthError('');
+      }
+
+      function initAuthModal() {
+        if (authModalInitialized) return;
+        authModalInitialized = true;
+        const form = document.getElementById('auth-form');
+        const input = document.getElementById('auth-password-input');
+        const submitBtn = document.getElementById('auth-password-submit');
+        if (!form || !input || !submitBtn) return;
+
+        form.addEventListener('submit', async function(e) {
+          e.preventDefault();
+          if (submitBtn.disabled) return;
+          const password = input.value || '';
+          if (!password.trim()) {
+            setAuthError('Password is required.');
+            input.focus();
+            return;
+          }
+
+          submitBtn.disabled = true;
+          submitBtn.textContent = 'Unlocking...';
+          setAuthError('');
+
+          try {
+            const loginRes = await fetch('/api/auth/login', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ password: password }),
+            });
+
+            if (!loginRes.ok) {
+              setAuthError('Invalid password. Please try again.');
+              input.select();
+              input.focus();
+              return;
+            }
+
+            hideAuthModal();
+            if (authModalResolve) {
+              authModalResolve(true);
+            }
+            authModalResolve = null;
+            authModalPromise = null;
+          } catch {
+            setAuthError('Login request failed. Check your connection and try again.');
+          } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Unlock dashboard';
+          }
+        });
+      }
+
+      function requestAuthModalUnlock() {
+        initAuthModal();
+        if (authModalPromise) return authModalPromise;
+        showAuthModal();
+        authModalPromise = new Promise(function(resolve) {
+          authModalResolve = resolve;
+        });
+        return authModalPromise;
+      }
 
       async function ensureAuth() {
         if (authInFlight) return authInFlight;
@@ -1401,16 +1605,10 @@
             if (!checkRes.ok) return false;
             const check = await checkRes.json();
             if (check.authRequired === false || check.authenticated === true) {
+              hideAuthModal();
               return true;
             }
-            const password = prompt('Enter dashboard password');
-            if (!password) return false;
-            const loginRes = await fetch('/api/auth/login', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ password: password })
-            });
-            return loginRes.ok;
+            return requestAuthModalUnlock();
           } catch {
             return false;
           }
