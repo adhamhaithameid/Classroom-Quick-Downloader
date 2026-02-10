@@ -559,6 +559,17 @@ function json<T>(obj: T, init: ResponseInit = {}): Response {
   });
 }
 
+function timingSafeStringEqual(a: string, b: string): boolean {
+  let mismatch = a.length ^ b.length;
+  const maxLength = Math.max(a.length, b.length);
+  for (let i = 0; i < maxLength; i += 1) {
+    const aCode = i < a.length ? a.charCodeAt(i) : 0;
+    const bCode = i < b.length ? b.charCodeAt(i) : 0;
+    mismatch |= aCode ^ bCode;
+  }
+  return mismatch === 0;
+}
+
 type LogLevel = "info" | "warn" | "error";
 
 function logEvent(level: LogLevel, message: string, fields?: Record<string, unknown>): void {
@@ -1103,7 +1114,7 @@ export class DownloadsDurable {
     const header = request.headers.get("X-Admin-Secret") || "";
     const expected = this.env.DO_SHARED_SECRET;
     if (!expected) return false;
-    return header === expected;
+    return timingSafeStringEqual(header, expected);
   }
 
   // ---------------------------------------------------------------------------

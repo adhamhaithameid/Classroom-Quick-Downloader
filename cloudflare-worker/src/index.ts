@@ -19,6 +19,17 @@ function getDashboardSecret(env: WorkerEnv): string | null {
   return env.DASHBOARD_PASSWORD || env.DO_SHARED_SECRET || null;
 }
 
+function timingSafeStringEqual(a: string, b: string): boolean {
+  let mismatch = a.length ^ b.length;
+  const maxLength = Math.max(a.length, b.length);
+  for (let i = 0; i < maxLength; i += 1) {
+    const aCode = i < a.length ? a.charCodeAt(i) : 0;
+    const bCode = i < b.length ? b.charCodeAt(i) : 0;
+    mismatch |= aCode ^ bCode;
+  }
+  return mismatch === 0;
+}
+
 export async function createSessionToken(secret: string, ip: string): Promise<string> {
   const payload: SessionPayload = {
     ip,
@@ -528,7 +539,7 @@ async function handleProtectedStats(request: Request, env: WorkerEnv): Promise<R
   const dashboardSecret = getDashboardSecret(env);
 
   // Check X-Admin-Secret header first (for API access)
-  const hasValidSecret = adminSecret === env.DO_SHARED_SECRET;
+  const hasValidSecret = !!adminSecret && timingSafeStringEqual(adminSecret, env.DO_SHARED_SECRET);
   
   // Check session token (for browser/dashboard access)
   const hasValidSession = !!dashboardSecret && sessionToken &&
@@ -558,7 +569,7 @@ async function handleProtectedAdminEndpoint(request: Request, env: WorkerEnv): P
   const dashboardSecret = getDashboardSecret(env);
 
   // Check X-Admin-Secret header first (for direct API access)
-  const hasValidSecret = adminSecret === env.DO_SHARED_SECRET;
+  const hasValidSecret = !!adminSecret && timingSafeStringEqual(adminSecret, env.DO_SHARED_SECRET);
   
   // Check session token (for browser/dashboard access)
   const hasValidSession = !!dashboardSecret && sessionToken &&
