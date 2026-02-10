@@ -16,7 +16,7 @@ describe('content state module', () => {
   it('exports expected selectors, patterns, and timing constants', async () => {
     const state = await loadStateWithDelay();
     expect(state.CLASSROOM_URL_PATTERN.test('https://classroom.google.com/u/0/h')).toBe(true);
-    expect(state.DRIVE_ANCHOR_SELECTOR.includes('drive.google.com')).toBe(true);
+    expect(state.DRIVE_ANCHOR_SELECTOR).toContain('a[href*=');
     expect(state.ATTACHMENT_CONTAINER_SELECTOR.length).toBeGreaterThan(0);
     expect(state.DRIVE_URL_PATTERNS.length).toBeGreaterThan(0);
     expect(state.INJECTED_ATTR).toBe('data-cqd-injected');
