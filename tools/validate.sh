@@ -33,7 +33,14 @@ sleep 5
 
 echo -e "\n${GREEN}3. Testing Health Endpoint...${NC}"
 HEALTH_URL="http://127.0.0.1:8788/health"
-HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$HEALTH_URL")
+HTTP_CODE=""
+for attempt in {1..30}; do
+  HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$HEALTH_URL" || true)
+  if [ "$HTTP_CODE" == "200" ]; then
+    break
+  fi
+  sleep 1
+done
 
 if [ "$HTTP_CODE" == "200" ]; then
   echo -e "${GREEN}Health check PASSED (Status: 200)${NC}"

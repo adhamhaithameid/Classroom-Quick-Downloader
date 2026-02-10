@@ -9,6 +9,7 @@ pnpm-debug.log
 extension/.output/
 extension/dev/.output/
 extension/.wxt/
+extension/coverage/
 **/.vite/
 .wrangler/
 .dev.vars

@@ -16,7 +16,7 @@ jobs:
     - name: Setup pnpm
       uses: pnpm/action-setup@v3
       with:
-        version: 9
+        version: 10.28.2
 
     - name: Setup Node.js
       uses: actions/setup-node@v4
@@ -33,10 +33,16 @@ jobs:
     - name: Run Extension Tests
       run: pnpm -C extension test
 
+    - name: Run Extension Typecheck
+      run: pnpm -C extension compile
+
+    - name: Enforce Extension Coverage Gates
+      run: pnpm -C extension test:coverage:all
+
     - name: Setup Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.24'
+        go-version: '1.24.13'
 
     - name: Run Oracle Backend Tests
       run: go test ./...

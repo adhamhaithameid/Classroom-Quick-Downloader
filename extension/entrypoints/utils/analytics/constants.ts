@@ -14,6 +14,7 @@ export const STORAGE_KEYS = {
   META: 'cqd_analytics_meta_v1',
   RATE_LIMIT: 'cqd_rate_limit_v1',
   INTEGRITY: 'cqd_integrity_v1',
+  QUEUE_MIGRATED: 'cqd_queue_migrated_v1',
 } as const;
 
 // --- Default Values ---

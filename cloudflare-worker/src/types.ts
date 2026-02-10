@@ -38,6 +38,17 @@ export interface StoredEvent {
   source?: string;
 
   /**
+   * Optional rollup count (compacted offline events).
+   * When present, represents multiple events aggregated into this entry.
+   */
+  count?: number;
+
+  /**
+   * Optional rollup marker for compacted events.
+   */
+  rollup?: boolean;
+
+  /**
    * Internal monotonic sequence assigned by the DO for commit tracking.
    */
   seq?: number;

@@ -6,6 +6,298 @@
 
 import type { AnalyticsEvent, LocalStats, AnalyticsConfig, AnalyticsMeta } from './types';
 import { STORAGE_KEYS, DEFAULT_CONFIG, DEFAULT_META, CONFIG_VERSION } from './constants';
+import { generateEventId } from './detection';
+
+const IDB_DB_NAME = 'cqd_analytics_db_v1';
+const IDB_DB_VERSION = 1;
+const IDB_STORE_QUEUE = 'queue';
+const MAX_EVENT_COUNT = 100_000;
+const MAX_DURATION_MS = 86_400_000;
+
+// Offline queue compaction thresholds (approx. "500 downloads" budget)
+const QUEUE_BUDGET_EVENTS = 500;
+const QUEUE_PRESERVE_RECENT = 200;
+const ROLLUP_BUCKET_MS = 60 * 60 * 1000; // 1h buckets for rollups
+
+let idbPromise: Promise<IDBDatabase> | null = null;
+let idbUnavailable = false;
+
+function isIndexedDbSupported(): boolean {
+  return typeof indexedDB !== 'undefined' && !idbUnavailable;
+}
+
+function openQueueDb(): Promise<IDBDatabase> {
+  if (idbPromise) return idbPromise;
+  idbPromise = new Promise<IDBDatabase>((resolve, reject) => {
+    try {
+      const req = indexedDB.open(IDB_DB_NAME, IDB_DB_VERSION);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains(IDB_STORE_QUEUE)) {
+          const store = db.createObjectStore(IDB_STORE_QUEUE, { keyPath: 'id' });
+          store.createIndex('byTimestamp', 'timestamp');
+        }
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    } catch (err) {
+      reject(err);
+    }
+  }).catch((err): never => {
+    console.warn('[CQD Analytics] IndexedDB unavailable:', err);
+    idbUnavailable = true;
+    idbPromise = null;
+    throw err;
+  });
+  return idbPromise;
+}
+
+function normalizeString(value: unknown, fallback: string, maxLen = 64): string {
+  if (typeof value !== 'string') return fallback;
+  const trimmed = value.trim();
+  if (!trimmed) return fallback;
+  return trimmed.slice(0, maxLen);
+}
+
+function normalizeTimestamp(value: unknown, fallbackNow: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return fallbackNow;
+  if (value <= 0) return fallbackNow;
+  return Math.floor(value);
+}
+
+function normalizeOptionalNumber(value: unknown, min: number, max: number): number | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return undefined;
+  const next = Math.floor(value);
+  if (next < min || next > max) return undefined;
+  return next;
+}
+
+function sanitizeEvent(raw: unknown, fallbackNow: number): AnalyticsEvent | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const ev = raw as Record<string, unknown>;
+  const status =
+    ev.status === 'success' || ev.status === 'fail' || ev.status === 'cancelled'
+      ? ev.status
+      : 'success';
+  const id = typeof ev.id === 'string' && ev.id.length > 0 ? ev.id.slice(0, 128) : undefined;
+  const retryCount = normalizeOptionalNumber(ev.retryCount, 0, 10_000);
+  const commitSeq = normalizeOptionalNumber(ev.commitSeq, 0, Number.MAX_SAFE_INTEGER);
+  const count = normalizeOptionalNumber(ev.count, 1, MAX_EVENT_COUNT);
+  const duration = normalizeOptionalNumber(ev.duration_ms, 0, MAX_DURATION_MS) ?? 0;
+
+  return {
+    status,
+    file_type: normalizeString(ev.file_type, 'unknown', 64),
+    browser: normalizeString(ev.browser, 'unknown', 64),
+    os: normalizeString(ev.os, 'unknown', 64),
+    ext_version: normalizeString(ev.ext_version, 'unknown', 32),
+    duration_ms: duration,
+    bypass_used: ev.bypass_used === true,
+    error_type: typeof ev.error_type === 'string' && ev.error_type.trim() ? ev.error_type.trim().slice(0, 128) : undefined,
+    language: normalizeString(ev.language, 'unknown', 12),
+    timestamp: normalizeTimestamp(ev.timestamp, fallbackNow),
+    id,
+    source: typeof ev.source === 'string' && ev.source.trim() ? ev.source.trim().slice(0, 64) : undefined,
+    retryCount,
+    commitSeq,
+    count,
+    rollup: ev.rollup === true,
+  };
+}
+
+function sanitizeQueue(rawQueue: unknown): { queue: AnalyticsEvent[]; changed: boolean } {
+  if (!Array.isArray(rawQueue)) return { queue: [], changed: true };
+  const fallbackNow = Date.now();
+  const queue: AnalyticsEvent[] = [];
+  let changed = false;
+  for (const raw of rawQueue) {
+    const ev = sanitizeEvent(raw, fallbackNow);
+    if (!ev) {
+      changed = true;
+      continue;
+    }
+    const candidate = raw as Record<string, unknown>;
+    const same =
+      candidate.status === ev.status &&
+      candidate.file_type === ev.file_type &&
+      candidate.browser === ev.browser &&
+      candidate.os === ev.os &&
+      candidate.ext_version === ev.ext_version &&
+      candidate.duration_ms === ev.duration_ms &&
+      candidate.bypass_used === ev.bypass_used &&
+      candidate.error_type === ev.error_type &&
+      candidate.language === ev.language &&
+      candidate.timestamp === ev.timestamp &&
+      candidate.id === ev.id &&
+      candidate.source === ev.source &&
+      candidate.retryCount === ev.retryCount &&
+      candidate.commitSeq === ev.commitSeq &&
+      candidate.count === ev.count &&
+      candidate.rollup === ev.rollup;
+    if (!same) changed = true;
+    queue.push(ev);
+  }
+  queue.sort((a, b) => a.timestamp - b.timestamp);
+  if (queue.length !== rawQueue.length) changed = true;
+  return { queue, changed };
+}
+
+async function getQueueFromIdb(): Promise<AnalyticsEvent[] | null> {
+  if (!isIndexedDbSupported()) return null;
+  try {
+    const db = await openQueueDb();
+    const rawQueue = await new Promise<unknown[]>((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE_QUEUE, 'readonly');
+      const store = tx.objectStore(IDB_STORE_QUEUE);
+      const index = store.index('byTimestamp');
+      const req = index.getAll();
+      req.onsuccess = () => resolve((req.result || []) as unknown[]);
+      req.onerror = () => reject(req.error);
+    });
+    return sanitizeQueue(rawQueue).queue;
+  } catch (err) {
+    console.warn('[CQD Analytics] getQueueFromIdb failed:', err);
+    return null;
+  }
+}
+
+async function replaceQueueInIdb(queue: AnalyticsEvent[]): Promise<boolean> {
+  if (!isIndexedDbSupported()) return false;
+  try {
+    const db = await openQueueDb();
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE_QUEUE, 'readwrite');
+      const store = tx.objectStore(IDB_STORE_QUEUE);
+      const clearReq = store.clear();
+      clearReq.onerror = () => reject(clearReq.error);
+      clearReq.onsuccess = () => {
+        for (const ev of queue) {
+          store.put(ev);
+        }
+      };
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+    return true;
+  } catch (err) {
+    console.warn('[CQD Analytics] replaceQueueInIdb failed:', err);
+    return false;
+  }
+}
+
+function getEventCount(ev: AnalyticsEvent): number {
+  const count = typeof ev.count === 'number' ? Math.floor(ev.count) : 1;
+  return count > 0 ? count : 1;
+}
+
+function getRollupBucket(ts: number): number {
+  return Math.floor(ts / ROLLUP_BUCKET_MS) * ROLLUP_BUCKET_MS;
+}
+
+function buildRollupKey(ev: AnalyticsEvent, bucketStart: number, coarse = false): string {
+  const status = ev.status || 'success';
+  const type = ev.file_type || 'unknown';
+  const error = ev.error_type || '';
+  if (coarse) {
+    return [bucketStart, status, type, error].join('|');
+  }
+  const browser = ev.browser || 'unknown';
+  const os = ev.os || 'unknown';
+  const lang = ev.language || 'unknown';
+  const version = ev.ext_version || '0.0.0';
+  const source = ev.source || '';
+  const bypass = ev.bypass_used ? '1' : '0';
+  return [bucketStart, status, type, browser, os, lang, version, error, source, bypass].join('|');
+}
+
+function rollupEvents(events: AnalyticsEvent[], coarse = false): AnalyticsEvent[] {
+  const map = new Map<string, {
+    sample: AnalyticsEvent;
+    count: number;
+    totalDuration: number;
+    earliest: number;
+  }>();
+
+  for (const ev of events) {
+    const ts = typeof ev.timestamp === 'number' ? ev.timestamp : Date.now();
+    const bucketStart = coarse ? new Date(ts).setUTCHours(0, 0, 0, 0) : getRollupBucket(ts);
+    const key = buildRollupKey(ev, bucketStart, coarse);
+    const weight = getEventCount(ev);
+    const duration = typeof ev.duration_ms === 'number' ? ev.duration_ms : 0;
+    const existing = map.get(key);
+    if (!existing) {
+      map.set(key, {
+        sample: ev,
+        count: weight,
+        totalDuration: duration * weight,
+        earliest: ts,
+      });
+    } else {
+      existing.count += weight;
+      existing.totalDuration += duration * weight;
+      if (ts < existing.earliest) existing.earliest = ts;
+    }
+  }
+
+  const rollups: AnalyticsEvent[] = [];
+  for (const entry of map.values()) {
+    const avgDuration = Math.round(entry.totalDuration / entry.count);
+    const sample = entry.sample;
+    rollups.push({
+      status: sample.status,
+      file_type: sample.file_type || 'unknown',
+      browser: coarse ? 'mixed' : (sample.browser || 'unknown'),
+      os: coarse ? 'mixed' : (sample.os || 'unknown'),
+      ext_version: coarse ? 'mixed' : (sample.ext_version || '0.0.0'),
+      duration_ms: avgDuration,
+      bypass_used: sample.bypass_used ?? false,
+      error_type: sample.error_type,
+      language: coarse ? 'mixed' : (sample.language || 'unknown'),
+      timestamp: entry.earliest,
+      id: generateEventId(entry.earliest),
+      retryCount: 0,
+      source: coarse ? 'rollup' : sample.source,
+      count: entry.count,
+      rollup: true,
+    });
+  }
+
+  rollups.sort((a, b) => a.timestamp - b.timestamp);
+  return rollups;
+}
+
+export function compactQueueForBudget(queue: AnalyticsEvent[]): { queue: AnalyticsEvent[]; compacted: boolean } {
+  if (queue.length <= QUEUE_BUDGET_EVENTS) {
+    return { queue, compacted: false };
+  }
+
+  const protectedEvents = queue.filter((ev) => typeof ev.commitSeq === 'number');
+  const compactable = queue.filter((ev) => typeof ev.commitSeq !== 'number');
+  if (compactable.length === 0) {
+    return { queue, compacted: false };
+  }
+
+  let preserve = Math.min(QUEUE_PRESERVE_RECENT, compactable.length);
+
+  while (true) {
+    const newer = compactable.slice(-preserve);
+    const older = compactable.slice(0, compactable.length - preserve);
+    const rollups = rollupEvents(older, false);
+    let nextQueue = [...rollups, ...protectedEvents, ...newer];
+    nextQueue.sort((a, b) => a.timestamp - b.timestamp);
+
+    if (nextQueue.length <= QUEUE_BUDGET_EVENTS || preserve === 0) {
+      if (nextQueue.length > QUEUE_BUDGET_EVENTS) {
+        const coarseRollups = rollupEvents(compactable, true);
+        nextQueue = [...coarseRollups, ...protectedEvents];
+        nextQueue.sort((a, b) => a.timestamp - b.timestamp);
+      }
+      return { queue: nextQueue, compacted: true };
+    }
+
+    preserve = Math.floor(preserve / 2);
+  }
+}
 
 // --- Core Storage Helpers ---
 
@@ -51,6 +343,10 @@ function clampInt(value: unknown, min: number, max: number, fallback: number): n
 }
 
 function normalizeConfig(cfg: AnalyticsConfig): AnalyticsConfig {
+  const maxEventsPerRequestDefault = DEFAULT_CONFIG.maxEventsPerRequest as number;
+  const maxEventsPerRequestInput = cfg.maxEventsPerRequest == null
+    ? maxEventsPerRequestDefault
+    : cfg.maxEventsPerRequest;
   return {
     ...cfg,
     configVersion: CONFIG_VERSION,
@@ -75,12 +371,7 @@ function normalizeConfig(cfg: AnalyticsConfig): AnalyticsConfig {
       24 * 60,
       DEFAULT_CONFIG.dailyFlushWindowMinutes
     ),
-    maxEventsPerRequest: clampInt(
-      cfg.maxEventsPerRequest ?? DEFAULT_CONFIG.maxEventsPerRequest,
-      1,
-      50_000,
-      DEFAULT_CONFIG.maxEventsPerRequest ?? 5000
-    ),
+    maxEventsPerRequest: clampInt(maxEventsPerRequestInput, 1, 50_000, maxEventsPerRequestDefault),
   };
 }
 
@@ -101,11 +392,46 @@ function migrateConfig(raw: any): AnalyticsConfig {
 // --- Queue Helpers ---
 
 export async function loadQueue(): Promise<{ queue: AnalyticsEvent[]; valid: boolean }> {
-  return loadQueueWithIntegrity();
+  const idbQueue = await getQueueFromIdb();
+  if (idbQueue && Array.isArray(idbQueue) && idbQueue.length > 0) {
+    return { queue: idbQueue, valid: true };
+  }
+
+  const stored = await loadQueueWithIntegrity();
+  if (stored.queue.length > 0 && isIndexedDbSupported()) {
+    const migrated = await replaceQueueInIdb(stored.queue);
+    if (migrated) {
+      await storageSet({
+        [STORAGE_KEYS.QUEUE]: [],
+        [STORAGE_KEYS.INTEGRITY]: computeChecksum('[]'),
+        [STORAGE_KEYS.QUEUE_MIGRATED]: true,
+      });
+    }
+  }
+  return stored;
 }
 
 export async function saveQueue(queue: AnalyticsEvent[]): Promise<void> {
-  await saveQueueWithIntegrity(queue);
+  const sanitized = sanitizeQueue(queue).queue;
+  const normalized = sanitized.map((ev) => {
+    if (!ev.id) {
+      return { ...ev, id: generateEventId(ev.timestamp) };
+    }
+    return ev;
+  });
+  normalized.sort((a, b) => a.timestamp - b.timestamp);
+  const compacted = compactQueueForBudget(normalized);
+  const nextQueue = compacted.queue;
+  const savedToIdb = await replaceQueueInIdb(nextQueue);
+  if (savedToIdb) {
+    await storageSet({
+      [STORAGE_KEYS.QUEUE]: [],
+      [STORAGE_KEYS.INTEGRITY]: computeChecksum('[]'),
+      [STORAGE_KEYS.QUEUE_MIGRATED]: true,
+    });
+    return;
+  }
+  await saveQueueWithIntegrity(nextQueue);
 }
 
 // --- Integrity Protection ---
@@ -122,6 +448,21 @@ function computeChecksum(data: string): string {
 
 let inMemoryQueue: AnalyticsEvent[] | null = null;
 let inMemoryChecksum: string | null = null;
+
+export async function __resetStorageForTests(): Promise<void> {
+  if (idbPromise) {
+    try {
+      const db = await idbPromise;
+      db.close();
+    } catch {
+      // ignore
+    }
+  }
+  idbPromise = null;
+  idbUnavailable = false;
+  inMemoryQueue = null;
+  inMemoryChecksum = null;
+}
 
 async function saveQueueWithIntegrity(queue: AnalyticsEvent[]): Promise<void> {
   const data = JSON.stringify(queue);
@@ -152,17 +493,19 @@ async function loadQueueWithIntegrity(): Promise<{ queue: AnalyticsEvent[]; vali
 
   const data = JSON.stringify(raw);
   const computed = computeChecksum(data);
+  const sanitized = sanitizeQueue(raw);
+  const sanitizedQueue = sanitized.queue;
 
   if (storedChecksum && storedChecksum !== computed) {
     console.warn('[CQD Analytics] Queue integrity check failed; keeping raw queue to avoid data loss');
-    inMemoryQueue = raw.slice();
+    inMemoryQueue = sanitizedQueue.slice();
     inMemoryChecksum = computed;
-    return { queue: raw, valid: false };
+    return { queue: sanitizedQueue, valid: false };
   }
 
-  inMemoryQueue = raw.slice();
+  inMemoryQueue = sanitizedQueue.slice();
   inMemoryChecksum = computed;
-  return { queue: raw, valid: true };
+  return { queue: sanitizedQueue, valid: !sanitized.changed };
 }
 
 // --- Config/Meta Helpers ---
@@ -190,45 +533,31 @@ export async function saveMeta(meta: AnalyticsMeta): Promise<void> {
 // --- Stats Helpers ---
 
 export function normalizeStats(raw: any): LocalStats {
-  const stats: LocalStats = {
-    total: 0,
-    byType: {},
-    success: 0,
-    fail: 0,
-    cancelled: 0,
-    attempts: 0,
-    bySpeed: { fast: 0, medium: 0, slow: 0 },
-    bypassCount: 0,
-    failByErrorType: {},
-    byLanguage: {},
-    lastUpdated: Date.now(),
+  const source = raw && typeof raw === 'object' ? raw : {};
+  const byType = source.byType && typeof source.byType === 'object' ? source.byType : {};
+  const bySpeed = source.bySpeed && typeof source.bySpeed === 'object' ? source.bySpeed : {};
+  const failByErrorType = source.failByErrorType && typeof source.failByErrorType === 'object'
+    ? source.failByErrorType
+    : {};
+  const byLanguage = source.byLanguage && typeof source.byLanguage === 'object' ? source.byLanguage : {};
+
+  return {
+    total: typeof source.total === 'number' ? source.total : 0,
+    byType,
+    success: typeof source.success === 'number' ? source.success : 0,
+    fail: typeof source.fail === 'number' ? source.fail : 0,
+    cancelled: typeof source.cancelled === 'number' ? source.cancelled : 0,
+    attempts: typeof source.attempts === 'number' ? source.attempts : 0,
+    bySpeed: {
+      fast: typeof bySpeed.fast === 'number' ? bySpeed.fast : 0,
+      medium: typeof bySpeed.medium === 'number' ? bySpeed.medium : 0,
+      slow: typeof bySpeed.slow === 'number' ? bySpeed.slow : 0,
+    },
+    bypassCount: typeof source.bypassCount === 'number' ? source.bypassCount : 0,
+    failByErrorType,
+    byLanguage,
+    lastUpdated: typeof source.lastUpdated === 'number' ? source.lastUpdated : Date.now(),
   };
-
-  if (!raw) return stats;
-
-  if (typeof raw.total === 'number') stats.total = raw.total;
-  if (raw.byType && typeof raw.byType === 'object') stats.byType = raw.byType;
-  if (typeof raw.success === 'number') stats.success = raw.success;
-  if (typeof raw.fail === 'number') stats.fail = raw.fail;
-  if (typeof raw.cancelled === 'number') stats.cancelled = raw.cancelled;
-  if (typeof raw.attempts === 'number') stats.attempts = raw.attempts;
-  if (raw.bySpeed && typeof raw.bySpeed === 'object') {
-    stats.bySpeed = {
-      fast: raw.bySpeed.fast ?? 0,
-      medium: raw.bySpeed.medium ?? 0,
-      slow: raw.bySpeed.slow ?? 0,
-    };
-  }
-  if (typeof raw.bypassCount === 'number') stats.bypassCount = raw.bypassCount;
-  if (raw.failByErrorType && typeof raw.failByErrorType === 'object') {
-    stats.failByErrorType = raw.failByErrorType;
-  }
-  if (raw.byLanguage && typeof raw.byLanguage === 'object') {
-    stats.byLanguage = raw.byLanguage;
-  }
-  if (typeof raw.lastUpdated === 'number') stats.lastUpdated = raw.lastUpdated;
-
-  return stats;
 }
 
 export async function loadStats(): Promise<LocalStats> {
@@ -239,3 +568,19 @@ export async function loadStats(): Promise<LocalStats> {
 export async function saveStats(stats: LocalStats): Promise<void> {
   await storageSet({ [STORAGE_KEYS.STATS]: stats });
 }
+
+// Test-only exports for deterministic branch coverage of private helpers.
+export const __storageTestInternals = {
+  openQueueDb,
+  sanitizeEvent,
+  sanitizeQueue,
+  getEventCount,
+  buildRollupKey,
+  rollupEvents,
+  clampInt,
+  normalizeConfig,
+  migrateConfig,
+  computeChecksum,
+  saveQueueWithIntegrity,
+  loadQueueWithIntegrity,
+};
