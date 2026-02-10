@@ -58,6 +58,16 @@ export interface Counters {
 }
 
 /**
+ * Aggregated totals for a single time bucket (typically one hour).
+ */
+export interface BucketTotals {
+  totalEvents: number;
+  totalDownloads: number;
+  totalSuccess: number;
+  totalFail: number;
+}
+
+/**
  * Retry/backoff state for Oracle flushing.
  */
 export interface RetryState {
@@ -114,13 +124,9 @@ export interface EnvSnapshot {
 /**
  * Response payload for /stats (DO -> Worker -> dashboard).
  */
-export interface StatsResponse {
+export interface StatsResponse extends BucketTotals {
   ok: boolean;
 
-  totalEvents: number;
-  totalDownloads: number;
-  totalSuccess: number;
-  totalFail: number;
   totalCancelled?: number;
   pendingEvents: number;
 
@@ -310,37 +316,13 @@ export interface ChangelogConfig {
 // ---------------------------------------------------------------------------
 
 /**
- * Aggregated totals for a single time bucket (typically one hour).
- */
-export interface BucketTotals {
-  totalEvents: number;
-  totalDownloads: number;
-  totalSuccess: number;
-  totalFail: number;
-}
-
-/**
- * Per-dimension counters for a time bucket.
- */
-export interface BucketCounters {
-  byStatus: Record<string, number>;
-  byType: Record<string, number>;
-  byBrowser: Record<string, number>;
-  byOs: Record<string, number>;
-  byExtVersion: Record<string, number>;
-  byLanguage: Record<string, number>;
-  byCountry: Record<string, number>;
-  byErrorType: Record<string, number>;
-}
-
-/**
  * One aggregated time bucket (typically one hour).
  */
 export interface TimeBucket {
   bucketStart: string; // RFC3339 UTC, e.g. "2025-12-11T03:00:00Z"
   bucketEnd: string;
   totals: BucketTotals;
-  counters: BucketCounters;
+  counters: Counters;
 }
 
 /**
@@ -368,12 +350,8 @@ export interface BatchSummary {
 /**
  * DO state snapshot included in each batch.
  */
-export interface DOStateBatch {
+export interface DOStateBatch extends BucketTotals {
   ok: boolean;
-  totalEvents: number;
-  totalDownloads: number;
-  totalSuccess: number;
-  totalFail: number;
   pendingEvents: number;
   lastEventAt: number | null;
   lastFlushAt: number | null;

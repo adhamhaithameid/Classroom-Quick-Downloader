@@ -9,7 +9,6 @@ import {
   OracleBatch,
   TimeBucket,
   BucketTotals,
-  BucketCounters,
   DOStateBatch,
   BatchSummary,
   ChangelogEntry,
@@ -2681,7 +2680,7 @@ export class DownloadsDurable {
       totalFail: 0,
     };
 
-    const counters: BucketCounters = {
+    const counters: Counters = {
       byStatus: {},
       byType: {},
       byBrowser: {},
