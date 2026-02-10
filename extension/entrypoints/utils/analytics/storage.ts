@@ -343,7 +343,7 @@ function clampInt(value: unknown, min: number, max: number, fallback: number): n
 }
 
 function normalizeConfig(cfg: AnalyticsConfig): AnalyticsConfig {
-  const maxEventsPerRequestDefault = DEFAULT_CONFIG.maxEventsPerRequest ?? 5000;
+  const maxEventsPerRequestDefault = DEFAULT_CONFIG.maxEventsPerRequest as number;
   const maxEventsPerRequestInput = cfg.maxEventsPerRequest == null
     ? maxEventsPerRequestDefault
     : cfg.maxEventsPerRequest;
