@@ -85,6 +85,40 @@ func TestAuthMiddleware_AllowsArchiverSecret(t *testing.T) {
 	}
 }
 
+func TestPipelineEndpoints_RequireAuth(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "pipeline-auth.db")
+	sqlDB, err := db.Init(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sqlDB.Close()
+
+	metrics := requireAuth("secret", "arch-secret", false)(handlers.PipelineMetricsHandler(sqlDB))
+	failures := requireAuth("secret", "arch-secret", false)(handlers.PipelineFailuresHandler(sqlDB))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/pipeline/metrics", nil)
+	rr := httptest.NewRecorder()
+	metrics.ServeHTTP(rr, req)
+	if rr.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 for metrics without auth, got %d", rr.Code)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/api/pipeline/failures", nil)
+	rr = httptest.NewRecorder()
+	failures.ServeHTTP(rr, req)
+	if rr.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 for failures without auth, got %d", rr.Code)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/api/pipeline/metrics", nil)
+	req.Header.Set("X-Archiver-Secret", "arch-secret")
+	rr = httptest.NewRecorder()
+	metrics.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200 for metrics with archiver secret, got %d", rr.Code)
+	}
+}
+
 func TestLoginHandler_SetsSecureCookieOnSuccess(t *testing.T) {
 	resetSessionStore()
 	resetLoginRateStore()
@@ -259,13 +293,13 @@ func TestIngestBatchHandler_AcceptsValidBatch(t *testing.T) {
 					TotalFail:      0,
 				},
 				Counters: model.BucketCounters{
-					ByStatus:   map[string]int64{"success": 1},
-					ByType:     map[string]int64{"pdf": 1},
-					ByBrowser:  map[string]int64{"chrome": 1},
-					ByOs:       map[string]int64{"mac": 1},
-					ByExtVer:   map[string]int64{"1.0.0": 1},
-					ByLanguage: map[string]int64{"en": 1},
-					ByCountry:  map[string]int64{"us": 1},
+					ByStatus:    map[string]int64{"success": 1},
+					ByType:      map[string]int64{"pdf": 1},
+					ByBrowser:   map[string]int64{"chrome": 1},
+					ByOs:        map[string]int64{"mac": 1},
+					ByExtVer:    map[string]int64{"1.0.0": 1},
+					ByLanguage:  map[string]int64{"en": 1},
+					ByCountry:   map[string]int64{"us": 1},
 					ByErrorType: map[string]int64{},
 				},
 			},
