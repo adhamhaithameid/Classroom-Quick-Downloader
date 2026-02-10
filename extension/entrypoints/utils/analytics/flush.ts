@@ -508,3 +508,10 @@ export async function internalFlush(): Promise<void> {
   }
 
 }
+
+// Test-only exports for deterministic branch coverage of private helpers.
+export const __flushTestInternals = {
+  getRandomInt,
+  resolveMaxEventsPerRequest,
+  getFlushDecision,
+};
