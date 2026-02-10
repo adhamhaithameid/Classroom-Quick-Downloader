@@ -1454,6 +1454,7 @@ export class DownloadsDurable {
       ev.file_type = sanitizeString(ev.file_type, 24, FIELD_PATTERNS.generic);
       ev.browser = sanitizeString(ev.browser, 24, FIELD_PATTERNS.generic);
       ev.os = sanitizeString(ev.os, 24, FIELD_PATTERNS.generic);
+      ev.ext_version = sanitizeString(ev.ext_version, 24, FIELD_PATTERNS.generic);
       ev.language = sanitizeString(ev.language, 10, FIELD_PATTERNS.language);
       if (ev.error_type) {
         ev.error_type = sanitizeString(ev.error_type, 32, FIELD_PATTERNS.generic);
