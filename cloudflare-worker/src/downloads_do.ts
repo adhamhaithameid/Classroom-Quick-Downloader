@@ -1523,7 +1523,7 @@ export class DownloadsDurable {
       const os = (ev.os || "unknown").toLowerCase();
       c.byOs[os] = (c.byOs[os] || 0) + eventCount;
 
-      const extVersion = ev.ext_version || "0.0.0";
+      const extVersion = sanitizeString(ev.ext_version, 12, FIELD_PATTERNS.generic, "0.0.0");
       c.byExtVersion[extVersion] =
         (c.byExtVersion[extVersion] || 0) + eventCount;
 
