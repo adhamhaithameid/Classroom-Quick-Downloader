@@ -103,6 +103,52 @@ func Migrate(db *sql.DB) error {
 		`CREATE INDEX IF NOT EXISTS idx_do_state_snapshots_captured_at
 			ON do_state_snapshots(captured_at);`,
 
+		// End-to-end delivery metrics (daily counters + per-delivery latest state).
+		`CREATE TABLE IF NOT EXISTS pipeline_stage_daily (
+			day_utc    TEXT NOT NULL,
+			stage      TEXT NOT NULL,
+			count      INTEGER NOT NULL DEFAULT 0,
+			updated_at INTEGER NOT NULL,
+			PRIMARY KEY(day_utc, stage)
+		);`,
+
+		`CREATE TABLE IF NOT EXISTS pipeline_delivery_events (
+			delivery_id      TEXT PRIMARY KEY,
+			batch_id         TEXT NOT NULL,
+			created_at       INTEGER NOT NULL,
+			updated_at       INTEGER NOT NULL,
+			accepted_count   INTEGER NOT NULL DEFAULT 0,
+			stored_count     INTEGER NOT NULL DEFAULT 0,
+			forwarded_count  INTEGER NOT NULL DEFAULT 0,
+			committed_count  INTEGER NOT NULL DEFAULT 0,
+			min_seq          INTEGER,
+			max_seq          INTEGER,
+			status           TEXT NOT NULL DEFAULT 'pending'
+		);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_pipeline_delivery_events_updated_at
+			ON pipeline_delivery_events(updated_at);`,
+
+		// Structured failure sink for Cloudflare + Oracle ingestion failures.
+		`CREATE TABLE IF NOT EXISTS pipeline_failure_logs (
+			id           INTEGER PRIMARY KEY AUTOINCREMENT,
+			ts_utc       INTEGER NOT NULL,
+			day_utc      TEXT NOT NULL,
+			source       TEXT NOT NULL,
+			stage        TEXT NOT NULL,
+			error_code   TEXT NOT NULL,
+			error_detail TEXT NOT NULL,
+			sample_count INTEGER NOT NULL DEFAULT 1,
+			batch_id     TEXT,
+			delivery_id  TEXT
+		);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_pipeline_failure_logs_ts
+			ON pipeline_failure_logs(ts_utc DESC);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_pipeline_failure_logs_day_stage
+			ON pipeline_failure_logs(day_utc, stage);`,
+
 		// IP Tracking for Geo Map feature (required for dashboard's geographical map view)
 		// NOTE: This is internal/trusted network traffic. Deploy behind VPN/Tunnel for security.
 		// unique_ips format: {"ips": [...], "count": N, "is_truncated": boolean}
