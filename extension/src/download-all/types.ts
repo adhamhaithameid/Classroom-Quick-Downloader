@@ -23,3 +23,15 @@ export interface GroupState {
   resetTimeoutId?: number;
   currentRunId?: number;
 }
+
+/**
+ * Custom dataset properties used by CQD buttons.
+ */
+export interface CqdButtonDataset extends DOMStringMap {
+  cqdUrl?: string;
+  cqdName?: string;
+  cqdExt?: string;
+  cqdMouseOver?: string;
+  cqdRequestId?: string;
+  cqdAllDone?: string;
+}

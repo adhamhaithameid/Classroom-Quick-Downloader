@@ -3,7 +3,7 @@
  * Download button creation and event handling.
  */
 
-import type { FileMeta, ButtonState } from './types';
+import type { FileMeta, ButtonState, CqdButtonDataset } from './types';
 import { INJECTED_ATTR, PROCESSED_ATTR } from './state';
 import { toDownloadUrl } from './url-utils';
 import { extractFileMeta } from './file-meta';
@@ -32,9 +32,10 @@ export function createDownloadButton(
   button.setAttribute('title', t('titleQuick'));
 
   try {
-    if (url) (button.dataset as any).cqdUrl = url;
-    if (fileMeta?.name) (button.dataset as any).cqdName = fileMeta.name;
-    if (fileMeta?.ext) (button.dataset as any).cqdExt = fileMeta.ext;
+    const ds = button.dataset as CqdButtonDataset;
+    if (url) ds.cqdUrl = url;
+    if (fileMeta?.name) ds.cqdName = fileMeta.name;
+    if (fileMeta?.ext) ds.cqdExt = fileMeta.ext;
   } catch { /* ignore */ }
 
   // Create button internals
@@ -57,7 +58,7 @@ export function createDownloadButton(
 
   // Mouse enter: show cancel if active
   button.addEventListener('mouseenter', () => {
-    (button.dataset as any).cqdMouseOver = 'true';
+    (button.dataset as CqdButtonDataset).cqdMouseOver = 'true';
     const s = getButtonState(button);
     if (s === 'loading' || s === 'trying') {
       button.classList.add('cqd-cancel');
@@ -73,7 +74,7 @@ export function createDownloadButton(
 
   // Mouse leave: revert to active state
   button.addEventListener('mouseleave', () => {
-    (button.dataset as any).cqdMouseOver = 'false';
+    (button.dataset as CqdButtonDataset).cqdMouseOver = 'false';
     const wasCancel = button.classList.contains('cqd-cancel');
     const isUnderlyingLoading = button.classList.contains('cqd-loading');
     const isUnderlyingTrying = button.classList.contains('cqd-trying');
@@ -106,7 +107,7 @@ export function createDownloadButton(
 
     const currentState = getButtonState(button);
     if (currentState === 'cancel') {
-      delete (button.dataset as any).cqdMouseOver;
+      delete (button.dataset as CqdButtonDataset).cqdMouseOver;
       await handleCancelClick(button);
       return;
     }

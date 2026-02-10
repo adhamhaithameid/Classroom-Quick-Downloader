@@ -3,7 +3,7 @@
  * Download button click handling and background communication.
  */
 
-import type { FileMeta, PendingButton } from './types';
+import type { FileMeta, PendingButton, CqdButtonDataset } from './types';
 import {
   pendingButtons,
   getNextRequestId,
@@ -164,7 +164,7 @@ export async function waitForSuccessReset(button: HTMLButtonElement): Promise<vo
   setButtonState(button, 'idle');
   setPillProgress(button, 0);
   try {
-    delete (button.dataset as any).cqdAllDone;
+    delete (button.dataset as CqdButtonDataset).cqdAllDone;
   } catch { /* ignore */ }
 }
 
@@ -186,7 +186,7 @@ export async function handleSingleDownloadClick(
   pendingButtons.set(requestId, { button, requestId, fileMeta, startedAt });
 
   try {
-    (button.dataset as any).cqdRequestId = requestId;
+    (button.dataset as CqdButtonDataset).cqdRequestId = requestId;
   } catch { /* ignore */ }
 
   setButtonState(button, 'loading');

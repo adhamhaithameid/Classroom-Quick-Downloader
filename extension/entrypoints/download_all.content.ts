@@ -4,6 +4,7 @@ import { t } from './content/i18n';
 import { isPageDark } from './content/theme';
 import { CANCEL_ICON_SVG_URL, DOWNLOAD_ICON_SVG_URL } from './content/icons';
 import { isClassworkPost, isTopicView } from './content/tab-detector';
+import type { CqdButtonDataset } from './content/types';
 
 
 const DOWNLOAD_BTN_SELECTOR = '.cqd-download-all-btn';
@@ -345,7 +346,7 @@ function isPostCollapsed(postRoot: HTMLElement): boolean {
 }
 
 function getCanonicalFileKey(btn: HTMLButtonElement): string {
-  const ds = btn.dataset as any;
+  const ds = btn.dataset as CqdButtonDataset;
   const url = ds.cqdUrl || '';
   if (url) {
     const idMatch =
@@ -491,7 +492,7 @@ function updateGroupState(group: GroupState): void {
     for (const b of file.buttons) {
       if (!b.isConnected) continue;
       const cls = b.classList;
-      const ds = b.dataset as any;
+      const ds = b.dataset as CqdButtonDataset;
       const isLoading = cls.contains('cqd-loading') || cls.contains('cqd-trying');
       const isSuccess = cls.contains('cqd-success') || ds.cqdAllDone === 'true';
       const isError = cls.contains('cqd-error');
@@ -1291,7 +1292,7 @@ function handleCancelAllClick(group: GroupState): void {
     const primary = getPrimaryButton(file);
     if (!primary) continue;
 
-    const fileName = (primary.dataset as any).cqdName || 'unknown';
+    const fileName = (primary.dataset as CqdButtonDataset).cqdName || 'unknown';
 
     // Mark file as cancelled
     file.inProgress = false;
@@ -1299,7 +1300,7 @@ function handleCancelAllClick(group: GroupState): void {
     cancelledCount++;
 
     // Check if requestId exists in dataset
-    const requestId = (primary.dataset as any).cqdRequestId;
+    const requestId = (primary.dataset as CqdButtonDataset).cqdRequestId;
     
     if (requestId) {
       requestIdFoundCount++;
@@ -1371,7 +1372,7 @@ function getSingleButtonState(btn: HTMLButtonElement): ButtonState {
   if (cls.contains('cqd-trying')) return 'trying';
   if (cls.contains('cqd-success')) return 'success';
   if (cls.contains('cqd-error')) return 'error';
-  if ((btn.dataset as any).cqdAllDone === 'true') return 'success';
+  if ((btn.dataset as CqdButtonDataset).cqdAllDone === 'true') return 'success';
   return 'idle';
 }
 

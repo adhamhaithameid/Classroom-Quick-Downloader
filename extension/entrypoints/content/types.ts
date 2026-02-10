@@ -32,3 +32,15 @@ export type PendingButton = {
   fileMeta?: FileMeta;
   startedAt: number;
 };
+
+/**
+ * Custom dataset properties used by CQD buttons.
+ */
+export interface CqdButtonDataset extends DOMStringMap {
+  cqdUrl?: string;
+  cqdName?: string;
+  cqdExt?: string;
+  cqdMouseOver?: string;
+  cqdRequestId?: string;
+  cqdAllDone?: string;
+}

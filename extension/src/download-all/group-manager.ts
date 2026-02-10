@@ -3,7 +3,7 @@
  * Group discovery and button registration.
  */
 
-import type { GroupState, FileEntry } from './types';
+import type { GroupState, FileEntry, CqdButtonDataset } from './types';
 import {
   groupStates,
   buttonToGroup,
@@ -133,7 +133,7 @@ export function findGroupRoot(btn: HTMLElement): HTMLElement | null {
  * Get canonical file key from button data.
  */
 export function getCanonicalFileKey(btn: HTMLButtonElement): string {
-  const ds = btn.dataset as any;
+  const ds = btn.dataset as CqdButtonDataset;
   const url = ds.cqdUrl || '';
   if (url) {
     const idMatch =

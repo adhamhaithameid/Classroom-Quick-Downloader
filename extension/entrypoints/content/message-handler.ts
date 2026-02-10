@@ -3,7 +3,7 @@
  * Message handling for popup and download status updates.
  */
 
-import type { ButtonState } from './types';
+import type { ButtonState, CqdButtonDataset } from './types';
 import {
   pendingButtons,
   desiredEnabled,
@@ -86,7 +86,7 @@ export function setupMessageListeners(): void {
           if (status === 'success' || status === 'complete') {
             pendingButtons.delete(requestId);
             try {
-              (button.dataset as any).cqdAllDone = 'true';
+              (button.dataset as CqdButtonDataset).cqdAllDone = 'true';
             } catch { /* ignore */ }
             setPillProgress(button, 1);
             setButtonState(button, 'success');

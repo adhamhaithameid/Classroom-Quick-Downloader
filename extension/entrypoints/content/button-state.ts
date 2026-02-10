@@ -3,7 +3,7 @@
  * Button state management and rendering.
  */
 
-import type { ButtonState } from './types';
+import type { ButtonState, CqdButtonDataset } from './types';
 import {
   DOWNLOAD_ICON_SVG_URL,
   SUCCESS_ICON_SVG_URL,
@@ -83,7 +83,7 @@ export function setButtonState(
   if (!icon || !label || !errorDetail) return;
 
   const currentState = getButtonState(button);
-  const isMouseOver = (button.dataset as any).cqdMouseOver === 'true';
+  const isMouseOver = (button.dataset as CqdButtonDataset).cqdMouseOver === 'true';
 
   if (!shouldAllowTransition(currentState, state, isMouseOver)) {
     return;
