@@ -197,6 +197,48 @@ export interface StatsResponse {
   // Changelog data for dashboard
   changelog: ChangelogEntry[];
   changelogConfig: ChangelogConfig;
+
+  // End-to-end delivery metrics chain
+  deliveryMetrics?: {
+    totals: {
+      accepted: number;
+      stored: number;
+      forwarded: number;
+      committed: number;
+    };
+    recent: Array<{
+      deliveryId: string;
+      batchId: string;
+      accepted: number;
+      stored: number;
+      forwarded: number;
+      committed: number;
+      status: "pending" | "forwarded" | "committed";
+      createdAt: number;
+      updatedAt: number;
+    }>;
+  };
+  deliveryHealth?: {
+    acceptedMinusCommitted: number;
+    forwardedMinusCommitted: number;
+  };
+
+  // Structured failure sink summary
+  failureSink?: {
+    totalRollups: number;
+    unsentRollups: number;
+    recent: Array<{
+      key: string;
+      source: "cloudflare-do";
+      stage: string;
+      errorCode: string;
+      errorDetail: string;
+      sampleCount: number;
+      unsentCount: number;
+      firstTs: number;
+      lastTs: number;
+    }>;
+  };
 }
 
 /**
@@ -392,6 +434,27 @@ export interface DOStateBatch {
   envSnapshot?: EnvSnapshot;
 }
 
+export interface BatchDeliverySnapshot {
+  deliveryId: string;
+  acceptedCount: number;
+  storedCount: number;
+  forwardedCount: number;
+  committedCount: number;
+  createdAt: number;
+  minSeq?: number | null;
+  maxSeq?: number | null;
+}
+
+export interface BatchFailureLogEntry {
+  key: string;
+  source: "cloudflare-do";
+  stage: string;
+  errorCode: string;
+  errorDetail: string;
+  sampleCount: number;
+  tsUtc: number;
+}
+
 /**
  * The aggregated payload sent to Oracle backend.
  */
@@ -405,6 +468,8 @@ export interface OracleBatch {
   
   timeBuckets: TimeBucket[];
   doState: DOStateBatch;
+  delivery?: BatchDeliverySnapshot;
+  failureLogs?: BatchFailureLogEntry[];
   
   // LEAN INGESTION: Unique IPs for Geo Map persistence
   // Raw events are intentionally excluded to reduce payload size
