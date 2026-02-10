@@ -37,7 +37,7 @@ func getDeployStatus() DeployStatus {
 	status := DeployStatus{
 		Commit:     "unknown",
 		CommitFull: "unknown",
-		Branch:     "oracle-deploy",
+		Branch:     "main",
 		DeployedAt: time.Now().UTC().Format(time.RFC3339),
 		Stale:      false,
 	}
