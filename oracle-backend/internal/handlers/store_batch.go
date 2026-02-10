@@ -592,6 +592,23 @@ func upsertDeliveryMetrics(ctx context.Context, tx *sql.Tx, batch *model.OracleB
 			maxSeq = sql.NullInt64{Int64: *batch.Delivery.MaxSeq, Valid: true}
 		}
 	}
+	if accepted < 0 {
+		accepted = 0
+	}
+	if stored < 0 {
+		stored = 0
+	}
+	if forwarded < 0 {
+		forwarded = 0
+	}
+	if committed < 0 {
+		committed = 0
+	}
+	// Oracle ACK is the final "committed" stage; when ingest succeeds and the
+	// worker payload does not carry committedCount yet, infer it from accepted.
+	if committed == 0 && accepted > 0 {
+		committed = accepted
+	}
 
 	day := dayUTC(createdAt)
 	stages := []struct {
