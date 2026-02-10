@@ -21,6 +21,20 @@ type StoredState = {
   retryState?: { consecutiveFailures?: number };
   lastFlushAt?: number;
   configMaxBufferSize?: number;
+  totalEvents?: number;
+  totalSuccess?: number;
+  totalFail?: number;
+  totalCancelled?: number;
+  counters?: {
+    byStatus?: Record<string, number>;
+    byType?: Record<string, number>;
+    byBrowser?: Record<string, number>;
+    byOs?: Record<string, number>;
+    byExtVersion?: Record<string, number>;
+    byLanguage?: Record<string, number>;
+    byCountry?: Record<string, number>;
+    byErrorType?: Record<string, number>;
+  };
   configHealthWarnPendingBatches?: number;
   configHealthCriticalPendingBatches?: number;
   configHealthWarnFailures?: number;
@@ -573,6 +587,17 @@ describe("Durable Object security behaviors", () => {
     expect(res.status).toBe(202);
     const stored = await state.storage.get<StoredState>(STORAGE_KEY);
     expect(stored.buffer?.[0]?.country).toBe("gb");
+  });
+
+  it("applies rollup count to counters", async () => {
+    const { obj, state } = makeDO();
+    const res = await callDO(obj, "/track", { events: [makeEvent({ count: 3 })] }, {
+      "CF-Connecting-IP": "4.4.4.4",
+    });
+    expect(res.status).toBe(202);
+    const stored = await state.storage.get<StoredState>(STORAGE_KEY);
+    expect(stored.totalEvents).toBe(3);
+    expect(stored.counters?.byStatus?.success).toBe(3);
   });
 
   it("supports IPv4/IPv6 CIDR entries in allowlist", async () => {

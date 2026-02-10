@@ -18,6 +18,15 @@ export interface AnalyticsEvent {
   source?: string;
   retryCount?: number;
   commitSeq?: number;
+  /**
+   * Rollup count for compacted/offline events.
+   * When present, represents multiple events aggregated into this entry.
+   */
+  count?: number;
+  /**
+   * Marks a locally compacted rollup event.
+   */
+  rollup?: boolean;
 }
 
 export interface LocalStats {

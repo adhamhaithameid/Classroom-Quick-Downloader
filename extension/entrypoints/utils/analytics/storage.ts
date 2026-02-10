@@ -6,6 +6,207 @@
 
 import type { AnalyticsEvent, LocalStats, AnalyticsConfig, AnalyticsMeta } from './types';
 import { STORAGE_KEYS, DEFAULT_CONFIG, DEFAULT_META, CONFIG_VERSION } from './constants';
+import { generateEventId } from './detection';
+
+const IDB_DB_NAME = 'cqd_analytics_db_v1';
+const IDB_DB_VERSION = 1;
+const IDB_STORE_QUEUE = 'queue';
+
+// Offline queue compaction thresholds (approx. "500 downloads" budget)
+const QUEUE_BUDGET_EVENTS = 500;
+const QUEUE_PRESERVE_RECENT = 200;
+const ROLLUP_BUCKET_MS = 60 * 60 * 1000; // 1h buckets for rollups
+
+let idbPromise: Promise<IDBDatabase> | null = null;
+let idbUnavailable = false;
+
+function isIndexedDbSupported(): boolean {
+  return typeof indexedDB !== 'undefined' && !idbUnavailable;
+}
+
+function openQueueDb(): Promise<IDBDatabase> {
+  if (idbPromise) return idbPromise;
+  idbPromise = new Promise((resolve, reject) => {
+    try {
+      const req = indexedDB.open(IDB_DB_NAME, IDB_DB_VERSION);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains(IDB_STORE_QUEUE)) {
+          const store = db.createObjectStore(IDB_STORE_QUEUE, { keyPath: 'id' });
+          store.createIndex('byTimestamp', 'timestamp');
+        }
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    } catch (err) {
+      reject(err);
+    }
+  }).catch((err) => {
+    console.warn('[CQD Analytics] IndexedDB unavailable:', err);
+    idbUnavailable = true;
+    idbPromise = null;
+    throw err;
+  });
+  return idbPromise;
+}
+
+async function getQueueFromIdb(): Promise<AnalyticsEvent[] | null> {
+  if (!isIndexedDbSupported()) return null;
+  try {
+    const db = await openQueueDb();
+    const queue = await new Promise<AnalyticsEvent[]>((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE_QUEUE, 'readonly');
+      const store = tx.objectStore(IDB_STORE_QUEUE);
+      const index = store.index('byTimestamp');
+      const req = index.getAll();
+      req.onsuccess = () => resolve((req.result || []) as AnalyticsEvent[]);
+      req.onerror = () => reject(req.error);
+    });
+    queue.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+    return queue;
+  } catch (err) {
+    console.warn('[CQD Analytics] getQueueFromIdb failed:', err);
+    return null;
+  }
+}
+
+async function replaceQueueInIdb(queue: AnalyticsEvent[]): Promise<boolean> {
+  if (!isIndexedDbSupported()) return false;
+  try {
+    const db = await openQueueDb();
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE_QUEUE, 'readwrite');
+      const store = tx.objectStore(IDB_STORE_QUEUE);
+      const clearReq = store.clear();
+      clearReq.onerror = () => reject(clearReq.error);
+      clearReq.onsuccess = () => {
+        for (const ev of queue) {
+          store.put(ev);
+        }
+      };
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+    return true;
+  } catch (err) {
+    console.warn('[CQD Analytics] replaceQueueInIdb failed:', err);
+    return false;
+  }
+}
+
+function getEventCount(ev: AnalyticsEvent): number {
+  const count = typeof ev.count === 'number' ? Math.floor(ev.count) : 1;
+  return count > 0 ? count : 1;
+}
+
+function getRollupBucket(ts: number): number {
+  return Math.floor(ts / ROLLUP_BUCKET_MS) * ROLLUP_BUCKET_MS;
+}
+
+function buildRollupKey(ev: AnalyticsEvent, bucketStart: number, coarse = false): string {
+  const status = ev.status || 'success';
+  const type = ev.file_type || 'unknown';
+  const error = ev.error_type || '';
+  if (coarse) {
+    return [bucketStart, status, type, error].join('|');
+  }
+  const browser = ev.browser || 'unknown';
+  const os = ev.os || 'unknown';
+  const lang = ev.language || 'unknown';
+  const version = ev.ext_version || '0.0.0';
+  const source = ev.source || '';
+  const bypass = ev.bypass_used ? '1' : '0';
+  return [bucketStart, status, type, browser, os, lang, version, error, source, bypass].join('|');
+}
+
+function rollupEvents(events: AnalyticsEvent[], coarse = false): AnalyticsEvent[] {
+  const map = new Map<string, {
+    sample: AnalyticsEvent;
+    count: number;
+    totalDuration: number;
+    earliest: number;
+  }>();
+
+  for (const ev of events) {
+    const ts = typeof ev.timestamp === 'number' ? ev.timestamp : Date.now();
+    const bucketStart = coarse ? new Date(ts).setUTCHours(0, 0, 0, 0) : getRollupBucket(ts);
+    const key = buildRollupKey(ev, bucketStart, coarse);
+    const weight = getEventCount(ev);
+    const duration = typeof ev.duration_ms === 'number' ? ev.duration_ms : 0;
+    const existing = map.get(key);
+    if (!existing) {
+      map.set(key, {
+        sample: ev,
+        count: weight,
+        totalDuration: duration * weight,
+        earliest: ts,
+      });
+    } else {
+      existing.count += weight;
+      existing.totalDuration += duration * weight;
+      if (ts < existing.earliest) existing.earliest = ts;
+    }
+  }
+
+  const rollups: AnalyticsEvent[] = [];
+  for (const entry of map.values()) {
+    const avgDuration = entry.count > 0 ? Math.round(entry.totalDuration / entry.count) : 0;
+    const sample = entry.sample;
+    rollups.push({
+      status: sample.status,
+      file_type: sample.file_type || 'unknown',
+      browser: coarse ? 'mixed' : (sample.browser || 'unknown'),
+      os: coarse ? 'mixed' : (sample.os || 'unknown'),
+      ext_version: coarse ? 'mixed' : (sample.ext_version || '0.0.0'),
+      duration_ms: avgDuration,
+      bypass_used: sample.bypass_used ?? false,
+      error_type: sample.error_type,
+      language: coarse ? 'mixed' : (sample.language || 'unknown'),
+      timestamp: entry.earliest,
+      id: generateEventId(entry.earliest),
+      retryCount: 0,
+      source: coarse ? 'rollup' : sample.source,
+      count: entry.count,
+      rollup: true,
+    });
+  }
+
+  rollups.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+  return rollups;
+}
+
+export function compactQueueForBudget(queue: AnalyticsEvent[]): { queue: AnalyticsEvent[]; compacted: boolean } {
+  if (queue.length <= QUEUE_BUDGET_EVENTS) {
+    return { queue, compacted: false };
+  }
+
+  const protectedEvents = queue.filter((ev) => typeof ev.commitSeq === 'number');
+  const compactable = queue.filter((ev) => typeof ev.commitSeq !== 'number');
+  if (compactable.length === 0) {
+    return { queue, compacted: false };
+  }
+
+  let preserve = Math.min(QUEUE_PRESERVE_RECENT, compactable.length);
+
+  while (true) {
+    const newer = compactable.slice(-preserve);
+    const older = compactable.slice(0, compactable.length - preserve);
+    const rollups = rollupEvents(older, false);
+    let nextQueue = [...rollups, ...protectedEvents, ...newer];
+    nextQueue.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+
+    if (nextQueue.length <= QUEUE_BUDGET_EVENTS || preserve === 0) {
+      if (nextQueue.length > QUEUE_BUDGET_EVENTS) {
+        const coarseRollups = rollupEvents(compactable, true);
+        nextQueue = [...coarseRollups, ...protectedEvents];
+        nextQueue.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+      }
+      return { queue: nextQueue, compacted: true };
+    }
+
+    preserve = Math.floor(preserve / 2);
+  }
+}
 
 // --- Core Storage Helpers ---
 
@@ -101,11 +302,44 @@ function migrateConfig(raw: any): AnalyticsConfig {
 // --- Queue Helpers ---
 
 export async function loadQueue(): Promise<{ queue: AnalyticsEvent[]; valid: boolean }> {
-  return loadQueueWithIntegrity();
+  const idbQueue = await getQueueFromIdb();
+  if (idbQueue && Array.isArray(idbQueue) && idbQueue.length > 0) {
+    return { queue: idbQueue, valid: true };
+  }
+
+  const stored = await loadQueueWithIntegrity();
+  if (stored.queue.length > 0 && isIndexedDbSupported()) {
+    const migrated = await replaceQueueInIdb(stored.queue);
+    if (migrated) {
+      await storageSet({
+        [STORAGE_KEYS.QUEUE]: [],
+        [STORAGE_KEYS.INTEGRITY]: computeChecksum('[]'),
+        [STORAGE_KEYS.QUEUE_MIGRATED]: true,
+      });
+    }
+  }
+  return stored;
 }
 
 export async function saveQueue(queue: AnalyticsEvent[]): Promise<void> {
-  await saveQueueWithIntegrity(queue);
+  const normalized = queue.map((ev) => {
+    if (!ev.id) {
+      return { ...ev, id: generateEventId(ev.timestamp) };
+    }
+    return ev;
+  });
+  const compacted = compactQueueForBudget(normalized);
+  const nextQueue = compacted.queue;
+  const savedToIdb = await replaceQueueInIdb(nextQueue);
+  if (savedToIdb) {
+    await storageSet({
+      [STORAGE_KEYS.QUEUE]: [],
+      [STORAGE_KEYS.INTEGRITY]: computeChecksum('[]'),
+      [STORAGE_KEYS.QUEUE_MIGRATED]: true,
+    });
+    return;
+  }
+  await saveQueueWithIntegrity(nextQueue);
 }
 
 // --- Integrity Protection ---

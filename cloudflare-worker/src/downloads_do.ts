@@ -197,6 +197,7 @@ const COMPACT_TRIGGER_UTIL = 0.8;
 const COMPACT_TARGET_UTIL = 0.5;
 const COMPACT_MAX_BATCH = 5000;
 const MAX_PENDING_BATCHES = 50;
+const MAX_ROLLUP_COUNT = 100_000;
 
 const HEALTH_WARN_PENDING_BATCHES = 10;
 const HEALTH_CRIT_PENDING_BATCHES = 25;
@@ -1405,20 +1406,28 @@ export class DownloadsDurable {
         if (this.d.configAllowLegacyEvents) {
           ev.id = generateEventId();
         } else {
-          invalidCount++;
+          const weight = this.normalizeEventCount(ev.count);
+          invalidCount += weight;
           if (typeof ev.id === "string") invalidIds.push(ev.id);
           continue;
         }
       }
       const eventId = typeof ev.id === "string" ? ev.id : undefined;
       if (!eventId) {
-        invalidCount++;
+        const weight = this.normalizeEventCount(ev.count);
+        invalidCount += weight;
         continue;
+      }
+
+      const eventCount = this.normalizeEventCount(ev.count);
+      if (eventCount !== 1) {
+        ev.count = eventCount;
+        ev.rollup = true;
       }
 
       // ----- IDEMPOTENCY: Skip duplicates -----
       if (processedSet.has(eventId)) {
-        duplicateCount++;
+        duplicateCount += eventCount;
         duplicateIds.push(eventId);
         continue;
       }
@@ -1433,7 +1442,7 @@ export class DownloadsDurable {
 
       // ----- VALIDATION: Required fields -----
       if (!ev.status || (ev.status !== "success" && ev.status !== "fail" && ev.status !== "cancelled")) {
-        invalidCount++;
+        invalidCount += eventCount;
         invalidIds.push(eventId);
         continue;
       }
@@ -1469,44 +1478,44 @@ export class DownloadsDurable {
       delete ev.ip_address;
 
       this.d.buffer.push(ev);
-      this.d.totalEvents += 1;
-      acceptedCount++;
+      this.d.totalEvents += eventCount;
+      acceptedCount += eventCount;
       acceptedIds.push(eventId);
       acceptedSeqs.push([eventId, ev.seq]);
       
       // totalDownloads = all download attempts (success + fail)
-      this.d.totalDownloads += 1;
+      this.d.totalDownloads += eventCount;
 
       if (ev.status === "success") {
-        this.d.totalSuccess += 1;
+        this.d.totalSuccess += eventCount;
       } else if (ev.status === "cancelled") {
-        this.d.totalCancelled += 1;
+        this.d.totalCancelled += eventCount;
       } else {
-        this.d.totalFail += 1;
+        this.d.totalFail += eventCount;
       }
 
-      this.d.pendingEvents += 1;
+      this.d.pendingEvents += eventCount;
       this.d.lastEventAt = ev.timestamp ?? Date.now();
 
       // Update counters
       const c = this.d.counters;
-      c.byStatus[ev.status] = (c.byStatus[ev.status] || 0) + 1;
+      c.byStatus[ev.status] = (c.byStatus[ev.status] || 0) + eventCount;
 
       const type = (ev.file_type || "unknown").toLowerCase();
-      c.byType[type] = (c.byType[type] || 0) + 1;
+      c.byType[type] = (c.byType[type] || 0) + eventCount;
 
       const browser = (ev.browser || "unknown").toLowerCase();
-      c.byBrowser[browser] = (c.byBrowser[browser] || 0) + 1;
+      c.byBrowser[browser] = (c.byBrowser[browser] || 0) + eventCount;
 
       const os = (ev.os || "unknown").toLowerCase();
-      c.byOs[os] = (c.byOs[os] || 0) + 1;
+      c.byOs[os] = (c.byOs[os] || 0) + eventCount;
 
       const extVersion = ev.ext_version || "0.0.0";
       c.byExtVersion[extVersion] =
-        (c.byExtVersion[extVersion] || 0) + 1;
+        (c.byExtVersion[extVersion] || 0) + eventCount;
 
       const lang = (ev.language || "unknown").toLowerCase();
-      c.byLanguage[lang] = (c.byLanguage[lang] || 0) + 1;
+      c.byLanguage[lang] = (c.byLanguage[lang] || 0) + eventCount;
 
       // --- CHANGED: use request geo as fallback before "unknown" ---
       const effectiveCountry = (
@@ -1515,12 +1524,12 @@ export class DownloadsDurable {
         "unknown"
       ).toLowerCase();
       c.byCountry[effectiveCountry] =
-        (c.byCountry[effectiveCountry] || 0) + 1;
+        (c.byCountry[effectiveCountry] || 0) + eventCount;
 
       // NEW: error-type counter (only for fails)
       if (ev.status === "fail") {
         const errKey = (ev.error_type || "unknown").toLowerCase();
-        c.byErrorType[errKey] = (c.byErrorType[errKey] || 0) + 1;
+        c.byErrorType[errKey] = (c.byErrorType[errKey] || 0) + eventCount;
       }
     }
 
@@ -2427,6 +2436,13 @@ export class DownloadsDurable {
     return target;
   }
 
+  private normalizeEventCount(value: unknown): number {
+    if (typeof value !== "number" || !Number.isFinite(value)) return 1;
+    const int = Math.floor(value);
+    if (int <= 0) return 1;
+    return Math.min(int, MAX_ROLLUP_COUNT);
+  }
+
   private mergeTimeBuckets(a: TimeBucket[], b: TimeBucket[]): TimeBucket[] {
     const map = new Map<string, TimeBucket>();
     const addBucket = (bucket: TimeBucket) => {
@@ -2594,34 +2610,36 @@ export class DownloadsDurable {
     };
 
     for (const ev of events) {
-      summary.totals.totalEvents++;
-      summary.totals.totalDownloads++; // Assuming every event is a download attempt
+      const weight = this.normalizeEventCount(ev.count);
+      summary.totals.totalEvents += weight;
+      summary.totals.totalDownloads += weight; // All events are download attempts
       
-      if (ev.status === "success") summary.totals.totalSuccess++;
-      else summary.totals.totalFail++;
+      if (ev.status === "success") summary.totals.totalSuccess += weight;
+      else if (ev.status === "cancelled") summary.totals.totalFail += weight;
+      else summary.totals.totalFail += weight;
 
       // Aggregations
       const browser = (ev.browser || "unknown").toLowerCase();
-      summary.browsers[browser] = (summary.browsers[browser] || 0) + 1;
+      summary.browsers[browser] = (summary.browsers[browser] || 0) + weight;
 
       const os = (ev.os || "unknown").toLowerCase();
-      summary.os[os] = (summary.os[os] || 0) + 1;
+      summary.os[os] = (summary.os[os] || 0) + weight;
 
       const country = (ev.country || "unknown").toLowerCase();
-      summary.countries[country] = (summary.countries[country] || 0) + 1;
+      summary.countries[country] = (summary.countries[country] || 0) + weight;
 
       const lang = (ev.language || "unknown").toLowerCase();
-      summary.languages[lang] = (summary.languages[lang] || 0) + 1;
+      summary.languages[lang] = (summary.languages[lang] || 0) + weight;
 
       const ver = ev.ext_version || "0.0.0";
-      summary.versions[ver] = (summary.versions[ver] || 0) + 1;
+      summary.versions[ver] = (summary.versions[ver] || 0) + weight;
 
       const type = (ev.file_type || "unknown").toLowerCase();
-      summary.types[type] = (summary.types[type] || 0) + 1;
+      summary.types[type] = (summary.types[type] || 0) + weight;
 
       if (ev.status === "fail") {
         const err = (ev.error_type || "unknown").toLowerCase();
-        summary.errorReasons[err] = (summary.errorReasons[err] || 0) + 1;
+        summary.errorReasons[err] = (summary.errorReasons[err] || 0) + weight;
       }
     }
 
@@ -2675,7 +2693,7 @@ export class DownloadsDurable {
 
   private aggregateBucket(hourStart: string, events: StoredEvent[]): TimeBucket {
     const totals: BucketTotals = {
-      totalEvents: events.length,
+      totalEvents: 0,
       totalDownloads: 0,
       totalSuccess: 0,
       totalFail: 0,
@@ -2693,40 +2711,42 @@ export class DownloadsDurable {
     };
 
     for (const ev of events) {
+      const weight = this.normalizeEventCount(ev.count);
+      totals.totalEvents += weight;
       // totalDownloads = all download attempts (success + fail)
-      totals.totalDownloads++;
+      totals.totalDownloads += weight;
       
       if (ev.status === "success") {
-        totals.totalSuccess++;
+        totals.totalSuccess += weight;
       } else {
-        totals.totalFail++;
+        totals.totalFail += weight;
       }
 
       // Aggregate counters
       const status = ev.status || "unknown";
-      counters.byStatus[status] = (counters.byStatus[status] || 0) + 1;
+      counters.byStatus[status] = (counters.byStatus[status] || 0) + weight;
 
       const type = (ev.file_type || "unknown").toLowerCase();
-      counters.byType[type] = (counters.byType[type] || 0) + 1;
+      counters.byType[type] = (counters.byType[type] || 0) + weight;
 
       const browser = (ev.browser || "unknown").toLowerCase();
-      counters.byBrowser[browser] = (counters.byBrowser[browser] || 0) + 1;
+      counters.byBrowser[browser] = (counters.byBrowser[browser] || 0) + weight;
 
       const os = (ev.os || "unknown").toLowerCase();
-      counters.byOs[os] = (counters.byOs[os] || 0) + 1;
+      counters.byOs[os] = (counters.byOs[os] || 0) + weight;
 
       const extVer = ev.ext_version || "0.0.0";
-      counters.byExtVersion[extVer] = (counters.byExtVersion[extVer] || 0) + 1;
+      counters.byExtVersion[extVer] = (counters.byExtVersion[extVer] || 0) + weight;
 
       const lang = (ev.language || "unknown").toLowerCase();
-      counters.byLanguage[lang] = (counters.byLanguage[lang] || 0) + 1;
+      counters.byLanguage[lang] = (counters.byLanguage[lang] || 0) + weight;
 
       const country = (ev.country || "unknown").toLowerCase();
-      counters.byCountry[country] = (counters.byCountry[country] || 0) + 1;
+      counters.byCountry[country] = (counters.byCountry[country] || 0) + weight;
 
       if (ev.status === "fail") {
         const errType = (ev.error_type || "unknown").toLowerCase();
-        counters.byErrorType[errType] = (counters.byErrorType[errType] || 0) + 1;
+        counters.byErrorType[errType] = (counters.byErrorType[errType] || 0) + weight;
       }
     }
 

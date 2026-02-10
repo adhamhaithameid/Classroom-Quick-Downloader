@@ -397,7 +397,12 @@ export async function internalFlush(): Promise<void> {
     return;
   }
 
-  const oldestEventTime = sendable[0]?.timestamp ?? null;
+  const oldestEventTime = sendable.length > 0
+    ? sendable.reduce((min, ev) => {
+      const ts = typeof ev.timestamp === 'number' ? ev.timestamp : min;
+      return ts < min ? ts : min;
+    }, sendable[0]?.timestamp ?? Date.now())
+    : null;
   const decision = getFlushDecision(cfg, meta, sendable.length, oldestEventTime);
   meta = decision.meta;
   const nowMs = decision.nowMs;

@@ -4,6 +4,7 @@
  */
 
 import { vi } from 'vitest';
+import 'fake-indexeddb/auto';
 
 // Mock chrome API
 const mockChrome = {
