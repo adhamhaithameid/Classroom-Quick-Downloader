@@ -96,6 +96,7 @@ afterAll(() => {
 beforeEach(async () => {
   seq = 0;
   vi.restoreAllMocks();
+  vi.spyOn(console, 'warn').mockImplementation(() => {});
   await __resetStorageForTests();
   await resetIdb();
   installStorageMock();
