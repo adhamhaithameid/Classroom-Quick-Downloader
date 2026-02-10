@@ -125,6 +125,20 @@ describe('background download handler', () => {
     expect(respondOnce).toHaveBeenCalledWith({ started: false, userMessage: 'Browser blocked download.' });
   });
 
+  it('startSingleAttempt falls back to unknown file type when metadata is missing', async () => {
+    const ctx = await loadDownloadHandler();
+    const pending = makePending({ fileMeta: undefined as any });
+    (chrome.runtime as { lastError?: { message: string } }).lastError = { message: 'blocked' };
+    (chrome.downloads.download as any).mockImplementation((_: unknown, cb: (id?: number) => void) => cb(undefined));
+
+    ctx.mod.startSingleAttempt(pending);
+
+    expect(ctx.recordSpy).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'unknown',
+      error_type: 'BROWSER_START_FAIL_DIRECT',
+    }));
+  });
+
   it('startSingleAttempt stores pending download on success', async () => {
     const ctx = await loadDownloadHandler();
     const pending = makePending();
@@ -147,6 +161,14 @@ describe('background download handler', () => {
     expect(ctx.stateModule.pendingByBypassTabId.get(77)).toBe(pending);
   });
 
+  it('openDriveBypassTab ignores tabs without numeric IDs', async () => {
+    const ctx = await loadDownloadHandler({ isFirefox: true });
+    const pending = makePending({ isDrive: true });
+    (chrome.tabs.create as any).mockImplementation((_: unknown, cb: (tab: { id?: number }) => void) => cb({}));
+    ctx.mod.openDriveBypassTab(pending, 'https://drive.google.com/uc?id=abc');
+    expect(ctx.stateModule.pendingByBypassTabId.size).toBe(0);
+  });
+
   it('startNextDriveAttempt fails when all auth users are exhausted', async () => {
     const ctx = await loadDownloadHandler({ authCandidates: [0, 1] });
     const pending = makePending({
@@ -162,6 +184,20 @@ describe('background download handler', () => {
     );
     expect(ctx.cleanupSpy).toHaveBeenCalledWith(pending);
     expect(ctx.recordSpy).toHaveBeenCalled();
+  });
+
+  it('startNextDriveAttempt uses unknown type for exhausted auth when metadata is missing', async () => {
+    const ctx = await loadDownloadHandler({ authCandidates: [0] });
+    const pending = makePending({
+      isDrive: true,
+      attemptedAuthUsers: [0],
+      fileMeta: undefined as any,
+    });
+    ctx.mod.startNextDriveAttempt(pending);
+    expect(ctx.recordSpy).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'unknown',
+      error_type: 'AUTH_ALL_FAILED',
+    }));
   });
 
   it('startNextDriveAttempt uses bypass tab path in Firefox mode', async () => {
@@ -240,6 +276,33 @@ describe('background download handler', () => {
     const pending = ctx.stateModule.pendingByRequestId.get('req-firefox');
     expect(pending?.attemptedAuthUsers).toContain(4);
     expect(sendResponse).toHaveBeenCalledWith({ started: true, requestId: 'req-firefox', userMessage: 'Opening Drive tab…' });
+  });
+
+  it('handleDownloadRequest firefox flow uses base URL when no initial auth is found', async () => {
+    const ctx = await loadDownloadHandler({
+      isFirefox: true,
+      initialAuthUser: undefined,
+      normalizeResult: { baseUrl: 'https://drive.google.com/uc?id=xyz', isDrive: true },
+    });
+    const createSpy = chrome.tabs.create as any;
+    createSpy.mockImplementation((opts: { url: string }, cb: (tab: { id?: number }) => void) => cb({ id: 987 }));
+    const sendResponse = vi.fn();
+
+    ctx.mod.handleDownloadRequest(
+      { url: 'https://drive.google.com/open?id=xyz', requestId: 'req-firefox-no-auth' },
+      { tab: { id: 31 } } as chrome.runtime.MessageSender,
+      sendResponse,
+    );
+
+    expect(createSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ url: 'https://drive.google.com/uc?id=xyz' }),
+      expect.any(Function),
+    );
+    expect(sendResponse).toHaveBeenCalledWith({
+      started: true,
+      requestId: 'req-firefox-no-auth',
+      userMessage: 'Opening Drive tab…',
+    });
   });
 
   it('handleDownloadRequest succeeds on Chromium Drive native download', async () => {
@@ -399,5 +462,26 @@ describe('background download handler', () => {
     );
     expect(ctx.cleanupSpy).toHaveBeenCalledWith(expect.objectContaining({ requestId: 'req-pre-cancel-direct' }));
     expect(sendResponse).not.toHaveBeenCalled();
+  });
+
+  it('handleDownloadRequest handles cancellation race even when browser does not return an ID', async () => {
+    const ctx = await loadDownloadHandler({
+      isFirefox: false,
+      normalizeResult: { baseUrl: 'https://drive.google.com/uc?id=abc', isDrive: true },
+    });
+    (chrome.downloads.download as any).mockImplementation((_: unknown, cb: (id?: number) => void) => {
+      const pending = ctx.stateModule.pendingByRequestId.get('req-race-no-id');
+      if (pending) pending.isCancelled = true;
+      cb(undefined);
+    });
+
+    ctx.mod.handleDownloadRequest(
+      { url: 'https://drive.google.com/open?id=abc', requestId: 'req-race-no-id' },
+      { tab: { id: 15 } } as chrome.runtime.MessageSender,
+      vi.fn(),
+    );
+
+    expect(chrome.downloads.cancel).not.toHaveBeenCalled();
+    expect(ctx.cleanupSpy).toHaveBeenCalledWith(expect.objectContaining({ requestId: 'req-race-no-id' }), undefined);
   });
 });

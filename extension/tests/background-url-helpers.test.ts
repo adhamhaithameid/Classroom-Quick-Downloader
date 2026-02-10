@@ -15,6 +15,14 @@ describe('background url helpers', () => {
     expect(result.baseUrl.includes('export=download')).toBe(true);
   });
 
+  it('keeps existing drive path/export values when already normalized', () => {
+    const input = 'https://drive.google.com/uc?id=abc123&export=download';
+    const result = normalizeUrl(input);
+    expect(result.isDrive).toBe(true);
+    expect(result.baseUrl.includes('/uc')).toBe(true);
+    expect(result.baseUrl.includes('export=download')).toBe(true);
+  });
+
   it('returns non-drive URLs untouched', () => {
     const input = 'https://classroom.google.com/u/0/h';
     const result = normalizeUrl(input);
