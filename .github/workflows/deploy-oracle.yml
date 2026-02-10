@@ -1,12 +1,14 @@
 name: Deploy Oracle Backend
 
 on:
-  push:
-    branches: [oracle-deploy]
+  pull_request:
+    branches: [main]
+    types: [closed]
   workflow_dispatch: # Allow manual trigger
 
 jobs:
   deploy:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     
@@ -25,8 +27,8 @@ jobs:
             
             # Pull latest changes
             echo "🔄 Pulling latest code..."
-            git fetch origin oracle-deploy
-            git reset --hard origin/oracle-deploy
+            git fetch origin main
+            git reset --hard origin/main
             
             # Stop existing containers
             echo "🛑 Stopping containers..."
