@@ -17,9 +17,8 @@
 - [CI / CD Workflows](#ci--cd-workflows)
   - [CI Pipeline](#1-ci-pipeline-ciyml)
   - [CodeQL Analysis](#2-codeql-analysis-codeqlyml)
-  - [Cloudflare Deployment](#3-cloudflare-deployment-deploy-cloudflareyml)
-  - [Oracle Deployment](#4-oracle-deployment-deploy-oracleyml)
-  - [Release Drafter](#5-release-drafter-release-drafteryml)
+  - [Oracle Deployment](#3-oracle-deployment-deploy-oracleyml)
+  - [Release Drafter](#4-release-drafter-release-drafteryml)
 - [Manual Testing Scripts](#manual-testing-scripts)
 - [Git Hooks](#git-hooks)
 - [Running Everything at Once](#running-everything-at-once)
@@ -67,7 +66,6 @@ Classroom-Quick-Downloader/
 └── .github/workflows/          # GitHub Actions CI/CD
     ├── ci.yml                  # Main CI pipeline
     ├── codeql.yml              # SAST security scanning
-    ├── deploy-cloudflare.yml   # Cloudflare production deployment
     ├── deploy-oracle.yml       # Production deployment
     └── release-drafter.yml     # Automated release notes
 ```
@@ -323,17 +321,7 @@ This is the primary quality gate. It runs every test suite in the monorepo:
 
 Results appear in the **Security** tab of the GitHub repository.
 
-### 3. Cloudflare Deployment (`deploy-cloudflare.yml`)
-
-> **Trigger:** Pushes to `main` that touch `cloudflare-worker/**`, manual `workflow_dispatch`
-
-| Step | What It Does |
-|------|--------------|
-| Checkout + pnpm setup | Installs dependencies with frozen lockfile |
-| Secret verification | Fails fast if Cloudflare deployment secrets are missing |
-| Deploy Worker | Runs `pnpm run deploy` in `cloudflare-worker/` using production API token |
-
-### 4. Oracle Deployment (`deploy-oracle.yml`)
+### 3. Oracle Deployment (`deploy-oracle.yml`)
 
 > **Trigger:** Pushes to `main` that touch `oracle-backend/**`, manual `workflow_dispatch`
 
@@ -341,7 +329,7 @@ Results appear in the **Security** tab of the GitHub repository.
 |------|--------------|
 | SSH into Oracle Cloud VM | Ensures repo clone exists, checks out target `main` SHA, exports deploy metadata, rebuilds stack, verifies `/health` |
 
-### 5. Release Drafter (`release-drafter.yml`)
+### 4. Release Drafter (`release-drafter.yml`)
 
 > **Trigger:** Push to `main`
 
@@ -414,6 +402,20 @@ Located in the `tools/` directory. These are used for local development and manu
 
 > [!IMPORTANT]
 > Requires Docker to be installed for the build verification step (skipped gracefully if Docker is not available).
+
+### 5. `oracle-backend/scripts/deploy_main_inplace.sh` — Oracle Production Deploy Helper
+
+```bash
+ssh ubuntu@<your-oracle-host>
+bash ~/Classroom-Quick-Downloader/oracle-backend/scripts/deploy_main_inplace.sh
+```
+
+**What it does:**
+1. Ensures the monorepo clone exists on the VM and checks out `origin/main` (or `TARGET_REF` override)
+2. Copies legacy `.env` / `google-credentials.json` forward once (if needed)
+3. Preserves the currently-running backend image under a rollback tag
+4. Rebuilds and recreates only `oracle-backend` service (no global `down`, no image prune)
+5. Verifies `/health` before reporting success
 
 ---
 
@@ -490,7 +492,6 @@ pnpm --filter cloudflare-worker test && \
 |-------------|---------|---------|
 | `ci.yml` | Push / PR to `main` | Full test suite + coverage gates + validation |
 | `codeql.yml` | Push / PR / Weekly | Static security analysis (SAST) |
-| `deploy-cloudflare.yml` | Push to `main` (`cloudflare-worker/**`) / Manual | Cloudflare production deployment |
 | `deploy-oracle.yml` | Push to `main` (`oracle-backend/**`) / Manual | Oracle production deployment |
 | `release-drafter.yml` | Push to `main` | Draft release notes |
 
@@ -500,3 +501,4 @@ pnpm --filter cloudflare-worker test && \
 | `test_analytics.sh` | 15-event pipeline test |
 | `test_pipeline.sh` | 6-event E2E smoke test |
 | `verify_oracle.sh` | Go vet + tests + Docker build |
+| `oracle-backend/scripts/deploy_main_inplace.sh` | In-place Oracle production deploy with rollback image tag |
