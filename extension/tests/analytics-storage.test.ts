@@ -353,6 +353,32 @@ describe('analytics storage', () => {
     expect(stats.byLanguage?.en).toBe(1);
   });
 
+  it('normalizeStats maps all persisted stat buckets when provided', () => {
+    const stats = normalizeStats({
+      total: 10,
+      byType: { pdf: 5, doc: 5 },
+      success: 8,
+      fail: 1,
+      cancelled: 1,
+      attempts: 10,
+      bySpeed: { fast: 3, medium: 4, slow: 3 },
+      bypassCount: 2,
+      failByErrorType: { NETWORK: 1 },
+      byLanguage: { en: 9, ar: 1 },
+      lastUpdated: 123456,
+    });
+    expect(stats.total).toBe(10);
+    expect(stats.success).toBe(8);
+    expect(stats.fail).toBe(1);
+    expect(stats.cancelled).toBe(1);
+    expect(stats.attempts).toBe(10);
+    expect(stats.bySpeed).toEqual({ fast: 3, medium: 4, slow: 3 });
+    expect(stats.bypassCount).toBe(2);
+    expect(stats.failByErrorType).toEqual({ NETWORK: 1 });
+    expect(stats.byLanguage).toEqual({ en: 9, ar: 1 });
+    expect(stats.lastUpdated).toBe(123456);
+  });
+
   it('loadStats/saveStats roundtrip through storage', async () => {
     const storageData = installStorageMock();
     await saveStats({

@@ -149,6 +149,15 @@ describe('analytics flush helpers', () => {
     expect(pruned.map((ev) => ev.id)).toEqual(['b']);
   });
 
+  it('pruneCommittedEvents preserves events without commit sequence numbers', () => {
+    const events = [
+      makeEvent({ id: 'a', commitSeq: undefined }),
+      makeEvent({ id: 'b', commitSeq: 12 }),
+    ];
+    const pruned = pruneCommittedEvents(events, 10);
+    expect(pruned.map((ev) => ev.id)).toEqual(['a', 'b']);
+  });
+
   it('isAckValidForBatch requires matching clientBatchId and ackId', () => {
     const ok = isAckValidForBatch({ success: true, clientBatchId: 'c1', ackId: 'ack-123' }, 'c1');
     expect(ok).toBe(true);
@@ -313,5 +322,86 @@ describe('analytics flush helpers', () => {
     };
     const decision = __flushTestInternals.getFlushDecision(cfg, meta, 40, now - 2 * 60 * 1000);
     expect(decision.shouldFlush).toBe(true);
+  });
+
+  it('getSafeUtcNowMs returns zero when no clocks are usable and lastKnown is missing', () => {
+    const originalDateNow = Date.now;
+    Date.now = () => Number.NaN as unknown as number;
+    const perfNowSpy = vi.spyOn(performance, 'now').mockReturnValue(Number.NaN);
+    const originalTimeOrigin = performance.timeOrigin;
+    Object.defineProperty(performance, 'timeOrigin', { value: Number.NaN, configurable: true });
+
+    const meta: AnalyticsMeta = {
+      lastFlushAt: null,
+      nextRetryAt: null,
+      backoffIndex: 0,
+      lastKnownUtcMs: null,
+      lastPerfMs: null,
+      serverTimeOffsetMs: 0,
+      dailyFlushOffsetMinutes: 0,
+      lastDailyFlushUtcDate: null,
+    };
+    const result = getSafeUtcNowMs(meta);
+    expect(result.nowMs).toBe(0);
+
+    Date.now = originalDateNow;
+    perfNowSpy.mockRestore();
+    Object.defineProperty(performance, 'timeOrigin', { value: originalTimeOrigin, configurable: true });
+  });
+
+  it('resolveBatchSize defaults to one when batchSize is zero', () => {
+    const cfg: AnalyticsConfig = {
+      ...DEFAULT_CONFIG,
+      batchSize: 0 as unknown as number,
+      maxEventsPerRequest: 5000,
+    };
+    expect(resolveBatchSize(cfg, 5)).toBe(1);
+  });
+
+  it('getDailyFlushScheduleUtcMs falls back to default window when config window values are unset', () => {
+    const nowMs = Date.UTC(2026, 1, 10, 5, 0, 0);
+    const meta: AnalyticsMeta = {
+      lastFlushAt: null,
+      nextRetryAt: null,
+      backoffIndex: 0,
+      dailyFlushOffsetMinutes: 0,
+      lastDailyFlushUtcDate: null,
+    };
+    const cfg: AnalyticsConfig = {
+      ...DEFAULT_CONFIG,
+      dailyFlushWindowStartUtc: undefined as unknown as number,
+      dailyFlushWindowMinutes: undefined as unknown as number,
+    };
+    const result = getDailyFlushScheduleUtcMs(nowMs, meta, cfg);
+    const expected = Date.UTC(2026, 1, 10, DEFAULT_CONFIG.dailyFlushWindowStartUtc, 0, 0);
+    expect(result.scheduleMs).toBe(expected);
+  });
+
+  it('__flushTestInternals.getFlushDecision covers low/mid threshold and missing reference branches', () => {
+    const now = Date.now();
+    const cfg: AnalyticsConfig = {
+      ...DEFAULT_CONFIG,
+      flushMode: 'time_based',
+      lowUsageFlushMinutes: 5,
+      midUsageFlushMinutes: 15,
+      highUsageFlushMinutes: 30,
+      batchSize: 100,
+    };
+    const meta: AnalyticsMeta = {
+      lastFlushAt: null,
+      nextRetryAt: null,
+      backoffIndex: 0,
+      dailyFlushOffsetMinutes: 0,
+      lastDailyFlushUtcDate: new Date(now).toISOString().slice(0, 10),
+    };
+
+    const lowDue = __flushTestInternals.getFlushDecision(cfg, meta, 10, now - 10 * 60 * 1000);
+    expect(lowDue.shouldFlush).toBe(true);
+
+    const midNotDue = __flushTestInternals.getFlushDecision(cfg, meta, 20, now - 5 * 60 * 1000);
+    expect(midNotDue.shouldFlush).toBe(false);
+
+    const missingReference = __flushTestInternals.getFlushDecision(cfg, meta, 10, null);
+    expect(missingReference.shouldFlush).toBe(false);
   });
 });

@@ -143,6 +143,60 @@ describe('analytics flush runtime', () => {
     expect(await mod.sendBatchToCloudflare([], 'empty')).toMatchObject({ success: false });
   });
 
+  it('sendBatchToCloudflare ignores malformed ACK fields from worker response', async () => {
+    const state: FlushTestState = {
+      cfg: {
+        configVersion: 2,
+        batchSize: 50,
+        maxDailyRequests: 50,
+        maxRetry: 3,
+        flushMode: 'next_day',
+        lowUsageFlushMinutes: 1440,
+        midUsageFlushMinutes: 1440,
+        highUsageFlushMinutes: 1440,
+        remoteEnabled: true,
+        cancelHoldDelayMs: 1000,
+        dailyFlushWindowStartUtc: 1,
+        dailyFlushWindowMinutes: 120,
+        maxEventsPerRequest: 5000,
+      },
+      meta: {
+        lastFlushAt: null,
+        nextRetryAt: null,
+        backoffIndex: 0,
+      },
+      queue: [],
+      stats: {
+        total: 0,
+        byType: {},
+        success: 0,
+        fail: 0,
+        cancelled: 0,
+        attempts: 0,
+        bySpeed: { fast: 0, medium: 0, slow: 0 },
+        bypassCount: 0,
+        failByErrorType: {},
+        byLanguage: {},
+        lastUpdated: Date.now(),
+      },
+      validQueue: true,
+    };
+    const { mod } = await loadFlushModule(state);
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({
+      ok: true,
+      accepted: 1,
+      clientBatchId: 123,
+      ackId: 123,
+      receivedAt: 'bad',
+    }), { status: 202, headers: { 'Content-Type': 'application/json' } }));
+
+    const result = await mod.sendBatchToCloudflare([makeEvent()], 'abc');
+    expect(result.success).toBe(true);
+    expect(result.clientBatchId).toBeUndefined();
+    expect(result.ackId).toBeUndefined();
+    expect(result.receivedAt).toBeUndefined();
+  });
+
   it('internalFlush handles successful ACK-based flush and commit pruning', async () => {
     const events = [
       makeEvent({ id: 'a1' }),
@@ -171,7 +225,7 @@ describe('analytics flush runtime', () => {
         backoffIndex: 0,
         dailyFlushOffsetMinutes: 0,
         lastDailyFlushUtcDate: null,
-        lastCommittedSeq: 0,
+        lastCommittedSeq: null,
       },
       queue: events,
       stats: {
@@ -231,7 +285,7 @@ describe('analytics flush runtime', () => {
       },
       queue: [
         makeEvent({ id: 'r1', retryCount: 1, timestamp: now - 2 * 24 * 60 * 60 * 1000 }),
-        makeEvent({ id: 'r2', retryCount: 0, timestamp: now - 2 * 24 * 60 * 60 * 1000 }),
+        makeEvent({ id: 'r2', retryCount: undefined, timestamp: now - 2 * 24 * 60 * 60 * 1000 }),
       ],
       stats: {
         total: 0,
@@ -392,6 +446,57 @@ describe('analytics flush runtime', () => {
     expect(state.queue).toHaveLength(1);
   });
 
+  it('internalFlush handles malformed timestamps while calculating oldest event time', async () => {
+    const now = Date.now();
+    const state: FlushTestState = {
+      cfg: {
+        configVersion: 2,
+        batchSize: 2,
+        maxDailyRequests: 50,
+        maxRetry: 2,
+        flushMode: 'next_day',
+        lowUsageFlushMinutes: 1440,
+        midUsageFlushMinutes: 1440,
+        highUsageFlushMinutes: 1440,
+        remoteEnabled: true,
+        cancelHoldDelayMs: 1000,
+        dailyFlushWindowStartUtc: 0,
+        dailyFlushWindowMinutes: 1439,
+        maxEventsPerRequest: 5000,
+      },
+      meta: {
+        lastFlushAt: null,
+        nextRetryAt: null,
+        backoffIndex: 0,
+        dailyFlushOffsetMinutes: 0,
+        lastDailyFlushUtcDate: null,
+      },
+      queue: [
+        makeEvent({ id: 'bad-ts', timestamp: undefined as unknown as number }),
+        makeEvent({ id: 'good-ts', timestamp: now - 2 * 24 * 60 * 60 * 1000 }),
+      ],
+      stats: {
+        total: 0,
+        byType: {},
+      },
+      validQueue: true,
+    };
+    vi.mocked(fetch).mockImplementationOnce(async (_url, init) => {
+      const body = JSON.parse((init?.body as string) || '{}') as { clientBatchId?: string };
+      return new Response(JSON.stringify({
+        ok: true,
+        acceptedIds: [],
+        duplicateIds: ['bad-ts', 'good-ts'],
+        invalidIds: [],
+        clientBatchId: body.clientBatchId,
+        ackId: 'ack-oldest-1',
+      }), { status: 202, headers: { 'Content-Type': 'application/json' } });
+    });
+    const { mod } = await loadFlushModule(state, true);
+    await mod.internalFlush();
+    expect(state.queue).toHaveLength(0);
+  });
+
   it('internalFlush saves queue when integrity is invalid and exits when all events are committed', async () => {
     const state: FlushTestState = {
       cfg: {
@@ -502,6 +607,126 @@ describe('analytics flush runtime', () => {
     await mod.internalFlush();
     expect(rateSpy).toHaveBeenCalled();
     expect(state.queue).toHaveLength(1);
+  });
+
+  it('internalFlush skips saveMeta on early returns when metadata did not change', async () => {
+    const originalDateNow = Date.now;
+    Date.now = () => Number.NaN as unknown as number;
+    const perfNowSpy = vi.spyOn(performance, 'now').mockReturnValue(Number.NaN);
+    const originalTimeOrigin = performance.timeOrigin;
+    Object.defineProperty(performance, 'timeOrigin', { value: Number.NaN, configurable: true });
+
+    const state: FlushTestState = {
+      cfg: {
+        configVersion: 2,
+        batchSize: 10,
+        maxDailyRequests: 50,
+        maxRetry: 2,
+        flushMode: 'next_day',
+        lowUsageFlushMinutes: 1440,
+        midUsageFlushMinutes: 1440,
+        highUsageFlushMinutes: 1440,
+        remoteEnabled: false,
+        cancelHoldDelayMs: 1000,
+        dailyFlushWindowStartUtc: 1,
+        dailyFlushWindowMinutes: 120,
+        maxEventsPerRequest: 5000,
+      },
+      meta: {
+        lastFlushAt: null,
+        nextRetryAt: null,
+        backoffIndex: 0,
+        dailyFlushOffsetMinutes: 0,
+        lastKnownUtcMs: null,
+        lastPerfMs: null,
+      },
+      queue: [makeEvent({ id: 'unchanged-meta', timestamp: 1 })],
+      stats: {
+        total: 0,
+        byType: {},
+      },
+      validQueue: true,
+    };
+    const { mod, saveMeta } = await loadFlushModule(state, true);
+    await mod.internalFlush();
+    expect(saveMeta).not.toHaveBeenCalled();
+
+    Date.now = originalDateNow;
+    perfNowSpy.mockRestore();
+    Object.defineProperty(performance, 'timeOrigin', { value: originalTimeOrigin, configurable: true });
+  });
+
+  it('internalFlush skips saveMeta on backoff/decision/rate-limit early exits when metadata is unchanged', async () => {
+    const originalDateNow = Date.now;
+    Date.now = () => Number.NaN as unknown as number;
+    const perfNowSpy = vi.spyOn(performance, 'now').mockReturnValue(Number.NaN);
+    const originalTimeOrigin = performance.timeOrigin;
+    Object.defineProperty(performance, 'timeOrigin', { value: Number.NaN, configurable: true });
+
+    const baseCfg: AnalyticsConfig = {
+      configVersion: 2,
+      batchSize: 10,
+      maxDailyRequests: 1,
+      maxRetry: 2,
+      flushMode: 'next_day',
+      lowUsageFlushMinutes: 1440,
+      midUsageFlushMinutes: 1440,
+      highUsageFlushMinutes: 1440,
+      remoteEnabled: true,
+      cancelHoldDelayMs: 1000,
+      dailyFlushWindowStartUtc: 1,
+      dailyFlushWindowMinutes: 120,
+      maxEventsPerRequest: 5000,
+    };
+    const baseMeta: AnalyticsMeta = {
+      lastFlushAt: null,
+      nextRetryAt: null,
+      backoffIndex: 0,
+      dailyFlushOffsetMinutes: 0,
+      lastKnownUtcMs: null,
+      lastPerfMs: null,
+      lastDailyFlushUtcDate: '1970-01-01',
+    };
+
+    // Backoff active path.
+    const backoffState: FlushTestState = {
+      cfg: { ...baseCfg },
+      meta: { ...baseMeta, nextRetryAt: 10 },
+      queue: [makeEvent({ id: 'bo', timestamp: 1 })],
+      stats: { total: 0, byType: {} },
+      validQueue: true,
+    };
+    const backoffCtx = await loadFlushModule(backoffState, true);
+    await backoffCtx.mod.internalFlush();
+    expect(backoffCtx.saveMeta).not.toHaveBeenCalled();
+
+    // Decision not due path.
+    const notDueState: FlushTestState = {
+      cfg: { ...baseCfg, batchSize: 99 },
+      meta: { ...baseMeta },
+      queue: [makeEvent({ id: 'nd', timestamp: 1 })],
+      stats: { total: 0, byType: {} },
+      validQueue: true,
+    };
+    const notDueCtx = await loadFlushModule(notDueState, true);
+    await notDueCtx.mod.internalFlush();
+    expect(notDueCtx.saveMeta).not.toHaveBeenCalled();
+
+    // Rate-limited (non-urgent) path.
+    const rateState: FlushTestState = {
+      cfg: { ...baseCfg, batchSize: 1 },
+      meta: { ...baseMeta },
+      queue: [makeEvent({ id: 'rl', timestamp: 1 })],
+      stats: { total: 0, byType: {} },
+      validQueue: true,
+    };
+    const rateCtx = await loadFlushModule(rateState, false);
+    await rateCtx.mod.internalFlush();
+    expect(rateCtx.saveMeta).not.toHaveBeenCalled();
+
+    Date.now = originalDateNow;
+    perfNowSpy.mockRestore();
+    Object.defineProperty(performance, 'timeOrigin', { value: originalTimeOrigin, configurable: true });
   });
 
   it('internalFlush treats ACK mismatch as failure and schedules retry', async () => {
@@ -789,5 +1014,71 @@ describe('analytics flush runtime', () => {
     expect(state.stats.bySpeed?.fast).toBe(1);
     expect(state.stats.bySpeed?.medium).toBe(1);
     expect(state.stats.bySpeed?.slow).toBe(1);
+  });
+
+  it('updateLocalStats initializes nullable counters/maps when stats are partially populated', async () => {
+    const state: FlushTestState = {
+      cfg: {
+        configVersion: 2,
+        batchSize: 10,
+        maxDailyRequests: 50,
+        maxRetry: 2,
+        flushMode: 'next_day',
+        lowUsageFlushMinutes: 1440,
+        midUsageFlushMinutes: 1440,
+        highUsageFlushMinutes: 1440,
+        remoteEnabled: true,
+        cancelHoldDelayMs: 1000,
+        dailyFlushWindowStartUtc: 1,
+        dailyFlushWindowMinutes: 120,
+        maxEventsPerRequest: 5000,
+      },
+      meta: {
+        lastFlushAt: null,
+        nextRetryAt: null,
+        backoffIndex: 0,
+      },
+      queue: [],
+      stats: {
+        total: 0,
+        byType: {},
+      },
+      validQueue: true,
+    };
+    const { mod } = await loadFlushModule(state, true);
+    await mod.updateLocalStats(makeEvent({
+      status: 'fail',
+      error_type: 'TIMEOUT',
+      bypass_used: true,
+      language: 'fr',
+    }));
+    await mod.updateLocalStats(makeEvent({
+      status: 'fail',
+      error_type: undefined,
+      bypass_used: true,
+      language: 'fr',
+    }));
+    await mod.updateLocalStats(makeEvent({
+      status: 'cancelled',
+      bypass_used: true,
+      language: 'fr',
+    }));
+    await mod.updateLocalStats(makeEvent({
+      status: 'success',
+      bypass_used: true,
+      language: 'fr',
+    }));
+    await mod.updateLocalStats(makeEvent({
+      status: 'mystery' as unknown as AnalyticsEvent['status'],
+      bypass_used: true,
+      language: 'fr',
+    }));
+
+    expect(state.stats.fail).toBe(2);
+    expect(state.stats.cancelled).toBe(1);
+    expect(state.stats.success).toBe(1);
+    expect(state.stats.bypassCount).toBe(5);
+    expect(state.stats.byLanguage?.fr).toBe(5);
+    expect(state.stats.failByErrorType?.TIMEOUT).toBe(1);
   });
 });
