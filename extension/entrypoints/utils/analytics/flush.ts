@@ -126,7 +126,7 @@ function resolveMaxEventsPerRequest(cfg: AnalyticsConfig): number {
   const max = Number.isFinite(cfg.maxEventsPerRequest)
     ? Math.max(1, Math.floor(cfg.maxEventsPerRequest as number))
     : DEFAULT_MAX_EVENTS_PER_REQUEST;
-  return max || DEFAULT_MAX_EVENTS_PER_REQUEST;
+  return max;
 }
 
 export function resolveBatchSize(cfg: AnalyticsConfig, queueLength: number): number {
@@ -397,12 +397,10 @@ export async function internalFlush(): Promise<void> {
     return;
   }
 
-  const oldestEventTime = sendable.length > 0
-    ? sendable.reduce((min, ev) => {
-      const ts = typeof ev.timestamp === 'number' ? ev.timestamp : min;
-      return ts < min ? ts : min;
-    }, sendable[0]?.timestamp ?? Date.now())
-    : null;
+  const oldestEventTime = sendable.reduce((min, ev) => {
+    const ts = typeof ev.timestamp === 'number' ? ev.timestamp : min;
+    return ts < min ? ts : min;
+  }, sendable[0]?.timestamp ?? Date.now());
   const decision = getFlushDecision(cfg, meta, sendable.length, oldestEventTime);
   meta = decision.meta;
   const nowMs = decision.nowMs;
@@ -448,7 +446,8 @@ export async function internalFlush(): Promise<void> {
     batchSize = Math.min(sendable.length, maxPerRequest);
   }
   const toSend = sendable.slice(0, batchSize);
-  const toSendIds = new Set<string>(toSend.map((ev) => ev.id ?? ''));
+  // Queue events are normalized with IDs before sending.
+  const toSendIds = new Set<string>(toSend.map((ev) => ev.id as string));
 
   // Send batch
   const clientBatchId = generateEventId();
@@ -465,10 +464,10 @@ export async function internalFlush(): Promise<void> {
     let remainingQueue = queue;
     if (ackInfoProvided) {
       const removal = buildAckRemovalSet(result);
-      remainingQueue = remainingQueue.filter((ev) => !removal.has(ev.id ?? ''));
+      remainingQueue = remainingQueue.filter((ev) => !removal.has(ev.id as string));
       remainingQueue = applyCommitSeqs(remainingQueue, result.acceptedSeqs);
     } else {
-      remainingQueue = remainingQueue.filter((ev) => !toSendIds.has(ev.id ?? ''));
+      remainingQueue = remainingQueue.filter((ev) => !toSendIds.has(ev.id as string));
     }
 
     if (typeof result.committedSeq === 'number') {
@@ -489,12 +488,12 @@ export async function internalFlush(): Promise<void> {
     // Failure - increment retry counts and apply backoff
     const maxRetry = Number.isFinite(cfg.maxRetry) ? cfg.maxRetry : 0;
     const updatedQueue = queue.map((ev) => {
-      if (!toSendIds.has(ev.id ?? '')) return ev;
+      if (!toSendIds.has(ev.id as string)) return ev;
       return { ...ev, retryCount: (ev.retryCount ?? 0) + 1 };
     });
     const cappedQueue = updatedQueue.filter((ev) => {
-      if (!toSendIds.has(ev.id ?? '')) return true;
-      return (ev.retryCount ?? 0) <= maxRetry;
+      if (!toSendIds.has(ev.id as string)) return true;
+      return (ev.retryCount as number) <= maxRetry;
     });
 
     const backoffSeconds = BACKOFF_STEPS_SECONDS[
