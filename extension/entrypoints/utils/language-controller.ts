@@ -28,6 +28,13 @@ const DEFAULT_STATE: LanguageState = {
   timestamp: Date.now(),
 };
 
+function cloneDefaultState(): LanguageState {
+  return {
+    ...DEFAULT_STATE,
+    timestamp: Date.now(),
+  };
+}
+
 /**
  * LanguageController - Singleton for managing extension language
  */
@@ -42,13 +49,13 @@ class LanguageController {
       try {
         if (typeof chrome !== 'undefined' && chrome.storage?.local) {
           const result = await chrome.storage.local.get(STORAGE_KEY);
-          this.state = result[STORAGE_KEY] || DEFAULT_STATE;
+          this.state = result[STORAGE_KEY] || cloneDefaultState();
         } else {
-          this.state = DEFAULT_STATE;
+          this.state = cloneDefaultState();
         }
       } catch (error) {
         console.warn('[CQD Language] Failed to load state from storage:', error);
-        this.state = DEFAULT_STATE;
+        this.state = cloneDefaultState();
       }
     })();
 
@@ -137,7 +144,7 @@ class LanguageController {
 
   async getState(): Promise<LanguageState> {
     await this.initialize();
-    return this.state || DEFAULT_STATE;
+    return this.state ? { ...this.state } : cloneDefaultState();
   }
 
   private broadcastLanguageChange(): void {
@@ -155,7 +162,7 @@ class LanguageController {
   }
 
   async reset(): Promise<void> {
-    this.state = { ...DEFAULT_STATE };
+    this.state = cloneDefaultState();
     await this.saveState();
     this.broadcastLanguageChange();
   }

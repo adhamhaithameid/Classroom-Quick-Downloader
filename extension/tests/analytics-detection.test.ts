@@ -46,6 +46,15 @@ describe('analytics detection utilities', () => {
     expect(await detection.detectOS()).toBe('windows');
   });
 
+  it('detectOS ignores empty userAgentData platform and falls back to UA', async () => {
+    const detection = await loadDetection();
+    setNavigatorProp('userAgentData', {
+      getHighEntropyValues: vi.fn(async () => ({ platform: '' })),
+    });
+    setNavigatorProp('userAgent', 'Mozilla/5.0 Linux');
+    expect(await detection.detectOS()).toBe('linux');
+  });
+
   it('detectOS falls back to userAgent when userAgentData fails', async () => {
     const detection = await loadDetection();
     setNavigatorProp('userAgentData', {
@@ -55,6 +64,18 @@ describe('analytics detection utilities', () => {
     });
     setNavigatorProp('userAgent', 'Mozilla/5.0 Android');
     expect(await detection.detectOS()).toBe('android');
+  });
+
+  it.each([
+    ['Mozilla/5.0 Windows NT 10.0', 'windows'],
+    ['Mozilla/5.0 Macintosh; Intel Mac OS X 13_6', 'macos'],
+    ['Mozilla/5.0 X11; Linux x86_64', 'linux'],
+    ['Mozilla/5.0 iPhone; CPU iPhone OS 17_0 like Mac OS X', 'ios'],
+  ])('detectOS maps fallback ua %s -> %s', async (ua, expected) => {
+    const detection = await loadDetection();
+    setNavigatorProp('userAgentData', undefined);
+    setNavigatorProp('userAgent', ua);
+    expect(await detection.detectOS()).toBe(expected);
   });
 
   it('detectOS returns unknown when no platform hints are available', async () => {
@@ -69,6 +90,21 @@ describe('analytics detection utilities', () => {
     expect(detection.detectLanguage()).toBe('ar');
     setNavigatorProp('language', 'toolonglanguage');
     expect(detection.detectLanguage()).toBe('unknown');
+  });
+
+  it('detectBrowser and detectLanguage handle missing navigator fields', async () => {
+    const detection = await loadDetection();
+    setNavigatorProp('userAgent', '');
+    setNavigatorProp('language', undefined);
+    expect(detection.detectBrowser()).toBe('unknown');
+    expect(detection.detectLanguage()).toBe('unknown');
+  });
+
+  it('detectBrowser and detectOS use empty-string fallback when userAgent is undefined', async () => {
+    const detection = await loadDetection();
+    setNavigatorProp('userAgent', undefined);
+    expect(detection.detectBrowser()).toBe('unknown');
+    expect(await detection.detectOS()).toBe('unknown');
   });
 
   it('getExtensionVersion caches manifest version', async () => {

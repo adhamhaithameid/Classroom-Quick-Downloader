@@ -30,10 +30,10 @@ export async function detectOS(): Promise<string> {
   } catch { /* ignore */ }
   const ua = navigator?.userAgent ?? '';
   if (/Windows/i.test(ua)) return 'windows';
+  if (/iOS|iPhone|iPad/i.test(ua)) return 'ios';
   if (/Mac/i.test(ua)) return 'macos';
   if (/Android/i.test(ua)) return 'android';
   if (/Linux/i.test(ua)) return 'linux';
-  if (/iOS|iPhone|iPad/i.test(ua)) return 'ios';
   return 'unknown';
 }
 

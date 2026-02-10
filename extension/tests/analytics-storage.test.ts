@@ -183,6 +183,7 @@ describe('analytics storage', () => {
 
   it('sanitizes malformed queue events and reports invalid queue state', async () => {
     const malformed = [
+      null,
       { foo: 'bar' },
       makeEvent({ id: 'valid-1' }),
       {
@@ -387,5 +388,164 @@ describe('analytics storage', () => {
     });
     expect(await storageGet('any-key')).toBeUndefined();
     expect(await storageSet({ a: 1 })).toBe(false);
+  });
+
+  it('storageGet/storageSet handle synchronous throw paths', async () => {
+    vi.spyOn(chrome.storage.local, 'get').mockImplementation(() => {
+      throw new Error('sync-get-fail');
+    });
+    vi.spyOn(chrome.storage.local, 'set').mockImplementation(() => {
+      throw new Error('sync-set-fail');
+    });
+    expect(await storageGet('k')).toBeUndefined();
+    expect(await storageSet({ k: 1 })).toBe(false);
+  });
+
+  it('loadMeta merges partial metadata from storage', async () => {
+    installStorageMock({
+      [STORAGE_KEYS.META]: { lastFlushAt: 1234 },
+    });
+    const meta = await loadMeta();
+    expect(meta.lastFlushAt).toBe(1234);
+    expect(meta.backoffIndex).toBe(DEFAULT_META.backoffIndex);
+  });
+
+  it('normalizeStats returns safe defaults for nullish input', () => {
+    const stats = normalizeStats(undefined);
+    expect(stats.total).toBe(0);
+    expect(stats.lastUpdated).toBeTypeOf('number');
+  });
+
+  it('compactQueueForBudget no-ops when all events are commit-protected', () => {
+    const queue = Array.from({ length: 510 }, (_, i) =>
+      makeEvent({ id: `protected-${i}`, commitSeq: i + 1 }),
+    );
+    const result = compactQueueForBudget(queue);
+    expect(result.compacted).toBe(false);
+    expect(result.queue.length).toBe(510);
+  });
+
+  it('compactQueueForBudget hits coarse rollup fallback when protected events exceed budget', () => {
+    const protectedEvents = Array.from({ length: 520 }, (_, i) =>
+      makeEvent({ id: `p-${i}`, commitSeq: i + 1, timestamp: Date.UTC(2026, 1, 8, 6, 0, 0) + i }),
+    );
+    const compactable = Array.from({ length: 20 }, (_, i) =>
+      makeEvent({ id: `c-${i}`, timestamp: Date.UTC(2026, 1, 8, 1, 0, 0) - i * 1000 }),
+    );
+    const result = compactQueueForBudget([...protectedEvents, ...compactable]);
+    expect(result.compacted).toBe(true);
+    expect(result.queue.some((ev) => ev.rollup)).toBe(true);
+  });
+
+  it('loadConfig keeps already-current configVersion values', async () => {
+    installStorageMock({
+      [STORAGE_KEYS.CONFIG]: {
+        ...DEFAULT_CONFIG,
+        configVersion: DEFAULT_CONFIG.configVersion,
+        batchSize: 55,
+      },
+    });
+    const cfg = await loadConfig();
+    expect(cfg.configVersion).toBe(DEFAULT_CONFIG.configVersion);
+    expect(cfg.batchSize).toBe(55);
+  });
+
+  it('loadQueue handles non-array legacy queue values safely', async () => {
+    installStorageMock({
+      [STORAGE_KEYS.QUEUE]: { bad: 'shape' },
+      [STORAGE_KEYS.INTEGRITY]: 'abc',
+    });
+    const loaded = await loadQueue();
+    expect(loaded.queue).toEqual([]);
+    expect(loaded.valid).toBe(true);
+  });
+
+  it('falls back when indexedDB open request emits onerror', async () => {
+    const storageData = installStorageMock();
+    const fakeReq: any = {};
+    vi.spyOn(indexedDB, 'open').mockImplementation(() => {
+      setTimeout(() => {
+        fakeReq.error = new Error('idb-open-error');
+        fakeReq.onerror?.(new Event('error'));
+      }, 0);
+      return fakeReq;
+    });
+
+    const loaded = await loadQueue();
+    expect(loaded.queue).toEqual([]);
+
+    // Subsequent save should use legacy storage fallback after IDB disable.
+    await saveQueue([makeEvent({ id: 'legacy-after-open-error' })]);
+    expect(Array.isArray(storageData[STORAGE_KEYS.QUEUE])).toBe(true);
+  });
+
+  it('falls back to legacy queue when indexedDB read request fails', async () => {
+    const queue = [makeEvent({ id: 'legacy-read-fallback' })];
+    installStorageMock({
+      [STORAGE_KEYS.QUEUE]: queue,
+      [STORAGE_KEYS.INTEGRITY]: computeChecksum(JSON.stringify(queue)),
+    });
+
+    const fakeDb = {
+      transaction: () => ({
+        objectStore: () => ({
+          index: () => ({
+            getAll: () => {
+              const req: any = {};
+              setTimeout(() => {
+                req.error = new Error('idb-read-error');
+                req.onerror?.(new Event('error'));
+              }, 0);
+              return req;
+            },
+          }),
+        }),
+      }),
+    };
+    const openReq: any = {};
+    vi.spyOn(indexedDB, 'open').mockImplementation(() => {
+      setTimeout(() => {
+        openReq.result = fakeDb;
+        openReq.onsuccess?.(new Event('success'));
+      }, 0);
+      return openReq;
+    });
+
+    const loaded = await loadQueue();
+    expect(loaded.queue.map((ev) => ev.id)).toContain('legacy-read-fallback');
+  });
+
+  it('saveQueue falls back when indexedDB write transaction fails', async () => {
+    const storageData = installStorageMock();
+    const fakeDb = {
+      transaction: () => {
+        const tx: any = {
+          objectStore: () => ({
+            clear: () => {
+              const req: any = {};
+              setTimeout(() => {
+                req.error = new Error('idb-clear-error');
+                req.onerror?.(new Event('error'));
+              }, 0);
+              return req;
+            },
+            put: vi.fn(),
+          }),
+        };
+        return tx;
+      },
+    };
+    const openReq: any = {};
+    vi.spyOn(indexedDB, 'open').mockImplementation(() => {
+      setTimeout(() => {
+        openReq.result = fakeDb;
+        openReq.onsuccess?.(new Event('success'));
+      }, 0);
+      return openReq;
+    });
+
+    await saveQueue([makeEvent({ id: 'fallback-write' })]);
+    const saved = storageData[STORAGE_KEYS.QUEUE] as AnalyticsEvent[];
+    expect(saved.map((ev) => ev.id)).toContain('fallback-write');
   });
 });

@@ -136,8 +136,6 @@ function sanitizeQueue(rawQueue: unknown): { queue: AnalyticsEvent[]; changed: b
         candidate.count === ev.count &&
         candidate.rollup === ev.rollup;
       if (!same) changed = true;
-    } else {
-      changed = true;
     }
     queue.push(ev);
   }
