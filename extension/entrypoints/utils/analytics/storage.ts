@@ -11,6 +11,8 @@ import { generateEventId } from './detection';
 const IDB_DB_NAME = 'cqd_analytics_db_v1';
 const IDB_DB_VERSION = 1;
 const IDB_STORE_QUEUE = 'queue';
+const MAX_EVENT_COUNT = 100_000;
+const MAX_DURATION_MS = 86_400_000;
 
 // Offline queue compaction thresholds (approx. "500 downloads" budget)
 const QUEUE_BUDGET_EVENTS = 500;
@@ -26,7 +28,7 @@ function isIndexedDbSupported(): boolean {
 
 function openQueueDb(): Promise<IDBDatabase> {
   if (idbPromise) return idbPromise;
-  idbPromise = new Promise((resolve, reject) => {
+  idbPromise = new Promise<IDBDatabase>((resolve, reject) => {
     try {
       const req = indexedDB.open(IDB_DB_NAME, IDB_DB_VERSION);
       req.onupgradeneeded = () => {
@@ -41,7 +43,7 @@ function openQueueDb(): Promise<IDBDatabase> {
     } catch (err) {
       reject(err);
     }
-  }).catch((err) => {
+  }).catch((err): never => {
     console.warn('[CQD Analytics] IndexedDB unavailable:', err);
     idbUnavailable = true;
     idbPromise = null;
@@ -50,20 +52,113 @@ function openQueueDb(): Promise<IDBDatabase> {
   return idbPromise;
 }
 
+function normalizeString(value: unknown, fallback: string, maxLen = 64): string {
+  if (typeof value !== 'string') return fallback;
+  const trimmed = value.trim();
+  if (!trimmed) return fallback;
+  return trimmed.slice(0, maxLen);
+}
+
+function normalizeTimestamp(value: unknown, fallbackNow: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return fallbackNow;
+  if (value <= 0) return fallbackNow;
+  return Math.floor(value);
+}
+
+function normalizeOptionalNumber(value: unknown, min: number, max: number): number | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return undefined;
+  const next = Math.floor(value);
+  if (next < min || next > max) return undefined;
+  return next;
+}
+
+function sanitizeEvent(raw: unknown, fallbackNow: number): AnalyticsEvent | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const ev = raw as Record<string, unknown>;
+  const status =
+    ev.status === 'success' || ev.status === 'fail' || ev.status === 'cancelled'
+      ? ev.status
+      : 'success';
+  const id = typeof ev.id === 'string' && ev.id.length > 0 ? ev.id.slice(0, 128) : undefined;
+  const retryCount = normalizeOptionalNumber(ev.retryCount, 0, 10_000);
+  const commitSeq = normalizeOptionalNumber(ev.commitSeq, 0, Number.MAX_SAFE_INTEGER);
+  const count = normalizeOptionalNumber(ev.count, 1, MAX_EVENT_COUNT);
+  const duration = normalizeOptionalNumber(ev.duration_ms, 0, MAX_DURATION_MS) ?? 0;
+
+  return {
+    status,
+    file_type: normalizeString(ev.file_type, 'unknown', 64),
+    browser: normalizeString(ev.browser, 'unknown', 64),
+    os: normalizeString(ev.os, 'unknown', 64),
+    ext_version: normalizeString(ev.ext_version, 'unknown', 32),
+    duration_ms: duration,
+    bypass_used: ev.bypass_used === true,
+    error_type: typeof ev.error_type === 'string' && ev.error_type.trim() ? ev.error_type.trim().slice(0, 128) : undefined,
+    language: normalizeString(ev.language, 'unknown', 12),
+    timestamp: normalizeTimestamp(ev.timestamp, fallbackNow),
+    id,
+    source: typeof ev.source === 'string' && ev.source.trim() ? ev.source.trim().slice(0, 64) : undefined,
+    retryCount,
+    commitSeq,
+    count,
+    rollup: ev.rollup === true,
+  };
+}
+
+function sanitizeQueue(rawQueue: unknown): { queue: AnalyticsEvent[]; changed: boolean } {
+  if (!Array.isArray(rawQueue)) return { queue: [], changed: true };
+  const fallbackNow = Date.now();
+  const queue: AnalyticsEvent[] = [];
+  let changed = false;
+  for (const raw of rawQueue) {
+    const ev = sanitizeEvent(raw, fallbackNow);
+    if (!ev) {
+      changed = true;
+      continue;
+    }
+    if (raw && typeof raw === 'object') {
+      const candidate = raw as Record<string, unknown>;
+      const same =
+        candidate.status === ev.status &&
+        candidate.file_type === ev.file_type &&
+        candidate.browser === ev.browser &&
+        candidate.os === ev.os &&
+        candidate.ext_version === ev.ext_version &&
+        candidate.duration_ms === ev.duration_ms &&
+        candidate.bypass_used === ev.bypass_used &&
+        candidate.error_type === ev.error_type &&
+        candidate.language === ev.language &&
+        candidate.timestamp === ev.timestamp &&
+        candidate.id === ev.id &&
+        candidate.source === ev.source &&
+        candidate.retryCount === ev.retryCount &&
+        candidate.commitSeq === ev.commitSeq &&
+        candidate.count === ev.count &&
+        candidate.rollup === ev.rollup;
+      if (!same) changed = true;
+    } else {
+      changed = true;
+    }
+    queue.push(ev);
+  }
+  queue.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+  if (queue.length !== rawQueue.length) changed = true;
+  return { queue, changed };
+}
+
 async function getQueueFromIdb(): Promise<AnalyticsEvent[] | null> {
   if (!isIndexedDbSupported()) return null;
   try {
     const db = await openQueueDb();
-    const queue = await new Promise<AnalyticsEvent[]>((resolve, reject) => {
+    const rawQueue = await new Promise<unknown[]>((resolve, reject) => {
       const tx = db.transaction(IDB_STORE_QUEUE, 'readonly');
       const store = tx.objectStore(IDB_STORE_QUEUE);
       const index = store.index('byTimestamp');
       const req = index.getAll();
-      req.onsuccess = () => resolve((req.result || []) as AnalyticsEvent[]);
+      req.onsuccess = () => resolve((req.result || []) as unknown[]);
       req.onerror = () => reject(req.error);
     });
-    queue.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
-    return queue;
+    return sanitizeQueue(rawQueue).queue;
   } catch (err) {
     console.warn('[CQD Analytics] getQueueFromIdb failed:', err);
     return null;
@@ -322,12 +417,14 @@ export async function loadQueue(): Promise<{ queue: AnalyticsEvent[]; valid: boo
 }
 
 export async function saveQueue(queue: AnalyticsEvent[]): Promise<void> {
-  const normalized = queue.map((ev) => {
+  const sanitized = sanitizeQueue(queue).queue;
+  const normalized = sanitized.map((ev) => {
     if (!ev.id) {
       return { ...ev, id: generateEventId(ev.timestamp) };
     }
     return ev;
   });
+  normalized.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
   const compacted = compactQueueForBudget(normalized);
   const nextQueue = compacted.queue;
   const savedToIdb = await replaceQueueInIdb(nextQueue);
@@ -356,6 +453,21 @@ function computeChecksum(data: string): string {
 
 let inMemoryQueue: AnalyticsEvent[] | null = null;
 let inMemoryChecksum: string | null = null;
+
+export async function __resetStorageForTests(): Promise<void> {
+  if (idbPromise) {
+    try {
+      const db = await idbPromise;
+      db.close();
+    } catch {
+      // ignore
+    }
+  }
+  idbPromise = null;
+  idbUnavailable = false;
+  inMemoryQueue = null;
+  inMemoryChecksum = null;
+}
 
 async function saveQueueWithIntegrity(queue: AnalyticsEvent[]): Promise<void> {
   const data = JSON.stringify(queue);
@@ -386,17 +498,19 @@ async function loadQueueWithIntegrity(): Promise<{ queue: AnalyticsEvent[]; vali
 
   const data = JSON.stringify(raw);
   const computed = computeChecksum(data);
+  const sanitized = sanitizeQueue(raw);
+  const sanitizedQueue = sanitized.queue;
 
   if (storedChecksum && storedChecksum !== computed) {
     console.warn('[CQD Analytics] Queue integrity check failed; keeping raw queue to avoid data loss');
-    inMemoryQueue = raw.slice();
+    inMemoryQueue = sanitizedQueue.slice();
     inMemoryChecksum = computed;
-    return { queue: raw, valid: false };
+    return { queue: sanitizedQueue, valid: false };
   }
 
-  inMemoryQueue = raw.slice();
+  inMemoryQueue = sanitizedQueue.slice();
   inMemoryChecksum = computed;
-  return { queue: raw, valid: true };
+  return { queue: sanitizedQueue, valid: !sanitized.changed };
 }
 
 // --- Config/Meta Helpers ---
