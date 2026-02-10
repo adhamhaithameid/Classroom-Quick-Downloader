@@ -307,7 +307,7 @@ This is the primary quality gate. It runs every test suite in the monorepo:
 | Oracle Backend Tests | `go test ./...` (inside `oracle-backend/`) | Runs Go unit tests for IP handling and security |
 | Full Validation Suite | `./tools/validate.sh` | Lints, typechecks, audits the worker, then starts a local wrangler dev server and curls `/health` |
 
-**Environment:** Ubuntu Latest, Node 20, pnpm 10.28.2, Go 1.24
+**Environment:** Ubuntu Latest, Node 20, pnpm 10.28.2, Go 1.24.13
 
 ### 2. CodeQL Analysis (`codeql.yml`)
 
