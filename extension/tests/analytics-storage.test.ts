@@ -1,6 +1,20 @@
 import { describe, it, expect, beforeEach, beforeAll, afterAll, vi } from 'vitest';
-import { __resetStorageForTests, compactQueueForBudget, loadQueue, saveQueue } from '../entrypoints/utils/analytics/storage';
-import { STORAGE_KEYS } from '../entrypoints/utils/analytics/constants';
+import {
+  __resetStorageForTests,
+  compactQueueForBudget,
+  loadConfig,
+  loadMeta,
+  loadQueue,
+  loadStats,
+  normalizeStats,
+  saveConfig,
+  saveMeta,
+  saveQueue,
+  saveStats,
+  storageGet,
+  storageSet,
+} from '../entrypoints/utils/analytics/storage';
+import { DEFAULT_CONFIG, DEFAULT_META, STORAGE_KEYS } from '../entrypoints/utils/analytics/constants';
 import type { AnalyticsEvent } from '../entrypoints/utils/analytics/types';
 
 let seq = 0;
@@ -265,5 +279,113 @@ describe('analytics storage', () => {
     const result = compactQueueForBudget(queue);
     const rollup = result.queue.find((ev) => ev.rollup && (ev.count ?? 1) > 1);
     expect(rollup).toBeDefined();
+  });
+
+  it('loadConfig returns defaults when config is missing', async () => {
+    const cfg = await loadConfig();
+    expect(cfg).toEqual(DEFAULT_CONFIG);
+  });
+
+  it('loadConfig migrates and clamps invalid config values', async () => {
+    installStorageMock({
+      [STORAGE_KEYS.CONFIG]: {
+        configVersion: 1,
+        batchSize: -5,
+        maxDailyRequests: 100000,
+        maxRetry: -1,
+        flushMode: 'invalid',
+        dailyFlushWindowStartUtc: 99,
+        dailyFlushWindowMinutes: 99999,
+        maxEventsPerRequest: 0,
+      },
+    });
+    const cfg = await loadConfig();
+    expect(cfg.configVersion).toBe(DEFAULT_CONFIG.configVersion);
+    expect(cfg.batchSize).toBe(1);
+    expect(cfg.maxDailyRequests).toBe(1000);
+    expect(cfg.maxRetry).toBe(0);
+    expect(cfg.flushMode).toBe('next_day');
+    expect(cfg.dailyFlushWindowStartUtc).toBe(23);
+    expect(cfg.dailyFlushWindowMinutes).toBe(24 * 60);
+    expect(cfg.maxEventsPerRequest).toBe(1);
+  });
+
+  it('saveConfig persists normalized values', async () => {
+    const storageData = installStorageMock();
+    await saveConfig({
+      ...DEFAULT_CONFIG,
+      batchSize: 9999,
+      maxRetry: 99,
+      dailyFlushWindowStartUtc: -5,
+    });
+    const stored = storageData[STORAGE_KEYS.CONFIG] as typeof DEFAULT_CONFIG;
+    expect(stored.batchSize).toBe(1000);
+    expect(stored.maxRetry).toBe(20);
+    expect(stored.dailyFlushWindowStartUtc).toBe(0);
+  });
+
+  it('loadMeta returns defaults and saveMeta persists metadata', async () => {
+    const storageData = installStorageMock();
+    expect(await loadMeta()).toEqual(DEFAULT_META);
+    await saveMeta({
+      ...DEFAULT_META,
+      lastFlushAt: Date.now(),
+      lastDailyFlushUtcDate: '2026-02-10',
+    });
+    expect(storageData[STORAGE_KEYS.META]).toEqual(expect.objectContaining({
+      lastDailyFlushUtcDate: '2026-02-10',
+    }));
+  });
+
+  it('normalizeStats fills missing fields safely', () => {
+    const stats = normalizeStats({
+      total: 3,
+      byType: { pdf: 2 },
+      bySpeed: { fast: 1 },
+      byLanguage: { en: 1 },
+    });
+    expect(stats.total).toBe(3);
+    expect(stats.byType.pdf).toBe(2);
+    expect(stats.bySpeed?.fast).toBe(1);
+    expect(stats.bySpeed?.medium).toBe(0);
+    expect(stats.bySpeed?.slow).toBe(0);
+    expect(stats.byLanguage?.en).toBe(1);
+  });
+
+  it('loadStats/saveStats roundtrip through storage', async () => {
+    const storageData = installStorageMock();
+    await saveStats({
+      total: 8,
+      byType: { pdf: 8 },
+      success: 7,
+      fail: 1,
+      cancelled: 0,
+      attempts: 8,
+      bySpeed: { fast: 6, medium: 2, slow: 0 },
+      bypassCount: 1,
+      failByErrorType: { NETWORK: 1 },
+      byLanguage: { en: 8 },
+      lastUpdated: Date.now(),
+    });
+    expect(storageData[STORAGE_KEYS.STATS]).toBeTruthy();
+    const loaded = await loadStats();
+    expect(loaded.total).toBe(8);
+    expect(loaded.success).toBe(7);
+    expect(loaded.failByErrorType?.NETWORK).toBe(1);
+  });
+
+  it('storageGet/storageSet handle runtime errors gracefully', async () => {
+    vi.spyOn(chrome.storage.local, 'get').mockImplementation((_keys: any, cb: (result: Record<string, unknown>) => void) => {
+      (chrome.runtime as { lastError?: { message: string } }).lastError = { message: 'read-fail' };
+      cb({});
+      (chrome.runtime as { lastError?: { message: string } }).lastError = undefined;
+    });
+    vi.spyOn(chrome.storage.local, 'set').mockImplementation((_items: Record<string, unknown>, cb?: () => void) => {
+      (chrome.runtime as { lastError?: { message: string } }).lastError = { message: 'write-fail' };
+      cb?.();
+      (chrome.runtime as { lastError?: { message: string } }).lastError = undefined;
+    });
+    expect(await storageGet('any-key')).toBeUndefined();
+    expect(await storageSet({ a: 1 })).toBe(false);
   });
 });
