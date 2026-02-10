@@ -162,20 +162,27 @@ type PendingOracleBatch = {
   createdAt: number;
 };
 
-const DEFAULT_COUNTERS: Counters = {
-  byStatus: {},
-  byType: {},
-  byBrowser: {},
-  byOs: {},
-  byExtVersion: {},
-  byLanguage: {},
-  byCountry: {},
-  byErrorType: {}, // NEW
-};
-
 const DEFAULT_RETRY_STATE: RetryState = {
   consecutiveFailures: 0,
 };
+
+function createEmptyCounters(): Counters {
+  return {
+    byStatus: {},
+    byType: {},
+    byBrowser: {},
+    byOs: {},
+    byExtVersion: {},
+    byLanguage: {},
+    byCountry: {},
+    byErrorType: {},
+  };
+}
+
+function cloneCounterMap(input: Record<string, number> | undefined): Record<string, number> {
+  if (!input || typeof input !== "object") return {};
+  return { ...input };
+}
 
 const CONFIG_VERSION = 2;
 const DEFAULT_DAILY_FLUSH_WINDOW_START_UTC = 1;
@@ -620,7 +627,7 @@ export class DownloadsDurable {
       pendingEvents: 0,
       lastEventAt: null,
       lastFlushAt: null,
-      counters: { ...DEFAULT_COUNTERS },
+      counters: createEmptyCounters(),
       retryState: { ...DEFAULT_RETRY_STATE },
 
       reqCountToday: 0,
@@ -696,19 +703,14 @@ export class DownloadsDurable {
       lastEventAt: stored.lastEventAt ?? base.lastEventAt,
       lastFlushAt: stored.lastFlushAt ?? base.lastFlushAt,
       counters: {
-        byStatus: stored.counters?.byStatus ?? { ...DEFAULT_COUNTERS.byStatus },
-        byType: stored.counters?.byType ?? { ...DEFAULT_COUNTERS.byType },
-        byBrowser:
-          stored.counters?.byBrowser ?? { ...DEFAULT_COUNTERS.byBrowser },
-        byOs: stored.counters?.byOs ?? { ...DEFAULT_COUNTERS.byOs },
-        byExtVersion:
-          stored.counters?.byExtVersion ?? { ...DEFAULT_COUNTERS.byExtVersion },
-        byLanguage:
-          stored.counters?.byLanguage ?? { ...DEFAULT_COUNTERS.byLanguage },
-        byCountry:
-          stored.counters?.byCountry ?? { ...DEFAULT_COUNTERS.byCountry },
-        byErrorType:
-          stored.counters?.byErrorType ?? { ...DEFAULT_COUNTERS.byErrorType },
+        byStatus: cloneCounterMap(stored.counters?.byStatus),
+        byType: cloneCounterMap(stored.counters?.byType),
+        byBrowser: cloneCounterMap(stored.counters?.byBrowser),
+        byOs: cloneCounterMap(stored.counters?.byOs),
+        byExtVersion: cloneCounterMap(stored.counters?.byExtVersion),
+        byLanguage: cloneCounterMap(stored.counters?.byLanguage),
+        byCountry: cloneCounterMap(stored.counters?.byCountry),
+        byErrorType: cloneCounterMap(stored.counters?.byErrorType),
       },
       retryState: stored.retryState ?? { ...DEFAULT_RETRY_STATE },
 
@@ -1961,7 +1963,7 @@ export class DownloadsDurable {
       pendingEvents: 0,
       lastEventAt: null,
       lastFlushAt: null,
-      counters: { ...DEFAULT_COUNTERS },
+      counters: createEmptyCounters(),
       retryState: { ...DEFAULT_RETRY_STATE },
       reqCountToday: 0,
       reqCountDate: today,
