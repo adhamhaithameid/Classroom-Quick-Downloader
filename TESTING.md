@@ -17,8 +17,7 @@
 - [CI / CD Workflows](#ci--cd-workflows)
   - [CI Pipeline](#1-ci-pipeline-ciyml)
   - [CodeQL Analysis](#2-codeql-analysis-codeqlyml)
-  - [Oracle Deployment](#3-oracle-deployment-deploy-oracleyml)
-  - [Release Drafter](#4-release-drafter-release-drafteryml)
+  - [Release Drafter](#3-release-drafter-release-drafteryml)
 - [Manual Testing Scripts](#manual-testing-scripts)
 - [Git Hooks](#git-hooks)
 - [Running Everything at Once](#running-everything-at-once)
@@ -62,11 +61,11 @@ Classroom-Quick-Downloader/
 │   ├── validate.sh             # CI-style full validation
 │   ├── test_analytics.sh       # Manual analytics pipeline test
 │   ├── test_pipeline.sh        # End-to-end pipeline smoke test
-│   └── verify_oracle.sh        # Oracle backend vet + test + Docker build
+│   ├── verify_oracle.sh        # Oracle backend vet + test + Docker build
+│   └── deploy_manual.sh        # Manual Cloudflare + Oracle deploy commands
 └── .github/workflows/          # GitHub Actions CI/CD
     ├── ci.yml                  # Main CI pipeline
     ├── codeql.yml              # SAST security scanning
-    ├── deploy-oracle.yml       # Production deployment
     └── release-drafter.yml     # Automated release notes
 ```
 
@@ -321,15 +320,19 @@ This is the primary quality gate. It runs every test suite in the monorepo:
 
 Results appear in the **Security** tab of the GitHub repository.
 
-### 3. Oracle Deployment (`deploy-oracle.yml`)
+### Deployment Model
 
-> **Trigger:** Pushes to `main` that touch `oracle-backend/**`, manual `workflow_dispatch`
+Production deployments are manual (no auto-deploy workflow in this repo):
 
-| Step | What It Does |
-|------|--------------|
-| SSH into Oracle Cloud VM | Ensures repo clone exists, checks out target `main` SHA, exports deploy metadata, rebuilds stack, verifies `/health` |
+```bash
+# Cloudflare Worker deploy (from your local machine)
+./tools/deploy_manual.sh cloudflare
 
-### 4. Release Drafter (`release-drafter.yml`)
+# Oracle backend deploy (run on Oracle VM)
+./tools/deploy_manual.sh oracle
+```
+
+### 3. Release Drafter (`release-drafter.yml`)
 
 > **Trigger:** Push to `main`
 
@@ -492,7 +495,6 @@ pnpm --filter cloudflare-worker test && \
 |-------------|---------|---------|
 | `ci.yml` | Push / PR to `main` | Full test suite + coverage gates + validation |
 | `codeql.yml` | Push / PR / Weekly | Static security analysis (SAST) |
-| `deploy-oracle.yml` | Push to `main` (`oracle-backend/**`) / Manual | Oracle production deployment |
 | `release-drafter.yml` | Push to `main` | Draft release notes |
 
 | Manual Script | Purpose |
@@ -502,3 +504,4 @@ pnpm --filter cloudflare-worker test && \
 | `test_pipeline.sh` | 6-event E2E smoke test |
 | `verify_oracle.sh` | Go vet + tests + Docker build |
 | `oracle-backend/scripts/deploy_main_inplace.sh` | In-place Oracle production deploy with rollback image tag |
+| `deploy_manual.sh` | One-command manual deploy wrapper (`cloudflare`, `oracle`, `all`) |
