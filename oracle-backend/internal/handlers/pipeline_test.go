@@ -133,6 +133,63 @@ func TestPipelineMetricsAndFailuresFromIngest(t *testing.T) {
 	}
 }
 
+func TestPipelineCommittedFallbackWhenPayloadCommittedZero(t *testing.T) {
+	sqlDB := newTestDB(t)
+	defer sqlDB.Close()
+
+	ingest := IngestBatchHandler(sqlDB, "secret")
+	now := time.Now().UnixMilli()
+	batch := model.OracleBatch{
+		BatchID:     "batch-commit-fallback-1",
+		GeneratedAt: now,
+		TimeZone:    "UTC",
+		Summary: model.BatchSummary{
+			Totals: model.BucketTotals{
+				TotalEvents:    3,
+				TotalDownloads: 3,
+				TotalSuccess:   3,
+				TotalFail:      0,
+			},
+		},
+		TimeBuckets: []model.TimeBucket{},
+		DOState:     model.DOState{OK: true},
+		Delivery: &model.DeliverySnapshot{
+			DeliveryID:     "dlv-batch-commit-fallback-1",
+			AcceptedCount:  3,
+			StoredCount:    3,
+			ForwardedCount: 3,
+			CommittedCount: 0, // Worker payload may not have this populated yet.
+			CreatedAt:      now,
+		},
+	}
+
+	rr := postBatch(t, ingest, batch, "secret")
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200 from ingest, got %d (%s)", rr.Code, rr.Body.String())
+	}
+
+	metricsReq := httptest.NewRequest(http.MethodGet, "/api/pipeline/metrics?days=30&limit=20", nil)
+	metricsRR := httptest.NewRecorder()
+	PipelineMetricsHandler(sqlDB).ServeHTTP(metricsRR, metricsReq)
+	if metricsRR.Code != http.StatusOK {
+		t.Fatalf("metrics status=%d body=%s", metricsRR.Code, metricsRR.Body.String())
+	}
+
+	var metrics pipelineMetricsResponse
+	if err := json.Unmarshal(metricsRR.Body.Bytes(), &metrics); err != nil {
+		t.Fatalf("metrics json parse failed: %v", err)
+	}
+	if metrics.Totals["committed"] != 3 {
+		t.Fatalf("expected committed=3 fallback from accepted, got %+v", metrics.Totals)
+	}
+	if len(metrics.Recent) == 0 {
+		t.Fatalf("expected recent deliveries")
+	}
+	if metrics.Recent[0].Status != "committed" {
+		t.Fatalf("expected status=committed after ingest fallback, got %q", metrics.Recent[0].Status)
+	}
+}
+
 func TestIngestBatchUnauthorizedWritesFailureLog(t *testing.T) {
 	sqlDB := newTestDB(t)
 	defer sqlDB.Close()

@@ -918,4 +918,46 @@ describe("Durable Object security behaviors", () => {
     expect(storedAfterSuccess?.pendingBatches?.length ?? 0).toBe(0);
     expect(storedAfterSuccess?.pendingEvents ?? -1).toBe(0);
   });
+
+  it("exports new failure rollups while replaying an existing pending batch", async () => {
+    const { obj, state } = makeDO();
+    const tracked = await callDO(obj, "/track", { events: [makeEvent()] });
+    expect(tracked.status).toBe(202);
+
+    const failFetch = vi.fn(async () => new Response("oracle down", { status: 503 }));
+    vi.stubGlobal("fetch", failFetch);
+    const firstFlush = await callDO(obj, "/admin/force-flush", {});
+    expect(firstFlush.status).toBe(500);
+    vi.unstubAllGlobals();
+
+    // Record a new structured failure after the batch has already moved to pending queue.
+    const invalid = await callDO(obj, "/track", { events: "invalid" });
+    expect(invalid.status).toBe(400);
+
+    const stored = await state.storage.get<StoredState>(STORAGE_KEY);
+    const pendingBatchId = (
+      stored?.pendingBatches?.[0] as { batch?: { batchId?: string } } | undefined
+    )?.batch?.batchId;
+    expect(typeof pendingBatchId).toBe("string");
+
+    const okFetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body ?? "{}")) as {
+        batchId?: string;
+        failureLogs?: Array<{ errorCode?: string; sampleCount?: number }>;
+      };
+      expect(body.batchId).toBe(pendingBatchId);
+      expect(body.failureLogs?.some((row) => row.errorCode === "invalid_payload")).toBe(true);
+      return new Response(
+        JSON.stringify({ ok: true, batchId: pendingBatchId, ingestedAt: Date.now() }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    });
+    vi.stubGlobal("fetch", okFetch);
+    const secondFlush = await callDO(obj, "/admin/force-flush", {});
+    expect(secondFlush.status).toBe(200);
+    vi.unstubAllGlobals();
+
+    const storedAfter = await state.storage.get<StoredState>(STORAGE_KEY);
+    expect(storedAfter?.failureRollups?.every((entry) => Number((entry as { unsentCount?: number }).unsentCount ?? 0) === 0)).toBe(true);
+  });
 });
