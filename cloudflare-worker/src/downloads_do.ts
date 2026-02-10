@@ -1372,7 +1372,23 @@ export class DownloadsDurable {
     const encoder = new TextEncoder();
     for (const ev of events) {
       try {
-        const eventSize = encoder.encode(JSON.stringify(ev)).length;
+        const jsonString = JSON.stringify(ev);
+        const len = jsonString.length;
+
+        if (len > MAX_EVENT_SIZE_BYTES) {
+          return json(
+            { ok: false, error: "event_too_large", maxBytes: MAX_EVENT_SIZE_BYTES },
+            { status: 400 }
+          );
+        }
+
+        // Fast path: if max expansion (3x) is still within limits, it's safe.
+        // This avoids expensive TextEncoder allocation for 99% of events.
+        if (len * 3 <= MAX_EVENT_SIZE_BYTES) {
+          continue;
+        }
+
+        const eventSize = encoder.encode(jsonString).length;
         if (eventSize > MAX_EVENT_SIZE_BYTES) {
           return json(
             { ok: false, error: "event_too_large", maxBytes: MAX_EVENT_SIZE_BYTES },
