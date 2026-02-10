@@ -709,7 +709,14 @@ describe("Durable Object security behaviors", () => {
     expect(res.status).toBe(200);
     await state.drain();
 
-    const webhookCalls = fetchSpy.mock.calls.filter((call) => String(call[0] ?? "").includes("alert.example.com"));
+    const webhookCalls = fetchSpy.mock.calls.filter((call) => {
+      try {
+        const url = new URL(String(call[0] ?? ""));
+        return url.hostname === "alert.example.com";
+      } catch {
+        return false;
+      }
+    });
     expect(webhookCalls.length).toBe(0);
     vi.unstubAllGlobals();
   });
