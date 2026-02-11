@@ -1,5 +1,9 @@
 # Oracle Hub v4 Notes
 
+## Tracking
+- Draft PR: https://github.com/adhamhaithameid/Classroom-Quick-Downloader/pull/235
+- Execution branch (repo policy): `codex/oracle-hub-v4`
+
 ## Security
 - Dashboard password auth uses `DASHBOARD_PASSWORD` (fallback default is set in app startup for first-run).
 - Critical operations require step-up verification using `SUPER_ADMIN_PASSWORD`.
