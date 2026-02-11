@@ -3,12 +3,15 @@ package handlers
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -125,6 +128,105 @@ func TestFeatureFlagHandlers(t *testing.T) {
 	}
 }
 
+func TestRetryOutboxHandler_DoesNotResubmitSentRows(t *testing.T) {
+	sqlDB := newAdminTestDB(t)
+	defer sqlDB.Close()
+
+	nowMs := time.Now().UnixMilli()
+	_, err := sqlDB.Exec(
+		`INSERT INTO ingest_outbox (event_type, payload_json, idempotency_key, status, attempts, last_error, created_at, next_run_at)
+		 VALUES
+		 ('e', '{}', 'k1', 'sent', 1, '', ?, ?),
+		 ('e', '{}', 'k2', 'retry', 3, 'x', ?, ?)`,
+		nowMs, nowMs, nowMs, nowMs,
+	)
+	if err != nil {
+		t.Fatalf("seed outbox failed: %v", err)
+	}
+
+	var sentID, retryID int64
+	if err := sqlDB.QueryRow(`SELECT id FROM ingest_outbox WHERE idempotency_key = 'k1'`).Scan(&sentID); err != nil {
+		t.Fatalf("load sent id failed: %v", err)
+	}
+	if err := sqlDB.QueryRow(`SELECT id FROM ingest_outbox WHERE idempotency_key = 'k2'`).Scan(&retryID); err != nil {
+		t.Fatalf("load retry id failed: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/admin/outbox/retry", bytes.NewBufferString(`{"ids":[`+strconv.FormatInt(sentID, 10)+`,`+strconv.FormatInt(retryID, 10)+`]}`))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	RetryOutboxHandler(sqlDB, observability.NewRegistry()).ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var sentStatus string
+	if err := sqlDB.QueryRow(`SELECT status FROM ingest_outbox WHERE id = ?`, sentID).Scan(&sentStatus); err != nil {
+		t.Fatalf("load sent status failed: %v", err)
+	}
+	if sentStatus != "sent" {
+		t.Fatalf("expected sent row to remain sent, got %s", sentStatus)
+	}
+	var retryStatus string
+	if err := sqlDB.QueryRow(`SELECT status FROM ingest_outbox WHERE id = ?`, retryID).Scan(&retryStatus); err != nil {
+		t.Fatalf("load retry status failed: %v", err)
+	}
+	if retryStatus != "pending" {
+		t.Fatalf("expected retry row to become pending, got %s", retryStatus)
+	}
+}
+
+func TestReplayDeadLetterHandler_PreservesIdempotencyKeyAndResetsOutboxRow(t *testing.T) {
+	sqlDB := newAdminTestDB(t)
+	defer sqlDB.Close()
+
+	nowMs := time.Now().UnixMilli()
+	res, err := sqlDB.Exec(
+		`INSERT INTO ingest_outbox (event_type, payload_json, idempotency_key, status, attempts, last_error, created_at, next_run_at)
+		 VALUES ('e', '{}', 'k1', 'dead', 10, 'boom', ?, ?)`,
+		nowMs, nowMs,
+	)
+	if err != nil {
+		t.Fatalf("seed outbox failed: %v", err)
+	}
+	outboxID, err := res.LastInsertId()
+	if err != nil {
+		t.Fatalf("outbox last insert id failed: %v", err)
+	}
+	if _, err := sqlDB.Exec(
+		`INSERT INTO outbox_dead_letter (outbox_id, event_type, payload_json, idempotency_key, attempts, last_error, failed_at)
+		 VALUES (?, 'e', '{}', 'k1', 10, 'boom', ?)`,
+		outboxID,
+		nowMs,
+	); err != nil {
+		t.Fatalf("seed dead letter failed: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/admin/outbox/replay-dead-letter", bytes.NewBufferString(`{}`))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	ReplayDeadLetterHandler(sqlDB).ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var count int64
+	if err := sqlDB.QueryRow(`SELECT COUNT(*) FROM ingest_outbox WHERE idempotency_key = 'k1'`).Scan(&count); err != nil {
+		t.Fatalf("count outbox rows failed: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected single idempotency key row after replay, got %d", count)
+	}
+	var status string
+	var attempts int64
+	if err := sqlDB.QueryRow(`SELECT status, attempts FROM ingest_outbox WHERE id = ?`, outboxID).Scan(&status, &attempts); err != nil {
+		t.Fatalf("load replayed row failed: %v", err)
+	}
+	if status != "pending" || attempts != 0 {
+		t.Fatalf("expected pending/0 after replay, got %s/%d", status, attempts)
+	}
+}
+
 func TestAuditVerifyChainHandler(t *testing.T) {
 	sqlDB := newAdminTestDB(t)
 	defer sqlDB.Close()
@@ -152,6 +254,49 @@ func TestAuditVerifyChainHandler(t *testing.T) {
 	}
 	if valid, _ := resp["valid"].(bool); !valid {
 		t.Fatalf("expected valid chain, got: %v", resp)
+	}
+}
+
+func TestAuditVerifyChainHandler_DetectsPayloadHashTamper(t *testing.T) {
+	sqlDB := newAdminTestDB(t)
+	defer sqlDB.Close()
+
+	payload := `{"a":1}`
+	prev := strings.Repeat("0", 64)
+	rowSum := sha256.Sum256([]byte(payload + ":" + prev))
+	rowHash := hex.EncodeToString(rowSum[:])
+
+	// Deliberately wrong payload_hash while row hash remains valid.
+	if _, err := sqlDB.Exec(
+		`INSERT INTO admin_audit_log (
+			ts_utc, request_id, correlation_id, user_id, token_id, role,
+			action_type, resource_type, resource_id, result, error_code,
+			payload_json, prev_hash, payload_hash, row_hash
+		) VALUES (?, 'r1', 'c1', 'u1', 't1', 'viewer', 'a', 'b', 'c', 'ok', '', ?, ?, ?, ?)`,
+		time.Now().UnixMilli(),
+		payload,
+		prev,
+		strings.Repeat("f", 64),
+		rowHash,
+	); err != nil {
+		t.Fatalf("insert tampered row failed: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/admin/audit/verify-chain", nil)
+	rr := httptest.NewRecorder()
+	AuditVerifyChainHandler(sqlDB).ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var resp map[string]any
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response failed: %v", err)
+	}
+	if valid, _ := resp["valid"].(bool); valid {
+		t.Fatalf("expected invalid chain due to payload hash mismatch: %v", resp)
+	}
+	if reason, _ := resp["reason"].(string); reason != "payload_hash_mismatch" {
+		t.Fatalf("expected payload_hash_mismatch, got %v", resp["reason"])
 	}
 }
 
@@ -378,5 +523,23 @@ func TestRecordsCRUDHandlers(t *testing.T) {
 	RecordsDeleteHandler(sqlDB).ServeHTTP(deleteRR, deleteReq)
 	if deleteRR.Code != http.StatusOK {
 		t.Fatalf("delete failed: %d %s", deleteRR.Code, deleteRR.Body.String())
+	}
+}
+
+func TestCanonicalJSON_SortsNestedMapsDeterministically(t *testing.T) {
+	in := map[string]any{
+		"z": map[string]any{
+			"b": 1,
+			"a": 2,
+		},
+		"a": 1,
+	}
+	raw, err := canonicalJSON(in)
+	if err != nil {
+		t.Fatalf("canonicalJSON failed: %v", err)
+	}
+	want := `{"a":1,"z":{"a":2,"b":1}}`
+	if raw != want {
+		t.Fatalf("unexpected canonical JSON: got %s want %s", raw, want)
 	}
 }
