@@ -204,7 +204,9 @@ func HealthDBHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ok"))
+		if _, err := w.Write([]byte("ok")); err != nil {
+			log.Printf("failed to write health response: %v", err)
+		}
 	}
 }
 
@@ -322,7 +324,13 @@ func loggingMiddleware(next http.Handler) http.Handler {
 		}
 		encoded, err := json.Marshal(payload)
 		if err != nil {
-			log.Printf("%s %s in %s (%d)", r.Method, r.URL.Path, duration, sw.statusCode)
+			log.Printf( // #nosec G706 -- method/path are sanitized with sanitizeLogValue before logging.
+				"%s %s in %s (%d)",
+				sanitizeLogValue(r.Method),
+				sanitizeLogValue(r.URL.Path),
+				duration,
+				sw.statusCode,
+			)
 			return
 		}
 		log.Printf("%s", encoded)
@@ -362,6 +370,7 @@ func spaHandler(staticDir string) http.Handler {
 		}
 
 		// If file exists, serve it
+		// #nosec G703 -- fullPath is validated with filepath.Rel to remain under absStaticDir.
 		if info, err := os.Stat(fullPath); err == nil && !info.IsDir() {
 			fs.ServeHTTP(w, r)
 			return
@@ -388,7 +397,11 @@ func scheduleSheetsArchiver() {
 	kumaPushURL := os.Getenv("KUMA_PUSH_URL")
 	archiverSecret := os.Getenv("ARCHIVER_SHARED_SECRET")
 
-	log.Printf("[Scheduler] Sheets archiver enabled: sheet=%s, creds=%s", sheetsID, credsPath)
+	log.Printf( // #nosec G706 -- sheet/creds are sanitized with sanitizeLogValue before logging.
+		"[Scheduler] Sheets archiver enabled: sheet=%s, creds=%s",
+		sanitizeLogValue(sheetsID),
+		sanitizeLogValue(credsPath),
+	)
 
 	for {
 		// Calculate time until next 00:15 UTC
@@ -427,6 +440,7 @@ func runArchiver(sheetsID, credsPath, kumaPushURL, archiverSecret string) {
 		return
 	}
 
+	// #nosec G204,G702 -- path is validated via resolveArchiverPath; args are fixed flags from trusted config.
 	cmd := exec.Command(archiverPath, args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -436,6 +450,11 @@ func runArchiver(sheetsID, credsPath, kumaPushURL, archiverSecret string) {
 	} else {
 		log.Println("[Scheduler] Sheets export completed successfully")
 	}
+}
+
+func sanitizeLogValue(v string) string {
+	sanitized := strings.ReplaceAll(v, "\n", "_")
+	return strings.ReplaceAll(sanitized, "\r", "_")
 }
 
 func resolveArchiverPath(configuredPath string) (string, error) {
@@ -546,7 +565,7 @@ func parseTrustedProxyCIDRs(input string) []*net.IPNet {
 		if strings.Contains(entry, "/") {
 			_, network, err := net.ParseCIDR(entry)
 			if err != nil {
-				log.Printf("[WARN] invalid trusted proxy CIDR: %s", entry)
+				log.Printf("[WARN] invalid trusted proxy CIDR: %s", sanitizeLogValue(entry)) // #nosec G706 -- value is sanitized before logging.
 				continue
 			}
 			nets = append(nets, network)
@@ -554,7 +573,7 @@ func parseTrustedProxyCIDRs(input string) []*net.IPNet {
 		}
 		ip := net.ParseIP(entry)
 		if ip == nil {
-			log.Printf("[WARN] invalid trusted proxy IP: %s", entry)
+			log.Printf("[WARN] invalid trusted proxy IP: %s", sanitizeLogValue(entry)) // #nosec G706 -- value is sanitized before logging.
 			continue
 		}
 		bits := 32
@@ -771,7 +790,7 @@ func stepUpVerifyHandler(db *sql.DB, superAdminPassword string, allowInsecureCoo
 
 		var req struct {
 			ChallengeID string `json:"challengeId"`
-			Password    string `json:"password"`
+			Password    string `json:"password"` // #nosec G117 -- required request field for step-up verify API contract.
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
@@ -1169,7 +1188,9 @@ func loginHandler(dashboardPassword string, allowInsecureCookies bool) http.Hand
 
 		// No auth required if DASHBOARD_PASSWORD is not set
 		if dashboardPassword == "" {
-			json.NewEncoder(w).Encode(map[string]interface{}{"ok": true, "authRequired": false})
+			if err := json.NewEncoder(w).Encode(map[string]interface{}{"ok": true, "authRequired": false}); err != nil {
+				log.Printf("failed to encode login response: %v", err)
+			}
 			return
 		}
 
@@ -1183,7 +1204,7 @@ func loginHandler(dashboardPassword string, allowInsecureCookies bool) http.Hand
 		}
 
 		var req struct {
-			Password string `json:"password"`
+			Password string `json:"password"` // #nosec G117 -- required request field for login API contract.
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
@@ -1229,7 +1250,9 @@ func loginHandler(dashboardPassword string, allowInsecureCookies bool) http.Hand
 			MaxAge:   int(sessionDuration.Seconds()),
 		})
 
-		json.NewEncoder(w).Encode(map[string]interface{}{"ok": true})
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{"ok": true}); err != nil {
+			log.Printf("failed to encode login success response: %v", err)
+		}
 	}
 }
 
@@ -1277,7 +1300,9 @@ func logoutHandler(allowInsecureCookies bool) http.HandlerFunc {
 			MaxAge:   -1,
 		})
 
-		json.NewEncoder(w).Encode(map[string]interface{}{"ok": true})
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{"ok": true}); err != nil {
+			log.Printf("failed to encode logout response: %v", err)
+		}
 	}
 }
 
@@ -1323,19 +1348,23 @@ func authCheckHandler(dashboardPassword string) http.HandlerFunc {
 
 		// No auth required if DASHBOARD_PASSWORD is not set
 		if dashboardPassword == "" {
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			if err := json.NewEncoder(w).Encode(map[string]interface{}{
 				"authenticated": true,
 				"authRequired":  false,
-			})
+			}); err != nil {
+				log.Printf("failed to encode auth-check response: %v", err)
+			}
 			return
 		}
 
 		cookie, err := r.Cookie(sessionCookieName)
 		authenticated := err == nil && isValidSession(cookie.Value)
 
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
 			"authenticated": authenticated,
 			"authRequired":  true,
-		})
+		}); err != nil {
+			log.Printf("failed to encode auth-check response: %v", err)
+		}
 	}
 }

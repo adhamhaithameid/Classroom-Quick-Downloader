@@ -175,9 +175,9 @@ func main() {
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		logEvent("error", "archiver_stats_bad_status", map[string]interface{}{
-			"status": resp.Status,
+			"status": resp.StatusCode,
 		})
-		log.Fatalf("Stats request failed: %s", resp.Status)
+		log.Fatalf("Stats request failed with status code: %d", resp.StatusCode) // #nosec G706 -- status code is numeric and not tainted text.
 	}
 
 	var data SummaryResponse

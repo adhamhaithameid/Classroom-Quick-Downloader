@@ -1078,15 +1078,14 @@ func BackupRunHandler(db *sql.DB, metrics *observability.Registry) http.HandlerF
 			http.Error(w, "failed to resolve backup path", http.StatusInternalServerError)
 			return
 		}
-		if err := os.MkdirAll(absBackupDir, 0o750); err != nil {
+		if err := os.MkdirAll(absBackupDir, 0o750); err != nil { // #nosec G703 -- absBackupDir is canonicalized and constrained by resolveBackupPath.
 			recordBackupFailure(r.Context(), db, metrics, backupPath, 0, 0, err)
 			http.Error(w, "failed to create backup directory", http.StatusInternalServerError)
 			return
 		}
 
 		startedAt := time.Now().UnixMilli()
-		vacuumStmt := "VACUUM INTO '" + strings.ReplaceAll(backupPath, "'", "''") + "'"
-		// #nosec G202 -- SQLite VACUUM INTO requires quoted literal path; backupPath is validated and escaped.
+		vacuumStmt := "VACUUM INTO '" + strings.ReplaceAll(backupPath, "'", "''") + "'" // #nosec G202 -- SQLite VACUUM INTO requires quoted literal path; backupPath is validated and escaped.
 		_, err = db.ExecContext(r.Context(), vacuumStmt)
 		finishedAt := time.Now().UnixMilli()
 

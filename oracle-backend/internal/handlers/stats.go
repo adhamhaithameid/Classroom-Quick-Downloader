@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"database/sql"
+	"encoding/csv"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -581,19 +582,32 @@ func ExportHandler(db *sql.DB) http.HandlerFunc {
 			w.Header().Set("Content-Type", "text/csv")
 			w.Header().Set("Content-Disposition", "attachment; filename=\""+filename+"\"")
 
-			// Write CSV header + rows
-			_, _ = w.Write([]byte("Timestamp,Downloads,Success,Fail,SuccessRate\n"))
+			cw := csv.NewWriter(w)
+			if err := cw.Write([]string{"Timestamp", "Downloads", "Success", "Fail", "SuccessRate"}); err != nil {
+				http.Error(w, "failed to write csv header", http.StatusInternalServerError)
+				return
+			}
 			for _, p := range points {
 				rate := "0%"
 				if p.Downloads > 0 {
 					rate = strconv.FormatFloat(p.SuccessRate*100, 'f', 1, 64) + "%"
 				}
-				line := p.Timestamp + "," +
-					strconv.FormatInt(p.Downloads, 10) + "," +
-					strconv.FormatInt(p.Success, 10) + "," +
-					strconv.FormatInt(p.Fail, 10) + "," +
-					rate + "\n"
-				_, _ = w.Write([]byte(line))
+				row := []string{
+					p.Timestamp,
+					strconv.FormatInt(p.Downloads, 10),
+					strconv.FormatInt(p.Success, 10),
+					strconv.FormatInt(p.Fail, 10),
+					rate,
+				}
+				if err := cw.Write(row); err != nil {
+					http.Error(w, "failed to write csv row", http.StatusInternalServerError)
+					return
+				}
+			}
+			cw.Flush()
+			if err := cw.Error(); err != nil {
+				http.Error(w, "failed to flush csv output", http.StatusInternalServerError)
+				return
 			}
 			return
 		}
