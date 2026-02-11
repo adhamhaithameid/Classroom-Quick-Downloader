@@ -2956,9 +2956,12 @@
           var repo = 'adhamhaithameid/Classroom-Quick-Downloader';
           var issues = await fetch('https://api.github.com/search/issues?q=repo:' + repo + '+type:issue+state:open').then(function(r) { return r.json(); });
           var prs = await fetch('https://api.github.com/search/issues?q=repo:' + repo + '+type:pr+state:open').then(function(r) { return r.json(); });
+          var alerts = await fetchJSON('/api/admin/alerts');
+          var openAlerts = (alerts.alerts || []).filter(function(a) { return a.status === 'open'; }).length;
           container.innerHTML =
             '<div class="stat-card"><div class="stat-label">Open Issues</div><div class="stat-value">' + fmtNumber(issues.total_count || 0) + '</div></div>' +
-            '<div class="stat-card"><div class="stat-label">Open PRs</div><div class="stat-value">' + fmtNumber(prs.total_count || 0) + '</div></div>';
+            '<div class="stat-card"><div class="stat-label">Open PRs</div><div class="stat-value">' + fmtNumber(prs.total_count || 0) + '</div></div>' +
+            '<div class="stat-card"><div class="stat-label">Open Alerts</div><div class="stat-value">' + fmtNumber(openAlerts) + '</div></div>';
         } catch (e) {
           container.innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed to load GitHub counters</div>';
         }
