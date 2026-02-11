@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -19,14 +20,26 @@ const (
 	roleKey          contextKey = "role"
 )
 
+var validIDPattern = regexp.MustCompile(`^[A-Za-z0-9._:-]{1,128}$`)
+
 func idFromHeaderOrRandom(h http.Header, key string, prefix string) string {
 	if h == nil {
 		return randomID(prefix)
 	}
-	if val := strings.TrimSpace(h.Get(key)); val != "" {
+	if val := sanitizeInboundID(strings.TrimSpace(h.Get(key))); val != "" {
 		return val
 	}
 	return randomID(prefix)
+}
+
+func sanitizeInboundID(v string) string {
+	if len(v) > 128 {
+		v = v[:128]
+	}
+	if !validIDPattern.MatchString(v) {
+		return ""
+	}
+	return v
 }
 
 func randomID(prefix string) string {
