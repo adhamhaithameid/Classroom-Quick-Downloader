@@ -4205,7 +4205,9 @@ export function renderDashboard(stats: StatsResponse): string {
         entries.sort((a, b) => b[1] - a[1]);
         return entries
           .map(function ([k, v]) {
-            return "<tr><td>" + escapeHtmlJS(k) + "</td><td>" + v + "</td></tr>";
+            const numeric = Number(v);
+            const safeValue = Number.isFinite(numeric) ? numeric.toString() : "0";
+            return "<tr><td>" + escapeHtmlJS(k) + "</td><td>" + safeValue + "</td></tr>";
           })
           .join("");
       }
