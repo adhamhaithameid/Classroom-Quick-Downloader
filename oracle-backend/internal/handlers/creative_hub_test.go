@@ -118,3 +118,101 @@ func TestNewsletterSubscribersUpsert_ValidatesAndNormalizesEmail(t *testing.T) {
 		t.Fatalf("expected normalized email in payload, got %q", email)
 	}
 }
+
+func TestCreativeEmailTemplateHandlers_CRUD(t *testing.T) {
+	sqlDB := newAdminTestDB(t)
+	defer sqlDB.Close()
+
+	upsertReq := httptest.NewRequest(
+		http.MethodPost,
+		"/api/admin/creative/emails/upsert",
+		bytes.NewBufferString(`{"recordKey":"welcome-v1","data":{"title":"Welcome V1","version":"1.0.0","html":"<h1>Welcome</h1>"}}`),
+	)
+	upsertReq.Header.Set("Content-Type", "application/json")
+	upsertRR := httptest.NewRecorder()
+	CreativeEmailsUpsertHandler(sqlDB, nil).ServeHTTP(upsertRR, upsertReq)
+	if upsertRR.Code != http.StatusOK {
+		t.Fatalf("email upsert failed: %d %s", upsertRR.Code, upsertRR.Body.String())
+	}
+
+	listReq := httptest.NewRequest(http.MethodGet, "/api/admin/creative/emails", nil)
+	listRR := httptest.NewRecorder()
+	CreativeEmailsListHandler(sqlDB, nil).ServeHTTP(listRR, listReq)
+	if listRR.Code != http.StatusOK {
+		t.Fatalf("email list failed: %d %s", listRR.Code, listRR.Body.String())
+	}
+
+	var listPayload map[string]any
+	if err := json.Unmarshal(listRR.Body.Bytes(), &listPayload); err != nil {
+		t.Fatalf("parse email list payload failed: %v", err)
+	}
+	records, ok := listPayload["records"].([]any)
+	if !ok || len(records) != 1 {
+		t.Fatalf("expected one email template record, got %#v", listPayload["records"])
+	}
+
+	deleteReq := httptest.NewRequest(http.MethodPost, "/api/admin/creative/emails/delete", bytes.NewBufferString(`{"recordKey":"welcome-v1"}`))
+	deleteReq.Header.Set("Content-Type", "application/json")
+	deleteRR := httptest.NewRecorder()
+	CreativeEmailsDeleteHandler(sqlDB, nil).ServeHTTP(deleteRR, deleteReq)
+	if deleteRR.Code != http.StatusOK {
+		t.Fatalf("email delete failed: %d %s", deleteRR.Code, deleteRR.Body.String())
+	}
+}
+
+func TestNewsletterCampaignHandlers_CRUD(t *testing.T) {
+	sqlDB := newAdminTestDB(t)
+	defer sqlDB.Close()
+
+	upsertReq := httptest.NewRequest(
+		http.MethodPost,
+		"/api/admin/newsletter/campaigns/upsert",
+		bytes.NewBufferString(`{"recordKey":"campaign-2026-02","data":{"version":"4.0.0","subject":"February Update","scheduledAt":"2026-02-11T09:00:00Z"}}`),
+	)
+	upsertReq.Header.Set("Content-Type", "application/json")
+	upsertRR := httptest.NewRecorder()
+	NewsletterCampaignsUpsertHandler(sqlDB, nil).ServeHTTP(upsertRR, upsertReq)
+	if upsertRR.Code != http.StatusOK {
+		t.Fatalf("campaign upsert failed: %d %s", upsertRR.Code, upsertRR.Body.String())
+	}
+
+	listReq := httptest.NewRequest(http.MethodGet, "/api/admin/newsletter/campaigns", nil)
+	listRR := httptest.NewRecorder()
+	NewsletterCampaignsListHandler(sqlDB, nil).ServeHTTP(listRR, listReq)
+	if listRR.Code != http.StatusOK {
+		t.Fatalf("campaign list failed: %d %s", listRR.Code, listRR.Body.String())
+	}
+
+	deleteReq := httptest.NewRequest(http.MethodPost, "/api/admin/newsletter/campaigns/delete", bytes.NewBufferString(`{"recordKey":"campaign-2026-02"}`))
+	deleteReq.Header.Set("Content-Type", "application/json")
+	deleteRR := httptest.NewRecorder()
+	NewsletterCampaignsDeleteHandler(sqlDB, nil).ServeHTTP(deleteRR, deleteReq)
+	if deleteRR.Code != http.StatusOK {
+		t.Fatalf("campaign delete failed: %d %s", deleteRR.Code, deleteRR.Body.String())
+	}
+}
+
+func TestNewsletterSubscribersDeleteHandler(t *testing.T) {
+	sqlDB := newAdminTestDB(t)
+	defer sqlDB.Close()
+
+	upsertReq := httptest.NewRequest(
+		http.MethodPost,
+		"/api/admin/newsletter/subscribers/upsert",
+		bytes.NewBufferString(`{"data":{"email":"subscriber@example.com"}}`),
+	)
+	upsertReq.Header.Set("Content-Type", "application/json")
+	upsertRR := httptest.NewRecorder()
+	NewsletterSubscribersUpsertHandler(sqlDB, nil).ServeHTTP(upsertRR, upsertReq)
+	if upsertRR.Code != http.StatusOK {
+		t.Fatalf("subscriber upsert failed: %d %s", upsertRR.Code, upsertRR.Body.String())
+	}
+
+	deleteReq := httptest.NewRequest(http.MethodPost, "/api/admin/newsletter/subscribers/delete", bytes.NewBufferString(`{"recordKey":"subscriber@example.com"}`))
+	deleteReq.Header.Set("Content-Type", "application/json")
+	deleteRR := httptest.NewRecorder()
+	NewsletterSubscribersDeleteHandler(sqlDB, nil).ServeHTTP(deleteRR, deleteReq)
+	if deleteRR.Code != http.StatusOK {
+		t.Fatalf("subscriber delete failed: %d %s", deleteRR.Code, deleteRR.Body.String())
+	}
+}
