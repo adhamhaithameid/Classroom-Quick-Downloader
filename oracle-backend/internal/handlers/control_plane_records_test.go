@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -155,5 +156,84 @@ func TestRecordsHandlersV4_PostgresWritesCreateOutbox(t *testing.T) {
 	}
 	if outboxCount == 0 {
 		t.Fatalf("expected outbox event for control_plane_upsert")
+	}
+
+	deleteReq := httptest.NewRequest(
+		http.MethodPost,
+		"/api/admin/records/delete",
+		bytes.NewBufferString(`{"recordType":"deployment_target","recordKey":"`+recordKey+`"}`),
+	)
+	deleteReq.Header.Set("Content-Type", "application/json")
+	deleteRR := httptest.NewRecorder()
+	RecordsDeleteHandlerV4(sqlDB, postgresDB, allowed).ServeHTTP(deleteRR, deleteReq)
+	if deleteRR.Code != http.StatusOK {
+		t.Fatalf("postgres delete failed: %d %s", deleteRR.Code, deleteRR.Body.String())
+	}
+
+	if err := postgresDB.QueryRow(
+		`SELECT COUNT(*) FROM pg_admin_records WHERE record_type = $1 AND record_key = $2`,
+		"deployment_target",
+		recordKey,
+	).Scan(&recordCount); err != nil {
+		t.Fatalf("query pg_admin_records after delete failed: %v", err)
+	}
+	if recordCount != 0 {
+		t.Fatalf("expected pg_admin_records row to be deleted, got %d", recordCount)
+	}
+
+	var deleteOutboxCount int64
+	if err := postgresDB.QueryRow(
+		`SELECT COUNT(*) FROM pg_outbox WHERE event_type = 'control_plane_delete' AND payload_json->>'recordKey' = $1`,
+		recordKey,
+	).Scan(&deleteOutboxCount); err != nil {
+		t.Fatalf("query delete outbox failed: %v", err)
+	}
+	if deleteOutboxCount == 0 {
+		t.Fatalf("expected outbox event for control_plane_delete")
+	}
+
+	listReq := httptest.NewRequest(http.MethodGet, "/api/admin/records/list?type=deployment_target", nil)
+	listRR := httptest.NewRecorder()
+	RecordsListHandlerV4(sqlDB, postgresDB, allowed).ServeHTTP(listRR, listReq)
+	if listRR.Code != http.StatusOK {
+		t.Fatalf("postgres list failed: %d %s", listRR.Code, listRR.Body.String())
+	}
+}
+
+func TestControlPlaneOutboxKey_IsDeterministicAndSensitiveToInputs(t *testing.T) {
+	key1 := controlPlaneOutboxKey("upsert", "deployment_target", "chrome", "req-1", []byte(`{"v":1}`))
+	key2 := controlPlaneOutboxKey("upsert", "deployment_target", "chrome", "req-1", []byte(`{"v":1}`))
+	key3 := controlPlaneOutboxKey("upsert", "deployment_target", "chrome", "req-2", []byte(`{"v":1}`))
+	key4 := controlPlaneOutboxKey("delete", "deployment_target", "chrome", "req-1", nil)
+
+	if key1 != key2 {
+		t.Fatalf("expected deterministic key; key1=%q key2=%q", key1, key2)
+	}
+	if key1 == key3 {
+		t.Fatalf("expected key to differ by request id")
+	}
+	if key1 == key4 {
+		t.Fatalf("expected key to differ by action/payload")
+	}
+}
+
+func TestControlPlaneStoreFromDBs(t *testing.T) {
+	if _, err := controlPlaneStoreFromDBs(nil, nil); err == nil {
+		t.Fatalf("expected error when both DBs are nil")
+	}
+
+	sqlDB := newAdminTestDB(t)
+	defer sqlDB.Close()
+
+	store, err := controlPlaneStoreFromDBs(sqlDB, nil)
+	if err != nil {
+		t.Fatalf("expected sqlite store, got error: %v", err)
+	}
+	if store == nil {
+		t.Fatalf("expected non-nil control plane store")
+	}
+
+	if err := store.upsertRecord(context.Background(), "deployment_target", "chrome", map[string]any{"users": "100"}); err != nil {
+		t.Fatalf("expected sqlite upsert through store to succeed: %v", err)
 	}
 }
