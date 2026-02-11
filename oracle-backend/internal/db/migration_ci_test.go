@@ -20,6 +20,7 @@ func TestMigrationBootstrapCleanDatabases(t *testing.T) {
 		"admin_audit_log",
 		"system_alerts",
 		"backup_runs",
+		"oracle_operation_logs",
 	}
 	for _, table := range requiredSQLiteTables {
 		var count int

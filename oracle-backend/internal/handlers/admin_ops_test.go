@@ -176,6 +176,19 @@ func TestRetryOutboxHandler_DoesNotResubmitSentRows(t *testing.T) {
 	}
 }
 
+func TestRetryOutboxHandler_RejectsMalformedJSON(t *testing.T) {
+	sqlDB := newAdminTestDB(t)
+	defer sqlDB.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/admin/outbox/retry", bytes.NewBufferString(`{`))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	RetryOutboxHandler(sqlDB, observability.NewRegistry()).ServeHTTP(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for malformed JSON, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
 func TestReplayDeadLetterHandler_PreservesIdempotencyKeyAndResetsOutboxRow(t *testing.T) {
 	sqlDB := newAdminTestDB(t)
 	defer sqlDB.Close()
@@ -500,6 +513,153 @@ func TestBackupRunHandler_RejectsInvalidFileNames(t *testing.T) {
 		if rr.Code != http.StatusBadRequest {
 			t.Fatalf("expected 400 for %s, got %d: %s", body, rr.Code, rr.Body.String())
 		}
+	}
+}
+
+func TestBackupRunHandler_RejectsMalformedJSON(t *testing.T) {
+	sqlDB := newAdminTestDB(t)
+	defer sqlDB.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/admin/backup/run", bytes.NewBufferString(`{`))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	BackupRunHandler(sqlDB, observability.NewRegistry()).ServeHTTP(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for malformed JSON, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestIngestRawSnapshotRedactsIPData(t *testing.T) {
+	sqlDB := newAdminTestDB(t)
+	defer sqlDB.Close()
+
+	payload := `{
+		"batchId":"batch-redact-1",
+		"generatedAt":1739308800000,
+		"timeZone":"UTC",
+		"summary":{"totals":{"totalEvents":1,"totalDownloads":1,"totalSuccess":1,"totalFail":0}},
+		"timeBuckets":[],
+		"doState":{"ok":true},
+		"uniqueIps":["1.1.1.1","8.8.8.8"],
+		"clientIp":"9.9.9.9",
+		"nested":{"ip_address":"4.4.4.4"}
+	}`
+
+	req := httptest.NewRequest(http.MethodPost, "/ingest-batch", bytes.NewBufferString(payload))
+	req.Header.Set("X-DO-SECRET", "secret")
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	IngestBatchHandler(sqlDB, "secret").ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var rawPayload string
+	if err := sqlDB.QueryRow(`SELECT payload_json FROM cf_snapshots_raw ORDER BY id DESC LIMIT 1`).Scan(&rawPayload); err != nil {
+		t.Fatalf("failed to load raw snapshot payload: %v", err)
+	}
+	if strings.Contains(rawPayload, "1.1.1.1") || strings.Contains(rawPayload, "8.8.8.8") || strings.Contains(rawPayload, "9.9.9.9") || strings.Contains(rawPayload, "4.4.4.4") {
+		t.Fatalf("expected IP values to be redacted, got payload: %s", rawPayload)
+	}
+	if !strings.Contains(rawPayload, "REDACTED") {
+		t.Fatalf("expected redaction markers in payload, got: %s", rawPayload)
+	}
+}
+
+func TestOracleOperationLogsHandlers_ListDeleteAndClear(t *testing.T) {
+	sqlDB := newAdminTestDB(t)
+	defer sqlDB.Close()
+
+	now := time.Now().UnixMilli()
+	if err := InsertOracleOperationLog(context.Background(), sqlDB, OracleOperationLogEntry{
+		TSUTC:         now - int64((10*24*time.Hour)/time.Millisecond),
+		RequestID:     "req-old",
+		CorrelationID: "corr-old",
+		UserID:        "viewer",
+		TokenID:       "tok-old",
+		Role:          "viewer",
+		ActionType:    "admin",
+		ResourceType:  "record",
+		ResourceID:    "old",
+		Method:        "POST",
+		Path:          "/api/admin/records/upsert",
+		StatusCode:    200,
+		Result:        "ok",
+		LatencyMS:     12,
+	}); err != nil {
+		t.Fatalf("insert old oracle operation log failed: %v", err)
+	}
+	if err := InsertOracleOperationLog(context.Background(), sqlDB, OracleOperationLogEntry{
+		TSUTC:         now,
+		RequestID:     "req-new",
+		CorrelationID: "corr-new",
+		UserID:        "super-admin",
+		TokenID:       "tok-new",
+		Role:          "super_admin",
+		ActionType:    "admin",
+		ResourceType:  "record",
+		ResourceID:    "new",
+		Method:        "POST",
+		Path:          "/api/admin/records/delete",
+		StatusCode:    200,
+		Result:        "ok",
+		LatencyMS:     9,
+	}); err != nil {
+		t.Fatalf("insert new oracle operation log failed: %v", err)
+	}
+
+	listReq := httptest.NewRequest(http.MethodGet, "/api/admin/oracle-logs?limit=10", nil)
+	listRR := httptest.NewRecorder()
+	OracleOperationLogsListHandler(sqlDB).ServeHTTP(listRR, listReq)
+	if listRR.Code != http.StatusOK {
+		t.Fatalf("list failed: %d %s", listRR.Code, listRR.Body.String())
+	}
+
+	dryDeleteReq := httptest.NewRequest(http.MethodPost, "/api/admin/oracle-logs/delete-older", bytes.NewBufferString(`{"days":5,"dryRun":true}`))
+	dryDeleteReq.Header.Set("Content-Type", "application/json")
+	dryDeleteRR := httptest.NewRecorder()
+	OracleOperationLogsDeleteOlderHandler(sqlDB).ServeHTTP(dryDeleteRR, dryDeleteReq)
+	if dryDeleteRR.Code != http.StatusOK {
+		t.Fatalf("delete older dry-run failed: %d %s", dryDeleteRR.Code, dryDeleteRR.Body.String())
+	}
+
+	deleteReq := httptest.NewRequest(http.MethodPost, "/api/admin/oracle-logs/delete-older", bytes.NewBufferString(`{"days":5,"dryRun":false}`))
+	deleteReq.Header.Set("Content-Type", "application/json")
+	deleteRR := httptest.NewRecorder()
+	OracleOperationLogsDeleteOlderHandler(sqlDB).ServeHTTP(deleteRR, deleteReq)
+	if deleteRR.Code != http.StatusOK {
+		t.Fatalf("delete older failed: %d %s", deleteRR.Code, deleteRR.Body.String())
+	}
+
+	var remaining int64
+	if err := sqlDB.QueryRow(`SELECT COUNT(*) FROM oracle_operation_logs`).Scan(&remaining); err != nil {
+		t.Fatalf("count after delete older failed: %v", err)
+	}
+	if remaining != 1 {
+		t.Fatalf("expected one row after delete older, got %d", remaining)
+	}
+
+	clearInvalidReq := httptest.NewRequest(http.MethodPost, "/api/admin/oracle-logs/clear-all", bytes.NewBufferString(`{"confirm":"NOPE","dryRun":false}`))
+	clearInvalidReq.Header.Set("Content-Type", "application/json")
+	clearInvalidRR := httptest.NewRecorder()
+	OracleOperationLogsClearAllHandler(sqlDB).ServeHTTP(clearInvalidRR, clearInvalidReq)
+	if clearInvalidRR.Code != http.StatusBadRequest {
+		t.Fatalf("expected clear-all confirm validation failure, got %d", clearInvalidRR.Code)
+	}
+
+	clearReq := httptest.NewRequest(http.MethodPost, "/api/admin/oracle-logs/clear-all", bytes.NewBufferString(`{"confirm":"CLEAR_ALL_LOGS","dryRun":false}`))
+	clearReq.Header.Set("Content-Type", "application/json")
+	clearRR := httptest.NewRecorder()
+	OracleOperationLogsClearAllHandler(sqlDB).ServeHTTP(clearRR, clearReq)
+	if clearRR.Code != http.StatusOK {
+		t.Fatalf("clear-all failed: %d %s", clearRR.Code, clearRR.Body.String())
+	}
+
+	if err := sqlDB.QueryRow(`SELECT COUNT(*) FROM oracle_operation_logs`).Scan(&remaining); err != nil {
+		t.Fatalf("count after clear-all failed: %v", err)
+	}
+	if remaining != 0 {
+		t.Fatalf("expected zero rows after clear-all, got %d", remaining)
 	}
 }
 

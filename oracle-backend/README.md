@@ -141,10 +141,13 @@ All configuration is done via environment variables, defined in `docker-compose.
 | `STATIC_DIR` | `/app/static` | Directory containing dashboard static files. |
 | `DO_SHARED_SECRET` | *(required)* | Shared secret for authenticating Cloudflare Durable Object requests. |
 | `DASHBOARD_PASSWORD` | *(required)* | Password for dashboard login (enables auth). |
+| `SUPER_ADMIN_PASSWORD` | *(required)* | Password for step-up verification on critical admin operations. |
 | `ARCHIVER_SHARED_SECRET` | *(required when auth enabled)* | Secret header for the archiver to read stats. |
 | `ALLOW_LOOPBACK_BYPASS` | `false` | Set `true` to allow loopback auth bypass (dev only). |
 | `ALLOW_INSECURE_COOKIES` | `false` | Set `true` to allow cookies over HTTP (HTTP-only deployments). |
 | `ALLOW_EMPTY_DASHBOARD_PASSWORD` | `false` | Set `true` to allow an empty dashboard password (dev only). |
+
+Startup is **fail-closed** for auth secrets: the server exits if `SUPER_ADMIN_PASSWORD` is missing, and also exits if `DASHBOARD_PASSWORD` is missing while `ALLOW_EMPTY_DASHBOARD_PASSWORD=false`.
 
 When `DASHBOARD_PASSWORD` is set, the Oracle dashboard prompts for authentication using an **in-page login modal form** (not a browser-native prompt), matching the Cloudflare dashboard workflow.
 
@@ -343,6 +346,42 @@ curl "http://localhost:8080/api/pipeline/failures?days=14&limit=200"
 ```
 
 **Auth:** Protected by dashboard session middleware.
+
+---
+
+### `GET /api/admin/oracle-logs` — Oracle Operation Logs
+
+Returns request-level backend operation logs captured by the Oracle server.
+
+**Query params:**
+- `limit` (default `200`, max `2000`)
+- `offset` (default `0`)
+
+---
+
+### `POST /api/admin/oracle-logs/delete-older` — Retention Delete
+
+Deletes Oracle operation logs older than a configured number of days.
+
+**Body:**
+```json
+{ "days": 30, "dryRun": false }
+```
+
+**Auth:** Requires dashboard auth + step-up.
+
+---
+
+### `POST /api/admin/oracle-logs/clear-all` — Clear All Logs
+
+Deletes all Oracle operation logs.
+
+**Body:**
+```json
+{ "confirm": "CLEAR_ALL_LOGS", "dryRun": false }
+```
+
+**Auth:** Requires dashboard auth + step-up.
 
 ---
 
