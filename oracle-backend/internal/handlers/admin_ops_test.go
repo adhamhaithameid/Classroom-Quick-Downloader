@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -202,6 +203,39 @@ func TestSQLExecDryRunDoesNotMutate(t *testing.T) {
 	}
 }
 
+func TestSQLQueryHandler_FeatureDisabled(t *testing.T) {
+	sqlDB := newAdminTestDB(t)
+	defer sqlDB.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/admin/sql/query", bytes.NewBufferString(`{"sql":"SELECT 1"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	SQLQueryHandler(sqlDB).ServeHTTP(rr, req)
+	if rr.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 when sql console flag disabled, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestSQLQueryHandler_RejectsWithMutatingCTE(t *testing.T) {
+	sqlDB := newAdminTestDB(t)
+	defer sqlDB.Close()
+	if _, err := sqlDB.Exec(`UPDATE feature_flags SET enabled = 1 WHERE name = 'feature_sql_console_enabled'`); err != nil {
+		t.Fatalf("failed to enable sql console flag: %v", err)
+	}
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/admin/sql/query",
+		bytes.NewBufferString(`{"sql":"WITH x AS (DELETE FROM system_alerts RETURNING 1) SELECT * FROM x"}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	SQLQueryHandler(sqlDB).ServeHTTP(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for WITH statement on query endpoint, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
 func TestDangerClearDataDryRunAndExec(t *testing.T) {
 	sqlDB := newAdminTestDB(t)
 	defer sqlDB.Close()
@@ -236,6 +270,70 @@ func TestDangerClearDataDryRunAndExec(t *testing.T) {
 	}
 	if count != 0 {
 		t.Fatalf("expected rows to be deleted, got %d", count)
+	}
+}
+
+func TestDangerClearData_FeatureDisabled(t *testing.T) {
+	sqlDB := newAdminTestDB(t)
+	defer sqlDB.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/admin/danger/clear-data", bytes.NewBufferString(`{"scope":"all_non_core","dryRun":true}`))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	DangerClearDataHandler(sqlDB).ServeHTTP(rr, req)
+	if rr.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 when clear-data flag disabled, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestBackupRunHandler_FailureCreatesAlertAndMetric(t *testing.T) {
+	sqlDB := newAdminTestDB(t)
+	defer sqlDB.Close()
+
+	// Force backup directory creation failure by pointing BACKUP_DIR at a file.
+	badPath := filepath.Join(t.TempDir(), "not-a-dir")
+	if err := os.WriteFile(badPath, []byte("x"), 0o644); err != nil {
+		t.Fatalf("seed file failed: %v", err)
+	}
+	prev := os.Getenv("BACKUP_DIR")
+	if err := os.Setenv("BACKUP_DIR", badPath); err != nil {
+		t.Fatalf("setenv failed: %v", err)
+	}
+	defer func() {
+		if prev == "" {
+			_ = os.Unsetenv("BACKUP_DIR")
+		} else {
+			_ = os.Setenv("BACKUP_DIR", prev)
+		}
+	}()
+
+	reg := observability.NewRegistry()
+	req := httptest.NewRequest(http.MethodPost, "/api/admin/backup/run", bytes.NewBufferString(`{"fileName":"x.db"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	BackupRunHandler(sqlDB, reg).ServeHTTP(rr, req)
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500 for backup failure, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var alertCount int64
+	if err := sqlDB.QueryRow(`SELECT COUNT(*) FROM system_alerts WHERE alert_type = 'backup_failed'`).Scan(&alertCount); err != nil {
+		t.Fatalf("query alerts failed: %v", err)
+	}
+	if alertCount == 0 {
+		t.Fatalf("expected backup_failed alert")
+	}
+
+	var runCount int64
+	if err := sqlDB.QueryRow(`SELECT COUNT(*) FROM backup_runs WHERE status = 'error'`).Scan(&runCount); err != nil {
+		t.Fatalf("query backup_runs failed: %v", err)
+	}
+	if runCount == 0 {
+		t.Fatalf("expected error row in backup_runs")
+	}
+
+	if !strings.Contains(reg.RenderPrometheus(), "oracle_backup_failures_total") {
+		t.Fatalf("expected backup failure metric, got: %s", reg.RenderPrometheus())
 	}
 }
 
