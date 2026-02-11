@@ -66,6 +66,49 @@ type SummaryResponse struct {
 	TopType    string `json:"topType"`
 }
 
+func formatMapSorted(m map[string]int64) string {
+	var parts []string
+	for k, v := range m {
+		parts = append(parts, fmt.Sprintf("%s: %d", k, v))
+	}
+	sort.Strings(parts)
+	return strings.Join(parts, "\n")
+}
+
+func calcSuccessRate(totalDownloads, totalSuccess int64) float64 {
+	if totalDownloads <= 0 {
+		return 0
+	}
+	return float64(totalSuccess) / float64(totalDownloads) * 100
+}
+
+func buildArchiveRow(today string, data SummaryResponse) []interface{} {
+	successRate := calcSuccessRate(data.Totals.TotalDownloads, data.Totals.TotalSuccess)
+	return []interface{}{
+		today,                              // A: Date
+		data.Totals.TotalDownloads,         // B: Total Downloads
+		data.Totals.TotalSuccess,           // C: Success Count
+		data.Totals.TotalFail,              // D: Fail Count
+		data.Totals.TotalCancelled,         // E: Cancelled Count
+		fmt.Sprintf("%.2f%%", successRate), // F: Success Rate
+
+		// Top Stats
+		data.TopBrowser, // F: Top Browser
+		data.TopOs,      // G: Top OS
+		data.TopCountry, // H: Top Country
+		data.TopType,    // I: Top File Type
+
+		// Full Data Dumps
+		formatMapSorted(data.Browsers),     // J: All Browsers
+		formatMapSorted(data.Os),           // K: All OS
+		formatMapSorted(data.Countries),    // L: All Countries
+		formatMapSorted(data.Languages),    // M: All Languages
+		formatMapSorted(data.Types),        // N: All File Types
+		formatMapSorted(data.ErrorReasons), // O: All Errors
+		formatMapSorted(data.Versions),     // P: Extension Versions
+	}
+}
+
 func main() {
 	sheetID := flag.String("sheet", "", "Google Sheet ID")
 	credsPath := flag.String("creds", "/app/google-credentials.json", "Path to Service Account JSON")
@@ -119,46 +162,8 @@ func main() {
 	// 2. Prepare Data (UTC)
 	today := time.Now().UTC().Format("2006-01-02")
 
-	// Helper to format map as readable string
-	formatMap := func(m map[string]int64) string {
-		var parts []string
-		for k, v := range m {
-			parts = append(parts, fmt.Sprintf("%s: %d", k, v))
-		}
-		sort.Strings(parts)
-		return strings.Join(parts, "\n")
-	}
-
-	// Calculate Success Rate
-	successRate := 0.0
-	if data.Totals.TotalDownloads > 0 {
-		successRate = float64(data.Totals.TotalSuccess) / float64(data.Totals.TotalDownloads) * 100
-	}
-
 	// 3. Build the "Everything" Row
-	row := []interface{}{
-		today,                              // A: Date
-		data.Totals.TotalDownloads,         // B: Total Downloads
-		data.Totals.TotalSuccess,           // C: Success Count
-		data.Totals.TotalFail,              // D: Fail Count
-		data.Totals.TotalCancelled,         // E: Cancelled Count
-		fmt.Sprintf("%.2f%%", successRate), // F: Success Rate
-
-		// Top Stats
-		data.TopBrowser, // F: Top Browser
-		data.TopOs,      // G: Top OS
-		data.TopCountry, // H: Top Country
-		data.TopType,    // I: Top File Type
-
-		// Full Data Dumps
-		formatMap(data.Browsers),     // J: All Browsers
-		formatMap(data.Os),           // K: All OS
-		formatMap(data.Countries),    // L: All Countries
-		formatMap(data.Languages),    // M: All Languages
-		formatMap(data.Types),        // N: All File Types
-		formatMap(data.ErrorReasons), // O: All Errors
-		formatMap(data.Versions),     // P: Extension Versions
-	}
+	row := buildArchiveRow(today, data)
 
 	// 4. Send to Google
 	ctx := context.Background()
