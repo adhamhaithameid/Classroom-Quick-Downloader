@@ -11,6 +11,9 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MODE="${1:-help}"
+ORACLE_SSH_DEST="${ORACLE_SSH_DEST:-ubuntu@129.151.233.229}"
+ORACLE_SSH_KEY="${ORACLE_SSH_KEY:-$HOME/.ssh/oracle_key}"
+ORACLE_REMOTE_REPO_DIR="${ORACLE_REMOTE_REPO_DIR:-\$HOME/Classroom-Quick-Downloader}"
 
 require_cmd() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -24,17 +27,25 @@ deploy_cloudflare() {
   echo "[cloudflare] validating worker..."
   pnpm -C "$ROOT_DIR/cloudflare-worker" validate
   echo "[cloudflare] deploying worker..."
-  pnpm -C "$ROOT_DIR/cloudflare-worker" deploy
+  pnpm -C "$ROOT_DIR/cloudflare-worker" run deploy
 }
 
 deploy_oracle() {
-  local script_path="$ROOT_DIR/oracle-backend/scripts/deploy_main_inplace.sh"
-  if [[ ! -x "$script_path" ]]; then
-    echo "Oracle deploy script is missing or not executable: $script_path" >&2
+  require_cmd ssh
+  if [[ ! -f "$ORACLE_SSH_KEY" ]]; then
+    echo "Oracle SSH key not found: $ORACLE_SSH_KEY" >&2
     exit 1
   fi
-  echo "[oracle] running in-place deploy..."
-  bash "$script_path"
+  echo "[oracle] deploying remotely via SSH"
+  echo "  target: $ORACLE_SSH_DEST"
+  echo "  key: $ORACLE_SSH_KEY"
+  ssh -i "$ORACLE_SSH_KEY" "$ORACLE_SSH_DEST" "REPO_DIR=$ORACLE_REMOTE_REPO_DIR bash -s" <<'EOF'
+set -euo pipefail
+if [[ ! -d "$REPO_DIR/.git" ]]; then
+  git clone https://github.com/adhamhaithameid/Classroom-Quick-Downloader.git "$REPO_DIR"
+fi
+bash "$REPO_DIR/oracle-backend/scripts/deploy_main_inplace.sh"
+EOF
 }
 
 case "$MODE" in
@@ -54,6 +65,11 @@ Usage:
   ./tools/deploy_manual.sh cloudflare
   ./tools/deploy_manual.sh oracle
   ./tools/deploy_manual.sh all
+
+Environment overrides:
+  ORACLE_SSH_DEST        SSH destination (default: ubuntu@129.151.233.229)
+  ORACLE_SSH_KEY         SSH key path (default: ~/.ssh/oracle_key)
+  ORACLE_REMOTE_REPO_DIR Repo path on server (default: $HOME/Classroom-Quick-Downloader)
 EOF
     ;;
   *)
