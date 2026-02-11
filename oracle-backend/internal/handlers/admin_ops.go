@@ -938,6 +938,7 @@ func BackupRunHandler(db *sql.DB, metrics *observability.Registry) http.HandlerF
 			backupDir = "./data/backups"
 		}
 		if err := os.MkdirAll(backupDir, 0o755); err != nil {
+			recordBackupFailure(r.Context(), db, metrics, filepath.Join(backupDir, baseName), 0, 0, err)
 			http.Error(w, "failed to create backup directory", http.StatusInternalServerError)
 			return
 		}
@@ -949,26 +950,7 @@ func BackupRunHandler(db *sql.DB, metrics *observability.Registry) http.HandlerF
 		finishedAt := time.Now().UnixMilli()
 
 		if err != nil {
-			if metrics != nil {
-				metrics.IncCounter("oracle_backup_failures_total", nil, 1)
-			}
-			_ = upsertOpenAlert(
-				r.Context(),
-				db,
-				"backup_failed",
-				"critical",
-				"backup job failed",
-				map[string]any{"error": truncateAlertError(err.Error()), "path": backupPath},
-			)
-			_, _ = db.ExecContext(
-				r.Context(),
-				`INSERT INTO backup_runs (backup_path, status, error_message, started_at, finished_at)
-				 VALUES (?, 'error', ?, ?, ?)`,
-				backupPath,
-				truncateAlertError(err.Error()),
-				startedAt,
-				finishedAt,
-			)
+			recordBackupFailure(r.Context(), db, metrics, backupPath, startedAt, finishedAt, err)
 			http.Error(w, "backup failed: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -1003,6 +985,43 @@ func BackupRunHandler(db *sql.DB, metrics *observability.Registry) http.HandlerF
 			"finishedAt": finishedAt,
 		})
 	}
+}
+
+func recordBackupFailure(
+	ctx context.Context,
+	db *sql.DB,
+	metrics *observability.Registry,
+	backupPath string,
+	startedAt int64,
+	finishedAt int64,
+	err error,
+) {
+	if startedAt == 0 {
+		startedAt = time.Now().UnixMilli()
+	}
+	if finishedAt == 0 {
+		finishedAt = startedAt
+	}
+	if metrics != nil {
+		metrics.IncCounter("oracle_backup_failures_total", nil, 1)
+	}
+	_ = upsertOpenAlert(
+		ctx,
+		db,
+		"backup_failed",
+		"critical",
+		"backup job failed",
+		map[string]any{"error": truncateAlertError(err.Error()), "path": backupPath},
+	)
+	_, _ = db.ExecContext(
+		ctx,
+		`INSERT INTO backup_runs (backup_path, status, error_message, started_at, finished_at)
+		 VALUES (?, 'error', ?, ?, ?)`,
+		backupPath,
+		truncateAlertError(err.Error()),
+		startedAt,
+		finishedAt,
+	)
 }
 
 func RecordsListHandler(db *sql.DB) http.HandlerFunc {
@@ -1204,7 +1223,7 @@ func normalizeSingleStatement(sqlText string) (string, error) {
 
 func isReadOnlySQL(stmt string) bool {
 	lower := strings.ToLower(strings.TrimSpace(stmt))
-	return strings.HasPrefix(lower, "select ") || strings.HasPrefix(lower, "with ")
+	return strings.HasPrefix(lower, "select ")
 }
 
 func isMutatingSQL(stmt string) bool {
