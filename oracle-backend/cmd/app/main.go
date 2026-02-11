@@ -469,6 +469,11 @@ type stepUpChallenge struct {
 	expiresAt time.Time
 }
 
+type stepUpSession struct {
+	expiresAt          time.Time
+	parentSessionToken string
+}
+
 type stepUpAttempt struct {
 	attempts       int
 	firstAttemptAt time.Time
@@ -482,8 +487,8 @@ var stepUpChallengeStore = struct {
 
 var stepUpSessionStore = struct {
 	sync.RWMutex
-	tokens map[string]time.Time
-}{tokens: make(map[string]time.Time)}
+	tokens map[string]stepUpSession
+}{tokens: make(map[string]stepUpSession)}
 
 var stepUpRateStore = struct {
 	sync.Mutex
@@ -638,7 +643,11 @@ func requireStepUp(db *sql.DB, superAdminPassword string) func(http.Handler) htt
 			}
 
 			cookie, err := r.Cookie(stepUpSessionCookieName)
-			if err != nil || !isValidStepUpSession(cookie.Value) {
+			parentSession := ""
+			if mainCookie, mainErr := r.Cookie(sessionCookieName); mainErr == nil {
+				parentSession = mainCookie.Value
+			}
+			if err != nil || !isValidStepUpSession(cookie.Value, parentSession) {
 				appMetrics.IncCounter("oracle_auth_failures_total", map[string]string{"reason": "stepup_required"}, 1)
 				http.Error(w, `{"error":"step_up_required"}`, http.StatusForbidden)
 				return
@@ -752,6 +761,12 @@ func stepUpVerifyHandler(db *sql.DB, superAdminPassword string, allowInsecureCoo
 			return
 		}
 
+		mainSessionCookie, mainSessionErr := r.Cookie(sessionCookieName)
+		if mainSessionErr != nil || strings.TrimSpace(mainSessionCookie.Value) == "" {
+			http.Error(w, `{"error":"missing_parent_session"}`, http.StatusUnauthorized)
+			return
+		}
+
 		hashedInput := hashPassword(req.Password)
 		if subtle.ConstantTimeCompare([]byte(hashedInput), []byte(storedHash)) != 1 {
 			appMetrics.IncCounter("oracle_stepup_verify_total", map[string]string{"result": "invalid_password"}, 1)
@@ -775,7 +790,10 @@ func stepUpVerifyHandler(db *sql.DB, superAdminPassword string, allowInsecureCoo
 		}
 
 		stepUpSessionStore.Lock()
-		stepUpSessionStore.tokens[token] = time.Now().Add(stepUpSessionDuration)
+		stepUpSessionStore.tokens[token] = stepUpSession{
+			expiresAt:          time.Now().Add(stepUpSessionDuration),
+			parentSessionToken: mainSessionCookie.Value,
+		}
 		stepUpSessionStore.Unlock()
 
 		secureCookie, sameSite := cookieSecurityPolicy(r, allowInsecureCookies)
@@ -823,7 +841,11 @@ func stepUpCheckHandler(db *sql.DB) http.Handler {
 		}
 		active := false
 		if cookie, err := r.Cookie(stepUpSessionCookieName); err == nil {
-			active = isValidStepUpSession(cookie.Value)
+			parent := ""
+			if mainCookie, mainErr := r.Cookie(sessionCookieName); mainErr == nil {
+				parent = mainCookie.Value
+			}
+			active = isValidStepUpSession(cookie.Value, parent)
 		}
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"ok":       true,
@@ -859,15 +881,18 @@ func cleanupExpiredStepUpChallengesLocked(now time.Time) {
 	}
 }
 
-func isValidStepUpSession(token string) bool {
+func isValidStepUpSession(token string, parentSessionToken string) bool {
 	stepUpSessionStore.RLock()
 	defer stepUpSessionStore.RUnlock()
 
-	expiry, exists := stepUpSessionStore.tokens[token]
+	session, exists := stepUpSessionStore.tokens[token]
 	if !exists {
 		return false
 	}
-	if time.Now().After(expiry) {
+	if parentSessionToken != "" && parentSessionToken != session.parentSessionToken {
+		return false
+	}
+	if time.Now().After(session.expiresAt) {
 		go func() {
 			stepUpSessionStore.Lock()
 			delete(stepUpSessionStore.tokens, token)
