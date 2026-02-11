@@ -220,27 +220,40 @@ func TimeSeriesHandler(db *sql.DB) http.HandlerFunc {
 		now := time.Now().UTC()
 		fromStr := q.Get("from")
 		toStr := q.Get("to")
+		rangeName := strings.TrimSpace(strings.ToLower(q.Get("range")))
+		extVersion := strings.TrimSpace(q.Get("extVersion"))
 
 		var fromTime, toTime time.Time
 		var err error
 
-		if fromStr == "" {
-			fromTime = now.AddDate(0, 0, -7)
-		} else {
-			fromTime, err = time.Parse("2006-01-02", fromStr)
+		if rangeName != "" {
+			fromTime, toTime, err = resolveRange(ctx, db, rangeName, now)
 			if err != nil {
-				http.Error(w, "invalid from (expected YYYY-MM-DD)", http.StatusBadRequest)
+				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
-		}
-
-		if toStr == "" {
-			toTime = now
+			if gran == "" || gran == "day" {
+				gran = granularityForRange(rangeName)
+			}
 		} else {
-			toTime, err = time.Parse("2006-01-02", toStr)
-			if err != nil {
-				http.Error(w, "invalid to (expected YYYY-MM-DD)", http.StatusBadRequest)
-				return
+			if fromStr == "" {
+				fromTime = now.AddDate(0, 0, -7)
+			} else {
+				fromTime, err = time.Parse("2006-01-02", fromStr)
+				if err != nil {
+					http.Error(w, "invalid from (expected YYYY-MM-DD)", http.StatusBadRequest)
+					return
+				}
+			}
+
+			if toStr == "" {
+				toTime = now
+			} else {
+				toTime, err = time.Parse("2006-01-02", toStr)
+				if err != nil {
+					http.Error(w, "invalid to (expected YYYY-MM-DD)", http.StatusBadRequest)
+					return
+				}
 			}
 		}
 
@@ -256,9 +269,9 @@ func TimeSeriesHandler(db *sql.DB) http.HandlerFunc {
 
 		switch gran {
 		case "hour":
-			points, err = queryTimeSeriesHour(ctx, db, fromIso, toIso)
+			points, err = queryTimeSeriesHour(ctx, db, fromIso, toIso, extVersion)
 		case "day":
-			points, err = queryTimeSeriesDay(ctx, db, fromIso, toIso)
+			points, err = queryTimeSeriesDay(ctx, db, fromIso, toIso, extVersion)
 		default:
 			http.Error(w, "invalid granularity (use 'hour' or 'day')", http.StatusBadRequest)
 			return
@@ -506,27 +519,37 @@ func ExportHandler(db *sql.DB) http.HandlerFunc {
 		now := time.Now().UTC()
 		fromStr := q.Get("from")
 		toStr := q.Get("to")
+		rangeName := strings.TrimSpace(strings.ToLower(q.Get("range")))
+		extVersion := strings.TrimSpace(q.Get("extVersion"))
 
 		var fromTime, toTime time.Time
 		var err error
 
-		if fromStr == "" {
-			fromTime = now.AddDate(0, 0, -30)
-		} else {
-			fromTime, err = time.Parse("2006-01-02", fromStr)
+		if rangeName != "" {
+			fromTime, toTime, err = resolveRange(ctx, db, rangeName, now)
 			if err != nil {
-				http.Error(w, "invalid from", http.StatusBadRequest)
+				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
-		}
-
-		if toStr == "" {
-			toTime = now
 		} else {
-			toTime, err = time.Parse("2006-01-02", toStr)
-			if err != nil {
-				http.Error(w, "invalid to", http.StatusBadRequest)
-				return
+			if fromStr == "" {
+				fromTime = now.AddDate(0, 0, -30)
+			} else {
+				fromTime, err = time.Parse("2006-01-02", fromStr)
+				if err != nil {
+					http.Error(w, "invalid from", http.StatusBadRequest)
+					return
+				}
+			}
+
+			if toStr == "" {
+				toTime = now
+			} else {
+				toTime, err = time.Parse("2006-01-02", toStr)
+				if err != nil {
+					http.Error(w, "invalid to", http.StatusBadRequest)
+					return
+				}
 			}
 		}
 
@@ -536,9 +559,9 @@ func ExportHandler(db *sql.DB) http.HandlerFunc {
 		var points []timeSeriesPoint
 		switch gran {
 		case "hour":
-			points, err = queryTimeSeriesHour(ctx, db, fromIso, toIso)
+			points, err = queryTimeSeriesHour(ctx, db, fromIso, toIso, extVersion)
 		case "day":
-			points, err = queryTimeSeriesDay(ctx, db, fromIso, toIso)
+			points, err = queryTimeSeriesDay(ctx, db, fromIso, toIso, extVersion)
 		default:
 			http.Error(w, "invalid granularity", http.StatusBadRequest)
 			return
@@ -686,91 +709,135 @@ func loadLastDOSnapshot(ctx context.Context, db *sql.DB) (*summaryDOStateInfo, e
 		&maxBatch,
 	); err != nil {
 		return nil, err
-    }
+	}
 
-    resp := &summaryDOStateInfo{
-        CapturedAt:         capturedAt,
-        TotalEvents:        totalEvents.Int64,
-        TotalDownloads:     totalDown.Int64,
-        TotalSuccess:       totalSucc.Int64,
-        TotalFail:          totalFail.Int64,
-        PendingEvents:      pending.Int64,
-        RequestsToday:      reqToday.Int64,
-        QuotaLevel:         quotaLevel.String,
-        ModeLabel:          modeLabel.String,
-        RemoteEnabled:      remote.Valid && remote.Int64 != 0,
-        BatchSizeSuggestion: batchSizeSug.Int64,
-        MaxBatchEvents:     maxBatch.Int64,
-    }
+	resp := &summaryDOStateInfo{
+		CapturedAt:          capturedAt,
+		TotalEvents:         totalEvents.Int64,
+		TotalDownloads:      totalDown.Int64,
+		TotalSuccess:        totalSucc.Int64,
+		TotalFail:           totalFail.Int64,
+		PendingEvents:       pending.Int64,
+		RequestsToday:       reqToday.Int64,
+		QuotaLevel:          quotaLevel.String,
+		ModeLabel:           modeLabel.String,
+		RemoteEnabled:       remote.Valid && remote.Int64 != 0,
+		BatchSizeSuggestion: batchSizeSug.Int64,
+		MaxBatchEvents:      maxBatch.Int64,
+	}
 
-    if lastEventAt.Valid {
-        v := lastEventAt.Int64
-        resp.LastEventAt = &v
-    }
-    if lastFlushAt.Valid {
-        v := lastFlushAt.Int64
-        resp.LastFlushAt = &v
-    }
+	if lastEventAt.Valid {
+		v := lastEventAt.Int64
+		resp.LastEventAt = &v
+	}
+	if lastFlushAt.Valid {
+		v := lastFlushAt.Int64
+		resp.LastFlushAt = &v
+	}
 
-    return resp, nil
+	return resp, nil
 }
 
 func deriveStatusAndFlags(lastBatch *summaryBatchInfo, doSnapshot *summaryDOStateInfo) (string, []string) {
-    nowMs := time.Now().UnixMilli()
-    flags := []string{}
+	nowMs := time.Now().UnixMilli()
+	flags := []string{}
 
-    var lastIngestAt int64
-    if lastBatch != nil {
-        lastIngestAt = lastBatch.IngestedAt
-    }
+	var lastIngestAt int64
+	if lastBatch != nil {
+		lastIngestAt = lastBatch.IngestedAt
+	}
 
-    status := "unknown"
-    if lastIngestAt == 0 {
-        status = "cold"
-    } else {
-        ageMs := nowMs - lastIngestAt
-        switch {
-        case ageMs < 5*60*1000:
-            status = "online"
-        case ageMs < 24*60*60*1000:
-            status = "stale"
-        default:
-            status = "idle"
-        }
-    }
+	status := "unknown"
+	if lastIngestAt == 0 {
+		status = "cold"
+	} else {
+		ageMs := nowMs - lastIngestAt
+		switch {
+		case ageMs < 5*60*1000:
+			status = "online"
+		case ageMs < 24*60*60*1000:
+			status = "stale"
+		default:
+			status = "idle"
+		}
+	}
 
-    if doSnapshot != nil {
-        if doSnapshot.RemoteEnabled {
-            flags = append(flags, "remote_enabled")
-        } else {
-            flags = append(flags, "remote_disabled")
-        }
-        if doSnapshot.PendingEvents > 0 {
-            flags = append(flags, "backlog")
-        }
-    }
+	if doSnapshot != nil {
+		if doSnapshot.RemoteEnabled {
+			flags = append(flags, "remote_enabled")
+		} else {
+			flags = append(flags, "remote_disabled")
+		}
+		if doSnapshot.PendingEvents > 0 {
+			flags = append(flags, "backlog")
+		}
+	}
 
-    if lastBatch == nil {
-        flags = append(flags, "no_batches_yet")
-    }
+	if lastBatch == nil {
+		flags = append(flags, "no_batches_yet")
+	}
 
-    return status, flags
+	return status, flags
 }
 
 func getTopKey(m map[string]int64) string {
-    topKey := "unknown"
-    var maxVal int64 = -1
-    for k, v := range m {
-        if v > maxVal {
-            maxVal = v
-            topKey = k
-        }
-    }
-    return topKey
+	topKey := "unknown"
+	var maxVal int64 = -1
+	for k, v := range m {
+		if v > maxVal {
+			maxVal = v
+			topKey = k
+		}
+	}
+	return topKey
 }
 
-func queryTimeSeriesHour(ctx context.Context, db *sql.DB, fromIso, toIso string) ([]timeSeriesPoint, error) {
-    rows, err := db.QueryContext(ctx, `
+func granularityForRange(rangeName string) string {
+	switch rangeName {
+	case "today":
+		return "hour"
+	default:
+		return "day"
+	}
+}
+
+func resolveRange(ctx context.Context, db *sql.DB, rangeName string, now time.Time) (time.Time, time.Time, error) {
+	switch rangeName {
+	case "today":
+		start := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+		return start, start, nil
+	case "week":
+		return now.AddDate(0, 0, -6), now, nil
+	case "month":
+		start := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+		return start, now, nil
+	case "year":
+		start := time.Date(now.Year(), time.January, 1, 0, 0, 0, 0, time.UTC)
+		return start, now, nil
+	case "all", "all_time", "alltime":
+		var minDay sql.NullString
+		err := db.QueryRowContext(ctx, `SELECT MIN(substr(bucket_start, 1, 10)) FROM downloads_hourly`).Scan(&minDay)
+		if err != nil {
+			return time.Time{}, time.Time{}, err
+		}
+		if minDay.Valid && strings.TrimSpace(minDay.String) != "" {
+			from, parseErr := time.Parse("2006-01-02", minDay.String)
+			if parseErr != nil {
+				return time.Time{}, time.Time{}, parseErr
+			}
+			return from, now, nil
+		}
+		return now, now, nil
+	default:
+		return time.Time{}, time.Time{}, errors.New("invalid range (use today|week|month|year|all)")
+	}
+}
+
+func queryTimeSeriesHour(ctx context.Context, db *sql.DB, fromIso, toIso, extVersion string) ([]timeSeriesPoint, error) {
+	if strings.TrimSpace(extVersion) != "" {
+		return queryTimeSeriesHourByVersion(ctx, db, fromIso, toIso, extVersion)
+	}
+	rows, err := db.QueryContext(ctx, `
         SELECT bucket_start,
                COALESCE(SUM(total_downloads), 0),
                COALESCE(SUM(total_success), 0),
@@ -780,35 +847,38 @@ func queryTimeSeriesHour(ctx context.Context, db *sql.DB, fromIso, toIso string)
         GROUP BY bucket_start
         ORDER BY bucket_start ASC
     `, fromIso, toIso)
-    if err != nil {
-        return nil, err
-    }
-    defer rows.Close()
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
 
-    var out []timeSeriesPoint
-    for rows.Next() {
-        var ts string
-        var d, s, f int64
-        if err := rows.Scan(&ts, &d, &s, &f); err != nil {
-            return nil, err
-        }
-        var rate float64
-        if d > 0 {
-            rate = float64(s) / float64(d)
-        }
-        out = append(out, timeSeriesPoint{
-            Timestamp:   ts,
-            Downloads:   d,
-            Success:     s,
-            Fail:        f,
-            SuccessRate: rate,
-        })
-    }
-    return out, rows.Err()
+	var out []timeSeriesPoint
+	for rows.Next() {
+		var ts string
+		var d, s, f int64
+		if err := rows.Scan(&ts, &d, &s, &f); err != nil {
+			return nil, err
+		}
+		var rate float64
+		if d > 0 {
+			rate = float64(s) / float64(d)
+		}
+		out = append(out, timeSeriesPoint{
+			Timestamp:   ts,
+			Downloads:   d,
+			Success:     s,
+			Fail:        f,
+			SuccessRate: rate,
+		})
+	}
+	return out, rows.Err()
 }
 
-func queryTimeSeriesDay(ctx context.Context, db *sql.DB, fromIso, toIso string) ([]timeSeriesPoint, error) {
-    rows, err := db.QueryContext(ctx, `
+func queryTimeSeriesDay(ctx context.Context, db *sql.DB, fromIso, toIso, extVersion string) ([]timeSeriesPoint, error) {
+	if strings.TrimSpace(extVersion) != "" {
+		return queryTimeSeriesDayByVersion(ctx, db, fromIso, toIso, extVersion)
+	}
+	rows, err := db.QueryContext(ctx, `
         SELECT substr(bucket_start, 1, 10) AS day,
                SUM(total_downloads),
                SUM(total_success),
@@ -818,104 +888,264 @@ func queryTimeSeriesDay(ctx context.Context, db *sql.DB, fromIso, toIso string) 
         GROUP BY day
         ORDER BY day ASC
     `, fromIso, toIso)
-    if err != nil {
-        return nil, err
-    }
-    defer rows.Close()
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
 
-    var out []timeSeriesPoint
-    for rows.Next() {
-        var day string
-        var d, s, f int64
-        if err := rows.Scan(&day, &d, &s, &f); err != nil {
-            return nil, err
-        }
-        var rate float64
-        if d > 0 {
-            rate = float64(s) / float64(d)
-        }
-        out = append(out, timeSeriesPoint{
-            Timestamp:   day,
-            Downloads:   d,
-            Success:     s,
-            Fail:        f,
-            SuccessRate: rate,
-        })
-    }
-    return out, rows.Err()
+	var out []timeSeriesPoint
+	for rows.Next() {
+		var day string
+		var d, s, f int64
+		if err := rows.Scan(&day, &d, &s, &f); err != nil {
+			return nil, err
+		}
+		var rate float64
+		if d > 0 {
+			rate = float64(s) / float64(d)
+		}
+		out = append(out, timeSeriesPoint{
+			Timestamp:   day,
+			Downloads:   d,
+			Success:     s,
+			Fail:        f,
+			SuccessRate: rate,
+		})
+	}
+	return out, rows.Err()
+}
+
+func queryTimeSeriesHourByVersion(ctx context.Context, db *sql.DB, fromIso, toIso, extVersion string) ([]timeSeriesPoint, error) {
+	rows, err := db.QueryContext(ctx, `
+		SELECT bucket_start,
+		       total_downloads,
+		       total_success,
+		       total_fail,
+		       by_ext_ver_json
+		FROM downloads_hourly
+		WHERE bucket_start >= ? AND bucket_start < ?
+		ORDER BY bucket_start ASC
+	`, fromIso, toIso)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	type aggRow struct {
+		Downloads int64
+		Success   int64
+		Fail      int64
+	}
+	agg := make(map[string]*aggRow)
+	keys := make([]string, 0, 256)
+	seen := make(map[string]struct{})
+	for rows.Next() {
+		var ts string
+		var totalDownloads, totalSuccess, totalFail int64
+		var byVersion sql.NullString
+		if err := rows.Scan(&ts, &totalDownloads, &totalSuccess, &totalFail, &byVersion); err != nil {
+			return nil, err
+		}
+
+		versionDownloads := extractVersionCount(byVersion.String, extVersion)
+		if versionDownloads <= 0 {
+			continue
+		}
+		if _, ok := agg[ts]; !ok {
+			agg[ts] = &aggRow{}
+		}
+		row := agg[ts]
+		row.Downloads += versionDownloads
+		row.Success += proportionalSplit(versionDownloads, totalDownloads, totalSuccess)
+		row.Fail += proportionalSplit(versionDownloads, totalDownloads, totalFail)
+		if _, ok := seen[ts]; !ok {
+			keys = append(keys, ts)
+			seen[ts] = struct{}{}
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	sort.Strings(keys)
+	out := make([]timeSeriesPoint, 0, len(keys))
+	for _, ts := range keys {
+		row := agg[ts]
+		rate := 0.0
+		if row.Downloads > 0 {
+			rate = float64(row.Success) / float64(row.Downloads)
+		}
+		out = append(out, timeSeriesPoint{
+			Timestamp:   ts,
+			Downloads:   row.Downloads,
+			Success:     row.Success,
+			Fail:        row.Fail,
+			SuccessRate: rate,
+		})
+	}
+	return out, nil
+}
+
+func queryTimeSeriesDayByVersion(ctx context.Context, db *sql.DB, fromIso, toIso, extVersion string) ([]timeSeriesPoint, error) {
+	rows, err := db.QueryContext(ctx, `
+		SELECT substr(bucket_start, 1, 10) AS day,
+		       total_downloads,
+		       total_success,
+		       total_fail,
+		       by_ext_ver_json
+		FROM downloads_hourly
+		WHERE bucket_start >= ? AND bucket_start < ?
+		ORDER BY day ASC
+	`, fromIso, toIso)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	type aggRow struct {
+		Downloads int64
+		Success   int64
+		Fail      int64
+	}
+	agg := make(map[string]*aggRow)
+	keys := make([]string, 0, 256)
+	seen := make(map[string]struct{})
+	for rows.Next() {
+		var day string
+		var totalDownloads, totalSuccess, totalFail int64
+		var byVersion sql.NullString
+		if err := rows.Scan(&day, &totalDownloads, &totalSuccess, &totalFail, &byVersion); err != nil {
+			return nil, err
+		}
+
+		versionDownloads := extractVersionCount(byVersion.String, extVersion)
+		if versionDownloads <= 0 {
+			continue
+		}
+		if _, ok := agg[day]; !ok {
+			agg[day] = &aggRow{}
+		}
+		row := agg[day]
+		row.Downloads += versionDownloads
+		row.Success += proportionalSplit(versionDownloads, totalDownloads, totalSuccess)
+		row.Fail += proportionalSplit(versionDownloads, totalDownloads, totalFail)
+		if _, ok := seen[day]; !ok {
+			keys = append(keys, day)
+			seen[day] = struct{}{}
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	sort.Strings(keys)
+	out := make([]timeSeriesPoint, 0, len(keys))
+	for _, day := range keys {
+		row := agg[day]
+		rate := 0.0
+		if row.Downloads > 0 {
+			rate = float64(row.Success) / float64(row.Downloads)
+		}
+		out = append(out, timeSeriesPoint{
+			Timestamp:   day,
+			Downloads:   row.Downloads,
+			Success:     row.Success,
+			Fail:        row.Fail,
+			SuccessRate: rate,
+		})
+	}
+	return out, nil
+}
+
+func extractVersionCount(raw string, extVersion string) int64 {
+	if strings.TrimSpace(raw) == "" || strings.TrimSpace(extVersion) == "" {
+		return 0
+	}
+	var m map[string]int64
+	if err := json.Unmarshal([]byte(raw), &m); err != nil {
+		return 0
+	}
+	return m[extVersion]
+}
+
+func proportionalSplit(versionDownloads, totalDownloads, totalCategory int64) int64 {
+	if versionDownloads <= 0 || totalDownloads <= 0 || totalCategory <= 0 {
+		return 0
+	}
+	return int64(float64(versionDownloads)*float64(totalCategory)/float64(totalDownloads) + 0.5)
 }
 
 func columnForDimension(dim string) (string, error) {
-    switch dim {
-    case "status":
-        return "by_status_json", nil
-    case "type":
-        return "by_type_json", nil
-    case "browser":
-        return "by_browser_json", nil
-    case "os":
-        return "by_os_json", nil
-    case "country":
-        return "by_country_json", nil
-    case "lang", "language":
-        return "by_lang_json", nil
-    case "ext_version", "extVersion":
-        return "by_ext_ver_json", nil
-    case "error_type", "errorType":
-        return "by_error_type_json", nil
-    default:
-        return "", errors.New("invalid dimension")
-    }
+	switch dim {
+	case "status":
+		return "by_status_json", nil
+	case "type":
+		return "by_type_json", nil
+	case "browser":
+		return "by_browser_json", nil
+	case "os":
+		return "by_os_json", nil
+	case "country":
+		return "by_country_json", nil
+	case "lang", "language":
+		return "by_lang_json", nil
+	case "ext_version", "extVersion":
+		return "by_ext_ver_json", nil
+	case "error_type", "errorType":
+		return "by_error_type_json", nil
+	default:
+		return "", errors.New("invalid dimension")
+	}
 }
 
 func queryBreakdown(ctx context.Context, db *sql.DB, jsonColumn, fromIso, toIso string) ([]breakdownValue, error) {
-    query := `
+	query := `
         SELECT ` + jsonColumn + `
         FROM downloads_hourly
         WHERE bucket_start >= ? AND bucket_start < ?
     `
-    rows, err := db.QueryContext(ctx, query, fromIso, toIso)
-    if err != nil {
-        return nil, err
-    }
-    defer rows.Close()
+	rows, err := db.QueryContext(ctx, query, fromIso, toIso)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
 
-    agg := map[string]int64{}
-    for rows.Next() {
-        var js sql.NullString
-        if err := rows.Scan(&js); err != nil {
-            return nil, err
-        }
-        if !js.Valid || js.String == "" {
-            continue
-        }
-        var m map[string]int64
-        if err := json.Unmarshal([]byte(js.String), &m); err != nil {
-            continue
-        }
-        for k, v := range m {
-            agg[k] += v
-        }
-    }
-    if err := rows.Err(); err != nil {
-        return nil, err
-    }
+	agg := map[string]int64{}
+	for rows.Next() {
+		var js sql.NullString
+		if err := rows.Scan(&js); err != nil {
+			return nil, err
+		}
+		if !js.Valid || js.String == "" {
+			continue
+		}
+		var m map[string]int64
+		if err := json.Unmarshal([]byte(js.String), &m); err != nil {
+			continue
+		}
+		for k, v := range m {
+			agg[k] += v
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 
-    out := make([]breakdownValue, 0, len(agg))
-    for k, v := range agg {
-        out = append(out, breakdownValue{
-            Value: k,
-            Count: v,
-        })
-    }
-    return out, nil
+	out := make([]breakdownValue, 0, len(agg))
+	for k, v := range agg {
+		out = append(out, breakdownValue{
+			Value: k,
+			Count: v,
+		})
+	}
+	return out, nil
 }
 
 func queryPeriodTotals(ctx context.Context, db *sql.DB, from, to time.Time) (periodData, error) {
-    fromIso := from.UTC().Format(time.RFC3339)
-    toIso := to.AddDate(0, 0, 1).UTC().Format(time.RFC3339)
+	fromIso := from.UTC().Format(time.RFC3339)
+	toIso := to.AddDate(0, 0, 1).UTC().Format(time.RFC3339)
 
-    row := db.QueryRowContext(ctx, `
+	row := db.QueryRowContext(ctx, `
         SELECT COALESCE(SUM(total_downloads), 0),
                COALESCE(SUM(total_success), 0),
                COALESCE(SUM(total_fail), 0)
@@ -923,34 +1153,34 @@ func queryPeriodTotals(ctx context.Context, db *sql.DB, from, to time.Time) (per
         WHERE bucket_start >= ? AND bucket_start < ?
     `, fromIso, toIso)
 
-    var d, s, f int64
-    if err := row.Scan(&d, &s, &f); err != nil {
-        return periodData{}, err
-    }
+	var d, s, f int64
+	if err := row.Scan(&d, &s, &f); err != nil {
+		return periodData{}, err
+	}
 
-    var rate float64
-    if d > 0 {
-        rate = float64(s) / float64(d)
-    }
+	var rate float64
+	if d > 0 {
+		rate = float64(s) / float64(d)
+	}
 
-    return periodData{
-        Downloads: d,
-        Success:   s,
-        Fail:      f,
-        Rate:      rate,
-    }, nil
+	return periodData{
+		Downloads: d,
+		Success:   s,
+		Fail:      f,
+		Rate:      rate,
+	}, nil
 }
 
 func calcChange(old, new int64) string {
-    if old == 0 {
-        if new == 0 {
-            return "0%"
-        }
-        return "+∞"
-    }
-    pct := float64(new-old) / float64(old) * 100
-    if pct >= 0 {
-        return "+" + strconv.FormatFloat(pct, 'f', 1, 64) + "%"
-    }
-    return strconv.FormatFloat(pct, 'f', 1, 64) + "%"
+	if old == 0 {
+		if new == 0 {
+			return "0%"
+		}
+		return "+∞"
+	}
+	pct := float64(new-old) / float64(old) * 100
+	if pct >= 0 {
+		return "+" + strconv.FormatFloat(pct, 'f', 1, 64) + "%"
+	}
+	return strconv.FormatFloat(pct, 'f', 1, 64) + "%"
 }
