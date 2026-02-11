@@ -176,3 +176,38 @@ func TestRelayRunOnce_SkipsWhenSyncFlagDisabled(t *testing.T) {
 		t.Fatalf("expected pending when sync disabled, got %s", status)
 	}
 }
+
+func TestRelayRunOnce_ReclaimsStaleProcessingRows(t *testing.T) {
+	sqlDB := newRelayTestDB(t)
+	defer sqlDB.Close()
+
+	nowMs := time.Now().UnixMilli()
+	res, err := sqlDB.Exec(
+		`INSERT INTO ingest_outbox (event_type, payload_json, idempotency_key, status, attempts, last_error, created_at, next_run_at)
+		 VALUES ('ingest_batch_committed', '{"batchId":"b2"}', 'k-stale', 'processing', 1, '', ?, ?)`,
+		nowMs,
+		nowMs-1000,
+	)
+	if err != nil {
+		t.Fatalf("insert stale processing row failed: %v", err)
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		t.Fatalf("last insert id failed: %v", err)
+	}
+
+	r := NewSQLiteToPostgresRelay(sqlDB, nil, observability.NewRegistry())
+	r.writeFn = func(context.Context, string, string, string) error { return nil }
+	if err := r.runOnce(context.Background()); err != nil {
+		t.Fatalf("runOnce failed: %v", err)
+	}
+
+	var status string
+	var attempts int64
+	if err := sqlDB.QueryRow(`SELECT status, attempts FROM ingest_outbox WHERE id = ?`, id).Scan(&status, &attempts); err != nil {
+		t.Fatalf("query row failed: %v", err)
+	}
+	if status != "sent" || attempts != 2 {
+		t.Fatalf("expected stale processing row to be reclaimed and sent, got %s/%d", status, attempts)
+	}
+}
