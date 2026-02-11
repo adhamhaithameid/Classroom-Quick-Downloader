@@ -77,7 +77,7 @@ func main() {
 	}
 
 	// Ensure data directory exists.
-	if err := os.MkdirAll(filepath.Dir(dbPath), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(dbPath), 0o750); err != nil {
 		log.Fatalf("failed to create data dir: %v", err)
 	}
 
@@ -421,7 +421,11 @@ func runArchiver(sheetsID, credsPath, kumaPushURL, archiverSecret string) {
 
 	// Note: In production, the archiver binary should be at /app/archiver
 	// For development, set ARCHIVER_PATH env var
-	archiverPath := getenv("ARCHIVER_PATH", "/app/archiver")
+	archiverPath, err := resolveArchiverPath(getenv("ARCHIVER_PATH", "/app/archiver"))
+	if err != nil {
+		log.Printf("[Scheduler] Invalid archiver path: %v", err)
+		return
+	}
 
 	cmd := exec.Command(archiverPath, args...)
 	cmd.Stdout = os.Stdout
@@ -432,6 +436,30 @@ func runArchiver(sheetsID, credsPath, kumaPushURL, archiverSecret string) {
 	} else {
 		log.Println("[Scheduler] Sheets export completed successfully")
 	}
+}
+
+func resolveArchiverPath(configuredPath string) (string, error) {
+	p := strings.TrimSpace(configuredPath)
+	if p == "" {
+		return "", errors.New("empty path")
+	}
+
+	absPath, err := filepath.Abs(p)
+	if err != nil {
+		return "", err
+	}
+	info, err := os.Stat(absPath)
+	if err != nil {
+		return "", err
+	}
+	if info.IsDir() {
+		return "", errors.New("path points to directory")
+	}
+	if info.Mode()&0o111 == 0 {
+		return "", errors.New("binary is not executable")
+	}
+
+	return absPath, nil
 }
 
 // =============================================================================

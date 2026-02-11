@@ -482,6 +482,27 @@ func TestBackupRunHandler_FailureCreatesAlertAndMetric(t *testing.T) {
 	}
 }
 
+func TestBackupRunHandler_RejectsInvalidFileNames(t *testing.T) {
+	sqlDB := newAdminTestDB(t)
+	defer sqlDB.Close()
+
+	cases := []string{
+		`{"fileName":"../escape.db"}`,
+		`{"fileName":"..\\escape.db"}`,
+		`{"fileName":"backup.txt"}`,
+		`{"fileName":"bad name.db"}`,
+	}
+	for _, body := range cases {
+		req := httptest.NewRequest(http.MethodPost, "/api/admin/backup/run", bytes.NewBufferString(body))
+		req.Header.Set("Content-Type", "application/json")
+		rr := httptest.NewRecorder()
+		BackupRunHandler(sqlDB, observability.NewRegistry()).ServeHTTP(rr, req)
+		if rr.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400 for %s, got %d: %s", body, rr.Code, rr.Body.String())
+		}
+	}
+}
+
 func TestRecordsCRUDHandlers(t *testing.T) {
 	sqlDB := newAdminTestDB(t)
 	defer sqlDB.Close()
@@ -541,5 +562,48 @@ func TestCanonicalJSON_SortsNestedMapsDeterministically(t *testing.T) {
 	want := `{"a":1,"z":{"a":2,"b":1}}`
 	if raw != want {
 		t.Fatalf("unexpected canonical JSON: got %s want %s", raw, want)
+	}
+}
+
+func TestBackupFileNameOrDefault_Validation(t *testing.T) {
+	now := time.Unix(1700000000, 0).UTC()
+
+	name, err := backupFileNameOrDefault("", now)
+	if err != nil {
+		t.Fatalf("unexpected error for default name: %v", err)
+	}
+	if name != "oracle-backup-1700000000.db" {
+		t.Fatalf("unexpected default name: %s", name)
+	}
+
+	valid, err := backupFileNameOrDefault("safe-file_1.db", now)
+	if err != nil {
+		t.Fatalf("unexpected error for valid name: %v", err)
+	}
+	if valid != "safe-file_1.db" {
+		t.Fatalf("unexpected valid name: %s", valid)
+	}
+
+	invalid := []string{"../x.db", "..\\x.db", "x.txt", "name with spaces.db", "x.db/../y.db"}
+	for _, v := range invalid {
+		if _, err := backupFileNameOrDefault(v, now); err == nil {
+			t.Fatalf("expected validation error for %q", v)
+		}
+	}
+}
+
+func TestResolveBackupPath_RejectsTraversal(t *testing.T) {
+	baseDir := t.TempDir()
+
+	_, path, err := resolveBackupPath(baseDir, "a.db")
+	if err != nil {
+		t.Fatalf("unexpected error resolving valid path: %v", err)
+	}
+	if !strings.HasSuffix(path, string(filepath.Separator)+"a.db") {
+		t.Fatalf("unexpected path: %s", path)
+	}
+
+	if _, _, err := resolveBackupPath(baseDir, "../escape.db"); err == nil {
+		t.Fatalf("expected traversal rejection")
 	}
 }

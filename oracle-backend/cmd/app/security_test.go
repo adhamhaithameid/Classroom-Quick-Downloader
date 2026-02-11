@@ -56,6 +56,41 @@ func TestSpaHandler_AllowsStaticFilesAndBlocksTraversal(t *testing.T) {
 	}
 }
 
+func TestResolveArchiverPath_Validation(t *testing.T) {
+	tmp := t.TempDir()
+	execPath := filepath.Join(tmp, "archiver")
+	if err := os.WriteFile(execPath, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatalf("failed to write exec file: %v", err)
+	}
+
+	resolved, err := resolveArchiverPath(execPath)
+	if err != nil {
+		t.Fatalf("expected executable file to resolve, got error: %v", err)
+	}
+	expected, err := filepath.Abs(execPath)
+	if err != nil {
+		t.Fatalf("filepath.Abs failed: %v", err)
+	}
+	if resolved != expected {
+		t.Fatalf("unexpected resolved path: got %s want %s", resolved, expected)
+	}
+
+	if _, err := resolveArchiverPath(""); err == nil {
+		t.Fatalf("expected empty path to fail")
+	}
+	if _, err := resolveArchiverPath(tmp); err == nil {
+		t.Fatalf("expected directory path to fail")
+	}
+
+	nonExecPath := filepath.Join(tmp, "archiver.txt")
+	if err := os.WriteFile(nonExecPath, []byte("plain"), 0o644); err != nil {
+		t.Fatalf("failed to write non-exec file: %v", err)
+	}
+	if _, err := resolveArchiverPath(nonExecPath); err == nil {
+		t.Fatalf("expected non-executable file to fail")
+	}
+}
+
 func TestAuthMiddleware_EnforcesSessionWhenEnabled(t *testing.T) {
 	resetSessionStore()
 	protected := requireAuth("secret", "", false)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {

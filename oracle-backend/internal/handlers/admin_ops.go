@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -237,9 +238,10 @@ func RetryOutboxHandler(db *sql.DB, metrics *observability.Registry) http.Handle
 				placeholders = append(placeholders, "?")
 				args = append(args, id)
 			}
+			// #nosec G202 -- placeholders are generated in-process and ids are bound parameters.
 			q := `UPDATE ingest_outbox
-				  SET status = 'pending', next_run_at = ?, last_error = ''
-				  WHERE status IN ('retry', 'dead') AND id IN (` + strings.Join(placeholders, ",") + `)`
+					  SET status = 'pending', next_run_at = ?, last_error = ''
+					  WHERE status IN ('retry', 'dead') AND id IN (` + strings.Join(placeholders, ",") + `)`
 			res, err = db.ExecContext(r.Context(), q, args...)
 		}
 		if err != nil {
@@ -668,6 +670,81 @@ type clearDataRequest struct {
 	DryRun bool   `json:"dryRun"`
 }
 
+type clearDataTableSQL struct {
+	countStmt  string
+	deleteStmt string
+}
+
+var clearDataSQLByTable = map[string]clearDataTableSQL{
+	"pipeline_failure_logs": {
+		countStmt:  `SELECT COUNT(*) FROM pipeline_failure_logs`,
+		deleteStmt: `DELETE FROM pipeline_failure_logs`,
+	},
+	"ingest_outbox": {
+		countStmt:  `SELECT COUNT(*) FROM ingest_outbox`,
+		deleteStmt: `DELETE FROM ingest_outbox`,
+	},
+	"outbox_dead_letter": {
+		countStmt:  `SELECT COUNT(*) FROM outbox_dead_letter`,
+		deleteStmt: `DELETE FROM outbox_dead_letter`,
+	},
+	"system_alerts": {
+		countStmt:  `SELECT COUNT(*) FROM system_alerts`,
+		deleteStmt: `DELETE FROM system_alerts`,
+	},
+	"cf_snapshots_raw": {
+		countStmt:  `SELECT COUNT(*) FROM cf_snapshots_raw`,
+		deleteStmt: `DELETE FROM cf_snapshots_raw`,
+	},
+	"cf_schema_registry": {
+		countStmt:  `SELECT COUNT(*) FROM cf_schema_registry`,
+		deleteStmt: `DELETE FROM cf_schema_registry`,
+	},
+	"backup_runs": {
+		countStmt:  `SELECT COUNT(*) FROM backup_runs`,
+		deleteStmt: `DELETE FROM backup_runs`,
+	},
+}
+
+var backupFileNamePattern = regexp.MustCompile(`^[a-zA-Z0-9._-]+\.db$`)
+
+func backupFileNameOrDefault(input string, now time.Time) (string, error) {
+	name := strings.TrimSpace(input)
+	if name == "" {
+		name = fmt.Sprintf("oracle-backup-%d.db", now.UTC().Unix())
+	}
+	if strings.ContainsAny(name, `/\`) {
+		return "", errors.New("invalid file name")
+	}
+	if filepath.Base(name) != name {
+		return "", errors.New("invalid file name")
+	}
+	if strings.Contains(name, "..") {
+		return "", errors.New("invalid file name")
+	}
+	if !backupFileNamePattern.MatchString(name) {
+		return "", errors.New("invalid file name")
+	}
+	return name, nil
+}
+
+func resolveBackupPath(baseDir string, fileName string) (string, string, error) {
+	absDir, err := filepath.Abs(baseDir)
+	if err != nil {
+		return "", "", err
+	}
+	joined := filepath.Join(absDir, fileName)
+	cleaned := filepath.Clean(joined)
+	rel, err := filepath.Rel(absDir, cleaned)
+	if err != nil {
+		return "", "", err
+	}
+	if rel == "." || strings.HasPrefix(rel, "..") || filepath.IsAbs(rel) {
+		return "", "", errors.New("invalid backup path")
+	}
+	return absDir, cleaned, nil
+}
+
 type recordUpsertRequest struct {
 	RecordType string         `json:"recordType"`
 	RecordKey  string         `json:"recordKey"`
@@ -890,8 +967,13 @@ func DangerClearDataHandler(db *sql.DB) http.HandlerFunc {
 
 		counts := make(map[string]int64, len(tables))
 		for _, table := range tables {
+			sqlDef, ok := clearDataSQLByTable[table]
+			if !ok {
+				http.Error(w, "invalid scope", http.StatusBadRequest)
+				return
+			}
 			var count int64
-			if err := db.QueryRowContext(r.Context(), `SELECT COUNT(*) FROM `+table).Scan(&count); err != nil {
+			if err := db.QueryRowContext(r.Context(), sqlDef.countStmt).Scan(&count); err != nil {
 				http.Error(w, "failed to count rows", http.StatusInternalServerError)
 				return
 			}
@@ -928,7 +1010,12 @@ func DangerClearDataHandler(db *sql.DB) http.HandlerFunc {
 
 		removed := make(map[string]int64, len(tables))
 		for _, table := range tables {
-			res, err := tx.ExecContext(r.Context(), `DELETE FROM `+table)
+			sqlDef, ok := clearDataSQLByTable[table]
+			if !ok {
+				http.Error(w, "invalid scope", http.StatusBadRequest)
+				return
+			}
+			res, err := tx.ExecContext(r.Context(), sqlDef.deleteStmt)
 			if err != nil {
 				http.Error(w, "failed to clear data", http.StatusInternalServerError)
 				return
@@ -975,15 +1062,8 @@ func BackupRunHandler(db *sql.DB, metrics *observability.Registry) http.HandlerF
 		var req reqShape
 		_ = json.NewDecoder(r.Body).Decode(&req)
 
-		baseName := strings.TrimSpace(req.FileName)
-		if baseName == "" {
-			baseName = fmt.Sprintf("oracle-backup-%d.db", time.Now().UTC().Unix())
-		}
-		if filepath.Base(baseName) != baseName {
-			http.Error(w, "invalid file name", http.StatusBadRequest)
-			return
-		}
-		if strings.Contains(baseName, "..") {
+		baseName, err := backupFileNameOrDefault(req.FileName, time.Now())
+		if err != nil {
 			http.Error(w, "invalid file name", http.StatusBadRequest)
 			return
 		}
@@ -992,16 +1072,22 @@ func BackupRunHandler(db *sql.DB, metrics *observability.Registry) http.HandlerF
 		if backupDir == "" {
 			backupDir = "./data/backups"
 		}
-		if err := os.MkdirAll(backupDir, 0o755); err != nil {
+		absBackupDir, backupPath, err := resolveBackupPath(backupDir, baseName)
+		if err != nil {
 			recordBackupFailure(r.Context(), db, metrics, filepath.Join(backupDir, baseName), 0, 0, err)
+			http.Error(w, "failed to resolve backup path", http.StatusInternalServerError)
+			return
+		}
+		if err := os.MkdirAll(absBackupDir, 0o750); err != nil {
+			recordBackupFailure(r.Context(), db, metrics, backupPath, 0, 0, err)
 			http.Error(w, "failed to create backup directory", http.StatusInternalServerError)
 			return
 		}
 
-		backupPath := filepath.Join(backupDir, baseName)
 		startedAt := time.Now().UnixMilli()
 		vacuumStmt := "VACUUM INTO '" + strings.ReplaceAll(backupPath, "'", "''") + "'"
-		_, err := db.ExecContext(r.Context(), vacuumStmt)
+		// #nosec G202 -- SQLite VACUUM INTO requires quoted literal path; backupPath is validated and escaped.
+		_, err = db.ExecContext(r.Context(), vacuumStmt)
 		finishedAt := time.Now().UnixMilli()
 
 		if err != nil {

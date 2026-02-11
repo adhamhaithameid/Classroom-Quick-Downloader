@@ -1103,11 +1103,59 @@ func columnForDimension(dim string) (string, error) {
 }
 
 func queryBreakdown(ctx context.Context, db *sql.DB, jsonColumn, fromIso, toIso string) ([]breakdownValue, error) {
-	query := `
-        SELECT ` + jsonColumn + `
+	var query string
+	switch jsonColumn {
+	case "by_status_json":
+		query = `
+        SELECT by_status_json
         FROM downloads_hourly
         WHERE bucket_start >= ? AND bucket_start < ?
     `
+	case "by_type_json":
+		query = `
+        SELECT by_type_json
+        FROM downloads_hourly
+        WHERE bucket_start >= ? AND bucket_start < ?
+    `
+	case "by_browser_json":
+		query = `
+        SELECT by_browser_json
+        FROM downloads_hourly
+        WHERE bucket_start >= ? AND bucket_start < ?
+    `
+	case "by_os_json":
+		query = `
+        SELECT by_os_json
+        FROM downloads_hourly
+        WHERE bucket_start >= ? AND bucket_start < ?
+    `
+	case "by_country_json":
+		query = `
+        SELECT by_country_json
+        FROM downloads_hourly
+        WHERE bucket_start >= ? AND bucket_start < ?
+    `
+	case "by_lang_json":
+		query = `
+        SELECT by_lang_json
+        FROM downloads_hourly
+        WHERE bucket_start >= ? AND bucket_start < ?
+    `
+	case "by_ext_ver_json":
+		query = `
+        SELECT by_ext_ver_json
+        FROM downloads_hourly
+        WHERE bucket_start >= ? AND bucket_start < ?
+    `
+	case "by_error_type_json":
+		query = `
+        SELECT by_error_type_json
+        FROM downloads_hourly
+        WHERE bucket_start >= ? AND bucket_start < ?
+    `
+	default:
+		return nil, errors.New("invalid dimension")
+	}
 	rows, err := db.QueryContext(ctx, query, fromIso, toIso)
 	if err != nil {
 		return nil, err
