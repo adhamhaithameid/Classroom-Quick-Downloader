@@ -54,3 +54,31 @@ func TestBuildArchiveRow(t *testing.T) {
 		t.Fatalf("unexpected success rate column: %v", row[5])
 	}
 }
+
+func TestParseAndValidateOutboundURL(t *testing.T) {
+	okCases := []string{
+		"http://localhost:8080/api/stats/summary",
+		"https://example.com/push?status=ok",
+	}
+	for _, tc := range okCases {
+		got, err := parseAndValidateOutboundURL(tc)
+		if err != nil {
+			t.Fatalf("expected URL %q to be valid, got error: %v", tc, err)
+		}
+		if got == "" {
+			t.Fatalf("expected normalized URL for %q", tc)
+		}
+	}
+
+	badCases := []string{
+		"",
+		"file:///tmp/x",
+		"javascript:alert(1)",
+		"http:///missing-host",
+	}
+	for _, tc := range badCases {
+		if _, err := parseAndValidateOutboundURL(tc); err == nil {
+			t.Fatalf("expected URL %q to be rejected", tc)
+		}
+	}
+}

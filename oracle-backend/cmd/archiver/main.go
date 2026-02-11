@@ -4,10 +4,12 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"sort"
 	"strings"
@@ -109,6 +111,24 @@ func buildArchiveRow(today string, data SummaryResponse) []interface{} {
 	}
 }
 
+func parseAndValidateOutboundURL(raw string) (string, error) {
+	v := strings.TrimSpace(raw)
+	if v == "" {
+		return "", errors.New("empty url")
+	}
+	u, err := url.Parse(v)
+	if err != nil {
+		return "", err
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return "", errors.New("unsupported url scheme")
+	}
+	if strings.TrimSpace(u.Host) == "" {
+		return "", errors.New("missing url host")
+	}
+	return u.String(), nil
+}
+
 func main() {
 	sheetID := flag.String("sheet", "", "Google Sheet ID")
 	credsPath := flag.String("creds", "/app/google-credentials.json", "Path to Service Account JSON")
@@ -122,9 +142,17 @@ func main() {
 		log.Fatal("Please provide a --sheet ID")
 	}
 
+	validatedAPIURL, err := parseAndValidateOutboundURL(*apiURL)
+	if err != nil {
+		logEvent("error", "archiver_invalid_api_url", map[string]interface{}{
+			"error": err.Error(),
+		})
+		log.Fatalf("Invalid --api URL: %v", err)
+	}
+
 	// 1. Fetch Stats
-	log.Printf("Fetching stats from %s...", *apiURL)
-	req, err := http.NewRequest(http.MethodGet, *apiURL, nil)
+	log.Printf("Fetching stats from %s...", validatedAPIURL)
+	req, err := http.NewRequest(http.MethodGet, validatedAPIURL, nil)
 	if err != nil {
 		logEvent("error", "archiver_request_build_failed", map[string]interface{}{
 			"error": err.Error(),
@@ -136,6 +164,7 @@ func main() {
 	}
 
 	httpClient := &http.Client{Timeout: 15 * time.Second}
+	// #nosec G107,G704 -- URL is validated by parseAndValidateOutboundURL before request creation.
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		logEvent("error", "archiver_stats_fetch_failed", map[string]interface{}{
@@ -212,13 +241,25 @@ func main() {
 
 	// 5. Notify Uptime Kuma (Push Monitor)
 	if *kumaPushURL != "" {
+		validatedKumaURL, err := parseAndValidateOutboundURL(*kumaPushURL)
+		if err != nil {
+			log.Printf("[WARN] Invalid Uptime Kuma URL: %v", err)
+			return
+		}
+
 		// Append success message param
-		pushURL := fmt.Sprintf("%s&msg=OK&ping=", *kumaPushURL)
-		k_resp, k_err := http.Get(pushURL)
-		if k_err != nil {
-			log.Printf("[WARN] Failed to push status to Uptime Kuma: %v", k_err)
+		pushURL := fmt.Sprintf("%s&msg=OK&ping=", validatedKumaURL)
+		kReq, reqErr := http.NewRequest(http.MethodGet, pushURL, nil)
+		if reqErr != nil {
+			log.Printf("[WARN] Failed to build Uptime Kuma request: %v", reqErr)
 		} else {
-			defer k_resp.Body.Close()
+			// #nosec G107,G704 -- URL is validated by parseAndValidateOutboundURL before request creation.
+			kResp, kErr := httpClient.Do(kReq)
+			if kErr != nil {
+				log.Printf("[WARN] Failed to push status to Uptime Kuma: %v", kErr)
+				return
+			}
+			defer kResp.Body.Close()
 			log.Println("Uptime Kuma notified.")
 		}
 	}
