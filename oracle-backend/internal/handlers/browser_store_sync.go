@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"regexp"
 	"strconv"
@@ -41,6 +42,19 @@ var deploymentTargetDefs = []deploymentTargetDef{
 		Name:         "Edge",
 		DefaultURL:   "https://microsoftedge.microsoft.com/addons/",
 		StoreEnvName: "ORACLE_EDGE_STORE_URL",
+	},
+}
+
+var deploymentTargetAllowedHosts = map[string]map[string]struct{}{
+	"chrome": {
+		"chromewebstore.google.com": {},
+		"chrome.google.com":         {},
+	},
+	"firefox": {
+		"addons.mozilla.org": {},
+	},
+	"edge": {
+		"microsoftedge.microsoft.com": {},
 	},
 }
 
@@ -323,8 +337,8 @@ func deploymentsSyncHandlerWithClient(sqliteDB, postgresDB *sql.DB, client *http
 }
 
 func fetchAndParseStoreStats(ctx context.Context, client *http.Client, key, url string) (string, int64, string, error) {
-	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
-		return "", 0, "", fmt.Errorf("target URL is not configured")
+	if err := validateStoreURL(key, url); err != nil {
+		return "", 0, "", err
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -350,6 +364,36 @@ func fetchAndParseStoreStats(ctx context.Context, client *http.Client, key, url 
 	}
 	usersCount := parseApproxUsersCount(users)
 	return users, usersCount, version, nil
+}
+
+func validateStoreURL(key, rawURL string) error {
+	trimmed := strings.TrimSpace(rawURL)
+	if trimmed == "" {
+		return fmt.Errorf("target URL is not configured")
+	}
+	parsed, err := url.Parse(trimmed)
+	if err != nil {
+		return fmt.Errorf("target URL is invalid")
+	}
+	if parsed.Scheme != "https" && parsed.Scheme != "http" {
+		return fmt.Errorf("target URL must use http/https")
+	}
+	if parsed.Host == "" {
+		return fmt.Errorf("target URL host is missing")
+	}
+	if os.Getenv("ORACLE_ALLOW_UNTRUSTED_STORE_URLS") == "true" {
+		return nil
+	}
+
+	host := strings.ToLower(parsed.Hostname())
+	allowed := deploymentTargetAllowedHosts[key]
+	if len(allowed) == 0 {
+		return fmt.Errorf("target has no allowed host configuration")
+	}
+	if _, ok := allowed[host]; !ok {
+		return fmt.Errorf("target URL host is not allowed for %s", key)
+	}
+	return nil
 }
 
 func parseStoreStatsFromHTML(key, html string) (string, string) {

@@ -48,6 +48,7 @@ func TestParseApproxUsersCount(t *testing.T) {
 func TestDeploymentsSyncHandlerWithClient(t *testing.T) {
 	sqlDB := newAdminTestDB(t)
 	defer sqlDB.Close()
+	t.Setenv("ORACLE_ALLOW_UNTRUSTED_STORE_URLS", "true")
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -134,5 +135,13 @@ func TestDeploymentsSyncHandlerRejectsUnknownTarget(t *testing.T) {
 	deploymentsSyncHandlerWithClient(sqlDB, nil, &http.Client{}, nil).ServeHTTP(rr, req)
 	if rr.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400 for unknown target, got %d", rr.Code)
+	}
+}
+
+func TestValidateStoreURL_RejectsUntrustedHostByDefault(t *testing.T) {
+	t.Setenv("ORACLE_ALLOW_UNTRUSTED_STORE_URLS", "false")
+	err := validateStoreURL("chrome", "https://example.com/x")
+	if err == nil {
+		t.Fatalf("expected untrusted host to be rejected")
 	}
 }
