@@ -22,6 +22,36 @@ type ingestResponse struct {
 	IngestedAt int64  `json:"ingestedAt,omitempty"`
 }
 
+const failureLogRetentionDays = 30
+const maxFailureFieldLen = 64
+const maxFailureDetailLen = 240
+
+func sanitizeFailureField(input string, fallback string) string {
+	v := input
+	if v == "" {
+		return fallback
+	}
+	if len(v) > maxFailureFieldLen {
+		v = v[:maxFailureFieldLen]
+	}
+	return v
+}
+
+func sanitizeFailureDetail(input string) string {
+	if input == "" {
+		return "n/a"
+	}
+	v := input
+	if len(v) > maxFailureDetailLen {
+		v = v[:maxFailureDetailLen]
+	}
+	return v
+}
+
+func dayUTC(tsMs int64) string {
+	return time.UnixMilli(tsMs).UTC().Format("2006-01-02")
+}
+
 // IngestBatchHandler handles POST /ingest-batch (and /storeBatch alias).
 // It expects an aggregated OracleBatch from the DO, is idempotent by batchId,
 // and writes:
@@ -40,6 +70,7 @@ func IngestBatchHandler(db *sql.DB, sharedSecret string) http.HandlerFunc {
 			logEvent("error", "ingest_misconfigured", map[string]interface{}{
 				"reason": "DO_SHARED_SECRET missing",
 			})
+			recordOracleFailure(db, "ingest", "misconfigured", "DO_SHARED_SECRET missing", 1, "", "")
 			http.Error(w, "server misconfigured: DO_SHARED_SECRET not set", http.StatusInternalServerError)
 			return
 		}
@@ -53,6 +84,7 @@ func IngestBatchHandler(db *sql.DB, sharedSecret string) http.HandlerFunc {
 			logEvent("warn", "ingest_unauthorized", map[string]interface{}{
 				"reason": "missing_or_invalid_secret",
 			})
+			recordOracleFailure(db, "ingest_auth", "unauthorized", "missing_or_invalid_secret", 1, "", "")
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
@@ -62,11 +94,13 @@ func IngestBatchHandler(db *sql.DB, sharedSecret string) http.HandlerFunc {
 			logEvent("warn", "ingest_invalid_json", map[string]interface{}{
 				"error": err.Error(),
 			})
+			recordOracleFailure(db, "ingest", "invalid_json", err.Error(), 1, "", "")
 			http.Error(w, "invalid JSON", http.StatusBadRequest)
 			return
 		}
 		if batch.BatchID == "" {
 			logEvent("warn", "ingest_missing_batch_id", nil)
+			recordOracleFailure(db, "ingest", "missing_batch_id", "batchId is required", 1, "", "")
 			http.Error(w, "missing batchId", http.StatusBadRequest)
 			return
 		}
@@ -77,6 +111,7 @@ func IngestBatchHandler(db *sql.DB, sharedSecret string) http.HandlerFunc {
 				"error":   err.Error(),
 				"batchId": batch.BatchID,
 			})
+			recordOracleFailure(db, "ingest", "ingest_failed", err.Error(), 1, batch.BatchID, "")
 			http.Error(w, "failed to ingest batch: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -158,13 +193,27 @@ func ingestBatch(ctx context.Context, db *sql.DB, batch *model.OracleBatch) erro
 		return err
 	}
 
+	// Update delivery stage counters and per-delivery chain.
+	if err := upsertDeliveryMetrics(ctx, tx, batch); err != nil {
+		return err
+	}
+
+	// Insert structured failure logs from Cloudflare DO payload.
+	if err := insertFailureLogsFromBatch(ctx, tx, batch); err != nil {
+		return err
+	}
+
+	// Keep failure sink bounded (retention policy).
+	if err := cleanupOldFailureLogs(ctx, tx, failureLogRetentionDays); err != nil {
+		return err
+	}
+
 	// PRIVACY FIX: IP storage disabled per PRIVACY.md policy
 	// The privacy policy states IPs are never stored. Geo Map feature is disabled.
 	// To re-enable, update PRIVACY.md to disclose IP storage and uncomment the code below.
 	// if err := insertBatchIPs(ctx, tx, batch); err != nil {
 	// 	return err
 	// }
-
 
 	return tx.Commit()
 }
@@ -511,4 +560,227 @@ func insertDOStateSnapshot(ctx context.Context, tx *sql.Tx, batch *model.OracleB
 		maxBatchEventsInt,
 	)
 	return err
+}
+
+func upsertDeliveryMetrics(ctx context.Context, tx *sql.Tx, batch *model.OracleBatch) error {
+	deliveryID := "dlv-" + batch.BatchID
+	accepted := batch.Summary.Totals.TotalDownloads
+	stored := batch.Summary.Totals.TotalDownloads
+	forwarded := int64(0)
+	committed := int64(0)
+	var minSeq, maxSeq sql.NullInt64
+	createdAt := batch.GeneratedAt
+	if createdAt == 0 {
+		createdAt = time.Now().UnixMilli()
+	}
+
+	if batch.Delivery != nil {
+		if batch.Delivery.DeliveryID != "" {
+			deliveryID = batch.Delivery.DeliveryID
+		}
+		accepted = batch.Delivery.AcceptedCount
+		stored = batch.Delivery.StoredCount
+		forwarded = batch.Delivery.ForwardedCount
+		committed = batch.Delivery.CommittedCount
+		if batch.Delivery.CreatedAt > 0 {
+			createdAt = batch.Delivery.CreatedAt
+		}
+		if batch.Delivery.MinSeq != nil {
+			minSeq = sql.NullInt64{Int64: *batch.Delivery.MinSeq, Valid: true}
+		}
+		if batch.Delivery.MaxSeq != nil {
+			maxSeq = sql.NullInt64{Int64: *batch.Delivery.MaxSeq, Valid: true}
+		}
+	}
+	if accepted < 0 {
+		accepted = 0
+	}
+	if stored < 0 {
+		stored = 0
+	}
+	if forwarded < 0 {
+		forwarded = 0
+	}
+	if committed < 0 {
+		committed = 0
+	}
+	// Oracle ACK is the final "committed" stage; when ingest succeeds and the
+	// worker payload does not carry committedCount yet, infer it from accepted.
+	if committed == 0 && accepted > 0 {
+		committed = accepted
+	}
+
+	day := dayUTC(createdAt)
+	stages := []struct {
+		name  string
+		count int64
+	}{
+		{name: "accepted", count: accepted},
+		{name: "stored", count: stored},
+		{name: "forwarded", count: forwarded},
+		{name: "committed", count: committed},
+	}
+	for _, stage := range stages {
+		if stage.count <= 0 {
+			continue
+		}
+		if _, err := tx.ExecContext(
+			ctx,
+			`INSERT INTO pipeline_stage_daily (day_utc, stage, count, updated_at)
+			 VALUES (?, ?, ?, ?)
+			 ON CONFLICT(day_utc, stage) DO UPDATE SET
+			   count = pipeline_stage_daily.count + excluded.count,
+			   updated_at = excluded.updated_at`,
+			day,
+			stage.name,
+			stage.count,
+			time.Now().UnixMilli(),
+		); err != nil {
+			return err
+		}
+	}
+
+	status := "pending"
+	if committed > 0 && committed >= accepted {
+		status = "committed"
+	} else if forwarded > 0 {
+		status = "forwarded"
+	}
+
+	_, err := tx.ExecContext(
+		ctx,
+		`INSERT INTO pipeline_delivery_events (
+			delivery_id, batch_id, created_at, updated_at,
+			accepted_count, stored_count, forwarded_count, committed_count,
+			min_seq, max_seq, status
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(delivery_id) DO UPDATE SET
+			batch_id = excluded.batch_id,
+			updated_at = excluded.updated_at,
+			accepted_count = excluded.accepted_count,
+			stored_count = excluded.stored_count,
+			forwarded_count = excluded.forwarded_count,
+			committed_count = excluded.committed_count,
+			min_seq = excluded.min_seq,
+			max_seq = excluded.max_seq,
+			status = excluded.status`,
+		deliveryID,
+		batch.BatchID,
+		createdAt,
+		time.Now().UnixMilli(),
+		accepted,
+		stored,
+		forwarded,
+		committed,
+		minSeq,
+		maxSeq,
+		status,
+	)
+	return err
+}
+
+func insertFailureLogRow(
+	ctx context.Context,
+	exec interface {
+		ExecContext(context.Context, string, ...interface{}) (sql.Result, error)
+	},
+	source, stage, errorCode, errorDetail string,
+	sampleCount int64,
+	tsUTC int64,
+	batchID, deliveryID string,
+) error {
+	if sampleCount <= 0 {
+		return nil
+	}
+	stage = sanitizeFailureField(stage, "unknown_stage")
+	errorCode = sanitizeFailureField(errorCode, "unknown_error")
+	source = sanitizeFailureField(source, "unknown")
+	errorDetail = sanitizeFailureDetail(errorDetail)
+	if tsUTC <= 0 {
+		tsUTC = time.Now().UnixMilli()
+	}
+	_, err := exec.ExecContext(
+		ctx,
+		`INSERT INTO pipeline_failure_logs (
+			ts_utc, day_utc, source, stage, error_code, error_detail, sample_count, batch_id, delivery_id
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		tsUTC,
+		dayUTC(tsUTC),
+		source,
+		stage,
+		errorCode,
+		errorDetail,
+		sampleCount,
+		batchID,
+		deliveryID,
+	)
+	return err
+}
+
+func insertFailureLogsFromBatch(ctx context.Context, tx *sql.Tx, batch *model.OracleBatch) error {
+	if len(batch.FailureLogs) == 0 {
+		return nil
+	}
+	deliveryID := ""
+	if batch.Delivery != nil {
+		deliveryID = batch.Delivery.DeliveryID
+	}
+	for _, row := range batch.FailureLogs {
+		if err := insertFailureLogRow(
+			ctx,
+			tx,
+			row.Source,
+			row.Stage,
+			row.ErrorCode,
+			row.ErrorDetail,
+			row.SampleCount,
+			row.TSUTC,
+			batch.BatchID,
+			deliveryID,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func cleanupOldFailureLogs(ctx context.Context, tx *sql.Tx, retentionDays int) error {
+	if retentionDays <= 0 {
+		return nil
+	}
+	cutoff := time.Now().UTC().AddDate(0, 0, -retentionDays).UnixMilli()
+	_, err := tx.ExecContext(ctx, `DELETE FROM pipeline_failure_logs WHERE ts_utc < ?`, cutoff)
+	return err
+}
+
+func recordOracleFailure(
+	db *sql.DB,
+	stage string,
+	errorCode string,
+	errorDetail string,
+	sampleCount int64,
+	batchID string,
+	deliveryID string,
+) {
+	if db == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := insertFailureLogRow(
+		ctx,
+		db,
+		"oracle-backend",
+		stage,
+		errorCode,
+		errorDetail,
+		sampleCount,
+		time.Now().UnixMilli(),
+		batchID,
+		deliveryID,
+	); err != nil {
+		logEvent("warn", "oracle_failure_log_write_failed", map[string]interface{}{
+			"error": err.Error(),
+		})
+	}
 }

@@ -58,6 +58,12 @@ type DurableStateShape = {
   // Durable queue of aggregated batches waiting for Oracle
   pendingBatches: PendingOracleBatch[];
 
+  // End-to-end delivery metrics chain (accepted -> stored -> forwarded -> committed)
+  deliveryMetrics: DeliveryMetricsState;
+
+  // Structured failure sink rollups (persisted in DO, forwarded to Oracle on successful flush)
+  failureRollups: FailureRollupState[];
+
   // --- Privacy / Anti-Abuse ---
   // IP tracking is disabled for privacy compliance. These fields are kept
   // for backward compatibility but are always cleared.
@@ -156,15 +162,67 @@ type DurableStateShape = {
 
 type PendingOracleBatch = {
   batch: OracleBatch;
-  eventCount: number;
+  weightedCount: number;
   maxSeq: number;
   attempts: number;
   createdAt: number;
 };
 
+type DeliveryStage = "accepted" | "stored" | "forwarded" | "committed";
+
+type DeliveryMetricsState = {
+  totals: {
+    accepted: number;
+    stored: number;
+    forwarded: number;
+    committed: number;
+  };
+  recent: Array<{
+    deliveryId: string;
+    batchId: string;
+    accepted: number;
+    stored: number;
+    forwarded: number;
+    committed: number;
+    status: "pending" | "forwarded" | "committed";
+    createdAt: number;
+    updatedAt: number;
+  }>;
+};
+
+type FailureRollupState = {
+  key: string;
+  source: "cloudflare-do";
+  stage: string;
+  errorCode: string;
+  errorDetail: string;
+  sampleCount: number;
+  unsentCount: number;
+  firstTs: number;
+  lastTs: number;
+};
+
 const DEFAULT_RETRY_STATE: RetryState = {
   consecutiveFailures: 0,
 };
+
+const MAX_RECENT_DELIVERIES = 300;
+const MAX_FAILURE_ROLLUPS = 500;
+const MAX_FAILURE_EXPORT_PER_BATCH = 100;
+const FAILURE_DETAIL_MAX_LEN = 240;
+const FAILURE_ROLLUP_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+
+function createEmptyDeliveryMetrics(): DeliveryMetricsState {
+  return {
+    totals: {
+      accepted: 0,
+      stored: 0,
+      forwarded: 0,
+      committed: 0,
+    },
+    recent: [],
+  };
+}
 
 function createEmptyCounters(): Counters {
   return {
@@ -606,6 +664,13 @@ function generateEventId(): string {
   return `legacy-${Date.now().toString(36)}-${rand}`;
 }
 
+function normalizeFailureDetail(input: unknown): string {
+  const raw = typeof input === "string" ? input : String(input ?? "");
+  const collapsed = raw.replace(/\s+/g, " ").trim();
+  if (!collapsed) return "n/a";
+  return collapsed.slice(0, FAILURE_DETAIL_MAX_LEN);
+}
+
 // ---------------------------------------------------------------------------
 // Durable Object class
 // ---------------------------------------------------------------------------
@@ -650,6 +715,8 @@ export class DownloadsDurable {
       eventSeq: 0,
       committedSeq: 0,
       pendingBatches: [],
+      deliveryMetrics: createEmptyDeliveryMetrics(),
+      failureRollups: [],
       
       ipCounts: {},
       ipCountsSize: 0,
@@ -734,6 +801,63 @@ export class DownloadsDurable {
       eventSeq: stored.eventSeq ?? 0,
       committedSeq: stored.committedSeq ?? 0,
       pendingBatches: Array.isArray(stored.pendingBatches) ? stored.pendingBatches : [],
+      deliveryMetrics: (() => {
+        const src = isPlainObject((stored as unknown as Record<string, unknown>).deliveryMetrics)
+          ? ((stored as unknown as Record<string, unknown>).deliveryMetrics as Record<string, unknown>)
+          : {};
+        const totals = isPlainObject(src.totals) ? (src.totals as Record<string, unknown>) : {};
+        const recentRaw = Array.isArray(src.recent) ? src.recent : [];
+        const recent = recentRaw
+          .filter((item) => isPlainObject(item))
+          .map((item) => {
+            const row = item as Record<string, unknown>;
+            const statusRaw = typeof row.status === "string" ? row.status : "pending";
+            const status: "pending" | "forwarded" | "committed" =
+              statusRaw === "committed" || statusRaw === "forwarded" ? statusRaw : "pending";
+            return {
+              deliveryId: typeof row.deliveryId === "string" ? row.deliveryId : "",
+              batchId: typeof row.batchId === "string" ? row.batchId : "",
+              accepted: clampInt(row.accepted, 0, Number.MAX_SAFE_INTEGER, 0),
+              stored: clampInt(row.stored, 0, Number.MAX_SAFE_INTEGER, 0),
+              forwarded: clampInt(row.forwarded, 0, Number.MAX_SAFE_INTEGER, 0),
+              committed: clampInt(row.committed, 0, Number.MAX_SAFE_INTEGER, 0),
+              status,
+              createdAt: clampInt(row.createdAt, 0, Number.MAX_SAFE_INTEGER, Date.now()),
+              updatedAt: clampInt(row.updatedAt, 0, Number.MAX_SAFE_INTEGER, Date.now()),
+            };
+          })
+          .filter((row) => row.deliveryId && row.batchId);
+        return {
+          totals: {
+            accepted: clampInt(totals.accepted, 0, Number.MAX_SAFE_INTEGER, 0),
+            stored: clampInt(totals.stored, 0, Number.MAX_SAFE_INTEGER, 0),
+            forwarded: clampInt(totals.forwarded, 0, Number.MAX_SAFE_INTEGER, 0),
+            committed: clampInt(totals.committed, 0, Number.MAX_SAFE_INTEGER, 0),
+          },
+          recent: recent.slice(0, MAX_RECENT_DELIVERIES),
+        };
+      })(),
+      failureRollups: (() => {
+        const src = (stored as unknown as Record<string, unknown>).failureRollups;
+        if (!Array.isArray(src)) return [];
+        return src
+          .filter((item) => isPlainObject(item))
+          .map((item) => {
+            const row = item as Record<string, unknown>;
+            return {
+              key: typeof row.key === "string" ? row.key : "",
+              source: "cloudflare-do" as const,
+              stage: sanitizeString(row.stage, 64, FIELD_PATTERNS.generic, "unknown_stage"),
+              errorCode: sanitizeString(row.errorCode, 64, FIELD_PATTERNS.generic, "unknown_error"),
+              errorDetail: normalizeFailureDetail(row.errorDetail),
+              sampleCount: clampInt(row.sampleCount, 0, Number.MAX_SAFE_INTEGER, 0),
+              unsentCount: clampInt(row.unsentCount, 0, Number.MAX_SAFE_INTEGER, 0),
+              firstTs: clampInt(row.firstTs, 0, Number.MAX_SAFE_INTEGER, Date.now()),
+              lastTs: clampInt(row.lastTs, 0, Number.MAX_SAFE_INTEGER, Date.now()),
+            };
+          })
+          .filter((row) => row.key);
+      })(),
 
       ipCounts: {},
       ipCountsSize: 0,
@@ -796,6 +920,12 @@ export class DownloadsDurable {
         .filter((b) => b && typeof b === "object" && b.batch)
         .map((b) => ({
           ...b,
+          weightedCount:
+            typeof (b as Partial<PendingOracleBatch>).weightedCount === "number"
+              ? Math.max(0, Math.floor((b as Partial<PendingOracleBatch>).weightedCount || 0))
+              : typeof (b as unknown as { eventCount?: number }).eventCount === "number"
+                ? Math.max(0, Math.floor((b as unknown as { eventCount?: number }).eventCount || 0))
+                : Math.max(0, Math.floor((b.batch?.summary?.totals?.totalDownloads as number) || 0)),
           attempts: typeof b.attempts === "number" ? b.attempts : 0,
           createdAt: typeof b.createdAt === "number" ? b.createdAt : Date.now(),
         }));
@@ -805,6 +935,10 @@ export class DownloadsDurable {
     const pendingBefore = this.data.pendingBatches.length;
     this.mergePendingBatchesIfNeeded();
     const pendingCompacted = this.data.pendingBatches.length !== pendingBefore;
+
+    const failureBefore = this.data.failureRollups.length;
+    this.pruneFailureRollups();
+    const failurePruned = this.data.failureRollups.length !== failureBefore;
 
     // Normalize config values and ensure schema version
     let configDirty = false;
@@ -1027,7 +1161,7 @@ export class DownloadsDurable {
       }
     }
 
-    if (hadLegacyIps || strippedEventIps || configDirty || pendingCompacted) {
+    if (hadLegacyIps || strippedEventIps || configDirty || pendingCompacted || failurePruned) {
       await this.persist();
     }
 
@@ -1281,6 +1415,7 @@ export class DownloadsDurable {
 
     const rate = this.checkTrackRateLimit(clientIp, now);
     if (!rate.allowed) {
+      this.recordFailure("track_ingest", "rate_limited", `ip=${clientIp}`, 1, now);
       await this.persist();
       return json(
         { ok: false, error: "rate_limited", retryAfterSec: rate.retryAfterSec ?? 60 },
@@ -1308,6 +1443,7 @@ export class DownloadsDurable {
     if (!parsedBody.ok) {
       if (parsedBody.error === "body_too_large") {
         logEvent("warn", "track_body_too_large", { size: parsedBody.size ?? -1, maxBytes: MAX_TRACK_BODY_BYTES });
+        this.recordFailure("track_ingest", "body_too_large", `size=${parsedBody.size ?? -1}`, 1, now);
         await this.persist();
         return json(
           { ok: false, error: "body_too_large", maxBytes: MAX_TRACK_BODY_BYTES },
@@ -1315,6 +1451,7 @@ export class DownloadsDurable {
         );
       }
       logEvent("warn", "track_invalid_json");
+      this.recordFailure("track_ingest", "invalid_json", "track payload json parse failed", 1, now);
       await this.persist();
       return json({ ok: false, error: "invalid_json" }, { status: 400 });
     }
@@ -1322,6 +1459,7 @@ export class DownloadsDurable {
 
     if (!isPlainObject(body) || !Array.isArray(body.events)) {
       logEvent("warn", "track_invalid_payload");
+      this.recordFailure("track_ingest", "invalid_payload", "missing events array", 1, now);
       await this.persist();
       return json({ ok: false, error: "invalid_payload" }, { status: 400 });
     }
@@ -1348,6 +1486,7 @@ export class DownloadsDurable {
     for (const ev of events) {
       if (!isPlainObject(ev)) {
         logEvent("warn", "track_invalid_event_payload");
+        this.recordFailure("track_ingest", "invalid_event_payload", "event must be object", 1, now);
         await this.persist();
         return json({ ok: false, error: "invalid_event_payload" }, { status: 400 });
       }
@@ -1359,6 +1498,14 @@ export class DownloadsDurable {
 
     if (events.length > MAX_EVENTS_PER_REQUEST) {
       logEvent("warn", "track_too_many_events", { count: events.length, max: MAX_EVENTS_PER_REQUEST });
+      this.recordFailure(
+        "track_ingest",
+        "too_many_events",
+        `count=${events.length},max=${MAX_EVENTS_PER_REQUEST}`,
+        events.length,
+        now,
+      );
+      await this.persist();
       return json(
         { ok: false, error: "too_many_events", max: MAX_EVENTS_PER_REQUEST, message: `Max ${MAX_EVENTS_PER_REQUEST} events per request.` },
         { status: 400 }
@@ -1374,12 +1521,16 @@ export class DownloadsDurable {
       try {
         const eventSize = encoder.encode(JSON.stringify(ev)).length;
         if (eventSize > MAX_EVENT_SIZE_BYTES) {
+          this.recordFailure("track_ingest", "event_too_large", `max=${MAX_EVENT_SIZE_BYTES}`, 1, now);
+          await this.persist();
           return json(
             { ok: false, error: "event_too_large", maxBytes: MAX_EVENT_SIZE_BYTES },
             { status: 400 }
           );
         }
       } catch {
+        this.recordFailure("track_ingest", "invalid_event_structure", "failed to stringify event", 1, now);
+        await this.persist();
         return json(
           { ok: false, error: "invalid_event_structure" },
           { status: 400 }
@@ -1389,6 +1540,14 @@ export class DownloadsDurable {
 
     if (this.d.buffer.length + events.length > MAX_BUFFER_SIZE) {
       logEvent("warn", "track_buffer_full", { bufferSize: this.d.buffer.length, incoming: events.length, max: MAX_BUFFER_SIZE });
+      this.recordFailure(
+        "track_ingest",
+        "buffer_full",
+        `buffer=${this.d.buffer.length},incoming=${events.length},max=${MAX_BUFFER_SIZE}`,
+        events.length,
+        now,
+      );
+      await this.persist();
       return json(
         { ok: false, error: "buffer_full", bufferSize: this.d.buffer.length },
         { status: 503 }
@@ -1555,6 +1714,16 @@ export class DownloadsDurable {
       this.d.processedIds = this.d.processedIds.slice(-MAX_PROCESSED_IDS_TRIM);
     }
 
+    if (invalidCount > 0) {
+      this.recordFailure(
+        "track_validation",
+        "invalid_events_filtered",
+        `invalid=${invalidCount}`,
+        invalidCount,
+        now,
+      );
+    }
+
     this.maybeCompactBuffer();
     await this.persist();
 
@@ -1566,6 +1735,13 @@ export class DownloadsDurable {
       await this.flushToOracle(false);
     }
 
+    const acceptedSeqRange = acceptedSeqs.length
+      ? {
+          min: Math.min(...acceptedSeqs.map((entry) => entry[1])),
+          max: Math.max(...acceptedSeqs.map((entry) => entry[1])),
+        }
+      : null;
+
     return json({ 
       ok: true, 
       accepted: acceptedCount,
@@ -1576,6 +1752,7 @@ export class DownloadsDurable {
       invalidIds,
       acceptedSeqs,
       committedSeq: this.d.committedSeq ?? 0,
+      acceptedSeqRange,
       clientBatchId,
       ackId: generateAckId(),
       receivedAt: now,
@@ -1679,6 +1856,26 @@ export class DownloadsDurable {
       // NEW: Changelog data
       changelog: this.d.changelog,
       changelogConfig: this.d.changelogConfig,
+
+      // Delivery observability chain
+      deliveryMetrics: this.d.deliveryMetrics,
+      deliveryHealth: {
+        acceptedMinusCommitted:
+          (this.d.deliveryMetrics.totals.accepted || 0) -
+          (this.d.deliveryMetrics.totals.committed || 0),
+        forwardedMinusCommitted:
+          (this.d.deliveryMetrics.totals.forwarded || 0) -
+          (this.d.deliveryMetrics.totals.committed || 0),
+      },
+
+      // Structured failure sink snapshot
+      failureSink: {
+        totalRollups: this.d.failureRollups.length,
+        unsentRollups: this.d.failureRollups.filter((item) => item.unsentCount > 0).length,
+        recent: [...this.d.failureRollups]
+          .sort((a, b) => b.lastTs - a.lastTs)
+          .slice(0, 20),
+      },
     };
 
     return json(payload);
@@ -1912,6 +2109,8 @@ export class DownloadsDurable {
 
     if (!res.ok) {
       logEvent("warn", "health_webhook_failed", { status: res.status });
+      this.recordFailure("alerting", "health_webhook_failed", `status=${res.status}`, 1, now);
+      await this.persist();
       return;
     }
 
@@ -1984,6 +2183,8 @@ export class DownloadsDurable {
       eventSeq: 0,
       committedSeq: 0,
       pendingBatches: [],
+      deliveryMetrics: createEmptyDeliveryMetrics(),
+      failureRollups: [],
       ipCounts: {},
       ipCountsSize: 0,
       uniqueRequestsToday: 0,
@@ -2376,7 +2577,7 @@ export class DownloadsDurable {
     let iterations = 0;
     let lastError: string | undefined;
 
-    while (this.d.buffer.length > 0 && iterations < 20) {
+    while ((this.d.buffer.length > 0 || this.d.pendingBatches.length > 0) && iterations < 20) {
       const result = await this.flushToOracle(true);
       if (!result.ok) {
         lastError = result.error;
@@ -2385,11 +2586,12 @@ export class DownloadsDurable {
       iterations++;
     }
 
-    const ok = this.d.buffer.length === 0 && !lastError;
+    const ok = this.d.buffer.length === 0 && this.d.pendingBatches.length === 0 && !lastError;
 
     return json({
       ok,
       remaining: this.d.buffer.length,
+      pendingBatches: this.d.pendingBatches.length,
       iterations,
       error: lastError,
     });
@@ -2449,11 +2651,179 @@ export class DownloadsDurable {
     return target;
   }
 
+  private mergeFailureLogs(
+    a: Array<{ key: string; source: "cloudflare-do"; stage: string; errorCode: string; errorDetail: string; sampleCount: number; tsUtc: number }> = [],
+    b: Array<{ key: string; source: "cloudflare-do"; stage: string; errorCode: string; errorDetail: string; sampleCount: number; tsUtc: number }> = [],
+  ): Array<{ key: string; source: "cloudflare-do"; stage: string; errorCode: string; errorDetail: string; sampleCount: number; tsUtc: number }> {
+    const map = new Map<string, { key: string; source: "cloudflare-do"; stage: string; errorCode: string; errorDetail: string; sampleCount: number; tsUtc: number }>();
+    for (const row of [...a, ...b]) {
+      if (!row?.key) continue;
+      const existing = map.get(row.key);
+      if (!existing) {
+        map.set(row.key, {
+          key: row.key,
+          source: "cloudflare-do",
+          stage: row.stage,
+          errorCode: row.errorCode,
+          errorDetail: row.errorDetail,
+          sampleCount: Math.max(0, Math.floor(row.sampleCount || 0)),
+          tsUtc: row.tsUtc || Date.now(),
+        });
+      } else {
+        existing.sampleCount += Math.max(0, Math.floor(row.sampleCount || 0));
+        if ((row.tsUtc || 0) >= existing.tsUtc) {
+          existing.tsUtc = row.tsUtc || existing.tsUtc;
+          existing.errorDetail = row.errorDetail || existing.errorDetail;
+        }
+      }
+    }
+    return Array.from(map.values())
+      .sort((x, y) => y.tsUtc - x.tsUtc)
+      .slice(0, MAX_FAILURE_EXPORT_PER_BATCH);
+  }
+
   private normalizeEventCount(value: unknown): number {
     if (typeof value !== "number" || !Number.isFinite(value)) return 1;
     const int = Math.floor(value);
     if (int <= 0) return 1;
     return Math.min(int, MAX_ROLLUP_COUNT);
+  }
+
+  private sumWeightedEventCount(events: StoredEvent[]): number {
+    if (!Array.isArray(events) || events.length === 0) return 0;
+    let total = 0;
+    for (const ev of events) {
+      total += this.normalizeEventCount(ev?.count);
+    }
+    return total;
+  }
+
+  private recordDeliveryStage(
+    deliveryId: string,
+    batchId: string,
+    stage: DeliveryStage,
+    count: number,
+    now: number = Date.now(),
+  ): void {
+    if (!deliveryId || !batchId) return;
+    const safeCount = Math.max(0, Math.floor(count || 0));
+    if (safeCount <= 0) return;
+
+    const totals = this.d.deliveryMetrics.totals;
+    totals[stage] += safeCount;
+
+    let rec = this.d.deliveryMetrics.recent.find((item) => item.deliveryId === deliveryId);
+    if (!rec) {
+      rec = {
+        deliveryId,
+        batchId,
+        accepted: 0,
+        stored: 0,
+        forwarded: 0,
+        committed: 0,
+        status: "pending",
+        createdAt: now,
+        updatedAt: now,
+      };
+      this.d.deliveryMetrics.recent.push(rec);
+    }
+    rec.batchId = batchId;
+    rec[stage] += safeCount;
+    if (stage === "forwarded") rec.status = "forwarded";
+    if (stage === "committed") rec.status = "committed";
+    rec.updatedAt = now;
+
+    if (this.d.deliveryMetrics.recent.length > MAX_RECENT_DELIVERIES) {
+      this.d.deliveryMetrics.recent = this.d.deliveryMetrics.recent
+        .sort((a, b) => b.updatedAt - a.updatedAt)
+        .slice(0, MAX_RECENT_DELIVERIES);
+    }
+  }
+
+  private pruneFailureRollups(now: number = Date.now()): void {
+    const floor = now - FAILURE_ROLLUP_RETENTION_MS;
+    this.d.failureRollups = this.d.failureRollups
+      .filter((item) => item && item.lastTs >= floor)
+      .sort((a, b) => b.lastTs - a.lastTs);
+    if (this.d.failureRollups.length > MAX_FAILURE_ROLLUPS) {
+      this.d.failureRollups = this.d.failureRollups.slice(0, MAX_FAILURE_ROLLUPS);
+    }
+  }
+
+  private recordFailure(
+    stage: string,
+    errorCode: string,
+    errorDetail: unknown,
+    sampleCount: number = 1,
+    now: number = Date.now(),
+  ): void {
+    const normalizedStage = sanitizeString(stage, 64, FIELD_PATTERNS.generic, "unknown_stage");
+    const normalizedCode = sanitizeString(errorCode, 64, FIELD_PATTERNS.generic, "unknown_error");
+    const detail = normalizeFailureDetail(errorDetail);
+    const day = new Date(now).toISOString().slice(0, 10);
+    const key = `${day}|${normalizedStage}|${normalizedCode}`;
+    const count = Math.max(1, Math.floor(sampleCount || 1));
+    const existing = this.d.failureRollups.find((item) => item.key === key);
+    if (existing) {
+      existing.sampleCount += count;
+      existing.unsentCount += count;
+      existing.lastTs = now;
+      existing.errorDetail = detail;
+    } else {
+      this.d.failureRollups.push({
+        key,
+        source: "cloudflare-do",
+        stage: normalizedStage,
+        errorCode: normalizedCode,
+        errorDetail: detail,
+        sampleCount: count,
+        unsentCount: count,
+        firstTs: now,
+        lastTs: now,
+      });
+    }
+    this.pruneFailureRollups(now);
+  }
+
+  private consumeFailureRollupsForBatch(now: number = Date.now()): Array<{
+    key: string;
+    source: "cloudflare-do";
+    stage: string;
+    errorCode: string;
+    errorDetail: string;
+    sampleCount: number;
+    tsUtc: number;
+  }> {
+    this.pruneFailureRollups(now);
+    const unsent = this.d.failureRollups
+      .filter((item) => item.unsentCount > 0)
+      .sort((a, b) => b.lastTs - a.lastTs)
+      .slice(0, MAX_FAILURE_EXPORT_PER_BATCH);
+    return unsent.map((item) => ({
+      key: item.key,
+      source: item.source,
+      stage: item.stage,
+      errorCode: item.errorCode,
+      errorDetail: item.errorDetail,
+      sampleCount: item.unsentCount,
+      tsUtc: item.lastTs,
+    }));
+  }
+
+  private markFailureRollupsExported(exported: Array<{ key: string; sampleCount: number }>): void {
+    if (!Array.isArray(exported) || exported.length === 0) return;
+    const byKey = new Map<string, number>();
+    for (const row of exported) {
+      if (!row?.key) continue;
+      const prev = byKey.get(row.key) || 0;
+      byKey.set(row.key, prev + Math.max(0, Math.floor(row.sampleCount || 0)));
+    }
+    for (const item of this.d.failureRollups) {
+      const used = byKey.get(item.key) || 0;
+      if (used <= 0) continue;
+      item.unsentCount = Math.max(0, item.unsentCount - used);
+    }
+    this.pruneFailureRollups();
   }
 
   private mergeTimeBuckets(a: TimeBucket[], b: TimeBucket[]): TimeBucket[] {
@@ -2529,18 +2899,72 @@ export class DownloadsDurable {
       mergedSummary.topCountry = this.getTopKey(mergedSummary.countries);
       mergedSummary.topType = this.getTopKey(mergedSummary.types);
 
+      const mergedWeightedCount = first.weightedCount + second.weightedCount;
+      const now = Date.now();
+      const mergedFailureLogs = this.mergeFailureLogs(
+        first.batch.failureLogs as Array<{
+          key: string;
+          source: "cloudflare-do";
+          stage: string;
+          errorCode: string;
+          errorDetail: string;
+          sampleCount: number;
+          tsUtc: number;
+        }> | undefined,
+        second.batch.failureLogs as Array<{
+          key: string;
+          source: "cloudflare-do";
+          stage: string;
+          errorCode: string;
+          errorDetail: string;
+          sampleCount: number;
+          tsUtc: number;
+        }> | undefined,
+      );
+
       const mergedBatch: OracleBatch = {
-        batchId: `do-merge-${Date.now()}`,
-        generatedAt: Date.now(),
+        batchId: `do-merge-${now}`,
+        generatedAt: now,
         timeZone: "UTC",
         summary: mergedSummary,
         timeBuckets: this.mergeTimeBuckets(first.batch.timeBuckets, second.batch.timeBuckets),
         doState: first.batch.doState,
         uniqueIps: [],
+        delivery: {
+          deliveryId: `dlv-do-merge-${now}`,
+          acceptedCount:
+            (first.batch.delivery?.acceptedCount || first.weightedCount) +
+            (second.batch.delivery?.acceptedCount || second.weightedCount),
+          storedCount:
+            (first.batch.delivery?.storedCount || first.weightedCount) +
+            (second.batch.delivery?.storedCount || second.weightedCount),
+          forwardedCount:
+            (first.batch.delivery?.forwardedCount || 0) +
+            (second.batch.delivery?.forwardedCount || 0),
+          committedCount:
+            (first.batch.delivery?.committedCount || 0) +
+            (second.batch.delivery?.committedCount || 0),
+          createdAt: Math.min(first.createdAt || now, second.createdAt || now),
+          minSeq:
+            typeof first.batch.delivery?.minSeq === "number" || typeof second.batch.delivery?.minSeq === "number"
+              ? Math.min(
+                  typeof first.batch.delivery?.minSeq === "number" ? first.batch.delivery.minSeq : Number.MAX_SAFE_INTEGER,
+                  typeof second.batch.delivery?.minSeq === "number" ? second.batch.delivery.minSeq : Number.MAX_SAFE_INTEGER,
+                )
+              : null,
+          maxSeq:
+            typeof first.batch.delivery?.maxSeq === "number" || typeof second.batch.delivery?.maxSeq === "number"
+              ? Math.max(
+                  typeof first.batch.delivery?.maxSeq === "number" ? first.batch.delivery.maxSeq : 0,
+                  typeof second.batch.delivery?.maxSeq === "number" ? second.batch.delivery.maxSeq : 0,
+                )
+              : null,
+        },
+        failureLogs: mergedFailureLogs,
       };
       const merged: PendingOracleBatch = {
         batch: mergedBatch,
-        eventCount: first.eventCount + second.eventCount,
+        weightedCount: mergedWeightedCount,
         maxSeq: Math.max(first.maxSeq, second.maxSeq),
         attempts: Math.max(first.attempts ?? 0, second.attempts ?? 0),
         createdAt: Math.min(first.createdAt || Date.now(), second.createdAt || Date.now()),
@@ -2566,9 +2990,14 @@ export class DownloadsDurable {
     const batchId = `do-compact-${Date.now()}-${events.length}ev`;
     const batch = this.buildOracleBatch(events, batchId);
     const maxSeq = events.reduce((m, ev) => Math.max(m, ev.seq || 0), this.d.committedSeq || 0);
+    const weightedCount = this.sumWeightedEventCount(events);
+    if (batch.delivery) {
+      this.recordDeliveryStage(batch.delivery.deliveryId, batch.batchId, "accepted", batch.delivery.acceptedCount);
+      this.recordDeliveryStage(batch.delivery.deliveryId, batch.batchId, "stored", batch.delivery.storedCount);
+    }
     this.d.pendingBatches.push({
       batch,
-      eventCount: events.length,
+      weightedCount,
       maxSeq,
       attempts: 0,
       createdAt: Date.now(),
@@ -2621,6 +3050,8 @@ export class DownloadsDurable {
       topCountry: "unknown",
       topType: "unknown"
     };
+    let minSeq: number | null = null;
+    let maxSeq: number | null = null;
 
     for (const ev of events) {
       const weight = this.normalizeEventCount(ev.count);
@@ -2654,6 +3085,10 @@ export class DownloadsDurable {
         const err = (ev.error_type || "unknown").toLowerCase();
         summary.errorReasons[err] = (summary.errorReasons[err] || 0) + weight;
       }
+      if (typeof ev.seq === "number" && Number.isFinite(ev.seq)) {
+        minSeq = minSeq == null ? ev.seq : Math.min(minSeq, ev.seq);
+        maxSeq = maxSeq == null ? ev.seq : Math.max(maxSeq, ev.seq);
+      }
     }
 
     // Calculate "Top" stats
@@ -2682,6 +3117,8 @@ export class DownloadsDurable {
 
     // Generate stable batch ID using sequence number (doesn't change on retry)
     const batchId = batchIdOverride || `do-seq${this.d.batchSeq}-${events.length}ev`;
+    const weightedCount = this.sumWeightedEventCount(events);
+    const failureLogs = this.consumeFailureRollupsForBatch(now);
 
     // PRIVACY FIX: IP collection disabled per PRIVACY.md policy
     // The privacy policy states IPs are never stored, so we don't send them to Oracle
@@ -2698,6 +3135,17 @@ export class DownloadsDurable {
       summary,      // Aggregated counters
       timeBuckets,  // Hourly aggregates
       doState,      // DO health snapshot
+      delivery: {
+        deliveryId: `dlv-${batchId}`,
+        acceptedCount: weightedCount,
+        storedCount: weightedCount,
+        forwardedCount: 0,
+        committedCount: 0,
+        createdAt: now,
+        minSeq,
+        maxSeq,
+      },
+      failureLogs,
       uniqueIps,    // Empty - IPs not collected per privacy policy
       // NOTE: Raw events intentionally excluded to reduce payload size
     };
@@ -2796,6 +3244,7 @@ export class DownloadsDurable {
       this.d.retryState.lastError = msg;
       this.d.retryState.lastFlushAttemptAt = now;
       logEvent("error", "oracle_flush_misconfigured", { error: msg });
+      this.recordFailure("oracle_forward", "misconfigured", msg, 1, now);
       // Don't schedule retries if endpoint is missing - just report error
       await this.state.storage.deleteAlarm();
       await this.persist();
@@ -2817,6 +3266,42 @@ export class DownloadsDurable {
       eventsToFlush = this.d.buffer.slice(0, maxBatchEnv);
       oracleBatch = this.buildOracleBatch(eventsToFlush);
     }
+    if (!oracleBatch) {
+      return { ok: false, sent: 0, error: "no_oracle_batch" };
+    }
+    const flushWeightedCount = pendingMeta
+      ? Math.max(
+          pendingMeta.weightedCount || 0,
+          oracleBatch.delivery?.acceptedCount || 0,
+        )
+      : this.sumWeightedEventCount(eventsToFlush);
+
+    if (!oracleBatch.delivery) {
+      oracleBatch.delivery = {
+        deliveryId: `dlv-${oracleBatch.batchId}`,
+        acceptedCount: flushWeightedCount,
+        storedCount: flushWeightedCount,
+        forwardedCount: 0,
+        committedCount: 0,
+        createdAt: now,
+      };
+    }
+    if (!pendingMeta) {
+      this.recordDeliveryStage(
+        oracleBatch.delivery.deliveryId,
+        oracleBatch.batchId,
+        "accepted",
+        oracleBatch.delivery.acceptedCount,
+        now,
+      );
+      this.recordDeliveryStage(
+        oracleBatch.delivery.deliveryId,
+        oracleBatch.batchId,
+        "stored",
+        oracleBatch.delivery.storedCount,
+        now,
+      );
+    }
 
     const stashFailedBatch = () => {
       if (pendingMeta || !oracleBatch || eventsToFlush.length === 0) return;
@@ -2826,7 +3311,7 @@ export class DownloadsDurable {
       );
       this.d.pendingBatches.push({
         batch: oracleBatch,
-        eventCount: eventsToFlush.length,
+        weightedCount: this.sumWeightedEventCount(eventsToFlush),
         maxSeq,
         attempts: 1,
         createdAt: now,
@@ -2846,6 +3331,20 @@ export class DownloadsDurable {
 
     if (!this.d.retryState) this.d.retryState = { ...DEFAULT_RETRY_STATE };
     this.d.retryState.lastFlushAttemptAt = now;
+    if (pendingMeta) {
+      oracleBatch.failureLogs = this.consumeFailureRollupsForBatch(now);
+    }
+    if (oracleBatch.delivery.forwardedCount < flushWeightedCount) {
+      const forwardedDelta = flushWeightedCount - oracleBatch.delivery.forwardedCount;
+      oracleBatch.delivery.forwardedCount += forwardedDelta;
+      this.recordDeliveryStage(
+        oracleBatch.delivery.deliveryId,
+        oracleBatch.batchId,
+        "forwarded",
+        forwardedDelta,
+        now,
+      );
+    }
 
     try {
       // Send to /ingest-batch endpoint (aggregated format)
@@ -2865,6 +3364,7 @@ export class DownloadsDurable {
         this.d.retryState.lastError = msg;
         this.d.retryState.consecutiveFailures += 1;
         logEvent("warn", "oracle_flush_failed", { status: res.status, statusText: res.statusText });
+        this.recordFailure("oracle_forward", "http_error", msg, 1, now);
         stashFailedBatch();
         await this.scheduleRetry();
         await this.persist();
@@ -2879,6 +3379,7 @@ export class DownloadsDurable {
         this.d.retryState.lastError = msg;
         this.d.retryState.consecutiveFailures += 1;
         logEvent("warn", "oracle_flush_ack_invalid", { error: msg });
+        this.recordFailure("oracle_ack", "invalid_ack", msg, 1, now);
         stashFailedBatch();
         await this.scheduleRetry();
         await this.persist();
@@ -2889,6 +3390,7 @@ export class DownloadsDurable {
         this.d.retryState.lastError = msg;
         this.d.retryState.consecutiveFailures += 1;
         logEvent("warn", "oracle_flush_ack_mismatch", { error: msg });
+        this.recordFailure("oracle_ack", "batch_mismatch", msg, 1, now);
         stashFailedBatch();
         await this.scheduleRetry();
         await this.persist();
@@ -2898,30 +3400,52 @@ export class DownloadsDurable {
       // Success: drop the sent events or pending batch and increment batch sequence
       if (pendingMeta) {
         this.d.pendingBatches.shift();
-        this.d.pendingEvents = Math.max(0, this.d.pendingEvents - pendingMeta.eventCount);
+        this.d.pendingEvents = Math.max(0, this.d.pendingEvents - pendingMeta.weightedCount);
         this.d.committedSeq = Math.max(this.d.committedSeq, pendingMeta.maxSeq);
       } else {
         const maxSeq = eventsToFlush.reduce((m, ev) => Math.max(m, ev.seq || 0), this.d.committedSeq || 0);
+        const weightedCount = this.sumWeightedEventCount(eventsToFlush);
         this.d.buffer = this.d.buffer.slice(eventsToFlush.length);
         this.d.pendingEvents = Math.max(
           0,
-          this.d.pendingEvents - eventsToFlush.length,
+          this.d.pendingEvents - weightedCount,
         );
         this.d.committedSeq = Math.max(this.d.committedSeq, maxSeq);
       }
       this.d.lastFlushAt = now;
       this.d.batchSeq += 1; // Increment so next batch gets new ID
+      if (oracleBatch.delivery.committedCount < flushWeightedCount) {
+        const committedDelta = flushWeightedCount - oracleBatch.delivery.committedCount;
+        oracleBatch.delivery.committedCount += committedDelta;
+        this.recordDeliveryStage(
+          oracleBatch.delivery.deliveryId,
+          oracleBatch.batchId,
+          "committed",
+          committedDelta,
+          now,
+        );
+      }
+      this.markFailureRollupsExported(
+        (oracleBatch.failureLogs || []).map((row) => ({
+          key: row.key,
+          sampleCount: row.sampleCount,
+        })),
+      );
       this.d.retryState = { ...DEFAULT_RETRY_STATE };
       await this.scheduleNextMidnightAlarm();
       await this.persist();
 
-      return { ok: true, sent: pendingMeta ? pendingMeta.eventCount : eventsToFlush.length };
+      return {
+        ok: true,
+        sent: flushWeightedCount,
+      };
     } catch (err: unknown) {
       const msg = `Oracle flush error: ${String(err)}`;
       if (!this.d.retryState) this.d.retryState = { ...DEFAULT_RETRY_STATE };
       this.d.retryState.lastError = msg;
       this.d.retryState.consecutiveFailures += 1;
       logEvent("error", "oracle_flush_exception", { error: String(err) });
+      this.recordFailure("oracle_forward", "exception", msg, 1, now);
       stashFailedBatch();
       await this.scheduleRetry();
       await this.persist();

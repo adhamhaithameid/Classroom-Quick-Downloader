@@ -17,8 +17,7 @@
 - [CI / CD Workflows](#ci--cd-workflows)
   - [CI Pipeline](#1-ci-pipeline-ciyml)
   - [CodeQL Analysis](#2-codeql-analysis-codeqlyml)
-  - [Oracle Deployment](#3-oracle-deployment-deploy-oracleyml)
-  - [Release Drafter](#4-release-drafter-release-drafteryml)
+  - [Release Drafter](#3-release-drafter-release-drafteryml)
 - [Manual Testing Scripts](#manual-testing-scripts)
 - [Git Hooks](#git-hooks)
 - [Running Everything at Once](#running-everything-at-once)
@@ -55,18 +54,20 @@ Classroom-Quick-Downloader/
 │   ├── vitest.config.ts        # Vitest config (Node env)
 │   └── package.json            # Test scripts
 ├── oracle-backend/             # Analytics API (Go / Docker)
-│   └── cmd/app/
-│       ├── main_test.go        # IP-handling tests
-│       └── security_test.go    # Auth, session & rate-limit tests
+│   ├── cmd/app/
+│   │   ├── main_test.go        # IP-handling tests
+│   │   └── security_test.go    # Auth, session & rate-limit tests
+│   └── internal/handlers/
+│       └── pipeline_test.go    # Delivery/failure observability tests
 ├── tools/                      # Shell-based testing & validation
 │   ├── validate.sh             # CI-style full validation
 │   ├── test_analytics.sh       # Manual analytics pipeline test
 │   ├── test_pipeline.sh        # End-to-end pipeline smoke test
-│   └── verify_oracle.sh        # Oracle backend vet + test + Docker build
+│   ├── verify_oracle.sh        # Oracle backend vet + test + Docker build
+│   └── deploy_manual.sh        # Manual Cloudflare + Oracle deploy commands
 └── .github/workflows/          # GitHub Actions CI/CD
     ├── ci.yml                  # Main CI pipeline
     ├── codeql.yml              # SAST security scanning
-    ├── deploy-oracle.yml       # Production deployment
     └── release-drafter.yml     # Automated release notes
 ```
 
@@ -242,7 +243,7 @@ This runs `test:coverage:critical` followed by `test:coverage:runtime` sequentia
 
 | # | Test File | What It Covers |
 |---|-----------|----------------|
-| 1 | `security.test.ts` (819 lines) | **Security behaviors** — session cookie/token creation & verification, local environment detection, Durable Object login attempt locking, IP allowlist enforcement, event PII stripping (`ip_address` removal), rate limiting on event batch size, admin secret enforcement |
+| 1 | `security.test.ts` | **Security + reliability behaviors** — session cookie/token creation & verification, local environment detection, Durable Object login attempt locking, IP allowlist enforcement, event PII stripping (`ip_address` removal), weighted replay queue behavior, failure-rollup export, delivery-chain metrics, admin secret enforcement |
 | 2 | `dashboard.test.ts` (121 lines) | **Dashboard UI rendering** — legacy toggle state (enabled/disabled), pipeline health card rendering, health-notify interval minute conversions |
 
 ### How to Run
@@ -269,8 +270,9 @@ The Oracle backend uses the standard Go testing framework (`testing` package).
 
 | # | Test File | What It Covers |
 |---|-----------|----------------|
-| 1 | `cmd/app/main_test.go` (39 lines) | **IP handling** — trusted proxy `X-Forwarded-For` extraction, untrusted proxy header rejection |
-| 2 | `cmd/app/security_test.go` (298 lines) | **Security & auth** — SPA handler path traversal blocking, session auth middleware enforcement, archiver secret bypass, login handler secure cookie setting, insecure cookie in dev mode (`ALLOW_INSECURE_COOKIES`), auth-check endpoint session reflection, ingest batch secret validation, login rate limiting after failures, valid batch acceptance |
+| 1 | `cmd/app/main_test.go` | **IP handling** — trusted proxy `X-Forwarded-For` extraction, untrusted proxy header rejection |
+| 2 | `cmd/app/security_test.go` | **Security & auth** — SPA handler path traversal blocking, session auth middleware enforcement, archiver secret bypass, login handler secure cookie setting, insecure cookie in dev mode (`ALLOW_INSECURE_COOKIES`), auth-check endpoint session reflection, ingest batch secret validation, login rate limiting, pipeline endpoint auth enforcement |
+| 3 | `internal/handlers/pipeline_test.go` | **Pipeline observability** — delivery-stage metrics persistence, structured failure sink ingestion, failure retention cleanup, committed-stage fallback behavior |
 
 ### How to Run
 
@@ -304,7 +306,7 @@ This is the primary quality gate. It runs every test suite in the monorepo:
 | Extension Tests | `pnpm -C extension test` | Runs all 43 extension test files |
 | Extension Typecheck | `pnpm -C extension compile` | TypeScript strict compilation (`tsc --noEmit`) |
 | Extension Coverage Gates | `pnpm -C extension test:coverage:all` | Enforces 100 % coverage on critical + runtime profiles |
-| Oracle Backend Tests | `go test ./...` (inside `oracle-backend/`) | Runs Go unit tests for IP handling and security |
+| Oracle Backend Tests | `go test ./...` (inside `oracle-backend/`) | Runs Go unit tests for IP handling, security, and pipeline observability handlers |
 | Full Validation Suite | `./tools/validate.sh` | Lints, typechecks, audits the worker, then starts a local wrangler dev server and curls `/health` |
 
 **Environment:** Ubuntu Latest, Node 20, pnpm 10.28.2, Go 1.24.13
@@ -321,15 +323,19 @@ This is the primary quality gate. It runs every test suite in the monorepo:
 
 Results appear in the **Security** tab of the GitHub repository.
 
-### 3. Oracle Deployment (`deploy-oracle.yml`)
+### Deployment Model
 
-> **Trigger:** Pushes to `main` that touch `oracle-backend/**`, manual `workflow_dispatch`
+Production deployments are manual (no auto-deploy workflow in this repo):
 
-| Step | What It Does |
-|------|--------------|
-| SSH into Oracle Cloud VM | Ensures repo clone exists, checks out target `main` SHA, exports deploy metadata, rebuilds stack, verifies `/health` |
+```bash
+# Cloudflare Worker deploy (from your local machine)
+./tools/deploy_manual.sh cloudflare
 
-### 4. Release Drafter (`release-drafter.yml`)
+# Oracle backend deploy (run on Oracle VM)
+./tools/deploy_manual.sh oracle
+```
+
+### 3. Release Drafter (`release-drafter.yml`)
 
 > **Trigger:** Push to `main`
 
@@ -492,7 +498,6 @@ pnpm --filter cloudflare-worker test && \
 |-------------|---------|---------|
 | `ci.yml` | Push / PR to `main` | Full test suite + coverage gates + validation |
 | `codeql.yml` | Push / PR / Weekly | Static security analysis (SAST) |
-| `deploy-oracle.yml` | Push to `main` (`oracle-backend/**`) / Manual | Oracle production deployment |
 | `release-drafter.yml` | Push to `main` | Draft release notes |
 
 | Manual Script | Purpose |
@@ -502,3 +507,4 @@ pnpm --filter cloudflare-worker test && \
 | `test_pipeline.sh` | 6-event E2E smoke test |
 | `verify_oracle.sh` | Go vet + tests + Docker build |
 | `oracle-backend/scripts/deploy_main_inplace.sh` | In-place Oracle production deploy with rollback image tag |
+| `deploy_manual.sh` | One-command manual deploy wrapper (`cloudflare`, `oracle`, `all`) |

@@ -45,6 +45,16 @@ export DEPLOY_TIME="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
 cd oracle-backend
 
+# Persist deploy metadata into .env so dashboard status survives manual restarts.
+ENV_FILE=".env"
+touch "$ENV_FILE"
+TMP_ENV="$(mktemp)"
+grep -Ev '^(GIT_COMMIT|DEPLOY_TIME)=' "$ENV_FILE" >"$TMP_ENV" || true
+cat "$TMP_ENV" >"$ENV_FILE"
+rm -f "$TMP_ENV"
+printf 'GIT_COMMIT=%s\n' "$GIT_COMMIT" >>"$ENV_FILE"
+printf 'DEPLOY_TIME=%s\n' "$DEPLOY_TIME" >>"$ENV_FILE"
+
 ROLLBACK_TAG=""
 if docker inspect cqd-oracle-backend >/dev/null 2>&1; then
   CURRENT_IMAGE_ID="$(docker inspect --format '{{.Image}}' cqd-oracle-backend || true)"

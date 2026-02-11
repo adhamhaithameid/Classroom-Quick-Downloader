@@ -25,6 +25,7 @@ type StoredState = {
   totalSuccess?: number;
   totalFail?: number;
   totalCancelled?: number;
+  pendingEvents?: number;
   counters?: {
     byStatus?: Record<string, number>;
     byType?: Record<string, number>;
@@ -43,6 +44,16 @@ type StoredState = {
   configHealthCriticalStaleMs?: number;
   configHealthWarnBufferUtil?: number;
   configHealthCriticalBufferUtil?: number;
+  deliveryMetrics?: {
+    totals?: {
+      accepted?: number;
+      stored?: number;
+      forwarded?: number;
+      committed?: number;
+    };
+    recent?: Array<Record<string, unknown>>;
+  };
+  failureRollups?: Array<Record<string, unknown>>;
 };
 
 type TestEvent = {
@@ -655,7 +666,7 @@ describe("Durable Object security behaviors", () => {
         },
         timeBuckets: [],
       },
-      eventCount: 0,
+      weightedCount: 0,
       maxSeq: 0,
       attempts: 0,
       createdAt: Date.now() - 30 * 60 * 60 * 1000,
@@ -700,7 +711,7 @@ describe("Durable Object security behaviors", () => {
         },
         timeBuckets: [],
       },
-      eventCount: 0,
+      weightedCount: 0,
       maxSeq: 0,
       attempts: 0,
       createdAt: Date.now() - 7 * 60 * 60 * 1000,
@@ -798,7 +809,7 @@ describe("Durable Object security behaviors", () => {
         },
         timeBuckets: [],
       },
-      eventCount: 0,
+      weightedCount: 0,
       maxSeq: 0,
       attempts: 2,
       createdAt: Date.now() - 60 * 1000,
@@ -814,5 +825,139 @@ describe("Durable Object security behaviors", () => {
     await obj.fetch(new Request("http://do/health", { method: "GET" }));
     const next = await state.storage.get<StoredState>(STORAGE_KEY);
     expect(next?.pendingBatches?.length ?? 0).toBeLessThanOrEqual(50);
+  });
+
+  it("tracks delivery metrics chain and exports failure rollups on flush success", async () => {
+    const { obj, state } = makeDO();
+
+    const invalid = await callDO(obj, "/track", { events: "invalid" });
+    expect(invalid.status).toBe(400);
+
+    const accepted = await callDO(obj, "/track", {
+      events: [makeEvent({ count: 3 })],
+    });
+    expect(accepted.status).toBe(202);
+
+    const fetchSpy = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body ?? "{}")) as {
+        batchId?: string;
+        delivery?: { acceptedCount?: number; forwardedCount?: number; committedCount?: number };
+        failureLogs?: Array<{ errorCode?: string; sampleCount?: number }>;
+      };
+      expect(body.delivery?.acceptedCount).toBe(3);
+      expect(body.delivery?.forwardedCount).toBe(3);
+      expect(body.delivery?.committedCount).toBe(0);
+      expect(body.failureLogs?.some((row) => row.errorCode === "invalid_payload")).toBe(true);
+      return new Response(
+        JSON.stringify({ ok: true, batchId: body.batchId, ingestedAt: Date.now() }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    });
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const flush = await callDO(obj, "/admin/force-flush", {});
+    expect(flush.status).toBe(200);
+    const flushPayload = await flush.json() as { ok?: boolean; sent?: number };
+    expect(flushPayload.ok).toBe(true);
+    expect(flushPayload.sent).toBe(3);
+
+    const stats = await callDOGet(obj, "/stats");
+    expect(stats.status).toBe(200);
+    const payload = await stats.json() as {
+      deliveryMetrics?: {
+        totals?: { accepted?: number; stored?: number; forwarded?: number; committed?: number };
+        recent?: Array<{ status?: string }>;
+      };
+      failureSink?: { unsentRollups?: number; totalRollups?: number };
+    };
+    expect(payload.deliveryMetrics?.totals?.accepted).toBe(3);
+    expect(payload.deliveryMetrics?.totals?.stored).toBe(3);
+    expect(payload.deliveryMetrics?.totals?.forwarded).toBe(3);
+    expect(payload.deliveryMetrics?.totals?.committed).toBe(3);
+    expect(payload.deliveryMetrics?.recent?.[0]?.status).toBe("committed");
+    expect(payload.failureSink?.totalRollups).toBeGreaterThan(0);
+    expect(payload.failureSink?.unsentRollups).toBe(0);
+
+    const stored = await state.storage.get<StoredState>(STORAGE_KEY);
+    expect(stored?.failureRollups?.every((entry) => Number((entry as { unsentCount?: number }).unsentCount ?? 0) === 0)).toBe(true);
+    vi.unstubAllGlobals();
+  });
+
+  it("preserves rollup weighted counts in pending replay queue and commits exact sent value", async () => {
+    const { obj, state } = makeDO();
+    const tracked = await callDO(obj, "/track", {
+      events: [makeEvent({ count: 4 })],
+    });
+    expect(tracked.status).toBe(202);
+
+    const failFetch = vi.fn(async () => new Response("oracle down", { status: 503 }));
+    vi.stubGlobal("fetch", failFetch);
+    const firstFlush = await callDO(obj, "/admin/force-flush", {});
+    expect(firstFlush.status).toBe(500);
+    vi.unstubAllGlobals();
+
+    const storedAfterFail = await state.storage.get<StoredState>(STORAGE_KEY);
+    const pending = storedAfterFail?.pendingBatches?.[0] as { weightedCount?: number; batch?: { batchId?: string } } | undefined;
+    expect(pending?.weightedCount).toBe(4);
+    const pendingBatchId = pending?.batch?.batchId;
+    expect(typeof pendingBatchId).toBe("string");
+
+    const okFetch = vi.fn(async () =>
+      new Response(
+        JSON.stringify({ ok: true, batchId: pendingBatchId, ingestedAt: Date.now() }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ));
+    vi.stubGlobal("fetch", okFetch);
+    const secondFlush = await callDO(obj, "/admin/force-flush", {});
+    expect(secondFlush.status).toBe(200);
+    const secondPayload = await secondFlush.json() as { sent?: number };
+    expect(secondPayload.sent).toBe(4);
+    vi.unstubAllGlobals();
+
+    const storedAfterSuccess = await state.storage.get<StoredState>(STORAGE_KEY);
+    expect(storedAfterSuccess?.pendingBatches?.length ?? 0).toBe(0);
+    expect(storedAfterSuccess?.pendingEvents ?? -1).toBe(0);
+  });
+
+  it("exports new failure rollups while replaying an existing pending batch", async () => {
+    const { obj, state } = makeDO();
+    const tracked = await callDO(obj, "/track", { events: [makeEvent()] });
+    expect(tracked.status).toBe(202);
+
+    const failFetch = vi.fn(async () => new Response("oracle down", { status: 503 }));
+    vi.stubGlobal("fetch", failFetch);
+    const firstFlush = await callDO(obj, "/admin/force-flush", {});
+    expect(firstFlush.status).toBe(500);
+    vi.unstubAllGlobals();
+
+    // Record a new structured failure after the batch has already moved to pending queue.
+    const invalid = await callDO(obj, "/track", { events: "invalid" });
+    expect(invalid.status).toBe(400);
+
+    const stored = await state.storage.get<StoredState>(STORAGE_KEY);
+    const pendingBatchId = (
+      stored?.pendingBatches?.[0] as { batch?: { batchId?: string } } | undefined
+    )?.batch?.batchId;
+    expect(typeof pendingBatchId).toBe("string");
+
+    const okFetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body ?? "{}")) as {
+        batchId?: string;
+        failureLogs?: Array<{ errorCode?: string; sampleCount?: number }>;
+      };
+      expect(body.batchId).toBe(pendingBatchId);
+      expect(body.failureLogs?.some((row) => row.errorCode === "invalid_payload")).toBe(true);
+      return new Response(
+        JSON.stringify({ ok: true, batchId: pendingBatchId, ingestedAt: Date.now() }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    });
+    vi.stubGlobal("fetch", okFetch);
+    const secondFlush = await callDO(obj, "/admin/force-flush", {});
+    expect(secondFlush.status).toBe(200);
+    vi.unstubAllGlobals();
+
+    const storedAfter = await state.storage.get<StoredState>(STORAGE_KEY);
+    expect(storedAfter?.failureRollups?.every((entry) => Number((entry as { unsentCount?: number }).unsentCount ?? 0) === 0)).toBe(true);
   });
 });

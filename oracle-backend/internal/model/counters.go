@@ -103,6 +103,29 @@ type DOState struct {
 	EnvSnapshot    *DOStateEnvSnapshot `json:"envSnapshot,omitempty"`
 }
 
+// DeliverySnapshot captures per-batch stage counters to verify end-to-end flow.
+type DeliverySnapshot struct {
+	DeliveryID     string `json:"deliveryId"`
+	AcceptedCount  int64  `json:"acceptedCount"`
+	StoredCount    int64  `json:"storedCount"`
+	ForwardedCount int64  `json:"forwardedCount"`
+	CommittedCount int64  `json:"committedCount"`
+	CreatedAt      int64  `json:"createdAt"`
+	MinSeq         *int64 `json:"minSeq,omitempty"`
+	MaxSeq         *int64 `json:"maxSeq,omitempty"`
+}
+
+// FailureLogEntry is a compact failure rollup emitted by Cloudflare DO.
+type FailureLogEntry struct {
+	Key         string `json:"key"`
+	Source      string `json:"source"`
+	Stage       string `json:"stage"`
+	ErrorCode   string `json:"errorCode"`
+	ErrorDetail string `json:"errorDetail"`
+	SampleCount int64  `json:"sampleCount"`
+	TSUTC       int64  `json:"tsUtc"`
+}
+
 // Event mirrors the StoredEvent from the Worker (raw analytics event).
 // We include this to capture IP addresses and other raw metadata.
 type Event struct {
@@ -122,11 +145,13 @@ type Event struct {
 // multiple time buckets (e.g. per hour).
 // LEAN INGESTION: Only contains uniqueIps, NOT raw events to reduce payload size.
 type OracleBatch struct {
-	BatchID     string       `json:"batchId"`
-	GeneratedAt int64        `json:"generatedAt"` // unix ms from DO
-	TimeZone    string       `json:"timeZone"`    // e.g. "UTC"
-	Summary     BatchSummary `json:"summary"`
-	TimeBuckets []TimeBucket `json:"timeBuckets"`
-	DOState     DOState      `json:"doState"`
-	UniqueIps   []string     `json:"uniqueIps"` // For Geo Map persistence
+	BatchID     string            `json:"batchId"`
+	GeneratedAt int64             `json:"generatedAt"` // unix ms from DO
+	TimeZone    string            `json:"timeZone"`    // e.g. "UTC"
+	Summary     BatchSummary      `json:"summary"`
+	TimeBuckets []TimeBucket      `json:"timeBuckets"`
+	DOState     DOState           `json:"doState"`
+	Delivery    *DeliverySnapshot `json:"delivery,omitempty"`
+	FailureLogs []FailureLogEntry `json:"failureLogs,omitempty"`
+	UniqueIps   []string          `json:"uniqueIps"` // For Geo Map persistence
 }
