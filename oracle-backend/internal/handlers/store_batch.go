@@ -3,13 +3,19 @@ package handlers
 
 import (
 	"context"
+	"crypto/sha256"
 	"crypto/subtle"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"net"
 	"net/http"
+	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	model "oracle-backend/internal/model"
@@ -89,8 +95,15 @@ func IngestBatchHandler(db *sql.DB, sharedSecret string) http.HandlerFunc {
 			return
 		}
 
+		bodyBytes, err := io.ReadAll(r.Body)
+		if err != nil {
+			recordOracleFailure(db, "ingest", "body_read_failed", err.Error(), 1, "", "")
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
+
 		var batch model.OracleBatch
-		if err := json.NewDecoder(r.Body).Decode(&batch); err != nil {
+		if err := json.Unmarshal(bodyBytes, &batch); err != nil {
 			logEvent("warn", "ingest_invalid_json", map[string]interface{}{
 				"error": err.Error(),
 			})
@@ -105,8 +118,15 @@ func IngestBatchHandler(db *sql.DB, sharedSecret string) http.HandlerFunc {
 			return
 		}
 
+		var rawPayload map[string]interface{}
+		if err := json.Unmarshal(bodyBytes, &rawPayload); err != nil {
+			rawPayload = map[string]interface{}{
+				"_parse_error": err.Error(),
+			}
+		}
+
 		ctx := r.Context()
-		if err := ingestBatch(ctx, db, &batch); err != nil {
+		if err := ingestBatch(ctx, db, &batch, bodyBytes, rawPayload); err != nil {
 			logEvent("error", "ingest_failed", map[string]interface{}{
 				"error":   err.Error(),
 				"batchId": batch.BatchID,
@@ -126,7 +146,7 @@ func IngestBatchHandler(db *sql.DB, sharedSecret string) http.HandlerFunc {
 	}
 }
 
-func ingestBatch(ctx context.Context, db *sql.DB, batch *model.OracleBatch) error {
+func ingestBatch(ctx context.Context, db *sql.DB, batch *model.OracleBatch, rawBody []byte, rawPayload map[string]interface{}) error {
 	tx, err := db.BeginTx(ctx, &sql.TxOptions{})
 	if err != nil {
 		return err
@@ -142,6 +162,16 @@ func ingestBatch(ctx context.Context, db *sql.DB, batch *model.OracleBatch) erro
 	if err == nil {
 		// Already ingested.
 		return tx.Commit()
+	}
+
+	// Persist full raw payload first (raw-to-projected model).
+	if err := insertRawSnapshot(ctx, tx, "cloudflare-do", "/ingest-batch", rawBody, "ok"); err != nil {
+		return err
+	}
+
+	// Register any new schema paths so drift is detected without breaking storage.
+	if err := registerSchemaPaths(ctx, tx, rawPayload); err != nil {
+		return err
 	}
 
 	// Aggregate totals across all time buckets.
@@ -208,6 +238,26 @@ func ingestBatch(ctx context.Context, db *sql.DB, batch *model.OracleBatch) erro
 		return err
 	}
 
+	// SQLite-owned outbox event for asynchronous Postgres projection.
+	if err := enqueueSQLiteOutbox(
+		ctx,
+		tx,
+		"ingest_batch_committed",
+		map[string]interface{}{
+			"batchId":      batch.BatchID,
+			"generatedAt":  batch.GeneratedAt,
+			"ingestedAt":   nowMs,
+			"timeZone":     batch.TimeZone,
+			"downloads":    totalDownloads,
+			"success":      totalSuccess,
+			"fail":         totalFail,
+			"snapshotHint": "cf_snapshots_raw",
+		},
+		"batch:"+batch.BatchID,
+	); err != nil {
+		return err
+	}
+
 	// PRIVACY FIX: IP storage disabled per PRIVACY.md policy
 	// The privacy policy states IPs are never stored. Geo Map feature is disabled.
 	// To re-enable, update PRIVACY.md to disclose IP storage and uncomment the code below.
@@ -216,6 +266,167 @@ func ingestBatch(ctx context.Context, db *sql.DB, batch *model.OracleBatch) erro
 	// }
 
 	return tx.Commit()
+}
+
+func insertRawSnapshot(
+	ctx context.Context,
+	tx *sql.Tx,
+	source string,
+	endpoint string,
+	body []byte,
+	status string,
+) error {
+	if len(body) == 0 {
+		return nil
+	}
+	sum := sha256.Sum256(body)
+	fingerprint := hex.EncodeToString(sum[:])
+	_, err := tx.ExecContext(
+		ctx,
+		`INSERT INTO cf_snapshots_raw (
+			source, endpoint, payload_json, schema_fingerprint, status, received_at
+		) VALUES (?, ?, ?, ?, ?, ?)`,
+		source,
+		endpoint,
+		string(body),
+		fingerprint,
+		status,
+		time.Now().UnixMilli(),
+	)
+	return err
+}
+
+func registerSchemaPaths(ctx context.Context, tx *sql.Tx, payload map[string]interface{}) error {
+	if len(payload) == 0 {
+		return nil
+	}
+	paths := make(map[string]string, 64)
+	walkJSONPaths("", payload, paths)
+	if len(paths) == 0 {
+		return nil
+	}
+
+	nowMs := time.Now().UnixMilli()
+	newCount := 0
+	keys := make([]string, 0, len(paths))
+	for k := range paths {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	for _, path := range keys {
+		sampleType := paths[path]
+		var exists int
+		err := tx.QueryRowContext(ctx, `SELECT 1 FROM cf_schema_registry WHERE json_path = ?`, path).Scan(&exists)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
+		if errors.Is(err, sql.ErrNoRows) {
+			if _, err := tx.ExecContext(
+				ctx,
+				`INSERT INTO cf_schema_registry (json_path, first_seen_at, last_seen_at, sample_type, is_projected)
+				 VALUES (?, ?, ?, ?, 0)`,
+				path,
+				nowMs,
+				nowMs,
+				sampleType,
+			); err != nil {
+				return err
+			}
+			newCount++
+			continue
+		}
+		if _, err := tx.ExecContext(
+			ctx,
+			`UPDATE cf_schema_registry SET last_seen_at = ?, sample_type = ? WHERE json_path = ?`,
+			nowMs,
+			sampleType,
+			path,
+		); err != nil {
+			return err
+		}
+	}
+
+	if newCount > 0 {
+		alertPayload, _ := json.Marshal(map[string]interface{}{
+			"newPaths": newCount,
+		})
+		if _, err := tx.ExecContext(
+			ctx,
+			`INSERT INTO system_alerts (alert_type, severity, message, status, payload_json, created_at, updated_at)
+			 VALUES (?, ?, ?, 'open', ?, ?, ?)`,
+			"schema_drift_detected",
+			"warning",
+			"new JSON schema paths detected from Cloudflare payload",
+			string(alertPayload),
+			nowMs,
+			nowMs,
+		); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func walkJSONPaths(prefix string, value interface{}, out map[string]string) {
+	switch v := value.(type) {
+	case map[string]interface{}:
+		for key, child := range v {
+			childPrefix := key
+			if prefix != "" {
+				childPrefix = prefix + "." + key
+			}
+			walkJSONPaths(childPrefix, child, out)
+		}
+	case []interface{}:
+		if prefix != "" {
+			out[prefix+"[]"] = "array"
+		}
+		for _, child := range v {
+			walkJSONPaths(prefix+"[]", child, out)
+		}
+	case nil:
+		if prefix != "" {
+			out[prefix] = "null"
+		}
+	case bool:
+		if prefix != "" {
+			out[prefix] = "bool"
+		}
+	case float64:
+		if prefix != "" {
+			out[prefix] = "number"
+		}
+	case string:
+		if prefix != "" {
+			out[prefix] = "string"
+		}
+	default:
+		if prefix != "" {
+			out[prefix] = strings.ToLower(fmt.Sprintf("%T", v))
+		}
+	}
+}
+
+func enqueueSQLiteOutbox(ctx context.Context, tx *sql.Tx, eventType string, payload map[string]interface{}, key string) error {
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	nowMs := time.Now().UnixMilli()
+	_, err = tx.ExecContext(
+		ctx,
+		`INSERT INTO ingest_outbox (event_type, payload_json, idempotency_key, status, attempts, last_error, created_at, next_run_at)
+		 VALUES (?, ?, ?, 'pending', 0, '', ?, ?)
+		 ON CONFLICT(idempotency_key) DO NOTHING`,
+		eventType,
+		string(raw),
+		key,
+		nowMs,
+		nowMs,
+	)
+	return err
 }
 
 // insertBatchIPs stores unique IPs for the Geo Map feature
