@@ -334,7 +334,7 @@ func TestCriticalStepUpFlow_EnforcedWhenFlagEnabled(t *testing.T) {
 	resetSessionStore()
 	resetLoginRateStore()
 	stepUpSessionStore.Lock()
-	stepUpSessionStore.tokens = make(map[string]time.Time)
+	stepUpSessionStore.tokens = make(map[string]stepUpSession)
 	stepUpSessionStore.Unlock()
 	stepUpChallengeStore.Lock()
 	stepUpChallengeStore.items = make(map[string]stepUpChallenge)
@@ -506,4 +506,106 @@ func TestStepUpVerify_RateLimitsFailures(t *testing.T) {
 	}
 
 	t.Fatalf("expected stepup verify to eventually return 429")
+}
+
+func TestCriticalStepUpFlow_BindsStepUpToParentSession(t *testing.T) {
+	resetSessionStore()
+	resetLoginRateStore()
+	stepUpSessionStore.Lock()
+	stepUpSessionStore.tokens = make(map[string]stepUpSession)
+	stepUpSessionStore.Unlock()
+	stepUpChallengeStore.Lock()
+	stepUpChallengeStore.items = make(map[string]stepUpChallenge)
+	stepUpChallengeStore.Unlock()
+
+	dbPath := filepath.Join(t.TempDir(), "stepup-bind.db")
+	sqlDB, err := db.Init(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sqlDB.Close()
+
+	if _, err := sqlDB.Exec(`UPDATE feature_flags SET enabled = 1 WHERE name = 'feature_stepup_enforced'`); err != nil {
+		t.Fatalf("failed to enable stepup flag: %v", err)
+	}
+
+	login := loginHandler("viewer-secret", false)
+	loginAndGetSession := func(remote string) *http.Cookie {
+		t.Helper()
+		req := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(`{"password":"viewer-secret"}`))
+		req.RemoteAddr = remote
+		req.Header.Set("Content-Type", "application/json")
+		rr := httptest.NewRecorder()
+		login.ServeHTTP(rr, req)
+		if rr.Code != http.StatusOK {
+			t.Fatalf("login failed: %d %s", rr.Code, rr.Body.String())
+		}
+		for _, c := range rr.Result().Cookies() {
+			if c.Name == sessionCookieName {
+				return c
+			}
+		}
+		t.Fatalf("session cookie not found")
+		return nil
+	}
+
+	sessionA := loginAndGetSession("203.0.113.10:1111")
+	sessionB := loginAndGetSession("203.0.113.11:2222")
+
+	authMW := requireAuth("viewer-secret", "", false)
+	start := authMW(stepUpStartHandler(sqlDB))
+	verify := authMW(stepUpVerifyHandler(sqlDB, "super-secret", false))
+
+	startReq := httptest.NewRequest(http.MethodPost, "/api/auth/stepup/start", nil)
+	startReq.RemoteAddr = "203.0.113.10:1111"
+	startReq.AddCookie(sessionA)
+	startRR := httptest.NewRecorder()
+	start.ServeHTTP(startRR, startReq)
+	if startRR.Code != http.StatusOK {
+		t.Fatalf("stepup start failed: %d %s", startRR.Code, startRR.Body.String())
+	}
+	var startPayload map[string]any
+	if err := json.Unmarshal(startRR.Body.Bytes(), &startPayload); err != nil {
+		t.Fatalf("invalid start payload: %v", err)
+	}
+	challengeID, _ := startPayload["challengeId"].(string)
+	if challengeID == "" {
+		t.Fatalf("missing challenge id: %v", startPayload)
+	}
+
+	verifyReq := httptest.NewRequest(
+		http.MethodPost,
+		"/api/auth/stepup/verify",
+		bytes.NewBufferString(`{"challengeId":"`+challengeID+`","password":"super-secret"}`),
+	)
+	verifyReq.RemoteAddr = "203.0.113.10:1111"
+	verifyReq.Header.Set("Content-Type", "application/json")
+	verifyReq.AddCookie(sessionA)
+	verifyRR := httptest.NewRecorder()
+	verify.ServeHTTP(verifyRR, verifyReq)
+	if verifyRR.Code != http.StatusOK {
+		t.Fatalf("stepup verify failed: %d %s", verifyRR.Code, verifyRR.Body.String())
+	}
+
+	var stepUpCookie *http.Cookie
+	for _, c := range verifyRR.Result().Cookies() {
+		if c.Name == stepUpSessionCookieName {
+			stepUpCookie = c
+		}
+	}
+	if stepUpCookie == nil {
+		t.Fatal("stepup session cookie not found")
+	}
+
+	protected := authMW(requireStepUp(sqlDB, "super-secret")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})))
+	protectedReq := httptest.NewRequest(http.MethodPost, "/api/admin/flags/update", nil)
+	protectedReq.AddCookie(sessionB)
+	protectedReq.AddCookie(stepUpCookie)
+	protectedRR := httptest.NewRecorder()
+	protected.ServeHTTP(protectedRR, protectedReq)
+	if protectedRR.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 for cross-session stepup reuse, got %d", protectedRR.Code)
+	}
 }
