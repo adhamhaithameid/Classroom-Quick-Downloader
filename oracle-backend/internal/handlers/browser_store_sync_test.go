@@ -156,6 +156,34 @@ func TestDeploymentsSyncHandler_RespectsSyncFeatureFlag(t *testing.T) {
 	}
 }
 
+func TestDeploymentsSyncHandler_MethodNotAllowed(t *testing.T) {
+	sqlDB := newAdminTestDB(t)
+	defer sqlDB.Close()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/admin/deployments/sync", nil)
+	rr := httptest.NewRecorder()
+	DeploymentsSyncHandler(sqlDB, nil, nil).ServeHTTP(rr, req)
+	if rr.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("expected 405 for non-POST method, got %d", rr.Code)
+	}
+}
+
+func TestDeploymentsSyncHandler_RespectsManagementFeatureFlag(t *testing.T) {
+	sqlDB := newAdminTestDB(t)
+	defer sqlDB.Close()
+	if _, err := sqlDB.Exec(`UPDATE feature_flags SET enabled = 0 WHERE name = 'feature_management_hub_enabled'`); err != nil {
+		t.Fatalf("failed to disable management feature flag: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/admin/deployments/sync", bytes.NewBufferString(`{}`))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	DeploymentsSyncHandler(sqlDB, nil, nil).ServeHTTP(rr, req)
+	if rr.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 when management feature is disabled, got %d", rr.Code)
+	}
+}
+
 func TestDeploymentsTargetsHandler_ReturnsAllDefaultTargets(t *testing.T) {
 	sqlDB := newAdminTestDB(t)
 	defer sqlDB.Close()
