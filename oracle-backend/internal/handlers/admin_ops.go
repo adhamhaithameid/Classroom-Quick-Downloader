@@ -1,0 +1,1321 @@
+package handlers
+
+import (
+	"context"
+	"crypto/sha256"
+	"database/sql"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net/http"
+	"os"
+	"path/filepath"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
+
+	"oracle-backend/internal/observability"
+)
+
+type featureFlagRow struct {
+	Name        string `json:"name"`
+	Enabled     bool   `json:"enabled"`
+	Description string `json:"description"`
+	UpdatedAt   int64  `json:"updatedAt"`
+}
+
+func FeatureFlagsHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+
+		rows, err := db.QueryContext(r.Context(), `SELECT name, enabled, description, updated_at FROM feature_flags ORDER BY name ASC`)
+		if err != nil {
+			http.Error(w, "failed to load feature flags", http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		out := make([]featureFlagRow, 0, 16)
+		for rows.Next() {
+			var item featureFlagRow
+			var enabled int64
+			if err := rows.Scan(&item.Name, &enabled, &item.Description, &item.UpdatedAt); err != nil {
+				http.Error(w, "failed to parse feature flags", http.StatusInternalServerError)
+				return
+			}
+			item.Enabled = enabled != 0
+			out = append(out, item)
+		}
+		if err := rows.Err(); err != nil {
+			http.Error(w, "failed to iterate feature flags", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"ok":    true,
+			"flags": out,
+		})
+	}
+}
+
+type updateFlagRequest struct {
+	Name    string `json:"name"`
+	Enabled bool   `json:"enabled"`
+}
+
+func UpdateFeatureFlagHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+
+		var req updateFlagRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
+		req.Name = strings.TrimSpace(req.Name)
+		if req.Name == "" {
+			http.Error(w, "name is required", http.StatusBadRequest)
+			return
+		}
+
+		enabled := 0
+		if req.Enabled {
+			enabled = 1
+		}
+
+		res, err := db.ExecContext(
+			r.Context(),
+			`UPDATE feature_flags SET enabled = ?, updated_at = ? WHERE name = ?`,
+			enabled,
+			time.Now().UnixMilli(),
+			req.Name,
+		)
+		if err != nil {
+			http.Error(w, "failed to update feature flag", http.StatusInternalServerError)
+			return
+		}
+		affected, err := res.RowsAffected()
+		if err != nil {
+			http.Error(w, "failed to update feature flag", http.StatusInternalServerError)
+			return
+		}
+		if affected == 0 {
+			http.Error(w, "feature flag not found", http.StatusNotFound)
+			return
+		}
+
+		if err := AppendAuditLog(
+			r.Context(),
+			db,
+			"feature_flag_update",
+			"feature_flag",
+			req.Name,
+			"ok",
+			map[string]any{
+				"name":    req.Name,
+				"enabled": req.Enabled,
+			},
+		); err != nil {
+			logEvent("warn", "audit_log_write_failed", map[string]interface{}{"error": err.Error()})
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"ok": true})
+	}
+}
+
+func IsFeatureEnabled(ctx context.Context, db *sql.DB, name string) (bool, error) {
+	var enabled int64
+	err := db.QueryRowContext(ctx, `SELECT enabled FROM feature_flags WHERE name = ?`, name).Scan(&enabled)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		return false, err
+	}
+	return enabled != 0, nil
+}
+
+type outboxStatusResponse struct {
+	OK              bool             `json:"ok"`
+	CountsByStatus  map[string]int64 `json:"countsByStatus"`
+	DeadLetterCount int64            `json:"deadLetterCount"`
+}
+
+func OutboxStatusHandler(db *sql.DB, metrics *observability.Registry) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+
+		rows, err := db.QueryContext(r.Context(), `SELECT status, COUNT(*) FROM ingest_outbox GROUP BY status`)
+		if err != nil {
+			http.Error(w, "failed to query outbox status", http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		counts := map[string]int64{
+			"pending":    0,
+			"processing": 0,
+			"sent":       0,
+			"retry":      0,
+			"dead":       0,
+		}
+		var backlog int64
+		for rows.Next() {
+			var status string
+			var cnt int64
+			if err := rows.Scan(&status, &cnt); err != nil {
+				http.Error(w, "failed to query outbox status", http.StatusInternalServerError)
+				return
+			}
+			counts[status] = cnt
+			if status == "pending" || status == "retry" || status == "processing" {
+				backlog += cnt
+			}
+		}
+		if err := rows.Err(); err != nil {
+			http.Error(w, "failed to query outbox status", http.StatusInternalServerError)
+			return
+		}
+
+		var deadCount int64
+		if err := db.QueryRowContext(r.Context(), `SELECT COUNT(*) FROM outbox_dead_letter`).Scan(&deadCount); err != nil {
+			http.Error(w, "failed to query outbox status", http.StatusInternalServerError)
+			return
+		}
+		metrics.SetGauge("oracle_outbox_backlog_size", map[string]string{"source": "sqlite"}, float64(backlog))
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(outboxStatusResponse{
+			OK:              true,
+			CountsByStatus:  counts,
+			DeadLetterCount: deadCount,
+		})
+	}
+}
+
+func RetryOutboxHandler(db *sql.DB, metrics *observability.Registry) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+
+		type reqShape struct {
+			IDs []int64 `json:"ids"`
+		}
+		var req reqShape
+		_ = json.NewDecoder(r.Body).Decode(&req)
+
+		nowMs := time.Now().UnixMilli()
+		var res sql.Result
+		var err error
+		if len(req.IDs) == 0 {
+			res, err = db.ExecContext(
+				r.Context(),
+				`UPDATE ingest_outbox
+				 SET status = 'pending', next_run_at = ?, last_error = ''
+				 WHERE status IN ('retry', 'dead')`,
+				nowMs,
+			)
+		} else {
+			placeholders := make([]string, 0, len(req.IDs))
+			args := make([]any, 0, len(req.IDs)+1)
+			args = append(args, nowMs)
+			for _, id := range req.IDs {
+				placeholders = append(placeholders, "?")
+				args = append(args, id)
+			}
+			q := `UPDATE ingest_outbox
+				  SET status = 'pending', next_run_at = ?, last_error = ''
+				  WHERE id IN (` + strings.Join(placeholders, ",") + `)`
+			res, err = db.ExecContext(r.Context(), q, args...)
+		}
+		if err != nil {
+			http.Error(w, "failed to mark outbox rows for retry", http.StatusInternalServerError)
+			return
+		}
+		affected, _ := res.RowsAffected()
+		metrics.IncCounter("oracle_outbox_retry_total", nil, float64(affected))
+
+		_ = AppendAuditLog(
+			r.Context(),
+			db,
+			"outbox_retry",
+			"ingest_outbox",
+			"bulk",
+			"ok",
+			map[string]any{"ids": req.IDs, "affected": affected},
+		)
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "affected": affected})
+	}
+}
+
+func ReplayDeadLetterHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+
+		rows, err := db.QueryContext(
+			r.Context(),
+			`SELECT id, event_type, payload_json, idempotency_key, attempts
+			 FROM outbox_dead_letter
+			 ORDER BY id ASC
+			 LIMIT 100`,
+		)
+		if err != nil {
+			http.Error(w, "failed to load dead letter rows", http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		type deadRow struct {
+			ID             int64
+			EventType      string
+			PayloadJSON    string
+			IdempotencyKey string
+			Attempts       int64
+		}
+		items := make([]deadRow, 0, 100)
+		for rows.Next() {
+			var item deadRow
+			if err := rows.Scan(&item.ID, &item.EventType, &item.PayloadJSON, &item.IdempotencyKey, &item.Attempts); err != nil {
+				http.Error(w, "failed to parse dead letter rows", http.StatusInternalServerError)
+				return
+			}
+			items = append(items, item)
+		}
+		if err := rows.Err(); err != nil {
+			http.Error(w, "failed to parse dead letter rows", http.StatusInternalServerError)
+			return
+		}
+
+		tx, err := db.BeginTx(r.Context(), nil)
+		if err != nil {
+			http.Error(w, "failed to replay dead letter rows", http.StatusInternalServerError)
+			return
+		}
+		defer tx.Rollback()
+
+		nowMs := time.Now().UnixMilli()
+		replayed := int64(0)
+		for _, item := range items {
+			key := item.IdempotencyKey + "-replay-" + strconv.FormatInt(item.ID, 10)
+			if _, err := tx.ExecContext(
+				r.Context(),
+				`INSERT INTO ingest_outbox (event_type, payload_json, idempotency_key, status, attempts, last_error, created_at, next_run_at)
+				 VALUES (?, ?, ?, 'pending', 0, '', ?, ?)`,
+				item.EventType,
+				item.PayloadJSON,
+				key,
+				nowMs,
+				nowMs,
+			); err != nil {
+				continue
+			}
+			if _, err := tx.ExecContext(r.Context(), `DELETE FROM outbox_dead_letter WHERE id = ?`, item.ID); err != nil {
+				http.Error(w, "failed to replay dead letter rows", http.StatusInternalServerError)
+				return
+			}
+			replayed++
+		}
+
+		if err := tx.Commit(); err != nil {
+			http.Error(w, "failed to replay dead letter rows", http.StatusInternalServerError)
+			return
+		}
+
+		_ = AppendAuditLog(
+			r.Context(),
+			db,
+			"dead_letter_replay",
+			"outbox_dead_letter",
+			"bulk",
+			"ok",
+			map[string]any{"replayed": replayed},
+		)
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "replayed": replayed})
+	}
+}
+
+func AlertsHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		rows, err := db.QueryContext(
+			r.Context(),
+			`SELECT id, alert_type, severity, message, status, payload_json, created_at, updated_at
+			 FROM system_alerts
+			 ORDER BY created_at DESC
+			 LIMIT 200`,
+		)
+		if err != nil {
+			http.Error(w, "failed to load alerts", http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		type alertRow struct {
+			ID        int64           `json:"id"`
+			AlertType string          `json:"alertType"`
+			Severity  string          `json:"severity"`
+			Message   string          `json:"message"`
+			Status    string          `json:"status"`
+			Payload   json.RawMessage `json:"payload"`
+			CreatedAt int64           `json:"createdAt"`
+			UpdatedAt int64           `json:"updatedAt"`
+		}
+
+		out := make([]alertRow, 0, 200)
+		for rows.Next() {
+			var item alertRow
+			if err := rows.Scan(
+				&item.ID,
+				&item.AlertType,
+				&item.Severity,
+				&item.Message,
+				&item.Status,
+				&item.Payload,
+				&item.CreatedAt,
+				&item.UpdatedAt,
+			); err != nil {
+				http.Error(w, "failed to load alerts", http.StatusInternalServerError)
+				return
+			}
+			out = append(out, item)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "alerts": out})
+	}
+}
+
+func MigrationsStatusHandler(postgresConfigured bool, postgresLastErr *string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+
+		payload := map[string]any{
+			"ok": true,
+			"sqlite": map[string]any{
+				"enabled": true,
+				"status":  "ready",
+			},
+			"postgres": map[string]any{
+				"configured": postgresConfigured,
+				"status":     "disabled",
+			},
+		}
+		if postgresConfigured {
+			payload["postgres"] = map[string]any{
+				"configured": true,
+				"status":     "ready",
+			}
+		}
+		if postgresLastErr != nil && *postgresLastErr != "" {
+			payload["postgres"] = map[string]any{
+				"configured": postgresConfigured,
+				"status":     "error",
+				"message":    *postgresLastErr,
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(payload)
+	}
+}
+
+func AppendAuditLog(
+	ctx context.Context,
+	db *sql.DB,
+	actionType string,
+	resourceType string,
+	resourceID string,
+	result string,
+	payload map[string]any,
+) error {
+	requestID := observability.RequestIDFromContext(ctx)
+	correlationID := observability.CorrelationIDFromContext(ctx)
+	userID := observability.UserIDFromContext(ctx)
+	tokenID := observability.TokenIDFromContext(ctx)
+	role := observability.RoleFromContext(ctx)
+
+	canonicalPayload, err := canonicalJSON(payload)
+	if err != nil {
+		return err
+	}
+	payloadHash := sha256.Sum256([]byte(canonicalPayload))
+	payloadHashHex := hex.EncodeToString(payloadHash[:])
+
+	var prevHash string
+	err = db.QueryRowContext(ctx, `SELECT row_hash FROM admin_audit_log ORDER BY id DESC LIMIT 1`).Scan(&prevHash)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+	if errors.Is(err, sql.ErrNoRows) {
+		prevHash = strings.Repeat("0", 64)
+	}
+
+	rowPreimage := canonicalPayload + ":" + prevHash
+	rowHash := sha256.Sum256([]byte(rowPreimage))
+	rowHashHex := hex.EncodeToString(rowHash[:])
+
+	_, err = db.ExecContext(
+		ctx,
+		`INSERT INTO admin_audit_log (
+			ts_utc, request_id, correlation_id, user_id, token_id, role,
+			action_type, resource_type, resource_id, result, error_code,
+			payload_json, prev_hash, payload_hash, row_hash
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		time.Now().UnixMilli(),
+		requestID,
+		correlationID,
+		userID,
+		tokenID,
+		role,
+		actionType,
+		resourceType,
+		resourceID,
+		result,
+		"",
+		canonicalPayload,
+		prevHash,
+		payloadHashHex,
+		rowHashHex,
+	)
+	return err
+}
+
+func AuditVerifyChainHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+
+		rows, err := db.QueryContext(
+			r.Context(),
+			`SELECT id, payload_json, prev_hash, row_hash FROM admin_audit_log ORDER BY id ASC`,
+		)
+		if err != nil {
+			http.Error(w, "failed to verify audit chain", http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		type rowData struct {
+			ID         int64
+			Payload    string
+			PrevHash   string
+			RowHash    string
+			Recomputed string
+		}
+		chain := make([]rowData, 0, 256)
+		prev := strings.Repeat("0", 64)
+		ok := true
+		var breakAt int64
+		var breakReason string
+
+		for rows.Next() {
+			var item rowData
+			if err := rows.Scan(&item.ID, &item.Payload, &item.PrevHash, &item.RowHash); err != nil {
+				http.Error(w, "failed to verify audit chain", http.StatusInternalServerError)
+				return
+			}
+			sum := sha256.Sum256([]byte(item.Payload + ":" + item.PrevHash))
+			item.Recomputed = hex.EncodeToString(sum[:])
+			chain = append(chain, item)
+
+			if item.PrevHash != prev && ok {
+				ok = false
+				breakAt = item.ID
+				breakReason = "prev_hash_mismatch"
+			}
+			if item.RowHash != item.Recomputed && ok {
+				ok = false
+				breakAt = item.ID
+				breakReason = "row_hash_mismatch"
+			}
+			prev = item.RowHash
+		}
+		if err := rows.Err(); err != nil {
+			http.Error(w, "failed to verify audit chain", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		resp := map[string]any{
+			"ok":        true,
+			"valid":     ok,
+			"totalRows": len(chain),
+		}
+		if !ok {
+			resp["breakAt"] = breakAt
+			resp["reason"] = breakReason
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+	}
+}
+
+func canonicalJSON(payload map[string]any) (string, error) {
+	if payload == nil {
+		return "{}", nil
+	}
+	keys := make([]string, 0, len(payload))
+	for k := range payload {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	ordered := make(map[string]any, len(payload))
+	for _, k := range keys {
+		ordered[k] = payload[k]
+	}
+	raw, err := json.Marshal(ordered)
+	if err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
+type sqlQueryRequest struct {
+	SQL   string `json:"sql"`
+	Limit int    `json:"limit"`
+}
+
+type sqlExecRequest struct {
+	SQL    string `json:"sql"`
+	DryRun bool   `json:"dryRun"`
+}
+
+type clearDataRequest struct {
+	Scope  string `json:"scope"`
+	DryRun bool   `json:"dryRun"`
+}
+
+type recordUpsertRequest struct {
+	RecordType string         `json:"recordType"`
+	RecordKey  string         `json:"recordKey"`
+	Data       map[string]any `json:"data"`
+}
+
+type recordDeleteRequest struct {
+	RecordType string `json:"recordType"`
+	RecordKey  string `json:"recordKey"`
+}
+
+func SQLQueryHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		if !ensureFeatureEnabled(w, r, db, "feature_sql_console_enabled") {
+			return
+		}
+
+		var req sqlQueryRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
+
+		stmt, err := normalizeSingleStatement(req.SQL)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if !isReadOnlySQL(stmt) {
+			http.Error(w, "only read-only SQL is allowed on query endpoint", http.StatusBadRequest)
+			return
+		}
+
+		limit := req.Limit
+		if limit <= 0 {
+			limit = 200
+		}
+		if limit > 2000 {
+			limit = 2000
+		}
+
+		rows, err := db.QueryContext(r.Context(), stmt)
+		if err != nil {
+			http.Error(w, "query failed: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		defer rows.Close()
+
+		cols, err := rows.Columns()
+		if err != nil {
+			http.Error(w, "query failed", http.StatusInternalServerError)
+			return
+		}
+
+		out := make([]map[string]any, 0, limit)
+		for rows.Next() {
+			if len(out) >= limit {
+				break
+			}
+			values := make([]any, len(cols))
+			ptrs := make([]any, len(cols))
+			for i := range values {
+				ptrs[i] = &values[i]
+			}
+			if err := rows.Scan(ptrs...); err != nil {
+				http.Error(w, "query scan failed", http.StatusInternalServerError)
+				return
+			}
+			row := make(map[string]any, len(cols))
+			for i, col := range cols {
+				v := values[i]
+				switch t := v.(type) {
+				case []byte:
+					row[col] = string(t)
+				default:
+					row[col] = t
+				}
+			}
+			out = append(out, row)
+		}
+		if err := rows.Err(); err != nil {
+			http.Error(w, "query failed", http.StatusInternalServerError)
+			return
+		}
+
+		_ = AppendAuditLog(
+			r.Context(),
+			db,
+			"sql_query",
+			"sql_console",
+			"query",
+			"ok",
+			map[string]any{
+				"rows":    len(out),
+				"limited": limit,
+			},
+		)
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"ok":     true,
+			"limit":  limit,
+			"count":  len(out),
+			"rows":   out,
+			"dryRun": true,
+		})
+	}
+}
+
+func SQLExecHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		if !ensureFeatureEnabled(w, r, db, "feature_sql_console_enabled") {
+			return
+		}
+
+		var req sqlExecRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
+
+		stmt, err := normalizeSingleStatement(req.SQL)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if !isMutatingSQL(stmt) {
+			http.Error(w, "exec endpoint only supports insert/update/delete statements", http.StatusBadRequest)
+			return
+		}
+		if isForbiddenMutatingSQL(stmt) {
+			http.Error(w, "statement is not allowed by safety policy", http.StatusBadRequest)
+			return
+		}
+
+		affected := int64(0)
+		if req.DryRun {
+			tx, err := db.BeginTx(r.Context(), nil)
+			if err != nil {
+				http.Error(w, "failed to execute dry run", http.StatusInternalServerError)
+				return
+			}
+			res, err := tx.ExecContext(r.Context(), stmt)
+			if err == nil {
+				affected, _ = res.RowsAffected()
+			}
+			_ = tx.Rollback()
+			if err != nil {
+				http.Error(w, "dry run failed: "+err.Error(), http.StatusBadRequest)
+				return
+			}
+		} else {
+			res, err := db.ExecContext(r.Context(), stmt)
+			if err != nil {
+				http.Error(w, "exec failed: "+err.Error(), http.StatusBadRequest)
+				return
+			}
+			affected, _ = res.RowsAffected()
+		}
+
+		action := "sql_exec"
+		if req.DryRun {
+			action = "sql_exec_dry_run"
+		}
+		_ = AppendAuditLog(
+			r.Context(),
+			db,
+			action,
+			"sql_console",
+			"exec",
+			"ok",
+			map[string]any{
+				"affected": affected,
+				"dryRun":   req.DryRun,
+			},
+		)
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"ok":       true,
+			"dryRun":   req.DryRun,
+			"affected": affected,
+		})
+	}
+}
+
+func DangerClearDataHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		if !ensureFeatureEnabled(w, r, db, "feature_clear_data_enabled") {
+			return
+		}
+
+		var req clearDataRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
+		scope := strings.TrimSpace(strings.ToLower(req.Scope))
+		if scope == "" {
+			scope = "all_non_core"
+		}
+
+		tables, ok := clearScopeTables(scope)
+		if !ok {
+			http.Error(w, "invalid scope", http.StatusBadRequest)
+			return
+		}
+
+		counts := make(map[string]int64, len(tables))
+		for _, table := range tables {
+			var count int64
+			if err := db.QueryRowContext(r.Context(), `SELECT COUNT(*) FROM `+table).Scan(&count); err != nil {
+				http.Error(w, "failed to count rows", http.StatusInternalServerError)
+				return
+			}
+			counts[table] = count
+		}
+
+		if req.DryRun {
+			_ = AppendAuditLog(
+				r.Context(),
+				db,
+				"danger_clear_data_dry_run",
+				"danger_zone",
+				scope,
+				"ok",
+				map[string]any{"counts": counts},
+			)
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"ok":      true,
+				"dryRun":  true,
+				"scope":   scope,
+				"counts":  counts,
+				"message": "dry run only; no rows removed",
+			})
+			return
+		}
+
+		tx, err := db.BeginTx(r.Context(), nil)
+		if err != nil {
+			http.Error(w, "failed to clear data", http.StatusInternalServerError)
+			return
+		}
+		defer tx.Rollback()
+
+		removed := make(map[string]int64, len(tables))
+		for _, table := range tables {
+			res, err := tx.ExecContext(r.Context(), `DELETE FROM `+table)
+			if err != nil {
+				http.Error(w, "failed to clear data", http.StatusInternalServerError)
+				return
+			}
+			n, _ := res.RowsAffected()
+			removed[table] = n
+		}
+
+		if err := tx.Commit(); err != nil {
+			http.Error(w, "failed to clear data", http.StatusInternalServerError)
+			return
+		}
+
+		_ = AppendAuditLog(
+			r.Context(),
+			db,
+			"danger_clear_data",
+			"danger_zone",
+			scope,
+			"ok",
+			map[string]any{"removed": removed},
+		)
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"ok":      true,
+			"dryRun":  false,
+			"scope":   scope,
+			"removed": removed,
+		})
+	}
+}
+
+func BackupRunHandler(db *sql.DB, metrics *observability.Registry) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+
+		type reqShape struct {
+			FileName string `json:"fileName"`
+		}
+		var req reqShape
+		_ = json.NewDecoder(r.Body).Decode(&req)
+
+		baseName := strings.TrimSpace(req.FileName)
+		if baseName == "" {
+			baseName = fmt.Sprintf("oracle-backup-%d.db", time.Now().UTC().Unix())
+		}
+		if filepath.Base(baseName) != baseName {
+			http.Error(w, "invalid file name", http.StatusBadRequest)
+			return
+		}
+		if strings.Contains(baseName, "..") {
+			http.Error(w, "invalid file name", http.StatusBadRequest)
+			return
+		}
+
+		backupDir := os.Getenv("BACKUP_DIR")
+		if backupDir == "" {
+			backupDir = "./data/backups"
+		}
+		if err := os.MkdirAll(backupDir, 0o755); err != nil {
+			http.Error(w, "failed to create backup directory", http.StatusInternalServerError)
+			return
+		}
+
+		backupPath := filepath.Join(backupDir, baseName)
+		startedAt := time.Now().UnixMilli()
+		vacuumStmt := "VACUUM INTO '" + strings.ReplaceAll(backupPath, "'", "''") + "'"
+		_, err := db.ExecContext(r.Context(), vacuumStmt)
+		finishedAt := time.Now().UnixMilli()
+
+		if err != nil {
+			if metrics != nil {
+				metrics.IncCounter("oracle_backup_failures_total", nil, 1)
+			}
+			_ = upsertOpenAlert(
+				r.Context(),
+				db,
+				"backup_failed",
+				"critical",
+				"backup job failed",
+				map[string]any{"error": truncateAlertError(err.Error()), "path": backupPath},
+			)
+			_, _ = db.ExecContext(
+				r.Context(),
+				`INSERT INTO backup_runs (backup_path, status, error_message, started_at, finished_at)
+				 VALUES (?, 'error', ?, ?, ?)`,
+				backupPath,
+				truncateAlertError(err.Error()),
+				startedAt,
+				finishedAt,
+			)
+			http.Error(w, "backup failed: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		_, _ = db.ExecContext(
+			r.Context(),
+			`INSERT INTO backup_runs (backup_path, status, error_message, started_at, finished_at)
+			 VALUES (?, 'ok', '', ?, ?)`,
+			backupPath,
+			startedAt,
+			finishedAt,
+		)
+		_ = AppendAuditLog(
+			r.Context(),
+			db,
+			"backup_run",
+			"backup",
+			backupPath,
+			"ok",
+			map[string]any{
+				"path":       backupPath,
+				"startedAt":  startedAt,
+				"finishedAt": finishedAt,
+			},
+		)
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"ok":         true,
+			"backupPath": backupPath,
+			"startedAt":  startedAt,
+			"finishedAt": finishedAt,
+		})
+	}
+}
+
+func RecordsListHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		recordType := strings.TrimSpace(r.URL.Query().Get("type"))
+		if recordType == "" {
+			http.Error(w, "type is required", http.StatusBadRequest)
+			return
+		}
+
+		rows, err := db.QueryContext(
+			r.Context(),
+			`SELECT record_key, data_json, created_at, updated_at
+			 FROM admin_records
+			 WHERE record_type = ?
+			 ORDER BY updated_at DESC, id DESC`,
+			recordType,
+		)
+		if err != nil {
+			http.Error(w, "failed to list records", http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		type recordRow struct {
+			RecordKey string          `json:"recordKey"`
+			Data      json.RawMessage `json:"data"`
+			CreatedAt int64           `json:"createdAt"`
+			UpdatedAt int64           `json:"updatedAt"`
+		}
+		out := make([]recordRow, 0, 64)
+		for rows.Next() {
+			var item recordRow
+			var raw sql.NullString
+			if err := rows.Scan(&item.RecordKey, &raw, &item.CreatedAt, &item.UpdatedAt); err != nil {
+				http.Error(w, "failed to parse records", http.StatusInternalServerError)
+				return
+			}
+			if raw.Valid && strings.TrimSpace(raw.String) != "" {
+				item.Data = json.RawMessage(raw.String)
+			} else {
+				item.Data = json.RawMessage(`{}`)
+			}
+			out = append(out, item)
+		}
+		if err := rows.Err(); err != nil {
+			http.Error(w, "failed to parse records", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"ok":      true,
+			"type":    recordType,
+			"records": out,
+		})
+	}
+}
+
+func RecordsUpsertHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		var req recordUpsertRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
+		req.RecordType = strings.TrimSpace(req.RecordType)
+		req.RecordKey = strings.TrimSpace(req.RecordKey)
+		if req.RecordType == "" || req.RecordKey == "" {
+			http.Error(w, "recordType and recordKey are required", http.StatusBadRequest)
+			return
+		}
+		if req.Data == nil {
+			req.Data = map[string]any{}
+		}
+		raw, err := json.Marshal(req.Data)
+		if err != nil {
+			http.Error(w, "invalid data payload", http.StatusBadRequest)
+			return
+		}
+
+		nowMs := time.Now().UnixMilli()
+		_, err = db.ExecContext(
+			r.Context(),
+			`INSERT INTO admin_records (record_type, record_key, data_json, created_at, updated_at)
+			 VALUES (?, ?, ?, ?, ?)
+			 ON CONFLICT(record_type, record_key) DO UPDATE SET
+			   data_json = excluded.data_json,
+			   updated_at = excluded.updated_at`,
+			req.RecordType,
+			req.RecordKey,
+			string(raw),
+			nowMs,
+			nowMs,
+		)
+		if err != nil {
+			http.Error(w, "failed to upsert record", http.StatusInternalServerError)
+			return
+		}
+
+		_ = AppendAuditLog(
+			r.Context(),
+			db,
+			"record_upsert",
+			req.RecordType,
+			req.RecordKey,
+			"ok",
+			map[string]any{"recordType": req.RecordType, "recordKey": req.RecordKey},
+		)
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"ok": true})
+	}
+}
+
+func RecordsDeleteHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		var req recordDeleteRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
+		req.RecordType = strings.TrimSpace(req.RecordType)
+		req.RecordKey = strings.TrimSpace(req.RecordKey)
+		if req.RecordType == "" || req.RecordKey == "" {
+			http.Error(w, "recordType and recordKey are required", http.StatusBadRequest)
+			return
+		}
+
+		res, err := db.ExecContext(
+			r.Context(),
+			`DELETE FROM admin_records WHERE record_type = ? AND record_key = ?`,
+			req.RecordType,
+			req.RecordKey,
+		)
+		if err != nil {
+			http.Error(w, "failed to delete record", http.StatusInternalServerError)
+			return
+		}
+		affected, _ := res.RowsAffected()
+
+		_ = AppendAuditLog(
+			r.Context(),
+			db,
+			"record_delete",
+			req.RecordType,
+			req.RecordKey,
+			"ok",
+			map[string]any{"affected": affected},
+		)
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"ok":       true,
+			"affected": affected,
+		})
+	}
+}
+
+func ensureFeatureEnabled(w http.ResponseWriter, r *http.Request, db *sql.DB, flagName string) bool {
+	enabled, err := IsFeatureEnabled(r.Context(), db, flagName)
+	if err != nil {
+		http.Error(w, "failed to evaluate feature flag", http.StatusInternalServerError)
+		return false
+	}
+	if !enabled {
+		http.Error(w, "feature disabled", http.StatusForbidden)
+		return false
+	}
+	return true
+}
+
+func normalizeSingleStatement(sqlText string) (string, error) {
+	stmt := strings.TrimSpace(sqlText)
+	if stmt == "" {
+		return "", errors.New("sql is required")
+	}
+	if strings.Count(stmt, ";") > 1 {
+		return "", errors.New("multiple SQL statements are not allowed")
+	}
+	stmt = strings.TrimSuffix(stmt, ";")
+	if strings.Contains(stmt, ";") {
+		return "", errors.New("multiple SQL statements are not allowed")
+	}
+	return stmt, nil
+}
+
+func isReadOnlySQL(stmt string) bool {
+	lower := strings.ToLower(strings.TrimSpace(stmt))
+	return strings.HasPrefix(lower, "select ") || strings.HasPrefix(lower, "with ")
+}
+
+func isMutatingSQL(stmt string) bool {
+	lower := strings.ToLower(strings.TrimSpace(stmt))
+	return strings.HasPrefix(lower, "insert ") ||
+		strings.HasPrefix(lower, "update ") ||
+		strings.HasPrefix(lower, "delete ")
+}
+
+func isForbiddenMutatingSQL(stmt string) bool {
+	lower := strings.ToLower(stmt)
+	forbidden := []string{
+		" drop ",
+		" alter ",
+		" pragma ",
+		" vacuum ",
+		" attach ",
+		" detach ",
+		" reindex ",
+	}
+	padded := " " + lower + " "
+	for _, term := range forbidden {
+		if strings.Contains(padded, term) {
+			return true
+		}
+	}
+	return false
+}
+
+func clearScopeTables(scope string) ([]string, bool) {
+	switch scope {
+	case "pipeline_failure_logs":
+		return []string{"pipeline_failure_logs"}, true
+	case "ingest_outbox":
+		return []string{"ingest_outbox"}, true
+	case "outbox_dead_letter":
+		return []string{"outbox_dead_letter"}, true
+	case "system_alerts":
+		return []string{"system_alerts"}, true
+	case "cf_snapshots_raw":
+		return []string{"cf_snapshots_raw"}, true
+	case "all_non_core":
+		return []string{
+			"pipeline_failure_logs",
+			"ingest_outbox",
+			"outbox_dead_letter",
+			"system_alerts",
+			"cf_snapshots_raw",
+			"cf_schema_registry",
+			"backup_runs",
+		}, true
+	default:
+		return nil, false
+	}
+}
+
+func truncateAlertError(v string) string {
+	if len(v) <= 240 {
+		return v
+	}
+	return v[:240]
+}
+
+func upsertOpenAlert(
+	ctx context.Context,
+	db *sql.DB,
+	alertType string,
+	severity string,
+	message string,
+	payload map[string]any,
+) error {
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	nowMs := time.Now().UnixMilli()
+
+	var existingID int64
+	queryErr := db.QueryRowContext(
+		ctx,
+		`SELECT id FROM system_alerts WHERE alert_type = ? AND status = 'open' ORDER BY id DESC LIMIT 1`,
+		alertType,
+	).Scan(&existingID)
+	if queryErr == nil {
+		_, err = db.ExecContext(
+			ctx,
+			`UPDATE system_alerts
+			 SET severity = ?, message = ?, payload_json = ?, updated_at = ?
+			 WHERE id = ?`,
+			severity,
+			message,
+			string(raw),
+			nowMs,
+			existingID,
+		)
+		return err
+	}
+	if !errors.Is(queryErr, sql.ErrNoRows) {
+		return queryErr
+	}
+
+	_, err = db.ExecContext(
+		ctx,
+		`INSERT INTO system_alerts (alert_type, severity, message, status, payload_json, created_at, updated_at)
+		 VALUES (?, ?, ?, 'open', ?, ?, ?)`,
+		alertType,
+		severity,
+		message,
+		string(raw),
+		nowMs,
+		nowMs,
+	)
+	return err
+}
