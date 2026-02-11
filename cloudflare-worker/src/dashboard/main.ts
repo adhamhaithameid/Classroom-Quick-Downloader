@@ -11,6 +11,10 @@ function escapeHtml(unsafe: string): string {
     .replace(/'/g, "&#039;");
 }
 
+function safeJson(data: unknown): string {
+  return JSON.stringify(data).replace(/</g, "\\u003c").replace(/>/g, "\\u003e");
+}
+
 function formatTs(ts: number | null): string {
   if (!ts) return "—";
   const d = new Date(ts);
@@ -262,10 +266,10 @@ function renderNotificationSection(entries: ChangelogEntry[], config: ChangelogC
   const knownVersions = Array.from(new Set(sorted.map(e => e.version)));
   const dataListOptions = [
     '<option value="all">Global (All Versions)</option>',
-    ...knownVersions.map(v => `<option value="${v}">v${v}</option>`)
+    ...knownVersions.map(v => `<option value="${escapeHtml(v)}">v${escapeHtml(v)}</option>`)
   ].join('');
 
-  const rulesJson = JSON.stringify(config.rules || []);
+  const rulesJson = safeJson(config.rules || []);
 
   return `
     <section class="card config-card" id="config">
@@ -397,28 +401,28 @@ function renderReleaseManagementSection(entries: ChangelogEntry[], _config: Chan
   const knownVersions = Array.from(new Set(sorted.map(e => e.version)));
   const dataListOptions = [
     '<option value="all">Global (All Versions)</option>',
-    ...knownVersions.map(v => `<option value="${v}">v${v}</option>`)
+    ...knownVersions.map(v => `<option value="${escapeHtml(v)}">v${escapeHtml(v)}</option>`)
   ].join('');
 
   const releaseCount = sorted.length;
   const historyHtml = sorted.map(e => `
-    <div class="cl-history-item" data-release-id="${e.id}">
+    <div class="cl-history-item" data-release-id="${escapeHtml(e.id)}">
       <div class="cl-history-header">
         <div class="cl-history-meta">
-          <span class="cl-version-badge">v${e.version}</span>
+          <span class="cl-version-badge">v${escapeHtml(e.version)}</span>
           <span class="cl-date">${new Date(e.date).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric', year: 'numeric' })}</span>
         </div>
         <div class="cl-actions">
-           <button class="cl-action-btn edit-cl-btn" data-id="${e.id}" title="Edit release">
+           <button class="cl-action-btn edit-cl-btn" data-id="${escapeHtml(e.id)}" title="Edit release">
              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
            </button>
-           <button class="cl-action-btn delete-cl-btn" data-id="${e.id}" title="Delete release">
+           <button class="cl-action-btn delete-cl-btn" data-id="${escapeHtml(e.id)}" title="Delete release">
              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
            </button>
         </div>
       </div>
       <ul class="cl-changes-list">
-        ${e.changes.map(c => `<li>${c}</li>`).join('')}
+        ${e.changes.map(c => `<li>${escapeHtml(c)}</li>`).join('')}
       </ul>
     </div>
   `).join('') || `
