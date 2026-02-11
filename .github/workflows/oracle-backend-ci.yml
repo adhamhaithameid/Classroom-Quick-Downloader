@@ -1,0 +1,98 @@
+name: Oracle Backend CI
+
+on:
+  push:
+    paths:
+      - "oracle-backend/**"
+      - ".github/workflows/oracle-backend-ci.yml"
+  pull_request:
+    paths:
+      - "oracle-backend/**"
+      - ".github/workflows/oracle-backend-ci.yml"
+
+concurrency:
+  group: oracle-backend-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  oracle-tests:
+    name: Oracle Backend Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.13"
+
+      - name: Run unit + integration tests
+        working-directory: oracle-backend
+        run: go test ./... -count=1
+
+      - name: Run go vet
+        working-directory: oracle-backend
+        run: go vet ./...
+
+  oracle-migrations:
+    name: Oracle Migration Bootstrap
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: oracle_test
+          POSTGRES_USER: postgres
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d oracle_test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.13"
+
+      - name: Run migration bootstrap tests
+        working-directory: oracle-backend
+        env:
+          POSTGRES_DSN: postgres://postgres@localhost:5432/oracle_test?sslmode=disable
+        run: |
+          go test ./internal/db -run 'TestMigrationBootstrapCleanDatabases|TestInitPostgres_Smoke' -count=1 -v
+          go test ./... -count=1
+
+  oracle-security:
+    name: Oracle Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.13"
+
+      - name: Install scanners
+        working-directory: oracle-backend
+        run: |
+          go install github.com/securego/gosec/v2/cmd/gosec@v2.22.9
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+
+      - name: Run gosec
+        working-directory: oracle-backend
+        run: |
+          # G701 is excluded due known taint-analysis false positives on static SQL with bound parameters.
+          "$(go env GOPATH)/bin/gosec" -exclude=G701 ./...
+
+      - name: Run govulncheck
+        working-directory: oracle-backend
+        run: "$(go env GOPATH)/bin/govulncheck" ./...
