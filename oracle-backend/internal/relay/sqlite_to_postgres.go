@@ -89,7 +89,7 @@ func (r *SQLiteToPostgresRelay) runOnce(ctx context.Context) error {
 		ctx,
 		`SELECT id, event_type, payload_json, idempotency_key, attempts
 		 FROM ingest_outbox
-		 WHERE status IN ('pending', 'retry') AND next_run_at <= ?
+		 WHERE status IN ('pending', 'retry', 'processing') AND next_run_at <= ?
 		 ORDER BY id ASC
 		 LIMIT ?`,
 		time.Now().UnixMilli(),
@@ -168,7 +168,10 @@ func (r *SQLiteToPostgresRelay) processItem(ctx context.Context, item struct {
 
 	res, err := tx.ExecContext(
 		ctx,
-		`UPDATE ingest_outbox SET status = 'processing' WHERE id = ? AND status IN ('pending', 'retry')`,
+		`UPDATE ingest_outbox
+		 SET status = 'processing', next_run_at = ?
+		 WHERE id = ? AND status IN ('pending', 'retry', 'processing')`,
+		time.Now().Add(relayLeaseDuration).UnixMilli(),
 		item.ID,
 	)
 	if err != nil {
