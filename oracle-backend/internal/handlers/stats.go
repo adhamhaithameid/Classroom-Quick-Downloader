@@ -198,6 +198,8 @@ type timeSeriesPoint struct {
 type timeSeriesResponse struct {
 	OK          bool              `json:"ok"`
 	Granularity string            `json:"granularity"`
+	Range       string            `json:"range,omitempty"`
+	ExtVersion  string            `json:"extVersion,omitempty"`
 	From        string            `json:"from"`
 	To          string            `json:"to"`
 	Points      []timeSeriesPoint `json:"points"`
@@ -285,6 +287,8 @@ func TimeSeriesHandler(db *sql.DB) http.HandlerFunc {
 		resp := timeSeriesResponse{
 			OK:          true,
 			Granularity: gran,
+			Range:       rangeName,
+			ExtVersion:  extVersion,
 			From:        fromTime.Format("2006-01-02"),
 			To:          toTime.Format("2006-01-02"),
 			Points:      points,
