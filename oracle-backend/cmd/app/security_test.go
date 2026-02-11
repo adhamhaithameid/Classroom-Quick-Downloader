@@ -432,3 +432,78 @@ func TestCriticalStepUpFlow_EnforcedWhenFlagEnabled(t *testing.T) {
 		t.Fatalf("expected success with stepup, got %d", protectedRR.Code)
 	}
 }
+
+func TestStepUpVerify_RateLimitsFailures(t *testing.T) {
+	resetSessionStore()
+	resetLoginRateStore()
+	stepUpRateStore.Lock()
+	stepUpRateStore.attempts = make(map[string]*stepUpAttempt)
+	stepUpRateStore.Unlock()
+	stepUpChallengeStore.Lock()
+	stepUpChallengeStore.items = make(map[string]stepUpChallenge)
+	stepUpChallengeStore.Unlock()
+
+	dbPath := filepath.Join(t.TempDir(), "stepup-rate.db")
+	sqlDB, err := db.Init(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sqlDB.Close()
+
+	if _, err := sqlDB.Exec(`UPDATE feature_flags SET enabled = 1 WHERE name = 'feature_stepup_enforced'`); err != nil {
+		t.Fatalf("failed to enable stepup flag: %v", err)
+	}
+
+	login := loginHandler("viewer-secret", false)
+	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(`{"password":"viewer-secret"}`))
+	loginReq.Header.Set("Content-Type", "application/json")
+	loginRR := httptest.NewRecorder()
+	login.ServeHTTP(loginRR, loginReq)
+	if loginRR.Code != http.StatusOK {
+		t.Fatalf("login failed: %d", loginRR.Code)
+	}
+	var sessionCookie *http.Cookie
+	for _, c := range loginRR.Result().Cookies() {
+		if c.Name == sessionCookieName {
+			sessionCookie = c
+		}
+	}
+	if sessionCookie == nil {
+		t.Fatal("missing session cookie")
+	}
+
+	authMW := requireAuth("viewer-secret", "", false)
+	start := authMW(stepUpStartHandler(sqlDB))
+	verify := authMW(stepUpVerifyHandler(sqlDB, "super-secret", false))
+
+	for i := 0; i < stepUpMaxAttempts+1; i++ {
+		startReq := httptest.NewRequest(http.MethodPost, "/api/auth/stepup/start", nil)
+		startReq.AddCookie(sessionCookie)
+		startReq.RemoteAddr = "203.0.113.1:1234"
+		startRR := httptest.NewRecorder()
+		start.ServeHTTP(startRR, startReq)
+		if startRR.Code != http.StatusOK {
+			t.Fatalf("stepup start failed at %d: %d", i, startRR.Code)
+		}
+		var startPayload map[string]any
+		if err := json.Unmarshal(startRR.Body.Bytes(), &startPayload); err != nil {
+			t.Fatalf("invalid start payload: %v", err)
+		}
+		challengeID, _ := startPayload["challengeId"].(string)
+		verifyReq := httptest.NewRequest(
+			http.MethodPost,
+			"/api/auth/stepup/verify",
+			bytes.NewBufferString(`{"challengeId":"`+challengeID+`","password":"wrong"}`),
+		)
+		verifyReq.RemoteAddr = "203.0.113.1:1234"
+		verifyReq.Header.Set("Content-Type", "application/json")
+		verifyReq.AddCookie(sessionCookie)
+		verifyRR := httptest.NewRecorder()
+		verify.ServeHTTP(verifyRR, verifyReq)
+		if i >= stepUpMaxAttempts-1 && verifyRR.Code == http.StatusTooManyRequests {
+			return
+		}
+	}
+
+	t.Fatalf("expected stepup verify to eventually return 429")
+}
