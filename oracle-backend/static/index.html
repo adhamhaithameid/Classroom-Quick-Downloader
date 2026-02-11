@@ -1251,6 +1251,13 @@
               </svg>
               Notifications
             </button>
+            <button class="nav-item" data-page="logs" onclick="showPage('logs')"
+              data-tooltip="Oracle backend request and admin operation logs" data-tooltip-position="bottom">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 4h18v16H3z"/><path d="M7 8h10"/><path d="M7 12h10"/><path d="M7 16h6"/>
+              </svg>
+              Logs
+            </button>
             <button class="nav-item" data-page="danger" onclick="showPage('danger')"
               data-tooltip="Critical administrative operations" data-tooltip-position="bottom">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1734,6 +1741,33 @@
             </div>
           </div>
 
+          <!-- LOGS PAGE -->
+          <div class="page" id="page-logs">
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <div class="card-title">Oracle Operation Logs</div>
+                  <div class="card-subtitle">Server-side request log for Oracle backend operations only</div>
+                </div>
+                <div class="action-buttons-grid" style="grid-template-columns: repeat(5, minmax(140px, 1fr)); max-width: 920px;">
+                  <button class="btn btn-secondary" onclick="loadOracleLogs()">Refresh</button>
+                  <input id="oracle-logs-retention-days" class="auth-input" type="number" min="1" max="36500" value="30" />
+                  <button class="btn btn-secondary" onclick="oracleLogsDeleteOlder(true)">Dry Run Delete Older</button>
+                  <button class="btn btn-secondary" onclick="oracleLogsDeleteOlder(false)">Delete Older</button>
+                  <button class="btn" style="background:#7f1d1d;" onclick="oracleLogsClearAll()">Delete All Logs</button>
+                </div>
+              </div>
+              <div class="card-body no-padding">
+                <div class="table-container" id="oracle-logs-table">
+                  <div class="loading"><div class="spinner"></div>Loading logs...</div>
+                </div>
+              </div>
+              <div class="card-body" style="border-top: 1px solid var(--border-primary);">
+                <pre id="oracle-logs-output" class="json-viewer" style="max-height: 220px; overflow:auto;">{}</pre>
+              </div>
+            </div>
+          </div>
+
           <!-- DANGER PAGE -->
           <div class="page" id="page-danger">
             <div class="card">
@@ -2198,6 +2232,7 @@
           deployments: 'Deployments',
           versions: 'Versions',
           notifications: 'Notifications',
+          logs: 'Logs',
           danger: 'Danger Zone'
         };
         document.getElementById('page-title').textContent = titles[page];
@@ -2206,6 +2241,7 @@
         if (page === 'deployments') loadDeploymentsHub();
         if (page === 'versions') loadVersionHub();
         if (page === 'notifications') loadNotifications();
+        if (page === 'logs') loadOracleLogs();
       }
 
       // Overview Page
@@ -2967,6 +3003,105 @@
         }
       }
 
+      function setOracleLogsOutput(payload) {
+        var out = document.getElementById('oracle-logs-output');
+        if (!out) return;
+        out.textContent = JSON.stringify(payload, null, 2);
+      }
+
+      async function loadOracleLogs() {
+        var container = document.getElementById('oracle-logs-table');
+        if (!container) return;
+        container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading logs...</div>';
+        try {
+          var data = await fetchJSON('/api/admin/oracle-logs?limit=500');
+          var logs = (data && data.logs) ? data.logs : [];
+          if (!logs.length) {
+            container.innerHTML = '<div class="empty-state">No oracle operation logs yet</div>';
+            setOracleLogsOutput({ ok: true, count: 0 });
+            return;
+          }
+          var html = '<table><thead><tr>';
+          html += '<th>Time (UTC)</th>';
+          html += '<th>Action</th>';
+          html += '<th>Resource</th>';
+          html += '<th>Actor</th>';
+          html += '<th>Request</th>';
+          html += '<th>Status</th>';
+          html += '<th>Latency</th>';
+          html += '</tr></thead><tbody>';
+          logs.forEach(function(row) {
+            var statusColor = (row.result === 'ok') ? 'var(--success)' : 'var(--danger)';
+            var actor = (row.userId || 'anonymous') + ' (' + (row.role || 'viewer') + ')';
+            var reqInfo = (row.method || '') + ' ' + (row.path || '');
+            var resourceInfo = (row.resourceType || '-') + ' / ' + (row.resourceId || '-');
+            html += '<tr>';
+            html += '<td class="td-primary">' + escapeHtml(fmtFullDateTime(row.tsUtc)) + '</td>';
+            html += '<td><span class="badge badge-warning">' + escapeHtml(row.actionType || '-') + '</span></td>';
+            html += '<td style="max-width:220px;word-break:break-word;">' + escapeHtml(resourceInfo) + '</td>';
+            html += '<td style="max-width:180px;word-break:break-word;">' + escapeHtml(actor) + '</td>';
+            html += '<td style="max-width:360px;word-break:break-word;font-family:monospace;font-size:11px;">' + escapeHtml(reqInfo) + '</td>';
+            html += '<td><span style="color:' + statusColor + ';">' + escapeHtml(String(row.statusCode || '')) + ' (' + escapeHtml(row.result || '') + ')</span></td>';
+            html += '<td>' + escapeHtml(String(row.latencyMs || 0)) + 'ms</td>';
+            html += '</tr>';
+          });
+          html += '</tbody></table>';
+          container.innerHTML = html;
+          setOracleLogsOutput({ ok: true, count: logs.length, latestTsUtc: logs[0].tsUtc || 0 });
+        } catch (e) {
+          container.innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed to load logs</div>';
+          setOracleLogsOutput({ ok: false, error: String(e) });
+        }
+      }
+
+      function oracleLogsRetentionDays() {
+        var input = document.getElementById('oracle-logs-retention-days');
+        var days = parseInt((input && input.value) ? input.value : '30', 10);
+        if (!Number.isFinite(days) || days < 1 || days > 36500) {
+          return null;
+        }
+        return days;
+      }
+
+      async function oracleLogsDeleteOlder(dryRun) {
+        var days = oracleLogsRetentionDays();
+        if (days === null) {
+          setOracleLogsOutput({ ok: false, error: 'Retention days must be between 1 and 36500.' });
+          return;
+        }
+        var ok = await ensureStepUp();
+        if (!ok) return;
+        if (!dryRun && !window.confirm('Delete oracle logs older than ' + days + ' day(s)?')) return;
+        try {
+          var data = await fetchJSONWithInit('/api/admin/oracle-logs/delete-older', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ days: days, dryRun: dryRun })
+          });
+          setOracleLogsOutput(data);
+          if (!dryRun) await loadOracleLogs();
+        } catch (e) {
+          setOracleLogsOutput({ ok: false, error: String(e) });
+        }
+      }
+
+      async function oracleLogsClearAll() {
+        var ok = await ensureStepUp();
+        if (!ok) return;
+        if (!window.confirm('Delete ALL oracle operation logs?')) return;
+        try {
+          var data = await fetchJSONWithInit('/api/admin/oracle-logs/clear-all', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ confirm: 'CLEAR_ALL_LOGS', dryRun: false })
+          });
+          setOracleLogsOutput(data);
+          await loadOracleLogs();
+        } catch (e) {
+          setOracleLogsOutput({ ok: false, error: String(e) });
+        }
+      }
+
       // Danger / admin tooling
       async function ensureStepUp() {
         try {
@@ -3087,6 +3222,7 @@
         { id: 'deployments', label: 'Go: Deployments', run: function() { showPage('deployments'); } },
         { id: 'versions', label: 'Go: Versions', run: function() { showPage('versions'); } },
         { id: 'notifications', label: 'Go: Notifications', run: function() { showPage('notifications'); } },
+        { id: 'logs', label: 'Go: Logs', run: function() { showPage('logs'); } },
         { id: 'danger', label: 'Go: Danger Zone', run: function() { showPage('danger'); } },
         { id: 'refresh', label: 'Action: Refresh All', run: function() { refreshAll(); } },
         { id: 'stepup', label: 'Action: Step-Up Verify', run: function() { openStepUpPrompt(); } }
@@ -3161,6 +3297,7 @@
         if (currentPage === 'deployments') loadDeploymentsHub();
         if (currentPage === 'versions') loadVersionHub();
         if (currentPage === 'notifications') await loadNotifications();
+        if (currentPage === 'logs') await loadOracleLogs();
 
         btn.disabled = false;
         btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 11-2.52-6.25"/><path d="M21 4v5h-5"/></svg> Refresh';
