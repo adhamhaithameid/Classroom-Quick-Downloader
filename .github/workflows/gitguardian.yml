@@ -19,7 +19,7 @@ jobs:
       - name: GitGuardian Scan
         uses: GitGuardian/ggshield-action@v1
         with:
-          args: secret scan ci --ignore-known-secrets
+          args: --ignore-known-secrets
         env:
           GITHUB_PUSH_BEFORE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
           GITHUB_PUSH_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.base_ref }}
