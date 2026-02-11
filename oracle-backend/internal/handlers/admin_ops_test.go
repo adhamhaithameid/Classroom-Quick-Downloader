@@ -648,6 +648,107 @@ func TestBackupRunHandler_RejectsMalformedJSON(t *testing.T) {
 	}
 }
 
+func TestAlertsHandler_ReturnsOpenAlerts(t *testing.T) {
+	sqlDB := newAdminTestDB(t)
+	defer sqlDB.Close()
+
+	if err := upsertOpenAlert(
+		context.Background(),
+		sqlDB,
+		"no_sync_success",
+		"critical",
+		"no sync success in configured window",
+		map[string]any{"endpoint": "chrome", "minutes": 30},
+	); err != nil {
+		t.Fatalf("seed alert failed: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/admin/alerts", nil)
+	rr := httptest.NewRecorder()
+	AlertsHandler(sqlDB).ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("alerts list failed: %d %s", rr.Code, rr.Body.String())
+	}
+
+	var payload struct {
+		OK     bool `json:"ok"`
+		Alerts []struct {
+			AlertType string `json:"alertType"`
+			Severity  string `json:"severity"`
+			Status    string `json:"status"`
+		} `json:"alerts"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("parse alerts payload failed: %v", err)
+	}
+	if !payload.OK || len(payload.Alerts) == 0 {
+		t.Fatalf("expected alerts payload with items, got %+v", payload)
+	}
+	if payload.Alerts[0].AlertType != "no_sync_success" {
+		t.Fatalf("unexpected alert type: %+v", payload.Alerts[0])
+	}
+}
+
+func TestMigrationsStatusHandler_StateMatrix(t *testing.T) {
+	tests := []struct {
+		name               string
+		postgresConfigured bool
+		postgresErr        *string
+		wantStatus         string
+		wantConfigured     bool
+	}{
+		{
+			name:               "postgres-disabled",
+			postgresConfigured: false,
+			postgresErr:        nil,
+			wantStatus:         "disabled",
+			wantConfigured:     false,
+		},
+		{
+			name:               "postgres-ready",
+			postgresConfigured: true,
+			postgresErr:        nil,
+			wantStatus:         "ready",
+			wantConfigured:     true,
+		},
+		{
+			name:               "postgres-error",
+			postgresConfigured: true,
+			postgresErr:        ptr("dsn auth failed"),
+			wantStatus:         "error",
+			wantConfigured:     true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/api/admin/migrations/status", nil)
+			rr := httptest.NewRecorder()
+			MigrationsStatusHandler(tc.postgresConfigured, tc.postgresErr).ServeHTTP(rr, req)
+			if rr.Code != http.StatusOK {
+				t.Fatalf("migrations status failed: %d %s", rr.Code, rr.Body.String())
+			}
+
+			var payload map[string]any
+			if err := json.Unmarshal(rr.Body.Bytes(), &payload); err != nil {
+				t.Fatalf("parse payload failed: %v", err)
+			}
+			postgres, _ := payload["postgres"].(map[string]any)
+			if postgres == nil {
+				t.Fatalf("postgres payload missing: %#v", payload)
+			}
+			if got, _ := postgres["status"].(string); got != tc.wantStatus {
+				t.Fatalf("unexpected postgres status=%q want=%q", got, tc.wantStatus)
+			}
+			if got, _ := postgres["configured"].(bool); got != tc.wantConfigured {
+				t.Fatalf("unexpected postgres configured=%v want=%v", got, tc.wantConfigured)
+			}
+		})
+	}
+}
+
+func ptr[T any](v T) *T { return &v }
+
 func TestIngestRawSnapshotRedactsIPData(t *testing.T) {
 	sqlDB := newAdminTestDB(t)
 	defer sqlDB.Close()

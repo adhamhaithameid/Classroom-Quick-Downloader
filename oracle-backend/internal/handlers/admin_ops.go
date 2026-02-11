@@ -535,19 +535,25 @@ func AlertsHandler(db *sql.DB) http.HandlerFunc {
 		out := make([]alertRow, 0, 200)
 		for rows.Next() {
 			var item alertRow
+			var payloadRaw string
 			if err := rows.Scan(
 				&item.ID,
 				&item.AlertType,
 				&item.Severity,
 				&item.Message,
 				&item.Status,
-				&item.Payload,
+				&payloadRaw,
 				&item.CreatedAt,
 				&item.UpdatedAt,
 			); err != nil {
 				http.Error(w, "failed to load alerts", http.StatusInternalServerError)
 				return
 			}
+			payloadRaw = strings.TrimSpace(payloadRaw)
+			if payloadRaw == "" {
+				payloadRaw = "{}"
+			}
+			item.Payload = json.RawMessage(payloadRaw)
 			out = append(out, item)
 		}
 
