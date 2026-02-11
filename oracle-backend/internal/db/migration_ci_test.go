@@ -31,6 +31,22 @@ func TestMigrationBootstrapCleanDatabases(t *testing.T) {
 		}
 	}
 
+	var stepupEnabled int64
+	if err := sqliteDB.QueryRow(`SELECT enabled FROM feature_flags WHERE name = 'feature_stepup_enforced'`).Scan(&stepupEnabled); err != nil {
+		t.Fatalf("failed to load stepup flag: %v", err)
+	}
+	if stepupEnabled != 1 {
+		t.Fatalf("expected feature_stepup_enforced to default to 1, got %d", stepupEnabled)
+	}
+
+	var sqlConsoleEnabled int64
+	if err := sqliteDB.QueryRow(`SELECT enabled FROM feature_flags WHERE name = 'feature_sql_console_enabled'`).Scan(&sqlConsoleEnabled); err != nil {
+		t.Fatalf("failed to load sql console flag: %v", err)
+	}
+	if sqlConsoleEnabled != 0 {
+		t.Fatalf("expected feature_sql_console_enabled to default to 0, got %d", sqlConsoleEnabled)
+	}
+
 	dsn := os.Getenv("POSTGRES_DSN")
 	if dsn == "" {
 		t.Skip("POSTGRES_DSN not set")
