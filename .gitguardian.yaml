@@ -1,0 +1,7 @@
+version: 2
+
+secret:
+  ignored_matches:
+    # False positive placeholder used in CI service env examples (Postgres local test value).
+    - name: ci-postgres-placeholder
+      match: 6e0d657eb1f0fbc40cf0b8f3c3873ef627cc9cb7c4108d1c07d979c04bc8a4bb
