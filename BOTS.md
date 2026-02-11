@@ -16,4 +16,4 @@ These tools are currently configured and running.
 | **Codecov** | **Coverage Reporter**<br>Posts code coverage reports on PRs, tracks coverage trends, and can block merges if coverage drops. | • `.github/workflows/codecov.yml` |
 | **Socket.dev** | **Supply-Chain Security**<br>Scans npm dependencies for malicious packages, typosquats, and supply-chain attacks on every PR. | • `.github/workflows/socket-security.yml` |
 | **GitGuardian** | **Secret Leak Detection**<br>Scans every push and PR for leaked secrets (API keys, tokens, passwords) before they reach production. | • `.github/workflows/gitguardian.yml` |
-
+| **Oracle Backend CI** | **Backend Quality Gate**<br>Runs Oracle backend tests, migration bootstrap checks (SQLite + Postgres), gosec, and govulncheck. | • `.github/workflows/oracle-backend-ci.yml` |

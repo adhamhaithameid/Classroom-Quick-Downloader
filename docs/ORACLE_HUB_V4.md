@@ -1,35 +1,45 @@
 # Oracle Hub v4 Notes
 
 ## Tracking
-- Draft PR: https://github.com/adhamhaithameid/Classroom-Quick-Downloader/pull/235
-- Execution branch (repo policy): `codex/oracle-hub-v4`
+- Draft PR: [#235](https://github.com/adhamhaithameid/Classroom-Quick-Downloader/pull/235)
+- Current execution branch: `codex/oracle-hub-v4`
 
-## Security
-- Dashboard password auth uses `DASHBOARD_PASSWORD` (fallback default is set in app startup for first-run).
-- Critical operations require step-up verification using `SUPER_ADMIN_PASSWORD`.
-- Step-up can be toggled with `feature_stepup_enforced`.
-- Append-only audit log:
-  - table: `admin_audit_log`
-  - hash chain fields: `prev_hash`, `payload_hash`, `row_hash`
+## Security Baseline
+- Startup is fail-closed for credentials:
+  - `DASHBOARD_PASSWORD` is required unless `ALLOW_EMPTY_DASHBOARD_PASSWORD=true` (dev-only escape hatch).
+  - `SUPER_ADMIN_PASSWORD` is required for step-up-protected operations.
+- No built-in default dashboard/admin passwords are used.
+- Critical actions require step-up auth when `feature_stepup_enforced=true`.
+- Audit log is append-only with hash chain integrity:
+  - `prev_hash`
+  - `payload_hash`
+  - `row_hash`
 
-## Reliability
-- SQLite transactional outbox table: `ingest_outbox`
-- Dead-letter table: `outbox_dead_letter`
-- Relay metadata:
+## Reliability Model
+- No unsafe synchronous dual-write between SQLite and Postgres in request paths.
+- SQLite ingestion path uses transactional outbox:
+  - `ingest_outbox`
+  - `outbox_dead_letter`
   - `relay_offsets`
   - `relay_leases`
-- SQLite -> Postgres projection relay:
-  - idempotent inserts into `raw_ingest_events`
-  - retry + backoff + dead-letter routing
+- Postgres control-plane path writes to `pg_admin_records` and appends to `pg_outbox`.
+- Replay/backfill tooling is exposed via admin APIs.
 
 ## Observability
-- Structured request logs include:
+- Structured operation logging includes:
   - `request_id`, `correlation_id`
   - `user_id`, `token_id`, `role`
   - `action_type`, `resource_type`, `resource_id`
   - `result`, `latency_ms`, `error_code`
-- Prometheus-style endpoint: `GET /metrics`
-- Alert table: `system_alerts`
+- Prometheus-style metrics endpoint:
+  - `GET /metrics`
+- Oracle operation logs UI/API:
+  - `GET /api/admin/oracle-logs`
+  - `POST /api/admin/oracle-logs/delete-older`
+  - `POST /api/admin/oracle-logs/clear-all`
+- Alert sink:
+  - `system_alerts`
+  - `GET /api/admin/alerts`
 
 ## Feature Flags
 - `feature_sql_console_enabled`
@@ -40,7 +50,7 @@
 - `feature_postgres_projection_enabled`
 - `feature_stepup_enforced`
 
-## Admin APIs
+## Admin API Surface (v4)
 - Flags:
   - `GET /api/admin/flags`
   - `POST /api/admin/flags/update`
@@ -50,40 +60,30 @@
   - `POST /api/admin/outbox/replay-dead-letter`
 - Audit:
   - `GET /api/admin/audit/verify-chain`
-- Alerts:
-  - `GET /api/admin/alerts`
-- Migration state:
+- Migrations:
   - `GET /api/admin/migrations/status`
-- SQL console:
-  - `POST /api/admin/sql/query` (read-only)
-  - `POST /api/admin/sql/exec` (mutating, supports `dryRun`)
-- Danger:
-  - `POST /api/admin/danger/clear-data` (supports `dryRun`)
+- Deployments:
+  - `GET /api/admin/deployments/targets`
+  - `POST /api/admin/deployments/sync`
+- Creative/Newsletter:
+  - `GET/POST` endpoints under `/api/admin/creative/*` and `/api/admin/newsletter/*`
+- Danger + SQL:
+  - `POST /api/admin/danger/clear-data`
+  - `POST /api/admin/sql/query`
+  - `POST /api/admin/sql/exec`
   - `POST /api/admin/backup/run`
-- Generic record CRUD:
-  - `GET /api/admin/records/list?type=...`
-  - `POST /api/admin/records/upsert`
-  - `POST /api/admin/records/delete`
 
-## Data Model Additions (SQLite)
-- `cf_snapshots_raw`
-- `cf_schema_registry`
-- `ingest_outbox`
-- `outbox_dead_letter`
-- `relay_offsets`
-- `relay_leases`
-- `feature_flags`
-- `admin_audit_log`
-- `system_alerts`
-- `backup_runs`
-- `admin_records`
+## UI Notes
+- Sidebar and topbar shortcuts are visible when holding `Command`/`Ctrl` for 1 second.
+- Main dashboard includes donut cards for:
+  - Success vs failure
+  - Downloads vs cancelled
+- Logs tab is dedicated to Oracle backend operation logs and retention controls.
 
-## Data Model Additions (Postgres)
-- `raw_ingest_events`
-- `pg_outbox`
-
-## CI
-- Added migration smoke job:
-  - boots clean SQLite + Postgres
-  - runs DB bootstrap tests
-  - runs backend tests
+## Verification Commands
+- Oracle backend full scan:
+  - `cd oracle-backend && ./scripts/full-scan.sh`
+- Cloudflare worker validation:
+  - `pnpm -C cloudflare-worker run validate`
+- Extension tests:
+  - `pnpm -C extension test`

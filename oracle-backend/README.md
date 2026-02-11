@@ -22,6 +22,54 @@ The **Oracle Backend** is a high-performance, low-footprint analytics server des
 
 ---
 
+## 🧭 Oracle Hub v4 Scope
+
+Oracle Hub v4 extends the backend from analytics-only to a full admin/control plane:
+
+- **Management Hub**: dashboards/deployments/versions records with API-backed CRUD.
+- **Creative Hub**: designs, HTML emails, newsletter subscribers, and campaigns.
+- **Danger Zone + SQL Console**: step-up protected destructive operations with feature flags and dry-run support.
+- **Dual-DB reliability**: outbox-driven SQLite ingestion relay and Postgres control-plane outbox events.
+- **Observability**: request-level structured logs, Prometheus metrics, alert sink, and Oracle operation logs APIs.
+- **UI productivity**: keyboard shortcuts panel + hold `Command`/`Ctrl` for 1 second to reveal shortcut badges.
+
+---
+
+## 📱 Testing Oracle UI On This Device
+
+Use this to test from desktop and mobile devices on your local network:
+
+1. Start backend locally:
+```bash
+cd oracle-backend
+export DASHBOARD_PASSWORD='your-dashboard-password'
+export SUPER_ADMIN_PASSWORD='your-super-admin-password'
+export ALLOW_INSECURE_COOKIES=true
+go run ./cmd/app
+```
+2. Desktop test URL:
+```text
+http://localhost:8080
+```
+3. Find your LAN IP and test from phone/tablet on same Wi-Fi:
+```bash
+ipconfig getifaddr en0   # macOS Wi-Fi interface
+```
+4. Open on phone:
+```text
+http://<LAN_IP>:8080
+```
+5. Optional backend quality scan before manual UI test:
+```bash
+cd oracle-backend && ./scripts/full-scan.sh
+```
+
+Notes:
+- `ALLOW_INSECURE_COOKIES=true` is needed for HTTP local testing.
+- For internet exposure, put this behind HTTPS + reverse proxy and disable insecure cookie mode.
+
+---
+
 ## 🏗️ System Architecture
 
 ```
