@@ -53,6 +53,28 @@ func TestRequestContextMiddleware_GeneratesWhenMissing(t *testing.T) {
 	}
 }
 
+func TestRequestContextMiddleware_RejectsMalformedHeaderIDs(t *testing.T) {
+	var reqID, corrID string
+	handler := RequestContextMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reqID = RequestIDFromContext(r.Context())
+		corrID = CorrelationIDFromContext(r.Context())
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("X-Request-ID", "bad id with spaces")
+	req.Header.Set("X-Correlation-ID", strings.Repeat("x", 200))
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	if !strings.HasPrefix(reqID, "req-") {
+		t.Fatalf("expected generated request id for malformed input, got %q", reqID)
+	}
+	if len(corrID) != 128 {
+		t.Fatalf("expected truncated correlation id length 128, got %d", len(corrID))
+	}
+}
+
 func TestActorContext_DefaultsAndOverrides(t *testing.T) {
 	if got := UserIDFromContext(nil); got != "anonymous" {
 		t.Fatalf("unexpected default user: %q", got)
