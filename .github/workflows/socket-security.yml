@@ -1,0 +1,23 @@
+name: Socket Security
+
+on:
+  pull_request:
+    branches: [main, master]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  socket-security:
+    runs-on: ubuntu-latest
+    name: Scan Dependencies
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Socket Security Scan
+        uses: SocketDev/socket-security-action@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
