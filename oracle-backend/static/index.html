@@ -50,7 +50,6 @@
       /* Tooltip styles */
       [data-tooltip] {
         position: relative;
-        cursor: help;
       }
 
       [data-tooltip]::before,
@@ -145,7 +144,7 @@
       .logo-icon svg { width: 16px; height: 16px; color: white; }
       .logo-text { font-weight: 600; font-size: 14px; }
 
-      .sidebar-nav { flex: 1; padding: 8px; overflow-y: auto; overflow-x: hidden; }
+      .sidebar-nav { flex: 1; padding: 8px; overflow-y: auto; overflow-x: hidden; scrollbar-gutter: stable both-edges; }
       .nav-section { margin-bottom: 16px; }
 
       .nav-label {
@@ -167,7 +166,7 @@
         text-decoration: none;
         font-size: 13px;
         font-weight: 500;
-        transition: all 0.15s ease;
+        transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
         cursor: pointer;
         border: none;
         background: none;
@@ -180,9 +179,18 @@
         min-width: 0;
       }
 
-      .nav-item:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+      .nav-item:hover { background: var(--bg-tertiary); color: var(--text-primary); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04); }
       .nav-item.active { background: var(--bg-tertiary); color: var(--text-primary); }
+      .nav-item:focus-visible {
+        outline: 2px solid rgba(59, 130, 246, 0.65);
+        outline-offset: 1px;
+      }
       .nav-item svg { width: 16px; height: 16px; opacity: 0.7; flex-shrink: 0; }
+      .nav-item-label {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
 
       .sidebar-footer {
         padding: 12px;
@@ -254,16 +262,21 @@
         font-size: 12px;
         font-weight: 500;
         cursor: pointer;
-        transition: all 0.15s ease;
+        transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
         border: 1px solid var(--border-secondary);
         background: var(--bg-secondary);
         color: var(--text-primary);
         text-decoration: none;
         white-space: nowrap;
+        min-width: 0;
       }
 
-      .btn:hover { background: var(--bg-tertiary); transform: translateY(-1px); }
-      .btn:active { transform: translateY(0); }
+      .btn:hover { background: var(--bg-tertiary); box-shadow: 0 0 0 1px rgba(255,255,255,0.04) inset; }
+      .btn:active { box-shadow: none; }
+      .btn:focus-visible {
+        outline: 2px solid rgba(59, 130, 246, 0.7);
+        outline-offset: 1px;
+      }
       .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
       .btn svg { width: 14px; height: 14px; }
 
@@ -292,14 +305,13 @@
         border: 1px solid var(--border-primary);
         border-radius: 8px;
         padding: 16px;
-        transition: all 0.2s ease;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
         cursor: default;
       }
 
       .stat-card:hover { 
         border-color: var(--border-secondary); 
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        box-shadow: 0 8px 18px rgba(0,0,0,0.18);
       }
 
       .stat-header {
@@ -359,14 +371,13 @@
         display: flex;
         align-items: center;
         gap: 12px;
-        transition: all 0.2s ease;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
         cursor: default;
       }
 
       .top-card:hover { 
         border-color: var(--border-secondary);
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        box-shadow: 0 8px 18px rgba(0,0,0,0.18);
       }
 
       .top-icon {
@@ -1188,6 +1199,11 @@
         border-radius: 10px;
         background: var(--bg-tertiary);
         padding: 12px;
+        transition: border-color 0.18s ease, box-shadow 0.18s ease;
+      }
+      .deployment-card:hover {
+        border-color: var(--border-secondary);
+        box-shadow: 0 8px 16px rgba(0,0,0,0.16);
       }
       .creative-grid {
         display: grid;
@@ -1201,6 +1217,11 @@
         padding: 12px;
         display: grid;
         gap: 8px;
+        transition: border-color 0.18s ease, box-shadow 0.18s ease;
+      }
+      .creative-card:hover {
+        border-color: var(--border-secondary);
+        box-shadow: 0 10px 18px rgba(0,0,0,0.2);
       }
       .creative-card h4 {
         font-size: 13px;
@@ -1237,7 +1258,7 @@
       }
       .calendar-day {
         min-height: 40px;
-        border: 1px solid var(--border);
+        border: 1px solid var(--border-primary);
         background: rgba(255,255,255,0.02);
         border-radius: 8px;
         font-size: 11px;
@@ -1285,12 +1306,17 @@
       [data-shortcut] {
         position: relative;
       }
+      .nav-item[data-shortcut] {
+        padding-right: 44px;
+      }
+      .btn[data-shortcut] {
+        padding-right: 36px;
+      }
       [data-shortcut]::after {
         content: attr(data-shortcut);
-        position: absolute;
-        right: 8px;
-        top: 50%;
-        transform: translateY(-50%);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
         font-family: "SF Mono", Monaco, Consolas, monospace;
         font-size: 10px;
         color: #bfdbfe;
@@ -1299,12 +1325,13 @@
         padding: 2px 6px;
         background: rgba(59,130,246,0.2);
         white-space: nowrap;
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
         opacity: 0;
         pointer-events: none;
-        transition: opacity 0.15s ease;
-      }
-      body.show-shortcut-hints [data-shortcut] {
-        padding-right: 52px;
+        transition: opacity 0.16s ease;
       }
       body.show-shortcut-hints [data-shortcut]::after {
         opacity: 1;
@@ -1343,63 +1370,63 @@
                 <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
                 <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
               </svg>
-              Overview
+              <span class="nav-item-label">Overview</span>
             </button>
             <button class="nav-item" data-page="activity" data-shortcut="⌘2" onclick="showPage('activity')"
               data-tooltip="View download activity over time" data-tooltip-position="bottom">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
               </svg>
-              Activity
+              <span class="nav-item-label">Activity</span>
             </button>
             <button class="nav-item" data-page="charts" data-shortcut="⌘3" onclick="showPage('charts')" data-tooltip="View breakdown charts"
               data-tooltip-position="bottom">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/>
               </svg>
-              Charts
+              <span class="nav-item-label">Charts</span>
             </button>
             <button class="nav-item" data-page="dashboards" data-shortcut="⌘4" onclick="showPage('dashboards')"
               data-tooltip="Infrastructure and external dashboards" data-tooltip-position="bottom">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 20h8"/>
               </svg>
-              Dashboards
+              <span class="nav-item-label">Dashboards</span>
             </button>
             <button class="nav-item" data-page="deployments" data-shortcut="⌘5" onclick="showPage('deployments')"
               data-tooltip="Browser store deployment tracking" data-tooltip-position="bottom">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M8 17l4 4 4-4"/><path d="M12 12v9"/><path d="M20 3H4v6h16z"/>
               </svg>
-              Deployments
+              <span class="nav-item-label">Deployments</span>
             </button>
             <button class="nav-item" data-page="versions" data-shortcut="⌘6" onclick="showPage('versions')"
               data-tooltip="Extension versions and release notes" data-tooltip-position="bottom">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M20 7l-8 8-4-4"/><path d="M4 4h16v16H4z"/>
               </svg>
-              Versions
+              <span class="nav-item-label">Versions</span>
             </button>
             <button class="nav-item" data-page="creative" data-shortcut="⌘7" onclick="showPage('creative')"
               data-tooltip="Design, email templates, and newsletter management" data-tooltip-position="bottom">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 113 3L7 19l-4 1 1-4z"/>
               </svg>
-              Creative Hub
+              <span class="nav-item-label">Creative Hub</span>
             </button>
             <button class="nav-item" data-page="notifications" data-shortcut="⌘8" onclick="showPage('notifications')"
               data-tooltip="GitHub issues and PR monitoring" data-tooltip-position="bottom">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M18 8a6 6 0 10-12 0c0 7-3 7-3 7h18s-3 0-3-7"/><path d="M13.73 21a2 2 0 01-3.46 0"/>
               </svg>
-              Notifications
+              <span class="nav-item-label">Notifications</span>
             </button>
             <button class="nav-item" data-page="logs" data-shortcut="⌘9" onclick="showPage('logs')"
               data-tooltip="Oracle backend request and admin operation logs" data-tooltip-position="bottom">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M3 4h18v16H3z"/><path d="M7 8h10"/><path d="M7 12h10"/><path d="M7 16h6"/>
               </svg>
-              Logs
+              <span class="nav-item-label">Logs</span>
             </button>
             <button class="nav-item" data-page="danger" data-shortcut="⌘0" onclick="showPage('danger')"
               data-tooltip="Critical administrative operations" data-tooltip-position="bottom">
@@ -1407,7 +1434,7 @@
                 <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
                 <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
               </svg>
-              Danger
+              <span class="nav-item-label">Danger</span>
             </button>
           </div>
 
@@ -1829,7 +1856,7 @@
                   <div class="card-subtitle">Store users, current version, and dashboard links</div>
                 </div>
                 <div>
-                  <button class="btn btn-secondary" onclick="syncDeploymentTargets()">Sync Browser Stores</button>
+                  <button class="btn btn-secondary" id="deployment-sync-btn" data-shortcut="⌘⇧D" onclick="syncDeploymentTargets()">Sync Browser Stores</button>
                 </div>
               </div>
               <div class="card-body">
@@ -2093,7 +2120,7 @@
       <div class="auth-modal" role="dialog" aria-modal="true" style="max-width: 620px;">
         <div class="auth-modal-head">
           <h2 class="auth-modal-title">Shortcuts</h2>
-          <p class="auth-modal-subtitle">Hold Command for 1 second to reveal shortcut badges across the UI.</p>
+          <p class="auth-modal-subtitle">Hold Command/Ctrl for 1 second to reveal shortcut badges across the UI.</p>
         </div>
         <div class="auth-modal-body">
           <div id="shortcuts-list" class="shortcut-list"></div>
@@ -2111,6 +2138,7 @@
       let calendarMonthOffset = 0;
       let allTimeActivityPoints = [];
       let commandHoldTimer = null;
+      let shortcutModifierHeld = false;
 
       // Helpers
       let authInFlight = null;
@@ -3824,6 +3852,7 @@
         { combo: '⌘0', desc: 'Go to Danger Zone', run: function() { showPage('danger'); } },
         { combo: '⌘R', desc: 'Refresh all data', run: function() { refreshAll(); } },
         { combo: '⌘B', desc: 'Open last batch modal', run: function() { showBatchModal(); } },
+        { combo: '⌘⇧D', desc: 'Sync deployment stores', run: function() { syncDeploymentTargets(); } },
         { combo: '⌘⇧S', desc: 'Open step-up prompt', run: function() { openStepUpPrompt(); } },
         { combo: '⌘/', desc: 'Open shortcuts help', run: function() { openShortcutsModal(); } }
       ];
@@ -3863,8 +3892,12 @@
       }
 
       function startCommandHoldTimer() {
-        if (commandHoldTimer) return;
+        if (commandHoldTimer || document.body.classList.contains('show-shortcut-hints')) return;
         commandHoldTimer = setTimeout(function() {
+          if (!shortcutModifierHeld) {
+            commandHoldTimer = null;
+            return;
+          }
           document.body.classList.add('show-shortcut-hints');
           commandHoldTimer = null;
         }, 1000);
@@ -3875,6 +3908,7 @@
           clearTimeout(commandHoldTimer);
           commandHoldTimer = null;
         }
+        shortcutModifierHeld = false;
         document.body.classList.remove('show-shortcut-hints');
       }
 
@@ -3897,6 +3931,7 @@
         if (!withShift && key === '0') { showPage('danger'); return true; }
         if (!withShift && key === 'r') { refreshAll(); return true; }
         if (!withShift && key === 'b') { showBatchModal(); return true; }
+        if (withShift && key === 'd') { syncDeploymentTargets(); return true; }
         if (withShift && key === 's') { openStepUpPrompt(); return true; }
         if (!withShift && key === '/') { openShortcutsModal(); return true; }
         return false;
@@ -3931,7 +3966,12 @@
       window.addEventListener("load", function() {
         renderShortcutsList();
         document.addEventListener('keydown', function(e) {
-          if (e.key === 'Meta') {
+          if ((e.metaKey || e.ctrlKey) && !shortcutModifierHeld) {
+            shortcutModifierHeld = true;
+            startCommandHoldTimer();
+          }
+          if (e.key === 'Meta' || e.key === 'Control') {
+            shortcutModifierHeld = true;
             startCommandHoldTimer();
             return;
           }
@@ -3947,10 +3987,17 @@
           }
         });
         document.addEventListener('keyup', function(e) {
-          if (e.key === 'Meta') {
+          if (shortcutModifierHeld && !(e.metaKey || e.ctrlKey)) {
+            clearCommandHoldHints();
+            return;
+          }
+          if (e.key === 'Meta' || e.key === 'Control') {
+            shortcutModifierHeld = !!(e.metaKey || e.ctrlKey);
+            if (shortcutModifierHeld) return;
             clearCommandHoldHints();
           }
         });
+        window.addEventListener('blur', clearCommandHoldHints);
         document.addEventListener('visibilitychange', function() {
           if (document.hidden) clearCommandHoldHints();
         });
