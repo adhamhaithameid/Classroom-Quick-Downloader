@@ -155,7 +155,7 @@ func TestRetryOutboxHandler_DoesNotResubmitSentRows(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/admin/outbox/retry", bytes.NewBufferString(`{"ids":[`+strconv.FormatInt(sentID, 10)+`,`+strconv.FormatInt(retryID, 10)+`]}`))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
-	RetryOutboxHandler(sqlDB, observability.NewRegistry()).ServeHTTP(rr, req)
+	RetryOutboxHandler(sqlDB, nil, observability.NewRegistry()).ServeHTTP(rr, req)
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
 	}
@@ -183,9 +183,128 @@ func TestRetryOutboxHandler_RejectsMalformedJSON(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/admin/outbox/retry", bytes.NewBufferString(`{`))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
-	RetryOutboxHandler(sqlDB, observability.NewRegistry()).ServeHTTP(rr, req)
+	RetryOutboxHandler(sqlDB, nil, observability.NewRegistry()).ServeHTTP(rr, req)
 	if rr.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400 for malformed JSON, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestOutboxStatusHandler_SQLiteSource(t *testing.T) {
+	sqlDB := newAdminTestDB(t)
+	defer sqlDB.Close()
+
+	nowMs := time.Now().UnixMilli()
+	if _, err := sqlDB.Exec(
+		`INSERT INTO ingest_outbox (event_type, payload_json, idempotency_key, status, attempts, last_error, created_at, next_run_at)
+		 VALUES ('e', '{}', 'status-k1', 'retry', 1, 'x', ?, ?)`,
+		nowMs,
+		nowMs,
+	); err != nil {
+		t.Fatalf("seed outbox row failed: %v", err)
+	}
+	if _, err := sqlDB.Exec(
+		`INSERT INTO outbox_dead_letter (outbox_id, event_type, payload_json, idempotency_key, attempts, last_error, failed_at)
+		 VALUES (NULL, 'e', '{}', 'status-k1', 1, 'x', ?)`,
+		nowMs,
+	); err != nil {
+		t.Fatalf("seed dead letter row failed: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/admin/outbox/status?source=sqlite", nil)
+	rr := httptest.NewRecorder()
+	OutboxStatusHandler(sqlDB, nil, nil).ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var payload struct {
+		OK              bool             `json:"ok"`
+		Source          string           `json:"source"`
+		CountsByStatus  map[string]int64 `json:"countsByStatus"`
+		DeadLetterCount int64            `json:"deadLetterCount"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("parse response failed: %v", err)
+	}
+	if !payload.OK || payload.Source != "sqlite" {
+		t.Fatalf("unexpected response: %+v", payload)
+	}
+	if payload.CountsByStatus["retry"] < 1 {
+		t.Fatalf("expected retry count >= 1, got %+v", payload.CountsByStatus)
+	}
+	if payload.DeadLetterCount < 1 {
+		t.Fatalf("expected dead letter count >= 1, got %d", payload.DeadLetterCount)
+	}
+}
+
+func TestOutboxStatusHandler_RejectsInvalidSource(t *testing.T) {
+	sqlDB := newAdminTestDB(t)
+	defer sqlDB.Close()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/admin/outbox/status?source=bad", nil)
+	rr := httptest.NewRecorder()
+	OutboxStatusHandler(sqlDB, nil, nil).ServeHTTP(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestRetryOutboxHandler_RejectsInvalidSource(t *testing.T) {
+	sqlDB := newAdminTestDB(t)
+	defer sqlDB.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/admin/outbox/retry", bytes.NewBufferString(`{"source":"bad"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	RetryOutboxHandler(sqlDB, nil, observability.NewRegistry()).ServeHTTP(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for invalid source, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestRetryOutboxHandler_PostgresSource(t *testing.T) {
+	dsn := os.Getenv("POSTGRES_DSN")
+	if dsn == "" {
+		t.Skip("POSTGRES_DSN not set")
+	}
+
+	sqlDB := newAdminTestDB(t)
+	defer sqlDB.Close()
+
+	postgresDB, err := db.InitPostgres(dsn)
+	if err != nil {
+		t.Fatalf("InitPostgres failed: %v", err)
+	}
+	defer postgresDB.Close()
+
+	nowMs := time.Now().UnixMilli()
+	idempotency := "pg-retry-" + strconv.FormatInt(nowMs, 10)
+	if _, err := postgresDB.Exec(
+		`INSERT INTO pg_outbox (event_type, payload_json, idempotency_key, status, attempts, last_error, created_at, next_run_at)
+		 VALUES ($1, $2::jsonb, $3, 'retry', 2, 'x', $4, $4)
+		 ON CONFLICT(idempotency_key) DO UPDATE SET status = 'retry', attempts = 2, next_run_at = $4, last_error = 'x'`,
+		"control_plane_upsert",
+		`{}`,
+		idempotency,
+		nowMs,
+	); err != nil {
+		t.Fatalf("seed pg_outbox failed: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/admin/outbox/retry", bytes.NewBufferString(`{"source":"postgres"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	RetryOutboxHandler(sqlDB, postgresDB, observability.NewRegistry()).ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var status string
+	if err := postgresDB.QueryRow(`SELECT status FROM pg_outbox WHERE idempotency_key = $1`, idempotency).Scan(&status); err != nil {
+		t.Fatalf("query pg_outbox failed: %v", err)
+	}
+	if status != "pending" {
+		t.Fatalf("expected status=pending after retry, got %s", status)
 	}
 }
 

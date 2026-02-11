@@ -49,6 +49,7 @@ func TestDeploymentsSyncHandlerWithClient(t *testing.T) {
 	sqlDB := newAdminTestDB(t)
 	defer sqlDB.Close()
 	t.Setenv("ORACLE_ALLOW_UNTRUSTED_STORE_URLS", "true")
+	t.Setenv("ORACLE_ALLOW_HTTP_STORE_URLS", "true")
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -138,10 +139,71 @@ func TestDeploymentsSyncHandlerRejectsUnknownTarget(t *testing.T) {
 	}
 }
 
+func TestDeploymentsSyncHandler_RespectsSyncFeatureFlag(t *testing.T) {
+	sqlDB := newAdminTestDB(t)
+	defer sqlDB.Close()
+
+	if _, err := sqlDB.Exec(`UPDATE feature_flags SET enabled = 0 WHERE name = 'feature_sync_enabled'`); err != nil {
+		t.Fatalf("failed to disable sync feature flag: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/admin/deployments/sync", bytes.NewBufferString(`{}`))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	deploymentsSyncHandlerWithClient(sqlDB, nil, &http.Client{}, nil).ServeHTTP(rr, req)
+	if rr.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 when sync feature is disabled, got %d", rr.Code)
+	}
+}
+
+func TestDeploymentsTargetsHandler_ReturnsAllDefaultTargets(t *testing.T) {
+	sqlDB := newAdminTestDB(t)
+	defer sqlDB.Close()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/admin/deployments/targets", nil)
+	rr := httptest.NewRecorder()
+	DeploymentsTargetsHandler(sqlDB, nil).ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var payload struct {
+		OK      bool `json:"ok"`
+		Targets []struct {
+			RecordKey string         `json:"recordKey"`
+			Data      map[string]any `json:"data"`
+		} `json:"targets"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("parse payload failed: %v", err)
+	}
+	if !payload.OK || len(payload.Targets) != 3 {
+		t.Fatalf("expected three default targets, got %+v", payload)
+	}
+}
+
 func TestValidateStoreURL_RejectsUntrustedHostByDefault(t *testing.T) {
 	t.Setenv("ORACLE_ALLOW_UNTRUSTED_STORE_URLS", "false")
 	err := validateStoreURL("chrome", "https://example.com/x")
 	if err == nil {
 		t.Fatalf("expected untrusted host to be rejected")
+	}
+}
+
+func TestValidateStoreURL_RejectsHTTPByDefault(t *testing.T) {
+	t.Setenv("ORACLE_ALLOW_UNTRUSTED_STORE_URLS", "true")
+	t.Setenv("ORACLE_ALLOW_HTTP_STORE_URLS", "false")
+	err := validateStoreURL("chrome", "http://example.com/x")
+	if err == nil {
+		t.Fatalf("expected plain HTTP URL to be rejected by default")
+	}
+}
+
+func TestValidateStoreURL_AllowsHTTPWithExplicitOptIn(t *testing.T) {
+	t.Setenv("ORACLE_ALLOW_UNTRUSTED_STORE_URLS", "true")
+	t.Setenv("ORACLE_ALLOW_HTTP_STORE_URLS", "true")
+	err := validateStoreURL("chrome", "http://example.com/x")
+	if err != nil {
+		t.Fatalf("expected plain HTTP URL with explicit opt-in, got: %v", err)
 	}
 }

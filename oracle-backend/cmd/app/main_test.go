@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"oracle-backend/internal/db"
 	"oracle-backend/internal/observability"
@@ -117,5 +118,52 @@ func TestIsOracleOperationPath(t *testing.T) {
 		if got != tc.want {
 			t.Fatalf("path=%q got=%v want=%v", tc.path, got, tc.want)
 		}
+	}
+}
+
+func TestLoggingMiddleware_CapturesActorFromAuthMiddleware(t *testing.T) {
+	resetSessionStore()
+	sqlDB, err := db.Init(filepath.Join(t.TempDir(), "oracle-auth-log.db"))
+	if err != nil {
+		t.Fatalf("db init failed: %v", err)
+	}
+	defer sqlDB.Close()
+
+	const rawToken = "test-session-token"
+	sessionStore.Lock()
+	sessionStore.tokens[rawToken] = time.Now().Add(sessionDuration)
+	sessionStore.Unlock()
+
+	protected := requireAuth("secret", "", false)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	handler := loggingMiddleware(sqlDB, observability.RequestContextMiddleware(protected))
+
+	req := httptest.NewRequest(http.MethodPost, "/api/admin/flags/update", nil)
+	req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: rawToken})
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("unexpected status code: %d", rr.Code)
+	}
+
+	var userID, tokenID, role string
+	if err := sqlDB.QueryRow(
+		`SELECT user_id, token_id, role
+		 FROM oracle_operation_logs
+		 WHERE path = '/api/admin/flags/update'
+		 ORDER BY id DESC
+		 LIMIT 1`,
+	).Scan(&userID, &tokenID, &role); err != nil {
+		t.Fatalf("query oracle operation logs failed: %v", err)
+	}
+	if userID != "viewer" {
+		t.Fatalf("expected user_id=viewer, got %q", userID)
+	}
+	if role != "viewer" {
+		t.Fatalf("expected role=viewer, got %q", role)
+	}
+	if tokenID == "" || tokenID == "none" {
+		t.Fatalf("expected non-empty token_id, got %q", tokenID)
 	}
 }
