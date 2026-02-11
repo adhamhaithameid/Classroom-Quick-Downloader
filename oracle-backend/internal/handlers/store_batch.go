@@ -279,7 +279,8 @@ func insertRawSnapshot(
 	if len(body) == 0 {
 		return nil
 	}
-	sum := sha256.Sum256(body)
+	sanitizedBody := sanitizeRawSnapshotPayload(body)
+	sum := sha256.Sum256(sanitizedBody)
 	fingerprint := hex.EncodeToString(sum[:])
 	_, err := tx.ExecContext(
 		ctx,
@@ -288,12 +289,87 @@ func insertRawSnapshot(
 		) VALUES (?, ?, ?, ?, ?, ?)`,
 		source,
 		endpoint,
-		string(body),
+		string(sanitizedBody),
 		fingerprint,
 		status,
 		time.Now().UnixMilli(),
 	)
 	return err
+}
+
+var rawSnapshotSensitiveKeys = map[string]struct{}{
+	"ip":         {},
+	"ipaddress":  {},
+	"clientip":   {},
+	"uniqueips":  {},
+	"rawips":     {},
+	"addressip":  {},
+	"iplist":     {},
+	"ipv4":       {},
+	"ipv6":       {},
+	"remoteaddr": {},
+}
+
+func sanitizeRawSnapshotPayload(body []byte) []byte {
+	var payload any
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return body
+	}
+	redactRawSnapshotValue(&payload)
+	sanitized, err := json.Marshal(payload)
+	if err != nil {
+		return body
+	}
+	return sanitized
+}
+
+func redactRawSnapshotValue(v *any) {
+	switch typed := (*v).(type) {
+	case map[string]any:
+		for key, child := range typed {
+			if isSensitiveRawSnapshotKey(key) {
+				typed[key] = redactedRawSnapshotValue(child)
+				continue
+			}
+			childAny := any(child)
+			redactRawSnapshotValue(&childAny)
+			typed[key] = childAny
+		}
+	case []any:
+		for i, child := range typed {
+			childAny := any(child)
+			redactRawSnapshotValue(&childAny)
+			typed[i] = childAny
+		}
+	case string:
+		if net.ParseIP(strings.TrimSpace(typed)) != nil {
+			*v = "[REDACTED_IP]"
+		}
+	}
+}
+
+func isSensitiveRawSnapshotKey(key string) bool {
+	lower := strings.ToLower(strings.TrimSpace(key))
+	clean := strings.NewReplacer("_", "", "-", "", " ", "").Replace(lower)
+	_, ok := rawSnapshotSensitiveKeys[clean]
+	return ok
+}
+
+func redactedRawSnapshotValue(value any) any {
+	switch cast := value.(type) {
+	case []any:
+		return map[string]any{
+			"redacted": true,
+			"count":    len(cast),
+		}
+	case map[string]any:
+		return map[string]any{
+			"redacted": true,
+			"keys":     len(cast),
+		}
+	default:
+		return "[REDACTED]"
+	}
 }
 
 func registerSchemaPaths(ctx context.Context, tx *sql.Tx, payload map[string]interface{}) error {
