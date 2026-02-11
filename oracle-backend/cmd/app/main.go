@@ -35,8 +35,8 @@ func main() {
 	dbPath := getenv("DB_PATH", "./data/analytics.db")
 	staticDir := getenv("STATIC_DIR", "./static")
 	doSecret := os.Getenv("DO_SHARED_SECRET")
-	dashboardPassword := getenv("DASHBOARD_PASSWORD", "SuperDuperFuckenSecretPassword10/02/2026")
-	superAdminPassword := getenv("SUPER_ADMIN_PASSWORD", "SuperDuperFuckenAdminSecretPassword11/02/2026")
+	dashboardPassword := os.Getenv("DASHBOARD_PASSWORD")
+	superAdminPassword := os.Getenv("SUPER_ADMIN_PASSWORD")
 	archiverSecret := os.Getenv("ARCHIVER_SHARED_SECRET")
 	allowLoopbackBypass := os.Getenv("ALLOW_LOOPBACK_BYPASS") == "true"
 	allowEmptyDashboardPassword := os.Getenv("ALLOW_EMPTY_DASHBOARD_PASSWORD") == "true"
@@ -48,15 +48,11 @@ func main() {
 	if doSecret == "" {
 		log.Println("[WARN] DO_SHARED_SECRET is empty – /ingest-batch will reject requests")
 	}
-	if os.Getenv("DASHBOARD_PASSWORD") == "" {
-		log.Println("[WARN] using built-in DASHBOARD_PASSWORD default; set DASHBOARD_PASSWORD in production")
-	}
-	if os.Getenv("SUPER_ADMIN_PASSWORD") == "" {
-		log.Println("[WARN] using built-in SUPER_ADMIN_PASSWORD default; set SUPER_ADMIN_PASSWORD in production")
-	}
-
 	if dashboardPassword == "" && !allowEmptyDashboardPassword {
 		log.Fatal("[FATAL] DASHBOARD_PASSWORD is required for dashboard access")
+	}
+	if superAdminPassword == "" {
+		log.Fatal("[FATAL] SUPER_ADMIN_PASSWORD is required for step-up protected operations")
 	}
 	if dashboardPassword == "" && allowEmptyDashboardPassword {
 		log.Println("[WARN] ALLOW_EMPTY_DASHBOARD_PASSWORD is true – dashboard is PUBLIC (dev only)")
@@ -142,6 +138,9 @@ func main() {
 	mux.Handle("/api/admin/records/list", authMiddleware(handlers.RecordsListHandler(sqlDB)))
 	mux.Handle("/api/admin/records/upsert", authMiddleware(criticalMiddleware(handlers.RecordsUpsertHandler(sqlDB))))
 	mux.Handle("/api/admin/records/delete", authMiddleware(criticalMiddleware(handlers.RecordsDeleteHandler(sqlDB))))
+	mux.Handle("/api/admin/oracle-logs", authMiddleware(handlers.OracleOperationLogsListHandler(sqlDB)))
+	mux.Handle("/api/admin/oracle-logs/delete-older", authMiddleware(criticalMiddleware(handlers.OracleOperationLogsDeleteOlderHandler(sqlDB))))
+	mux.Handle("/api/admin/oracle-logs/clear-all", authMiddleware(criticalMiddleware(handlers.OracleOperationLogsClearAllHandler(sqlDB))))
 	mux.Handle("/metrics", metricsHandler(appMetrics))
 
 	// Auth endpoints
@@ -170,7 +169,7 @@ func main() {
 
 	server := &http.Server{
 		Addr:              addr,
-		Handler:           loggingMiddleware(rootHandler),
+		Handler:           loggingMiddleware(sqlDB, rootHandler),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      30 * time.Second,
@@ -288,7 +287,7 @@ func resourceIDFromRequest(r *http.Request) string {
 }
 
 // loggingMiddleware emits structured request logs with correlation context.
-func loggingMiddleware(next http.Handler) http.Handler {
+func loggingMiddleware(db *sql.DB, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		sw := &statusWriter{ResponseWriter: w, statusCode: http.StatusOK}
@@ -299,6 +298,20 @@ func loggingMiddleware(next http.Handler) http.Handler {
 		if sw.statusCode >= 400 {
 			statusClass = "error"
 		}
+		requestID := observability.RequestIDFromContext(r.Context())
+		correlationID := observability.CorrelationIDFromContext(r.Context())
+		if requestID == "unknown" {
+			requestID = strings.TrimSpace(sw.Header().Get("X-Request-ID"))
+			if requestID == "" {
+				requestID = "unknown"
+			}
+		}
+		if correlationID == "unknown" {
+			correlationID = strings.TrimSpace(sw.Header().Get("X-Correlation-ID"))
+			if correlationID == "" {
+				correlationID = "unknown"
+			}
+		}
 		errorCode := ""
 		if sw.statusCode >= 400 {
 			errorCode = "http_" + strconv.Itoa(sw.statusCode)
@@ -307,8 +320,8 @@ func loggingMiddleware(next http.Handler) http.Handler {
 			"level":          "info",
 			"message":        "http_request",
 			"time":           time.Now().UTC().Format(time.RFC3339),
-			"request_id":     observability.RequestIDFromContext(r.Context()),
-			"correlation_id": observability.CorrelationIDFromContext(r.Context()),
+			"request_id":     requestID,
+			"correlation_id": correlationID,
 			"user_id":        observability.UserIDFromContext(r.Context()),
 			"token_id":       observability.TokenIDFromContext(r.Context()),
 			"role":           observability.RoleFromContext(r.Context()),
@@ -334,7 +347,44 @@ func loggingMiddleware(next http.Handler) http.Handler {
 			return
 		}
 		log.Printf("%s", encoded)
+		if db == nil || !isOracleOperationPath(r.URL.Path) {
+			return
+		}
+		if err := handlers.InsertOracleOperationLog(
+			r.Context(),
+			db,
+			handlers.OracleOperationLogEntry{
+				TSUTC:         time.Now().UnixMilli(),
+				RequestID:     requestID,
+				CorrelationID: correlationID,
+				UserID:        observability.UserIDFromContext(r.Context()),
+				TokenID:       observability.TokenIDFromContext(r.Context()),
+				Role:          observability.RoleFromContext(r.Context()),
+				ActionType:    actionTypeFromRequest(r),
+				ResourceType:  resourceTypeFromRequest(r),
+				ResourceID:    resourceIDFromRequest(r),
+				Method:        r.Method,
+				Path:          r.URL.Path,
+				StatusCode:    sw.statusCode,
+				Result:        statusClass,
+				LatencyMS:     duration.Milliseconds(),
+				ErrorCode:     errorCode,
+			},
+		); err != nil {
+			log.Printf("[WARN] failed to write oracle operation log: %v", err)
+		}
 	})
+}
+
+func isOracleOperationPath(requestPath string) bool {
+	if requestPath == "" {
+		return false
+	}
+	return strings.HasPrefix(requestPath, "/api/") ||
+		strings.HasPrefix(requestPath, "/ingest-batch") ||
+		strings.HasPrefix(requestPath, "/storeBatch") ||
+		strings.HasPrefix(requestPath, "/health") ||
+		strings.HasPrefix(requestPath, "/metrics")
 }
 
 // spaHandler serves static files with SPA fallback for client-side routing.

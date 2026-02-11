@@ -303,6 +303,32 @@ func Migrate(db *sql.DB) error {
 		`CREATE INDEX IF NOT EXISTS idx_backup_runs_started_at
 			ON backup_runs(started_at DESC);`,
 
+		// Oracle backend operation logs (request-level, server-side observability).
+		`CREATE TABLE IF NOT EXISTS oracle_operation_logs (
+			id             INTEGER PRIMARY KEY AUTOINCREMENT,
+			ts_utc         INTEGER NOT NULL,
+			request_id     TEXT NOT NULL,
+			correlation_id TEXT NOT NULL,
+			user_id        TEXT NOT NULL,
+			token_id       TEXT NOT NULL,
+			role           TEXT NOT NULL,
+			action_type    TEXT NOT NULL,
+			resource_type  TEXT NOT NULL,
+			resource_id    TEXT NOT NULL,
+			method         TEXT NOT NULL,
+			path           TEXT NOT NULL,
+			status_code    INTEGER NOT NULL,
+			result         TEXT NOT NULL,
+			latency_ms     INTEGER NOT NULL,
+			error_code     TEXT NOT NULL DEFAULT ''
+		);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_oracle_operation_logs_ts
+			ON oracle_operation_logs(ts_utc DESC);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_oracle_operation_logs_action_ts
+			ON oracle_operation_logs(action_type, ts_utc DESC);`,
+
 		// Generic admin entity store for dashboard-managed records (deployments, versions, designs, emails, etc.).
 		`CREATE TABLE IF NOT EXISTS admin_records (
 			id           INTEGER PRIMARY KEY AUTOINCREMENT,
