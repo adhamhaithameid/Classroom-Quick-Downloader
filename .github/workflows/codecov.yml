@@ -25,7 +25,7 @@ jobs:
             flag: extension
           - name: cloudflare-worker
             workdir: cloudflare-worker
-            test-cmd: pnpm --filter cloudflare-worker test -- --coverage
+            test-cmd: pnpm -C cloudflare-worker test:coverage
             coverage-file: cloudflare-worker/coverage/coverage-final.json
             flag: cloudflare-worker
 
