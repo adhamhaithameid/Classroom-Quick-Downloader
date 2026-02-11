@@ -8,8 +8,6 @@ import {
   EnvSnapshot,
   OracleBatch,
   TimeBucket,
-  BucketTotals,
-  BucketCounters,
   DOStateBatch,
   BatchSummary,
   ChangelogEntry,
@@ -3009,33 +3007,12 @@ export class DownloadsDurable {
 
   /**
    * Build an aggregated OracleBatch from raw events in buffer.
-   * Groups events by hour and aggregates counters.
+   * Optimized single-pass implementation.
    */
   private buildOracleBatch(events: StoredEvent[], batchIdOverride?: string): OracleBatch {
     const now = Date.now();
     
-    // 1. Group events by hour bucket (Keep logic for historical data)
-    const hourBuckets = new Map<string, StoredEvent[]>();
-    for (const ev of events) {
-      const ts = ev.timestamp || now;
-      const d = new Date(ts);
-      // Truncate to hour: "2025-12-11T03:00:00Z"
-      const hourKey = d.toISOString().slice(0, 13) + ":00:00Z";
-      if (!hourBuckets.has(hourKey)) {
-        hourBuckets.set(hourKey, []);
-      }
-      hourBuckets.get(hourKey)!.push(ev);
-    }
-
-    // Aggregate each hour bucket
-    const timeBuckets: TimeBucket[] = [];
-    for (const [hourStart, evs] of hourBuckets) {
-      const bucket = this.aggregateBucket(hourStart, evs);
-      timeBuckets.push(bucket);
-    }
-    timeBuckets.sort((a, b) => a.bucketStart.localeCompare(b.bucketStart));
-
-    // 2. Build Full Batch Summary (Aggregates EVERYTHING)
+    // 1. Initialize Summary Accumulators
     const summary: BatchSummary = {
       totals: { totalEvents: 0, totalDownloads: 0, totalSuccess: 0, totalFail: 0 },
       browsers: {},
@@ -3050,11 +3027,18 @@ export class DownloadsDurable {
       topCountry: "unknown",
       topType: "unknown"
     };
+
     let minSeq: number | null = null;
     let maxSeq: number | null = null;
 
+    // 2. Initialize Time Buckets Map
+    const bucketMap = new Map<string, TimeBucket>();
+
+    // 3. Single Pass Loop
     for (const ev of events) {
       const weight = this.normalizeEventCount(ev.count);
+
+      // --- Update Summary ---
       summary.totals.totalEvents += weight;
       summary.totals.totalDownloads += weight; // All events are download attempts
       
@@ -3085,19 +3069,82 @@ export class DownloadsDurable {
         const err = (ev.error_type || "unknown").toLowerCase();
         summary.errorReasons[err] = (summary.errorReasons[err] || 0) + weight;
       }
+
       if (typeof ev.seq === "number" && Number.isFinite(ev.seq)) {
         minSeq = minSeq == null ? ev.seq : Math.min(minSeq, ev.seq);
         maxSeq = maxSeq == null ? ev.seq : Math.max(maxSeq, ev.seq);
       }
+
+      // --- Update Bucket ---
+      const ts = ev.timestamp || now;
+      const d = new Date(ts);
+      // Truncate to hour: "2025-12-11T03:00:00Z"
+      const hourKey = d.toISOString().slice(0, 13) + ":00:00Z";
+
+      let bucket = bucketMap.get(hourKey);
+      if (!bucket) {
+        const startDate = new Date(hourKey);
+        const endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
+        const bucketEnd = endDate.toISOString().slice(0, 19) + "Z";
+        bucket = {
+          bucketStart: hourKey,
+          bucketEnd,
+          totals: {
+            totalEvents: 0,
+            totalDownloads: 0,
+            totalSuccess: 0,
+            totalFail: 0,
+          },
+          counters: {
+            byStatus: {},
+            byType: {},
+            byBrowser: {},
+            byOs: {},
+            byExtVersion: {},
+            byLanguage: {},
+            byCountry: {},
+            byErrorType: {},
+          },
+        };
+        bucketMap.set(hourKey, bucket);
+      }
+
+      // Update bucket totals
+      bucket.totals.totalEvents += weight;
+      bucket.totals.totalDownloads += weight;
+      if (ev.status === "success") {
+        bucket.totals.totalSuccess += weight;
+      } else {
+        bucket.totals.totalFail += weight;
+      }
+
+      // Update bucket counters
+      const status = ev.status || "unknown";
+      bucket.counters.byStatus[status] = (bucket.counters.byStatus[status] || 0) + weight;
+
+      bucket.counters.byType[type] = (bucket.counters.byType[type] || 0) + weight;
+      bucket.counters.byBrowser[browser] = (bucket.counters.byBrowser[browser] || 0) + weight;
+      bucket.counters.byOs[os] = (bucket.counters.byOs[os] || 0) + weight;
+      bucket.counters.byExtVersion[ver] = (bucket.counters.byExtVersion[ver] || 0) + weight;
+      bucket.counters.byLanguage[lang] = (bucket.counters.byLanguage[lang] || 0) + weight;
+      bucket.counters.byCountry[country] = (bucket.counters.byCountry[country] || 0) + weight;
+
+      if (ev.status === "fail") {
+        const errType = (ev.error_type || "unknown").toLowerCase();
+        bucket.counters.byErrorType[errType] = (bucket.counters.byErrorType[errType] || 0) + weight;
+      }
     }
 
-    // Calculate "Top" stats
+    // Finalize Summary Stats
     summary.topBrowser = this.getTopKey(summary.browsers);
     summary.topOs = this.getTopKey(summary.os);
     summary.topCountry = this.getTopKey(summary.countries);
     summary.topType = this.getTopKey(summary.types);
 
-    // 3. Build DO state snapshot
+    // Finalize Buckets (sort by time)
+    const timeBuckets = Array.from(bucketMap.values()).sort((a, b) => a.bucketStart.localeCompare(b.bucketStart));
+
+    // 4. Build DO state snapshot
     const quota = computeQuotaDescriptor(this.d.reqCountToday, this.d.hardRemoteOff);
     const doState: DOStateBatch = {
       ok: true,
@@ -3121,13 +3168,8 @@ export class DownloadsDurable {
     const failureLogs = this.consumeFailureRollupsForBatch(now);
 
     // PRIVACY FIX: IP collection disabled per PRIVACY.md policy
-    // The privacy policy states IPs are never stored, so we don't send them to Oracle
-    // This disables the Geo Map feature but aligns code with documented privacy claims
-    // To re-enable, update PRIVACY.md to disclose IP storage and uncomment the code below
-    const uniqueIps: string[] = [];  // Disabled for privacy compliance
+    const uniqueIps: string[] = [];
 
-    // LEAN INGESTION: Only send summaries, NOT raw events or IPs
-    // This reduces payload size and maintains privacy compliance
     return {
       batchId,
       generatedAt: now,
@@ -3146,81 +3188,7 @@ export class DownloadsDurable {
         maxSeq,
       },
       failureLogs,
-      uniqueIps,    // Empty - IPs not collected per privacy policy
-      // NOTE: Raw events intentionally excluded to reduce payload size
-    };
-
-  }
-
-  private aggregateBucket(hourStart: string, events: StoredEvent[]): TimeBucket {
-    const totals: BucketTotals = {
-      totalEvents: 0,
-      totalDownloads: 0,
-      totalSuccess: 0,
-      totalFail: 0,
-    };
-
-    const counters: BucketCounters = {
-      byStatus: {},
-      byType: {},
-      byBrowser: {},
-      byOs: {},
-      byExtVersion: {},
-      byLanguage: {},
-      byCountry: {},
-      byErrorType: {},
-    };
-
-    for (const ev of events) {
-      const weight = this.normalizeEventCount(ev.count);
-      totals.totalEvents += weight;
-      // totalDownloads = all download attempts (success + fail)
-      totals.totalDownloads += weight;
-      
-      if (ev.status === "success") {
-        totals.totalSuccess += weight;
-      } else {
-        totals.totalFail += weight;
-      }
-
-      // Aggregate counters
-      const status = ev.status || "unknown";
-      counters.byStatus[status] = (counters.byStatus[status] || 0) + weight;
-
-      const type = (ev.file_type || "unknown").toLowerCase();
-      counters.byType[type] = (counters.byType[type] || 0) + weight;
-
-      const browser = (ev.browser || "unknown").toLowerCase();
-      counters.byBrowser[browser] = (counters.byBrowser[browser] || 0) + weight;
-
-      const os = (ev.os || "unknown").toLowerCase();
-      counters.byOs[os] = (counters.byOs[os] || 0) + weight;
-
-      const extVer = ev.ext_version || "0.0.0";
-      counters.byExtVersion[extVer] = (counters.byExtVersion[extVer] || 0) + weight;
-
-      const lang = (ev.language || "unknown").toLowerCase();
-      counters.byLanguage[lang] = (counters.byLanguage[lang] || 0) + weight;
-
-      const country = (ev.country || "unknown").toLowerCase();
-      counters.byCountry[country] = (counters.byCountry[country] || 0) + weight;
-
-      if (ev.status === "fail") {
-        const errType = (ev.error_type || "unknown").toLowerCase();
-        counters.byErrorType[errType] = (counters.byErrorType[errType] || 0) + weight;
-      }
-    }
-
-    // Calculate bucket end (1 hour later)
-    const startDate = new Date(hourStart);
-    const endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
-    const bucketEnd = endDate.toISOString().slice(0, 19) + "Z";
-
-    return {
-      bucketStart: hourStart,
-      bucketEnd,
-      totals,
-      counters,
+      uniqueIps,
     };
   }
 
