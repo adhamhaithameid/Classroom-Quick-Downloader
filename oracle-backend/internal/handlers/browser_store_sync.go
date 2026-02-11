@@ -183,6 +183,9 @@ func deploymentsSyncHandlerWithClient(sqliteDB, postgresDB *sql.DB, client *http
 		if sqliteDB != nil && !ensureFeatureEnabled(w, r, sqliteDB, "feature_management_hub_enabled") {
 			return
 		}
+		if sqliteDB != nil && !ensureFeatureEnabled(w, r, sqliteDB, "feature_sync_enabled") {
+			return
+		}
 
 		var req struct {
 			Targets []string `json:"targets"`
@@ -345,6 +348,7 @@ func fetchAndParseStoreStats(ctx context.Context, client *http.Client, key, url 
 		return "", 0, "", err
 	}
 	req.Header.Set("User-Agent", "oracle-dashboard-sync/1.0")
+	// #nosec G704 -- URL is validated by validateStoreURL (scheme + host allowlist, with explicit opt-in overrides).
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", 0, "", err
@@ -377,6 +381,9 @@ func validateStoreURL(key, rawURL string) error {
 	}
 	if parsed.Scheme != "https" && parsed.Scheme != "http" {
 		return fmt.Errorf("target URL must use http/https")
+	}
+	if parsed.Scheme == "http" && os.Getenv("ORACLE_ALLOW_HTTP_STORE_URLS") != "true" {
+		return fmt.Errorf("target URL must use https")
 	}
 	if parsed.Host == "" {
 		return fmt.Errorf("target URL host is missing")

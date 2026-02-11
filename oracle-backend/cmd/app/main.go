@@ -133,8 +133,8 @@ func main() {
 	mux.Handle("/api/pipeline/failures", authMiddleware(handlers.PipelineFailuresHandler(sqlDB)))
 	mux.Handle("/api/admin/flags", authMiddleware(handlers.FeatureFlagsHandler(sqlDB)))
 	mux.Handle("/api/admin/flags/update", authMiddleware(criticalMiddleware(handlers.UpdateFeatureFlagHandler(sqlDB))))
-	mux.Handle("/api/admin/outbox/status", authMiddleware(handlers.OutboxStatusHandler(sqlDB, appMetrics)))
-	mux.Handle("/api/admin/outbox/retry", authMiddleware(criticalMiddleware(handlers.RetryOutboxHandler(sqlDB, appMetrics))))
+	mux.Handle("/api/admin/outbox/status", authMiddleware(handlers.OutboxStatusHandler(sqlDB, postgresDB, appMetrics)))
+	mux.Handle("/api/admin/outbox/retry", authMiddleware(criticalMiddleware(handlers.RetryOutboxHandler(sqlDB, postgresDB, appMetrics))))
 	mux.Handle("/api/admin/outbox/replay-dead-letter", authMiddleware(criticalMiddleware(handlers.ReplayDeadLetterHandler(sqlDB))))
 	mux.Handle("/api/admin/audit/verify-chain", authMiddleware(handlers.AuditVerifyChainHandler(sqlDB)))
 	mux.Handle("/api/admin/alerts", authMiddleware(handlers.AlertsHandler(sqlDB)))
@@ -234,11 +234,26 @@ func HealthDBHandler(db *sql.DB) http.HandlerFunc {
 type statusWriter struct {
 	http.ResponseWriter
 	statusCode int
+	userID     string
+	tokenID    string
+	role       string
 }
 
 func (w *statusWriter) WriteHeader(code int) {
 	w.statusCode = code
 	w.ResponseWriter.WriteHeader(code)
+}
+
+func (w *statusWriter) SetActorContext(userID, tokenID, role string) {
+	w.userID = strings.TrimSpace(userID)
+	w.tokenID = strings.TrimSpace(tokenID)
+	w.role = strings.TrimSpace(role)
+}
+
+func setActorContextOnWriter(w http.ResponseWriter, userID, tokenID, role string) {
+	if carrier, ok := w.(interface{ SetActorContext(string, string, string) }); ok {
+		carrier.SetActorContext(userID, tokenID, role)
+	}
 }
 
 func securityHeadersMiddleware(next http.Handler) http.Handler {
@@ -338,15 +353,27 @@ func loggingMiddleware(db *sql.DB, next http.Handler) http.Handler {
 		if sw.statusCode >= 400 {
 			errorCode = "http_" + strconv.Itoa(sw.statusCode)
 		}
+		userID := observability.UserIDFromContext(r.Context())
+		tokenID := observability.TokenIDFromContext(r.Context())
+		role := observability.RoleFromContext(r.Context())
+		if userID == "anonymous" && strings.TrimSpace(sw.userID) != "" {
+			userID = sw.userID
+		}
+		if tokenID == "none" && strings.TrimSpace(sw.tokenID) != "" {
+			tokenID = sw.tokenID
+		}
+		if role == "viewer" && strings.TrimSpace(sw.role) != "" {
+			role = sw.role
+		}
 		payload := map[string]interface{}{
 			"level":          "info",
 			"message":        "http_request",
 			"time":           time.Now().UTC().Format(time.RFC3339),
 			"request_id":     requestID,
 			"correlation_id": correlationID,
-			"user_id":        observability.UserIDFromContext(r.Context()),
-			"token_id":       observability.TokenIDFromContext(r.Context()),
-			"role":           observability.RoleFromContext(r.Context()),
+			"user_id":        userID,
+			"token_id":       tokenID,
+			"role":           role,
 			"action_type":    actionTypeFromRequest(r),
 			"resource_type":  resourceTypeFromRequest(r),
 			"resource_id":    resourceIDFromRequest(r),
@@ -379,9 +406,9 @@ func loggingMiddleware(db *sql.DB, next http.Handler) http.Handler {
 				TSUTC:         time.Now().UnixMilli(),
 				RequestID:     requestID,
 				CorrelationID: correlationID,
-				UserID:        observability.UserIDFromContext(r.Context()),
-				TokenID:       observability.TokenIDFromContext(r.Context()),
-				Role:          observability.RoleFromContext(r.Context()),
+				UserID:        userID,
+				TokenID:       tokenID,
+				Role:          role,
 				ActionType:    actionTypeFromRequest(r),
 				ResourceType:  resourceTypeFromRequest(r),
 				ResourceID:    resourceIDFromRequest(r),
@@ -713,6 +740,7 @@ func requireAuth(dashboardPassword, archiverSecret string, allowLoopbackBypass b
 
 			if allowLoopbackBypass && archiverSecret == "" && isLoopbackAddr(r.RemoteAddr) && isLoopbackHost(r.Host) && !hasForwardedIp(r) {
 				ctx := observability.WithActorContext(r.Context(), "loopback-bypass", "loopback", "system")
+				setActorContextOnWriter(w, "loopback-bypass", "loopback", "system")
 				next.ServeHTTP(w, r.WithContext(ctx))
 				return
 			}
@@ -721,6 +749,7 @@ func requireAuth(dashboardPassword, archiverSecret string, allowLoopbackBypass b
 				headerSecret := r.Header.Get("X-Archiver-Secret")
 				if headerSecret != "" && subtle.ConstantTimeCompare([]byte(headerSecret), []byte(archiverSecret)) == 1 {
 					ctx := observability.WithActorContext(r.Context(), "archiver", "archiver-secret", "system")
+					setActorContextOnWriter(w, "archiver", "archiver-secret", "system")
 					next.ServeHTTP(w, r.WithContext(ctx))
 					return
 				}
@@ -738,6 +767,7 @@ func requireAuth(dashboardPassword, archiverSecret string, allowLoopbackBypass b
 				tokenID = tokenID[:12]
 			}
 			ctx := observability.WithActorContext(r.Context(), "viewer", tokenID, "viewer")
+			setActorContextOnWriter(w, "viewer", tokenID, "viewer")
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
@@ -777,6 +807,7 @@ func requireStepUp(db *sql.DB, superAdminPassword string) func(http.Handler) htt
 				tokenID = tokenID[:12]
 			}
 			ctx := observability.WithActorContext(r.Context(), "super-admin", tokenID, "super_admin")
+			setActorContextOnWriter(w, "super-admin", tokenID, "super_admin")
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

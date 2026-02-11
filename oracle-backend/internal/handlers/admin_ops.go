@@ -147,67 +147,130 @@ func IsFeatureEnabled(ctx context.Context, db *sql.DB, name string) (bool, error
 }
 
 type outboxStatusResponse struct {
-	OK              bool             `json:"ok"`
-	CountsByStatus  map[string]int64 `json:"countsByStatus"`
-	DeadLetterCount int64            `json:"deadLetterCount"`
+	OK              bool                          `json:"ok"`
+	Source          string                        `json:"source"`
+	CountsByStatus  map[string]int64              `json:"countsByStatus"`
+	DeadLetterCount int64                         `json:"deadLetterCount"`
+	Sources         map[string]outboxSourceStatus `json:"sources"`
 }
 
-func OutboxStatusHandler(db *sql.DB, metrics *observability.Registry) http.HandlerFunc {
+type outboxSourceStatus struct {
+	CountsByStatus  map[string]int64 `json:"countsByStatus"`
+	DeadLetterCount int64            `json:"deadLetterCount,omitempty"`
+	Backlog         int64            `json:"backlog"`
+}
+
+func queryOutboxStatus(ctx context.Context, db *sql.DB, tableName string) (outboxSourceStatus, error) {
+	if db == nil {
+		return outboxSourceStatus{}, errors.New("database not configured")
+	}
+
+	query := fmt.Sprintf(`SELECT status, COUNT(*) FROM %s GROUP BY status`, tableName) // #nosec G201 -- tableName is internal constant.
+	rows, err := db.QueryContext(ctx, query)
+	if err != nil {
+		return outboxSourceStatus{}, err
+	}
+	defer rows.Close()
+
+	counts := map[string]int64{
+		"pending":    0,
+		"processing": 0,
+		"sent":       0,
+		"retry":      0,
+		"dead":       0,
+	}
+	var backlog int64
+	for rows.Next() {
+		var status string
+		var cnt int64
+		if err := rows.Scan(&status, &cnt); err != nil {
+			return outboxSourceStatus{}, err
+		}
+		counts[status] = cnt
+		if status == "pending" || status == "retry" || status == "processing" {
+			backlog += cnt
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return outboxSourceStatus{}, err
+	}
+
+	return outboxSourceStatus{
+		CountsByStatus: counts,
+		Backlog:        backlog,
+	}, nil
+}
+
+func OutboxStatusHandler(sqliteDB, postgresDB *sql.DB, metrics *observability.Registry) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return
 		}
-
-		rows, err := db.QueryContext(r.Context(), `SELECT status, COUNT(*) FROM ingest_outbox GROUP BY status`)
-		if err != nil {
-			http.Error(w, "failed to query outbox status", http.StatusInternalServerError)
+		source := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("source")))
+		if source == "" {
+			source = "all"
+		}
+		if source != "all" && source != "sqlite" && source != "postgres" {
+			http.Error(w, "source must be one of: all, sqlite, postgres", http.StatusBadRequest)
 			return
 		}
-		defer rows.Close()
 
-		counts := map[string]int64{
-			"pending":    0,
-			"processing": 0,
-			"sent":       0,
-			"retry":      0,
-			"dead":       0,
-		}
-		var backlog int64
-		for rows.Next() {
-			var status string
-			var cnt int64
-			if err := rows.Scan(&status, &cnt); err != nil {
-				http.Error(w, "failed to query outbox status", http.StatusInternalServerError)
+		sources := map[string]outboxSourceStatus{}
+		if source == "all" || source == "sqlite" {
+			sqliteStatus, err := queryOutboxStatus(r.Context(), sqliteDB, "ingest_outbox")
+			if err != nil {
+				http.Error(w, "failed to query sqlite outbox status", http.StatusInternalServerError)
 				return
 			}
-			counts[status] = cnt
-			if status == "pending" || status == "retry" || status == "processing" {
-				backlog += cnt
+			if err := sqliteDB.QueryRowContext(r.Context(), `SELECT COUNT(*) FROM outbox_dead_letter`).Scan(&sqliteStatus.DeadLetterCount); err != nil {
+				http.Error(w, "failed to query sqlite outbox dead letter status", http.StatusInternalServerError)
+				return
+			}
+			sources["sqlite"] = sqliteStatus
+			if metrics != nil {
+				metrics.SetGauge("oracle_outbox_backlog_size", map[string]string{"source": "sqlite"}, float64(sqliteStatus.Backlog))
 			}
 		}
-		if err := rows.Err(); err != nil {
-			http.Error(w, "failed to query outbox status", http.StatusInternalServerError)
-			return
+		if source == "all" || source == "postgres" {
+			postgresStatus, err := queryOutboxStatus(r.Context(), postgresDB, "pg_outbox")
+			if err != nil {
+				http.Error(w, "failed to query postgres outbox status", http.StatusInternalServerError)
+				return
+			}
+			sources["postgres"] = postgresStatus
+			if metrics != nil {
+				metrics.SetGauge("oracle_outbox_backlog_size", map[string]string{"source": "postgres"}, float64(postgresStatus.Backlog))
+			}
 		}
 
-		var deadCount int64
-		if err := db.QueryRowContext(r.Context(), `SELECT COUNT(*) FROM outbox_dead_letter`).Scan(&deadCount); err != nil {
-			http.Error(w, "failed to query outbox status", http.StatusInternalServerError)
-			return
+		primarySource := source
+		if source == "all" {
+			primarySource = "sqlite"
+			if _, ok := sources["sqlite"]; !ok {
+				primarySource = "postgres"
+			}
 		}
-		metrics.SetGauge("oracle_outbox_backlog_size", map[string]string{"source": "sqlite"}, float64(backlog))
+		primaryStatus, ok := sources[primarySource]
+		if !ok {
+			primaryStatus = outboxSourceStatus{
+				CountsByStatus: map[string]int64{},
+				Backlog:        0,
+			}
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(outboxStatusResponse{
 			OK:              true,
-			CountsByStatus:  counts,
-			DeadLetterCount: deadCount,
+			Source:          source,
+			CountsByStatus:  primaryStatus.CountsByStatus,
+			DeadLetterCount: primaryStatus.DeadLetterCount,
+			Sources:         sources,
 		})
 	}
 }
 
-func RetryOutboxHandler(db *sql.DB, metrics *observability.Registry) http.HandlerFunc {
+func RetryOutboxHandler(sqliteDB, postgresDB *sql.DB, metrics *observability.Registry) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			w.WriteHeader(http.StatusMethodNotAllowed)
@@ -215,38 +278,82 @@ func RetryOutboxHandler(db *sql.DB, metrics *observability.Registry) http.Handle
 		}
 
 		type reqShape struct {
-			IDs []int64 `json:"ids"`
+			Source string  `json:"source"`
+			IDs    []int64 `json:"ids"`
 		}
 		var req reqShape
 		if err := decodeJSONBodyStrict(r, &req); err != nil && !errors.Is(err, io.EOF) {
 			http.Error(w, "invalid request body", http.StatusBadRequest)
 			return
 		}
+		req.Source = strings.ToLower(strings.TrimSpace(req.Source))
+		if req.Source == "" {
+			req.Source = "sqlite"
+		}
+		if req.Source != "sqlite" && req.Source != "postgres" {
+			http.Error(w, "source must be one of: sqlite, postgres", http.StatusBadRequest)
+			return
+		}
 
 		nowMs := time.Now().UnixMilli()
 		var res sql.Result
 		var err error
-		if len(req.IDs) == 0 {
-			res, err = db.ExecContext(
-				r.Context(),
-				`UPDATE ingest_outbox
+		resourceType := "ingest_outbox"
+		if req.Source == "sqlite" {
+			if sqliteDB == nil {
+				http.Error(w, "sqlite outbox is not configured", http.StatusServiceUnavailable)
+				return
+			}
+			if len(req.IDs) == 0 {
+				res, err = sqliteDB.ExecContext(
+					r.Context(),
+					`UPDATE ingest_outbox
 				 SET status = 'pending', next_run_at = ?, last_error = ''
 				 WHERE status IN ('retry', 'dead')`,
-				nowMs,
-			)
-		} else {
-			placeholders := make([]string, 0, len(req.IDs))
-			args := make([]any, 0, len(req.IDs)+1)
-			args = append(args, nowMs)
-			for _, id := range req.IDs {
-				placeholders = append(placeholders, "?")
-				args = append(args, id)
-			}
-			// #nosec G202 -- placeholders are generated in-process and ids are bound parameters.
-			q := `UPDATE ingest_outbox
+					nowMs,
+				)
+			} else {
+				placeholders := make([]string, 0, len(req.IDs))
+				args := make([]any, 0, len(req.IDs)+1)
+				args = append(args, nowMs)
+				for _, id := range req.IDs {
+					placeholders = append(placeholders, "?")
+					args = append(args, id)
+				}
+				// #nosec G202 -- placeholders are generated in-process and ids are bound parameters.
+				q := `UPDATE ingest_outbox
 					  SET status = 'pending', next_run_at = ?, last_error = ''
 					  WHERE status IN ('retry', 'dead') AND id IN (` + strings.Join(placeholders, ",") + `)`
-			res, err = db.ExecContext(r.Context(), q, args...)
+				res, err = sqliteDB.ExecContext(r.Context(), q, args...)
+			}
+		} else {
+			if postgresDB == nil {
+				http.Error(w, "postgres outbox is not configured", http.StatusServiceUnavailable)
+				return
+			}
+			resourceType = "pg_outbox"
+			if len(req.IDs) == 0 {
+				res, err = postgresDB.ExecContext(
+					r.Context(),
+					`UPDATE pg_outbox
+					 SET status = 'pending', next_run_at = $1, last_error = ''
+					 WHERE status IN ('retry', 'dead')`,
+					nowMs,
+				)
+			} else {
+				placeholders := make([]string, 0, len(req.IDs))
+				args := make([]any, 0, len(req.IDs)+1)
+				args = append(args, nowMs)
+				for i, id := range req.IDs {
+					placeholders = append(placeholders, fmt.Sprintf("$%d", i+2))
+					args = append(args, id)
+				}
+				// #nosec G202 -- placeholders are generated in-process and ids are bound parameters.
+				q := `UPDATE pg_outbox
+					  SET status = 'pending', next_run_at = $1, last_error = ''
+					  WHERE status IN ('retry', 'dead') AND id IN (` + strings.Join(placeholders, ",") + `)`
+				res, err = postgresDB.ExecContext(r.Context(), q, args...)
+			}
 		}
 		if err != nil {
 			http.Error(w, "failed to mark outbox rows for retry", http.StatusInternalServerError)
@@ -254,21 +361,23 @@ func RetryOutboxHandler(db *sql.DB, metrics *observability.Registry) http.Handle
 		}
 		affected, _ := res.RowsAffected()
 		if metrics != nil {
-			metrics.IncCounter("oracle_outbox_retry_total", nil, float64(affected))
+			metrics.IncCounter("oracle_outbox_retry_total", map[string]string{"source": req.Source}, float64(affected))
 		}
 
-		_ = AppendAuditLog(
-			r.Context(),
-			db,
-			"outbox_retry",
-			"ingest_outbox",
-			"bulk",
-			"ok",
-			map[string]any{"ids": req.IDs, "affected": affected},
-		)
+		if sqliteDB != nil {
+			_ = AppendAuditLog(
+				r.Context(),
+				sqliteDB,
+				"outbox_retry",
+				resourceType,
+				"bulk",
+				"ok",
+				map[string]any{"ids": req.IDs, "affected": affected, "source": req.Source},
+			)
+		}
 
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "affected": affected})
+		_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "affected": affected, "source": req.Source})
 	}
 }
 
