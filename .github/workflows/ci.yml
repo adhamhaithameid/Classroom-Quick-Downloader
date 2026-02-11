@@ -56,6 +56,27 @@ jobs:
     - name: Run Full Validation Suite
       run: ./tools/validate.sh
 
+  gosec:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24.13'
+
+    - name: Install gosec
+      run: go install github.com/securego/gosec/v2/cmd/gosec@v2.23.0
+
+    - name: Run gosec (triaged profile)
+      working-directory: oracle-backend
+      run: |
+        # G701 is excluded because gosec taint analysis currently reports broad false positives
+        # for static SQL with bound parameters in database/sql calls. See docs/security/gosec-triage.md.
+        "$(go env GOPATH)/bin/gosec" -exclude=G701 -track-suppressions ./...
+
   oracle-migration-smoke:
     runs-on: ubuntu-latest
     services:
