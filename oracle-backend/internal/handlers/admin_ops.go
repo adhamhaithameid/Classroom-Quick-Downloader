@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -217,7 +218,10 @@ func RetryOutboxHandler(db *sql.DB, metrics *observability.Registry) http.Handle
 			IDs []int64 `json:"ids"`
 		}
 		var req reqShape
-		_ = json.NewDecoder(r.Body).Decode(&req)
+		if err := decodeJSONBodyStrict(r, &req); err != nil && !errors.Is(err, io.EOF) {
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
 
 		nowMs := time.Now().UnixMilli()
 		var res sql.Result
@@ -1060,7 +1064,10 @@ func BackupRunHandler(db *sql.DB, metrics *observability.Registry) http.HandlerF
 			FileName string `json:"fileName"`
 		}
 		var req reqShape
-		_ = json.NewDecoder(r.Body).Decode(&req)
+		if err := decodeJSONBodyStrict(r, &req); err != nil && !errors.Is(err, io.EOF) {
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
 
 		baseName, err := backupFileNameOrDefault(req.FileName, time.Now())
 		if err != nil {
@@ -1405,6 +1412,8 @@ func clearScopeTables(scope string) ([]string, bool) {
 		return []string{"system_alerts"}, true
 	case "cf_snapshots_raw":
 		return []string{"cf_snapshots_raw"}, true
+	case "oracle_operation_logs":
+		return []string{"oracle_operation_logs"}, true
 	case "all_non_core":
 		return []string{
 			"pipeline_failure_logs",
@@ -1412,6 +1421,7 @@ func clearScopeTables(scope string) ([]string, bool) {
 			"outbox_dead_letter",
 			"system_alerts",
 			"cf_snapshots_raw",
+			"oracle_operation_logs",
 			"cf_schema_registry",
 			"backup_runs",
 		}, true
