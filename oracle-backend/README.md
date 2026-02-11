@@ -607,6 +607,52 @@ docker cp cqd-oracle-backend:/data/analytics.db ./backup-$(date +%Y%m%d).db
 
 We use **Uptime Kuma** for self-hosted infrastructure monitoring. It runs on the same Oracle VM as the backend, providing 24/7 uptime tracking and instant alerts when something goes wrong.
 
+## Oracle Hub v4 Admin APIs
+
+The dashboard now exposes dedicated control-plane APIs for creative/content operations,
+Postgres-backed record management, and deployment synchronization.
+
+### Outbox Reliability
+
+- `GET /api/admin/outbox/status?source=all|sqlite|postgres`
+- `POST /api/admin/outbox/retry` with optional JSON body:
+  - `{"source":"sqlite","ids":[1,2]}`
+  - `{"source":"postgres"}`
+- `POST /api/admin/outbox/replay-dead-letter` (SQLite dead-letter replay)
+
+### Management + Deployment Sync
+
+- `GET /api/admin/deployments/targets`
+- `POST /api/admin/deployments/sync`
+- `GET /api/admin/records/list?type=deployment_target`
+- `POST /api/admin/records/upsert`
+
+### Creative Hub
+
+- `GET /api/admin/creative/designs`
+- `POST /api/admin/creative/designs/upsert`
+- `POST /api/admin/creative/designs/delete`
+- `GET /api/admin/creative/emails`
+- `POST /api/admin/creative/emails/upsert`
+- `POST /api/admin/creative/emails/delete`
+
+### Newsletter APIs
+
+- `GET /api/admin/newsletter/subscribers`
+- `POST /api/admin/newsletter/subscribers/upsert`
+- `POST /api/admin/newsletter/subscribers/delete`
+- `GET /api/admin/newsletter/campaigns`
+- `POST /api/admin/newsletter/campaigns/upsert`
+- `POST /api/admin/newsletter/campaigns/delete`
+
+### Security Scan Script
+
+Run all backend checks locally:
+
+```bash
+./scripts/full-scan.sh
+```
+
 ### Tooling
 
 | Component | Details |
