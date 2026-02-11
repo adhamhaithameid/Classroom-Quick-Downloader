@@ -45,7 +45,7 @@
           radial-gradient(circle at 92% 0%, rgba(34,197,94,0.08) 0%, transparent 28%);
       }
 
-      .layout { display: flex; min-height: 100vh; }
+      .layout { display: flex; min-height: 100vh; width: 100%; overflow-x: clip; }
 
       /* Tooltip styles */
       [data-tooltip] {
@@ -173,10 +173,11 @@
         background: none;
         width: 100%;
         text-align: left;
-        margin-top: 15px;
+        margin-top: 6px;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        min-width: 0;
       }
 
       .nav-item:hover { background: var(--bg-tertiary); color: var(--text-primary); }
@@ -240,6 +241,8 @@
         align-items: center;
         flex-wrap: wrap;
         justify-content: flex-end;
+        min-width: 0;
+        max-width: 100%;
       }
 
       .btn {
@@ -256,6 +259,7 @@
         background: var(--bg-secondary);
         color: var(--text-primary);
         text-decoration: none;
+        white-space: nowrap;
       }
 
       .btn:hover { background: var(--bg-tertiary); transform: translateY(-1px); }
@@ -1180,10 +1184,44 @@
         gap: 12px;
       }
       .deployment-card {
-        border: 1px solid var(--border);
+        border: 1px solid var(--border-primary);
         border-radius: 10px;
         background: var(--bg-tertiary);
         padding: 12px;
+      }
+      .creative-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 12px;
+      }
+      .creative-card {
+        border: 1px solid var(--border-primary);
+        border-radius: 12px;
+        background: linear-gradient(180deg, rgba(24,24,27,0.92), rgba(39,39,42,0.92));
+        padding: 12px;
+        display: grid;
+        gap: 8px;
+      }
+      .creative-card h4 {
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .creative-meta {
+        font-size: 11px;
+        color: var(--text-muted);
+      }
+      .pill-row {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      .pill {
+        border: 1px solid var(--border-secondary);
+        border-radius: 999px;
+        padding: 2px 8px;
+        font-size: 11px;
+        color: var(--text-secondary);
+        background: rgba(255,255,255,0.03);
       }
       .form-grid { display: grid; gap: 10px; }
       .calendar-grid-wrap { min-height: 220px; }
@@ -1247,9 +1285,12 @@
       [data-shortcut] {
         position: relative;
       }
-      body.show-shortcut-hints [data-shortcut]::after {
+      [data-shortcut]::after {
         content: attr(data-shortcut);
-        margin-left: 8px;
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
         font-family: "SF Mono", Monaco, Consolas, monospace;
         font-size: 10px;
         color: #bfdbfe;
@@ -1258,11 +1299,15 @@
         padding: 2px 6px;
         background: rgba(59,130,246,0.2);
         white-space: nowrap;
-        vertical-align: middle;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.15s ease;
       }
-      body.show-shortcut-hints .nav-item {
-        overflow: visible;
-        text-overflow: clip;
+      body.show-shortcut-hints [data-shortcut] {
+        padding-right: 52px;
+      }
+      body.show-shortcut-hints [data-shortcut]::after {
+        opacity: 1;
       }
 
       .auth-error {
@@ -1335,21 +1380,28 @@
               </svg>
               Versions
             </button>
-            <button class="nav-item" data-page="notifications" data-shortcut="⌘7" onclick="showPage('notifications')"
+            <button class="nav-item" data-page="creative" data-shortcut="⌘7" onclick="showPage('creative')"
+              data-tooltip="Design, email templates, and newsletter management" data-tooltip-position="bottom">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 113 3L7 19l-4 1 1-4z"/>
+              </svg>
+              Creative Hub
+            </button>
+            <button class="nav-item" data-page="notifications" data-shortcut="⌘8" onclick="showPage('notifications')"
               data-tooltip="GitHub issues and PR monitoring" data-tooltip-position="bottom">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M18 8a6 6 0 10-12 0c0 7-3 7-3 7h18s-3 0-3-7"/><path d="M13.73 21a2 2 0 01-3.46 0"/>
               </svg>
               Notifications
             </button>
-            <button class="nav-item" data-page="logs" data-shortcut="⌘8" onclick="showPage('logs')"
+            <button class="nav-item" data-page="logs" data-shortcut="⌘9" onclick="showPage('logs')"
               data-tooltip="Oracle backend request and admin operation logs" data-tooltip-position="bottom">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M3 4h18v16H3z"/><path d="M7 8h10"/><path d="M7 12h10"/><path d="M7 16h6"/>
               </svg>
               Logs
             </button>
-            <button class="nav-item" data-page="danger" data-shortcut="⌘9" onclick="showPage('danger')"
+            <button class="nav-item" data-page="danger" data-shortcut="⌘0" onclick="showPage('danger')"
               data-tooltip="Critical administrative operations" data-tooltip-position="bottom">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
@@ -1776,9 +1828,15 @@
                   <div class="card-title">Browser Deployments</div>
                   <div class="card-subtitle">Store users, current version, and dashboard links</div>
                 </div>
+                <div>
+                  <button class="btn btn-secondary" onclick="syncDeploymentTargets()">Sync Browser Stores</button>
+                </div>
               </div>
               <div class="card-body">
                 <div id="deployment-cards" class="deployment-grid"></div>
+              </div>
+              <div class="card-body" style="border-top: 1px solid var(--border-primary);">
+                <pre id="deployment-sync-output" class="json-viewer" style="max-height: 220px; overflow:auto;">{}</pre>
               </div>
             </div>
             <div class="card">
@@ -1810,6 +1868,97 @@
                   <button class="btn" type="submit">Save Version Note</button>
                 </form>
                 <div id="version-list" style="margin-top: 14px;"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- CREATIVE PAGE -->
+          <div class="page" id="page-creative">
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <div class="card-title">Figma Designs</div>
+                  <div class="card-subtitle">Card-based design registry with links and notes</div>
+                </div>
+              </div>
+              <div class="card-body">
+                <form class="form-grid" onsubmit="saveCreativeDesign(event)">
+                  <div class="creative-grid">
+                    <input id="design-key" class="auth-input" placeholder="Design key (e.g., landing-v2)" required />
+                    <input id="design-title" class="auth-input" placeholder="Title" required />
+                    <input id="design-url" class="auth-input" placeholder="Figma URL" required />
+                    <input id="design-thumb-url" class="auth-input" placeholder="Preview image URL (optional)" />
+                    <input id="design-version" class="auth-input" placeholder="Version (optional)" />
+                    <input id="design-tags" class="auth-input" placeholder="Tags (comma-separated)" />
+                  </div>
+                  <textarea id="design-description" class="auth-input" style="min-height: 90px;" placeholder="Description"></textarea>
+                  <button class="btn" type="submit">Save Design</button>
+                </form>
+                <div id="creative-designs-list" class="creative-grid" style="margin-top: 14px;"></div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <div class="card-title">HTML Email Templates</div>
+                  <div class="card-subtitle">Versioned templates for release and newsletter communication</div>
+                </div>
+              </div>
+              <div class="card-body">
+                <form class="form-grid" onsubmit="saveCreativeEmailTemplate(event)">
+                  <div class="creative-grid">
+                    <input id="email-template-key" class="auth-input" placeholder="Template key (e.g., release-5-7-0)" required />
+                    <input id="email-template-title" class="auth-input" placeholder="Template title" required />
+                    <input id="email-template-version" class="auth-input" placeholder="Extension version" />
+                    <input id="email-template-subject" class="auth-input" placeholder="Email subject" />
+                    <input id="email-template-scheduled-at" class="auth-input" placeholder="Scheduled UTC (ISO string)" />
+                  </div>
+                  <textarea id="email-template-html" class="auth-input" style="min-height: 160px;" placeholder="HTML content" required></textarea>
+                  <button class="btn" type="submit">Save Email Template</button>
+                </form>
+                <div id="creative-email-list" class="creative-grid" style="margin-top: 14px;"></div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <div class="card-title">Newsletter Management</div>
+                  <div class="card-subtitle">Subscribers and campaign database</div>
+                </div>
+              </div>
+              <div class="card-body">
+                <div class="creative-grid">
+                  <form class="form-grid" onsubmit="saveNewsletterSubscriber(event)">
+                    <input id="newsletter-email" class="auth-input" placeholder="Subscriber email" required />
+                    <input id="newsletter-name" class="auth-input" placeholder="Subscriber name (optional)" />
+                    <select id="newsletter-status" class="auth-input">
+                      <option value="active">Active</option>
+                      <option value="paused">Paused</option>
+                      <option value="unsubscribed">Unsubscribed</option>
+                    </select>
+                    <button class="btn" type="submit">Add/Update Subscriber</button>
+                  </form>
+                  <form class="form-grid" onsubmit="saveNewsletterCampaign(event)">
+                    <input id="newsletter-campaign-key" class="auth-input" placeholder="Campaign key (e.g., v5-7-launch)" required />
+                    <input id="newsletter-campaign-title" class="auth-input" placeholder="Campaign title" required />
+                    <input id="newsletter-campaign-version" class="auth-input" placeholder="Version (optional)" />
+                    <input id="newsletter-campaign-send-at" class="auth-input" placeholder="Send at UTC (ISO string)" />
+                    <textarea id="newsletter-campaign-notes" class="auth-input" style="min-height: 90px;" placeholder="Campaign notes"></textarea>
+                    <button class="btn" type="submit">Save Campaign</button>
+                  </form>
+                </div>
+                <div class="creative-grid" style="margin-top: 14px;">
+                  <div>
+                    <h4 style="font-size:13px; margin-bottom:8px;">Subscribers</h4>
+                    <div id="newsletter-subscribers-list" class="creative-grid"></div>
+                  </div>
+                  <div>
+                    <h4 style="font-size:13px; margin-bottom:8px;">Campaigns</h4>
+                    <div id="newsletter-campaigns-list" class="creative-grid"></div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -2321,6 +2470,7 @@
           dashboards: 'Dashboards',
           deployments: 'Deployments',
           versions: 'Versions',
+          creative: 'Creative Hub',
           notifications: 'Notifications',
           logs: 'Logs',
           danger: 'Danger Zone'
@@ -2330,6 +2480,7 @@
         if (page === 'charts') loadCharts();
         if (page === 'deployments') loadDeploymentsHub();
         if (page === 'versions') loadVersionHub();
+        if (page === 'creative') loadCreativeHub();
         if (page === 'notifications') loadNotifications();
         if (page === 'logs') loadOracleLogs();
       }
@@ -2963,35 +3114,59 @@
       async function loadDeploymentsHub() {
         var container = document.getElementById('deployment-cards');
         if (!container) return;
-        var defaults = [
-          { key: 'chrome', name: 'Chrome', users: '', version: '', url: 'https://chrome.google.com/webstore/' },
-          { key: 'firefox', name: 'Firefox', users: '', version: '', url: 'https://addons.mozilla.org/' },
-          { key: 'edge', name: 'Edge', users: '', version: '', url: 'https://microsoftedge.microsoft.com/addons/' }
-        ];
-        var saved = {};
+        var targets = [];
         try {
-          var payload = await fetchJSON('/api/admin/records/list?type=deployment_target');
-          (payload.records || []).forEach(function(item) {
-            saved[item.recordKey] = item.data || {};
-          });
-        } catch (_) {
-          try { saved = JSON.parse(localStorage.getItem('oracleDeployments') || '{}'); } catch (_err) { saved = {}; }
+          var payload = await fetchJSON('/api/admin/deployments/targets');
+          targets = payload.targets || [];
+        } catch (e) {
+          container.innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed to load deployment targets</div>';
+          setDeploymentSyncOutput({ ok: false, error: String(e) });
+          return;
         }
-
         var html = '';
-        defaults.forEach(function(item) {
-          var v = saved[item.key] || {};
+        targets.forEach(function(item) {
+          var key = item.recordKey;
+          var v = item.data || {};
+          var statusBadge = '';
+          if (v.syncStatus === 'ok') statusBadge = '<span class="pill">Synced</span>';
+          if (v.syncStatus === 'error') statusBadge = '<span class="pill" style="border-color:rgba(239,68,68,0.55);color:#fecaca;">Sync Error</span>';
           html += '<div class="deployment-card">';
-          html += '<div style="font-weight:600;margin-bottom:8px;">' + item.name + '</div>';
+          html += '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;">';
+          html += '<div style="font-weight:600;">' + escapeHtml(v.name || key) + '</div>';
+          html += statusBadge;
+          html += '</div>';
           html += '<div style="display:grid;gap:8px;">';
-          html += '<input class="auth-input" id="dep-users-' + item.key + '" placeholder="Users" value="' + escapeHtml(v.users || item.users) + '"/>';
-          html += '<input class="auth-input" id="dep-version-' + item.key + '" placeholder="Current version" value="' + escapeHtml(v.version || item.version) + '"/>';
-          html += '<input class="auth-input" id="dep-url-' + item.key + '" placeholder="Dashboard URL" value="' + escapeHtml(v.url || item.url) + '"/>';
-          html += '<button class="btn btn-secondary" onclick="saveDeploymentCard(\'' + item.key + '\')">Save</button>';
+          html += '<input class="auth-input" id="dep-users-' + key + '" placeholder="Users" value="' + escapeHtml(v.users || '') + '"/>';
+          html += '<input class="auth-input" id="dep-version-' + key + '" placeholder="Current version" value="' + escapeHtml(v.version || '') + '"/>';
+          html += '<input class="auth-input" id="dep-url-' + key + '" placeholder="Store dashboard URL" value="' + escapeHtml(v.url || '') + '"/>';
+          html += '<div class="pill-row"><span class="pill">UsersCount: ' + fmtNumber(Number(v.usersCount || 0)) + '</span><span class="pill">Latency: ' + fmtNumber(Number(v.syncLatencyMs || 0)) + 'ms</span></div>';
+          html += '<button class="btn btn-secondary" onclick="saveDeploymentCard(\'' + key + '\')">Save</button>';
           html += '</div></div>';
         });
         container.innerHTML = html;
         renderUpdateSentenceList();
+      }
+
+      function setDeploymentSyncOutput(payload) {
+        var out = document.getElementById('deployment-sync-output');
+        if (!out) return;
+        out.textContent = JSON.stringify(payload || {}, null, 2);
+      }
+
+      async function syncDeploymentTargets() {
+        var ok = await ensureStepUp();
+        if (!ok) return;
+        try {
+          var data = await fetchJSONWithInit('/api/admin/deployments/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+          });
+          setDeploymentSyncOutput(data);
+          await loadDeploymentsHub();
+        } catch (e) {
+          setDeploymentSyncOutput({ ok: false, error: String(e) });
+        }
       }
 
       async function saveDeploymentCard(key) {
@@ -3008,11 +3183,10 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ recordType: 'deployment_target', recordKey: key, data: record })
           });
-        } catch (_) {
-          var fallback = {};
-          try { fallback = JSON.parse(localStorage.getItem('oracleDeployments') || '{}'); } catch (_err) { fallback = {}; }
-          fallback[key] = record;
-          localStorage.setItem('oracleDeployments', JSON.stringify(fallback));
+          setDeploymentSyncOutput({ ok: true, action: 'manual_update', key: key });
+          await loadDeploymentsHub();
+        } catch (e) {
+          setDeploymentSyncOutput({ ok: false, error: String(e) });
         }
       }
 
@@ -3110,6 +3284,301 @@
         document.getElementById('version-input').value = '';
         document.getElementById('version-note-input').value = '';
         await loadVersionHub();
+      }
+
+      function creativeTimestampLabel(ts) {
+        if (!ts) return 'n/a';
+        try {
+          return new Date(Number(ts)).toLocaleString('en-US', { timeZone: 'UTC' }) + ' UTC';
+        } catch (_) {
+          return 'n/a';
+        }
+      }
+
+      function normalizeKey(input, fallbackPrefix) {
+        var v = (input || '').trim().toLowerCase().replace(/[^a-z0-9._-]+/g, '-');
+        if (!v) v = fallbackPrefix + '-' + Date.now();
+        return v;
+      }
+
+      async function loadCreativeHub() {
+        await loadCreativeDesigns();
+        await loadCreativeEmails();
+        await loadNewsletterSubscribers();
+        await loadNewsletterCampaigns();
+      }
+
+      async function loadCreativeDesigns() {
+        var container = document.getElementById('creative-designs-list');
+        if (!container) return;
+        try {
+          var payload = await fetchJSON('/api/admin/creative/designs');
+          var records = payload.records || [];
+          if (!records.length) {
+            container.innerHTML = '<div class="empty-state">No designs saved yet</div>';
+            return;
+          }
+          var html = '';
+          records.forEach(function(item) {
+            var d = item.data || {};
+            var tags = Array.isArray(d.tags) ? d.tags : [];
+            html += '<div class="creative-card">';
+            html += '<h4>' + escapeHtml(d.title || item.recordKey) + '</h4>';
+            html += '<div class="creative-meta">Key: ' + escapeHtml(item.recordKey) + '</div>';
+            html += '<div class="creative-meta">Version: ' + escapeHtml(d.version || 'n/a') + '</div>';
+            html += '<div style="font-size:12px;white-space:pre-wrap;">' + escapeHtml(d.description || '') + '</div>';
+            if (d.thumbUrl) {
+              html += '<a href="' + escapeHtml(d.thumbUrl) + '" target="_blank" class="creative-meta">Preview image</a>';
+            }
+            if (d.url) {
+              html += '<a href="' + escapeHtml(d.url) + '" target="_blank" class="btn btn-secondary">Open Design</a>';
+            }
+            if (tags.length) {
+              html += '<div class="pill-row">' + tags.map(function(tag) {
+                return '<span class="pill">' + escapeHtml(String(tag)) + '</span>';
+              }).join('') + '</div>';
+            }
+            html += '<div class="creative-meta">Updated: ' + escapeHtml(creativeTimestampLabel(item.updatedAt)) + '</div>';
+            html += '<button class="btn" style="background:#7f1d1d;" onclick="deleteCreativeDesign(' + JSON.stringify(item.recordKey).replace(/"/g, '&quot;') + ')">Delete</button>';
+            html += '</div>';
+          });
+          container.innerHTML = html;
+        } catch (e) {
+          container.innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed to load designs</div>';
+        }
+      }
+
+      async function saveCreativeDesign(e) {
+        e.preventDefault();
+        var key = normalizeKey(document.getElementById('design-key').value, 'design');
+        var data = {
+          title: (document.getElementById('design-title').value || '').trim(),
+          url: (document.getElementById('design-url').value || '').trim(),
+          thumbUrl: (document.getElementById('design-thumb-url').value || '').trim(),
+          version: (document.getElementById('design-version').value || '').trim(),
+          description: (document.getElementById('design-description').value || '').trim(),
+          tags: (document.getElementById('design-tags').value || '').split(',').map(function(v) { return v.trim(); }).filter(Boolean),
+          updatedAt: Date.now()
+        };
+        if (!data.title || !data.url) return;
+        var ok = await ensureStepUp();
+        if (!ok) return;
+        try {
+          await fetchJSONWithInit('/api/admin/creative/designs/upsert', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ recordKey: key, data: data })
+          });
+          await loadCreativeDesigns();
+        } catch (_) {}
+      }
+
+      async function deleteCreativeDesign(key) {
+        var ok = await ensureStepUp();
+        if (!ok) return;
+        if (!window.confirm('Delete design "' + key + '"?')) return;
+        try {
+          await fetchJSONWithInit('/api/admin/creative/designs/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ recordKey: key })
+          });
+          await loadCreativeDesigns();
+        } catch (_) {}
+      }
+
+      async function loadCreativeEmails() {
+        var container = document.getElementById('creative-email-list');
+        if (!container) return;
+        try {
+          var payload = await fetchJSON('/api/admin/creative/emails');
+          var records = payload.records || [];
+          if (!records.length) {
+            container.innerHTML = '<div class="empty-state">No email templates yet</div>';
+            return;
+          }
+          var html = '';
+          records.forEach(function(item) {
+            var d = item.data || {};
+            var htmlBody = String(d.html || '');
+            html += '<div class="creative-card">';
+            html += '<h4>' + escapeHtml(d.title || item.recordKey) + '</h4>';
+            html += '<div class="creative-meta">Subject: ' + escapeHtml(d.subject || 'n/a') + '</div>';
+            html += '<div class="pill-row"><span class="pill">Version: ' + escapeHtml(d.version || 'n/a') + '</span><span class="pill">Schedule: ' + escapeHtml(d.scheduledAt || 'manual') + '</span></div>';
+            html += '<div style="font-size:12px;white-space:pre-wrap;max-height:120px;overflow:auto;">' + escapeHtml(htmlBody.slice(0, 800)) + '</div>';
+            html += '<div style="display:flex;gap:8px;flex-wrap:wrap;">';
+            html += '<button class="btn btn-secondary" onclick="copyText(' + JSON.stringify(htmlBody).replace(/"/g, '&quot;') + ')">Copy HTML</button>';
+            html += '<button class="btn" style="background:#7f1d1d;" onclick="deleteCreativeEmailTemplate(' + JSON.stringify(item.recordKey).replace(/"/g, '&quot;') + ')">Delete</button>';
+            html += '</div></div>';
+          });
+          container.innerHTML = html;
+        } catch (e) {
+          container.innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed to load email templates</div>';
+        }
+      }
+
+      async function saveCreativeEmailTemplate(e) {
+        e.preventDefault();
+        var key = normalizeKey(document.getElementById('email-template-key').value, 'email-template');
+        var htmlBody = (document.getElementById('email-template-html').value || '').trim();
+        if (!htmlBody) return;
+        var data = {
+          title: (document.getElementById('email-template-title').value || '').trim(),
+          version: (document.getElementById('email-template-version').value || '').trim(),
+          subject: (document.getElementById('email-template-subject').value || '').trim(),
+          scheduledAt: (document.getElementById('email-template-scheduled-at').value || '').trim(),
+          html: htmlBody,
+          updatedAt: Date.now()
+        };
+        var ok = await ensureStepUp();
+        if (!ok) return;
+        try {
+          await fetchJSONWithInit('/api/admin/creative/emails/upsert', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ recordKey: key, data: data })
+          });
+          await loadCreativeEmails();
+        } catch (_) {}
+      }
+
+      async function deleteCreativeEmailTemplate(key) {
+        var ok = await ensureStepUp();
+        if (!ok) return;
+        if (!window.confirm('Delete email template "' + key + '"?')) return;
+        try {
+          await fetchJSONWithInit('/api/admin/creative/emails/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ recordKey: key })
+          });
+          await loadCreativeEmails();
+        } catch (_) {}
+      }
+
+      async function loadNewsletterSubscribers() {
+        var container = document.getElementById('newsletter-subscribers-list');
+        if (!container) return;
+        try {
+          var payload = await fetchJSON('/api/admin/newsletter/subscribers');
+          var records = payload.records || [];
+          if (!records.length) {
+            container.innerHTML = '<div class="empty-state">No subscribers yet</div>';
+            return;
+          }
+          var html = '';
+          records.forEach(function(item) {
+            var d = item.data || {};
+            html += '<div class="creative-card">';
+            html += '<h4>' + escapeHtml(d.email || item.recordKey) + '</h4>';
+            html += '<div class="creative-meta">Name: ' + escapeHtml(d.name || 'n/a') + '</div>';
+            html += '<div class="pill-row"><span class="pill">Status: ' + escapeHtml(d.status || 'active') + '</span></div>';
+            html += '<button class="btn" style="background:#7f1d1d;" onclick="deleteNewsletterSubscriber(' + JSON.stringify(item.recordKey).replace(/"/g, '&quot;') + ')">Delete</button>';
+            html += '</div>';
+          });
+          container.innerHTML = html;
+        } catch (e) {
+          container.innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed to load subscribers</div>';
+        }
+      }
+
+      async function saveNewsletterSubscriber(e) {
+        e.preventDefault();
+        var email = (document.getElementById('newsletter-email').value || '').trim();
+        if (!email) return;
+        var data = {
+          email: email,
+          name: (document.getElementById('newsletter-name').value || '').trim(),
+          status: (document.getElementById('newsletter-status').value || 'active').trim(),
+          updatedAt: Date.now()
+        };
+        var ok = await ensureStepUp();
+        if (!ok) return;
+        try {
+          await fetchJSONWithInit('/api/admin/newsletter/subscribers/upsert', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ data: data })
+          });
+          await loadNewsletterSubscribers();
+        } catch (_) {}
+      }
+
+      async function deleteNewsletterSubscriber(key) {
+        var ok = await ensureStepUp();
+        if (!ok) return;
+        if (!window.confirm('Delete subscriber "' + key + '"?')) return;
+        try {
+          await fetchJSONWithInit('/api/admin/newsletter/subscribers/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ recordKey: key })
+          });
+          await loadNewsletterSubscribers();
+        } catch (_) {}
+      }
+
+      async function loadNewsletterCampaigns() {
+        var container = document.getElementById('newsletter-campaigns-list');
+        if (!container) return;
+        try {
+          var payload = await fetchJSON('/api/admin/newsletter/campaigns');
+          var records = payload.records || [];
+          if (!records.length) {
+            container.innerHTML = '<div class="empty-state">No campaigns yet</div>';
+            return;
+          }
+          var html = '';
+          records.forEach(function(item) {
+            var d = item.data || {};
+            html += '<div class="creative-card">';
+            html += '<h4>' + escapeHtml(d.title || item.recordKey) + '</h4>';
+            html += '<div class="pill-row"><span class="pill">Version: ' + escapeHtml(d.version || 'n/a') + '</span><span class="pill">Send: ' + escapeHtml(d.sendAt || 'manual') + '</span></div>';
+            html += '<div style="font-size:12px;white-space:pre-wrap;">' + escapeHtml(d.notes || '') + '</div>';
+            html += '<button class="btn" style="background:#7f1d1d;" onclick="deleteNewsletterCampaign(' + JSON.stringify(item.recordKey).replace(/"/g, '&quot;') + ')">Delete</button>';
+            html += '</div>';
+          });
+          container.innerHTML = html;
+        } catch (e) {
+          container.innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed to load campaigns</div>';
+        }
+      }
+
+      async function saveNewsletterCampaign(e) {
+        e.preventDefault();
+        var key = normalizeKey(document.getElementById('newsletter-campaign-key').value, 'campaign');
+        var data = {
+          title: (document.getElementById('newsletter-campaign-title').value || '').trim(),
+          version: (document.getElementById('newsletter-campaign-version').value || '').trim(),
+          sendAt: (document.getElementById('newsletter-campaign-send-at').value || '').trim(),
+          notes: (document.getElementById('newsletter-campaign-notes').value || '').trim(),
+          updatedAt: Date.now()
+        };
+        if (!data.title) return;
+        var ok = await ensureStepUp();
+        if (!ok) return;
+        try {
+          await fetchJSONWithInit('/api/admin/newsletter/campaigns/upsert', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ recordKey: key, data: data })
+          });
+          await loadNewsletterCampaigns();
+        } catch (_) {}
+      }
+
+      async function deleteNewsletterCampaign(key) {
+        var ok = await ensureStepUp();
+        if (!ok) return;
+        if (!window.confirm('Delete campaign "' + key + '"?')) return;
+        try {
+          await fetchJSONWithInit('/api/admin/newsletter/campaigns/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ recordKey: key })
+          });
+          await loadNewsletterCampaigns();
+        } catch (_) {}
       }
 
       async function loadNotifications() {
@@ -3349,9 +3818,10 @@
         { combo: '⌘4', desc: 'Go to Dashboards', run: function() { showPage('dashboards'); } },
         { combo: '⌘5', desc: 'Go to Deployments', run: function() { showPage('deployments'); } },
         { combo: '⌘6', desc: 'Go to Versions', run: function() { showPage('versions'); } },
-        { combo: '⌘7', desc: 'Go to Notifications', run: function() { showPage('notifications'); } },
-        { combo: '⌘8', desc: 'Go to Logs', run: function() { showPage('logs'); } },
-        { combo: '⌘9', desc: 'Go to Danger Zone', run: function() { showPage('danger'); } },
+        { combo: '⌘7', desc: 'Go to Creative Hub', run: function() { showPage('creative'); } },
+        { combo: '⌘8', desc: 'Go to Notifications', run: function() { showPage('notifications'); } },
+        { combo: '⌘9', desc: 'Go to Logs', run: function() { showPage('logs'); } },
+        { combo: '⌘0', desc: 'Go to Danger Zone', run: function() { showPage('danger'); } },
         { combo: '⌘R', desc: 'Refresh all data', run: function() { refreshAll(); } },
         { combo: '⌘B', desc: 'Open last batch modal', run: function() { showBatchModal(); } },
         { combo: '⌘⇧S', desc: 'Open step-up prompt', run: function() { openStepUpPrompt(); } },
@@ -3421,9 +3891,10 @@
         if (!withShift && key === '4') { showPage('dashboards'); return true; }
         if (!withShift && key === '5') { showPage('deployments'); return true; }
         if (!withShift && key === '6') { showPage('versions'); return true; }
-        if (!withShift && key === '7') { showPage('notifications'); return true; }
-        if (!withShift && key === '8') { showPage('logs'); return true; }
-        if (!withShift && key === '9') { showPage('danger'); return true; }
+        if (!withShift && key === '7') { showPage('creative'); return true; }
+        if (!withShift && key === '8') { showPage('notifications'); return true; }
+        if (!withShift && key === '9') { showPage('logs'); return true; }
+        if (!withShift && key === '0') { showPage('danger'); return true; }
         if (!withShift && key === 'r') { refreshAll(); return true; }
         if (!withShift && key === 'b') { showBatchModal(); return true; }
         if (withShift && key === 's') { openStepUpPrompt(); return true; }
@@ -3448,6 +3919,7 @@
         }
         if (currentPage === 'deployments') loadDeploymentsHub();
         if (currentPage === 'versions') loadVersionHub();
+        if (currentPage === 'creative') await loadCreativeHub();
         if (currentPage === 'notifications') await loadNotifications();
         if (currentPage === 'logs') await loadOracleLogs();
 
