@@ -27,16 +27,19 @@ type SQLiteToPostgresRelay struct {
 	lastSuccess time.Time
 	startedAt   time.Time
 	ownerID     string
+	writeFn     func(context.Context, string, string, string) error
 }
 
 func NewSQLiteToPostgresRelay(sqlite *sql.DB, postgres *sql.DB, metrics *observability.Registry) *SQLiteToPostgresRelay {
-	return &SQLiteToPostgresRelay{
+	relay := &SQLiteToPostgresRelay{
 		sqlite:    sqlite,
 		postgres:  postgres,
 		metrics:   metrics,
 		startedAt: time.Now(),
 		ownerID:   fmt.Sprintf("relay-%d", time.Now().UnixNano()),
 	}
+	relay.writeFn = relay.writeToPostgres
+	return relay
 }
 
 func (r *SQLiteToPostgresRelay) Start(ctx context.Context) {
@@ -134,9 +137,9 @@ func (r *SQLiteToPostgresRelay) runOnce(ctx context.Context) error {
 	}
 
 	duration := time.Since(start).Seconds()
-	r.metrics.SetGauge("oracle_sync_duration_seconds", map[string]string{"endpoint": "ingest_outbox"}, duration)
+	r.setGauge("oracle_sync_duration_seconds", map[string]string{"endpoint": "ingest_outbox"}, duration)
 	if !r.lastSuccess.IsZero() {
-		r.metrics.SetGauge(
+		r.setGauge(
 			"oracle_sync_last_success_timestamp_seconds",
 			map[string]string{"endpoint": "ingest_outbox"},
 			float64(r.lastSuccess.Unix()),
@@ -176,7 +179,11 @@ func (r *SQLiteToPostgresRelay) processItem(ctx context.Context, item struct {
 		return false, tx.Commit()
 	}
 
-	if err := r.writeToPostgres(ctx, item.EventType, item.PayloadJSON, item.IdempotencyKey); err != nil {
+	writeFn := r.writeFn
+	if writeFn == nil {
+		writeFn = r.writeToPostgres
+	}
+	if err := writeFn(ctx, item.EventType, item.PayloadJSON, item.IdempotencyKey); err != nil {
 		nextAttempts := item.Attempts + 1
 		nextRunAt := time.Now().Add(backoffForAttempts(nextAttempts)).UnixMilli()
 		status := "retry"
@@ -210,7 +217,7 @@ func (r *SQLiteToPostgresRelay) processItem(ctx context.Context, item struct {
 		); upErr != nil {
 			return false, upErr
 		}
-		r.metrics.IncCounter("oracle_outbox_retry_total", nil, 1)
+		r.incCounter("oracle_outbox_retry_total", nil, 1)
 		return false, tx.Commit()
 	}
 
@@ -252,7 +259,7 @@ func (r *SQLiteToPostgresRelay) updateBacklogMetrics(ctx context.Context) error 
 	).Scan(&backlog); err != nil {
 		return err
 	}
-	r.metrics.SetGauge("oracle_outbox_backlog_size", map[string]string{"source": "sqlite"}, float64(backlog))
+	r.setGauge("oracle_outbox_backlog_size", map[string]string{"source": "sqlite"}, float64(backlog))
 	if backlog > backlogAlertThreshold {
 		return upsertOpenAlert(
 			ctx,
@@ -264,6 +271,20 @@ func (r *SQLiteToPostgresRelay) updateBacklogMetrics(ctx context.Context) error 
 		)
 	}
 	return nil
+}
+
+func (r *SQLiteToPostgresRelay) setGauge(name string, labels map[string]string, value float64) {
+	if r == nil || r.metrics == nil {
+		return
+	}
+	r.metrics.SetGauge(name, labels, value)
+}
+
+func (r *SQLiteToPostgresRelay) incCounter(name string, labels map[string]string, delta float64) {
+	if r == nil || r.metrics == nil {
+		return
+	}
+	r.metrics.IncCounter(name, labels, delta)
 }
 
 func (r *SQLiteToPostgresRelay) checkNoSyncAlert(ctx context.Context) {
