@@ -2,12 +2,14 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"log"
 	"net"
 	"net/http"
@@ -22,14 +24,19 @@ import (
 
 	"oracle-backend/internal/db"
 	"oracle-backend/internal/handlers"
+	"oracle-backend/internal/observability"
+	"oracle-backend/internal/relay"
 )
+
+var appMetrics = observability.NewRegistry()
 
 func main() {
 	addr := getenv("ADDR", ":8080")
 	dbPath := getenv("DB_PATH", "./data/analytics.db")
 	staticDir := getenv("STATIC_DIR", "./static")
 	doSecret := os.Getenv("DO_SHARED_SECRET")
-	dashboardPassword := os.Getenv("DASHBOARD_PASSWORD")
+	dashboardPassword := getenv("DASHBOARD_PASSWORD", "SuperDuperFuckenSecretPassword10/02/2026")
+	superAdminPassword := getenv("SUPER_ADMIN_PASSWORD", "SuperDuperFuckenAdminSecretPassword11/02/2026")
 	archiverSecret := os.Getenv("ARCHIVER_SHARED_SECRET")
 	allowLoopbackBypass := os.Getenv("ALLOW_LOOPBACK_BYPASS") == "true"
 	allowEmptyDashboardPassword := os.Getenv("ALLOW_EMPTY_DASHBOARD_PASSWORD") == "true"
@@ -40,6 +47,12 @@ func main() {
 
 	if doSecret == "" {
 		log.Println("[WARN] DO_SHARED_SECRET is empty – /ingest-batch will reject requests")
+	}
+	if os.Getenv("DASHBOARD_PASSWORD") == "" {
+		log.Println("[WARN] using built-in DASHBOARD_PASSWORD default; set DASHBOARD_PASSWORD in production")
+	}
+	if os.Getenv("SUPER_ADMIN_PASSWORD") == "" {
+		log.Println("[WARN] using built-in SUPER_ADMIN_PASSWORD default; set SUPER_ADMIN_PASSWORD in production")
 	}
 
 	if dashboardPassword == "" && !allowEmptyDashboardPassword {
@@ -74,6 +87,21 @@ func main() {
 	}
 	defer sqlDB.Close()
 
+	postgresDSN := os.Getenv("POSTGRES_DSN")
+	var postgresDB *sql.DB
+	var postgresMigrationErr string
+	if postgresDSN != "" {
+		pgDB, pgErr := db.InitPostgres(postgresDSN)
+		if pgErr != nil {
+			postgresMigrationErr = pgErr.Error()
+			log.Printf("[WARN] failed to init postgres: %v", pgErr)
+		} else {
+			postgresDB = pgDB
+			defer postgresDB.Close()
+			log.Printf("[INFO] postgres initialized for projection relay")
+		}
+	}
+
 	mux := http.NewServeMux()
 
 	// Health endpoints.
@@ -90,6 +118,7 @@ func main() {
 
 	// Analytics API endpoints (protected by auth when DASHBOARD_PASSWORD is set).
 	authMiddleware := requireAuth(dashboardPassword, archiverSecret, allowLoopbackBypass)
+	criticalMiddleware := requireStepUp(sqlDB, superAdminPassword)
 	mux.Handle("/api/stats/summary", authMiddleware(handlers.SummaryHandler(sqlDB)))
 	mux.Handle("/api/stats/timeseries", authMiddleware(handlers.TimeSeriesHandler(sqlDB)))
 	mux.Handle("/api/stats/breakdown", authMiddleware(handlers.BreakdownHandler(sqlDB)))
@@ -98,11 +127,30 @@ func main() {
 	mux.Handle("/api/deploy-status", authMiddleware(handlers.DeployStatusHandler()))
 	mux.Handle("/api/pipeline/metrics", authMiddleware(handlers.PipelineMetricsHandler(sqlDB)))
 	mux.Handle("/api/pipeline/failures", authMiddleware(handlers.PipelineFailuresHandler(sqlDB)))
+	mux.Handle("/api/admin/flags", authMiddleware(handlers.FeatureFlagsHandler(sqlDB)))
+	mux.Handle("/api/admin/flags/update", authMiddleware(criticalMiddleware(handlers.UpdateFeatureFlagHandler(sqlDB))))
+	mux.Handle("/api/admin/outbox/status", authMiddleware(handlers.OutboxStatusHandler(sqlDB, appMetrics)))
+	mux.Handle("/api/admin/outbox/retry", authMiddleware(criticalMiddleware(handlers.RetryOutboxHandler(sqlDB, appMetrics))))
+	mux.Handle("/api/admin/outbox/replay-dead-letter", authMiddleware(criticalMiddleware(handlers.ReplayDeadLetterHandler(sqlDB))))
+	mux.Handle("/api/admin/audit/verify-chain", authMiddleware(handlers.AuditVerifyChainHandler(sqlDB)))
+	mux.Handle("/api/admin/alerts", authMiddleware(handlers.AlertsHandler(sqlDB)))
+	mux.Handle("/api/admin/migrations/status", authMiddleware(handlers.MigrationsStatusHandler(postgresDSN != "", &postgresMigrationErr)))
+	mux.Handle("/api/admin/sql/query", authMiddleware(criticalMiddleware(handlers.SQLQueryHandler(sqlDB))))
+	mux.Handle("/api/admin/sql/exec", authMiddleware(criticalMiddleware(handlers.SQLExecHandler(sqlDB))))
+	mux.Handle("/api/admin/danger/clear-data", authMiddleware(criticalMiddleware(handlers.DangerClearDataHandler(sqlDB))))
+	mux.Handle("/api/admin/backup/run", authMiddleware(criticalMiddleware(handlers.BackupRunHandler(sqlDB, appMetrics))))
+	mux.Handle("/api/admin/records/list", authMiddleware(handlers.RecordsListHandler(sqlDB)))
+	mux.Handle("/api/admin/records/upsert", authMiddleware(criticalMiddleware(handlers.RecordsUpsertHandler(sqlDB))))
+	mux.Handle("/api/admin/records/delete", authMiddleware(criticalMiddleware(handlers.RecordsDeleteHandler(sqlDB))))
+	mux.Handle("/metrics", metricsHandler(appMetrics))
 
 	// Auth endpoints
 	mux.HandleFunc("/api/auth/login", loginHandler(dashboardPassword, allowInsecureCookies))
 	mux.HandleFunc("/api/auth/logout", logoutHandler(allowInsecureCookies))
 	mux.HandleFunc("/api/auth/check", authCheckHandler(dashboardPassword))
+	mux.Handle("/api/auth/stepup/start", authMiddleware(stepUpStartHandler(sqlDB)))
+	mux.Handle("/api/auth/stepup/verify", authMiddleware(stepUpVerifyHandler(sqlDB, superAdminPassword, allowInsecureCookies)))
+	mux.Handle("/api/auth/stepup/check", authMiddleware(stepUpCheckHandler(sqlDB)))
 
 	// Serve static dashboard with SPA fallback.
 	mux.Handle("/", spaHandler(staticDir))
@@ -113,11 +161,20 @@ func main() {
 	// Configure via SHEETS_ID and GOOGLE_CREDS_PATH env vars
 	// =========================================================================
 	go scheduleSheetsArchiver()
+	if postgresDB != nil {
+		go relay.NewSQLiteToPostgresRelay(sqlDB, postgresDB, appMetrics).Start(context.Background())
+	}
+
+	rootHandler := observability.RequestContextMiddleware(mux)
+	rootHandler = securityHeadersMiddleware(rootHandler)
 
 	server := &http.Server{
 		Addr:              addr,
-		Handler:           loggingMiddleware(mux),
+		Handler:           loggingMiddleware(rootHandler),
 		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
 	}
 
 	log.Printf("oracle-backend listening on %s (db: %s, static: %s)", addr, dbPath, staticDir)
@@ -151,12 +208,124 @@ func HealthDBHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-// loggingMiddleware logs basic request info.
+type statusWriter struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+func (w *statusWriter) WriteHeader(code int) {
+	w.statusCode = code
+	w.ResponseWriter.WriteHeader(code)
+}
+
+func securityHeadersMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Referrer-Policy", "no-referrer")
+		w.Header().Set("Content-Security-Policy", "default-src 'self' https:; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https:; script-src 'self' 'unsafe-inline'; frame-ancestors 'none'; base-uri 'self'")
+		next.ServeHTTP(w, r)
+	})
+}
+
+func metricsHandler(reg *observability.Registry) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		w.Header().Set("Content-Type", "text/plain; version=0.0.4")
+		_, _ = w.Write([]byte(reg.RenderPrometheus()))
+	})
+}
+
+func actionTypeFromRequest(r *http.Request) string {
+	if r == nil {
+		return "unknown"
+	}
+	path := r.URL.Path
+	switch {
+	case strings.HasPrefix(path, "/api/auth/"):
+		return "auth"
+	case strings.HasPrefix(path, "/api/admin/"):
+		return "admin"
+	case strings.HasPrefix(path, "/api/stats/"):
+		return "stats"
+	case strings.HasPrefix(path, "/ingest-batch"):
+		return "ingest"
+	case strings.HasPrefix(path, "/metrics"):
+		return "metrics"
+	default:
+		return "request"
+	}
+}
+
+func resourceTypeFromRequest(r *http.Request) string {
+	if r == nil {
+		return "unknown"
+	}
+	path := strings.Trim(r.URL.Path, "/")
+	if path == "" {
+		return "root"
+	}
+	parts := strings.Split(path, "/")
+	if len(parts) >= 3 && parts[0] == "api" {
+		return parts[2]
+	}
+	return parts[0]
+}
+
+func resourceIDFromRequest(r *http.Request) string {
+	if r == nil {
+		return "-"
+	}
+	if id := strings.TrimSpace(r.URL.Query().Get("id")); id != "" {
+		return id
+	}
+	return "-"
+}
+
+// loggingMiddleware emits structured request logs with correlation context.
 func loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
-		next.ServeHTTP(w, r)
-		log.Printf("%s %s in %s", r.Method, r.URL.Path, time.Since(start))
+		sw := &statusWriter{ResponseWriter: w, statusCode: http.StatusOK}
+		next.ServeHTTP(sw, r)
+
+		duration := time.Since(start)
+		statusClass := "ok"
+		if sw.statusCode >= 400 {
+			statusClass = "error"
+		}
+		errorCode := ""
+		if sw.statusCode >= 400 {
+			errorCode = "http_" + strconv.Itoa(sw.statusCode)
+		}
+		payload := map[string]interface{}{
+			"level":          "info",
+			"message":        "http_request",
+			"time":           time.Now().UTC().Format(time.RFC3339),
+			"request_id":     observability.RequestIDFromContext(r.Context()),
+			"correlation_id": observability.CorrelationIDFromContext(r.Context()),
+			"user_id":        observability.UserIDFromContext(r.Context()),
+			"token_id":       observability.TokenIDFromContext(r.Context()),
+			"role":           observability.RoleFromContext(r.Context()),
+			"action_type":    actionTypeFromRequest(r),
+			"resource_type":  resourceTypeFromRequest(r),
+			"resource_id":    resourceIDFromRequest(r),
+			"method":         r.Method,
+			"path":           r.URL.Path,
+			"status_code":    sw.statusCode,
+			"result":         statusClass,
+			"latency_ms":     duration.Milliseconds(),
+			"error_code":     errorCode,
+		}
+		encoded, err := json.Marshal(payload)
+		if err != nil {
+			log.Printf("%s %s in %s (%d)", r.Method, r.URL.Path, duration, sw.statusCode)
+			return
+		}
+		log.Printf("%s", encoded)
 	})
 }
 
@@ -277,6 +446,9 @@ var sessionStore = struct {
 
 const sessionDuration = 24 * time.Hour
 const sessionCookieName = "oracle_session"
+const stepUpSessionDuration = 15 * time.Minute
+const stepUpChallengeDuration = 5 * time.Minute
+const stepUpSessionCookieName = "oracle_stepup"
 
 type loginAttempt struct {
 	attempts       int
@@ -291,6 +463,36 @@ var loginRateStore = struct {
 
 const loginMaxAttempts = 5
 const loginLockout = 15 * time.Minute
+
+type stepUpChallenge struct {
+	clientIP  string
+	expiresAt time.Time
+}
+
+type stepUpAttempt struct {
+	attempts       int
+	firstAttemptAt time.Time
+	blockedUntil   time.Time
+}
+
+var stepUpChallengeStore = struct {
+	sync.Mutex
+	items map[string]stepUpChallenge
+}{items: make(map[string]stepUpChallenge)}
+
+var stepUpSessionStore = struct {
+	sync.RWMutex
+	tokens map[string]time.Time
+}{tokens: make(map[string]time.Time)}
+
+var stepUpRateStore = struct {
+	sync.Mutex
+	attempts map[string]*stepUpAttempt
+}{attempts: make(map[string]*stepUpAttempt)}
+
+const stepUpMaxAttempts = 8
+const stepUpLockout = 10 * time.Minute
+const stepUpAbuseThreshold = 5
 
 var trustedProxyNets []*net.IPNet
 
@@ -386,27 +588,413 @@ func requireAuth(dashboardPassword, archiverSecret string, allowLoopbackBypass b
 			}
 
 			if allowLoopbackBypass && archiverSecret == "" && isLoopbackAddr(r.RemoteAddr) && isLoopbackHost(r.Host) && !hasForwardedIp(r) {
-				next.ServeHTTP(w, r)
+				ctx := observability.WithActorContext(r.Context(), "loopback-bypass", "loopback", "system")
+				next.ServeHTTP(w, r.WithContext(ctx))
 				return
 			}
 
 			if archiverSecret != "" {
 				headerSecret := r.Header.Get("X-Archiver-Secret")
 				if headerSecret != "" && subtle.ConstantTimeCompare([]byte(headerSecret), []byte(archiverSecret)) == 1 {
-					next.ServeHTTP(w, r)
+					ctx := observability.WithActorContext(r.Context(), "archiver", "archiver-secret", "system")
+					next.ServeHTTP(w, r.WithContext(ctx))
 					return
 				}
 			}
 
 			cookie, err := r.Cookie(sessionCookieName)
 			if err != nil || !isValidSession(cookie.Value) {
+				appMetrics.IncCounter("oracle_auth_failures_total", map[string]string{"reason": "session_invalid"}, 1)
 				http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
 				return
 			}
 
-			next.ServeHTTP(w, r)
+			tokenID := cookie.Value
+			if len(tokenID) > 12 {
+				tokenID = tokenID[:12]
+			}
+			ctx := observability.WithActorContext(r.Context(), "viewer", tokenID, "viewer")
+			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
+}
+
+// requireStepUp enforces super-admin step-up for critical routes when enabled by feature flag.
+func requireStepUp(db *sql.DB, superAdminPassword string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			enabled, err := handlers.IsFeatureEnabled(r.Context(), db, "feature_stepup_enforced")
+			if err != nil {
+				http.Error(w, `{"error":"stepup_flag_unavailable"}`, http.StatusInternalServerError)
+				return
+			}
+			if !enabled {
+				next.ServeHTTP(w, r)
+				return
+			}
+			if superAdminPassword == "" {
+				http.Error(w, `{"error":"stepup_misconfigured"}`, http.StatusInternalServerError)
+				return
+			}
+
+			cookie, err := r.Cookie(stepUpSessionCookieName)
+			if err != nil || !isValidStepUpSession(cookie.Value) {
+				appMetrics.IncCounter("oracle_auth_failures_total", map[string]string{"reason": "stepup_required"}, 1)
+				http.Error(w, `{"error":"step_up_required"}`, http.StatusForbidden)
+				return
+			}
+
+			tokenID := cookie.Value
+			if len(tokenID) > 12 {
+				tokenID = tokenID[:12]
+			}
+			ctx := observability.WithActorContext(r.Context(), "super-admin", tokenID, "super_admin")
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
+func stepUpStartHandler(db *sql.DB) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method != http.MethodPost {
+			http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+			return
+		}
+
+		enabled, err := handlers.IsFeatureEnabled(r.Context(), db, "feature_stepup_enforced")
+		if err != nil {
+			http.Error(w, `{"error":"stepup_flag_unavailable"}`, http.StatusInternalServerError)
+			return
+		}
+		if !enabled {
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok":       true,
+				"required": false,
+			})
+			return
+		}
+
+		challengeID, err := generateToken()
+		if err != nil {
+			http.Error(w, `{"error":"failed_to_create_challenge"}`, http.StatusInternalServerError)
+			return
+		}
+		clientIP := getClientIP(r)
+
+		stepUpChallengeStore.Lock()
+		cleanupExpiredStepUpChallengesLocked(time.Now())
+		stepUpChallengeStore.items[challengeID] = stepUpChallenge{
+			clientIP:  clientIP,
+			expiresAt: time.Now().Add(stepUpChallengeDuration),
+		}
+		stepUpChallengeStore.Unlock()
+
+		appMetrics.IncCounter("oracle_stepup_start_total", nil, 1)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"ok":           true,
+			"required":     true,
+			"challengeId":  challengeID,
+			"expiresInSec": int(stepUpChallengeDuration.Seconds()),
+		})
+	})
+}
+
+func stepUpVerifyHandler(db *sql.DB, superAdminPassword string, allowInsecureCookies bool) http.Handler {
+	storedHash := hashPassword(superAdminPassword)
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method != http.MethodPost {
+			http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+			return
+		}
+
+		enabled, err := handlers.IsFeatureEnabled(r.Context(), db, "feature_stepup_enforced")
+		if err != nil {
+			http.Error(w, `{"error":"stepup_flag_unavailable"}`, http.StatusInternalServerError)
+			return
+		}
+		if !enabled {
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok":       true,
+				"required": false,
+			})
+			return
+		}
+
+		clientIP := getClientIP(r)
+		allowed, retryAfter := allowStepUpAttempt(clientIP)
+		if !allowed {
+			appMetrics.IncCounter("oracle_rate_limit_hits_total", map[string]string{"scope": "stepup"}, 1)
+			w.Header().Set("Retry-After", strconv.Itoa(retryAfter))
+			http.Error(w, `{"error":"too many attempts"}`, http.StatusTooManyRequests)
+			return
+		}
+
+		var req struct {
+			ChallengeID string `json:"challengeId"`
+			Password    string `json:"password"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+			return
+		}
+		req.ChallengeID = strings.TrimSpace(req.ChallengeID)
+		if req.ChallengeID == "" || strings.TrimSpace(req.Password) == "" {
+			http.Error(w, `{"error":"challengeId and password are required"}`, http.StatusBadRequest)
+			return
+		}
+
+		if !consumeStepUpChallenge(req.ChallengeID, clientIP) {
+			appMetrics.IncCounter("oracle_stepup_verify_total", map[string]string{"result": "invalid_challenge"}, 1)
+			http.Error(w, `{"error":"invalid_or_expired_challenge"}`, http.StatusUnauthorized)
+			return
+		}
+
+		hashedInput := hashPassword(req.Password)
+		if subtle.ConstantTimeCompare([]byte(hashedInput), []byte(storedHash)) != 1 {
+			appMetrics.IncCounter("oracle_stepup_verify_total", map[string]string{"result": "invalid_password"}, 1)
+			appMetrics.IncCounter("oracle_auth_failures_total", map[string]string{"reason": "stepup_invalid_password"}, 1)
+			blocked, retryAfter := recordStepUpFailure(db, clientIP)
+			if blocked {
+				appMetrics.IncCounter("oracle_rate_limit_hits_total", map[string]string{"scope": "stepup"}, 1)
+				w.Header().Set("Retry-After", strconv.Itoa(retryAfter))
+				http.Error(w, `{"error":"too many attempts"}`, http.StatusTooManyRequests)
+				return
+			}
+			http.Error(w, `{"error":"invalid password"}`, http.StatusUnauthorized)
+			return
+		}
+
+		clearStepUpFailures(clientIP)
+		token, err := generateToken()
+		if err != nil {
+			http.Error(w, `{"error":"failed to create stepup session"}`, http.StatusInternalServerError)
+			return
+		}
+
+		stepUpSessionStore.Lock()
+		stepUpSessionStore.tokens[token] = time.Now().Add(stepUpSessionDuration)
+		stepUpSessionStore.Unlock()
+
+		secureCookie, sameSite := cookieSecurityPolicy(r, allowInsecureCookies)
+		http.SetCookie(w, &http.Cookie{
+			Name:     stepUpSessionCookieName,
+			Value:    token,
+			Path:     "/",
+			HttpOnly: true,
+			Secure:   secureCookie,
+			SameSite: sameSite,
+			MaxAge:   int(stepUpSessionDuration.Seconds()),
+		})
+
+		appMetrics.IncCounter("oracle_stepup_verify_total", map[string]string{"result": "success"}, 1)
+		_ = handlers.AppendAuditLog(
+			r.Context(),
+			db,
+			"stepup_verify",
+			"auth",
+			"stepup",
+			"ok",
+			map[string]any{
+				"clientIp": clientIP,
+			},
+		)
+
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"ok":           true,
+			"expiresInSec": int(stepUpSessionDuration.Seconds()),
+		})
+	})
+}
+
+func stepUpCheckHandler(db *sql.DB) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method != http.MethodGet {
+			http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+			return
+		}
+		enabled, err := handlers.IsFeatureEnabled(r.Context(), db, "feature_stepup_enforced")
+		if err != nil {
+			http.Error(w, `{"error":"stepup_flag_unavailable"}`, http.StatusInternalServerError)
+			return
+		}
+		active := false
+		if cookie, err := r.Cookie(stepUpSessionCookieName); err == nil {
+			active = isValidStepUpSession(cookie.Value)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"ok":       true,
+			"required": enabled,
+			"active":   active,
+		})
+	})
+}
+
+func consumeStepUpChallenge(challengeID string, clientIP string) bool {
+	now := time.Now()
+	stepUpChallengeStore.Lock()
+	defer stepUpChallengeStore.Unlock()
+
+	cleanupExpiredStepUpChallengesLocked(now)
+	item, exists := stepUpChallengeStore.items[challengeID]
+	if !exists {
+		return false
+	}
+	if item.expiresAt.Before(now) || item.clientIP != clientIP {
+		delete(stepUpChallengeStore.items, challengeID)
+		return false
+	}
+	delete(stepUpChallengeStore.items, challengeID)
+	return true
+}
+
+func cleanupExpiredStepUpChallengesLocked(now time.Time) {
+	for key, item := range stepUpChallengeStore.items {
+		if now.After(item.expiresAt) {
+			delete(stepUpChallengeStore.items, key)
+		}
+	}
+}
+
+func isValidStepUpSession(token string) bool {
+	stepUpSessionStore.RLock()
+	defer stepUpSessionStore.RUnlock()
+
+	expiry, exists := stepUpSessionStore.tokens[token]
+	if !exists {
+		return false
+	}
+	if time.Now().After(expiry) {
+		go func() {
+			stepUpSessionStore.Lock()
+			delete(stepUpSessionStore.tokens, token)
+			stepUpSessionStore.Unlock()
+		}()
+		return false
+	}
+	return true
+}
+
+func allowStepUpAttempt(ip string) (bool, int) {
+	now := time.Now()
+	stepUpRateStore.Lock()
+	defer stepUpRateStore.Unlock()
+
+	rec := stepUpRateStore.attempts[ip]
+	if rec == nil {
+		return true, 0
+	}
+	if !rec.blockedUntil.IsZero() && now.Before(rec.blockedUntil) {
+		retryAfter := int(time.Until(rec.blockedUntil).Seconds())
+		if retryAfter < 1 {
+			retryAfter = 1
+		}
+		return false, retryAfter
+	}
+	if now.Sub(rec.firstAttemptAt) > stepUpLockout {
+		delete(stepUpRateStore.attempts, ip)
+		return true, 0
+	}
+	return true, 0
+}
+
+func recordStepUpFailure(db *sql.DB, ip string) (blocked bool, retryAfter int) {
+	now := time.Now()
+	stepUpRateStore.Lock()
+	rec := stepUpRateStore.attempts[ip]
+	if rec == nil || now.Sub(rec.firstAttemptAt) > stepUpLockout {
+		rec = &stepUpAttempt{attempts: 0, firstAttemptAt: now}
+		stepUpRateStore.attempts[ip] = rec
+	}
+	rec.attempts++
+	attempts := rec.attempts
+	if rec.attempts >= stepUpMaxAttempts {
+		rec.blockedUntil = now.Add(stepUpLockout)
+		retryAfter = int(time.Until(rec.blockedUntil).Seconds())
+		if retryAfter < 1 {
+			retryAfter = 1
+		}
+		blocked = true
+	}
+	stepUpRateStore.Unlock()
+
+	if attempts >= stepUpAbuseThreshold {
+		_ = upsertSystemAlert(
+			context.Background(),
+			db,
+			"stepup_abuse_spike",
+			"warning",
+			"high volume of failed step-up verification attempts",
+			map[string]any{
+				"ip":            ip,
+				"attempts":      attempts,
+				"threshold":     stepUpAbuseThreshold,
+				"windowMinutes": int(stepUpLockout.Minutes()),
+			},
+		)
+	}
+	return blocked, retryAfter
+}
+
+func clearStepUpFailures(ip string) {
+	stepUpRateStore.Lock()
+	defer stepUpRateStore.Unlock()
+	delete(stepUpRateStore.attempts, ip)
+}
+
+func upsertSystemAlert(
+	ctx context.Context,
+	db *sql.DB,
+	alertType string,
+	severity string,
+	message string,
+	payload map[string]any,
+) error {
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	nowMs := time.Now().UnixMilli()
+
+	var existingID int64
+	err = db.QueryRowContext(
+		ctx,
+		`SELECT id FROM system_alerts WHERE alert_type = ? AND status = 'open' ORDER BY id DESC LIMIT 1`,
+		alertType,
+	).Scan(&existingID)
+	if err == nil {
+		_, err = db.ExecContext(
+			ctx,
+			`UPDATE system_alerts
+			 SET severity = ?, message = ?, payload_json = ?, updated_at = ?
+			 WHERE id = ?`,
+			severity,
+			message,
+			string(raw),
+			nowMs,
+			existingID,
+		)
+		return err
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+
+	_, err = db.ExecContext(
+		ctx,
+		`INSERT INTO system_alerts (alert_type, severity, message, status, payload_json, created_at, updated_at)
+		 VALUES (?, ?, ?, 'open', ?, ?, ?)`,
+		alertType,
+		severity,
+		message,
+		string(raw),
+		nowMs,
+		nowMs,
+	)
+	return err
 }
 
 // isValidSession checks if token is in store and not expired.
@@ -535,6 +1123,7 @@ func loginHandler(dashboardPassword string, allowInsecureCookies bool) http.Hand
 		clientIP := getClientIP(r)
 		allowed, _, retryAfter := allowLoginAttempt(clientIP)
 		if !allowed {
+			appMetrics.IncCounter("oracle_rate_limit_hits_total", map[string]string{"scope": "login"}, 1)
 			w.Header().Set("Retry-After", strconv.Itoa(retryAfter))
 			http.Error(w, `{"error":"too many attempts"}`, http.StatusTooManyRequests)
 			return
@@ -551,8 +1140,10 @@ func loginHandler(dashboardPassword string, allowInsecureCookies bool) http.Hand
 		// Timing-safe comparison via SHA256 (stored hash precomputed)
 		hashedInput := hashPassword(req.Password)
 		if subtle.ConstantTimeCompare([]byte(hashedInput), []byte(storedHash)) != 1 {
+			appMetrics.IncCounter("oracle_auth_failures_total", map[string]string{"reason": "invalid_password"}, 1)
 			blocked, retryAfter := recordLoginFailure(clientIP)
 			if blocked {
+				appMetrics.IncCounter("oracle_rate_limit_hits_total", map[string]string{"scope": "login"}, 1)
 				w.Header().Set("Retry-After", strconv.Itoa(retryAfter))
 				http.Error(w, `{"error":"too many attempts"}`, http.StatusTooManyRequests)
 				return
@@ -605,11 +1196,26 @@ func logoutHandler(allowInsecureCookies bool) http.HandlerFunc {
 			delete(sessionStore.tokens, cookie.Value)
 			sessionStore.Unlock()
 		}
+		stepUpCookie, stepErr := r.Cookie(stepUpSessionCookieName)
+		if stepErr == nil && stepUpCookie.Value != "" {
+			stepUpSessionStore.Lock()
+			delete(stepUpSessionStore.tokens, stepUpCookie.Value)
+			stepUpSessionStore.Unlock()
+		}
 
 		secureCookie, sameSite := cookieSecurityPolicy(r, allowInsecureCookies)
 		// Clear cookie
 		http.SetCookie(w, &http.Cookie{
 			Name:     sessionCookieName,
+			Value:    "",
+			Path:     "/",
+			HttpOnly: true,
+			Secure:   secureCookie,
+			SameSite: sameSite,
+			MaxAge:   -1,
+		})
+		http.SetCookie(w, &http.Cookie{
+			Name:     stepUpSessionCookieName,
 			Value:    "",
 			Path:     "/",
 			HttpOnly: true,
