@@ -21,4 +21,7 @@ func TestInitPostgres_Smoke(t *testing.T) {
 	if err := pg.QueryRow(`SELECT COUNT(*) FROM raw_ingest_events`).Scan(&count); err != nil {
 		t.Fatalf("expected raw_ingest_events table to exist: %v", err)
 	}
+	if err := pg.QueryRow(`SELECT COUNT(*) FROM pg_admin_records`).Scan(&count); err != nil {
+		t.Fatalf("expected pg_admin_records table to exist: %v", err)
+	}
 }

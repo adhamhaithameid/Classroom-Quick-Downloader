@@ -61,6 +61,7 @@ func TestMigrationBootstrapCleanDatabases(t *testing.T) {
 	requiredPostgresTables := []string{
 		"raw_ingest_events",
 		"pg_outbox",
+		"pg_admin_records",
 	}
 	for _, table := range requiredPostgresTables {
 		var count int

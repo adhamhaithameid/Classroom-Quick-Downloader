@@ -115,6 +115,14 @@ func main() {
 	// Analytics API endpoints (protected by auth when DASHBOARD_PASSWORD is set).
 	authMiddleware := requireAuth(dashboardPassword, archiverSecret, allowLoopbackBypass)
 	criticalMiddleware := requireStepUp(sqlDB, superAdminPassword)
+	allowedRecordTypes := map[string]struct{}{
+		"deployment_target":       {},
+		"extension_version_note":  {},
+		"creative_design":         {},
+		"creative_email_template": {},
+		"newsletter_subscriber":   {},
+		"newsletter_campaign":     {},
+	}
 	mux.Handle("/api/stats/summary", authMiddleware(handlers.SummaryHandler(sqlDB)))
 	mux.Handle("/api/stats/timeseries", authMiddleware(handlers.TimeSeriesHandler(sqlDB)))
 	mux.Handle("/api/stats/breakdown", authMiddleware(handlers.BreakdownHandler(sqlDB)))
@@ -135,9 +143,23 @@ func main() {
 	mux.Handle("/api/admin/sql/exec", authMiddleware(criticalMiddleware(handlers.SQLExecHandler(sqlDB))))
 	mux.Handle("/api/admin/danger/clear-data", authMiddleware(criticalMiddleware(handlers.DangerClearDataHandler(sqlDB))))
 	mux.Handle("/api/admin/backup/run", authMiddleware(criticalMiddleware(handlers.BackupRunHandler(sqlDB, appMetrics))))
-	mux.Handle("/api/admin/records/list", authMiddleware(handlers.RecordsListHandler(sqlDB)))
-	mux.Handle("/api/admin/records/upsert", authMiddleware(criticalMiddleware(handlers.RecordsUpsertHandler(sqlDB))))
-	mux.Handle("/api/admin/records/delete", authMiddleware(criticalMiddleware(handlers.RecordsDeleteHandler(sqlDB))))
+	mux.Handle("/api/admin/records/list", authMiddleware(handlers.RecordsListHandlerV4(sqlDB, postgresDB, allowedRecordTypes)))
+	mux.Handle("/api/admin/records/upsert", authMiddleware(criticalMiddleware(handlers.RecordsUpsertHandlerV4(sqlDB, postgresDB, allowedRecordTypes))))
+	mux.Handle("/api/admin/records/delete", authMiddleware(criticalMiddleware(handlers.RecordsDeleteHandlerV4(sqlDB, postgresDB, allowedRecordTypes))))
+	mux.Handle("/api/admin/creative/designs", authMiddleware(handlers.CreativeDesignsListHandler(sqlDB, postgresDB)))
+	mux.Handle("/api/admin/creative/designs/upsert", authMiddleware(criticalMiddleware(handlers.CreativeDesignsUpsertHandler(sqlDB, postgresDB))))
+	mux.Handle("/api/admin/creative/designs/delete", authMiddleware(criticalMiddleware(handlers.CreativeDesignsDeleteHandler(sqlDB, postgresDB))))
+	mux.Handle("/api/admin/creative/emails", authMiddleware(handlers.CreativeEmailsListHandler(sqlDB, postgresDB)))
+	mux.Handle("/api/admin/creative/emails/upsert", authMiddleware(criticalMiddleware(handlers.CreativeEmailsUpsertHandler(sqlDB, postgresDB))))
+	mux.Handle("/api/admin/creative/emails/delete", authMiddleware(criticalMiddleware(handlers.CreativeEmailsDeleteHandler(sqlDB, postgresDB))))
+	mux.Handle("/api/admin/newsletter/subscribers", authMiddleware(handlers.NewsletterSubscribersListHandler(sqlDB, postgresDB)))
+	mux.Handle("/api/admin/newsletter/subscribers/upsert", authMiddleware(criticalMiddleware(handlers.NewsletterSubscribersUpsertHandler(sqlDB, postgresDB))))
+	mux.Handle("/api/admin/newsletter/subscribers/delete", authMiddleware(criticalMiddleware(handlers.NewsletterSubscribersDeleteHandler(sqlDB, postgresDB))))
+	mux.Handle("/api/admin/newsletter/campaigns", authMiddleware(handlers.NewsletterCampaignsListHandler(sqlDB, postgresDB)))
+	mux.Handle("/api/admin/newsletter/campaigns/upsert", authMiddleware(criticalMiddleware(handlers.NewsletterCampaignsUpsertHandler(sqlDB, postgresDB))))
+	mux.Handle("/api/admin/newsletter/campaigns/delete", authMiddleware(criticalMiddleware(handlers.NewsletterCampaignsDeleteHandler(sqlDB, postgresDB))))
+	mux.Handle("/api/admin/deployments/targets", authMiddleware(handlers.DeploymentsTargetsHandler(sqlDB, postgresDB)))
+	mux.Handle("/api/admin/deployments/sync", authMiddleware(criticalMiddleware(handlers.DeploymentsSyncHandler(sqlDB, postgresDB, appMetrics))))
 	mux.Handle("/api/admin/oracle-logs", authMiddleware(handlers.OracleOperationLogsListHandler(sqlDB)))
 	mux.Handle("/api/admin/oracle-logs/delete-older", authMiddleware(criticalMiddleware(handlers.OracleOperationLogsDeleteOlderHandler(sqlDB))))
 	mux.Handle("/api/admin/oracle-logs/clear-all", authMiddleware(criticalMiddleware(handlers.OracleOperationLogsClearAllHandler(sqlDB))))

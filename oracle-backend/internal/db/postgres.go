@@ -55,6 +55,23 @@ func migratePostgres(db *sql.DB) error {
 			created_at      BIGINT NOT NULL,
 			next_run_at     BIGINT NOT NULL
 		);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_pg_outbox_status_next_run
+			ON pg_outbox(status, next_run_at, id);`,
+
+		// Postgres-owned control-plane entities mirrored from dashboard actions.
+		`CREATE TABLE IF NOT EXISTS pg_admin_records (
+			id           BIGSERIAL PRIMARY KEY,
+			record_type  TEXT NOT NULL,
+			record_key   TEXT NOT NULL,
+			data_json    JSONB NOT NULL,
+			created_at   BIGINT NOT NULL,
+			updated_at   BIGINT NOT NULL,
+			UNIQUE(record_type, record_key)
+		);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_pg_admin_records_type_updated
+			ON pg_admin_records(record_type, updated_at DESC, id DESC);`,
 	}
 
 	for _, stmt := range stmts {
