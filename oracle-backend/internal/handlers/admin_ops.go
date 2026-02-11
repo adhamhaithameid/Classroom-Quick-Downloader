@@ -12,7 +12,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -240,7 +239,7 @@ func RetryOutboxHandler(db *sql.DB, metrics *observability.Registry) http.Handle
 			}
 			q := `UPDATE ingest_outbox
 				  SET status = 'pending', next_run_at = ?, last_error = ''
-				  WHERE id IN (` + strings.Join(placeholders, ",") + `)`
+				  WHERE status IN ('retry', 'dead') AND id IN (` + strings.Join(placeholders, ",") + `)`
 			res, err = db.ExecContext(r.Context(), q, args...)
 		}
 		if err != nil {
@@ -248,7 +247,9 @@ func RetryOutboxHandler(db *sql.DB, metrics *observability.Registry) http.Handle
 			return
 		}
 		affected, _ := res.RowsAffected()
-		metrics.IncCounter("oracle_outbox_retry_total", nil, float64(affected))
+		if metrics != nil {
+			metrics.IncCounter("oracle_outbox_retry_total", nil, float64(affected))
+		}
 
 		_ = AppendAuditLog(
 			r.Context(),
@@ -274,7 +275,7 @@ func ReplayDeadLetterHandler(db *sql.DB) http.HandlerFunc {
 
 		rows, err := db.QueryContext(
 			r.Context(),
-			`SELECT id, event_type, payload_json, idempotency_key, attempts
+			`SELECT id, outbox_id, event_type, payload_json, idempotency_key, attempts
 			 FROM outbox_dead_letter
 			 ORDER BY id ASC
 			 LIMIT 100`,
@@ -287,6 +288,7 @@ func ReplayDeadLetterHandler(db *sql.DB) http.HandlerFunc {
 
 		type deadRow struct {
 			ID             int64
+			OutboxID       sql.NullInt64
 			EventType      string
 			PayloadJSON    string
 			IdempotencyKey string
@@ -295,7 +297,7 @@ func ReplayDeadLetterHandler(db *sql.DB) http.HandlerFunc {
 		items := make([]deadRow, 0, 100)
 		for rows.Next() {
 			var item deadRow
-			if err := rows.Scan(&item.ID, &item.EventType, &item.PayloadJSON, &item.IdempotencyKey, &item.Attempts); err != nil {
+			if err := rows.Scan(&item.ID, &item.OutboxID, &item.EventType, &item.PayloadJSON, &item.IdempotencyKey, &item.Attempts); err != nil {
 				http.Error(w, "failed to parse dead letter rows", http.StatusInternalServerError)
 				return
 			}
@@ -316,18 +318,47 @@ func ReplayDeadLetterHandler(db *sql.DB) http.HandlerFunc {
 		nowMs := time.Now().UnixMilli()
 		replayed := int64(0)
 		for _, item := range items {
-			key := item.IdempotencyKey + "-replay-" + strconv.FormatInt(item.ID, 10)
-			if _, err := tx.ExecContext(
-				r.Context(),
-				`INSERT INTO ingest_outbox (event_type, payload_json, idempotency_key, status, attempts, last_error, created_at, next_run_at)
-				 VALUES (?, ?, ?, 'pending', 0, '', ?, ?)`,
-				item.EventType,
-				item.PayloadJSON,
-				key,
-				nowMs,
-				nowMs,
-			); err != nil {
-				continue
+			resetDone := false
+			if item.OutboxID.Valid {
+				res, err := tx.ExecContext(
+					r.Context(),
+					`UPDATE ingest_outbox
+					 SET status = 'pending', attempts = 0, last_error = '', next_run_at = ?
+					 WHERE id = ? AND idempotency_key = ?`,
+					nowMs,
+					item.OutboxID.Int64,
+					item.IdempotencyKey,
+				)
+				if err != nil {
+					http.Error(w, "failed to replay dead letter rows", http.StatusInternalServerError)
+					return
+				}
+				affected, _ := res.RowsAffected()
+				if affected > 0 {
+					resetDone = true
+				}
+			}
+
+			if !resetDone {
+				// Fallback for legacy rows without outbox_id or missing source row.
+				if _, err := tx.ExecContext(
+					r.Context(),
+					`INSERT INTO ingest_outbox (event_type, payload_json, idempotency_key, status, attempts, last_error, created_at, next_run_at)
+					 VALUES (?, ?, ?, 'pending', 0, '', ?, ?)
+					 ON CONFLICT(idempotency_key) DO UPDATE SET
+					   status = 'pending',
+					   attempts = 0,
+					   last_error = '',
+					   next_run_at = excluded.next_run_at`,
+					item.EventType,
+					item.PayloadJSON,
+					item.IdempotencyKey,
+					nowMs,
+					nowMs,
+				); err != nil {
+					http.Error(w, "failed to replay dead letter rows", http.StatusInternalServerError)
+					return
+				}
 			}
 			if _, err := tx.ExecContext(r.Context(), `DELETE FROM outbox_dead_letter WHERE id = ?`, item.ID); err != nil {
 				http.Error(w, "failed to replay dead letter rows", http.StatusInternalServerError)
@@ -516,7 +547,7 @@ func AuditVerifyChainHandler(db *sql.DB) http.HandlerFunc {
 
 		rows, err := db.QueryContext(
 			r.Context(),
-			`SELECT id, payload_json, prev_hash, row_hash FROM admin_audit_log ORDER BY id ASC`,
+			`SELECT id, payload_json, prev_hash, payload_hash, row_hash FROM admin_audit_log ORDER BY id ASC`,
 		)
 		if err != nil {
 			http.Error(w, "failed to verify audit chain", http.StatusInternalServerError)
@@ -525,11 +556,12 @@ func AuditVerifyChainHandler(db *sql.DB) http.HandlerFunc {
 		defer rows.Close()
 
 		type rowData struct {
-			ID         int64
-			Payload    string
-			PrevHash   string
-			RowHash    string
-			Recomputed string
+			ID          int64
+			Payload     string
+			PrevHash    string
+			PayloadHash string
+			RowHash     string
+			Recomputed  string
 		}
 		chain := make([]rowData, 0, 256)
 		prev := strings.Repeat("0", 64)
@@ -539,10 +571,12 @@ func AuditVerifyChainHandler(db *sql.DB) http.HandlerFunc {
 
 		for rows.Next() {
 			var item rowData
-			if err := rows.Scan(&item.ID, &item.Payload, &item.PrevHash, &item.RowHash); err != nil {
+			if err := rows.Scan(&item.ID, &item.Payload, &item.PrevHash, &item.PayloadHash, &item.RowHash); err != nil {
 				http.Error(w, "failed to verify audit chain", http.StatusInternalServerError)
 				return
 			}
+			payloadSum := sha256.Sum256([]byte(item.Payload))
+			recomputedPayloadHash := hex.EncodeToString(payloadSum[:])
 			sum := sha256.Sum256([]byte(item.Payload + ":" + item.PrevHash))
 			item.Recomputed = hex.EncodeToString(sum[:])
 			chain = append(chain, item)
@@ -556,6 +590,11 @@ func AuditVerifyChainHandler(db *sql.DB) http.HandlerFunc {
 				ok = false
 				breakAt = item.ID
 				breakReason = "row_hash_mismatch"
+			}
+			if item.PayloadHash != recomputedPayloadHash && ok {
+				ok = false
+				breakAt = item.ID
+				breakReason = "payload_hash_mismatch"
 			}
 			prev = item.RowHash
 		}
@@ -582,20 +621,36 @@ func canonicalJSON(payload map[string]any) (string, error) {
 	if payload == nil {
 		return "{}", nil
 	}
-	keys := make([]string, 0, len(payload))
-	for k := range payload {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	ordered := make(map[string]any, len(payload))
-	for _, k := range keys {
-		ordered[k] = payload[k]
-	}
-	raw, err := json.Marshal(ordered)
+	canonicalized := canonicalizeValue(payload)
+	raw, err := json.Marshal(canonicalized)
 	if err != nil {
 		return "", err
 	}
 	return string(raw), nil
+}
+
+func canonicalizeValue(v any) any {
+	switch typed := v.(type) {
+	case map[string]any:
+		keys := make([]string, 0, len(typed))
+		for k := range typed {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		ordered := make(map[string]any, len(typed))
+		for _, k := range keys {
+			ordered[k] = canonicalizeValue(typed[k])
+		}
+		return ordered
+	case []any:
+		out := make([]any, len(typed))
+		for i := range typed {
+			out[i] = canonicalizeValue(typed[i])
+		}
+		return out
+	default:
+		return v
+	}
 }
 
 type sqlQueryRequest struct {
