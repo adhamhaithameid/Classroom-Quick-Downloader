@@ -1090,6 +1090,90 @@
       .auth-submit:hover { transform: translateY(-1px); }
       .auth-submit:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
 
+      .mini-ratio-chart { display: flex; flex-direction: column; gap: 10px; }
+      .mini-ratio-track {
+        height: 16px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.06);
+        overflow: hidden;
+      }
+      .mini-ratio-fill {
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        color: white;
+        font-size: 10px;
+        font-weight: 700;
+        padding-right: 8px;
+        white-space: nowrap;
+      }
+      .mini-ratio-fill.success { background: linear-gradient(90deg, #0f766e, #14b8a6); }
+      .mini-ratio-fill.fail { background: linear-gradient(90deg, #b91c1c, #ef4444); }
+      .mini-ratio-fill.cancelled { background: linear-gradient(90deg, #854d0e, #f59e0b); }
+      .mini-ratio-fill.downloads { background: linear-gradient(90deg, #1d4ed8, #3b82f6); }
+      .action-buttons-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 10px;
+      }
+      .deployment-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+        gap: 12px;
+      }
+      .deployment-card {
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: var(--bg-tertiary);
+        padding: 12px;
+      }
+      .form-grid { display: grid; gap: 10px; }
+      .calendar-grid-wrap { min-height: 220px; }
+      .calendar-grid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 8px;
+      }
+      .calendar-header-cell {
+        font-size: 11px;
+        color: var(--text-muted);
+        text-align: center;
+      }
+      .calendar-day {
+        min-height: 40px;
+        border: 1px solid var(--border);
+        background: rgba(255,255,255,0.02);
+        border-radius: 8px;
+        font-size: 11px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-secondary);
+      }
+      .calendar-day.has-data { border-color: rgba(59, 130, 246, 0.5); color: var(--text-primary); }
+      .calendar-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 999px;
+        background: #60a5fa;
+        margin-top: 4px;
+      }
+      .palette-item {
+        border: 1px solid transparent;
+        border-radius: 8px;
+        padding: 8px 10px;
+        color: var(--text-secondary);
+        cursor: pointer;
+      }
+      .palette-item:hover,
+      .palette-item.active {
+        border-color: var(--border);
+        background: rgba(255,255,255,0.04);
+        color: var(--text-primary);
+      }
+
       .auth-error {
         display: none;
         border: 1px solid rgba(239,68,68,0.45);
@@ -1138,6 +1222,42 @@
                 <path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/>
               </svg>
               Charts
+            </button>
+            <button class="nav-item" data-page="dashboards" onclick="showPage('dashboards')"
+              data-tooltip="Infrastructure and external dashboards" data-tooltip-position="bottom">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 20h8"/>
+              </svg>
+              Dashboards
+            </button>
+            <button class="nav-item" data-page="deployments" onclick="showPage('deployments')"
+              data-tooltip="Browser store deployment tracking" data-tooltip-position="bottom">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M8 17l4 4 4-4"/><path d="M12 12v9"/><path d="M20 3H4v6h16z"/>
+              </svg>
+              Deployments
+            </button>
+            <button class="nav-item" data-page="versions" onclick="showPage('versions')"
+              data-tooltip="Extension versions and release notes" data-tooltip-position="bottom">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20 7l-8 8-4-4"/><path d="M4 4h16v16H4z"/>
+              </svg>
+              Versions
+            </button>
+            <button class="nav-item" data-page="notifications" onclick="showPage('notifications')"
+              data-tooltip="GitHub issues and PR monitoring" data-tooltip-position="bottom">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 8a6 6 0 10-12 0c0 7-3 7-3 7h18s-3 0-3-7"/><path d="M13.73 21a2 2 0 01-3.46 0"/>
+              </svg>
+              Notifications
+            </button>
+            <button class="nav-item" data-page="danger" onclick="showPage('danger')"
+              data-tooltip="Critical administrative operations" data-tooltip-position="bottom">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+              Danger
             </button>
           </div>
 
@@ -1290,6 +1410,67 @@
                 </div>
               </div>
             </div>
+
+            <h3 style="font-size: 13px; font-weight: 600; margin: 18px 0 12px; color: var(--text-secondary);">Top All Time</h3>
+            <div class="top-today-grid" id="top-all-time-grid">
+              <div class="top-card" data-tooltip="Most used browser all time">
+                <div class="top-icon">🌐</div>
+                <div class="top-info">
+                  <div class="top-label">Browser</div>
+                  <div class="top-value" id="all-top-browser">--</div>
+                  <div class="top-count" id="all-top-browser-count"></div>
+                </div>
+              </div>
+              <div class="top-card" data-tooltip="Most common OS all time">
+                <div class="top-icon">💻</div>
+                <div class="top-info">
+                  <div class="top-label">OS</div>
+                  <div class="top-value" id="all-top-os">--</div>
+                  <div class="top-count" id="all-top-os-count"></div>
+                </div>
+              </div>
+              <div class="top-card" data-tooltip="Most downloaded type all time">
+                <div class="top-icon">📄</div>
+                <div class="top-info">
+                  <div class="top-label">File Type</div>
+                  <div class="top-value" id="all-top-type">--</div>
+                  <div class="top-count" id="all-top-type-count"></div>
+                </div>
+              </div>
+              <div class="top-card" data-tooltip="Top country all time">
+                <div class="top-icon">🌍</div>
+                <div class="top-info">
+                  <div class="top-label">Country</div>
+                  <div class="top-value" id="all-top-country">--</div>
+                  <div class="top-count" id="all-top-country-count"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="charts-grid" style="margin-top: 16px;">
+              <div class="card">
+                <div class="card-header">
+                  <div>
+                    <div class="card-title">Success vs Failure</div>
+                    <div class="card-subtitle">All-time percentage</div>
+                  </div>
+                </div>
+                <div class="card-body">
+                  <div id="overview-success-fail-chart" class="mini-ratio-chart"></div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-header">
+                  <div>
+                    <div class="card-title">Cancelled vs Downloads</div>
+                    <div class="card-subtitle">All-time percentage</div>
+                  </div>
+                </div>
+                <div class="card-body">
+                  <div id="overview-cancelled-chart" class="mini-ratio-chart"></div>
+                </div>
+              </div>
+            </div>
           </div>
 
           <!-- ACTIVITY PAGE -->
@@ -1301,8 +1482,16 @@
                   <div class="card-subtitle">Hover over bars for details</div>
                 </div>
                 <div class="tabs" id="activity-tabs">
-                  <button class="tab active" onclick="setActivityRange('today')" data-tooltip="Show today's hourly data">Today</button>
-                  <button class="tab" onclick="setActivityRange('week')" data-tooltip="Show last 7 days">This Week</button>
+                  <button class="tab active" data-range="today" onclick="setActivityRange('today')" data-tooltip="Show today's hourly data">Today</button>
+                  <button class="tab" data-range="week" onclick="setActivityRange('week')" data-tooltip="Show last 7 days">This Week</button>
+                  <button class="tab" data-range="month" onclick="setActivityRange('month')" data-tooltip="Show current month">This Month</button>
+                  <button class="tab" data-range="year" onclick="setActivityRange('year')" data-tooltip="Show current year">This Year</button>
+                  <button class="tab" data-range="all" onclick="setActivityRange('all')" data-tooltip="Show all time">All Time</button>
+                </div>
+                <div>
+                  <select id="activity-version-filter" class="tab" style="min-width: 140px;" onchange="onActivityVersionChange()">
+                    <option value="">All Versions</option>
+                  </select>
                 </div>
               </div>
               <div class="card-body">
@@ -1351,6 +1540,24 @@
                 <div class="log-summary-item">⬆️ Peak: <span class="log-summary-value" id="summary-peak">--</span></div>
                 <div class="log-summary-item">📈 Avg: <span class="log-summary-value" id="summary-avg">--</span></div>
                 <div class="log-summary-item">⬇️ Low: <span class="log-summary-value" id="summary-low">--</span></div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <div class="card-title">📅 Activity Calendar</div>
+                  <div class="card-subtitle">Dots mark days with data</div>
+                </div>
+                <div class="tabs">
+                  <button class="tab" onclick="shiftCalendarMonth(-1)">Prev</button>
+                  <button class="tab" onclick="shiftCalendarMonth(1)">Next</button>
+                </div>
+              </div>
+              <div class="card-body">
+                <div id="activity-calendar" class="calendar-grid-wrap">
+                  <div class="loading"><div class="spinner"></div>Loading calendar...</div>
+                </div>
               </div>
             </div>
           </div>
@@ -1439,6 +1646,119 @@
               </div>
             </div>
           </div>
+
+          <!-- DASHBOARDS PAGE -->
+          <div class="page" id="page-dashboards">
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <div class="card-title">Infrastructure Dashboards</div>
+                  <div class="card-subtitle">Quick links for operations</div>
+                </div>
+              </div>
+              <div class="card-body">
+                <div class="action-buttons-grid">
+                  <a href="https://cqd-analytics.adhamhaithameid.workers.dev/" target="_blank" class="btn btn-secondary">☁️ Cloudflare</a>
+                  <a href="http://129.151.233.229:3001/status/cqd" target="_blank" class="btn btn-secondary">🟢 Uptime Kuma</a>
+                  <a href="https://github.com/adhamhaithameid/Classroom-Quick-Downloader" target="_blank" class="btn btn-secondary">🐙 GitHub Repo</a>
+                  <a href="https://docs.google.com/spreadsheets/" target="_blank" class="btn btn-secondary">📊 Google Sheets</a>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- DEPLOYMENTS PAGE -->
+          <div class="page" id="page-deployments">
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <div class="card-title">Browser Deployments</div>
+                  <div class="card-subtitle">Store users, current version, and dashboard links</div>
+                </div>
+              </div>
+              <div class="card-body">
+                <div id="deployment-cards" class="deployment-grid"></div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <div class="card-title">Update Sentences</div>
+                  <div class="card-subtitle">Copy-ready release copy snippets</div>
+                </div>
+              </div>
+              <div class="card-body">
+                <div id="update-sentence-list"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- VERSIONS PAGE -->
+          <div class="page" id="page-versions">
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <div class="card-title">Extension Versions</div>
+                  <div class="card-subtitle">Manual version ledger with update notes</div>
+                </div>
+              </div>
+              <div class="card-body">
+                <form id="version-form" class="form-grid" onsubmit="saveVersionNote(event)">
+                  <input id="version-input" class="auth-input" placeholder="Version (e.g., 5.7.1)" required />
+                  <textarea id="version-note-input" class="auth-input" style="min-height: 90px;" placeholder="Update notes..." required></textarea>
+                  <button class="btn" type="submit">Save Version Note</button>
+                </form>
+                <div id="version-list" style="margin-top: 14px;"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- NOTIFICATIONS PAGE -->
+          <div class="page" id="page-notifications">
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <div class="card-title">GitHub Notifications</div>
+                  <div class="card-subtitle">Open issues and PRs</div>
+                </div>
+                <div>
+                  <button class="btn btn-secondary" onclick="loadNotifications()">Refresh</button>
+                </div>
+              </div>
+              <div class="card-body">
+                <div id="notification-counters" class="stats-grid"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- DANGER PAGE -->
+          <div class="page" id="page-danger">
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <div class="card-title">Danger Zone</div>
+                  <div class="card-subtitle">Destructive operations (step-up required)</div>
+                </div>
+              </div>
+              <div class="card-body">
+                <div class="action-buttons-grid">
+                  <button class="btn btn-secondary" onclick="dangerDryRun('all_non_core')">Dry Run Clear (All Non-Core)</button>
+                  <button class="btn" style="background:#7f1d1d;" onclick="dangerExecute('all_non_core')">Execute Clear (All Non-Core)</button>
+                  <button class="btn btn-secondary" onclick="runBackup()">Run SQLite Backup</button>
+                  <button class="btn btn-secondary" onclick="openStepUpPrompt()">Step-Up Now</button>
+                </div>
+                <div style="margin-top: 14px;">
+                  <textarea id="sql-console-input" class="auth-input" style="min-height: 110px;" placeholder="SQL statement..."></textarea>
+                  <div class="action-buttons-grid" style="margin-top: 8px;">
+                    <button class="btn btn-secondary" onclick="sqlQuery()">SQL Query</button>
+                    <button class="btn btn-secondary" onclick="sqlExec(true)">SQL Exec Dry Run</button>
+                    <button class="btn" style="background:#b91c1c;" onclick="sqlExec(false)">SQL Exec</button>
+                  </div>
+                </div>
+                <pre id="danger-output" class="json-viewer" style="margin-top: 12px; max-height: 340px; overflow:auto;">{}</pre>
+              </div>
+            </div>
+          </div>
         </div>
       </main>
     </div>
@@ -1492,12 +1812,29 @@
       </div>
     </div>
 
+    <div class="modal-overlay" id="command-palette-modal" aria-hidden="true">
+      <div class="auth-modal" role="dialog" aria-modal="true" style="max-width: 620px;">
+        <div class="auth-modal-head">
+          <h2 class="auth-modal-title">Command Palette</h2>
+          <p class="auth-modal-subtitle">Press Enter to run selected action</p>
+        </div>
+        <div class="auth-modal-body">
+          <input id="palette-input" class="auth-input" type="text" placeholder="Search commands..." />
+          <div id="palette-results" style="margin-top: 10px; max-height: 320px; overflow-y: auto;"></div>
+        </div>
+      </div>
+    </div>
+
     <script>
       // State
       let currentPage = 'overview';
       let activityRange = 'today';
+      let activityVersion = '';
       let lastBatchData = null;
       let batchTab = 'info';
+      let calendarMonthOffset = 0;
+      let allTimeActivityPoints = [];
+      let paletteIndex = 0;
 
       // Helpers
       let authInFlight = null;
@@ -1618,15 +1955,19 @@
         return ok;
       }
 
-      async function fetchJSON(url) {
-        let res = await fetch(url);
+      async function fetchJSONWithInit(url, init) {
+        let res = await fetch(url, init);
         if (res.status === 401) {
           const ok = await ensureAuth();
           if (!ok) throw new Error("HTTP 401");
-          res = await fetch(url);
+          res = await fetch(url, init);
         }
         if (!res.ok) throw new Error("HTTP " + res.status);
         return res.json();
+      }
+
+      async function fetchJSON(url) {
+        return fetchJSONWithInit(url);
       }
 
       function fmtPct(v) { return (v * 100).toFixed(1) + "%"; }
@@ -1719,6 +2060,17 @@
         if (days > 1) fromDate.setUTCDate(fromDate.getUTCDate() - (days - 1));
         const from = fromDate.toISOString().slice(0, 10);
         return { from: from, to: to };
+      }
+
+      function activityRangeParams(range) {
+        switch (range) {
+          case 'today': return { range: 'today', granularity: 'hour' };
+          case 'week': return { range: 'week', granularity: 'day' };
+          case 'month': return { range: 'month', granularity: 'day' };
+          case 'year': return { range: 'year', granularity: 'day' };
+          case 'all': return { range: 'all', granularity: 'day' };
+          default: return { range: 'week', granularity: 'day' };
+        }
       }
 
       function getBrowserIcon(b) {
@@ -1835,10 +2187,22 @@
         document.querySelectorAll('.nav-item').forEach(function(n) {
           n.classList.toggle('active', n.dataset.page === page);
         });
-        var titles = { overview: 'Overview', activity: 'Activity', charts: 'Charts' };
+        var titles = {
+          overview: 'Overview',
+          activity: 'Activity',
+          charts: 'Charts',
+          dashboards: 'Dashboards',
+          deployments: 'Deployments',
+          versions: 'Versions',
+          notifications: 'Notifications',
+          danger: 'Danger Zone'
+        };
         document.getElementById('page-title').textContent = titles[page];
         if (page === 'activity') loadActivity();
         if (page === 'charts') loadCharts();
+        if (page === 'deployments') loadDeploymentsHub();
+        if (page === 'versions') loadVersionHub();
+        if (page === 'notifications') loadNotifications();
       }
 
       // Overview Page
@@ -1854,10 +2218,63 @@
           document.getElementById("stat-fail").textContent = fmtNumber(data.totalFail);
           document.getElementById("stat-rate").textContent = fmtPct(data.successRate || 0);
           document.getElementById("last-updated").textContent = "Last updated: " + new Date().toLocaleTimeString('en-US', { timeZone: 'UTC' });
+
+          setAllTimeTop('browser', data.browsers || {});
+          setAllTimeTop('os', data.os || {});
+          setAllTimeTop('type', data.types || {});
+          setAllTimeTop('country', data.countries || {});
+          renderOverviewMiniCharts(data);
+          updateVersionFilterOptions(data.versions || {});
         } catch (e) {
           document.getElementById("sidebar-status").className = "status-dot error";
           document.getElementById("sidebar-status-text").textContent = "Error";
         }
+      }
+
+      function setAllTimeTop(dim, valuesMap) {
+        var entries = Object.entries(valuesMap || {});
+        entries.sort(function(a, b) { return (b[1] || 0) - (a[1] || 0); });
+        var top = entries[0] || ['No data', 0];
+        var valueEl = document.getElementById('all-top-' + dim);
+        var countEl = document.getElementById('all-top-' + dim + '-count');
+        if (!valueEl || !countEl) return;
+        valueEl.textContent = top[0];
+        countEl.textContent = fmtNumber(top[1]) + ' downloads';
+      }
+
+      function renderOverviewMiniCharts(summary) {
+        var success = summary.totalSuccess || 0;
+        var fail = summary.totalFail || 0;
+        var downloads = summary.totalDownloads || 0;
+        var cancelled = (summary.totals && summary.totals.totalCancelled) ? summary.totals.totalCancelled : 0;
+
+        var successPct = downloads > 0 ? (success / downloads) * 100 : 0;
+        var failPct = downloads > 0 ? (fail / downloads) * 100 : 0;
+        var cancelledPct = downloads > 0 ? (cancelled / downloads) * 100 : 0;
+
+        document.getElementById('overview-success-fail-chart').innerHTML =
+          '<div><div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">Success</div><div class="mini-ratio-track"><div class="mini-ratio-fill success" style="width:' + Math.min(100, successPct) + '%">' + successPct.toFixed(1) + '%</div></div></div>' +
+          '<div><div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">Fail</div><div class="mini-ratio-track"><div class="mini-ratio-fill fail" style="width:' + Math.min(100, failPct) + '%">' + failPct.toFixed(1) + '%</div></div></div>';
+
+        document.getElementById('overview-cancelled-chart').innerHTML =
+          '<div><div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">Cancelled</div><div class="mini-ratio-track"><div class="mini-ratio-fill cancelled" style="width:' + Math.min(100, cancelledPct) + '%">' + cancelledPct.toFixed(1) + '%</div></div></div>' +
+          '<div><div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">Downloads</div><div class="mini-ratio-track"><div class="mini-ratio-fill downloads" style="width:100%">' + fmtNumber(downloads) + '</div></div></div>';
+      }
+
+      function updateVersionFilterOptions(versionMap) {
+        var select = document.getElementById('activity-version-filter');
+        if (!select) return;
+        var current = activityVersion || '';
+        var versions = Object.keys(versionMap || {});
+        versions.sort(function(a, b) {
+          return (versionMap[b] || 0) - (versionMap[a] || 0);
+        });
+        var html = '<option value="">All Versions</option>';
+        versions.forEach(function(v) {
+          html += '<option value="' + escapeHtml(v) + '">' + escapeHtml(v) + '</option>';
+        });
+        select.innerHTML = html;
+        select.value = current;
       }
 
       async function loadTopToday() {
@@ -1910,8 +2327,14 @@
       function setActivityRange(range) {
         activityRange = range;
         document.querySelectorAll('#activity-tabs .tab').forEach(function(t) {
-          t.classList.toggle('active', t.textContent.toLowerCase().includes(range));
+          t.classList.toggle('active', t.dataset.range === range);
         });
+        loadActivity();
+      }
+
+      function onActivityVersionChange() {
+        var select = document.getElementById('activity-version-filter');
+        activityVersion = select ? select.value : '';
         loadActivity();
       }
 
@@ -1920,13 +2343,12 @@
         var logContainer = document.getElementById('activity-log');
         chartContainer.innerHTML = '<div class="loading"><div class="spinner"></div>Loading...</div>';
         logContainer.innerHTML = '<div class="loading"><div class="spinner"></div>Loading...</div>';
-
-         var days = activityRange === 'today' ? 1 : 7;
-        var range = getDateRange(days);
-        var granularity = activityRange === 'today' ? 'hour' : 'day';
+        var range = activityRangeParams(activityRange);
+        var params = '?range=' + encodeURIComponent(range.range) + '&granularity=' + encodeURIComponent(range.granularity);
+        if (activityVersion) params += '&extVersion=' + encodeURIComponent(activityVersion);
 
         try {
-          var data = await fetchJSON('/api/stats/timeseries?granularity=' + granularity + '&from=' + range.from + '&to=' + range.to);
+          var data = await fetchJSON('/api/stats/timeseries' + params);
           
           if (!data.points || !data.points.length) {
             chartContainer.innerHTML = '<div class="empty-state">No activity data</div>';
@@ -1936,10 +2358,9 @@
           }
 
           // Store for sorting/export
-          currentLogData = data.points;
-          currentGranularity = granularity;
+          currentGranularity = range.granularity;
 
-          renderBarChart(chartContainer, data.points, granularity);
+          renderBarChart(chartContainer, data.points, range.granularity);
 
           var totalDownloads = 0, totalSuccess = 0, totalFail = 0;
           data.points.forEach(function(p) {
@@ -1952,11 +2373,19 @@
           document.getElementById('activity-success').textContent = fmtNumber(totalSuccess);
           document.getElementById('activity-fail').textContent = fmtNumber(totalFail);
 
-          renderEnhancedLog(data.points, granularity);
+          // Recent activity is always all-time and only sort-filtered by time order.
+          var logParams = '?range=all&granularity=day';
+          if (activityVersion) logParams += '&extVersion=' + encodeURIComponent(activityVersion);
+          var logData = await fetchJSON('/api/stats/timeseries' + logParams);
+          currentLogData = (logData && logData.points) ? logData.points : [];
+          allTimeActivityPoints = currentLogData.slice();
+          renderEnhancedLog(currentLogData, 'day');
+          renderActivityCalendar(allTimeActivityPoints);
 
         } catch (e) {
           chartContainer.innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed: ' + escapeHtml(e.message) + '</div>';
           logContainer.innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed</div>';
+          document.getElementById('activity-calendar').innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed</div>';
         }
       }
 
@@ -2074,6 +2503,52 @@
         a.download = 'activity_log_' + new Date().toISOString().slice(0,10) + '.csv';
         a.click();
         URL.revokeObjectURL(url);
+      }
+
+      function shiftCalendarMonth(delta) {
+        calendarMonthOffset += delta;
+        renderActivityCalendar(allTimeActivityPoints || []);
+      }
+
+      function renderActivityCalendar(points) {
+        var container = document.getElementById('activity-calendar');
+        if (!container) return;
+
+        var now = new Date();
+        var monthDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + calendarMonthOffset, 1));
+        var year = monthDate.getUTCFullYear();
+        var month = monthDate.getUTCMonth();
+        var daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+        var firstWeekday = new Date(Date.UTC(year, month, 1)).getUTCDay();
+        var weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+        var dayCounts = {};
+        (points || []).forEach(function(p) {
+          if (!p.timestamp) return;
+          var key = p.timestamp.slice(0, 10);
+          dayCounts[key] = (dayCounts[key] || 0) + (p.downloads || 0);
+        });
+
+        var html = '<div style="font-size:12px;color:var(--text-secondary);margin-bottom:10px;">' +
+          monthDate.toLocaleDateString('en-US', { timeZone: 'UTC', month: 'long', year: 'numeric' }) +
+          '</div>';
+        html += '<div class="calendar-grid">';
+        weekdayLabels.forEach(function(label) {
+          html += '<div class="calendar-header-cell">' + label + '</div>';
+        });
+        for (var i = 0; i < firstWeekday; i++) {
+          html += '<div class="calendar-day" style="opacity:0.35;"></div>';
+        }
+        for (var d = 1; d <= daysInMonth; d++) {
+          var iso = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+          var hasData = (dayCounts[iso] || 0) > 0;
+          html += '<div class="calendar-day ' + (hasData ? 'has-data' : '') + '" title="' + iso + ' • ' + fmtNumber(dayCounts[iso] || 0) + ' downloads">';
+          html += '<div>' + d + '</div>';
+          html += hasData ? '<div class="calendar-dot"></div>' : '';
+          html += '</div>';
+        }
+        html += '</div>';
+        container.innerHTML = html;
       }
 
       function renderBarChart(container, points, granularity) {
@@ -2276,18 +2751,14 @@
 
       // API Export button for Activity page
       function exportAPICSV() {
-        var days = activityRange === 'today' ? 1 : 7;
-        var range = getDateRange(days);
-        var granularity = activityRange === 'today' ? 'hour' : 'day';
-        var url = '/api/stats/export?format=csv&granularity=' + granularity + '&from=' + range.from + '&to=' + range.to;
+        var range = activityRangeParams(activityRange);
+        var url = '/api/stats/export?format=csv&range=' + encodeURIComponent(range.range) + '&granularity=' + encodeURIComponent(range.granularity);
         window.open(url, '_blank');
       }
 
       function exportAPIJSON() {
-        var days = activityRange === 'today' ? 1 : 7;
-        var range = getDateRange(days);
-        var granularity = activityRange === 'today' ? 'hour' : 'day';
-        var url = '/api/stats/export?format=json&granularity=' + granularity + '&from=' + range.from + '&to=' + range.to;
+        var range = activityRangeParams(activityRange);
+        var url = '/api/stats/export?format=json&range=' + encodeURIComponent(range.range) + '&granularity=' + encodeURIComponent(range.granularity);
         window.open(url, '_blank');
       }
 
@@ -2321,6 +2792,351 @@
         }
       }
 
+      // Dashboards / Management hub
+      async function loadDeploymentsHub() {
+        var container = document.getElementById('deployment-cards');
+        if (!container) return;
+        var defaults = [
+          { key: 'chrome', name: 'Chrome', users: '', version: '', url: 'https://chrome.google.com/webstore/' },
+          { key: 'firefox', name: 'Firefox', users: '', version: '', url: 'https://addons.mozilla.org/' },
+          { key: 'edge', name: 'Edge', users: '', version: '', url: 'https://microsoftedge.microsoft.com/addons/' }
+        ];
+        var saved = {};
+        try {
+          var payload = await fetchJSON('/api/admin/records/list?type=deployment_target');
+          (payload.records || []).forEach(function(item) {
+            saved[item.recordKey] = item.data || {};
+          });
+        } catch (_) {
+          try { saved = JSON.parse(localStorage.getItem('oracleDeployments') || '{}'); } catch (_err) { saved = {}; }
+        }
+
+        var html = '';
+        defaults.forEach(function(item) {
+          var v = saved[item.key] || {};
+          html += '<div class="deployment-card">';
+          html += '<div style="font-weight:600;margin-bottom:8px;">' + item.name + '</div>';
+          html += '<div style="display:grid;gap:8px;">';
+          html += '<input class="auth-input" id="dep-users-' + item.key + '" placeholder="Users" value="' + escapeHtml(v.users || item.users) + '"/>';
+          html += '<input class="auth-input" id="dep-version-' + item.key + '" placeholder="Current version" value="' + escapeHtml(v.version || item.version) + '"/>';
+          html += '<input class="auth-input" id="dep-url-' + item.key + '" placeholder="Dashboard URL" value="' + escapeHtml(v.url || item.url) + '"/>';
+          html += '<button class="btn btn-secondary" onclick="saveDeploymentCard(\'' + item.key + '\')">Save</button>';
+          html += '</div></div>';
+        });
+        container.innerHTML = html;
+        renderUpdateSentenceList();
+      }
+
+      async function saveDeploymentCard(key) {
+        var record = {
+          users: document.getElementById('dep-users-' + key).value,
+          version: document.getElementById('dep-version-' + key).value,
+          url: document.getElementById('dep-url-' + key).value
+        };
+        var ok = await ensureStepUp();
+        if (!ok) return;
+        try {
+          await fetchJSONWithInit('/api/admin/records/upsert', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ recordType: 'deployment_target', recordKey: key, data: record })
+          });
+        } catch (_) {
+          var fallback = {};
+          try { fallback = JSON.parse(localStorage.getItem('oracleDeployments') || '{}'); } catch (_err) { fallback = {}; }
+          fallback[key] = record;
+          localStorage.setItem('oracleDeployments', JSON.stringify(fallback));
+        }
+      }
+
+      function renderUpdateSentenceList() {
+        var container = document.getElementById('update-sentence-list');
+        if (!container) return;
+        var sentences = [
+          'Stability pass completed with lower fail-rate.',
+          'Release includes improved retry behavior.',
+          'This build introduces better analytics visibility.',
+          'Client-side charts are now faster and smoother.',
+          'Outbox relay reliability has been upgraded.',
+          'Security hardening updates are included.',
+          'Step-up verification now protects critical actions.',
+          'Schema drift detection is active and monitored.',
+          'Backup/restore pathways have been improved.',
+          'Dashboard loading behavior is now more resilient.',
+          'Extension deployment metadata has been refreshed.',
+          'Version notes and release records were updated.',
+          'Notification monitoring now tracks open work items.',
+          'Danger-zone controls now support dry-run mode.',
+          'Overall observability and metrics depth increased.'
+        ];
+        var html = '<div style="display:grid;gap:8px;">';
+        sentences.forEach(function(s, idx) {
+          html += '<div class="deployment-card" style="display:flex;justify-content:space-between;align-items:center;gap:10px;">';
+          html += '<span style="font-size:12px;">' + (idx + 1) + '. ' + escapeHtml(s) + '</span>';
+          html += '<button class="btn btn-secondary" onclick="copyText(' + JSON.stringify(s).replace(/"/g, '&quot;') + ')">Copy</button>';
+          html += '</div>';
+        });
+        html += '</div>';
+        container.innerHTML = html;
+      }
+
+      async function copyText(text) {
+        try { await navigator.clipboard.writeText(text); } catch (_) {}
+      }
+
+      async function loadVersionHub() {
+        var container = document.getElementById('version-list');
+        if (!container) return;
+        var items = [];
+        try {
+          var payload = await fetchJSON('/api/admin/records/list?type=extension_version_note');
+          items = (payload.records || []).map(function(item) {
+            return {
+              key: item.recordKey,
+              version: (item.data && item.data.version) || item.recordKey,
+              note: (item.data && item.data.note) || '',
+              createdAt: item.createdAt || 0
+            };
+          });
+        } catch (_) {
+          try { items = JSON.parse(localStorage.getItem('oracleVersionNotes') || '[]'); } catch (_err) { items = []; }
+        }
+        items.sort(function(a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
+        if (!items.length) {
+          container.innerHTML = '<div class="empty-state">No version notes yet</div>';
+          return;
+        }
+        var html = '';
+        items.forEach(function(item) {
+          html += '<div class="deployment-card" style="margin-bottom:8px;">';
+          html += '<div style="font-weight:600;">' + escapeHtml(item.version) + '</div>';
+          html += '<div style="font-size:11px;color:var(--text-muted);margin:4px 0 8px;">' + new Date(item.createdAt).toLocaleString() + '</div>';
+          html += '<div style="white-space:pre-wrap;font-size:12px;">' + escapeHtml(item.note) + '</div>';
+          html += '</div>';
+        });
+        container.innerHTML = html;
+      }
+
+      async function saveVersionNote(e) {
+        e.preventDefault();
+        var version = (document.getElementById('version-input').value || '').trim();
+        var note = (document.getElementById('version-note-input').value || '').trim();
+        if (!version || !note) return;
+        var ok = await ensureStepUp();
+        if (!ok) return;
+        try {
+          await fetchJSONWithInit('/api/admin/records/upsert', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              recordType: 'extension_version_note',
+              recordKey: version + '-' + Date.now(),
+              data: { version: version, note: note, createdAt: Date.now() }
+            })
+          });
+        } catch (_) {
+          var items = [];
+          try { items = JSON.parse(localStorage.getItem('oracleVersionNotes') || '[]'); } catch (_err) { items = []; }
+          items.push({ version: version, note: note, createdAt: Date.now() });
+          localStorage.setItem('oracleVersionNotes', JSON.stringify(items));
+        }
+        document.getElementById('version-input').value = '';
+        document.getElementById('version-note-input').value = '';
+        await loadVersionHub();
+      }
+
+      async function loadNotifications() {
+        var container = document.getElementById('notification-counters');
+        if (!container) return;
+        container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading...</div>';
+        try {
+          var repo = 'adhamhaithameid/Classroom-Quick-Downloader';
+          var issues = await fetch('https://api.github.com/search/issues?q=repo:' + repo + '+type:issue+state:open').then(function(r) { return r.json(); });
+          var prs = await fetch('https://api.github.com/search/issues?q=repo:' + repo + '+type:pr+state:open').then(function(r) { return r.json(); });
+          container.innerHTML =
+            '<div class="stat-card"><div class="stat-label">Open Issues</div><div class="stat-value">' + fmtNumber(issues.total_count || 0) + '</div></div>' +
+            '<div class="stat-card"><div class="stat-label">Open PRs</div><div class="stat-value">' + fmtNumber(prs.total_count || 0) + '</div></div>';
+        } catch (e) {
+          container.innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed to load GitHub counters</div>';
+        }
+      }
+
+      // Danger / admin tooling
+      async function ensureStepUp() {
+        try {
+          var check = await fetchJSON('/api/auth/stepup/check');
+          if (!check.required || check.active) return true;
+          return openStepUpPrompt();
+        } catch (_) {
+          return false;
+        }
+      }
+
+      async function openStepUpPrompt() {
+        try {
+          var start = await fetchJSONWithInit('/api/auth/stepup/start', { method: 'POST' });
+          if (!start.required) return true;
+          var password = window.prompt('Enter super-admin password for critical action:');
+          if (!password) return false;
+          await fetchJSONWithInit('/api/auth/stepup/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ challengeId: start.challengeId, password: password })
+          });
+          return true;
+        } catch (e) {
+          return false;
+        }
+      }
+
+      function setDangerOutput(payload) {
+        var out = document.getElementById('danger-output');
+        if (!out) return;
+        out.textContent = JSON.stringify(payload, null, 2);
+      }
+
+      async function dangerDryRun(scope) {
+        var ok = await ensureStepUp();
+        if (!ok) return;
+        try {
+          var data = await fetchJSONWithInit('/api/admin/danger/clear-data', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ scope: scope, dryRun: true })
+          });
+          setDangerOutput(data);
+        } catch (e) {
+          setDangerOutput({ ok: false, error: String(e) });
+        }
+      }
+
+      async function dangerExecute(scope) {
+        var ok = await ensureStepUp();
+        if (!ok) return;
+        if (!window.confirm('Execute destructive clear-data operation?')) return;
+        try {
+          var data = await fetchJSONWithInit('/api/admin/danger/clear-data', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ scope: scope, dryRun: false })
+          });
+          setDangerOutput(data);
+        } catch (e) {
+          setDangerOutput({ ok: false, error: String(e) });
+        }
+      }
+
+      async function runBackup() {
+        var ok = await ensureStepUp();
+        if (!ok) return;
+        try {
+          var data = await fetchJSONWithInit('/api/admin/backup/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+          setDangerOutput(data);
+        } catch (e) {
+          setDangerOutput({ ok: false, error: String(e) });
+        }
+      }
+
+      async function sqlQuery() {
+        var ok = await ensureStepUp();
+        if (!ok) return;
+        var sql = (document.getElementById('sql-console-input').value || '').trim();
+        if (!sql) return;
+        try {
+          var data = await fetchJSONWithInit('/api/admin/sql/query', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sql: sql, limit: 200 })
+          });
+          setDangerOutput(data);
+        } catch (e) {
+          setDangerOutput({ ok: false, error: String(e) });
+        }
+      }
+
+      async function sqlExec(dryRun) {
+        var ok = await ensureStepUp();
+        if (!ok) return;
+        var sql = (document.getElementById('sql-console-input').value || '').trim();
+        if (!sql) return;
+        if (!dryRun && !window.confirm('Run mutating SQL statement?')) return;
+        try {
+          var data = await fetchJSONWithInit('/api/admin/sql/exec', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sql: sql, dryRun: dryRun })
+          });
+          setDangerOutput(data);
+        } catch (e) {
+          setDangerOutput({ ok: false, error: String(e) });
+        }
+      }
+
+      // Command palette
+      var paletteCommands = [
+        { id: 'overview', label: 'Go: Overview', run: function() { showPage('overview'); } },
+        { id: 'activity', label: 'Go: Activity', run: function() { showPage('activity'); } },
+        { id: 'charts', label: 'Go: Charts', run: function() { showPage('charts'); } },
+        { id: 'dashboards', label: 'Go: Dashboards', run: function() { showPage('dashboards'); } },
+        { id: 'deployments', label: 'Go: Deployments', run: function() { showPage('deployments'); } },
+        { id: 'versions', label: 'Go: Versions', run: function() { showPage('versions'); } },
+        { id: 'notifications', label: 'Go: Notifications', run: function() { showPage('notifications'); } },
+        { id: 'danger', label: 'Go: Danger Zone', run: function() { showPage('danger'); } },
+        { id: 'refresh', label: 'Action: Refresh All', run: function() { refreshAll(); } },
+        { id: 'stepup', label: 'Action: Step-Up Verify', run: function() { openStepUpPrompt(); } }
+      ];
+
+      function openPalette() {
+        var modal = document.getElementById('command-palette-modal');
+        var input = document.getElementById('palette-input');
+        if (!modal || !input) return;
+        modal.classList.add('visible');
+        modal.setAttribute('aria-hidden', 'false');
+        input.value = '';
+        paletteIndex = 0;
+        renderPalette();
+        setTimeout(function() { input.focus(); }, 0);
+      }
+
+      function closePalette() {
+        var modal = document.getElementById('command-palette-modal');
+        if (!modal) return;
+        modal.classList.remove('visible');
+        modal.setAttribute('aria-hidden', 'true');
+      }
+
+      function filteredPaletteCommands() {
+        var input = document.getElementById('palette-input');
+        var q = ((input && input.value) || '').toLowerCase();
+        if (!q) return paletteCommands.slice();
+        return paletteCommands.filter(function(cmd) { return cmd.label.toLowerCase().includes(q); });
+      }
+
+      function renderPalette() {
+        var results = document.getElementById('palette-results');
+        if (!results) return;
+        var items = filteredPaletteCommands();
+        if (!items.length) {
+          results.innerHTML = '<div class="empty-state">No commands</div>';
+          return;
+        }
+        if (paletteIndex >= items.length) paletteIndex = 0;
+        if (paletteIndex < 0) paletteIndex = items.length - 1;
+        var html = '';
+        items.forEach(function(item, idx) {
+          html += '<div class="palette-item ' + (idx === paletteIndex ? 'active' : '') + '" data-cmd="' + escapeHtml(item.id) + '">' + escapeHtml(item.label) + '</div>';
+        });
+        results.innerHTML = html;
+        Array.from(results.querySelectorAll('.palette-item')).forEach(function(el) {
+          el.addEventListener('click', function() {
+            var id = el.getAttribute('data-cmd');
+            var cmd = paletteCommands.find(function(c) { return c.id === id; });
+            if (cmd) cmd.run();
+            closePalette();
+          });
+        });
+      }
+
       // Refresh all data
       async function refreshAll() {
         var btn = document.getElementById("refresh-btn");
@@ -2336,6 +3152,9 @@
           await loadCharts();
           await loadComparison();
         }
+        if (currentPage === 'deployments') loadDeploymentsHub();
+        if (currentPage === 'versions') loadVersionHub();
+        if (currentPage === 'notifications') await loadNotifications();
 
         btn.disabled = false;
         btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 11-2.52-6.25"/><path d="M21 4v5h-5"/></svg> Refresh';
@@ -2343,6 +3162,47 @@
 
       // Init
       window.addEventListener("load", function() {
+        var paletteInput = document.getElementById('palette-input');
+        if (paletteInput) {
+          paletteInput.addEventListener('input', function() {
+            paletteIndex = 0;
+            renderPalette();
+          });
+          paletteInput.addEventListener('keydown', function(e) {
+            if (e.key === 'ArrowDown') {
+              e.preventDefault();
+              paletteIndex += 1;
+              renderPalette();
+            } else if (e.key === 'ArrowUp') {
+              e.preventDefault();
+              paletteIndex -= 1;
+              renderPalette();
+            } else if (e.key === 'Enter') {
+              e.preventDefault();
+              var items = filteredPaletteCommands();
+              if (!items.length) return;
+              items[paletteIndex].run();
+              closePalette();
+            } else if (e.key === 'Escape') {
+              e.preventDefault();
+              closePalette();
+            }
+          });
+        }
+        document.addEventListener('keydown', function(e) {
+          if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+            e.preventDefault();
+            openPalette();
+          } else if (e.key === 'Escape') {
+            closePalette();
+          }
+        });
+        var paletteModal = document.getElementById('command-palette-modal');
+        if (paletteModal) {
+          paletteModal.addEventListener('click', function(ev) {
+            if (ev.target === paletteModal) closePalette();
+          });
+        }
         refreshAll();
         setInterval(refreshAll, 60000);
       });
