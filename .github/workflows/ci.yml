@@ -55,3 +55,36 @@ jobs:
     # Run the exact same script you use locally
     - name: Run Full Validation Suite
       run: ./tools/validate.sh
+
+  oracle-migration-smoke:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: oracle_test
+          POSTGRES_USER: postgres
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+        - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d oracle_test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24.13'
+
+    - name: Run Migration Bootstrap + Tests
+      working-directory: oracle-backend
+      env:
+        POSTGRES_DSN: postgres://postgres@localhost:5432/oracle_test?sslmode=disable
+      run: |
+        go test ./internal/db -run 'TestMigrationBootstrapCleanDatabases|TestInitPostgres_Smoke' -count=1 -v
+        go test ./... -count=1
