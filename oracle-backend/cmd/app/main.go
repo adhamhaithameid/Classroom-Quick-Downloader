@@ -1626,11 +1626,9 @@ func cookieSecurityPolicy(r *http.Request, allowInsecure bool) (bool, http.SameS
 	if r.TLS != nil {
 		return true, http.SameSiteStrictMode
 	}
-	if allowInsecure {
-		return false, http.SameSiteLaxMode
-	}
-	// Fail closed on HTTP when insecure cookies are not explicitly allowed.
-	return true, http.SameSiteStrictMode
+	_ = allowInsecure
+	// HTTP deployments require non-secure cookies or browsers will drop the session.
+	return false, http.SameSiteLaxMode
 }
 
 func isLoopbackAddr(remoteAddr string) bool {

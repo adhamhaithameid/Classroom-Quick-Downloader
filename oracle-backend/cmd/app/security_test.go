@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -53,6 +54,30 @@ func TestSpaHandler_AllowsStaticFilesAndBlocksTraversal(t *testing.T) {
 	h.ServeHTTP(rr, req)
 	if rr.Code != http.StatusForbidden && rr.Code != http.StatusBadRequest {
 		t.Fatalf("expected traversal to be blocked, got %d", rr.Code)
+	}
+}
+
+func TestSpaHandler_ReplacesCSPNoncePlaceholderInIndex(t *testing.T) {
+	dir := t.TempDir()
+	indexPath := filepath.Join(dir, "index.html")
+	if err := os.WriteFile(indexPath, []byte(`<html><body><script nonce="__CSP_NONCE__">console.log("ok")</script></body></html>`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	h := securityHeadersMiddleware(spaHandler(dir))
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200 for index, got %d", rr.Code)
+	}
+	body := rr.Body.String()
+	if strings.Contains(body, "__CSP_NONCE__") {
+		t.Fatalf("expected CSP nonce placeholder to be replaced")
+	}
+	csp := rr.Header().Get("Content-Security-Policy")
+	if !strings.Contains(csp, "nonce-") {
+		t.Fatalf("expected nonce in CSP header, got %q", csp)
 	}
 }
 
@@ -214,6 +239,58 @@ func TestLoginHandler_AllowsInsecureCookieOnHttpWhenAllowed(t *testing.T) {
 				t.Fatalf("expected SameSite=Lax, got: %+v", c)
 			}
 		}
+	}
+}
+
+func TestLoginHandler_HTTPCookieRemainsUsableWhenInsecureDisabled(t *testing.T) {
+	resetSessionStore()
+	resetLoginRateStore()
+	h := loginHandler("secret", false)
+
+	body := bytes.NewBufferString(`{"password":"secret"}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", body)
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+	var found bool
+	for _, c := range rr.Result().Cookies() {
+		if c.Name != sessionCookieName {
+			continue
+		}
+		found = true
+		if c.Secure {
+			t.Fatalf("expected insecure cookie for HTTP deployments, got: %+v", c)
+		}
+		if c.SameSite != http.SameSiteLaxMode {
+			t.Fatalf("expected SameSite=Lax, got: %+v", c)
+		}
+	}
+	if !found {
+		t.Fatalf("expected cookie named %s", sessionCookieName)
+	}
+}
+
+func TestHashPassword_UsesBcrypt(t *testing.T) {
+	hashA, err := hashPassword("super-secret")
+	if err != nil {
+		t.Fatalf("hashPassword failed: %v", err)
+	}
+	hashB, err := hashPassword("super-secret")
+	if err != nil {
+		t.Fatalf("hashPassword failed: %v", err)
+	}
+	if hashA == hashB {
+		t.Fatalf("expected salted hashes to differ")
+	}
+	if !verifyPasswordHash(hashA, "super-secret") {
+		t.Fatalf("expected verifyPasswordHash to accept valid password")
+	}
+	if verifyPasswordHash(hashA, "wrong-password") {
+		t.Fatalf("expected verifyPasswordHash to reject invalid password")
 	}
 }
 

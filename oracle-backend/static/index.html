@@ -2576,7 +2576,7 @@
             }
             const checkPayload = await checkRes.json().catch(function() { return {}; });
             if (!checkPayload || checkPayload.authenticated !== true) {
-              setAuthError('Session cookie was not saved. For HTTP mode set ALLOW_INSECURE_COOKIES=true and retry.');
+              setAuthError('Session cookie was not saved by your browser. Enable cookies, refresh, and try again.');
               input.select();
               input.focus();
               return;
