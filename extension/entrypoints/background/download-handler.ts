@@ -63,49 +63,59 @@ export function openDriveBypassTab(pending: PendingDownload, url: string): void 
  * Try the next auth user for a Drive download.
  * Cycles through authuser=0..9 to find one with access.
  */
-export function startNextDriveAttempt(pending: PendingDownload): void {
+export async function startNextDriveAttempt(pending: PendingDownload): Promise<void> {
   pending.htmlSeen = false;
   pending.fallbackStarted = false;
   pending.confirmed403 = false;
 
-  const nextAuth = AUTHUSER_CANDIDATES.find(
-    (n) => !pending.attemptedAuthUsers.includes(n)
-  );
-
-  if (nextAuth == null) {
-    sendStatusToTab(pending, 'error', 'Access denied for all accounts.', 'AUTH_ALL_FAILED');
-    recordDownloadEvent({
-      type: pending.fileMeta?.ext || 'unknown',
-      status: 'fail',
-      duration_ms: Date.now() - pending.startTime,
-      bypass_used: true,
-      error_type: 'AUTH_ALL_FAILED',
-    });
-    cleanup(pending);
-    return;
-  }
-
-  pending.attemptedAuthUsers.push(nextAuth);
-  pending.currentAuthUser = nextAuth;
-
-  if (IS_FIREFOX) {
-    // Firefox: Open bypass tab with next auth
-    const attemptUrl = buildUrlWithAuthUser(pending.baseUrl, nextAuth);
-    openDriveBypassTab(pending, attemptUrl);
-  } else {
-    // Chrome: Try native download
-    const attemptUrl = buildUrlWithAuthUser(pending.baseUrl, nextAuth);
-    chrome.downloads.download(
-      { url: attemptUrl, saveAs: false, conflictAction: 'uniquify' },
-      (downloadId) => {
-        if (chrome.runtime.lastError || !downloadId) {
-          startNextDriveAttempt(pending);
-          return;
-        }
-        pending.currentDownloadId = downloadId;
-        pendingByDownloadId.set(downloadId, pending);
-      }
+  while (true) {
+    const nextAuth = AUTHUSER_CANDIDATES.find(
+      (n) => !pending.attemptedAuthUsers.includes(n)
     );
+
+    if (nextAuth == null) {
+      sendStatusToTab(pending, 'error', 'Access denied for all accounts.', 'AUTH_ALL_FAILED');
+      recordDownloadEvent({
+        type: pending.fileMeta?.ext || 'unknown',
+        status: 'fail',
+        duration_ms: Date.now() - pending.startTime,
+        bypass_used: true,
+        error_type: 'AUTH_ALL_FAILED',
+      });
+      cleanup(pending);
+      return;
+    }
+
+    pending.attemptedAuthUsers.push(nextAuth);
+    pending.currentAuthUser = nextAuth;
+    const attemptUrl = buildUrlWithAuthUser(pending.baseUrl, nextAuth);
+
+    if (IS_FIREFOX) {
+      // Firefox: Open bypass tab with next auth
+      openDriveBypassTab(pending, attemptUrl);
+      return;
+    }
+
+    // Chrome: Try native download
+    const downloadId = await new Promise<number | undefined>((resolve) => {
+      chrome.downloads.download(
+        { url: attemptUrl, saveAs: false, conflictAction: 'uniquify' },
+        (id) => {
+          if (chrome.runtime.lastError || !id) {
+            resolve(undefined);
+          } else {
+            resolve(id);
+          }
+        }
+      );
+    });
+
+    if (downloadId) {
+      pending.currentDownloadId = downloadId;
+      pendingByDownloadId.set(downloadId, pending);
+      return;
+    }
+    // Loop continues if download failed to start
   }
 }
 

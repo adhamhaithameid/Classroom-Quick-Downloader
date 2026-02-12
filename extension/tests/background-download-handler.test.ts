@@ -175,7 +175,7 @@ describe('background download handler', () => {
       isDrive: true,
       attemptedAuthUsers: [0, 1],
     });
-    ctx.mod.startNextDriveAttempt(pending);
+    await ctx.mod.startNextDriveAttempt(pending);
     expect(ctx.sendStatusSpy).toHaveBeenCalledWith(
       pending,
       'error',
@@ -193,7 +193,7 @@ describe('background download handler', () => {
       attemptedAuthUsers: [0],
       fileMeta: undefined as any,
     });
-    ctx.mod.startNextDriveAttempt(pending);
+    await ctx.mod.startNextDriveAttempt(pending);
     expect(ctx.recordSpy).toHaveBeenCalledWith(expect.objectContaining({
       type: 'unknown',
       error_type: 'AUTH_ALL_FAILED',
@@ -204,7 +204,7 @@ describe('background download handler', () => {
     const ctx = await loadDownloadHandler({ isFirefox: true, authCandidates: [3] });
     const pending = makePending({ isDrive: true, attemptedAuthUsers: [] });
     (chrome.tabs.create as any).mockImplementation((_: unknown, cb: (tab: { id?: number }) => void) => cb({ id: 5 }));
-    ctx.mod.startNextDriveAttempt(pending);
+    await ctx.mod.startNextDriveAttempt(pending);
     expect(pending.currentAuthUser).toBe(3);
     expect(ctx.stateModule.pendingByBypassTabId.get(5)).toBe(pending);
   });
@@ -224,7 +224,7 @@ describe('background download handler', () => {
       }
     });
 
-    ctx.mod.startNextDriveAttempt(pending);
+    await ctx.mod.startNextDriveAttempt(pending);
 
     expect(calls).toBe(2);
     expect(pending.attemptedAuthUsers).toEqual([0, 1]);
