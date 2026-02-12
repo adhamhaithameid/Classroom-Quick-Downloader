@@ -134,47 +134,17 @@ func ingestBatch(ctx context.Context, db *sql.DB, batch *model.OracleBatch) erro
 	defer tx.Rollback()
 
 	// Idempotency: if batch_id exists, do nothing.
-	var exists int
-	err = tx.QueryRowContext(ctx, `SELECT 1 FROM batches WHERE batch_id = ?`, batch.BatchID).Scan(&exists)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	exists, err := checkBatchExists(ctx, tx, batch.BatchID)
+	if err != nil {
 		return err
 	}
-	if err == nil {
+	if exists {
 		// Already ingested.
 		return tx.Commit()
 	}
 
-	// Aggregate totals across all time buckets.
-	var totalEvents, totalDownloads, totalSuccess, totalFail int64
-	for _, b := range batch.TimeBuckets {
-		totalEvents += b.Totals.TotalEvents
-		totalDownloads += b.Totals.TotalDownloads
-		totalSuccess += b.Totals.TotalSuccess
-		totalFail += b.Totals.TotalFail
-	}
-
-	nowMs := time.Now().UnixMilli()
-	generatedAt := batch.GeneratedAt
-	if generatedAt == 0 {
-		generatedAt = nowMs
-	}
-
-	// Insert into batches.
-	if _, err := tx.ExecContext(
-		ctx,
-		`INSERT INTO batches (
-			batch_id, generated_at, ingested_at, time_zone,
-			events_count, downloads_count, success_count, fail_count
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		batch.BatchID,
-		generatedAt,
-		nowMs,
-		batch.TimeZone,
-		totalEvents,
-		totalDownloads,
-		totalSuccess,
-		totalFail,
-	); err != nil {
+	// Insert into batches (with aggregation).
+	if err := insertBatchRecord(ctx, tx, batch); err != nil {
 		return err
 	}
 
@@ -783,4 +753,53 @@ func recordOracleFailure(
 			"error": err.Error(),
 		})
 	}
+}
+
+func checkBatchExists(ctx context.Context, tx *sql.Tx, batchID string) (bool, error) {
+	var exists int
+	err := tx.QueryRowContext(ctx, `SELECT 1 FROM batches WHERE batch_id = ?`, batchID).Scan(&exists)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
+func insertBatchRecord(ctx context.Context, tx *sql.Tx, batch *model.OracleBatch) error {
+	// Aggregate totals across all time buckets.
+	var totalEvents, totalDownloads, totalSuccess, totalFail int64
+	for _, b := range batch.TimeBuckets {
+		totalEvents += b.Totals.TotalEvents
+		totalDownloads += b.Totals.TotalDownloads
+		totalSuccess += b.Totals.TotalSuccess
+		totalFail += b.Totals.TotalFail
+	}
+
+	nowMs := time.Now().UnixMilli()
+	generatedAt := batch.GeneratedAt
+	if generatedAt == 0 {
+		generatedAt = nowMs
+	}
+
+	// Insert into batches.
+	if _, err := tx.ExecContext(
+		ctx,
+		`INSERT INTO batches (
+			batch_id, generated_at, ingested_at, time_zone,
+			events_count, downloads_count, success_count, fail_count
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		batch.BatchID,
+		generatedAt,
+		nowMs,
+		batch.TimeZone,
+		totalEvents,
+		totalDownloads,
+		totalSuccess,
+		totalFail,
+	); err != nil {
+		return err
+	}
+	return nil
 }
