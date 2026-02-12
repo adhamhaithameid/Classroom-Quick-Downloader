@@ -3063,26 +3063,26 @@ export class DownloadsDurable {
       else summary.totals.totalFail += weight;
 
       // Aggregations
-      const browser = (ev.browser || "unknown").toLowerCase();
+      const browser = ev.browser || "unknown";
       summary.browsers[browser] = (summary.browsers[browser] || 0) + weight;
 
-      const os = (ev.os || "unknown").toLowerCase();
+      const os = ev.os || "unknown";
       summary.os[os] = (summary.os[os] || 0) + weight;
 
-      const country = (ev.country || "unknown").toLowerCase();
+      const country = ev.country || "unknown";
       summary.countries[country] = (summary.countries[country] || 0) + weight;
 
-      const lang = (ev.language || "unknown").toLowerCase();
+      const lang = ev.language || "unknown";
       summary.languages[lang] = (summary.languages[lang] || 0) + weight;
 
       const ver = ev.ext_version || "0.0.0";
       summary.versions[ver] = (summary.versions[ver] || 0) + weight;
 
-      const type = (ev.file_type || "unknown").toLowerCase();
+      const type = ev.file_type || "unknown";
       summary.types[type] = (summary.types[type] || 0) + weight;
 
       if (ev.status === "fail") {
-        const err = (ev.error_type || "unknown").toLowerCase();
+        const err = ev.error_type || "unknown";
         summary.errorReasons[err] = (summary.errorReasons[err] || 0) + weight;
       }
       if (typeof ev.seq === "number" && Number.isFinite(ev.seq)) {
@@ -3187,26 +3187,26 @@ export class DownloadsDurable {
       const status = ev.status || "unknown";
       counters.byStatus[status] = (counters.byStatus[status] || 0) + weight;
 
-      const type = (ev.file_type || "unknown").toLowerCase();
+      const type = ev.file_type || "unknown";
       counters.byType[type] = (counters.byType[type] || 0) + weight;
 
-      const browser = (ev.browser || "unknown").toLowerCase();
+      const browser = ev.browser || "unknown";
       counters.byBrowser[browser] = (counters.byBrowser[browser] || 0) + weight;
 
-      const os = (ev.os || "unknown").toLowerCase();
+      const os = ev.os || "unknown";
       counters.byOs[os] = (counters.byOs[os] || 0) + weight;
 
       const extVer = ev.ext_version || "0.0.0";
       counters.byExtVersion[extVer] = (counters.byExtVersion[extVer] || 0) + weight;
 
-      const lang = (ev.language || "unknown").toLowerCase();
+      const lang = ev.language || "unknown";
       counters.byLanguage[lang] = (counters.byLanguage[lang] || 0) + weight;
 
-      const country = (ev.country || "unknown").toLowerCase();
+      const country = ev.country || "unknown";
       counters.byCountry[country] = (counters.byCountry[country] || 0) + weight;
 
       if (ev.status === "fail") {
-        const errType = (ev.error_type || "unknown").toLowerCase();
+        const errType = ev.error_type || "unknown";
         counters.byErrorType[errType] = (counters.byErrorType[errType] || 0) + weight;
       }
     }
