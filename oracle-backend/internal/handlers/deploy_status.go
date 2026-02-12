@@ -21,6 +21,15 @@ type DeployStatus struct {
 	Stale      bool   `json:"stale"`
 }
 
+// Variables to allow mocking in tests
+var (
+	execCommandOutput = func(name string, arg ...string) ([]byte, error) {
+		return exec.Command(name, arg...).Output()
+	}
+	timeNow   = time.Now
+	timeSince = time.Since
+)
+
 // DeployStatusHandler returns the current deployment status
 func DeployStatusHandler() http.HandlerFunc {
 	// Cache the deployment info at startup
@@ -38,7 +47,7 @@ func getDeployStatus() DeployStatus {
 		Commit:     "unknown",
 		CommitFull: "unknown",
 		Branch:     "main",
-		DeployedAt: time.Now().UTC().Format(time.RFC3339),
+		DeployedAt: timeNow().UTC().Format(time.RFC3339),
 		Stale:      false,
 	}
 	
@@ -52,7 +61,7 @@ func getDeployStatus() DeployStatus {
 		}
 	} else {
 		// Fall back to git command
-		if out, err := exec.Command("git", "rev-parse", "HEAD").Output(); err == nil {
+		if out, err := execCommandOutput("git", "rev-parse", "HEAD"); err == nil {
 			full := strings.TrimSpace(string(out))
 			status.CommitFull = full
 			if len(full) > 7 {
@@ -64,12 +73,12 @@ func getDeployStatus() DeployStatus {
 	}
 	
 	// Get commit message
-	if out, err := exec.Command("git", "log", "-1", "--pretty=%s").Output(); err == nil {
+	if out, err := execCommandOutput("git", "log", "-1", "--pretty=%s"); err == nil {
 		status.Message = strings.TrimSpace(string(out))
 	}
 	
 	// Get branch
-	if out, err := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD").Output(); err == nil {
+	if out, err := execCommandOutput("git", "rev-parse", "--abbrev-ref", "HEAD"); err == nil {
 		status.Branch = strings.TrimSpace(string(out))
 	}
 	
@@ -79,7 +88,7 @@ func getDeployStatus() DeployStatus {
 		
 		// Check if deployment is stale (>24h old)
 		if t, err := time.Parse(time.RFC3339, deployTime); err == nil {
-			if time.Since(t) > 24*time.Hour {
+			if timeSince(t) > 24*time.Hour {
 				status.Stale = true
 			}
 		}
