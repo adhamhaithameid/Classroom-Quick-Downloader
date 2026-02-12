@@ -114,7 +114,7 @@
 
       /* Sidebar */
       .sidebar {
-        width: 220px;
+        width: 276px;
         background: var(--bg-primary);
         border-right: 1px solid var(--border-primary);
         display: flex;
@@ -201,8 +201,7 @@
       .sidebar-footer {
         padding: 12px;
         border-top: 1px solid var(--border-primary);
-        display: grid;
-        gap: 10px;
+        display: block;
         overflow: hidden;
       }
 
@@ -211,9 +210,39 @@
         gap: 8px;
       }
 
-      .sidebar-controls .btn {
+      .sidebar-controls-row {
+        display: grid;
+        gap: 8px;
+      }
+
+      .sidebar-controls-row.secondary {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      }
+
+      .sidebar-controls-row.bottom {
+        grid-template-columns: minmax(0, 1fr) 38px 38px;
+        align-items: stretch;
+      }
+
+      .sidebar-controls .btn,
+      .sidebar-controls .status-indicator {
         width: 100%;
+        min-height: 36px;
         justify-content: flex-start;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        box-shadow: none;
+        color: var(--text-secondary);
+        font-size: 11px;
+        font-weight: 600;
+        padding: 8px 10px;
+      }
+
+      .sidebar-controls .btn:hover {
+        background: var(--bg-tertiary);
+        border-color: var(--border-secondary);
+        color: var(--text-primary);
       }
 
       #deploy-status-btn {
@@ -230,7 +259,29 @@
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
-        max-width: 120px;
+        max-width: 130px;
+      }
+
+      .sidebar-controls .footer-icon-btn {
+        min-width: 38px;
+        width: 38px;
+        padding: 0;
+        justify-content: center;
+      }
+
+      .sidebar-controls .footer-icon-btn svg {
+        width: 15px;
+        height: 15px;
+      }
+
+      .sidebar-controls .footer-batch-btn {
+        justify-content: flex-start;
+      }
+
+      .sidebar-controls .footer-batch-btn .footer-batch-label {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
 
       .status-indicator {
@@ -262,7 +313,7 @@
       .status-dot.warning { background: var(--warning); box-shadow: 0 0 8px rgba(245,158,11,0.5); }
 
       /* Main Content */
-      .main-content { flex: 1; margin-left: 220px; min-height: 100vh; overflow-x: hidden; }
+      .main-content { flex: 1; margin-left: 276px; min-height: 100vh; overflow-x: hidden; }
 
       /* Top Bar */
       .topbar {
@@ -669,8 +720,10 @@
       /* Floating tooltip */
       .floating-tooltip {
         position: fixed;
-        background: var(--bg-primary);
-        border: 1px solid var(--accent);
+        background: rgba(9, 9, 11, 0.85);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        border: 1px solid #3b82f6;
         border-radius: 8px;
         padding: 10px 14px;
         font-size: 12px;
@@ -678,7 +731,7 @@
         opacity: 0;
         transition: opacity 0.15s ease;
         z-index: 1000;
-        box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+        box-shadow: 0 8px 32px rgba(59, 130, 246, 0.25), 0 0 0 1px rgba(59, 130, 246, 0.1);
         max-width: 200px;
       }
 
@@ -1720,26 +1773,34 @@
 
         <div class="sidebar-footer">
           <div class="sidebar-controls">
-            <button class="btn btn-secondary" id="shortcuts-btn" data-shortcut="Cmd+/" data-tooltip="Keyboard shortcuts" data-tooltip-position="bottom">
-              Shortcuts
-            </button>
-            <a href="https://github.com/adhamhaithameid/Classroom-Quick-Downloader/commits/main" target="_blank" class="btn btn-secondary deploy-status-btn" id="deploy-status-btn" data-role="deploy-status-btn" data-tooltip="Deployment status - Click to view commit" data-tooltip-position="bottom">
-              <span id="deploy-icon" data-role="deploy-icon">🔄</span>
-              <span id="deploy-commit" data-role="deploy-commit">Loading...</span>
-            </a>
-            <button class="btn" id="batch-btn" data-shortcut="Cmd+B" data-tooltip="View last batch info" data-tooltip-position="bottom">
-              📦 Last Batch
-            </button>
-            <button class="btn refresh-action-btn" id="refresh-btn" data-role="refresh-action" data-shortcut="Cmd+R" data-tooltip="Refresh all data" data-tooltip-position="bottom">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 12a9 9 0 11-2.52-6.25"/><path d="M21 4v5h-5"/>
-              </svg>
-              Refresh
-            </button>
-          </div>
-          <div class="status-indicator" id="status-indicator" data-tooltip="System status">
-            <div class="status-dot" id="sidebar-status"></div>
-            <span id="sidebar-status-text">Connecting...</span>
+            <div class="sidebar-controls-row secondary">
+              <button class="btn footer-batch-btn" id="batch-btn" data-shortcut="Cmd+B" data-tooltip="View last batch info" data-tooltip-position="bottom">
+                <span aria-hidden="true">📦</span>
+                <span class="footer-batch-label">Last Batch</span>
+              </button>
+              <a href="https://github.com/adhamhaithameid/Classroom-Quick-Downloader/commits/main" target="_blank" class="btn deploy-status-btn" id="deploy-status-btn" data-role="deploy-status-btn" data-tooltip="Deployment status - Click to view commit" data-tooltip-position="bottom">
+                <span id="deploy-icon" data-role="deploy-icon">🔄</span>
+                <span id="deploy-commit" data-role="deploy-commit">Loading...</span>
+              </a>
+            </div>
+            <div class="sidebar-controls-row bottom">
+              <div class="status-indicator" id="status-indicator" data-tooltip="System status">
+                <div class="status-dot" id="sidebar-status"></div>
+                <span id="sidebar-status-text">Connecting...</span>
+              </div>
+              <button class="btn footer-icon-btn" id="shortcuts-btn" data-shortcut="Cmd+/" data-tooltip="Keyboard shortcuts" data-tooltip-position="bottom" aria-label="Shortcuts">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <rect x="3" y="5" width="18" height="14" rx="2"></rect>
+                  <path d="M8 9h.01M12 9h.01M16 9h.01M8 13h8"></path>
+                </svg>
+              </button>
+              <button class="btn refresh-action-btn footer-icon-btn" id="refresh-btn" data-role="refresh-action" data-shortcut="Cmd+R" data-tooltip="Refresh all data" data-tooltip-position="bottom" aria-label="Refresh">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path d="M21 12a9 9 0 11-2.52-6.25"></path>
+                  <path d="M21 4v5h-5"></path>
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
       </aside>
@@ -3003,7 +3064,37 @@
       // Floating tooltip
       var tooltip = document.getElementById('chart-tooltip');
       
-      function showTooltip(e, payload) {
+      // Command-key-based tooltip logic
+      var cmdHeld = false;
+      var canShowTooltip = false;
+      var cmdTimer = null;
+      var currentTooltipEvent = null;
+      var currentTooltipPayload = null;
+      var CMD_DELAY = 1000;
+
+      document.addEventListener('keydown', function(e) {
+        if ((e.key === 'Meta' || e.key === 'Control') && !cmdHeld) {
+          cmdHeld = true;
+          cmdTimer = setTimeout(function() {
+            canShowTooltip = true;
+            if (currentTooltipEvent && currentTooltipPayload) {
+              renderTooltip(currentTooltipEvent, currentTooltipPayload);
+            }
+          }, CMD_DELAY);
+        }
+      });
+
+      document.addEventListener('keyup', function(e) {
+        if (e.key === 'Meta' || e.key === 'Control') {
+          cmdHeld = false;
+          canShowTooltip = false;
+          if (cmdTimer) clearTimeout(cmdTimer);
+          cmdTimer = null;
+          hideTooltip();
+        }
+      });
+      
+      function renderTooltip(e, payload) {
         var model = payload || {};
         var title = String(model.title || '');
         var rows = Array.isArray(model.rows) ? model.rows : [];
@@ -3024,8 +3115,20 @@
         tooltip.style.left = x + 'px';
         tooltip.style.top = y + 'px';
       }
+
+      function showTooltip(e, payload) {
+        currentTooltipEvent = e;
+        currentTooltipPayload = payload;
+        if (canShowTooltip) {
+          renderTooltip(e, payload);
+        }
+      }
       
-      function hideTooltip() { tooltip.classList.remove('visible'); }
+      function hideTooltip() { 
+        currentTooltipEvent = null;
+        currentTooltipPayload = null;
+        tooltip.classList.remove('visible'); 
+      }
 
       // Batch Modal
       function showBatchModal() {
@@ -5140,7 +5243,14 @@
         var refreshButtons = Array.from(document.querySelectorAll('[data-role="refresh-action"]'));
         refreshButtons.forEach(function(btn) {
           btn.disabled = true;
-          btn.innerHTML = '<div class="spinner"></div> Refreshing...';
+          if (!btn.dataset.defaultHtml) {
+            btn.dataset.defaultHtml = btn.innerHTML;
+          }
+          if (btn.classList.contains('footer-icon-btn')) {
+            btn.innerHTML = '<div class="spinner"></div>';
+          } else {
+            btn.innerHTML = '<div class="spinner"></div> Refreshing...';
+          }
         });
         
         await loadOverview();
@@ -5163,7 +5273,11 @@
 
         refreshButtons.forEach(function(btn) {
           btn.disabled = false;
-          btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 11-2.52-6.25"/><path d="M21 4v5h-5"/></svg> Refresh';
+          if (btn.dataset.defaultHtml) {
+            btn.innerHTML = btn.dataset.defaultHtml;
+          } else {
+            btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 11-2.52-6.25"/><path d="M21 4v5h-5"/></svg> Refresh';
+          }
         });
       }
 
