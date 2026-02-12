@@ -40,9 +40,6 @@
         line-height: 1.5;
         min-height: 100vh;
         overflow-x: hidden;
-        background-image:
-          radial-gradient(circle at 8% 8%, rgba(59,130,246,0.12) 0%, transparent 34%),
-          radial-gradient(circle at 92% 0%, rgba(34,197,94,0.08) 0%, transparent 28%);
       }
 
       .layout { display: flex; min-height: 100vh; width: 100%; overflow-x: clip; }
@@ -87,10 +84,19 @@
         border-top-color: var(--border-secondary);
       }
 
-      [data-tooltip]:hover::before,
-      [data-tooltip]:hover::after {
-        opacity: 1;
-        visibility: visible;
+      @media (hover: hover) and (pointer: fine) {
+        [data-tooltip]:hover::before,
+        [data-tooltip]:hover::after {
+          opacity: 1;
+          visibility: visible;
+        }
+      }
+
+      @media (hover: none) {
+        [data-tooltip]::before,
+        [data-tooltip]::after {
+          display: none;
+        }
       }
 
       /* Tooltip below for items near top */
@@ -195,6 +201,36 @@
       .sidebar-footer {
         padding: 12px;
         border-top: 1px solid var(--border-primary);
+        display: grid;
+        gap: 10px;
+        overflow: hidden;
+      }
+
+      .sidebar-controls {
+        display: grid;
+        gap: 8px;
+      }
+
+      .sidebar-controls .btn {
+        width: 100%;
+        justify-content: flex-start;
+      }
+
+      #deploy-status-btn {
+        width: 100%;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .deploy-status-btn > span {
+        min-width: 0;
+      }
+
+      .deploy-status-btn [data-role="deploy-commit"] {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 120px;
       }
 
       .status-indicator {
@@ -253,26 +289,122 @@
         max-width: 100%;
       }
 
+      .mobile-toolbar {
+        display: none;
+        padding: 10px 20px;
+        border-bottom: 1px solid var(--border-primary);
+        background: var(--bg-primary);
+      }
+
+      .mobile-toolbar-grid {
+        display: grid;
+        grid-template-columns: minmax(140px, 1fr) repeat(3, auto);
+        gap: 8px;
+        align-items: center;
+      }
+
+      .mobile-page-select {
+        width: 100%;
+        min-width: 0;
+        border-radius: 8px;
+        border: 1px solid #4b5563;
+        background: #1f232b;
+        color: #f4f4f5;
+        font-size: 13px;
+        font-weight: 600;
+        padding: 9px 10px;
+      }
+
+      .mobile-toolbar .btn {
+        min-width: 0;
+      }
+
+      .mobile-toolbar .btn[data-shortcut] {
+        padding-right: 44px;
+      }
+
+      .mobile-toolbar-grid .deploy-status-btn {
+        grid-column: 1 / -1;
+        justify-content: space-between;
+      }
+
+      @keyframes pulse-accent {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.6; transform: scale(0.85); }
+      }
+
+      .nav-utc {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+        font-variant-numeric: tabular-nums;
+        user-select: none;
+      }
+
+      .sidebar-utc {
+        width: 100%;
+        justify-content: space-between;
+        padding: 10px 12px;
+      }
+
+      .nav-utc-row {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .nav-utc-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 999px;
+        background: var(--accent);
+        box-shadow: 0 0 10px rgba(59,130,246,0.8);
+        animation: pulse-accent 2s infinite;
+      }
+
+      .nav-utc small {
+        font-size: 14px;
+        color: var(--text-muted);
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .nav-utc-time {
+        font-size: 18px;
+        letter-spacing: 0.05em;
+        color: var(--text-primary);
+        white-space: nowrap;
+        transition: font-size 0.2s ease;
+      }
+
+      .nav-utc-time.is-12h {
+        font-size: 11px;
+      }
+
       .btn {
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        padding: 6px 12px;
-        border-radius: 6px;
-        font-size: 12px;
-        font-weight: 500;
+        padding: 9px 15px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        line-height: 1.3;
         cursor: pointer;
-        transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
-        border: 1px solid var(--border-secondary);
-        background: var(--bg-secondary);
-        color: var(--text-primary);
+        transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+        border: 1px solid #6b7280;
+        background: #2a2a31;
+        color: #ffffff;
         text-decoration: none;
         white-space: nowrap;
         min-width: 0;
+        box-shadow: 0 1px 0 rgba(255,255,255,0.08) inset, 0 4px 12px rgba(0,0,0,0.24);
       }
 
-      .btn:hover { background: var(--bg-tertiary); box-shadow: 0 0 0 1px rgba(255,255,255,0.04) inset; }
-      .btn:active { box-shadow: none; }
+      .btn:hover { background: #393944; border-color: #93a4b8; box-shadow: 0 1px 0 rgba(255,255,255,0.11) inset, 0 9px 18px rgba(0,0,0,0.28); }
+      .btn:active { box-shadow: 0 1px 0 rgba(255,255,255,0.05) inset; }
       .btn:focus-visible {
         outline: 2px solid rgba(59, 130, 246, 0.7);
         outline-offset: 1px;
@@ -280,11 +412,18 @@
       .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
       .btn svg { width: 14px; height: 14px; }
 
-      .btn-primary { background: var(--accent); border-color: var(--accent); color: white; }
-      .btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+      .btn-primary { background: #2563eb; border-color: #2563eb; color: #eff6ff; }
+      .btn-primary:hover { background: #3b82f6; border-color: #3b82f6; color: #ffffff; }
 
-      .btn-secondary { background: transparent; border-color: var(--border-primary); color: var(--text-muted); }
-      .btn-secondary:hover { background: var(--bg-tertiary); color: var(--text-primary); border-color: var(--border-secondary); }
+      .btn-secondary { background: #1f232b; border-color: #4b5563; color: #f3f4f6; }
+      .btn-secondary:hover { background: #2b313c; color: #ffffff; border-color: #94a3b8; }
+
+      .btn-danger { background: #991b1b; border-color: #dc2626; color: #fee2e2; }
+      .btn-danger:hover { background: #b91c1c; border-color: #ef4444; color: #ffffff; }
+      .btn-danger-exec { background: #b91c1c; border-color: #ef4444; color: #ffffff; }
+      .btn-danger-exec:hover { background: #dc2626; border-color: #f87171; }
+      .btn-warning { background: #b45309; border-color: #f59e0b; color: #fffbeb; }
+      .btn-warning:hover { background: #d97706; border-color: #fbbf24; color: #ffffff; }
 
       .container { padding: 20px; }
 
@@ -494,7 +633,7 @@
       .chart-bar {
         width: 100%;
         max-width: 24px;
-        background: linear-gradient(180deg, var(--accent), #1d4ed8);
+        background: var(--accent);
         border-radius: 3px 3px 0 0;
         transition: all 0.2s ease;
         cursor: pointer;
@@ -504,7 +643,7 @@
       }
 
       .chart-bar:hover {
-        background: linear-gradient(180deg, #60a5fa, var(--accent));
+        background: #60a5fa;
         transform: scaleX(1.2);
         box-shadow: 0 0 12px rgba(59, 130, 246, 0.4);
       }
@@ -617,10 +756,10 @@
         font-size: 11px;
         font-weight: 500;
         border-radius: 4px;
-        transition: transform 0.15s ease;
+        transition: background-color 0.15s ease, color 0.15s ease;
       }
 
-      .badge:hover { transform: scale(1.05); }
+      .badge:hover { background: var(--bg-hover); color: var(--text-primary); }
       .badge-success { background: rgba(34,197,94,0.1); color: var(--success); }
       .badge-danger { background: rgba(239,68,68,0.1); color: var(--danger); }
       .badge-warning { background: rgba(245,158,11,0.1); color: var(--warning); }
@@ -674,10 +813,10 @@
         padding-left: 8px;
       }
 
-      .breakdown-bar-fill.purple { background: linear-gradient(90deg, var(--purple), #c084fc); }
-      .breakdown-bar-fill.blue { background: linear-gradient(90deg, var(--accent), #60a5fa); }
-      .breakdown-bar-fill.cyan { background: linear-gradient(90deg, var(--cyan), #22d3d8); }
-      .breakdown-bar-fill.green { background: linear-gradient(90deg, var(--success), #4ade80); }
+      .breakdown-bar-fill.purple { background: var(--purple); }
+      .breakdown-bar-fill.blue { background: var(--accent); }
+      .breakdown-bar-fill.cyan { background: var(--cyan); }
+      .breakdown-bar-fill.green { background: var(--success); }
 
       .breakdown-bar-value {
         font-size: 11px;
@@ -692,6 +831,89 @@
         font-size: 12px;
         font-weight: 600;
         color: var(--text-primary);
+      }
+
+      .ip-map-wrap {
+        display: grid;
+        gap: 12px;
+      }
+
+      .ip-map-canvas {
+        border: 1px solid var(--border-primary);
+        border-radius: 10px;
+        background: #111116;
+        padding: 8px;
+      }
+
+      .ip-map-svg {
+        width: 100%;
+        height: 230px;
+        display: block;
+      }
+
+      .ip-map-gridline {
+        stroke: rgba(161,161,170,0.16);
+        stroke-width: 1;
+      }
+
+      .ip-map-outline {
+        fill: none;
+        stroke: rgba(161,161,170,0.3);
+        stroke-width: 1.2;
+      }
+
+      .ip-map-point {
+        fill: #3b82f6;
+        fill-opacity: 0.8;
+        stroke: #dbeafe;
+        stroke-width: 1;
+      }
+
+      .ip-map-point.hot {
+        fill: #22c55e;
+      }
+
+      .ip-map-label {
+        fill: #f4f4f5;
+        font-size: 10px;
+        font-family: "SF Mono", Monaco, Consolas, monospace;
+      }
+
+      .ip-map-legend {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .ip-map-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        border: 1px solid var(--border-primary);
+        border-radius: 8px;
+        background: rgba(255,255,255,0.02);
+        padding: 6px 8px;
+        font-size: 12px;
+      }
+
+      .ip-map-name {
+        color: var(--text-secondary);
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .ip-map-count {
+        color: var(--text-primary);
+        font-weight: 600;
+      }
+
+      @media (max-width: 900px) {
+        .ip-map-legend {
+          grid-template-columns: 1fr;
+        }
       }
 
       /* Loading & Empty */
@@ -936,12 +1158,15 @@
         .main-content { margin-left: 0; }
         .stats-grid, .top-today-grid { grid-template-columns: repeat(2, 1fr); }
         .charts-grid { grid-template-columns: 1fr; }
+        .mobile-toolbar { display: block; }
       }
 
       @media (max-width: 640px) {
         .stats-grid, .top-today-grid { grid-template-columns: 1fr; }
         .topbar { flex-direction: column; gap: 12px; align-items: flex-start; }
         .topbar-right { width: 100%; justify-content: flex-start; }
+        .mobile-toolbar-grid { grid-template-columns: 1fr; }
+        .mobile-toolbar .btn { width: 100%; justify-content: flex-start; }
         .mini-ratio-chart { grid-template-columns: 1fr; }
         .donut-wrap { margin: 0 auto; }
       }
@@ -1090,6 +1315,16 @@
         gap: 10px;
       }
 
+      .auth-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .auth-actions .auth-submit {
+        flex: 1;
+      }
+
       .auth-input {
         width: 100%;
         border: 1px solid var(--border-secondary);
@@ -1110,7 +1345,7 @@
       .auth-submit {
         border: none;
         border-radius: 10px;
-        background: linear-gradient(135deg, var(--accent), #2563eb);
+        background: var(--accent);
         color: white;
         font-weight: 600;
         padding: 10px 14px;
@@ -1118,7 +1353,7 @@
         transition: transform 0.12s ease, opacity 0.15s ease;
       }
 
-      .auth-submit:hover { transform: translateY(-1px); }
+      .auth-submit:hover { opacity: 0.95; }
       .auth-submit:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
 
       .mini-ratio-chart {
@@ -1135,6 +1370,22 @@
         display: grid;
         place-items: center;
         box-shadow: 0 10px 26px rgba(0,0,0,0.36);
+        background: var(--bg-tertiary);
+        overflow: hidden;
+      }
+      .donut-svg {
+        width: 120px;
+        height: 120px;
+        transform: rotate(-90deg);
+      }
+      .donut-track {
+        fill: none;
+        stroke: rgba(255,255,255,0.1);
+        stroke-width: 16;
+      }
+      .donut-segment {
+        fill: none;
+        stroke-width: 16;
       }
       .donut-hole {
         width: 72px;
@@ -1142,6 +1393,7 @@
         border-radius: 999px;
         background: var(--bg-secondary);
         border: 1px solid var(--border-secondary);
+        position: absolute;
         display: grid;
         place-items: center;
         text-align: center;
@@ -1205,6 +1457,33 @@
         border-color: var(--border-secondary);
         box-shadow: 0 8px 16px rgba(0,0,0,0.16);
       }
+      .update-sentence-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+      .update-sentence-list {
+        display: grid;
+        gap: 10px;
+      }
+      .update-sentence-text {
+        font-size: 12px;
+        color: var(--text-primary);
+        line-height: 1.5;
+        white-space: pre-wrap;
+      }
+      .update-sentence-meta {
+        font-size: 11px;
+        color: var(--text-muted);
+      }
+      .update-sentence-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 10px;
+      }
       .creative-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -1213,7 +1492,7 @@
       .creative-card {
         border: 1px solid var(--border-primary);
         border-radius: 12px;
-        background: linear-gradient(180deg, rgba(24,24,27,0.92), rgba(39,39,42,0.92));
+        background: rgba(31,31,35,0.95);
         padding: 12px;
         display: grid;
         gap: 8px;
@@ -1307,26 +1586,33 @@
         position: relative;
       }
       .nav-item[data-shortcut] {
-        padding-right: 44px;
+        padding-right: 84px;
+        min-height: 36px;
       }
       .btn[data-shortcut] {
-        padding-right: 36px;
+        padding-right: 86px;
+        min-height: 38px;
       }
       [data-shortcut]::after {
-        content: attr(data-shortcut);
+        content: '';
         display: inline-flex;
         align-items: center;
         justify-content: center;
         font-family: "SF Mono", Monaco, Consolas, monospace;
-        font-size: 10px;
+        font-size: 11px;
+        line-height: 1.2;
+        font-weight: 600;
+        letter-spacing: 0.01em;
         color: #bfdbfe;
         border: 1px solid rgba(59,130,246,0.5);
-        border-radius: 7px;
-        padding: 2px 6px;
+        border-radius: 6px;
+        min-width: 56px;
+        height: 20px;
+        padding: 0 8px;
         background: rgba(59,130,246,0.2);
         white-space: nowrap;
         position: absolute;
-        right: 8px;
+        right: 10px;
         top: 50%;
         transform: translateY(-50%);
         opacity: 0;
@@ -1334,6 +1620,7 @@
         transition: opacity 0.16s ease;
       }
       body.show-shortcut-hints [data-shortcut]::after {
+        content: attr(data-shortcut);
         opacity: 1;
       }
 
@@ -1353,18 +1640,19 @@
       <!-- Sidebar -->
       <aside class="sidebar">
         <div class="sidebar-header">
-          <div class="logo" data-tooltip="Classroom Quick Downloader Oracle" data-tooltip-position="bottom">
-            <div class="logo-icon">
-              <img src="/logo.svg" alt="CQD">
+          <button class="btn btn-secondary nav-utc sidebar-utc" id="top-utc-clock" data-tooltip="Current UTC time for Oracle. Click to toggle 12h/24h." data-tooltip-position="bottom">
+            <div class="nav-utc-row">
+              <span class="nav-utc-dot"></span>
+              <small>UTC</small>
             </div>
-            <span class="logo-text">CQD Oracle</span>
-          </div>
+            <span class="nav-utc-time">--:--:--</span>
+          </button>
         </div>
 
         <nav class="sidebar-nav">
           <div class="nav-section">
             <div class="nav-label">Dashboard</div>
-            <button class="nav-item active" data-page="overview" data-shortcut="⌘1" onclick="showPage('overview')"
+            <button class="nav-item active" data-page="overview" data-shortcut="Cmd+1"
               data-tooltip="View summary statistics" data-tooltip-position="bottom">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
@@ -1372,63 +1660,42 @@
               </svg>
               <span class="nav-item-label">Overview</span>
             </button>
-            <button class="nav-item" data-page="activity" data-shortcut="⌘2" onclick="showPage('activity')"
-              data-tooltip="View download activity over time" data-tooltip-position="bottom">
+            <button class="nav-item" data-page="activity" data-shortcut="Cmd+2"
+              data-tooltip="View activity timeline and analytics charts" data-tooltip-position="bottom">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
               </svg>
-              <span class="nav-item-label">Activity</span>
+              <span class="nav-item-label">Insights</span>
             </button>
-            <button class="nav-item" data-page="charts" data-shortcut="⌘3" onclick="showPage('charts')" data-tooltip="View breakdown charts"
-              data-tooltip-position="bottom">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/>
-              </svg>
-              <span class="nav-item-label">Charts</span>
-            </button>
-            <button class="nav-item" data-page="dashboards" data-shortcut="⌘4" onclick="showPage('dashboards')"
-              data-tooltip="Infrastructure and external dashboards" data-tooltip-position="bottom">
+            <button class="nav-item" data-page="dashboards" data-shortcut="Cmd+3"
+              data-tooltip="Dashboards, deployments, and notifications" data-tooltip-position="bottom">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 20h8"/>
               </svg>
-              <span class="nav-item-label">Dashboards</span>
+              <span class="nav-item-label">Ops Hub</span>
             </button>
-            <button class="nav-item" data-page="deployments" data-shortcut="⌘5" onclick="showPage('deployments')"
-              data-tooltip="Browser store deployment tracking" data-tooltip-position="bottom">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M8 17l4 4 4-4"/><path d="M12 12v9"/><path d="M20 3H4v6h16z"/>
-              </svg>
-              <span class="nav-item-label">Deployments</span>
-            </button>
-            <button class="nav-item" data-page="versions" data-shortcut="⌘6" onclick="showPage('versions')"
+            <button class="nav-item" data-page="versions" data-shortcut="Cmd+4"
               data-tooltip="Extension versions and release notes" data-tooltip-position="bottom">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M20 7l-8 8-4-4"/><path d="M4 4h16v16H4z"/>
               </svg>
               <span class="nav-item-label">Versions</span>
             </button>
-            <button class="nav-item" data-page="creative" data-shortcut="⌘7" onclick="showPage('creative')"
+            <button class="nav-item" data-page="creative" data-shortcut="Cmd+5"
               data-tooltip="Design, email templates, and newsletter management" data-tooltip-position="bottom">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 113 3L7 19l-4 1 1-4z"/>
               </svg>
               <span class="nav-item-label">Creative Hub</span>
             </button>
-            <button class="nav-item" data-page="notifications" data-shortcut="⌘8" onclick="showPage('notifications')"
-              data-tooltip="GitHub issues and PR monitoring" data-tooltip-position="bottom">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M18 8a6 6 0 10-12 0c0 7-3 7-3 7h18s-3 0-3-7"/><path d="M13.73 21a2 2 0 01-3.46 0"/>
-              </svg>
-              <span class="nav-item-label">Notifications</span>
-            </button>
-            <button class="nav-item" data-page="logs" data-shortcut="⌘9" onclick="showPage('logs')"
+            <button class="nav-item" data-page="logs" data-shortcut="Cmd+6"
               data-tooltip="Oracle backend request and admin operation logs" data-tooltip-position="bottom">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M3 4h18v16H3z"/><path d="M7 8h10"/><path d="M7 12h10"/><path d="M7 16h6"/>
               </svg>
               <span class="nav-item-label">Logs</span>
             </button>
-            <button class="nav-item" data-page="danger" data-shortcut="⌘0" onclick="showPage('danger')"
+            <button class="nav-item" data-page="danger" data-shortcut="Cmd+0"
               data-tooltip="Critical administrative operations" data-tooltip-position="bottom">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
@@ -1452,6 +1719,24 @@
         </nav>
 
         <div class="sidebar-footer">
+          <div class="sidebar-controls">
+            <button class="btn btn-secondary" id="shortcuts-btn" data-shortcut="Cmd+/" data-tooltip="Keyboard shortcuts" data-tooltip-position="bottom">
+              Shortcuts
+            </button>
+            <a href="https://github.com/adhamhaithameid/Classroom-Quick-Downloader/commits/main" target="_blank" class="btn btn-secondary deploy-status-btn" id="deploy-status-btn" data-role="deploy-status-btn" data-tooltip="Deployment status - Click to view commit" data-tooltip-position="bottom">
+              <span id="deploy-icon" data-role="deploy-icon">🔄</span>
+              <span id="deploy-commit" data-role="deploy-commit">Loading...</span>
+            </a>
+            <button class="btn" id="batch-btn" data-shortcut="Cmd+B" data-tooltip="View last batch info" data-tooltip-position="bottom">
+              📦 Last Batch
+            </button>
+            <button class="btn refresh-action-btn" id="refresh-btn" data-role="refresh-action" data-shortcut="Cmd+R" data-tooltip="Refresh all data" data-tooltip-position="bottom">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 12a9 9 0 11-2.52-6.25"/><path d="M21 4v5h-5"/>
+              </svg>
+              Refresh
+            </button>
+          </div>
           <div class="status-indicator" id="status-indicator" data-tooltip="System status">
             <div class="status-dot" id="sidebar-status"></div>
             <span id="sidebar-status-text">Connecting...</span>
@@ -1466,33 +1751,31 @@
             <h1 id="page-title">Overview</h1>
             <p id="last-updated">Last updated: --</p>
           </div>
-          <div class="topbar-right">
-            <button class="btn btn-secondary" id="shortcuts-btn" data-shortcut="⌘/" onclick="openShortcutsModal()" data-tooltip="Keyboard shortcuts" data-tooltip-position="bottom">
+        </div>
+        <div class="mobile-toolbar" data-shortcuts-capture="true">
+          <div class="mobile-toolbar-grid">
+            <select id="mobile-page-select" class="mobile-page-select" aria-label="Select dashboard section">
+              <option value="overview">Overview</option>
+              <option value="activity">Activity + Charts</option>
+              <option value="dashboards">Ops Hub</option>
+              <option value="versions">Versions</option>
+              <option value="creative">Creative Hub</option>
+              <option value="logs">Logs</option>
+              <option value="danger">Danger Zone</option>
+            </select>
+            <button class="btn btn-secondary" id="shortcuts-btn-mobile" data-shortcut="Cmd+/" data-tooltip="Keyboard shortcuts">
               Shortcuts
             </button>
-            <a href="https://cqd-analytics.adhamhaithameid.workers.dev/" target="_blank" class="btn btn-secondary" data-tooltip="Open Cloudflare Worker dashboard" data-tooltip-position="bottom">
-              ☁️ CF Dashboard
-            </a>
-            <a href="http://129.151.233.229:3001/status/cqd" target="_blank" class="btn btn-secondary" data-tooltip="Open Uptime Kuma status" data-tooltip-position="bottom">
-              🟢 Uptime Kuma
-            </a>
-            <a href="https://github.com/adhamhaithameid/Classroom-Quick-Downloader/commits/main" target="_blank" class="btn btn-secondary" id="deploy-status-btn" data-tooltip="Deployment status - Click to view commit" data-tooltip-position="bottom">
-              <span id="deploy-icon">🔄</span>
-              <span id="deploy-commit">Loading...</span>
-            </a>
-            <button class="btn" onclick="showBatchModal()" id="batch-btn" data-shortcut="⌘B" data-tooltip="View last batch info" data-tooltip-position="bottom">
-              <!-- <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
-                <polyline points="14 2 14 8 20 8"/>
-              </svg> -->
-              📦  Last Batch
+            <button class="btn" id="batch-btn-mobile" data-shortcut="Cmd+B" data-tooltip="View last batch info">
+              Last Batch
             </button>
-            <button class="btn" onclick="refreshAll()" id="refresh-btn" data-shortcut="⌘R" data-tooltip="Refresh all data" data-tooltip-position="bottom">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 12a9 9 0 11-2.52-6.25"/><path d="M21 4v5h-5"/>
-              </svg>
+            <button class="btn refresh-action-btn" id="refresh-btn-mobile" data-role="refresh-action" data-shortcut="Cmd+R" data-tooltip="Refresh all data">
               Refresh
             </button>
+            <a href="https://github.com/adhamhaithameid/Classroom-Quick-Downloader/commits/main" target="_blank" class="btn btn-secondary deploy-status-btn" data-role="deploy-status-btn" data-tooltip="Deployment status - Click to view commit">
+              <span data-role="deploy-icon">🔄</span>
+              <span data-role="deploy-commit">Loading...</span>
+            </a>
           </div>
         </div>
 
@@ -1809,6 +2092,18 @@
                   <div class="loading"><div class="spinner"></div>Loading...</div>
                 </div>
               </div>
+
+              <div class="card">
+                <div class="card-header">
+                  <div>
+                    <div class="card-title">IP Geo Map</div>
+                    <div class="card-subtitle">Country-level IP activity (last 7 days)</div>
+                  </div>
+                </div>
+                <div class="card-body" id="chart-ip-map">
+                  <div class="loading"><div class="spinner"></div>Loading...</div>
+                </div>
+              </div>
             </div>
 
             <!-- Daily Downloads Chart -->
@@ -1837,7 +2132,7 @@
                 </div>
               </div>
               <div class="card-body">
-                <div class="action-buttons-grid">
+                <div class="action-buttons-grid" style="grid-template-columns: repeat(4, 1fr);">
                   <a href="https://cqd-analytics.adhamhaithameid.workers.dev/" target="_blank" class="btn btn-secondary">☁️ Cloudflare</a>
                   <a href="http://129.151.233.229:3001/status/cqd" target="_blank" class="btn btn-secondary">🟢 Uptime Kuma</a>
                   <a href="https://github.com/adhamhaithameid/Classroom-Quick-Downloader" target="_blank" class="btn btn-secondary">🐙 GitHub Repo</a>
@@ -1856,14 +2151,14 @@
                   <div class="card-subtitle">Store users, current version, and dashboard links</div>
                 </div>
                 <div>
-                  <button class="btn btn-secondary" id="deployment-sync-btn" data-shortcut="⌘⇧D" onclick="syncDeploymentTargets()">Sync Browser Stores</button>
+                  <button class="btn btn-secondary" id="deployment-sync-btn" data-shortcut="Cmd+Shift+D">Sync Browser Stores</button>
                 </div>
               </div>
               <div class="card-body">
                 <div id="deployment-cards" class="deployment-grid"></div>
               </div>
               <div class="card-body" style="border-top: 1px solid var(--border-primary);">
-                <pre id="deployment-sync-output" class="json-viewer" style="max-height: 220px; overflow:auto;">{}</pre>
+                <pre id="deployment-sync-output" class="json-viewer" style="max-height: 220px; overflow:auto; display:none;"></pre>
               </div>
             </div>
             <div class="card">
@@ -1874,7 +2169,19 @@
                 </div>
               </div>
               <div class="card-body">
-                <div id="update-sentence-list"></div>
+                <form id="update-sentence-form" class="form-grid" onsubmit="saveUpdateSentence(event)">
+                  <input id="update-sentence-key" type="hidden" />
+                  <textarea id="update-sentence-input" class="auth-input" style="min-height: 92px;" placeholder="Write an update sentence..." required></textarea>
+                  <div class="update-sentence-header">
+                    <div id="update-sentence-form-state" class="update-sentence-meta">Creating new sentence</div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                      <button class="btn btn-secondary" type="button" onclick="seedDefaultUpdateSentences()">Seed Defaults</button>
+                      <button class="btn btn-secondary" type="button" onclick="resetUpdateSentenceForm()">Clear</button>
+                      <button class="btn btn-primary" id="update-sentence-save-btn" type="submit">Add Sentence</button>
+                    </div>
+                  </div>
+                </form>
+                <div id="update-sentence-list" class="update-sentence-list"></div>
               </div>
             </div>
           </div>
@@ -1892,7 +2199,7 @@
                 <form id="version-form" class="form-grid" onsubmit="saveVersionNote(event)">
                   <input id="version-input" class="auth-input" placeholder="Version (e.g., 5.7.1)" required />
                   <textarea id="version-note-input" class="auth-input" style="min-height: 90px;" placeholder="Update notes..." required></textarea>
-                  <button class="btn" type="submit">Save Version Note</button>
+                  <button class="btn" type="submit" style="justify-self:start;">Save Version Note</button>
                 </form>
                 <div id="version-list" style="margin-top: 14px;"></div>
               </div>
@@ -1919,7 +2226,7 @@
                     <input id="design-tags" class="auth-input" placeholder="Tags (comma-separated)" />
                   </div>
                   <textarea id="design-description" class="auth-input" style="min-height: 90px;" placeholder="Description"></textarea>
-                  <button class="btn" type="submit">Save Design</button>
+                  <button class="btn" type="submit" style="justify-self:start;">Save Design</button>
                 </form>
                 <div id="creative-designs-list" class="creative-grid" style="margin-top: 14px;"></div>
               </div>
@@ -1942,7 +2249,7 @@
                     <input id="email-template-scheduled-at" class="auth-input" placeholder="Scheduled UTC (ISO string)" />
                   </div>
                   <textarea id="email-template-html" class="auth-input" style="min-height: 160px;" placeholder="HTML content" required></textarea>
-                  <button class="btn" type="submit">Save Email Template</button>
+                  <button class="btn" type="submit" style="justify-self:start;">Save Email Template</button>
                 </form>
                 <div id="creative-email-list" class="creative-grid" style="margin-top: 14px;"></div>
               </div>
@@ -2016,12 +2323,15 @@
                   <div class="card-title">Oracle Operation Logs</div>
                   <div class="card-subtitle">Server-side request log for Oracle backend operations only</div>
                 </div>
-                <div class="action-buttons-grid" style="grid-template-columns: repeat(5, minmax(140px, 1fr)); max-width: 920px;">
+                <div class="action-buttons-grid" style="grid-template-columns: auto auto auto auto auto; max-width: 920px; align-items:center;">
                   <button class="btn btn-secondary" onclick="loadOracleLogs()">Refresh</button>
-                  <input id="oracle-logs-retention-days" class="auth-input" type="number" min="1" max="36500" value="30" />
+                  <div style="display:flex;align-items:center;gap:6px;">
+                    <input id="oracle-logs-retention-days" class="auth-input" type="number" min="1" max="36500" value="30" style="width:80px;text-align:center;" />
+                    <span style="font-size:12px;color:var(--text-muted);">days</span>
+                  </div>
                   <button class="btn btn-secondary" onclick="oracleLogsDeleteOlder(true)">Dry Run Delete Older</button>
                   <button class="btn btn-secondary" onclick="oracleLogsDeleteOlder(false)">Delete Older</button>
-                  <button class="btn" style="background:#7f1d1d;" onclick="oracleLogsClearAll()">Delete All Logs</button>
+                  <button class="btn btn-danger" onclick="oracleLogsClearAll()">Delete All Logs</button>
                 </div>
               </div>
               <div class="card-body no-padding">
@@ -2030,7 +2340,7 @@
                 </div>
               </div>
               <div class="card-body" style="border-top: 1px solid var(--border-primary);">
-                <pre id="oracle-logs-output" class="json-viewer" style="max-height: 220px; overflow:auto;">{}</pre>
+                <pre id="oracle-logs-output" class="json-viewer" style="max-height: 220px; overflow:auto; display:none;"></pre>
               </div>
             </div>
           </div>
@@ -2045,21 +2355,26 @@
                 </div>
               </div>
               <div class="card-body">
-                <div class="action-buttons-grid">
+                <div class="action-buttons-grid" style="grid-template-columns: repeat(4, 1fr);">
                   <button class="btn btn-secondary" onclick="dangerDryRun('all_non_core')">Dry Run Clear (All Non-Core)</button>
-                  <button class="btn" style="background:#7f1d1d;" onclick="dangerExecute('all_non_core')">Execute Clear (All Non-Core)</button>
+                  <button class="btn btn-danger" onclick="dangerExecute('all_non_core')">Execute Clear (All Non-Core)</button>
                   <button class="btn btn-secondary" onclick="runBackup()">Run SQLite Backup</button>
-                  <button class="btn btn-secondary" id="stepup-btn" data-shortcut="⌘⇧S" onclick="openStepUpPrompt()">Step-Up Now</button>
+                  <button class="btn btn-secondary" id="stepup-btn" data-shortcut="Cmd+Shift+S">Step-Up Now</button>
                 </div>
                 <div style="margin-top: 14px;">
-                  <textarea id="sql-console-input" class="auth-input" style="min-height: 110px;" placeholder="SQL statement..."></textarea>
-                  <div class="action-buttons-grid" style="margin-top: 8px;">
-                    <button class="btn btn-secondary" onclick="sqlQuery()">SQL Query</button>
-                    <button class="btn btn-secondary" onclick="sqlExec(true)">SQL Exec Dry Run</button>
-                    <button class="btn" style="background:#b91c1c;" onclick="sqlExec(false)">SQL Exec</button>
+                  <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;">Preset Admin Actions</div>
+                  <div class="action-buttons-grid" style="grid-template-columns: repeat(4, 1fr);">
+                    <button class="btn btn-secondary" onclick="dangerLoadOutboxStatus()">Outbox Status</button>
+                    <button class="btn btn-secondary" onclick="dangerRetryOutbox()">Retry Outbox</button>
+                    <button class="btn btn-secondary" onclick="dangerReplayDeadLetter()">Replay Dead Letter</button>
+                    <button class="btn btn-secondary" onclick="dangerVerifyAuditChain()">Verify Audit Chain</button>
+                    <button class="btn btn-secondary" onclick="dangerLoadAlerts()">Load Alerts</button>
+                    <button class="btn btn-secondary" onclick="dangerLoadFeatureFlags()">Load Feature Flags</button>
+                    <button class="btn btn-secondary" onclick="dangerLoadMigrationsStatus()">Load Migrations Status</button>
+                    <button class="btn btn-secondary" onclick="dangerLoadOpsSnapshot()">Load Full Ops Snapshot</button>
                   </div>
                 </div>
-                <pre id="danger-output" class="json-viewer" style="margin-top: 12px; max-height: 340px; overflow:auto;">{}</pre>
+                <pre id="danger-output" class="json-viewer" style="margin-top: 12px; max-height: 340px; overflow:auto; display:none;"></pre>
               </div>
             </div>
           </div>
@@ -2116,6 +2431,32 @@
       </div>
     </div>
 
+    <div class="modal-overlay" id="stepup-modal" aria-hidden="true">
+      <div class="auth-modal" role="dialog" aria-modal="true" aria-labelledby="stepup-modal-title">
+        <div class="auth-modal-head">
+          <h2 class="auth-modal-title" id="stepup-modal-title">Enter super-admin password</h2>
+          <p class="auth-modal-subtitle">Critical operations require a step-up verification.</p>
+        </div>
+        <div class="auth-modal-body">
+          <form class="auth-form" id="stepup-form">
+            <input
+              id="stepup-password-input"
+              class="auth-input"
+              type="password"
+              autocomplete="current-password"
+              placeholder="Super-admin password"
+              required
+            />
+            <div class="auth-actions">
+              <button id="stepup-password-submit" class="auth-submit" type="submit">Verify step-up</button>
+              <button id="stepup-cancel-btn" class="btn btn-secondary" type="button">Cancel</button>
+            </div>
+            <div id="stepup-error" class="auth-error"></div>
+          </form>
+        </div>
+      </div>
+    </div>
+
     <div class="modal-overlay" id="shortcuts-modal" aria-hidden="true">
       <div class="auth-modal" role="dialog" aria-modal="true" style="max-width: 620px;">
         <div class="auth-modal-head">
@@ -2128,7 +2469,7 @@
       </div>
     </div>
 
-    <script>
+    <script nonce="__CSP_NONCE__">
       // State
       let currentPage = 'overview';
       let activityRange = 'today';
@@ -2139,12 +2480,20 @@
       let allTimeActivityPoints = [];
       let commandHoldTimer = null;
       let shortcutModifierHeld = false;
+      let oracleClockIs24 = localStorage.getItem('oracle_clock_24h') !== 'false';
+      let deploymentUpdateSentences = [];
+      let refreshIntervalId = null;
 
       // Helpers
       let authInFlight = null;
       let authModalPromise = null;
       let authModalResolve = null;
       let authModalInitialized = false;
+      let stepUpInFlight = null;
+      let stepUpModalPromise = null;
+      let stepUpModalResolve = null;
+      let stepUpModalInitialized = false;
+      let stepUpChallengeId = '';
 
       function setAuthError(message) {
         const errorEl = document.getElementById('auth-error');
@@ -2207,7 +2556,27 @@
             });
 
             if (!loginRes.ok) {
-              setAuthError('Invalid password. Please try again.');
+              if (loginRes.status === 429) {
+                setAuthError('Too many attempts. Please wait and try again.');
+              } else {
+                setAuthError('Invalid password. Please try again.');
+              }
+              input.select();
+              input.focus();
+              return;
+            }
+
+            // Confirm the browser persisted the session cookie before closing modal.
+            const checkRes = await fetch('/api/auth/check', { cache: 'no-store' });
+            if (!checkRes.ok) {
+              setAuthError('Authentication check failed. Please try again.');
+              input.select();
+              input.focus();
+              return;
+            }
+            const checkPayload = await checkRes.json().catch(function() { return {}; });
+            if (!checkPayload || checkPayload.authenticated !== true) {
+              setAuthError('Session cookie was not saved. For HTTP mode set ALLOW_INSECURE_COOKIES=true and retry.');
               input.select();
               input.focus();
               return;
@@ -2238,11 +2607,156 @@
         return authModalPromise;
       }
 
+      function setStepUpError(message) {
+        const errorEl = document.getElementById('stepup-error');
+        if (!errorEl) return;
+        if (!message) {
+          errorEl.textContent = '';
+          errorEl.style.display = 'none';
+          return;
+        }
+        errorEl.textContent = message;
+        errorEl.style.display = 'block';
+      }
+
+      function showStepUpModal(challengeId) {
+        const modal = document.getElementById('stepup-modal');
+        const input = document.getElementById('stepup-password-input');
+        if (!modal || !input) return;
+        stepUpChallengeId = challengeId || '';
+        modal.classList.add('visible');
+        modal.setAttribute('aria-hidden', 'false');
+        input.value = '';
+        setStepUpError('');
+        setTimeout(function() { input.focus(); }, 0);
+      }
+
+      function hideStepUpModal() {
+        const modal = document.getElementById('stepup-modal');
+        if (!modal) return;
+        modal.classList.remove('visible');
+        modal.setAttribute('aria-hidden', 'true');
+        stepUpChallengeId = '';
+        setStepUpError('');
+      }
+
+      function resolveStepUpModal(result) {
+        if (stepUpModalResolve) {
+          stepUpModalResolve(!!result);
+        }
+        stepUpModalResolve = null;
+        stepUpModalPromise = null;
+      }
+
+      function closeStepUpModal() {
+        hideStepUpModal();
+        resolveStepUpModal(false);
+      }
+
+      function initStepUpModal() {
+        if (stepUpModalInitialized) return;
+        stepUpModalInitialized = true;
+        const modal = document.getElementById('stepup-modal');
+        const form = document.getElementById('stepup-form');
+        const input = document.getElementById('stepup-password-input');
+        const submitBtn = document.getElementById('stepup-password-submit');
+        const cancelBtn = document.getElementById('stepup-cancel-btn');
+        if (!modal || !form || !input || !submitBtn || !cancelBtn) return;
+
+        cancelBtn.addEventListener('click', function() {
+          closeStepUpModal();
+        });
+
+        modal.addEventListener('click', function(ev) {
+          if (ev.target === modal) {
+            closeStepUpModal();
+          }
+        });
+
+        form.addEventListener('submit', async function(e) {
+          e.preventDefault();
+          if (submitBtn.disabled) return;
+          const password = input.value || '';
+          if (!password.trim()) {
+            setStepUpError('Super-admin password is required.');
+            input.focus();
+            return;
+          }
+          if (!stepUpChallengeId) {
+            setStepUpError('Step-up challenge expired. Retry the action.');
+            return;
+          }
+
+          submitBtn.disabled = true;
+          cancelBtn.disabled = true;
+          submitBtn.textContent = 'Verifying...';
+          setStepUpError('');
+
+          try {
+            await fetchJSONWithInit('/api/auth/stepup/verify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ challengeId: stepUpChallengeId, password: password })
+            });
+            hideStepUpModal();
+            resolveStepUpModal(true);
+          } catch (e) {
+            const msg = String(e || '');
+            if (msg.indexOf('429') !== -1) {
+              setStepUpError('Too many attempts. Wait before retrying.');
+            } else if (msg.indexOf('400') !== -1) {
+              setStepUpError('Step-up challenge expired. Retry the action.');
+              stepUpChallengeId = '';
+            } else if (msg.indexOf('403') !== -1) {
+              setStepUpError('Invalid super-admin password. Please try again.');
+              input.select();
+            } else {
+              setStepUpError('Step-up verification failed. Please try again.');
+            }
+            input.focus();
+          } finally {
+            submitBtn.disabled = false;
+            cancelBtn.disabled = false;
+            submitBtn.textContent = 'Verify step-up';
+          }
+        });
+      }
+
+      function requestStepUpModal(challengeId) {
+        initStepUpModal();
+        if (stepUpModalPromise) {
+          if (challengeId) stepUpChallengeId = challengeId;
+          return stepUpModalPromise;
+        }
+        showStepUpModal(challengeId);
+        stepUpModalPromise = new Promise(function(resolve) {
+          stepUpModalResolve = resolve;
+        });
+        return stepUpModalPromise;
+      }
+
+      async function openStepUpModal() {
+        if (stepUpInFlight) return stepUpInFlight;
+        stepUpInFlight = (async () => {
+          try {
+            var start = await fetchJSONWithInit('/api/auth/stepup/start', { method: 'POST' });
+            if (!start.required) return true;
+            if (!start.challengeId) return false;
+            return requestStepUpModal(start.challengeId);
+          } catch (_) {
+            return false;
+          }
+        })();
+        var ok = await stepUpInFlight;
+        stepUpInFlight = null;
+        return ok;
+      }
+
       async function ensureAuth() {
         if (authInFlight) return authInFlight;
         authInFlight = (async () => {
           try {
-            const checkRes = await fetch('/api/auth/check');
+            const checkRes = await fetch('/api/auth/check', { cache: 'no-store' });
             if (!checkRes.ok) return false;
             const check = await checkRes.json();
             if (check.authRequired === false || check.authenticated === true) {
@@ -2274,6 +2788,38 @@
         return fetchJSONWithInit(url);
       }
 
+      function formatOracleUtcClock(ts) {
+        return new Date(ts).toLocaleTimeString('en-US', {
+          timeZone: 'UTC',
+          hour12: !oracleClockIs24,
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        });
+      }
+
+      function updateOracleUtcClock() {
+        var wrap = document.getElementById('top-utc-clock');
+        if (!wrap) return;
+        var label = wrap.querySelector('.nav-utc-time');
+        if (!label) return;
+        var next = formatOracleUtcClock(Date.now());
+        if (label.textContent !== next) label.textContent = next;
+        label.classList.toggle('is-12h', !oracleClockIs24);
+      }
+
+      function initOracleUtcClock() {
+        var wrap = document.getElementById('top-utc-clock');
+        if (!wrap) return;
+        updateOracleUtcClock();
+        setInterval(updateOracleUtcClock, 1000);
+        wrap.addEventListener('click', function() {
+          oracleClockIs24 = !oracleClockIs24;
+          localStorage.setItem('oracle_clock_24h', oracleClockIs24 ? 'true' : 'false');
+          updateOracleUtcClock();
+        });
+      }
+
       function fmtPct(v) { return (v * 100).toFixed(1) + "%"; }
 
       // XSS prevention: escape untrusted strings for HTML context
@@ -2285,6 +2831,14 @@
           .replace(/>/g, '&gt;')
           .replace(/"/g, '&quot;')
           .replace(/'/g, '&#039;');
+      }
+
+      function safeDomIdPart(v) {
+        return encodeURIComponent(String(v || ''));
+      }
+
+      function deploymentInputId(field, key) {
+        return 'dep-' + field + '-' + safeDomIdPart(key);
       }
 
       
@@ -2486,30 +3040,49 @@
       // Page Navigation
       function showPage(page) {
         currentPage = page;
+        var pageGroups = {
+          overview: ['overview'],
+          activity: ['activity', 'charts'],
+          dashboards: ['dashboards', 'deployments', 'notifications'],
+          versions: ['versions'],
+          creative: ['creative'],
+          logs: ['logs'],
+          danger: ['danger']
+        };
+        var activePages = pageGroups[page] || [page];
         document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
-        document.getElementById('page-' + page).classList.add('active');
+        activePages.forEach(function(p) {
+          var el = document.getElementById('page-' + p);
+          if (el) el.classList.add('active');
+        });
         document.querySelectorAll('.nav-item').forEach(function(n) {
           n.classList.toggle('active', n.dataset.page === page);
         });
+        var mobilePageSelect = document.getElementById('mobile-page-select');
+        if (mobilePageSelect && mobilePageSelect.value !== page) {
+          mobilePageSelect.value = page;
+        }
         var titles = {
           overview: 'Overview',
-          activity: 'Activity',
-          charts: 'Charts',
-          dashboards: 'Dashboards',
-          deployments: 'Deployments',
+          activity: 'Activity + Charts',
+          dashboards: 'Dashboards + Deployments + Notifications',
           versions: 'Versions',
           creative: 'Creative Hub',
-          notifications: 'Notifications',
           logs: 'Logs',
           danger: 'Danger Zone'
         };
         document.getElementById('page-title').textContent = titles[page];
-        if (page === 'activity') loadActivity();
-        if (page === 'charts') loadCharts();
-        if (page === 'deployments') loadDeploymentsHub();
+        if (page === 'activity') {
+          loadActivity();
+          loadCharts();
+          loadComparison();
+        }
+        if (page === 'dashboards') {
+          loadDeploymentsHub();
+          loadNotifications();
+        }
         if (page === 'versions') loadVersionHub();
         if (page === 'creative') loadCreativeHub();
-        if (page === 'notifications') loadNotifications();
         if (page === 'logs') loadOracleLogs();
       }
 
@@ -2578,20 +3151,23 @@
         if (!container) return;
         var segments = config.segments || [];
         var total = segments.reduce(function(acc, seg) { return acc + (seg.value || 0); }, 0);
-        var running = 0;
-        var gradientParts = [];
+        var radius = 50;
+        var circumference = 2 * Math.PI * radius;
+        var offset = 0;
+        var svg = '<svg class="donut-svg" viewBox="0 0 120 120" aria-hidden="true">';
+        svg += '<circle class="donut-track" cx="60" cy="60" r="' + radius + '"></circle>';
         if (total > 0) {
           segments.forEach(function(seg) {
-            var pct = ((seg.value || 0) / total) * 100;
-            var start = running;
-            running += pct;
-            gradientParts.push(seg.color + ' ' + start.toFixed(2) + '% ' + running.toFixed(2) + '%');
+            var value = Math.max(0, Number(seg.value || 0));
+            if (value <= 0) return;
+            var segLen = (value / total) * circumference;
+            svg += '<circle class="donut-segment" cx="60" cy="60" r="' + radius + '" stroke="' + escapeHtml(seg.color || '#3b82f6') + '" stroke-dasharray="' + segLen.toFixed(4) + ' ' + circumference.toFixed(4) + '" stroke-dashoffset="' + (-offset).toFixed(4) + '"></circle>';
+            offset += segLen;
           });
-        } else {
-          gradientParts.push('rgba(255,255,255,0.08) 0% 100%');
         }
+        svg += '</svg>';
 
-        var html = '<div class="donut-wrap" style="background:conic-gradient(' + gradientParts.join(',') + ')">';
+        var html = '<div class="donut-wrap">' + svg;
         html += '<div class="donut-hole"><div><div class="donut-value">' + escapeHtml(config.centerValue || '0') + '</div><div class="donut-label">' + escapeHtml(config.centerLabel || 'Total') + '</div></div></div></div>';
         html += '<div class="donut-legend">';
         segments.forEach(function(seg) {
@@ -2938,11 +3514,147 @@
         showTooltip(e, html);
       }
 
+      var ipMapCountryCoords = {
+        "US": [-98.583, 39.833], "CA": [-106.347, 56.130], "MX": [-102.552, 23.634],
+        "BR": [-51.925, -14.235], "AR": [-63.616, -38.416], "CL": [-71.543, -35.675],
+        "CO": [-74.297, 4.570], "PE": [-75.016, -9.190], "GB": [-3.436, 55.378],
+        "IE": [-8.244, 53.413], "FR": [2.214, 46.227], "DE": [10.451, 51.165],
+        "ES": [-3.750, 40.464], "IT": [12.568, 41.871], "NL": [5.291, 52.133],
+        "BE": [4.469, 50.503], "SE": [18.643, 60.128], "NO": [8.468, 60.472],
+        "PL": [19.145, 51.919], "TR": [35.243, 38.963], "RU": [105.319, 61.524],
+        "UA": [31.165, 48.379], "SA": [45.079, 23.886], "AE": [53.848, 23.424],
+        "IL": [34.851, 31.046], "EG": [30.802, 26.820], "ZA": [22.937, -30.559],
+        "NG": [8.676, 9.082], "IN": [78.963, 20.593], "PK": [69.345, 30.375],
+        "BD": [90.356, 23.685], "CN": [104.195, 35.861], "JP": [138.253, 36.205],
+        "KR": [127.766, 35.907], "TW": [120.961, 23.698], "HK": [114.169, 22.319],
+        "SG": [103.820, 1.352], "TH": [100.993, 15.870], "VN": [108.278, 14.058],
+        "ID": [113.921, -0.789], "PH": [121.775, 12.880], "AU": [133.775, -25.274],
+        "NZ": [174.886, -40.901]
+      };
+
+      var ipMapCountryAlias = {
+        "UNITED STATES": "US",
+        "USA": "US",
+        "UNITED KINGDOM": "GB",
+        "UK": "GB",
+        "SOUTH KOREA": "KR",
+        "KOREA": "KR",
+        "RUSSIA": "RU",
+        "UAE": "AE",
+        "VIET NAM": "VN"
+      };
+
+      function normalizeCountryToken(value) {
+        return String(value || '').trim().toUpperCase().replace(/\s+/g, ' ');
+      }
+
+      function lookupCountryCoordinate(value) {
+        var token = normalizeCountryToken(value);
+        if (!token) return null;
+        if (ipMapCountryAlias[token]) token = ipMapCountryAlias[token];
+        if (ipMapCountryCoords[token]) return ipMapCountryCoords[token];
+        if (token.length > 2) {
+          var maybeCode = token.slice(0, 2);
+          if (ipMapCountryCoords[maybeCode]) return ipMapCountryCoords[maybeCode];
+        }
+        return null;
+      }
+
+      function projectLonLat(lon, lat, width, height) {
+        var x = ((lon + 180) / 360) * width;
+        var y = ((90 - lat) / 180) * height;
+        return { x: x, y: y };
+      }
+
+      function renderIPGeoMap(values, errText) {
+        var container = document.getElementById('chart-ip-map');
+        if (!container) return;
+
+        if (errText) {
+          container.innerHTML = '<div class="empty-state" style="color:var(--danger)">' + escapeHtml(errText) + '</div>';
+          return;
+        }
+
+        var items = Array.isArray(values) ? values : [];
+        if (!items.length) {
+          container.innerHTML = '<div class="empty-state">No country data for IP map</div>';
+          return;
+        }
+
+        var total = items.reduce(function(acc, item) { return acc + Number((item && item.count) || 0); }, 0) || 1;
+        var mapped = [];
+        var unmappedCount = 0;
+        items.slice(0, 50).forEach(function(item) {
+          var count = Number((item && item.count) || 0);
+          if (count <= 0) return;
+          var name = String((item && item.value) || 'Unknown');
+          var coords = lookupCountryCoordinate(name);
+          if (!coords) {
+            unmappedCount += count;
+            return;
+          }
+          mapped.push({
+            name: name,
+            count: count,
+            lon: coords[0],
+            lat: coords[1]
+          });
+        });
+
+        if (!mapped.length) {
+          container.innerHTML = '<div class="empty-state">No mappable country coordinates found</div>';
+          return;
+        }
+
+        var width = 920;
+        var height = 420;
+        var maxCount = Math.max.apply(null, mapped.map(function(item) { return item.count; })) || 1;
+        var svg = '<svg class="ip-map-svg" viewBox="0 0 ' + width + ' ' + height + '" role="img" aria-label="IP geo map by country">';
+        svg += '<rect class="ip-map-outline" x="3" y="3" width="' + (width - 6) + '" height="' + (height - 6) + '" rx="10"></rect>';
+        for (var lat = -60; lat <= 60; lat += 30) {
+          var gy = projectLonLat(0, lat, width, height).y;
+          svg += '<line class="ip-map-gridline" x1="8" y1="' + gy.toFixed(1) + '" x2="' + (width - 8) + '" y2="' + gy.toFixed(1) + '"></line>';
+        }
+        for (var lon = -120; lon <= 120; lon += 60) {
+          var gx = projectLonLat(lon, 0, width, height).x;
+          svg += '<line class="ip-map-gridline" x1="' + gx.toFixed(1) + '" y1="8" x2="' + gx.toFixed(1) + '" y2="' + (height - 8) + '"></line>';
+        }
+
+        mapped.sort(function(a, b) { return b.count - a.count; });
+        mapped.forEach(function(item, idx) {
+          var point = projectLonLat(item.lon, item.lat, width, height);
+          var radius = 3 + ((item.count / maxCount) * 8);
+          var cls = idx < 3 ? 'ip-map-point hot' : 'ip-map-point';
+          svg += '<circle class="' + cls + '" cx="' + point.x.toFixed(1) + '" cy="' + point.y.toFixed(1) + '" r="' + radius.toFixed(1) + '"></circle>';
+          if (idx < 6) {
+            svg += '<text class="ip-map-label" x="' + (point.x + 6).toFixed(1) + '" y="' + (point.y - 6).toFixed(1) + '">' + escapeHtml(item.name) + '</text>';
+          }
+        });
+        svg += '</svg>';
+
+        var legend = '<div class="ip-map-legend">';
+        items.slice(0, 8).forEach(function(item) {
+          var count = Number((item && item.count) || 0);
+          var pct = total > 0 ? ((count / total) * 100).toFixed(1) : '0.0';
+          legend += '<div class="ip-map-row">';
+          legend += '<span class="ip-map-name">' + escapeHtml(String((item && item.value) || 'Unknown')) + ' (' + pct + '%)</span>';
+          legend += '<span class="ip-map-count">' + escapeHtml(fmtNumber(count)) + '</span>';
+          legend += '</div>';
+        });
+        if (unmappedCount > 0) {
+          legend += '<div class="ip-map-row"><span class="ip-map-name">Unmapped countries</span><span class="ip-map-count">' + escapeHtml(fmtNumber(unmappedCount)) + '</span></div>';
+        }
+        legend += '</div>';
+
+        container.innerHTML = '<div class="ip-map-wrap"><div class="ip-map-canvas">' + svg + '</div>' + legend + '</div>';
+      }
+
       // Charts Page
       async function loadCharts() {
         var dimensions = ['browser', 'os', 'type', 'country'];
         var colors = ['purple', 'blue', 'cyan', 'green'];
         var range = getDateRange(7);
+        var countryValuesForMap = [];
 
         for (var i = 0; i < dimensions.length; i++) {
           var dim = dimensions[i];
@@ -2963,9 +3675,20 @@
             });
             html += '</div>';
             container.innerHTML = html;
+            if (dim === 'country') {
+              countryValuesForMap = data.values.slice();
+            }
           } catch (e) {
             container.innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed</div>';
+            if (dim === 'country') {
+              renderIPGeoMap([], 'Failed to load country data');
+            }
           }
+        }
+        if (countryValuesForMap.length) {
+          renderIPGeoMap(countryValuesForMap);
+        } else if (!document.getElementById('chart-ip-map').textContent.trim()) {
+          renderIPGeoMap([]);
         }
 
         // Daily chart
@@ -3042,6 +3765,10 @@
           var p1 = data.period1;
           var p2 = data.period2;
           var change = data.change;
+          if (!p1 || !p2 || !change) {
+            container.innerHTML = '<div class="empty-state">No comparison data available</div>';
+            return;
+          }
 
           var changeClass = function(str) {
             if (str.startsWith('+') && str !== '+0%' && str !== '+0.0%') return 'positive';
@@ -3110,31 +3837,36 @@
 
       // Load deployment status
       async function loadDeployStatus() {
+        var iconNodes = Array.from(document.querySelectorAll('[data-role="deploy-icon"]'));
+        var commitNodes = Array.from(document.querySelectorAll('[data-role="deploy-commit"]'));
+        var linkNodes = Array.from(document.querySelectorAll('[data-role="deploy-status-btn"]'));
+        if (!iconNodes.length || !commitNodes.length || !linkNodes.length) return;
+
+        function setStatusUI(iconText, commitText, href, tooltip, stale) {
+          iconNodes.forEach(function(node) { node.textContent = iconText; });
+          commitNodes.forEach(function(node) { node.textContent = commitText; });
+          linkNodes.forEach(function(node) {
+            if (href) node.href = href;
+            if (tooltip) node.setAttribute('data-tooltip', tooltip);
+            node.classList.toggle('btn-warning', !!stale);
+          });
+        }
+
         try {
           var data = await fetchJSON('/api/deploy-status');
-          var icon = document.getElementById('deploy-icon');
-          var commit = document.getElementById('deploy-commit');
-          var btn = document.getElementById('deploy-status-btn');
-          
           if (data.commit && data.commit !== 'unknown') {
-            commit.textContent = data.commit;
-            btn.href = 'https://github.com/adhamhaithameid/Classroom-Quick-Downloader/commit/' + data.commit_full;
-            
+            var commitHref = 'https://github.com/adhamhaithameid/Classroom-Quick-Downloader/commit/' + data.commit_full;
             if (data.stale) {
-              icon.textContent = '⚠️';
-              btn.setAttribute('data-tooltip', 'Stale deployment (>24h) - ' + data.message);
-              btn.classList.add('btn-warning');
+              setStatusUI('⚠️', data.commit, commitHref, 'Stale deployment (>24h) - ' + data.message, true);
             } else {
-              icon.textContent = '✅';
-              btn.setAttribute('data-tooltip', 'Commit: ' + data.message + ' - Deployed: ' + new Date(data.deployed_at).toLocaleString('en-US', { timeZone: 'UTC' }));
+              var tip = 'Commit: ' + data.message + ' - Deployed: ' + new Date(data.deployed_at).toLocaleString('en-US', { timeZone: 'UTC' });
+              setStatusUI('✅', data.commit, commitHref, tip, false);
             }
           } else {
-            commit.textContent = 'Unknown';
-            icon.textContent = '❓';
+            setStatusUI('❓', 'Unknown', '', 'Deployment status unknown', false);
           }
         } catch (e) {
-          document.getElementById('deploy-icon').textContent = '❌';
-          document.getElementById('deploy-commit').textContent = 'Error';
+          setStatusUI('❌', 'Error', '', 'Failed to load deployment status', false);
         }
       }
 
@@ -3143,42 +3875,51 @@
         var container = document.getElementById('deployment-cards');
         if (!container) return;
         var targets = [];
+        var loadTargetsErr = '';
         try {
           var payload = await fetchJSON('/api/admin/deployments/targets');
           targets = payload.targets || [];
         } catch (e) {
-          container.innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed to load deployment targets</div>';
-          setDeploymentSyncOutput({ ok: false, error: String(e) });
-          return;
+          loadTargetsErr = String((e && e.message) || e || 'Unknown error');
         }
-        var html = '';
-        targets.forEach(function(item) {
-          var key = item.recordKey;
-          var v = item.data || {};
-          var statusBadge = '';
-          if (v.syncStatus === 'ok') statusBadge = '<span class="pill">Synced</span>';
-          if (v.syncStatus === 'error') statusBadge = '<span class="pill" style="border-color:rgba(239,68,68,0.55);color:#fecaca;">Sync Error</span>';
-          html += '<div class="deployment-card">';
-          html += '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;">';
-          html += '<div style="font-weight:600;">' + escapeHtml(v.name || key) + '</div>';
-          html += statusBadge;
-          html += '</div>';
-          html += '<div style="display:grid;gap:8px;">';
-          html += '<input class="auth-input" id="dep-users-' + key + '" placeholder="Users" value="' + escapeHtml(v.users || '') + '"/>';
-          html += '<input class="auth-input" id="dep-version-' + key + '" placeholder="Current version" value="' + escapeHtml(v.version || '') + '"/>';
-          html += '<input class="auth-input" id="dep-url-' + key + '" placeholder="Store dashboard URL" value="' + escapeHtml(v.url || '') + '"/>';
-          html += '<div class="pill-row"><span class="pill">UsersCount: ' + fmtNumber(Number(v.usersCount || 0)) + '</span><span class="pill">Latency: ' + fmtNumber(Number(v.syncLatencyMs || 0)) + 'ms</span></div>';
-          html += '<button class="btn btn-secondary" onclick="saveDeploymentCard(\'' + key + '\')">Save</button>';
-          html += '</div></div>';
-        });
-        container.innerHTML = html;
-        renderUpdateSentenceList();
+        if (loadTargetsErr) {
+          container.innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed to load deployment targets: ' + escapeHtml(loadTargetsErr) + '</div>';
+        } else {
+          var html = '';
+          targets.forEach(function(item) {
+            var key = String(item.recordKey || '');
+            var v = item.data || {};
+            var statusBadge = '';
+            if (v.syncStatus === 'ok') statusBadge = '<span class="pill">Synced</span>';
+            if (v.syncStatus === 'error') statusBadge = '<span class="pill" style="border-color:rgba(239,68,68,0.55);color:#fecaca;">Sync Error</span>';
+            var usersId = deploymentInputId('users', key);
+            var versionId = deploymentInputId('version', key);
+            var urlId = deploymentInputId('url', key);
+            var keyArg = JSON.stringify(key).replace(/"/g, '&quot;');
+            html += '<div class="deployment-card">';
+            html += '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;">';
+            html += '<div style="font-weight:600;">' + escapeHtml(v.name || key) + '</div>';
+            html += statusBadge;
+            html += '</div>';
+            html += '<div style="display:grid;gap:8px;">';
+            html += '<input class="auth-input" id="' + escapeHtml(usersId) + '" placeholder="Users" value="' + escapeHtml(v.users || '') + '"/>';
+            html += '<input class="auth-input" id="' + escapeHtml(versionId) + '" placeholder="Current version" value="' + escapeHtml(v.version || '') + '"/>';
+            html += '<input class="auth-input" id="' + escapeHtml(urlId) + '" placeholder="Store dashboard URL" value="' + escapeHtml(v.url || '') + '"/>';
+            html += '<div class="pill-row"><span class="pill">UsersCount: ' + fmtNumber(Number(v.usersCount || 0)) + '</span><span class="pill">Latency: ' + fmtNumber(Number(v.syncLatencyMs || 0)) + 'ms</span></div>';
+            html += '<button class="btn btn-secondary" onclick="saveDeploymentCard(' + keyArg + ')">Save</button>';
+            html += '</div></div>';
+          });
+          container.innerHTML = html || '<div class="empty-state">No deployment targets found</div>';
+        }
+        resetUpdateSentenceForm();
+        await loadUpdateSentences();
       }
 
       function setDeploymentSyncOutput(payload) {
         var out = document.getElementById('deployment-sync-output');
         if (!out) return;
         out.textContent = JSON.stringify(payload || {}, null, 2);
+        out.style.display = 'block';
       }
 
       async function syncDeploymentTargets() {
@@ -3198,10 +3939,17 @@
       }
 
       async function saveDeploymentCard(key) {
+        var usersEl = document.getElementById(deploymentInputId('users', key));
+        var versionEl = document.getElementById(deploymentInputId('version', key));
+        var urlEl = document.getElementById(deploymentInputId('url', key));
+        if (!usersEl || !versionEl || !urlEl) {
+          setDeploymentSyncOutput({ ok: false, error: 'Deployment inputs are missing for key: ' + String(key || '') });
+          return;
+        }
         var record = {
-          users: document.getElementById('dep-users-' + key).value,
-          version: document.getElementById('dep-version-' + key).value,
-          url: document.getElementById('dep-url-' + key).value
+          users: usersEl.value,
+          version: versionEl.value,
+          url: urlEl.value
         };
         var ok = await ensureStepUp();
         if (!ok) return;
@@ -3218,10 +3966,8 @@
         }
       }
 
-      function renderUpdateSentenceList() {
-        var container = document.getElementById('update-sentence-list');
-        if (!container) return;
-        var sentences = [
+      function defaultUpdateSentences() {
+        return [
           'Stability pass completed with lower fail-rate.',
           'Release includes improved retry behavior.',
           'This build introduces better analytics visibility.',
@@ -3238,19 +3984,151 @@
           'Danger-zone controls now support dry-run mode.',
           'Overall observability and metrics depth increased.'
         ];
-        var html = '<div style="display:grid;gap:8px;">';
-        sentences.forEach(function(s, idx) {
-          html += '<div class="deployment-card" style="display:flex;justify-content:space-between;align-items:center;gap:10px;">';
-          html += '<span style="font-size:12px;">' + (idx + 1) + '. ' + escapeHtml(s) + '</span>';
-          html += '<button class="btn btn-secondary" onclick="copyText(' + JSON.stringify(s).replace(/"/g, '&quot;') + ')">Copy</button>';
+      }
+
+      function renderUpdateSentenceList() {
+        var container = document.getElementById('update-sentence-list');
+        if (!container) return;
+        if (!deploymentUpdateSentences.length) {
+          container.innerHTML = '<div class="empty-state">No update sentences yet. Add one above or seed defaults.</div>';
+          return;
+        }
+        var html = '';
+        deploymentUpdateSentences.forEach(function(item, idx) {
+          var text = String((item.data && item.data.text) || '');
+          html += '<div class="deployment-card">';
+          html += '<div class="update-sentence-text">' + (idx + 1) + '. ' + escapeHtml(text) + '</div>';
+          html += '<div class="update-sentence-meta">Updated: ' + escapeHtml(creativeTimestampLabel(item.updatedAt || 0)) + '</div>';
+          html += '<div class="update-sentence-actions">';
+          html += '<button class="btn btn-secondary" onclick="copyText(' + JSON.stringify(text).replace(/"/g, '&quot;') + ')">Copy</button>';
+          html += '<button class="btn btn-secondary" onclick="editUpdateSentence(' + JSON.stringify(item.recordKey).replace(/"/g, '&quot;') + ',' + JSON.stringify(text).replace(/"/g, '&quot;') + ')">Edit</button>';
+          html += '<button class="btn btn-danger" onclick="deleteUpdateSentence(' + JSON.stringify(item.recordKey).replace(/"/g, '&quot;') + ')">Delete</button>';
+          html += '</div>';
           html += '</div>';
         });
-        html += '</div>';
         container.innerHTML = html;
       }
 
       async function copyText(text) {
         try { await navigator.clipboard.writeText(text); } catch (_) {}
+      }
+
+      async function loadUpdateSentences() {
+        try {
+          var payload = await fetchJSON('/api/admin/records/list?type=deployment_update_sentence');
+          var items = payload.records || [];
+          deploymentUpdateSentences = items.slice().sort(function(a, b) {
+            return Number((b && b.updatedAt) || 0) - Number((a && a.updatedAt) || 0);
+          });
+        } catch (e) {
+          deploymentUpdateSentences = [];
+          var container = document.getElementById('update-sentence-list');
+          if (container) {
+            container.innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed to load update sentences</div>';
+          }
+          return;
+        }
+        renderUpdateSentenceList();
+      }
+
+      function resetUpdateSentenceForm() {
+        var keyEl = document.getElementById('update-sentence-key');
+        var inputEl = document.getElementById('update-sentence-input');
+        var stateEl = document.getElementById('update-sentence-form-state');
+        var saveBtn = document.getElementById('update-sentence-save-btn');
+        if (keyEl) keyEl.value = '';
+        if (inputEl) inputEl.value = '';
+        if (stateEl) stateEl.textContent = 'Creating new sentence';
+        if (saveBtn) saveBtn.textContent = 'Add Sentence';
+      }
+
+      function editUpdateSentence(recordKey, text) {
+        var keyEl = document.getElementById('update-sentence-key');
+        var inputEl = document.getElementById('update-sentence-input');
+        var stateEl = document.getElementById('update-sentence-form-state');
+        var saveBtn = document.getElementById('update-sentence-save-btn');
+        if (keyEl) keyEl.value = String(recordKey || '').trim();
+        if (inputEl) {
+          inputEl.value = String(text || '');
+          inputEl.focus();
+        }
+        if (stateEl) stateEl.textContent = 'Editing: ' + String(recordKey || '');
+        if (saveBtn) saveBtn.textContent = 'Update Sentence';
+      }
+
+      async function saveUpdateSentence(e) {
+        e.preventDefault();
+        var keyEl = document.getElementById('update-sentence-key');
+        var inputEl = document.getElementById('update-sentence-input');
+        var text = (inputEl && inputEl.value ? inputEl.value : '').trim();
+        if (!text) return;
+        var recordKey = (keyEl && keyEl.value ? keyEl.value : '').trim();
+        if (!recordKey) {
+          recordKey = normalizeKey('sentence-' + Date.now(), 'sentence');
+        }
+        var ok = await ensureStepUp();
+        if (!ok) return;
+        try {
+          await fetchJSONWithInit('/api/admin/records/upsert', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              recordType: 'deployment_update_sentence',
+              recordKey: recordKey,
+              data: {
+                text: text,
+                updatedAt: Date.now()
+              }
+            })
+          });
+          resetUpdateSentenceForm();
+          await loadUpdateSentences();
+        } catch (_) {}
+      }
+
+      async function deleteUpdateSentence(recordKey) {
+        var key = String(recordKey || '').trim();
+        if (!key) return;
+        var ok = await ensureStepUp();
+        if (!ok) return;
+        if (!window.confirm('Delete update sentence "' + key + '"?')) return;
+        try {
+          await fetchJSONWithInit('/api/admin/records/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              recordType: 'deployment_update_sentence',
+              recordKey: key
+            })
+          });
+          var editKeyEl = document.getElementById('update-sentence-key');
+          if (editKeyEl && editKeyEl.value === key) resetUpdateSentenceForm();
+          await loadUpdateSentences();
+        } catch (_) {}
+      }
+
+      async function seedDefaultUpdateSentences() {
+        var ok = await ensureStepUp();
+        if (!ok) return;
+        var defaults = defaultUpdateSentences();
+        try {
+          for (var i = 0; i < defaults.length; i++) {
+            await fetchJSONWithInit('/api/admin/records/upsert', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                recordType: 'deployment_update_sentence',
+                recordKey: 'default-sentence-' + String(i + 1).padStart(2, '0'),
+                data: {
+                  text: defaults[i],
+                  updatedAt: Date.now()
+                }
+              })
+            });
+          }
+          resetUpdateSentenceForm();
+          await loadUpdateSentences();
+        } catch (_) {}
       }
 
       async function loadVersionHub() {
@@ -3367,12 +4245,12 @@
               }).join('') + '</div>';
             }
             html += '<div class="creative-meta">Updated: ' + escapeHtml(creativeTimestampLabel(item.updatedAt)) + '</div>';
-            html += '<button class="btn" style="background:#7f1d1d;" onclick="deleteCreativeDesign(' + JSON.stringify(item.recordKey).replace(/"/g, '&quot;') + ')">Delete</button>';
+            html += '<button class="btn btn-danger" onclick="deleteCreativeDesign(' + JSON.stringify(item.recordKey).replace(/"/g, '&quot;') + ')">Delete</button>';
             html += '</div>';
           });
           container.innerHTML = html;
         } catch (e) {
-          container.innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed to load designs</div>';
+          container.innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed to load designs: ' + escapeHtml(e.message || 'Unknown error') + '</div>';
         }
       }
 
@@ -3436,7 +4314,7 @@
             html += '<div style="font-size:12px;white-space:pre-wrap;max-height:120px;overflow:auto;">' + escapeHtml(htmlBody.slice(0, 800)) + '</div>';
             html += '<div style="display:flex;gap:8px;flex-wrap:wrap;">';
             html += '<button class="btn btn-secondary" onclick="copyText(' + JSON.stringify(htmlBody).replace(/"/g, '&quot;') + ')">Copy HTML</button>';
-            html += '<button class="btn" style="background:#7f1d1d;" onclick="deleteCreativeEmailTemplate(' + JSON.stringify(item.recordKey).replace(/"/g, '&quot;') + ')">Delete</button>';
+            html += '<button class="btn btn-danger" onclick="deleteCreativeEmailTemplate(' + JSON.stringify(item.recordKey).replace(/"/g, '&quot;') + ')">Delete</button>';
             html += '</div></div>';
           });
           container.innerHTML = html;
@@ -3501,7 +4379,7 @@
             html += '<h4>' + escapeHtml(d.email || item.recordKey) + '</h4>';
             html += '<div class="creative-meta">Name: ' + escapeHtml(d.name || 'n/a') + '</div>';
             html += '<div class="pill-row"><span class="pill">Status: ' + escapeHtml(d.status || 'active') + '</span></div>';
-            html += '<button class="btn" style="background:#7f1d1d;" onclick="deleteNewsletterSubscriber(' + JSON.stringify(item.recordKey).replace(/"/g, '&quot;') + ')">Delete</button>';
+            html += '<button class="btn btn-danger" onclick="deleteNewsletterSubscriber(' + JSON.stringify(item.recordKey).replace(/"/g, '&quot;') + ')">Delete</button>';
             html += '</div>';
           });
           container.innerHTML = html;
@@ -3563,7 +4441,7 @@
             html += '<h4>' + escapeHtml(d.title || item.recordKey) + '</h4>';
             html += '<div class="pill-row"><span class="pill">Version: ' + escapeHtml(d.version || 'n/a') + '</span><span class="pill">Send: ' + escapeHtml(d.sendAt || 'manual') + '</span></div>';
             html += '<div style="font-size:12px;white-space:pre-wrap;">' + escapeHtml(d.notes || '') + '</div>';
-            html += '<button class="btn" style="background:#7f1d1d;" onclick="deleteNewsletterCampaign(' + JSON.stringify(item.recordKey).replace(/"/g, '&quot;') + ')">Delete</button>';
+            html += '<button class="btn btn-danger" onclick="deleteNewsletterCampaign(' + JSON.stringify(item.recordKey).replace(/"/g, '&quot;') + ')">Delete</button>';
             html += '</div>';
           });
           container.innerHTML = html;
@@ -3632,6 +4510,7 @@
         var out = document.getElementById('oracle-logs-output');
         if (!out) return;
         out.textContent = JSON.stringify(payload, null, 2);
+        out.style.display = 'block';
       }
 
       async function loadOracleLogs() {
@@ -3732,25 +4611,8 @@
         try {
           var check = await fetchJSON('/api/auth/stepup/check');
           if (!check.required || check.active) return true;
-          return openStepUpPrompt();
+          return openStepUpModal();
         } catch (_) {
-          return false;
-        }
-      }
-
-      async function openStepUpPrompt() {
-        try {
-          var start = await fetchJSONWithInit('/api/auth/stepup/start', { method: 'POST' });
-          if (!start.required) return true;
-          var password = window.prompt('Enter super-admin password for critical action:');
-          if (!password) return false;
-          await fetchJSONWithInit('/api/auth/stepup/verify', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ challengeId: start.challengeId, password: password })
-          });
-          return true;
-        } catch (e) {
           return false;
         }
       }
@@ -3759,6 +4621,7 @@
         var out = document.getElementById('danger-output');
         if (!out) return;
         out.textContent = JSON.stringify(payload, null, 2);
+        out.style.display = 'block';
       }
 
       async function dangerDryRun(scope) {
@@ -3803,16 +4666,23 @@
         }
       }
 
-      async function sqlQuery() {
+      async function dangerLoadOutboxStatus() {
+        try {
+          var data = await fetchJSON('/api/admin/outbox/status');
+          setDangerOutput(data);
+        } catch (e) {
+          setDangerOutput({ ok: false, error: String(e) });
+        }
+      }
+
+      async function dangerRetryOutbox() {
         var ok = await ensureStepUp();
         if (!ok) return;
-        var sql = (document.getElementById('sql-console-input').value || '').trim();
-        if (!sql) return;
         try {
-          var data = await fetchJSONWithInit('/api/admin/sql/query', {
+          var data = await fetchJSONWithInit('/api/admin/outbox/retry', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sql: sql, limit: 200 })
+            body: JSON.stringify({})
           });
           setDangerOutput(data);
         } catch (e) {
@@ -3820,19 +4690,76 @@
         }
       }
 
-      async function sqlExec(dryRun) {
+      async function dangerReplayDeadLetter() {
         var ok = await ensureStepUp();
         if (!ok) return;
-        var sql = (document.getElementById('sql-console-input').value || '').trim();
-        if (!sql) return;
-        if (!dryRun && !window.confirm('Run mutating SQL statement?')) return;
+        if (!window.confirm('Replay dead-letter rows back into the outbox queue?')) return;
         try {
-          var data = await fetchJSONWithInit('/api/admin/sql/exec', {
+          var data = await fetchJSONWithInit('/api/admin/outbox/replay-dead-letter', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sql: sql, dryRun: dryRun })
+            body: JSON.stringify({})
           });
           setDangerOutput(data);
+        } catch (e) {
+          setDangerOutput({ ok: false, error: String(e) });
+        }
+      }
+
+      async function dangerVerifyAuditChain() {
+        try {
+          var data = await fetchJSON('/api/admin/audit/verify-chain');
+          setDangerOutput(data);
+        } catch (e) {
+          setDangerOutput({ ok: false, error: String(e) });
+        }
+      }
+
+      async function dangerLoadAlerts() {
+        try {
+          var data = await fetchJSON('/api/admin/alerts');
+          setDangerOutput(data);
+        } catch (e) {
+          setDangerOutput({ ok: false, error: String(e) });
+        }
+      }
+
+      async function dangerLoadFeatureFlags() {
+        try {
+          var data = await fetchJSON('/api/admin/flags');
+          setDangerOutput(data);
+        } catch (e) {
+          setDangerOutput({ ok: false, error: String(e) });
+        }
+      }
+
+      async function dangerLoadMigrationsStatus() {
+        try {
+          var data = await fetchJSON('/api/admin/migrations/status');
+          setDangerOutput(data);
+        } catch (e) {
+          setDangerOutput({ ok: false, error: String(e) });
+        }
+      }
+
+      async function dangerLoadOpsSnapshot() {
+        try {
+          var parts = await Promise.all([
+            fetchJSON('/api/admin/outbox/status').catch(function(e) { return { ok: false, error: String(e) }; }),
+            fetchJSON('/api/admin/alerts').catch(function(e) { return { ok: false, error: String(e) }; }),
+            fetchJSON('/api/admin/flags').catch(function(e) { return { ok: false, error: String(e) }; }),
+            fetchJSON('/api/admin/migrations/status').catch(function(e) { return { ok: false, error: String(e) }; }),
+            fetchJSON('/api/admin/audit/verify-chain').catch(function(e) { return { ok: false, error: String(e) }; })
+          ]);
+          setDangerOutput({
+            ok: true,
+            snapshotAtUtc: new Date().toISOString(),
+            outbox: parts[0],
+            alerts: parts[1],
+            flags: parts[2],
+            migrations: parts[3],
+            auditChain: parts[4]
+          });
         } catch (e) {
           setDangerOutput({ ok: false, error: String(e) });
         }
@@ -3840,21 +4767,18 @@
 
       // Keyboard shortcuts
       var shortcutItems = [
-        { combo: '⌘1', desc: 'Go to Overview', run: function() { showPage('overview'); } },
-        { combo: '⌘2', desc: 'Go to Activity', run: function() { showPage('activity'); } },
-        { combo: '⌘3', desc: 'Go to Charts', run: function() { showPage('charts'); } },
-        { combo: '⌘4', desc: 'Go to Dashboards', run: function() { showPage('dashboards'); } },
-        { combo: '⌘5', desc: 'Go to Deployments', run: function() { showPage('deployments'); } },
-        { combo: '⌘6', desc: 'Go to Versions', run: function() { showPage('versions'); } },
-        { combo: '⌘7', desc: 'Go to Creative Hub', run: function() { showPage('creative'); } },
-        { combo: '⌘8', desc: 'Go to Notifications', run: function() { showPage('notifications'); } },
-        { combo: '⌘9', desc: 'Go to Logs', run: function() { showPage('logs'); } },
-        { combo: '⌘0', desc: 'Go to Danger Zone', run: function() { showPage('danger'); } },
-        { combo: '⌘R', desc: 'Refresh all data', run: function() { refreshAll(); } },
-        { combo: '⌘B', desc: 'Open last batch modal', run: function() { showBatchModal(); } },
-        { combo: '⌘⇧D', desc: 'Sync deployment stores', run: function() { syncDeploymentTargets(); } },
-        { combo: '⌘⇧S', desc: 'Open step-up prompt', run: function() { openStepUpPrompt(); } },
-        { combo: '⌘/', desc: 'Open shortcuts help', run: function() { openShortcutsModal(); } }
+        { combo: 'Cmd/Ctrl+1', desc: 'Go to Overview', run: function() { showPage('overview'); } },
+        { combo: 'Cmd/Ctrl+2', desc: 'Go to Activity + Charts', run: function() { showPage('activity'); } },
+        { combo: 'Cmd/Ctrl+3', desc: 'Go to Ops Hub', run: function() { showPage('dashboards'); } },
+        { combo: 'Cmd/Ctrl+4', desc: 'Go to Versions', run: function() { showPage('versions'); } },
+        { combo: 'Cmd/Ctrl+5', desc: 'Go to Creative Hub', run: function() { showPage('creative'); } },
+        { combo: 'Cmd/Ctrl+6', desc: 'Go to Logs', run: function() { showPage('logs'); } },
+        { combo: 'Cmd/Ctrl+0', desc: 'Go to Danger Zone', run: function() { showPage('danger'); } },
+        { combo: 'Cmd/Ctrl+R', desc: 'Refresh all data', run: function() { refreshAll(); } },
+        { combo: 'Cmd/Ctrl+B', desc: 'Open last batch modal', run: function() { showBatchModal(); } },
+        { combo: 'Cmd/Ctrl+Shift+D', desc: 'Sync deployment stores', run: function() { syncDeploymentTargets(); } },
+        { combo: 'Cmd/Ctrl+Shift+S', desc: 'Open step-up modal', run: function() { openStepUpModal(); } },
+        { combo: 'Cmd/Ctrl+/', desc: 'Open shortcuts help', run: function() { openShortcutsModal(); } }
       ];
 
       function openShortcutsModal() {
@@ -3887,8 +4811,17 @@
       function shouldIgnoreGlobalShortcut(e) {
         var target = e && e.target;
         if (!target) return false;
+        if (target.closest && target.closest('[data-shortcuts-capture="true"]')) return false;
+        var editable = target.closest
+          ? target.closest('input, textarea, select, [contenteditable], [role="textbox"]')
+          : null;
+        if (editable) return true;
         var tag = (target.tagName || '').toLowerCase();
-        return tag === 'input' || tag === 'textarea' || !!target.isContentEditable;
+        return tag === 'input' || tag === 'textarea' || tag === 'select' || !!target.isContentEditable;
+      }
+
+      function isShortcutModifierKey(key) {
+        return key === 'Meta' || key === 'Control';
       }
 
       function startCommandHoldTimer() {
@@ -3921,81 +4854,150 @@
 
         if (!withShift && key === '1') { showPage('overview'); return true; }
         if (!withShift && key === '2') { showPage('activity'); return true; }
-        if (!withShift && key === '3') { showPage('charts'); return true; }
-        if (!withShift && key === '4') { showPage('dashboards'); return true; }
-        if (!withShift && key === '5') { showPage('deployments'); return true; }
-        if (!withShift && key === '6') { showPage('versions'); return true; }
-        if (!withShift && key === '7') { showPage('creative'); return true; }
-        if (!withShift && key === '8') { showPage('notifications'); return true; }
-        if (!withShift && key === '9') { showPage('logs'); return true; }
+        if (!withShift && key === '3') { showPage('dashboards'); return true; }
+        if (!withShift && key === '4') { showPage('versions'); return true; }
+        if (!withShift && key === '5') { showPage('creative'); return true; }
+        if (!withShift && key === '6') { showPage('logs'); return true; }
         if (!withShift && key === '0') { showPage('danger'); return true; }
         if (!withShift && key === 'r') { refreshAll(); return true; }
         if (!withShift && key === 'b') { showBatchModal(); return true; }
         if (withShift && key === 'd') { syncDeploymentTargets(); return true; }
-        if (withShift && key === 's') { openStepUpPrompt(); return true; }
+        if (withShift && key === 's') { openStepUpModal(); return true; }
         if (!withShift && key === '/') { openShortcutsModal(); return true; }
         return false;
       }
 
+      function bindButtonActions() {
+        document.querySelectorAll('.nav-item[data-page]').forEach(function(btn) {
+          if (btn.dataset.boundClick === '1') return;
+          btn.dataset.boundClick = '1';
+          btn.addEventListener('click', function(ev) {
+            ev.preventDefault();
+            var page = btn.getAttribute('data-page');
+            if (page) showPage(page);
+          });
+        });
+
+        var mobilePageSelect = document.getElementById('mobile-page-select');
+        if (mobilePageSelect && mobilePageSelect.dataset.boundChange !== '1') {
+          mobilePageSelect.dataset.boundChange = '1';
+          mobilePageSelect.addEventListener('change', function() {
+            showPage(mobilePageSelect.value);
+          });
+        }
+
+        [
+          ['shortcuts-btn', openShortcutsModal],
+          ['shortcuts-btn-mobile', openShortcutsModal],
+          ['batch-btn', showBatchModal],
+          ['batch-btn-mobile', showBatchModal],
+          ['refresh-btn', refreshAll],
+          ['refresh-btn-mobile', refreshAll],
+          ['deployment-sync-btn', syncDeploymentTargets],
+          ['stepup-btn', openStepUpModal]
+        ].forEach(function(entry) {
+          var node = document.getElementById(entry[0]);
+          if (!node || node.dataset.boundClick === '1') return;
+          node.dataset.boundClick = '1';
+          node.addEventListener('click', function(ev) {
+            ev.preventDefault();
+            entry[1]();
+          });
+        });
+      }
+
+      function startAutoRefreshLoop() {
+        if (refreshIntervalId) clearInterval(refreshIntervalId);
+        refreshIntervalId = setInterval(async function() {
+          var ok = await ensureAuth();
+          if (!ok) return;
+          refreshAll();
+        }, 60000);
+      }
+
       // Refresh all data
       async function refreshAll() {
-        var btn = document.getElementById("refresh-btn");
-        btn.disabled = true;
-        btn.innerHTML = '<div class="spinner"></div> Refreshing...';
+        var refreshButtons = Array.from(document.querySelectorAll('[data-role="refresh-action"]'));
+        refreshButtons.forEach(function(btn) {
+          btn.disabled = true;
+          btn.innerHTML = '<div class="spinner"></div> Refreshing...';
+        });
         
         await loadOverview();
         await loadTopToday();
         await loadDeployStatus();
         
-        if (currentPage === 'activity') await loadActivity();
-        if (currentPage === 'charts') {
+        if (currentPage === 'activity') {
+          await loadActivity();
           await loadCharts();
           await loadComparison();
         }
-        if (currentPage === 'deployments') loadDeploymentsHub();
+        if (currentPage === 'dashboards') {
+          loadDeploymentsHub();
+          await loadNotifications();
+        }
         if (currentPage === 'versions') loadVersionHub();
         if (currentPage === 'creative') await loadCreativeHub();
-        if (currentPage === 'notifications') await loadNotifications();
         if (currentPage === 'logs') await loadOracleLogs();
 
-        btn.disabled = false;
-        btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 11-2.52-6.25"/><path d="M21 4v5h-5"/></svg> Refresh';
+        refreshButtons.forEach(function(btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 11-2.52-6.25"/><path d="M21 4v5h-5"/></svg> Refresh';
+        });
       }
 
       // Init
-      window.addEventListener("load", function() {
+      window.addEventListener("load", async function() {
+        initOracleUtcClock();
         renderShortcutsList();
+        bindButtonActions();
         document.addEventListener('keydown', function(e) {
-          if ((e.metaKey || e.ctrlKey) && !shortcutModifierHeld) {
-            shortcutModifierHeld = true;
-            startCommandHoldTimer();
-          }
-          if (e.key === 'Meta' || e.key === 'Control') {
+          var ignoreForTarget = shouldIgnoreGlobalShortcut(e);
+          if (isShortcutModifierKey(e.key)) {
+            if (ignoreForTarget) {
+              clearCommandHoldHints();
+              return;
+            }
             shortcutModifierHeld = true;
             startCommandHoldTimer();
             return;
           }
-          if (runKeyboardShortcut(e)) {
-            e.preventDefault();
+
+          // If shortcut hints are visible and user continues without modifier, clear them.
+          if (document.body.classList.contains('show-shortcut-hints') && (ignoreForTarget || !(e.metaKey || e.ctrlKey))) {
             clearCommandHoldHints();
+          }
+
+          if (e.metaKey || e.ctrlKey) {
+            if (ignoreForTarget) return;
+            shortcutModifierHeld = true;
+            if (runKeyboardShortcut(e)) {
+              e.preventDefault();
+              clearCommandHoldHints();
+            }
             return;
           }
+
           if (e.key === 'Escape') {
             closeShortcutsModal();
             closeBatchModal();
+            closeStepUpModal();
             clearCommandHoldHints();
           }
         });
         document.addEventListener('keyup', function(e) {
-          if (shortcutModifierHeld && !(e.metaKey || e.ctrlKey)) {
-            clearCommandHoldHints();
-            return;
-          }
-          if (e.key === 'Meta' || e.key === 'Control') {
+          if (isShortcutModifierKey(e.key)) {
             shortcutModifierHeld = !!(e.metaKey || e.ctrlKey);
             if (shortcutModifierHeld) return;
             clearCommandHoldHints();
+            return;
           }
+          if (!(e.metaKey || e.ctrlKey) && document.body.classList.contains('show-shortcut-hints')) {
+            clearCommandHoldHints();
+          }
+        });
+        document.addEventListener('pointerdown', function() {
+          if (document.body.classList.contains('show-shortcut-hints')) clearCommandHoldHints();
         });
         window.addEventListener('blur', clearCommandHoldHints);
         document.addEventListener('visibilitychange', function() {
@@ -4007,8 +5009,11 @@
             if (ev.target === shortcutsModal) closeShortcutsModal();
           });
         }
-        refreshAll();
-        setInterval(refreshAll, 60000);
+        var authed = await ensureAuth();
+        if (authed) {
+          await refreshAll();
+        }
+        startAutoRefreshLoop();
       });
     </script>
   </body>

@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bytes"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -24,6 +27,176 @@ func TestGetClientIPTrustedProxyUsesForwarded(t *testing.T) {
 	ip := getClientIP(req)
 	if ip != "203.0.113.10" {
 		t.Fatalf("expected forwarded IP, got %q", ip)
+	}
+}
+
+func TestRequestBodyLimitMiddleware_AdminRejectsOversizedBody(t *testing.T) {
+	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := io.ReadAll(r.Body)
+		if err != nil {
+			if strings.Contains(err.Error(), "http: request body too large") {
+				http.Error(w, "request too large", http.StatusRequestEntityTooLarge)
+				return
+			}
+			http.Error(w, "read failed", http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+	handler := requestBodyLimitMiddleware(inner)
+
+	body := bytes.Repeat([]byte("a"), adminRequestBodyLimit+1)
+	req := httptest.NewRequest(http.MethodPost, "/api/admin/flags/update", bytes.NewReader(body))
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+	if rr.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("expected 413 for oversized admin body, got %d", rr.Code)
+	}
+}
+
+func TestRequestBodyLimitMiddleware_AuthRejectsOversizedBody(t *testing.T) {
+	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := io.ReadAll(r.Body)
+		if err != nil {
+			if strings.Contains(err.Error(), "http: request body too large") {
+				http.Error(w, "request too large", http.StatusRequestEntityTooLarge)
+				return
+			}
+			http.Error(w, "read failed", http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+	handler := requestBodyLimitMiddleware(inner)
+
+	body := bytes.Repeat([]byte("a"), authRequestBodyLimit+1)
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewReader(body))
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+	if rr.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("expected 413 for oversized auth body, got %d", rr.Code)
+	}
+}
+
+func TestCleanupExpiredInMemoryStores_RemovesExpiredEntries(t *testing.T) {
+	now := time.Now()
+	sessionStore.Lock()
+	sessionStore.tokens = map[string]time.Time{
+		"expired-session": now.Add(-time.Minute),
+		"valid-session":   now.Add(time.Hour),
+	}
+	sessionStore.Unlock()
+
+	stepUpSessionStore.Lock()
+	stepUpSessionStore.tokens = map[string]stepUpSession{
+		"expired-stepup": {expiresAt: now.Add(-time.Minute)},
+		"valid-stepup":   {expiresAt: now.Add(time.Hour)},
+	}
+	stepUpSessionStore.Unlock()
+
+	stepUpChallengeStore.Lock()
+	stepUpChallengeStore.items = map[string]stepUpChallenge{
+		"expired-challenge": {expiresAt: now.Add(-time.Minute)},
+		"valid-challenge":   {expiresAt: now.Add(time.Hour)},
+	}
+	stepUpChallengeStore.Unlock()
+
+	loginRateStore.Lock()
+	loginRateStore.attempts = map[string]*loginAttempt{
+		"expired-login-ip": {firstAttemptAt: now.Add(-(loginLockout + inMemoryCleanupHorizon + time.Minute))},
+		"valid-login-ip":   {firstAttemptAt: now.Add(-time.Minute)},
+	}
+	loginRateStore.Unlock()
+
+	stepUpRateStore.Lock()
+	stepUpRateStore.attempts = map[string]*stepUpAttempt{
+		"expired-stepup-ip": {firstAttemptAt: now.Add(-(stepUpLockout + inMemoryCleanupHorizon + time.Minute))},
+		"valid-stepup-ip":   {firstAttemptAt: now.Add(-time.Minute)},
+	}
+	stepUpRateStore.Unlock()
+
+	cleanupExpiredInMemoryStores(now)
+
+	sessionStore.RLock()
+	if _, ok := sessionStore.tokens["expired-session"]; ok {
+		t.Fatalf("expected expired viewer session to be removed")
+	}
+	if _, ok := sessionStore.tokens["valid-session"]; !ok {
+		t.Fatalf("expected valid viewer session to remain")
+	}
+	sessionStore.RUnlock()
+
+	stepUpSessionStore.RLock()
+	if _, ok := stepUpSessionStore.tokens["expired-stepup"]; ok {
+		t.Fatalf("expected expired step-up session to be removed")
+	}
+	if _, ok := stepUpSessionStore.tokens["valid-stepup"]; !ok {
+		t.Fatalf("expected valid step-up session to remain")
+	}
+	stepUpSessionStore.RUnlock()
+
+	stepUpChallengeStore.Lock()
+	if _, ok := stepUpChallengeStore.items["expired-challenge"]; ok {
+		t.Fatalf("expected expired step-up challenge to be removed")
+	}
+	if _, ok := stepUpChallengeStore.items["valid-challenge"]; !ok {
+		t.Fatalf("expected valid step-up challenge to remain")
+	}
+	stepUpChallengeStore.Unlock()
+
+	loginRateStore.Lock()
+	if _, ok := loginRateStore.attempts["expired-login-ip"]; ok {
+		t.Fatalf("expected expired login rate entry to be removed")
+	}
+	if _, ok := loginRateStore.attempts["valid-login-ip"]; !ok {
+		t.Fatalf("expected valid login rate entry to remain")
+	}
+	loginRateStore.Unlock()
+
+	stepUpRateStore.Lock()
+	if _, ok := stepUpRateStore.attempts["expired-stepup-ip"]; ok {
+		t.Fatalf("expected expired step-up rate entry to be removed")
+	}
+	if _, ok := stepUpRateStore.attempts["valid-stepup-ip"]; !ok {
+		t.Fatalf("expected valid step-up rate entry to remain")
+	}
+	stepUpRateStore.Unlock()
+}
+
+func TestSecurityHeadersMiddleware_UsesScriptNonceAndSupportsInlineHandlers(t *testing.T) {
+	handler := securityHeadersMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if cspNonceFromContext(r.Context()) == "" {
+			t.Fatalf("expected CSP nonce in request context")
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("unexpected status: %d", rr.Code)
+	}
+	csp := rr.Header().Get("Content-Security-Policy")
+	if !strings.Contains(csp, "script-src 'self' 'unsafe-inline' 'nonce-") {
+		t.Fatalf("expected nonce-based script CSP, got: %q", csp)
+	}
+	if !strings.Contains(csp, "script-src-attr 'unsafe-inline'") {
+		t.Fatalf("expected script-src-attr unsafe-inline for legacy inline handlers, got: %q", csp)
+	}
+}
+
+func TestMetricsRoute_RequiresAuthMiddleware(t *testing.T) {
+	mux := http.NewServeMux()
+	authMW := requireAuth("secret", "", false)
+	mux.Handle("/metrics", authMW(metricsHandler(appMetrics)))
+
+	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 for unauthenticated metrics request, got %d", rr.Code)
 	}
 }
 

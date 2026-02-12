@@ -2,25 +2,31 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
-	"crypto/sha256"
 	"crypto/subtle"
 	"database/sql"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	iofs "io/fs"
 	"log"
 	"net"
 	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
+
+	"golang.org/x/crypto/bcrypt"
 
 	"oracle-backend/internal/db"
 	"oracle-backend/internal/handlers"
@@ -43,7 +49,7 @@ func main() {
 	trustedProxyNets = parseTrustedProxyCIDRs(os.Getenv("TRUSTED_PROXY_CIDRS"))
 	// HTTP mode note: if your Oracle deployment is HTTP-only, cookies are non-Secure.
 	// This keeps the dashboard usable but provides no transport confidentiality.
-	allowInsecureCookies := os.Getenv("ALLOW_INSECURE_COOKIES") == "true"
+	allowInsecureCookies := getenvBool("ALLOW_INSECURE_COOKIES", true)
 
 	if doSecret == "" {
 		log.Println("[WARN] DO_SHARED_SECRET is empty – /ingest-batch will reject requests")
@@ -65,8 +71,10 @@ func main() {
 	if allowLoopbackBypass {
 		log.Println("[WARN] ALLOW_LOOPBACK_BYPASS is true – loopback requests can bypass auth (dev only)")
 	}
-	if !allowInsecureCookies {
-		log.Println("[INFO] ALLOW_INSECURE_COOKIES is false – HTTP dashboards will use non-secure cookies")
+	if allowInsecureCookies {
+		log.Println("[WARN] ALLOW_INSECURE_COOKIES is true/default – HTTP dashboards will use non-secure cookies")
+	} else {
+		log.Println("[INFO] ALLOW_INSECURE_COOKIES is false – secure cookies require HTTPS")
 	}
 	if len(trustedProxyNets) > 0 {
 		log.Printf("[INFO] Trusted proxy CIDRs loaded: %d", len(trustedProxyNets))
@@ -116,12 +124,13 @@ func main() {
 	authMiddleware := requireAuth(dashboardPassword, archiverSecret, allowLoopbackBypass)
 	criticalMiddleware := requireStepUp(sqlDB, superAdminPassword)
 	allowedRecordTypes := map[string]struct{}{
-		"deployment_target":       {},
-		"extension_version_note":  {},
-		"creative_design":         {},
-		"creative_email_template": {},
-		"newsletter_subscriber":   {},
-		"newsletter_campaign":     {},
+		"deployment_target":          {},
+		"deployment_update_sentence": {},
+		"extension_version_note":     {},
+		"creative_design":            {},
+		"creative_email_template":    {},
+		"newsletter_subscriber":      {},
+		"newsletter_campaign":        {},
 	}
 	mux.Handle("/api/stats/summary", authMiddleware(handlers.SummaryHandler(sqlDB)))
 	mux.Handle("/api/stats/timeseries", authMiddleware(handlers.TimeSeriesHandler(sqlDB)))
@@ -163,7 +172,7 @@ func main() {
 	mux.Handle("/api/admin/oracle-logs", authMiddleware(handlers.OracleOperationLogsListHandler(sqlDB)))
 	mux.Handle("/api/admin/oracle-logs/delete-older", authMiddleware(criticalMiddleware(handlers.OracleOperationLogsDeleteOlderHandler(sqlDB))))
 	mux.Handle("/api/admin/oracle-logs/clear-all", authMiddleware(criticalMiddleware(handlers.OracleOperationLogsClearAllHandler(sqlDB))))
-	mux.Handle("/metrics", metricsHandler(appMetrics))
+	mux.Handle("/metrics", authMiddleware(metricsHandler(appMetrics)))
 
 	// Auth endpoints
 	mux.HandleFunc("/api/auth/login", loginHandler(dashboardPassword, allowInsecureCookies))
@@ -185,8 +194,12 @@ func main() {
 	if postgresDB != nil {
 		go relay.NewSQLiteToPostgresRelay(sqlDB, postgresDB, appMetrics).Start(context.Background())
 	}
+	serverCtx, stopServerCtx := context.WithCancel(context.Background())
+	defer stopServerCtx()
+	go startInMemoryStoreCleanupLoop(serverCtx, 15*time.Minute)
 
 	rootHandler := observability.RequestContextMiddleware(mux)
+	rootHandler = requestBodyLimitMiddleware(rootHandler)
 	rootHandler = securityHeadersMiddleware(rootHandler)
 
 	server := &http.Server{
@@ -199,8 +212,32 @@ func main() {
 	}
 
 	log.Printf("oracle-backend listening on %s (db: %s, static: %s)", addr, dbPath, staticDir)
-	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		log.Fatalf("server error: %v", err)
+	serverErr := make(chan error, 1)
+	go func() {
+		serverErr <- server.ListenAndServe()
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(quit)
+
+	select {
+	case sig := <-quit:
+		log.Printf("shutdown signal received: %s", sig.String())
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			log.Printf("graceful shutdown failed: %v", err)
+		}
+		stopServerCtx()
+		if err := <-serverErr; err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Printf("server error during shutdown: %v", err)
+		}
+	case err := <-serverErr:
+		stopServerCtx()
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalf("server error: %v", err)
+		}
 	}
 }
 
@@ -209,6 +246,18 @@ func getenv(key, def string) string {
 		return v
 	}
 	return def
+}
+
+func getenvBool(key string, def bool) bool {
+	v, ok := os.LookupEnv(key)
+	if !ok || strings.TrimSpace(v) == "" {
+		return def
+	}
+	parsed, err := strconv.ParseBool(strings.TrimSpace(v))
+	if err != nil {
+		return def
+	}
+	return parsed
 }
 
 // HealthDBHandler returns a handler that checks the database connection
@@ -256,13 +305,53 @@ func setActorContextOnWriter(w http.ResponseWriter, userID, tokenID, role string
 	}
 }
 
+const adminRequestBodyLimit = 1 << 20  // 1 MiB
+const authRequestBodyLimit = 256 << 10 // 256 KiB
+
+func requestBodyLimitMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Body != nil {
+			switch {
+			case strings.HasPrefix(r.URL.Path, "/api/admin/"):
+				r.Body = http.MaxBytesReader(w, r.Body, adminRequestBodyLimit)
+			case strings.HasPrefix(r.URL.Path, "/api/auth/"):
+				r.Body = http.MaxBytesReader(w, r.Body, authRequestBodyLimit)
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+type cspNonceContextKey struct{}
+
+func generateCSPNonce() string {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return "nonce-unavailable"
+	}
+	return base64.RawStdEncoding.EncodeToString(b)
+}
+
+func cspNonceFromContext(ctx context.Context) string {
+	if ctx == nil {
+		return ""
+	}
+	nonce, _ := ctx.Value(cspNonceContextKey{}).(string)
+	return strings.TrimSpace(nonce)
+}
+
 func securityHeadersMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		nonce := generateCSPNonce()
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "no-referrer")
-		w.Header().Set("Content-Security-Policy", "default-src 'self' https:; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https:; script-src 'self' 'unsafe-inline'; frame-ancestors 'none'; base-uri 'self'")
-		next.ServeHTTP(w, r)
+		w.Header().Set(
+			"Content-Security-Policy",
+			"default-src 'self' https:; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https:; script-src 'self' 'unsafe-inline' 'nonce-"+nonce+"'; script-src-attr 'unsafe-inline'; frame-ancestors 'none'; base-uri 'self'",
+		)
+		ctx := context.WithValue(r.Context(), cspNonceContextKey{}, nonce)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
@@ -449,6 +538,12 @@ func spaHandler(staticDir string) http.Handler {
 			http.NotFound(w, r)
 			return
 		}
+		for _, segment := range strings.Split(r.URL.Path, "/") {
+			if segment == ".." {
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
+		}
 
 		// PATH TRAVERSAL PROTECTION: Ensure cleaned path stays within staticDir
 		// Clean URL path using path (always slash-separated), then make it relative.
@@ -471,13 +566,32 @@ func spaHandler(staticDir string) http.Handler {
 		// If file exists, serve it
 		// #nosec G703 -- fullPath is validated with filepath.Rel to remain under absStaticDir.
 		if info, err := os.Stat(fullPath); err == nil && !info.IsDir() {
+			if relPath == "index.html" {
+				serveIndexWithNonce(w, r, absStaticDir)
+				return
+			}
 			fs.ServeHTTP(w, r)
 			return
 		}
 
 		// Otherwise serve SPA entry (index.html)
-		http.ServeFile(w, r, filepath.Join(absStaticDir, "index.html"))
+		serveIndexWithNonce(w, r, absStaticDir)
 	})
+}
+
+func serveIndexWithNonce(w http.ResponseWriter, r *http.Request, staticRoot string) {
+	content, err := iofs.ReadFile(os.DirFS(staticRoot), "index.html")
+	if err != nil {
+		http.Error(w, "Server error", http.StatusInternalServerError)
+		return
+	}
+	nonce := cspNonceFromContext(r.Context())
+	if nonce != "" {
+		content = bytes.ReplaceAll(content, []byte("__CSP_NONCE__"), []byte(nonce))
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(content) // #nosec G705 -- content is trusted local template from static root with nonce substitution only.
 }
 
 // scheduleSheetsArchiver runs a scheduled task at 00:15 daily to export stats to Google Sheets.
@@ -644,11 +758,98 @@ var stepUpRateStore = struct {
 const stepUpMaxAttempts = 8
 const stepUpLockout = 10 * time.Minute
 const stepUpAbuseThreshold = 5
+const inMemoryCleanupHorizon = 24 * time.Hour
 
 var trustedProxyNets []*net.IPNet
 
 func setTrustedProxyNets(nets []*net.IPNet) {
 	trustedProxyNets = nets
+}
+
+func startInMemoryStoreCleanupLoop(ctx context.Context, interval time.Duration) {
+	if interval <= 0 {
+		interval = 15 * time.Minute
+	}
+	cleanupExpiredInMemoryStores(time.Now())
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			cleanupExpiredInMemoryStores(time.Now())
+		}
+	}
+}
+
+func cleanupExpiredInMemoryStores(now time.Time) {
+	cleanupExpiredViewerSessions(now)
+	cleanupExpiredStepUpChallenges(now)
+	cleanupExpiredStepUpSessions(now)
+	cleanupExpiredLoginRateEntries(now)
+	cleanupExpiredStepUpRateEntries(now)
+}
+
+func cleanupExpiredViewerSessions(now time.Time) {
+	sessionStore.Lock()
+	defer sessionStore.Unlock()
+	for token, expiry := range sessionStore.tokens {
+		if now.After(expiry) {
+			delete(sessionStore.tokens, token)
+		}
+	}
+}
+
+func cleanupExpiredStepUpChallenges(now time.Time) {
+	stepUpChallengeStore.Lock()
+	defer stepUpChallengeStore.Unlock()
+	cleanupExpiredStepUpChallengesLocked(now)
+}
+
+func cleanupExpiredStepUpSessions(now time.Time) {
+	stepUpSessionStore.Lock()
+	defer stepUpSessionStore.Unlock()
+	for token, session := range stepUpSessionStore.tokens {
+		if now.After(session.expiresAt) {
+			delete(stepUpSessionStore.tokens, token)
+		}
+	}
+}
+
+func cleanupExpiredLoginRateEntries(now time.Time) {
+	loginRateStore.Lock()
+	defer loginRateStore.Unlock()
+	for ip, rec := range loginRateStore.attempts {
+		if rec == nil {
+			delete(loginRateStore.attempts, ip)
+			continue
+		}
+		if !rec.blockedUntil.IsZero() && now.Before(rec.blockedUntil) {
+			continue
+		}
+		if now.Sub(rec.firstAttemptAt) > loginLockout+inMemoryCleanupHorizon {
+			delete(loginRateStore.attempts, ip)
+		}
+	}
+}
+
+func cleanupExpiredStepUpRateEntries(now time.Time) {
+	stepUpRateStore.Lock()
+	defer stepUpRateStore.Unlock()
+	for ip, rec := range stepUpRateStore.attempts {
+		if rec == nil {
+			delete(stepUpRateStore.attempts, ip)
+			continue
+		}
+		if !rec.blockedUntil.IsZero() && now.Before(rec.blockedUntil) {
+			continue
+		}
+		if now.Sub(rec.firstAttemptAt) > stepUpLockout+inMemoryCleanupHorizon {
+			delete(stepUpRateStore.attempts, ip)
+		}
+	}
 }
 
 func parseTrustedProxyCIDRs(input string) []*net.IPNet {
@@ -721,10 +922,28 @@ func generateToken() (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
-// hashPassword creates a SHA256 hash for timing-safe comparison.
-func hashPassword(password string) string {
-	h := sha256.Sum256([]byte(password))
-	return hex.EncodeToString(h[:])
+// hashPassword creates a bcrypt hash for password verification.
+func hashPassword(password string) (string, error) {
+	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+	return string(hashed), nil
+}
+
+func mustHashPassword(password string) string {
+	hashed, err := hashPassword(password)
+	if err != nil {
+		log.Fatalf("failed to hash password: %v", err)
+	}
+	return hashed
+}
+
+func verifyPasswordHash(hashedPassword, password string) bool {
+	if strings.TrimSpace(hashedPassword) == "" {
+		return false
+	}
+	return bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password)) == nil
 }
 
 // requireAuth returns middleware that checks for valid session cookie.
@@ -860,7 +1079,7 @@ func stepUpStartHandler(db *sql.DB) http.Handler {
 }
 
 func stepUpVerifyHandler(db *sql.DB, superAdminPassword string, allowInsecureCookies bool) http.Handler {
-	storedHash := hashPassword(superAdminPassword)
+	storedHash := mustHashPassword(superAdminPassword)
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -917,8 +1136,7 @@ func stepUpVerifyHandler(db *sql.DB, superAdminPassword string, allowInsecureCoo
 			return
 		}
 
-		hashedInput := hashPassword(req.Password)
-		if subtle.ConstantTimeCompare([]byte(hashedInput), []byte(storedHash)) != 1 {
+		if !verifyPasswordHash(storedHash, req.Password) {
 			appMetrics.IncCounter("oracle_stepup_verify_total", map[string]string{"result": "invalid_password"}, 1)
 			appMetrics.IncCounter("oracle_auth_failures_total", map[string]string{"reason": "stepup_invalid_password"}, 1)
 			blocked, retryAfter := recordStepUpFailure(db, clientIP)
@@ -1033,9 +1251,8 @@ func cleanupExpiredStepUpChallengesLocked(now time.Time) {
 
 func isValidStepUpSession(token string, parentSessionToken string) bool {
 	stepUpSessionStore.RLock()
-	defer stepUpSessionStore.RUnlock()
-
 	session, exists := stepUpSessionStore.tokens[token]
+	stepUpSessionStore.RUnlock()
 	if !exists {
 		return false
 	}
@@ -1043,11 +1260,11 @@ func isValidStepUpSession(token string, parentSessionToken string) bool {
 		return false
 	}
 	if time.Now().After(session.expiresAt) {
-		go func() {
-			stepUpSessionStore.Lock()
+		stepUpSessionStore.Lock()
+		if latest, ok := stepUpSessionStore.tokens[token]; ok && time.Now().After(latest.expiresAt) {
 			delete(stepUpSessionStore.tokens, token)
-			stepUpSessionStore.Unlock()
-		}()
+		}
+		stepUpSessionStore.Unlock()
 		return false
 	}
 	return true
@@ -1175,19 +1392,17 @@ func upsertSystemAlert(
 // isValidSession checks if token is in store and not expired.
 func isValidSession(token string) bool {
 	sessionStore.RLock()
-	defer sessionStore.RUnlock()
-
 	expiry, exists := sessionStore.tokens[token]
+	sessionStore.RUnlock()
 	if !exists {
 		return false
 	}
 	if time.Now().After(expiry) {
-		// Expired - clean up async
-		go func() {
-			sessionStore.Lock()
+		sessionStore.Lock()
+		if latest, ok := sessionStore.tokens[token]; ok && time.Now().After(latest) {
 			delete(sessionStore.tokens, token)
-			sessionStore.Unlock()
-		}()
+		}
+		sessionStore.Unlock()
 		return false
 	}
 	return true
@@ -1279,7 +1494,7 @@ func clearLoginFailures(ip string) {
 func loginHandler(dashboardPassword string, allowInsecureCookies bool) http.HandlerFunc {
 	storedHash := ""
 	if dashboardPassword != "" {
-		storedHash = hashPassword(dashboardPassword)
+		storedHash = mustHashPassword(dashboardPassword)
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -1314,9 +1529,7 @@ func loginHandler(dashboardPassword string, allowInsecureCookies bool) http.Hand
 			return
 		}
 
-		// Timing-safe comparison via SHA256 (stored hash precomputed)
-		hashedInput := hashPassword(req.Password)
-		if subtle.ConstantTimeCompare([]byte(hashedInput), []byte(storedHash)) != 1 {
+		if !verifyPasswordHash(storedHash, req.Password) {
 			appMetrics.IncCounter("oracle_auth_failures_total", map[string]string{"reason": "invalid_password"}, 1)
 			blocked, retryAfter := recordLoginFailure(clientIP)
 			if blocked {
@@ -1416,7 +1629,8 @@ func cookieSecurityPolicy(r *http.Request, allowInsecure bool) (bool, http.SameS
 	if allowInsecure {
 		return false, http.SameSiteLaxMode
 	}
-	return false, http.SameSiteLaxMode
+	// Fail closed on HTTP when insecure cookies are not explicitly allowed.
+	return true, http.SameSiteStrictMode
 }
 
 func isLoopbackAddr(remoteAddr string) bool {
