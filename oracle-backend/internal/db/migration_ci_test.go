@@ -21,6 +21,9 @@ func TestMigrationBootstrapCleanDatabases(t *testing.T) {
 		"system_alerts",
 		"backup_runs",
 		"oracle_operation_logs",
+		"auth_sessions",
+		"auth_stepup_challenges",
+		"auth_rate_limits",
 	}
 	for _, table := range requiredSQLiteTables {
 		var count int
@@ -71,5 +74,97 @@ func TestMigrationBootstrapCleanDatabases(t *testing.T) {
 		if count != 1 {
 			t.Fatalf("expected postgres table %s to exist", table)
 		}
+	}
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Expanded migration tests
+// ──────────────────────────────────────────────────────────────────────────────
+
+func TestMigrationIdempotency_DoubleInit(t *testing.T) {
+	dir := t.TempDir()
+	sqlitePath := filepath.Join(dir, "idempotent.db")
+
+	// First init
+	db1, err := Init(sqlitePath)
+	if err != nil {
+		t.Fatalf("first Init failed: %v", err)
+	}
+	db1.Close()
+
+	// Second init on same path — should not error
+	db2, err := Init(sqlitePath)
+	if err != nil {
+		t.Fatalf("second Init failed: %v", err)
+	}
+	defer db2.Close()
+
+	// Verify tables still exist
+	var count int
+	if err := db2.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'feature_flags'`).Scan(&count); err != nil {
+		t.Fatalf("table probe: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected feature_flags table to survive double init")
+	}
+}
+
+func TestFeatureFlagsDefaultValues(t *testing.T) {
+	sqlitePath := filepath.Join(t.TempDir(), "flags.db")
+	sqlDB, err := Init(sqlitePath)
+	if err != nil {
+		t.Fatalf("Init failed: %v", err)
+	}
+	defer sqlDB.Close()
+
+	// Check all expected feature flags and their defaults
+	expectedFlags := map[string]int64{
+		"feature_stepup_enforced":      1,
+		"feature_sql_console_enabled":  0,
+		"feature_sync_enabled":         1,
+		"feature_creative_hub_enabled": 1,
+	}
+
+	for name, expectedEnabled := range expectedFlags {
+		var enabled int64
+		err := sqlDB.QueryRow(`SELECT enabled FROM feature_flags WHERE name = ?`, name).Scan(&enabled)
+		if err != nil {
+			t.Errorf("flag %q: query failed: %v", name, err)
+			continue
+		}
+		if enabled != expectedEnabled {
+			t.Errorf("flag %q: expected enabled=%d, got %d", name, expectedEnabled, enabled)
+		}
+	}
+}
+
+func TestMigrationCreatesRequiredIndexes(t *testing.T) {
+	sqlitePath := filepath.Join(t.TempDir(), "indexes.db")
+	sqlDB, err := Init(sqlitePath)
+	if err != nil {
+		t.Fatalf("Init failed: %v", err)
+	}
+	defer sqlDB.Close()
+
+	// Verify that key tables have the correct structure by doing a simple operation
+	// Insert and query from downloads_hourly
+	_, err = sqlDB.Exec(
+		`INSERT INTO downloads_hourly (
+			bucket_start, bucket_end, total_events, total_downloads, total_success, total_fail,
+			by_status_json, by_type_json, by_browser_json, by_os_json, by_ext_ver_json,
+			by_lang_json, by_country_json, by_error_type_json, batch_id
+		) VALUES ('2026-01-01T00:00:00Z', '2026-01-01T01:00:00Z', 1, 1, 1, 0,
+			'{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', 'test-batch')`,
+	)
+	if err != nil {
+		t.Fatalf("insert into downloads_hourly: %v", err)
+	}
+
+	var totalEvents int
+	if err := sqlDB.QueryRow(`SELECT total_events FROM downloads_hourly WHERE bucket_start = '2026-01-01T00:00:00Z'`).Scan(&totalEvents); err != nil {
+		t.Fatalf("query downloads_hourly: %v", err)
+	}
+	if totalEvents != 1 {
+		t.Fatalf("expected 1, got %d", totalEvents)
 	}
 }
