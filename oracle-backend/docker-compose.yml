@@ -15,6 +15,7 @@ services:
       - ADDR=:8080
       - DB_PATH=/data/analytics.db
       - STATIC_DIR=/app/static
+      - GOOGLE_CREDS_PATH=${GOOGLE_CREDS_PATH:-/run/secrets/google-credentials.json}
       - DO_SHARED_SECRET=${DO_SHARED_SECRET:?DO_SHARED_SECRET is required}
       - DASHBOARD_PASSWORD=${DASHBOARD_PASSWORD:?DASHBOARD_PASSWORD is required}
       - SUPER_ADMIN_PASSWORD=${SUPER_ADMIN_PASSWORD:?SUPER_ADMIN_PASSWORD is required}
@@ -22,7 +23,7 @@ services:
       - DEPLOY_TIME=${DEPLOY_TIME:-}
     volumes:
       - oracle_data:/data
-      - ./google-credentials.json:/app/google-credentials.json:ro
+      - ${GOOGLE_CREDS_PATH_HOST:-/dev/null}:/run/secrets/google-credentials.json:ro
     restart: always
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]      
