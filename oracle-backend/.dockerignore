@@ -14,6 +14,11 @@ docker_data/
 app
 oracle-backend
 
+# Secrets
+google-credentials.json
+google-credentials*.json
+.env
+
 # IDE
 .idea/
 .vscode/
