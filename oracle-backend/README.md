@@ -44,7 +44,6 @@ Use this to test from desktop and mobile devices on your local network:
 cd oracle-backend
 export DASHBOARD_PASSWORD='your-dashboard-password'
 export SUPER_ADMIN_PASSWORD='your-super-admin-password'
-export ALLOW_INSECURE_COOKIES=true
 go run ./cmd/app
 ```
 2. Desktop test URL:
@@ -65,8 +64,8 @@ cd oracle-backend && ./scripts/full-scan.sh
 ```
 
 Notes:
-- `ALLOW_INSECURE_COOKIES=true` is needed for HTTP local testing.
-- For internet exposure, put this behind HTTPS + reverse proxy and disable insecure cookie mode.
+- HTTP local testing works out of the box.
+- For internet exposure, always place Oracle behind HTTPS + reverse proxy.
 
 ---
 
@@ -192,7 +191,6 @@ All configuration is done via environment variables, defined in `docker-compose.
 | `SUPER_ADMIN_PASSWORD` | *(required)* | Password for step-up verification on critical admin operations. |
 | `ARCHIVER_SHARED_SECRET` | *(required when auth enabled)* | Secret header for the archiver to read stats. |
 | `ALLOW_LOOPBACK_BYPASS` | `false` | Set `true` to allow loopback auth bypass (dev only). |
-| `ALLOW_INSECURE_COOKIES` | `false` | Set `true` to allow cookies over HTTP (HTTP-only deployments). |
 | `ALLOW_EMPTY_DASHBOARD_PASSWORD` | `false` | Set `true` to allow an empty dashboard password (dev only). |
 
 Startup is **fail-closed** for auth secrets: the server exits if `SUPER_ADMIN_PASSWORD` is missing, and also exits if `DASHBOARD_PASSWORD` is missing while `ALLOW_EMPTY_DASHBOARD_PASSWORD=false`.
@@ -227,13 +225,15 @@ The archiver requires a Google Cloud Service Account JSON file for Google Sheets
 1. Create a Service Account in Google Cloud Console.
 2. Enable the Google Sheets API.
 3. Download the JSON key file.
-4. Place it at `oracle-backend/google-credentials.json`.
+4. Store it outside the repository, e.g. `$HOME/.config/cqd/google-credentials.json`.
 5. Share your Google Sheet with the Service Account email.
 
-The file is mounted read-only in the container via `docker-compose.yml`:
+Mount credentials from an external path into the container:
 ```yaml
+environment:
+  - GOOGLE_CREDS_PATH=/run/secrets/google-credentials.json
 volumes:
-  - ./google-credentials.json:/app/google-credentials.json:ro
+  - ${GOOGLE_CREDS_PATH_HOST:-/dev/null}:/run/secrets/google-credentials.json:ro
 ```
 
 ---
@@ -465,7 +465,7 @@ The `archiver` CLI tool pushes daily analytics snapshots to a Google Sheet for l
 ```bash
 ./archiver \
   --sheet "YOUR_GOOGLE_SHEET_ID" \
-  --creds "/app/google-credentials.json" \
+  --creds "/run/secrets/google-credentials.json" \
   --api "http://localhost:8080/api/stats/summary"
 ```
 
@@ -828,13 +828,13 @@ This page shows:
 
 ### Archiver Fails with "Unable to read client secret file"
 
-**Symptom:** Archiver can't find `google-credentials.json`.
+**Symptom:** Archiver can't find Google credentials JSON.
 
 **Cause:** File not mounted or incorrect path.
 
 **Solution:**
-1. Verify `google-credentials.json` exists in `oracle-backend/`.
-2. Check `docker-compose.yml` volume mount is correct.
+1. Verify the credentials file exists at `GOOGLE_CREDS_PATH_HOST` on the host.
+2. Check the compose bind mount points to `/run/secrets/google-credentials.json`.
 3. Ensure Service Account has Sheets API enabled.
 
 ---
