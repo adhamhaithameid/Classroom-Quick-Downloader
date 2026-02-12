@@ -204,6 +204,7 @@ type timeSeriesResponse struct {
 	From        string            `json:"from"`
 	To          string            `json:"to"`
 	Points      []timeSeriesPoint `json:"points"`
+	Buckets     []timeSeriesPoint `json:"buckets"` // Backward-compatible alias for older clients/tests.
 }
 
 func TimeSeriesHandler(db *sql.DB) http.HandlerFunc {
@@ -293,6 +294,7 @@ func TimeSeriesHandler(db *sql.DB) http.HandlerFunc {
 			From:        fromTime.Format("2006-01-02"),
 			To:          toTime.Format("2006-01-02"),
 			Points:      points,
+			Buckets:     points,
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -630,7 +632,7 @@ func ExportHandler(db *sql.DB) http.HandlerFunc {
 // ---------------------------------------------------------------------------
 
 func loadTotals(ctx context.Context, db *sql.DB) (map[string]int64, error) {
-	rows, err := db.QueryContext(ctx, `SELECT key, value FROM downloads_totals`)
+	rows, err := db.QueryContext(ctx, `SELECT key, value FROM downloads_totals`) // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 	if err != nil {
 		return nil, err
 	}
@@ -649,6 +651,7 @@ func loadTotals(ctx context.Context, db *sql.DB) (map[string]int64, error) {
 }
 
 func loadLastBatch(ctx context.Context, db *sql.DB) (*summaryBatchInfo, error) {
+	// #nosec G701 -- statement is static SQL; no untrusted SQL fragments are concatenated.
 	row := db.QueryRowContext(ctx, `
         SELECT batch_id, generated_at, ingested_at, events_count,
                downloads_count, success_count, fail_count
@@ -672,6 +675,7 @@ func loadLastBatch(ctx context.Context, db *sql.DB) (*summaryBatchInfo, error) {
 }
 
 func loadLastDOSnapshot(ctx context.Context, db *sql.DB) (*summaryDOStateInfo, error) {
+	// #nosec G701 -- statement is static SQL; no untrusted SQL fragments are concatenated.
 	row := db.QueryRowContext(ctx, `
         SELECT
             captured_at,
@@ -834,7 +838,7 @@ func resolveRange(ctx context.Context, db *sql.DB, rangeName string, now time.Ti
 		return start, now, nil
 	case "all", "all_time", "alltime":
 		var minDay sql.NullString
-		err := db.QueryRowContext(ctx, `SELECT MIN(substr(bucket_start, 1, 10)) FROM downloads_hourly`).Scan(&minDay)
+		err := db.QueryRowContext(ctx, `SELECT MIN(substr(bucket_start, 1, 10)) FROM downloads_hourly`).Scan(&minDay) // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 		if err != nil {
 			return time.Time{}, time.Time{}, err
 		}
@@ -855,6 +859,7 @@ func queryTimeSeriesHour(ctx context.Context, db *sql.DB, fromIso, toIso, extVer
 	if strings.TrimSpace(extVersion) != "" {
 		return queryTimeSeriesHourByVersion(ctx, db, fromIso, toIso, extVersion)
 	}
+	// #nosec G701 -- statement is static SQL; time bounds are bound parameters.
 	rows, err := db.QueryContext(ctx, `
         SELECT bucket_start,
                COALESCE(SUM(total_downloads), 0),
@@ -896,6 +901,7 @@ func queryTimeSeriesDay(ctx context.Context, db *sql.DB, fromIso, toIso, extVers
 	if strings.TrimSpace(extVersion) != "" {
 		return queryTimeSeriesDayByVersion(ctx, db, fromIso, toIso, extVersion)
 	}
+	// #nosec G701 -- statement is static SQL; time bounds are bound parameters.
 	rows, err := db.QueryContext(ctx, `
         SELECT substr(bucket_start, 1, 10) AS day,
                SUM(total_downloads),
@@ -934,6 +940,7 @@ func queryTimeSeriesDay(ctx context.Context, db *sql.DB, fromIso, toIso, extVers
 }
 
 func queryTimeSeriesHourByVersion(ctx context.Context, db *sql.DB, fromIso, toIso, extVersion string) ([]timeSeriesPoint, error) {
+	// #nosec G701 -- statement is static SQL; time bounds are bound parameters.
 	rows, err := db.QueryContext(ctx, `
 		SELECT bucket_start,
 		       total_downloads,
@@ -1005,6 +1012,7 @@ func queryTimeSeriesHourByVersion(ctx context.Context, db *sql.DB, fromIso, toIs
 }
 
 func queryTimeSeriesDayByVersion(ctx context.Context, db *sql.DB, fromIso, toIso, extVersion string) ([]timeSeriesPoint, error) {
+	// #nosec G701 -- statement is static SQL; time bounds are bound parameters.
 	rows, err := db.QueryContext(ctx, `
 		SELECT substr(bucket_start, 1, 10) AS day,
 		       total_downloads,
@@ -1107,9 +1115,9 @@ func columnForDimension(dim string) (string, error) {
 		return "by_country_json", nil
 	case "lang", "language":
 		return "by_lang_json", nil
-	case "ext_version", "extVersion":
+	case "ext_version", "extVersion", "version":
 		return "by_ext_ver_json", nil
-	case "error_type", "errorType":
+	case "error_type", "errorType", "error":
 		return "by_error_type_json", nil
 	default:
 		return "", errors.New("invalid dimension")
@@ -1170,7 +1178,7 @@ func queryBreakdown(ctx context.Context, db *sql.DB, jsonColumn, fromIso, toIso 
 	default:
 		return nil, errors.New("invalid dimension")
 	}
-	rows, err := db.QueryContext(ctx, query, fromIso, toIso)
+	rows, err := db.QueryContext(ctx, query, fromIso, toIso) // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 	if err != nil {
 		return nil, err
 	}
@@ -1211,6 +1219,7 @@ func queryPeriodTotals(ctx context.Context, db *sql.DB, from, to time.Time) (per
 	fromIso := from.UTC().Format(time.RFC3339)
 	toIso := to.AddDate(0, 0, 1).UTC().Format(time.RFC3339)
 
+	// #nosec G701 -- statement is static SQL; time bounds are bound parameters.
 	row := db.QueryRowContext(ctx, `
         SELECT COALESCE(SUM(total_downloads), 0),
                COALESCE(SUM(total_success), 0),
