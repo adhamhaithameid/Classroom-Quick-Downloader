@@ -4,11 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -22,22 +22,30 @@ type githubOpenCountsResponse struct {
 	Repo        string `json:"repo"`
 	OpenIssues  int64  `json:"openIssues"`
 	OpenPRs     int64  `json:"openPRs"`
+	Branches    int64  `json:"branches"`
+	Discussions int64  `json:"discussions"`
 	FetchedAt   int64  `json:"fetchedAt"`
 	Cached      bool   `json:"cached"`
 	Stale       bool   `json:"stale,omitempty"`
 	CacheTTLSec int64  `json:"cacheTtlSec"`
 }
 
+type githubCounts struct {
+	issues      int64
+	prs         int64
+	branches    int64
+	discussions int64
+}
+
 type githubCountsCache struct {
-	issues    int64
-	prs       int64
+	counts    githubCounts
 	fetchedAt time.Time
 	expiresAt time.Time
 }
 
-type githubCountsFetcher func(ctx context.Context, client *http.Client, repoSlug string, token string) (int64, int64, error)
+type githubCountsFetcher func(ctx context.Context, client *http.Client, repoSlug string, token string) (githubCounts, error)
 
-func DashboardLinksHandler(cloudflareURL, uptimeKumaURL, githubRepoURL, googleSheetsURL string) http.HandlerFunc {
+func DashboardLinksHandler(cloudflareURL, uptimeKumaURL, githubRepoURL, googleSheetsURL, figmaDesignURL string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			w.WriteHeader(http.StatusMethodNotAllowed)
@@ -51,6 +59,7 @@ func DashboardLinksHandler(cloudflareURL, uptimeKumaURL, githubRepoURL, googleSh
 				"uptimeKuma":   normalizeExternalURL(uptimeKumaURL),
 				"githubRepo":   normalizeExternalURL(githubRepoURL),
 				"googleSheets": normalizeExternalURL(googleSheetsURL),
+				"figmaDesign":  normalizeExternalURL(figmaDesignURL),
 			},
 		})
 	}
@@ -103,8 +112,10 @@ func gitHubOpenCountsHandlerWithFetcher(repoSlug string, token string, cacheTTL 
 			resp := githubOpenCountsResponse{
 				OK:          true,
 				Repo:        repoSlug,
-				OpenIssues:  cache.issues,
-				OpenPRs:     cache.prs,
+				OpenIssues:  cache.counts.issues,
+				OpenPRs:     cache.counts.prs,
+				Branches:    cache.counts.branches,
+				Discussions: cache.counts.discussions,
 				FetchedAt:   cache.fetchedAt.UnixMilli(),
 				Cached:      true,
 				CacheTTLSec: int64(cacheTTL.Seconds()),
@@ -116,15 +127,17 @@ func gitHubOpenCountsHandlerWithFetcher(repoSlug string, token string, cacheTTL 
 		}
 		mu.Unlock()
 
-		issues, prs, err := fetcher(r.Context(), client, repoSlug, token)
+		counts, err := fetcher(r.Context(), client, repoSlug, token)
 		if err != nil {
 			mu.Lock()
 			staleAvailable := !cache.fetchedAt.IsZero()
 			resp := githubOpenCountsResponse{
 				OK:          staleAvailable,
 				Repo:        repoSlug,
-				OpenIssues:  cache.issues,
-				OpenPRs:     cache.prs,
+				OpenIssues:  cache.counts.issues,
+				OpenPRs:     cache.counts.prs,
+				Branches:    cache.counts.branches,
+				Discussions: cache.counts.discussions,
 				FetchedAt:   cache.fetchedAt.UnixMilli(),
 				Cached:      staleAvailable,
 				Stale:       staleAvailable,
@@ -144,6 +157,8 @@ func gitHubOpenCountsHandlerWithFetcher(repoSlug string, token string, cacheTTL 
 				Repo:        repoSlug,
 				OpenIssues:  0,
 				OpenPRs:     0,
+				Branches:    0,
+				Discussions: 0,
 				FetchedAt:   0,
 				Cached:      false,
 				Stale:       true,
@@ -153,8 +168,7 @@ func gitHubOpenCountsHandlerWithFetcher(repoSlug string, token string, cacheTTL 
 		}
 
 		mu.Lock()
-		cache.issues = issues
-		cache.prs = prs
+		cache.counts = counts
 		cache.fetchedAt = now
 		cache.expiresAt = now.Add(cacheTTL)
 		mu.Unlock()
@@ -163,8 +177,10 @@ func gitHubOpenCountsHandlerWithFetcher(repoSlug string, token string, cacheTTL 
 		_ = json.NewEncoder(w).Encode(githubOpenCountsResponse{
 			OK:          true,
 			Repo:        repoSlug,
-			OpenIssues:  issues,
-			OpenPRs:     prs,
+			OpenIssues:  counts.issues,
+			OpenPRs:     counts.prs,
+			Branches:    counts.branches,
+			Discussions: counts.discussions,
 			FetchedAt:   now.UnixMilli(),
 			Cached:      false,
 			CacheTTLSec: int64(cacheTTL.Seconds()),
@@ -172,28 +188,134 @@ func gitHubOpenCountsHandlerWithFetcher(repoSlug string, token string, cacheTTL 
 	}
 }
 
-func fetchGitHubOpenCounts(ctx context.Context, client *http.Client, repoSlug string, token string) (int64, int64, error) {
-	issues, err := fetchGitHubSearchCount(ctx, client, repoSlug, "issue", token)
-	if err != nil {
-		return 0, 0, err
+func fetchGitHubOpenCounts(ctx context.Context, client *http.Client, repoSlug string, token string) (githubCounts, error) {
+	issues, issuesErr := fetchGitHubSearchOpenCount(ctx, client, repoSlug, true, token)
+	prs, prsErr := fetchGitHubSearchOpenCount(ctx, client, repoSlug, false, token)
+	if issuesErr != nil || prsErr != nil {
+		// Fallback path: derive issues using repo metadata (issues+PRs) minus open PR list count.
+		openIssuesAndPRs, err := fetchGitHubRepoOpenIssuesCount(ctx, client, repoSlug, token)
+		if err != nil {
+			return githubCounts{}, err
+		}
+		if prsErr != nil {
+			prs, err = fetchGitHubRepoCollectionCount(ctx, client, repoSlug, "pulls", token)
+			if err != nil {
+				prs = 0
+			}
+		}
+		if issuesErr != nil {
+			issues = openIssuesAndPRs - prs
+			if issues < 0 {
+				issues = openIssuesAndPRs
+			}
+		}
 	}
-	prs, err := fetchGitHubSearchCount(ctx, client, repoSlug, "pr", token)
+	branches, err := fetchGitHubRepoCollectionCount(ctx, client, repoSlug, "branches", token)
 	if err != nil {
-		return 0, 0, err
+		branches = 0
 	}
-	return issues, prs, nil
+	discussions, err := fetchGitHubRepoCollectionCount(ctx, client, repoSlug, "discussions", token)
+	if err != nil {
+		discussions = 0
+	}
+	return githubCounts{issues: issues, prs: prs, branches: branches, discussions: discussions}, nil
 }
 
-func fetchGitHubSearchCount(ctx context.Context, client *http.Client, repoSlug string, kind string, token string) (int64, error) {
-	q := fmt.Sprintf("repo:%s type:%s state:open", repoSlug, kind)
+func fetchGitHubSearchOpenCount(ctx context.Context, client *http.Client, repoSlug string, isIssue bool, token string) (int64, error) {
 	u, err := url.Parse("https://api.github.com/search/issues")
 	if err != nil {
 		return 0, err
 	}
-	values := u.Query()
-	values.Set("q", q)
-	values.Set("per_page", "1")
-	u.RawQuery = values.Encode()
+	itemType := "is:issue"
+	if !isIssue {
+		itemType = "is:pr"
+	}
+	q := u.Query()
+	q.Set("q", "repo:"+repoSlug+" "+itemType+" is:open")
+	q.Set("per_page", "1")
+	u.RawQuery = q.Encode()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return 0, err
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("User-Agent", "oracle-dashboard/1.0")
+	if strings.TrimSpace(token) != "" {
+		req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(token))
+	}
+	resp, err := client.Do(req) // #nosec G107,G704 -- request target is fixed to api.github.com and repo slug is strict allowlisted config.
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		msg := strings.TrimSpace(string(body))
+		if msg == "" {
+			msg = resp.Status
+		}
+		return 0, errors.New(msg)
+	}
+	var payload struct {
+		TotalCount int64 `json:"total_count"`
+	}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return 0, err
+	}
+	if payload.TotalCount < 0 {
+		return 0, nil
+	}
+	return payload.TotalCount, nil
+}
+
+func fetchGitHubRepoOpenIssuesCount(ctx context.Context, client *http.Client, repoSlug string, token string) (int64, error) {
+	u, err := url.Parse("https://api.github.com/repos/" + repoSlug)
+	if err != nil {
+		return 0, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return 0, err
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("User-Agent", "oracle-dashboard/1.0")
+	if strings.TrimSpace(token) != "" {
+		req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(token))
+	}
+	resp, err := client.Do(req) // #nosec G107,G704 -- request target is fixed to api.github.com and repo slug is strict allowlisted config.
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		msg := strings.TrimSpace(string(body))
+		if msg == "" {
+			msg = resp.Status
+		}
+		return 0, errors.New(msg)
+	}
+	var payload struct {
+		OpenIssuesCount int64 `json:"open_issues_count"`
+	}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return 0, err
+	}
+	if payload.OpenIssuesCount < 0 {
+		return 0, nil
+	}
+	return payload.OpenIssuesCount, nil
+}
+
+func fetchGitHubRepoCollectionCount(ctx context.Context, client *http.Client, repoSlug string, collection string, token string) (int64, error) {
+	u, err := url.Parse("https://api.github.com/repos/" + repoSlug + "/" + collection)
+	if err != nil {
+		return 0, err
+	}
+	q := u.Query()
+	q.Set("per_page", "1")
+	q.Set("page", "1")
+	u.RawQuery = q.Encode()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
@@ -210,7 +332,12 @@ func fetchGitHubSearchCount(ctx context.Context, client *http.Client, repoSlug s
 		return 0, err
 	}
 	defer resp.Body.Close()
-	body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
+	if resp.StatusCode == http.StatusNotFound && collection == "discussions" {
+		// Discussions can be disabled for a repo; treat as zero instead of hard-failing dashboard notifications.
+		return 0, nil
+	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		msg := strings.TrimSpace(string(body))
 		if msg == "" {
@@ -219,11 +346,45 @@ func fetchGitHubSearchCount(ctx context.Context, client *http.Client, repoSlug s
 		return 0, errors.New(msg)
 	}
 
-	var payload struct {
-		TotalCount int64 `json:"total_count"`
+	if lastPage, ok := parseGitHubLastPage(resp.Header.Get("Link")); ok {
+		return lastPage, nil
 	}
-	if err := json.Unmarshal(body, &payload); err != nil {
+
+	var arr []json.RawMessage
+	if err := json.Unmarshal(body, &arr); err != nil {
 		return 0, err
 	}
-	return payload.TotalCount, nil
+	return int64(len(arr)), nil
+}
+
+func parseGitHubLastPage(linkHeader string) (int64, bool) {
+	if strings.TrimSpace(linkHeader) == "" {
+		return 0, false
+	}
+	parts := strings.Split(linkHeader, ",")
+	for _, part := range parts {
+		segment := strings.TrimSpace(part)
+		if !strings.Contains(segment, `rel="last"`) {
+			continue
+		}
+		start := strings.Index(segment, "<")
+		end := strings.Index(segment, ">")
+		if start < 0 || end <= start+1 {
+			continue
+		}
+		parsed, err := url.Parse(segment[start+1 : end])
+		if err != nil {
+			continue
+		}
+		pageRaw := strings.TrimSpace(parsed.Query().Get("page"))
+		if pageRaw == "" {
+			continue
+		}
+		page, err := strconv.ParseInt(pageRaw, 10, 64)
+		if err != nil || page < 0 {
+			continue
+		}
+		return page, true
+	}
+	return 0, false
 }
