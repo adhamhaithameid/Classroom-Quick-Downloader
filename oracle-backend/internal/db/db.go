@@ -31,11 +31,27 @@ func Init(dbPath string) (*sql.DB, error) {
 	return database, nil
 }
 
+// InitReadOnly opens the SQLite database in read-only mode for restricted query handlers.
+func InitReadOnly(dbPath string) (*sql.DB, error) {
+	dsn := fmt.Sprintf("file:%s?mode=ro&_pragma=busy_timeout(5000)&_pragma=query_only(1)", dbPath)
+	database, err := sql.Open("sqlite", dsn)
+	if err != nil {
+		return nil, err
+	}
+	database.SetMaxOpenConns(3)
+	database.SetMaxIdleConns(2)
+	if err := database.Ping(); err != nil {
+		_ = database.Close()
+		return nil, err
+	}
+	return database, nil
+}
+
 // Migrate ensures all tables/indices exist.
 func Migrate(db *sql.DB) error {
 	stmts := []string{
 		`PRAGMA journal_mode = WAL;`,
-		`PRAGMA synchronous = NORMAL;`,
+		`PRAGMA synchronous = FULL;`,
 		`PRAGMA busy_timeout = 5000;`,
 
 		// Idempotency + batch metadata.
@@ -342,6 +358,43 @@ func Migrate(db *sql.DB) error {
 
 		`CREATE INDEX IF NOT EXISTS idx_admin_records_type_updated
 			ON admin_records(record_type, updated_at DESC);`,
+
+		// Persisted auth/session state to survive restarts.
+		`CREATE TABLE IF NOT EXISTS auth_sessions (
+			token        TEXT PRIMARY KEY,
+			session_kind TEXT NOT NULL,
+			parent_token TEXT NOT NULL DEFAULT '',
+			expires_at   INTEGER NOT NULL,
+			created_at   INTEGER NOT NULL,
+			updated_at   INTEGER NOT NULL
+		);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_auth_sessions_kind_expiry
+			ON auth_sessions(session_kind, expires_at);`,
+
+		`CREATE TABLE IF NOT EXISTS auth_stepup_challenges (
+			challenge_id TEXT PRIMARY KEY,
+			client_ip    TEXT NOT NULL,
+			expires_at   INTEGER NOT NULL,
+			created_at   INTEGER NOT NULL,
+			updated_at   INTEGER NOT NULL
+		);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_auth_stepup_challenges_expiry
+			ON auth_stepup_challenges(expires_at);`,
+
+		`CREATE TABLE IF NOT EXISTS auth_rate_limits (
+			scope            TEXT NOT NULL,
+			client_ip        TEXT NOT NULL,
+			attempts         INTEGER NOT NULL,
+			first_attempt_at INTEGER NOT NULL,
+			blocked_until    INTEGER NOT NULL DEFAULT 0,
+			updated_at       INTEGER NOT NULL,
+			PRIMARY KEY(scope, client_ip)
+		);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_auth_rate_limits_scope_updated
+			ON auth_rate_limits(scope, updated_at DESC);`,
 	}
 
 	for _, stmt := range stmts {
