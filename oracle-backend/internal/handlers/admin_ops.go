@@ -233,14 +233,21 @@ func OutboxStatusHandler(sqliteDB, postgresDB *sql.DB, metrics *observability.Re
 			}
 		}
 		if source == "all" || source == "postgres" {
-			postgresStatus, err := queryOutboxStatus(r.Context(), postgresDB, "pg_outbox")
-			if err != nil {
-				http.Error(w, "failed to query postgres outbox status", http.StatusInternalServerError)
-				return
-			}
-			sources["postgres"] = postgresStatus
-			if metrics != nil {
-				metrics.SetGauge("oracle_outbox_backlog_size", map[string]string{"source": "postgres"}, float64(postgresStatus.Backlog))
+			if postgresDB == nil {
+				if source == "postgres" {
+					http.Error(w, "postgres outbox is not configured", http.StatusServiceUnavailable)
+					return
+				}
+			} else {
+				postgresStatus, err := queryOutboxStatus(r.Context(), postgresDB, "pg_outbox")
+				if err != nil {
+					http.Error(w, "failed to query postgres outbox status", http.StatusInternalServerError)
+					return
+				}
+				sources["postgres"] = postgresStatus
+				if metrics != nil {
+					metrics.SetGauge("oracle_outbox_backlog_size", map[string]string{"source": "postgres"}, float64(postgresStatus.Backlog))
+				}
 			}
 		}
 
