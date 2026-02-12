@@ -121,6 +121,7 @@ func (s *controlPlaneStore) upsertRecordSQLite(ctx context.Context, recordType, 
 		return err
 	}
 	nowMs := time.Now().UnixMilli()
+	// #nosec G701 -- statement is static SQL; values are bound parameters.
 	_, err = s.sqlite.ExecContext(
 		ctx,
 		`INSERT INTO admin_records (record_type, record_key, data_json, created_at, updated_at)
@@ -155,6 +156,7 @@ func (s *controlPlaneStore) upsertRecordPostgres(ctx context.Context, recordType
 	}
 	defer tx.Rollback()
 
+	// #nosec G701 -- statement is static SQL; values are bound parameters.
 	_, err = tx.ExecContext(
 		ctx,
 		`INSERT INTO pg_admin_records (record_type, record_key, data_json, created_at, updated_at)
@@ -182,6 +184,7 @@ func (s *controlPlaneStore) upsertRecordPostgres(ctx context.Context, recordType
 	if err != nil {
 		return err
 	}
+	// #nosec G701 -- statement is static SQL; values are bound parameters.
 	_, err = tx.ExecContext(
 		ctx,
 		`INSERT INTO pg_outbox (event_type, payload_json, idempotency_key, status, attempts, last_error, created_at, next_run_at)
