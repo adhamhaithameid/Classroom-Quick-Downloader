@@ -23,10 +23,12 @@ type DeployStatus struct {
 
 // DeployStatusHandler returns the current deployment status
 func DeployStatusHandler() http.HandlerFunc {
-	// Cache the deployment info at startup
-	status := getDeployStatus()
-
 	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		status := getDeployStatus()
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Cache-Control", "no-cache")
 		if err := json.NewEncoder(w).Encode(status); err != nil {
