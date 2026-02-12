@@ -75,6 +75,7 @@ func TestDashboardLinksHandler_Success(t *testing.T) {
 		"http://129.151.233.229:3001/status/cqd",
 		"https://github.com/user/repo",
 		"https://docs.google.com/spreadsheets/d/abc",
+		"https://www.figma.com/design/abc",
 	)
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/dashboard/links", nil)
@@ -94,7 +95,7 @@ func TestDashboardLinksHandler_Success(t *testing.T) {
 }
 
 func TestDashboardLinksHandler_EmptyURLs(t *testing.T) {
-	h := DashboardLinksHandler("", "", "", "")
+	h := DashboardLinksHandler("", "", "", "", "")
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/dashboard/links", nil)
 	h.ServeHTTP(rr, req)
@@ -110,7 +111,7 @@ func TestDashboardLinksHandler_EmptyURLs(t *testing.T) {
 }
 
 func TestDashboardLinksHandler_MethodNotAllowed(t *testing.T) {
-	h := DashboardLinksHandler("", "", "", "")
+	h := DashboardLinksHandler("", "", "", "", "")
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/api/dashboard/links", nil)
 	h.ServeHTTP(rr, req)
@@ -124,8 +125,8 @@ func TestDashboardLinksHandler_MethodNotAllowed(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestGitHubOpenCountsHandler_FreshFetch(t *testing.T) {
-	fakeFetcher := func(_ context.Context, _ *http.Client, _ string, _ string) (int64, int64, error) {
-		return 5, 3, nil
+	fakeFetcher := func(_ context.Context, _ *http.Client, _ string, _ string) (githubCounts, error) {
+		return githubCounts{issues: 5, prs: 3, branches: 2, discussions: 1}, nil
 	}
 	h := gitHubOpenCountsHandlerWithFetcher("user/repo", "token", time.Minute, fakeFetcher)
 	rr := httptest.NewRecorder()
@@ -146,9 +147,9 @@ func TestGitHubOpenCountsHandler_FreshFetch(t *testing.T) {
 
 func TestGitHubOpenCountsHandler_CachedResponse(t *testing.T) {
 	calls := 0
-	fakeFetcher := func(_ context.Context, _ *http.Client, _ string, _ string) (int64, int64, error) {
+	fakeFetcher := func(_ context.Context, _ *http.Client, _ string, _ string) (githubCounts, error) {
 		calls++
-		return 5, 3, nil
+		return githubCounts{issues: 5, prs: 3, branches: 2, discussions: 1}, nil
 	}
 	h := gitHubOpenCountsHandlerWithFetcher("user/repo", "token", time.Hour, fakeFetcher)
 
@@ -170,8 +171,8 @@ func TestGitHubOpenCountsHandler_CachedResponse(t *testing.T) {
 }
 
 func TestGitHubOpenCountsHandler_FetchError_NoCache(t *testing.T) {
-	fakeFetcher := func(_ context.Context, _ *http.Client, _ string, _ string) (int64, int64, error) {
-		return 0, 0, errors.New("network error")
+	fakeFetcher := func(_ context.Context, _ *http.Client, _ string, _ string) (githubCounts, error) {
+		return githubCounts{}, errors.New("network error")
 	}
 	h := gitHubOpenCountsHandlerWithFetcher("user/repo", "", time.Minute, fakeFetcher)
 	rr := httptest.NewRecorder()
@@ -192,12 +193,12 @@ func TestGitHubOpenCountsHandler_FetchError_NoCache(t *testing.T) {
 
 func TestGitHubOpenCountsHandler_FetchError_StaleCache(t *testing.T) {
 	call := 0
-	fakeFetcher := func(_ context.Context, _ *http.Client, _ string, _ string) (int64, int64, error) {
+	fakeFetcher := func(_ context.Context, _ *http.Client, _ string, _ string) (githubCounts, error) {
 		call++
 		if call == 1 {
-			return 10, 2, nil
+			return githubCounts{issues: 10, prs: 2, branches: 6, discussions: 4}, nil
 		}
-		return 0, 0, errors.New("fail")
+		return githubCounts{}, errors.New("fail")
 	}
 	// Very short TTL so cache expires immediately
 	h := gitHubOpenCountsHandlerWithFetcher("user/repo", "", time.Nanosecond, fakeFetcher)
@@ -226,8 +227,8 @@ func TestGitHubOpenCountsHandler_FetchError_StaleCache(t *testing.T) {
 }
 
 func TestGitHubOpenCountsHandler_InvalidSlug(t *testing.T) {
-	fakeFetcher := func(_ context.Context, _ *http.Client, _ string, _ string) (int64, int64, error) {
-		return 0, 0, nil
+	fakeFetcher := func(_ context.Context, _ *http.Client, _ string, _ string) (githubCounts, error) {
+		return githubCounts{}, nil
 	}
 	h := gitHubOpenCountsHandlerWithFetcher("not a valid slug!!", "", time.Minute, fakeFetcher)
 	rr := httptest.NewRecorder()
@@ -238,8 +239,8 @@ func TestGitHubOpenCountsHandler_InvalidSlug(t *testing.T) {
 }
 
 func TestGitHubOpenCountsHandler_MethodNotAllowed(t *testing.T) {
-	fakeFetcher := func(_ context.Context, _ *http.Client, _ string, _ string) (int64, int64, error) {
-		return 0, 0, nil
+	fakeFetcher := func(_ context.Context, _ *http.Client, _ string, _ string) (githubCounts, error) {
+		return githubCounts{}, nil
 	}
 	h := gitHubOpenCountsHandlerWithFetcher("user/repo", "", time.Minute, fakeFetcher)
 	rr := httptest.NewRecorder()
@@ -250,8 +251,8 @@ func TestGitHubOpenCountsHandler_MethodNotAllowed(t *testing.T) {
 }
 
 func TestGitHubOpenCountsHandler_NegativeTTL(t *testing.T) {
-	fakeFetcher := func(_ context.Context, _ *http.Client, _ string, _ string) (int64, int64, error) {
-		return 1, 1, nil
+	fakeFetcher := func(_ context.Context, _ *http.Client, _ string, _ string) (githubCounts, error) {
+		return githubCounts{issues: 1, prs: 1, branches: 1, discussions: 0}, nil
 	}
 	// Negative TTL should be clamped to 1 minute
 	h := gitHubOpenCountsHandlerWithFetcher("user/repo", "", -time.Hour, fakeFetcher)
