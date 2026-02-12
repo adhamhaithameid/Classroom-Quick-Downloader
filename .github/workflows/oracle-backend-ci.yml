@@ -81,6 +81,13 @@ jobs:
         with:
           go-version: "1.24.13"
 
+      - name: Ensure no committed Google credential files
+        run: |
+          if git ls-files --error-unmatch "oracle-backend/google-credentials.json" >/dev/null 2>&1; then
+            echo "oracle-backend/google-credentials.json must never be committed."
+            exit 1
+          fi
+
       - name: Install scanners
         working-directory: oracle-backend
         run: |
@@ -90,8 +97,7 @@ jobs:
       - name: Run gosec
         working-directory: oracle-backend
         run: |
-          # G701 is excluded due known taint-analysis false positives on static SQL with bound parameters.
-          "$(go env GOPATH)/bin/gosec" -exclude=G701 ./...
+          "$(go env GOPATH)/bin/gosec" ./...
 
       - name: Run govulncheck
         working-directory: oracle-backend
