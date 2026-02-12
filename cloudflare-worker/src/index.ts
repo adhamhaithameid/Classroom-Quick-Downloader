@@ -16,7 +16,9 @@ interface SessionPayload {
 }
 
 function getDashboardSecret(env: WorkerEnv): string | null {
-  return env.DASHBOARD_PASSWORD || env.DO_SHARED_SECRET || null;
+  // Security hardening: require a dedicated dashboard secret.
+  // Do not silently fall back to DO_SHARED_SECRET.
+  return env.DASHBOARD_PASSWORD || null;
 }
 
 function timingSafeStringEqual(a: string, b: string): boolean {
