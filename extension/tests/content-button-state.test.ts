@@ -89,8 +89,8 @@ describe('content button state', () => {
     (button.dataset as any).cqdMouseOver = 'true';
     mod.setButtonState(button, 'loading');
     expect(button.classList.contains('cqd-cancel')).toBe(true);
-    expect(label.textContent).toBe('cancel');
-    expect(icon.style.backgroundImage).toContain('cancel-icon');
+    // Visual text/icon is now handled by CSS, so we just check the class
+    expect(label.textContent).toBe('downloading');
   });
 
   it('returns early when required button elements are missing and sets pill progress', async () => {
