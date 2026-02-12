@@ -47,9 +47,6 @@ func main() {
 	allowLoopbackBypass := os.Getenv("ALLOW_LOOPBACK_BYPASS") == "true"
 	allowEmptyDashboardPassword := os.Getenv("ALLOW_EMPTY_DASHBOARD_PASSWORD") == "true"
 	trustedProxyNets = parseTrustedProxyCIDRs(os.Getenv("TRUSTED_PROXY_CIDRS"))
-	// HTTP mode note: if your Oracle deployment is HTTP-only, cookies are non-Secure.
-	// This keeps the dashboard usable but provides no transport confidentiality.
-	allowInsecureCookies := getenvBool("ALLOW_INSECURE_COOKIES", true)
 
 	if doSecret == "" {
 		log.Println("[WARN] DO_SHARED_SECRET is empty – /ingest-batch will reject requests")
@@ -71,11 +68,7 @@ func main() {
 	if allowLoopbackBypass {
 		log.Println("[WARN] ALLOW_LOOPBACK_BYPASS is true – loopback requests can bypass auth (dev only)")
 	}
-	if allowInsecureCookies {
-		log.Println("[WARN] ALLOW_INSECURE_COOKIES is true/default – HTTP dashboards will use non-secure cookies")
-	} else {
-		log.Println("[INFO] ALLOW_INSECURE_COOKIES is false – secure cookies require HTTPS")
-	}
+	log.Println("[INFO] HTTP deployments use non-secure cookies; prefer HTTPS in production")
 	if len(trustedProxyNets) > 0 {
 		log.Printf("[INFO] Trusted proxy CIDRs loaded: %d", len(trustedProxyNets))
 	}
@@ -90,6 +83,12 @@ func main() {
 		log.Fatalf("failed to init db: %v", err)
 	}
 	defer sqlDB.Close()
+	readOnlySQLDB, roErr := db.InitReadOnly(dbPath)
+	if roErr != nil {
+		log.Printf("[WARN] failed to init read-only sqlite handle: %v", roErr)
+	} else {
+		defer readOnlySQLDB.Close()
+	}
 
 	postgresDSN := os.Getenv("POSTGRES_DSN")
 	var postgresDB *sql.DB
@@ -121,7 +120,8 @@ func main() {
 	mux.HandleFunc("/storeBatch", handlers.IngestBatchHandler(sqlDB, doSecret))
 
 	// Analytics API endpoints (protected by auth when DASHBOARD_PASSWORD is set).
-	authMiddleware := requireAuth(dashboardPassword, archiverSecret, allowLoopbackBypass)
+	setAuthStateDB(sqlDB)
+	authMiddleware := requireAuth(sqlDB, dashboardPassword, archiverSecret, allowLoopbackBypass)
 	criticalMiddleware := requireStepUp(sqlDB, superAdminPassword)
 	allowedRecordTypes := map[string]struct{}{
 		"deployment_target":          {},
@@ -148,7 +148,7 @@ func main() {
 	mux.Handle("/api/admin/audit/verify-chain", authMiddleware(handlers.AuditVerifyChainHandler(sqlDB)))
 	mux.Handle("/api/admin/alerts", authMiddleware(handlers.AlertsHandler(sqlDB)))
 	mux.Handle("/api/admin/migrations/status", authMiddleware(handlers.MigrationsStatusHandler(postgresDSN != "", &postgresMigrationErr)))
-	mux.Handle("/api/admin/sql/query", authMiddleware(criticalMiddleware(handlers.SQLQueryHandler(sqlDB))))
+	mux.Handle("/api/admin/sql/query", authMiddleware(criticalMiddleware(handlers.SQLQueryHandler(sqlDB, readOnlySQLDB))))
 	mux.Handle("/api/admin/sql/exec", authMiddleware(criticalMiddleware(handlers.SQLExecHandler(sqlDB))))
 	mux.Handle("/api/admin/danger/clear-data", authMiddleware(criticalMiddleware(handlers.DangerClearDataHandler(sqlDB))))
 	mux.Handle("/api/admin/backup/run", authMiddleware(criticalMiddleware(handlers.BackupRunHandler(sqlDB, appMetrics))))
@@ -169,17 +169,28 @@ func main() {
 	mux.Handle("/api/admin/newsletter/campaigns/delete", authMiddleware(criticalMiddleware(handlers.NewsletterCampaignsDeleteHandler(sqlDB, postgresDB))))
 	mux.Handle("/api/admin/deployments/targets", authMiddleware(handlers.DeploymentsTargetsHandler(sqlDB, postgresDB)))
 	mux.Handle("/api/admin/deployments/sync", authMiddleware(criticalMiddleware(handlers.DeploymentsSyncHandler(sqlDB, postgresDB, appMetrics))))
+	mux.Handle("/api/admin/dashboard-links", authMiddleware(handlers.DashboardLinksHandler(
+		getenv("CLOUDFLARE_DASHBOARD_URL", "https://cqd-analytics.adhamhaithameid.workers.dev/"),
+		getenv("UPTIME_KUMA_URL", ""),
+		getenv("GITHUB_REPO_URL", "https://github.com/adhamhaithameid/Classroom-Quick-Downloader"),
+		getenv("GOOGLE_SHEETS_URL", "https://docs.google.com/spreadsheets/"),
+	)))
+	mux.Handle("/api/admin/github/open-counts", authMiddleware(handlers.GitHubOpenCountsHandler(
+		getenv("GITHUB_REPO_SLUG", "adhamhaithameid/Classroom-Quick-Downloader"),
+		os.Getenv("GITHUB_API_TOKEN"),
+		60*time.Second,
+	)))
 	mux.Handle("/api/admin/oracle-logs", authMiddleware(handlers.OracleOperationLogsListHandler(sqlDB)))
 	mux.Handle("/api/admin/oracle-logs/delete-older", authMiddleware(criticalMiddleware(handlers.OracleOperationLogsDeleteOlderHandler(sqlDB))))
 	mux.Handle("/api/admin/oracle-logs/clear-all", authMiddleware(criticalMiddleware(handlers.OracleOperationLogsClearAllHandler(sqlDB))))
 	mux.Handle("/metrics", authMiddleware(metricsHandler(appMetrics)))
 
 	// Auth endpoints
-	mux.HandleFunc("/api/auth/login", loginHandler(dashboardPassword, allowInsecureCookies))
-	mux.HandleFunc("/api/auth/logout", logoutHandler(allowInsecureCookies))
-	mux.HandleFunc("/api/auth/check", authCheckHandler(dashboardPassword))
+	mux.HandleFunc("/api/auth/login", loginHandler(sqlDB, dashboardPassword))
+	mux.HandleFunc("/api/auth/logout", logoutHandler(sqlDB))
+	mux.HandleFunc("/api/auth/check", authCheckHandler(sqlDB, dashboardPassword))
 	mux.Handle("/api/auth/stepup/start", authMiddleware(stepUpStartHandler(sqlDB)))
-	mux.Handle("/api/auth/stepup/verify", authMiddleware(stepUpVerifyHandler(sqlDB, superAdminPassword, allowInsecureCookies)))
+	mux.Handle("/api/auth/stepup/verify", authMiddleware(stepUpVerifyHandler(sqlDB, superAdminPassword)))
 	mux.Handle("/api/auth/stepup/check", authMiddleware(stepUpCheckHandler(sqlDB)))
 
 	// Serve static dashboard with SPA fallback.
@@ -200,6 +211,7 @@ func main() {
 
 	rootHandler := observability.RequestContextMiddleware(mux)
 	rootHandler = requestBodyLimitMiddleware(rootHandler)
+	rootHandler = csrfHeaderMiddleware(rootHandler)
 	rootHandler = securityHeadersMiddleware(rootHandler)
 
 	server := &http.Server{
@@ -246,18 +258,6 @@ func getenv(key, def string) string {
 		return v
 	}
 	return def
-}
-
-func getenvBool(key string, def bool) bool {
-	v, ok := os.LookupEnv(key)
-	if !ok || strings.TrimSpace(v) == "" {
-		return def
-	}
-	parsed, err := strconv.ParseBool(strings.TrimSpace(v))
-	if err != nil {
-		return def
-	}
-	return parsed
 }
 
 // HealthDBHandler returns a handler that checks the database connection
@@ -322,6 +322,21 @@ func requestBodyLimitMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+func csrfHeaderMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/api/") {
+			switch r.Method {
+			case http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
+				if r.Header.Get("X-Requested-With") != "XMLHttpRequest" {
+					http.Error(w, `{"error":"missing_csrf_header"}`, http.StatusBadRequest)
+					return
+				}
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 type cspNonceContextKey struct{}
 
 func generateCSPNonce() string {
@@ -348,7 +363,7 @@ func securityHeadersMiddleware(next http.Handler) http.Handler {
 		w.Header().Set("Referrer-Policy", "no-referrer")
 		w.Header().Set(
 			"Content-Security-Policy",
-			"default-src 'self' https:; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https:; script-src 'self' 'unsafe-inline' 'nonce-"+nonce+"'; script-src-attr 'unsafe-inline'; frame-ancestors 'none'; base-uri 'self'",
+			"default-src 'self' https:; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https:; script-src 'self' 'nonce-"+nonce+"'; frame-ancestors 'none'; base-uri 'self'",
 		)
 		ctx := context.WithValue(r.Context(), cspNonceContextKey{}, nonce)
 		next.ServeHTTP(w, r.WithContext(ctx))
@@ -597,7 +612,7 @@ func serveIndexWithNonce(w http.ResponseWriter, r *http.Request, staticRoot stri
 // scheduleSheetsArchiver runs a scheduled task at 00:15 daily to export stats to Google Sheets.
 // Configure with environment variables:
 // - SHEETS_ID: Google Sheets spreadsheet ID
-// - GOOGLE_CREDS_PATH: Path to service account JSON (default: /app/google-credentials.json)
+// - GOOGLE_CREDS_PATH: Path to service account JSON (default: /run/secrets/google-credentials.json)
 // - KUMA_PUSH_URL: Optional Uptime Kuma push URL
 func scheduleSheetsArchiver() {
 	sheetsID := os.Getenv("SHEETS_ID")
@@ -606,7 +621,7 @@ func scheduleSheetsArchiver() {
 		return
 	}
 
-	credsPath := getenv("GOOGLE_CREDS_PATH", "/app/google-credentials.json")
+	credsPath := getenv("GOOGLE_CREDS_PATH", "/run/secrets/google-credentials.json")
 	kumaPushURL := os.Getenv("KUMA_PUSH_URL")
 	archiverSecret := os.Getenv("ARCHIVER_SHARED_SECRET")
 
@@ -762,8 +777,32 @@ const inMemoryCleanupHorizon = 24 * time.Hour
 
 var trustedProxyNets []*net.IPNet
 
+var authStateStore = struct {
+	sync.RWMutex
+	db *sql.DB
+}{}
+
+const (
+	authSessionKindViewer = "viewer"
+	authSessionKindStepUp = "stepup"
+	authRateScopeLogin    = "login"
+	authRateScopeStepUp   = "stepup"
+)
+
 func setTrustedProxyNets(nets []*net.IPNet) {
 	trustedProxyNets = nets
+}
+
+func setAuthStateDB(database *sql.DB) {
+	authStateStore.Lock()
+	authStateStore.db = database
+	authStateStore.Unlock()
+}
+
+func getAuthStateDB() *sql.DB {
+	authStateStore.RLock()
+	defer authStateStore.RUnlock()
+	return authStateStore.db
 }
 
 func startInMemoryStoreCleanupLoop(ctx context.Context, interval time.Duration) {
@@ -790,6 +829,7 @@ func cleanupExpiredInMemoryStores(now time.Time) {
 	cleanupExpiredStepUpSessions(now)
 	cleanupExpiredLoginRateEntries(now)
 	cleanupExpiredStepUpRateEntries(now)
+	cleanupPersistedAuthState(now)
 }
 
 func cleanupExpiredViewerSessions(now time.Time) {
@@ -850,6 +890,34 @@ func cleanupExpiredStepUpRateEntries(now time.Time) {
 			delete(stepUpRateStore.attempts, ip)
 		}
 	}
+}
+
+func cleanupPersistedAuthState(now time.Time) {
+	database := getAuthStateDB()
+	if database == nil {
+		return
+	}
+
+	nowUnix := now.Unix()
+	pruneBefore := now.Add(-(inMemoryCleanupHorizon + loginLockout)).Unix()
+	if stepUpLockout > loginLockout {
+		pruneBefore = now.Add(-(inMemoryCleanupHorizon + stepUpLockout)).Unix()
+	}
+
+	_, _ = database.Exec(
+		`DELETE FROM auth_sessions WHERE expires_at <= ?`,
+		nowUnix,
+	)
+	_, _ = database.Exec(
+		`DELETE FROM auth_stepup_challenges WHERE expires_at <= ?`,
+		nowUnix,
+	)
+	_, _ = database.Exec(
+		`DELETE FROM auth_rate_limits
+		  WHERE ((blocked_until > 0 AND blocked_until <= ?) OR first_attempt_at <= ?)`,
+		nowUnix,
+		pruneBefore,
+	)
 }
 
 func parseTrustedProxyCIDRs(input string) []*net.IPNet {
@@ -913,6 +981,176 @@ func extractRemoteIP(addr string) string {
 	return addr
 }
 
+func persistAuthSession(token, kind, parentToken string, expiresAt time.Time) error {
+	database := getAuthStateDB()
+	if database == nil {
+		return nil
+	}
+	nowUnix := time.Now().Unix()
+	_, err := database.Exec(
+		`INSERT INTO auth_sessions (token, session_kind, parent_token, expires_at, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?)
+		 ON CONFLICT(token) DO UPDATE SET
+		   session_kind = excluded.session_kind,
+		   parent_token = excluded.parent_token,
+		   expires_at = excluded.expires_at,
+		   updated_at = excluded.updated_at`,
+		token,
+		kind,
+		parentToken,
+		expiresAt.Unix(),
+		nowUnix,
+		nowUnix,
+	)
+	return err
+}
+
+func loadAuthSession(token, kind string) (time.Time, string, bool, error) {
+	database := getAuthStateDB()
+	if database == nil {
+		return time.Time{}, "", false, nil
+	}
+
+	var expiresAtUnix int64
+	var parent sql.NullString
+	err := database.QueryRow(
+		`SELECT expires_at, parent_token
+		   FROM auth_sessions
+		  WHERE token = ? AND session_kind = ?`,
+		token,
+		kind,
+	).Scan(&expiresAtUnix, &parent)
+	if errors.Is(err, sql.ErrNoRows) {
+		return time.Time{}, "", false, nil
+	}
+	if err != nil {
+		return time.Time{}, "", false, err
+	}
+	return time.Unix(expiresAtUnix, 0), parent.String, true, nil
+}
+
+func deleteAuthSession(token string) {
+	database := getAuthStateDB()
+	if database == nil {
+		return
+	}
+	_, _ = database.Exec(`DELETE FROM auth_sessions WHERE token = ?`, token)
+}
+
+func persistAuthRateAttempt(scope, ip string, attempts int, firstAttemptAt time.Time, blockedUntil time.Time) {
+	database := getAuthStateDB()
+	if database == nil {
+		return
+	}
+	blockedUntilUnix := int64(0)
+	if !blockedUntil.IsZero() {
+		blockedUntilUnix = blockedUntil.Unix()
+	}
+	nowUnix := time.Now().Unix()
+	_, _ = database.Exec(
+		`INSERT INTO auth_rate_limits (scope, client_ip, attempts, first_attempt_at, blocked_until, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?)
+		 ON CONFLICT(scope, client_ip) DO UPDATE SET
+		   attempts = excluded.attempts,
+		   first_attempt_at = excluded.first_attempt_at,
+		   blocked_until = excluded.blocked_until,
+		   updated_at = excluded.updated_at`,
+		scope,
+		ip,
+		attempts,
+		firstAttemptAt.Unix(),
+		blockedUntilUnix,
+		nowUnix,
+	)
+}
+
+func loadAuthRateAttempt(scope, ip string) (attempts int, firstAttemptAt time.Time, blockedUntil time.Time, ok bool) {
+	database := getAuthStateDB()
+	if database == nil {
+		return 0, time.Time{}, time.Time{}, false
+	}
+	var firstAttemptUnix int64
+	var blockedUntilUnix int64
+	err := database.QueryRow(
+		`SELECT attempts, first_attempt_at, blocked_until
+		   FROM auth_rate_limits
+		  WHERE scope = ? AND client_ip = ?`,
+		scope,
+		ip,
+	).Scan(&attempts, &firstAttemptUnix, &blockedUntilUnix)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, time.Time{}, time.Time{}, false
+	}
+	if err != nil {
+		return 0, time.Time{}, time.Time{}, false
+	}
+	firstAttemptAt = time.Unix(firstAttemptUnix, 0)
+	if blockedUntilUnix > 0 {
+		blockedUntil = time.Unix(blockedUntilUnix, 0)
+	}
+	return attempts, firstAttemptAt, blockedUntil, true
+}
+
+func deleteAuthRateAttempt(scope, ip string) {
+	database := getAuthStateDB()
+	if database == nil {
+		return
+	}
+	_, _ = database.Exec(`DELETE FROM auth_rate_limits WHERE scope = ? AND client_ip = ?`, scope, ip)
+}
+
+func persistStepUpChallenge(challengeID, clientIP string, expiresAt time.Time) error {
+	database := getAuthStateDB()
+	if database == nil {
+		return nil
+	}
+	nowUnix := time.Now().Unix()
+	_, err := database.Exec(
+		`INSERT INTO auth_stepup_challenges (challenge_id, client_ip, expires_at, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?)
+		 ON CONFLICT(challenge_id) DO UPDATE SET
+		   client_ip = excluded.client_ip,
+		   expires_at = excluded.expires_at,
+		   updated_at = excluded.updated_at`,
+		challengeID,
+		clientIP,
+		expiresAt.Unix(),
+		nowUnix,
+		nowUnix,
+	)
+	return err
+}
+
+func consumePersistedStepUpChallenge(challengeID, clientIP string) bool {
+	database := getAuthStateDB()
+	if database == nil {
+		return false
+	}
+	nowUnix := time.Now().Unix()
+	res, err := database.Exec(
+		`DELETE FROM auth_stepup_challenges
+		  WHERE challenge_id = ?
+		    AND client_ip = ?
+		    AND expires_at >= ?`,
+		challengeID,
+		clientIP,
+		nowUnix,
+	)
+	if err != nil {
+		return false
+	}
+	rows, err := res.RowsAffected()
+	return err == nil && rows > 0
+}
+
+func deletePersistedStepUpChallenge(challengeID string) {
+	database := getAuthStateDB()
+	if database == nil {
+		return
+	}
+	_, _ = database.Exec(`DELETE FROM auth_stepup_challenges WHERE challenge_id = ?`, challengeID)
+}
+
 // generateToken creates a cryptographically secure session token.
 func generateToken() (string, error) {
 	b := make([]byte, 32)
@@ -948,7 +1186,7 @@ func verifyPasswordHash(hashedPassword, password string) bool {
 
 // requireAuth returns middleware that checks for valid session cookie.
 // If dashboardPassword is empty, all requests are allowed (no auth).
-func requireAuth(dashboardPassword, archiverSecret string, allowLoopbackBypass bool) func(http.Handler) http.Handler {
+func requireAuth(db *sql.DB, dashboardPassword, archiverSecret string, allowLoopbackBypass bool) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// No auth required if DASHBOARD_PASSWORD is not set
@@ -1060,11 +1298,18 @@ func stepUpStartHandler(db *sql.DB) http.Handler {
 		}
 		clientIP := getClientIP(r)
 
+		now := time.Now()
+		expiresAt := now.Add(stepUpChallengeDuration)
+		if err := persistStepUpChallenge(challengeID, clientIP, expiresAt); err != nil {
+			http.Error(w, `{"error":"failed_to_persist_challenge"}`, http.StatusInternalServerError)
+			return
+		}
+
 		stepUpChallengeStore.Lock()
-		cleanupExpiredStepUpChallengesLocked(time.Now())
+		cleanupExpiredStepUpChallengesLocked(now)
 		stepUpChallengeStore.items[challengeID] = stepUpChallenge{
 			clientIP:  clientIP,
-			expiresAt: time.Now().Add(stepUpChallengeDuration),
+			expiresAt: expiresAt,
 		}
 		stepUpChallengeStore.Unlock()
 
@@ -1078,7 +1323,7 @@ func stepUpStartHandler(db *sql.DB) http.Handler {
 	})
 }
 
-func stepUpVerifyHandler(db *sql.DB, superAdminPassword string, allowInsecureCookies bool) http.Handler {
+func stepUpVerifyHandler(db *sql.DB, superAdminPassword string) http.Handler {
 	storedHash := mustHashPassword(superAdminPassword)
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1156,15 +1401,20 @@ func stepUpVerifyHandler(db *sql.DB, superAdminPassword string, allowInsecureCoo
 			http.Error(w, `{"error":"failed to create stepup session"}`, http.StatusInternalServerError)
 			return
 		}
+		expiresAt := time.Now().Add(stepUpSessionDuration)
+		if err := persistAuthSession(token, authSessionKindStepUp, mainSessionCookie.Value, expiresAt); err != nil {
+			http.Error(w, `{"error":"failed to persist stepup session"}`, http.StatusInternalServerError)
+			return
+		}
 
 		stepUpSessionStore.Lock()
 		stepUpSessionStore.tokens[token] = stepUpSession{
-			expiresAt:          time.Now().Add(stepUpSessionDuration),
+			expiresAt:          expiresAt,
 			parentSessionToken: mainSessionCookie.Value,
 		}
 		stepUpSessionStore.Unlock()
 
-		secureCookie, sameSite := cookieSecurityPolicy(r, allowInsecureCookies)
+		secureCookie, sameSite := cookieSecurityPolicy(r)
 		http.SetCookie(w, &http.Cookie{
 			Name:     stepUpSessionCookieName,
 			Value:    token,
@@ -1224,6 +1474,13 @@ func stepUpCheckHandler(db *sql.DB) http.Handler {
 }
 
 func consumeStepUpChallenge(challengeID string, clientIP string) bool {
+	if consumePersistedStepUpChallenge(challengeID, clientIP) {
+		stepUpChallengeStore.Lock()
+		delete(stepUpChallengeStore.items, challengeID)
+		stepUpChallengeStore.Unlock()
+		return true
+	}
+
 	now := time.Now()
 	stepUpChallengeStore.Lock()
 	defer stepUpChallengeStore.Unlock()
@@ -1235,9 +1492,11 @@ func consumeStepUpChallenge(challengeID string, clientIP string) bool {
 	}
 	if item.expiresAt.Before(now) || item.clientIP != clientIP {
 		delete(stepUpChallengeStore.items, challengeID)
+		deletePersistedStepUpChallenge(challengeID)
 		return false
 	}
 	delete(stepUpChallengeStore.items, challengeID)
+	deletePersistedStepUpChallenge(challengeID)
 	return true
 }
 
@@ -1250,21 +1509,37 @@ func cleanupExpiredStepUpChallengesLocked(now time.Time) {
 }
 
 func isValidStepUpSession(token string, parentSessionToken string) bool {
+	now := time.Now()
 	stepUpSessionStore.RLock()
 	session, exists := stepUpSessionStore.tokens[token]
 	stepUpSessionStore.RUnlock()
+	if !exists {
+		expiry, persistedParent, ok, err := loadAuthSession(token, authSessionKindStepUp)
+		if err != nil || !ok {
+			return false
+		}
+		session = stepUpSession{
+			expiresAt:          expiry,
+			parentSessionToken: persistedParent,
+		}
+		stepUpSessionStore.Lock()
+		stepUpSessionStore.tokens[token] = session
+		stepUpSessionStore.Unlock()
+		exists = true
+	}
 	if !exists {
 		return false
 	}
 	if parentSessionToken != "" && parentSessionToken != session.parentSessionToken {
 		return false
 	}
-	if time.Now().After(session.expiresAt) {
+	if now.After(session.expiresAt) {
 		stepUpSessionStore.Lock()
-		if latest, ok := stepUpSessionStore.tokens[token]; ok && time.Now().After(latest.expiresAt) {
+		if latest, ok := stepUpSessionStore.tokens[token]; ok && now.After(latest.expiresAt) {
 			delete(stepUpSessionStore.tokens, token)
 		}
 		stepUpSessionStore.Unlock()
+		deleteAuthSession(token)
 		return false
 	}
 	return true
@@ -1277,6 +1552,17 @@ func allowStepUpAttempt(ip string) (bool, int) {
 
 	rec := stepUpRateStore.attempts[ip]
 	if rec == nil {
+		attempts, firstAttemptAt, blockedUntil, ok := loadAuthRateAttempt(authRateScopeStepUp, ip)
+		if ok {
+			rec = &stepUpAttempt{
+				attempts:       attempts,
+				firstAttemptAt: firstAttemptAt,
+				blockedUntil:   blockedUntil,
+			}
+			stepUpRateStore.attempts[ip] = rec
+		}
+	}
+	if rec == nil {
 		return true, 0
 	}
 	if !rec.blockedUntil.IsZero() && now.Before(rec.blockedUntil) {
@@ -1288,6 +1574,7 @@ func allowStepUpAttempt(ip string) (bool, int) {
 	}
 	if now.Sub(rec.firstAttemptAt) > stepUpLockout {
 		delete(stepUpRateStore.attempts, ip)
+		deleteAuthRateAttempt(authRateScopeStepUp, ip)
 		return true, 0
 	}
 	return true, 0
@@ -1311,6 +1598,7 @@ func recordStepUpFailure(db *sql.DB, ip string) (blocked bool, retryAfter int) {
 		}
 		blocked = true
 	}
+	persistAuthRateAttempt(authRateScopeStepUp, ip, rec.attempts, rec.firstAttemptAt, rec.blockedUntil)
 	stepUpRateStore.Unlock()
 
 	if attempts >= stepUpAbuseThreshold {
@@ -1335,6 +1623,7 @@ func clearStepUpFailures(ip string) {
 	stepUpRateStore.Lock()
 	defer stepUpRateStore.Unlock()
 	delete(stepUpRateStore.attempts, ip)
+	deleteAuthRateAttempt(authRateScopeStepUp, ip)
 }
 
 func upsertSystemAlert(
@@ -1391,18 +1680,31 @@ func upsertSystemAlert(
 
 // isValidSession checks if token is in store and not expired.
 func isValidSession(token string) bool {
+	now := time.Now()
 	sessionStore.RLock()
 	expiry, exists := sessionStore.tokens[token]
 	sessionStore.RUnlock()
 	if !exists {
+		persistedExpiry, _, ok, err := loadAuthSession(token, authSessionKindViewer)
+		if err != nil || !ok {
+			return false
+		}
+		expiry = persistedExpiry
+		sessionStore.Lock()
+		sessionStore.tokens[token] = expiry
+		sessionStore.Unlock()
+		exists = true
+	}
+	if !exists {
 		return false
 	}
-	if time.Now().After(expiry) {
+	if now.After(expiry) {
 		sessionStore.Lock()
-		if latest, ok := sessionStore.tokens[token]; ok && time.Now().After(latest) {
+		if latest, ok := sessionStore.tokens[token]; ok && now.After(latest) {
 			delete(sessionStore.tokens, token)
 		}
 		sessionStore.Unlock()
+		deleteAuthSession(token)
 		return false
 	}
 	return true
@@ -1437,6 +1739,17 @@ func allowLoginAttempt(ip string) (bool, int, int) {
 
 	rec := loginRateStore.attempts[ip]
 	if rec == nil {
+		attempts, firstAttemptAt, blockedUntil, ok := loadAuthRateAttempt(authRateScopeLogin, ip)
+		if ok {
+			rec = &loginAttempt{
+				attempts:       attempts,
+				firstAttemptAt: firstAttemptAt,
+				blockedUntil:   blockedUntil,
+			}
+			loginRateStore.attempts[ip] = rec
+		}
+	}
+	if rec == nil {
 		return true, loginMaxAttempts, 0
 	}
 
@@ -1450,6 +1763,7 @@ func allowLoginAttempt(ip string) (bool, int, int) {
 
 	if now.Sub(rec.firstAttemptAt) > loginLockout {
 		delete(loginRateStore.attempts, ip)
+		deleteAuthRateAttempt(authRateScopeLogin, ip)
 		return true, loginMaxAttempts, 0
 	}
 
@@ -1478,8 +1792,10 @@ func recordLoginFailure(ip string) (blocked bool, retryAfter int) {
 		if retryAfter < 1 {
 			retryAfter = 1
 		}
+		persistAuthRateAttempt(authRateScopeLogin, ip, rec.attempts, rec.firstAttemptAt, rec.blockedUntil)
 		return true, retryAfter
 	}
+	persistAuthRateAttempt(authRateScopeLogin, ip, rec.attempts, rec.firstAttemptAt, rec.blockedUntil)
 
 	return false, 0
 }
@@ -1488,10 +1804,11 @@ func clearLoginFailures(ip string) {
 	loginRateStore.Lock()
 	defer loginRateStore.Unlock()
 	delete(loginRateStore.attempts, ip)
+	deleteAuthRateAttempt(authRateScopeLogin, ip)
 }
 
 // loginHandler handles POST /api/auth/login
-func loginHandler(dashboardPassword string, allowInsecureCookies bool) http.HandlerFunc {
+func loginHandler(db *sql.DB, dashboardPassword string) http.HandlerFunc {
 	storedHash := ""
 	if dashboardPassword != "" {
 		storedHash = mustHashPassword(dashboardPassword)
@@ -1551,11 +1868,17 @@ func loginHandler(dashboardPassword string, allowInsecureCookies bool) http.Hand
 			return
 		}
 
+		expiresAt := time.Now().Add(sessionDuration)
+		if err := persistAuthSession(token, authSessionKindViewer, "", expiresAt); err != nil {
+			http.Error(w, `{"error":"failed to persist session"}`, http.StatusInternalServerError)
+			return
+		}
+
 		sessionStore.Lock()
-		sessionStore.tokens[token] = time.Now().Add(sessionDuration)
+		sessionStore.tokens[token] = expiresAt
 		sessionStore.Unlock()
 
-		secureCookie, sameSite := cookieSecurityPolicy(r, allowInsecureCookies)
+		secureCookie, sameSite := cookieSecurityPolicy(r)
 		http.SetCookie(w, &http.Cookie{
 			Name:     sessionCookieName,
 			Value:    token,
@@ -1573,7 +1896,7 @@ func loginHandler(dashboardPassword string, allowInsecureCookies bool) http.Hand
 }
 
 // logoutHandler handles POST /api/auth/logout
-func logoutHandler(allowInsecureCookies bool) http.HandlerFunc {
+func logoutHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
@@ -1587,15 +1910,17 @@ func logoutHandler(allowInsecureCookies bool) http.HandlerFunc {
 			sessionStore.Lock()
 			delete(sessionStore.tokens, cookie.Value)
 			sessionStore.Unlock()
+			deleteAuthSession(cookie.Value)
 		}
 		stepUpCookie, stepErr := r.Cookie(stepUpSessionCookieName)
 		if stepErr == nil && stepUpCookie.Value != "" {
 			stepUpSessionStore.Lock()
 			delete(stepUpSessionStore.tokens, stepUpCookie.Value)
 			stepUpSessionStore.Unlock()
+			deleteAuthSession(stepUpCookie.Value)
 		}
 
-		secureCookie, sameSite := cookieSecurityPolicy(r, allowInsecureCookies)
+		secureCookie, sameSite := cookieSecurityPolicy(r)
 		// Clear cookie
 		http.SetCookie(w, &http.Cookie{
 			Name:     sessionCookieName,
@@ -1622,11 +1947,10 @@ func logoutHandler(allowInsecureCookies bool) http.HandlerFunc {
 	}
 }
 
-func cookieSecurityPolicy(r *http.Request, allowInsecure bool) (bool, http.SameSite) {
+func cookieSecurityPolicy(r *http.Request) (bool, http.SameSite) {
 	if r.TLS != nil {
 		return true, http.SameSiteStrictMode
 	}
-	_ = allowInsecure
 	// HTTP deployments require non-secure cookies or browsers will drop the session.
 	return false, http.SameSiteLaxMode
 }
@@ -1657,7 +1981,7 @@ func isLoopbackHost(hostport string) bool {
 }
 
 // authCheckHandler handles GET /api/auth/check
-func authCheckHandler(dashboardPassword string) http.HandlerFunc {
+func authCheckHandler(db *sql.DB, dashboardPassword string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
