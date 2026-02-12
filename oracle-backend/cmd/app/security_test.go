@@ -721,3 +721,79 @@ func TestCriticalStepUpFlow_BindsStepUpToParentSession(t *testing.T) {
 		t.Fatalf("expected 403 for cross-session stepup reuse, got %d", protectedRR.Code)
 	}
 }
+
+func TestNewsletterSubscriberUpsert_AllowsViewerWithoutStepUp_DeleteStillProtected(t *testing.T) {
+	resetSessionStore()
+	resetLoginRateStore()
+	stepUpSessionStore.Lock()
+	stepUpSessionStore.tokens = make(map[string]stepUpSession)
+	stepUpSessionStore.Unlock()
+	stepUpChallengeStore.Lock()
+	stepUpChallengeStore.items = make(map[string]stepUpChallenge)
+	stepUpChallengeStore.Unlock()
+
+	dbPath := filepath.Join(t.TempDir(), "newsletter-stepup.db")
+	sqlDB, err := db.Init(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sqlDB.Close()
+
+	if _, err := sqlDB.Exec(`UPDATE feature_flags SET enabled = 1 WHERE name = 'feature_stepup_enforced'`); err != nil {
+		t.Fatalf("failed to enable stepup flag: %v", err)
+	}
+	if _, err := sqlDB.Exec(`UPDATE feature_flags SET enabled = 1 WHERE name = 'feature_creative_hub_enabled'`); err != nil {
+		t.Fatalf("failed to enable creative hub flag: %v", err)
+	}
+
+	login := loginHandler(sqlDB, "viewer-secret")
+	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(`{"password":"viewer-secret"}`))
+	loginReq.Header.Set("Content-Type", "application/json")
+	loginRR := httptest.NewRecorder()
+	login.ServeHTTP(loginRR, loginReq)
+	if loginRR.Code != http.StatusOK {
+		t.Fatalf("login failed: %d %s", loginRR.Code, loginRR.Body.String())
+	}
+
+	var sessionCookie *http.Cookie
+	for _, c := range loginRR.Result().Cookies() {
+		if c.Name == sessionCookieName {
+			sessionCookie = c
+		}
+	}
+	if sessionCookie == nil {
+		t.Fatal("expected viewer session cookie")
+	}
+
+	authMW := requireAuth(sqlDB, "viewer-secret", "", false)
+
+	// Upsert should work with viewer auth only (no step-up middleware).
+	upsert := authMW(handlers.NewsletterSubscribersUpsertHandler(sqlDB, nil))
+	upsertReq := httptest.NewRequest(
+		http.MethodPost,
+		"/api/admin/newsletter/subscribers/upsert",
+		bytes.NewBufferString(`{"data":{"email":"viewer@example.com","name":"Viewer","status":"active"}}`),
+	)
+	upsertReq.Header.Set("Content-Type", "application/json")
+	upsertReq.AddCookie(sessionCookie)
+	upsertRR := httptest.NewRecorder()
+	upsert.ServeHTTP(upsertRR, upsertReq)
+	if upsertRR.Code != http.StatusOK {
+		t.Fatalf("expected upsert to succeed without step-up, got %d: %s", upsertRR.Code, upsertRR.Body.String())
+	}
+
+	// Delete remains protected by step-up and should reject viewer-only session.
+	del := authMW(requireStepUp(sqlDB, "super-secret")(handlers.NewsletterSubscribersDeleteHandler(sqlDB, nil)))
+	delReq := httptest.NewRequest(
+		http.MethodPost,
+		"/api/admin/newsletter/subscribers/delete",
+		bytes.NewBufferString(`{"recordKey":"viewer@example.com"}`),
+	)
+	delReq.Header.Set("Content-Type", "application/json")
+	delReq.AddCookie(sessionCookie)
+	delRR := httptest.NewRecorder()
+	del.ServeHTTP(delRR, delReq)
+	if delRR.Code != http.StatusForbidden {
+		t.Fatalf("expected delete to require step-up and return 403, got %d: %s", delRR.Code, delRR.Body.String())
+	}
+}
