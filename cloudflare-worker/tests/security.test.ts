@@ -5,7 +5,7 @@ import {
   createSessionToken,
   verifySessionToken,
   isLocalEnvironment,
-} from "../src/index";
+} from "../src/auth";
 import { DownloadsDurable } from "../src/downloads_do";
 import type { Env } from "../src/types";
 import type { DurableObjectState } from "@cloudflare/workers-types";
