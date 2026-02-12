@@ -156,23 +156,24 @@
       .nav-section { margin-bottom: 16px; }
 
       .nav-label {
-        font-size: 10px;
+        font-size: 12px;
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.08em;
         color: var(--text-muted);
-        padding: 8px 10px 4px;
+        padding: 12px 12px 8px;
       }
 
       .nav-item {
         display: flex;
         align-items: center;
         gap: 8px;
-        padding: 8px 10px;
+        padding: 11px 12px;
+        min-height: 44px;
         border-radius: 6px;
         color: var(--text-secondary);
         text-decoration: none;
-        font-size: 13px;
+        font-size: 15px;
         font-weight: 500;
         transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
         cursor: pointer;
@@ -187,7 +188,10 @@
         min-width: 0;
       }
 
-      .nav-item:hover { background: none; color: var(--text-secondary); }
+      .nav-item:hover {
+        background: rgba(255,255,255,0.08);
+        color: var(--text-primary);
+      }
       .nav-item.active { background: var(--bg-tertiary); color: var(--text-primary); }
       .nav-item:focus-visible {
         outline: 2px solid rgba(59, 130, 246, 0.65);
@@ -195,6 +199,8 @@
       }
       .nav-item svg { width: 16px; height: 16px; opacity: 0.7; flex-shrink: 0; }
       .nav-item-label {
+        font-size: 15px;
+        font-weight: 600;
         min-width: 0;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -209,12 +215,12 @@
 
       .sidebar-controls {
         display: grid;
-        gap: 8px;
+        gap: 12px;
       }
 
       .sidebar-controls-row {
         display: grid;
-        gap: 4px;
+        gap: 8px;
       }
 
       .sidebar-controls-row.top {
@@ -243,10 +249,10 @@
 
       .sidebar-controls .btn:hover,
       .sidebar-controls .status-indicator:hover {
-        background: var(--bg-secondary);
-        border-color: var(--border-primary);
-        color: var(--text-secondary);
-        cursor: default;
+        background: rgba(255,255,255,0.1);
+        border-color: var(--border-secondary);
+        color: var(--text-primary);
+        cursor: pointer;
       }
 
       .sidebar .btn:hover,
@@ -254,9 +260,9 @@
       .sidebar .btn-primary:hover,
       .sidebar .btn-danger:hover,
       .sidebar .btn-warning:hover {
-        background: var(--bg-secondary);
-        border-color: var(--border-primary);
-        color: var(--text-secondary);
+        background: rgba(255,255,255,0.1);
+        border-color: var(--border-secondary);
+        color: var(--text-primary);
         box-shadow: none;
         transform: none;
       }
@@ -424,24 +430,24 @@
       }
 
       .nav-utc-dot {
-        width: 5px;
-        height: 5px;
+        width: 8px;
+        height: 8px;
         border-radius: 999px;
         background: var(--accent);
-        box-shadow: 0 0 6px rgba(59,130,246,1);
+        box-shadow: 0 0 6px rgba(59,130,246,0.8);
         animation: pulse-accent 2s infinite;
       }
 
       .nav-utc small {
-        font-size: 11px;
-        color: var(--text-muted);
+        font-size: 18.5px;
+        color: #ffffff;
         font-weight: 700;
         letter-spacing: 0.12em;
         text-transform: uppercase;
       }
 
       .nav-utc-time {
-        font-size: 16px;
+        font-size: 18.5px;
         font-weight: 700;
         letter-spacing: 0.02em;
         color: var(--text-primary);
@@ -450,7 +456,7 @@
       }
 
       .nav-utc-time.is-12h {
-        font-size: 16px;
+        font-size: 18.5px;
       }
 
       .btn {
@@ -464,36 +470,54 @@
         line-height: 1.3;
         cursor: pointer;
         transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
-        border: 1px solid #6b7280;
-        background: #2a2a31;
-        color: #ffffff;
+        border: 1px solid var(--border-primary);
+        background: var(--bg-secondary);
+        color: var(--text-secondary);
         text-decoration: none;
         white-space: nowrap;
         min-width: 0;
-        box-shadow: 0 1px 0 rgba(255,255,255,0.08) inset, 0 4px 12px rgba(0,0,0,0.24);
+        box-shadow: none;
       }
 
-      .btn:hover { background: #393944; border-color: #93a4b8; box-shadow: 0 1px 0 rgba(255,255,255,0.11) inset, 0 9px 18px rgba(0,0,0,0.28); }
-      .btn:active { box-shadow: 0 1px 0 rgba(255,255,255,0.05) inset; }
+      .btn:hover { background: rgba(255,255,255,0.08); border-color: var(--border-secondary); color: var(--text-primary); }
+      .btn:active { box-shadow: none; }
       .btn:focus-visible {
-        outline: 2px solid rgba(59, 130, 246, 0.7);
+        outline: 2px solid rgba(161,161,170,0.8);
         outline-offset: 1px;
       }
       .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
       .btn svg { width: 14px; height: 14px; }
 
-      .btn-primary { background: #2563eb; border-color: #2563eb; color: #eff6ff; }
-      .btn-primary:hover { background: #3b82f6; border-color: #3b82f6; color: #ffffff; }
+      .btn-primary { background: var(--bg-secondary); border-color: var(--border-primary); color: var(--text-secondary); }
+      .btn-primary:hover { background: rgba(255,255,255,0.08); border-color: var(--border-secondary); color: var(--text-primary); }
 
-      .btn-secondary { background: #1f232b; border-color: #4b5563; color: #f3f4f6; }
-      .btn-secondary:hover { background: #2b313c; color: #ffffff; border-color: #94a3b8; }
+      .btn-secondary { background: var(--bg-secondary); border-color: var(--border-primary); color: var(--text-secondary); }
+      .btn-secondary:hover { background: rgba(255,255,255,0.08); color: var(--text-primary); border-color: var(--border-secondary); }
 
-      .btn-danger { background: #991b1b; border-color: #dc2626; color: #fee2e2; }
-      .btn-danger:hover { background: #b91c1c; border-color: #ef4444; color: #ffffff; }
-      .btn-danger-exec { background: #b91c1c; border-color: #ef4444; color: #ffffff; }
-      .btn-danger-exec:hover { background: #dc2626; border-color: #f87171; }
-      .btn-warning { background: #b45309; border-color: #f59e0b; color: #fffbeb; }
-      .btn-warning:hover { background: #d97706; border-color: #fbbf24; color: #ffffff; }
+      .btn-danger,
+      .btn-danger-exec,
+      .btn-warning {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
+        color: var(--text-secondary);
+      }
+      .btn-danger:hover,
+      .btn-danger-exec:hover,
+      .btn-warning:hover {
+        background: rgba(255,255,255,0.1);
+        border-color: var(--border-secondary);
+        color: var(--text-primary);
+      }
+
+      button:hover,
+      .btn:hover,
+      .nav-item:hover,
+      .tab:hover,
+      .log-sort-btn:hover,
+      .log-export-btn:hover,
+      a:hover {
+        cursor: pointer;
+      }
 
       .container { padding: 20px; }
 
@@ -518,6 +542,19 @@
         cursor: default;
       }
 
+      .stat-card2 {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-direction: row;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
+        border-radius: 8px;
+        padding: 16px;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        cursor: default;
+      }
+
       .stat-card:hover { 
         border-color: var(--border-secondary); 
         box-shadow: 0 8px 18px rgba(0,0,0,0.18);
@@ -530,7 +567,7 @@
         margin-bottom: 8px;
       }
 
-      .stat-label { font-size: 12px; color: var(--text-secondary); font-weight: 500; }
+      .stat-label { font-size: 16px; color: var(--text-secondary); font-weight: 500; }
 
       .stat-icon {
         width: 28px;
@@ -905,89 +942,6 @@
         color: var(--text-primary);
       }
 
-      .ip-map-wrap {
-        display: grid;
-        gap: 12px;
-      }
-
-      .ip-map-canvas {
-        border: 1px solid var(--border-primary);
-        border-radius: 10px;
-        background: #111116;
-        padding: 8px;
-      }
-
-      .ip-map-svg {
-        width: 100%;
-        height: 230px;
-        display: block;
-      }
-
-      .ip-map-gridline {
-        stroke: rgba(161,161,170,0.16);
-        stroke-width: 1;
-      }
-
-      .ip-map-outline {
-        fill: none;
-        stroke: rgba(161,161,170,0.3);
-        stroke-width: 1.2;
-      }
-
-      .ip-map-point {
-        fill: #3b82f6;
-        fill-opacity: 0.8;
-        stroke: #dbeafe;
-        stroke-width: 1;
-      }
-
-      .ip-map-point.hot {
-        fill: #22c55e;
-      }
-
-      .ip-map-label {
-        fill: #f4f4f5;
-        font-size: 10px;
-        font-family: "SF Mono", Monaco, Consolas, monospace;
-      }
-
-      .ip-map-legend {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 8px;
-      }
-
-      .ip-map-row {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 8px;
-        border: 1px solid var(--border-primary);
-        border-radius: 8px;
-        background: rgba(255,255,255,0.02);
-        padding: 6px 8px;
-        font-size: 12px;
-      }
-
-      .ip-map-name {
-        color: var(--text-secondary);
-        min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-
-      .ip-map-count {
-        color: var(--text-primary);
-        font-weight: 600;
-      }
-
-      @media (max-width: 900px) {
-        .ip-map-legend {
-          grid-template-columns: 1fr;
-        }
-      }
-
       /* Loading & Empty */
       .loading {
         display: flex;
@@ -1022,7 +976,7 @@
         display: flex;
         gap: 2px;
         padding: 3px;
-        background: var(--bg-tertiary);
+        background: transparent;
         border-radius: 6px;
       }
 
@@ -1034,12 +988,12 @@
         border-radius: 4px;
         cursor: pointer;
         transition: all 0.15s ease;
-        border: none;
-        background: none;
+        border: 1px solid var(--border-primary);
+        background: var(--bg-secondary);
       }
 
-      .tab:hover { color: var(--text-secondary); background: rgba(255,255,255,0.05); }
-      .tab.active { background: var(--bg-secondary); color: var(--text-primary); }
+      .tab:hover { color: var(--text-primary); background: rgba(255,255,255,0.08); border-color: var(--border-secondary); }
+      .tab.active { background: rgba(255,255,255,0.08); color: var(--text-primary); border-color: var(--border-secondary); }
 
       /* Enhanced Log Viewer */
       .log-toolbar {
@@ -1059,8 +1013,8 @@
         padding: 6px 10px;
         font-size: 11px;
         font-weight: 500;
-        color: var(--text-muted);
-        background: var(--bg-tertiary);
+        color: var(--text-secondary);
+        background: var(--bg-secondary);
         border: 1px solid var(--border-primary);
         border-radius: 6px;
         cursor: pointer;
@@ -1072,10 +1026,11 @@
 
       .log-sort-btn:hover, .log-export-btn:hover {
         color: var(--text-primary);
+        background: rgba(255,255,255,0.08);
         border-color: var(--border-secondary);
       }
 
-      .log-sort-btn.active { color: var(--accent); border-color: var(--accent); }
+      .log-sort-btn.active { color: var(--text-primary); border-color: var(--border-secondary); background: rgba(255,255,255,0.08); }
 
       .mini-bar {
         display: inline-flex;
@@ -1400,7 +1355,7 @@
       .auth-input {
         width: 100%;
         border: 1px solid var(--border-secondary);
-        background: var(--bg-tertiary);
+        background: rgba(255, 255, 255, 0.08);
         color: var(--text-primary);
         padding: 10px 12px;
         border-radius: 10px;
@@ -1513,6 +1468,99 @@
         grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
         gap: 10px;
       }
+      .danger-help-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 10px;
+      }
+      .danger-help-item {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
+        border-radius: 8px;
+        padding: 10px;
+      }
+      .danger-help-title {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+      .danger-help-text {
+        font-size: 12px;
+        color: var(--text-secondary);
+        margin-top: 4px;
+        line-height: 1.45;
+      }
+      .danger-log-retention {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid rgba(239,68,68,0.32);
+        border-radius: 8px;
+        background: rgba(127,29,29,0.16);
+        margin-bottom: 10px;
+      }
+      .danger-log-retention-copy {
+        display: grid;
+        gap: 2px;
+        min-width: 0;
+      }
+      .danger-log-retention .auth-input {
+        width: 96px;
+        text-align: center;
+        border-color: rgba(248,113,113,0.55);
+        background: rgba(17,24,39,0.5);
+        color: #fee2e2;
+      }
+      .danger-log-retention-label {
+        font-size: 12px;
+        color: #ffe4e6;
+        font-weight: 600;
+      }
+      .danger-log-retention-note {
+        font-size: 11px;
+        color: #fca5a5;
+      }
+      #page-danger .card {
+        border-color: rgba(239,68,68,0.45);
+        background: rgba(127,29,29,0.08);
+      }
+      #page-danger .card-header {
+        border-bottom-color: rgba(239,68,68,0.4);
+        background: rgba(127,29,29,0.18);
+      }
+      #page-danger .card-title {
+        color: #fee2e2;
+      }
+      #page-danger .card-subtitle {
+        color: #fca5a5;
+      }
+      #page-danger .btn {
+        border-color: rgba(239,68,68,0.42);
+        background: rgba(127,29,29,0.3);
+        color: #fecaca;
+      }
+      #page-danger .btn:hover {
+        border-color: rgba(248,113,113,0.7);
+        background: rgba(185,28,28,0.44);
+        color: #ffe4e6;
+      }
+      #page-danger .danger-help-item {
+        background: var(--bg-secondary);
+        border-color: var(--border-primary);
+      }
+      #page-danger .danger-help-title {
+        color: var(--text-primary);
+      }
+      #page-danger .danger-help-text {
+        color: var(--text-secondary);
+      }
+      #page-danger .json-viewer {
+        border-color: rgba(239,68,68,0.4);
+        background: rgba(127,29,29,0.2);
+      }
       .deployment-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
@@ -1521,40 +1569,14 @@
       .deployment-card {
         border: 1px solid var(--border-primary);
         border-radius: 10px;
-        background: var(--bg-tertiary);
+        background: var(--bg-secondary);
         padding: 12px;
         transition: border-color 0.18s ease, box-shadow 0.18s ease;
+        color: var(--text-secondary);
       }
       .deployment-card:hover {
         border-color: var(--border-secondary);
         box-shadow: 0 8px 16px rgba(0,0,0,0.16);
-      }
-      .update-sentence-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 10px;
-        margin-bottom: 10px;
-      }
-      .update-sentence-list {
-        display: grid;
-        gap: 10px;
-      }
-      .update-sentence-text {
-        font-size: 12px;
-        color: var(--text-primary);
-        line-height: 1.5;
-        white-space: pre-wrap;
-      }
-      .update-sentence-meta {
-        font-size: 11px;
-        color: var(--text-muted);
-      }
-      .update-sentence-actions {
-        display: flex;
-        gap: 8px;
-        flex-wrap: wrap;
-        margin-top: 10px;
       }
       .creative-grid {
         display: grid;
@@ -1564,11 +1586,12 @@
       .creative-card {
         border: 1px solid var(--border-primary);
         border-radius: 12px;
-        background: rgba(31,31,35,0.95);
+        background: var(--bg-secondary);
         padding: 12px;
         display: grid;
         gap: 8px;
         transition: border-color 0.18s ease, box-shadow 0.18s ease;
+        color: var(--text-secondary);
       }
       .creative-card:hover {
         border-color: var(--border-secondary);
@@ -1593,7 +1616,72 @@
         padding: 2px 8px;
         font-size: 11px;
         color: var(--text-secondary);
-        background: rgba(255,255,255,0.03);
+        background: var(--bg-secondary);
+      }
+      .newsletter-layout {
+        display: grid;
+        grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+        gap: 14px;
+        align-items: start;
+      }
+      .newsletter-panel {
+        border: 1px solid var(--border-primary);
+        border-radius: 12px;
+        background: var(--bg-secondary);
+        padding: 12px;
+        display: grid;
+        gap: 10px;
+      }
+      .newsletter-panel h4 {
+        font-size: 14px;
+        color: var(--text-primary);
+      }
+      .newsletter-hint {
+        font-size: 12px;
+        color: var(--text-muted);
+        line-height: 1.45;
+      }
+      .newsletter-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .newsletter-summary {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .newsletter-tag {
+        border: 1px solid var(--border-primary);
+        border-radius: 999px;
+        padding: 3px 8px;
+        font-size: 11px;
+        color: var(--text-secondary);
+        background: var(--bg-tertiary);
+      }
+      @media (max-width: 900px) {
+        .newsletter-layout {
+          grid-template-columns: 1fr;
+        }
+        .danger-log-retention {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+        .danger-log-retention .auth-input {
+          width: 100%;
+          max-width: 160px;
+        }
+      }
+
+      .nav-item-emoji {
+        width: 16px;
+        min-width: 16px;
+        text-align: center;
+        font-size: 14px;
+        line-height: 1;
+        flex-shrink: 0;
       }
       .form-grid { display: grid; gap: 10px; }
       .calendar-grid-wrap { min-height: 220px; }
@@ -1644,11 +1732,11 @@
       .shortcut-key {
         font-family: "SF Mono", Monaco, Consolas, monospace;
         font-size: 11px;
-        color: #bfdbfe;
-        border: 1px solid rgba(59,130,246,0.45);
+        color: #e4e4e7;
+        border: 1px solid #5a5f6a;
         border-radius: 7px;
         padding: 3px 8px;
-        background: rgba(59,130,246,0.15);
+        background: rgba(255,255,255,0.06);
       }
       .shortcut-desc {
         font-size: 12px;
@@ -1681,57 +1769,36 @@
 
         <nav class="sidebar-nav">
           <div class="nav-section">
-            <div class="nav-label">Dashboard</div>
+            <div class="nav-label">Sections</div>
             <button class="nav-item active" data-page="overview" data-shortcut="Cmd+1"
               data-tooltip="View summary statistics" data-tooltip-position="bottom">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
-                <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
-              </svg>
+              <span class="nav-item-emoji" aria-hidden="true">🏠</span>
               <span class="nav-item-label">Overview</span>
             </button>
             <button class="nav-item" data-page="activity" data-shortcut="Cmd+2"
               data-tooltip="View activity timeline and analytics charts" data-tooltip-position="bottom">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
-              </svg>
-              <span class="nav-item-label">Insights</span>
+              <span class="nav-item-emoji" aria-hidden="true">📊</span>
+              <span class="nav-item-label">Activity &amp; Charts</span>
             </button>
             <button class="nav-item" data-page="dashboards" data-shortcut="Cmd+3"
               data-tooltip="Dashboards, deployments, and notifications" data-tooltip-position="bottom">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 20h8"/>
-              </svg>
+              <span class="nav-item-emoji" aria-hidden="true">🛰️</span>
               <span class="nav-item-label">Ops Hub</span>
             </button>
-            <button class="nav-item" data-page="versions" data-shortcut="Cmd+4"
-              data-tooltip="Extension versions and release notes" data-tooltip-position="bottom">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M20 7l-8 8-4-4"/><path d="M4 4h16v16H4z"/>
-              </svg>
-              <span class="nav-item-label">Versions</span>
-            </button>
-            <button class="nav-item" data-page="creative" data-shortcut="Cmd+5"
+            <button class="nav-item" data-page="creative" data-shortcut="Cmd+4"
               data-tooltip="Design, email templates, and newsletter management" data-tooltip-position="bottom">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 113 3L7 19l-4 1 1-4z"/>
-              </svg>
+              <span class="nav-item-emoji" aria-hidden="true">🎨</span>
               <span class="nav-item-label">Creative Hub</span>
             </button>
-            <button class="nav-item" data-page="logs" data-shortcut="Cmd+6"
+            <button class="nav-item" data-page="logs" data-shortcut="Cmd+5"
               data-tooltip="Oracle backend request and admin operation logs" data-tooltip-position="bottom">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M3 4h18v16H3z"/><path d="M7 8h10"/><path d="M7 12h10"/><path d="M7 16h6"/>
-              </svg>
-              <span class="nav-item-label">Logs</span>
+              <span class="nav-item-emoji" aria-hidden="true">🧾</span>
+              <span class="nav-item-label">Oracle Logs</span>
             </button>
             <button class="nav-item" data-page="danger" data-shortcut="Cmd+0"
               data-tooltip="Critical administrative operations" data-tooltip-position="bottom">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-                <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-              </svg>
-              <span class="nav-item-label">Danger</span>
+              <span class="nav-item-emoji" aria-hidden="true">☢️</span>
+              <span class="nav-item-label">Danger Zone</span>
             </button>
           </div>
 
@@ -1786,7 +1853,7 @@
       <main class="main-content">
         <div class="topbar">
           <div class="topbar-left">
-            <h1 id="page-title">Overview</h1>
+            <h1 id="page-title">🏠 Overview</h1>
             <p id="last-updated">Last updated: --</p>
           </div>
         </div>
@@ -1794,11 +1861,10 @@
           <div class="mobile-toolbar-grid">
             <select id="mobile-page-select" class="mobile-page-select" aria-label="Select dashboard section">
               <option value="overview">Overview</option>
-              <option value="activity">Activity + Charts</option>
+              <option value="activity">Activity &amp; Charts</option>
               <option value="dashboards">Ops Hub</option>
-              <option value="versions">Versions</option>
               <option value="creative">Creative Hub</option>
-              <option value="logs">Logs</option>
+              <option value="logs">Oracle Logs</option>
               <option value="danger">Danger Zone</option>
             </select>
             <button class="btn btn-secondary" id="shortcuts-btn-mobile" data-shortcut="Cmd+/" data-tooltip="Keyboard shortcuts">
@@ -2027,7 +2093,7 @@
                     ⬇️ Newest First
                   </button>
                   <button class="log-export-btn" id="log-export-btn" data-tooltip="Export as CSV">
-                    📥 Export
+                    📥 Export CSV
                   </button>
                 </div>
               </div>
@@ -2131,17 +2197,6 @@
                 </div>
               </div>
 
-              <div class="card">
-                <div class="card-header">
-                  <div>
-                    <div class="card-title">IP Geo Map</div>
-                    <div class="card-subtitle">Country-level IP activity (last 7 days)</div>
-                  </div>
-                </div>
-                <div class="card-body" id="chart-ip-map">
-                  <div class="loading"><div class="spinner"></div>Loading...</div>
-                </div>
-              </div>
             </div>
 
             <!-- Daily Downloads Chart -->
@@ -2149,7 +2204,7 @@
               <div class="card-header">
                 <div>
                   <div class="card-title">Daily Downloads</div>
-                  <div class="card-subtitle">Last 14 days • Hover for details</div>
+                  <div class="card-subtitle">Last 14 days - Hover for details</div>
                 </div>
               </div>
               <div class="card-body">
@@ -2170,11 +2225,17 @@
                 </div>
               </div>
               <div class="card-body">
-                <div class="action-buttons-grid" style="grid-template-columns: repeat(4, 1fr);">
-                  <a href="#" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" id="infra-link-cloudflare">☁️ Cloudflare</a>
-                  <a href="#" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" id="infra-link-uptime">🟢 Uptime Kuma</a>
-                  <a href="#" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" id="infra-link-github">🐙 GitHub Repo</a>
-                  <a href="#" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" id="infra-link-sheets">📊 Google Sheets</a>
+                <div class="action-buttons-grid" style="grid-template-columns: repeat(5, 1fr);">
+                  <a href="https://cqd-analytics.adhamhaithameid.workers.dev/" target="_blank" rel="noopener noreferrer"
+                    class="btn btn-secondary" id="infra-link-cloudflare">☁️ Cloudflare</a>
+                  <a href="http://129.151.233.229:3001/status/cqd" target="_blank" rel="noopener noreferrer" class="btn btn-secondary"
+                    id="infra-link-uptime">🟢 Uptime Kuma</a>
+                  <a href="https://github.com/adhamhaithameid/Classroom-Quick-Downloader" target="_blank" rel="noopener noreferrer"
+                    class="btn btn-secondary" id="infra-link-github">🐙 GitHub Repo</a>
+                  <a href="https://docs.google.com/spreadsheets/d/1ptzLKUVnAkyXnT635Zgb1C6Img9aeAZ1se3nRz_QZmI/edit?gid=0#gid=0"
+                    target="_blank" rel="noopener noreferrer" class="btn btn-secondary" id="infra-link-sheets">📊 Google Sheets</a>
+                  <a href="https://www.figma.com/design/hQLRpncinKnJQRG1lhCdQG/Google-Classroom-Downloade-Icon?node-id=0-1&t=5Eimhfrvp8RwFC19-1"
+                    target="_blank" rel="noopener noreferrer" class="btn btn-secondary" id="infra-link-figma">🎨 Figma</a>
                 </div>
               </div>
             </div>
@@ -2199,77 +2260,10 @@
                 <pre id="deployment-sync-output" class="json-viewer" style="max-height: 220px; overflow:auto; display:none;"></pre>
               </div>
             </div>
-            <div class="card">
-              <div class="card-header">
-                <div>
-                  <div class="card-title">Update Sentences</div>
-                  <div class="card-subtitle">Copy-ready release copy snippets</div>
-                </div>
-              </div>
-              <div class="card-body">
-                <form id="update-sentence-form" class="form-grid">
-                  <input id="update-sentence-key" type="hidden" />
-                  <textarea id="update-sentence-input" class="auth-input" style="min-height: 92px;" placeholder="Write an update sentence..." required></textarea>
-                  <div class="update-sentence-header">
-                    <div id="update-sentence-form-state" class="update-sentence-meta">Creating new sentence</div>
-                    <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                      <button class="btn btn-secondary" id="seed-update-sentences-btn" type="button">Seed Defaults</button>
-                      <button class="btn btn-secondary" id="clear-update-sentence-form-btn" type="button">Clear</button>
-                      <button class="btn btn-primary" id="update-sentence-save-btn" type="submit">Add Sentence</button>
-                    </div>
-                  </div>
-                </form>
-                <div id="update-sentence-list" class="update-sentence-list"></div>
-              </div>
-            </div>
-          </div>
-
-          <!-- VERSIONS PAGE -->
-          <div class="page" id="page-versions">
-            <div class="card">
-              <div class="card-header">
-                <div>
-                  <div class="card-title">Extension Versions</div>
-                  <div class="card-subtitle">Manual version ledger with update notes</div>
-                </div>
-              </div>
-              <div class="card-body">
-                <form id="version-form" class="form-grid">
-                  <input id="version-input" class="auth-input" placeholder="Version (e.g., 5.7.1)" required />
-                  <textarea id="version-note-input" class="auth-input" style="min-height: 90px;" placeholder="Update notes..." required></textarea>
-                  <button class="btn" type="submit" style="justify-self:start;">Save Version Note</button>
-                </form>
-                <div id="version-list" style="margin-top: 14px;"></div>
-              </div>
-            </div>
           </div>
 
           <!-- CREATIVE PAGE -->
           <div class="page" id="page-creative">
-            <div class="card">
-              <div class="card-header">
-                <div>
-                  <div class="card-title">Figma Designs</div>
-                  <div class="card-subtitle">Card-based design registry with links and notes</div>
-                </div>
-              </div>
-              <div class="card-body">
-                <form class="form-grid" id="creative-design-form">
-                  <div class="creative-grid">
-                    <input id="design-key" class="auth-input" placeholder="Design key (e.g., landing-v2)" required />
-                    <input id="design-title" class="auth-input" placeholder="Title" required />
-                    <input id="design-url" class="auth-input" placeholder="Figma URL" required />
-                    <input id="design-thumb-url" class="auth-input" placeholder="Preview image URL (optional)" />
-                    <input id="design-version" class="auth-input" placeholder="Version (optional)" />
-                    <input id="design-tags" class="auth-input" placeholder="Tags (comma-separated)" />
-                  </div>
-                  <textarea id="design-description" class="auth-input" style="min-height: 90px;" placeholder="Description"></textarea>
-                  <button class="btn" type="submit" style="justify-self:start;">Save Design</button>
-                </form>
-                <div id="creative-designs-list" class="creative-grid" style="margin-top: 14px;"></div>
-              </div>
-            </div>
-
             <div class="card">
               <div class="card-header">
                 <div>
@@ -2297,38 +2291,31 @@
               <div class="card-header">
                 <div>
                   <div class="card-title">Newsletter Management</div>
-                  <div class="card-subtitle">Subscribers and campaign database</div>
+                  <div class="card-subtitle">Subscribers database and delivery list control</div>
                 </div>
               </div>
               <div class="card-body">
-                <div class="creative-grid">
-                  <form class="form-grid" id="newsletter-subscriber-form">
-                    <input id="newsletter-email" class="auth-input" placeholder="Subscriber email" required />
-                    <input id="newsletter-name" class="auth-input" placeholder="Subscriber name (optional)" />
-                    <select id="newsletter-status" class="auth-input">
-                      <option value="active">Active</option>
+                <div class="newsletter-layout">
+                  <div class="newsletter-panel">
+                    <h4>➕ Add / Update Subscriber</h4>
+                    <div class="newsletter-hint">Manage subscriber records quickly from here.</div>
+                    <form class="form-grid" id="newsletter-subscriber-form">
+                      <input id="newsletter-email" class="auth-input" placeholder="Subscriber email" required />
+                      <input id="newsletter-name" class="auth-input" placeholder="Subscriber name (optional)" />
+                      <select id="newsletter-status" class="auth-input">
+                        <option value="active">Active</option>
                       <option value="paused">Paused</option>
                       <option value="unsubscribed">Unsubscribed</option>
-                    </select>
-                    <button class="btn" type="submit">Add/Update Subscriber</button>
-                  </form>
-                  <form class="form-grid" id="newsletter-campaign-form">
-                    <input id="newsletter-campaign-key" class="auth-input" placeholder="Campaign key (e.g., v5-7-launch)" required />
-                    <input id="newsletter-campaign-title" class="auth-input" placeholder="Campaign title" required />
-                    <input id="newsletter-campaign-version" class="auth-input" placeholder="Version (optional)" />
-                    <input id="newsletter-campaign-send-at" class="auth-input" placeholder="Send at UTC (ISO string)" />
-                    <textarea id="newsletter-campaign-notes" class="auth-input" style="min-height: 90px;" placeholder="Campaign notes"></textarea>
-                    <button class="btn" type="submit">Save Campaign</button>
-                  </form>
-                </div>
-                <div class="creative-grid" style="margin-top: 14px;">
-                  <div>
-                    <h4 style="font-size:13px; margin-bottom:8px;">Subscribers</h4>
-                    <div id="newsletter-subscribers-list" class="creative-grid"></div>
+                      </select>
+                      <button class="btn btn-primary" type="submit">💾 Save Subscriber</button>
+                    </form>
                   </div>
-                  <div>
-                    <h4 style="font-size:13px; margin-bottom:8px;">Campaigns</h4>
-                    <div id="newsletter-campaigns-list" class="creative-grid"></div>
+                  <div class="newsletter-panel">
+                    <div class="newsletter-head">
+                      <h4>📬 Subscribers</h4>
+                      <div class="newsletter-summary" id="newsletter-summary"></div>
+                    </div>
+                    <div id="newsletter-subscribers-list" class="creative-grid"></div>
                   </div>
                 </div>
               </div>
@@ -2341,7 +2328,7 @@
               <div class="card-header">
                 <div>
                   <div class="card-title">GitHub Notifications</div>
-                  <div class="card-subtitle">Open issues and PRs</div>
+                  <div class="card-subtitle">Issues, PRs, branches, and discussions</div>
                 </div>
                 <div>
                   <button class="btn btn-secondary" id="notifications-refresh-btn">Refresh</button>
@@ -2389,27 +2376,49 @@
               <div class="card-header">
                 <div>
                   <div class="card-title">Danger Zone</div>
-                  <div class="card-subtitle">Destructive operations (step-up required)</div>
+                  <div class="card-subtitle">Restricted operations with elevated verification</div>
                 </div>
               </div>
               <div class="card-body">
                 <div class="action-buttons-grid" style="grid-template-columns: repeat(4, 1fr);">
-                  <button class="btn btn-secondary" id="danger-dryrun-clear-btn">Dry Run Clear (All Non-Core)</button>
-                  <button class="btn btn-danger" id="danger-exec-clear-btn">Execute Clear (All Non-Core)</button>
-                  <button class="btn btn-secondary" id="danger-run-backup-btn">Run SQLite Backup</button>
-                  <button class="btn btn-secondary" id="stepup-btn" data-shortcut="Cmd+Shift+S">Step-Up Now</button>
+                  <button class="btn btn-secondary" id="danger-dryrun-clear-btn">🧪 Dry Run Clear (All Non-Core)</button>
+                  <button class="btn btn-danger" id="danger-exec-clear-btn">💥 Execute Clear (All Non-Core)</button>
+                  <button class="btn btn-secondary" id="danger-run-backup-btn">💾 Run SQLite Backup</button>
+                  <button class="btn btn-secondary" id="stepup-btn" data-shortcut="Cmd+Shift+S">🛂 Step-Up Now</button>
                 </div>
                 <div style="margin-top: 14px;">
-                  <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;">Preset Admin Actions</div>
+                  <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;">Operational Safety Actions</div>
+                  <div class="danger-log-retention">
+                    <div class="danger-log-retention-copy">
+                      <span class="danger-log-retention-label">🕒 Log Retention Window</span>
+                      <span class="danger-log-retention-note">Used by delete-older actions in this page.</span>
+                    </div>
+                    <input id="danger-log-retention-days" class="auth-input" type="number" min="1" max="36500" value="30" />
+                  </div>
                   <div class="action-buttons-grid" style="grid-template-columns: repeat(4, 1fr);">
-                    <button class="btn btn-secondary" id="danger-outbox-status-btn">Outbox Status</button>
-                    <button class="btn btn-secondary" id="danger-outbox-retry-btn">Retry Outbox</button>
-                    <button class="btn btn-secondary" id="danger-outbox-replay-btn">Replay Dead Letter</button>
-                    <button class="btn btn-secondary" id="danger-audit-verify-btn">Verify Audit Chain</button>
-                    <button class="btn btn-secondary" id="danger-alerts-btn">Load Alerts</button>
-                    <button class="btn btn-secondary" id="danger-flags-btn">Load Feature Flags</button>
-                    <button class="btn btn-secondary" id="danger-migrations-btn">Load Migrations Status</button>
-                    <button class="btn btn-secondary" id="danger-ops-snapshot-btn">Load Full Ops Snapshot</button>
+                    <button class="btn btn-secondary" id="danger-alerts-btn">🚨 Load Alerts</button>
+                    <button class="btn btn-secondary" id="danger-audit-verify-btn">🔗 Verify Audit Chain</button>
+                    <button class="btn btn-secondary" id="danger-outbox-status-btn">📦 Outbox Status</button>
+                    <button class="btn btn-secondary" id="danger-flags-btn">⚙️ Load Feature Flags</button>
+                    <button class="btn btn-secondary" id="danger-logs-dry-run-btn">🧪 Dry Run Delete Older Logs</button>
+                    <button class="btn btn-secondary" id="danger-logs-delete-older-btn">🧹 Delete Older Logs</button>
+                    <button class="btn btn-danger" id="danger-logs-delete-all-btn">🗑️ Delete All Oracle Logs</button>
+                  </div>
+                </div>
+                <div style="margin-top: 14px;">
+                  <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;">Action Explanations</div>
+                  <div class="danger-help-grid">
+                    <div class="danger-help-item"><div class="danger-help-title">Dry Run Clear</div><div class="danger-help-text">Preview mode only. Oracle calculates exactly what would be deleted from non-core analytics tables and returns row counts per table, but commits nothing. Use this first before any destructive cleanup to validate scope and avoid accidental data loss.</div></div>
+                    <div class="danger-help-item"><div class="danger-help-title">Execute Clear</div><div class="danger-help-text">Runs the same cleanup plan as Dry Run but actually deletes data. This action requires elevated verification and should be used only after reviewing Dry Run output. It does not remove core auth/config tables, but it will permanently remove matching operational data.</div></div>
+                    <div class="danger-help-item"><div class="danger-help-title">Run SQLite Backup</div><div class="danger-help-text">Creates a point-in-time backup file under the server backup location. Use this immediately before risky operations. If cleanup or migration has unintended effects, this snapshot is your rollback anchor for the SQLite state.</div></div>
+                    <div class="danger-help-item"><div class="danger-help-title">Step-Up Now</div><div class="danger-help-text">Starts elevated verification for the current admin session. Critical actions in this page rely on this elevated window. If buttons are rejected with permission errors, run this first and complete verification.</div></div>
+                    <div class="danger-help-item"><div class="danger-help-title">Load Alerts</div><div class="danger-help-text">Retrieves active operational alerts such as no sync success, drift detection, backup failures, and backlog anomalies. This is the fastest health check when dashboard data looks stale or inconsistent.</div></div>
+                    <div class="danger-help-item"><div class="danger-help-title">Verify Audit Chain</div><div class="danger-help-text">Validates append-only hash-chain integrity for admin audit records from oldest to newest. If a link is broken, response includes where validation failed. Run this after critical operations and before incident closure.</div></div>
+                    <div class="danger-help-item"><div class="danger-help-title">Outbox Status</div><div class="danger-help-text">Shows queue health for relay pipelines: pending rows, retry counts, dead-letter presence, and relay freshness. Use this to confirm dual-DB/eventual-consistency pipelines are keeping up and not silently lagging.</div></div>
+                    <div class="danger-help-item"><div class="danger-help-title">Load Feature Flags</div><div class="danger-help-text">Reads server-side feature flags and kill switches currently enforced by backend logic. Use this to confirm whether sensitive modules (sync, destructive endpoints, advanced admin tooling) are intentionally on or off.</div></div>
+                    <div class="danger-help-item"><div class="danger-help-title">Dry Run Delete Older Logs</div><div class="danger-help-text">Uses the retention-days value and reports how many oracle log rows would be deleted. Safe preview mode; no records are removed.</div></div>
+                    <div class="danger-help-item"><div class="danger-help-title">Delete Older Logs</div><div class="danger-help-text">Deletes oracle logs older than the selected retention period. Use this to keep the logs table small while preserving recent operational trace history.</div></div>
+                    <div class="danger-help-item"><div class="danger-help-title">Delete All Oracle Logs</div><div class="danger-help-text">Irreversibly clears all oracle operation logs. Use only when resetting the environment or when log storage must be purged completely.</div></div>
                   </div>
                 </div>
                 <pre id="danger-output" class="json-viewer" style="margin-top: 12px; max-height: 340px; overflow:auto; display:none;"></pre>
@@ -2427,7 +2436,7 @@
     <div class="modal-overlay" id="batch-modal">
       <div class="modal">
         <div class="modal-header">
-          <span class="modal-title">📦 Last Batch Info</span>
+          <span class="modal-title">Last Batch Info</span>
           <button class="modal-close" id="batch-modal-close-btn">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
@@ -2436,8 +2445,8 @@
         </div>
         <div class="modal-body">
           <div class="modal-tabs" id="batch-modal-tabs">
-            <button class="tab active" data-batch-tab="info">📋 Info</button>
-            <button class="tab" data-batch-tab="json">🔧 JSON</button>
+            <button class="tab active" data-batch-tab="info">Info</button>
+            <button class="tab" data-batch-tab="json">JSON</button>
           </div>
           <div id="batch-info-content">
             <div class="loading"><div class="spinner"></div>Loading batch info...</div>
@@ -2449,8 +2458,8 @@
     <div class="modal-overlay" id="auth-modal" aria-hidden="true">
       <div class="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title">
         <div class="auth-modal-head">
-          <h2 class="auth-modal-title" id="auth-modal-title">Enter dashboard password</h2>
-          <p class="auth-modal-subtitle">This dashboard is protected. Authenticate to continue.</p>
+          <h2 class="auth-modal-title" id="auth-modal-title">Authentication Required</h2>
+          <p class="auth-modal-subtitle">Enter your access key to continue.</p>
         </div>
         <div class="auth-modal-body">
           <form class="auth-form" id="auth-form">
@@ -2459,10 +2468,10 @@
               class="auth-input"
               type="password"
               autocomplete="current-password"
-              placeholder="Password"
+              placeholder="Access key"
               required
             />
-            <button id="auth-password-submit" class="auth-submit" type="submit">Unlock dashboard</button>
+            <button id="auth-password-submit" class="auth-submit" type="submit">Unlock</button>
             <div id="auth-error" class="auth-error"></div>
           </form>
         </div>
@@ -2472,8 +2481,8 @@
     <div class="modal-overlay" id="stepup-modal" aria-hidden="true">
       <div class="auth-modal" role="dialog" aria-modal="true" aria-labelledby="stepup-modal-title">
         <div class="auth-modal-head">
-          <h2 class="auth-modal-title" id="stepup-modal-title">Enter super-admin password</h2>
-          <p class="auth-modal-subtitle">Critical operations require a step-up verification.</p>
+          <h2 class="auth-modal-title" id="stepup-modal-title">Additional Verification</h2>
+          <p class="auth-modal-subtitle">Confirm this action to proceed.</p>
         </div>
         <div class="auth-modal-body">
           <form class="auth-form" id="stepup-form">
@@ -2482,11 +2491,11 @@
               class="auth-input"
               type="password"
               autocomplete="current-password"
-              placeholder="Super-admin password"
+              placeholder="Verification key"
               required
             />
             <div class="auth-actions">
-              <button id="stepup-password-submit" class="auth-submit" type="submit">Verify step-up</button>
+              <button id="stepup-password-submit" class="auth-submit" type="submit">Verify</button>
               <button id="stepup-cancel-btn" class="btn btn-secondary" type="button">Cancel</button>
             </div>
             <div id="stepup-error" class="auth-error"></div>
@@ -2499,7 +2508,7 @@
       <div class="auth-modal" role="dialog" aria-modal="true" style="max-width: 620px;">
         <div class="auth-modal-head">
           <h2 class="auth-modal-title">Shortcuts</h2>
-          <p class="auth-modal-subtitle">Hold Command/Ctrl for 1 second to reveal shortcut badges across the UI.</p>
+          <p class="auth-modal-subtitle">Keyboard shortcuts for fast navigation and actions.</p>
         </div>
         <div class="auth-modal-body">
           <div id="shortcuts-list" class="shortcut-list"></div>
@@ -2516,9 +2525,15 @@
       let batchTab = 'info';
       let calendarMonthOffset = 0;
       let allTimeActivityPoints = [];
-      let oracleClockIs24 = localStorage.getItem('oracle_clock_24h') !== 'false';
-      let deploymentUpdateSentences = [];
+          let oracleClockIs24 = localStorage.getItem('oracle_clock_24h') !== 'false';
       let refreshIntervalId = null;
+          const DEFAULT_INFRA_LINKS = {
+            cloudflare: 'https://cqd-analytics.adhamhaithameid.workers.dev/',
+            uptimeKuma: 'http://129.151.233.229:3001/status/cqd',
+            githubRepo: 'https://github.com/adhamhaithameid/Classroom-Quick-Downloader',
+            googleSheets: 'https://docs.google.com/spreadsheets/d/1ptzLKUVnAkyXnT635Zgb1C6Img9aeAZ1se3nRz_QZmI/edit?gid=0#gid=0',
+            figmaDesign: 'https://www.figma.com/design/hQLRpncinKnJQRG1lhCdQG/Google-Classroom-Downloade-Icon?node-id=0-1&t=5Eimhfrvp8RwFC19-1'
+          };
 
       // Helpers
       let authInFlight = null;
@@ -2611,7 +2626,7 @@
           if (submitBtn.disabled) return;
           const password = input.value || '';
           if (!password.trim()) {
-            setAuthError('Password is required.');
+            setAuthError('Access key is required.');
             input.focus();
             return;
           }
@@ -2635,7 +2650,7 @@
               if (loginRes.status === 429) {
                 setAuthError('Too many attempts. Please wait and try again.');
               } else {
-                setAuthError('Invalid password. Please try again.');
+                setAuthError('Authentication failed. Please try again.');
               }
               input.select();
               input.focus();
@@ -2662,7 +2677,7 @@
             setAuthError('Login request failed. Check your connection and try again.');
           } finally {
             submitBtn.disabled = false;
-            submitBtn.textContent = 'Unlock dashboard';
+            submitBtn.textContent = 'Unlock';
           }
         });
       }
@@ -2748,7 +2763,7 @@
           if (submitBtn.disabled) return;
           const password = input.value || '';
           if (!password.trim()) {
-            setStepUpError('Super-admin password is required.');
+            setStepUpError('Verification key is required.');
             input.focus();
             return;
           }
@@ -2778,16 +2793,16 @@
               setStepUpError('Step-up challenge expired. Retry the action.');
               stepUpChallengeId = '';
             } else if (msg.indexOf('403') !== -1) {
-              setStepUpError('Invalid super-admin password. Please try again.');
+              setStepUpError('Verification failed. Please try again.');
               input.select();
             } else {
-              setStepUpError('Step-up verification failed. Please try again.');
+              setStepUpError('Verification failed. Please try again.');
             }
             input.focus();
           } finally {
             submitBtn.disabled = false;
             cancelBtn.disabled = false;
-            submitBtn.textContent = 'Verify step-up';
+            submitBtn.textContent = 'Verify';
           }
         });
       }
@@ -3022,18 +3037,47 @@
       }
 
       function getBrowserIcon(b) {
-        var icons = { chrome: '🌐', firefox: '🦊', safari: '🧭', edge: '📘', opera: '🔴' };
+        var icons = {
+          chrome: '🌐',
+          firefox: '🦊',
+          safari: '🧭',
+          edge: '🔷',
+          opera: '🎭',
+          brave: '🦁'
+        };
         return icons[(b || '').toLowerCase()] || '🌐';
       }
 
       function getOSIcon(o) {
-        var icons = { windows: '🪟', macos: '🍎', mac: '🍎', linux: '🐧', android: '🤖', ios: '📱' };
+        var icons = {
+          windows: '🪟',
+          macos: '🍎',
+          mac: '🍎',
+          linux: '🐧',
+          android: '🤖',
+          ios: '📱'
+        };
         return icons[(o || '').toLowerCase()] || '💻';
       }
 
       function getFileIcon(t) {
-        var icons = { pdf: '📄', doc: '📝', docx: '📝', ppt: '📊', pptx: '📊', xls: '📈', xlsx: '📈', zip: '📦', jpg: '🖼️', png: '🖼️', mp4: '🎬' };
-        return icons[(t || '').toLowerCase()] || '📎';
+        var icons = {
+          pdf: '📕',
+          doc: '📝',
+          docx: '📝',
+          ppt: '📊',
+          pptx: '📊',
+          xls: '📗',
+          xlsx: '📗',
+          zip: '🗜️',
+          jpg: '🖼️',
+          png: '🖼️',
+          gif: '🖼️',
+          mp4: '🎬',
+          mp3: '🎵',
+          txt: '📄'
+        };
+        return icons[(t || '').toLowerCase()] || '📄';
       }
 
       // Floating tooltip
@@ -3186,7 +3230,6 @@
           overview: ['overview'],
           activity: ['activity', 'charts'],
           dashboards: ['dashboards', 'deployments', 'notifications'],
-          versions: ['versions'],
           creative: ['creative'],
           logs: ['logs'],
           danger: ['danger']
@@ -3204,16 +3247,16 @@
         if (mobilePageSelect && mobilePageSelect.value !== page) {
           mobilePageSelect.value = page;
         }
-        var titles = {
-          overview: 'Overview',
-          activity: 'Activity + Charts',
-          dashboards: 'Dashboards + Deployments + Notifications',
-          versions: 'Versions',
-          creative: 'Creative Hub',
-          logs: 'Logs',
-          danger: 'Danger Zone'
+        var titleMeta = {
+          overview: { icon: '🏠', label: 'Overview' },
+          activity: { icon: '📊', label: 'Activity & Charts' },
+          dashboards: { icon: '🛰️', label: 'Ops Hub' },
+          creative: { icon: '🎨', label: 'Creative Hub' },
+          logs: { icon: '🧾', label: 'Oracle Logs' },
+          danger: { icon: '☢️', label: 'Danger Zone' }
         };
-        document.getElementById('page-title').textContent = titles[page];
+        var t = titleMeta[page] || { icon: '📄', label: page };
+        document.getElementById('page-title').textContent = t.icon + ' ' + t.label;
         if (page === 'activity') {
           loadActivity();
           loadCharts();
@@ -3224,7 +3267,6 @@
           loadDeploymentsHub();
           loadNotifications();
         }
-        if (page === 'versions') loadVersionHub();
         if (page === 'creative') loadCreativeHub();
         if (page === 'logs') loadOracleLogs();
       }
@@ -3365,7 +3407,7 @@
               if (tiedItems.length > 1) {
                 valueEl.textContent = tiedItems.map(function(t) { return t.value; }).join(' / ');
                 countEl.textContent = fmtNumber(topCount) + ' each';
-                tiedEl.textContent = '🏆 ' + tiedItems.length + '-way tie';
+                tiedEl.textContent = tiedItems.length + '-way tie';
               } else {
                 valueEl.textContent = top.value || 'Unknown';
                 countEl.textContent = fmtNumber(topCount) + ' downloads';
@@ -3462,7 +3504,7 @@
       function toggleLogSort() {
         logSortAsc = !logSortAsc;
         var btn = document.getElementById('log-sort-btn');
-        btn.innerHTML = logSortAsc ? '⬆️ Oldest First' : '⬇️ Newest First';
+        btn.innerHTML = logSortAsc ? 'Oldest First' : 'Newest First';
         btn.classList.toggle('active', logSortAsc);
         renderEnhancedLog(currentLogData, currentGranularity);
       }
@@ -3513,11 +3555,11 @@
             var prevDownloads = sortedPoints[prevIdx].downloads || 0;
             var currDownloads = p.downloads || 0;
             if (currDownloads > prevDownloads) {
-              trend = '<span class="trend-indicator trend-up">▲</span>';
+              trend = '<span class="trend-indicator trend-up">UP</span>';
             } else if (currDownloads < prevDownloads) {
-              trend = '<span class="trend-indicator trend-down">▼</span>';
+              trend = '<span class="trend-indicator trend-down">DOWN</span>';
             } else {
-              trend = '<span class="trend-indicator trend-stable">◆</span>';
+              trend = '<span class="trend-indicator trend-stable">SAME</span>';
             }
           }
 
@@ -3607,7 +3649,7 @@
         for (var d = 1; d <= daysInMonth; d++) {
           var iso = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
           var hasData = (dayCounts[iso] || 0) > 0;
-          html += '<div class="calendar-day ' + (hasData ? 'has-data' : '') + '" title="' + iso + ' • ' + fmtNumber(dayCounts[iso] || 0) + ' downloads">';
+          html += '<div class="calendar-day ' + (hasData ? 'has-data' : '') + '" title="' + iso + ' - ' + fmtNumber(dayCounts[iso] || 0) + ' downloads">';
           html += '<div>' + d + '</div>';
           html += hasData ? '<div class="calendar-dot"></div>' : '';
           html += '</div>';
@@ -3671,147 +3713,11 @@
         });
       }
 
-      var ipMapCountryCoords = {
-        "US": [-98.583, 39.833], "CA": [-106.347, 56.130], "MX": [-102.552, 23.634],
-        "BR": [-51.925, -14.235], "AR": [-63.616, -38.416], "CL": [-71.543, -35.675],
-        "CO": [-74.297, 4.570], "PE": [-75.016, -9.190], "GB": [-3.436, 55.378],
-        "IE": [-8.244, 53.413], "FR": [2.214, 46.227], "DE": [10.451, 51.165],
-        "ES": [-3.750, 40.464], "IT": [12.568, 41.871], "NL": [5.291, 52.133],
-        "BE": [4.469, 50.503], "SE": [18.643, 60.128], "NO": [8.468, 60.472],
-        "PL": [19.145, 51.919], "TR": [35.243, 38.963], "RU": [105.319, 61.524],
-        "UA": [31.165, 48.379], "SA": [45.079, 23.886], "AE": [53.848, 23.424],
-        "IL": [34.851, 31.046], "EG": [30.802, 26.820], "ZA": [22.937, -30.559],
-        "NG": [8.676, 9.082], "IN": [78.963, 20.593], "PK": [69.345, 30.375],
-        "BD": [90.356, 23.685], "CN": [104.195, 35.861], "JP": [138.253, 36.205],
-        "KR": [127.766, 35.907], "TW": [120.961, 23.698], "HK": [114.169, 22.319],
-        "SG": [103.820, 1.352], "TH": [100.993, 15.870], "VN": [108.278, 14.058],
-        "ID": [113.921, -0.789], "PH": [121.775, 12.880], "AU": [133.775, -25.274],
-        "NZ": [174.886, -40.901]
-      };
-
-      var ipMapCountryAlias = {
-        "UNITED STATES": "US",
-        "USA": "US",
-        "UNITED KINGDOM": "GB",
-        "UK": "GB",
-        "SOUTH KOREA": "KR",
-        "KOREA": "KR",
-        "RUSSIA": "RU",
-        "UAE": "AE",
-        "VIET NAM": "VN"
-      };
-
-      function normalizeCountryToken(value) {
-        return String(value || '').trim().toUpperCase().replace(/\s+/g, ' ');
-      }
-
-      function lookupCountryCoordinate(value) {
-        var token = normalizeCountryToken(value);
-        if (!token) return null;
-        if (ipMapCountryAlias[token]) token = ipMapCountryAlias[token];
-        if (ipMapCountryCoords[token]) return ipMapCountryCoords[token];
-        if (token.length > 2) {
-          var maybeCode = token.slice(0, 2);
-          if (ipMapCountryCoords[maybeCode]) return ipMapCountryCoords[maybeCode];
-        }
-        return null;
-      }
-
-      function projectLonLat(lon, lat, width, height) {
-        var x = ((lon + 180) / 360) * width;
-        var y = ((90 - lat) / 180) * height;
-        return { x: x, y: y };
-      }
-
-      function renderIPGeoMap(values, errText) {
-        var container = document.getElementById('chart-ip-map');
-        if (!container) return;
-
-        if (errText) {
-          container.innerHTML = '<div class="empty-state" style="color:var(--danger)">' + escapeHtml(errText) + '</div>';
-          return;
-        }
-
-        var items = Array.isArray(values) ? values : [];
-        if (!items.length) {
-          container.innerHTML = '<div class="empty-state">No country data for IP map</div>';
-          return;
-        }
-
-        var total = items.reduce(function(acc, item) { return acc + Number((item && item.count) || 0); }, 0) || 1;
-        var mapped = [];
-        var unmappedCount = 0;
-        items.slice(0, 50).forEach(function(item) {
-          var count = Number((item && item.count) || 0);
-          if (count <= 0) return;
-          var name = String((item && item.value) || 'Unknown');
-          var coords = lookupCountryCoordinate(name);
-          if (!coords) {
-            unmappedCount += count;
-            return;
-          }
-          mapped.push({
-            name: name,
-            count: count,
-            lon: coords[0],
-            lat: coords[1]
-          });
-        });
-
-        if (!mapped.length) {
-          container.innerHTML = '<div class="empty-state">No mappable country coordinates found</div>';
-          return;
-        }
-
-        var width = 920;
-        var height = 420;
-        var maxCount = Math.max.apply(null, mapped.map(function(item) { return item.count; })) || 1;
-        var svg = '<svg class="ip-map-svg" viewBox="0 0 ' + width + ' ' + height + '" role="img" aria-label="IP geo map by country">';
-        svg += '<rect class="ip-map-outline" x="3" y="3" width="' + (width - 6) + '" height="' + (height - 6) + '" rx="10"></rect>';
-        for (var lat = -60; lat <= 60; lat += 30) {
-          var gy = projectLonLat(0, lat, width, height).y;
-          svg += '<line class="ip-map-gridline" x1="8" y1="' + gy.toFixed(1) + '" x2="' + (width - 8) + '" y2="' + gy.toFixed(1) + '"></line>';
-        }
-        for (var lon = -120; lon <= 120; lon += 60) {
-          var gx = projectLonLat(lon, 0, width, height).x;
-          svg += '<line class="ip-map-gridline" x1="' + gx.toFixed(1) + '" y1="8" x2="' + gx.toFixed(1) + '" y2="' + (height - 8) + '"></line>';
-        }
-
-        mapped.sort(function(a, b) { return b.count - a.count; });
-        mapped.forEach(function(item, idx) {
-          var point = projectLonLat(item.lon, item.lat, width, height);
-          var radius = 3 + ((item.count / maxCount) * 8);
-          var cls = idx < 3 ? 'ip-map-point hot' : 'ip-map-point';
-          svg += '<circle class="' + cls + '" cx="' + point.x.toFixed(1) + '" cy="' + point.y.toFixed(1) + '" r="' + radius.toFixed(1) + '"></circle>';
-          if (idx < 6) {
-            svg += '<text class="ip-map-label" x="' + (point.x + 6).toFixed(1) + '" y="' + (point.y - 6).toFixed(1) + '">' + escapeHtml(item.name) + '</text>';
-          }
-        });
-        svg += '</svg>';
-
-        var legend = '<div class="ip-map-legend">';
-        items.slice(0, 8).forEach(function(item) {
-          var count = Number((item && item.count) || 0);
-          var pct = total > 0 ? ((count / total) * 100).toFixed(1) : '0.0';
-          legend += '<div class="ip-map-row">';
-          legend += '<span class="ip-map-name">' + escapeHtml(String((item && item.value) || 'Unknown')) + ' (' + pct + '%)</span>';
-          legend += '<span class="ip-map-count">' + escapeHtml(fmtNumber(count)) + '</span>';
-          legend += '</div>';
-        });
-        if (unmappedCount > 0) {
-          legend += '<div class="ip-map-row"><span class="ip-map-name">Unmapped countries</span><span class="ip-map-count">' + escapeHtml(fmtNumber(unmappedCount)) + '</span></div>';
-        }
-        legend += '</div>';
-
-        container.innerHTML = '<div class="ip-map-wrap"><div class="ip-map-canvas">' + svg + '</div>' + legend + '</div>';
-      }
-
       // Charts Page
       async function loadCharts() {
         var dimensions = ['browser', 'os', 'type', 'country'];
         var colors = ['purple', 'blue', 'cyan', 'green'];
         var range = getDateRange(7);
-        var countryValuesForMap = [];
 
         for (var i = 0; i < dimensions.length; i++) {
           var dim = dimensions[i];
@@ -3832,20 +3738,9 @@
             });
             html += '</div>';
             container.innerHTML = html;
-            if (dim === 'country') {
-              countryValuesForMap = data.values.slice();
-            }
           } catch (e) {
             container.innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed</div>';
-            if (dim === 'country') {
-              renderIPGeoMap([], 'Failed to load country data');
-            }
           }
-        }
-        if (countryValuesForMap.length) {
-          renderIPGeoMap(countryValuesForMap);
-        } else if (!document.getElementById('chart-ip-map').textContent.trim()) {
-          renderIPGeoMap([]);
         }
 
         // Daily chart
@@ -3938,25 +3833,25 @@
           // Period 1
           html += '<div class="period-card">';
           html += '<div class="period-label">' + label1 + '</div>';
-          html += '<div class="period-dates">' + p1.from + ' → ' + p1.to + '</div>';
+          html += '<div class="period-dates">' + p1.from + ' to ' + p1.to + '</div>';
           html += '<div class="period-value">' + fmtNumber(p1.downloads) + '</div>';
           html += '<div class="period-stats">';
-          html += '<span class="period-stat">✓ <strong>' + fmtNumber(p1.success) + '</strong></span>';
-          html += '<span class="period-stat">✗ <strong>' + fmtNumber(p1.fail) + '</strong></span>';
+          html += '<span class="period-stat">Success: <strong>' + fmtNumber(p1.success) + '</strong></span>';
+          html += '<span class="period-stat">Fail: <strong>' + fmtNumber(p1.fail) + '</strong></span>';
           html += '<span class="period-stat">' + fmtPct(p1.successRate) + '</span>';
           html += '</div></div>';
 
           // Arrow
-          html += '<div class="comparison-arrow">→</div>';
+          html += '<div class="comparison-arrow">vs</div>';
 
           // Period 2
           html += '<div class="period-card">';
           html += '<div class="period-label">' + label2 + '</div>';
-          html += '<div class="period-dates">' + p2.from + ' → ' + p2.to + '</div>';
+          html += '<div class="period-dates">' + p2.from + ' to ' + p2.to + '</div>';
           html += '<div class="period-value">' + fmtNumber(p2.downloads) + '</div>';
           html += '<div class="period-stats">';
-          html += '<span class="period-stat">✓ <strong>' + fmtNumber(p2.success) + '</strong></span>';
-          html += '<span class="period-stat">✗ <strong>' + fmtNumber(p2.fail) + '</strong></span>';
+          html += '<span class="period-stat">Success: <strong>' + fmtNumber(p2.success) + '</strong></span>';
+          html += '<span class="period-stat">Fail: <strong>' + fmtNumber(p2.fail) + '</strong></span>';
           html += '<span class="period-stat">' + fmtPct(p2.successRate) + '</span>';
           html += '</div></div>';
 
@@ -4048,15 +3943,17 @@
         try {
           var payload = await fetchJSON('/api/admin/dashboard-links');
           var links = (payload && payload.links) ? payload.links : {};
-          applyInfraLink('infra-link-cloudflare', links.cloudflare || '');
-          applyInfraLink('infra-link-uptime', links.uptimeKuma || '');
-          applyInfraLink('infra-link-github', links.githubRepo || '');
-          applyInfraLink('infra-link-sheets', links.googleSheets || '');
+          applyInfraLink('infra-link-cloudflare', links.cloudflare || DEFAULT_INFRA_LINKS.cloudflare);
+          applyInfraLink('infra-link-uptime', links.uptimeKuma || DEFAULT_INFRA_LINKS.uptimeKuma);
+          applyInfraLink('infra-link-github', links.githubRepo || DEFAULT_INFRA_LINKS.githubRepo);
+          applyInfraLink('infra-link-sheets', links.googleSheets || DEFAULT_INFRA_LINKS.googleSheets);
+          applyInfraLink('infra-link-figma', links.figmaDesign || DEFAULT_INFRA_LINKS.figmaDesign);
         } catch (_) {
-          applyInfraLink('infra-link-cloudflare', '');
-          applyInfraLink('infra-link-uptime', '');
-          applyInfraLink('infra-link-github', '');
-          applyInfraLink('infra-link-sheets', '');
+          applyInfraLink('infra-link-cloudflare', DEFAULT_INFRA_LINKS.cloudflare);
+          applyInfraLink('infra-link-uptime', DEFAULT_INFRA_LINKS.uptimeKuma);
+          applyInfraLink('infra-link-github', DEFAULT_INFRA_LINKS.githubRepo);
+          applyInfraLink('infra-link-sheets', DEFAULT_INFRA_LINKS.googleSheets);
+          applyInfraLink('infra-link-figma', DEFAULT_INFRA_LINKS.figmaDesign);
         }
       }
 
@@ -4099,8 +3996,6 @@
           });
           container.innerHTML = html || '<div class="empty-state">No deployment targets found</div>';
         }
-        resetUpdateSentenceForm();
-        await loadUpdateSentences();
       }
 
       function setDeploymentSyncOutput(payload) {
@@ -4154,237 +4049,8 @@
         }
       }
 
-      function defaultUpdateSentences() {
-        return [
-          'Stability pass completed with lower fail-rate.',
-          'Release includes improved retry behavior.',
-          'This build introduces better analytics visibility.',
-          'Client-side charts are now faster and smoother.',
-          'Outbox relay reliability has been upgraded.',
-          'Security hardening updates are included.',
-          'Step-up verification now protects critical actions.',
-          'Schema drift detection is active and monitored.',
-          'Backup/restore pathways have been improved.',
-          'Dashboard loading behavior is now more resilient.',
-          'Extension deployment metadata has been refreshed.',
-          'Version notes and release records were updated.',
-          'Notification monitoring now tracks open work items.',
-          'Danger-zone controls now support dry-run mode.',
-          'Overall observability and metrics depth increased.'
-        ];
-      }
-
-      function renderUpdateSentenceList() {
-        var container = document.getElementById('update-sentence-list');
-        if (!container) return;
-        if (!deploymentUpdateSentences.length) {
-          container.innerHTML = '<div class="empty-state">No update sentences yet. Add one above or seed defaults.</div>';
-          return;
-        }
-        var html = '';
-        deploymentUpdateSentences.forEach(function(item, idx) {
-          var text = String((item.data && item.data.text) || '');
-          html += '<div class="deployment-card">';
-          html += '<div class="update-sentence-text">' + (idx + 1) + '. ' + escapeHtml(text) + '</div>';
-          html += '<div class="update-sentence-meta">Updated: ' + escapeHtml(creativeTimestampLabel(item.updatedAt || 0)) + '</div>';
-          html += '<div class="update-sentence-actions">';
-          html += '<button class="btn btn-secondary" data-action="copy-update-sentence" data-text="' + escapeHtml(text) + '">Copy</button>';
-          html += '<button class="btn btn-secondary" data-action="edit-update-sentence" data-record-key="' + escapeHtml(item.recordKey || '') + '" data-text="' + escapeHtml(text) + '">Edit</button>';
-          html += '<button class="btn btn-danger" data-action="delete-update-sentence" data-record-key="' + escapeHtml(item.recordKey || '') + '">Delete</button>';
-          html += '</div>';
-          html += '</div>';
-        });
-        container.innerHTML = html;
-      }
-
       async function copyText(text) {
         try { await navigator.clipboard.writeText(text); } catch (_) {}
-      }
-
-      async function loadUpdateSentences() {
-        try {
-          var payload = await fetchJSON('/api/admin/records/list?type=deployment_update_sentence');
-          var items = payload.records || [];
-          deploymentUpdateSentences = items.slice().sort(function(a, b) {
-            return Number((b && b.updatedAt) || 0) - Number((a && a.updatedAt) || 0);
-          });
-        } catch (e) {
-          deploymentUpdateSentences = [];
-          var container = document.getElementById('update-sentence-list');
-          if (container) {
-            container.innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed to load update sentences</div>';
-          }
-          return;
-        }
-        renderUpdateSentenceList();
-      }
-
-      function resetUpdateSentenceForm() {
-        var keyEl = document.getElementById('update-sentence-key');
-        var inputEl = document.getElementById('update-sentence-input');
-        var stateEl = document.getElementById('update-sentence-form-state');
-        var saveBtn = document.getElementById('update-sentence-save-btn');
-        if (keyEl) keyEl.value = '';
-        if (inputEl) inputEl.value = '';
-        if (stateEl) stateEl.textContent = 'Creating new sentence';
-        if (saveBtn) saveBtn.textContent = 'Add Sentence';
-      }
-
-      function editUpdateSentence(recordKey, text) {
-        var keyEl = document.getElementById('update-sentence-key');
-        var inputEl = document.getElementById('update-sentence-input');
-        var stateEl = document.getElementById('update-sentence-form-state');
-        var saveBtn = document.getElementById('update-sentence-save-btn');
-        if (keyEl) keyEl.value = String(recordKey || '').trim();
-        if (inputEl) {
-          inputEl.value = String(text || '');
-          inputEl.focus();
-        }
-        if (stateEl) stateEl.textContent = 'Editing: ' + String(recordKey || '');
-        if (saveBtn) saveBtn.textContent = 'Update Sentence';
-      }
-
-      async function saveUpdateSentence(e) {
-        e.preventDefault();
-        var keyEl = document.getElementById('update-sentence-key');
-        var inputEl = document.getElementById('update-sentence-input');
-        var text = (inputEl && inputEl.value ? inputEl.value : '').trim();
-        if (!text) return;
-        var recordKey = (keyEl && keyEl.value ? keyEl.value : '').trim();
-        if (!recordKey) {
-          recordKey = normalizeKey('sentence-' + Date.now(), 'sentence');
-        }
-        var ok = await ensureStepUp();
-        if (!ok) return;
-        try {
-          await fetchJSONWithInit('/api/admin/records/upsert', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              recordType: 'deployment_update_sentence',
-              recordKey: recordKey,
-              data: {
-                text: text,
-                updatedAt: Date.now()
-              }
-            })
-          });
-          resetUpdateSentenceForm();
-          await loadUpdateSentences();
-        } catch (_) {}
-      }
-
-      async function deleteUpdateSentence(recordKey) {
-        var key = String(recordKey || '').trim();
-        if (!key) return;
-        var ok = await ensureStepUp();
-        if (!ok) return;
-        if (!window.confirm('Delete update sentence "' + key + '"?')) return;
-        try {
-          await fetchJSONWithInit('/api/admin/records/delete', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              recordType: 'deployment_update_sentence',
-              recordKey: key
-            })
-          });
-          var editKeyEl = document.getElementById('update-sentence-key');
-          if (editKeyEl && editKeyEl.value === key) resetUpdateSentenceForm();
-          await loadUpdateSentences();
-        } catch (_) {}
-      }
-
-      async function seedDefaultUpdateSentences() {
-        var ok = await ensureStepUp();
-        if (!ok) return;
-        var defaults = defaultUpdateSentences();
-        try {
-          for (var i = 0; i < defaults.length; i++) {
-            await fetchJSONWithInit('/api/admin/records/upsert', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                recordType: 'deployment_update_sentence',
-                recordKey: 'default-sentence-' + String(i + 1).padStart(2, '0'),
-                data: {
-                  text: defaults[i],
-                  updatedAt: Date.now()
-                }
-              })
-            });
-          }
-          resetUpdateSentenceForm();
-          await loadUpdateSentences();
-        } catch (_) {}
-      }
-
-      async function loadVersionHub() {
-        var container = document.getElementById('version-list');
-        if (!container) return;
-        var items = [];
-        try {
-          var payload = await fetchJSON('/api/admin/records/list?type=extension_version_note');
-          items = (payload.records || []).map(function(item) {
-            return {
-              key: item.recordKey,
-              version: (item.data && item.data.version) || item.recordKey,
-              note: (item.data && item.data.note) || '',
-              createdAt: item.createdAt || 0
-            };
-          });
-        } catch (_) {
-          container.innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed to load version notes</div>';
-          return;
-        }
-        items.sort(function(a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
-        if (!items.length) {
-          container.innerHTML = '<div class="empty-state">No version notes yet</div>';
-          return;
-        }
-        var html = '';
-        items.forEach(function(item) {
-          html += '<div class="deployment-card" style="margin-bottom:8px;">';
-          html += '<div style="font-weight:600;">' + escapeHtml(item.version) + '</div>';
-          html += '<div style="font-size:11px;color:var(--text-muted);margin:4px 0 8px;">' + new Date(item.createdAt).toLocaleString() + '</div>';
-          html += '<div style="white-space:pre-wrap;font-size:12px;">' + escapeHtml(item.note) + '</div>';
-          html += '</div>';
-        });
-        container.innerHTML = html;
-      }
-
-      async function saveVersionNote(e) {
-        e.preventDefault();
-        var version = (document.getElementById('version-input').value || '').trim();
-        var note = (document.getElementById('version-note-input').value || '').trim();
-        if (!version || !note) return;
-        var ok = await ensureStepUp();
-        if (!ok) return;
-        try {
-          await fetchJSONWithInit('/api/admin/records/upsert', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              recordType: 'extension_version_note',
-              recordKey: version + '-' + Date.now(),
-              data: { version: version, note: note, createdAt: Date.now() }
-            })
-          });
-        } catch (_) {
-          return;
-        }
-        document.getElementById('version-input').value = '';
-        document.getElementById('version-note-input').value = '';
-        await loadVersionHub();
-      }
-
-      function creativeTimestampLabel(ts) {
-        if (!ts) return 'n/a';
-        try {
-          return new Date(Number(ts)).toLocaleString('en-US', { timeZone: 'UTC' }) + ' UTC';
-        } catch (_) {
-          return 'n/a';
-        }
       }
 
       function normalizeKey(input, fallbackPrefix) {
@@ -4393,90 +4059,9 @@
         return v;
       }
 
-      async function loadCreativeHub() {
-        await loadCreativeDesigns();
+          async function loadCreativeHub() {
         await loadCreativeEmails();
-        await loadNewsletterSubscribers();
-        await loadNewsletterCampaigns();
-      }
-
-      async function loadCreativeDesigns() {
-        var container = document.getElementById('creative-designs-list');
-        if (!container) return;
-        try {
-          var payload = await fetchJSON('/api/admin/creative/designs');
-          var records = payload.records || [];
-          if (!records.length) {
-            container.innerHTML = '<div class="empty-state">No designs saved yet</div>';
-            return;
-          }
-          var html = '';
-          records.forEach(function(item) {
-            var d = item.data || {};
-            var tags = Array.isArray(d.tags) ? d.tags : [];
-            html += '<div class="creative-card">';
-            html += '<h4>' + escapeHtml(d.title || item.recordKey) + '</h4>';
-            html += '<div class="creative-meta">Key: ' + escapeHtml(item.recordKey) + '</div>';
-            html += '<div class="creative-meta">Version: ' + escapeHtml(d.version || 'n/a') + '</div>';
-            html += '<div style="font-size:12px;white-space:pre-wrap;">' + escapeHtml(d.description || '') + '</div>';
-            if (d.thumbUrl) {
-              html += '<a href="' + escapeHtml(d.thumbUrl) + '" target="_blank" class="creative-meta">Preview image</a>';
-            }
-            if (d.url) {
-              html += '<a href="' + escapeHtml(d.url) + '" target="_blank" class="btn btn-secondary">Open Design</a>';
-            }
-            if (tags.length) {
-              html += '<div class="pill-row">' + tags.map(function(tag) {
-                return '<span class="pill">' + escapeHtml(String(tag)) + '</span>';
-              }).join('') + '</div>';
-            }
-            html += '<div class="creative-meta">Updated: ' + escapeHtml(creativeTimestampLabel(item.updatedAt)) + '</div>';
-            html += '<button class="btn btn-danger" data-action="delete-creative-design" data-record-key="' + escapeHtml(item.recordKey || '') + '">Delete</button>';
-            html += '</div>';
-          });
-          container.innerHTML = html;
-        } catch (e) {
-          container.innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed to load designs: ' + escapeHtml(e.message || 'Unknown error') + '</div>';
-        }
-      }
-
-      async function saveCreativeDesign(e) {
-        e.preventDefault();
-        var key = normalizeKey(document.getElementById('design-key').value, 'design');
-        var data = {
-          title: (document.getElementById('design-title').value || '').trim(),
-          url: (document.getElementById('design-url').value || '').trim(),
-          thumbUrl: (document.getElementById('design-thumb-url').value || '').trim(),
-          version: (document.getElementById('design-version').value || '').trim(),
-          description: (document.getElementById('design-description').value || '').trim(),
-          tags: (document.getElementById('design-tags').value || '').split(',').map(function(v) { return v.trim(); }).filter(Boolean),
-          updatedAt: Date.now()
-        };
-        if (!data.title || !data.url) return;
-        var ok = await ensureStepUp();
-        if (!ok) return;
-        try {
-          await fetchJSONWithInit('/api/admin/creative/designs/upsert', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ recordKey: key, data: data })
-          });
-          await loadCreativeDesigns();
-        } catch (_) {}
-      }
-
-      async function deleteCreativeDesign(key) {
-        var ok = await ensureStepUp();
-        if (!ok) return;
-        if (!window.confirm('Delete design "' + key + '"?')) return;
-        try {
-          await fetchJSONWithInit('/api/admin/creative/designs/delete', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ recordKey: key })
-          });
-          await loadCreativeDesigns();
-        } catch (_) {}
+          await loadNewsletterSubscribers();
       }
 
       async function loadCreativeEmails() {
@@ -4550,27 +4135,49 @@
 
       async function loadNewsletterSubscribers() {
         var container = document.getElementById('newsletter-subscribers-list');
+        var summary = document.getElementById('newsletter-summary');
         if (!container) return;
         try {
           var payload = await fetchJSON('/api/admin/newsletter/subscribers');
           var records = payload.records || [];
           if (!records.length) {
             container.innerHTML = '<div class="empty-state">No subscribers yet</div>';
+            if (summary) {
+              summary.innerHTML =
+                '<span class="newsletter-tag">Total: 0</span>' +
+                '<span class="newsletter-tag">Active: 0</span>' +
+                '<span class="newsletter-tag">Paused: 0</span>' +
+                '<span class="newsletter-tag">Unsubscribed: 0</span>';
+            }
             return;
           }
+          var counts = { total: records.length, active: 0, paused: 0, unsubscribed: 0 };
           var html = '';
           records.forEach(function(item) {
             var d = item.data || {};
+            var status = String(d.status || 'active').toLowerCase();
+            if (status === 'paused') counts.paused += 1;
+            else if (status === 'unsubscribed') counts.unsubscribed += 1;
+            else counts.active += 1;
+            var statusEmoji = status === 'paused' ? '⏸️' : (status === 'unsubscribed' ? '🚫' : '✅');
             html += '<div class="creative-card">';
-            html += '<h4>' + escapeHtml(d.email || item.recordKey) + '</h4>';
+            html += '<h4>📧 ' + escapeHtml(d.email || item.recordKey) + '</h4>';
             html += '<div class="creative-meta">Name: ' + escapeHtml(d.name || 'n/a') + '</div>';
-            html += '<div class="pill-row"><span class="pill">Status: ' + escapeHtml(d.status || 'active') + '</span></div>';
-            html += '<button class="btn btn-danger" data-action="delete-newsletter-subscriber" data-record-key="' + escapeHtml(item.recordKey || '') + '">Delete</button>';
+            html += '<div class="pill-row"><span class="pill">' + statusEmoji + ' Status: ' + escapeHtml(status) + '</span></div>';
+            html += '<button class="btn btn-danger" data-action="delete-newsletter-subscriber" data-record-key="' + escapeHtml(item.recordKey || '') + '">🗑️ Delete</button>';
             html += '</div>';
           });
           container.innerHTML = html;
+          if (summary) {
+            summary.innerHTML =
+              '<span class="newsletter-tag">Total: ' + fmtNumber(counts.total) + '</span>' +
+              '<span class="newsletter-tag">Active: ' + fmtNumber(counts.active) + '</span>' +
+              '<span class="newsletter-tag">Paused: ' + fmtNumber(counts.paused) + '</span>' +
+              '<span class="newsletter-tag">Unsubscribed: ' + fmtNumber(counts.unsubscribed) + '</span>';
+          }
         } catch (e) {
           container.innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed to load subscribers</div>';
+          if (summary) summary.innerHTML = '';
         }
       }
 
@@ -4584,14 +4191,16 @@
           status: (document.getElementById('newsletter-status').value || 'active').trim(),
           updatedAt: Date.now()
         };
-        var ok = await ensureStepUp();
-        if (!ok) return;
         try {
           await fetchJSONWithInit('/api/admin/newsletter/subscribers/upsert', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ data: data })
           });
+          var form = document.getElementById('newsletter-subscriber-form');
+          if (form) form.reset();
+          var statusEl = document.getElementById('newsletter-status');
+          if (statusEl) statusEl.value = 'active';
           await loadNewsletterSubscribers();
         } catch (_) {}
       }
@@ -4610,88 +4219,28 @@
         } catch (_) {}
       }
 
-      async function loadNewsletterCampaigns() {
-        var container = document.getElementById('newsletter-campaigns-list');
-        if (!container) return;
-        try {
-          var payload = await fetchJSON('/api/admin/newsletter/campaigns');
-          var records = payload.records || [];
-          if (!records.length) {
-            container.innerHTML = '<div class="empty-state">No campaigns yet</div>';
-            return;
-          }
-          var html = '';
-          records.forEach(function(item) {
-            var d = item.data || {};
-            html += '<div class="creative-card">';
-            html += '<h4>' + escapeHtml(d.title || item.recordKey) + '</h4>';
-            html += '<div class="pill-row"><span class="pill">Version: ' + escapeHtml(d.version || 'n/a') + '</span><span class="pill">Send: ' + escapeHtml(d.sendAt || 'manual') + '</span></div>';
-            html += '<div style="font-size:12px;white-space:pre-wrap;">' + escapeHtml(d.notes || '') + '</div>';
-            html += '<button class="btn btn-danger" data-action="delete-newsletter-campaign" data-record-key="' + escapeHtml(item.recordKey || '') + '">Delete</button>';
-            html += '</div>';
-          });
-          container.innerHTML = html;
-        } catch (e) {
-          container.innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed to load campaigns</div>';
-        }
-      }
-
-      async function saveNewsletterCampaign(e) {
-        e.preventDefault();
-        var key = normalizeKey(document.getElementById('newsletter-campaign-key').value, 'campaign');
-        var data = {
-          title: (document.getElementById('newsletter-campaign-title').value || '').trim(),
-          version: (document.getElementById('newsletter-campaign-version').value || '').trim(),
-          sendAt: (document.getElementById('newsletter-campaign-send-at').value || '').trim(),
-          notes: (document.getElementById('newsletter-campaign-notes').value || '').trim(),
-          updatedAt: Date.now()
-        };
-        if (!data.title) return;
-        var ok = await ensureStepUp();
-        if (!ok) return;
-        try {
-          await fetchJSONWithInit('/api/admin/newsletter/campaigns/upsert', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ recordKey: key, data: data })
-          });
-          await loadNewsletterCampaigns();
-        } catch (_) {}
-      }
-
-      async function deleteNewsletterCampaign(key) {
-        var ok = await ensureStepUp();
-        if (!ok) return;
-        if (!window.confirm('Delete campaign "' + key + '"?')) return;
-        try {
-          await fetchJSONWithInit('/api/admin/newsletter/campaigns/delete', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ recordKey: key })
-          });
-          await loadNewsletterCampaigns();
-        } catch (_) {}
-      }
-
       async function loadNotifications() {
         var container = document.getElementById('notification-counters');
         if (!container) return;
         container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading...</div>';
         try {
-          var github = { openIssues: 0, openPRs: 0 };
-          try {
-            var githubPayload = await fetchJSON('/api/admin/github/open-counts');
-            if (githubPayload && typeof githubPayload.openIssues === 'number') github.openIssues = githubPayload.openIssues;
-            if (githubPayload && typeof githubPayload.openPRs === 'number') github.openPRs = githubPayload.openPRs;
-          } catch (_) {}
-          var alerts = await fetchJSON('/api/admin/alerts');
-          var openAlerts = (alerts.alerts || []).filter(function(a) { return a.status === 'open'; }).length;
+          var githubPayload = await fetchJSON('/api/admin/github/open-counts');
+          if (!githubPayload || githubPayload.ok === false) {
+            throw new Error((githubPayload && githubPayload.error) ? githubPayload.error : 'github_unreachable');
+          }
+          var github = {
+            openIssues: Number(githubPayload.openIssues || 0),
+            openPRs: Number(githubPayload.openPRs || 0),
+            branches: Number(githubPayload.branches || 0),
+            discussions: Number(githubPayload.discussions || 0)
+          };
           container.innerHTML =
-            '<div class="stat-card"><div class="stat-label">Open Issues</div><div class="stat-value">' + fmtNumber(github.openIssues || 0) + '</div></div>' +
-            '<div class="stat-card"><div class="stat-label">Open PRs</div><div class="stat-value">' + fmtNumber(github.openPRs || 0) + '</div></div>' +
-            '<div class="stat-card"><div class="stat-label">Open Alerts</div><div class="stat-value">' + fmtNumber(openAlerts) + '</div></div>';
+            '<div class="stat-card2"><div class="stat-label">🐛 Open Issues</div><div class="stat-value">' + fmtNumber(github.openIssues || 0) + '</div></div>' +
+            '<div class="stat-card2"><div class="stat-label">🔀 Open PRs</div><div class="stat-value">' + fmtNumber(github.openPRs || 0) + '</div></div>' +
+            '<div class="stat-card2"><div class="stat-label">🌿 Branches</div><div class="stat-value">' + fmtNumber(github.branches || 0) + '</div></div>' +
+            '<div class="stat-card2"><div class="stat-label">💬 Discussions</div><div class="stat-value">' + fmtNumber(github.discussions || 0) + '</div></div>';
         } catch (e) {
-          container.innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed to load GitHub counters</div>';
+          container.innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed to load GitHub counters: ' + escapeHtml(String((e && e.message) || e || 'unknown')) + '</div>';
         }
       }
 
@@ -4792,6 +4341,54 @@
           await loadOracleLogs();
         } catch (e) {
           setOracleLogsOutput({ ok: false, error: String(e) });
+        }
+      }
+
+      function dangerLogRetentionDays() {
+        var input = document.getElementById('danger-log-retention-days');
+        var days = parseInt((input && input.value) ? input.value : '30', 10);
+        if (!Number.isFinite(days) || days < 1 || days > 36500) return null;
+        return days;
+      }
+
+      async function dangerDeleteOlderLogs(dryRun) {
+        var days = dangerLogRetentionDays();
+        if (days === null) {
+          setDangerOutput({ ok: false, error: 'Retention days must be between 1 and 36500.' });
+          return;
+        }
+        var ok = await ensureStepUp();
+        if (!ok) return;
+        if (!dryRun && !window.confirm('Delete oracle logs older than ' + days + ' day(s)?')) return;
+        try {
+          var data = await fetchJSONWithInit('/api/admin/oracle-logs/delete-older', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ days: days, dryRun: dryRun })
+          });
+          setDangerOutput(data);
+          var logsInput = document.getElementById('oracle-logs-retention-days');
+          if (logsInput) logsInput.value = String(days);
+          if (!dryRun && currentPage === 'logs') await loadOracleLogs();
+        } catch (e) {
+          setDangerOutput({ ok: false, error: String(e) });
+        }
+      }
+
+      async function dangerDeleteAllLogs() {
+        var ok = await ensureStepUp();
+        if (!ok) return;
+        if (!window.confirm('Delete ALL oracle operation logs?')) return;
+        try {
+          var data = await fetchJSONWithInit('/api/admin/oracle-logs/clear-all', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ confirm: 'CLEAR_ALL_LOGS', dryRun: false })
+          });
+          setDangerOutput(data);
+          if (currentPage === 'logs') await loadOracleLogs();
+        } catch (e) {
+          setDangerOutput({ ok: false, error: String(e) });
         }
       }
 
@@ -4957,11 +4554,10 @@
       // Keyboard shortcuts
       var shortcutItems = [
         { combo: 'Cmd/Ctrl+1', desc: 'Go to Overview', run: function() { showPage('overview'); } },
-        { combo: 'Cmd/Ctrl+2', desc: 'Go to Activity + Charts', run: function() { showPage('activity'); } },
+        { combo: 'Cmd/Ctrl+2', desc: 'Go to Activity & Charts', run: function () { showPage('activity'); } },
         { combo: 'Cmd/Ctrl+3', desc: 'Go to Ops Hub', run: function() { showPage('dashboards'); } },
-        { combo: 'Cmd/Ctrl+4', desc: 'Go to Versions', run: function() { showPage('versions'); } },
-        { combo: 'Cmd/Ctrl+5', desc: 'Go to Creative Hub', run: function() { showPage('creative'); } },
-        { combo: 'Cmd/Ctrl+6', desc: 'Go to Logs', run: function() { showPage('logs'); } },
+        { combo: 'Cmd/Ctrl+4', desc: 'Go to Creative Hub', run: function () { showPage('creative'); } },
+        { combo: 'Cmd/Ctrl+5', desc: 'Go to Logs', run: function () { showPage('logs'); } },
         { combo: 'Cmd/Ctrl+0', desc: 'Go to Danger Zone', run: function() { showPage('danger'); } },
         { combo: 'Cmd/Ctrl+R', desc: 'Refresh all data', run: function() { refreshAll(); } },
         { combo: 'Cmd/Ctrl+B', desc: 'Open last batch modal', run: function() { showBatchModal(); } },
@@ -5019,9 +4615,8 @@
         if (!withShift && key === '1') { showPage('overview'); return true; }
         if (!withShift && key === '2') { showPage('activity'); return true; }
         if (!withShift && key === '3') { showPage('dashboards'); return true; }
-        if (!withShift && key === '4') { showPage('versions'); return true; }
-        if (!withShift && key === '5') { showPage('creative'); return true; }
-        if (!withShift && key === '6') { showPage('logs'); return true; }
+        if (!withShift && key === '4') { showPage('creative'); return true; }
+        if (!withShift && key === '5') { showPage('logs'); return true; }
         if (!withShift && key === '0') { showPage('danger'); return true; }
         if (!withShift && key === 'r') { refreshAll(); return true; }
         if (!withShift && key === 'b') { showBatchModal(); return true; }
@@ -5086,8 +4681,6 @@
           ['refresh-btn-mobile', refreshAll],
           ['deployment-sync-btn', syncDeploymentTargets],
           ['stepup-btn', openStepUpModal],
-          ['seed-update-sentences-btn', seedDefaultUpdateSentences],
-          ['clear-update-sentence-form-btn', resetUpdateSentenceForm],
           ['log-sort-btn', toggleLogSort],
           ['log-export-btn', exportLogCSV],
           ['notifications-refresh-btn', loadNotifications],
@@ -5098,14 +4691,13 @@
           ['danger-dryrun-clear-btn', function() { dangerDryRun('all_non_core'); }],
           ['danger-exec-clear-btn', function() { dangerExecute('all_non_core'); }],
           ['danger-run-backup-btn', runBackup],
-          ['danger-outbox-status-btn', dangerLoadOutboxStatus],
-          ['danger-outbox-retry-btn', dangerRetryOutbox],
-          ['danger-outbox-replay-btn', dangerReplayDeadLetter],
-          ['danger-audit-verify-btn', dangerVerifyAuditChain],
           ['danger-alerts-btn', dangerLoadAlerts],
+          ['danger-audit-verify-btn', dangerVerifyAuditChain],
+          ['danger-outbox-status-btn', dangerLoadOutboxStatus],
           ['danger-flags-btn', dangerLoadFeatureFlags],
-          ['danger-migrations-btn', dangerLoadMigrationsStatus],
-          ['danger-ops-snapshot-btn', dangerLoadOpsSnapshot],
+          ['danger-logs-dry-run-btn', function() { dangerDeleteOlderLogs(true); }],
+          ['danger-logs-delete-older-btn', function() { dangerDeleteOlderLogs(false); }],
+          ['danger-logs-delete-all-btn', dangerDeleteAllLogs],
           ['batch-modal-close-btn', closeBatchModal]
         ].forEach(function(entry) {
           var node = document.getElementById(entry[0]);
@@ -5118,12 +4710,8 @@
         });
 
         [
-          ['update-sentence-form', saveUpdateSentence],
-          ['version-form', saveVersionNote],
-          ['creative-design-form', saveCreativeDesign],
           ['creative-email-template-form', saveCreativeEmailTemplate],
-          ['newsletter-subscriber-form', saveNewsletterSubscriber],
-          ['newsletter-campaign-form', saveNewsletterCampaign],
+          ['newsletter-subscriber-form', saveNewsletterSubscriber]
         ].forEach(function(entry) {
           var form = document.getElementById(entry[0]);
           if (!form || form.dataset.boundSubmit === '1') return;
@@ -5165,14 +4753,9 @@
             if (!action) return;
             ev.preventDefault();
             if (action === 'save-deployment-card') saveDeploymentCard(actionNode.getAttribute('data-record-key') || '');
-            if (action === 'copy-update-sentence') copyText(actionNode.getAttribute('data-text') || '');
-            if (action === 'edit-update-sentence') editUpdateSentence(actionNode.getAttribute('data-record-key') || '', actionNode.getAttribute('data-text') || '');
-            if (action === 'delete-update-sentence') deleteUpdateSentence(actionNode.getAttribute('data-record-key') || '');
-            if (action === 'delete-creative-design') deleteCreativeDesign(actionNode.getAttribute('data-record-key') || '');
             if (action === 'copy-email-html') copyText(actionNode.getAttribute('data-html') || '');
             if (action === 'delete-creative-email') deleteCreativeEmailTemplate(actionNode.getAttribute('data-record-key') || '');
             if (action === 'delete-newsletter-subscriber') deleteNewsletterSubscriber(actionNode.getAttribute('data-record-key') || '');
-            if (action === 'delete-newsletter-campaign') deleteNewsletterCampaign(actionNode.getAttribute('data-record-key') || '');
             if (action === 'shift-calendar-month') shiftCalendarMonth(Number(actionNode.getAttribute('data-delta') || '0'));
           });
         }
@@ -5217,7 +4800,6 @@
           loadDeploymentsHub();
           await loadNotifications();
         }
-        if (currentPage === 'versions') loadVersionHub();
         if (currentPage === 'creative') await loadCreativeHub();
         if (currentPage === 'logs') await loadOracleLogs();
 
