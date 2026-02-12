@@ -7,12 +7,14 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -389,6 +391,83 @@ func TestAuditVerifyChainHandler(t *testing.T) {
 	}
 }
 
+func TestAppendAuditLog_ConcurrentWritersDoNotForkChain(t *testing.T) {
+	sqlDB := newAdminTestDB(t)
+	defer sqlDB.Close()
+
+	const writers = 32
+	start := make(chan struct{})
+	errCh := make(chan error, writers)
+	var wg sync.WaitGroup
+
+	for i := 0; i < writers; i++ {
+		i := i
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			ctx := context.Background()
+			ctx = observability.WithRequestContext(ctx, fmt.Sprintf("req-conc-%d", i), fmt.Sprintf("corr-conc-%d", i))
+			ctx = observability.WithActorContext(ctx, "user-conc", "token-conc", "super_admin")
+			errCh <- AppendAuditLog(
+				ctx,
+				sqlDB,
+				"concurrent_append",
+				"audit",
+				strconv.Itoa(i),
+				"ok",
+				map[string]any{"seq": i},
+			)
+		}()
+	}
+
+	close(start)
+	wg.Wait()
+	close(errCh)
+
+	for err := range errCh {
+		if err != nil {
+			t.Fatalf("concurrent append failed: %v", err)
+		}
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/admin/audit/verify-chain", nil)
+	rr := httptest.NewRecorder()
+	AuditVerifyChainHandler(sqlDB).ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp struct {
+		Valid     bool `json:"valid"`
+		TotalRows int  `json:"totalRows"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("invalid json response: %v", err)
+	}
+	if !resp.Valid {
+		t.Fatalf("expected valid chain under concurrent appends, got %s", rr.Body.String())
+	}
+	if resp.TotalRows != writers {
+		t.Fatalf("expected %d audit rows, got %d", writers, resp.TotalRows)
+	}
+
+	var duplicatePrevHashChains int64
+	if err := sqlDB.QueryRow(
+		`SELECT COUNT(*) FROM (
+			SELECT prev_hash
+			FROM admin_audit_log
+			GROUP BY prev_hash
+			HAVING COUNT(*) > 1
+		)`,
+	).Scan(&duplicatePrevHashChains); err != nil {
+		t.Fatalf("failed to query duplicate prev_hash counts: %v", err)
+	}
+	if duplicatePrevHashChains != 0 {
+		t.Fatalf("detected forked chain segments: %d duplicate predecessor hashes", duplicatePrevHashChains)
+	}
+}
+
 func TestAuditVerifyChainHandler_DetectsPayloadHashTamper(t *testing.T) {
 	sqlDB := newAdminTestDB(t)
 	defer sqlDB.Close()
@@ -487,7 +566,7 @@ func TestSQLQueryHandler_FeatureDisabled(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/admin/sql/query", bytes.NewBufferString(`{"sql":"SELECT 1"}`))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
-	SQLQueryHandler(sqlDB).ServeHTTP(rr, req)
+	SQLQueryHandler(sqlDB, nil).ServeHTTP(rr, req)
 	if rr.Code != http.StatusForbidden {
 		t.Fatalf("expected 403 when sql console flag disabled, got %d: %s", rr.Code, rr.Body.String())
 	}
@@ -507,9 +586,69 @@ func TestSQLQueryHandler_RejectsWithMutatingCTE(t *testing.T) {
 	)
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
-	SQLQueryHandler(sqlDB).ServeHTTP(rr, req)
+	SQLQueryHandler(sqlDB, nil).ServeHTTP(rr, req)
 	if rr.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400 for WITH statement on query endpoint, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestSQLQueryHandler_RejectsRestrictedTables(t *testing.T) {
+	sqlDB := newAdminTestDB(t)
+	defer sqlDB.Close()
+	if _, err := sqlDB.Exec(`UPDATE feature_flags SET enabled = 1 WHERE name = 'feature_sql_console_enabled'`); err != nil {
+		t.Fatalf("failed to enable sql console flag: %v", err)
+	}
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/admin/sql/query",
+		bytes.NewBufferString(`{"sql":"SELECT * FROM admin_audit_log"}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	SQLQueryHandler(sqlDB, nil).ServeHTTP(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for restricted table query, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestSQLExecHandler_RejectsForbiddenKeywords(t *testing.T) {
+	sqlDB := newAdminTestDB(t)
+	defer sqlDB.Close()
+	if _, err := sqlDB.Exec(`UPDATE feature_flags SET enabled = 1 WHERE name = 'feature_sql_console_enabled'`); err != nil {
+		t.Fatalf("failed to enable sql console flag: %v", err)
+	}
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/admin/sql/exec",
+		bytes.NewBufferString(`{"sql":"UPDATE system_alerts SET message = replace(message,'a','b')","dryRun":true}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	SQLExecHandler(sqlDB).ServeHTTP(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for forbidden keyword, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestSQLExecHandler_RejectsRestrictedMutationTables(t *testing.T) {
+	sqlDB := newAdminTestDB(t)
+	defer sqlDB.Close()
+	if _, err := sqlDB.Exec(`UPDATE feature_flags SET enabled = 1 WHERE name = 'feature_sql_console_enabled'`); err != nil {
+		t.Fatalf("failed to enable sql console flag: %v", err)
+	}
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/admin/sql/exec",
+		bytes.NewBufferString(`{"sql":"DELETE FROM feature_flags","dryRun":true}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	SQLExecHandler(sqlDB).ServeHTTP(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for restricted mutation table, got %d: %s", rr.Code, rr.Body.String())
 	}
 }
 
