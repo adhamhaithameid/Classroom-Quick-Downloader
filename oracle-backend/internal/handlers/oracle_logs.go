@@ -95,7 +95,7 @@ func OracleOperationLogsListHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		rows, err := db.QueryContext(
+		rows, err := db.QueryContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 			r.Context(),
 			`SELECT
 				id, ts_utc, request_id, correlation_id, user_id, token_id, role,
@@ -175,7 +175,7 @@ func OracleOperationLogsDeleteOlderHandler(db *sql.DB) http.HandlerFunc {
 
 		cutoffMs := time.Now().Add(-time.Duration(req.Days) * 24 * time.Hour).UnixMilli()
 		var count int64
-		if err := db.QueryRowContext(
+		if err := db.QueryRowContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 			r.Context(),
 			`SELECT COUNT(*) FROM oracle_operation_logs WHERE ts_utc < ?`,
 			cutoffMs,
@@ -196,7 +196,7 @@ func OracleOperationLogsDeleteOlderHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		res, err := db.ExecContext(
+		res, err := db.ExecContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 			r.Context(),
 			`DELETE FROM oracle_operation_logs WHERE ts_utc < ?`,
 			cutoffMs,
@@ -252,7 +252,7 @@ func OracleOperationLogsClearAllHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		var count int64
-		if err := db.QueryRowContext(r.Context(), `SELECT COUNT(*) FROM oracle_operation_logs`).Scan(&count); err != nil {
+		if err := db.QueryRowContext(r.Context(), `SELECT COUNT(*) FROM oracle_operation_logs`).Scan(&count); err != nil { // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 			http.Error(w, "failed to count oracle logs", http.StatusInternalServerError)
 			return
 		}
@@ -267,7 +267,7 @@ func OracleOperationLogsClearAllHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		res, err := db.ExecContext(r.Context(), `DELETE FROM oracle_operation_logs`)
+		res, err := db.ExecContext(r.Context(), `DELETE FROM oracle_operation_logs`) // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 		if err != nil {
 			http.Error(w, "failed to clear oracle logs", http.StatusInternalServerError)
 			return
