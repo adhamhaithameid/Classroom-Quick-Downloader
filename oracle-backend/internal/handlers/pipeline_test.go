@@ -256,3 +256,130 @@ func TestFailureLogRetentionCleanupRunsOnIngest(t *testing.T) {
 		t.Fatalf("expected old failure logs to be cleaned up, found %d rows", count)
 	}
 }
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Expanded pipeline tests
+// ──────────────────────────────────────────────────────────────────────────────
+
+func TestPipelineMetricsHandler_MethodNotAllowed(t *testing.T) {
+	sqlDB := newTestDB(t)
+	defer sqlDB.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/pipeline/metrics", nil)
+	rr := httptest.NewRecorder()
+	PipelineMetricsHandler(sqlDB).ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("expected 405, got %d", rr.Code)
+	}
+}
+
+func TestPipelineFailuresHandler_MethodNotAllowed(t *testing.T) {
+	sqlDB := newTestDB(t)
+	defer sqlDB.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/pipeline/failures", nil)
+	rr := httptest.NewRecorder()
+	PipelineFailuresHandler(sqlDB).ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("expected 405, got %d", rr.Code)
+	}
+}
+
+func TestPipelineFailuresHandler_EmptyDB(t *testing.T) {
+	sqlDB := newTestDB(t)
+	defer sqlDB.Close()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/pipeline/failures?days=30&limit=20", nil)
+	rr := httptest.NewRecorder()
+	PipelineFailuresHandler(sqlDB).ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp pipelineFailuresResponse
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(resp.Recent) != 0 {
+		t.Fatalf("expected empty recent failures for empty DB, got %d", len(resp.Recent))
+	}
+}
+
+func TestPipelineMetricsHandler_EmptyDB(t *testing.T) {
+	sqlDB := newTestDB(t)
+	defer sqlDB.Close()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/pipeline/metrics?days=30&limit=20", nil)
+	rr := httptest.NewRecorder()
+	PipelineMetricsHandler(sqlDB).ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp pipelineMetricsResponse
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(resp.Recent) != 0 {
+		t.Fatalf("expected empty recent deliveries for empty DB, got %d", len(resp.Recent))
+	}
+}
+
+func TestPipelineMetricsHandler_MultipleBatches(t *testing.T) {
+	sqlDB := newTestDB(t)
+	defer sqlDB.Close()
+
+	ingest := IngestBatchHandler(sqlDB, "secret")
+	now := time.Now().UnixMilli()
+
+	for i := 0; i < 3; i++ {
+		batch := model.OracleBatch{
+			BatchID:     "batch-multi-" + strings.Replace(time.Now().Format("150405.000"), ".", "", 1) + "-" + string(rune('a'+i)),
+			GeneratedAt: now + int64(i*1000),
+			TimeZone:    "UTC",
+			Summary: model.BatchSummary{
+				Totals: model.BucketTotals{
+					TotalEvents:    int64(10 * (i + 1)),
+					TotalDownloads: int64(10 * (i + 1)),
+					TotalSuccess:   int64(8 * (i + 1)),
+					TotalFail:      int64(2 * (i + 1)),
+				},
+			},
+			TimeBuckets: []model.TimeBucket{},
+			DOState:     model.DOState{OK: true},
+			Delivery: &model.DeliverySnapshot{
+				DeliveryID:     "dlv-multi-" + string(rune('a'+i)),
+				AcceptedCount:  int64(10 * (i + 1)),
+				StoredCount:    int64(10 * (i + 1)),
+				ForwardedCount: int64(10 * (i + 1)),
+				CommittedCount: int64(10 * (i + 1)),
+				CreatedAt:      now + int64(i*1000),
+			},
+		}
+		rr := postBatch(t, ingest, batch, "secret")
+		if rr.Code != http.StatusOK {
+			t.Fatalf("batch %d: expected 200, got %d (%s)", i, rr.Code, rr.Body.String())
+		}
+	}
+
+	metricsReq := httptest.NewRequest(http.MethodGet, "/api/pipeline/metrics?days=30&limit=20", nil)
+	metricsRR := httptest.NewRecorder()
+	PipelineMetricsHandler(sqlDB).ServeHTTP(metricsRR, metricsReq)
+
+	if metricsRR.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", metricsRR.Code, metricsRR.Body.String())
+	}
+
+	var resp pipelineMetricsResponse
+	if err := json.Unmarshal(metricsRR.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(resp.Recent) < 3 {
+		t.Fatalf("expected at least 3 recent deliveries, got %d", len(resp.Recent))
+	}
+}
+
