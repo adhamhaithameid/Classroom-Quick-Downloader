@@ -15,6 +15,7 @@ func TestDashboardLinksHandler_NormalizesInvalidValues(t *testing.T) {
 		"javascript:alert(1)",
 		"http://github.com/example/repo",
 		"not-a-url",
+		"https://www.figma.com/design/abc",
 	)
 	req := httptest.NewRequest(http.MethodGet, "/api/admin/dashboard-links", nil)
 	rr := httptest.NewRecorder()
@@ -44,6 +45,9 @@ func TestDashboardLinksHandler_NormalizesInvalidValues(t *testing.T) {
 	if payload.Links["googleSheets"] != "" {
 		t.Fatalf("expected invalid sheets url to be blank, got %q", payload.Links["googleSheets"])
 	}
+	if payload.Links["figmaDesign"] != "https://www.figma.com/design/abc" {
+		t.Fatalf("unexpected figma url: %q", payload.Links["figmaDesign"])
+	}
 }
 
 func TestGitHubOpenCountsHandler_UsesCache(t *testing.T) {
@@ -52,9 +56,9 @@ func TestGitHubOpenCountsHandler_UsesCache(t *testing.T) {
 		"owner/repo",
 		"",
 		5*time.Minute,
-		func(_ context.Context, _ *http.Client, _ string, _ string) (int64, int64, error) {
+		func(_ context.Context, _ *http.Client, _ string, _ string) (githubCounts, error) {
 			callCount++
-			return 11, 7, nil
+			return githubCounts{issues: 11, prs: 7, branches: 13, discussions: 5}, nil
 		},
 	)
 
@@ -100,12 +104,12 @@ func TestGitHubOpenCountsHandler_ReturnsStaleOnFetchError(t *testing.T) {
 		"owner/repo",
 		"",
 		5*time.Millisecond,
-		func(_ context.Context, _ *http.Client, _ string, _ string) (int64, int64, error) {
+		func(_ context.Context, _ *http.Client, _ string, _ string) (githubCounts, error) {
 			callCount++
 			if callCount == 1 {
-				return 3, 2, nil
+				return githubCounts{issues: 3, prs: 2, branches: 4, discussions: 1}, nil
 			}
-			return 0, 0, context.DeadlineExceeded
+			return githubCounts{}, context.DeadlineExceeded
 		},
 	)
 
@@ -123,10 +127,12 @@ func TestGitHubOpenCountsHandler_ReturnsStaleOnFetchError(t *testing.T) {
 		t.Fatalf("expected stale fallback 200, got %d", rr2.Code)
 	}
 	var payload struct {
-		OK         bool  `json:"ok"`
-		OpenIssues int64 `json:"openIssues"`
-		OpenPRs    int64 `json:"openPRs"`
-		Stale      bool  `json:"stale"`
+		OK          bool  `json:"ok"`
+		OpenIssues  int64 `json:"openIssues"`
+		OpenPRs     int64 `json:"openPRs"`
+		Branches    int64 `json:"branches"`
+		Discussions int64 `json:"discussions"`
+		Stale       bool  `json:"stale"`
 	}
 	if err := json.Unmarshal(rr2.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode stale response: %v", err)
@@ -134,7 +140,7 @@ func TestGitHubOpenCountsHandler_ReturnsStaleOnFetchError(t *testing.T) {
 	if !payload.OK || !payload.Stale {
 		t.Fatalf("expected stale ok response, got %+v", payload)
 	}
-	if payload.OpenIssues != 3 || payload.OpenPRs != 2 {
+	if payload.OpenIssues != 3 || payload.OpenPRs != 2 || payload.Branches != 4 || payload.Discussions != 1 {
 		t.Fatalf("unexpected stale counts: %+v", payload)
 	}
 }
