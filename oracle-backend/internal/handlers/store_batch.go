@@ -373,30 +373,14 @@ func updateTotals(ctx context.Context, tx *sql.Tx, batch *model.OracleBatch) err
 		aggSuccess += b.Totals.TotalSuccess
 		aggFail += b.Totals.TotalFail
 
-		for k, v := range b.Counters.ByStatus {
-			aggStatus[k] += v
-		}
-		for k, v := range b.Counters.ByType {
-			aggType[k] += v
-		}
-		for k, v := range b.Counters.ByBrowser {
-			aggBrowser[k] += v
-		}
-		for k, v := range b.Counters.ByOs {
-			aggOs[k] += v
-		}
-		for k, v := range b.Counters.ByExtVer {
-			aggExtVer[k] += v
-		}
-		for k, v := range b.Counters.ByLanguage {
-			aggLang[k] += v
-		}
-		for k, v := range b.Counters.ByCountry {
-			aggCountry[k] += v
-		}
-		for k, v := range b.Counters.ByErrorType {
-			aggErrorType[k] += v
-		}
+		mergeCounts(aggStatus, b.Counters.ByStatus)
+		mergeCounts(aggType, b.Counters.ByType)
+		mergeCounts(aggBrowser, b.Counters.ByBrowser)
+		mergeCounts(aggOs, b.Counters.ByOs)
+		mergeCounts(aggExtVer, b.Counters.ByExtVer)
+		mergeCounts(aggLang, b.Counters.ByLanguage)
+		mergeCounts(aggCountry, b.Counters.ByCountry)
+		mergeCounts(aggErrorType, b.Counters.ByErrorType)
 	}
 
 	// Lifetime totals (global).
@@ -413,63 +397,36 @@ func updateTotals(ctx context.Context, tx *sql.Tx, batch *model.OracleBatch) err
 		return err
 	}
 
-	// Per-status.
-	for status, v := range aggStatus {
-		if err := upsertTotal(ctx, tx, "status:"+status, v); err != nil {
-			return err
-		}
+	// Define dimensions for cleaner iteration
+	dimensions := []struct {
+		prefix string
+		counts map[string]int64
+	}{
+		{"status:", aggStatus},
+		{"type:", aggType},
+		{"browser:", aggBrowser},
+		{"os:", aggOs},
+		{"extVer:", aggExtVer},
+		{"lang:", aggLang},
+		{"country:", aggCountry},
+		{"errorType:", aggErrorType},
 	}
 
-	// Per-type.
-	for t, v := range aggType {
-		if err := upsertTotal(ctx, tx, "type:"+t, v); err != nil {
-			return err
-		}
-	}
-
-	// Per-browser.
-	for br, v := range aggBrowser {
-		if err := upsertTotal(ctx, tx, "browser:"+br, v); err != nil {
-			return err
-		}
-	}
-
-	// Per-OS.
-	for osName, v := range aggOs {
-		if err := upsertTotal(ctx, tx, "os:"+osName, v); err != nil {
-			return err
-		}
-	}
-
-	// Per extension version.
-	for ver, v := range aggExtVer {
-		if err := upsertTotal(ctx, tx, "extVer:"+ver, v); err != nil {
-			return err
-		}
-	}
-
-	// Per language.
-	for lang, v := range aggLang {
-		if err := upsertTotal(ctx, tx, "lang:"+lang, v); err != nil {
-			return err
-		}
-	}
-
-	// Per country.
-	for c, v := range aggCountry {
-		if err := upsertTotal(ctx, tx, "country:"+c, v); err != nil {
-			return err
-		}
-	}
-
-	// Per error type.
-	for e, v := range aggErrorType {
-		if err := upsertTotal(ctx, tx, "errorType:"+e, v); err != nil {
-			return err
+	for _, dim := range dimensions {
+		for k, v := range dim.counts {
+			if err := upsertTotal(ctx, tx, dim.prefix+k, v); err != nil {
+				return err
+			}
 		}
 	}
 
 	return nil
+}
+
+func mergeCounts(dst, src map[string]int64) {
+	for k, v := range src {
+		dst[k] += v
+	}
 }
 
 func upsertTotal(ctx context.Context, tx *sql.Tx, key string, delta int64) error {
