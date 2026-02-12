@@ -26,3 +26,6 @@ oracle-backend/handler_cover.out
 *.db-wal
 google-credentials.json
 oracle-backend/google-credentials*.json
+
+ownership-map-out/
+ownership-map-out-sensitive/
