@@ -10,6 +10,7 @@ extension/.output/
 extension/dev/.output/
 extension/.wxt/
 extension/coverage/
+cloudflare-worker/coverage/
 **/.vite/
 .wrangler/
 .dev.vars
@@ -18,6 +19,8 @@ ai/
 oracle-backend/data/
 oracle-backend/docker_data/
 oracle-backend/app
+oracle-backend/coverage.out
+oracle-backend/handler_cover.out
 *.db
 *.db-shm
 *.db-wal
