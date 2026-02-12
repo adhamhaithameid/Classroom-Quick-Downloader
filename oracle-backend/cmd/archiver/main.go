@@ -131,7 +131,7 @@ func parseAndValidateOutboundURL(raw string) (string, error) {
 
 func main() {
 	sheetID := flag.String("sheet", "", "Google Sheet ID")
-	credsPath := flag.String("creds", "/app/google-credentials.json", "Path to Service Account JSON")
+	credsPath := flag.String("creds", "/run/secrets/google-credentials.json", "Path to Service Account JSON")
 	apiURL := flag.String("api", "http://localhost:8080/api/stats/summary", "URL to fetch stats from")
 	secret := flag.String("secret", os.Getenv("ARCHIVER_SHARED_SECRET"), "Shared secret for authenticated stats (optional)")
 	kumaPushURL := flag.String("kuma", "", "Uptime Kuma Push URL (optional)")
