@@ -224,14 +224,16 @@ func scheduleSheetsArchiver() {
 	for {
 		// Calculate time until next 00:15 UTC
 		now := time.Now().UTC()
-		next := time.Date(now.Year(), now.Month(), now.Day(), 0, 15, 0, 0, time.UTC)
-		if now.After(next) {
-			next = next.Add(24 * time.Hour)
-		}
+		next := nextRunTime(now)
 		sleepDuration := time.Until(next)
 
 		log.Printf("[Scheduler] Next Sheets export at %s (in %s)", next.Format(time.RFC3339), sleepDuration.Round(time.Minute))
 		time.Sleep(sleepDuration)
+
+		// Ensure we don't run early due to system wakeups or clock adjustments
+		if time.Now().UTC().Before(next) {
+			continue
+		}
 
 		// Run the archiver
 		log.Println("[Scheduler] Running scheduled Sheets export...")
@@ -407,6 +409,15 @@ func requireAuth(dashboardPassword, archiverSecret string, allowLoopbackBypass b
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+// nextRunTime calculates the next 00:15 UTC time relative to the given time.
+func nextRunTime(now time.Time) time.Time {
+	next := time.Date(now.Year(), now.Month(), now.Day(), 0, 15, 0, 0, time.UTC)
+	if now.After(next) {
+		next = next.Add(24 * time.Hour)
+	}
+	return next
 }
 
 // isValidSession checks if token is in store and not expired.

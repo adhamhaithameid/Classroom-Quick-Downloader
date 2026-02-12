@@ -3,6 +3,7 @@ package main
 import (
 	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 func TestGetClientIPTrustedProxyUsesForwarded(t *testing.T) {
@@ -34,5 +35,48 @@ func TestGetClientIPUntrustedProxyIgnoresForwarded(t *testing.T) {
 	ip := getClientIP(req)
 	if ip != "192.168.1.5" {
 		t.Fatalf("expected remote IP, got %q", ip)
+	}
+}
+
+func TestNextRunTime(t *testing.T) {
+	tests := []struct {
+		name     string
+		now      time.Time
+		expected time.Time
+	}{
+		{
+			name:     "before 00:15 same day",
+			now:      time.Date(2023, 10, 27, 0, 10, 0, 0, time.UTC),
+			expected: time.Date(2023, 10, 27, 0, 15, 0, 0, time.UTC),
+		},
+		{
+			name:     "after 00:15 same day",
+			now:      time.Date(2023, 10, 27, 0, 20, 0, 0, time.UTC),
+			expected: time.Date(2023, 10, 28, 0, 15, 0, 0, time.UTC),
+		},
+		{
+			name:     "exactly 00:15 same day",
+			now:      time.Date(2023, 10, 27, 0, 15, 0, 0, time.UTC),
+			expected: time.Date(2023, 10, 27, 0, 15, 0, 0, time.UTC),
+		},
+		{
+			name:     "just before 00:15",
+			now:      time.Date(2023, 10, 27, 0, 14, 59, 999999999, time.UTC),
+			expected: time.Date(2023, 10, 27, 0, 15, 0, 0, time.UTC),
+		},
+		{
+			name:     "just after 00:15",
+			now:      time.Date(2023, 10, 27, 0, 15, 0, 1, time.UTC),
+			expected: time.Date(2023, 10, 28, 0, 15, 0, 0, time.UTC),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := nextRunTime(tt.now)
+			if !got.Equal(tt.expected) {
+				t.Errorf("nextRunTime() = %v, want %v", got, tt.expected)
+			}
+		})
 	}
 }
