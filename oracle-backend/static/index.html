@@ -1945,14 +1945,14 @@
                   <div class="card-subtitle">Hover over bars for details</div>
                 </div>
                 <div class="tabs" id="activity-tabs">
-                  <button class="tab active" data-range="today" onclick="setActivityRange('today')" data-tooltip="Show today's hourly data">Today</button>
-                  <button class="tab" data-range="week" onclick="setActivityRange('week')" data-tooltip="Show last 7 days">This Week</button>
-                  <button class="tab" data-range="month" onclick="setActivityRange('month')" data-tooltip="Show current month">This Month</button>
-                  <button class="tab" data-range="year" onclick="setActivityRange('year')" data-tooltip="Show current year">This Year</button>
-                  <button class="tab" data-range="all" onclick="setActivityRange('all')" data-tooltip="Show all time">All Time</button>
+                  <button class="tab active" data-range="today" data-tooltip="Show today's hourly data">Today</button>
+                  <button class="tab" data-range="week" data-tooltip="Show last 7 days">This Week</button>
+                  <button class="tab" data-range="month" data-tooltip="Show current month">This Month</button>
+                  <button class="tab" data-range="year" data-tooltip="Show current year">This Year</button>
+                  <button class="tab" data-range="all" data-tooltip="Show all time">All Time</button>
                 </div>
                 <div>
-                  <select id="activity-version-filter" class="tab" style="min-width: 140px;" onchange="onActivityVersionChange()">
+                  <select id="activity-version-filter" class="tab" style="min-width: 140px;">
                     <option value="">All Versions</option>
                   </select>
                 </div>
@@ -1985,10 +1985,10 @@
                   <div class="card-subtitle">Download events log with analytics</div>
                 </div>
                 <div class="log-toolbar-right">
-                  <button class="log-sort-btn" id="log-sort-btn" onclick="toggleLogSort()" data-tooltip="Toggle sort order">
+                  <button class="log-sort-btn" id="log-sort-btn" data-tooltip="Toggle sort order">
                     ⬇️ Newest First
                   </button>
-                  <button class="log-export-btn" onclick="exportLogCSV()" data-tooltip="Export as CSV">
+                  <button class="log-export-btn" id="log-export-btn" data-tooltip="Export as CSV">
                     📥 Export
                   </button>
                 </div>
@@ -2013,8 +2013,8 @@
                   <div class="card-subtitle">Dots mark days with data</div>
                 </div>
                 <div class="tabs">
-                  <button class="tab" onclick="shiftCalendarMonth(-1)">Prev</button>
-                  <button class="tab" onclick="shiftCalendarMonth(1)">Next</button>
+                  <button class="tab" data-action="shift-calendar-month" data-delta="-1">Prev</button>
+                  <button class="tab" data-action="shift-calendar-month" data-delta="1">Next</button>
                 </div>
               </div>
               <div class="card-body">
@@ -2035,8 +2035,8 @@
                   <div class="card-subtitle">Compare two time periods</div>
                 </div>
                 <div class="tabs">
-                  <button class="tab active" onclick="setComparison('week')" id="cmp-week">This Week vs Last</button>
-                  <button class="tab" onclick="setComparison('month')" id="cmp-month">This Month vs Last</button>
+                  <button class="tab active" id="cmp-week" data-comparison-range="week">This Week vs Last</button>
+                  <button class="tab" id="cmp-month" data-comparison-range="month">This Month vs Last</button>
                 </div>
               </div>
               <div class="card-body" id="comparison-content">
@@ -2133,10 +2133,10 @@
               </div>
               <div class="card-body">
                 <div class="action-buttons-grid" style="grid-template-columns: repeat(4, 1fr);">
-                  <a href="https://cqd-analytics.adhamhaithameid.workers.dev/" target="_blank" class="btn btn-secondary">☁️ Cloudflare</a>
-                  <a href="http://129.151.233.229:3001/status/cqd" target="_blank" class="btn btn-secondary">🟢 Uptime Kuma</a>
-                  <a href="https://github.com/adhamhaithameid/Classroom-Quick-Downloader" target="_blank" class="btn btn-secondary">🐙 GitHub Repo</a>
-                  <a href="https://docs.google.com/spreadsheets/" target="_blank" class="btn btn-secondary">📊 Google Sheets</a>
+                  <a href="#" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" id="infra-link-cloudflare">☁️ Cloudflare</a>
+                  <a href="#" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" id="infra-link-uptime">🟢 Uptime Kuma</a>
+                  <a href="#" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" id="infra-link-github">🐙 GitHub Repo</a>
+                  <a href="#" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" id="infra-link-sheets">📊 Google Sheets</a>
                 </div>
               </div>
             </div>
@@ -2169,14 +2169,14 @@
                 </div>
               </div>
               <div class="card-body">
-                <form id="update-sentence-form" class="form-grid" onsubmit="saveUpdateSentence(event)">
+                <form id="update-sentence-form" class="form-grid">
                   <input id="update-sentence-key" type="hidden" />
                   <textarea id="update-sentence-input" class="auth-input" style="min-height: 92px;" placeholder="Write an update sentence..." required></textarea>
                   <div class="update-sentence-header">
                     <div id="update-sentence-form-state" class="update-sentence-meta">Creating new sentence</div>
                     <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                      <button class="btn btn-secondary" type="button" onclick="seedDefaultUpdateSentences()">Seed Defaults</button>
-                      <button class="btn btn-secondary" type="button" onclick="resetUpdateSentenceForm()">Clear</button>
+                      <button class="btn btn-secondary" id="seed-update-sentences-btn" type="button">Seed Defaults</button>
+                      <button class="btn btn-secondary" id="clear-update-sentence-form-btn" type="button">Clear</button>
                       <button class="btn btn-primary" id="update-sentence-save-btn" type="submit">Add Sentence</button>
                     </div>
                   </div>
@@ -2196,7 +2196,7 @@
                 </div>
               </div>
               <div class="card-body">
-                <form id="version-form" class="form-grid" onsubmit="saveVersionNote(event)">
+                <form id="version-form" class="form-grid">
                   <input id="version-input" class="auth-input" placeholder="Version (e.g., 5.7.1)" required />
                   <textarea id="version-note-input" class="auth-input" style="min-height: 90px;" placeholder="Update notes..." required></textarea>
                   <button class="btn" type="submit" style="justify-self:start;">Save Version Note</button>
@@ -2216,7 +2216,7 @@
                 </div>
               </div>
               <div class="card-body">
-                <form class="form-grid" onsubmit="saveCreativeDesign(event)">
+                <form class="form-grid" id="creative-design-form">
                   <div class="creative-grid">
                     <input id="design-key" class="auth-input" placeholder="Design key (e.g., landing-v2)" required />
                     <input id="design-title" class="auth-input" placeholder="Title" required />
@@ -2240,7 +2240,7 @@
                 </div>
               </div>
               <div class="card-body">
-                <form class="form-grid" onsubmit="saveCreativeEmailTemplate(event)">
+                <form class="form-grid" id="creative-email-template-form">
                   <div class="creative-grid">
                     <input id="email-template-key" class="auth-input" placeholder="Template key (e.g., release-5-7-0)" required />
                     <input id="email-template-title" class="auth-input" placeholder="Template title" required />
@@ -2264,7 +2264,7 @@
               </div>
               <div class="card-body">
                 <div class="creative-grid">
-                  <form class="form-grid" onsubmit="saveNewsletterSubscriber(event)">
+                  <form class="form-grid" id="newsletter-subscriber-form">
                     <input id="newsletter-email" class="auth-input" placeholder="Subscriber email" required />
                     <input id="newsletter-name" class="auth-input" placeholder="Subscriber name (optional)" />
                     <select id="newsletter-status" class="auth-input">
@@ -2274,7 +2274,7 @@
                     </select>
                     <button class="btn" type="submit">Add/Update Subscriber</button>
                   </form>
-                  <form class="form-grid" onsubmit="saveNewsletterCampaign(event)">
+                  <form class="form-grid" id="newsletter-campaign-form">
                     <input id="newsletter-campaign-key" class="auth-input" placeholder="Campaign key (e.g., v5-7-launch)" required />
                     <input id="newsletter-campaign-title" class="auth-input" placeholder="Campaign title" required />
                     <input id="newsletter-campaign-version" class="auth-input" placeholder="Version (optional)" />
@@ -2306,7 +2306,7 @@
                   <div class="card-subtitle">Open issues and PRs</div>
                 </div>
                 <div>
-                  <button class="btn btn-secondary" onclick="loadNotifications()">Refresh</button>
+                  <button class="btn btn-secondary" id="notifications-refresh-btn">Refresh</button>
                 </div>
               </div>
               <div class="card-body">
@@ -2324,14 +2324,14 @@
                   <div class="card-subtitle">Server-side request log for Oracle backend operations only</div>
                 </div>
                 <div class="action-buttons-grid" style="grid-template-columns: auto auto auto auto auto; max-width: 920px; align-items:center;">
-                  <button class="btn btn-secondary" onclick="loadOracleLogs()">Refresh</button>
+                  <button class="btn btn-secondary" id="logs-refresh-btn">Refresh</button>
                   <div style="display:flex;align-items:center;gap:6px;">
                     <input id="oracle-logs-retention-days" class="auth-input" type="number" min="1" max="36500" value="30" style="width:80px;text-align:center;" />
                     <span style="font-size:12px;color:var(--text-muted);">days</span>
                   </div>
-                  <button class="btn btn-secondary" onclick="oracleLogsDeleteOlder(true)">Dry Run Delete Older</button>
-                  <button class="btn btn-secondary" onclick="oracleLogsDeleteOlder(false)">Delete Older</button>
-                  <button class="btn btn-danger" onclick="oracleLogsClearAll()">Delete All Logs</button>
+                  <button class="btn btn-secondary" id="logs-dry-run-delete-btn">Dry Run Delete Older</button>
+                  <button class="btn btn-secondary" id="logs-delete-older-btn">Delete Older</button>
+                  <button class="btn btn-danger" id="logs-delete-all-btn">Delete All Logs</button>
                 </div>
               </div>
               <div class="card-body no-padding">
@@ -2356,22 +2356,22 @@
               </div>
               <div class="card-body">
                 <div class="action-buttons-grid" style="grid-template-columns: repeat(4, 1fr);">
-                  <button class="btn btn-secondary" onclick="dangerDryRun('all_non_core')">Dry Run Clear (All Non-Core)</button>
-                  <button class="btn btn-danger" onclick="dangerExecute('all_non_core')">Execute Clear (All Non-Core)</button>
-                  <button class="btn btn-secondary" onclick="runBackup()">Run SQLite Backup</button>
+                  <button class="btn btn-secondary" id="danger-dryrun-clear-btn">Dry Run Clear (All Non-Core)</button>
+                  <button class="btn btn-danger" id="danger-exec-clear-btn">Execute Clear (All Non-Core)</button>
+                  <button class="btn btn-secondary" id="danger-run-backup-btn">Run SQLite Backup</button>
                   <button class="btn btn-secondary" id="stepup-btn" data-shortcut="Cmd+Shift+S">Step-Up Now</button>
                 </div>
                 <div style="margin-top: 14px;">
                   <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;">Preset Admin Actions</div>
                   <div class="action-buttons-grid" style="grid-template-columns: repeat(4, 1fr);">
-                    <button class="btn btn-secondary" onclick="dangerLoadOutboxStatus()">Outbox Status</button>
-                    <button class="btn btn-secondary" onclick="dangerRetryOutbox()">Retry Outbox</button>
-                    <button class="btn btn-secondary" onclick="dangerReplayDeadLetter()">Replay Dead Letter</button>
-                    <button class="btn btn-secondary" onclick="dangerVerifyAuditChain()">Verify Audit Chain</button>
-                    <button class="btn btn-secondary" onclick="dangerLoadAlerts()">Load Alerts</button>
-                    <button class="btn btn-secondary" onclick="dangerLoadFeatureFlags()">Load Feature Flags</button>
-                    <button class="btn btn-secondary" onclick="dangerLoadMigrationsStatus()">Load Migrations Status</button>
-                    <button class="btn btn-secondary" onclick="dangerLoadOpsSnapshot()">Load Full Ops Snapshot</button>
+                    <button class="btn btn-secondary" id="danger-outbox-status-btn">Outbox Status</button>
+                    <button class="btn btn-secondary" id="danger-outbox-retry-btn">Retry Outbox</button>
+                    <button class="btn btn-secondary" id="danger-outbox-replay-btn">Replay Dead Letter</button>
+                    <button class="btn btn-secondary" id="danger-audit-verify-btn">Verify Audit Chain</button>
+                    <button class="btn btn-secondary" id="danger-alerts-btn">Load Alerts</button>
+                    <button class="btn btn-secondary" id="danger-flags-btn">Load Feature Flags</button>
+                    <button class="btn btn-secondary" id="danger-migrations-btn">Load Migrations Status</button>
+                    <button class="btn btn-secondary" id="danger-ops-snapshot-btn">Load Full Ops Snapshot</button>
                   </div>
                 </div>
                 <pre id="danger-output" class="json-viewer" style="margin-top: 12px; max-height: 340px; overflow:auto; display:none;"></pre>
@@ -2386,20 +2386,20 @@
     <div class="floating-tooltip" id="chart-tooltip"></div>
 
     <!-- Batch Info Modal -->
-    <div class="modal-overlay" id="batch-modal" onclick="closeBatchModal(event)">
-      <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-overlay" id="batch-modal">
+      <div class="modal">
         <div class="modal-header">
           <span class="modal-title">📦 Last Batch Info</span>
-          <button class="modal-close" onclick="closeBatchModal()">
+          <button class="modal-close" id="batch-modal-close-btn">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
             </svg>
           </button>
         </div>
         <div class="modal-body">
-          <div class="modal-tabs">
-            <button class="tab active" onclick="setBatchTab('info')">📋 Info</button>
-            <button class="tab" onclick="setBatchTab('json')">🔧 JSON</button>
+          <div class="modal-tabs" id="batch-modal-tabs">
+            <button class="tab active" data-batch-tab="info">📋 Info</button>
+            <button class="tab" data-batch-tab="json">🔧 JSON</button>
           </div>
           <div id="batch-info-content">
             <div class="loading"><div class="spinner"></div>Loading batch info...</div>
@@ -2526,6 +2526,42 @@
         setAuthError('');
       }
 
+      function sleepMs(ms) {
+        return new Promise(function(resolve) {
+          setTimeout(resolve, ms);
+        });
+      }
+
+      async function fetchAuthCheckWithRetry(maxAttempts) {
+        var attempts = Number(maxAttempts || 1);
+        if (!Number.isFinite(attempts) || attempts < 1) attempts = 1;
+        attempts = Math.floor(attempts);
+
+        for (var i = 0; i < attempts; i++) {
+          try {
+            const checkRes = await fetch('/api/auth/check', {
+              cache: 'no-store',
+              credentials: 'same-origin',
+              headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            if (checkRes.ok) {
+              const checkPayload = await checkRes.json().catch(function() { return {}; });
+              if (checkPayload && (checkPayload.authRequired === false || checkPayload.authenticated === true)) {
+                return checkPayload;
+              }
+            }
+          } catch (_) {
+            // Retry below.
+          }
+
+          if (i < attempts - 1) {
+            await sleepMs(120 * (i + 1));
+          }
+        }
+
+        return { authenticated: false, authRequired: true };
+      }
+
       function initAuthModal() {
         if (authModalInitialized) return;
         authModalInitialized = true;
@@ -2551,7 +2587,11 @@
           try {
             const loginRes = await fetch('/api/auth/login', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              credentials: 'same-origin',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+              },
               body: JSON.stringify({ password: password }),
             });
 
@@ -2567,15 +2607,9 @@
             }
 
             // Confirm the browser persisted the session cookie before closing modal.
-            const checkRes = await fetch('/api/auth/check', { cache: 'no-store' });
-            if (!checkRes.ok) {
-              setAuthError('Authentication check failed. Please try again.');
-              input.select();
-              input.focus();
-              return;
-            }
-            const checkPayload = await checkRes.json().catch(function() { return {}; });
-            if (!checkPayload || checkPayload.authenticated !== true) {
+            // Some browsers can apply Set-Cookie from fetch responses with slight delay.
+            const checkPayload = await fetchAuthCheckWithRetry(4);
+            if (!checkPayload || (checkPayload.authRequired !== false && checkPayload.authenticated !== true)) {
               setAuthError('Session cookie was not saved by your browser. Enable cookies, refresh, and try again.');
               input.select();
               input.focus();
@@ -2756,9 +2790,7 @@
         if (authInFlight) return authInFlight;
         authInFlight = (async () => {
           try {
-            const checkRes = await fetch('/api/auth/check', { cache: 'no-store' });
-            if (!checkRes.ok) return false;
-            const check = await checkRes.json();
+            const check = await fetchAuthCheckWithRetry(2);
             if (check.authRequired === false || check.authenticated === true) {
               hideAuthModal();
               return true;
@@ -2774,11 +2806,15 @@
       }
 
       async function fetchJSONWithInit(url, init) {
-        let res = await fetch(url, init);
+        var requestInit = init ? Object.assign({}, init) : {};
+        requestInit.headers = mergeRequestHeaders(init && init.headers);
+        if (!requestInit.method) requestInit.method = 'GET';
+        if (!requestInit.credentials) requestInit.credentials = 'same-origin';
+        let res = await fetch(url, requestInit);
         if (res.status === 401) {
           const ok = await ensureAuth();
           if (!ok) throw new Error("HTTP 401");
-          res = await fetch(url, init);
+          res = await fetch(url, requestInit);
         }
         if (!res.ok) throw new Error("HTTP " + res.status);
         return res.json();
@@ -2786,6 +2822,24 @@
 
       async function fetchJSON(url) {
         return fetchJSONWithInit(url);
+      }
+
+      function mergeRequestHeaders(extraHeaders) {
+        var headers = {};
+        if (extraHeaders) {
+          if (typeof Headers !== 'undefined' && extraHeaders instanceof Headers) {
+            extraHeaders.forEach(function(v, k) { headers[k] = v; });
+          } else if (Array.isArray(extraHeaders)) {
+            extraHeaders.forEach(function(entry) {
+              if (!entry || entry.length < 2) return;
+              headers[String(entry[0])] = String(entry[1]);
+            });
+          } else {
+            Object.keys(extraHeaders).forEach(function(k) { headers[k] = extraHeaders[k]; });
+          }
+        }
+        headers['X-Requested-With'] = 'XMLHttpRequest';
+        return headers;
       }
 
       function formatOracleUtcClock(ts) {
@@ -2949,7 +3003,17 @@
       // Floating tooltip
       var tooltip = document.getElementById('chart-tooltip');
       
-      function showTooltip(e, html) {
+      function showTooltip(e, payload) {
+        var model = payload || {};
+        var title = String(model.title || '');
+        var rows = Array.isArray(model.rows) ? model.rows : [];
+        var html = '<div class="tooltip-title">' + escapeHtml(title) + '</div>';
+        rows.forEach(function(row) {
+          var label = String((row && row.label) || '');
+          var value = String((row && row.value) || '');
+          var cssClass = String((row && row.className) || '');
+          html += '<div class="tooltip-row"><span class="tooltip-label">' + escapeHtml(label) + '</span><span class="tooltip-value ' + escapeHtml(cssClass) + '">' + escapeHtml(value) + '</span></div>';
+        });
         tooltip.innerHTML = html;
         tooltip.classList.add('visible');
         var rect = tooltip.getBoundingClientRect();
@@ -3078,6 +3142,7 @@
           loadComparison();
         }
         if (page === 'dashboards') {
+          loadDashboardLinks();
           loadDeploymentsHub();
           loadNotifications();
         }
@@ -3490,7 +3555,7 @@
             fail: p.fail || 0,
             rate: fmtPct(p.successRate || 0)
           }).replace(/"/g, '&quot;');
-          html += '<div class="chart-bar-wrapper"><div class="chart-bar" style="height:' + height + '%" data-point=\'' + tooltipData + '\' onmouseenter="handleBarHover(event)" onmousemove="handleBarMove(event)" onmouseleave="hideTooltip()"></div></div>';
+          html += '<div class="chart-bar-wrapper"><div class="chart-bar" style="height:' + height + '%" data-point=\'' + tooltipData + '\'></div></div>';
         });
 
         html += '</div><div class="chart-x-axis">';
@@ -3501,17 +3566,31 @@
         });
         html += '</div></div>';
         container.innerHTML = html;
+        bindChartBarHover(container);
       }
 
       function handleBarHover(e) { handleBarMove(e); }
       function handleBarMove(e) {
         var data = JSON.parse(e.target.dataset.point);
-        var html = '<div class="tooltip-title">' + escapeHtml(data.time) + '</div>';
-        html += '<div class="tooltip-row"><span class="tooltip-label">Downloads</span><span class="tooltip-value">' + fmtNumber(data.downloads) + '</span></div>';
-        html += '<div class="tooltip-row"><span class="tooltip-label">Success</span><span class="tooltip-value tooltip-success">' + fmtNumber(data.success) + '</span></div>';
-        html += '<div class="tooltip-row"><span class="tooltip-label">Failed</span><span class="tooltip-value tooltip-fail">' + fmtNumber(data.fail) + '</span></div>';
-        html += '<div class="tooltip-row"><span class="tooltip-label">Rate</span><span class="tooltip-value">' + escapeHtml(data.rate) + '</span></div>';
-        showTooltip(e, html);
+        showTooltip(e, {
+          title: data.time,
+          rows: [
+            { label: 'Downloads', value: fmtNumber(data.downloads), className: '' },
+            { label: 'Success', value: fmtNumber(data.success), className: 'tooltip-success' },
+            { label: 'Failed', value: fmtNumber(data.fail), className: 'tooltip-fail' },
+            { label: 'Rate', value: data.rate, className: '' },
+          ],
+        });
+      }
+
+      function bindChartBarHover(container) {
+        container.querySelectorAll('.chart-bar').forEach(function(bar) {
+          if (bar.dataset.hoverBound === '1') return;
+          bar.dataset.hoverBound = '1';
+          bar.addEventListener('mouseenter', handleBarHover);
+          bar.addEventListener('mousemove', handleBarMove);
+          bar.addEventListener('mouseleave', hideTooltip);
+        });
       }
 
       var ipMapCountryCoords = {
@@ -3871,6 +3950,38 @@
       }
 
       // Dashboards / Management hub
+      function applyInfraLink(id, url) {
+        var node = document.getElementById(id);
+        if (!node) return;
+        if (url) {
+          node.href = url;
+          node.removeAttribute('aria-disabled');
+          node.style.opacity = '1';
+          node.style.pointerEvents = 'auto';
+        } else {
+          node.href = '#';
+          node.setAttribute('aria-disabled', 'true');
+          node.style.opacity = '0.55';
+          node.style.pointerEvents = 'none';
+        }
+      }
+
+      async function loadDashboardLinks() {
+        try {
+          var payload = await fetchJSON('/api/admin/dashboard-links');
+          var links = (payload && payload.links) ? payload.links : {};
+          applyInfraLink('infra-link-cloudflare', links.cloudflare || '');
+          applyInfraLink('infra-link-uptime', links.uptimeKuma || '');
+          applyInfraLink('infra-link-github', links.githubRepo || '');
+          applyInfraLink('infra-link-sheets', links.googleSheets || '');
+        } catch (_) {
+          applyInfraLink('infra-link-cloudflare', '');
+          applyInfraLink('infra-link-uptime', '');
+          applyInfraLink('infra-link-github', '');
+          applyInfraLink('infra-link-sheets', '');
+        }
+      }
+
       async function loadDeploymentsHub() {
         var container = document.getElementById('deployment-cards');
         if (!container) return;
@@ -3895,7 +4006,6 @@
             var usersId = deploymentInputId('users', key);
             var versionId = deploymentInputId('version', key);
             var urlId = deploymentInputId('url', key);
-            var keyArg = JSON.stringify(key).replace(/"/g, '&quot;');
             html += '<div class="deployment-card">';
             html += '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;">';
             html += '<div style="font-weight:600;">' + escapeHtml(v.name || key) + '</div>';
@@ -3906,7 +4016,7 @@
             html += '<input class="auth-input" id="' + escapeHtml(versionId) + '" placeholder="Current version" value="' + escapeHtml(v.version || '') + '"/>';
             html += '<input class="auth-input" id="' + escapeHtml(urlId) + '" placeholder="Store dashboard URL" value="' + escapeHtml(v.url || '') + '"/>';
             html += '<div class="pill-row"><span class="pill">UsersCount: ' + fmtNumber(Number(v.usersCount || 0)) + '</span><span class="pill">Latency: ' + fmtNumber(Number(v.syncLatencyMs || 0)) + 'ms</span></div>';
-            html += '<button class="btn btn-secondary" onclick="saveDeploymentCard(' + keyArg + ')">Save</button>';
+            html += '<button class="btn btn-secondary" data-action="save-deployment-card" data-record-key="' + escapeHtml(key) + '">Save</button>';
             html += '</div></div>';
           });
           container.innerHTML = html || '<div class="empty-state">No deployment targets found</div>';
@@ -4000,9 +4110,9 @@
           html += '<div class="update-sentence-text">' + (idx + 1) + '. ' + escapeHtml(text) + '</div>';
           html += '<div class="update-sentence-meta">Updated: ' + escapeHtml(creativeTimestampLabel(item.updatedAt || 0)) + '</div>';
           html += '<div class="update-sentence-actions">';
-          html += '<button class="btn btn-secondary" onclick="copyText(' + JSON.stringify(text).replace(/"/g, '&quot;') + ')">Copy</button>';
-          html += '<button class="btn btn-secondary" onclick="editUpdateSentence(' + JSON.stringify(item.recordKey).replace(/"/g, '&quot;') + ',' + JSON.stringify(text).replace(/"/g, '&quot;') + ')">Edit</button>';
-          html += '<button class="btn btn-danger" onclick="deleteUpdateSentence(' + JSON.stringify(item.recordKey).replace(/"/g, '&quot;') + ')">Delete</button>';
+          html += '<button class="btn btn-secondary" data-action="copy-update-sentence" data-text="' + escapeHtml(text) + '">Copy</button>';
+          html += '<button class="btn btn-secondary" data-action="edit-update-sentence" data-record-key="' + escapeHtml(item.recordKey || '') + '" data-text="' + escapeHtml(text) + '">Edit</button>';
+          html += '<button class="btn btn-danger" data-action="delete-update-sentence" data-record-key="' + escapeHtml(item.recordKey || '') + '">Delete</button>';
           html += '</div>';
           html += '</div>';
         });
@@ -4146,7 +4256,8 @@
             };
           });
         } catch (_) {
-          try { items = JSON.parse(localStorage.getItem('oracleVersionNotes') || '[]'); } catch (_err) { items = []; }
+          container.innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed to load version notes</div>';
+          return;
         }
         items.sort(function(a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
         if (!items.length) {
@@ -4182,10 +4293,7 @@
             })
           });
         } catch (_) {
-          var items = [];
-          try { items = JSON.parse(localStorage.getItem('oracleVersionNotes') || '[]'); } catch (_err) { items = []; }
-          items.push({ version: version, note: note, createdAt: Date.now() });
-          localStorage.setItem('oracleVersionNotes', JSON.stringify(items));
+          return;
         }
         document.getElementById('version-input').value = '';
         document.getElementById('version-note-input').value = '';
@@ -4245,7 +4353,7 @@
               }).join('') + '</div>';
             }
             html += '<div class="creative-meta">Updated: ' + escapeHtml(creativeTimestampLabel(item.updatedAt)) + '</div>';
-            html += '<button class="btn btn-danger" onclick="deleteCreativeDesign(' + JSON.stringify(item.recordKey).replace(/"/g, '&quot;') + ')">Delete</button>';
+            html += '<button class="btn btn-danger" data-action="delete-creative-design" data-record-key="' + escapeHtml(item.recordKey || '') + '">Delete</button>';
             html += '</div>';
           });
           container.innerHTML = html;
@@ -4313,8 +4421,8 @@
             html += '<div class="pill-row"><span class="pill">Version: ' + escapeHtml(d.version || 'n/a') + '</span><span class="pill">Schedule: ' + escapeHtml(d.scheduledAt || 'manual') + '</span></div>';
             html += '<div style="font-size:12px;white-space:pre-wrap;max-height:120px;overflow:auto;">' + escapeHtml(htmlBody.slice(0, 800)) + '</div>';
             html += '<div style="display:flex;gap:8px;flex-wrap:wrap;">';
-            html += '<button class="btn btn-secondary" onclick="copyText(' + JSON.stringify(htmlBody).replace(/"/g, '&quot;') + ')">Copy HTML</button>';
-            html += '<button class="btn btn-danger" onclick="deleteCreativeEmailTemplate(' + JSON.stringify(item.recordKey).replace(/"/g, '&quot;') + ')">Delete</button>';
+            html += '<button class="btn btn-secondary" data-action="copy-email-html" data-html="' + escapeHtml(htmlBody) + '">Copy HTML</button>';
+            html += '<button class="btn btn-danger" data-action="delete-creative-email" data-record-key="' + escapeHtml(item.recordKey || '') + '">Delete</button>';
             html += '</div></div>';
           });
           container.innerHTML = html;
@@ -4379,7 +4487,7 @@
             html += '<h4>' + escapeHtml(d.email || item.recordKey) + '</h4>';
             html += '<div class="creative-meta">Name: ' + escapeHtml(d.name || 'n/a') + '</div>';
             html += '<div class="pill-row"><span class="pill">Status: ' + escapeHtml(d.status || 'active') + '</span></div>';
-            html += '<button class="btn btn-danger" onclick="deleteNewsletterSubscriber(' + JSON.stringify(item.recordKey).replace(/"/g, '&quot;') + ')">Delete</button>';
+            html += '<button class="btn btn-danger" data-action="delete-newsletter-subscriber" data-record-key="' + escapeHtml(item.recordKey || '') + '">Delete</button>';
             html += '</div>';
           });
           container.innerHTML = html;
@@ -4441,7 +4549,7 @@
             html += '<h4>' + escapeHtml(d.title || item.recordKey) + '</h4>';
             html += '<div class="pill-row"><span class="pill">Version: ' + escapeHtml(d.version || 'n/a') + '</span><span class="pill">Send: ' + escapeHtml(d.sendAt || 'manual') + '</span></div>';
             html += '<div style="font-size:12px;white-space:pre-wrap;">' + escapeHtml(d.notes || '') + '</div>';
-            html += '<button class="btn btn-danger" onclick="deleteNewsletterCampaign(' + JSON.stringify(item.recordKey).replace(/"/g, '&quot;') + ')">Delete</button>';
+            html += '<button class="btn btn-danger" data-action="delete-newsletter-campaign" data-record-key="' + escapeHtml(item.recordKey || '') + '">Delete</button>';
             html += '</div>';
           });
           container.innerHTML = html;
@@ -4492,14 +4600,17 @@
         if (!container) return;
         container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading...</div>';
         try {
-          var repo = 'adhamhaithameid/Classroom-Quick-Downloader';
-          var issues = await fetch('https://api.github.com/search/issues?q=repo:' + repo + '+type:issue+state:open').then(function(r) { return r.json(); });
-          var prs = await fetch('https://api.github.com/search/issues?q=repo:' + repo + '+type:pr+state:open').then(function(r) { return r.json(); });
+          var github = { openIssues: 0, openPRs: 0 };
+          try {
+            var githubPayload = await fetchJSON('/api/admin/github/open-counts');
+            if (githubPayload && typeof githubPayload.openIssues === 'number') github.openIssues = githubPayload.openIssues;
+            if (githubPayload && typeof githubPayload.openPRs === 'number') github.openPRs = githubPayload.openPRs;
+          } catch (_) {}
           var alerts = await fetchJSON('/api/admin/alerts');
           var openAlerts = (alerts.alerts || []).filter(function(a) { return a.status === 'open'; }).length;
           container.innerHTML =
-            '<div class="stat-card"><div class="stat-label">Open Issues</div><div class="stat-value">' + fmtNumber(issues.total_count || 0) + '</div></div>' +
-            '<div class="stat-card"><div class="stat-label">Open PRs</div><div class="stat-value">' + fmtNumber(prs.total_count || 0) + '</div></div>' +
+            '<div class="stat-card"><div class="stat-label">Open Issues</div><div class="stat-value">' + fmtNumber(github.openIssues || 0) + '</div></div>' +
+            '<div class="stat-card"><div class="stat-label">Open PRs</div><div class="stat-value">' + fmtNumber(github.openPRs || 0) + '</div></div>' +
             '<div class="stat-card"><div class="stat-label">Open Alerts</div><div class="stat-value">' + fmtNumber(openAlerts) + '</div></div>';
         } catch (e) {
           container.innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed to load GitHub counters</div>';
@@ -4886,6 +4997,33 @@
           });
         }
 
+        var activityVersionFilter = document.getElementById('activity-version-filter');
+        if (activityVersionFilter && activityVersionFilter.dataset.boundChange !== '1') {
+          activityVersionFilter.dataset.boundChange = '1';
+          activityVersionFilter.addEventListener('change', onActivityVersionChange);
+        }
+
+        var activityTabs = document.getElementById('activity-tabs');
+        if (activityTabs && activityTabs.dataset.boundClick !== '1') {
+          activityTabs.dataset.boundClick = '1';
+          activityTabs.addEventListener('click', function(ev) {
+            var btn = ev.target.closest('.tab[data-range]');
+            if (!btn) return;
+            ev.preventDefault();
+            setActivityRange(btn.dataset.range);
+          });
+        }
+
+        var comparisonTabs = document.querySelectorAll('[data-comparison-range]');
+        comparisonTabs.forEach(function(btn) {
+          if (btn.dataset.boundClick === '1') return;
+          btn.dataset.boundClick = '1';
+          btn.addEventListener('click', function(ev) {
+            ev.preventDefault();
+            setComparison(btn.getAttribute('data-comparison-range'));
+          });
+        });
+
         [
           ['shortcuts-btn', openShortcutsModal],
           ['shortcuts-btn-mobile', openShortcutsModal],
@@ -4894,7 +5032,28 @@
           ['refresh-btn', refreshAll],
           ['refresh-btn-mobile', refreshAll],
           ['deployment-sync-btn', syncDeploymentTargets],
-          ['stepup-btn', openStepUpModal]
+          ['stepup-btn', openStepUpModal],
+          ['seed-update-sentences-btn', seedDefaultUpdateSentences],
+          ['clear-update-sentence-form-btn', resetUpdateSentenceForm],
+          ['log-sort-btn', toggleLogSort],
+          ['log-export-btn', exportLogCSV],
+          ['notifications-refresh-btn', loadNotifications],
+          ['logs-refresh-btn', loadOracleLogs],
+          ['logs-dry-run-delete-btn', function() { oracleLogsDeleteOlder(true); }],
+          ['logs-delete-older-btn', function() { oracleLogsDeleteOlder(false); }],
+          ['logs-delete-all-btn', oracleLogsClearAll],
+          ['danger-dryrun-clear-btn', function() { dangerDryRun('all_non_core'); }],
+          ['danger-exec-clear-btn', function() { dangerExecute('all_non_core'); }],
+          ['danger-run-backup-btn', runBackup],
+          ['danger-outbox-status-btn', dangerLoadOutboxStatus],
+          ['danger-outbox-retry-btn', dangerRetryOutbox],
+          ['danger-outbox-replay-btn', dangerReplayDeadLetter],
+          ['danger-audit-verify-btn', dangerVerifyAuditChain],
+          ['danger-alerts-btn', dangerLoadAlerts],
+          ['danger-flags-btn', dangerLoadFeatureFlags],
+          ['danger-migrations-btn', dangerLoadMigrationsStatus],
+          ['danger-ops-snapshot-btn', dangerLoadOpsSnapshot],
+          ['batch-modal-close-btn', closeBatchModal]
         ].forEach(function(entry) {
           var node = document.getElementById(entry[0]);
           if (!node || node.dataset.boundClick === '1') return;
@@ -4904,11 +5063,72 @@
             entry[1]();
           });
         });
+
+        [
+          ['update-sentence-form', saveUpdateSentence],
+          ['version-form', saveVersionNote],
+          ['creative-design-form', saveCreativeDesign],
+          ['creative-email-template-form', saveCreativeEmailTemplate],
+          ['newsletter-subscriber-form', saveNewsletterSubscriber],
+          ['newsletter-campaign-form', saveNewsletterCampaign],
+        ].forEach(function(entry) {
+          var form = document.getElementById(entry[0]);
+          if (!form || form.dataset.boundSubmit === '1') return;
+          form.dataset.boundSubmit = '1';
+          form.addEventListener('submit', entry[1]);
+        });
+
+        var batchModal = document.getElementById('batch-modal');
+        if (batchModal && batchModal.dataset.boundClick !== '1') {
+          batchModal.dataset.boundClick = '1';
+          batchModal.addEventListener('click', function(ev) {
+            if (ev.target === batchModal) closeBatchModal();
+          });
+        }
+        var batchModalCard = batchModal ? batchModal.querySelector('.modal') : null;
+        if (batchModalCard && batchModalCard.dataset.boundClick !== '1') {
+          batchModalCard.dataset.boundClick = '1';
+          batchModalCard.addEventListener('click', function(ev) {
+            ev.stopPropagation();
+          });
+        }
+        var batchTabs = document.getElementById('batch-modal-tabs');
+        if (batchTabs && batchTabs.dataset.boundClick !== '1') {
+          batchTabs.dataset.boundClick = '1';
+          batchTabs.addEventListener('click', function(ev) {
+            var btn = ev.target.closest('[data-batch-tab]');
+            if (!btn) return;
+            ev.preventDefault();
+            setBatchTab(btn.getAttribute('data-batch-tab'));
+          });
+        }
+
+        if (document.body.dataset.boundDynamicActions !== '1') {
+          document.body.dataset.boundDynamicActions = '1';
+          document.addEventListener('click', function(ev) {
+            var actionNode = ev.target.closest('[data-action]');
+            if (!actionNode) return;
+            var action = actionNode.getAttribute('data-action');
+            if (!action) return;
+            ev.preventDefault();
+            if (action === 'save-deployment-card') saveDeploymentCard(actionNode.getAttribute('data-record-key') || '');
+            if (action === 'copy-update-sentence') copyText(actionNode.getAttribute('data-text') || '');
+            if (action === 'edit-update-sentence') editUpdateSentence(actionNode.getAttribute('data-record-key') || '', actionNode.getAttribute('data-text') || '');
+            if (action === 'delete-update-sentence') deleteUpdateSentence(actionNode.getAttribute('data-record-key') || '');
+            if (action === 'delete-creative-design') deleteCreativeDesign(actionNode.getAttribute('data-record-key') || '');
+            if (action === 'copy-email-html') copyText(actionNode.getAttribute('data-html') || '');
+            if (action === 'delete-creative-email') deleteCreativeEmailTemplate(actionNode.getAttribute('data-record-key') || '');
+            if (action === 'delete-newsletter-subscriber') deleteNewsletterSubscriber(actionNode.getAttribute('data-record-key') || '');
+            if (action === 'delete-newsletter-campaign') deleteNewsletterCampaign(actionNode.getAttribute('data-record-key') || '');
+            if (action === 'shift-calendar-month') shiftCalendarMonth(Number(actionNode.getAttribute('data-delta') || '0'));
+          });
+        }
       }
 
       function startAutoRefreshLoop() {
         if (refreshIntervalId) clearInterval(refreshIntervalId);
         refreshIntervalId = setInterval(async function() {
+          if (document.visibilityState === 'hidden') return;
           var ok = await ensureAuth();
           if (!ok) return;
           refreshAll();
@@ -4933,6 +5153,7 @@
           await loadComparison();
         }
         if (currentPage === 'dashboards') {
+          await loadDashboardLinks();
           loadDeploymentsHub();
           await loadNotifications();
         }
@@ -5001,7 +5222,14 @@
         });
         window.addEventListener('blur', clearCommandHoldHints);
         document.addEventListener('visibilitychange', function() {
-          if (document.hidden) clearCommandHoldHints();
+          if (document.hidden) {
+            clearCommandHoldHints();
+            return;
+          }
+          ensureAuth().then(function(ok) {
+            if (!ok) return;
+            refreshAll();
+          });
         });
         var shortcutsModal = document.getElementById('shortcuts-modal');
         if (shortcutsModal) {
@@ -5011,6 +5239,7 @@
         }
         var authed = await ensureAuth();
         if (authed) {
+          await loadDashboardLinks();
           await refreshAll();
         }
         startAutoRefreshLoop();
