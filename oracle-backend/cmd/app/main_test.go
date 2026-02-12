@@ -78,6 +78,31 @@ func TestRequestBodyLimitMiddleware_AuthRejectsOversizedBody(t *testing.T) {
 	}
 }
 
+func TestCSRFMiddleware_RejectsMissingHeaderOnMutatingAPI(t *testing.T) {
+	handler := csrfHeaderMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	req := httptest.NewRequest(http.MethodPost, "/api/admin/flags/update", bytes.NewBufferString(`{}`))
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 when csrf header missing, got %d", rr.Code)
+	}
+}
+
+func TestCSRFMiddleware_AllowsMutatingAPIWithHeader(t *testing.T) {
+	handler := csrfHeaderMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	req := httptest.NewRequest(http.MethodPost, "/api/admin/flags/update", bytes.NewBufferString(`{}`))
+	req.Header.Set("X-Requested-With", "XMLHttpRequest")
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected 204 when csrf header present, got %d", rr.Code)
+	}
+}
+
 func TestCleanupExpiredInMemoryStores_RemovesExpiredEntries(t *testing.T) {
 	now := time.Now()
 	sessionStore.Lock()
@@ -163,7 +188,7 @@ func TestCleanupExpiredInMemoryStores_RemovesExpiredEntries(t *testing.T) {
 	stepUpRateStore.Unlock()
 }
 
-func TestSecurityHeadersMiddleware_UsesScriptNonceAndSupportsInlineHandlers(t *testing.T) {
+func TestSecurityHeadersMiddleware_UsesScriptNonceWithoutUnsafeInline(t *testing.T) {
 	handler := securityHeadersMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if cspNonceFromContext(r.Context()) == "" {
 			t.Fatalf("expected CSP nonce in request context")
@@ -179,17 +204,98 @@ func TestSecurityHeadersMiddleware_UsesScriptNonceAndSupportsInlineHandlers(t *t
 		t.Fatalf("unexpected status: %d", rr.Code)
 	}
 	csp := rr.Header().Get("Content-Security-Policy")
-	if !strings.Contains(csp, "script-src 'self' 'unsafe-inline' 'nonce-") {
+	if !strings.Contains(csp, "script-src 'self' 'nonce-") {
 		t.Fatalf("expected nonce-based script CSP, got: %q", csp)
 	}
-	if !strings.Contains(csp, "script-src-attr 'unsafe-inline'") {
-		t.Fatalf("expected script-src-attr unsafe-inline for legacy inline handlers, got: %q", csp)
+	if strings.Contains(csp, "script-src-attr 'unsafe-inline'") || strings.Contains(csp, "script-src 'self' 'unsafe-inline'") {
+		t.Fatalf("expected CSP without unsafe-inline script permissions, got: %q", csp)
+	}
+}
+
+func TestIsValidSession_UsesPersistedAuthSessionWhenMemoryIsEmpty(t *testing.T) {
+	sqlDB, err := db.Init(filepath.Join(t.TempDir(), "persisted-session.db"))
+	if err != nil {
+		t.Fatalf("db init failed: %v", err)
+	}
+	defer sqlDB.Close()
+
+	prevDB := getAuthStateDB()
+	setAuthStateDB(sqlDB)
+	defer setAuthStateDB(prevDB)
+
+	sessionStore.Lock()
+	sessionStore.tokens = make(map[string]time.Time)
+	sessionStore.Unlock()
+
+	token := "persisted-viewer-token"
+	expiresAt := time.Now().Add(2 * time.Hour)
+	nowUnix := time.Now().Unix()
+	if _, err := sqlDB.Exec(
+		`INSERT INTO auth_sessions (token, session_kind, parent_token, expires_at, created_at, updated_at)
+		 VALUES (?, ?, '', ?, ?, ?)`,
+		token,
+		authSessionKindViewer,
+		expiresAt.Unix(),
+		nowUnix,
+		nowUnix,
+	); err != nil {
+		t.Fatalf("insert persisted session failed: %v", err)
+	}
+
+	if !isValidSession(token) {
+		t.Fatalf("expected persisted session to validate")
+	}
+
+	sessionStore.RLock()
+	_, ok := sessionStore.tokens[token]
+	sessionStore.RUnlock()
+	if !ok {
+		t.Fatalf("expected persisted session to hydrate in-memory cache")
+	}
+}
+
+func TestConsumeStepUpChallenge_UsesPersistedAuthChallenge(t *testing.T) {
+	sqlDB, err := db.Init(filepath.Join(t.TempDir(), "persisted-challenge.db"))
+	if err != nil {
+		t.Fatalf("db init failed: %v", err)
+	}
+	defer sqlDB.Close()
+
+	prevDB := getAuthStateDB()
+	setAuthStateDB(sqlDB)
+	defer setAuthStateDB(prevDB)
+
+	stepUpChallengeStore.Lock()
+	stepUpChallengeStore.items = make(map[string]stepUpChallenge)
+	stepUpChallengeStore.Unlock()
+
+	challengeID := "persisted-challenge-token"
+	clientIP := "203.0.113.44"
+	expiresAt := time.Now().Add(3 * time.Minute)
+	nowUnix := time.Now().Unix()
+	if _, err := sqlDB.Exec(
+		`INSERT INTO auth_stepup_challenges (challenge_id, client_ip, expires_at, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?)`,
+		challengeID,
+		clientIP,
+		expiresAt.Unix(),
+		nowUnix,
+		nowUnix,
+	); err != nil {
+		t.Fatalf("insert persisted challenge failed: %v", err)
+	}
+
+	if !consumeStepUpChallenge(challengeID, clientIP) {
+		t.Fatalf("expected persisted challenge to be consumed")
+	}
+	if consumeStepUpChallenge(challengeID, clientIP) {
+		t.Fatalf("expected challenge to be one-time use")
 	}
 }
 
 func TestMetricsRoute_RequiresAuthMiddleware(t *testing.T) {
 	mux := http.NewServeMux()
-	authMW := requireAuth("secret", "", false)
+	authMW := requireAuth(nil, "secret", "", false)
 	mux.Handle("/metrics", authMW(metricsHandler(appMetrics)))
 
 	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
@@ -307,7 +413,7 @@ func TestLoggingMiddleware_CapturesActorFromAuthMiddleware(t *testing.T) {
 	sessionStore.tokens[rawToken] = time.Now().Add(sessionDuration)
 	sessionStore.Unlock()
 
-	protected := requireAuth("secret", "", false)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	protected := requireAuth(nil, "secret", "", false)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	handler := loggingMiddleware(sqlDB, observability.RequestContextMiddleware(protected))
