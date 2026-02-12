@@ -118,7 +118,7 @@ func TestResolveArchiverPath_Validation(t *testing.T) {
 
 func TestAuthMiddleware_EnforcesSessionWhenEnabled(t *testing.T) {
 	resetSessionStore()
-	protected := requireAuth("secret", "", false)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	protected := requireAuth(nil, "secret", "", false)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -132,7 +132,7 @@ func TestAuthMiddleware_EnforcesSessionWhenEnabled(t *testing.T) {
 
 func TestAuthMiddleware_AllowsArchiverSecret(t *testing.T) {
 	resetSessionStore()
-	protected := requireAuth("secret", "arch-secret", false)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	protected := requireAuth(nil, "secret", "arch-secret", false)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -153,8 +153,8 @@ func TestPipelineEndpoints_RequireAuth(t *testing.T) {
 	}
 	defer sqlDB.Close()
 
-	metrics := requireAuth("secret", "arch-secret", false)(handlers.PipelineMetricsHandler(sqlDB))
-	failures := requireAuth("secret", "arch-secret", false)(handlers.PipelineFailuresHandler(sqlDB))
+	metrics := requireAuth(nil, "secret", "arch-secret", false)(handlers.PipelineMetricsHandler(sqlDB))
+	failures := requireAuth(nil, "secret", "arch-secret", false)(handlers.PipelineFailuresHandler(sqlDB))
 
 	req := httptest.NewRequest(http.MethodGet, "/api/pipeline/metrics", nil)
 	rr := httptest.NewRecorder()
@@ -182,7 +182,7 @@ func TestPipelineEndpoints_RequireAuth(t *testing.T) {
 func TestLoginHandler_SetsSecureCookieOnSuccess(t *testing.T) {
 	resetSessionStore()
 	resetLoginRateStore()
-	h := loginHandler("secret", false)
+	h := loginHandler(nil, "secret")
 
 	body := bytes.NewBufferString(`{"password":"secret"}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", body)
@@ -215,7 +215,7 @@ func TestLoginHandler_SetsSecureCookieOnSuccess(t *testing.T) {
 func TestLoginHandler_AllowsInsecureCookieOnHttpWhenAllowed(t *testing.T) {
 	resetSessionStore()
 	resetLoginRateStore()
-	h := loginHandler("secret", true)
+	h := loginHandler(nil, "secret")
 
 	body := bytes.NewBufferString(`{"password":"secret"}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", body)
@@ -245,7 +245,7 @@ func TestLoginHandler_AllowsInsecureCookieOnHttpWhenAllowed(t *testing.T) {
 func TestLoginHandler_HTTPCookieRemainsUsableWhenInsecureDisabled(t *testing.T) {
 	resetSessionStore()
 	resetLoginRateStore()
-	h := loginHandler("secret", false)
+	h := loginHandler(nil, "secret")
 
 	body := bytes.NewBufferString(`{"password":"secret"}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", body)
@@ -297,7 +297,7 @@ func TestHashPassword_UsesBcrypt(t *testing.T) {
 func TestAuthCheckHandler_ReflectsSessionState(t *testing.T) {
 	resetSessionStore()
 	resetLoginRateStore()
-	login := loginHandler("secret", false)
+	login := loginHandler(nil, "secret")
 	body := bytes.NewBufferString(`{"password":"secret"}`)
 	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", body)
 	loginReq.TLS = &tls.ConnectionState{}
@@ -318,7 +318,7 @@ func TestAuthCheckHandler_ReflectsSessionState(t *testing.T) {
 		t.Fatal("missing session cookie")
 	}
 
-	check := authCheckHandler("secret")
+	check := authCheckHandler(nil, "secret")
 	checkReq := httptest.NewRequest(http.MethodGet, "/api/auth/check", nil)
 	checkReq.AddCookie(sessionCookie)
 	checkRR := httptest.NewRecorder()
@@ -356,7 +356,7 @@ func TestIngestBatchHandler_RejectsInvalidSecret(t *testing.T) {
 func TestLoginHandler_RateLimitsAfterFailures(t *testing.T) {
 	resetSessionStore()
 	resetLoginRateStore()
-	h := loginHandler("secret", false)
+	h := loginHandler(nil, "secret")
 
 	for i := 0; i < loginMaxAttempts; i++ {
 		body := bytes.NewBufferString(`{"password":"wrong"}`)
@@ -463,7 +463,7 @@ func TestCriticalStepUpFlow_EnforcedWhenFlagEnabled(t *testing.T) {
 		t.Fatalf("failed to enable stepup flag: %v", err)
 	}
 
-	login := loginHandler("viewer-secret", false)
+	login := loginHandler(nil, "viewer-secret")
 	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(`{"password":"viewer-secret"}`))
 	loginReq.Header.Set("Content-Type", "application/json")
 	loginRR := httptest.NewRecorder()
@@ -481,7 +481,7 @@ func TestCriticalStepUpFlow_EnforcedWhenFlagEnabled(t *testing.T) {
 		t.Fatal("expected viewer session cookie")
 	}
 
-	authMW := requireAuth("viewer-secret", "", false)
+	authMW := requireAuth(nil, "viewer-secret", "", false)
 	protected := authMW(requireStepUp(sqlDB, "super-secret")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})))
@@ -511,7 +511,7 @@ func TestCriticalStepUpFlow_EnforcedWhenFlagEnabled(t *testing.T) {
 		t.Fatalf("missing challengeId: %v", startPayload)
 	}
 
-	verify := authMW(stepUpVerifyHandler(sqlDB, "super-secret", false))
+	verify := authMW(stepUpVerifyHandler(sqlDB, "super-secret"))
 	verifyReq := httptest.NewRequest(
 		http.MethodPost,
 		"/api/auth/stepup/verify",
@@ -566,7 +566,7 @@ func TestStepUpVerify_RateLimitsFailures(t *testing.T) {
 		t.Fatalf("failed to enable stepup flag: %v", err)
 	}
 
-	login := loginHandler("viewer-secret", false)
+	login := loginHandler(nil, "viewer-secret")
 	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(`{"password":"viewer-secret"}`))
 	loginReq.Header.Set("Content-Type", "application/json")
 	loginRR := httptest.NewRecorder()
@@ -584,9 +584,9 @@ func TestStepUpVerify_RateLimitsFailures(t *testing.T) {
 		t.Fatal("missing session cookie")
 	}
 
-	authMW := requireAuth("viewer-secret", "", false)
+	authMW := requireAuth(nil, "viewer-secret", "", false)
 	start := authMW(stepUpStartHandler(sqlDB))
-	verify := authMW(stepUpVerifyHandler(sqlDB, "super-secret", false))
+	verify := authMW(stepUpVerifyHandler(sqlDB, "super-secret"))
 
 	for i := 0; i < stepUpMaxAttempts+1; i++ {
 		startReq := httptest.NewRequest(http.MethodPost, "/api/auth/stepup/start", nil)
@@ -641,7 +641,7 @@ func TestCriticalStepUpFlow_BindsStepUpToParentSession(t *testing.T) {
 		t.Fatalf("failed to enable stepup flag: %v", err)
 	}
 
-	login := loginHandler("viewer-secret", false)
+	login := loginHandler(nil, "viewer-secret")
 	loginAndGetSession := func(remote string) *http.Cookie {
 		t.Helper()
 		req := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(`{"password":"viewer-secret"}`))
@@ -664,9 +664,9 @@ func TestCriticalStepUpFlow_BindsStepUpToParentSession(t *testing.T) {
 	sessionA := loginAndGetSession("203.0.113.10:1111")
 	sessionB := loginAndGetSession("203.0.113.11:2222")
 
-	authMW := requireAuth("viewer-secret", "", false)
+	authMW := requireAuth(nil, "viewer-secret", "", false)
 	start := authMW(stepUpStartHandler(sqlDB))
-	verify := authMW(stepUpVerifyHandler(sqlDB, "super-secret", false))
+	verify := authMW(stepUpVerifyHandler(sqlDB, "super-secret"))
 
 	startReq := httptest.NewRequest(http.MethodPost, "/api/auth/stepup/start", nil)
 	startReq.RemoteAddr = "203.0.113.10:1111"
