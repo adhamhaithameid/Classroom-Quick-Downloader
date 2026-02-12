@@ -251,6 +251,58 @@ func TestOutboxStatusHandler_RejectsInvalidSource(t *testing.T) {
 	}
 }
 
+func TestOutboxStatusHandler_DefaultAllWithoutPostgres(t *testing.T) {
+	sqlDB := newAdminTestDB(t)
+	defer sqlDB.Close()
+
+	nowMs := time.Now().UnixMilli()
+	if _, err := sqlDB.Exec(
+		`INSERT INTO ingest_outbox (event_type, payload_json, idempotency_key, status, attempts, last_error, created_at, next_run_at)
+		 VALUES ('e', '{}', 'status-default-all', 'pending', 0, '', ?, ?)`,
+		nowMs,
+		nowMs,
+	); err != nil {
+		t.Fatalf("seed outbox row failed: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/admin/outbox/status", nil)
+	rr := httptest.NewRecorder()
+	OutboxStatusHandler(sqlDB, nil, nil).ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var payload struct {
+		OK      bool                          `json:"ok"`
+		Source  string                        `json:"source"`
+		Sources map[string]outboxSourceStatus `json:"sources"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("parse response failed: %v", err)
+	}
+	if !payload.OK || payload.Source != "all" {
+		t.Fatalf("unexpected response: %+v", payload)
+	}
+	if _, ok := payload.Sources["sqlite"]; !ok {
+		t.Fatalf("expected sqlite source in response, got: %+v", payload.Sources)
+	}
+	if _, ok := payload.Sources["postgres"]; ok {
+		t.Fatalf("did not expect postgres source in response when postgres DB is nil: %+v", payload.Sources)
+	}
+}
+
+func TestOutboxStatusHandler_PostgresSourceWithoutPostgres(t *testing.T) {
+	sqlDB := newAdminTestDB(t)
+	defer sqlDB.Close()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/admin/outbox/status?source=postgres", nil)
+	rr := httptest.NewRecorder()
+	OutboxStatusHandler(sqlDB, nil, nil).ServeHTTP(rr, req)
+	if rr.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503 when postgres source requested without postgres DB, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
 func TestRetryOutboxHandler_RejectsInvalidSource(t *testing.T) {
 	sqlDB := newAdminTestDB(t)
 	defer sqlDB.Close()
