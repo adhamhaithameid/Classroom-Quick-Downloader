@@ -126,7 +126,7 @@
       }
 
       .sidebar-header {
-        padding: 16px;
+        padding: 12px;
         border-bottom: 1px solid var(--border-primary);
       }
 
@@ -185,7 +185,7 @@
         min-width: 0;
       }
 
-      .nav-item:hover { background: var(--bg-tertiary); color: var(--text-primary); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04); }
+      .nav-item:hover { background: none; color: var(--text-secondary); box-shadow: none; }
       .nav-item.active { background: var(--bg-tertiary); color: var(--text-primary); }
       .nav-item:focus-visible {
         outline: 2px solid rgba(59, 130, 246, 0.65);
@@ -212,7 +212,7 @@
 
       .sidebar-controls-row {
         display: grid;
-        gap: 8px;
+        gap: 4px;
       }
 
       .sidebar-controls-row.secondary {
@@ -240,9 +240,25 @@
       }
 
       .sidebar-controls .btn:hover {
-        background: var(--bg-tertiary);
-        border-color: var(--border-secondary);
-        color: var(--text-primary);
+        background: var(--bg-secondary);
+        border-color: var(--border-primary);
+        color: var(--text-secondary);
+        box-shadow: none;
+        transform: none;
+      }
+
+      .sidebar .btn:hover,
+      .sidebar .btn-secondary:hover,
+      .sidebar .btn-primary:hover,
+      .sidebar .btn-danger:hover,
+      .sidebar .btn-warning:hover {
+        box-shadow: none;
+        transform: none;
+      }
+
+      .sidebar [data-tooltip]::before,
+      .sidebar [data-tooltip]::after {
+        display: none !important;
       }
 
       #deploy-status-btn {
@@ -368,10 +384,6 @@
 
       .mobile-toolbar .btn {
         min-width: 0;
-      }
-
-      .mobile-toolbar .btn[data-shortcut] {
-        padding-right: 44px;
       }
 
       .mobile-toolbar-grid .deploy-status-btn {
@@ -1635,48 +1647,6 @@
         font-size: 12px;
         color: var(--text-secondary);
       }
-      [data-shortcut] {
-        position: relative;
-      }
-      .nav-item[data-shortcut] {
-        padding-right: 84px;
-        min-height: 36px;
-      }
-      .btn[data-shortcut] {
-        padding-right: 86px;
-        min-height: 38px;
-      }
-      [data-shortcut]::after {
-        content: '';
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        font-family: "SF Mono", Monaco, Consolas, monospace;
-        font-size: 11px;
-        line-height: 1.2;
-        font-weight: 600;
-        letter-spacing: 0.01em;
-        color: #bfdbfe;
-        border: 1px solid rgba(59,130,246,0.5);
-        border-radius: 6px;
-        min-width: 56px;
-        height: 20px;
-        padding: 0 8px;
-        background: rgba(59,130,246,0.2);
-        white-space: nowrap;
-        position: absolute;
-        right: 10px;
-        top: 50%;
-        transform: translateY(-50%);
-        opacity: 0;
-        pointer-events: none;
-        transition: opacity 0.16s ease;
-      }
-      body.show-shortcut-hints [data-shortcut]::after {
-        content: attr(data-shortcut);
-        opacity: 1;
-      }
-
       .auth-error {
         display: none;
         border: 1px solid rgba(239,68,68,0.45);
@@ -2539,8 +2509,6 @@
       let batchTab = 'info';
       let calendarMonthOffset = 0;
       let allTimeActivityPoints = [];
-      let commandHoldTimer = null;
-      let shortcutModifierHeld = false;
       let oracleClockIs24 = localStorage.getItem('oracle_clock_24h') !== 'false';
       let deploymentUpdateSentences = [];
       let refreshIntervalId = null;
@@ -5034,31 +5002,6 @@
         return tag === 'input' || tag === 'textarea' || tag === 'select' || !!target.isContentEditable;
       }
 
-      function isShortcutModifierKey(key) {
-        return key === 'Meta' || key === 'Control';
-      }
-
-      function startCommandHoldTimer() {
-        if (commandHoldTimer || document.body.classList.contains('show-shortcut-hints')) return;
-        commandHoldTimer = setTimeout(function() {
-          if (!shortcutModifierHeld) {
-            commandHoldTimer = null;
-            return;
-          }
-          document.body.classList.add('show-shortcut-hints');
-          commandHoldTimer = null;
-        }, 1000);
-      }
-
-      function clearCommandHoldHints() {
-        if (commandHoldTimer) {
-          clearTimeout(commandHoldTimer);
-          commandHoldTimer = null;
-        }
-        shortcutModifierHeld = false;
-        document.body.classList.remove('show-shortcut-hints');
-      }
-
       function runKeyboardShortcut(e) {
         if (shouldIgnoreGlobalShortcut(e)) return false;
         var usesMod = e.metaKey || e.ctrlKey;
@@ -5287,29 +5230,8 @@
         renderShortcutsList();
         bindButtonActions();
         document.addEventListener('keydown', function(e) {
-          var ignoreForTarget = shouldIgnoreGlobalShortcut(e);
-          if (isShortcutModifierKey(e.key)) {
-            if (ignoreForTarget) {
-              clearCommandHoldHints();
-              return;
-            }
-            shortcutModifierHeld = true;
-            startCommandHoldTimer();
-            return;
-          }
-
-          // If shortcut hints are visible and user continues without modifier, clear them.
-          if (document.body.classList.contains('show-shortcut-hints') && (ignoreForTarget || !(e.metaKey || e.ctrlKey))) {
-            clearCommandHoldHints();
-          }
-
-          if (e.metaKey || e.ctrlKey) {
-            if (ignoreForTarget) return;
-            shortcutModifierHeld = true;
-            if (runKeyboardShortcut(e)) {
-              e.preventDefault();
-              clearCommandHoldHints();
-            }
+          if ((e.metaKey || e.ctrlKey) && !shouldIgnoreGlobalShortcut(e) && runKeyboardShortcut(e)) {
+            e.preventDefault();
             return;
           }
 
@@ -5317,27 +5239,10 @@
             closeShortcutsModal();
             closeBatchModal();
             closeStepUpModal();
-            clearCommandHoldHints();
           }
         });
-        document.addEventListener('keyup', function(e) {
-          if (isShortcutModifierKey(e.key)) {
-            shortcutModifierHeld = !!(e.metaKey || e.ctrlKey);
-            if (shortcutModifierHeld) return;
-            clearCommandHoldHints();
-            return;
-          }
-          if (!(e.metaKey || e.ctrlKey) && document.body.classList.contains('show-shortcut-hints')) {
-            clearCommandHoldHints();
-          }
-        });
-        document.addEventListener('pointerdown', function() {
-          if (document.body.classList.contains('show-shortcut-hints')) clearCommandHoldHints();
-        });
-        window.addEventListener('blur', clearCommandHoldHints);
         document.addEventListener('visibilitychange', function() {
           if (document.hidden) {
-            clearCommandHoldHints();
             return;
           }
           ensureAuth().then(function(ok) {
