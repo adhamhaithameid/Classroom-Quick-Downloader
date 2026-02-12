@@ -30,6 +30,12 @@ func TestGetClientIPTrustedProxyUsesForwarded(t *testing.T) {
 	}
 }
 
+func TestDefaultMaxHeaderBytes_IsSetTo1MiB(t *testing.T) {
+	if defaultMaxHeaderBytes != 1<<20 {
+		t.Fatalf("expected defaultMaxHeaderBytes to be 1MiB, got %d", defaultMaxHeaderBytes)
+	}
+}
+
 func TestRequestBodyLimitMiddleware_AdminRejectsOversizedBody(t *testing.T) {
 	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, err := io.ReadAll(r.Body)
@@ -100,6 +106,34 @@ func TestCSRFMiddleware_AllowsMutatingAPIWithHeader(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 	if rr.Code != http.StatusNoContent {
 		t.Fatalf("expected 204 when csrf header present, got %d", rr.Code)
+	}
+}
+
+func TestCSRFMiddleware_RejectsCrossOriginMutatingAPI(t *testing.T) {
+	handler := csrfHeaderMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	req := httptest.NewRequest(http.MethodPost, "http://oracle.local/api/admin/flags/update", bytes.NewBufferString(`{}`))
+	req.Header.Set("X-Requested-With", "XMLHttpRequest")
+	req.Header.Set("Origin", "https://evil.example")
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+	if rr.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 when origin mismatches host, got %d", rr.Code)
+	}
+}
+
+func TestCSRFMiddleware_AllowsMatchingOriginMutatingAPI(t *testing.T) {
+	handler := csrfHeaderMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	req := httptest.NewRequest(http.MethodPost, "http://oracle.local/api/admin/flags/update", bytes.NewBufferString(`{}`))
+	req.Header.Set("X-Requested-With", "XMLHttpRequest")
+	req.Header.Set("Origin", "https://oracle.local")
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected 204 when origin matches host, got %d", rr.Code)
 	}
 }
 
