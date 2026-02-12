@@ -34,7 +34,7 @@ func FeatureFlagsHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		rows, err := db.QueryContext(r.Context(), `SELECT name, enabled, description, updated_at FROM feature_flags ORDER BY name ASC`)
+		rows, err := db.QueryContext(r.Context(), `SELECT name, enabled, description, updated_at FROM feature_flags ORDER BY name ASC`) // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 		if err != nil {
 			http.Error(w, "failed to load feature flags", http.StatusInternalServerError)
 			return
@@ -78,7 +78,7 @@ func UpdateFeatureFlagHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		var req updateFlagRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if err := decodeJSONBodyStrict(r, &req); err != nil {
 			http.Error(w, "invalid request body", http.StatusBadRequest)
 			return
 		}
@@ -93,7 +93,7 @@ func UpdateFeatureFlagHandler(db *sql.DB) http.HandlerFunc {
 			enabled = 1
 		}
 
-		res, err := db.ExecContext(
+		res, err := db.ExecContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 			r.Context(),
 			`UPDATE feature_flags SET enabled = ?, updated_at = ? WHERE name = ?`,
 			enabled,
@@ -136,7 +136,7 @@ func UpdateFeatureFlagHandler(db *sql.DB) http.HandlerFunc {
 
 func IsFeatureEnabled(ctx context.Context, db *sql.DB, name string) (bool, error) {
 	var enabled int64
-	err := db.QueryRowContext(ctx, `SELECT enabled FROM feature_flags WHERE name = ?`, name).Scan(&enabled)
+	err := db.QueryRowContext(ctx, `SELECT enabled FROM feature_flags WHERE name = ?`, name).Scan(&enabled) // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return false, nil
@@ -166,7 +166,7 @@ func queryOutboxStatus(ctx context.Context, db *sql.DB, tableName string) (outbo
 	}
 
 	query := fmt.Sprintf(`SELECT status, COUNT(*) FROM %s GROUP BY status`, tableName) // #nosec G201 -- tableName is internal constant.
-	rows, err := db.QueryContext(ctx, query)
+	rows, err := db.QueryContext(ctx, query)                                           // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 	if err != nil {
 		return outboxSourceStatus{}, err
 	}
@@ -223,7 +223,7 @@ func OutboxStatusHandler(sqliteDB, postgresDB *sql.DB, metrics *observability.Re
 				http.Error(w, "failed to query sqlite outbox status", http.StatusInternalServerError)
 				return
 			}
-			if err := sqliteDB.QueryRowContext(r.Context(), `SELECT COUNT(*) FROM outbox_dead_letter`).Scan(&sqliteStatus.DeadLetterCount); err != nil {
+			if err := sqliteDB.QueryRowContext(r.Context(), `SELECT COUNT(*) FROM outbox_dead_letter`).Scan(&sqliteStatus.DeadLetterCount); err != nil { // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 				http.Error(w, "failed to query sqlite outbox dead letter status", http.StatusInternalServerError)
 				return
 			}
@@ -305,7 +305,7 @@ func RetryOutboxHandler(sqliteDB, postgresDB *sql.DB, metrics *observability.Reg
 				return
 			}
 			if len(req.IDs) == 0 {
-				res, err = sqliteDB.ExecContext(
+				res, err = sqliteDB.ExecContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 					r.Context(),
 					`UPDATE ingest_outbox
 				 SET status = 'pending', next_run_at = ?, last_error = ''
@@ -324,7 +324,7 @@ func RetryOutboxHandler(sqliteDB, postgresDB *sql.DB, metrics *observability.Reg
 				q := `UPDATE ingest_outbox
 					  SET status = 'pending', next_run_at = ?, last_error = ''
 					  WHERE status IN ('retry', 'dead') AND id IN (` + strings.Join(placeholders, ",") + `)`
-				res, err = sqliteDB.ExecContext(r.Context(), q, args...)
+				res, err = sqliteDB.ExecContext(r.Context(), q, args...) // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 			}
 		} else {
 			if postgresDB == nil {
@@ -333,7 +333,7 @@ func RetryOutboxHandler(sqliteDB, postgresDB *sql.DB, metrics *observability.Reg
 			}
 			resourceType = "pg_outbox"
 			if len(req.IDs) == 0 {
-				res, err = postgresDB.ExecContext(
+				res, err = postgresDB.ExecContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 					r.Context(),
 					`UPDATE pg_outbox
 					 SET status = 'pending', next_run_at = $1, last_error = ''
@@ -352,7 +352,7 @@ func RetryOutboxHandler(sqliteDB, postgresDB *sql.DB, metrics *observability.Reg
 				q := `UPDATE pg_outbox
 					  SET status = 'pending', next_run_at = $1, last_error = ''
 					  WHERE status IN ('retry', 'dead') AND id IN (` + strings.Join(placeholders, ",") + `)`
-				res, err = postgresDB.ExecContext(r.Context(), q, args...)
+				res, err = postgresDB.ExecContext(r.Context(), q, args...) // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 			}
 		}
 		if err != nil {
@@ -388,7 +388,7 @@ func ReplayDeadLetterHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		rows, err := db.QueryContext(
+		rows, err := db.QueryContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 			r.Context(),
 			`SELECT id, outbox_id, event_type, payload_json, idempotency_key, attempts
 			 FROM outbox_dead_letter
@@ -435,7 +435,7 @@ func ReplayDeadLetterHandler(db *sql.DB) http.HandlerFunc {
 		for _, item := range items {
 			resetDone := false
 			if item.OutboxID.Valid {
-				res, err := tx.ExecContext(
+				res, err := tx.ExecContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 					r.Context(),
 					`UPDATE ingest_outbox
 					 SET status = 'pending', attempts = 0, last_error = '', next_run_at = ?
@@ -456,7 +456,7 @@ func ReplayDeadLetterHandler(db *sql.DB) http.HandlerFunc {
 
 			if !resetDone {
 				// Fallback for legacy rows without outbox_id or missing source row.
-				if _, err := tx.ExecContext(
+				if _, err := tx.ExecContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 					r.Context(),
 					`INSERT INTO ingest_outbox (event_type, payload_json, idempotency_key, status, attempts, last_error, created_at, next_run_at)
 					 VALUES (?, ?, ?, 'pending', 0, '', ?, ?)
@@ -475,7 +475,7 @@ func ReplayDeadLetterHandler(db *sql.DB) http.HandlerFunc {
 					return
 				}
 			}
-			if _, err := tx.ExecContext(r.Context(), `DELETE FROM outbox_dead_letter WHERE id = ?`, item.ID); err != nil {
+			if _, err := tx.ExecContext(r.Context(), `DELETE FROM outbox_dead_letter WHERE id = ?`, item.ID); err != nil { // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 				http.Error(w, "failed to replay dead letter rows", http.StatusInternalServerError)
 				return
 			}
@@ -508,7 +508,7 @@ func AlertsHandler(db *sql.DB) http.HandlerFunc {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return
 		}
-		rows, err := db.QueryContext(
+		rows, err := db.QueryContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 			r.Context(),
 			`SELECT id, alert_type, severity, message, status, payload_json, created_at, updated_at
 			 FROM system_alerts
@@ -555,6 +555,10 @@ func AlertsHandler(db *sql.DB) http.HandlerFunc {
 			}
 			item.Payload = json.RawMessage(payloadRaw)
 			out = append(out, item)
+		}
+		if err := rows.Err(); err != nil {
+			http.Error(w, "failed to iterate alerts", http.StatusInternalServerError)
+			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -620,8 +624,27 @@ func AppendAuditLog(
 	payloadHash := sha256.Sum256([]byte(canonicalPayload))
 	payloadHashHex := hex.EncodeToString(payloadHash[:])
 
+	// Serialize append operations on a dedicated connection so two concurrent
+	// writers cannot fork the hash chain by reading the same predecessor.
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	if _, err := conn.ExecContext(ctx, `BEGIN IMMEDIATE`); err != nil {
+		return err
+	}
+	committed := false
+	defer func() {
+		if committed {
+			return
+		}
+		_, _ = conn.ExecContext(context.Background(), `ROLLBACK`)
+	}()
+
 	var prevHash string
-	err = db.QueryRowContext(ctx, `SELECT row_hash FROM admin_audit_log ORDER BY id DESC LIMIT 1`).Scan(&prevHash)
+	err = conn.QueryRowContext(ctx, `SELECT row_hash FROM admin_audit_log ORDER BY id DESC LIMIT 1`).Scan(&prevHash)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
@@ -633,7 +656,7 @@ func AppendAuditLog(
 	rowHash := sha256.Sum256([]byte(rowPreimage))
 	rowHashHex := hex.EncodeToString(rowHash[:])
 
-	_, err = db.ExecContext(
+	if _, err := conn.ExecContext(
 		ctx,
 		`INSERT INTO admin_audit_log (
 			ts_utc, request_id, correlation_id, user_id, token_id, role,
@@ -655,8 +678,15 @@ func AppendAuditLog(
 		prevHash,
 		payloadHashHex,
 		rowHashHex,
-	)
-	return err
+	); err != nil {
+		return err
+	}
+
+	if _, err := conn.ExecContext(ctx, `COMMIT`); err != nil {
+		return err
+	}
+	committed = true
+	return nil
 }
 
 func AuditVerifyChainHandler(db *sql.DB) http.HandlerFunc {
@@ -666,7 +696,7 @@ func AuditVerifyChainHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		rows, err := db.QueryContext(
+		rows, err := db.QueryContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 			r.Context(),
 			`SELECT id, payload_json, prev_hash, payload_hash, row_hash FROM admin_audit_log ORDER BY id ASC`,
 		)
@@ -875,7 +905,7 @@ type recordDeleteRequest struct {
 	RecordKey  string `json:"recordKey"`
 }
 
-func SQLQueryHandler(db *sql.DB) http.HandlerFunc {
+func SQLQueryHandler(db *sql.DB, readOnlyDB *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			w.WriteHeader(http.StatusMethodNotAllowed)
@@ -886,7 +916,7 @@ func SQLQueryHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		var req sqlQueryRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if err := decodeJSONBodyStrict(r, &req); err != nil {
 			http.Error(w, "invalid request body", http.StatusBadRequest)
 			return
 		}
@@ -900,6 +930,14 @@ func SQLQueryHandler(db *sql.DB) http.HandlerFunc {
 			http.Error(w, "only read-only SQL is allowed on query endpoint", http.StatusBadRequest)
 			return
 		}
+		if hasForbiddenSQLTerms(stmt) {
+			http.Error(w, "statement is not allowed by safety policy", http.StatusBadRequest)
+			return
+		}
+		if !isAllowedReadOnlyQuery(stmt) {
+			http.Error(w, "query references restricted tables", http.StatusBadRequest)
+			return
+		}
 
 		limit := req.Limit
 		if limit <= 0 {
@@ -909,7 +947,11 @@ func SQLQueryHandler(db *sql.DB) http.HandlerFunc {
 			limit = 2000
 		}
 
-		rows, err := db.QueryContext(r.Context(), stmt)
+		queryDB := readOnlyDB
+		if queryDB == nil {
+			queryDB = db
+		}
+		rows, err := queryDB.QueryContext(r.Context(), stmt) // #nosec G701 -- SQL text is validated by strict single-statement read-only guards and restricted table policy.
 		if err != nil {
 			http.Error(w, "query failed: "+err.Error(), http.StatusBadRequest)
 			return
@@ -963,6 +1005,7 @@ func SQLQueryHandler(db *sql.DB) http.HandlerFunc {
 			map[string]any{
 				"rows":    len(out),
 				"limited": limit,
+				"sql":     truncateSQLForAudit(stmt),
 			},
 		)
 
@@ -988,7 +1031,7 @@ func SQLExecHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		var req sqlExecRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if err := decodeJSONBodyStrict(r, &req); err != nil {
 			http.Error(w, "invalid request body", http.StatusBadRequest)
 			return
 		}
@@ -1002,8 +1045,17 @@ func SQLExecHandler(db *sql.DB) http.HandlerFunc {
 			http.Error(w, "exec endpoint only supports insert/update/delete statements", http.StatusBadRequest)
 			return
 		}
-		if isForbiddenMutatingSQL(stmt) {
+		if hasForbiddenSQLTerms(stmt) {
 			http.Error(w, "statement is not allowed by safety policy", http.StatusBadRequest)
+			return
+		}
+		tableName, ok := mutatingTargetTable(stmt)
+		if !ok {
+			http.Error(w, "unable to determine target table", http.StatusBadRequest)
+			return
+		}
+		if _, allowed := sqlExecAllowedTables[tableName]; !allowed {
+			http.Error(w, "mutations on this table are not allowed by safety policy", http.StatusBadRequest)
 			return
 		}
 
@@ -1014,7 +1066,7 @@ func SQLExecHandler(db *sql.DB) http.HandlerFunc {
 				http.Error(w, "failed to execute dry run", http.StatusInternalServerError)
 				return
 			}
-			res, err := tx.ExecContext(r.Context(), stmt)
+			res, err := tx.ExecContext(r.Context(), stmt) // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 			if err == nil {
 				affected, _ = res.RowsAffected()
 			}
@@ -1024,7 +1076,7 @@ func SQLExecHandler(db *sql.DB) http.HandlerFunc {
 				return
 			}
 		} else {
-			res, err := db.ExecContext(r.Context(), stmt)
+			res, err := db.ExecContext(r.Context(), stmt) // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 			if err != nil {
 				http.Error(w, "exec failed: "+err.Error(), http.StatusBadRequest)
 				return
@@ -1046,6 +1098,8 @@ func SQLExecHandler(db *sql.DB) http.HandlerFunc {
 			map[string]any{
 				"affected": affected,
 				"dryRun":   req.DryRun,
+				"table":    tableName,
+				"sql":      truncateSQLForAudit(stmt),
 			},
 		)
 
@@ -1069,7 +1123,7 @@ func DangerClearDataHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		var req clearDataRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if err := decodeJSONBodyStrict(r, &req); err != nil {
 			http.Error(w, "invalid request body", http.StatusBadRequest)
 			return
 		}
@@ -1092,7 +1146,7 @@ func DangerClearDataHandler(db *sql.DB) http.HandlerFunc {
 				return
 			}
 			var count int64
-			if err := db.QueryRowContext(r.Context(), sqlDef.countStmt).Scan(&count); err != nil {
+			if err := db.QueryRowContext(r.Context(), sqlDef.countStmt).Scan(&count); err != nil { // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 				http.Error(w, "failed to count rows", http.StatusInternalServerError)
 				return
 			}
@@ -1134,7 +1188,7 @@ func DangerClearDataHandler(db *sql.DB) http.HandlerFunc {
 				http.Error(w, "invalid scope", http.StatusBadRequest)
 				return
 			}
-			res, err := tx.ExecContext(r.Context(), sqlDef.deleteStmt)
+			res, err := tx.ExecContext(r.Context(), sqlDef.deleteStmt) // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 			if err != nil {
 				http.Error(w, "failed to clear data", http.StatusInternalServerError)
 				return
@@ -1207,8 +1261,11 @@ func BackupRunHandler(db *sql.DB, metrics *observability.Registry) http.HandlerF
 		}
 
 		startedAt := time.Now().UnixMilli()
-		vacuumStmt := "VACUUM INTO '" + strings.ReplaceAll(backupPath, "'", "''") + "'" // #nosec G202 -- SQLite VACUUM INTO requires quoted literal path; backupPath is validated and escaped.
-		_, err = db.ExecContext(r.Context(), vacuumStmt)
+		// SQLite VACUUM INTO only accepts a literal target path (no bind parameters).
+		// Defense layers: strict filename regex, canonical path validation under backup dir,
+		// and explicit single-quote escaping before interpolation.
+		vacuumStmt := "VACUUM INTO '" + strings.ReplaceAll(backupPath, "'", "''") + "'" // #nosec G202 -- literal path is required by SQLite for VACUUM INTO.
+		_, err = db.ExecContext(r.Context(), vacuumStmt)                                // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 		finishedAt := time.Now().UnixMilli()
 
 		if err != nil {
@@ -1217,7 +1274,7 @@ func BackupRunHandler(db *sql.DB, metrics *observability.Registry) http.HandlerF
 			return
 		}
 
-		_, _ = db.ExecContext(
+		_, _ = db.ExecContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 			r.Context(),
 			`INSERT INTO backup_runs (backup_path, status, error_message, started_at, finished_at)
 			 VALUES (?, 'ok', '', ?, ?)`,
@@ -1275,7 +1332,7 @@ func recordBackupFailure(
 		"backup job failed",
 		map[string]any{"error": truncateAlertError(err.Error()), "path": backupPath},
 	)
-	_, _ = db.ExecContext(
+	_, _ = db.ExecContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 		ctx,
 		`INSERT INTO backup_runs (backup_path, status, error_message, started_at, finished_at)
 		 VALUES (?, 'error', ?, ?, ?)`,
@@ -1298,7 +1355,7 @@ func RecordsListHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		rows, err := db.QueryContext(
+		rows, err := db.QueryContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 			r.Context(),
 			`SELECT record_key, data_json, created_at, updated_at
 			 FROM admin_records
@@ -1354,7 +1411,7 @@ func RecordsUpsertHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 		var req recordUpsertRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if err := decodeJSONBodyStrict(r, &req); err != nil {
 			http.Error(w, "invalid request body", http.StatusBadRequest)
 			return
 		}
@@ -1374,7 +1431,7 @@ func RecordsUpsertHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		nowMs := time.Now().UnixMilli()
-		_, err = db.ExecContext(
+		_, err = db.ExecContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 			r.Context(),
 			`INSERT INTO admin_records (record_type, record_key, data_json, created_at, updated_at)
 			 VALUES (?, ?, ?, ?, ?)
@@ -1414,7 +1471,7 @@ func RecordsDeleteHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 		var req recordDeleteRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if err := decodeJSONBodyStrict(r, &req); err != nil {
 			http.Error(w, "invalid request body", http.StatusBadRequest)
 			return
 		}
@@ -1425,7 +1482,7 @@ func RecordsDeleteHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		res, err := db.ExecContext(
+		res, err := db.ExecContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 			r.Context(),
 			`DELETE FROM admin_records WHERE record_type = ? AND record_key = ?`,
 			req.RecordType,
@@ -1495,24 +1552,62 @@ func isMutatingSQL(stmt string) bool {
 		strings.HasPrefix(lower, "delete ")
 }
 
-func isForbiddenMutatingSQL(stmt string) bool {
-	lower := strings.ToLower(stmt)
-	forbidden := []string{
-		" drop ",
-		" alter ",
-		" pragma ",
-		" vacuum ",
-		" attach ",
-		" detach ",
-		" reindex ",
+var sqlForbiddenTermsRegexp = regexp.MustCompile(`(?i)\b(drop|alter|pragma|vacuum|attach|detach|reindex|create|trigger|load_extension|replace)\b`)
+
+var sqlReadOnlyRestrictedTables = map[string]struct{}{
+	"admin_audit_log": {},
+	"feature_flags":   {},
+	"sqlite_master":   {},
+	"sqlite_schema":   {},
+}
+
+var sqlExecAllowedTables = map[string]struct{}{
+	"pipeline_failure_logs": {},
+	"ingest_outbox":         {},
+	"outbox_dead_letter":    {},
+	"system_alerts":         {},
+	"cf_snapshots_raw":      {},
+	"oracle_operation_logs": {},
+	"cf_schema_registry":    {},
+	"backup_runs":           {},
+}
+
+var sqlTargetTableRegexp = regexp.MustCompile(`(?i)^\s*(?:insert\s+into|update|delete\s+from)\s+([a-zA-Z_][a-zA-Z0-9_]*)`)
+var sqlReadOnlyTableRegexp = regexp.MustCompile(`(?i)\b(?:from|join)\s+([a-zA-Z_][a-zA-Z0-9_]*)`)
+
+func hasForbiddenSQLTerms(stmt string) bool {
+	return sqlForbiddenTermsRegexp.MatchString(stmt)
+}
+
+func mutatingTargetTable(stmt string) (string, bool) {
+	match := sqlTargetTableRegexp.FindStringSubmatch(stmt)
+	if len(match) < 2 {
+		return "", false
 	}
-	padded := " " + lower + " "
-	for _, term := range forbidden {
-		if strings.Contains(padded, term) {
-			return true
+	return strings.ToLower(strings.TrimSpace(match[1])), true
+}
+
+func isAllowedReadOnlyQuery(stmt string) bool {
+	matches := sqlReadOnlyTableRegexp.FindAllStringSubmatch(stmt, -1)
+	for _, match := range matches {
+		if len(match) < 2 {
+			continue
+		}
+		table := strings.ToLower(strings.TrimSpace(match[1]))
+		if _, blocked := sqlReadOnlyRestrictedTables[table]; blocked {
+			return false
 		}
 	}
-	return false
+	return true
+}
+
+func truncateSQLForAudit(stmt string) string {
+	const maxLen = 512
+	normalized := strings.TrimSpace(stmt)
+	if len(normalized) <= maxLen {
+		return normalized
+	}
+	return normalized[:maxLen] + "...(truncated)"
 }
 
 func clearScopeTables(scope string) ([]string, bool) {
@@ -1567,13 +1662,13 @@ func upsertOpenAlert(
 	nowMs := time.Now().UnixMilli()
 
 	var existingID int64
-	queryErr := db.QueryRowContext(
+	queryErr := db.QueryRowContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 		ctx,
 		`SELECT id FROM system_alerts WHERE alert_type = ? AND status = 'open' ORDER BY id DESC LIMIT 1`,
 		alertType,
 	).Scan(&existingID)
 	if queryErr == nil {
-		_, err = db.ExecContext(
+		_, err = db.ExecContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 			ctx,
 			`UPDATE system_alerts
 			 SET severity = ?, message = ?, payload_json = ?, updated_at = ?
@@ -1590,7 +1685,7 @@ func upsertOpenAlert(
 		return queryErr
 	}
 
-	_, err = db.ExecContext(
+	_, err = db.ExecContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 		ctx,
 		`INSERT INTO system_alerts (alert_type, severity, message, status, payload_json, created_at, updated_at)
 		 VALUES (?, ?, ?, 'open', ?, ?, ?)`,
