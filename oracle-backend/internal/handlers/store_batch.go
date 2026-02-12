@@ -155,7 +155,7 @@ func ingestBatch(ctx context.Context, db *sql.DB, batch *model.OracleBatch, rawB
 
 	// Idempotency: if batch_id exists, do nothing.
 	var exists int
-	err = tx.QueryRowContext(ctx, `SELECT 1 FROM batches WHERE batch_id = ?`, batch.BatchID).Scan(&exists)
+	err = tx.QueryRowContext(ctx, `SELECT 1 FROM batches WHERE batch_id = ?`, batch.BatchID).Scan(&exists) // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
@@ -182,6 +182,12 @@ func ingestBatch(ctx context.Context, db *sql.DB, batch *model.OracleBatch, rawB
 		totalSuccess += b.Totals.TotalSuccess
 		totalFail += b.Totals.TotalFail
 	}
+	if len(batch.TimeBuckets) == 0 {
+		totalEvents = batch.Summary.Totals.TotalEvents
+		totalDownloads = batch.Summary.Totals.TotalDownloads
+		totalSuccess = batch.Summary.Totals.TotalSuccess
+		totalFail = batch.Summary.Totals.TotalFail
+	}
 
 	nowMs := time.Now().UnixMilli()
 	generatedAt := batch.GeneratedAt
@@ -190,7 +196,7 @@ func ingestBatch(ctx context.Context, db *sql.DB, batch *model.OracleBatch, rawB
 	}
 
 	// Insert into batches.
-	if _, err := tx.ExecContext(
+	if _, err := tx.ExecContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 		ctx,
 		`INSERT INTO batches (
 			batch_id, generated_at, ingested_at, time_zone,
@@ -282,7 +288,7 @@ func insertRawSnapshot(
 	sanitizedBody := sanitizeRawSnapshotPayload(body)
 	sum := sha256.Sum256(sanitizedBody)
 	fingerprint := hex.EncodeToString(sum[:])
-	_, err := tx.ExecContext(
+	_, err := tx.ExecContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 		ctx,
 		`INSERT INTO cf_snapshots_raw (
 			source, endpoint, payload_json, schema_fingerprint, status, received_at
@@ -393,12 +399,12 @@ func registerSchemaPaths(ctx context.Context, tx *sql.Tx, payload map[string]int
 	for _, path := range keys {
 		sampleType := paths[path]
 		var exists int
-		err := tx.QueryRowContext(ctx, `SELECT 1 FROM cf_schema_registry WHERE json_path = ?`, path).Scan(&exists)
+		err := tx.QueryRowContext(ctx, `SELECT 1 FROM cf_schema_registry WHERE json_path = ?`, path).Scan(&exists) // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return err
 		}
 		if errors.Is(err, sql.ErrNoRows) {
-			if _, err := tx.ExecContext(
+			if _, err := tx.ExecContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 				ctx,
 				`INSERT INTO cf_schema_registry (json_path, first_seen_at, last_seen_at, sample_type, is_projected)
 				 VALUES (?, ?, ?, ?, 0)`,
@@ -412,7 +418,7 @@ func registerSchemaPaths(ctx context.Context, tx *sql.Tx, payload map[string]int
 			newCount++
 			continue
 		}
-		if _, err := tx.ExecContext(
+		if _, err := tx.ExecContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 			ctx,
 			`UPDATE cf_schema_registry SET last_seen_at = ?, sample_type = ? WHERE json_path = ?`,
 			nowMs,
@@ -427,7 +433,7 @@ func registerSchemaPaths(ctx context.Context, tx *sql.Tx, payload map[string]int
 		alertPayload, _ := json.Marshal(map[string]interface{}{
 			"newPaths": newCount,
 		})
-		if _, err := tx.ExecContext(
+		if _, err := tx.ExecContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 			ctx,
 			`INSERT INTO system_alerts (alert_type, severity, message, status, payload_json, created_at, updated_at)
 			 VALUES (?, ?, ?, 'open', ?, ?, ?)`,
@@ -460,7 +466,12 @@ func walkJSONPaths(prefix string, value interface{}, out map[string]string) {
 			out[prefix+"[]"] = "array"
 		}
 		for _, child := range v {
-			walkJSONPaths(prefix+"[]", child, out)
+			switch child.(type) {
+			case map[string]interface{}, []interface{}:
+				walkJSONPaths(prefix+"[]", child, out)
+			default:
+				// Keep array marker stable for scalar arrays.
+			}
 		}
 	case nil:
 		if prefix != "" {
@@ -491,7 +502,7 @@ func enqueueSQLiteOutbox(ctx context.Context, tx *sql.Tx, eventType string, payl
 		return err
 	}
 	nowMs := time.Now().UnixMilli()
-	_, err = tx.ExecContext(
+	_, err = tx.ExecContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 		ctx,
 		`INSERT INTO ingest_outbox (event_type, payload_json, idempotency_key, status, attempts, last_error, created_at, next_run_at)
 		 VALUES (?, ?, ?, 'pending', 0, '', ?, ?)
@@ -583,6 +594,7 @@ func isValidIP(ip string) bool {
 }
 
 func insertHourly(ctx context.Context, tx *sql.Tx, batch *model.OracleBatch) error {
+	// #nosec G701 -- statement is static SQL; all dynamic values are bound parameters.
 	stmt, err := tx.PrepareContext(ctx, `
 		INSERT INTO downloads_hourly (
 			bucket_start,
@@ -685,6 +697,30 @@ func updateTotals(ctx context.Context, tx *sql.Tx, batch *model.OracleBatch) err
 			aggErrorType[k] += v
 		}
 	}
+	if len(batch.TimeBuckets) == 0 {
+		aggEvents = batch.Summary.Totals.TotalEvents
+		aggDownloads = batch.Summary.Totals.TotalDownloads
+		aggSuccess = batch.Summary.Totals.TotalSuccess
+		aggFail = batch.Summary.Totals.TotalFail
+		for k, v := range batch.Summary.Browsers {
+			aggBrowser[k] += v
+		}
+		for k, v := range batch.Summary.Os {
+			aggOs[k] += v
+		}
+		for k, v := range batch.Summary.Countries {
+			aggCountry[k] += v
+		}
+		for k, v := range batch.Summary.Languages {
+			aggLang[k] += v
+		}
+		for k, v := range batch.Summary.Versions {
+			aggExtVer[k] += v
+		}
+		for k, v := range batch.Summary.Types {
+			aggType[k] += v
+		}
+	}
 
 	// Lifetime totals (global).
 	if err := upsertTotal(ctx, tx, "totalEvents", aggEvents); err != nil {
@@ -763,6 +799,7 @@ func upsertTotal(ctx context.Context, tx *sql.Tx, key string, delta int64) error
 	if delta == 0 {
 		return nil
 	}
+	// #nosec G701 -- statement is static SQL; key/delta are passed as bound parameters.
 	_, err := tx.ExecContext(ctx, `
 		INSERT INTO downloads_totals (key, value)
 		VALUES (?, ?)
@@ -809,7 +846,7 @@ func insertDOStateSnapshot(ctx context.Context, tx *sql.Tx, batch *model.OracleB
 		}
 	}
 
-	_, err := tx.ExecContext(
+	_, err := tx.ExecContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 		ctx,
 		`INSERT INTO do_state_snapshots (
 			captured_at,
@@ -911,7 +948,7 @@ func upsertDeliveryMetrics(ctx context.Context, tx *sql.Tx, batch *model.OracleB
 		if stage.count <= 0 {
 			continue
 		}
-		if _, err := tx.ExecContext(
+		if _, err := tx.ExecContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 			ctx,
 			`INSERT INTO pipeline_stage_daily (day_utc, stage, count, updated_at)
 			 VALUES (?, ?, ?, ?)
@@ -934,7 +971,7 @@ func upsertDeliveryMetrics(ctx context.Context, tx *sql.Tx, batch *model.OracleB
 		status = "forwarded"
 	}
 
-	_, err := tx.ExecContext(
+	_, err := tx.ExecContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 		ctx,
 		`INSERT INTO pipeline_delivery_events (
 			delivery_id, batch_id, created_at, updated_at,
@@ -1036,7 +1073,7 @@ func cleanupOldFailureLogs(ctx context.Context, tx *sql.Tx, retentionDays int) e
 		return nil
 	}
 	cutoff := time.Now().UTC().AddDate(0, 0, -retentionDays).UnixMilli()
-	_, err := tx.ExecContext(ctx, `DELETE FROM pipeline_failure_logs WHERE ts_utc < ?`, cutoff)
+	_, err := tx.ExecContext(ctx, `DELETE FROM pipeline_failure_logs WHERE ts_utc < ?`, cutoff) // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 	return err
 }
 
