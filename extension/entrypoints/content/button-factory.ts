@@ -47,6 +47,7 @@ export function createDownloadButton(
   const label = document.createElement('span');
   label.className = 'cqd-label';
   label.textContent = t('download');
+  label.setAttribute('data-cancel-label', t('cancel') || 'Cancel');
 
   const errorDetail = document.createElement('span');
   errorDetail.className = 'cqd-error-detail';
@@ -61,40 +62,30 @@ export function createDownloadButton(
     const s = getButtonState(button);
     if (s === 'loading' || s === 'trying') {
       button.classList.add('cqd-cancel');
-      const btnLabel = button.querySelector<HTMLSpanElement>('.cqd-label');
-      const icon = button.querySelector<HTMLElement>('.cqd-download-icon');
-      if (btnLabel) btnLabel.textContent = t('cancel') || 'Cancel';
-      if (icon) {
-        icon.className = 'cqd-download-icon';
-        icon.style.backgroundImage = `url("${CANCEL_ICON_SVG_URL}")`;
-      }
     }
   });
 
   // Mouse leave: revert to active state
   button.addEventListener('mouseleave', () => {
     (button.dataset as any).cqdMouseOver = 'false';
-    const wasCancel = button.classList.contains('cqd-cancel');
-    const isUnderlyingLoading = button.classList.contains('cqd-loading');
-    const isUnderlyingTrying = button.classList.contains('cqd-trying');
+    // If we added cqd-cancel on hover, remove it now
+    if (button.classList.contains('cqd-cancel')) {
+      // Check if we should actually remove it (only if underlying state is loading/trying)
+      // But getButtonState returns 'cancel' if cqd-cancel is present.
+      // We rely on the fact that if we added it purely for hover, we can remove it.
+      // If the state was legitimately set to 'cancel' via setButtonState, cqd-loading would have been removed.
+      // But cqd-cancel class is the same for both hover and permanent state.
 
-    if (wasCancel) {
-      button.classList.remove('cqd-cancel');
-      const btnLabel = button.querySelector<HTMLSpanElement>('.cqd-label');
-      const icon = button.querySelector<HTMLElement>('.cqd-download-icon');
+      const isUnderlyingLoading = button.classList.contains('cqd-loading');
+      const isUnderlyingTrying = button.classList.contains('cqd-trying');
 
-      if (isUnderlyingLoading) {
-        if (btnLabel) btnLabel.textContent = t('downloading') || 'Downloading...';
-        if (icon) {
-          icon.className = 'cqd-download-icon cqd-spinner';
-          icon.style.backgroundImage = 'none';
-        }
-      } else if (isUnderlyingTrying) {
-        if (btnLabel) btnLabel.textContent = t('trying') || 'Retrying...';
-        if (icon) {
-          icon.className = 'cqd-download-icon cqd-spinner';
-          icon.style.backgroundImage = 'none';
-        }
+      // Only remove cqd-cancel if there is an underlying active state we want to revert to.
+      // If there is NO underlying state (e.g. permanent cancel), we might have an issue?
+      // But permanent cancel state replaces all classes, so cqd-loading is NOT present.
+      // So checking for cqd-loading / cqd-trying ensures we only revert if we were in those states.
+
+      if (isUnderlyingLoading || isUnderlyingTrying) {
+        button.classList.remove('cqd-cancel');
       }
     }
   });

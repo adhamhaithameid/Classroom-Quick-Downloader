@@ -273,6 +273,27 @@ export function injectStyles(): void {
       cursor: pointer;
     }
 
+    /* Override spinner and icon for cancel state */
+    .cqd-download-btn.cqd-cancel .cqd-download-icon {
+      background-image: url("${CANCEL_ICON_SVG_URL}") !important;
+      background-size: 20px 20px !important;
+      width: 24px !important;
+      height: 24px !important;
+      border: none !important;
+      border-radius: 0 !important;
+    }
+
+    /* Swap label text for cancel state */
+    .cqd-download-btn.cqd-cancel .cqd-label {
+      font-size: 0 !important;
+    }
+
+    .cqd-download-btn.cqd-cancel .cqd-label::before {
+      content: attr(data-cancel-label);
+      font-size: 13px;
+      visibility: visible;
+    }
+
     /* Cancel state - smooth entry animation when hover starts */
     .cqd-download-btn.cqd-loading:hover,
     .cqd-download-btn.cqd-trying:hover {

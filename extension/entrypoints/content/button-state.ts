@@ -116,7 +116,7 @@ export function setButtonState(
       label.textContent = t('downloading');
       button.disabled = false;
       if (isMouseOver) {
-        applyHoverCancelVisual(button, icon, label);
+        applyHoverCancelVisual(button);
       }
       break;
 
@@ -126,7 +126,7 @@ export function setButtonState(
       label.textContent = options?.userMessage || t('trying') || 'Retrying...';
       button.disabled = false;
       if (isMouseOver) {
-        applyHoverCancelVisual(button, icon, label);
+        applyHoverCancelVisual(button);
       }
       break;
 
@@ -164,16 +164,8 @@ export function setButtonState(
 /**
  * Apply cancel visual when hovering over active download.
  */
-function applyHoverCancelVisual(
-  button: HTMLButtonElement,
-  icon: HTMLElement,
-  label: HTMLSpanElement
-): void {
+function applyHoverCancelVisual(button: HTMLButtonElement): void {
   button.classList.add('cqd-cancel');
-  label.textContent = t('cancel') || 'Cancel';
-  icon.className = 'cqd-download-icon';
-  icon.style.backgroundImage = `url("${CANCEL_ICON_SVG_URL}")`;
-  icon.style.backgroundSize = '20px 20px';
 }
 
 /**

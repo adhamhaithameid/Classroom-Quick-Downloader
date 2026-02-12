@@ -82,4 +82,33 @@ describe('content/button-factory', () => {
     expect(container.getAttribute('data-cqd-processed')).toBe('true');
     expect(container.querySelector('.cqd-download-btn')).toBeTruthy();
   });
+
+  it('sets data-cancel-label attribute', async () => {
+    const { mod } = await loadButtonFactoryModule();
+    const container = document.createElement('div');
+    const button = mod.createDownloadButton(container, 'url', { name: 'f.pdf', ext: 'pdf', kind: 'file' });
+    const label = button.querySelector('.cqd-label');
+    expect(label?.getAttribute('data-cancel-label')).toBe('cancel');
+  });
+
+  it('toggles cancel class on mouseenter/mouseleave when loading', async () => {
+    const { mod, setState } = await loadButtonFactoryModule();
+    const container = document.createElement('div');
+    const button = mod.createDownloadButton(container, 'url', { name: 'f.pdf', ext: 'pdf', kind: 'file' });
+
+    setState('loading');
+    button.classList.add('cqd-loading');
+
+    // Trigger mouseenter
+    button.dispatchEvent(new MouseEvent('mouseenter'));
+    expect(button.classList.contains('cqd-cancel')).toBe(true);
+
+    // Verify text content is NOT changed manually (relying on CSS)
+    const label = button.querySelector('.cqd-label');
+    expect(label?.textContent).toBe('download'); // Default text
+
+    // Trigger mouseleave
+    button.dispatchEvent(new MouseEvent('mouseleave'));
+    expect(button.classList.contains('cqd-cancel')).toBe(false);
+  });
 });
