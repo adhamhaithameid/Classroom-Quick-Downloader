@@ -276,7 +276,6 @@ func deploymentsSyncHandlerWithClient(sqliteDB, postgresDB *sql.DB, client *http
 				}
 			} else {
 				result.Status = "ok"
-				okCount++
 				data["users"] = users
 				data["usersCount"] = usersCount
 				data["version"] = version
@@ -284,7 +283,21 @@ func deploymentsSyncHandlerWithClient(sqliteDB, postgresDB *sql.DB, client *http
 				data["syncError"] = ""
 				data["syncLatencyMs"] = latencyMs
 				data["syncedAt"] = nowMs
-				if metrics != nil {
+			}
+
+			persisted := req.DryRun
+			if !req.DryRun {
+				if err := store.upsertRecord(r.Context(), "deployment_target", def.Key, data); err != nil {
+					result.Status = "error"
+					result.Error = "failed to persist sync result"
+				} else {
+					persisted = true
+				}
+			}
+
+			if syncErr == nil && persisted {
+				okCount++
+				if metrics != nil && !req.DryRun {
 					metrics.SetGauge(
 						"oracle_sync_duration_seconds",
 						map[string]string{"endpoint": def.Key},
@@ -295,13 +308,6 @@ func deploymentsSyncHandlerWithClient(sqliteDB, postgresDB *sql.DB, client *http
 						map[string]string{"endpoint": def.Key},
 						float64(nowMs)/1000.0,
 					)
-				}
-			}
-
-			if !req.DryRun {
-				if err := store.upsertRecord(r.Context(), "deployment_target", def.Key, data); err != nil {
-					result.Status = "error"
-					result.Error = "failed to persist sync result"
 				}
 			}
 
