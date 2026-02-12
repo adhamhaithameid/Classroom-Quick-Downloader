@@ -15,6 +15,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -35,6 +36,8 @@ import (
 )
 
 var appMetrics = observability.NewRegistry()
+
+const defaultMaxHeaderBytes = 1 << 20
 
 func main() {
 	addr := getenv("ADDR", ":8080")
@@ -162,7 +165,7 @@ func main() {
 	mux.Handle("/api/admin/creative/emails/upsert", authMiddleware(criticalMiddleware(handlers.CreativeEmailsUpsertHandler(sqlDB, postgresDB))))
 	mux.Handle("/api/admin/creative/emails/delete", authMiddleware(criticalMiddleware(handlers.CreativeEmailsDeleteHandler(sqlDB, postgresDB))))
 	mux.Handle("/api/admin/newsletter/subscribers", authMiddleware(handlers.NewsletterSubscribersListHandler(sqlDB, postgresDB)))
-	mux.Handle("/api/admin/newsletter/subscribers/upsert", authMiddleware(criticalMiddleware(handlers.NewsletterSubscribersUpsertHandler(sqlDB, postgresDB))))
+	mux.Handle("/api/admin/newsletter/subscribers/upsert", authMiddleware(handlers.NewsletterSubscribersUpsertHandler(sqlDB, postgresDB)))
 	mux.Handle("/api/admin/newsletter/subscribers/delete", authMiddleware(criticalMiddleware(handlers.NewsletterSubscribersDeleteHandler(sqlDB, postgresDB))))
 	mux.Handle("/api/admin/newsletter/campaigns", authMiddleware(handlers.NewsletterCampaignsListHandler(sqlDB, postgresDB)))
 	mux.Handle("/api/admin/newsletter/campaigns/upsert", authMiddleware(criticalMiddleware(handlers.NewsletterCampaignsUpsertHandler(sqlDB, postgresDB))))
@@ -174,6 +177,7 @@ func main() {
 		getenv("UPTIME_KUMA_URL", "http://129.151.233.229:3001/status/cqd"),
 		getenv("GITHUB_REPO_URL", "https://github.com/adhamhaithameid/Classroom-Quick-Downloader"),
 		getenv("GOOGLE_SHEETS_URL", "https://docs.google.com/spreadsheets/d/1ptzLKUVnAkyXnT635Zgb1C6Img9aeAZ1se3nRz_QZmI/edit?gid=0#gid=0"),
+		getenv("FIGMA_DESIGN_URL", "https://www.figma.com/design/hQLRpncinKnJQRG1lhCdQG/Google-Classroom-Downloade-Icon?node-id=0-1&t=5Eimhfrvp8RwFC19-1"),
 	)))
 	mux.Handle("/api/admin/github/open-counts", authMiddleware(handlers.GitHubOpenCountsHandler(
 		getenv("GITHUB_REPO_SLUG", "adhamhaithameid/Classroom-Quick-Downloader"),
@@ -221,6 +225,7 @@ func main() {
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      30 * time.Second,
 		IdleTimeout:       60 * time.Second,
+		MaxHeaderBytes:    defaultMaxHeaderBytes,
 	}
 
 	log.Printf("oracle-backend listening on %s (db: %s, static: %s)", addr, dbPath, staticDir)
@@ -330,6 +335,14 @@ func csrfHeaderMiddleware(next http.Handler) http.Handler {
 				if r.Header.Get("X-Requested-With") != "XMLHttpRequest" {
 					http.Error(w, `{"error":"missing_csrf_header"}`, http.StatusBadRequest)
 					return
+				}
+				origin := strings.TrimSpace(r.Header.Get("Origin"))
+				if origin != "" {
+					parsed, err := url.Parse(origin)
+					if err != nil || parsed.Host == "" || !strings.EqualFold(parsed.Host, r.Host) {
+						http.Error(w, `{"error":"invalid_origin"}`, http.StatusForbidden)
+						return
+					}
 				}
 			}
 		}
