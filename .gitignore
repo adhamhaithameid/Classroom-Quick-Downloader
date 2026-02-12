@@ -17,7 +17,9 @@ AI/
 ai/
 oracle-backend/data/
 oracle-backend/docker_data/
+oracle-backend/app
 *.db
 *.db-shm
 *.db-wal
 google-credentials.json
+oracle-backend/google-credentials*.json
