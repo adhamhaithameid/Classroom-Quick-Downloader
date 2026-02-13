@@ -22,7 +22,7 @@ fi
 
 if ! command -v govulncheck >/dev/null 2>&1; then
   echo "[oracle-scan] installing govulncheck"
-  go install golang.org/x/vuln/cmd/govulncheck@latest
+  go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
 fi
 
 GO_BIN_DIR="$(go env GOPATH)/bin"
