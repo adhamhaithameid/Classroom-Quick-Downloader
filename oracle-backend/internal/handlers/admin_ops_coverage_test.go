@@ -658,6 +658,24 @@ func TestIsAllowedReadOnlyQuery_QualifiedQuotedRestrictedTable(t *testing.T) {
 	}
 }
 
+func TestIsAllowedReadOnlyQuery_BacktickRestrictedTable(t *testing.T) {
+	if isAllowedReadOnlyQuery("SELECT * FROM `feature_flags`") {
+		t.Fatal("expected rejected for backtick-quoted feature_flags")
+	}
+}
+
+func TestIsAllowedReadOnlyQuery_BracketRestrictedTable(t *testing.T) {
+	if isAllowedReadOnlyQuery("SELECT * FROM [feature_flags]") {
+		t.Fatal("expected rejected for bracket-quoted feature_flags")
+	}
+}
+
+func TestIsAllowedReadOnlyQuery_MalformedSourceFailsClosed(t *testing.T) {
+	if isAllowedReadOnlyQuery(`SELECT * FROM "main"."feature_flags`) {
+		t.Fatal("expected malformed quoted source to be rejected")
+	}
+}
+
 func TestIsAllowedReadOnlyQuery_CommentObfuscatedRestrictedTable(t *testing.T) {
 	stmt := normalizeSQLForPolicy(`SELECT * FROM/* bypass */feature_flags`)
 	if isAllowedReadOnlyQuery(stmt) {
