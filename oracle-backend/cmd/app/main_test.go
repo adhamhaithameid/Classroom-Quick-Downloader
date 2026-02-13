@@ -84,6 +84,39 @@ func TestRequestBodyLimitMiddleware_AuthRejectsOversizedBody(t *testing.T) {
 	}
 }
 
+func TestDecodeJSONBodyStrict_AcceptsValidObject(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(`{"password":"secret"}`))
+	var payload struct {
+		Password string `json:"password"`
+	}
+	if err := decodeJSONBodyStrict(req, &payload); err != nil {
+		t.Fatalf("expected valid JSON payload, got err: %v", err)
+	}
+	if payload.Password != "secret" {
+		t.Fatalf("unexpected password value: %q", payload.Password)
+	}
+}
+
+func TestDecodeJSONBodyStrict_RejectsUnknownField(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(`{"password":"secret","extra":true}`))
+	var payload struct {
+		Password string `json:"password"`
+	}
+	if err := decodeJSONBodyStrict(req, &payload); err == nil {
+		t.Fatal("expected unknown field to be rejected")
+	}
+}
+
+func TestDecodeJSONBodyStrict_RejectsTrailingJSON(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(`{"password":"secret"}{"password":"two"}`))
+	var payload struct {
+		Password string `json:"password"`
+	}
+	if err := decodeJSONBodyStrict(req, &payload); err == nil {
+		t.Fatal("expected trailing JSON to be rejected")
+	}
+}
+
 func TestCSRFMiddleware_RejectsMissingHeaderOnMutatingAPI(t *testing.T) {
 	handler := csrfHeaderMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)

@@ -11,6 +11,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"io"
 	iofs "io/fs"
 	"log"
 	"net"
@@ -378,6 +379,22 @@ func csrfHeaderMiddleware(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+func decodeJSONBodyStrict(r *http.Request, dst any) error {
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(dst); err != nil {
+		return err
+	}
+	var extra any
+	if err := dec.Decode(&extra); err != io.EOF {
+		if err == nil {
+			return errors.New("request body must contain only one JSON object")
+		}
+		return err
+	}
+	return nil
 }
 
 type cspNonceContextKey struct{}
@@ -1422,7 +1439,7 @@ func stepUpVerifyHandler(db *sql.DB, superAdminPassword string) http.Handler {
 			ChallengeID string `json:"challengeId"`
 			Password    string `json:"password"` // #nosec G117 -- required request field for step-up verify API contract.
 		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if err := decodeJSONBodyStrict(r, &req); err != nil {
 			http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
 			return
 		}
@@ -1918,7 +1935,7 @@ func loginHandler(db *sql.DB, dashboardPassword string) http.HandlerFunc {
 		var req struct {
 			Password string `json:"password"` // #nosec G117 -- required request field for login API contract.
 		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		if err := decodeJSONBodyStrict(r, &req); err != nil {
 			http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
 			return
 		}
