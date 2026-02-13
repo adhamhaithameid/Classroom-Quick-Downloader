@@ -435,6 +435,28 @@ func TestGetClientIPTrustedProxyRejectsInvalidForwardedIP(t *testing.T) {
 	}
 }
 
+func TestNormalizeSessionCookieSecureMode(t *testing.T) {
+	cases := []struct {
+		in   string
+		want string
+	}{
+		{in: "true", want: "true"},
+		{in: "YES", want: "true"},
+		{in: "always", want: "true"},
+		{in: "false", want: "false"},
+		{in: "0", want: "false"},
+		{in: "never", want: "false"},
+		{in: "", want: "auto"},
+		{in: "unexpected", want: "auto"},
+	}
+	for _, tc := range cases {
+		got := normalizeSessionCookieSecureMode(tc.in)
+		if got != tc.want {
+			t.Fatalf("normalizeSessionCookieSecureMode(%q)=%q want=%q", tc.in, got, tc.want)
+		}
+	}
+}
+
 func TestCookieSecurityPolicy_RespectsModeOverride(t *testing.T) {
 	prev := sessionCookieSecureMode
 	defer func() { sessionCookieSecureMode = prev }()
