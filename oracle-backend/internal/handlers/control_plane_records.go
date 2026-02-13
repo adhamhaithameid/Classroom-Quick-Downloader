@@ -422,16 +422,17 @@ func RecordsUpsertHandlerV4(sqliteDB, postgresDB *sql.DB, allowedRecordTypes map
 			return
 		}
 
-		if sqliteDB != nil {
-			_ = AppendAuditLog(
-				r.Context(),
-				sqliteDB,
-				"record_upsert",
-				req.RecordType,
-				req.RecordKey,
-				"ok",
-				map[string]any{"recordType": req.RecordType, "recordKey": req.RecordKey},
-			)
+		if !appendAuditLogOrHTTPError(
+			w,
+			r.Context(),
+			sqliteDB,
+			"record_upsert",
+			req.RecordType,
+			req.RecordKey,
+			"ok",
+			map[string]any{"recordType": req.RecordType, "recordKey": req.RecordKey},
+		) {
+			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -468,16 +469,17 @@ func RecordsDeleteHandlerV4(sqliteDB, postgresDB *sql.DB, allowedRecordTypes map
 			return
 		}
 
-		if sqliteDB != nil {
-			_ = AppendAuditLog(
-				r.Context(),
-				sqliteDB,
-				"record_delete",
-				req.RecordType,
-				req.RecordKey,
-				"ok",
-				map[string]any{"affected": affected},
-			)
+		if !appendAuditLogOrHTTPError(
+			w,
+			r.Context(),
+			sqliteDB,
+			"record_delete",
+			req.RecordType,
+			req.RecordKey,
+			"ok",
+			map[string]any{"affected": affected},
+		) {
+			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
