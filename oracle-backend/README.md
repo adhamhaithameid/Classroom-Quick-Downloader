@@ -192,6 +192,14 @@ All configuration is done via environment variables, defined in `docker-compose.
 | `ARCHIVER_SHARED_SECRET` | *(required when auth enabled)* | Secret header for the archiver to read stats. |
 | `ALLOW_LOOPBACK_BYPASS` | `false` | Set `true` to allow loopback auth bypass (dev only). |
 | `ALLOW_EMPTY_DASHBOARD_PASSWORD` | `false` | Set `true` to allow an empty dashboard password (dev only). |
+| `POSTGRES_DSN` | *(optional)* | Enables Postgres bootstrap and v4 cutover paths. |
+| `STORAGE_WATERMARK_WARN` | `70` | Disk usage warning watermark percentage. |
+| `STORAGE_WATERMARK_CRITICAL` | `85` | Disk usage critical watermark percentage. |
+| `STORAGE_WATERMARK_EMERGENCY` | `92` | Disk usage emergency watermark percentage. |
+| `ORACLE_PRIMARY_REGION` | `primary` | Label for primary region in DR status APIs. |
+| `ORACLE_DR_REGION` | `warm-dr` | Label for warm DR region in DR status APIs. |
+| `ORACLE_DR_REPLICA_LAG_SECONDS` | `-1` | Optional external replica lag feed for DR visibility. |
+| `ORACLE_DR_PROMOTION_MAX_LAG_SECONDS` | `300` | Promotion guardrail for DR eligibility checks. |
 
 Startup is **fail-closed** for auth secrets: the server exits if `SUPER_ADMIN_PASSWORD` is missing, and also exits if `DASHBOARD_PASSWORD` is missing while `ALLOW_EMPTY_DASHBOARD_PASSWORD=false`.
 
@@ -446,6 +454,82 @@ curl http://localhost:8080/health
 ```json
 { "ok": true }
 ```
+
+---
+
+### `GET /health/ready` — Readiness Gate
+
+Readiness probe for load balancers and failover automation.
+
+Checks:
+- SQLite connectivity + outbox health.
+- Postgres migration/init/outbox health when Postgres is configured.
+- Storage emergency state (ingest backpressure mode).
+
+Returns `503` with reasons when not ready.
+
+---
+
+### `GET /api/admin/ha/status` — HA Runtime Status
+
+Returns HA runtime state for operators:
+- active write mode (`sqlite_primary` or `postgres_primary`)
+- cutover feature flags
+- sqlite/postgres outbox backlog health
+- storage pressure snapshot
+- latest backup run metadata
+
+---
+
+### `GET /api/admin/storage/status` — Storage/Disk Status
+
+Returns host disk telemetry and growth indicators:
+- disk used/available bytes + percentage
+- configured warn/critical/emergency thresholds
+- current severity + ingest backpressure state
+- top high-row-count tables
+
+---
+
+### `GET /api/admin/dr/status` — DR Readiness Status
+
+Returns warm-DR visibility:
+- primary + DR region labels
+- replica lag feed value (if configured)
+- promotion eligibility decision
+- latest drill result metadata
+
+---
+
+### `POST /api/admin/dr/drill` — Record DR Drill
+
+Step-up protected endpoint for game-day drill records.
+
+Body:
+```json
+{
+  "dryRun": true,
+  "targetRegion": "warm-dr",
+  "simulatedOutcome": "passed",
+  "notes": "weekly validation"
+}
+```
+
+---
+
+### `POST /api/admin/retention/run` — Retention Executor
+
+Step-up protected retention action for bounded operational tables.
+
+Body:
+```json
+{
+  "dryRun": true,
+  "policies": ["pipeline_failure_logs", "oracle_operation_logs", "ingest_outbox_sent"]
+}
+```
+
+Applies retention to transient tables (failure logs, operation logs, sent outbox rows, storage samples, auth stale rows, and optional Postgres outbox rows).
 
 ---
 
