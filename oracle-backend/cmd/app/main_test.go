@@ -386,6 +386,41 @@ func TestGetClientIPUntrustedProxyIgnoresForwarded(t *testing.T) {
 	}
 }
 
+func TestGetClientIPTrustedProxyRejectsInvalidForwardedIP(t *testing.T) {
+	prev := trustedProxyNets
+	defer setTrustedProxyNets(prev)
+
+	setTrustedProxyNets(parseTrustedProxyCIDRs("10.0.0.0/8"))
+
+	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req.RemoteAddr = "10.1.2.3:1234"
+	req.Header.Set("X-Forwarded-For", "not-an-ip")
+
+	ip := getClientIP(req)
+	if ip != "10.1.2.3" {
+		t.Fatalf("expected remote IP fallback, got %q", ip)
+	}
+}
+
+func TestCookieSecurityPolicy_RespectsModeOverride(t *testing.T) {
+	prev := sessionCookieSecureMode
+	defer func() { sessionCookieSecureMode = prev }()
+
+	req := httptest.NewRequest(http.MethodGet, "http://example.com", nil)
+
+	sessionCookieSecureMode = "true"
+	secure, sameSite := cookieSecurityPolicy(req)
+	if !secure || sameSite != http.SameSiteStrictMode {
+		t.Fatalf("expected forced secure strict cookie policy, got secure=%v sameSite=%v", secure, sameSite)
+	}
+
+	sessionCookieSecureMode = "false"
+	secure, sameSite = cookieSecurityPolicy(req)
+	if secure || sameSite != http.SameSiteLaxMode {
+		t.Fatalf("expected forced insecure lax cookie policy, got secure=%v sameSite=%v", secure, sameSite)
+	}
+}
+
 func TestLoggingMiddleware_PersistsOracleOperationLogs(t *testing.T) {
 	sqlDB, err := db.Init(filepath.Join(t.TempDir(), "oracle-logs.db"))
 	if err != nil {
@@ -451,8 +486,8 @@ func TestIsOracleOperationPath(t *testing.T) {
 		{path: "/api/admin/flags", want: true},
 		{path: "/ingest-batch", want: true},
 		{path: "/storeBatch", want: true},
-		{path: "/health", want: true},
-		{path: "/metrics", want: true},
+		{path: "/health", want: false},
+		{path: "/metrics", want: false},
 		{path: "/logo.svg", want: false},
 		{path: "/", want: false},
 	}

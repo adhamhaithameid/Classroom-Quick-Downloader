@@ -50,6 +50,7 @@ func main() {
 	allowLoopbackBypass := os.Getenv("ALLOW_LOOPBACK_BYPASS") == "true"
 	allowEmptyDashboardPassword := os.Getenv("ALLOW_EMPTY_DASHBOARD_PASSWORD") == "true"
 	trustedProxyNets = parseTrustedProxyCIDRs(os.Getenv("TRUSTED_PROXY_CIDRS"))
+	sessionCookieSecureMode = normalizeSessionCookieSecureMode(os.Getenv("SESSION_COOKIE_SECURE"))
 
 	if doSecret == "" {
 		log.Println("[WARN] DO_SHARED_SECRET is empty – /ingest-batch will reject requests")
@@ -70,6 +71,9 @@ func main() {
 	}
 	if allowLoopbackBypass {
 		log.Println("[WARN] ALLOW_LOOPBACK_BYPASS is true – loopback requests can bypass auth (dev only)")
+	}
+	if sessionCookieSecureMode == "true" {
+		log.Println("[INFO] SESSION_COOKIE_SECURE=true forcing Secure cookies")
 	}
 	log.Println("[INFO] HTTP deployments use non-secure cookies; prefer HTTPS in production")
 	if len(trustedProxyNets) > 0 {
@@ -584,9 +588,7 @@ func isOracleOperationPath(requestPath string) bool {
 	}
 	return strings.HasPrefix(requestPath, "/api/") ||
 		strings.HasPrefix(requestPath, "/ingest-batch") ||
-		strings.HasPrefix(requestPath, "/storeBatch") ||
-		strings.HasPrefix(requestPath, "/health") ||
-		strings.HasPrefix(requestPath, "/metrics")
+		strings.HasPrefix(requestPath, "/storeBatch")
 }
 
 // spaHandler serves static files with SPA fallback for client-side routing.
@@ -825,6 +827,7 @@ const stepUpAbuseThreshold = 5
 const inMemoryCleanupHorizon = 24 * time.Hour
 
 var trustedProxyNets []*net.IPNet
+var sessionCookieSecureMode = "auto"
 
 var authStateStore = struct {
 	sync.RWMutex
@@ -1001,6 +1004,17 @@ func parseTrustedProxyCIDRs(input string) []*net.IPNet {
 		nets = append(nets, &net.IPNet{IP: ip, Mask: mask})
 	}
 	return nets
+}
+
+func normalizeSessionCookieSecureMode(raw string) string {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "true", "1", "yes", "always":
+		return "true"
+	case "false", "0", "no", "never":
+		return "false"
+	default:
+		return "auto"
+	}
 }
 
 func isTrustedProxy(remoteIP string) bool {
@@ -1765,13 +1779,15 @@ func getClientIP(r *http.Request) string {
 	}
 	remoteIP := extractRemoteIP(r.RemoteAddr)
 	if isTrustedProxy(remoteIP) {
-		if ip := strings.TrimSpace(r.Header.Get("X-Real-IP")); ip != "" {
+		if ip := parseIPHeaderValue(r.Header.Get("X-Real-IP")); ip != "" {
 			return ip
 		}
 		if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
 			parts := strings.Split(fwd, ",")
 			if len(parts) > 0 {
-				return strings.TrimSpace(parts[0])
+				if ip := parseIPHeaderValue(parts[0]); ip != "" {
+					return ip
+				}
 			}
 		}
 	}
@@ -1779,6 +1795,18 @@ func getClientIP(r *http.Request) string {
 		return remoteIP
 	}
 	return r.RemoteAddr
+}
+
+func parseIPHeaderValue(raw string) string {
+	candidate := strings.TrimSpace(raw)
+	if candidate == "" {
+		return ""
+	}
+	ip := net.ParseIP(candidate)
+	if ip == nil {
+		return ""
+	}
+	return ip.String()
 }
 
 func allowLoginAttempt(ip string) (bool, int, int) {
@@ -1997,6 +2025,12 @@ func logoutHandler(db *sql.DB) http.HandlerFunc {
 }
 
 func cookieSecurityPolicy(r *http.Request) (bool, http.SameSite) {
+	switch sessionCookieSecureMode {
+	case "true":
+		return true, http.SameSiteStrictMode
+	case "false":
+		return false, http.SameSiteLaxMode
+	}
 	if r.TLS != nil {
 		return true, http.SameSiteStrictMode
 	}
