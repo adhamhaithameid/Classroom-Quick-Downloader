@@ -66,6 +66,12 @@ func dayUTC(tsMs int64) string {
 //   - downloads_totals
 //   - do_state_snapshots
 func IngestBatchHandler(db *sql.DB, sharedSecret string) http.HandlerFunc {
+	return IngestBatchHandlerV4(db, nil, sharedSecret)
+}
+
+// IngestBatchHandlerV4 routes ingest writes through SQLite or Postgres primary mode
+// based on server-side feature flags.
+func IngestBatchHandlerV4(sqliteDB, postgresDB *sql.DB, sharedSecret string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			w.WriteHeader(http.StatusMethodNotAllowed)
@@ -76,7 +82,7 @@ func IngestBatchHandler(db *sql.DB, sharedSecret string) http.HandlerFunc {
 			logEvent("error", "ingest_misconfigured", map[string]interface{}{
 				"reason": "DO_SHARED_SECRET missing",
 			})
-			recordOracleFailure(db, "ingest", "misconfigured", "DO_SHARED_SECRET missing", 1, "", "")
+			recordOracleFailure(sqliteDB, "ingest", "misconfigured", "DO_SHARED_SECRET missing", 1, "", "")
 			http.Error(w, "server misconfigured: DO_SHARED_SECRET not set", http.StatusInternalServerError)
 			return
 		}
@@ -90,14 +96,14 @@ func IngestBatchHandler(db *sql.DB, sharedSecret string) http.HandlerFunc {
 			logEvent("warn", "ingest_unauthorized", map[string]interface{}{
 				"reason": "missing_or_invalid_secret",
 			})
-			recordOracleFailure(db, "ingest_auth", "unauthorized", "missing_or_invalid_secret", 1, "", "")
+			recordOracleFailure(sqliteDB, "ingest_auth", "unauthorized", "missing_or_invalid_secret", 1, "", "")
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
 
 		bodyBytes, err := io.ReadAll(r.Body)
 		if err != nil {
-			recordOracleFailure(db, "ingest", "body_read_failed", err.Error(), 1, "", "")
+			recordOracleFailure(sqliteDB, "ingest", "body_read_failed", err.Error(), 1, "", "")
 			http.Error(w, "invalid request body", http.StatusBadRequest)
 			return
 		}
@@ -107,13 +113,13 @@ func IngestBatchHandler(db *sql.DB, sharedSecret string) http.HandlerFunc {
 			logEvent("warn", "ingest_invalid_json", map[string]interface{}{
 				"error": err.Error(),
 			})
-			recordOracleFailure(db, "ingest", "invalid_json", err.Error(), 1, "", "")
+			recordOracleFailure(sqliteDB, "ingest", "invalid_json", err.Error(), 1, "", "")
 			http.Error(w, "invalid JSON", http.StatusBadRequest)
 			return
 		}
 		if batch.BatchID == "" {
 			logEvent("warn", "ingest_missing_batch_id", nil)
-			recordOracleFailure(db, "ingest", "missing_batch_id", "batchId is required", 1, "", "")
+			recordOracleFailure(sqliteDB, "ingest", "missing_batch_id", "batchId is required", 1, "", "")
 			http.Error(w, "missing batchId", http.StatusBadRequest)
 			return
 		}
@@ -126,12 +132,26 @@ func IngestBatchHandler(db *sql.DB, sharedSecret string) http.HandlerFunc {
 		}
 
 		ctx := r.Context()
-		if err := ingestBatch(ctx, db, &batch, bodyBytes, rawPayload); err != nil {
+		usePostgresPrimary, evalErr := shouldUsePostgresPrimaryIngest(ctx, sqliteDB, postgresDB)
+		if evalErr != nil {
+			logEvent("error", "ingest_mode_eval_failed", map[string]interface{}{
+				"error": evalErr.Error(),
+			})
+			http.Error(w, "failed to evaluate ingest mode", http.StatusInternalServerError)
+			return
+		}
+		if usePostgresPrimary {
+			err = ingestBatchPostgres(ctx, postgresDB, &batch, bodyBytes)
+		} else {
+			err = ingestBatch(ctx, sqliteDB, &batch, bodyBytes, rawPayload)
+		}
+		if err != nil {
 			logEvent("error", "ingest_failed", map[string]interface{}{
 				"error":   err.Error(),
 				"batchId": batch.BatchID,
+				"mode":    map[bool]string{true: "postgres_primary", false: "sqlite_primary"}[usePostgresPrimary],
 			})
-			recordOracleFailure(db, "ingest", "ingest_failed", err.Error(), 1, batch.BatchID, "")
+			recordOracleFailure(sqliteDB, "ingest", "ingest_failed", err.Error(), 1, batch.BatchID, "")
 			http.Error(w, "failed to ingest batch: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -144,6 +164,130 @@ func IngestBatchHandler(db *sql.DB, sharedSecret string) http.HandlerFunc {
 			IngestedAt: time.Now().UnixMilli(),
 		})
 	}
+}
+
+func shouldUsePostgresPrimaryIngest(ctx context.Context, sqliteDB, postgresDB *sql.DB) (bool, error) {
+	if postgresDB == nil {
+		return false, nil
+	}
+	if sqliteDB == nil {
+		return true, nil
+	}
+	enabled, err := IsFeatureEnabled(ctx, sqliteDB, "feature_postgres_primary_ingest")
+	if err != nil {
+		return false, err
+	}
+	return enabled, nil
+}
+
+func ingestBatchPostgres(ctx context.Context, postgresDB *sql.DB, batch *model.OracleBatch, rawBody []byte) error {
+	if postgresDB == nil {
+		return errors.New("postgres primary ingest is not configured")
+	}
+	tx, err := postgresDB.BeginTx(ctx, &sql.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	nowMs := time.Now().UnixMilli()
+	generatedAt := batch.GeneratedAt
+	if generatedAt == 0 {
+		generatedAt = nowMs
+	}
+
+	// Keep ingestion idempotent on batch ID at the Postgres primary layer.
+	batchInserted := false
+	{
+		// Aggregate totals across all time buckets.
+		var totalEvents, totalDownloads, totalSuccess, totalFail int64
+		for _, b := range batch.TimeBuckets {
+			totalEvents += b.Totals.TotalEvents
+			totalDownloads += b.Totals.TotalDownloads
+			totalSuccess += b.Totals.TotalSuccess
+			totalFail += b.Totals.TotalFail
+		}
+		if len(batch.TimeBuckets) == 0 {
+			totalEvents = batch.Summary.Totals.TotalEvents
+			totalDownloads = batch.Summary.Totals.TotalDownloads
+			totalSuccess = batch.Summary.Totals.TotalSuccess
+			totalFail = batch.Summary.Totals.TotalFail
+		}
+
+		sanitizedBody := sanitizeRawSnapshotPayload(rawBody)
+		res, err := tx.ExecContext( // #nosec G701 -- SQL text is constant and values are passed as bound parameters.
+			ctx,
+			`INSERT INTO pg_ingest_batches (
+				batch_id, generated_at, ingested_at, time_zone,
+				events_count, downloads_count, success_count, fail_count, payload_json
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)
+			ON CONFLICT(batch_id) DO NOTHING`,
+			batch.BatchID,
+			generatedAt,
+			nowMs,
+			batch.TimeZone,
+			totalEvents,
+			totalDownloads,
+			totalSuccess,
+			totalFail,
+			string(sanitizedBody),
+		)
+		if err != nil {
+			return err
+		}
+		affected, _ := res.RowsAffected()
+		batchInserted = affected > 0
+		if !batchInserted {
+			return tx.Commit()
+		}
+
+		_, err = tx.ExecContext( // #nosec G701 -- SQL text is constant and values are passed as bound parameters.
+			ctx,
+			`INSERT INTO raw_ingest_events (event_type, payload_json, idempotency_key, created_at)
+			 VALUES ($1, $2::jsonb, $3, $4)
+			 ON CONFLICT (idempotency_key) DO NOTHING`,
+			"ingest_batch_committed",
+			string(sanitizedBody),
+			"batch:"+batch.BatchID,
+			nowMs,
+		)
+		if err != nil {
+			return err
+		}
+
+		outboxPayload, err := json.Marshal(map[string]any{
+			"batchId":      batch.BatchID,
+			"generatedAt":  generatedAt,
+			"ingestedAt":   nowMs,
+			"timeZone":     batch.TimeZone,
+			"events":       totalEvents,
+			"downloads":    totalDownloads,
+			"success":      totalSuccess,
+			"fail":         totalFail,
+			"snapshotHint": "raw_ingest_events",
+		})
+		if err != nil {
+			return err
+		}
+		_, err = tx.ExecContext( // #nosec G701 -- SQL text is constant and values are passed as bound parameters.
+			ctx,
+			`INSERT INTO pg_outbox (event_type, payload_json, idempotency_key, status, attempts, last_error, created_at, next_run_at)
+			 VALUES ($1, $2::jsonb, $3, 'pending', 0, '', $4, $4)
+			 ON CONFLICT(idempotency_key) DO NOTHING`,
+			"ingest_batch_committed",
+			string(outboxPayload),
+			"pg-ingest:"+batch.BatchID,
+			nowMs,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	if !batchInserted {
+		return tx.Commit()
+	}
+	return tx.Commit()
 }
 
 func ingestBatch(ctx context.Context, db *sql.DB, batch *model.OracleBatch, rawBody []byte, rawPayload map[string]interface{}) error {

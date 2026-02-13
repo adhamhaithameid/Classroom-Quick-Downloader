@@ -26,6 +26,31 @@ func newControlPlaneStore(sqliteDB, postgresDB *sql.DB) *controlPlaneStore {
 	}
 }
 
+func (s *controlPlaneStore) shouldUsePostgresPrimary(ctx context.Context) bool {
+	if s == nil || s.postgres == nil {
+		return false
+	}
+	if s.sqlite == nil {
+		return true
+	}
+	enabled, err := IsFeatureEnabled(ctx, s.sqlite, "feature_postgres_primary_control_plane")
+	if err != nil {
+		return false
+	}
+	return enabled
+}
+
+func (s *controlPlaneStore) shouldAllowSQLiteReadFallback(ctx context.Context) bool {
+	if s == nil || s.sqlite == nil {
+		return false
+	}
+	enabled, err := IsFeatureEnabled(ctx, s.sqlite, "feature_sqlite_fallback_readonly")
+	if err != nil {
+		return true
+	}
+	return enabled
+}
+
 type controlPlaneRecordRow struct {
 	RecordKey string          `json:"recordKey"`
 	Data      json.RawMessage `json:"data"`
@@ -34,8 +59,24 @@ type controlPlaneRecordRow struct {
 }
 
 func (s *controlPlaneStore) listRecords(ctx context.Context, recordType string) ([]controlPlaneRecordRow, error) {
-	if s.postgres != nil {
-		return s.listRecordsPostgres(ctx, recordType)
+	if s == nil {
+		return nil, errors.New("control plane store is not configured")
+	}
+	if s.shouldUsePostgresPrimary(ctx) {
+		records, err := s.listRecordsPostgres(ctx, recordType)
+		if err == nil || !s.shouldAllowSQLiteReadFallback(ctx) {
+			return records, err
+		}
+		if s.sqlite != nil {
+			return s.listRecordsSQLite(ctx, recordType)
+		}
+		return records, err
+	}
+	if s.sqlite == nil {
+		if s.postgres != nil {
+			return s.listRecordsPostgres(ctx, recordType)
+		}
+		return nil, errors.New("no control plane database configured")
 	}
 	return s.listRecordsSQLite(ctx, recordType)
 }
@@ -109,8 +150,17 @@ func (s *controlPlaneStore) listRecordsPostgres(ctx context.Context, recordType 
 }
 
 func (s *controlPlaneStore) upsertRecord(ctx context.Context, recordType, recordKey string, data map[string]any) error {
-	if s.postgres != nil {
+	if s == nil {
+		return errors.New("control plane store is not configured")
+	}
+	if s.shouldUsePostgresPrimary(ctx) {
 		return s.upsertRecordPostgres(ctx, recordType, recordKey, data)
+	}
+	if s.sqlite == nil {
+		if s.postgres != nil {
+			return s.upsertRecordPostgres(ctx, recordType, recordKey, data)
+		}
+		return errors.New("no control plane database configured")
 	}
 	return s.upsertRecordSQLite(ctx, recordType, recordKey, data)
 }
@@ -202,8 +252,17 @@ func (s *controlPlaneStore) upsertRecordPostgres(ctx context.Context, recordType
 }
 
 func (s *controlPlaneStore) deleteRecord(ctx context.Context, recordType, recordKey string) (int64, error) {
-	if s.postgres != nil {
+	if s == nil {
+		return 0, errors.New("control plane store is not configured")
+	}
+	if s.shouldUsePostgresPrimary(ctx) {
 		return s.deleteRecordPostgres(ctx, recordType, recordKey)
+	}
+	if s.sqlite == nil {
+		if s.postgres != nil {
+			return s.deleteRecordPostgres(ctx, recordType, recordKey)
+		}
+		return 0, errors.New("no control plane database configured")
 	}
 	return s.deleteRecordSQLite(ctx, recordType, recordKey)
 }

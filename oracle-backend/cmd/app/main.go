@@ -107,20 +107,29 @@ func main() {
 			log.Printf("[INFO] postgres initialized for projection relay")
 		}
 	}
+	storageWatermarks := handlers.NormalizeStorageWatermarks(handlers.StorageWatermarks{
+		Warn:      getenvFloat("STORAGE_WATERMARK_WARN", 70),
+		Critical:  getenvFloat("STORAGE_WATERMARK_CRITICAL", 85),
+		Emergency: getenvFloat("STORAGE_WATERMARK_EMERGENCY", 92),
+	})
+	storageGuard := handlers.NewStorageGuard(dbPath, storageWatermarks)
 
 	mux := http.NewServeMux()
 
 	// Health endpoints.
 	mux.HandleFunc("/health", handlers.APIHealthHandler)
 	mux.HandleFunc("/health/api", handlers.APIHealthHandler)
+	mux.HandleFunc("/health/ready", handlers.ReadyHandler(sqlDB, postgresDB, storageGuard, postgresDSN != "", &postgresMigrationErr))
 
 	// Updated: Use the local HealthDBHandler for granular SQLite monitoring
 	mux.HandleFunc("/health/db", HealthDBHandler(sqlDB))
 
 	// Ingest endpoint (aggregated batches from DO).
-	mux.HandleFunc("/ingest-batch", handlers.IngestBatchHandler(sqlDB, doSecret))
+	ingestHandler := handlers.IngestBatchHandlerV4(sqlDB, postgresDB, doSecret)
+	ingestHandler = handlers.IngestBackpressureMiddleware(ingestHandler, sqlDB, storageGuard).ServeHTTP
+	mux.HandleFunc("/ingest-batch", ingestHandler)
 	// Backwards-compatible alias, if you ever used /storeBatch naming.
-	mux.HandleFunc("/storeBatch", handlers.IngestBatchHandler(sqlDB, doSecret))
+	mux.HandleFunc("/storeBatch", ingestHandler)
 
 	// Analytics API endpoints (protected by auth when DASHBOARD_PASSWORD is set).
 	setAuthStateDB(sqlDB)
@@ -151,6 +160,11 @@ func main() {
 	mux.Handle("/api/admin/audit/verify-chain", authMiddleware(handlers.AuditVerifyChainHandler(sqlDB)))
 	mux.Handle("/api/admin/alerts", authMiddleware(handlers.AlertsHandler(sqlDB)))
 	mux.Handle("/api/admin/migrations/status", authMiddleware(handlers.MigrationsStatusHandler(postgresDSN != "", &postgresMigrationErr)))
+	mux.Handle("/api/admin/ha/status", authMiddleware(handlers.HARuntimeStatusHandler(sqlDB, postgresDB, storageGuard, postgresDSN != "", &postgresMigrationErr)))
+	mux.Handle("/api/admin/storage/status", authMiddleware(handlers.StorageStatusHandler(sqlDB, storageGuard)))
+	mux.Handle("/api/admin/dr/status", authMiddleware(handlers.DRStatusHandler(sqlDB, postgresDB)))
+	mux.Handle("/api/admin/dr/drill", authMiddleware(criticalMiddleware(handlers.DRDrillHandler(sqlDB, postgresDB))))
+	mux.Handle("/api/admin/retention/run", authMiddleware(criticalMiddleware(handlers.RetentionRunHandler(sqlDB, postgresDB))))
 	mux.Handle("/api/admin/sql/query", authMiddleware(criticalMiddleware(handlers.SQLQueryHandler(sqlDB, readOnlySQLDB))))
 	mux.Handle("/api/admin/sql/exec", authMiddleware(criticalMiddleware(handlers.SQLExecHandler(sqlDB))))
 	mux.Handle("/api/admin/danger/clear-data", authMiddleware(criticalMiddleware(handlers.DangerClearDataHandler(sqlDB))))
@@ -187,7 +201,7 @@ func main() {
 	mux.Handle("/api/admin/oracle-logs", authMiddleware(handlers.OracleOperationLogsListHandler(sqlDB)))
 	mux.Handle("/api/admin/oracle-logs/delete-older", authMiddleware(criticalMiddleware(handlers.OracleOperationLogsDeleteOlderHandler(sqlDB))))
 	mux.Handle("/api/admin/oracle-logs/clear-all", authMiddleware(criticalMiddleware(handlers.OracleOperationLogsClearAllHandler(sqlDB))))
-	mux.Handle("/metrics", authMiddleware(metricsHandler(appMetrics)))
+	mux.Handle("/metrics", authMiddleware(metricsHandler(appMetrics, sqlDB)))
 
 	// Auth endpoints
 	mux.HandleFunc("/api/auth/login", loginHandler(sqlDB, dashboardPassword))
@@ -263,6 +277,18 @@ func getenv(key, def string) string {
 		return v
 	}
 	return def
+}
+
+func getenvFloat(key string, def float64) float64 {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return def
+	}
+	parsed, err := strconv.ParseFloat(raw, 64)
+	if err != nil {
+		return def
+	}
+	return parsed
 }
 
 // HealthDBHandler returns a handler that checks the database connection
@@ -383,14 +409,24 @@ func securityHeadersMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func metricsHandler(reg *observability.Registry) http.Handler {
+func metricsHandler(reg *observability.Registry, sqliteDB *sql.DB) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return
 		}
 		w.Header().Set("Content-Type", "text/plain; version=0.0.4")
-		_, _ = w.Write([]byte(reg.RenderPrometheus()))
+		var b strings.Builder
+		b.WriteString(reg.RenderPrometheus())
+		if sqliteDB != nil {
+			var schemaPathCount int64
+			if err := sqliteDB.QueryRowContext(r.Context(), `SELECT COUNT(*) FROM cf_schema_registry`).Scan(&schemaPathCount); err == nil { // #nosec G701 -- SQL text is constant and has no untrusted interpolation.
+				b.WriteString("oracle_schema_drift_paths_total ")
+				b.WriteString(strconv.FormatInt(schemaPathCount, 10))
+				b.WriteByte('\n')
+			}
+		}
+		_, _ = w.Write([]byte(b.String()))
 	})
 }
 
