@@ -330,13 +330,43 @@ func TestConsumeStepUpChallenge_UsesPersistedAuthChallenge(t *testing.T) {
 func TestMetricsRoute_RequiresAuthMiddleware(t *testing.T) {
 	mux := http.NewServeMux()
 	authMW := requireAuth(nil, "secret", "", false)
-	mux.Handle("/metrics", authMW(metricsHandler(appMetrics)))
+	mux.Handle("/metrics", authMW(metricsHandler(appMetrics, nil)))
 
 	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
 	rr := httptest.NewRecorder()
 	mux.ServeHTTP(rr, req)
 	if rr.Code != http.StatusUnauthorized {
 		t.Fatalf("expected 401 for unauthenticated metrics request, got %d", rr.Code)
+	}
+}
+
+func TestMetricsHandler_IncludesSchemaDriftMetricFromSQLite(t *testing.T) {
+	sqlDB, err := db.Init(filepath.Join(t.TempDir(), "metrics-schema.db"))
+	if err != nil {
+		t.Fatalf("db init failed: %v", err)
+	}
+	defer sqlDB.Close()
+
+	now := time.Now().UnixMilli()
+	if _, err := sqlDB.Exec(
+		`INSERT INTO cf_schema_registry (json_path, first_seen_at, last_seen_at, sample_type, is_projected)
+		 VALUES (?, ?, ?, ?, 0)`,
+		"root.field",
+		now,
+		now,
+		"string",
+	); err != nil {
+		t.Fatalf("seed schema registry failed: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	rr := httptest.NewRecorder()
+	metricsHandler(observability.NewRegistry(), sqlDB).ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), "oracle_schema_drift_paths_total 1") {
+		t.Fatalf("expected schema drift metric in output, got: %s", rr.Body.String())
 	}
 }
 

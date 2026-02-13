@@ -113,6 +113,9 @@ func TestRecordsHandlersV4_PostgresWritesCreateOutbox(t *testing.T) {
 		t.Fatalf("postgres init failed: %v", err)
 	}
 	defer postgresDB.Close()
+	if _, err := sqlDB.Exec(`UPDATE feature_flags SET enabled = 1, updated_at = ? WHERE name = 'feature_postgres_primary_control_plane'`, time.Now().UnixMilli()); err != nil {
+		t.Fatalf("enable postgres control plane flag failed: %v", err)
+	}
 
 	recordKey := "cp-test-" + strings.ReplaceAll(strings.ToLower(t.Name()), "/", "-") + "-" + strings.ReplaceAll(time.Now().UTC().Format("150405"), ":", "")
 	if _, err := postgresDB.Exec(`DELETE FROM pg_admin_records WHERE record_type = $1 AND record_key = $2`, "deployment_target", recordKey); err != nil {
@@ -197,6 +200,50 @@ func TestRecordsHandlersV4_PostgresWritesCreateOutbox(t *testing.T) {
 	RecordsListHandlerV4(sqlDB, postgresDB, allowed).ServeHTTP(listRR, listReq)
 	if listRR.Code != http.StatusOK {
 		t.Fatalf("postgres list failed: %d %s", listRR.Code, listRR.Body.String())
+	}
+}
+
+func TestRecordsHandlersV4_PostgresConfiguredButFlagDisabledWritesSQLite(t *testing.T) {
+	dsn := os.Getenv("POSTGRES_DSN")
+	if dsn == "" {
+		t.Skip("POSTGRES_DSN not set")
+	}
+	sqlDB := newAdminTestDB(t)
+	defer sqlDB.Close()
+
+	postgresDB, err := db.InitPostgres(dsn)
+	if err != nil {
+		t.Fatalf("postgres init failed: %v", err)
+	}
+	defer postgresDB.Close()
+
+	recordKey := "sqlite-fallback-" + strings.ReplaceAll(strings.ToLower(t.Name()), "/", "-")
+	allowed := map[string]struct{}{
+		"deployment_target": {},
+	}
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/admin/records/upsert",
+		bytes.NewBufferString(`{"recordType":"deployment_target","recordKey":"`+recordKey+`","data":{"users":"1500"}}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	RecordsUpsertHandlerV4(sqlDB, postgresDB, allowed).ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("upsert failed: %d %s", rr.Code, rr.Body.String())
+	}
+
+	var sqliteCount int64
+	if err := sqlDB.QueryRow(
+		`SELECT COUNT(*) FROM admin_records WHERE record_type = ? AND record_key = ?`,
+		"deployment_target",
+		recordKey,
+	).Scan(&sqliteCount); err != nil {
+		t.Fatalf("query sqlite admin_records failed: %v", err)
+	}
+	if sqliteCount != 1 {
+		t.Fatalf("expected sqlite fallback write, got sqliteCount=%d", sqliteCount)
 	}
 }
 
