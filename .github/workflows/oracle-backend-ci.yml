@@ -97,7 +97,7 @@ jobs:
       - name: Run gosec
         working-directory: oracle-backend
         run: |
-          "$(go env GOPATH)/bin/gosec" ./...
+          "$(go env GOPATH)/bin/gosec" -track-suppressions ./...
 
       - name: Run govulncheck
         working-directory: oracle-backend
