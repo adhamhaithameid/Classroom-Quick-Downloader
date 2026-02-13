@@ -73,16 +73,17 @@ func fixedRecordUpsertHandler(sqliteDB, postgresDB *sql.DB, recordType string, f
 			http.Error(w, "failed to upsert record", http.StatusInternalServerError)
 			return
 		}
-		if sqliteDB != nil {
-			_ = AppendAuditLog(
-				r.Context(),
-				sqliteDB,
-				"creative_record_upsert",
-				recordType,
-				req.RecordKey,
-				"ok",
-				map[string]any{"recordType": recordType, "recordKey": req.RecordKey},
-			)
+		if !appendAuditLogOrHTTPError(
+			w,
+			r.Context(),
+			sqliteDB,
+			"creative_record_upsert",
+			recordType,
+			req.RecordKey,
+			"ok",
+			map[string]any{"recordType": recordType, "recordKey": req.RecordKey},
+		) {
+			return
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{"ok": true})
@@ -117,16 +118,17 @@ func fixedRecordDeleteHandler(sqliteDB, postgresDB *sql.DB, recordType string, f
 			http.Error(w, "failed to delete record", http.StatusInternalServerError)
 			return
 		}
-		if sqliteDB != nil {
-			_ = AppendAuditLog(
-				r.Context(),
-				sqliteDB,
-				"creative_record_delete",
-				recordType,
-				req.RecordKey,
-				"ok",
-				map[string]any{"recordType": recordType, "recordKey": req.RecordKey, "affected": affected},
-			)
+		if !appendAuditLogOrHTTPError(
+			w,
+			r.Context(),
+			sqliteDB,
+			"creative_record_delete",
+			recordType,
+			req.RecordKey,
+			"ok",
+			map[string]any{"recordType": recordType, "recordKey": req.RecordKey, "affected": affected},
+		) {
+			return
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{
@@ -206,16 +208,17 @@ func NewsletterSubscribersUpsertHandler(sqliteDB, postgresDB *sql.DB) http.Handl
 			http.Error(w, "failed to upsert subscriber", http.StatusInternalServerError)
 			return
 		}
-		if sqliteDB != nil {
-			_ = AppendAuditLog(
-				r.Context(),
-				sqliteDB,
-				"newsletter_subscriber_upsert",
-				"newsletter_subscriber",
-				req.RecordKey,
-				"ok",
-				map[string]any{"recordKey": req.RecordKey},
-			)
+		if !appendAuditLogOrHTTPError(
+			w,
+			r.Context(),
+			sqliteDB,
+			"newsletter_subscriber_upsert",
+			"newsletter_subscriber",
+			req.RecordKey,
+			"ok",
+			map[string]any{"recordKey": req.RecordKey},
+		) {
+			return
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "recordKey": req.RecordKey})
