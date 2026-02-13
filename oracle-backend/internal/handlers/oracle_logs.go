@@ -207,7 +207,8 @@ func OracleOperationLogsDeleteOlderHandler(db *sql.DB) http.HandlerFunc {
 		}
 		deleted, _ := res.RowsAffected()
 
-		_ = AppendAuditLog(
+		if !appendAuditLogOrHTTPError(
+			w,
 			r.Context(),
 			db,
 			"oracle_logs_delete_older",
@@ -219,7 +220,9 @@ func OracleOperationLogsDeleteOlderHandler(db *sql.DB) http.HandlerFunc {
 				"cutoffTsMs": cutoffMs,
 				"deleted":    deleted,
 			},
-		)
+		) {
+			return
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{
@@ -274,7 +277,8 @@ func OracleOperationLogsClearAllHandler(db *sql.DB) http.HandlerFunc {
 		}
 		deleted, _ := res.RowsAffected()
 
-		_ = AppendAuditLog(
+		if !appendAuditLogOrHTTPError(
+			w,
 			r.Context(),
 			db,
 			"oracle_logs_clear_all",
@@ -284,7 +288,9 @@ func OracleOperationLogsClearAllHandler(db *sql.DB) http.HandlerFunc {
 			map[string]any{
 				"deleted": deleted,
 			},
-		)
+		) {
+			return
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{
