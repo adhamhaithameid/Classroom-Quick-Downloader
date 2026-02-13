@@ -435,6 +435,40 @@ func TestGetClientIPTrustedProxyRejectsInvalidForwardedIP(t *testing.T) {
 	}
 }
 
+func TestGetClientIPTrustedProxyUsesXRealIPWhenValid(t *testing.T) {
+	prev := trustedProxyNets
+	defer setTrustedProxyNets(prev)
+
+	setTrustedProxyNets(parseTrustedProxyCIDRs("10.0.0.0/8"))
+
+	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req.RemoteAddr = "10.1.2.3:1234"
+	req.Header.Set("X-Real-IP", "203.0.113.77")
+	req.Header.Set("X-Forwarded-For", "203.0.113.10")
+
+	ip := getClientIP(req)
+	if ip != "203.0.113.77" {
+		t.Fatalf("expected X-Real-IP to win, got %q", ip)
+	}
+}
+
+func TestGetClientIPTrustedProxyFallsBackToForwardedWhenXRealInvalid(t *testing.T) {
+	prev := trustedProxyNets
+	defer setTrustedProxyNets(prev)
+
+	setTrustedProxyNets(parseTrustedProxyCIDRs("10.0.0.0/8"))
+
+	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req.RemoteAddr = "10.1.2.3:1234"
+	req.Header.Set("X-Real-IP", "not-an-ip")
+	req.Header.Set("X-Forwarded-For", "203.0.113.10")
+
+	ip := getClientIP(req)
+	if ip != "203.0.113.10" {
+		t.Fatalf("expected X-Forwarded-For fallback, got %q", ip)
+	}
+}
+
 func TestNormalizeSessionCookieSecureMode(t *testing.T) {
 	cases := []struct {
 		in   string
