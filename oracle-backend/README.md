@@ -60,7 +60,7 @@ http://<LAN_IP>:8080
 ```
 5. Optional backend quality scan before manual UI test:
 ```bash
-cd oracle-backend && ./scripts/full-scan.sh
+cd oracle-backend && make scan
 ```
 
 Notes:
@@ -783,7 +783,15 @@ Postgres-backed record management, and deployment synchronization.
 Run all backend checks locally:
 
 ```bash
-./scripts/full-scan.sh
+make scan
+```
+
+Fast local targets:
+
+```bash
+make test-app
+make test-handlers
+make test
 ```
 
 ### Tooling
