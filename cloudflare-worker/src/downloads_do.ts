@@ -3325,8 +3325,7 @@ export class DownloadsDurable {
     // Keep transport protected via network controls if TLS is unavailable.
     const targetUrl = this.env.ORACLE_ENDPOINT + "/ingest-batch";
     console.log("------------------------------------------------");
-    console.log("Attempting Flush to:", targetUrl);
-    console.log("Secret Length:", this.env.DO_SHARED_SECRET ? this.env.DO_SHARED_SECRET.length : "MISSING");
+    console.log("Attempting Flush to Oracle ingest endpoint");
     // ----------------------
 
     if (!this.d.retryState) this.d.retryState = { ...DEFAULT_RETRY_STATE };
