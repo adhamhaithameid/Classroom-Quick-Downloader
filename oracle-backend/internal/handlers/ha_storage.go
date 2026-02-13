@@ -623,16 +623,17 @@ func DRDrillHandler(sqliteDB, postgresDB *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		if sqliteDB != nil {
-			_ = AppendAuditLog(
-				r.Context(),
-				sqliteDB,
-				"dr_drill",
-				"disaster_recovery",
-				drillID,
-				"ok",
-				map[string]any{"targetRegion": targetRegion, "status": status, "dryRun": req.DryRun},
-			)
+		if !appendAuditLogOrHTTPError(
+			w,
+			r.Context(),
+			sqliteDB,
+			"dr_drill",
+			"disaster_recovery",
+			drillID,
+			"ok",
+			map[string]any{"targetRegion": targetRegion, "status": status, "dryRun": req.DryRun},
+		) {
+			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -795,7 +796,8 @@ func RetentionRunHandler(sqliteDB, postgresDB *sql.DB) http.HandlerFunc {
 			if req.DryRun {
 				action = "retention_dry_run"
 			}
-			_ = AppendAuditLog(
+			if !appendAuditLogOrHTTPError(
+				w,
 				r.Context(),
 				sqliteDB,
 				action,
@@ -803,7 +805,9 @@ func RetentionRunHandler(sqliteDB, postgresDB *sql.DB) http.HandlerFunc {
 				"policy_set",
 				"ok",
 				map[string]any{"dryRun": req.DryRun, "actions": actions},
-			)
+			) {
+				return
+			}
 		}
 
 		w.Header().Set("Content-Type", "application/json")

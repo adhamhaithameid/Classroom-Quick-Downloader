@@ -319,7 +319,8 @@ func deploymentsSyncHandlerWithClient(sqliteDB, postgresDB *sql.DB, client *http
 			if req.DryRun {
 				action = "deployment_sync_dryrun"
 			}
-			_ = AppendAuditLog(
+			if !appendAuditLogOrHTTPError(
+				w,
 				r.Context(),
 				sqliteDB,
 				action,
@@ -331,7 +332,9 @@ func deploymentsSyncHandlerWithClient(sqliteDB, postgresDB *sql.DB, client *http
 					"ok":      okCount,
 					"dryRun":  req.DryRun,
 				},
-			)
+			) {
+				return
+			}
 		}
 
 		w.Header().Set("Content-Type", "application/json")
