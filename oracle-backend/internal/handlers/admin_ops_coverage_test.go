@@ -658,6 +658,13 @@ func TestIsAllowedReadOnlyQuery_QualifiedQuotedRestrictedTable(t *testing.T) {
 	}
 }
 
+func TestIsAllowedReadOnlyQuery_CommentObfuscatedRestrictedTable(t *testing.T) {
+	stmt := normalizeSQLForPolicy(`SELECT * FROM/* bypass */feature_flags`)
+	if isAllowedReadOnlyQuery(stmt) {
+		t.Fatal("expected rejected for comment-obfuscated restricted table")
+	}
+}
+
 // ---------------------------------------------------------------------------
 // truncateSQLForAudit
 // ---------------------------------------------------------------------------

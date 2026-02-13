@@ -704,6 +704,26 @@ func TestSQLQueryHandler_RejectsQualifiedRestrictedTables(t *testing.T) {
 	}
 }
 
+func TestSQLQueryHandler_RejectsCommentObfuscatedRestrictedTables(t *testing.T) {
+	sqlDB := newAdminTestDB(t)
+	defer sqlDB.Close()
+	if _, err := sqlDB.Exec(`UPDATE feature_flags SET enabled = 1 WHERE name = 'feature_sql_console_enabled'`); err != nil {
+		t.Fatalf("failed to enable sql console flag: %v", err)
+	}
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/admin/sql/query",
+		bytes.NewBufferString(`{"sql":"SELECT * FROM/*x*/feature_flags"}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	SQLQueryHandler(sqlDB, nil).ServeHTTP(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for comment-obfuscated restricted query, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
 func TestSQLExecHandler_RejectsForbiddenKeywords(t *testing.T) {
 	sqlDB := newAdminTestDB(t)
 	defer sqlDB.Close()

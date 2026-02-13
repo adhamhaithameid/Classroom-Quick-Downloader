@@ -933,15 +933,16 @@ func SQLQueryHandler(db *sql.DB, readOnlyDB *sql.DB) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		if !isReadOnlySQL(stmt) {
+		policyStmt := normalizeSQLForPolicy(stmt)
+		if !isReadOnlySQL(policyStmt) {
 			http.Error(w, "only read-only SQL is allowed on query endpoint", http.StatusBadRequest)
 			return
 		}
-		if hasForbiddenSQLTerms(stmt) {
+		if hasForbiddenSQLTerms(policyStmt) {
 			http.Error(w, "statement is not allowed by safety policy", http.StatusBadRequest)
 			return
 		}
-		if !isAllowedReadOnlyQuery(stmt) {
+		if !isAllowedReadOnlyQuery(policyStmt) {
 			http.Error(w, "query references restricted tables", http.StatusBadRequest)
 			return
 		}
@@ -1048,15 +1049,16 @@ func SQLExecHandler(db *sql.DB) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		if !isMutatingSQL(stmt) {
+		policyStmt := normalizeSQLForPolicy(stmt)
+		if !isMutatingSQL(policyStmt) {
 			http.Error(w, "exec endpoint only supports insert/update/delete statements", http.StatusBadRequest)
 			return
 		}
-		if hasForbiddenSQLTerms(stmt) {
+		if hasForbiddenSQLTerms(policyStmt) {
 			http.Error(w, "statement is not allowed by safety policy", http.StatusBadRequest)
 			return
 		}
-		tableName, ok := mutatingTargetTable(stmt)
+		tableName, ok := mutatingTargetTable(policyStmt)
 		if !ok {
 			http.Error(w, "unable to determine target table", http.StatusBadRequest)
 			return
@@ -1547,6 +1549,11 @@ func normalizeSingleStatement(sqlText string) (string, error) {
 	return stmt, nil
 }
 
+func normalizeSQLForPolicy(stmt string) string {
+	noComments := sqlInlineCommentRegexp.ReplaceAllString(stmt, " ")
+	return strings.TrimSpace(noComments)
+}
+
 func isReadOnlySQL(stmt string) bool {
 	lower := strings.ToLower(strings.TrimSpace(stmt))
 	return strings.HasPrefix(lower, "select ")
@@ -1560,6 +1567,7 @@ func isMutatingSQL(stmt string) bool {
 }
 
 var sqlForbiddenTermsRegexp = regexp.MustCompile(`(?i)\b(drop|alter|pragma|vacuum|attach|detach|reindex|create|trigger|load_extension|replace)\b`)
+var sqlInlineCommentRegexp = regexp.MustCompile(`(?s)/\*.*?\*/|--[^\r\n]*`)
 
 var sqlReadOnlyRestrictedTables = map[string]struct{}{
 	"admin_audit_log": {},
