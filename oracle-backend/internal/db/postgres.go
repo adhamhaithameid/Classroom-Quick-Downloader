@@ -44,6 +44,22 @@ func migratePostgres(db *sql.DB) error {
 		`CREATE INDEX IF NOT EXISTS idx_raw_ingest_events_created_at
 			ON raw_ingest_events(created_at DESC);`,
 
+		`CREATE TABLE IF NOT EXISTS pg_ingest_batches (
+			id              BIGSERIAL PRIMARY KEY,
+			batch_id        TEXT NOT NULL UNIQUE,
+			generated_at    BIGINT NOT NULL,
+			ingested_at     BIGINT NOT NULL,
+			time_zone       TEXT NOT NULL DEFAULT 'UTC',
+			events_count    BIGINT NOT NULL DEFAULT 0,
+			downloads_count BIGINT NOT NULL DEFAULT 0,
+			success_count   BIGINT NOT NULL DEFAULT 0,
+			fail_count      BIGINT NOT NULL DEFAULT 0,
+			payload_json    JSONB NOT NULL
+		);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_pg_ingest_batches_ingested_at
+			ON pg_ingest_batches(ingested_at DESC);`,
+
 		`CREATE TABLE IF NOT EXISTS pg_outbox (
 			id              BIGSERIAL PRIMARY KEY,
 			event_type      TEXT NOT NULL,
@@ -72,6 +88,19 @@ func migratePostgres(db *sql.DB) error {
 
 		`CREATE INDEX IF NOT EXISTS idx_pg_admin_records_type_updated
 			ON pg_admin_records(record_type, updated_at DESC, id DESC);`,
+
+		`CREATE TABLE IF NOT EXISTS pg_dr_drills (
+			id             BIGSERIAL PRIMARY KEY,
+			drill_id       TEXT NOT NULL UNIQUE,
+			target_region  TEXT NOT NULL,
+			status         TEXT NOT NULL,
+			result_json    JSONB NOT NULL,
+			started_at     BIGINT NOT NULL,
+			finished_at    BIGINT NOT NULL
+		);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_pg_dr_drills_started_at
+			ON pg_dr_drills(started_at DESC);`,
 	}
 
 	for _, stmt := range stmts {

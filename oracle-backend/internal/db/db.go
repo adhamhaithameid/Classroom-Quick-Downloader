@@ -319,6 +319,34 @@ func Migrate(db *sql.DB) error {
 		`CREATE INDEX IF NOT EXISTS idx_backup_runs_started_at
 			ON backup_runs(started_at DESC);`,
 
+		// Storage pressure telemetry snapshots for operator visibility.
+		`CREATE TABLE IF NOT EXISTS storage_status_samples (
+			id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+			captured_at           INTEGER NOT NULL,
+			disk_used_percent     REAL NOT NULL,
+			disk_total_bytes      INTEGER NOT NULL,
+			disk_available_bytes  INTEGER NOT NULL,
+			sqlite_db_size_bytes  INTEGER NOT NULL,
+			severity              TEXT NOT NULL
+		);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_storage_status_samples_captured_at
+			ON storage_status_samples(captured_at DESC);`,
+
+		// Disaster recovery drill tracking for warm-DR readiness checks.
+		`CREATE TABLE IF NOT EXISTS dr_drills (
+			id             INTEGER PRIMARY KEY AUTOINCREMENT,
+			drill_id       TEXT NOT NULL UNIQUE,
+			target_region  TEXT NOT NULL,
+			status         TEXT NOT NULL,
+			result_json    TEXT NOT NULL,
+			started_at     INTEGER NOT NULL,
+			finished_at    INTEGER NOT NULL
+		);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_dr_drills_started_at
+			ON dr_drills(started_at DESC);`,
+
 		// Oracle backend operation logs (request-level, server-side observability).
 		`CREATE TABLE IF NOT EXISTS oracle_operation_logs (
 			id             INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -422,6 +450,9 @@ func seedFeatureFlags(db *sql.DB) error {
 		{name: "feature_creative_hub_enabled", desc: "Enable designs/emails/newsletter hub", enabled: 1},
 		{name: "feature_management_hub_enabled", desc: "Enable deployments/versions hub", enabled: 1},
 		{name: "feature_postgres_projection_enabled", desc: "Enable SQLite outbox to Postgres projection relay", enabled: 1},
+		{name: "feature_postgres_primary_ingest", desc: "Use Postgres as source-of-truth for ingest writes", enabled: 0},
+		{name: "feature_postgres_primary_control_plane", desc: "Use Postgres as source-of-truth for control-plane writes", enabled: 0},
+		{name: "feature_sqlite_fallback_readonly", desc: "Allow SQLite read fallback while Postgres primary is rolling out", enabled: 1},
 		{name: "feature_stepup_enforced", desc: "Require step-up auth for sensitive operations", enabled: 1},
 	}
 
