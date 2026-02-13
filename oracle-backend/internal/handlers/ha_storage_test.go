@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -171,5 +172,51 @@ func TestRetentionRunHandler_DryRunAndExecute(t *testing.T) {
 	}
 	if remaining != 0 {
 		t.Fatalf("expected retention executor to remove old rows, remaining=%d", remaining)
+	}
+}
+
+func TestMultiplyClampUint64(t *testing.T) {
+	tests := []struct {
+		name string
+		a    uint64
+		b    uint64
+		want uint64
+	}{
+		{name: "normal product", a: 12, b: 1024, want: 12288},
+		{name: "zero a clamps to zero", a: 0, b: 10, want: 0},
+		{name: "zero b clamps to zero", a: 10, b: 0, want: 0},
+		{name: "overflow clamps to max int64", a: math.MaxInt64, b: 2, want: uint64(math.MaxInt64)},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := multiplyClampUint64(tc.a, tc.b)
+			if got != tc.want {
+				t.Fatalf("got %d, want %d", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestParseNonNegativeUint64(t *testing.T) {
+	tests := []struct {
+		name string
+		in   any
+		want uint64
+	}{
+		{name: "uint64 input", in: uint64(42), want: 42},
+		{name: "int input", in: 42, want: 42},
+		{name: "int64 input", in: int64(42), want: 42},
+		{name: "negative clamps to zero", in: int64(-1), want: 0},
+		{name: "invalid string clamps to zero", in: "abc", want: 0},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := parseNonNegativeUint64(tc.in)
+			if got != tc.want {
+				t.Fatalf("got %d, want %d", got, tc.want)
+			}
+		})
 	}
 }
