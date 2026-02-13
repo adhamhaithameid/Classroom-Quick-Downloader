@@ -32,6 +32,7 @@ async function loadDownloadHandlerModule() {
     getButtonState,
     setButtonState,
     setPillProgress,
+    updateAriaLabel: vi.fn(),
   }));
   vi.doMock('../entrypoints/content/i18n', () => ({
     t: (key: string) => key,

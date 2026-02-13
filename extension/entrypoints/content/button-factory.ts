@@ -7,7 +7,7 @@ import type { FileMeta, ButtonState } from './types';
 import { INJECTED_ATTR, PROCESSED_ATTR } from './state';
 import { toDownloadUrl } from './url-utils';
 import { extractFileMeta } from './file-meta';
-import { getButtonState, setButtonState } from './button-state';
+import { getButtonState, setButtonState, updateAriaLabel } from './button-state';
 import { handleCancelClick, handleSingleDownloadClick } from './download-handler';
 import { DOWNLOAD_ICON_SVG_URL, CANCEL_ICON_SVG_URL } from './icons';
 import { t } from './i18n';
@@ -55,8 +55,8 @@ export function createDownloadButton(
   button.appendChild(label);
   button.appendChild(errorDetail);
 
-  // Mouse enter: show cancel if active
-  button.addEventListener('mouseenter', () => {
+  // Shared interaction handlers (Mouse + Keyboard)
+  const handleInteractionStart = () => {
     (button.dataset as any).cqdMouseOver = 'true';
     const s = getButtonState(button);
     if (s === 'loading' || s === 'trying') {
@@ -68,11 +68,11 @@ export function createDownloadButton(
         icon.className = 'cqd-download-icon';
         icon.style.backgroundImage = `url("${CANCEL_ICON_SVG_URL}")`;
       }
+      updateAriaLabel(button, 'cancel');
     }
-  });
+  };
 
-  // Mouse leave: revert to active state
-  button.addEventListener('mouseleave', () => {
+  const handleInteractionEnd = () => {
     (button.dataset as any).cqdMouseOver = 'false';
     const wasCancel = button.classList.contains('cqd-cancel');
     const isUnderlyingLoading = button.classList.contains('cqd-loading');
@@ -89,12 +89,33 @@ export function createDownloadButton(
           icon.className = 'cqd-download-icon cqd-spinner';
           icon.style.backgroundImage = 'none';
         }
+        updateAriaLabel(button, 'loading');
       } else if (isUnderlyingTrying) {
         if (btnLabel) btnLabel.textContent = t('trying') || 'Retrying...';
         if (icon) {
           icon.className = 'cqd-download-icon cqd-spinner';
           icon.style.backgroundImage = 'none';
         }
+        updateAriaLabel(button, 'trying');
+      }
+    }
+  };
+
+  button.addEventListener('mouseenter', handleInteractionStart);
+  button.addEventListener('mouseleave', handleInteractionEnd);
+  button.addEventListener('focus', handleInteractionStart);
+  button.addEventListener('blur', handleInteractionEnd);
+
+  // Keydown handler for keyboard cancel
+  button.addEventListener('keydown', async (e) => {
+    if (e.key === 'Escape') {
+      const s = getButtonState(button);
+      // If visually showing cancel (via interaction) OR underlying state is loading/trying
+      if (s === 'cancel' || s === 'loading' || s === 'trying') {
+        e.preventDefault();
+        e.stopPropagation();
+        delete (button.dataset as any).cqdMouseOver;
+        await handleCancelClick(button);
       }
     }
   });

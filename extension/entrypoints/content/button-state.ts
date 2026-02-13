@@ -106,6 +106,8 @@ export function setButtonState(
 
   button.classList.add(`cqd-${state}`);
 
+  updateAriaLabel(button, state, options);
+
   switch (state) {
     case 'idle':
       break;
@@ -182,4 +184,40 @@ function applyHoverCancelVisual(
 export function setPillProgress(button: HTMLButtonElement, fraction: number): void {
   const percent = Math.max(0, Math.min(100, Math.round(fraction * 100)));
   button.style.setProperty('--cqd-progress', `${percent}%`);
+}
+
+/**
+ * Update aria-label based on state and filename.
+ */
+export function updateAriaLabel(
+  button: HTMLButtonElement,
+  state: ButtonState,
+  options?: { userMessage?: string }
+): void {
+  const filename = (button.dataset as any).cqdName || '';
+  let label = '';
+
+  switch (state) {
+    case 'loading':
+    case 'trying':
+      // Include instructions for cancellation
+      label = `${t('downloading')} ${filename}. ${t('cancel')}`;
+      break;
+    case 'success':
+      label = `${t('downloaded')} ${filename}`;
+      break;
+    case 'error':
+      label = `${t('error')}: ${options?.userMessage || t('failed')} ${filename}`;
+      break;
+    case 'cancelled':
+      label = `${t('cancelled')} ${filename}`;
+      break;
+    case 'cancel':
+      label = `${t('cancel')} ${filename}`;
+      break;
+    default:
+      label = `${t('ariaDownload')} ${filename}`;
+  }
+
+  button.setAttribute('aria-label', label);
 }
