@@ -371,16 +371,17 @@ func RetryOutboxHandler(sqliteDB, postgresDB *sql.DB, metrics *observability.Reg
 			metrics.IncCounter("oracle_outbox_retry_total", map[string]string{"source": req.Source}, float64(affected))
 		}
 
-		if sqliteDB != nil {
-			_ = AppendAuditLog(
-				r.Context(),
-				sqliteDB,
-				"outbox_retry",
-				resourceType,
-				"bulk",
-				"ok",
-				map[string]any{"ids": req.IDs, "affected": affected, "source": req.Source},
-			)
+		if !appendAuditLogOrHTTPError(
+			w,
+			r.Context(),
+			sqliteDB,
+			"outbox_retry",
+			resourceType,
+			"bulk",
+			"ok",
+			map[string]any{"ids": req.IDs, "affected": affected, "source": req.Source},
+		) {
+			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -494,7 +495,8 @@ func ReplayDeadLetterHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		_ = AppendAuditLog(
+		if !appendAuditLogOrHTTPError(
+			w,
 			r.Context(),
 			db,
 			"dead_letter_replay",
@@ -502,7 +504,9 @@ func ReplayDeadLetterHandler(db *sql.DB) http.HandlerFunc {
 			"bulk",
 			"ok",
 			map[string]any{"replayed": replayed},
-		)
+		) {
+			return
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "replayed": replayed})
@@ -1097,7 +1101,8 @@ func SQLExecHandler(db *sql.DB) http.HandlerFunc {
 		if req.DryRun {
 			action = "sql_exec_dry_run"
 		}
-		_ = AppendAuditLog(
+		if !appendAuditLogOrHTTPError(
+			w,
 			r.Context(),
 			db,
 			action,
@@ -1110,7 +1115,9 @@ func SQLExecHandler(db *sql.DB) http.HandlerFunc {
 				"table":    tableName,
 				"sql":      truncateSQLForAudit(stmt),
 			},
-		)
+		) {
+			return
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{
@@ -1163,7 +1170,8 @@ func DangerClearDataHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		if req.DryRun {
-			_ = AppendAuditLog(
+			if !appendAuditLogOrHTTPError(
+				w,
 				r.Context(),
 				db,
 				"danger_clear_data_dry_run",
@@ -1171,7 +1179,9 @@ func DangerClearDataHandler(db *sql.DB) http.HandlerFunc {
 				scope,
 				"ok",
 				map[string]any{"counts": counts},
-			)
+			) {
+				return
+			}
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"ok":      true,
@@ -1211,7 +1221,8 @@ func DangerClearDataHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		_ = AppendAuditLog(
+		if !appendAuditLogOrHTTPError(
+			w,
 			r.Context(),
 			db,
 			"danger_clear_data",
@@ -1219,7 +1230,9 @@ func DangerClearDataHandler(db *sql.DB) http.HandlerFunc {
 			scope,
 			"ok",
 			map[string]any{"removed": removed},
-		)
+		) {
+			return
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{
@@ -1291,7 +1304,8 @@ func BackupRunHandler(db *sql.DB, metrics *observability.Registry) http.HandlerF
 			startedAt,
 			finishedAt,
 		)
-		_ = AppendAuditLog(
+		if !appendAuditLogOrHTTPError(
+			w,
 			r.Context(),
 			db,
 			"backup_run",
@@ -1303,7 +1317,9 @@ func BackupRunHandler(db *sql.DB, metrics *observability.Registry) http.HandlerF
 				"startedAt":  startedAt,
 				"finishedAt": finishedAt,
 			},
-		)
+		) {
+			return
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{
@@ -1458,7 +1474,8 @@ func RecordsUpsertHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		_ = AppendAuditLog(
+		if !appendAuditLogOrHTTPError(
+			w,
 			r.Context(),
 			db,
 			"record_upsert",
@@ -1466,7 +1483,9 @@ func RecordsUpsertHandler(db *sql.DB) http.HandlerFunc {
 			req.RecordKey,
 			"ok",
 			map[string]any{"recordType": req.RecordType, "recordKey": req.RecordKey},
-		)
+		) {
+			return
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{"ok": true})
@@ -1503,7 +1522,8 @@ func RecordsDeleteHandler(db *sql.DB) http.HandlerFunc {
 		}
 		affected, _ := res.RowsAffected()
 
-		_ = AppendAuditLog(
+		if !appendAuditLogOrHTTPError(
+			w,
 			r.Context(),
 			db,
 			"record_delete",
@@ -1511,7 +1531,9 @@ func RecordsDeleteHandler(db *sql.DB) http.HandlerFunc {
 			req.RecordKey,
 			"ok",
 			map[string]any{"affected": affected},
-		)
+		) {
+			return
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{
