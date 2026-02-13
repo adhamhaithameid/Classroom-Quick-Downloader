@@ -1365,7 +1365,7 @@ export class DownloadsDurable {
     // =========================================================================
     const currentHour = new Date().getUTCHours();
     if (this.d.buffer.length > 0 && currentHour === 0) {
-      console.log(`[Alarm] Midnight flush: ${this.d.buffer.length} events to Oracle`);
+      logEvent("info", "alarm_midnight_flush", { bufferedEvents: this.d.buffer.length });
       await this.flushToOracle(true);
     }
 
@@ -1397,7 +1397,7 @@ export class DownloadsDurable {
     const currentAlarm = await this.state.storage.getAlarm();
     if (!currentAlarm || currentAlarm > alarmTime) {
       await this.state.storage.setAlarm(alarmTime);
-      console.log(`[Alarm] Scheduled next midnight flush for ${tomorrow.toISOString()}`);
+      logEvent("info", "alarm_scheduled_next_midnight_flush", { at: tomorrow.toISOString() });
     }
   }
 
@@ -3320,13 +3320,12 @@ export class DownloadsDurable {
       this.mergePendingBatchesIfNeeded();
     };
 
-    // --- LOGGING for Debugging ---
-    // HTTP mode note: Oracle free-tier deployment may be HTTP-only.
-    // Keep transport protected via network controls if TLS is unavailable.
     const targetUrl = this.env.ORACLE_ENDPOINT + "/ingest-batch";
-    console.log("------------------------------------------------");
-    console.log("Attempting Flush to Oracle ingest endpoint");
-    // ----------------------
+    logEvent("info", "oracle_flush_attempt", {
+      target: "/ingest-batch",
+      fromPendingBatch: !!pendingMeta,
+      eventCount: eventsToFlush.length,
+    });
 
     if (!this.d.retryState) this.d.retryState = { ...DEFAULT_RETRY_STATE };
     this.d.retryState.lastFlushAttemptAt = now;
