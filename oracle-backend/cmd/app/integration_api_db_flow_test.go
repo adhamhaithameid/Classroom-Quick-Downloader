@@ -1,0 +1,176 @@
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"time"
+
+	model "oracle-backend/internal/model"
+)
+
+func newIntegrationBatch(batchID string, downloads int64) model.OracleBatch {
+	now := time.Now().UTC()
+	bucketStart := now.Truncate(time.Hour)
+	bucketEnd := bucketStart.Add(time.Hour)
+	return model.OracleBatch{
+		BatchID:     batchID,
+		GeneratedAt: now.UnixMilli(),
+		TimeZone:    "UTC",
+		Summary: model.BatchSummary{
+			Totals: model.BucketTotals{
+				TotalEvents:    downloads,
+				TotalDownloads: downloads,
+				TotalSuccess:   downloads - 1,
+				TotalFail:      1,
+			},
+		},
+		TimeBuckets: []model.TimeBucket{
+			{
+				BucketStart: bucketStart.Format(time.RFC3339),
+				BucketEnd:   bucketEnd.Format(time.RFC3339),
+				Totals: model.BucketTotals{
+					TotalEvents:    downloads,
+					TotalDownloads: downloads,
+					TotalSuccess:   downloads - 1,
+					TotalFail:      1,
+				},
+				Counters: model.BucketCounters{
+					ByStatus:    map[string]int64{"success": downloads - 1, "fail": 1},
+					ByType:      map[string]int64{"pdf": downloads},
+					ByBrowser:   map[string]int64{"chrome": downloads},
+					ByOs:        map[string]int64{"windows": downloads},
+					ByExtVer:    map[string]int64{"1.0.0": downloads},
+					ByLanguage:  map[string]int64{"en": downloads},
+					ByCountry:   map[string]int64{"us": downloads},
+					ByErrorType: map[string]int64{"timeout": 1},
+				},
+			},
+		},
+		DOState: model.DOState{OK: true},
+	}
+}
+
+func TestIntegrationAPIFlow_IngestBatchPersistsAndLoadsSummary(t *testing.T) {
+	// Arrange
+	mux, sqlDB := newIntegrationMux(t)
+	defer sqlDB.Close()
+
+	batch := newIntegrationBatch("integration-flow-1", 12)
+	body, err := json.Marshal(batch)
+	if err != nil {
+		t.Fatalf("marshal batch failed: %v", err)
+	}
+
+	// Act: ingest
+	ingestReq := httptest.NewRequest(http.MethodPost, "/ingest-batch", bytes.NewReader(body))
+	ingestReq.Header.Set("Content-Type", "application/json")
+	ingestReq.Header.Set("X-DO-SECRET", "test-secret")
+	ingestRR := httptest.NewRecorder()
+	mux.ServeHTTP(ingestRR, ingestReq)
+
+	// Assert: ingest response
+	if ingestRR.Code != http.StatusOK {
+		t.Fatalf("expected ingest status 200, got %d: %s", ingestRR.Code, ingestRR.Body.String())
+	}
+
+	// Assert: row persisted
+	var batchCount int
+	if err := sqlDB.QueryRow(`SELECT COUNT(*) FROM batches WHERE batch_id = ?`, batch.BatchID).Scan(&batchCount); err != nil {
+		t.Fatalf("query batches count failed: %v", err)
+	}
+	if batchCount != 1 {
+		t.Fatalf("expected 1 batch row, got %d", batchCount)
+	}
+
+	// Act: read summary
+	summaryReq := httptest.NewRequest(http.MethodGet, "/api/stats/summary", nil)
+	summaryRR := httptest.NewRecorder()
+	mux.ServeHTTP(summaryRR, summaryReq)
+
+	// Assert: summary response
+	if summaryRR.Code != http.StatusOK {
+		t.Fatalf("expected summary status 200, got %d: %s", summaryRR.Code, summaryRR.Body.String())
+	}
+	var summary map[string]any
+	if err := json.Unmarshal(summaryRR.Body.Bytes(), &summary); err != nil {
+		t.Fatalf("unmarshal summary failed: %v", err)
+	}
+	if ok, _ := summary["ok"].(bool); !ok {
+		t.Fatalf("expected summary ok=true, got %v", summary["ok"])
+	}
+	if got, _ := summary["totalDownloads"].(float64); got < 12 {
+		t.Fatalf("expected totalDownloads >= 12, got %v", summary["totalDownloads"])
+	}
+}
+
+func TestIntegrationAPIFlow_CreativeEmailCRUDRoundTrip(t *testing.T) {
+	// Arrange
+	mux, sqlDB := newIntegrationMux(t)
+	defer sqlDB.Close()
+
+	upsertBody := `{"recordKey":"welcome-v1","data":{"subject":"Welcome","html":"<p>Hello</p>"}}`
+
+	// Act: upsert
+	upsertReq := httptest.NewRequest(http.MethodPost, "/api/admin/creative/emails/upsert", strings.NewReader(upsertBody))
+	upsertReq.Header.Set("Content-Type", "application/json")
+	upsertRR := httptest.NewRecorder()
+	mux.ServeHTTP(upsertRR, upsertReq)
+
+	// Assert: upsert response
+	if upsertRR.Code != http.StatusOK {
+		t.Fatalf("expected upsert status 200, got %d: %s", upsertRR.Code, upsertRR.Body.String())
+	}
+
+	// Act: list
+	listReq := httptest.NewRequest(http.MethodGet, "/api/admin/creative/emails", nil)
+	listRR := httptest.NewRecorder()
+	mux.ServeHTTP(listRR, listReq)
+
+	// Assert: list contains the inserted record
+	if listRR.Code != http.StatusOK {
+		t.Fatalf("expected list status 200, got %d: %s", listRR.Code, listRR.Body.String())
+	}
+	var listPayload struct {
+		OK      bool `json:"ok"`
+		Records []struct {
+			RecordKey string `json:"recordKey"`
+		} `json:"records"`
+	}
+	if err := json.Unmarshal(listRR.Body.Bytes(), &listPayload); err != nil {
+		t.Fatalf("unmarshal list payload failed: %v", err)
+	}
+	if !listPayload.OK || len(listPayload.Records) != 1 || listPayload.Records[0].RecordKey != "welcome-v1" {
+		t.Fatalf("unexpected list payload: %s", listRR.Body.String())
+	}
+
+	// Act: delete
+	deleteReq := httptest.NewRequest(http.MethodPost, "/api/admin/creative/emails/delete", strings.NewReader(`{"recordKey":"welcome-v1"}`))
+	deleteReq.Header.Set("Content-Type", "application/json")
+	deleteRR := httptest.NewRecorder()
+	mux.ServeHTTP(deleteRR, deleteReq)
+
+	// Assert: delete response
+	if deleteRR.Code != http.StatusOK {
+		t.Fatalf("expected delete status 200, got %d: %s", deleteRR.Code, deleteRR.Body.String())
+	}
+	var deletePayload map[string]any
+	if err := json.Unmarshal(deleteRR.Body.Bytes(), &deletePayload); err != nil {
+		t.Fatalf("unmarshal delete payload failed: %v", err)
+	}
+	if affected, _ := deletePayload["affected"].(float64); affected != 1 {
+		t.Fatalf("expected affected=1, got %v", deletePayload["affected"])
+	}
+
+	// Assert: row actually removed in SQLite
+	var remaining int
+	if err := sqlDB.QueryRow(`SELECT COUNT(*) FROM admin_records WHERE record_type = 'creative_email_template' AND record_key = 'welcome-v1'`).Scan(&remaining); err != nil {
+		t.Fatalf("query remaining records failed: %v", err)
+	}
+	if remaining != 0 {
+		t.Fatalf("expected remaining records=0, got %d", remaining)
+	}
+}
