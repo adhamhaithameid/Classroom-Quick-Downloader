@@ -54,8 +54,6 @@ func TestFeatureFlagsHandler_MethodNotAllowed(t *testing.T) {
 	}
 }
 
-
-
 func TestFeatureFlagsHandler_ReturnsSeedFlags(t *testing.T) {
 	d := openAdminCoverageDB(t)
 	rr := httptest.NewRecorder()
@@ -129,8 +127,6 @@ func TestUpdateFeatureFlagHandler_Success(t *testing.T) {
 	}
 }
 
-
-
 // ---------------------------------------------------------------------------
 // IsFeatureEnabled
 // ---------------------------------------------------------------------------
@@ -156,8 +152,6 @@ func TestIsFeatureEnabled_NoRows(t *testing.T) {
 		t.Fatal("expected false for nonexistent flag")
 	}
 }
-
-
 
 // ---------------------------------------------------------------------------
 // OutboxStatusHandler
@@ -427,8 +421,6 @@ func TestAlertsHandler_EmptyDB(t *testing.T) {
 	}
 }
 
-
-
 // ---------------------------------------------------------------------------
 // RetryOutboxHandler
 // ---------------------------------------------------------------------------
@@ -645,6 +637,24 @@ func TestIsAllowedReadOnlyQuery_RestrictedTable(t *testing.T) {
 func TestIsAllowedReadOnlyQuery_FeatureFlagsRestricted(t *testing.T) {
 	if isAllowedReadOnlyQuery("SELECT * FROM feature_flags") {
 		t.Fatal("expected rejected for feature_flags")
+	}
+}
+
+func TestIsAllowedReadOnlyQuery_QuotedRestrictedTable(t *testing.T) {
+	if isAllowedReadOnlyQuery(`SELECT * FROM "feature_flags"`) {
+		t.Fatal("expected rejected for quoted feature_flags")
+	}
+}
+
+func TestIsAllowedReadOnlyQuery_QualifiedRestrictedTable(t *testing.T) {
+	if isAllowedReadOnlyQuery(`SELECT * FROM main.feature_flags`) {
+		t.Fatal("expected rejected for qualified feature_flags")
+	}
+}
+
+func TestIsAllowedReadOnlyQuery_QualifiedQuotedRestrictedTable(t *testing.T) {
+	if isAllowedReadOnlyQuery(`SELECT * FROM "main"."feature_flags"`) {
+		t.Fatal("expected rejected for quoted qualified feature_flags")
 	}
 }
 
