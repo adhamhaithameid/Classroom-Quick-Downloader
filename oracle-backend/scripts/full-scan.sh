@@ -33,4 +33,13 @@ echo "[oracle-scan] running gosec (excluding G701 false positives)"
 echo "[oracle-scan] running govulncheck"
 "$GO_BIN_DIR/govulncheck" ./...
 
+WORKER_DIR="$ROOT_DIR/../cloudflare-worker"
+if command -v pnpm >/dev/null 2>&1 && [ -f "$WORKER_DIR/package.json" ]; then
+  echo "[oracle-scan] running cloudflare-worker tests"
+  pnpm -C "$WORKER_DIR" test
+
+  echo "[oracle-scan] running cloudflare-worker lint"
+  pnpm -C "$WORKER_DIR" lint
+fi
+
 echo "[oracle-scan] complete"
