@@ -1519,7 +1519,27 @@ export class DownloadsDurable {
     const encoder = new TextEncoder();
     for (const ev of events) {
       try {
-        const eventSize = encoder.encode(JSON.stringify(ev)).length;
+        const jsonStr = JSON.stringify(ev);
+        const len = jsonStr.length;
+
+        // Optimization: Fast path for size check
+        if (len > MAX_EVENT_SIZE_BYTES) {
+          this.recordFailure("track_ingest", "event_too_large", `max=${MAX_EVENT_SIZE_BYTES}`, 1, now);
+          await this.persist();
+          return json(
+            { ok: false, error: "event_too_large", maxBytes: MAX_EVENT_SIZE_BYTES },
+            { status: 400 }
+          );
+        }
+
+        // Safe threshold: UTF-8 encoding is max 3 bytes per UTF-16 code unit (for BMP) or less.
+        // Even with surrogate pairs (4 bytes for 2 units), effective bytes per unit is 2.
+        // So len * 3 is a strictly safe upper bound for byte size.
+        if (len * 3 <= MAX_EVENT_SIZE_BYTES) {
+          continue;
+        }
+
+        const eventSize = encoder.encode(jsonStr).length;
         if (eventSize > MAX_EVENT_SIZE_BYTES) {
           this.recordFailure("track_ingest", "event_too_large", `max=${MAX_EVENT_SIZE_BYTES}`, 1, now);
           await this.persist();
