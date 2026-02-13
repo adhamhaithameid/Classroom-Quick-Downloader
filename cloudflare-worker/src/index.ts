@@ -325,7 +325,7 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
     const password = (form.get("password") || "").toString();
 
     // Validate password
-    if (password !== dashboardSecret) {
+    if (!timingSafeStringEqual(password, dashboardSecret)) {
       const rateLimitRes = await stub.fetch(rateLimitReq);
       const rateLimitData = await rateLimitRes.json() as {
         allowed: boolean;
@@ -488,7 +488,7 @@ async function handleVerifyDangerPassword(request: Request, env: WorkerEnv): Pro
   try {
     const { password } = await request.json() as { password: string };
     
-    if (!password || password !== env.DANGER_PASSWORD) {
+    if (!password || !timingSafeStringEqual(password, env.DANGER_PASSWORD)) {
       // Record failed attempt
       await stub.fetch(new Request("https://do/auth/login-attempt", {
         method: "POST",
