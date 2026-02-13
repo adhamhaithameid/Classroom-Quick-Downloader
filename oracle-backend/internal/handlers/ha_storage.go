@@ -144,8 +144,15 @@ func collectStorageStatus(dbPath string, watermarks StorageWatermarks, sqliteDB 
 		return StorageStatus{}, err
 	}
 
-	total := uint64(fs.Blocks) * uint64(fs.Bsize)
-	available := uint64(fs.Bavail) * uint64(fs.Bsize)
+	// Convert Statfs fields defensively across platforms before arithmetic.
+	blocks := parseNonNegativeUint64(fs.Blocks)
+	availableBlocks := parseNonNegativeUint64(fs.Bavail)
+	blockSize := parseNonNegativeUint64(fs.Bsize)
+	total := multiplyClampUint64(blocks, blockSize)
+	available := multiplyClampUint64(availableBlocks, blockSize)
+	if available > total {
+		available = total
+	}
 	used := uint64(0)
 	if total > available {
 		used = total - available
@@ -177,6 +184,29 @@ func collectStorageStatus(dbPath string, watermarks StorageWatermarks, sqliteDB 
 		status.TopGrowthTables = queryTopGrowthTables(context.Background(), sqliteDB)
 	}
 	return status, nil
+}
+
+func parseNonNegativeUint64(v any) uint64 {
+	raw := strings.TrimSpace(fmt.Sprintf("%v", v))
+	if raw == "" || strings.HasPrefix(raw, "-") {
+		return 0
+	}
+	parsed, err := strconv.ParseUint(raw, 10, 64)
+	if err != nil {
+		return 0
+	}
+	return parsed
+}
+
+func multiplyClampUint64(a, b uint64) uint64 {
+	if a == 0 || b == 0 {
+		return 0
+	}
+	max := uint64(math.MaxInt64)
+	if a > max/b {
+		return max
+	}
+	return a * b
 }
 
 func safeUint64ToInt64(v uint64) int64 {
