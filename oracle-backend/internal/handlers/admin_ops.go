@@ -1580,7 +1580,7 @@ var sqlExecAllowedTables = map[string]struct{}{
 }
 
 var sqlTargetTableRegexp = regexp.MustCompile(`(?i)^\s*(?:insert\s+into|update|delete\s+from)\s+([a-zA-Z_][a-zA-Z0-9_]*)`)
-var sqlReadOnlyTableRegexp = regexp.MustCompile(`(?i)\b(?:from|join)\s+([a-zA-Z_][a-zA-Z0-9_]*)`)
+var sqlReadOnlySourceRegexp = regexp.MustCompile(`(?i)\b(?:from|join)\s+([^\s,;]+)`)
 
 func hasForbiddenSQLTerms(stmt string) bool {
 	return sqlForbiddenTermsRegexp.MatchString(stmt)
@@ -1595,17 +1595,149 @@ func mutatingTargetTable(stmt string) (string, bool) {
 }
 
 func isAllowedReadOnlyQuery(stmt string) bool {
-	matches := sqlReadOnlyTableRegexp.FindAllStringSubmatch(stmt, -1)
+	matches := sqlReadOnlySourceRegexp.FindAllStringSubmatch(stmt, -1)
 	for _, match := range matches {
 		if len(match) < 2 {
 			continue
 		}
-		table := strings.ToLower(strings.TrimSpace(match[1]))
+		table, ok := normalizeReadOnlySourceTable(match[1])
+		if !ok {
+			return false
+		}
 		if _, blocked := sqlReadOnlyRestrictedTables[table]; blocked {
 			return false
 		}
 	}
 	return true
+}
+
+func normalizeReadOnlySourceTable(sourceToken string) (string, bool) {
+	token := strings.TrimSpace(strings.TrimRight(sourceToken, ","))
+	if token == "" {
+		return "", false
+	}
+	if strings.HasPrefix(token, "(") {
+		return "", false
+	}
+
+	parts, ok := splitIdentifierParts(token)
+	if !ok || len(parts) == 0 {
+		return "", false
+	}
+
+	table := strings.ToLower(strings.TrimSpace(parts[len(parts)-1]))
+	if table == "" {
+		return "", false
+	}
+	return table, true
+}
+
+func splitIdentifierParts(token string) ([]string, bool) {
+	parts := make([]string, 0, 2)
+	i := 0
+
+	readBare := func() (string, bool) {
+		start := i
+		for i < len(token) {
+			switch token[i] {
+			case '.', ' ', '\t', '\n', '\r', ',', ';':
+				goto done
+			case '(', ')':
+				return "", false
+			default:
+				i++
+			}
+		}
+	done:
+		if start == i {
+			return "", false
+		}
+		return token[start:i], true
+	}
+
+	readQuoted := func(quote byte) (string, bool) {
+		if i >= len(token) || token[i] != quote {
+			return "", false
+		}
+		i++
+		start := i
+		for i < len(token) && token[i] != quote {
+			i++
+		}
+		if i >= len(token) {
+			return "", false
+		}
+		value := token[start:i]
+		i++ // closing quote
+		if value == "" {
+			return "", false
+		}
+		return value, true
+	}
+
+	readBracketQuoted := func() (string, bool) {
+		if i >= len(token) || token[i] != '[' {
+			return "", false
+		}
+		i++
+		start := i
+		for i < len(token) && token[i] != ']' {
+			i++
+		}
+		if i >= len(token) {
+			return "", false
+		}
+		value := token[start:i]
+		i++ // closing bracket
+		if value == "" {
+			return "", false
+		}
+		return value, true
+	}
+
+	for i < len(token) {
+		for i < len(token) && (token[i] == ' ' || token[i] == '\t' || token[i] == '\n' || token[i] == '\r') {
+			i++
+		}
+		if i >= len(token) {
+			break
+		}
+
+		var part string
+		var ok bool
+		switch token[i] {
+		case '"', '`':
+			part, ok = readQuoted(token[i])
+		case '[':
+			part, ok = readBracketQuoted()
+		default:
+			part, ok = readBare()
+		}
+		if !ok {
+			return nil, false
+		}
+		part = strings.TrimSpace(part)
+		if part == "" {
+			return nil, false
+		}
+		parts = append(parts, part)
+
+		for i < len(token) && (token[i] == ' ' || token[i] == '\t' || token[i] == '\n' || token[i] == '\r') {
+			i++
+		}
+		if i >= len(token) {
+			break
+		}
+		if token[i] != '.' {
+			return nil, false
+		}
+		i++ // dot separator
+	}
+
+	if len(parts) == 0 {
+		return nil, false
+	}
+	return parts, true
 }
 
 func truncateSQLForAudit(stmt string) string {
