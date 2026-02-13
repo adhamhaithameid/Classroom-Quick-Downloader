@@ -43,6 +43,13 @@
 | L6/L7 | ✅ Fixed | Inline handlers removed; CSP nonce enforcement active. |
 | L8 | ✅ Fixed | Auto-refresh skips hidden tabs and refreshes on visibility return. |
 
+### Follow-up Hardening (2026-02-13)
+
+- Auth handlers now use strict JSON decoding (unknown fields and trailing payloads rejected) for login and step-up verification.
+- SQL restricted-table coverage now explicitly includes quoted variants (`"table"`, `` `table` ``, `[table]`) and schema-qualified forms.
+- Worker flush/alarm logging now emits structured events only; secret-derived debug metadata has been removed.
+- Cookie troubleshooting now documents `SESSION_COOKIE_SECURE` mode selection for HTTP vs HTTPS deployments.
+
 ---
 
 ## 🔴 CRITICAL
