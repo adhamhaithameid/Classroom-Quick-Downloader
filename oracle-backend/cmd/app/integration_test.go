@@ -52,9 +52,33 @@ func newIntegrationMux(t *testing.T) (*http.ServeMux, *sql.DB) {
 	mux.Handle("/api/pipeline/failures", handlers.PipelineFailuresHandler(sqlDB))
 
 	// Admin routes (no auth wrapper for integration test)
+	allowedRecordTypes := map[string]struct{}{
+		"deployment_target":          {},
+		"deployment_update_sentence": {},
+		"extension_version_note":     {},
+		"creative_design":            {},
+		"creative_email_template":    {},
+		"newsletter_subscriber":      {},
+		"newsletter_campaign":        {},
+	}
 	mux.Handle("/api/admin/flags", handlers.FeatureFlagsHandler(sqlDB))
 	mux.Handle("/api/admin/alerts", handlers.AlertsHandler(sqlDB))
 	mux.Handle("/api/admin/oracle-logs", handlers.OracleOperationLogsListHandler(sqlDB))
+	mux.Handle("/api/admin/records/list", handlers.RecordsListHandlerV4(sqlDB, nil, allowedRecordTypes))
+	mux.Handle("/api/admin/records/upsert", handlers.RecordsUpsertHandlerV4(sqlDB, nil, allowedRecordTypes))
+	mux.Handle("/api/admin/records/delete", handlers.RecordsDeleteHandlerV4(sqlDB, nil, allowedRecordTypes))
+	mux.Handle("/api/admin/creative/designs", handlers.CreativeDesignsListHandler(sqlDB, nil))
+	mux.Handle("/api/admin/creative/designs/upsert", handlers.CreativeDesignsUpsertHandler(sqlDB, nil))
+	mux.Handle("/api/admin/creative/designs/delete", handlers.CreativeDesignsDeleteHandler(sqlDB, nil))
+	mux.Handle("/api/admin/creative/emails", handlers.CreativeEmailsListHandler(sqlDB, nil))
+	mux.Handle("/api/admin/creative/emails/upsert", handlers.CreativeEmailsUpsertHandler(sqlDB, nil))
+	mux.Handle("/api/admin/creative/emails/delete", handlers.CreativeEmailsDeleteHandler(sqlDB, nil))
+	mux.Handle("/api/admin/newsletter/subscribers", handlers.NewsletterSubscribersListHandler(sqlDB, nil))
+	mux.Handle("/api/admin/newsletter/subscribers/upsert", handlers.NewsletterSubscribersUpsertHandler(sqlDB, nil))
+	mux.Handle("/api/admin/newsletter/subscribers/delete", handlers.NewsletterSubscribersDeleteHandler(sqlDB, nil))
+	mux.Handle("/api/admin/newsletter/campaigns", handlers.NewsletterCampaignsListHandler(sqlDB, nil))
+	mux.Handle("/api/admin/newsletter/campaigns/upsert", handlers.NewsletterCampaignsUpsertHandler(sqlDB, nil))
+	mux.Handle("/api/admin/newsletter/campaigns/delete", handlers.NewsletterCampaignsDeleteHandler(sqlDB, nil))
 
 	return mux, sqlDB
 }
@@ -109,7 +133,9 @@ func TestIntegration_HealthEndpointReturnsOK(t *testing.T) {
 		t.Fatalf("expected 200, got %d", rr.Code)
 	}
 
-	var resp struct{ OK bool `json:"ok"` }
+	var resp struct {
+		OK bool `json:"ok"`
+	}
 	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("invalid JSON: %v", err)
 	}
