@@ -683,6 +683,20 @@ func TestIsAllowedReadOnlyQuery_CommentObfuscatedRestrictedTable(t *testing.T) {
 	}
 }
 
+func TestNormalizeSQLForPolicy_RemovesDashComments(t *testing.T) {
+	got := normalizeSQLForPolicy("SELECT * FROM batches -- trailing comment")
+	if strings.Contains(got, "--") {
+		t.Fatalf("expected dash comments to be removed, got %q", got)
+	}
+}
+
+func TestNormalizeSQLForPolicy_RemovesBlockComments(t *testing.T) {
+	got := normalizeSQLForPolicy("SELECT /* hidden */ * FROM batches")
+	if strings.Contains(got, "hidden") {
+		t.Fatalf("expected block comments to be removed, got %q", got)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // truncateSQLForAudit
 // ---------------------------------------------------------------------------
