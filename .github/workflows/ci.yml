@@ -101,7 +101,7 @@ jobs:
         run: pnpm install
 
       - name: Run Cloudflare Worker Tests
-        run: pnpm --filter cloudflare-worker test
+        run: pnpm -C cloudflare-worker test
 
       - name: Run Static Analysis (Lint, Typecheck, Audit)
         run: pnpm -C cloudflare-worker run validate
