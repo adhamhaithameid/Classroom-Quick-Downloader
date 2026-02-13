@@ -566,6 +566,62 @@ func TestLoggingMiddleware_SkipsStaticAssetPaths(t *testing.T) {
 	}
 }
 
+func TestLoggingMiddleware_SkipsHealthPath(t *testing.T) {
+	sqlDB, err := db.Init(filepath.Join(t.TempDir(), "oracle-skip-health.db"))
+	if err != nil {
+		t.Fatalf("db init failed: %v", err)
+	}
+	defer sqlDB.Close()
+
+	handler := observability.RequestContextMiddleware(
+		loggingMiddleware(sqlDB, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		})),
+	)
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("unexpected status code: %d", rr.Code)
+	}
+
+	var count int64
+	if err := sqlDB.QueryRow(`SELECT COUNT(*) FROM oracle_operation_logs`).Scan(&count); err != nil {
+		t.Fatalf("query oracle operation logs failed: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("expected zero oracle operation log rows for /health, got %d", count)
+	}
+}
+
+func TestLoggingMiddleware_SkipsMetricsPath(t *testing.T) {
+	sqlDB, err := db.Init(filepath.Join(t.TempDir(), "oracle-skip-metrics.db"))
+	if err != nil {
+		t.Fatalf("db init failed: %v", err)
+	}
+	defer sqlDB.Close()
+
+	handler := observability.RequestContextMiddleware(
+		loggingMiddleware(sqlDB, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		})),
+	)
+	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("unexpected status code: %d", rr.Code)
+	}
+
+	var count int64
+	if err := sqlDB.QueryRow(`SELECT COUNT(*) FROM oracle_operation_logs`).Scan(&count); err != nil {
+		t.Fatalf("query oracle operation logs failed: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("expected zero oracle operation log rows for /metrics, got %d", count)
+	}
+}
+
 func TestIsOracleOperationPath(t *testing.T) {
 	cases := []struct {
 		path string
