@@ -542,26 +542,23 @@ func registerSchemaPaths(ctx context.Context, tx *sql.Tx, payload map[string]int
 
 	for _, path := range keys {
 		sampleType := paths[path]
-		var exists int
-		err := tx.QueryRowContext(ctx, `SELECT 1 FROM cf_schema_registry WHERE json_path = ?`, path).Scan(&exists) // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
-		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		insertRes, err := tx.ExecContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
+			ctx,
+			`INSERT OR IGNORE INTO cf_schema_registry (json_path, first_seen_at, last_seen_at, sample_type, is_projected)
+			 VALUES (?, ?, ?, ?, 0)`,
+			path,
+			nowMs,
+			nowMs,
+			sampleType,
+		)
+		if err != nil {
 			return err
 		}
-		if errors.Is(err, sql.ErrNoRows) {
-			if _, err := tx.ExecContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
-				ctx,
-				`INSERT INTO cf_schema_registry (json_path, first_seen_at, last_seen_at, sample_type, is_projected)
-				 VALUES (?, ?, ?, ?, 0)`,
-				path,
-				nowMs,
-				nowMs,
-				sampleType,
-			); err != nil {
-				return err
-			}
+
+		if rowsInserted, rowsErr := insertRes.RowsAffected(); rowsErr == nil && rowsInserted > 0 {
 			newCount++
-			continue
 		}
+
 		if _, err := tx.ExecContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 			ctx,
 			`UPDATE cf_schema_registry SET last_seen_at = ?, sample_type = ? WHERE json_path = ?`,
