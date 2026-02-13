@@ -192,6 +192,7 @@ All configuration is done via environment variables, defined in `docker-compose.
 | `ARCHIVER_SHARED_SECRET` | *(required when auth enabled)* | Secret header for the archiver to read stats. |
 | `ALLOW_LOOPBACK_BYPASS` | `false` | Set `true` to allow loopback auth bypass (dev only). |
 | `ALLOW_EMPTY_DASHBOARD_PASSWORD` | `false` | Set `true` to allow an empty dashboard password (dev only). |
+| `SESSION_COOKIE_SECURE` | `auto` | Cookie Secure mode: `auto` (TLS-aware), `true` (always secure), `false` (always non-secure; needed for plain HTTP). |
 | `POSTGRES_DSN` | *(optional)* | Enables Postgres bootstrap and v4 cutover paths. |
 | `STORAGE_WATERMARK_WARN` | `70` | Disk usage warning watermark percentage. |
 | `STORAGE_WATERMARK_CRITICAL` | `85` | Disk usage critical watermark percentage. |
@@ -933,6 +934,19 @@ This page shows:
 1. Check logs: `docker compose logs oracle-backend`.
 2. Verify port `8080` is not in use by another process.
 3. Ensure `DB_PATH` directory is writable.
+
+---
+
+### "Session cookie was not saved by your browser" on login
+
+**Symptom:** Dashboard login accepts password but auth modal does not unlock.
+
+**Cause:** Browser drops the session cookie due to Secure policy mismatch for HTTP deployments.
+
+**Solution:**
+1. For HTTPS deployments keep `SESSION_COOKIE_SECURE=auto` (or `true`).
+2. For plain HTTP deployments set `SESSION_COOKIE_SECURE=false`.
+3. Refresh the page and retry login after updating env vars.
 
 ---
 
