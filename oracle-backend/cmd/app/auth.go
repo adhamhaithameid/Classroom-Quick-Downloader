@@ -93,7 +93,7 @@ func requireAuth(db *sql.DB, dashboardPassword, archiverSecret string, allowLoop
 			cookie, err := r.Cookie(sessionCookieName)
 			if err != nil || !isValidSession(cookie.Value) {
 				appMetrics.IncCounter("oracle_auth_failures_total", map[string]string{"reason": "session_invalid"}, 1)
-				http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+				writeAPIError(w, http.StatusUnauthorized, "unauthorized")
 				return
 			}
 
@@ -114,7 +114,7 @@ func requireStepUp(db *sql.DB, superAdminPassword string) func(http.Handler) htt
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			enabled, err := handlers.IsFeatureEnabled(r.Context(), db, "feature_stepup_enforced")
 			if err != nil {
-				http.Error(w, `{"error":"stepup_flag_unavailable"}`, http.StatusInternalServerError)
+				writeAPIError(w, http.StatusInternalServerError, "stepup_flag_unavailable")
 				return
 			}
 			if !enabled {
@@ -122,7 +122,7 @@ func requireStepUp(db *sql.DB, superAdminPassword string) func(http.Handler) htt
 				return
 			}
 			if superAdminPassword == "" {
-				http.Error(w, `{"error":"stepup_misconfigured"}`, http.StatusInternalServerError)
+				writeAPIError(w, http.StatusInternalServerError, "stepup_misconfigured")
 				return
 			}
 
@@ -133,7 +133,7 @@ func requireStepUp(db *sql.DB, superAdminPassword string) func(http.Handler) htt
 			}
 			if err != nil || !isValidStepUpSession(cookie.Value, parentSession) {
 				appMetrics.IncCounter("oracle_auth_failures_total", map[string]string{"reason": "stepup_required"}, 1)
-				http.Error(w, `{"error":"step_up_required"}`, http.StatusForbidden)
+				writeAPIError(w, http.StatusForbidden, "step_up_required")
 				return
 			}
 
@@ -152,13 +152,13 @@ func stepUpStartHandler(db *sql.DB) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		if r.Method != http.MethodPost {
-			http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+			writeAPIError(w, http.StatusMethodNotAllowed, "method not allowed")
 			return
 		}
 
 		enabled, err := handlers.IsFeatureEnabled(r.Context(), db, "feature_stepup_enforced")
 		if err != nil {
-			http.Error(w, `{"error":"stepup_flag_unavailable"}`, http.StatusInternalServerError)
+			writeAPIError(w, http.StatusInternalServerError, "stepup_flag_unavailable")
 			return
 		}
 		if !enabled {
@@ -171,7 +171,7 @@ func stepUpStartHandler(db *sql.DB) http.Handler {
 
 		challengeID, err := generateToken()
 		if err != nil {
-			http.Error(w, `{"error":"failed_to_create_challenge"}`, http.StatusInternalServerError)
+			writeAPIError(w, http.StatusInternalServerError, "failed_to_create_challenge")
 			return
 		}
 		clientIP := getClientIP(r)
@@ -179,7 +179,7 @@ func stepUpStartHandler(db *sql.DB) http.Handler {
 		now := time.Now()
 		expiresAt := now.Add(stepUpChallengeDuration)
 		if err := persistStepUpChallenge(challengeID, clientIP, expiresAt); err != nil {
-			http.Error(w, `{"error":"failed_to_persist_challenge"}`, http.StatusInternalServerError)
+			writeAPIError(w, http.StatusInternalServerError, "failed_to_persist_challenge")
 			return
 		}
 
@@ -207,13 +207,13 @@ func stepUpVerifyHandler(db *sql.DB, superAdminPassword string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		if r.Method != http.MethodPost {
-			http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+			writeAPIError(w, http.StatusMethodNotAllowed, "method not allowed")
 			return
 		}
 
 		enabled, err := handlers.IsFeatureEnabled(r.Context(), db, "feature_stepup_enforced")
 		if err != nil {
-			http.Error(w, `{"error":"stepup_flag_unavailable"}`, http.StatusInternalServerError)
+			writeAPIError(w, http.StatusInternalServerError, "stepup_flag_unavailable")
 			return
 		}
 		if !enabled {
@@ -229,7 +229,7 @@ func stepUpVerifyHandler(db *sql.DB, superAdminPassword string) http.Handler {
 		if !allowed {
 			appMetrics.IncCounter("oracle_rate_limit_hits_total", map[string]string{"scope": "stepup"}, 1)
 			w.Header().Set("Retry-After", strconv.Itoa(retryAfter))
-			http.Error(w, `{"error":"too many attempts"}`, http.StatusTooManyRequests)
+			writeAPIError(w, http.StatusTooManyRequests, "too many attempts")
 			return
 		}
 
@@ -238,24 +238,24 @@ func stepUpVerifyHandler(db *sql.DB, superAdminPassword string) http.Handler {
 			Password    string `json:"password"` // #nosec G117 -- required request field for step-up verify API contract.
 		}
 		if err := decodeJSONBodyStrict(r, &req); err != nil {
-			http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+			writeAPIError(w, http.StatusBadRequest, "invalid request body")
 			return
 		}
 		req.ChallengeID = strings.TrimSpace(req.ChallengeID)
 		if req.ChallengeID == "" || strings.TrimSpace(req.Password) == "" {
-			http.Error(w, `{"error":"challengeId and password are required"}`, http.StatusBadRequest)
+			writeAPIError(w, http.StatusBadRequest, "challengeId and password are required")
 			return
 		}
 
 		if !consumeStepUpChallenge(req.ChallengeID, clientIP) {
 			appMetrics.IncCounter("oracle_stepup_verify_total", map[string]string{"result": "invalid_challenge"}, 1)
-			http.Error(w, `{"error":"invalid_or_expired_challenge"}`, http.StatusUnauthorized)
+			writeAPIError(w, http.StatusUnauthorized, "invalid_or_expired_challenge")
 			return
 		}
 
 		mainSessionCookie, mainSessionErr := r.Cookie(sessionCookieName)
 		if mainSessionErr != nil || strings.TrimSpace(mainSessionCookie.Value) == "" {
-			http.Error(w, `{"error":"missing_parent_session"}`, http.StatusUnauthorized)
+			writeAPIError(w, http.StatusUnauthorized, "missing_parent_session")
 			return
 		}
 
@@ -266,22 +266,22 @@ func stepUpVerifyHandler(db *sql.DB, superAdminPassword string) http.Handler {
 			if blocked {
 				appMetrics.IncCounter("oracle_rate_limit_hits_total", map[string]string{"scope": "stepup"}, 1)
 				w.Header().Set("Retry-After", strconv.Itoa(retryAfter))
-				http.Error(w, `{"error":"too many attempts"}`, http.StatusTooManyRequests)
+				writeAPIError(w, http.StatusTooManyRequests, "too many attempts")
 				return
 			}
-			http.Error(w, `{"error":"invalid password"}`, http.StatusUnauthorized)
+			writeAPIError(w, http.StatusUnauthorized, "invalid password")
 			return
 		}
 
 		clearStepUpFailures(clientIP)
 		token, err := generateToken()
 		if err != nil {
-			http.Error(w, `{"error":"failed to create stepup session"}`, http.StatusInternalServerError)
+			writeAPIError(w, http.StatusInternalServerError, "failed to create stepup session")
 			return
 		}
 		expiresAt := time.Now().Add(stepUpSessionDuration)
 		if err := persistAuthSession(token, authSessionKindStepUp, mainSessionCookie.Value, expiresAt); err != nil {
-			http.Error(w, `{"error":"failed to persist stepup session"}`, http.StatusInternalServerError)
+			writeAPIError(w, http.StatusInternalServerError, "failed to persist stepup session")
 			return
 		}
 
@@ -327,12 +327,12 @@ func stepUpCheckHandler(db *sql.DB) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		if r.Method != http.MethodGet {
-			http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+			writeAPIError(w, http.StatusMethodNotAllowed, "method not allowed")
 			return
 		}
 		enabled, err := handlers.IsFeatureEnabled(r.Context(), db, "feature_stepup_enforced")
 		if err != nil {
-			http.Error(w, `{"error":"stepup_flag_unavailable"}`, http.StatusInternalServerError)
+			writeAPIError(w, http.StatusInternalServerError, "stepup_flag_unavailable")
 			return
 		}
 		active := false
@@ -814,7 +814,7 @@ func loginHandler(db *sql.DB, dashboardPassword string) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 
 		if r.Method != http.MethodPost {
-			http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+			writeAPIError(w, http.StatusMethodNotAllowed, "method not allowed")
 			return
 		}
 
@@ -831,7 +831,7 @@ func loginHandler(db *sql.DB, dashboardPassword string) http.HandlerFunc {
 		if !allowed {
 			appMetrics.IncCounter("oracle_rate_limit_hits_total", map[string]string{"scope": "login"}, 1)
 			w.Header().Set("Retry-After", strconv.Itoa(retryAfter))
-			http.Error(w, `{"error":"too many attempts"}`, http.StatusTooManyRequests)
+			writeAPIError(w, http.StatusTooManyRequests, "too many attempts")
 			return
 		}
 
@@ -839,7 +839,7 @@ func loginHandler(db *sql.DB, dashboardPassword string) http.HandlerFunc {
 			Password string `json:"password"` // #nosec G117 -- required request field for login API contract.
 		}
 		if err := decodeJSONBodyStrict(r, &req); err != nil {
-			http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+			writeAPIError(w, http.StatusBadRequest, "invalid request body")
 			return
 		}
 
@@ -849,10 +849,10 @@ func loginHandler(db *sql.DB, dashboardPassword string) http.HandlerFunc {
 			if blocked {
 				appMetrics.IncCounter("oracle_rate_limit_hits_total", map[string]string{"scope": "login"}, 1)
 				w.Header().Set("Retry-After", strconv.Itoa(retryAfter))
-				http.Error(w, `{"error":"too many attempts"}`, http.StatusTooManyRequests)
+				writeAPIError(w, http.StatusTooManyRequests, "too many attempts")
 				return
 			}
-			http.Error(w, `{"error":"invalid password"}`, http.StatusUnauthorized)
+			writeAPIError(w, http.StatusUnauthorized, "invalid password")
 			return
 		}
 
@@ -861,13 +861,13 @@ func loginHandler(db *sql.DB, dashboardPassword string) http.HandlerFunc {
 		// Create session
 		token, err := generateToken()
 		if err != nil {
-			http.Error(w, `{"error":"failed to create session"}`, http.StatusInternalServerError)
+			writeAPIError(w, http.StatusInternalServerError, "failed to create session")
 			return
 		}
 
 		expiresAt := time.Now().Add(sessionDuration)
 		if err := persistAuthSession(token, authSessionKindViewer, "", expiresAt); err != nil {
-			http.Error(w, `{"error":"failed to persist session"}`, http.StatusInternalServerError)
+			writeAPIError(w, http.StatusInternalServerError, "failed to persist session")
 			return
 		}
 
@@ -898,7 +898,7 @@ func logoutHandler(db *sql.DB) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 
 		if r.Method != http.MethodPost {
-			http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+			writeAPIError(w, http.StatusMethodNotAllowed, "method not allowed")
 			return
 		}
 

@@ -38,13 +38,13 @@ func csrfHeaderMiddleware(next http.Handler) http.Handler {
 			switch r.Method {
 			case http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
 				if r.Header.Get("X-Requested-With") != "XMLHttpRequest" {
-					http.Error(w, `{"error":"missing_csrf_header"}`, http.StatusBadRequest)
+					writeAPIError(w, http.StatusBadRequest, "missing_csrf_header")
 					return
 				}
 				origin := strings.TrimSpace(r.Header.Get("Origin"))
 				if origin != "" {
 					if !isAllowedCSRFOrigin(r, origin) {
-						http.Error(w, `{"error":"invalid_origin"}`, http.StatusForbidden)
+						writeAPIError(w, http.StatusForbidden, "invalid_origin")
 						return
 					}
 				}
