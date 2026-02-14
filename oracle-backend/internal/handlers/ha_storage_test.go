@@ -101,6 +101,50 @@ func TestReadyHandler_HealthySQLiteOnly(t *testing.T) {
 	}
 }
 
+func TestReadyHandler_StorageBackpressureWarnsButStaysReady(t *testing.T) {
+	sqlDB := newHAStorageTestDB(t)
+	defer sqlDB.Close()
+
+	guard := NewStorageGuard(
+		filepath.Join(t.TempDir(), "analytics.db"),
+		StorageWatermarks{Warn: 0.00001, Critical: 0.00002, Emergency: 0.00003},
+	)
+	migrationErr := ""
+	req := httptest.NewRequest(http.MethodGet, "/health/ready", nil)
+	rr := httptest.NewRecorder()
+	ReadyHandler(sqlDB, nil, guard, false, &migrationErr).ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200 during ingest backpressure, got %d body=%s", rr.Code, rr.Body.String())
+	}
+
+	var payload struct {
+		OK                 bool     `json:"ok"`
+		Reasons            []string `json:"reasons"`
+		Warnings           []string `json:"warnings"`
+		IngestBackpressure bool     `json:"ingestBackpressure"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to decode ready payload: %v", err)
+	}
+	if !payload.OK {
+		t.Fatalf("expected ready payload OK=true under storage backpressure, got false")
+	}
+	if !payload.IngestBackpressure {
+		t.Fatalf("expected ingestBackpressure=true in payload")
+	}
+	foundWarning := false
+	for _, warning := range payload.Warnings {
+		if warning == "storage_emergency_backpressure" {
+			foundWarning = true
+			break
+		}
+	}
+	if !foundWarning {
+		t.Fatalf("expected storage_emergency_backpressure warning in payload")
+	}
+}
+
 func TestHARuntimeStatusHandler_ReturnsFlagsAndBacklog(t *testing.T) {
 	sqlDB := newHAStorageTestDB(t)
 	defer sqlDB.Close()
