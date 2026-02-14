@@ -174,3 +174,92 @@ func TestIntegrationAPIFlow_CreativeEmailCRUDRoundTrip(t *testing.T) {
 		t.Fatalf("expected remaining records=0, got %d", remaining)
 	}
 }
+
+func TestIntegrationAPIFlow_DeploymentSyncUpdatesOverviewAggregates(t *testing.T) {
+	// Arrange
+	mux, sqlDB := newIntegrationMux(t)
+	defer sqlDB.Close()
+	t.Setenv("ORACLE_ALLOW_UNTRUSTED_STORE_URLS", "true")
+	t.Setenv("ORACLE_ALLOW_HTTP_STORE_URLS", "true")
+
+	const edgeCRXID = "ecojbijjkcjdolpeoiemnccgmaeomcmn"
+	storeServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/chrome":
+			_, _ = w.Write([]byte(`<script>{"users":"120K","version":"5.9.1"}</script><div>4.7 (21 ratings)</div>`))
+		case "/firefox":
+			_, _ = w.Write([]byte(`<div>Users 12,345</div><div>Version 6.0.0</div><div>5 (2 reviews)</div>`))
+		case "/addons/getproductdetailsbycrxid/" + edgeCRXID:
+			_, _ = w.Write([]byte(`{"activeInstallCount":75,"averageRating":5,"ratingCount":6,"version":"6.1.0"}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer storeServer.Close()
+
+	upserts := []struct {
+		key string
+		url string
+	}{
+		{key: "chrome", url: storeServer.URL + "/chrome"},
+		{key: "firefox", url: storeServer.URL + "/firefox"},
+		{key: "edge", url: storeServer.URL + "/addons/detail/classroom-quick-downloader/" + edgeCRXID},
+	}
+	for _, item := range upserts {
+		body, err := json.Marshal(map[string]any{
+			"recordType": "deployment_target",
+			"recordKey":  item.key,
+			"data": map[string]any{
+				"url": item.url,
+			},
+		})
+		if err != nil {
+			t.Fatalf("marshal deployment upsert body failed: %v", err)
+		}
+		req := httptest.NewRequest(http.MethodPost, "/api/admin/records/upsert", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		rr := httptest.NewRecorder()
+		mux.ServeHTTP(rr, req)
+		if rr.Code != http.StatusOK {
+			t.Fatalf("seed deployment target upsert failed for %s: %d %s", item.key, rr.Code, rr.Body.String())
+		}
+	}
+
+	// Act: run browser stores sync.
+	syncReq := httptest.NewRequest(http.MethodPost, "/api/admin/deployments/sync", strings.NewReader(`{}`))
+	syncReq.Header.Set("Content-Type", "application/json")
+	syncRR := httptest.NewRecorder()
+	mux.ServeHTTP(syncRR, syncReq)
+	if syncRR.Code != http.StatusOK {
+		t.Fatalf("deployment sync failed: %d %s", syncRR.Code, syncRR.Body.String())
+	}
+
+	// Act: read deployment targets aggregate payload that overview/charts consume.
+	targetsReq := httptest.NewRequest(http.MethodGet, "/api/admin/deployments/targets", nil)
+	targetsRR := httptest.NewRecorder()
+	mux.ServeHTTP(targetsRR, targetsReq)
+	if targetsRR.Code != http.StatusOK {
+		t.Fatalf("deployment targets read failed: %d %s", targetsRR.Code, targetsRR.Body.String())
+	}
+
+	// Assert
+	var payload struct {
+		OK         bool `json:"ok"`
+		Aggregates struct {
+			UsersTotal   float64 `json:"usersTotal"`
+			ReviewsTotal float64 `json:"reviewsTotal"`
+		} `json:"aggregates"`
+	}
+	if err := json.Unmarshal(targetsRR.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("unmarshal deployment targets payload failed: %v", err)
+	}
+	if !payload.OK {
+		t.Fatalf("expected ok=true in deployment targets payload")
+	}
+	if int64(payload.Aggregates.UsersTotal) != 132420 {
+		t.Fatalf("expected usersTotal=132420, got %v", payload.Aggregates.UsersTotal)
+	}
+	if int64(payload.Aggregates.ReviewsTotal) != 29 {
+		t.Fatalf("expected reviewsTotal=29, got %v", payload.Aggregates.ReviewsTotal)
+	}
+}

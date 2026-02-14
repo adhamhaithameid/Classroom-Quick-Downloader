@@ -30,7 +30,6 @@ func newIntegrationMux(t *testing.T) (*http.ServeMux, *sql.DB) {
 	}
 
 	metrics := observability.NewRegistry()
-	_ = metrics // used by some handlers
 
 	mux := http.NewServeMux()
 
@@ -79,6 +78,8 @@ func newIntegrationMux(t *testing.T) (*http.ServeMux, *sql.DB) {
 	mux.Handle("/api/admin/newsletter/campaigns", handlers.NewsletterCampaignsListHandler(sqlDB, nil))
 	mux.Handle("/api/admin/newsletter/campaigns/upsert", handlers.NewsletterCampaignsUpsertHandler(sqlDB, nil))
 	mux.Handle("/api/admin/newsletter/campaigns/delete", handlers.NewsletterCampaignsDeleteHandler(sqlDB, nil))
+	mux.Handle("/api/admin/deployments/targets", handlers.DeploymentsTargetsHandler(sqlDB, nil))
+	mux.Handle("/api/admin/deployments/sync", handlers.DeploymentsSyncHandler(sqlDB, nil, metrics))
 
 	return mux, sqlDB
 }
@@ -106,6 +107,7 @@ func TestIntegration_AllRegisteredRoutesRespondNon404(t *testing.T) {
 		"/api/admin/flags",
 		"/api/admin/alerts",
 		"/api/admin/oracle-logs",
+		"/api/admin/deployments/targets",
 	}
 
 	for _, route := range getRoutes {
