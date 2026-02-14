@@ -16,6 +16,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"os"
 	"os/exec"
@@ -40,6 +41,25 @@ var appMetrics = observability.NewRegistry()
 
 const defaultMaxHeaderBytes = 1 << 20
 
+var weakSecretValues = map[string]struct{}{
+	"change-me-in-production": {},
+	"changeme":                {},
+	"change-me":               {},
+	"default":                 {},
+	"password":                {},
+	"secret":                  {},
+	"admin":                   {},
+}
+
+func isWeakSecretValue(secret string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(secret))
+	if normalized == "" {
+		return false
+	}
+	_, weak := weakSecretValues[normalized]
+	return weak
+}
+
 func main() {
 	addr := getenv("ADDR", ":8080")
 	dbPath := getenv("DB_PATH", "./data/analytics.db")
@@ -52,6 +72,20 @@ func main() {
 	allowEmptyDashboardPassword := os.Getenv("ALLOW_EMPTY_DASHBOARD_PASSWORD") == "true"
 	trustedProxyNets = parseTrustedProxyCIDRs(os.Getenv("TRUSTED_PROXY_CIDRS"))
 	sessionCookieSecureMode = normalizeSessionCookieSecureMode(os.Getenv("SESSION_COOKIE_SECURE"))
+	csrfAllowedOrigins = loadCSRFAllowedOrigins(os.Getenv("CSRF_ALLOWED_ORIGINS"), os.Getenv("PUBLIC_BASE_URL"))
+
+	if isWeakSecretValue(doSecret) {
+		log.Fatal("[FATAL] DO_SHARED_SECRET is set to a weak placeholder value")
+	}
+	if isWeakSecretValue(dashboardPassword) {
+		log.Fatal("[FATAL] DASHBOARD_PASSWORD is set to a weak placeholder value")
+	}
+	if isWeakSecretValue(superAdminPassword) {
+		log.Fatal("[FATAL] SUPER_ADMIN_PASSWORD is set to a weak placeholder value")
+	}
+	if archiverSecret != "" && isWeakSecretValue(archiverSecret) {
+		log.Fatal("[FATAL] ARCHIVER_SHARED_SECRET is set to a weak placeholder value")
+	}
 
 	if doSecret == "" {
 		log.Println("[WARN] DO_SHARED_SECRET is empty – /ingest-batch will reject requests")
@@ -79,6 +113,9 @@ func main() {
 	log.Println("[INFO] HTTP deployments use non-secure cookies; prefer HTTPS in production")
 	if len(trustedProxyNets) > 0 {
 		log.Printf("[INFO] Trusted proxy CIDRs loaded: %d", len(trustedProxyNets))
+	}
+	if len(csrfAllowedOrigins) > 0 {
+		log.Printf("[INFO] CSRF allowed origins loaded: %d", len(csrfAllowedOrigins))
 	}
 
 	// Ensure data directory exists.
@@ -190,7 +227,7 @@ func main() {
 	mux.Handle("/api/admin/newsletter/campaigns/upsert", authMiddleware(criticalMiddleware(handlers.NewsletterCampaignsUpsertHandler(sqlDB, postgresDB))))
 	mux.Handle("/api/admin/newsletter/campaigns/delete", authMiddleware(criticalMiddleware(handlers.NewsletterCampaignsDeleteHandler(sqlDB, postgresDB))))
 	mux.Handle("/api/admin/deployments/targets", authMiddleware(handlers.DeploymentsTargetsHandler(sqlDB, postgresDB)))
-	mux.Handle("/api/admin/deployments/sync", authMiddleware(criticalMiddleware(handlers.DeploymentsSyncHandler(sqlDB, postgresDB, appMetrics))))
+	mux.Handle("/api/admin/deployments/sync", authMiddleware(handlers.DeploymentsSyncHandler(sqlDB, postgresDB, appMetrics)))
 	mux.Handle("/api/admin/dashboard-links", authMiddleware(handlers.DashboardLinksHandler(
 		getenv("CLOUDFLARE_DASHBOARD_URL", "https://cqd-analytics.adhamhaithameid.workers.dev/"),
 		getenv("UPTIME_KUMA_URL", "http://129.151.233.229:3001/status/cqd"),
@@ -206,6 +243,7 @@ func main() {
 	mux.Handle("/api/admin/oracle-logs", authMiddleware(handlers.OracleOperationLogsListHandler(sqlDB)))
 	mux.Handle("/api/admin/oracle-logs/delete-older", authMiddleware(criticalMiddleware(handlers.OracleOperationLogsDeleteOlderHandler(sqlDB))))
 	mux.Handle("/api/admin/oracle-logs/clear-all", authMiddleware(criticalMiddleware(handlers.OracleOperationLogsClearAllHandler(sqlDB))))
+	mux.Handle("/api/admin/sheets/last-flush", authMiddleware(handlers.SheetsLastFlushHandler(sqlDB)))
 	mux.Handle("/metrics", authMiddleware(metricsHandler(appMetrics, sqlDB)))
 
 	// Auth endpoints
@@ -219,6 +257,8 @@ func main() {
 	// Serve static dashboard with SPA fallback.
 	mux.Handle("/", spaHandler(staticDir))
 
+	serverCtx, stopServerCtx := context.WithCancel(context.Background())
+	defer stopServerCtx()
 	// =========================================================================
 	// SCHEDULED 12:15 AM GOOGLE SHEETS EXPORT
 	// Runs daily at 00:15 to archive stats to Google Sheets
@@ -228,8 +268,11 @@ func main() {
 	if postgresDB != nil {
 		go relay.NewSQLiteToPostgresRelay(sqlDB, postgresDB, appMetrics).Start(context.Background())
 	}
-	serverCtx, stopServerCtx := context.WithCancel(context.Background())
-	defer stopServerCtx()
+	if deploymentsAutoSyncEnabled() {
+		interval := deploymentsAutoSyncInterval()
+		log.Printf("[Scheduler] deployment auto-sync enabled (interval=%s)", interval)
+		go handlers.StartDeploymentsAutoSyncLoop(serverCtx, sqlDB, postgresDB, appMetrics, interval)
+	}
 	go startInMemoryStoreCleanupLoop(serverCtx, 15*time.Minute)
 
 	rootHandler := observability.RequestContextMiddleware(mux)
@@ -296,13 +339,62 @@ func getenvFloat(key string, def float64) float64 {
 	return parsed
 }
 
+const (
+	defaultDeploymentsAutoSyncInterval = 15 * time.Minute
+	minDeploymentsAutoSyncInterval     = 1 * time.Minute
+	maxDeploymentsAutoSyncInterval     = 24 * time.Hour
+)
+
+func deploymentsAutoSyncEnabled() bool {
+	raw := strings.ToLower(strings.TrimSpace(os.Getenv("ORACLE_DEPLOYMENTS_AUTO_SYNC_ENABLED")))
+	switch raw {
+	case "", "true", "1", "yes", "on":
+		return true
+	case "false", "0", "no", "off":
+		return false
+	default:
+		log.Printf("[Scheduler] Invalid ORACLE_DEPLOYMENTS_AUTO_SYNC_ENABLED=%q, defaulting to enabled", sanitizeLogValue(raw))
+		return true
+	}
+}
+
+func deploymentsAutoSyncInterval() time.Duration {
+	raw := strings.TrimSpace(os.Getenv("ORACLE_DEPLOYMENTS_AUTO_SYNC_INTERVAL_SECONDS"))
+	if raw == "" {
+		return defaultDeploymentsAutoSyncInterval
+	}
+	seconds, err := strconv.Atoi(raw)
+	if err != nil || seconds <= 0 {
+		log.Printf("[Scheduler] Invalid ORACLE_DEPLOYMENTS_AUTO_SYNC_INTERVAL_SECONDS=%q, using default %s", sanitizeLogValue(raw), defaultDeploymentsAutoSyncInterval)
+		return defaultDeploymentsAutoSyncInterval
+	}
+	interval := time.Duration(seconds) * time.Second
+	if interval < minDeploymentsAutoSyncInterval {
+		log.Printf("[Scheduler] ORACLE_DEPLOYMENTS_AUTO_SYNC_INTERVAL_SECONDS below minimum; clamping to %s", minDeploymentsAutoSyncInterval)
+		return minDeploymentsAutoSyncInterval
+	}
+	if interval > maxDeploymentsAutoSyncInterval {
+		log.Printf("[Scheduler] ORACLE_DEPLOYMENTS_AUTO_SYNC_INTERVAL_SECONDS above maximum; clamping to %s", maxDeploymentsAutoSyncInterval)
+		return maxDeploymentsAutoSyncInterval
+	}
+	return interval
+}
+
 // HealthDBHandler returns a handler that checks the database connection
 // by executing a lightweight query.
 func HealthDBHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		if db == nil {
+			http.Error(w, "Database Unhealthy", http.StatusServiceUnavailable)
+			return
+		}
 		var one int
 		// Execute a lightweight query to ensure the DB is not locked
-		err := db.QueryRow("SELECT 1").Scan(&one)
+		err := db.QueryRowContext(r.Context(), "SELECT 1").Scan(&one)
 		if err != nil {
 			log.Printf("Health Check Failed: %v", err)
 			http.Error(w, "Database Unhealthy", http.StatusInternalServerError)
@@ -310,6 +402,9 @@ func HealthDBHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		w.WriteHeader(http.StatusOK)
+		if r.Method == http.MethodHead {
+			return
+		}
 		if _, err := w.Write([]byte("ok")); err != nil {
 			log.Printf("failed to write health response: %v", err)
 		}
@@ -369,8 +464,7 @@ func csrfHeaderMiddleware(next http.Handler) http.Handler {
 				}
 				origin := strings.TrimSpace(r.Header.Get("Origin"))
 				if origin != "" {
-					parsed, err := url.Parse(origin)
-					if err != nil || parsed.Host == "" || !strings.EqualFold(parsed.Host, r.Host) {
+					if !isAllowedCSRFOrigin(r, origin) {
 						http.Error(w, `{"error":"invalid_origin"}`, http.StatusForbidden)
 						return
 					}
@@ -379,6 +473,106 @@ func csrfHeaderMiddleware(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+func loadCSRFAllowedOrigins(rawList, publicBaseURL string) map[string]struct{} {
+	origins := make(map[string]struct{})
+	candidates := make([]string, 0, 8)
+	if strings.TrimSpace(rawList) != "" {
+		candidates = append(candidates, strings.Split(rawList, ",")...)
+	}
+	if strings.TrimSpace(publicBaseURL) != "" {
+		candidates = append(candidates, publicBaseURL)
+	}
+	for _, candidate := range candidates {
+		normalized, err := normalizeOriginValue(candidate)
+		if err != nil {
+			log.Printf("[WARN] ignoring invalid CSRF origin %q: %v", candidate, err)
+			continue
+		}
+		origins[normalized] = struct{}{}
+	}
+	if len(origins) == 0 {
+		return nil
+	}
+	return origins
+}
+
+func isAllowedCSRFOrigin(r *http.Request, originValue string) bool {
+	normalizedOrigin, err := normalizeOriginValue(originValue)
+	if err != nil {
+		return false
+	}
+	if len(csrfAllowedOrigins) > 0 {
+		_, ok := csrfAllowedOrigins[normalizedOrigin]
+		return ok
+	}
+	return normalizedOrigin == requestOriginForCSRF(r)
+}
+
+func requestOriginForCSRF(r *http.Request) string {
+	if r == nil {
+		return ""
+	}
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+	if proto := trustedProxyProto(r); proto != "" {
+		scheme = proto
+	}
+	host := strings.TrimSpace(r.Host)
+	if host == "" {
+		return ""
+	}
+	normalized, err := normalizeOriginValue(scheme + "://" + host)
+	if err != nil {
+		return ""
+	}
+	return normalized
+}
+
+func normalizeOriginValue(raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", errors.New("origin is empty")
+	}
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return "", err
+	}
+	scheme := strings.ToLower(strings.TrimSpace(parsed.Scheme))
+	if scheme != "http" && scheme != "https" {
+		return "", errors.New("origin scheme must be http or https")
+	}
+	host := strings.ToLower(strings.TrimSpace(parsed.Hostname()))
+	if host == "" {
+		return "", errors.New("origin host is required")
+	}
+	if strings.Contains(host, "%") {
+		return "", errors.New("origin host must not contain zone identifiers")
+	}
+	port := strings.TrimSpace(parsed.Port())
+	switch {
+	case scheme == "http" && port == "80":
+		port = ""
+	case scheme == "https" && port == "443":
+		port = ""
+	}
+	var hostPort string
+	if port == "" {
+		if strings.Contains(host, ":") {
+			hostPort = "[" + host + "]"
+		} else {
+			hostPort = host
+		}
+	} else {
+		if _, err := strconv.Atoi(port); err != nil {
+			return "", errors.New("origin port must be numeric")
+		}
+		hostPort = net.JoinHostPort(host, port)
+	}
+	return scheme + "://" + hostPort, nil
 }
 
 func decodeJSONBodyStrict(r *http.Request, dst any) error {
@@ -402,7 +596,7 @@ type cspNonceContextKey struct{}
 func generateCSPNonce() string {
 	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {
-		return "nonce-unavailable"
+		return ""
 	}
 	return base64.RawStdEncoding.EncodeToString(b)
 }
@@ -418,13 +612,26 @@ func cspNonceFromContext(ctx context.Context) string {
 func securityHeadersMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		nonce := generateCSPNonce()
+		scriptSrc := "script-src 'self'"
+		styleSrc := "style-src 'self' https:"
+		if nonce != "" {
+			scriptSrc += " 'nonce-" + nonce + "'"
+			styleSrc += " 'nonce-" + nonce + "'"
+		}
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "no-referrer")
+		w.Header().Set("Permissions-Policy", "accelerometer=(), camera=(), geolocation=(), microphone=(), payment=(), usb=()")
+		w.Header().Set("Cross-Origin-Opener-Policy", "same-origin")
+		w.Header().Set("Cross-Origin-Resource-Policy", "same-origin")
 		w.Header().Set(
 			"Content-Security-Policy",
-			"default-src 'self' https:; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https:; script-src 'self' 'nonce-"+nonce+"'; frame-ancestors 'none'; base-uri 'self'",
+			"default-src 'self' https:; img-src 'self' data: https:; "+styleSrc+"; "+scriptSrc+"; frame-ancestors 'none'; base-uri 'self'",
 		)
+		if strings.HasPrefix(r.URL.Path, "/api/auth/") || strings.HasPrefix(r.URL.Path, "/api/admin/") || strings.HasPrefix(r.URL.Path, "/metrics") {
+			w.Header().Set("Cache-Control", "no-store")
+			w.Header().Set("Pragma", "no-cache")
+		}
 		ctx := context.WithValue(r.Context(), cspNonceContextKey{}, nonce)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
@@ -669,9 +876,7 @@ func serveIndexWithNonce(w http.ResponseWriter, r *http.Request, staticRoot stri
 		return
 	}
 	nonce := cspNonceFromContext(r.Context())
-	if nonce != "" {
-		content = bytes.ReplaceAll(content, []byte("__CSP_NONCE__"), []byte(nonce))
-	}
+	content = bytes.ReplaceAll(content, []byte("__CSP_NONCE__"), []byte(nonce))
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(content) // #nosec G705 -- content is trusted local template from static root with nonce substitution only.
@@ -692,11 +897,13 @@ func scheduleSheetsArchiver() {
 	credsPath := getenv("GOOGLE_CREDS_PATH", "/run/secrets/google-credentials.json")
 	kumaPushURL := os.Getenv("KUMA_PUSH_URL")
 	archiverSecret := os.Getenv("ARCHIVER_SHARED_SECRET")
+	archiverAPI := resolveArchiverAPIURL(os.Getenv("ARCHIVER_API_URL"), getenv("ADDR", ":8080"))
 
 	log.Printf( // #nosec G706 -- sheet/creds are sanitized with sanitizeLogValue before logging.
-		"[Scheduler] Sheets archiver enabled: sheet=%s, creds=%s",
+		"[Scheduler] Sheets archiver enabled: sheet=%s, creds=%s, api=%s",
 		sanitizeLogValue(sheetsID),
 		sanitizeLogValue(credsPath),
+		sanitizeLogValue(archiverAPI),
 	)
 
 	for {
@@ -713,14 +920,47 @@ func scheduleSheetsArchiver() {
 
 		// Run the archiver
 		log.Println("[Scheduler] Running scheduled Sheets export...")
-		runArchiver(sheetsID, credsPath, kumaPushURL, archiverSecret)
+		runArchiver(sheetsID, credsPath, kumaPushURL, archiverSecret, archiverAPI)
 	}
 }
 
 // runArchiver executes the archiver binary with the given parameters.
 // This calls the archiver as a subprocess to maintain separation of concerns.
-func runArchiver(sheetsID, credsPath, kumaPushURL, archiverSecret string) {
-	args := []string{"-sheet", sheetsID, "-creds", credsPath, "-api", "http://localhost:8080/api/stats/summary"}
+func runArchiver(sheetsID, credsPath, kumaPushURL, archiverSecret, apiURL string) {
+	if strings.TrimSpace(apiURL) == "" {
+		apiURL = "http://127.0.0.1:8080/api/stats/summary"
+	}
+	archivedDay := time.Now().UTC().AddDate(0, 0, -1).Format("2006-01-02")
+
+	metaDir, err := os.MkdirTemp("", "oracle-archiver-meta-")
+	if err != nil {
+		log.Printf("[Scheduler] Failed to create metadata temp dir: %v", err)
+		recordSheetsFlushRunResult(
+			context.Background(),
+			"error",
+			sheetsID,
+			apiURL,
+			nil,
+			nil,
+			nil,
+			archivedDay,
+			err.Error(),
+		)
+		return
+	}
+	defer func() {
+		_ = os.RemoveAll(metaDir)
+	}()
+
+	const metaFileName = "meta.json"
+	metaFile := filepath.Join(metaDir, metaFileName)
+	args := []string{
+		"-sheet", sheetsID,
+		"-creds", credsPath,
+		"-api", apiURL,
+		"-day", "yesterday",
+		"-meta-out", metaFile,
+	}
 	if kumaPushURL != "" {
 		args = append(args, "-kuma", kumaPushURL)
 	}
@@ -733,19 +973,215 @@ func runArchiver(sheetsID, credsPath, kumaPushURL, archiverSecret string) {
 	archiverPath, err := resolveArchiverPath(getenv("ARCHIVER_PATH", "/app/archiver"))
 	if err != nil {
 		log.Printf("[Scheduler] Invalid archiver path: %v", err)
+		recordSheetsFlushRunResult(
+			context.Background(),
+			"error",
+			sheetsID,
+			apiURL,
+			nil,
+			nil,
+			nil,
+			archivedDay,
+			err.Error(),
+		)
 		return
 	}
 
+	runTimeout := archiverRunTimeout()
+	ctx, cancel := context.WithTimeout(context.Background(), runTimeout)
+	defer cancel()
+
 	// #nosec G204,G702 -- path is validated via resolveArchiverPath; args are fixed flags from trusted config.
-	cmd := exec.Command(archiverPath, args...)
+	cmd := exec.CommandContext(ctx, archiverPath, args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
 	if err := cmd.Run(); err != nil {
+		recordSheetsFlushRunResult(
+			context.Background(),
+			"error",
+			sheetsID,
+			apiURL,
+			nil,
+			nil,
+			nil,
+			archivedDay,
+			err.Error(),
+		)
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			log.Printf("[Scheduler] Archiver timed out after %s", runTimeout)
+			return
+		}
 		log.Printf("[Scheduler] Archiver failed: %v", err)
 	} else {
+		metaRaw, metaErr := readArchiverMetadataFile(metaDir, metaFileName)
+		if metaErr != nil {
+			log.Printf("[Scheduler] Failed to read archiver metadata: %v", metaErr)
+		}
+		archivedDay, rowJSON, summaryJSON := extractArchiverMetadata(metaRaw)
+		if archivedDay == "" {
+			archivedDay = time.Now().UTC().AddDate(0, 0, -1).Format("2006-01-02")
+		}
+		recordSheetsFlushRunResult(
+			context.Background(),
+			"ok",
+			sheetsID,
+			apiURL,
+			rowJSON,
+			summaryJSON,
+			metaRaw,
+			archivedDay,
+			"",
+		)
 		log.Println("[Scheduler] Sheets export completed successfully")
 	}
+}
+
+func readArchiverMetadataFile(rootDir, fileName string) ([]byte, error) {
+	root, err := os.OpenRoot(rootDir)
+	if err != nil {
+		return nil, err
+	}
+	defer root.Close()
+
+	metaFile, err := root.Open(fileName)
+	if err != nil {
+		return nil, err
+	}
+	defer metaFile.Close()
+
+	return io.ReadAll(io.LimitReader(metaFile, maxArchiverMetaBytes))
+}
+
+func extractArchiverMetadata(metaRaw []byte) (string, []byte, []byte) {
+	if len(metaRaw) == 0 {
+		return "", nil, nil
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(metaRaw, &payload); err != nil {
+		return "", nil, nil
+	}
+	var archivedDay string
+	if v, ok := payload["archivedDay"].(string); ok {
+		archivedDay = strings.TrimSpace(v)
+	}
+	var rowJSON []byte
+	if v, ok := payload["row"]; ok {
+		if b, err := json.Marshal(v); err == nil {
+			rowJSON = b
+		}
+	}
+	var summaryJSON []byte
+	if v, ok := payload["summary"]; ok {
+		if b, err := json.Marshal(v); err == nil {
+			summaryJSON = b
+		}
+	}
+	return archivedDay, rowJSON, summaryJSON
+}
+
+func recordSheetsFlushRunResult(
+	ctx context.Context,
+	status,
+	sheetID,
+	apiURL string,
+	rowJSON,
+	summaryJSON,
+	metaJSON []byte,
+	archivedDay,
+	errorMessage string,
+) {
+	db := getAuthStateDB()
+	if db == nil {
+		return
+	}
+	recordCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	if err := handlers.RecordSheetsFlushRun(recordCtx, db, handlers.SheetsFlushRunRecordInput{
+		FlushedAtUTC: time.Now().UnixMilli(),
+		ArchivedDay:  archivedDay,
+		Status:       status,
+		SheetID:      sheetID,
+		APIURL:       apiURL,
+		RowJSON:      rowJSON,
+		SummaryJSON:  summaryJSON,
+		MetaJSON:     metaJSON,
+		ErrorMessage: errorMessage,
+	}); err != nil {
+		log.Printf("[Scheduler] Failed to persist sheets flush run: %v", err)
+	}
+}
+
+const (
+	defaultArchiverRunTimeout = 2 * time.Minute
+	minArchiverRunTimeout     = 1 * time.Second
+	maxArchiverRunTimeout     = 30 * time.Minute
+	maxArchiverMetaBytes      = 1 << 20 // 1 MiB
+)
+
+func archiverRunTimeout() time.Duration {
+	raw := strings.TrimSpace(os.Getenv("ARCHIVER_RUN_TIMEOUT_SECONDS"))
+	if raw == "" {
+		return defaultArchiverRunTimeout
+	}
+	seconds, err := strconv.Atoi(raw)
+	if err != nil || seconds <= 0 {
+		log.Printf("[Scheduler] Invalid ARCHIVER_RUN_TIMEOUT_SECONDS %q, using default %s", sanitizeLogValue(raw), defaultArchiverRunTimeout)
+		return defaultArchiverRunTimeout
+	}
+
+	timeout := time.Duration(seconds) * time.Second
+	if timeout < minArchiverRunTimeout {
+		log.Printf("[Scheduler] ARCHIVER_RUN_TIMEOUT_SECONDS below minimum, clamping to %s", minArchiverRunTimeout)
+		return minArchiverRunTimeout
+	}
+	if timeout > maxArchiverRunTimeout {
+		log.Printf("[Scheduler] ARCHIVER_RUN_TIMEOUT_SECONDS above maximum, clamping to %s", maxArchiverRunTimeout)
+		return maxArchiverRunTimeout
+	}
+	return timeout
+}
+
+func resolveArchiverAPIURL(configuredURL, listenAddr string) string {
+	const defaultURL = "http://127.0.0.1:8080/api/stats/summary"
+
+	rawURL := strings.TrimSpace(configuredURL)
+	if rawURL != "" {
+		parsed, err := url.Parse(rawURL)
+		if err == nil {
+			scheme := strings.ToLower(strings.TrimSpace(parsed.Scheme))
+			if scheme != "" && parsed.Host != "" && (scheme == "http" || scheme == "https") {
+				if parsed.Path == "" || parsed.Path == "/" {
+					parsed.Path = "/api/stats/summary"
+				}
+				return parsed.String()
+			}
+		}
+		log.Printf("[Scheduler] Invalid ARCHIVER_API_URL %q, falling back to auto URL", sanitizeLogValue(rawURL))
+	}
+
+	host := strings.TrimSpace(listenAddr)
+	if host == "" {
+		return defaultURL
+	}
+	if strings.HasPrefix(host, ":") {
+		host = "127.0.0.1" + host
+	}
+	if strings.HasPrefix(host, "0.0.0.0:") {
+		host = "127.0.0.1:" + strings.TrimPrefix(host, "0.0.0.0:")
+	}
+	if strings.HasPrefix(host, "[::]:") {
+		host = "127.0.0.1:" + strings.TrimPrefix(host, "[::]:")
+	}
+	if _, _, err := net.SplitHostPort(host); err != nil {
+		return defaultURL
+	}
+
+	return (&url.URL{
+		Scheme: "http",
+		Host:   host,
+		Path:   "/api/stats/summary",
+	}).String()
 }
 
 func sanitizeLogValue(v string) string {
@@ -845,6 +1281,7 @@ const inMemoryCleanupHorizon = 24 * time.Hour
 
 var trustedProxyNets []*net.IPNet
 var sessionCookieSecureMode = "auto"
+var csrfAllowedOrigins map[string]struct{}
 
 var authStateStore = struct {
 	sync.RWMutex
@@ -1267,6 +1704,10 @@ func verifyPasswordHash(hashedPassword, password string) bool {
 // requireAuth returns middleware that checks for valid session cookie.
 // If dashboardPassword is empty, all requests are allowed (no auth).
 func requireAuth(db *sql.DB, dashboardPassword, archiverSecret string, allowLoopbackBypass bool) func(http.Handler) http.Handler {
+	archiverAllowedPaths := map[string]struct{}{
+		"/api/stats/summary": {},
+	}
+
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// No auth required if DASHBOARD_PASSWORD is not set
@@ -1284,7 +1725,11 @@ func requireAuth(db *sql.DB, dashboardPassword, archiverSecret string, allowLoop
 
 			if archiverSecret != "" {
 				headerSecret := r.Header.Get("X-Archiver-Secret")
-				if headerSecret != "" && subtle.ConstantTimeCompare([]byte(headerSecret), []byte(archiverSecret)) == 1 {
+				_, pathAllowed := archiverAllowedPaths[r.URL.Path]
+				if pathAllowed &&
+					r.Method == http.MethodGet &&
+					headerSecret != "" &&
+					subtle.ConstantTimeCompare([]byte(headerSecret), []byte(archiverSecret)) == 1 {
 					ctx := observability.WithActorContext(r.Context(), "archiver", "archiver-secret", "system")
 					setActorContextOnWriter(w, "archiver", "archiver-secret", "system")
 					next.ServeHTTP(w, r.WithContext(ctx))
@@ -1796,16 +2241,14 @@ func getClientIP(r *http.Request) string {
 	}
 	remoteIP := extractRemoteIP(r.RemoteAddr)
 	if isTrustedProxy(remoteIP) {
+		if ip := parseForwardedForHeaderValue(r.Header.Get("Forwarded")); ip != "" {
+			return ip
+		}
 		if ip := parseIPHeaderValue(r.Header.Get("X-Real-IP")); ip != "" {
 			return ip
 		}
-		if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
-			parts := strings.Split(fwd, ",")
-			if len(parts) > 0 {
-				if ip := parseIPHeaderValue(parts[0]); ip != "" {
-					return ip
-				}
-			}
+		if ip := parseIPHeaderValue(firstHeaderListValue(r.Header.Get("X-Forwarded-For"))); ip != "" {
+			return ip
 		}
 	}
 	if remoteIP != "" {
@@ -1815,15 +2258,101 @@ func getClientIP(r *http.Request) string {
 }
 
 func parseIPHeaderValue(raw string) string {
-	candidate := strings.TrimSpace(raw)
+	candidate := strings.Trim(strings.TrimSpace(raw), `"`)
 	if candidate == "" {
 		return ""
 	}
-	ip := net.ParseIP(candidate)
-	if ip == nil {
+	if strings.EqualFold(candidate, "unknown") {
 		return ""
 	}
-	return ip.String()
+	// Reject scoped identifiers and RFC 7239 obfuscated identifiers.
+	if strings.Contains(candidate, "%") {
+		return ""
+	}
+	if strings.HasPrefix(candidate, "_") {
+		return ""
+	}
+	// RFC 7239 "for=" may include host:port. Accept only when host portion is an IP.
+	if host, _, err := net.SplitHostPort(candidate); err == nil {
+		candidate = host
+	}
+	// RFC 7239 IPv6 values may be wrapped in brackets.
+	if strings.HasPrefix(candidate, "[") && strings.HasSuffix(candidate, "]") && len(candidate) > 2 {
+		candidate = candidate[1 : len(candidate)-1]
+	}
+	addr, err := netip.ParseAddr(candidate)
+	if err != nil {
+		return ""
+	}
+	return addr.Unmap().String()
+}
+
+func firstHeaderListValue(raw string) string {
+	for _, part := range strings.Split(raw, ",") {
+		if token := strings.TrimSpace(part); token != "" {
+			return token
+		}
+	}
+	return ""
+}
+
+func parseForwardedForHeaderValue(raw string) string {
+	entry := firstHeaderListValue(raw)
+	if entry == "" {
+		return ""
+	}
+	for _, part := range strings.Split(entry, ";") {
+		kv := strings.SplitN(part, "=", 2)
+		if len(kv) != 2 {
+			continue
+		}
+		if strings.EqualFold(strings.TrimSpace(kv[0]), "for") {
+			return parseIPHeaderValue(kv[1])
+		}
+	}
+	return ""
+}
+
+func parseForwardedProtoHeaderValue(raw string) string {
+	entry := firstHeaderListValue(raw)
+	if entry == "" {
+		return ""
+	}
+	for _, part := range strings.Split(entry, ";") {
+		kv := strings.SplitN(part, "=", 2)
+		if len(kv) != 2 {
+			continue
+		}
+		if strings.EqualFold(strings.TrimSpace(kv[0]), "proto") {
+			proto := strings.ToLower(strings.Trim(strings.TrimSpace(kv[1]), `"`))
+			if proto == "https" || proto == "http" {
+				return proto
+			}
+			return ""
+		}
+	}
+	return ""
+}
+
+func parseXForwardedProtoHeaderValue(raw string) string {
+	proto := strings.ToLower(strings.TrimSpace(firstHeaderListValue(raw)))
+	if proto == "https" || proto == "http" {
+		return proto
+	}
+	return ""
+}
+
+func trustedProxyProto(r *http.Request) string {
+	if r == nil {
+		return ""
+	}
+	if !isTrustedProxy(extractRemoteIP(r.RemoteAddr)) {
+		return ""
+	}
+	if proto := parseForwardedProtoHeaderValue(r.Header.Get("Forwarded")); proto != "" {
+		return proto
+	}
+	return parseXForwardedProtoHeaderValue(r.Header.Get("X-Forwarded-Proto"))
 }
 
 func allowLoginAttempt(ip string) (bool, int, int) {
@@ -2048,7 +2577,10 @@ func cookieSecurityPolicy(r *http.Request) (bool, http.SameSite) {
 	case "false":
 		return false, http.SameSiteLaxMode
 	}
-	if r.TLS != nil {
+	if r != nil && r.TLS != nil {
+		return true, http.SameSiteStrictMode
+	}
+	if trustedProxyProto(r) == "https" {
 		return true, http.SameSiteStrictMode
 	}
 	// HTTP deployments require non-secure cookies or browsers will drop the session.
@@ -2065,7 +2597,7 @@ func isLoopbackAddr(remoteAddr string) bool {
 }
 
 func hasForwardedIp(r *http.Request) bool {
-	return r.Header.Get("X-Forwarded-For") != "" || r.Header.Get("X-Real-IP") != ""
+	return r.Header.Get("X-Forwarded-For") != "" || r.Header.Get("X-Real-IP") != "" || r.Header.Get("Forwarded") != ""
 }
 
 func isLoopbackHost(hostport string) bool {
