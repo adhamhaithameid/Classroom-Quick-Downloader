@@ -100,6 +100,30 @@ type storeStats struct {
 	ratingCount int64
 }
 
+type deploymentTargetResponse struct {
+	RecordKey string         `json:"recordKey"`
+	Data      map[string]any `json:"data"`
+	CreatedAt int64          `json:"createdAt"`
+	UpdatedAt int64          `json:"updatedAt"`
+}
+
+type deploymentTargetAggregate struct {
+	Key         string `json:"key"`
+	Name        string `json:"name"`
+	UsersCount  int64  `json:"usersCount"`
+	Reviews     int64  `json:"reviews"`
+	Rating      string `json:"rating"`
+	Version     string `json:"version"`
+	SyncedAtUTC int64  `json:"syncedAtUtc"`
+}
+
+type deploymentTargetsAggregate struct {
+	UsersTotal      int64                       `json:"usersTotal"`
+	ReviewsTotal    int64                       `json:"reviewsTotal"`
+	Browsers        []deploymentTargetAggregate `json:"browsers"`
+	LastSyncedAtUTC int64                       `json:"lastSyncedAtUtc"`
+}
+
 var (
 	// Tunable in tests to keep retry behavior deterministic and fast.
 	deploymentsAutoSyncMaxAttempts = 3
@@ -182,6 +206,62 @@ func loadDeploymentRecords(ctx context.Context, store *controlPlaneStore) (map[s
 	return rowByKey, dataByKey, nil
 }
 
+func summarizeDeploymentTargets(targets []deploymentTargetResponse) deploymentTargetsAggregate {
+	summary := deploymentTargetsAggregate{
+		Browsers: make([]deploymentTargetAggregate, 0, len(targets)),
+	}
+	for _, target := range targets {
+		data := target.Data
+		usersCount := int64FromAny(data["usersCount"])
+		if usersCount <= 0 {
+			usersCount = parseApproxUsersCount(stringFromAny(data["users"]))
+		}
+		if usersCount < 0 {
+			usersCount = 0
+		}
+
+		reviewsCount := int64FromAny(data["ratingCount"])
+		if reviewsCount < 0 {
+			reviewsCount = 0
+		}
+
+		syncedAtUTC := int64FromAny(data["syncedAt"])
+		if syncedAtUTC <= 0 {
+			syncedAtUTC = target.UpdatedAt
+		}
+
+		name := stringFromAny(data["name"])
+		if name == "" {
+			name = target.RecordKey
+		}
+
+		summary.UsersTotal += usersCount
+		summary.ReviewsTotal += reviewsCount
+		if syncedAtUTC > summary.LastSyncedAtUTC {
+			summary.LastSyncedAtUTC = syncedAtUTC
+		}
+
+		summary.Browsers = append(summary.Browsers, deploymentTargetAggregate{
+			Key:         target.RecordKey,
+			Name:        name,
+			UsersCount:  usersCount,
+			Reviews:     reviewsCount,
+			Rating:      stringFromAny(data["rating"]),
+			Version:     stringFromAny(data["version"]),
+			SyncedAtUTC: syncedAtUTC,
+		})
+	}
+
+	sort.Slice(summary.Browsers, func(i, j int) bool {
+		if summary.Browsers[i].UsersCount == summary.Browsers[j].UsersCount {
+			return summary.Browsers[i].Key < summary.Browsers[j].Key
+		}
+		return summary.Browsers[i].UsersCount > summary.Browsers[j].UsersCount
+	})
+
+	return summary
+}
+
 func DeploymentsTargetsHandler(sqliteDB, postgresDB *sql.DB) http.HandlerFunc {
 	store := newControlPlaneStore(sqliteDB, postgresDB)
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -199,12 +279,6 @@ func DeploymentsTargetsHandler(sqliteDB, postgresDB *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		type deploymentTargetResponse struct {
-			RecordKey string         `json:"recordKey"`
-			Data      map[string]any `json:"data"`
-			CreatedAt int64          `json:"createdAt"`
-			UpdatedAt int64          `json:"updatedAt"`
-		}
 		targets := make([]deploymentTargetResponse, 0, len(deploymentTargetDefs))
 		for _, def := range deploymentTargetDefs {
 			existing := dataByKey[def.Key]
@@ -217,11 +291,13 @@ func DeploymentsTargetsHandler(sqliteDB, postgresDB *sql.DB) http.HandlerFunc {
 				UpdatedAt: row.UpdatedAt,
 			})
 		}
+		aggregates := summarizeDeploymentTargets(targets)
 
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{
-			"ok":      true,
-			"targets": targets,
+			"ok":         true,
+			"targets":    targets,
+			"aggregates": aggregates,
 		})
 	}
 }
