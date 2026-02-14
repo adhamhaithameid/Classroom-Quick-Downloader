@@ -317,8 +317,13 @@ func TestArchiverRunTimeout(t *testing.T) {
 func TestDeploymentsAutoSyncEnabled(t *testing.T) {
 	t.Setenv("DEPLOYMENTS_AUTO_SYNC_ENABLED", "")
 	t.Setenv("ORACLE_DEPLOYMENTS_AUTO_SYNC_ENABLED", "")
+	if deploymentsAutoSyncEnabled() {
+		t.Fatal("expected default auto-sync to be disabled when env is empty")
+	}
+
+	t.Setenv("ORACLE_DEPLOYMENTS_AUTO_SYNC_ENABLED", "true")
 	if !deploymentsAutoSyncEnabled() {
-		t.Fatal("expected default auto-sync to be enabled")
+		t.Fatal("expected auto-sync enabled when set to true")
 	}
 
 	t.Setenv("ORACLE_DEPLOYMENTS_AUTO_SYNC_ENABLED", "false")
@@ -335,6 +340,18 @@ func TestDeploymentsAutoSyncEnabled(t *testing.T) {
 	t.Setenv("DEPLOYMENTS_AUTO_SYNC_ENABLED", "false")
 	if deploymentsAutoSyncEnabled() {
 		t.Fatal("expected legacy env alias to disable auto-sync")
+	}
+
+	t.Setenv("ORACLE_DEPLOYMENTS_AUTO_SYNC_ENABLED", "")
+	t.Setenv("DEPLOYMENTS_AUTO_SYNC_ENABLED", "true")
+	if !deploymentsAutoSyncEnabled() {
+		t.Fatal("expected legacy env alias to enable auto-sync")
+	}
+
+	t.Setenv("ORACLE_DEPLOYMENTS_AUTO_SYNC_ENABLED", "garbage")
+	t.Setenv("DEPLOYMENTS_AUTO_SYNC_ENABLED", "")
+	if deploymentsAutoSyncEnabled() {
+		t.Fatal("expected invalid value to default to disabled")
 	}
 }
 
