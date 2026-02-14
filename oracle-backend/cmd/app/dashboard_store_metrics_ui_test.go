@@ -56,3 +56,18 @@ func TestDashboardStoreMetricsUI_RefreshesOverviewAfterSyncAndLoads(t *testing.T
 		t.Fatalf("expected at least 3 loadDeploymentStoreMetrics refresh calls, got %d", calls)
 	}
 }
+
+func TestDashboardStoreMetricsUI_HasUtcToggleAnimationAndStatusHoverHooks(t *testing.T) {
+	indexHTML := loadDashboardIndexHTML(t)
+	requiredSnippets := []string{
+		`.nav-utc-time.is-swapping`,
+		`label.classList.add('is-swapping');`,
+		`.status-indicator:hover`,
+		`#status-indicator:hover #sidebar-status-text`,
+	}
+	for _, snippet := range requiredSnippets {
+		if !strings.Contains(indexHTML, snippet) {
+			t.Fatalf("dashboard index missing interaction snippet: %s", snippet)
+		}
+	}
+}
