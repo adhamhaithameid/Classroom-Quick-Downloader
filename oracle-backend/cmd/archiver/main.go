@@ -89,26 +89,50 @@ func buildArchiveRow(today string, data SummaryResponse) []interface{} {
 	return []interface{}{
 		today,                              // A: Date
 		data.Totals.TotalDownloads,         // B: Total Downloads
-		data.Totals.TotalSuccess,           // C: Success Count
-		data.Totals.TotalFail,              // D: Fail Count
-		data.Totals.TotalCancelled,         // E: Cancelled Count
-		fmt.Sprintf("%.2f%%", successRate), // F: Success Rate
-
-		// Top Stats
-		data.TopBrowser, // F: Top Browser
-		data.TopOs,      // G: Top OS
-		data.TopCountry, // H: Top Country
-		data.TopType,    // I: Top File Type
-
-		// Full Data Dumps
+		data.Totals.TotalSuccess,           // C: Success
+		data.Totals.TotalFail,              // D: Fail
+		fmt.Sprintf("%.2f%%", successRate), // E: Success Rate
+		data.TopBrowser,                    // F: Top Browser
+		data.TopOs,                         // G: Top OS
+		data.TopCountry,                    // H: Top Country
+		data.TopType,                       // I: Top File Type
 		formatMapSorted(data.Browsers),     // J: All Browsers
 		formatMapSorted(data.Os),           // K: All OS
 		formatMapSorted(data.Countries),    // L: All Countries
 		formatMapSorted(data.Languages),    // M: All Languages
 		formatMapSorted(data.Types),        // N: All File Types
 		formatMapSorted(data.ErrorReasons), // O: All Errors
-		formatMapSorted(data.Versions),     // P: Extension Versions
+		formatMapSorted(data.Versions),     // P: Ext Versions
+		data.Totals.TotalCancelled,         // Q: Total Cancelled
 	}
+}
+
+func resolveArchiveDateUTC(dayFlag string, now time.Time) (string, error) {
+	normalized := strings.TrimSpace(strings.ToLower(dayFlag))
+	switch normalized {
+	case "", "yesterday":
+		return now.AddDate(0, 0, -1).Format("2006-01-02"), nil
+	case "today":
+		return now.Format("2006-01-02"), nil
+	default:
+		parsed, err := time.Parse("2006-01-02", normalized)
+		if err != nil {
+			return "", errors.New("invalid --day value (use yesterday|today|YYYY-MM-DD)")
+		}
+		return parsed.Format("2006-01-02"), nil
+	}
+}
+
+func buildSummaryURLForDay(baseURL, day string) (string, error) {
+	parsed, err := url.Parse(strings.TrimSpace(baseURL))
+	if err != nil {
+		return "", err
+	}
+	q := parsed.Query()
+	q.Set("from", day)
+	q.Set("to", day)
+	parsed.RawQuery = q.Encode()
+	return parsed.String(), nil
 }
 
 func parseAndValidateOutboundURL(raw string) (string, error) {
@@ -133,6 +157,8 @@ func main() {
 	sheetID := flag.String("sheet", "", "Google Sheet ID")
 	credsPath := flag.String("creds", "/run/secrets/google-credentials.json", "Path to Service Account JSON")
 	apiURL := flag.String("api", "http://localhost:8080/api/stats/summary", "URL to fetch stats from")
+	day := flag.String("day", "yesterday", "Archive day in UTC: yesterday|today|YYYY-MM-DD")
+	metaOut := flag.String("meta-out", "", "Optional path to write flush metadata JSON")
 	secret := flag.String("secret", os.Getenv("ARCHIVER_SHARED_SECRET"), "Shared secret for authenticated stats (optional)")
 	kumaPushURL := flag.String("kuma", "", "Uptime Kuma Push URL (optional)")
 	flag.Parse()
@@ -149,10 +175,24 @@ func main() {
 		})
 		log.Fatalf("Invalid --api URL: %v", err)
 	}
+	archiveDay, err := resolveArchiveDateUTC(*day, time.Now().UTC())
+	if err != nil {
+		logEvent("error", "archiver_invalid_day", map[string]interface{}{
+			"error": err.Error(),
+		})
+		log.Fatalf("Invalid --day value: %v", err)
+	}
+	apiURLForDay, err := buildSummaryURLForDay(validatedAPIURL, archiveDay)
+	if err != nil {
+		logEvent("error", "archiver_invalid_api_day_url", map[string]interface{}{
+			"error": err.Error(),
+		})
+		log.Fatalf("Failed to build day-scoped API URL: %v", err)
+	}
 
 	// 1. Fetch Stats
-	log.Printf("Fetching stats from %s...", validatedAPIURL)
-	req, err := http.NewRequest(http.MethodGet, validatedAPIURL, nil)
+	log.Printf("Fetching stats for %s from %s...", archiveDay, apiURLForDay)
+	req, err := http.NewRequest(http.MethodGet, apiURLForDay, nil)
 	if err != nil {
 		logEvent("error", "archiver_request_build_failed", map[string]interface{}{
 			"error": err.Error(),
@@ -188,11 +228,8 @@ func main() {
 		log.Fatalf("Failed to decode JSON: %v", err)
 	}
 
-	// 2. Prepare Data (UTC)
-	today := time.Now().UTC().Format("2006-01-02")
-
 	// 3. Build the "Everything" Row
-	row := buildArchiveRow(today, data)
+	row := buildArchiveRow(archiveDay, data)
 
 	// 4. Send to Google
 	ctx := context.Background()
@@ -234,10 +271,28 @@ func main() {
 		log.Fatalf("Unable to append data to sheet: %v", err)
 	}
 
+	if strings.TrimSpace(*metaOut) != "" {
+		metaPayload := map[string]any{
+			"archivedAt":   time.Now().UTC().Format(time.RFC3339),
+			"archivedAtMs": time.Now().UnixMilli(),
+			"archivedDay":  archiveDay,
+			"sheetId":      *sheetID,
+			"apiUrl":       apiURLForDay,
+			"row":          row,
+			"summary":      data,
+		}
+		metaBytes, marshalErr := json.Marshal(metaPayload)
+		if marshalErr != nil {
+			log.Printf("[WARN] Failed to encode flush metadata: %v", marshalErr)
+		} else if writeErr := os.WriteFile(*metaOut, metaBytes, 0o600); writeErr != nil {
+			log.Printf("[WARN] Failed to write flush metadata file: %v", writeErr)
+		}
+	}
+
 	logEvent("info", "archiver_success", map[string]interface{}{
-		"date": today,
+		"date": archiveDay,
 	})
-	log.Printf("Successfully archived FULL stats for %s", today)
+	log.Printf("Successfully archived FULL stats for %s", archiveDay)
 
 	// 5. Notify Uptime Kuma (Push Monitor)
 	if *kumaPushURL != "" {
