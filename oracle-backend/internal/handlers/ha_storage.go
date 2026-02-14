@@ -684,7 +684,8 @@ func RetentionRunHandler(sqliteDB, postgresDB *sql.DB) http.HandlerFunc {
 			return ok
 		}
 
-		nowMs := time.Now().UnixMilli()
+		nowUTC := time.Now().UTC()
+		nowSec := nowUTC.Unix()
 		actions := make([]map[string]any, 0, 12)
 
 		runSQLite := func(name, countStmt, deleteStmt string, cutoff int64) error {
@@ -770,20 +771,20 @@ func RetentionRunHandler(sqliteDB, postgresDB *sql.DB) http.HandlerFunc {
 			}
 		}
 		if isSelected("auth_sessions_expired") {
-			cutoff := nowMs - int64(24*time.Hour/time.Millisecond)
+			cutoff := nowSec - int64(24*time.Hour/time.Second)
 			if err := runSQLite("auth_sessions_expired", `SELECT COUNT(*) FROM auth_sessions WHERE expires_at > 0 AND expires_at < ?`, `DELETE FROM auth_sessions WHERE expires_at > 0 AND expires_at < ?`, cutoff); err != nil {
 				http.Error(w, "retention failed", http.StatusInternalServerError)
 				return
 			}
 		}
 		if isSelected("auth_stepup_challenges_expired") {
-			if err := runSQLite("auth_stepup_challenges_expired", `SELECT COUNT(*) FROM auth_stepup_challenges WHERE expires_at < ?`, `DELETE FROM auth_stepup_challenges WHERE expires_at < ?`, nowMs); err != nil {
+			if err := runSQLite("auth_stepup_challenges_expired", `SELECT COUNT(*) FROM auth_stepup_challenges WHERE expires_at < ?`, `DELETE FROM auth_stepup_challenges WHERE expires_at < ?`, nowSec); err != nil {
 				http.Error(w, "retention failed", http.StatusInternalServerError)
 				return
 			}
 		}
 		if isSelected("auth_rate_limits_stale") {
-			cutoff := time.Now().UTC().AddDate(0, 0, -getenvIntWithDefault("ORACLE_RETENTION_RATE_LIMIT_DAYS", defaultRetentionAuthStaleDays)).UnixMilli()
+			cutoff := time.Now().UTC().AddDate(0, 0, -getenvIntWithDefault("ORACLE_RETENTION_RATE_LIMIT_DAYS", defaultRetentionAuthStaleDays)).Unix()
 			if err := runSQLite("auth_rate_limits_stale", `SELECT COUNT(*) FROM auth_rate_limits WHERE updated_at < ?`, `DELETE FROM auth_rate_limits WHERE updated_at < ?`, cutoff); err != nil {
 				http.Error(w, "retention failed", http.StatusInternalServerError)
 				return
