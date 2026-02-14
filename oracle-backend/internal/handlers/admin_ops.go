@@ -2,18 +2,13 @@ package handlers
 
 import (
 	"context"
-	"crypto/sha256"
 	"database/sql"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
-	"os"
-	"path/filepath"
-	"regexp"
-	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -27,6 +22,17 @@ type featureFlagRow struct {
 	UpdatedAt   int64  `json:"updatedAt"`
 }
 
+// writeJSONError sends a structured JSON error response without leaking internal details.
+func writeJSONError(w http.ResponseWriter, code, message string, status int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(map[string]string{
+		"ok":      "false",
+		"error":   code,
+		"message": message,
+	})
+}
+
 func FeatureFlagsHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
@@ -36,7 +42,7 @@ func FeatureFlagsHandler(db *sql.DB) http.HandlerFunc {
 
 		rows, err := db.QueryContext(r.Context(), `SELECT name, enabled, description, updated_at FROM feature_flags ORDER BY name ASC`) // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 		if err != nil {
-			http.Error(w, "failed to load feature flags", http.StatusInternalServerError)
+			writeJSONError(w, "list_failed", "Failed to load feature flags", http.StatusInternalServerError)
 			return
 		}
 		defer rows.Close()
@@ -46,14 +52,14 @@ func FeatureFlagsHandler(db *sql.DB) http.HandlerFunc {
 			var item featureFlagRow
 			var enabled int64
 			if err := rows.Scan(&item.Name, &enabled, &item.Description, &item.UpdatedAt); err != nil {
-				http.Error(w, "failed to parse feature flags", http.StatusInternalServerError)
+				writeJSONError(w, "parse_failed", "Failed to parse feature flags", http.StatusInternalServerError)
 				return
 			}
 			item.Enabled = enabled != 0
 			out = append(out, item)
 		}
 		if err := rows.Err(); err != nil {
-			http.Error(w, "failed to iterate feature flags", http.StatusInternalServerError)
+			writeJSONError(w, "iterate_failed", "Failed to iterate feature flags", http.StatusInternalServerError)
 			return
 		}
 
@@ -79,12 +85,12 @@ func UpdateFeatureFlagHandler(db *sql.DB) http.HandlerFunc {
 
 		var req updateFlagRequest
 		if err := decodeJSONBodyStrict(r, &req); err != nil {
-			http.Error(w, "invalid request body", http.StatusBadRequest)
+			writeJSONError(w, "invalid_body", "Invalid request body", http.StatusBadRequest)
 			return
 		}
 		req.Name = strings.TrimSpace(req.Name)
 		if req.Name == "" {
-			http.Error(w, "name is required", http.StatusBadRequest)
+			writeJSONError(w, "missing_name", "Name is required", http.StatusBadRequest)
 			return
 		}
 
@@ -101,16 +107,16 @@ func UpdateFeatureFlagHandler(db *sql.DB) http.HandlerFunc {
 			req.Name,
 		)
 		if err != nil {
-			http.Error(w, "failed to update feature flag", http.StatusInternalServerError)
+			writeJSONError(w, "update_failed", "Failed to update feature flag", http.StatusInternalServerError)
 			return
 		}
 		affected, err := res.RowsAffected()
 		if err != nil {
-			http.Error(w, "failed to update feature flag", http.StatusInternalServerError)
+			writeJSONError(w, "update_failed", "Failed to update feature flag", http.StatusInternalServerError)
 			return
 		}
 		if affected == 0 {
-			http.Error(w, "feature flag not found", http.StatusNotFound)
+			writeJSONError(w, "not_found", "Feature flag not found", http.StatusNotFound)
 			return
 		}
 
@@ -212,7 +218,7 @@ func OutboxStatusHandler(sqliteDB, postgresDB *sql.DB, metrics *observability.Re
 			source = "all"
 		}
 		if source != "all" && source != "sqlite" && source != "postgres" {
-			http.Error(w, "source must be one of: all, sqlite, postgres", http.StatusBadRequest)
+			writeJSONError(w, "invalid_source", "Source must be one of: all, sqlite, postgres", http.StatusBadRequest)
 			return
 		}
 
@@ -220,11 +226,11 @@ func OutboxStatusHandler(sqliteDB, postgresDB *sql.DB, metrics *observability.Re
 		if source == "all" || source == "sqlite" {
 			sqliteStatus, err := queryOutboxStatus(r.Context(), sqliteDB, "ingest_outbox")
 			if err != nil {
-				http.Error(w, "failed to query sqlite outbox status", http.StatusInternalServerError)
+				writeJSONError(w, "query_failed", "Failed to query SQLite outbox status", http.StatusInternalServerError)
 				return
 			}
 			if err := sqliteDB.QueryRowContext(r.Context(), `SELECT COUNT(*) FROM outbox_dead_letter`).Scan(&sqliteStatus.DeadLetterCount); err != nil { // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
-				http.Error(w, "failed to query sqlite outbox dead letter status", http.StatusInternalServerError)
+				writeJSONError(w, "query_failed", "Failed to query SQLite outbox dead letter status", http.StatusInternalServerError)
 				return
 			}
 			sources["sqlite"] = sqliteStatus
@@ -235,13 +241,13 @@ func OutboxStatusHandler(sqliteDB, postgresDB *sql.DB, metrics *observability.Re
 		if source == "all" || source == "postgres" {
 			if postgresDB == nil {
 				if source == "postgres" {
-					http.Error(w, "postgres outbox is not configured", http.StatusServiceUnavailable)
+					writeJSONError(w, "not_configured", "Postgres outbox is not configured", http.StatusServiceUnavailable)
 					return
 				}
 			} else {
 				postgresStatus, err := queryOutboxStatus(r.Context(), postgresDB, "pg_outbox")
 				if err != nil {
-					http.Error(w, "failed to query postgres outbox status", http.StatusInternalServerError)
+					writeJSONError(w, "query_failed", "Failed to query Postgres outbox status", http.StatusInternalServerError)
 					return
 				}
 				sources["postgres"] = postgresStatus
@@ -290,7 +296,7 @@ func RetryOutboxHandler(sqliteDB, postgresDB *sql.DB, metrics *observability.Reg
 		}
 		var req reqShape
 		if err := decodeJSONBodyStrict(r, &req); err != nil && !errors.Is(err, io.EOF) {
-			http.Error(w, "invalid request body", http.StatusBadRequest)
+			writeJSONError(w, "invalid_body", "Invalid request body", http.StatusBadRequest)
 			return
 		}
 		req.Source = strings.ToLower(strings.TrimSpace(req.Source))
@@ -298,7 +304,7 @@ func RetryOutboxHandler(sqliteDB, postgresDB *sql.DB, metrics *observability.Reg
 			req.Source = "sqlite"
 		}
 		if req.Source != "sqlite" && req.Source != "postgres" {
-			http.Error(w, "source must be one of: sqlite, postgres", http.StatusBadRequest)
+			writeJSONError(w, "invalid_source", "Source must be one of: sqlite, postgres", http.StatusBadRequest)
 			return
 		}
 
@@ -308,7 +314,7 @@ func RetryOutboxHandler(sqliteDB, postgresDB *sql.DB, metrics *observability.Reg
 		resourceType := "ingest_outbox"
 		if req.Source == "sqlite" {
 			if sqliteDB == nil {
-				http.Error(w, "sqlite outbox is not configured", http.StatusServiceUnavailable)
+				writeJSONError(w, "not_configured", "SQLite outbox is not configured", http.StatusServiceUnavailable)
 				return
 			}
 			if len(req.IDs) == 0 {
@@ -335,7 +341,7 @@ func RetryOutboxHandler(sqliteDB, postgresDB *sql.DB, metrics *observability.Reg
 			}
 		} else {
 			if postgresDB == nil {
-				http.Error(w, "postgres outbox is not configured", http.StatusServiceUnavailable)
+				writeJSONError(w, "not_configured", "Postgres outbox is not configured", http.StatusServiceUnavailable)
 				return
 			}
 			resourceType = "pg_outbox"
@@ -363,7 +369,7 @@ func RetryOutboxHandler(sqliteDB, postgresDB *sql.DB, metrics *observability.Reg
 			}
 		}
 		if err != nil {
-			http.Error(w, "failed to mark outbox rows for retry", http.StatusInternalServerError)
+			writeJSONError(w, "retry_failed", "Failed to mark outbox rows for retry", http.StatusInternalServerError)
 			return
 		}
 		affected, _ := res.RowsAffected()
@@ -404,7 +410,7 @@ func ReplayDeadLetterHandler(db *sql.DB) http.HandlerFunc {
 			 LIMIT 100`,
 		)
 		if err != nil {
-			http.Error(w, "failed to load dead letter rows", http.StatusInternalServerError)
+			writeJSONError(w, "load_failed", "Failed to load dead letter rows", http.StatusInternalServerError)
 			return
 		}
 		defer rows.Close()
@@ -421,19 +427,19 @@ func ReplayDeadLetterHandler(db *sql.DB) http.HandlerFunc {
 		for rows.Next() {
 			var item deadRow
 			if err := rows.Scan(&item.ID, &item.OutboxID, &item.EventType, &item.PayloadJSON, &item.IdempotencyKey, &item.Attempts); err != nil {
-				http.Error(w, "failed to parse dead letter rows", http.StatusInternalServerError)
+				writeJSONError(w, "parse_failed", "Failed to parse dead letter rows", http.StatusInternalServerError)
 				return
 			}
 			items = append(items, item)
 		}
 		if err := rows.Err(); err != nil {
-			http.Error(w, "failed to parse dead letter rows", http.StatusInternalServerError)
+			writeJSONError(w, "parse_failed", "Failed to parse dead letter rows", http.StatusInternalServerError)
 			return
 		}
 
 		tx, err := db.BeginTx(r.Context(), nil)
 		if err != nil {
-			http.Error(w, "failed to replay dead letter rows", http.StatusInternalServerError)
+			writeJSONError(w, "replay_failed", "Failed to replay dead letter rows", http.StatusInternalServerError)
 			return
 		}
 		defer tx.Rollback()
@@ -453,7 +459,7 @@ func ReplayDeadLetterHandler(db *sql.DB) http.HandlerFunc {
 					item.IdempotencyKey,
 				)
 				if err != nil {
-					http.Error(w, "failed to replay dead letter rows", http.StatusInternalServerError)
+					writeJSONError(w, "replay_failed", "Failed to replay dead letter rows", http.StatusInternalServerError)
 					return
 				}
 				affected, _ := res.RowsAffected()
@@ -479,19 +485,19 @@ func ReplayDeadLetterHandler(db *sql.DB) http.HandlerFunc {
 					nowMs,
 					nowMs,
 				); err != nil {
-					http.Error(w, "failed to replay dead letter rows", http.StatusInternalServerError)
+					writeJSONError(w, "replay_failed", "Failed to replay dead letter rows", http.StatusInternalServerError)
 					return
 				}
 			}
 			if _, err := tx.ExecContext(r.Context(), `DELETE FROM outbox_dead_letter WHERE id = ?`, item.ID); err != nil { // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
-				http.Error(w, "failed to replay dead letter rows", http.StatusInternalServerError)
+				writeJSONError(w, "replay_failed", "Failed to replay dead letter rows", http.StatusInternalServerError)
 				return
 			}
 			replayed++
 		}
 
 		if err := tx.Commit(); err != nil {
-			http.Error(w, "failed to replay dead letter rows", http.StatusInternalServerError)
+			writeJSONError(w, "replay_failed", "Failed to replay dead letter rows", http.StatusInternalServerError)
 			return
 		}
 
@@ -527,7 +533,7 @@ func AlertsHandler(db *sql.DB) http.HandlerFunc {
 			 LIMIT 200`,
 		)
 		if err != nil {
-			http.Error(w, "failed to load alerts", http.StatusInternalServerError)
+			writeJSONError(w, "list_failed", "Failed to load alerts", http.StatusInternalServerError)
 			return
 		}
 		defer rows.Close()
@@ -557,7 +563,7 @@ func AlertsHandler(db *sql.DB) http.HandlerFunc {
 				&item.CreatedAt,
 				&item.UpdatedAt,
 			); err != nil {
-				http.Error(w, "failed to load alerts", http.StatusInternalServerError)
+				writeJSONError(w, "list_failed", "Failed to load alerts", http.StatusInternalServerError)
 				return
 			}
 			payloadRaw = strings.TrimSpace(payloadRaw)
@@ -568,7 +574,7 @@ func AlertsHandler(db *sql.DB) http.HandlerFunc {
 			out = append(out, item)
 		}
 		if err := rows.Err(); err != nil {
-			http.Error(w, "failed to iterate alerts", http.StatusInternalServerError)
+			writeJSONError(w, "iterate_failed", "Failed to iterate alerts", http.StatusInternalServerError)
 			return
 		}
 
@@ -613,217 +619,15 @@ func MigrationsStatusHandler(postgresConfigured bool, postgresLastErr *string) h
 	}
 }
 
-func AppendAuditLog(
-	ctx context.Context,
-	db *sql.DB,
-	actionType string,
-	resourceType string,
-	resourceID string,
-	result string,
-	payload map[string]any,
-) error {
-	requestID := observability.RequestIDFromContext(ctx)
-	correlationID := observability.CorrelationIDFromContext(ctx)
-	userID := observability.UserIDFromContext(ctx)
-	tokenID := observability.TokenIDFromContext(ctx)
-	role := observability.RoleFromContext(ctx)
+// Audit log functions (AppendAuditLog, AuditVerifyChainHandler, canonicalJSON,
+// canonicalizeValue, canonicalizeValueDepth, truncateSQLForAudit) have been
+// extracted to admin_audit.go.
 
-	canonicalPayload, err := canonicalJSON(payload)
-	if err != nil {
-		return err
-	}
-	payloadHash := sha256.Sum256([]byte(canonicalPayload))
-	payloadHashHex := hex.EncodeToString(payloadHash[:])
+// SQL console functions (SQLQueryHandler, SQLExecHandler, ensureFeatureEnabled,
+// and all SQL policy/validation helpers) have been extracted to admin_sql.go.
 
-	// Serialize append operations on a dedicated connection so two concurrent
-	// writers cannot fork the hash chain by reading the same predecessor.
-	conn, err := db.Conn(ctx)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-
-	if _, err := conn.ExecContext(ctx, `BEGIN IMMEDIATE`); err != nil {
-		return err
-	}
-	committed := false
-	defer func() {
-		if committed {
-			return
-		}
-		_, _ = conn.ExecContext(context.Background(), `ROLLBACK`)
-	}()
-
-	var prevHash string
-	err = conn.QueryRowContext(ctx, `SELECT row_hash FROM admin_audit_log ORDER BY id DESC LIMIT 1`).Scan(&prevHash)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return err
-	}
-	if errors.Is(err, sql.ErrNoRows) {
-		prevHash = strings.Repeat("0", 64)
-	}
-
-	rowPreimage := canonicalPayload + ":" + prevHash
-	rowHash := sha256.Sum256([]byte(rowPreimage))
-	rowHashHex := hex.EncodeToString(rowHash[:])
-
-	if _, err := conn.ExecContext(
-		ctx,
-		`INSERT INTO admin_audit_log (
-			ts_utc, request_id, correlation_id, user_id, token_id, role,
-			action_type, resource_type, resource_id, result, error_code,
-			payload_json, prev_hash, payload_hash, row_hash
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		time.Now().UnixMilli(),
-		requestID,
-		correlationID,
-		userID,
-		tokenID,
-		role,
-		actionType,
-		resourceType,
-		resourceID,
-		result,
-		"",
-		canonicalPayload,
-		prevHash,
-		payloadHashHex,
-		rowHashHex,
-	); err != nil {
-		return err
-	}
-
-	if _, err := conn.ExecContext(ctx, `COMMIT`); err != nil {
-		return err
-	}
-	committed = true
-	return nil
-}
-
-func AuditVerifyChainHandler(db *sql.DB) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			return
-		}
-
-		rows, err := db.QueryContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
-			r.Context(),
-			`SELECT id, payload_json, prev_hash, payload_hash, row_hash FROM admin_audit_log ORDER BY id ASC`,
-		)
-		if err != nil {
-			http.Error(w, "failed to verify audit chain", http.StatusInternalServerError)
-			return
-		}
-		defer rows.Close()
-
-		type rowData struct {
-			ID          int64
-			Payload     string
-			PrevHash    string
-			PayloadHash string
-			RowHash     string
-			Recomputed  string
-		}
-		chain := make([]rowData, 0, 256)
-		prev := strings.Repeat("0", 64)
-		ok := true
-		var breakAt int64
-		var breakReason string
-
-		for rows.Next() {
-			var item rowData
-			if err := rows.Scan(&item.ID, &item.Payload, &item.PrevHash, &item.PayloadHash, &item.RowHash); err != nil {
-				http.Error(w, "failed to verify audit chain", http.StatusInternalServerError)
-				return
-			}
-			payloadSum := sha256.Sum256([]byte(item.Payload))
-			recomputedPayloadHash := hex.EncodeToString(payloadSum[:])
-			sum := sha256.Sum256([]byte(item.Payload + ":" + item.PrevHash))
-			item.Recomputed = hex.EncodeToString(sum[:])
-			chain = append(chain, item)
-
-			if item.PrevHash != prev && ok {
-				ok = false
-				breakAt = item.ID
-				breakReason = "prev_hash_mismatch"
-			}
-			if item.RowHash != item.Recomputed && ok {
-				ok = false
-				breakAt = item.ID
-				breakReason = "row_hash_mismatch"
-			}
-			if item.PayloadHash != recomputedPayloadHash && ok {
-				ok = false
-				breakAt = item.ID
-				breakReason = "payload_hash_mismatch"
-			}
-			prev = item.RowHash
-		}
-		if err := rows.Err(); err != nil {
-			http.Error(w, "failed to verify audit chain", http.StatusInternalServerError)
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		resp := map[string]any{
-			"ok":        true,
-			"valid":     ok,
-			"totalRows": len(chain),
-		}
-		if !ok {
-			resp["breakAt"] = breakAt
-			resp["reason"] = breakReason
-		}
-		_ = json.NewEncoder(w).Encode(resp)
-	}
-}
-
-func canonicalJSON(payload map[string]any) (string, error) {
-	if payload == nil {
-		return "{}", nil
-	}
-	canonicalized := canonicalizeValue(payload)
-	raw, err := json.Marshal(canonicalized)
-	if err != nil {
-		return "", err
-	}
-	return string(raw), nil
-}
-
-func canonicalizeValue(v any) any {
-	switch typed := v.(type) {
-	case map[string]any:
-		keys := make([]string, 0, len(typed))
-		for k := range typed {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-		ordered := make(map[string]any, len(typed))
-		for _, k := range keys {
-			ordered[k] = canonicalizeValue(typed[k])
-		}
-		return ordered
-	case []any:
-		out := make([]any, len(typed))
-		for i := range typed {
-			out[i] = canonicalizeValue(typed[i])
-		}
-		return out
-	default:
-		return v
-	}
-}
-
-type sqlQueryRequest struct {
-	SQL   string `json:"sql"`
-	Limit int    `json:"limit"`
-}
-
-type sqlExecRequest struct {
-	SQL    string `json:"sql"`
-	DryRun bool   `json:"dryRun"`
-}
+// Backup functions (BackupRunHandler, recordBackupFailure, backupFileNameOrDefault,
+// resolveBackupPath) have been extracted to admin_backup.go.
 
 type clearDataRequest struct {
 	Scope  string `json:"scope"`
@@ -860,49 +664,14 @@ var clearDataSQLByTable = map[string]clearDataTableSQL{
 		countStmt:  `SELECT COUNT(*) FROM cf_schema_registry`,
 		deleteStmt: `DELETE FROM cf_schema_registry`,
 	},
+	"oracle_operation_logs": {
+		countStmt:  `SELECT COUNT(*) FROM oracle_operation_logs`,
+		deleteStmt: `DELETE FROM oracle_operation_logs`,
+	},
 	"backup_runs": {
 		countStmt:  `SELECT COUNT(*) FROM backup_runs`,
 		deleteStmt: `DELETE FROM backup_runs`,
 	},
-}
-
-var backupFileNamePattern = regexp.MustCompile(`^[a-zA-Z0-9._-]+\.db$`)
-
-func backupFileNameOrDefault(input string, now time.Time) (string, error) {
-	name := strings.TrimSpace(input)
-	if name == "" {
-		name = fmt.Sprintf("oracle-backup-%d.db", now.UTC().Unix())
-	}
-	if strings.ContainsAny(name, `/\`) {
-		return "", errors.New("invalid file name")
-	}
-	if filepath.Base(name) != name {
-		return "", errors.New("invalid file name")
-	}
-	if strings.Contains(name, "..") {
-		return "", errors.New("invalid file name")
-	}
-	if !backupFileNamePattern.MatchString(name) {
-		return "", errors.New("invalid file name")
-	}
-	return name, nil
-}
-
-func resolveBackupPath(baseDir string, fileName string) (string, string, error) {
-	absDir, err := filepath.Abs(baseDir)
-	if err != nil {
-		return "", "", err
-	}
-	joined := filepath.Join(absDir, fileName)
-	cleaned := filepath.Clean(joined)
-	rel, err := filepath.Rel(absDir, cleaned)
-	if err != nil {
-		return "", "", err
-	}
-	if rel == "." || strings.HasPrefix(rel, "..") || filepath.IsAbs(rel) {
-		return "", "", errors.New("invalid backup path")
-	}
-	return absDir, cleaned, nil
 }
 
 type recordUpsertRequest struct {
@@ -914,224 +683,6 @@ type recordUpsertRequest struct {
 type recordDeleteRequest struct {
 	RecordType string `json:"recordType"`
 	RecordKey  string `json:"recordKey"`
-}
-
-func SQLQueryHandler(db *sql.DB, readOnlyDB *sql.DB) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			return
-		}
-		if !ensureFeatureEnabled(w, r, db, "feature_sql_console_enabled") {
-			return
-		}
-
-		var req sqlQueryRequest
-		if err := decodeJSONBodyStrict(r, &req); err != nil {
-			http.Error(w, "invalid request body", http.StatusBadRequest)
-			return
-		}
-
-		stmt, err := normalizeSingleStatement(req.SQL)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		policyStmt := normalizeSQLForPolicy(stmt)
-		if !isReadOnlySQL(policyStmt) {
-			http.Error(w, "only read-only SQL is allowed on query endpoint", http.StatusBadRequest)
-			return
-		}
-		if hasForbiddenSQLTerms(policyStmt) {
-			http.Error(w, "statement is not allowed by safety policy", http.StatusBadRequest)
-			return
-		}
-		if !isAllowedReadOnlyQuery(policyStmt) {
-			http.Error(w, "query references restricted tables", http.StatusBadRequest)
-			return
-		}
-
-		limit := req.Limit
-		if limit <= 0 {
-			limit = 200
-		}
-		if limit > 2000 {
-			limit = 2000
-		}
-
-		queryDB := readOnlyDB
-		if queryDB == nil {
-			queryDB = db
-		}
-		sqlCtx, cancel := context.WithTimeout(r.Context(), sqlExecTimeout)
-		defer cancel()
-		rows, err := queryDB.QueryContext(sqlCtx, stmt) // #nosec G701 -- SQL text is validated by strict single-statement read-only guards and restricted table policy.
-		if err != nil {
-			http.Error(w, "query failed: "+err.Error(), http.StatusBadRequest)
-			return
-		}
-		defer rows.Close()
-
-		cols, err := rows.Columns()
-		if err != nil {
-			http.Error(w, "query failed", http.StatusInternalServerError)
-			return
-		}
-
-		out := make([]map[string]any, 0, limit)
-		for rows.Next() {
-			if len(out) >= limit {
-				break
-			}
-			values := make([]any, len(cols))
-			ptrs := make([]any, len(cols))
-			for i := range values {
-				ptrs[i] = &values[i]
-			}
-			if err := rows.Scan(ptrs...); err != nil {
-				http.Error(w, "query scan failed", http.StatusInternalServerError)
-				return
-			}
-			row := make(map[string]any, len(cols))
-			for i, col := range cols {
-				v := values[i]
-				switch t := v.(type) {
-				case []byte:
-					row[col] = string(t)
-				default:
-					row[col] = t
-				}
-			}
-			out = append(out, row)
-		}
-		if err := rows.Err(); err != nil {
-			http.Error(w, "query failed", http.StatusInternalServerError)
-			return
-		}
-
-		_ = AppendAuditLog(
-			r.Context(),
-			db,
-			"sql_query",
-			"sql_console",
-			"query",
-			"ok",
-			map[string]any{
-				"rows":    len(out),
-				"limited": limit,
-				"sql":     truncateSQLForAudit(stmt),
-			},
-		)
-
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{
-			"ok":     true,
-			"limit":  limit,
-			"count":  len(out),
-			"rows":   out,
-			"dryRun": true,
-		})
-	}
-}
-
-func SQLExecHandler(db *sql.DB) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			return
-		}
-		if !ensureFeatureEnabled(w, r, db, "feature_sql_console_enabled") {
-			return
-		}
-
-		var req sqlExecRequest
-		if err := decodeJSONBodyStrict(r, &req); err != nil {
-			http.Error(w, "invalid request body", http.StatusBadRequest)
-			return
-		}
-
-		stmt, err := normalizeSingleStatement(req.SQL)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		policyStmt := normalizeSQLForPolicy(stmt)
-		if !isMutatingSQL(policyStmt) {
-			http.Error(w, "exec endpoint only supports insert/update/delete statements", http.StatusBadRequest)
-			return
-		}
-		if hasForbiddenSQLTerms(policyStmt) {
-			http.Error(w, "statement is not allowed by safety policy", http.StatusBadRequest)
-			return
-		}
-		tableName, ok := mutatingTargetTable(policyStmt)
-		if !ok {
-			http.Error(w, "unable to determine target table", http.StatusBadRequest)
-			return
-		}
-		if _, allowed := sqlExecAllowedTables[tableName]; !allowed {
-			http.Error(w, "mutations on this table are not allowed by safety policy", http.StatusBadRequest)
-			return
-		}
-
-		affected := int64(0)
-		if req.DryRun {
-			sqlCtx, cancel := context.WithTimeout(r.Context(), sqlExecTimeout)
-			defer cancel()
-			tx, err := db.BeginTx(sqlCtx, nil)
-			if err != nil {
-				http.Error(w, "failed to execute dry run", http.StatusInternalServerError)
-				return
-			}
-			res, err := tx.ExecContext(sqlCtx, stmt) // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
-			if err == nil {
-				affected, _ = res.RowsAffected()
-			}
-			_ = tx.Rollback()
-			if err != nil {
-				http.Error(w, "dry run failed: "+err.Error(), http.StatusBadRequest)
-				return
-			}
-		} else {
-			sqlCtx, cancel := context.WithTimeout(r.Context(), sqlExecTimeout)
-			defer cancel()
-			res, err := db.ExecContext(sqlCtx, stmt) // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
-			if err != nil {
-				http.Error(w, "exec failed: "+err.Error(), http.StatusBadRequest)
-				return
-			}
-			affected, _ = res.RowsAffected()
-		}
-
-		action := "sql_exec"
-		if req.DryRun {
-			action = "sql_exec_dry_run"
-		}
-		if !appendAuditLogOrHTTPError(
-			w,
-			r.Context(),
-			db,
-			action,
-			"sql_console",
-			"exec",
-			"ok",
-			map[string]any{
-				"affected": affected,
-				"dryRun":   req.DryRun,
-				"table":    tableName,
-				"sql":      truncateSQLForAudit(stmt),
-			},
-		) {
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{
-			"ok":       true,
-			"dryRun":   req.DryRun,
-			"affected": affected,
-		})
-	}
 }
 
 func DangerClearDataHandler(db *sql.DB) http.HandlerFunc {
@@ -1146,7 +697,7 @@ func DangerClearDataHandler(db *sql.DB) http.HandlerFunc {
 
 		var req clearDataRequest
 		if err := decodeJSONBodyStrict(r, &req); err != nil {
-			http.Error(w, "invalid request body", http.StatusBadRequest)
+			writeJSONError(w, "invalid_body", "Invalid request body", http.StatusBadRequest)
 			return
 		}
 		scope := strings.TrimSpace(strings.ToLower(req.Scope))
@@ -1156,7 +707,7 @@ func DangerClearDataHandler(db *sql.DB) http.HandlerFunc {
 
 		tables, ok := clearScopeTables(scope)
 		if !ok {
-			http.Error(w, "invalid scope", http.StatusBadRequest)
+			writeJSONError(w, "invalid_scope", "Invalid scope", http.StatusBadRequest)
 			return
 		}
 
@@ -1164,12 +715,12 @@ func DangerClearDataHandler(db *sql.DB) http.HandlerFunc {
 		for _, table := range tables {
 			sqlDef, ok := clearDataSQLByTable[table]
 			if !ok {
-				http.Error(w, "invalid scope", http.StatusBadRequest)
+				writeJSONError(w, "invalid_scope", "Invalid scope", http.StatusBadRequest)
 				return
 			}
 			var count int64
 			if err := db.QueryRowContext(r.Context(), sqlDef.countStmt).Scan(&count); err != nil { // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
-				http.Error(w, "failed to count rows", http.StatusInternalServerError)
+				writeJSONError(w, "count_failed", "Failed to count rows", http.StatusInternalServerError)
 				return
 			}
 			counts[table] = count
@@ -1201,7 +752,7 @@ func DangerClearDataHandler(db *sql.DB) http.HandlerFunc {
 
 		tx, err := db.BeginTx(r.Context(), nil)
 		if err != nil {
-			http.Error(w, "failed to clear data", http.StatusInternalServerError)
+			writeJSONError(w, "clear_failed", "Failed to clear data", http.StatusInternalServerError)
 			return
 		}
 		defer tx.Rollback()
@@ -1210,12 +761,12 @@ func DangerClearDataHandler(db *sql.DB) http.HandlerFunc {
 		for _, table := range tables {
 			sqlDef, ok := clearDataSQLByTable[table]
 			if !ok {
-				http.Error(w, "invalid scope", http.StatusBadRequest)
+				writeJSONError(w, "invalid_scope", "Invalid scope", http.StatusBadRequest)
 				return
 			}
 			res, err := tx.ExecContext(r.Context(), sqlDef.deleteStmt) // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 			if err != nil {
-				http.Error(w, "failed to clear data", http.StatusInternalServerError)
+				writeJSONError(w, "clear_failed", "Failed to clear data", http.StatusInternalServerError)
 				return
 			}
 			n, _ := res.RowsAffected()
@@ -1223,7 +774,7 @@ func DangerClearDataHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		if err := tx.Commit(); err != nil {
-			http.Error(w, "failed to clear data", http.StatusInternalServerError)
+			writeJSONError(w, "clear_failed", "Failed to clear data", http.StatusInternalServerError)
 			return
 		}
 
@@ -1250,130 +801,6 @@ func DangerClearDataHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-func BackupRunHandler(db *sql.DB, metrics *observability.Registry) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			return
-		}
-
-		type reqShape struct {
-			FileName string `json:"fileName"`
-		}
-		var req reqShape
-		if err := decodeJSONBodyStrict(r, &req); err != nil && !errors.Is(err, io.EOF) {
-			http.Error(w, "invalid request body", http.StatusBadRequest)
-			return
-		}
-
-		baseName, err := backupFileNameOrDefault(req.FileName, time.Now())
-		if err != nil {
-			http.Error(w, "invalid file name", http.StatusBadRequest)
-			return
-		}
-
-		backupDir := os.Getenv("BACKUP_DIR")
-		if backupDir == "" {
-			backupDir = "./data/backups"
-		}
-		absBackupDir, backupPath, err := resolveBackupPath(backupDir, baseName)
-		if err != nil {
-			recordBackupFailure(r.Context(), db, metrics, filepath.Join(backupDir, baseName), 0, 0, err)
-			http.Error(w, "failed to resolve backup path", http.StatusInternalServerError)
-			return
-		}
-		if err := os.MkdirAll(absBackupDir, 0o750); err != nil { // #nosec G703 -- absBackupDir is canonicalized and constrained by resolveBackupPath.
-			recordBackupFailure(r.Context(), db, metrics, backupPath, 0, 0, err)
-			http.Error(w, "failed to create backup directory", http.StatusInternalServerError)
-			return
-		}
-
-		startedAt := time.Now().UnixMilli()
-		// SQLite VACUUM INTO only accepts a literal target path (no bind parameters).
-		// Defense layers: strict filename regex, canonical path validation under backup dir,
-		// and explicit single-quote escaping before interpolation.
-		vacuumStmt := "VACUUM INTO '" + strings.ReplaceAll(backupPath, "'", "''") + "'" // #nosec G202 -- literal path is required by SQLite for VACUUM INTO.
-		_, err = db.ExecContext(r.Context(), vacuumStmt)                                // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
-		finishedAt := time.Now().UnixMilli()
-
-		if err != nil {
-			recordBackupFailure(r.Context(), db, metrics, backupPath, startedAt, finishedAt, err)
-			http.Error(w, "backup failed: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		_, _ = db.ExecContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
-			r.Context(),
-			`INSERT INTO backup_runs (backup_path, status, error_message, started_at, finished_at)
-			 VALUES (?, 'ok', '', ?, ?)`,
-			backupPath,
-			startedAt,
-			finishedAt,
-		)
-		if !appendAuditLogOrHTTPError(
-			w,
-			r.Context(),
-			db,
-			"backup_run",
-			"backup",
-			backupPath,
-			"ok",
-			map[string]any{
-				"path":       backupPath,
-				"startedAt":  startedAt,
-				"finishedAt": finishedAt,
-			},
-		) {
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{
-			"ok":         true,
-			"backupPath": backupPath,
-			"startedAt":  startedAt,
-			"finishedAt": finishedAt,
-		})
-	}
-}
-
-func recordBackupFailure(
-	ctx context.Context,
-	db *sql.DB,
-	metrics *observability.Registry,
-	backupPath string,
-	startedAt int64,
-	finishedAt int64,
-	err error,
-) {
-	if startedAt == 0 {
-		startedAt = time.Now().UnixMilli()
-	}
-	if finishedAt == 0 {
-		finishedAt = startedAt
-	}
-	if metrics != nil {
-		metrics.IncCounter("oracle_backup_failures_total", nil, 1)
-	}
-	_ = upsertOpenAlert(
-		ctx,
-		db,
-		"backup_failed",
-		"critical",
-		"backup job failed",
-		map[string]any{"error": truncateAlertError(err.Error()), "path": backupPath},
-	)
-	_, _ = db.ExecContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
-		ctx,
-		`INSERT INTO backup_runs (backup_path, status, error_message, started_at, finished_at)
-		 VALUES (?, 'error', ?, ?, ?)`,
-		backupPath,
-		truncateAlertError(err.Error()),
-		startedAt,
-		finishedAt,
-	)
-}
-
 func RecordsListHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
@@ -1382,8 +809,21 @@ func RecordsListHandler(db *sql.DB) http.HandlerFunc {
 		}
 		recordType := strings.TrimSpace(r.URL.Query().Get("type"))
 		if recordType == "" {
-			http.Error(w, "type is required", http.StatusBadRequest)
+			writeJSONError(w, "missing_type", "Type is required", http.StatusBadRequest)
 			return
+		}
+
+		limit := 200
+		offset := 0
+		if v := r.URL.Query().Get("limit"); v != "" {
+			if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 2000 {
+				limit = n
+			}
+		}
+		if v := r.URL.Query().Get("offset"); v != "" {
+			if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+				offset = n
+			}
 		}
 
 		rows, err := db.QueryContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
@@ -1391,11 +831,12 @@ func RecordsListHandler(db *sql.DB) http.HandlerFunc {
 			`SELECT record_key, data_json, created_at, updated_at
 			 FROM admin_records
 			 WHERE record_type = ?
-			 ORDER BY updated_at DESC, id DESC`,
-			recordType,
+			 ORDER BY updated_at DESC, id DESC
+			 LIMIT ? OFFSET ?`,
+			recordType, limit, offset,
 		)
 		if err != nil {
-			http.Error(w, "failed to list records", http.StatusInternalServerError)
+			writeJSONError(w, "list_failed", "Failed to list records", http.StatusInternalServerError)
 			return
 		}
 		defer rows.Close()
@@ -1411,7 +852,7 @@ func RecordsListHandler(db *sql.DB) http.HandlerFunc {
 			var item recordRow
 			var raw sql.NullString
 			if err := rows.Scan(&item.RecordKey, &raw, &item.CreatedAt, &item.UpdatedAt); err != nil {
-				http.Error(w, "failed to parse records", http.StatusInternalServerError)
+				writeJSONError(w, "parse_failed", "Failed to parse records", http.StatusInternalServerError)
 				return
 			}
 			if raw.Valid && strings.TrimSpace(raw.String) != "" {
@@ -1422,7 +863,7 @@ func RecordsListHandler(db *sql.DB) http.HandlerFunc {
 			out = append(out, item)
 		}
 		if err := rows.Err(); err != nil {
-			http.Error(w, "failed to parse records", http.StatusInternalServerError)
+			writeJSONError(w, "parse_failed", "Failed to parse records", http.StatusInternalServerError)
 			return
 		}
 
@@ -1431,6 +872,9 @@ func RecordsListHandler(db *sql.DB) http.HandlerFunc {
 			"ok":      true,
 			"type":    recordType,
 			"records": out,
+			"limit":   limit,
+			"offset":  offset,
+			"hasMore": len(out) == limit,
 		})
 	}
 }
@@ -1443,13 +887,13 @@ func RecordsUpsertHandler(db *sql.DB) http.HandlerFunc {
 		}
 		var req recordUpsertRequest
 		if err := decodeJSONBodyStrict(r, &req); err != nil {
-			http.Error(w, "invalid request body", http.StatusBadRequest)
+			writeJSONError(w, "invalid_body", "Invalid request body", http.StatusBadRequest)
 			return
 		}
 		req.RecordType = strings.TrimSpace(req.RecordType)
 		req.RecordKey = strings.TrimSpace(req.RecordKey)
 		if req.RecordType == "" || req.RecordKey == "" {
-			http.Error(w, "recordType and recordKey are required", http.StatusBadRequest)
+			writeJSONError(w, "missing_fields", "recordType and recordKey are required", http.StatusBadRequest)
 			return
 		}
 		if req.Data == nil {
@@ -1457,7 +901,7 @@ func RecordsUpsertHandler(db *sql.DB) http.HandlerFunc {
 		}
 		raw, err := json.Marshal(req.Data)
 		if err != nil {
-			http.Error(w, "invalid data payload", http.StatusBadRequest)
+			writeJSONError(w, "invalid_payload", "Invalid data payload", http.StatusBadRequest)
 			return
 		}
 
@@ -1476,7 +920,7 @@ func RecordsUpsertHandler(db *sql.DB) http.HandlerFunc {
 			nowMs,
 		)
 		if err != nil {
-			http.Error(w, "failed to upsert record", http.StatusInternalServerError)
+			writeJSONError(w, "upsert_failed", "Failed to upsert record", http.StatusInternalServerError)
 			return
 		}
 
@@ -1506,13 +950,13 @@ func RecordsDeleteHandler(db *sql.DB) http.HandlerFunc {
 		}
 		var req recordDeleteRequest
 		if err := decodeJSONBodyStrict(r, &req); err != nil {
-			http.Error(w, "invalid request body", http.StatusBadRequest)
+			writeJSONError(w, "invalid_body", "Invalid request body", http.StatusBadRequest)
 			return
 		}
 		req.RecordType = strings.TrimSpace(req.RecordType)
 		req.RecordKey = strings.TrimSpace(req.RecordKey)
 		if req.RecordType == "" || req.RecordKey == "" {
-			http.Error(w, "recordType and recordKey are required", http.StatusBadRequest)
+			writeJSONError(w, "missing_fields", "recordType and recordKey are required", http.StatusBadRequest)
 			return
 		}
 
@@ -1523,7 +967,7 @@ func RecordsDeleteHandler(db *sql.DB) http.HandlerFunc {
 			req.RecordKey,
 		)
 		if err != nil {
-			http.Error(w, "failed to delete record", http.StatusInternalServerError)
+			writeJSONError(w, "delete_failed", "Failed to delete record", http.StatusInternalServerError)
 			return
 		}
 		affected, _ := res.RowsAffected()
@@ -1547,401 +991,6 @@ func RecordsDeleteHandler(db *sql.DB) http.HandlerFunc {
 			"affected": affected,
 		})
 	}
-}
-
-func ensureFeatureEnabled(w http.ResponseWriter, r *http.Request, db *sql.DB, flagName string) bool {
-	enabled, err := IsFeatureEnabled(r.Context(), db, flagName)
-	if err != nil {
-		http.Error(w, "failed to evaluate feature flag", http.StatusInternalServerError)
-		return false
-	}
-	if !enabled {
-		http.Error(w, "feature disabled", http.StatusForbidden)
-		return false
-	}
-	return true
-}
-
-func normalizeSingleStatement(sqlText string) (string, error) {
-	stmt := strings.TrimSpace(sqlText)
-	if stmt == "" {
-		return "", errors.New("sql is required")
-	}
-	if strings.Count(stmt, ";") > 1 {
-		return "", errors.New("multiple SQL statements are not allowed")
-	}
-	stmt = strings.TrimSuffix(stmt, ";")
-	if strings.Contains(stmt, ";") {
-		return "", errors.New("multiple SQL statements are not allowed")
-	}
-	return stmt, nil
-}
-
-func normalizeSQLForPolicy(stmt string) string {
-	noComments := sqlInlineCommentRegexp.ReplaceAllString(stmt, " ")
-	return strings.TrimSpace(noComments)
-}
-
-func isReadOnlySQL(stmt string) bool {
-	lower := strings.ToLower(strings.TrimSpace(stmt))
-	return strings.HasPrefix(lower, "select ")
-}
-
-func isMutatingSQL(stmt string) bool {
-	lower := strings.ToLower(strings.TrimSpace(stmt))
-	return strings.HasPrefix(lower, "insert ") ||
-		strings.HasPrefix(lower, "update ") ||
-		strings.HasPrefix(lower, "delete ")
-}
-
-var sqlForbiddenTermsRegexp = regexp.MustCompile(`(?i)\b(drop|alter|pragma|vacuum|attach|detach|reindex|create|trigger|load_extension|replace)\b`)
-var sqlInlineCommentRegexp = regexp.MustCompile(`(?s)/\*.*?\*/|--[^\r\n]*`)
-var sqlExecTimeout = 5 * time.Second
-
-var sqlReadOnlyRestrictedTables = map[string]struct{}{
-	"admin_audit_log": {},
-	"feature_flags":   {},
-	"sqlite_master":   {},
-	"sqlite_schema":   {},
-}
-
-var sqlExecAllowedTables = map[string]struct{}{
-	"pipeline_failure_logs": {},
-	"ingest_outbox":         {},
-	"outbox_dead_letter":    {},
-	"system_alerts":         {},
-	"cf_snapshots_raw":      {},
-	"oracle_operation_logs": {},
-	"cf_schema_registry":    {},
-	"backup_runs":           {},
-}
-
-var sqlTargetTableRegexp = regexp.MustCompile(`(?i)^\s*(?:insert\s+into|update|delete\s+from)\s+([a-zA-Z_][a-zA-Z0-9_]*)`)
-var sqlReadOnlySourceRegexp = regexp.MustCompile(`(?i)\b(?:from|join)\s+([^\s,;]+)`)
-var sqlReadOnlyFromClauseRegexp = regexp.MustCompile(`(?is)\bfrom\b\s+(.+?)(?:\bwhere\b|\bgroup\b|\border\b|\blimit\b|\bhaving\b|\bunion\b|\bintersect\b|\bexcept\b|$)`)
-
-func hasForbiddenSQLTerms(stmt string) bool {
-	return sqlForbiddenTermsRegexp.MatchString(stmt)
-}
-
-func mutatingTargetTable(stmt string) (string, bool) {
-	match := sqlTargetTableRegexp.FindStringSubmatch(stmt)
-	if len(match) < 2 {
-		return "", false
-	}
-	return strings.ToLower(strings.TrimSpace(match[1])), true
-}
-
-func isAllowedReadOnlyQuery(stmt string) bool {
-	sourceTokens, ok := collectReadOnlySourceTokens(stmt)
-	if !ok {
-		return false
-	}
-	for _, token := range sourceTokens {
-		table, ok := normalizeReadOnlySourceTable(token)
-		if !ok {
-			return false
-		}
-		if _, blocked := sqlReadOnlyRestrictedTables[table]; blocked {
-			return false
-		}
-	}
-	return true
-}
-
-func collectReadOnlySourceTokens(stmt string) ([]string, bool) {
-	tokens := make([]string, 0, 8)
-
-	matches := sqlReadOnlySourceRegexp.FindAllStringSubmatch(stmt, -1)
-	for _, match := range matches {
-		if len(match) < 2 {
-			continue
-		}
-		tokens = append(tokens, match[1])
-	}
-
-	fromMatches := sqlReadOnlyFromClauseRegexp.FindAllStringSubmatch(stmt, -1)
-	for _, match := range fromMatches {
-		if len(match) < 2 {
-			continue
-		}
-		commaSources, ok := extractCommaSourceTokens(match[1])
-		if !ok {
-			return nil, false
-		}
-		tokens = append(tokens, commaSources...)
-	}
-
-	return tokens, true
-}
-
-func extractCommaSourceTokens(fromClause string) ([]string, bool) {
-	segments, ok := splitTopLevelCommaSegments(fromClause)
-	if !ok {
-		return nil, false
-	}
-	if len(segments) <= 1 {
-		return nil, true
-	}
-
-	out := make([]string, 0, len(segments)-1)
-	for i := 1; i < len(segments); i++ {
-		token, ok := leadingSourceToken(segments[i])
-		if !ok {
-			return nil, false
-		}
-		out = append(out, token)
-	}
-	return out, true
-}
-
-func splitTopLevelCommaSegments(input string) ([]string, bool) {
-	segments := make([]string, 0, 4)
-	start := 0
-	depth := 0
-	var quote byte
-	bracketQuoted := false
-
-	for i := 0; i < len(input); i++ {
-		ch := input[i]
-		if quote != 0 {
-			if ch == quote {
-				if i+1 < len(input) && input[i+1] == quote {
-					i++
-					continue
-				}
-				quote = 0
-			}
-			continue
-		}
-		if bracketQuoted {
-			if ch == ']' {
-				bracketQuoted = false
-			}
-			continue
-		}
-
-		switch ch {
-		case '\'', '"', '`':
-			quote = ch
-		case '[':
-			bracketQuoted = true
-		case '(':
-			depth++
-		case ')':
-			if depth == 0 {
-				return nil, false
-			}
-			depth--
-		case ',':
-			if depth == 0 {
-				segments = append(segments, input[start:i])
-				start = i + 1
-			}
-		}
-	}
-
-	if quote != 0 || bracketQuoted || depth != 0 {
-		return nil, false
-	}
-
-	segments = append(segments, input[start:])
-	return segments, true
-}
-
-func leadingSourceToken(segment string) (string, bool) {
-	s := strings.TrimSpace(segment)
-	if s == "" || strings.HasPrefix(s, "(") {
-		return "", false
-	}
-
-	var quote byte
-	bracketQuoted := false
-	end := 0
-	for end < len(s) {
-		ch := s[end]
-		if quote != 0 {
-			if ch == quote {
-				if end+1 < len(s) && s[end+1] == quote {
-					end += 2
-					continue
-				}
-				quote = 0
-			}
-			end++
-			continue
-		}
-		if bracketQuoted {
-			if ch == ']' {
-				bracketQuoted = false
-			}
-			end++
-			continue
-		}
-
-		switch ch {
-		case '\'', '"', '`':
-			quote = ch
-		case '[':
-			bracketQuoted = true
-		case ' ', '\t', '\n', '\r', ',', ';':
-			token := strings.TrimSpace(s[:end])
-			if token == "" {
-				return "", false
-			}
-			return token, true
-		case '(', ')':
-			return "", false
-		}
-		end++
-	}
-
-	if quote != 0 || bracketQuoted {
-		return "", false
-	}
-	token := strings.TrimSpace(s[:end])
-	if token == "" {
-		return "", false
-	}
-	return token, true
-}
-
-func normalizeReadOnlySourceTable(sourceToken string) (string, bool) {
-	token := strings.TrimSpace(strings.TrimRight(sourceToken, ","))
-	if token == "" {
-		return "", false
-	}
-	if strings.HasPrefix(token, "(") {
-		return "", false
-	}
-
-	parts, ok := splitIdentifierParts(token)
-	if !ok || len(parts) == 0 {
-		return "", false
-	}
-
-	table := strings.ToLower(strings.TrimSpace(parts[len(parts)-1]))
-	if table == "" {
-		return "", false
-	}
-	return table, true
-}
-
-func splitIdentifierParts(token string) ([]string, bool) {
-	parts := make([]string, 0, 2)
-	i := 0
-
-	readBare := func() (string, bool) {
-		start := i
-		for i < len(token) {
-			switch token[i] {
-			case '.', ' ', '\t', '\n', '\r', ',', ';':
-				goto done
-			case '(', ')':
-				return "", false
-			default:
-				i++
-			}
-		}
-	done:
-		if start == i {
-			return "", false
-		}
-		return token[start:i], true
-	}
-
-	readQuoted := func(quote byte) (string, bool) {
-		if i >= len(token) || token[i] != quote {
-			return "", false
-		}
-		i++
-		start := i
-		for i < len(token) && token[i] != quote {
-			i++
-		}
-		if i >= len(token) {
-			return "", false
-		}
-		value := token[start:i]
-		i++ // closing quote
-		if value == "" {
-			return "", false
-		}
-		return value, true
-	}
-
-	readBracketQuoted := func() (string, bool) {
-		if i >= len(token) || token[i] != '[' {
-			return "", false
-		}
-		i++
-		start := i
-		for i < len(token) && token[i] != ']' {
-			i++
-		}
-		if i >= len(token) {
-			return "", false
-		}
-		value := token[start:i]
-		i++ // closing bracket
-		if value == "" {
-			return "", false
-		}
-		return value, true
-	}
-
-	for i < len(token) {
-		for i < len(token) && (token[i] == ' ' || token[i] == '\t' || token[i] == '\n' || token[i] == '\r') {
-			i++
-		}
-		if i >= len(token) {
-			break
-		}
-
-		var part string
-		var ok bool
-		switch token[i] {
-		case '"', '`':
-			part, ok = readQuoted(token[i])
-		case '[':
-			part, ok = readBracketQuoted()
-		default:
-			part, ok = readBare()
-		}
-		if !ok {
-			return nil, false
-		}
-		part = strings.TrimSpace(part)
-		if part == "" {
-			return nil, false
-		}
-		parts = append(parts, part)
-
-		for i < len(token) && (token[i] == ' ' || token[i] == '\t' || token[i] == '\n' || token[i] == '\r') {
-			i++
-		}
-		if i >= len(token) {
-			break
-		}
-		if token[i] != '.' {
-			return nil, false
-		}
-		i++ // dot separator
-	}
-
-	if len(parts) == 0 {
-		return nil, false
-	}
-	return parts, true
-}
-
-func truncateSQLForAudit(stmt string) string {
-	const maxLen = 512
-	normalized := strings.TrimSpace(stmt)
-	if len(normalized) <= maxLen {
-		return normalized
-	}
-	return normalized[:maxLen] + "...(truncated)"
 }
 
 func clearScopeTables(scope string) ([]string, bool) {
