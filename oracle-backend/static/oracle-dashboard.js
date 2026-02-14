@@ -271,7 +271,7 @@
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ challengeId: stepUpChallengeId, password: password })
-            });
+            }, { retryOn401: false });
             hideStepUpModal();
             resolveStepUpModal(true);
           } catch (e) {
@@ -345,13 +345,15 @@
         return ok;
       }
 
-      async function fetchJSONWithInit(url, init) {
+      async function fetchJSONWithInit(url, init, options) {
+        var requestOptions = options ? Object.assign({}, options) : {};
+        var retryOn401 = requestOptions.retryOn401 !== false;
         var requestInit = init ? Object.assign({}, init) : {};
         requestInit.headers = mergeRequestHeaders(init && init.headers);
         if (!requestInit.method) requestInit.method = 'GET';
         if (!requestInit.credentials) requestInit.credentials = 'same-origin';
         let res = await fetch(url, requestInit);
-        if (res.status === 401) {
+        if (retryOn401 && res.status === 401) {
           const ok = await ensureAuth();
           if (!ok) throw new Error("HTTP 401");
           res = await fetch(url, requestInit);
@@ -360,8 +362,8 @@
         return res.json();
       }
 
-      async function fetchJSON(url) {
-        return fetchJSONWithInit(url);
+      async function fetchJSON(url, options) {
+        return fetchJSONWithInit(url, null, options);
       }
 
       /**
@@ -375,18 +377,22 @@
        * @throws {Error} Network/HTTP errors propagate to the caller; stale
        *   cache entries are NOT used as a fallback on fetch failure.
        */
-      function cachedFetchJSON(url, ttlMs) {
+      function cachedFetchJSON(url, ttlMs, options) {
+        var fetchOptions = options ? Object.assign({}, options) : {};
+        var forceRefresh = !!fetchOptions.forceRefresh;
         var key = 'orc_cache_' + url;
-        try {
-          var cached = localStorage.getItem(key);
-          if (cached) {
-            var parsed = JSON.parse(cached);
-            if (parsed.ts && Date.now() - parsed.ts < ttlMs) {
-              return Promise.resolve(parsed.data);
+        if (!forceRefresh) {
+          try {
+            var cached = localStorage.getItem(key);
+            if (cached) {
+              var parsed = JSON.parse(cached);
+              if (parsed.ts && Date.now() - parsed.ts < ttlMs) {
+                return Promise.resolve(parsed.data);
+              }
             }
-          }
-        } catch (_) { /* ignore parse/storage errors */ }
-        return fetchJSON(url).then(function(data) {
+          } catch (_) { /* ignore parse/storage errors */ }
+        }
+        return fetchJSON(url, fetchOptions).then(function(data) {
           try {
             localStorage.setItem(key, JSON.stringify({ ts: Date.now(), data: data }));
           } catch (e) { if (typeof console !== 'undefined') console.warn('[cachedFetchJSON] localStorage write failed:', e); }
@@ -1072,9 +1078,9 @@
       }
 
       // Overview Page
-      async function loadOverview() {
+      async function loadOverview(forceRefresh) {
         try {
-          var data = await cachedFetchJSON("/api/stats/summary", 30000);
+          var data = await cachedFetchJSON("/api/stats/summary", 30000, { forceRefresh: !!forceRefresh });
           var statusLabel = (data.status || "unknown");
           var statusLabelTitle = statusLabel.charAt(0).toUpperCase() + statusLabel.slice(1);
           document.getElementById("sidebar-status").className = "status-dot " + 
@@ -2678,7 +2684,7 @@
           }
         });
         
-        await loadOverview();
+        await loadOverview(true);
         await loadTopToday();
         await loadDeployStatus();
         
