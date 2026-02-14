@@ -332,11 +332,20 @@
         gap: 8px;
         padding: 8px 10px;
         background: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
         border-radius: 6px;
         font-size: 11px;
         cursor: help;
         white-space: nowrap;
         overflow: hidden;
+        transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, color 0.15s ease;
+      }
+
+      .status-indicator:hover {
+        background: rgba(255,255,255,0.1);
+        border-color: var(--border-secondary);
+        color: var(--text-primary);
+        box-shadow: 0 8px 18px rgba(0,0,0,0.18);
       }
 
       .status-dot {
@@ -431,6 +440,14 @@
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
         font-variant-numeric: tabular-nums;
         user-select: none;
+        transition: transform 0.18s ease, border-color 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease;
+      }
+
+      .nav-utc.is-toggling {
+        transform: scale(0.97);
+        border-color: rgba(59,130,246,0.55);
+        background: rgba(59,130,246,0.08);
+        box-shadow: 0 0 0 2px rgba(59,130,246,0.18) inset;
       }
 
       .sidebar-utc {
@@ -469,7 +486,7 @@
         letter-spacing: 0.02em;
         color: var(--text-primary);
         white-space: nowrap;
-        transition: font-size 0.2s ease;
+        transition: font-size 0.2s ease, opacity 0.18s ease, transform 0.18s ease;
       }
 
       .nav-utc-time.is-12h {
@@ -887,6 +904,26 @@
 
       /* Table */
       .table-container { overflow-x: auto; }
+      #oracle-logs-table {
+        max-height: 560px;
+        overflow: auto;
+        scrollbar-width: thin;
+        -ms-overflow-style: auto;
+      }
+      #oracle-logs-table::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+      }
+      #oracle-logs-table::-webkit-scrollbar-track {
+        background: rgba(255,255,255,0.04);
+      }
+      #oracle-logs-table::-webkit-scrollbar-thumb {
+        background: rgba(148,163,184,0.45);
+        border-radius: 999px;
+      }
+      #oracle-logs-table::-webkit-scrollbar-thumb:hover {
+        background: rgba(148,163,184,0.65);
+      }
       table { width: 100%; border-collapse: collapse; }
 
       th {
@@ -1299,15 +1336,6 @@
         .main-content { margin-left: 0; }
         .stats-grid, .top-today-grid { grid-template-columns: repeat(2, 1fr); }
         .charts-grid { grid-template-columns: 1fr; }
-        .store-metrics-row {
-          grid-template-columns: 110px 1fr;
-        }
-        .store-metrics-values {
-          grid-column: 1 / -1;
-          justify-items: start;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          width: 100%;
-        }
         .mobile-toolbar { display: block; }
       }
 
@@ -1319,8 +1347,6 @@
         .mobile-toolbar .btn { width: 100%; justify-content: flex-start; }
         .mini-ratio-chart { grid-template-columns: 1fr; }
         .donut-wrap { margin: 0 auto; }
-        .store-metrics-row { grid-template-columns: 1fr; }
-        .store-metrics-name { margin-bottom: 2px; }
       }
 
       /* Modal */
@@ -1588,58 +1614,6 @@
       .donut-name { font-size: 12px; color: var(--text-secondary); }
       .donut-count { font-size: 12px; font-weight: 600; color: var(--text-primary); }
       .donut-pct { font-size: 11px; color: var(--text-muted); }
-      .store-metrics-summary {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        margin-bottom: 12px;
-      }
-      .store-metrics-grid {
-        display: grid;
-        gap: 10px;
-      }
-      .store-metrics-row {
-        display: grid;
-        grid-template-columns: 120px 1fr 180px;
-        align-items: center;
-        gap: 10px;
-        padding: 10px;
-        border: 1px solid var(--border-primary);
-        border-radius: 8px;
-        background: rgba(255,255,255,0.02);
-      }
-      .store-metrics-name {
-        font-size: 12px;
-        font-weight: 600;
-        color: var(--text-secondary);
-      }
-      .store-metrics-bars {
-        display: grid;
-        gap: 6px;
-      }
-      .store-metrics-bar-track {
-        height: 8px;
-        border-radius: 999px;
-        background: var(--bg-tertiary);
-        overflow: hidden;
-      }
-      .store-metrics-bar {
-        height: 100%;
-        border-radius: inherit;
-      }
-      .store-metrics-bar.users {
-        background: rgba(59,130,246,0.8);
-      }
-      .store-metrics-bar.reviews {
-        background: rgba(168,85,247,0.8);
-      }
-      .store-metrics-values {
-        display: grid;
-        justify-items: end;
-        gap: 3px;
-        font-size: 11px;
-        color: var(--text-muted);
-      }
       .action-buttons-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -1671,6 +1645,29 @@
         color: var(--text-secondary);
         margin-bottom: 8px;
       }
+      .infra-button-grid .btn {
+        border: 1px solid rgba(148,163,184,0.32);
+        background: rgba(30,41,59,0.42);
+        color: #e2e8f0;
+        min-height: 42px;
+        font-weight: 700;
+        letter-spacing: 0.01em;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+      }
+      .infra-button-grid .btn:hover {
+        background: rgba(51,65,85,0.7);
+        border-color: rgba(148,163,184,0.58);
+        color: #f8fafc;
+        box-shadow: 0 8px 18px rgba(0,0,0,0.22);
+      }
+      #infra-link-cloudflare { border-color: rgba(14,165,233,0.42); }
+      #infra-link-uptime { border-color: rgba(34,197,94,0.42); }
+      #infra-link-github { border-color: rgba(148,163,184,0.45); }
+      #infra-link-sheets { border-color: rgba(22,163,74,0.44); }
+      #infra-link-figma { border-color: rgba(249,115,22,0.42); }
+      #infra-link-chrome-dev, #infra-link-chrome-store { border-color: rgba(59,130,246,0.46); }
+      #infra-link-firefox-dev, #infra-link-firefox-store { border-color: rgba(245,158,11,0.46); }
+      #infra-link-edge-dev, #infra-link-edge-store { border-color: rgba(6,182,212,0.46); }
       .danger-help-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -2181,18 +2178,6 @@
                 <div class="stat-value" id="stat-downloads">--</div>
                 <div class="stat-subtext">All time</div>
               </div>
-              <div class="stat-card" data-tooltip="Percentage of successful downloads" data-tooltip-position="bottom">
-                <div class="stat-header">
-                  <span class="stat-label">Success Rate</span>
-                  <div class="stat-icon yellow">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
-                    </svg>
-                  </div>
-                </div>
-                <div class="stat-value" id="stat-rate">--</div>
-                <div class="stat-subtext">Overall</div>
-              </div>
               <div class="stat-card" data-tooltip="Downloads completed successfully" data-tooltip-position="bottom">
                 <div class="stat-header">
                   <span class="stat-label">Successful</span>
@@ -2216,6 +2201,52 @@
                 </div>
                 <div class="stat-value" id="stat-fail">--</div>
                 <div class="stat-subtext">All time</div>
+              </div>
+              <div class="stat-card" data-tooltip="Events cancelled before download completion" data-tooltip-position="bottom">
+                <div class="stat-header">
+                  <span class="stat-label">Total Cancelled</span>
+                  <div class="stat-icon yellow">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <line x1="15" y1="9" x2="9" y2="15"></line>
+                      <line x1="9" y1="9" x2="15" y2="15"></line>
+                    </svg>
+                  </div>
+                </div>
+                <div class="stat-value" id="stat-cancelled">--</div>
+                <div class="stat-subtext">All time</div>
+              </div>
+              <div class="stat-card" data-tooltip="Number of unique countries reached by downloads" data-tooltip-position="bottom">
+                <div class="stat-header">
+                  <span class="stat-label">Countries Reached</span>
+                  <div class="stat-icon blue">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <path d="M2 12h20"></path>
+                      <path d="M12 2a15.3 15.3 0 010 20"></path>
+                      <path d="M12 2a15.3 15.3 0 000 20"></path>
+                    </svg>
+                  </div>
+                </div>
+                <div class="stat-value" id="stat-countries-reached">--</div>
+                <div class="stat-subtext">Unique countries</div>
+              </div>
+              <div class="stat-card" data-tooltip="Number of unique languages seen in downloads" data-tooltip-position="bottom">
+                <div class="stat-header">
+                  <span class="stat-label">Languages Reached</span>
+                  <div class="stat-icon purple">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M5 8l6 6"></path>
+                      <path d="M4 14l6-6 2-3"></path>
+                      <path d="M2 5h12"></path>
+                      <path d="M7 2h1"></path>
+                      <path d="M22 22l-5-10-5 10"></path>
+                      <path d="M14 18h6"></path>
+                    </svg>
+                  </div>
+                </div>
+                <div class="stat-value" id="stat-languages-reached">--</div>
+                <div class="stat-subtext">Unique languages</div>
               </div>
               <div class="stat-card" data-tooltip="Total extension users across Chrome, Firefox, and Edge" data-tooltip-position="bottom">
                 <div class="stat-header">
@@ -2507,20 +2538,6 @@
 
             </div>
 
-            <div class="card">
-              <div class="card-header">
-                <div>
-                  <div class="card-title">Store Users & Reviews</div>
-                  <div class="card-subtitle">Auto-updated from browser sync</div>
-                </div>
-              </div>
-              <div class="card-body">
-                <div id="chart-store-metrics">
-                  <div class="loading"><div class="spinner"></div>Loading...</div>
-                </div>
-              </div>
-            </div>
-
             <!-- Daily Downloads Chart -->
             <div class="card">
               <div class="card-header">
@@ -2549,7 +2566,7 @@
               <div class="card-body">
                 <div class="section-block">
                   <div class="section-caption">Core Dashboards</div>
-                  <div class="action-buttons-grid action-buttons-grid-five">
+                  <div class="action-buttons-grid action-buttons-grid-five infra-button-grid">
                     <a href="https://cqd-analytics.adhamhaithameid.workers.dev/" target="_blank" rel="noopener noreferrer"
                       class="btn btn-secondary" id="infra-link-cloudflare">☁️ Cloudflare</a>
                     <a href="http://129.151.233.229:3001/status/cqd" target="_blank" rel="noopener noreferrer" class="btn btn-secondary"
@@ -2564,7 +2581,7 @@
                 </div>
                 <div class="section-block">
                   <div class="section-caption">Browser Developer Dashboards</div>
-                  <div class="action-buttons-grid">
+                  <div class="action-buttons-grid infra-button-grid">
                     <a href="https://chrome.google.com/webstore/devconsole/9fe14497-b35b-4542-9af0-dedfdf6a194c"
                       target="_blank" rel="noopener noreferrer" class="btn btn-secondary" id="infra-link-chrome-dev">🧩 Chrome Dev Dashboard</a>
                     <a href="https://addons.mozilla.org/en-US/firefox/user/19632882/"
@@ -2575,7 +2592,7 @@
                 </div>
                 <div class="section-block">
                   <div class="section-caption">Browser Store Listings</div>
-                  <div class="action-buttons-grid">
+                  <div class="action-buttons-grid infra-button-grid">
                     <a href="https://chromewebstore.google.com/detail/classroom-quick-downloade/oemoongiefmpmomjikcjmkkkhffcbdid"
                       target="_blank" rel="noopener noreferrer" class="btn btn-secondary" id="infra-link-chrome-store">🛍️ Chrome Listing</a>
                     <a href="https://addons.mozilla.org/en-US/firefox/addon/classroom-quick-downloader/"
@@ -3298,6 +3315,11 @@
         updateOracleUtcClock();
         setInterval(updateOracleUtcClock, 1000);
         wrap.addEventListener('click', function() {
+          wrap.classList.remove('is-toggling');
+          // Trigger the click transition reliably across repeated clicks.
+          void wrap.offsetWidth;
+          wrap.classList.add('is-toggling');
+          setTimeout(function() { wrap.classList.remove('is-toggling'); }, 180);
           oracleClockIs24 = !oracleClockIs24;
           localStorage.setItem('oracle_clock_24h', oracleClockIs24 ? 'true' : 'false');
           updateOracleUtcClock();
@@ -3336,6 +3358,16 @@
         if (value === null || value === undefined || value === "") return null;
         var n = Number(value);
         return Number.isFinite(n) ? n : null;
+      }
+
+      function countUniqueMetricKeys(metricMap) {
+        var src = metricMap || {};
+        return Object.keys(src).filter(function(key) {
+          var trimmed = String(key || '').trim();
+          if (!trimmed) return false;
+          var val = Number(src[key] || 0);
+          return Number.isFinite(val) && val > 0;
+        }).length;
       }
 
       function parseApproxCountText(value) {
@@ -3473,57 +3505,13 @@
         if (reviewsEl) reviewsEl.textContent = reviewsValue === null ? '--' : fmtNumber(reviewsValue);
       }
 
-      function renderStoreMetricsChart(summary) {
-        var container = document.getElementById('chart-store-metrics');
-        if (!container) return;
-        var rows = summary.browsers || [];
-        if (!rows.length) {
-          container.innerHTML = '<div class="empty-state">No deployment sync data</div>';
-          return;
-        }
-
-        var maxValue = rows.reduce(function(maxSeen, row) {
-          return Math.max(maxSeen, row.usersCount || 0, row.reviewsCount || 0);
-        }, 0);
-        if (maxValue <= 0) maxValue = 1;
-
-        var html = '<div class="store-metrics-summary">';
-        html += '<span class="pill">Total users: ' + escapeHtml(fmtNumber(summary.usersTotal || 0)) + '</span>';
-        html += '<span class="pill">Total reviews: ' + escapeHtml(fmtNumber(summary.reviewsTotal || 0)) + '</span>';
-        if ((summary.lastSyncedAtUtc || 0) > 0) {
-          html += '<span class="pill">Last sync (UTC): ' + escapeHtml(fmtUtcDateTimeFromMs(summary.lastSyncedAtUtc)) + '</span>';
-        }
-        html += '</div>';
-
-        html += '<div class="store-metrics-grid">';
-        rows.forEach(function(row) {
-          var usersPct = ((row.usersCount || 0) / maxValue) * 100;
-          var reviewsPct = ((row.reviewsCount || 0) / maxValue) * 100;
-          html += '<div class="store-metrics-row">';
-          html += '<div class="store-metrics-name">' + escapeHtml(row.name || row.key || '-') + '</div>';
-          html += '<div class="store-metrics-bars">';
-          html += '<div class="store-metrics-bar-track"><div class="store-metrics-bar users" style="width:' + usersPct.toFixed(2) + '%"></div></div>';
-          html += '<div class="store-metrics-bar-track"><div class="store-metrics-bar reviews" style="width:' + reviewsPct.toFixed(2) + '%"></div></div>';
-          html += '</div>';
-          html += '<div class="store-metrics-values"><span>Users ' + escapeHtml(fmtNumber(row.usersCount || 0)) + '</span><span>Reviews ' + escapeHtml(fmtNumber(row.reviewsCount || 0)) + '</span></div>';
-          html += '</div>';
-        });
-        html += '</div>';
-        container.innerHTML = html;
-      }
-
       async function loadDeploymentStoreMetrics() {
         try {
           var payload = await fetchJSON('/api/admin/deployments/targets');
           var metrics = normalizeDeploymentStoreMetrics(payload || {});
           renderOverviewStoreMetrics(metrics);
-          renderStoreMetricsChart(metrics);
         } catch (_) {
           renderOverviewStoreMetrics({ usersTotal: null, reviewsTotal: null });
-          var container = document.getElementById('chart-store-metrics');
-          if (container) {
-            container.innerHTML = '<div class="empty-state empty-state-danger">Failed to load store metrics</div>';
-          }
         }
       }
 
@@ -3942,14 +3930,23 @@
       async function loadOverview() {
         try {
           var data = await fetchJSON("/api/stats/summary");
+          var statusLabel = (data.status || "unknown");
+          var statusLabelTitle = statusLabel.charAt(0).toUpperCase() + statusLabel.slice(1);
           document.getElementById("sidebar-status").className = "status-dot " + 
-            (data.status === "online" ? "" : data.status === "stale" ? "warning" : "error");
+            (statusLabel === "online" ? "" : statusLabel === "stale" ? "warning" : "error");
           document.getElementById("sidebar-status-text").textContent = 
-            (data.status || "Unknown").charAt(0).toUpperCase() + (data.status || "unknown").slice(1);
+            statusLabelTitle;
+          var statusIndicatorEl = document.getElementById("status-indicator");
+          if (statusIndicatorEl) {
+            var statusFlags = Array.isArray(data.flags) && data.flags.length ? (" Flags: " + data.flags.join(", ")) : "";
+            statusIndicatorEl.setAttribute("data-tooltip", "Backend status: " + statusLabelTitle + "." + statusFlags);
+          }
           document.getElementById("stat-downloads").textContent = fmtNumber(data.totalDownloads);
           document.getElementById("stat-success").textContent = fmtNumber(data.totalSuccess);
           document.getElementById("stat-fail").textContent = fmtNumber(data.totalFail);
-          document.getElementById("stat-rate").textContent = fmtPct(data.successRate || 0);
+          document.getElementById("stat-cancelled").textContent = fmtNumber((data.totals && data.totals.totalCancelled) || 0);
+          document.getElementById("stat-countries-reached").textContent = fmtNumber(countUniqueMetricKeys(data.countries || {}));
+          document.getElementById("stat-languages-reached").textContent = fmtNumber(countUniqueMetricKeys(data.languages || {}));
           var summaryTs = inferSummaryDataTimestampMs(data);
           document.getElementById("last-updated").textContent = "Data updated (UTC): " + (summaryTs ? fmtUtcDateTimeFromMs(summaryTs) : "n/a");
 
@@ -3963,6 +3960,10 @@
         } catch (e) {
           document.getElementById("sidebar-status").className = "status-dot error";
           document.getElementById("sidebar-status-text").textContent = "Error";
+          var statusIndicatorError = document.getElementById("status-indicator");
+          if (statusIndicatorError) {
+            statusIndicatorError.setAttribute("data-tooltip", "Backend status: Error. Last overview request failed.");
+          }
         }
       }
 
@@ -4423,7 +4424,6 @@
         } catch (e) {
           dailyContainer.innerHTML = '<div class="empty-state empty-state-danger">Failed</div>';
         }
-        await loadDeploymentStoreMetrics();
       }
 
       // Comparison feature
