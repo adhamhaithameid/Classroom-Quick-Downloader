@@ -816,8 +816,8 @@ async function handleVerifyDangerPassword(request: Request, env: WorkerEnv): Pro
 
   try {
     const { password } = await request.json() as { password: string };
-    
-    if (!password || !timingSafeStringEqual(password, env.DANGER_PASSWORD)) {
+
+    if (!password || !env.DANGER_PASSWORD || !timingSafeStringEqual(password, env.DANGER_PASSWORD)) {
       // Record failed attempt
       await stub.fetch(new Request("https://do/auth/login-attempt", {
         method: "POST",
