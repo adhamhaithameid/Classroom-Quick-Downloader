@@ -9,7 +9,14 @@ import (
 	"time"
 )
 
+func resetDeployStatusState(t *testing.T) {
+	t.Helper()
+	resetDeployStatusCache()
+	t.Cleanup(resetDeployStatusCache)
+}
+
 func TestDeployStatusHandler_ReturnsJSON(t *testing.T) {
+	resetDeployStatusState(t)
 	// Arrange
 	handler := DeployStatusHandler()
 	req := httptest.NewRequest(http.MethodGet, "/api/deploy-status", nil)
@@ -41,6 +48,7 @@ func TestDeployStatusHandler_ReturnsJSON(t *testing.T) {
 }
 
 func TestDeployStatusHandler_NoCacheHeaders(t *testing.T) {
+	resetDeployStatusState(t)
 	// Arrange
 	handler := DeployStatusHandler()
 	req := httptest.NewRequest(http.MethodGet, "/api/deploy-status", nil)
@@ -56,6 +64,7 @@ func TestDeployStatusHandler_NoCacheHeaders(t *testing.T) {
 }
 
 func TestGetDeployStatus_UsesGitCommitEnv(t *testing.T) {
+	resetDeployStatusState(t)
 	// Arrange
 	testCommit := "abc123def456789"
 	os.Setenv("GIT_COMMIT", testCommit)
@@ -74,6 +83,7 @@ func TestGetDeployStatus_UsesGitCommitEnv(t *testing.T) {
 }
 
 func TestGetDeployStatus_ShortCommitUnchanged(t *testing.T) {
+	resetDeployStatusState(t)
 	// Arrange — commit shorter than 7 chars should not be truncated
 	shortCommit := "abc12"
 	os.Setenv("GIT_COMMIT", shortCommit)
@@ -92,6 +102,7 @@ func TestGetDeployStatus_ShortCommitUnchanged(t *testing.T) {
 }
 
 func TestGetDeployStatus_StaleDetection(t *testing.T) {
+	resetDeployStatusState(t)
 	// Arrange — set DEPLOY_TIME to >24h ago
 	oldTime := time.Now().Add(-25 * time.Hour).UTC().Format(time.RFC3339)
 	os.Setenv("DEPLOY_TIME", oldTime)
@@ -110,6 +121,7 @@ func TestGetDeployStatus_StaleDetection(t *testing.T) {
 }
 
 func TestGetDeployStatus_NotStaleWhenRecent(t *testing.T) {
+	resetDeployStatusState(t)
 	// Arrange — set DEPLOY_TIME to recent
 	recentTime := time.Now().Add(-1 * time.Hour).UTC().Format(time.RFC3339)
 	os.Setenv("DEPLOY_TIME", recentTime)
@@ -125,6 +137,7 @@ func TestGetDeployStatus_NotStaleWhenRecent(t *testing.T) {
 }
 
 func TestGetDeployStatus_DefaultsWithoutEnvVars(t *testing.T) {
+	resetDeployStatusState(t)
 	// Arrange — clear all relevant env vars
 	os.Unsetenv("GIT_COMMIT")
 	os.Unsetenv("DEPLOY_TIME")
@@ -142,5 +155,47 @@ func TestGetDeployStatus_DefaultsWithoutEnvVars(t *testing.T) {
 	// deployed_at should be valid RFC3339
 	if _, err := time.Parse(time.RFC3339, status.DeployedAt); err != nil {
 		t.Fatalf("deployed_at is not valid RFC3339: %q", status.DeployedAt)
+	}
+}
+
+func TestGetDeployStatus_UsesCachedValueWhenNoExplicitEnv(t *testing.T) {
+	resetDeployStatusState(t)
+	os.Unsetenv("GIT_COMMIT")
+	os.Unsetenv("DEPLOY_TIME")
+
+	deployStatusRuntime.Lock()
+	deployStatusRuntime.cached = DeployStatus{
+		Commit:     "cached1",
+		CommitFull: "cached123",
+		Branch:     "cached-branch",
+		DeployedAt: time.Now().UTC().Format(time.RFC3339),
+	}
+	deployStatusRuntime.expiresAt = time.Now().Add(30 * time.Second)
+	deployStatusRuntime.Unlock()
+
+	got := getDeployStatus()
+	if got.Commit != "cached1" || got.CommitFull != "cached123" {
+		t.Fatalf("expected cached deploy status, got commit=%q full=%q", got.Commit, got.CommitFull)
+	}
+}
+
+func TestGetDeployStatus_ExplicitEnvBypassesCachedValue(t *testing.T) {
+	resetDeployStatusState(t)
+	os.Setenv("GIT_COMMIT", "2222222bbbbbbb")
+	defer os.Unsetenv("GIT_COMMIT")
+
+	deployStatusRuntime.Lock()
+	deployStatusRuntime.cached = DeployStatus{
+		Commit:     "cached1",
+		CommitFull: "cached123",
+		Branch:     "cached-branch",
+		DeployedAt: time.Now().UTC().Format(time.RFC3339),
+	}
+	deployStatusRuntime.expiresAt = time.Now().Add(30 * time.Second)
+	deployStatusRuntime.Unlock()
+
+	got := getDeployStatus()
+	if got.CommitFull != "2222222bbbbbbb" {
+		t.Fatalf("expected env-backed deploy status to bypass cache, got %q", got.CommitFull)
 	}
 }

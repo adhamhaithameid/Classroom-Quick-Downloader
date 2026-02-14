@@ -3,11 +3,13 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -20,6 +22,19 @@ type DeployStatus struct {
 	Message    string `json:"message,omitempty"`
 	Stale      bool   `json:"stale"`
 }
+
+var deployStatusRuntime = struct {
+	sync.Mutex
+	cached    DeployStatus
+	expiresAt time.Time
+}{
+	cached: DeployStatus{},
+}
+
+const (
+	deployStatusCacheTTL  = 30 * time.Second
+	gitCommandTimeoutEach = 800 * time.Millisecond
+)
 
 // DeployStatusHandler returns the current deployment status
 func DeployStatusHandler() http.HandlerFunc {
@@ -39,11 +54,36 @@ func DeployStatusHandler() http.HandlerFunc {
 }
 
 func getDeployStatus() DeployStatus {
+	// When explicit deployment metadata is present, compute directly from env.
+	// This avoids stale cache interactions in dynamic test and rollout flows.
+	if strings.TrimSpace(os.Getenv("GIT_COMMIT")) != "" || strings.TrimSpace(os.Getenv("DEPLOY_TIME")) != "" {
+		return collectDeployStatus(time.Now())
+	}
+
+	now := time.Now()
+	deployStatusRuntime.Lock()
+	if !deployStatusRuntime.expiresAt.IsZero() && now.Before(deployStatusRuntime.expiresAt) {
+		cached := deployStatusRuntime.cached
+		deployStatusRuntime.Unlock()
+		return cached
+	}
+	deployStatusRuntime.Unlock()
+
+	status := collectDeployStatus(now)
+
+	deployStatusRuntime.Lock()
+	deployStatusRuntime.cached = status
+	deployStatusRuntime.expiresAt = now.Add(deployStatusCacheTTL)
+	deployStatusRuntime.Unlock()
+	return status
+}
+
+func collectDeployStatus(now time.Time) DeployStatus {
 	status := DeployStatus{
 		Commit:     "unknown",
 		CommitFull: "unknown",
 		Branch:     "main",
-		DeployedAt: time.Now().UTC().Format(time.RFC3339),
+		DeployedAt: now.UTC().Format(time.RFC3339),
 		Stale:      false,
 	}
 
@@ -57,8 +97,7 @@ func getDeployStatus() DeployStatus {
 		}
 	} else {
 		// Fall back to git command
-		if out, err := exec.Command("git", "rev-parse", "HEAD").Output(); err == nil {
-			full := strings.TrimSpace(string(out))
+		if full, err := runGitCommand("rev-parse", "HEAD"); err == nil {
 			status.CommitFull = full
 			if len(full) > 7 {
 				status.Commit = full[:7]
@@ -69,13 +108,13 @@ func getDeployStatus() DeployStatus {
 	}
 
 	// Get commit message
-	if out, err := exec.Command("git", "log", "-1", "--pretty=%s").Output(); err == nil {
-		status.Message = strings.TrimSpace(string(out))
+	if message, err := runGitCommand("log", "-1", "--pretty=%s"); err == nil {
+		status.Message = message
 	}
 
 	// Get branch
-	if out, err := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD").Output(); err == nil {
-		status.Branch = strings.TrimSpace(string(out))
+	if branch, err := runGitCommand("rev-parse", "--abbrev-ref", "HEAD"); err == nil {
+		status.Branch = branch
 	}
 
 	// Check deploy time from environment or file
@@ -91,4 +130,21 @@ func getDeployStatus() DeployStatus {
 	}
 
 	return status
+}
+
+func runGitCommand(args ...string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), gitCommandTimeoutEach)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, "git", args...).Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
+func resetDeployStatusCache() {
+	deployStatusRuntime.Lock()
+	deployStatusRuntime.cached = DeployStatus{}
+	deployStatusRuntime.expiresAt = time.Time{}
+	deployStatusRuntime.Unlock()
 }
