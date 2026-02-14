@@ -247,6 +247,8 @@ describe("Worker security helpers", () => {
     const token = await createSessionToken("secret", "1.2.3.4");
     expect(await verifySessionToken(token, "secret", "1.2.3.4")).toBe(true);
     expect(await verifySessionToken(token + "x", "secret", "1.2.3.4")).toBe(false);
+    expect(await verifySessionToken(token, "secret", "1.2.3.4", "Mozilla/5.0", "optional")).toBe(true);
+    expect(await verifySessionToken(token, "secret", "1.2.3.4", "Mozilla/5.0", "strict")).toBe(false);
 
     spy.mockReturnValue(1_000_000 + 2 * 60 * 60 * 1000);
     expect(await verifySessionToken(token, "secret", "1.2.3.4")).toBe(false);

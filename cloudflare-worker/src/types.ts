@@ -328,6 +328,21 @@ export interface Env {
    * Use for LAN development only. Production should never set this.
    */
   ALLOW_INSECURE_COOKIES?: string;
+  /**
+   * Optional session replay hardening mode: "off" | "optional" | "strict".
+   * strict enforces coarse client fingerprint checks (IP prefix + UA hash).
+   */
+  SESSION_BINDING_MODE?: string;
+  /**
+   * Optional comma-separated origin allowlist for protected CORS routes.
+   * Example: "https://oracle.example.com,https://admin.example.com"
+   */
+  CORS_ALLOWED_ORIGINS?: string;
+  /**
+   * Optional comma-separated strict origin allowlist for admin/debug routes.
+   * Falls back to CORS_ALLOWED_ORIGINS when not set.
+   */
+  ADMIN_CORS_ALLOWED_ORIGINS?: string;
 }
 
 /**

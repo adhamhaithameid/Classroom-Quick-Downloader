@@ -11,9 +11,12 @@ const COOKIE_NAME = "cqd_session";
 
 interface SessionPayload {
   ip: string;
+  fp?: string;
   exp: number; // Expiration timestamp
   iat: number; // Issued at timestamp
 }
+
+type SessionBindingMode = "off" | "optional" | "strict";
 
 function getDashboardSecret(env: WorkerEnv): string | null {
   // Security hardening: require a dedicated dashboard secret.
@@ -33,11 +36,78 @@ function timingSafeStringEqual(a: string, b: string): boolean {
 }
 
 export async function createSessionToken(secret: string, ip: string): Promise<string> {
+  return createSessionTokenWithBinding(secret, ip, "", "off");
+}
+
+function normalizeSessionBindingMode(raw?: string): SessionBindingMode {
+  const mode = (raw || "").trim().toLowerCase();
+  if (mode === "strict") return "strict";
+  if (mode === "optional") return "optional";
+  return "off";
+}
+
+function sessionBindingModeFromEnv(env: WorkerEnv): SessionBindingMode {
+  return normalizeSessionBindingMode(env.SESSION_BINDING_MODE);
+}
+
+function normalizeIPv4Prefix(ip: string): string | null {
+  const parts = ip.split(".");
+  if (parts.length !== 4) return null;
+  const octets: number[] = [];
+  for (const part of parts) {
+    if (!/^\d{1,3}$/.test(part)) return null;
+    const n = Number(part);
+    if (!Number.isInteger(n) || n < 0 || n > 255) return null;
+    octets.push(n);
+  }
+  return `${octets[0]}.${octets[1]}.${octets[2]}.0/24`;
+}
+
+function normalizeIPv6Prefix(ip: string): string | null {
+  const cleaned = ip.trim().toLowerCase().replace(/^\[/, "").replace(/\]$/, "");
+  if (!cleaned.includes(":")) return null;
+  const segments = cleaned.split(":").filter((seg) => seg.length > 0).slice(0, 4);
+  if (!segments.length) return null;
+  return `${segments.join(":")}::/64`;
+}
+
+function coarseIPPrefix(ip: string): string {
+  const v4 = normalizeIPv4Prefix(ip.trim());
+  if (v4) return v4;
+  const v6 = normalizeIPv6Prefix(ip.trim());
+  if (v6) return v6;
+  return "unknown";
+}
+
+async function userAgentFingerprintHash(userAgent: string): Promise<string> {
+  const value = userAgent.trim();
+  if (!value) return "ua:none";
+  const bytes = new TextEncoder().encode(value);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  const hash = btoa(String.fromCharCode(...new Uint8Array(digest))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+  return `ua:${hash.slice(0, 24)}`;
+}
+
+async function buildSessionFingerprint(clientIp: string, userAgent: string): Promise<string> {
+  const prefix = coarseIPPrefix(clientIp);
+  const uaHash = await userAgentFingerprintHash(userAgent);
+  return `${prefix}|${uaHash}`;
+}
+
+async function createSessionTokenWithBinding(
+  secret: string,
+  ip: string,
+  userAgent: string,
+  bindingMode: SessionBindingMode,
+): Promise<string> {
   const payload: SessionPayload = {
     ip,
     exp: Date.now() + SESSION_DURATION_MS,
     iat: Date.now(),
   };
+  if (bindingMode !== "off") {
+    payload.fp = await buildSessionFingerprint(ip, userAgent);
+  }
   
   const payloadB64 = btoa(JSON.stringify(payload));
   const encoder = new TextEncoder();
@@ -59,7 +129,13 @@ export async function createSessionToken(secret: string, ip: string): Promise<st
   return `${payloadB64}.${sigB64}`;
 }
 
-export async function verifySessionToken(token: string, secret: string, _clientIp: string): Promise<boolean> {
+export async function verifySessionToken(
+  token: string,
+  secret: string,
+  clientIp: string,
+  clientUserAgent = "",
+  bindingMode: SessionBindingMode = "off",
+): Promise<boolean> {
   try {
     const [payloadB64, sigB64] = token.split(".");
     if (!payloadB64 || !sigB64) return false;
@@ -87,10 +163,22 @@ export async function verifySessionToken(token: string, secret: string, _clientI
     
     // Check expiration
     if (Date.now() > payload.exp) return false;
-    
-    // Optional: Check IP binding (disabled for now to allow mobile switching)
-    // if (payload.ip !== clientIp) return false;
-    
+
+    if (bindingMode === "off") {
+      return true;
+    }
+
+    if (!payload.fp) {
+      return bindingMode !== "strict";
+    }
+
+    const expectedFingerprint = await buildSessionFingerprint(clientIp, clientUserAgent);
+    if (timingSafeStringEqual(payload.fp, expectedFingerprint)) {
+      return true;
+    }
+    if (bindingMode === "strict") {
+      return false;
+    }
     return true;
   } catch {
     return false;
@@ -209,25 +297,117 @@ function getDownloadsStub(env: WorkerEnv): DurableObjectStub {
 
 // --- CORS helpers -----------------------------------------------------------
 
-function corsHeaders(request: Request): Headers {
-  const origin = request.headers.get("Origin") || "*";
+function parseAllowedOrigins(raw: string | undefined): Set<string> {
+  const allowed = new Set<string>();
+  if (!raw) return allowed;
+  for (const item of raw.split(",")) {
+    const candidate = item.trim();
+    if (!candidate) continue;
+    try {
+      const origin = new URL(candidate).origin;
+      if (origin !== "null") {
+        allowed.add(origin);
+      }
+    } catch {
+      // Ignore malformed values to fail safely.
+    }
+  }
+  return allowed;
+}
 
-  // If you want to lock it down later, replace "*" with a whitelist check.
+function isPublicCorsRoute(pathname: string): boolean {
+  return pathname === "/config" || pathname === "/health" || pathname === "/pipeline-health" || pathname === "/changelog" || pathname === "/track";
+}
+
+function isAdminCorsRoute(pathname: string): boolean {
+  return pathname.startsWith("/admin/") || pathname.startsWith("/debug/");
+}
+
+function isProtectedCorsRoute(pathname: string): boolean {
+  return pathname === "/stats" || pathname === "/auth/verify-danger" || isAdminCorsRoute(pathname);
+}
+
+function isKnownCorsRoute(pathname: string): boolean {
+  return isPublicCorsRoute(pathname) || isProtectedCorsRoute(pathname);
+}
+
+function normalizeRequestOrigin(request: Request): string | null {
+  try {
+    return new URL(request.url).origin;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeHeaderOrigin(rawOrigin: string | null): string | null {
+  if (!rawOrigin) return null;
+  try {
+    const origin = new URL(rawOrigin).origin;
+    return origin === "null" ? null : origin;
+  } catch {
+    return null;
+  }
+}
+
+function isCorsOriginAllowedForPath(request: Request, env: WorkerEnv, pathname: string): boolean {
+  const headerOrigin = normalizeHeaderOrigin(request.headers.get("Origin"));
+  if (!headerOrigin) return true;
+  const requestOrigin = normalizeRequestOrigin(request);
+  if (requestOrigin && headerOrigin === requestOrigin) {
+    return true;
+  }
+  if (isAdminCorsRoute(pathname)) {
+    const adminAllowlist = parseAllowedOrigins(env.ADMIN_CORS_ALLOWED_ORIGINS);
+    return adminAllowlist.has(headerOrigin);
+  }
+  if (pathname === "/stats" || pathname === "/auth/verify-danger") {
+    const protectedAllowlist = parseAllowedOrigins(env.CORS_ALLOWED_ORIGINS);
+    return protectedAllowlist.has(headerOrigin);
+  }
+  return false;
+}
+
+function corsAllowedHeadersForPath(pathname: string): string {
+  if (isPublicCorsRoute(pathname)) {
+    return "Content-Type";
+  }
+  if (pathname === "/stats" || isAdminCorsRoute(pathname)) {
+    return "Content-Type, X-Admin-Secret";
+  }
+  return "Content-Type";
+}
+
+function corsHeaders(request: Request, env: WorkerEnv): Headers {
+  const pathname = new URL(request.url).pathname;
+  const headerOrigin = normalizeHeaderOrigin(request.headers.get("Origin"));
   const h = new Headers();
-  h.set("Access-Control-Allow-Origin", origin);
-  h.set("Vary", "Origin");
+
+  if (isPublicCorsRoute(pathname)) {
+    h.set("Access-Control-Allow-Origin", "*");
+    h.set("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+    h.set("Access-Control-Allow-Headers", corsAllowedHeadersForPath(pathname));
+    h.set("Access-Control-Max-Age", "86400");
+    return h;
+  }
+
+  if (!isKnownCorsRoute(pathname)) {
+    return h;
+  }
+
+  if (headerOrigin && isCorsOriginAllowedForPath(request, env, pathname)) {
+    h.set("Access-Control-Allow-Origin", headerOrigin);
+    h.set("Vary", "Origin");
+  }
+
   h.set("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-  h.set(
-    "Access-Control-Allow-Headers",
-    "Content-Type, X-Admin-Secret",
-  );
+  h.set("Access-Control-Allow-Headers", corsAllowedHeadersForPath(pathname));
   h.set("Access-Control-Max-Age", "86400");
   return h;
 }
 
-function withCors(request: Request, res: Response): Response {
+function withCors(request: Request, res: Response, env: WorkerEnv): Response {
   const headers = new Headers(res.headers);
-  const ch = corsHeaders(request);
+  const ch = corsHeaders(request, env);
   ch.forEach((v, k) => headers.set(k, v));
 
   return new Response(res.body, {
@@ -237,8 +417,15 @@ function withCors(request: Request, res: Response): Response {
   });
 }
 
-function handleOptions(request: Request): Response {
-  return new Response(null, { status: 204, headers: corsHeaders(request) });
+function handleOptions(request: Request, env: WorkerEnv): Response {
+  const pathname = new URL(request.url).pathname;
+  if (!isKnownCorsRoute(pathname)) {
+    return new Response("CORS not enabled for route", { status: 403 });
+  }
+  if (isProtectedCorsRoute(pathname) && !isCorsOriginAllowedForPath(request, env, pathname)) {
+    return new Response("CORS origin not allowed", { status: 403 });
+  }
+  return new Response(null, { status: 204, headers: corsHeaders(request, env) });
 }
 
 // ---------------------------------------------------------------------------
@@ -248,13 +435,19 @@ function handleOptions(request: Request): Response {
 async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
   const method = request.method.toUpperCase();
   const clientIp = request.headers.get("CF-Connecting-IP") || "unknown";
+  const userAgent = request.headers.get("User-Agent") || "";
+  const sessionBindingMode = sessionBindingModeFromEnv(env);
   const stub = getDownloadsStub(env);
   const dashboardSecret = getDashboardSecret(env);
 
   // GET: Show login page OR redirect to dashboard if valid session
   if (method === "GET") {
     const sessionToken = getSessionCookie(request);
-    if (sessionToken && dashboardSecret && await verifySessionToken(sessionToken, dashboardSecret, clientIp)) {
+    if (
+      sessionToken &&
+      dashboardSecret &&
+      await verifySessionToken(sessionToken, dashboardSecret, clientIp, userAgent, sessionBindingMode)
+    ) {
       // Valid session - redirect to dashboard
       return Response.redirect(new URL("/dashboard", request.url).toString(), 302);
     }
@@ -327,7 +520,7 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
     const password = (form.get("password") || "").toString();
 
     // Validate password
-    if (password !== dashboardSecret) {
+    if (!timingSafeStringEqual(password, dashboardSecret)) {
       const rateLimitRes = await stub.fetch(rateLimitReq);
       const rateLimitData = await rateLimitRes.json() as {
         allowed: boolean;
@@ -362,7 +555,7 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
     await stub.fetch(successReq);
 
     // Create session token and set cookie
-    const sessionToken = await createSessionToken(dashboardSecret, clientIp);
+    const sessionToken = await createSessionTokenWithBinding(dashboardSecret, clientIp, userAgent, sessionBindingMode);
 
     // Redirect to dashboard with session cookie
     const loginUrl = new URL(request.url);
@@ -384,10 +577,16 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
 
 async function handleDashboard(request: Request, env: WorkerEnv): Promise<Response> {
   const clientIp = request.headers.get("CF-Connecting-IP") || "unknown";
+  const userAgent = request.headers.get("User-Agent") || "";
+  const sessionBindingMode = sessionBindingModeFromEnv(env);
   const sessionToken = getSessionCookie(request);
   const dashboardSecret = getDashboardSecret(env);
 
-  if (!dashboardSecret || !sessionToken || !await verifySessionToken(sessionToken, dashboardSecret, clientIp)) {
+  if (
+    !dashboardSecret ||
+    !sessionToken ||
+    !await verifySessionToken(sessionToken, dashboardSecret, clientIp, userAgent, sessionBindingMode)
+  ) {
     // Invalid or missing session - redirect to login
     const logoutUrl = new URL(request.url);
     return new Response(null, {
@@ -464,7 +663,7 @@ async function handleVerifyDangerPassword(request: Request, env: WorkerEnv): Pro
     return withCors(request, new Response(
       JSON.stringify({ ok: false, error: "Rate limit service unavailable. Try again later." }),
       { status: 503, headers: { "content-type": "application/json" } }
-    ));
+    ), env);
   }
   let rateLimitData: { ok: boolean; allowed: boolean; blockedForSeconds?: number };
   try {
@@ -473,7 +672,7 @@ async function handleVerifyDangerPassword(request: Request, env: WorkerEnv): Pro
     return withCors(request, new Response(
       JSON.stringify({ ok: false, error: "Rate limit service unavailable. Try again later." }),
       { status: 503, headers: { "content-type": "application/json" } }
-    ));
+    ), env);
   }
   
   if (!rateLimitData.allowed) {
@@ -484,13 +683,13 @@ async function handleVerifyDangerPassword(request: Request, env: WorkerEnv): Pro
         blockedForSeconds: rateLimitData.blockedForSeconds 
       }),
       { status: 429, headers: { "content-type": "application/json" } }
-    ));
+    ), env);
   }
 
   try {
     const { password } = await request.json() as { password: string };
     
-    if (!password || password !== env.DANGER_PASSWORD) {
+    if (!password || !timingSafeStringEqual(password, env.DANGER_PASSWORD)) {
       // Record failed attempt
       await stub.fetch(new Request("https://do/auth/login-attempt", {
         method: "POST",
@@ -504,7 +703,7 @@ async function handleVerifyDangerPassword(request: Request, env: WorkerEnv): Pro
       return withCors(request, new Response(
         JSON.stringify({ ok: false, error: "Invalid danger password" }),
         { status: 401, headers: { "content-type": "application/json" } }
-      ));
+      ), env);
     }
 
     // Clear attempts on success
@@ -520,12 +719,12 @@ async function handleVerifyDangerPassword(request: Request, env: WorkerEnv): Pro
     return withCors(request, new Response(
       JSON.stringify({ ok: true }),
       { status: 200, headers: { "content-type": "application/json" } }
-    ));
+    ), env);
   } catch {
     return withCors(request, new Response(
       JSON.stringify({ ok: false, error: "Invalid request body" }),
       { status: 400, headers: { "content-type": "application/json" } }
-    ));
+    ), env);
   }
 }
 
@@ -536,6 +735,8 @@ async function handleVerifyDangerPassword(request: Request, env: WorkerEnv): Pro
 
 async function handleProtectedStats(request: Request, env: WorkerEnv): Promise<Response> {
   const clientIp = request.headers.get("CF-Connecting-IP") || "unknown";
+  const userAgent = request.headers.get("User-Agent") || "";
+  const sessionBindingMode = sessionBindingModeFromEnv(env);
   const adminSecret = request.headers.get("X-Admin-Secret");
   const sessionToken = getSessionCookie(request);
   const dashboardSecret = getDashboardSecret(env);
@@ -545,13 +746,13 @@ async function handleProtectedStats(request: Request, env: WorkerEnv): Promise<R
   
   // Check session token (for browser/dashboard access)
   const hasValidSession = !!dashboardSecret && sessionToken &&
-    await verifySessionToken(sessionToken, dashboardSecret, clientIp);
+    await verifySessionToken(sessionToken, dashboardSecret, clientIp, userAgent, sessionBindingMode);
 
   if (!hasValidSecret && !hasValidSession) {
     return withCors(request, new Response(
       JSON.stringify({ ok: false, error: "unauthorized", message: "Valid session or X-Admin-Secret required" }),
       { status: 401, headers: { "content-type": "application/json" } }
-    ));
+    ), env);
   }
 
   return proxyToDO(request, env);
@@ -566,6 +767,8 @@ async function handleProtectedStats(request: Request, env: WorkerEnv): Promise<R
 
 async function handleProtectedAdminEndpoint(request: Request, env: WorkerEnv): Promise<Response> {
   const clientIp = request.headers.get("CF-Connecting-IP") || "unknown";
+  const userAgent = request.headers.get("User-Agent") || "";
+  const sessionBindingMode = sessionBindingModeFromEnv(env);
   const adminSecret = request.headers.get("X-Admin-Secret");
   const sessionToken = getSessionCookie(request);
   const dashboardSecret = getDashboardSecret(env);
@@ -575,13 +778,13 @@ async function handleProtectedAdminEndpoint(request: Request, env: WorkerEnv): P
   
   // Check session token (for browser/dashboard access)
   const hasValidSession = !!dashboardSecret && sessionToken &&
-    await verifySessionToken(sessionToken, dashboardSecret, clientIp);
+    await verifySessionToken(sessionToken, dashboardSecret, clientIp, userAgent, sessionBindingMode);
 
   if (!hasValidSecret && !hasValidSession) {
     return withCors(request, new Response(
       JSON.stringify({ ok: false, error: "unauthorized", message: "Valid session or X-Admin-Secret required" }),
       { status: 401, headers: { "content-type": "application/json" } }
-    ));
+    ), env);
   }
 
   // If session-based auth but no secret header, inject the secret for DO
@@ -607,7 +810,7 @@ async function handleProtectedAdminEndpoint(request: Request, env: WorkerEnv): P
   });
 
   const res = await stub.fetch(newReq);
-  return withCors(request, res);
+  return withCors(request, res, env);
 }
 
 // ---------------------------------------------------------------------------
@@ -636,7 +839,7 @@ async function proxyToDO(request: Request, env: WorkerEnv): Promise<Response> {
   });
 
   const res = await stub.fetch(newReq);
-  return withCors(request, res);
+  return withCors(request, res, env);
 }
 
 export default {
@@ -646,7 +849,18 @@ export default {
 
     // Preflight for all routes
     if (request.method === "OPTIONS") {
-      return handleOptions(request);
+      return handleOptions(request, env);
+    }
+
+    if (isProtectedCorsRoute(pathname) && !isCorsOriginAllowedForPath(request, env, pathname)) {
+      return withCors(
+        request,
+        new Response(
+          JSON.stringify({ ok: false, error: "cors_origin_not_allowed" }),
+          { status: 403, headers: { "content-type": "application/json" } },
+        ),
+        env,
+      );
     }
 
     // Login page
