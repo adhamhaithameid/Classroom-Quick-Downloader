@@ -779,7 +779,7 @@ func TestCriticalStepUpFlow_BindsStepUpToParentSession(t *testing.T) {
 	}
 }
 
-func TestNewsletterSubscriberUpsert_AllowsViewerWithoutStepUp_DeleteStillProtected(t *testing.T) {
+func TestNewsletterSubscriberUpsert_RequiresStepUp(t *testing.T) {
 	resetSessionStore()
 	resetLoginRateStore()
 	stepUpSessionStore.Lock()
@@ -824,8 +824,7 @@ func TestNewsletterSubscriberUpsert_AllowsViewerWithoutStepUp_DeleteStillProtect
 
 	authMW := requireAuth(sqlDB, "viewer-secret", "", false)
 
-	// Upsert should work with viewer auth only (no step-up middleware).
-	upsert := authMW(handlers.NewsletterSubscribersUpsertHandler(sqlDB, nil))
+	upsert := authMW(requireStepUp(sqlDB, "super-secret")(handlers.NewsletterSubscribersUpsertHandler(sqlDB, nil)))
 	upsertReq := httptest.NewRequest(
 		http.MethodPost,
 		"/api/admin/newsletter/subscribers/upsert",
@@ -835,11 +834,10 @@ func TestNewsletterSubscriberUpsert_AllowsViewerWithoutStepUp_DeleteStillProtect
 	upsertReq.AddCookie(sessionCookie)
 	upsertRR := httptest.NewRecorder()
 	upsert.ServeHTTP(upsertRR, upsertReq)
-	if upsertRR.Code != http.StatusOK {
-		t.Fatalf("expected upsert to succeed without step-up, got %d: %s", upsertRR.Code, upsertRR.Body.String())
+	if upsertRR.Code != http.StatusForbidden {
+		t.Fatalf("expected upsert to require step-up and return 403, got %d: %s", upsertRR.Code, upsertRR.Body.String())
 	}
 
-	// Delete remains protected by step-up and should reject viewer-only session.
 	del := authMW(requireStepUp(sqlDB, "super-secret")(handlers.NewsletterSubscribersDeleteHandler(sqlDB, nil)))
 	delReq := httptest.NewRequest(
 		http.MethodPost,
