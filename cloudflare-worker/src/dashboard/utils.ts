@@ -88,7 +88,7 @@ export function quotaToFlag(quota?: QuotaDescriptor): StateTag {
   if (n <= 20_000) return { label: "easy", className: "flag-easy", description: "Way below limits." };
   if (n <= 50_000) return { label: "normal", className: "flag-normal", description: "Comfortable usage." };
   if (n <= 80_000) return { label: "hard", className: "flag-hard", description: "High traffic." };
-  return { label: "critical", className: "flag-fuck", description: "At limits." };
+  return { label: "critical", className: "flag-critical", description: "At limits." };
 }
 
 interface SuccessRateMeta {
