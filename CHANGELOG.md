@@ -3,6 +3,16 @@
 All notable changes to **Classroom Quick Downloader** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+- Oracle Hub v4 reference document at `docs/ORACLE_HUB_V4.md` consolidating:
+  - architecture and reliability model,
+  - security baseline and hardening controls,
+  - observability and feature flags,
+  - admin API map and verification commands.
+- Backend README now links directly to the Oracle Hub v4 reference.
+
 ## [1.3.0] - 2026-02-09
 
 ### Added
@@ -27,4 +37,3 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Tests
 - Added/expanded unit tests for worker security validation and extension flush behavior.
 - Added backend auth rate‑limit tests.
-
