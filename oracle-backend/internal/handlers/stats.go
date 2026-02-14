@@ -89,6 +89,7 @@ func SummaryHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 		ctx := r.Context()
+		now := time.Now().UTC()
 
 		// Initialize maps
 		resp := summaryResponse{
@@ -101,48 +102,27 @@ func SummaryHandler(db *sql.DB) http.HandlerFunc {
 			ErrorReasons: make(map[string]int64),
 		}
 
-		// 1. Load Totals from DB
-		rawTotals, err := loadTotals(ctx, db)
+		rangeName := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("range")))
+		fromStr := strings.TrimSpace(r.URL.Query().Get("from"))
+		toStr := strings.TrimSpace(r.URL.Query().Get("to"))
+		fromTime, toTime, useWindow, err := resolveSummaryWindow(ctx, db, rangeName, fromStr, toStr, now)
 		if err != nil {
-			http.Error(w, "failed to load totals: "+err.Error(), http.StatusInternalServerError)
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		// 2. Parse Raw Totals into Structs (for both Dashboard and Archiver)
-		for key, val := range rawTotals {
-			switch {
-			// Global Counts
-			case key == "totalEvents":
-				resp.Totals.TotalEvents = val
-			case key == "totalDownloads":
-				resp.Totals.TotalDownloads = val
-				resp.TotalDownloads = val // Flat field for Dashboard
-			case key == "totalSuccess":
-				resp.Totals.TotalSuccess = val
-				resp.TotalSuccess = val // Flat field for Dashboard
-			case key == "totalFail":
-				resp.Totals.TotalFail = val
-				resp.TotalFail = val // Flat field for Dashboard
-			// Cancelled count comes from status:cancelled
-			case key == "status:cancelled":
-				resp.Totals.TotalCancelled = val
-
-			// Breakdowns (Parsing "prefix:value" keys)
-			case strings.HasPrefix(key, "browser:"):
-				resp.Browsers[strings.TrimPrefix(key, "browser:")] = val
-			case strings.HasPrefix(key, "os:"):
-				resp.Os[strings.TrimPrefix(key, "os:")] = val
-			case strings.HasPrefix(key, "country:"):
-				resp.Countries[strings.TrimPrefix(key, "country:")] = val
-			case strings.HasPrefix(key, "lang:"):
-				resp.Languages[strings.TrimPrefix(key, "lang:")] = val
-			case strings.HasPrefix(key, "extVer:"):
-				resp.Versions[strings.TrimPrefix(key, "extVer:")] = val
-			case strings.HasPrefix(key, "type:"):
-				resp.Types[strings.TrimPrefix(key, "type:")] = val
-			case strings.HasPrefix(key, "errorType:"):
-				resp.ErrorReasons[strings.TrimPrefix(key, "errorType:")] = val
+		if useWindow {
+			if err := loadWindowTotals(ctx, db, fromTime, toTime, &resp); err != nil {
+				http.Error(w, "failed to load window totals: "+err.Error(), http.StatusInternalServerError)
+				return
 			}
+		} else {
+			rawTotals, err := loadTotals(ctx, db)
+			if err != nil {
+				http.Error(w, "failed to load totals: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+			applyRawTotalsToSummary(rawTotals, &resp)
 		}
 
 		// 3. Calculate Rates
@@ -177,7 +157,7 @@ func SummaryHandler(db *sql.DB) http.HandlerFunc {
 		resp.Status = status
 		resp.Flags = flags
 		resp.OK = true
-		resp.GeneratedAt = time.Now().UnixMilli()
+		resp.GeneratedAt = now.UnixMilli()
 
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(resp)
@@ -336,27 +316,36 @@ func BreakdownHandler(db *sql.DB) http.HandlerFunc {
 		now := time.Now().UTC()
 		fromStr := q.Get("from")
 		toStr := q.Get("to")
+		rangeName := strings.TrimSpace(strings.ToLower(q.Get("range")))
 
 		var fromTime, toTime time.Time
 		var err error
 
-		if fromStr == "" {
-			fromTime = now.AddDate(0, 0, -7)
-		} else {
-			fromTime, err = time.Parse("2006-01-02", fromStr)
+		if rangeName != "" {
+			fromTime, toTime, err = resolveRange(ctx, db, rangeName, now)
 			if err != nil {
-				http.Error(w, "invalid from (expected YYYY-MM-DD)", http.StatusBadRequest)
+				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
-		}
-
-		if toStr == "" {
-			toTime = now
 		} else {
-			toTime, err = time.Parse("2006-01-02", toStr)
-			if err != nil {
-				http.Error(w, "invalid to (expected YYYY-MM-DD)", http.StatusBadRequest)
-				return
+			if fromStr == "" {
+				fromTime = now.AddDate(0, 0, -7)
+			} else {
+				fromTime, err = time.Parse("2006-01-02", fromStr)
+				if err != nil {
+					http.Error(w, "invalid from (expected YYYY-MM-DD)", http.StatusBadRequest)
+					return
+				}
+			}
+
+			if toStr == "" {
+				toTime = now
+			} else {
+				toTime, err = time.Parse("2006-01-02", toStr)
+				if err != nil {
+					http.Error(w, "invalid to (expected YYYY-MM-DD)", http.StatusBadRequest)
+					return
+				}
 			}
 		}
 		if toTime.Before(fromTime) {
@@ -648,6 +637,185 @@ func loadTotals(ctx context.Context, db *sql.DB) (map[string]int64, error) {
 		out[key] = v
 	}
 	return out, rows.Err()
+}
+
+func applyRawTotalsToSummary(rawTotals map[string]int64, resp *summaryResponse) {
+	for key, val := range rawTotals {
+		switch {
+		case key == "totalEvents":
+			resp.Totals.TotalEvents = val
+		case key == "totalDownloads":
+			resp.Totals.TotalDownloads = val
+			resp.TotalDownloads = val
+		case key == "totalSuccess":
+			resp.Totals.TotalSuccess = val
+			resp.TotalSuccess = val
+		case key == "totalFail":
+			resp.Totals.TotalFail = val
+			resp.TotalFail = val
+		case key == "status:cancelled":
+			resp.Totals.TotalCancelled = val
+		case strings.HasPrefix(key, "browser:"):
+			resp.Browsers[strings.TrimPrefix(key, "browser:")] = val
+		case strings.HasPrefix(key, "os:"):
+			resp.Os[strings.TrimPrefix(key, "os:")] = val
+		case strings.HasPrefix(key, "country:"):
+			resp.Countries[strings.TrimPrefix(key, "country:")] = val
+		case strings.HasPrefix(key, "lang:"):
+			resp.Languages[strings.TrimPrefix(key, "lang:")] = val
+		case strings.HasPrefix(key, "extVer:"):
+			resp.Versions[strings.TrimPrefix(key, "extVer:")] = val
+		case strings.HasPrefix(key, "type:"):
+			resp.Types[strings.TrimPrefix(key, "type:")] = val
+		case strings.HasPrefix(key, "errorType:"):
+			resp.ErrorReasons[strings.TrimPrefix(key, "errorType:")] = val
+		}
+	}
+}
+
+func resolveSummaryWindow(ctx context.Context, db *sql.DB, rangeName, fromStr, toStr string, now time.Time) (time.Time, time.Time, bool, error) {
+	if rangeName == "" && fromStr == "" && toStr == "" {
+		return time.Time{}, time.Time{}, false, nil
+	}
+
+	if rangeName != "" {
+		fromTime, toTime, err := resolveRange(ctx, db, rangeName, now)
+		if err != nil {
+			return time.Time{}, time.Time{}, false, err
+		}
+		return fromTime, toTime, true, nil
+	}
+
+	var (
+		fromTime time.Time
+		toTime   time.Time
+		err      error
+	)
+
+	if fromStr != "" {
+		fromTime, err = time.Parse("2006-01-02", fromStr)
+		if err != nil {
+			return time.Time{}, time.Time{}, false, errors.New("invalid from (expected YYYY-MM-DD)")
+		}
+	}
+	if toStr != "" {
+		toTime, err = time.Parse("2006-01-02", toStr)
+		if err != nil {
+			return time.Time{}, time.Time{}, false, errors.New("invalid to (expected YYYY-MM-DD)")
+		}
+	}
+	switch {
+	case fromStr == "" && toStr != "":
+		fromTime = toTime
+	case toStr == "" && fromStr != "":
+		toTime = fromTime
+	}
+	if toTime.Before(fromTime) {
+		return time.Time{}, time.Time{}, false, errors.New("to must be >= from")
+	}
+	return fromTime, toTime, true, nil
+}
+
+func loadWindowTotals(ctx context.Context, db *sql.DB, fromDate, toDate time.Time, resp *summaryResponse) error {
+	fromIso := fromDate.UTC().Format(time.RFC3339)
+	toIso := toDate.AddDate(0, 0, 1).UTC().Format(time.RFC3339)
+
+	rows, err := db.QueryContext(ctx, `
+		SELECT
+			total_events,
+			total_downloads,
+			total_success,
+			total_fail,
+			by_status_json,
+			by_type_json,
+			by_browser_json,
+			by_os_json,
+			by_ext_ver_json,
+			by_lang_json,
+			by_country_json,
+			by_error_type_json
+		FROM downloads_hourly
+		WHERE bucket_start >= ? AND bucket_start < ?
+	`, fromIso, toIso) // #nosec G701 -- SQL text is static and uses bound parameters for window bounds.
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			totalEvents, totalDownloads, totalSuccess, totalFail int64
+			byStatus, byType, byBrowser, byOS                    sql.NullString
+			byExtVer, byLang, byCountry, byErrorType             sql.NullString
+		)
+		if err := rows.Scan(
+			&totalEvents,
+			&totalDownloads,
+			&totalSuccess,
+			&totalFail,
+			&byStatus,
+			&byType,
+			&byBrowser,
+			&byOS,
+			&byExtVer,
+			&byLang,
+			&byCountry,
+			&byErrorType,
+		); err != nil {
+			return err
+		}
+
+		resp.Totals.TotalEvents += totalEvents
+		resp.Totals.TotalDownloads += totalDownloads
+		resp.Totals.TotalSuccess += totalSuccess
+		resp.Totals.TotalFail += totalFail
+
+		resp.TotalDownloads = resp.Totals.TotalDownloads
+		resp.TotalSuccess = resp.Totals.TotalSuccess
+		resp.TotalFail = resp.Totals.TotalFail
+
+		statusMap := decodeCounterMap(byStatus.String)
+		if cancelled, ok := statusMap["cancelled"]; ok {
+			resp.Totals.TotalCancelled += cancelled
+		}
+		if canceled, ok := statusMap["canceled"]; ok {
+			resp.Totals.TotalCancelled += canceled
+		}
+		mergeCounterMap(resp.Types, decodeCounterMap(byType.String))
+		mergeCounterMap(resp.Browsers, decodeCounterMap(byBrowser.String))
+		mergeCounterMap(resp.Os, decodeCounterMap(byOS.String))
+		mergeCounterMap(resp.Versions, decodeCounterMap(byExtVer.String))
+		mergeCounterMap(resp.Languages, decodeCounterMap(byLang.String))
+		mergeCounterMap(resp.Countries, decodeCounterMap(byCountry.String))
+		mergeCounterMap(resp.ErrorReasons, decodeCounterMap(byErrorType.String))
+	}
+	return rows.Err()
+}
+
+func mergeCounterMap(dest, src map[string]int64) {
+	for k, v := range src {
+		dest[k] += v
+	}
+}
+
+func decodeCounterMap(raw string) map[string]int64 {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return map[string]int64{}
+	}
+	var ints map[string]int64
+	if err := json.Unmarshal([]byte(raw), &ints); err == nil {
+		return ints
+	}
+	var floats map[string]float64
+	if err := json.Unmarshal([]byte(raw), &floats); err == nil {
+		out := make(map[string]int64, len(floats))
+		for k, v := range floats {
+			out[k] = int64(v)
+		}
+		return out
+	}
+	return map[string]int64{}
 }
 
 func loadLastBatch(ctx context.Context, db *sql.DB) (*summaryBatchInfo, error) {

@@ -163,6 +163,66 @@ func TestSummaryHandler_ReturnsAggregatedTotals(t *testing.T) {
 	}
 }
 
+func TestSummaryHandler_WindowedDayTotals(t *testing.T) {
+	sqlDB := newStatsTestDB(t)
+	defer sqlDB.Close()
+
+	_, err := sqlDB.Exec(
+		`INSERT INTO downloads_hourly (
+			bucket_start, bucket_end, total_events, total_downloads, total_success, total_fail,
+			by_status_json, by_type_json, by_browser_json, by_os_json, by_ext_ver_json,
+			by_lang_json, by_country_json, by_error_type_json, batch_id
+		) VALUES
+		('2026-02-01T00:00:00Z', '2026-02-01T01:00:00Z', 10, 10, 7, 3,
+		 '{"success":7,"fail":3,"cancelled":2}',
+		 '{"pdf":6,"docx":4}',
+		 '{"chrome":8,"firefox":2}',
+		 '{"windows":8,"macos":2}',
+		 '{"1.0.0":10}',
+		 '{"en":10}',
+		 '{"us":10}',
+		 '{"none":9,"network":1}',
+		 'b1'),
+		('2026-02-02T00:00:00Z', '2026-02-02T01:00:00Z', 20, 20, 10, 10,
+		 '{"success":10,"fail":10,"cancelled":5}',
+		 '{"pdf":2,"zip":18}',
+		 '{"edge":20}',
+		 '{"linux":20}',
+		 '{"2.0.0":20}',
+		 '{"fr":20}',
+		 '{"gb":20}',
+		 '{"timeout":20}',
+		 'b2')`,
+	)
+	if err != nil {
+		t.Fatalf("seed hourly rows failed: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/stats/summary?from=2026-02-01&to=2026-02-01", nil)
+	rr := httptest.NewRecorder()
+	SummaryHandler(sqlDB).ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp summaryResponse
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal summary response failed: %v", err)
+	}
+	if resp.TotalDownloads != 10 || resp.TotalSuccess != 7 || resp.TotalFail != 3 {
+		t.Fatalf("unexpected totals for window: downloads=%d success=%d fail=%d", resp.TotalDownloads, resp.TotalSuccess, resp.TotalFail)
+	}
+	if resp.Totals.TotalCancelled != 2 {
+		t.Fatalf("expected totalCancelled=2 for windowed summary, got %d", resp.Totals.TotalCancelled)
+	}
+	if resp.TopBrowser != "chrome" || resp.TopOs != "windows" || resp.TopCountry != "us" || resp.TopType != "pdf" {
+		t.Fatalf("unexpected top fields: browser=%s os=%s country=%s type=%s", resp.TopBrowser, resp.TopOs, resp.TopCountry, resp.TopType)
+	}
+	if got := resp.Browsers["edge"]; got != 0 {
+		t.Fatalf("expected edge browser count to be excluded from selected day, got %d", got)
+	}
+}
+
 func TestSummaryHandler_EmptyDB(t *testing.T) {
 	sqlDB := newStatsTestDB(t)
 	defer sqlDB.Close()
@@ -197,6 +257,47 @@ func TestSummaryHandler_MethodNotAllowed(t *testing.T) {
 
 	if rr.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("expected 405, got %d", rr.Code)
+	}
+}
+
+func TestBreakdownHandler_RangeTodayUsesUTCDayWindow(t *testing.T) {
+	sqlDB := newStatsTestDB(t)
+	defer sqlDB.Close()
+
+	now := time.Now().UTC()
+	todayBucket := time.Date(now.Year(), now.Month(), now.Day(), 3, 0, 0, 0, time.UTC).Format(time.RFC3339)
+	yesterdayBucket := time.Date(now.Year(), now.Month(), now.Day()-1, 3, 0, 0, 0, time.UTC).Format(time.RFC3339)
+
+	_, err := sqlDB.Exec(
+		`INSERT INTO downloads_hourly (
+			bucket_start, bucket_end, total_events, total_downloads, total_success, total_fail,
+			by_status_json, by_type_json, by_browser_json, by_os_json, by_ext_ver_json,
+			by_lang_json, by_country_json, by_error_type_json, batch_id
+		) VALUES
+		(?, ?, 10, 10, 8, 2, '{}', '{}', '{"chrome":10}', '{}', '{}', '{}', '{}', '{}', 'today-batch'),
+		(?, ?, 10, 10, 8, 2, '{}', '{}', '{"firefox":10}', '{}', '{}', '{}', '{}', '{}', 'yesterday-batch')`,
+		todayBucket,
+		todayBucket,
+		yesterdayBucket,
+		yesterdayBucket,
+	)
+	if err != nil {
+		t.Fatalf("seed breakdown rows failed: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/stats/breakdown?dimension=browser&range=today", nil)
+	rr := httptest.NewRecorder()
+	BreakdownHandler(sqlDB).ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp breakdownResponse
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal breakdown response failed: %v", err)
+	}
+	if len(resp.Values) != 1 || resp.Values[0].Value != "chrome" {
+		t.Fatalf("expected only today's browser breakdown, got %+v", resp.Values)
 	}
 }
 
@@ -355,4 +456,3 @@ func TestTimeSeriesHandler_MethodNotAllowed(t *testing.T) {
 		t.Fatalf("expected 405, got %d", rr.Code)
 	}
 }
-
