@@ -373,8 +373,14 @@ func TestSecurityHeadersMiddleware_UsesScriptNonceWithoutUnsafeInline(t *testing
 	if strings.Contains(csp, "script-src-attr 'unsafe-inline'") || strings.Contains(csp, "script-src 'self' 'unsafe-inline'") {
 		t.Fatalf("expected CSP without unsafe-inline script permissions, got: %q", csp)
 	}
-	if !strings.Contains(csp, "style-src 'self' 'nonce-") {
-		t.Fatalf("expected nonce-based style CSP, got: %q", csp)
+	if !strings.Contains(csp, "style-src 'self'") {
+		t.Fatalf("expected style-src self directive, got: %q", csp)
+	}
+	if !strings.Contains(csp, "https://fonts.googleapis.com") {
+		t.Fatalf("expected style-src to allow Google Fonts stylesheet origin, got: %q", csp)
+	}
+	if !strings.Contains(csp, "style-src 'self' https://fonts.googleapis.com 'nonce-") {
+		t.Fatalf("expected nonce-based style CSP with Google Fonts allowed, got: %q", csp)
 	}
 	if strings.Contains(csp, "style-src 'self' 'unsafe-inline'") {
 		t.Fatalf("expected CSP without unsafe-inline style-src, got: %q", csp)
