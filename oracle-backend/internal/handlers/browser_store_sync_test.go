@@ -754,6 +754,56 @@ func TestDeploymentsTargetsHandler_AggregatesReflectSyncedTargets(t *testing.T) 
 	}
 }
 
+func TestSummarizeDeploymentTargets_UsesFallbackAndSortsByUsers(t *testing.T) {
+	input := []deploymentTargetResponse{
+		{
+			RecordKey: "firefox",
+			Data: map[string]any{
+				"name":        "Firefox",
+				"users":       "12,345",
+				"ratingCount": 7,
+			},
+			UpdatedAt: 200,
+		},
+		{
+			RecordKey: "chrome",
+			Data: map[string]any{
+				"name":        "Chrome",
+				"usersCount":  120000,
+				"ratingCount": 20,
+				"syncedAt":    300,
+			},
+			UpdatedAt: 100,
+		},
+		{
+			RecordKey: "edge",
+			Data: map[string]any{
+				"name":        "Edge",
+				"usersCount":  75,
+				"ratingCount": 1,
+			},
+			UpdatedAt: 400,
+		},
+	}
+
+	summary := summarizeDeploymentTargets(input)
+	if summary.UsersTotal != 132420 {
+		t.Fatalf("expected usersTotal=132420, got %d", summary.UsersTotal)
+	}
+	if summary.ReviewsTotal != 28 {
+		t.Fatalf("expected reviewsTotal=28, got %d", summary.ReviewsTotal)
+	}
+	if summary.LastSyncedAtUTC != 400 {
+		t.Fatalf("expected lastSyncedAtUtc=400, got %d", summary.LastSyncedAtUTC)
+	}
+	if len(summary.Browsers) != 3 {
+		t.Fatalf("expected 3 browsers in aggregate, got %+v", summary.Browsers)
+	}
+	if summary.Browsers[0].Key != "chrome" || summary.Browsers[1].Key != "firefox" || summary.Browsers[2].Key != "edge" {
+		t.Fatalf("expected browser rows sorted by users desc, got %+v", summary.Browsers)
+	}
+}
+
 func TestValidateStoreURL_RejectsUntrustedHostByDefault(t *testing.T) {
 	t.Setenv("ORACLE_ALLOW_UNTRUSTED_STORE_URLS", "false")
 	err := validateStoreURL("chrome", "https://example.com/x")
