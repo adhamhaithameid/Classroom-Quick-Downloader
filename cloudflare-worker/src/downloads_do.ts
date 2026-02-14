@@ -617,6 +617,20 @@ function json<T>(obj: T, init: ResponseInit = {}): Response {
   });
 }
 
+/**
+ * Best-effort timing-safe string comparison for JavaScript.
+ *
+ * IMPORTANT: JavaScript does not guarantee constant-time execution.
+ * JIT compilers, garbage collection, and branch prediction can all
+ * introduce timing variations. This implementation minimizes the
+ * most obvious timing channels (early exit on length mismatch,
+ * character-by-character short-circuit) but is NOT equivalent to
+ * crypto.subtle.timingSafeEqual (unavailable in Workers runtime for
+ * arbitrary strings).
+ *
+ * For password verification, prefer bcrypt/scrypt which have their
+ * own timing-safe comparison built in.
+ */
 function timingSafeStringEqual(a: string, b: string): boolean {
   let mismatch = a.length ^ b.length;
   const maxLength = Math.max(a.length, b.length);
