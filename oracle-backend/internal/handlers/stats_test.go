@@ -79,6 +79,39 @@ func TestTimeSeriesHandler_ExtVersionFilter(t *testing.T) {
 	}
 }
 
+func TestTimeSeriesHandler_ExtVersionFilter_DoesNotOvercountSuccessFail(t *testing.T) {
+	sqlDB := newStatsTestDB(t)
+	defer sqlDB.Close()
+
+	seedHourly(t, sqlDB, "2026-02-01T00:00:00Z", 2, 1, 1, `{"1.0.0":1}`)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/stats/timeseries?range=all&granularity=day&extVersion=1.0.0", nil)
+	rr := httptest.NewRecorder()
+	TimeSeriesHandler(sqlDB).ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp struct {
+		OK     bool `json:"ok"`
+		Points []struct {
+			Downloads int64 `json:"downloads"`
+			Success   int64 `json:"success"`
+			Fail      int64 `json:"fail"`
+		} `json:"points"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+	if !resp.OK || len(resp.Points) != 1 {
+		t.Fatalf("unexpected response payload: %+v", resp)
+	}
+	point := resp.Points[0]
+	if point.Success+point.Fail > point.Downloads {
+		t.Fatalf("expected success+fail <= downloads, got success=%d fail=%d downloads=%d", point.Success, point.Fail, point.Downloads)
+	}
+}
+
 func TestTimeSeriesHandler_RangeTodayHourly(t *testing.T) {
 	sqlDB := newStatsTestDB(t)
 	defer sqlDB.Close()

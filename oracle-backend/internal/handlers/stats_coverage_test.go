@@ -78,6 +78,9 @@ func TestResolveRange_Week(t *testing.T) {
 	if from.Day() != 9 {
 		t.Fatalf("expected June 9, got %v", from)
 	}
+	if from.Hour() != 0 || from.Minute() != 0 || from.Second() != 0 {
+		t.Fatalf("expected week range to start at midnight UTC, got %v", from)
+	}
 }
 
 func TestResolveRange_Month(t *testing.T) {
@@ -215,6 +218,13 @@ func TestProportionalSplit_ZeroCategory(t *testing.T) {
 func TestProportionalSplit_Negative(t *testing.T) {
 	if proportionalSplit(-1, 100, 200) != 0 {
 		t.Fatal("expected 0 for negative")
+	}
+}
+
+func TestProportionalSuccessFail_DoesNotOvercountVersionDownloads(t *testing.T) {
+	success, fail := proportionalSuccessFail(1, 2, 1, 1)
+	if success+fail > 1 {
+		t.Fatalf("expected success+fail <= downloads, got success=%d fail=%d", success, fail)
 	}
 }
 

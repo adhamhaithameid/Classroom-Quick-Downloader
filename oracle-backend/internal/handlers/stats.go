@@ -997,7 +997,8 @@ func resolveRange(ctx context.Context, db *sql.DB, rangeName string, now time.Ti
 		start := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 		return start, start, nil
 	case "week":
-		return now.AddDate(0, 0, -6), now, nil
+		start := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC).AddDate(0, 0, -6)
+		return start, now, nil
 	case "month":
 		start := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
 		return start, now, nil
@@ -1149,8 +1150,9 @@ func queryTimeSeriesHourByVersion(ctx context.Context, db *sql.DB, fromIso, toIs
 		}
 		row := agg[ts]
 		row.Downloads += versionDownloads
-		row.Success += proportionalSplit(versionDownloads, totalDownloads, totalSuccess)
-		row.Fail += proportionalSplit(versionDownloads, totalDownloads, totalFail)
+		versionSuccess, versionFail := proportionalSuccessFail(versionDownloads, totalDownloads, totalSuccess, totalFail)
+		row.Success += versionSuccess
+		row.Fail += versionFail
 		if _, ok := seen[ts]; !ok {
 			keys = append(keys, ts)
 			seen[ts] = struct{}{}
@@ -1221,8 +1223,9 @@ func queryTimeSeriesDayByVersion(ctx context.Context, db *sql.DB, fromIso, toIso
 		}
 		row := agg[day]
 		row.Downloads += versionDownloads
-		row.Success += proportionalSplit(versionDownloads, totalDownloads, totalSuccess)
-		row.Fail += proportionalSplit(versionDownloads, totalDownloads, totalFail)
+		versionSuccess, versionFail := proportionalSuccessFail(versionDownloads, totalDownloads, totalSuccess, totalFail)
+		row.Success += versionSuccess
+		row.Fail += versionFail
 		if _, ok := seen[day]; !ok {
 			keys = append(keys, day)
 			seen[day] = struct{}{}
@@ -1267,6 +1270,29 @@ func proportionalSplit(versionDownloads, totalDownloads, totalCategory int64) in
 		return 0
 	}
 	return int64(float64(versionDownloads)*float64(totalCategory)/float64(totalDownloads) + 0.5)
+}
+
+func proportionalSuccessFail(versionDownloads, totalDownloads, totalSuccess, totalFail int64) (int64, int64) {
+	if versionDownloads <= 0 {
+		return 0, 0
+	}
+	success := proportionalSplit(versionDownloads, totalDownloads, totalSuccess)
+	fail := proportionalSplit(versionDownloads, totalDownloads, totalFail)
+
+	if success < 0 {
+		success = 0
+	}
+	if fail < 0 {
+		fail = 0
+	}
+	if success > versionDownloads {
+		success = versionDownloads
+	}
+	maxFail := versionDownloads - success
+	if fail > maxFail {
+		fail = maxFail
+	}
+	return success, fail
 }
 
 func columnForDimension(dim string) (string, error) {
