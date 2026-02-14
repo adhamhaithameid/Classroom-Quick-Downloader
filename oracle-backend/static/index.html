@@ -10,7 +10,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="icon" type="image/svg+xml" href="/logo.svg">
     <link rel="alternate icon" href="/favicon.png">
-    <style>
+    <style nonce="__CSP_NONCE__">
       :root {
         --bg-primary: #09090b;
         --bg-secondary: #18181b;
@@ -73,7 +73,10 @@
         font-size: 11px;
         font-weight: 500;
         color: var(--text-primary);
-        white-space: nowrap;
+        white-space: normal;
+        text-align: center;
+        line-height: 1.35;
+        max-width: 220px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.3);
       }
 
@@ -210,7 +213,7 @@
         padding: 12px;
         border-top: 1px solid var(--border-primary);
         display: block;
-        overflow: hidden;
+        overflow: visible;
       }
 
       .sidebar-controls {
@@ -224,11 +227,11 @@
       }
 
       .sidebar-controls-row.top {
-        grid-template-columns: 38px minmax(0, 1fr) 38px;
+        grid-template-columns: minmax(0, 1fr) 38px minmax(0, 1fr);
       }
 
       .sidebar-controls-row.bottom {
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        grid-template-columns: minmax(0, 1fr) 38px minmax(0, 1fr);
         align-items: stretch;
       }
 
@@ -267,9 +270,21 @@
         transform: none;
       }
 
-      .sidebar [data-tooltip]::before,
-      .sidebar [data-tooltip]::after {
+      .sidebar-nav [data-tooltip]::before,
+      .sidebar-nav [data-tooltip]::after {
         display: none !important;
+      }
+
+      .sidebar-footer [data-tooltip]::before,
+      .sidebar-footer [data-tooltip]::after {
+        transition-delay: 0.2s;
+      }
+
+      @media (hover: hover) and (pointer: fine) {
+        .sidebar-footer [data-tooltip]:not(:hover)::before,
+        .sidebar-footer [data-tooltip]:not(:hover)::after {
+          transition-delay: 0s;
+        }
       }
 
       #deploy-status-btn {
@@ -320,6 +335,8 @@
         border-radius: 6px;
         font-size: 11px;
         cursor: help;
+        white-space: nowrap;
+        overflow: hidden;
       }
 
       .status-dot {
@@ -673,6 +690,39 @@
       .card-subtitle { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
       .card-body { padding: 16px; }
       .card-body.no-padding { padding: 0; }
+      .card-body-top { border-top: 1px solid var(--border-primary); }
+
+      .section-heading {
+        font-size: 13px;
+        font-weight: 600;
+        margin-bottom: 12px;
+        color: var(--text-secondary);
+      }
+
+      .section-heading-spaced { margin-top: 18px; }
+      .charts-grid-spaced { margin-top: 16px; }
+      .tab-version-filter { min-width: 140px; }
+      .hidden { display: none !important; }
+      .empty-state-danger { color: var(--danger); }
+      .text-success { color: var(--success); }
+      .text-danger { color: var(--danger); }
+      .text-muted { color: var(--text-muted); }
+      .log-cell-resource {
+        max-width: 220px;
+        word-break: break-word;
+      }
+      .log-cell-actor {
+        max-width: 180px;
+        word-break: break-word;
+      }
+      .log-cell-request {
+        max-width: 360px;
+        word-break: break-word;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+        font-size: 11px;
+      }
+      .log-status-ok { color: var(--success); }
+      .log-status-error { color: var(--danger); }
 
       /* Bar Chart */
       .chart-container {
@@ -737,22 +787,27 @@
         position: relative;
       }
 
-      .chart-bar {
+      .chart-bar-svg {
         width: 100%;
         max-width: 24px;
-        background: var(--accent);
-        border-radius: 3px 3px 0 0;
-        transition: all 0.2s ease;
+        height: 100%;
+        transition: transform 0.2s ease;
         cursor: pointer;
         position: absolute;
         bottom: 0;
-        min-height: 2px;
       }
 
-      .chart-bar:hover {
-        background: #60a5fa;
+      .chart-bar-rect {
+        fill: var(--accent);
+        transition: fill 0.2s ease;
+      }
+
+      .chart-bar-svg:hover {
         transform: scaleX(1.2);
-        box-shadow: 0 0 12px rgba(59, 130, 246, 0.4);
+      }
+
+      .chart-bar-svg:hover .chart-bar-rect {
+        fill: #60a5fa;
       }
 
       .chart-x-axis {
@@ -776,6 +831,8 @@
       /* Floating tooltip */
       .floating-tooltip {
         position: fixed;
+        right: 16px;
+        bottom: 16px;
         background: rgba(9, 9, 11, 0.85);
         backdrop-filter: blur(8px);
         -webkit-backdrop-filter: blur(8px);
@@ -933,6 +990,40 @@
         color: white;
         text-shadow: 0 1px 2px rgba(0,0,0,0.3);
       }
+      .breakdown-progress {
+        width: 100%;
+        height: 100%;
+        border: none;
+        background: transparent;
+      }
+      .breakdown-progress::-webkit-progress-bar {
+        background: transparent;
+      }
+      .breakdown-progress::-webkit-progress-value {
+        background: var(--accent);
+      }
+      .breakdown-progress::-moz-progress-bar {
+        background: var(--accent);
+      }
+      .breakdown-progress.purple::-webkit-progress-value,
+      .breakdown-progress.purple::-moz-progress-bar { background: var(--purple); }
+      .breakdown-progress.blue::-webkit-progress-value,
+      .breakdown-progress.blue::-moz-progress-bar { background: var(--accent); }
+      .breakdown-progress.cyan::-webkit-progress-value,
+      .breakdown-progress.cyan::-moz-progress-bar { background: var(--cyan); }
+      .breakdown-progress.green::-webkit-progress-value,
+      .breakdown-progress.green::-moz-progress-bar { background: var(--success); }
+      .breakdown-progress-value {
+        position: absolute;
+        left: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 11px;
+        font-weight: 600;
+        color: white;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+        pointer-events: none;
+      }
 
       .breakdown-bar-count {
         width: 60px;
@@ -1052,6 +1143,28 @@
 
       .mini-bar-fill.green { background: var(--success); }
       .mini-bar-fill.red { background: var(--danger); }
+      .mini-progress {
+        width: 60px;
+        height: 6px;
+        margin-right: 8px;
+        vertical-align: middle;
+        border-radius: 999px;
+        overflow: hidden;
+        border: none;
+        background: var(--bg-tertiary);
+      }
+      .mini-progress::-webkit-progress-bar {
+        background: var(--bg-tertiary);
+        border-radius: 999px;
+      }
+      .mini-progress::-webkit-progress-value {
+        background: var(--accent);
+        border-radius: 999px;
+      }
+      .mini-progress::-moz-progress-bar {
+        background: var(--accent);
+        border-radius: 999px;
+      }
 
       .trend-indicator {
         font-size: 10px;
@@ -1092,6 +1205,7 @@
 
       .log-summary-item { display: flex; align-items: center; gap: 4px; }
       .log-summary-value { color: var(--text-primary); font-weight: 500; }
+      .log-summary.hidden { display: none !important; }
 
       /* Comparison Cards */
       .comparison-grid {
@@ -1468,6 +1582,32 @@
         grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
         gap: 10px;
       }
+      .action-buttons-grid-five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+      .action-buttons-grid-four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .action-buttons-grid-logs {
+        grid-template-columns: auto auto auto auto auto;
+        max-width: 920px;
+        align-items: center;
+      }
+      .inline-controls {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .retention-days-input {
+        width: 80px;
+        text-align: center;
+      }
+      .retention-days-label {
+        font-size: 12px;
+        color: var(--text-muted);
+      }
+      .section-block { margin-top: 14px; }
+      .section-caption {
+        font-size: 12px;
+        color: var(--text-secondary);
+        margin-bottom: 8px;
+      }
       .danger-help-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -1578,6 +1718,18 @@
         border-color: var(--border-secondary);
         box-shadow: 0 8px 16px rgba(0,0,0,0.16);
       }
+      .deployment-card-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+      }
+      .deployment-card-title { font-weight: 600; }
+      .deployment-card-body {
+        display: grid;
+        gap: 8px;
+      }
       .creative-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -1617,6 +1769,21 @@
         font-size: 11px;
         color: var(--text-secondary);
         background: var(--bg-secondary);
+      }
+      .pill-error {
+        border-color: rgba(239,68,68,0.55);
+        color: #fecaca;
+      }
+      .creative-preview {
+        font-size: 12px;
+        white-space: pre-wrap;
+        max-height: 120px;
+        overflow: auto;
+      }
+      .inline-btn-row {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
       }
       .newsletter-layout {
         display: grid;
@@ -1708,6 +1875,12 @@
         color: var(--text-secondary);
       }
       .calendar-day.has-data { border-color: rgba(59, 130, 246, 0.5); color: var(--text-primary); }
+      .calendar-day-faded { opacity: 0.35; }
+      .calendar-caption {
+        font-size: 12px;
+        color: var(--text-secondary);
+        margin-bottom: 10px;
+      }
       .calendar-dot {
         width: 6px;
         height: 6px;
@@ -1751,6 +1924,44 @@
         padding: 8px 10px;
         font-size: 12px;
       }
+      .auth-error.visible { display: block; }
+      .json-viewer-compact {
+        max-height: 220px;
+        overflow: auto;
+      }
+      .json-viewer-danger {
+        margin-top: 12px;
+        max-height: 340px;
+        overflow: auto;
+      }
+      .auth-input-lg { min-height: 160px; }
+      .btn-start { justify-self: start; }
+      .creative-grid-spaced { margin-top: 14px; }
+      .auth-modal-wide { max-width: 620px; }
+      .disabled-link {
+        opacity: 0.55;
+        pointer-events: none;
+      }
+      .batch-id-value {
+        font-family: "SF Mono", Monaco, Consolas, monospace;
+        font-size: 11px;
+      }
+      .cell-resource {
+        max-width: 220px;
+        word-break: break-word;
+      }
+      .cell-actor {
+        max-width: 180px;
+        word-break: break-word;
+      }
+      .cell-request {
+        max-width: 360px;
+        word-break: break-word;
+        font-family: "SF Mono", Monaco, Consolas, monospace;
+        font-size: 11px;
+      }
+      .status-ok { color: var(--success); }
+      .status-error { color: var(--danger); }
     </style>
   </head>
   <body>
@@ -1818,32 +2029,36 @@
         <div class="sidebar-footer">
           <div class="sidebar-controls">
             <div class="sidebar-controls-row top">
-              <button class="btn footer-icon-btn" id="shortcuts-btn" data-shortcut="Cmd+/" data-tooltip="Keyboard shortcuts" data-tooltip-position="bottom" aria-label="Shortcuts">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                  <rect x="3" y="5" width="18" height="14" rx="2"></rect>
-                  <path d="M8 9h.01M12 9h.01M16 9h.01M8 13h8"></path>
-                </svg>
+              <button class="btn footer-batch-btn" id="batch-btn" data-shortcut="Cmd+B" data-tooltip="Open the latest processed batch details (Info/JSON)." data-tooltip-position="top">
+                <span aria-hidden="true">📦</span>
+                <span class="footer-batch-label">Last Batch</span>
               </button>
-              <a href="https://github.com/adhamhaithameid/Classroom-Quick-Downloader/commits/main" target="_blank" class="btn deploy-status-btn" id="deploy-status-btn" data-role="deploy-status-btn" data-tooltip="Deployment status - Click to view commit" data-tooltip-position="bottom">
-                <span id="deploy-icon" data-role="deploy-icon">🔄</span>
-                <span id="deploy-commit" data-role="deploy-commit">Loading...</span>
-              </a>
-              <button class="btn refresh-action-btn footer-icon-btn" id="refresh-btn" data-role="refresh-action" data-shortcut="Cmd+R" data-tooltip="Refresh all data" data-tooltip-position="bottom" aria-label="Refresh">
+              <button class="btn refresh-action-btn footer-icon-btn" id="refresh-btn" data-role="refresh-action" data-shortcut="Cmd+R" data-tooltip="Refresh dashboard data and stats now." data-tooltip-position="top" aria-label="Refresh">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                   <path d="M21 12a9 9 0 11-2.52-6.25"></path>
                   <path d="M21 4v5h-5"></path>
                 </svg>
               </button>
+              <button class="btn footer-batch-btn" id="flush-btn" data-shortcut="Cmd+Shift+B" data-tooltip="Open the most recent Google Sheets flush details (Info/JSON)." data-tooltip-position="top">
+                <span aria-hidden="true">🧮</span>
+                <span class="footer-batch-label">Last Flush</span>
+              </button>
             </div>
             <div class="sidebar-controls-row bottom">
-              <div class="status-indicator" id="status-indicator" data-tooltip="System status">
+              <div class="status-indicator" id="status-indicator" data-tooltip="Current backend health status and freshness." data-tooltip-position="top">
                 <div class="status-dot" id="sidebar-status"></div>
                 <span id="sidebar-status-text">Connecting...</span>
               </div>
-              <button class="btn footer-batch-btn" id="batch-btn" data-shortcut="Cmd+B" data-tooltip="View last batch info" data-tooltip-position="bottom">
-                <span aria-hidden="true">📦</span>
-                <span class="footer-batch-label">Last Batch</span>
+              <button class="btn footer-icon-btn" id="shortcuts-btn" data-shortcut="Cmd+/" data-tooltip="Keyboard shortcuts" data-tooltip-position="top" aria-label="Shortcuts">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <rect x="3" y="5" width="18" height="14" rx="2"></rect>
+                  <path d="M8 9h.01M12 9h.01M16 9h.01M8 13h8"></path>
+                </svg>
               </button>
+              <a href="https://github.com/adhamhaithameid/Classroom-Quick-Downloader/commits/main" target="_blank" class="btn deploy-status-btn" id="deploy-status-btn" data-role="deploy-status-btn" data-tooltip="Deployment status - Click to view commit" data-tooltip-position="top">
+                <span id="deploy-icon" data-role="deploy-icon">🔄</span>
+                <span id="deploy-commit" data-role="deploy-commit">Loading...</span>
+              </a>
             </div>
           </div>
         </div>
@@ -1872,6 +2087,9 @@
             </button>
             <button class="btn" id="batch-btn-mobile" data-shortcut="Cmd+B" data-tooltip="View last batch info">
               Last Batch
+            </button>
+            <button class="btn" id="flush-btn-mobile" data-shortcut="Cmd+Shift+B" data-tooltip="View last Google Sheets flush">
+              Last Flush
             </button>
             <button class="btn refresh-action-btn" id="refresh-btn-mobile" data-role="refresh-action" data-shortcut="Cmd+R" data-tooltip="Refresh all data">
               Refresh
@@ -1938,7 +2156,7 @@
               </div>
             </div>
 
-            <h3 style="font-size: 13px; font-weight: 600; margin-bottom: 12px; color: var(--text-secondary);">Top Today</h3>
+            <h3 class="section-heading">Top Today (UTC 00:00-24:00)</h3>
             <div class="top-today-grid" id="top-today-grid">
               <div class="top-card" data-tooltip="Most used browser today">
                 <div class="top-icon" id="top-browser-icon">🌐</div>
@@ -1978,7 +2196,7 @@
               </div>
             </div>
 
-            <h3 style="font-size: 13px; font-weight: 600; margin: 18px 0 12px; color: var(--text-secondary);">Top All Time</h3>
+            <h3 class="section-heading section-heading-spaced">Top All Time</h3>
             <div class="top-today-grid" id="top-all-time-grid">
               <div class="top-card" data-tooltip="Most used browser all time">
                 <div class="top-icon">🌐</div>
@@ -2014,7 +2232,7 @@
               </div>
             </div>
 
-            <div class="charts-grid" style="margin-top: 16px;">
+            <div class="charts-grid charts-grid-spaced">
               <div class="card">
                 <div class="card-header">
                   <div>
@@ -2056,7 +2274,7 @@
                   <button class="tab" data-range="all" data-tooltip="Show all time">All Time</button>
                 </div>
                 <div>
-                  <select id="activity-version-filter" class="tab" style="min-width: 140px;">
+                  <select id="activity-version-filter" class="tab tab-version-filter">
                     <option value="">All Versions</option>
                   </select>
                 </div>
@@ -2102,7 +2320,7 @@
                   <div class="loading"><div class="spinner"></div>Loading...</div>
                 </div>
               </div>
-              <div class="log-summary" id="log-summary" style="display:none">
+              <div class="log-summary hidden" id="log-summary">
                 <div class="log-summary-item">📊 <span class="log-summary-value" id="summary-periods">--</span> periods</div>
                 <div class="log-summary-item">⬆️ Peak: <span class="log-summary-value" id="summary-peak">--</span></div>
                 <div class="log-summary-item">📈 Avg: <span class="log-summary-value" id="summary-avg">--</span></div>
@@ -2132,7 +2350,7 @@
           <!-- CHARTS PAGE -->
           <div class="page" id="page-charts">
             <!-- Comparison Section -->
-            <div class="card" style="margin-bottom: 20px;">
+            <div class="card">
               <div class="card-header">
                 <div>
                   <div class="card-title">📊 Period Comparison</div>
@@ -2225,17 +2443,42 @@
                 </div>
               </div>
               <div class="card-body">
-                <div class="action-buttons-grid" style="grid-template-columns: repeat(5, 1fr);">
-                  <a href="https://cqd-analytics.adhamhaithameid.workers.dev/" target="_blank" rel="noopener noreferrer"
-                    class="btn btn-secondary" id="infra-link-cloudflare">☁️ Cloudflare</a>
-                  <a href="http://129.151.233.229:3001/status/cqd" target="_blank" rel="noopener noreferrer" class="btn btn-secondary"
-                    id="infra-link-uptime">🟢 Uptime Kuma</a>
-                  <a href="https://github.com/adhamhaithameid/Classroom-Quick-Downloader" target="_blank" rel="noopener noreferrer"
-                    class="btn btn-secondary" id="infra-link-github">🐙 GitHub Repo</a>
-                  <a href="https://docs.google.com/spreadsheets/d/1ptzLKUVnAkyXnT635Zgb1C6Img9aeAZ1se3nRz_QZmI/edit?gid=0#gid=0"
-                    target="_blank" rel="noopener noreferrer" class="btn btn-secondary" id="infra-link-sheets">📊 Google Sheets</a>
-                  <a href="https://www.figma.com/design/hQLRpncinKnJQRG1lhCdQG/Google-Classroom-Downloade-Icon?node-id=0-1&t=5Eimhfrvp8RwFC19-1"
-                    target="_blank" rel="noopener noreferrer" class="btn btn-secondary" id="infra-link-figma">🎨 Figma</a>
+                <div class="section-block">
+                  <div class="section-caption">Core Dashboards</div>
+                  <div class="action-buttons-grid action-buttons-grid-five">
+                    <a href="https://cqd-analytics.adhamhaithameid.workers.dev/" target="_blank" rel="noopener noreferrer"
+                      class="btn btn-secondary" id="infra-link-cloudflare">☁️ Cloudflare</a>
+                    <a href="http://129.151.233.229:3001/status/cqd" target="_blank" rel="noopener noreferrer" class="btn btn-secondary"
+                      id="infra-link-uptime">🟢 Uptime Kuma</a>
+                    <a href="https://github.com/adhamhaithameid/Classroom-Quick-Downloader" target="_blank" rel="noopener noreferrer"
+                      class="btn btn-secondary" id="infra-link-github">🐙 GitHub Repo</a>
+                    <a href="https://docs.google.com/spreadsheets/d/1ptzLKUVnAkyXnT635Zgb1C6Img9aeAZ1se3nRz_QZmI/edit?gid=0#gid=0"
+                      target="_blank" rel="noopener noreferrer" class="btn btn-secondary" id="infra-link-sheets">📊 Google Sheets</a>
+                    <a href="https://www.figma.com/design/hQLRpncinKnJQRG1lhCdQG/Google-Classroom-Downloade-Icon?node-id=0-1&t=5Eimhfrvp8RwFC19-1"
+                      target="_blank" rel="noopener noreferrer" class="btn btn-secondary" id="infra-link-figma">🎨 Figma</a>
+                  </div>
+                </div>
+                <div class="section-block">
+                  <div class="section-caption">Browser Developer Dashboards</div>
+                  <div class="action-buttons-grid">
+                    <a href="https://chrome.google.com/webstore/devconsole/9fe14497-b35b-4542-9af0-dedfdf6a194c"
+                      target="_blank" rel="noopener noreferrer" class="btn btn-secondary" id="infra-link-chrome-dev">🧩 Chrome Dev Dashboard</a>
+                    <a href="https://addons.mozilla.org/en-US/firefox/user/19632882/"
+                      target="_blank" rel="noopener noreferrer" class="btn btn-secondary" id="infra-link-firefox-dev">🦊 Firefox Dev Dashboard</a>
+                    <a href="https://partner.microsoft.com/en-us/dashboard/microsoftedge/7b2c7f20-4ea7-4b63-bbdb-5acabc886215/analytics"
+                      target="_blank" rel="noopener noreferrer" class="btn btn-secondary" id="infra-link-edge-dev">🌐 Edge Dev Dashboard</a>
+                  </div>
+                </div>
+                <div class="section-block">
+                  <div class="section-caption">Browser Store Listings</div>
+                  <div class="action-buttons-grid">
+                    <a href="https://chromewebstore.google.com/detail/classroom-quick-downloade/oemoongiefmpmomjikcjmkkkhffcbdid"
+                      target="_blank" rel="noopener noreferrer" class="btn btn-secondary" id="infra-link-chrome-store">🛍️ Chrome Listing</a>
+                    <a href="https://addons.mozilla.org/en-US/firefox/addon/classroom-quick-downloader/"
+                      target="_blank" rel="noopener noreferrer" class="btn btn-secondary" id="infra-link-firefox-store">🛍️ Firefox Listing</a>
+                    <a href="https://microsoftedge.microsoft.com/addons/detail/classroom-quick-downloade/ecojbijjkcjdolpeoiemnccgmaeomcmn"
+                      target="_blank" rel="noopener noreferrer" class="btn btn-secondary" id="infra-link-edge-store">🛍️ Edge Listing</a>
+                  </div>
                 </div>
               </div>
             </div>
@@ -2247,7 +2490,7 @@
               <div class="card-header">
                 <div>
                   <div class="card-title">Browser Deployments</div>
-                  <div class="card-subtitle">Store users, current version, and dashboard links</div>
+                  <div class="card-subtitle">Store users, ratings, current version, and dashboard links</div>
                 </div>
                 <div>
                   <button class="btn btn-secondary" id="deployment-sync-btn" data-shortcut="Cmd+Shift+D">Sync Browser Stores</button>
@@ -2256,8 +2499,8 @@
               <div class="card-body">
                 <div id="deployment-cards" class="deployment-grid"></div>
               </div>
-              <div class="card-body" style="border-top: 1px solid var(--border-primary);">
-                <pre id="deployment-sync-output" class="json-viewer" style="max-height: 220px; overflow:auto; display:none;"></pre>
+              <div class="card-body card-body-top">
+                <pre id="deployment-sync-output" class="json-viewer json-viewer-compact hidden"></pre>
               </div>
             </div>
           </div>
@@ -2280,10 +2523,10 @@
                     <input id="email-template-subject" class="auth-input" placeholder="Email subject" />
                     <input id="email-template-scheduled-at" class="auth-input" placeholder="Scheduled UTC (ISO string)" />
                   </div>
-                  <textarea id="email-template-html" class="auth-input" style="min-height: 160px;" placeholder="HTML content" required></textarea>
-                  <button class="btn" type="submit" style="justify-self:start;">Save Email Template</button>
+                  <textarea id="email-template-html" class="auth-input auth-input-lg" placeholder="HTML content" required></textarea>
+                  <button class="btn btn-start" type="submit">Save Email Template</button>
                 </form>
-                <div id="creative-email-list" class="creative-grid" style="margin-top: 14px;"></div>
+                <div id="creative-email-list" class="creative-grid creative-grid-spaced"></div>
               </div>
             </div>
 
@@ -2329,6 +2572,7 @@
                 <div>
                   <div class="card-title">GitHub Notifications</div>
                   <div class="card-subtitle">Issues, PRs, branches, and discussions</div>
+                  <div class="card-subtitle" id="notification-freshness">Source: --</div>
                 </div>
                 <div>
                   <button class="btn btn-secondary" id="notifications-refresh-btn">Refresh</button>
@@ -2348,11 +2592,11 @@
                   <div class="card-title">Oracle Operation Logs</div>
                   <div class="card-subtitle">Server-side request log for Oracle backend operations only</div>
                 </div>
-                <div class="action-buttons-grid" style="grid-template-columns: auto auto auto auto auto; max-width: 920px; align-items:center;">
+                <div class="action-buttons-grid action-buttons-grid-logs">
                   <button class="btn btn-secondary" id="logs-refresh-btn">Refresh</button>
-                  <div style="display:flex;align-items:center;gap:6px;">
-                    <input id="oracle-logs-retention-days" class="auth-input" type="number" min="1" max="36500" value="30" style="width:80px;text-align:center;" />
-                    <span style="font-size:12px;color:var(--text-muted);">days</span>
+                  <div class="inline-controls">
+                    <input id="oracle-logs-retention-days" class="auth-input retention-days-input" type="number" min="1" max="36500" value="30" />
+                    <span class="retention-days-label">days</span>
                   </div>
                   <button class="btn btn-secondary" id="logs-dry-run-delete-btn">Dry Run Delete Older</button>
                   <button class="btn btn-secondary" id="logs-delete-older-btn">Delete Older</button>
@@ -2364,8 +2608,8 @@
                   <div class="loading"><div class="spinner"></div>Loading logs...</div>
                 </div>
               </div>
-              <div class="card-body" style="border-top: 1px solid var(--border-primary);">
-                <pre id="oracle-logs-output" class="json-viewer" style="max-height: 220px; overflow:auto; display:none;"></pre>
+              <div class="card-body card-body-top">
+                <pre id="oracle-logs-output" class="json-viewer json-viewer-compact hidden"></pre>
               </div>
             </div>
           </div>
@@ -2380,14 +2624,14 @@
                 </div>
               </div>
               <div class="card-body">
-                <div class="action-buttons-grid" style="grid-template-columns: repeat(4, 1fr);">
+                <div class="action-buttons-grid action-buttons-grid-four">
                   <button class="btn btn-secondary" id="danger-dryrun-clear-btn">🧪 Dry Run Clear (All Non-Core)</button>
                   <button class="btn btn-danger" id="danger-exec-clear-btn">💥 Execute Clear (All Non-Core)</button>
                   <button class="btn btn-secondary" id="danger-run-backup-btn">💾 Run SQLite Backup</button>
                   <button class="btn btn-secondary" id="stepup-btn" data-shortcut="Cmd+Shift+S">🛂 Step-Up Now</button>
                 </div>
-                <div style="margin-top: 14px;">
-                  <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;">Operational Safety Actions</div>
+                <div class="section-block">
+                  <div class="section-caption">Operational Safety Actions</div>
                   <div class="danger-log-retention">
                     <div class="danger-log-retention-copy">
                       <span class="danger-log-retention-label">🕒 Log Retention Window</span>
@@ -2395,7 +2639,7 @@
                     </div>
                     <input id="danger-log-retention-days" class="auth-input" type="number" min="1" max="36500" value="30" />
                   </div>
-                  <div class="action-buttons-grid" style="grid-template-columns: repeat(4, 1fr);">
+                  <div class="action-buttons-grid action-buttons-grid-four">
                     <button class="btn btn-secondary" id="danger-alerts-btn">🚨 Load Alerts</button>
                     <button class="btn btn-secondary" id="danger-audit-verify-btn">🔗 Verify Audit Chain</button>
                     <button class="btn btn-secondary" id="danger-outbox-status-btn">📦 Outbox Status</button>
@@ -2405,8 +2649,8 @@
                     <button class="btn btn-danger" id="danger-logs-delete-all-btn">🗑️ Delete All Oracle Logs</button>
                   </div>
                 </div>
-                <div style="margin-top: 14px;">
-                  <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;">Action Explanations</div>
+                <div class="section-block">
+                  <div class="section-caption">Action Explanations</div>
                   <div class="danger-help-grid">
                     <div class="danger-help-item"><div class="danger-help-title">Dry Run Clear</div><div class="danger-help-text">Preview mode only. Oracle calculates exactly what would be deleted from non-core analytics tables and returns row counts per table, but commits nothing. Use this first before any destructive cleanup to validate scope and avoid accidental data loss.</div></div>
                     <div class="danger-help-item"><div class="danger-help-title">Execute Clear</div><div class="danger-help-text">Runs the same cleanup plan as Dry Run but actually deletes data. This action requires elevated verification and should be used only after reviewing Dry Run output. It does not remove core auth/config tables, but it will permanently remove matching operational data.</div></div>
@@ -2421,7 +2665,7 @@
                     <div class="danger-help-item"><div class="danger-help-title">Delete All Oracle Logs</div><div class="danger-help-text">Irreversibly clears all oracle operation logs. Use only when resetting the environment or when log storage must be purged completely.</div></div>
                   </div>
                 </div>
-                <pre id="danger-output" class="json-viewer" style="margin-top: 12px; max-height: 340px; overflow:auto; display:none;"></pre>
+                <pre id="danger-output" class="json-viewer json-viewer-danger hidden"></pre>
               </div>
             </div>
           </div>
@@ -2450,6 +2694,29 @@
           </div>
           <div id="batch-info-content">
             <div class="loading"><div class="spinner"></div>Loading batch info...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sheets Flush Modal -->
+    <div class="modal-overlay" id="flush-modal">
+      <div class="modal">
+        <div class="modal-header">
+          <span class="modal-title">Last Sheets Flush</span>
+          <button class="modal-close" id="flush-modal-close-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="modal-tabs" id="flush-modal-tabs">
+            <button class="tab active" data-flush-tab="info">Info</button>
+            <button class="tab" data-flush-tab="json">JSON</button>
+          </div>
+          <div id="flush-info-content">
+            <div class="loading"><div class="spinner"></div>Loading flush info...</div>
           </div>
         </div>
       </div>
@@ -2505,7 +2772,7 @@
     </div>
 
     <div class="modal-overlay" id="shortcuts-modal" aria-hidden="true">
-      <div class="auth-modal" role="dialog" aria-modal="true" style="max-width: 620px;">
+      <div class="auth-modal auth-modal-wide" role="dialog" aria-modal="true">
         <div class="auth-modal-head">
           <h2 class="auth-modal-title">Shortcuts</h2>
           <p class="auth-modal-subtitle">Keyboard shortcuts for fast navigation and actions.</p>
@@ -2523,6 +2790,8 @@
       let activityVersion = '';
       let lastBatchData = null;
       let batchTab = 'info';
+      let lastFlushData = null;
+      let flushTab = 'info';
       let calendarMonthOffset = 0;
       let allTimeActivityPoints = [];
           let oracleClockIs24 = localStorage.getItem('oracle_clock_24h') !== 'false';
@@ -2532,7 +2801,13 @@
             uptimeKuma: 'http://129.151.233.229:3001/status/cqd',
             githubRepo: 'https://github.com/adhamhaithameid/Classroom-Quick-Downloader',
             googleSheets: 'https://docs.google.com/spreadsheets/d/1ptzLKUVnAkyXnT635Zgb1C6Img9aeAZ1se3nRz_QZmI/edit?gid=0#gid=0',
-            figmaDesign: 'https://www.figma.com/design/hQLRpncinKnJQRG1lhCdQG/Google-Classroom-Downloade-Icon?node-id=0-1&t=5Eimhfrvp8RwFC19-1'
+            figmaDesign: 'https://www.figma.com/design/hQLRpncinKnJQRG1lhCdQG/Google-Classroom-Downloade-Icon?node-id=0-1&t=5Eimhfrvp8RwFC19-1',
+            chromeDevDashboard: 'https://chrome.google.com/webstore/devconsole/9fe14497-b35b-4542-9af0-dedfdf6a194c',
+            firefoxDevDashboard: 'https://addons.mozilla.org/en-US/firefox/user/19632882/',
+            edgeDevDashboard: 'https://partner.microsoft.com/en-us/dashboard/microsoftedge/7b2c7f20-4ea7-4b63-bbdb-5acabc886215/analytics',
+            chromeStoreListing: 'https://chromewebstore.google.com/detail/classroom-quick-downloade/oemoongiefmpmomjikcjmkkkhffcbdid',
+            firefoxStoreListing: 'https://addons.mozilla.org/en-US/firefox/addon/classroom-quick-downloader/',
+            edgeStoreListing: 'https://microsoftedge.microsoft.com/addons/detail/classroom-quick-downloade/ecojbijjkcjdolpeoiemnccgmaeomcmn'
           };
 
       // Helpers
@@ -2551,11 +2826,11 @@
         if (!errorEl) return;
         if (!message) {
           errorEl.textContent = '';
-          errorEl.style.display = 'none';
+          errorEl.classList.remove('visible');
           return;
         }
         errorEl.textContent = message;
-        errorEl.style.display = 'block';
+        errorEl.classList.add('visible');
       }
 
       function showAuthModal() {
@@ -2697,11 +2972,11 @@
         if (!errorEl) return;
         if (!message) {
           errorEl.textContent = '';
-          errorEl.style.display = 'none';
+          errorEl.classList.remove('visible');
           return;
         }
         errorEl.textContent = message;
-        errorEl.style.display = 'block';
+        errorEl.classList.add('visible');
       }
 
       function showStepUpModal(challengeId) {
@@ -2953,6 +3228,53 @@
         return (n || 0).toLocaleString();
       }
 
+      function parseMaybeNumber(value) {
+        if (value === null || value === undefined || value === "") return null;
+        var n = Number(value);
+        return Number.isFinite(n) ? n : null;
+      }
+
+      function fmtNumberOrNA(value, known) {
+        if (known === false) return "N/A";
+        var n = parseMaybeNumber(value);
+        if (n === null) return "N/A";
+        return fmtNumber(n);
+      }
+
+      function fmtUtcDateTimeFromMs(tsMs) {
+        var n = parseMaybeNumber(tsMs);
+        if (n === null || n <= 0) return "n/a";
+        var d = new Date(n);
+        if (isNaN(d.getTime())) return "n/a";
+        return d.toLocaleString("en-US", {
+          timeZone: "UTC",
+          hour12: false
+        });
+      }
+
+      function inferSummaryDataTimestampMs(summary) {
+        var candidates = [];
+        if (summary && summary.lastBatch) {
+          candidates.push(parseMaybeNumber(summary.lastBatch.ingestedAt));
+          candidates.push(parseMaybeNumber(summary.lastBatch.generatedAt));
+        }
+        if (summary && summary.doState) {
+          candidates.push(parseMaybeNumber(summary.doState.capturedAt));
+        }
+        candidates = candidates.filter(function(v) { return v !== null && v > 0; });
+        if (!candidates.length) return null;
+        return Math.max.apply(null, candidates);
+      }
+
+      function sourceLabelFromCode(source) {
+        var s = String(source || "").toLowerCase();
+        if (s === "live") return "Live";
+        if (s === "cache") return "Cached";
+        if (s === "stale_cache") return "Stale Cache";
+        if (s === "unavailable") return "Unavailable";
+        return "Unknown";
+      }
+
       function fmtTimestamp(ts, granularity) {
         if (!ts) return '--';
         const date = new Date(ts.includes('T') ? ts : ts + 'T00:00:00Z');
@@ -3126,13 +3448,6 @@
         });
         tooltip.innerHTML = html;
         tooltip.classList.add('visible');
-        var rect = tooltip.getBoundingClientRect();
-        var x = e.clientX + 15;
-        var y = e.clientY - 10;
-        if (x + rect.width > window.innerWidth - 20) x = e.clientX - rect.width - 15;
-        if (y + rect.height > window.innerHeight - 20) y = e.clientY - rect.height - 10;
-        tooltip.style.left = x + 'px';
-        tooltip.style.top = y + 'px';
       }
 
       function showTooltip(e, payload) {
@@ -3176,7 +3491,7 @@
           lastBatchData = await fetchJSON('/api/stats/summary');
           renderBatchContent();
         } catch (e) {
-          container.innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed to load</div>';
+          container.innerHTML = '<div class="empty-state empty-state-danger">Failed to load</div>';
         }
       }
 
@@ -3195,20 +3510,111 @@
         html += '<div class="batch-info-row"><span class="batch-info-label">Status</span><span class="batch-info-value">' + escapeHtml(lastBatchData.status || 'Unknown') + '</span></div>';
         
         if (lb) {
-          html += '<div class="batch-info-row"><span class="batch-info-label">Last Batch ID</span><span class="batch-info-value" style="font-family:monospace;font-size:11px">' + escapeHtml(lb.batchId || '--') + '</span></div>';
+          html += '<div class="batch-info-row"><span class="batch-info-label">Last Batch ID</span><span class="batch-info-value batch-id-value">' + escapeHtml(lb.batchId || '--') + '</span></div>';
           html += '<div class="batch-info-row"><span class="batch-info-label">Received</span><span class="batch-info-value">' + fmtFullDateTime(lb.ingestedAt) + ' (' + timeAgo(lb.ingestedAt) + ')</span></div>';
           html += '<div class="batch-info-row"><span class="batch-info-label">Generated</span><span class="batch-info-value">' + fmtFullDateTime(lb.generatedAt) + '</span></div>';
           html += '<div class="batch-info-row"><span class="batch-info-label">Events</span><span class="batch-info-value">' + fmtNumber(lb.eventsCount) + '</span></div>';
           html += '<div class="batch-info-row"><span class="batch-info-label">Downloads</span><span class="batch-info-value">' + fmtNumber(lb.downloadsCount) + '</span></div>';
-          html += '<div class="batch-info-row"><span class="batch-info-label">Success / Fail</span><span class="batch-info-value"><span style="color:var(--success)">' + fmtNumber(lb.successCount) + '</span> / <span style="color:var(--danger)">' + fmtNumber(lb.failCount) + '</span></span></div>';
+          html += '<div class="batch-info-row"><span class="batch-info-label">Success / Fail</span><span class="batch-info-value"><span class="text-success">' + fmtNumber(lb.successCount) + '</span> / <span class="text-danger">' + fmtNumber(lb.failCount) + '</span></span></div>';
         } else {
-          html += '<div class="batch-info-row"><span class="batch-info-label">Last Batch</span><span class="batch-info-value" style="color:var(--text-muted)">No batches yet</span></div>';
+          html += '<div class="batch-info-row"><span class="batch-info-label">Last Batch</span><span class="batch-info-value text-muted">No batches yet</span></div>';
         }
         
         if (ds) {
           html += '<div class="batch-info-row"><span class="batch-info-label">Pending Events</span><span class="batch-info-value">' + fmtNumber(ds.pendingEvents) + '</span></div>';
         }
         html += '</div>';
+        container.innerHTML = html;
+      }
+
+      function showFlushModal() {
+        document.getElementById('flush-modal').classList.add('visible');
+        loadFlushInfo();
+      }
+
+      function closeFlushModal(e) {
+        if (e && e.target !== e.currentTarget) return;
+        document.getElementById('flush-modal').classList.remove('visible');
+      }
+
+      function setFlushTab(tab) {
+        flushTab = tab;
+        var tabs = document.querySelectorAll('#flush-modal .modal-tabs .tab');
+        tabs.forEach(function(t) {
+          t.classList.toggle('active', t.textContent.includes(tab === 'info' ? 'Info' : 'JSON'));
+        });
+        renderFlushContent();
+      }
+
+      async function loadFlushInfo() {
+        var container = document.getElementById('flush-info-content');
+        container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading...</div>';
+        try {
+          lastFlushData = await fetchJSON('/api/admin/sheets/last-flush');
+          renderFlushContent();
+        } catch (e) {
+          container.innerHTML = '<div class="empty-state empty-state-danger">Failed to load</div>';
+        }
+      }
+
+      function renderFlushContent() {
+        var container = document.getElementById('flush-info-content');
+        if (!lastFlushData) return;
+
+        if (flushTab === 'json') {
+          container.innerHTML = '<div class="json-viewer">' + syntaxHighlight(JSON.stringify(lastFlushData, null, 2)) + '</div>';
+          return;
+        }
+
+        if (!lastFlushData.exists || !lastFlushData.run) {
+          container.innerHTML = '<div class="empty-state">No Sheets flush recorded yet</div>';
+          return;
+        }
+
+        var run = lastFlushData.run || {};
+        var row = Array.isArray(run.row) ? run.row : [];
+        var columnNames = [
+          'Date',
+          'Total Downloads',
+          'Success',
+          'Fail',
+          'Success Rate',
+          'Top Browser',
+          'Top OS',
+          'Top Country',
+          'Top Type',
+          'All Browsers',
+          'All OS',
+          'All Countries',
+          'All Languages',
+          'All File Types',
+          'All Errors',
+          'Ext Versions',
+          'Total Cancelled'
+        ];
+
+        var html = '<div class="batch-info-grid">';
+        html += '<div class="batch-info-row"><span class="batch-info-label">Status</span><span class="batch-info-value">' + escapeHtml(String(run.status || 'unknown')) + '</span></div>';
+        html += '<div class="batch-info-row"><span class="batch-info-label">Flushed At</span><span class="batch-info-value">' + fmtFullDateTime(run.flushedAtUtc) + (run.flushedAtUtc ? ' (' + timeAgo(run.flushedAtUtc) + ')' : '') + '</span></div>';
+        html += '<div class="batch-info-row"><span class="batch-info-label">Archived Day</span><span class="batch-info-value">' + escapeHtml(String(run.archivedDay || '--')) + '</span></div>';
+        html += '<div class="batch-info-row"><span class="batch-info-label">Sheet ID</span><span class="batch-info-value">' + escapeHtml(String(run.sheetId || '--')) + '</span></div>';
+        html += '<div class="batch-info-row"><span class="batch-info-label">API URL</span><span class="batch-info-value">' + escapeHtml(String(run.apiUrl || '--')) + '</span></div>';
+        if (run.error) {
+          html += '<div class="batch-info-row"><span class="batch-info-label">Error</span><span class="batch-info-value text-danger">' + escapeHtml(String(run.error)) + '</span></div>';
+        }
+        html += '</div>';
+
+        if (row.length > 0) {
+          html += '<div class="batch-info-grid" style="margin-top:12px">';
+          for (var i = 0; i < row.length; i++) {
+            var label = columnNames[i] || ('Column ' + (i + 1));
+            var value = row[i];
+            var display = typeof value === 'string' ? value : JSON.stringify(value);
+            html += '<div class="batch-info-row"><span class="batch-info-label">' + escapeHtml(label) + '</span><span class="batch-info-value">' + escapeHtml(String(display || '')) + '</span></div>';
+          }
+          html += '</div>';
+        }
+
         container.innerHTML = html;
       }
 
@@ -3283,7 +3689,8 @@
           document.getElementById("stat-success").textContent = fmtNumber(data.totalSuccess);
           document.getElementById("stat-fail").textContent = fmtNumber(data.totalFail);
           document.getElementById("stat-rate").textContent = fmtPct(data.successRate || 0);
-          document.getElementById("last-updated").textContent = "Last updated: " + new Date().toLocaleTimeString('en-US', { timeZone: 'UTC' });
+          var summaryTs = inferSummaryDataTimestampMs(data);
+          document.getElementById("last-updated").textContent = "Data updated (UTC): " + (summaryTs ? fmtUtcDateTimeFromMs(summaryTs) : "n/a");
 
           setAllTimeTop('browser', data.browsers || {});
           setAllTimeTop('os', data.os || {});
@@ -3385,15 +3792,11 @@
       }
 
       async function loadTopToday() {
-        var today = new Date();
-        var fromStr = today.toISOString().slice(0, 10);
-        var toStr = fromStr; // inclusive same-day
-        
         var dimensions = ['browser', 'os', 'type', 'country'];
         for (var i = 0; i < dimensions.length; i++) {
           var dim = dimensions[i];
           try {
-            var data = await fetchJSON('/api/stats/breakdown?dimension=' + dim + '&from=' + fromStr + '&to=' + toStr);
+            var data = await fetchJSON('/api/stats/breakdown?dimension=' + dim + '&range=today');
             var valueEl = document.getElementById('top-' + dim);
             var countEl = document.getElementById('top-' + dim + '-count');
             var tiedEl = document.getElementById('top-' + dim + '-tied');
@@ -3460,7 +3863,7 @@
           if (!data.points || !data.points.length) {
             chartContainer.innerHTML = '<div class="empty-state">No activity data</div>';
             logContainer.innerHTML = '<div class="empty-state">No events</div>';
-            document.getElementById('log-summary').style.display = 'none';
+            document.getElementById('log-summary').classList.add('hidden');
             return;
           }
 
@@ -3490,9 +3893,9 @@
           renderActivityCalendar(allTimeActivityPoints);
 
         } catch (e) {
-          chartContainer.innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed: ' + escapeHtml(e.message) + '</div>';
-          logContainer.innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed</div>';
-          document.getElementById('activity-calendar').innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed</div>';
+          chartContainer.innerHTML = '<div class="empty-state empty-state-danger">Failed: ' + escapeHtml(e.message) + '</div>';
+          logContainer.innerHTML = '<div class="empty-state empty-state-danger">Failed</div>';
+          document.getElementById('activity-calendar').innerHTML = '<div class="empty-state empty-state-danger">Failed</div>';
         }
       }
 
@@ -3572,9 +3975,9 @@
           
           tableHtml += '<tr class="' + rowClass + '">';
           tableHtml += '<td class="td-primary">' + escapeHtml(fmtTimestamp(p.timestamp, granularity)) + badges + '</td>';
-          tableHtml += '<td><div class="mini-bar"><div class="mini-bar-fill" style="width:' + barWidth + '%"></div></div>' + fmtNumber(p.downloads) + '</td>';
-          tableHtml += '<td style="color:var(--success)">' + fmtNumber(p.success) + '</td>';
-          tableHtml += '<td style="color:var(--danger)">' + fmtNumber(p.fail) + '</td>';
+          tableHtml += '<td><progress class="mini-progress" max="100" value="' + Math.round(barWidth) + '"></progress>' + fmtNumber(p.downloads) + '</td>';
+          tableHtml += '<td class="text-success">' + fmtNumber(p.success) + '</td>';
+          tableHtml += '<td class="text-danger">' + fmtNumber(p.fail) + '</td>';
           tableHtml += '<td><span class="badge ' + badgeClass + '">' + fmtPct(rate) + '</span></td>';
           tableHtml += '<td>' + trend + '</td>';
           tableHtml += '</tr>';
@@ -3584,7 +3987,7 @@
         logContainer.innerHTML = tableHtml;
 
         // Update summary
-        document.getElementById('log-summary').style.display = 'flex';
+        document.getElementById('log-summary').classList.remove('hidden');
         document.getElementById('summary-periods').textContent = points.length;
         document.getElementById('summary-peak').textContent = fmtNumber(maxDownloads);
         document.getElementById('summary-avg').textContent = fmtNumber(Math.round(avgDownloads));
@@ -3636,7 +4039,7 @@
           dayCounts[key] = (dayCounts[key] || 0) + (p.downloads || 0);
         });
 
-        var html = '<div style="font-size:12px;color:var(--text-secondary);margin-bottom:10px;">' +
+        var html = '<div class="calendar-caption">' +
           monthDate.toLocaleDateString('en-US', { timeZone: 'UTC', month: 'long', year: 'numeric' }) +
           '</div>';
         html += '<div class="calendar-grid">';
@@ -3644,7 +4047,7 @@
           html += '<div class="calendar-header-cell">' + label + '</div>';
         });
         for (var i = 0; i < firstWeekday; i++) {
-          html += '<div class="calendar-day" style="opacity:0.35;"></div>';
+          html += '<div class="calendar-day calendar-day-faded"></div>';
         }
         for (var d = 1; d <= daysInMonth; d++) {
           var iso = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
@@ -3675,7 +4078,9 @@
             fail: p.fail || 0,
             rate: fmtPct(p.successRate || 0)
           }).replace(/"/g, '&quot;');
-          html += '<div class="chart-bar-wrapper"><div class="chart-bar" style="height:' + height + '%" data-point=\'' + tooltipData + '\'></div></div>';
+          var y = Math.max(0, 100 - height);
+          var barHeight = Math.max(height, 2);
+          html += '<div class="chart-bar-wrapper"><svg class="chart-bar-svg" viewBox="0 0 10 100" preserveAspectRatio="none" data-point=\'' + tooltipData + '\'><rect class="chart-bar-rect" x="0" y="' + y + '" width="10" height="' + barHeight + '"></rect></svg></div>';
         });
 
         html += '</div><div class="chart-x-axis">';
@@ -3704,7 +4109,7 @@
       }
 
       function bindChartBarHover(container) {
-        container.querySelectorAll('.chart-bar').forEach(function(bar) {
+        container.querySelectorAll('.chart-bar-svg').forEach(function(bar) {
           if (bar.dataset.hoverBound === '1') return;
           bar.dataset.hoverBound = '1';
           bar.addEventListener('mouseenter', handleBarHover);
@@ -3733,13 +4138,13 @@
             data.values.slice(0, 5).forEach(function(v) {
               var pct = (v.count / maxCount) * 100;
               html += '<div class="breakdown-bar-item"><span class="breakdown-bar-label">' + escapeHtml(v.value || 'Unknown') + '</span>';
-              html += '<div class="breakdown-bar-track"><div class="breakdown-bar-fill ' + colors[i] + '" style="width:' + pct + '%"><span class="breakdown-bar-value">' + Math.round(pct) + '%</span></div></div>';
+              html += '<div class="breakdown-bar-track"><progress class="breakdown-progress ' + colors[i] + '" max="100" value="' + Math.round(pct) + '"></progress><span class="breakdown-progress-value">' + Math.round(pct) + '%</span></div>';
               html += '<span class="breakdown-bar-count">' + fmtNumber(v.count) + '</span></div>';
             });
             html += '</div>';
             container.innerHTML = html;
           } catch (e) {
-            container.innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed</div>';
+            container.innerHTML = '<div class="empty-state empty-state-danger">Failed</div>';
           }
         }
 
@@ -3754,7 +4159,7 @@
           }
           renderBarChart(dailyContainer, data.points, 'day');
         } catch (e) {
-          dailyContainer.innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed</div>';
+          dailyContainer.innerHTML = '<div class="empty-state empty-state-danger">Failed</div>';
         }
       }
 
@@ -3866,7 +4271,7 @@
 
           container.innerHTML = html;
         } catch (e) {
-          container.innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed to load: ' + escapeHtml(e.message) + '</div>';
+          container.innerHTML = '<div class="empty-state empty-state-danger">Failed to load: ' + escapeHtml(e.message) + '</div>';
         }
       }
 
@@ -3929,13 +4334,11 @@
         if (url) {
           node.href = url;
           node.removeAttribute('aria-disabled');
-          node.style.opacity = '1';
-          node.style.pointerEvents = 'auto';
+          node.classList.remove('disabled-link');
         } else {
           node.href = '#';
           node.setAttribute('aria-disabled', 'true');
-          node.style.opacity = '0.55';
-          node.style.pointerEvents = 'none';
+          node.classList.add('disabled-link');
         }
       }
 
@@ -3948,12 +4351,24 @@
           applyInfraLink('infra-link-github', links.githubRepo || DEFAULT_INFRA_LINKS.githubRepo);
           applyInfraLink('infra-link-sheets', links.googleSheets || DEFAULT_INFRA_LINKS.googleSheets);
           applyInfraLink('infra-link-figma', links.figmaDesign || DEFAULT_INFRA_LINKS.figmaDesign);
+          applyInfraLink('infra-link-chrome-dev', links.chromeDevDashboard || DEFAULT_INFRA_LINKS.chromeDevDashboard);
+          applyInfraLink('infra-link-firefox-dev', links.firefoxDevDashboard || DEFAULT_INFRA_LINKS.firefoxDevDashboard);
+          applyInfraLink('infra-link-edge-dev', links.edgeDevDashboard || DEFAULT_INFRA_LINKS.edgeDevDashboard);
+          applyInfraLink('infra-link-chrome-store', links.chromeStoreListing || DEFAULT_INFRA_LINKS.chromeStoreListing);
+          applyInfraLink('infra-link-firefox-store', links.firefoxStoreListing || DEFAULT_INFRA_LINKS.firefoxStoreListing);
+          applyInfraLink('infra-link-edge-store', links.edgeStoreListing || DEFAULT_INFRA_LINKS.edgeStoreListing);
         } catch (_) {
           applyInfraLink('infra-link-cloudflare', DEFAULT_INFRA_LINKS.cloudflare);
           applyInfraLink('infra-link-uptime', DEFAULT_INFRA_LINKS.uptimeKuma);
           applyInfraLink('infra-link-github', DEFAULT_INFRA_LINKS.githubRepo);
           applyInfraLink('infra-link-sheets', DEFAULT_INFRA_LINKS.googleSheets);
           applyInfraLink('infra-link-figma', DEFAULT_INFRA_LINKS.figmaDesign);
+          applyInfraLink('infra-link-chrome-dev', DEFAULT_INFRA_LINKS.chromeDevDashboard);
+          applyInfraLink('infra-link-firefox-dev', DEFAULT_INFRA_LINKS.firefoxDevDashboard);
+          applyInfraLink('infra-link-edge-dev', DEFAULT_INFRA_LINKS.edgeDevDashboard);
+          applyInfraLink('infra-link-chrome-store', DEFAULT_INFRA_LINKS.chromeStoreListing);
+          applyInfraLink('infra-link-firefox-store', DEFAULT_INFRA_LINKS.firefoxStoreListing);
+          applyInfraLink('infra-link-edge-store', DEFAULT_INFRA_LINKS.edgeStoreListing);
         }
       }
 
@@ -3969,28 +4384,41 @@
           loadTargetsErr = String((e && e.message) || e || 'Unknown error');
         }
         if (loadTargetsErr) {
-          container.innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed to load deployment targets: ' + escapeHtml(loadTargetsErr) + '</div>';
+          container.innerHTML = '<div class="empty-state empty-state-danger">Failed to load deployment targets: ' + escapeHtml(loadTargetsErr) + '</div>';
         } else {
           var html = '';
           targets.forEach(function(item) {
             var key = String(item.recordKey || '');
             var v = item.data || {};
+            var hasUsersCount = Object.prototype.hasOwnProperty.call(v, 'usersCount') && parseMaybeNumber(v.usersCount) !== null;
+            var hasRatingCount = Object.prototype.hasOwnProperty.call(v, 'ratingCount') && parseMaybeNumber(v.ratingCount) !== null;
+            var hasLatency = Object.prototype.hasOwnProperty.call(v, 'syncLatencyMs') && parseMaybeNumber(v.syncLatencyMs) !== null;
+            var usersCountText = fmtNumberOrNA(v.usersCount, hasUsersCount);
+            var ratingCountText = fmtNumberOrNA(v.ratingCount, hasRatingCount);
+            var latencyText = hasLatency ? fmtNumber(parseMaybeNumber(v.syncLatencyMs)) + 'ms' : 'N/A';
+            var sourceText = item.updatedAt > 0 ? 'Database' : 'Template';
+            var updatedAtText = item.updatedAt > 0 ? fmtUtcDateTimeFromMs(item.updatedAt) : 'never';
             var statusBadge = '';
             if (v.syncStatus === 'ok') statusBadge = '<span class="pill">Synced</span>';
-            if (v.syncStatus === 'error') statusBadge = '<span class="pill" style="border-color:rgba(239,68,68,0.55);color:#fecaca;">Sync Error</span>';
+            if (v.syncStatus === 'error') statusBadge = '<span class="pill pill-error">Sync Error</span>';
             var usersId = deploymentInputId('users', key);
             var versionId = deploymentInputId('version', key);
+            var ratingId = deploymentInputId('rating', key);
+            var ratingCountId = deploymentInputId('ratingCount', key);
             var urlId = deploymentInputId('url', key);
             html += '<div class="deployment-card">';
-            html += '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;">';
-            html += '<div style="font-weight:600;">' + escapeHtml(v.name || key) + '</div>';
+            html += '<div class="deployment-card-head">';
+            html += '<div class="deployment-card-title">' + escapeHtml(v.name || key) + '</div>';
             html += statusBadge;
             html += '</div>';
-            html += '<div style="display:grid;gap:8px;">';
+            html += '<div class="deployment-card-body">';
             html += '<input class="auth-input" id="' + escapeHtml(usersId) + '" placeholder="Users" value="' + escapeHtml(v.users || '') + '"/>';
             html += '<input class="auth-input" id="' + escapeHtml(versionId) + '" placeholder="Current version" value="' + escapeHtml(v.version || '') + '"/>';
+            html += '<input class="auth-input" id="' + escapeHtml(ratingId) + '" placeholder="Rating (e.g. 5.0)" value="' + escapeHtml(v.rating || '') + '"/>';
+            html += '<input class="auth-input" id="' + escapeHtml(ratingCountId) + '" placeholder="Rating count" value="' + escapeHtml(v.ratingCount || '') + '"/>';
             html += '<input class="auth-input" id="' + escapeHtml(urlId) + '" placeholder="Store dashboard URL" value="' + escapeHtml(v.url || '') + '"/>';
-            html += '<div class="pill-row"><span class="pill">UsersCount: ' + fmtNumber(Number(v.usersCount || 0)) + '</span><span class="pill">Latency: ' + fmtNumber(Number(v.syncLatencyMs || 0)) + 'ms</span></div>';
+            html += '<div class="pill-row"><span class="pill">UsersCount: ' + escapeHtml(usersCountText) + '</span><span class="pill">RatingCount: ' + escapeHtml(ratingCountText) + '</span><span class="pill">Latency: ' + escapeHtml(latencyText) + '</span></div>';
+            html += '<div class="pill-row"><span class="pill">Source: ' + escapeHtml(sourceText) + '</span><span class="pill">Updated (UTC): ' + escapeHtml(updatedAtText) + '</span></div>';
             html += '<button class="btn btn-secondary" data-action="save-deployment-card" data-record-key="' + escapeHtml(key) + '">Save</button>';
             html += '</div></div>';
           });
@@ -4002,12 +4430,10 @@
         var out = document.getElementById('deployment-sync-output');
         if (!out) return;
         out.textContent = JSON.stringify(payload || {}, null, 2);
-        out.style.display = 'block';
+        out.classList.remove('hidden');
       }
 
       async function syncDeploymentTargets() {
-        var ok = await ensureStepUp();
-        if (!ok) return;
         try {
           var data = await fetchJSONWithInit('/api/admin/deployments/sync', {
             method: 'POST',
@@ -4024,14 +4450,18 @@
       async function saveDeploymentCard(key) {
         var usersEl = document.getElementById(deploymentInputId('users', key));
         var versionEl = document.getElementById(deploymentInputId('version', key));
+        var ratingEl = document.getElementById(deploymentInputId('rating', key));
+        var ratingCountEl = document.getElementById(deploymentInputId('ratingCount', key));
         var urlEl = document.getElementById(deploymentInputId('url', key));
-        if (!usersEl || !versionEl || !urlEl) {
+        if (!usersEl || !versionEl || !ratingEl || !ratingCountEl || !urlEl) {
           setDeploymentSyncOutput({ ok: false, error: 'Deployment inputs are missing for key: ' + String(key || '') });
           return;
         }
         var record = {
           users: usersEl.value,
           version: versionEl.value,
+          rating: ratingEl.value,
+          ratingCount: ratingCountEl.value,
           url: urlEl.value
         };
         var ok = await ensureStepUp();
@@ -4082,15 +4512,15 @@
             html += '<h4>' + escapeHtml(d.title || item.recordKey) + '</h4>';
             html += '<div class="creative-meta">Subject: ' + escapeHtml(d.subject || 'n/a') + '</div>';
             html += '<div class="pill-row"><span class="pill">Version: ' + escapeHtml(d.version || 'n/a') + '</span><span class="pill">Schedule: ' + escapeHtml(d.scheduledAt || 'manual') + '</span></div>';
-            html += '<div style="font-size:12px;white-space:pre-wrap;max-height:120px;overflow:auto;">' + escapeHtml(htmlBody.slice(0, 800)) + '</div>';
-            html += '<div style="display:flex;gap:8px;flex-wrap:wrap;">';
+            html += '<div class="creative-preview">' + escapeHtml(htmlBody.slice(0, 800)) + '</div>';
+            html += '<div class="inline-btn-row">';
             html += '<button class="btn btn-secondary" data-action="copy-email-html" data-html="' + escapeHtml(htmlBody) + '">Copy HTML</button>';
             html += '<button class="btn btn-danger" data-action="delete-creative-email" data-record-key="' + escapeHtml(item.recordKey || '') + '">Delete</button>';
             html += '</div></div>';
           });
           container.innerHTML = html;
         } catch (e) {
-          container.innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed to load email templates</div>';
+          container.innerHTML = '<div class="empty-state empty-state-danger">Failed to load email templates</div>';
         }
       }
 
@@ -4176,7 +4606,7 @@
               '<span class="newsletter-tag">Unsubscribed: ' + fmtNumber(counts.unsubscribed) + '</span>';
           }
         } catch (e) {
-          container.innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed to load subscribers</div>';
+          container.innerHTML = '<div class="empty-state empty-state-danger">Failed to load subscribers</div>';
           if (summary) summary.innerHTML = '';
         }
       }
@@ -4221,26 +4651,48 @@
 
       async function loadNotifications() {
         var container = document.getElementById('notification-counters');
+        var freshness = document.getElementById('notification-freshness');
         if (!container) return;
         container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading...</div>';
+        if (freshness) freshness.textContent = 'Source: loading...';
         try {
           var githubPayload = await fetchJSON('/api/admin/github/open-counts');
           if (!githubPayload || githubPayload.ok === false) {
             throw new Error((githubPayload && githubPayload.error) ? githubPayload.error : 'github_unreachable');
           }
+          var known = {
+            openIssues: githubPayload.issuesKnown !== false,
+            openPRs: githubPayload.prsKnown !== false,
+            branches: githubPayload.branchesKnown !== false,
+            discussions: githubPayload.discussionsKnown !== false
+          };
           var github = {
             openIssues: Number(githubPayload.openIssues || 0),
             openPRs: Number(githubPayload.openPRs || 0),
             branches: Number(githubPayload.branches || 0),
             discussions: Number(githubPayload.discussions || 0)
           };
+          function renderNotificationCard(label, value, isKnown) {
+            var shown = isKnown ? fmtNumber(value) : 'N/A';
+            var valueClass = isKnown ? 'stat-value' : 'stat-value status-warning';
+            return '<div class="stat-card2"><div class="stat-label">' + label + '</div><div class="' + valueClass + '">' + shown + '</div></div>';
+          }
           container.innerHTML =
-            '<div class="stat-card2"><div class="stat-label">🐛 Open Issues</div><div class="stat-value">' + fmtNumber(github.openIssues || 0) + '</div></div>' +
-            '<div class="stat-card2"><div class="stat-label">🔀 Open PRs</div><div class="stat-value">' + fmtNumber(github.openPRs || 0) + '</div></div>' +
-            '<div class="stat-card2"><div class="stat-label">🌿 Branches</div><div class="stat-value">' + fmtNumber(github.branches || 0) + '</div></div>' +
-            '<div class="stat-card2"><div class="stat-label">💬 Discussions</div><div class="stat-value">' + fmtNumber(github.discussions || 0) + '</div></div>';
+            renderNotificationCard('🐛 Open Issues', github.openIssues || 0, known.openIssues) +
+            renderNotificationCard('🔀 Open PRs', github.openPRs || 0, known.openPRs) +
+            renderNotificationCard('🌿 Branches', github.branches || 0, known.branches) +
+            renderNotificationCard('💬 Discussions', github.discussions || 0, known.discussions);
+          if (freshness) {
+            var sourceCode = String(githubPayload.source || (githubPayload.stale ? 'stale_cache' : (githubPayload.cached ? 'cache' : 'live')));
+            var parts = ['Source: ' + sourceLabelFromCode(sourceCode)];
+            var fetchedAt = fmtUtcDateTimeFromMs(githubPayload.fetchedAt);
+            if (fetchedAt !== 'n/a') parts.push('Fetched (UTC): ' + fetchedAt);
+            if (githubPayload.partial) parts.push('Partial data');
+            freshness.textContent = parts.join(' | ');
+          }
         } catch (e) {
-          container.innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed to load GitHub counters: ' + escapeHtml(String((e && e.message) || e || 'unknown')) + '</div>';
+          container.innerHTML = '<div class="empty-state empty-state-danger">Failed to load GitHub counters: ' + escapeHtml(String((e && e.message) || e || 'unknown')) + '</div>';
+          if (freshness) freshness.textContent = 'Source: unavailable';
         }
       }
 
@@ -4248,7 +4700,7 @@
         var out = document.getElementById('oracle-logs-output');
         if (!out) return;
         out.textContent = JSON.stringify(payload, null, 2);
-        out.style.display = 'block';
+        out.classList.remove('hidden');
       }
 
       async function loadOracleLogs() {
@@ -4273,17 +4725,17 @@
           html += '<th>Latency</th>';
           html += '</tr></thead><tbody>';
           logs.forEach(function(row) {
-            var statusColor = (row.result === 'ok') ? 'var(--success)' : 'var(--danger)';
+            var statusClass = (row.result === 'ok') ? 'log-status-ok' : 'log-status-error';
             var actor = (row.userId || 'anonymous') + ' (' + (row.role || 'viewer') + ')';
             var reqInfo = (row.method || '') + ' ' + (row.path || '');
             var resourceInfo = (row.resourceType || '-') + ' / ' + (row.resourceId || '-');
             html += '<tr>';
             html += '<td class="td-primary">' + escapeHtml(fmtFullDateTime(row.tsUtc)) + '</td>';
             html += '<td><span class="badge badge-warning">' + escapeHtml(row.actionType || '-') + '</span></td>';
-            html += '<td style="max-width:220px;word-break:break-word;">' + escapeHtml(resourceInfo) + '</td>';
-            html += '<td style="max-width:180px;word-break:break-word;">' + escapeHtml(actor) + '</td>';
-            html += '<td style="max-width:360px;word-break:break-word;font-family:monospace;font-size:11px;">' + escapeHtml(reqInfo) + '</td>';
-            html += '<td><span style="color:' + statusColor + ';">' + escapeHtml(String(row.statusCode || '')) + ' (' + escapeHtml(row.result || '') + ')</span></td>';
+            html += '<td class="log-cell-resource">' + escapeHtml(resourceInfo) + '</td>';
+            html += '<td class="log-cell-actor">' + escapeHtml(actor) + '</td>';
+            html += '<td class="log-cell-request">' + escapeHtml(reqInfo) + '</td>';
+            html += '<td><span class="' + statusClass + '">' + escapeHtml(String(row.statusCode || '')) + ' (' + escapeHtml(row.result || '') + ')</span></td>';
             html += '<td>' + escapeHtml(String(row.latencyMs || 0)) + 'ms</td>';
             html += '</tr>';
           });
@@ -4291,7 +4743,7 @@
           container.innerHTML = html;
           setOracleLogsOutput({ ok: true, count: logs.length, latestTsUtc: logs[0].tsUtc || 0 });
         } catch (e) {
-          container.innerHTML = '<div class="empty-state" style="color:var(--danger)">Failed to load logs</div>';
+          container.innerHTML = '<div class="empty-state empty-state-danger">Failed to load logs</div>';
           setOracleLogsOutput({ ok: false, error: String(e) });
         }
       }
@@ -4407,7 +4859,7 @@
         var out = document.getElementById('danger-output');
         if (!out) return;
         out.textContent = JSON.stringify(payload, null, 2);
-        out.style.display = 'block';
+        out.classList.remove('hidden');
       }
 
       async function dangerDryRun(scope) {
@@ -4561,6 +5013,7 @@
         { combo: 'Cmd/Ctrl+0', desc: 'Go to Danger Zone', run: function() { showPage('danger'); } },
         { combo: 'Cmd/Ctrl+R', desc: 'Refresh all data', run: function() { refreshAll(); } },
         { combo: 'Cmd/Ctrl+B', desc: 'Open last batch modal', run: function() { showBatchModal(); } },
+        { combo: 'Cmd/Ctrl+Shift+B', desc: 'Open last sheets flush modal', run: function() { showFlushModal(); } },
         { combo: 'Cmd/Ctrl+Shift+D', desc: 'Sync deployment stores', run: function() { syncDeploymentTargets(); } },
         { combo: 'Cmd/Ctrl+Shift+S', desc: 'Open step-up modal', run: function() { openStepUpModal(); } },
         { combo: 'Cmd/Ctrl+/', desc: 'Open shortcuts help', run: function() { openShortcutsModal(); } }
@@ -4620,6 +5073,7 @@
         if (!withShift && key === '0') { showPage('danger'); return true; }
         if (!withShift && key === 'r') { refreshAll(); return true; }
         if (!withShift && key === 'b') { showBatchModal(); return true; }
+        if (withShift && key === 'b') { showFlushModal(); return true; }
         if (withShift && key === 'd') { syncDeploymentTargets(); return true; }
         if (withShift && key === 's') { openStepUpModal(); return true; }
         if (!withShift && key === '/') { openShortcutsModal(); return true; }
@@ -4677,6 +5131,8 @@
           ['shortcuts-btn-mobile', openShortcutsModal],
           ['batch-btn', showBatchModal],
           ['batch-btn-mobile', showBatchModal],
+          ['flush-btn', showFlushModal],
+          ['flush-btn-mobile', showFlushModal],
           ['refresh-btn', refreshAll],
           ['refresh-btn-mobile', refreshAll],
           ['deployment-sync-btn', syncDeploymentTargets],
@@ -4698,7 +5154,8 @@
           ['danger-logs-dry-run-btn', function() { dangerDeleteOlderLogs(true); }],
           ['danger-logs-delete-older-btn', function() { dangerDeleteOlderLogs(false); }],
           ['danger-logs-delete-all-btn', dangerDeleteAllLogs],
-          ['batch-modal-close-btn', closeBatchModal]
+          ['batch-modal-close-btn', closeBatchModal],
+          ['flush-modal-close-btn', closeFlushModal]
         ].forEach(function(entry) {
           var node = document.getElementById(entry[0]);
           if (!node || node.dataset.boundClick === '1') return;
@@ -4741,6 +5198,31 @@
             if (!btn) return;
             ev.preventDefault();
             setBatchTab(btn.getAttribute('data-batch-tab'));
+          });
+        }
+
+        var flushModal = document.getElementById('flush-modal');
+        if (flushModal && flushModal.dataset.boundClick !== '1') {
+          flushModal.dataset.boundClick = '1';
+          flushModal.addEventListener('click', function(ev) {
+            if (ev.target === flushModal) closeFlushModal();
+          });
+        }
+        var flushModalCard = flushModal ? flushModal.querySelector('.modal') : null;
+        if (flushModalCard && flushModalCard.dataset.boundClick !== '1') {
+          flushModalCard.dataset.boundClick = '1';
+          flushModalCard.addEventListener('click', function(ev) {
+            ev.stopPropagation();
+          });
+        }
+        var flushTabs = document.getElementById('flush-modal-tabs');
+        if (flushTabs && flushTabs.dataset.boundClick !== '1') {
+          flushTabs.dataset.boundClick = '1';
+          flushTabs.addEventListener('click', function(ev) {
+            var btn = ev.target.closest('[data-flush-tab]');
+            if (!btn) return;
+            ev.preventDefault();
+            setFlushTab(btn.getAttribute('data-flush-tab'));
           });
         }
 
@@ -4827,6 +5309,7 @@
           if (e.key === 'Escape') {
             closeShortcutsModal();
             closeBatchModal();
+            closeFlushModal();
             closeStepUpModal();
           }
         });
