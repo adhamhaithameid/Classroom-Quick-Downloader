@@ -186,8 +186,6 @@ function isColorDark(hexColor: string): boolean {
  * Returns value between 0 (identical) and ~441 (opposite)
  */
 function getColorDistance(hex1: string, hex2: string): number {
-  const c1 = hexToHsl(hex1); // Use HSL for better perceptual tracking? Actually RGB is easier for simple diff
-  // Let's use RGB for distance
   const r1 = parseInt(hex1.slice(1, 3), 16);
   const g1 = parseInt(hex1.slice(3, 5), 16);
   const b1 = parseInt(hex1.slice(5, 7), 16);
@@ -279,12 +277,10 @@ function getDistinctColorForTypeAtPosition(
 
 function App() {
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [tabId, setTabId] = useState<number | null>(null);
 
   const [isClassroomTab, setIsClassroomTab] = useState(false);
   const [loadingState, setLoadingState] = useState(true);
 
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState<string | null>(null);
 
@@ -351,7 +347,6 @@ function App() {
       }
       if (tabs && tabs.length > 0) {
         const url = tabs[0].url || '';
-        setTabId(tabs[0].id || null);
         // Use proper URL parsing to avoid security issues with substring matching
         try {
           const parsedUrl = new URL(url);
@@ -840,7 +835,7 @@ function App() {
                       label="Enable Extension"
                       description="Turn the extension on or off globally."
                       checked={settings?.extensionEnabled ?? true}
-                      loading={isLoadingSettings || saving}
+                      loading={isLoadingSettings}
                       onToggle={handleToggleExtension}
                       disabled={isLoadingSettings}
                       primary
