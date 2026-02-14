@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
+	"time"
 )
 
 func TestParseStoreStatsFromHTML(t *testing.T) {
@@ -24,6 +26,22 @@ func TestParseStoreStatsFromHTML(t *testing.T) {
 	}
 	if version != "6.0.0" {
 		t.Fatalf("expected version 6.0.0, got %q", version)
+	}
+}
+
+func TestParseStoreStatsFullFromHTML_WithRatings(t *testing.T) {
+	stats := parseStoreStatsFullFromHTML("chrome", `<div>5.0 (8 ratings)</div><div>251 users</div><div>Version 1.1.1</div>`)
+	if stats.users != "251" {
+		t.Fatalf("expected users 251, got %q", stats.users)
+	}
+	if stats.version != "1.1.1" {
+		t.Fatalf("expected version 1.1.1, got %q", stats.version)
+	}
+	if stats.rating != "5.0" {
+		t.Fatalf("expected rating 5.0, got %q", stats.rating)
+	}
+	if stats.ratingCount != 8 {
+		t.Fatalf("expected ratingCount 8, got %d", stats.ratingCount)
 	}
 }
 
@@ -45,20 +63,65 @@ func TestParseApproxUsersCount(t *testing.T) {
 	}
 }
 
+func TestExtractStoreRating_MetaAndText(t *testing.T) {
+	rating, count := extractStoreRating(`<meta itemprop="ratingValue" content="5"><meta itemprop="ratingCount" content="2">`)
+	if rating != "5.0" || count != 2 {
+		t.Fatalf("expected 5.0/2 from meta, got %q/%d", rating, count)
+	}
+	rating, count = extractStoreRating(`Rated 4.8 by 123 reviewers`)
+	if rating != "4.8" || count != 123 {
+		t.Fatalf("expected 4.8/123 from text, got %q/%d", rating, count)
+	}
+}
+
+func TestExtractEdgeCRXIDFromPath(t *testing.T) {
+	got := extractEdgeCRXIDFromPath("/addons/detail/classroom-quick-downloader/ecojbijjkcjdolpeoiemnccgmaeomcmn")
+	if got != "ecojbijjkcjdolpeoiemnccgmaeomcmn" {
+		t.Fatalf("unexpected crx id: %q", got)
+	}
+}
+
+func TestFetchEdgeStoreStatsByDetailsAPI(t *testing.T) {
+	const edgeCRXID = "ecojbijjkcjdolpeoiemnccgmaeomcmn"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/addons/getproductdetailsbycrxid/"+edgeCRXID {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write([]byte(`{"activeInstallCount":9,"averageRating":5,"ratingCount":1,"version":"1.1.1"}`))
+	}))
+	defer server.Close()
+
+	stats, err := fetchEdgeStoreStatsByDetailsAPI(context.Background(), server.Client(), server.URL+"/addons/detail/classroom-quick-downloader/"+edgeCRXID)
+	if err != nil {
+		t.Fatalf("fetchEdgeStoreStatsByDetailsAPI failed: %v", err)
+	}
+	if stats.users != "9" || stats.usersCount != 9 {
+		t.Fatalf("unexpected users payload: %+v", stats)
+	}
+	if stats.version != "1.1.1" {
+		t.Fatalf("unexpected version: %+v", stats)
+	}
+	if stats.rating != "5.0" || stats.ratingCount != 1 {
+		t.Fatalf("unexpected rating payload: %+v", stats)
+	}
+}
+
 func TestDeploymentsSyncHandlerWithClient(t *testing.T) {
 	sqlDB := newAdminTestDB(t)
 	defer sqlDB.Close()
 	t.Setenv("ORACLE_ALLOW_UNTRUSTED_STORE_URLS", "true")
 	t.Setenv("ORACLE_ALLOW_HTTP_STORE_URLS", "true")
+	const edgeCRXID = "ecojbijjkcjdolpeoiemnccgmaeomcmn"
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/chrome":
-			_, _ = w.Write([]byte(`<script>{"users":"120K","version":"5.9.1"}</script>`))
+			_, _ = w.Write([]byte(`<script>{"users":"120K","version":"5.9.1"}</script><div>4.7 (21 ratings)</div>`))
 		case "/firefox":
-			_, _ = w.Write([]byte(`<div>Users 12,345</div><div>Version 6.0.0</div>`))
-		case "/edge":
-			_, _ = w.Write([]byte(`<div>1.2M users</div><div>Version 6.1.0</div>`))
+			_, _ = w.Write([]byte(`<div>Users 12,345</div><div>Version 6.0.0</div><div>5 (2 reviews)</div>`))
+		case "/addons/getproductdetailsbycrxid/" + edgeCRXID:
+			_, _ = w.Write([]byte(`{"activeInstallCount":9,"averageRating":5,"ratingCount":1,"version":"6.1.0"}`))
 		default:
 			http.NotFound(w, r)
 		}
@@ -72,7 +135,7 @@ func TestDeploymentsSyncHandlerWithClient(t *testing.T) {
 	if err := store.upsertRecord(context.Background(), "deployment_target", "firefox", map[string]any{"url": server.URL + "/firefox"}); err != nil {
 		t.Fatalf("seed firefox record failed: %v", err)
 	}
-	if err := store.upsertRecord(context.Background(), "deployment_target", "edge", map[string]any{"url": server.URL + "/edge"}); err != nil {
+	if err := store.upsertRecord(context.Background(), "deployment_target", "edge", map[string]any{"url": server.URL + "/addons/detail/classroom-quick-downloader/" + edgeCRXID}); err != nil {
 		t.Fatalf("seed edge record failed: %v", err)
 	}
 
@@ -92,6 +155,7 @@ func TestDeploymentsSyncHandlerWithClient(t *testing.T) {
 			Key     string `json:"key"`
 			Status  string `json:"status"`
 			Version string `json:"version"`
+			Rating  string `json:"rating"`
 		} `json:"results"`
 	}
 	if err := json.Unmarshal(rr.Body.Bytes(), &payload); err != nil {
@@ -106,6 +170,8 @@ func TestDeploymentsSyncHandlerWithClient(t *testing.T) {
 		t.Fatalf("list deployment records failed: %v", err)
 	}
 	versions := map[string]string{}
+	storedRatings := map[string]string{}
+	storedRatingCounts := map[string]int64{}
 	for _, row := range records {
 		var m map[string]any
 		if err := json.Unmarshal(row.Data, &m); err != nil {
@@ -113,6 +179,15 @@ func TestDeploymentsSyncHandlerWithClient(t *testing.T) {
 		}
 		if v, _ := m["version"].(string); v != "" {
 			versions[row.RecordKey] = v
+		}
+		if v, _ := m["rating"].(string); v != "" {
+			storedRatings[row.RecordKey] = v
+		}
+		switch v := m["ratingCount"].(type) {
+		case float64:
+			storedRatingCounts[row.RecordKey] = int64(v)
+		case int64:
+			storedRatingCounts[row.RecordKey] = v
 		}
 	}
 	if versions["chrome"] != "5.9.1" {
@@ -124,22 +199,46 @@ func TestDeploymentsSyncHandlerWithClient(t *testing.T) {
 	if versions["edge"] != "6.1.0" {
 		t.Fatalf("expected edge version to be updated, got %q", versions["edge"])
 	}
+	if storedRatings["chrome"] != "4.7" || storedRatingCounts["chrome"] != 21 {
+		t.Fatalf("expected chrome rating/ratingCount to be stored, got rating=%q count=%d", storedRatings["chrome"], storedRatingCounts["chrome"])
+	}
+	if storedRatings["firefox"] != "5.0" || storedRatingCounts["firefox"] != 2 {
+		t.Fatalf("expected firefox rating/ratingCount to be stored, got rating=%q count=%d", storedRatings["firefox"], storedRatingCounts["firefox"])
+	}
+	if storedRatings["edge"] != "5.0" || storedRatingCounts["edge"] != 1 {
+		t.Fatalf("expected edge rating/ratingCount to be stored, got rating=%q count=%d", storedRatings["edge"], storedRatingCounts["edge"])
+	}
+
+	ratings := map[string]string{}
+	for _, result := range payload.Results {
+		ratings[result.Key] = result.Rating
+	}
+	if ratings["chrome"] != "4.7" {
+		t.Fatalf("expected chrome rating to be updated, got %q", ratings["chrome"])
+	}
+	if ratings["firefox"] != "5.0" {
+		t.Fatalf("expected firefox rating to be updated, got %q", ratings["firefox"])
+	}
+	if ratings["edge"] != "5.0" {
+		t.Fatalf("expected edge rating to be updated, got %q", ratings["edge"])
+	}
 }
 
-func TestDeploymentsSyncHandler_DoesNotCountPersistFailuresAsSuccess(t *testing.T) {
+func TestSyncDeploymentTargets(t *testing.T) {
 	sqlDB := newAdminTestDB(t)
 	defer sqlDB.Close()
 	t.Setenv("ORACLE_ALLOW_UNTRUSTED_STORE_URLS", "true")
 	t.Setenv("ORACLE_ALLOW_HTTP_STORE_URLS", "true")
+	const edgeCRXID = "ecojbijjkcjdolpeoiemnccgmaeomcmn"
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/chrome":
-			_, _ = w.Write([]byte(`<script>{"users":"120K","version":"5.9.1"}</script>`))
+			_, _ = w.Write([]byte(`<div>251 users</div><div>Version 1.1.1</div><div>5.0 (8 ratings)</div>`))
 		case "/firefox":
-			_, _ = w.Write([]byte(`<div>Users 12,345</div><div>Version 6.0.0</div>`))
-		case "/edge":
-			_, _ = w.Write([]byte(`<div>1.2M users</div><div>Version 6.1.0</div>`))
+			_, _ = w.Write([]byte(`<div>11 Users</div><div>Version 1.1.1</div><div>5 (2 reviews)</div>`))
+		case "/addons/getproductdetailsbycrxid/" + edgeCRXID:
+			_, _ = w.Write([]byte(`{"activeInstallCount":9,"averageRating":5,"ratingCount":1,"version":"1.1.1"}`))
 		default:
 			http.NotFound(w, r)
 		}
@@ -153,7 +252,221 @@ func TestDeploymentsSyncHandler_DoesNotCountPersistFailuresAsSuccess(t *testing.
 	if err := store.upsertRecord(context.Background(), "deployment_target", "firefox", map[string]any{"url": server.URL + "/firefox"}); err != nil {
 		t.Fatalf("seed firefox record failed: %v", err)
 	}
-	if err := store.upsertRecord(context.Background(), "deployment_target", "edge", map[string]any{"url": server.URL + "/edge"}); err != nil {
+	if err := store.upsertRecord(context.Background(), "deployment_target", "edge", map[string]any{"url": server.URL + "/addons/detail/classroom-quick-downloader/" + edgeCRXID}); err != nil {
+		t.Fatalf("seed edge record failed: %v", err)
+	}
+
+	targetSet := map[string]struct{}{"chrome": {}, "firefox": {}, "edge": {}}
+	results, okCount, err := syncDeploymentTargets(context.Background(), store, sqlDB, server.Client(), nil, targetSet, false, false)
+	if err != nil {
+		t.Fatalf("syncDeploymentTargets failed: %v", err)
+	}
+	if len(results) != 3 || okCount != 3 {
+		t.Fatalf("unexpected sync totals: len=%d ok=%d", len(results), okCount)
+	}
+}
+
+func TestStartDeploymentsAutoSyncLoop_RunsImmediately(t *testing.T) {
+	sqlDB := newAdminTestDB(t)
+	defer sqlDB.Close()
+	t.Setenv("ORACLE_ALLOW_UNTRUSTED_STORE_URLS", "true")
+	t.Setenv("ORACLE_ALLOW_HTTP_STORE_URLS", "true")
+	const edgeCRXID = "ecojbijjkcjdolpeoiemnccgmaeomcmn"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/chrome":
+			_, _ = w.Write([]byte(`<div>250 users</div><div>Version 7.0.0</div><div>5.0 (10 ratings)</div>`))
+		case "/firefox":
+			_, _ = w.Write([]byte(`<div>100 users</div><div>Version 7.0.1</div><div>4.9 (9 reviews)</div>`))
+		case "/addons/getproductdetailsbycrxid/" + edgeCRXID:
+			_, _ = w.Write([]byte(`{"activeInstallCount":50,"averageRating":5,"ratingCount":7,"version":"7.0.2"}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	store := newControlPlaneStore(sqlDB, nil)
+	if err := store.upsertRecord(context.Background(), "deployment_target", "chrome", map[string]any{"url": server.URL + "/chrome"}); err != nil {
+		t.Fatalf("seed chrome record failed: %v", err)
+	}
+	if err := store.upsertRecord(context.Background(), "deployment_target", "firefox", map[string]any{"url": server.URL + "/firefox"}); err != nil {
+		t.Fatalf("seed firefox record failed: %v", err)
+	}
+	if err := store.upsertRecord(context.Background(), "deployment_target", "edge", map[string]any{"url": server.URL + "/addons/detail/classroom-quick-downloader/" + edgeCRXID}); err != nil {
+		t.Fatalf("seed edge record failed: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		StartDeploymentsAutoSyncLoop(ctx, sqlDB, nil, nil, 24*time.Hour)
+		close(done)
+	}()
+	defer func() {
+		cancel()
+		select {
+		case <-done:
+		case <-time.After(2 * time.Second):
+			t.Fatal("auto-sync loop did not stop after cancellation")
+		}
+	}()
+
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		records, err := store.listRecords(context.Background(), "deployment_target")
+		if err != nil {
+			t.Fatalf("list deployment records failed: %v", err)
+		}
+		if len(records) != 3 {
+			time.Sleep(30 * time.Millisecond)
+			continue
+		}
+		allSynced := true
+		for _, row := range records {
+			var data map[string]any
+			if err := json.Unmarshal(row.Data, &data); err != nil {
+				t.Fatalf("unmarshal deployment row failed: %v", err)
+			}
+			if data["syncStatus"] != "ok" {
+				allSynced = false
+				break
+			}
+		}
+		if allSynced {
+			return
+		}
+		time.Sleep(30 * time.Millisecond)
+	}
+
+	t.Fatal("expected immediate auto-sync run to populate deployment status before first long interval tick")
+}
+
+func TestStartDeploymentsAutoSyncLoop_RetriesTransientFailures(t *testing.T) {
+	sqlDB := newAdminTestDB(t)
+	defer sqlDB.Close()
+	t.Setenv("ORACLE_ALLOW_UNTRUSTED_STORE_URLS", "true")
+	t.Setenv("ORACLE_ALLOW_HTTP_STORE_URLS", "true")
+	const edgeCRXID = "ecojbijjkcjdolpeoiemnccgmaeomcmn"
+
+	var requestCount atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Fail the first full sync attempt (3 target requests), then succeed on retry.
+		if requestCount.Add(1) <= int32(len(deploymentTargetDefs)) {
+			http.Error(w, "temporary upstream failure", http.StatusServiceUnavailable)
+			return
+		}
+		switch r.URL.Path {
+		case "/chrome":
+			_, _ = w.Write([]byte(`<div>300 users</div><div>Version 8.0.0</div><div>5.0 (12 ratings)</div>`))
+		case "/firefox":
+			_, _ = w.Write([]byte(`<div>200 users</div><div>Version 8.0.1</div><div>4.8 (11 reviews)</div>`))
+		case "/addons/getproductdetailsbycrxid/" + edgeCRXID:
+			_, _ = w.Write([]byte(`{"activeInstallCount":75,"averageRating":5,"ratingCount":6,"version":"8.0.2"}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	store := newControlPlaneStore(sqlDB, nil)
+	if err := store.upsertRecord(context.Background(), "deployment_target", "chrome", map[string]any{"url": server.URL + "/chrome"}); err != nil {
+		t.Fatalf("seed chrome record failed: %v", err)
+	}
+	if err := store.upsertRecord(context.Background(), "deployment_target", "firefox", map[string]any{"url": server.URL + "/firefox"}); err != nil {
+		t.Fatalf("seed firefox record failed: %v", err)
+	}
+	if err := store.upsertRecord(context.Background(), "deployment_target", "edge", map[string]any{"url": server.URL + "/addons/detail/classroom-quick-downloader/" + edgeCRXID}); err != nil {
+		t.Fatalf("seed edge record failed: %v", err)
+	}
+
+	oldAttempts := deploymentsAutoSyncMaxAttempts
+	oldRetryDelay := deploymentsAutoSyncRetryDelay
+	deploymentsAutoSyncMaxAttempts = 2
+	deploymentsAutoSyncRetryDelay = 20 * time.Millisecond
+	defer func() {
+		deploymentsAutoSyncMaxAttempts = oldAttempts
+		deploymentsAutoSyncRetryDelay = oldRetryDelay
+	}()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		StartDeploymentsAutoSyncLoop(ctx, sqlDB, nil, nil, 24*time.Hour)
+		close(done)
+	}()
+	defer func() {
+		cancel()
+		select {
+		case <-done:
+		case <-time.After(2 * time.Second):
+			t.Fatal("auto-sync loop did not stop after cancellation")
+		}
+	}()
+
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		records, err := store.listRecords(context.Background(), "deployment_target")
+		if err != nil {
+			t.Fatalf("list deployment records failed: %v", err)
+		}
+		if len(records) != 3 {
+			time.Sleep(30 * time.Millisecond)
+			continue
+		}
+		allSynced := true
+		for _, row := range records {
+			var data map[string]any
+			if err := json.Unmarshal(row.Data, &data); err != nil {
+				t.Fatalf("unmarshal deployment row failed: %v", err)
+			}
+			if data["syncStatus"] != "ok" {
+				allSynced = false
+				break
+			}
+		}
+		if allSynced {
+			if got := requestCount.Load(); got <= int32(len(deploymentTargetDefs)) {
+				t.Fatalf("expected retry attempt to happen, request count=%d", got)
+			}
+			return
+		}
+		time.Sleep(30 * time.Millisecond)
+	}
+
+	t.Fatal("expected auto-sync retry to recover after transient failures")
+}
+
+func TestDeploymentsSyncHandler_DoesNotCountPersistFailuresAsSuccess(t *testing.T) {
+	sqlDB := newAdminTestDB(t)
+	defer sqlDB.Close()
+	t.Setenv("ORACLE_ALLOW_UNTRUSTED_STORE_URLS", "true")
+	t.Setenv("ORACLE_ALLOW_HTTP_STORE_URLS", "true")
+	const edgeCRXID = "ecojbijjkcjdolpeoiemnccgmaeomcmn"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/chrome":
+			_, _ = w.Write([]byte(`<script>{"users":"120K","version":"5.9.1"}</script><div>4.7 (21 ratings)</div>`))
+		case "/firefox":
+			_, _ = w.Write([]byte(`<div>Users 12,345</div><div>Version 6.0.0</div><div>5 (2 reviews)</div>`))
+		case "/addons/getproductdetailsbycrxid/" + edgeCRXID:
+			_, _ = w.Write([]byte(`{"activeInstallCount":9,"averageRating":5,"ratingCount":1,"version":"6.1.0"}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	store := newControlPlaneStore(sqlDB, nil)
+	if err := store.upsertRecord(context.Background(), "deployment_target", "chrome", map[string]any{"url": server.URL + "/chrome"}); err != nil {
+		t.Fatalf("seed chrome record failed: %v", err)
+	}
+	if err := store.upsertRecord(context.Background(), "deployment_target", "firefox", map[string]any{"url": server.URL + "/firefox"}); err != nil {
+		t.Fatalf("seed firefox record failed: %v", err)
+	}
+	if err := store.upsertRecord(context.Background(), "deployment_target", "edge", map[string]any{"url": server.URL + "/addons/detail/classroom-quick-downloader/" + edgeCRXID}); err != nil {
 		t.Fatalf("seed edge record failed: %v", err)
 	}
 
