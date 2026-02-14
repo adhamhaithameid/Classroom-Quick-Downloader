@@ -33,6 +33,9 @@ Oracle Hub v4 extends the backend from analytics-only to a full admin/control pl
 - **Observability**: request-level structured logs, Prometheus metrics, alert sink, and Oracle operation logs APIs.
 - **UI productivity**: keyboard shortcuts panel + hold `Command`/`Ctrl` for 1 second to reveal shortcut badges.
 
+Full v4 reference:
+- [`docs/ORACLE_HUB_V4.md`](../docs/ORACLE_HUB_V4.md)
+
 ---
 
 ## 📱 Testing Oracle UI On This Device
@@ -61,6 +64,33 @@ http://<LAN_IP>:8080
 5. Optional backend quality scan before manual UI test:
 ```bash
 cd oracle-backend && make scan
+```
+
+6. One-command full API smoke matrix:
+```bash
+cd oracle-backend
+BASE_URL="http://127.0.0.1:8080" \
+DASHBOARD_PASSWORD="your-dashboard-password" \
+./scripts/api-matrix-smoke.sh
+```
+
+7. Include step-up protected dry-run checks (critical endpoints):
+```bash
+cd oracle-backend
+BASE_URL="http://127.0.0.1:8080" \
+DASHBOARD_PASSWORD="your-dashboard-password" \
+SUPER_ADMIN_PASSWORD="your-super-admin-password" \
+./scripts/api-matrix-smoke.sh
+```
+
+8. Strict mode (fail if policy-gated critical endpoints are blocked):
+```bash
+cd oracle-backend
+BASE_URL="http://127.0.0.1:8080" \
+DASHBOARD_PASSWORD="your-dashboard-password" \
+SUPER_ADMIN_PASSWORD="your-super-admin-password" \
+STRICT_CRITICAL=1 \
+./scripts/api-matrix-smoke.sh
 ```
 
 Notes:
@@ -193,6 +223,8 @@ All configuration is done via environment variables, defined in `docker-compose.
 | `ALLOW_LOOPBACK_BYPASS` | `false` | Set `true` to allow loopback auth bypass (dev only). |
 | `ALLOW_EMPTY_DASHBOARD_PASSWORD` | `false` | Set `true` to allow an empty dashboard password (dev only). |
 | `SESSION_COOKIE_SECURE` | `auto` | Cookie Secure mode: `auto` (TLS-aware), `true` (always secure), `false` (always non-secure; needed for plain HTTP). |
+| `PUBLIC_BASE_URL` | *(optional)* | Canonical public origin (for CSRF origin allow checks), e.g. `https://oracle.example.com`. |
+| `CSRF_ALLOWED_ORIGINS` | *(optional)* | Comma-separated explicit CSRF origin allowlist (scheme + host), e.g. `https://oracle.example.com,https://admin.example.com`. |
 | `POSTGRES_DSN` | *(optional)* | Enables Postgres bootstrap and v4 cutover paths. |
 | `STORAGE_WATERMARK_WARN` | `70` | Disk usage warning watermark percentage. |
 | `STORAGE_WATERMARK_CRITICAL` | `85` | Disk usage critical watermark percentage. |
@@ -203,6 +235,7 @@ All configuration is done via environment variables, defined in `docker-compose.
 | `ORACLE_DR_PROMOTION_MAX_LAG_SECONDS` | `300` | Promotion guardrail for DR eligibility checks. |
 
 Startup is **fail-closed** for auth secrets: the server exits if `SUPER_ADMIN_PASSWORD` is missing, and also exits if `DASHBOARD_PASSWORD` is missing while `ALLOW_EMPTY_DASHBOARD_PASSWORD=false`.
+Startup also exits when `DO_SHARED_SECRET`, `DASHBOARD_PASSWORD`, `SUPER_ADMIN_PASSWORD`, or `ARCHIVER_SHARED_SECRET` are set to known weak placeholder values (for example `secret`, `password`, or `change-me-in-production`).
 
 When `DASHBOARD_PASSWORD` is set, the Oracle dashboard prompts for authentication using an **in-page login modal form** (not a browser-native prompt), matching the Cloudflare dashboard workflow.
 
@@ -541,6 +574,8 @@ The `archiver` CLI tool pushes daily analytics snapshots to a Google Sheet for l
 ### How It Works
 
 1. Fetches `/api/stats/summary` from the local server.
+   - It automatically scopes to a full UTC day window (`from=YYYY-MM-DD&to=YYYY-MM-DD`).
+   - Default archived day is `yesterday` (good for the 00:15 UTC scheduler run).
 2. Extracts totals, breakdowns, and top stats.
 3. Formats data as a spreadsheet row.
 4. Appends the row to the specified Google Sheet.
@@ -551,7 +586,8 @@ The `archiver` CLI tool pushes daily analytics snapshots to a Google Sheet for l
 ./archiver \
   --sheet "YOUR_GOOGLE_SHEET_ID" \
   --creds "/run/secrets/google-credentials.json" \
-  --api "http://localhost:8080/api/stats/summary"
+  --api "http://localhost:8080/api/stats/summary" \
+  --day "yesterday"
 ```
 
 ### Cron Job Setup
@@ -588,6 +624,7 @@ The archiver appends a row with the following columns:
 | N | All File Types (breakdown) |
 | O | All Errors (breakdown) |
 | P | Extension Versions (breakdown) |
+| Q | Total Cancelled |
 
 ---
 
@@ -757,8 +794,25 @@ Postgres-backed record management, and deployment synchronization.
 
 - `GET /api/admin/deployments/targets`
 - `POST /api/admin/deployments/sync`
+- `GET /api/admin/sheets/last-flush`
 - `GET /api/admin/records/list?type=deployment_target`
 - `POST /api/admin/records/upsert`
+
+Deployment sync stores these fields per browser target:
+- `users`
+- `usersCount`
+- `version`
+- `rating`
+- `ratingCount`
+
+Automatic deployment sync runs server-side in the background (all targets) and can be tuned with:
+- `ORACLE_DEPLOYMENTS_AUTO_SYNC_ENABLED` (`true` by default)
+- `ORACLE_DEPLOYMENTS_AUTO_SYNC_INTERVAL_SECONDS` (`900` by default, min `60`, max `86400`)
+
+Reliability behavior:
+- Auto-sync runs immediately at startup (no need to wait for the first interval tick).
+- Each cycle retries transient full-failure runs automatically before waiting for the next schedule.
+- Archiver runs persist latest Sheets flush metadata (`status`, archived day, row payload JSON) for dashboard visibility.
 
 ### Creative Hub
 
