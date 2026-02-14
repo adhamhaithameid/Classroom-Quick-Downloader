@@ -379,10 +379,18 @@ function getDownloadsStub(env: WorkerEnv): DurableObjectStub {
 
 // --- CORS helpers -----------------------------------------------------------
 
+const parsedAllowedOriginsCache = new Map<string, Set<string>>();
+
 function parseAllowedOrigins(raw: string | undefined): Set<string> {
+  if (!raw) return new Set<string>();
+  const cacheKey = raw.trim();
+  if (!cacheKey) return new Set<string>();
+
+  const cached = parsedAllowedOriginsCache.get(cacheKey);
+  if (cached) return cached;
+
   const allowed = new Set<string>();
-  if (!raw) return allowed;
-  for (const item of raw.split(",")) {
+  for (const item of cacheKey.split(",")) {
     const candidate = item.trim();
     if (!candidate) continue;
     try {
@@ -394,6 +402,7 @@ function parseAllowedOrigins(raw: string | undefined): Set<string> {
       // Ignore malformed values to fail safely.
     }
   }
+  parsedAllowedOriginsCache.set(cacheKey, allowed);
   return allowed;
 }
 
@@ -602,12 +611,37 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
         },
         body: JSON.stringify({ ip: clientIp, success: false }),
       });
-      const rateLimitRes = await stub.fetch(rateLimitReq);
-      const rateLimitData = await rateLimitRes.json() as {
+      let rateLimitData: {
         allowed: boolean;
         attemptsRemaining?: number;
         blockedForSeconds?: number;
       };
+      try {
+        const rateLimitRes = await stub.fetch(rateLimitReq);
+        if (!rateLimitRes.ok) {
+          throw new Error(`login-attempt endpoint returned ${rateLimitRes.status}`);
+        }
+        rateLimitData = await rateLimitRes.json() as {
+          allowed: boolean;
+          attemptsRemaining?: number;
+          blockedForSeconds?: number;
+        };
+        if (typeof rateLimitData.allowed !== "boolean") {
+          throw new Error("login-attempt payload missing allowed boolean");
+        }
+      } catch {
+        return new Response(
+          renderLoginPage("Login service temporarily unavailable. Please try again shortly."),
+          {
+            status: 503,
+            headers: {
+              "content-type": "text/html; charset=utf-8",
+              "Retry-After": "30",
+              "X-Dependency-Error": "durable-object-unavailable",
+            },
+          },
+        );
+      }
 
       if (!rateLimitData.allowed) {
         const mins = Math.ceil((rateLimitData.blockedForSeconds || 900) / 60);
@@ -633,7 +667,14 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
       },
       body: JSON.stringify({ ip: clientIp, success: true }),
     });
-    await stub.fetch(successReq);
+    try {
+      const successRes = await stub.fetch(successReq);
+      if (!successRes.ok) {
+        console.warn("[handleRoot] failed to clear login attempts after successful login", successRes.status);
+      }
+    } catch (err) {
+      console.warn("[handleRoot] failed to clear login attempts after successful login", err);
+    }
 
     // Create session token and set cookie
     const sessionToken = await createSessionTokenWithBinding(dashboardSecret, clientIp, userAgent, sessionBindingMode);

@@ -53,6 +53,87 @@ describe("Worker auth config hardening", () => {
     expect(text).toContain("DASHBOARD_PASSWORD missing");
   });
 
+  it("returns 503 when login-attempt dependency is unavailable", async () => {
+    const stub = {
+      fetch: async (input: RequestInfo) => {
+        const url = typeof input === "string" ? input : input instanceof Request ? input.url : "";
+        if (url.includes("/auth/check-ip-allowlist")) {
+          return new Response(JSON.stringify({ allowed: true, enabled: true }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        if (url.includes("/auth/login-attempt")) {
+          throw new Error("durable-object-down");
+        }
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      },
+    };
+    const namespace = {
+      idFromName: (_name: string) => "downloads-id",
+      get: (_id: string) => stub,
+    };
+    const env = mockEnv({ DOWNLOADS_DO: namespace as unknown as DurableObjectNamespace });
+    const request = new Request("https://example.com/", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+      },
+      body: "password=wrong-password",
+    });
+
+    const res = await worker.fetch(request, env, {} as ExecutionContext);
+    const text = await res.text();
+
+    expect(res.status).toBe(503);
+    expect(res.headers.get("Retry-After")).toBe("30");
+    expect(res.headers.get("X-Dependency-Error")).toBe("durable-object-unavailable");
+    expect(text).toContain("temporarily unavailable");
+  });
+
+  it("still logs in when clearing login-attempt state fails", async () => {
+    const stub = {
+      fetch: async (input: RequestInfo) => {
+        const url = typeof input === "string" ? input : input instanceof Request ? input.url : "";
+        if (url.includes("/auth/check-ip-allowlist")) {
+          return new Response(JSON.stringify({ allowed: true, enabled: true }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        if (url.includes("/auth/login-attempt")) {
+          return new Response(JSON.stringify({ ok: false }), {
+            status: 503,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      },
+    };
+    const namespace = {
+      idFromName: (_name: string) => "downloads-id",
+      get: (_id: string) => stub,
+    };
+    const env = mockEnv({ DOWNLOADS_DO: namespace as unknown as DurableObjectNamespace });
+    const request = new Request("https://example.com/", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+      },
+      body: "password=dashboard-secret",
+    });
+
+    const res = await worker.fetch(request, env, {} as ExecutionContext);
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Set-Cookie")).toContain("cqd_session=");
+  });
+
   it("blocks protected CORS requests from disallowed origins", async () => {
     const env = mockEnv();
     const request = new Request("https://example.com/stats", {
@@ -361,4 +442,3 @@ describe("Worker auth config hardening", () => {
     expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
   });
 });
-
