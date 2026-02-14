@@ -298,7 +298,7 @@ run_get_json "/api/admin/dashboard-links" '.ok == true and (.links|type=="object
 run_get_json "/api/admin/github/open-counts" '(.source|type=="string") and (.issuesKnown|type=="boolean") and (.prsKnown|type=="boolean")' "admin github counters"
 run_get_json "/api/admin/oracle-logs?limit=20" '.ok == true and (.logs|type=="array")' "admin oracle logs"
 run_get_json "/api/admin/sheets/last-flush" '.ok == true and (.exists|type=="boolean")' "admin sheets last flush"
-run_get_json "/api/admin/deployments/targets" '.ok == true and (.targets|type=="array")' "admin deployment targets"
+run_get_json "/api/admin/deployments/targets" '.ok == true and (.targets|type=="array") and (.aggregates|type=="object") and (.aggregates.usersTotal|type=="number") and (.aggregates.reviewsTotal|type=="number") and (.aggregates.browsers|type=="array")' "admin deployment targets"
 run_get_json "/api/admin/creative/designs" '.ok == true and ((.designs|type=="array") or (.records|type=="array"))' "admin creative designs"
 run_get_json "/api/admin/creative/emails" '.ok == true and ((.templates|type=="array") or (.records|type=="array"))' "admin creative emails"
 run_get_json "/api/admin/newsletter/subscribers" '.ok == true and ((.subscribers|type=="array") or (.records|type=="array"))' "admin newsletter subscribers"
