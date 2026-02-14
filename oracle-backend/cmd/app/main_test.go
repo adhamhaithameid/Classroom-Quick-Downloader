@@ -2,11 +2,13 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -347,7 +349,7 @@ func TestSecurityHeadersMiddleware_UsesScriptNonceWithoutUnsafeInline(t *testing
 	if strings.Contains(csp, "script-src-attr 'unsafe-inline'") || strings.Contains(csp, "script-src 'self' 'unsafe-inline'") {
 		t.Fatalf("expected CSP without unsafe-inline script permissions, got: %q", csp)
 	}
-	if !strings.Contains(csp, "style-src 'self' https: 'nonce-") {
+	if !strings.Contains(csp, "style-src 'self' 'nonce-") {
 		t.Fatalf("expected nonce-based style CSP, got: %q", csp)
 	}
 	if strings.Contains(csp, "style-src 'self' 'unsafe-inline'") {
@@ -978,5 +980,51 @@ func TestIsWeakSecretValue(t *testing.T) {
 				t.Fatalf("isWeakSecretValue(%q)=%v want %v", tc.secret, got, tc.want)
 			}
 		})
+	}
+}
+
+func TestUpsertSystemAlert_ConcurrentSingleOpenRow(t *testing.T) {
+	sqlDB, err := db.Init(filepath.Join(t.TempDir(), "oracle-alert-upsert.db"))
+	if err != nil {
+		t.Fatalf("db init failed: %v", err)
+	}
+	defer sqlDB.Close()
+
+	const workers = 20
+	errCh := make(chan error, workers)
+	var wg sync.WaitGroup
+	for i := 0; i < workers; i++ {
+		i := i
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			errCh <- upsertSystemAlert(
+				context.Background(),
+				sqlDB,
+				"no_sync_success",
+				"warning",
+				"concurrency check",
+				map[string]any{"worker": i},
+			)
+		}()
+	}
+	wg.Wait()
+	close(errCh)
+
+	for err := range errCh {
+		if err != nil {
+			t.Fatalf("concurrent upsert failed: %v", err)
+		}
+	}
+
+	var openRows int64
+	if err := sqlDB.QueryRow(
+		`SELECT COUNT(*) FROM system_alerts WHERE alert_type = ? AND status = 'open'`,
+		"no_sync_success",
+	).Scan(&openRows); err != nil {
+		t.Fatalf("count open alerts failed: %v", err)
+	}
+	if openRows != 1 {
+		t.Fatalf("expected exactly one open alert row, got %d", openRows)
 	}
 }

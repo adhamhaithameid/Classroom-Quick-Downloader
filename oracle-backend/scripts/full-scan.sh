@@ -70,8 +70,8 @@ fi
 
 GO_BIN_DIR="$(go env GOPATH)/bin"
 
-echo "[oracle-scan] running gosec (excluding G701 false positives)"
-"$GO_BIN_DIR/gosec" -exclude=G701 ./...
+echo "[oracle-scan] running gosec with tracked suppressions"
+"$GO_BIN_DIR/gosec" -track-suppressions ./...
 
 echo "[oracle-scan] running govulncheck"
 "$GO_BIN_DIR/govulncheck" ./...

@@ -1995,40 +1995,61 @@ func upsertOpenAlert(
 	}
 	nowMs := time.Now().UnixMilli()
 
-	var existingID int64
-	queryErr := db.QueryRowContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
-		ctx,
-		`SELECT id FROM system_alerts WHERE alert_type = ? AND status = 'open' ORDER BY id DESC LIMIT 1`,
-		alertType,
-	).Scan(&existingID)
-	if queryErr == nil {
-		_, err = db.ExecContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
-			ctx,
-			`UPDATE system_alerts
-			 SET severity = ?, message = ?, payload_json = ?, updated_at = ?
-			 WHERE id = ?`,
-			severity,
-			message,
-			string(raw),
-			nowMs,
-			existingID,
-		)
+	conn, err := db.Conn(ctx)
+	if err != nil {
 		return err
 	}
-	if !errors.Is(queryErr, sql.ErrNoRows) {
-		return queryErr
-	}
+	defer conn.Close()
 
-	_, err = db.ExecContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
+	if _, err := conn.ExecContext(ctx, `BEGIN IMMEDIATE`); err != nil {
+		return err
+	}
+	committed := false
+	defer func() {
+		if committed {
+			return
+		}
+		_, _ = conn.ExecContext(context.Background(), `ROLLBACK`)
+	}()
+
+	updateRes, err := conn.ExecContext( // #nosec G701 -- SQL text is constant; values are bound parameters.
 		ctx,
-		`INSERT INTO system_alerts (alert_type, severity, message, status, payload_json, created_at, updated_at)
-		 VALUES (?, ?, ?, 'open', ?, ?, ?)`,
-		alertType,
+		`UPDATE system_alerts
+		 SET severity = ?, message = ?, payload_json = ?, updated_at = ?
+		 WHERE alert_type = ? AND status = 'open'`,
 		severity,
 		message,
 		string(raw),
 		nowMs,
-		nowMs,
+		alertType,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	updatedRows, err := updateRes.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if updatedRows == 0 {
+		if _, err := conn.ExecContext( // #nosec G701 -- SQL text is constant; values are bound parameters.
+			ctx,
+			`INSERT INTO system_alerts (alert_type, severity, message, status, payload_json, created_at, updated_at)
+			 VALUES (?, ?, ?, 'open', ?, ?, ?)`,
+			alertType,
+			severity,
+			message,
+			string(raw),
+			nowMs,
+			nowMs,
+		); err != nil {
+			return err
+		}
+	}
+
+	if _, err := conn.ExecContext(ctx, `COMMIT`); err != nil {
+		return err
+	}
+	committed = true
+	return nil
 }

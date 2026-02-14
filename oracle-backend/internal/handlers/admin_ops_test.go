@@ -1020,6 +1020,49 @@ func TestAlertsHandler_ReturnsOpenAlerts(t *testing.T) {
 	}
 }
 
+func TestUpsertOpenAlert_ConcurrentSingleOpenRow(t *testing.T) {
+	sqlDB := newAdminTestDB(t)
+	defer sqlDB.Close()
+
+	const workers = 20
+	errCh := make(chan error, workers)
+	var wg sync.WaitGroup
+	for i := 0; i < workers; i++ {
+		i := i
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			errCh <- upsertOpenAlert(
+				context.Background(),
+				sqlDB,
+				"schema_drift_detected",
+				"warning",
+				"drift observed",
+				map[string]any{"worker": i},
+			)
+		}()
+	}
+	wg.Wait()
+	close(errCh)
+
+	for err := range errCh {
+		if err != nil {
+			t.Fatalf("concurrent upsert failed: %v", err)
+		}
+	}
+
+	var openRows int64
+	if err := sqlDB.QueryRow(
+		`SELECT COUNT(*) FROM system_alerts WHERE alert_type = ? AND status = 'open'`,
+		"schema_drift_detected",
+	).Scan(&openRows); err != nil {
+		t.Fatalf("count open alerts failed: %v", err)
+	}
+	if openRows != 1 {
+		t.Fatalf("expected exactly one open alert row, got %d", openRows)
+	}
+}
+
 func TestMigrationsStatusHandler_StateMatrix(t *testing.T) {
 	tests := []struct {
 		name               string

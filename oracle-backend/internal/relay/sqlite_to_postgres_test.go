@@ -6,6 +6,7 @@ import (
 	"errors"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -150,6 +151,49 @@ func TestRelayRunOnce_NoSyncAlertWhenNoSuccessOverThreshold(t *testing.T) {
 	}
 	if count == 0 {
 		t.Fatalf("expected no_sync_success alert")
+	}
+}
+
+func TestUpsertOpenAlert_ConcurrentSingleOpenRow(t *testing.T) {
+	sqlDB := newRelayTestDB(t)
+	defer sqlDB.Close()
+
+	const workers = 20
+	errCh := make(chan error, workers)
+	var wg sync.WaitGroup
+	for i := 0; i < workers; i++ {
+		i := i
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			errCh <- upsertOpenAlert(
+				context.Background(),
+				sqlDB,
+				"outbox_backlog_high",
+				"critical",
+				"backlog high",
+				map[string]any{"worker": i},
+			)
+		}()
+	}
+	wg.Wait()
+	close(errCh)
+
+	for err := range errCh {
+		if err != nil {
+			t.Fatalf("concurrent upsert failed: %v", err)
+		}
+	}
+
+	var openRows int64
+	if err := sqlDB.QueryRow(
+		`SELECT COUNT(*) FROM system_alerts WHERE alert_type = ? AND status = 'open'`,
+		"outbox_backlog_high",
+	).Scan(&openRows); err != nil {
+		t.Fatalf("count open alerts failed: %v", err)
+	}
+	if openRows != 1 {
+		t.Fatalf("expected exactly one open alert row, got %d", openRows)
 	}
 }
 
