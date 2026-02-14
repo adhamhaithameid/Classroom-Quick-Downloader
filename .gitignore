@@ -20,6 +20,9 @@ oracle-backend/data/
 oracle-backend/docker_data/
 oracle-backend/app
 oracle-backend/coverage.out
+oracle-backend/coverage.project.out
+oracle-backend/coverage_all.out
+oracle-backend/coverage_all.func.txt
 oracle-backend/handler_cover.out
 *.db
 *.db-shm
