@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"oracle-backend/internal/db"
 )
@@ -216,6 +217,116 @@ func TestRetentionRunHandler_DryRunAndExecute(t *testing.T) {
 	}
 	if remaining != 0 {
 		t.Fatalf("expected retention executor to remove old rows, remaining=%d", remaining)
+	}
+}
+
+func TestRetentionRunHandler_AuthPoliciesUseSecondCutoffs(t *testing.T) {
+	sqlDB := newHAStorageTestDB(t)
+	defer sqlDB.Close()
+
+	nowSec := time.Now().Unix()
+
+	if _, err := sqlDB.Exec(
+		`INSERT INTO auth_sessions (token, session_kind, parent_token, expires_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`,
+		"expired-session",
+		"viewer",
+		"",
+		nowSec-(2*24*60*60),
+		nowSec-(2*24*60*60),
+		nowSec-(2*24*60*60),
+	); err != nil {
+		t.Fatalf("failed to seed expired auth session: %v", err)
+	}
+	if _, err := sqlDB.Exec(
+		`INSERT INTO auth_sessions (token, session_kind, parent_token, expires_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`,
+		"active-session",
+		"viewer",
+		"",
+		nowSec+(24*60*60),
+		nowSec,
+		nowSec,
+	); err != nil {
+		t.Fatalf("failed to seed active auth session: %v", err)
+	}
+
+	if _, err := sqlDB.Exec(
+		`INSERT INTO auth_stepup_challenges (challenge_id, client_ip, expires_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
+		"expired-challenge",
+		"203.0.113.1",
+		nowSec-60,
+		nowSec-60,
+		nowSec-60,
+	); err != nil {
+		t.Fatalf("failed to seed expired stepup challenge: %v", err)
+	}
+	if _, err := sqlDB.Exec(
+		`INSERT INTO auth_stepup_challenges (challenge_id, client_ip, expires_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
+		"active-challenge",
+		"203.0.113.2",
+		nowSec+(10*60),
+		nowSec,
+		nowSec,
+	); err != nil {
+		t.Fatalf("failed to seed active stepup challenge: %v", err)
+	}
+
+	if _, err := sqlDB.Exec(
+		`INSERT INTO auth_rate_limits (scope, client_ip, attempts, first_attempt_at, blocked_until, updated_at) VALUES (?, ?, ?, ?, ?, ?)`,
+		"login",
+		"stale-ip",
+		3,
+		nowSec-(15*24*60*60),
+		int64(0),
+		nowSec-(15*24*60*60),
+	); err != nil {
+		t.Fatalf("failed to seed stale auth rate limit: %v", err)
+	}
+	if _, err := sqlDB.Exec(
+		`INSERT INTO auth_rate_limits (scope, client_ip, attempts, first_attempt_at, blocked_until, updated_at) VALUES (?, ?, ?, ?, ?, ?)`,
+		"login",
+		"recent-ip",
+		1,
+		nowSec-(60*60),
+		int64(0),
+		nowSec-(60*60),
+	); err != nil {
+		t.Fatalf("failed to seed recent auth rate limit: %v", err)
+	}
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/admin/retention/run",
+		bytes.NewBufferString(`{"dryRun":false,"policies":["auth_sessions_expired","auth_stepup_challenges_expired","auth_rate_limits_stale"]}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	RetentionRunHandler(sqlDB, nil).ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200 from retention run, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var sessions int64
+	if err := sqlDB.QueryRow(`SELECT COUNT(*) FROM auth_sessions`).Scan(&sessions); err != nil {
+		t.Fatalf("failed to count auth sessions: %v", err)
+	}
+	if sessions != 1 {
+		t.Fatalf("expected only one auth session to remain, got %d", sessions)
+	}
+
+	var challenges int64
+	if err := sqlDB.QueryRow(`SELECT COUNT(*) FROM auth_stepup_challenges`).Scan(&challenges); err != nil {
+		t.Fatalf("failed to count stepup challenges: %v", err)
+	}
+	if challenges != 1 {
+		t.Fatalf("expected only one stepup challenge to remain, got %d", challenges)
+	}
+
+	var rateLimits int64
+	if err := sqlDB.QueryRow(`SELECT COUNT(*) FROM auth_rate_limits`).Scan(&rateLimits); err != nil {
+		t.Fatalf("failed to count auth rate limits: %v", err)
+	}
+	if rateLimits != 1 {
+		t.Fatalf("expected only one auth rate limit row to remain, got %d", rateLimits)
 	}
 }
 
