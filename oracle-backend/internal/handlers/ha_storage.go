@@ -337,7 +337,9 @@ func ReadyHandler(sqliteDB, postgresDB *sql.DB, guard *StorageGuard, postgresCon
 		}
 
 		reasons := make([]string, 0, 8)
+		warnings := make([]string, 0, 2)
 		ready := true
+		ingestBackpressure := false
 
 		if sqliteDB == nil {
 			ready = false
@@ -380,14 +382,18 @@ func ReadyHandler(sqliteDB, postgresDB *sql.DB, guard *StorageGuard, postgresCon
 				ready = false
 				reasons = append(reasons, "storage_status_failed")
 			} else if status.Backpressure {
-				ready = false
-				reasons = append(reasons, "storage_emergency_backpressure")
+				// Keep instance ready for read/control-plane traffic while ingest route
+				// applies targeted backpressure via IngestBackpressureMiddleware.
+				ingestBackpressure = true
+				warnings = append(warnings, "storage_emergency_backpressure")
 			}
 		}
 
 		payload := map[string]any{
-			"ok":      ready,
-			"reasons": reasons,
+			"ok":                 ready,
+			"reasons":            reasons,
+			"warnings":           warnings,
+			"ingestBackpressure": ingestBackpressure,
 		}
 
 		w.Header().Set("Content-Type", "application/json")
