@@ -683,6 +683,24 @@ func TestIsAllowedReadOnlyQuery_CommentObfuscatedRestrictedTable(t *testing.T) {
 	}
 }
 
+func TestIsAllowedReadOnlyQuery_CommaJoinRestrictedTable(t *testing.T) {
+	if isAllowedReadOnlyQuery(`SELECT * FROM batches, feature_flags`) {
+		t.Fatal("expected rejected for comma-joined restricted table")
+	}
+}
+
+func TestIsAllowedReadOnlyQuery_CommaJoinQuotedRestrictedTable(t *testing.T) {
+	if isAllowedReadOnlyQuery(`SELECT * FROM batches b, "main"."feature_flags" f`) {
+		t.Fatal("expected rejected for comma-joined quoted restricted table")
+	}
+}
+
+func TestIsAllowedReadOnlyQuery_CommaJoinMalformedFailsClosed(t *testing.T) {
+	if isAllowedReadOnlyQuery(`SELECT * FROM batches, "feature_flags`) {
+		t.Fatal("expected malformed comma source to be rejected")
+	}
+}
+
 func TestNormalizeSQLForPolicy_RemovesDashComments(t *testing.T) {
 	got := normalizeSQLForPolicy("SELECT * FROM batches -- trailing comment")
 	if strings.Contains(got, "--") {

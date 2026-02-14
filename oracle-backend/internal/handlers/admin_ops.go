@@ -963,7 +963,9 @@ func SQLQueryHandler(db *sql.DB, readOnlyDB *sql.DB) http.HandlerFunc {
 		if queryDB == nil {
 			queryDB = db
 		}
-		rows, err := queryDB.QueryContext(r.Context(), stmt) // #nosec G701 -- SQL text is validated by strict single-statement read-only guards and restricted table policy.
+		sqlCtx, cancel := context.WithTimeout(r.Context(), sqlExecTimeout)
+		defer cancel()
+		rows, err := queryDB.QueryContext(sqlCtx, stmt) // #nosec G701 -- SQL text is validated by strict single-statement read-only guards and restricted table policy.
 		if err != nil {
 			http.Error(w, "query failed: "+err.Error(), http.StatusBadRequest)
 			return
@@ -1074,12 +1076,14 @@ func SQLExecHandler(db *sql.DB) http.HandlerFunc {
 
 		affected := int64(0)
 		if req.DryRun {
-			tx, err := db.BeginTx(r.Context(), nil)
+			sqlCtx, cancel := context.WithTimeout(r.Context(), sqlExecTimeout)
+			defer cancel()
+			tx, err := db.BeginTx(sqlCtx, nil)
 			if err != nil {
 				http.Error(w, "failed to execute dry run", http.StatusInternalServerError)
 				return
 			}
-			res, err := tx.ExecContext(r.Context(), stmt) // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
+			res, err := tx.ExecContext(sqlCtx, stmt) // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 			if err == nil {
 				affected, _ = res.RowsAffected()
 			}
@@ -1089,7 +1093,9 @@ func SQLExecHandler(db *sql.DB) http.HandlerFunc {
 				return
 			}
 		} else {
-			res, err := db.ExecContext(r.Context(), stmt) // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
+			sqlCtx, cancel := context.WithTimeout(r.Context(), sqlExecTimeout)
+			defer cancel()
+			res, err := db.ExecContext(sqlCtx, stmt) // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 			if err != nil {
 				http.Error(w, "exec failed: "+err.Error(), http.StatusBadRequest)
 				return
@@ -1590,6 +1596,7 @@ func isMutatingSQL(stmt string) bool {
 
 var sqlForbiddenTermsRegexp = regexp.MustCompile(`(?i)\b(drop|alter|pragma|vacuum|attach|detach|reindex|create|trigger|load_extension|replace)\b`)
 var sqlInlineCommentRegexp = regexp.MustCompile(`(?s)/\*.*?\*/|--[^\r\n]*`)
+var sqlExecTimeout = 5 * time.Second
 
 var sqlReadOnlyRestrictedTables = map[string]struct{}{
 	"admin_audit_log": {},
@@ -1611,6 +1618,7 @@ var sqlExecAllowedTables = map[string]struct{}{
 
 var sqlTargetTableRegexp = regexp.MustCompile(`(?i)^\s*(?:insert\s+into|update|delete\s+from)\s+([a-zA-Z_][a-zA-Z0-9_]*)`)
 var sqlReadOnlySourceRegexp = regexp.MustCompile(`(?i)\b(?:from|join)\s+([^\s,;]+)`)
+var sqlReadOnlyFromClauseRegexp = regexp.MustCompile(`(?is)\bfrom\b\s+(.+?)(?:\bwhere\b|\bgroup\b|\border\b|\blimit\b|\bhaving\b|\bunion\b|\bintersect\b|\bexcept\b|$)`)
 
 func hasForbiddenSQLTerms(stmt string) bool {
 	return sqlForbiddenTermsRegexp.MatchString(stmt)
@@ -1625,12 +1633,12 @@ func mutatingTargetTable(stmt string) (string, bool) {
 }
 
 func isAllowedReadOnlyQuery(stmt string) bool {
-	matches := sqlReadOnlySourceRegexp.FindAllStringSubmatch(stmt, -1)
-	for _, match := range matches {
-		if len(match) < 2 {
-			continue
-		}
-		table, ok := normalizeReadOnlySourceTable(match[1])
+	sourceTokens, ok := collectReadOnlySourceTokens(stmt)
+	if !ok {
+		return false
+	}
+	for _, token := range sourceTokens {
+		table, ok := normalizeReadOnlySourceTable(token)
 		if !ok {
 			return false
 		}
@@ -1639,6 +1647,163 @@ func isAllowedReadOnlyQuery(stmt string) bool {
 		}
 	}
 	return true
+}
+
+func collectReadOnlySourceTokens(stmt string) ([]string, bool) {
+	tokens := make([]string, 0, 8)
+
+	matches := sqlReadOnlySourceRegexp.FindAllStringSubmatch(stmt, -1)
+	for _, match := range matches {
+		if len(match) < 2 {
+			continue
+		}
+		tokens = append(tokens, match[1])
+	}
+
+	fromMatches := sqlReadOnlyFromClauseRegexp.FindAllStringSubmatch(stmt, -1)
+	for _, match := range fromMatches {
+		if len(match) < 2 {
+			continue
+		}
+		commaSources, ok := extractCommaSourceTokens(match[1])
+		if !ok {
+			return nil, false
+		}
+		tokens = append(tokens, commaSources...)
+	}
+
+	return tokens, true
+}
+
+func extractCommaSourceTokens(fromClause string) ([]string, bool) {
+	segments, ok := splitTopLevelCommaSegments(fromClause)
+	if !ok {
+		return nil, false
+	}
+	if len(segments) <= 1 {
+		return nil, true
+	}
+
+	out := make([]string, 0, len(segments)-1)
+	for i := 1; i < len(segments); i++ {
+		token, ok := leadingSourceToken(segments[i])
+		if !ok {
+			return nil, false
+		}
+		out = append(out, token)
+	}
+	return out, true
+}
+
+func splitTopLevelCommaSegments(input string) ([]string, bool) {
+	segments := make([]string, 0, 4)
+	start := 0
+	depth := 0
+	var quote byte
+	bracketQuoted := false
+
+	for i := 0; i < len(input); i++ {
+		ch := input[i]
+		if quote != 0 {
+			if ch == quote {
+				if i+1 < len(input) && input[i+1] == quote {
+					i++
+					continue
+				}
+				quote = 0
+			}
+			continue
+		}
+		if bracketQuoted {
+			if ch == ']' {
+				bracketQuoted = false
+			}
+			continue
+		}
+
+		switch ch {
+		case '\'', '"', '`':
+			quote = ch
+		case '[':
+			bracketQuoted = true
+		case '(':
+			depth++
+		case ')':
+			if depth == 0 {
+				return nil, false
+			}
+			depth--
+		case ',':
+			if depth == 0 {
+				segments = append(segments, input[start:i])
+				start = i + 1
+			}
+		}
+	}
+
+	if quote != 0 || bracketQuoted || depth != 0 {
+		return nil, false
+	}
+
+	segments = append(segments, input[start:])
+	return segments, true
+}
+
+func leadingSourceToken(segment string) (string, bool) {
+	s := strings.TrimSpace(segment)
+	if s == "" || strings.HasPrefix(s, "(") {
+		return "", false
+	}
+
+	var quote byte
+	bracketQuoted := false
+	end := 0
+	for end < len(s) {
+		ch := s[end]
+		if quote != 0 {
+			if ch == quote {
+				if end+1 < len(s) && s[end+1] == quote {
+					end += 2
+					continue
+				}
+				quote = 0
+			}
+			end++
+			continue
+		}
+		if bracketQuoted {
+			if ch == ']' {
+				bracketQuoted = false
+			}
+			end++
+			continue
+		}
+
+		switch ch {
+		case '\'', '"', '`':
+			quote = ch
+		case '[':
+			bracketQuoted = true
+		case ' ', '\t', '\n', '\r', ',', ';':
+			token := strings.TrimSpace(s[:end])
+			if token == "" {
+				return "", false
+			}
+			return token, true
+		case '(', ')':
+			return "", false
+		}
+		end++
+	}
+
+	if quote != 0 || bracketQuoted {
+		return "", false
+	}
+	token := strings.TrimSpace(s[:end])
+	if token == "" {
+		return "", false
+	}
+	return token, true
 }
 
 func normalizeReadOnlySourceTable(sourceToken string) (string, bool) {
