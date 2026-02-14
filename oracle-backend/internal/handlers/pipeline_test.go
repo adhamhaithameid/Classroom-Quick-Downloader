@@ -382,4 +382,3 @@ func TestPipelineMetricsHandler_MultipleBatches(t *testing.T) {
 		t.Fatalf("expected at least 3 recent deliveries, got %d", len(resp.Recent))
 	}
 }
-
