@@ -337,7 +337,7 @@
         font-size: 11px;
         cursor: help;
         white-space: nowrap;
-        overflow: hidden;
+        overflow: visible;
         transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, color 0.15s ease;
       }
 
@@ -346,6 +346,14 @@
         border-color: var(--border-secondary);
         color: var(--text-primary);
         box-shadow: 0 8px 18px rgba(0,0,0,0.18);
+      }
+
+      #status-indicator:hover #sidebar-status-text {
+        color: var(--text-primary);
+      }
+
+      #status-indicator:hover .status-dot {
+        transform: scale(1.08);
       }
 
       .status-dot {
@@ -443,8 +451,14 @@
         transition: transform 0.18s ease, border-color 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease;
       }
 
+      @keyframes utc-toggle-pop {
+        0% { transform: scale(1); }
+        45% { transform: scale(0.95); }
+        100% { transform: scale(1); }
+      }
+
       .nav-utc.is-toggling {
-        transform: scale(0.97);
+        animation: utc-toggle-pop 0.28s ease;
         border-color: rgba(59,130,246,0.55);
         background: rgba(59,130,246,0.08);
         box-shadow: 0 0 0 2px rgba(59,130,246,0.18) inset;
@@ -487,6 +501,17 @@
         color: var(--text-primary);
         white-space: nowrap;
         transition: font-size 0.2s ease, opacity 0.18s ease, transform 0.18s ease;
+      }
+
+      @keyframes utc-time-swap {
+        0% { opacity: 1; transform: translateY(0); }
+        45% { opacity: 0; transform: translateY(-3px); }
+        55% { opacity: 0; transform: translateY(3px); }
+        100% { opacity: 1; transform: translateY(0); }
+      }
+
+      .nav-utc-time.is-swapping {
+        animation: utc-time-swap 0.28s ease;
       }
 
       .nav-utc-time.is-12h {
@@ -3315,14 +3340,24 @@
         updateOracleUtcClock();
         setInterval(updateOracleUtcClock, 1000);
         wrap.addEventListener('click', function() {
+          var label = wrap.querySelector('.nav-utc-time');
           wrap.classList.remove('is-toggling');
-          // Trigger the click transition reliably across repeated clicks.
           void wrap.offsetWidth;
           wrap.classList.add('is-toggling');
-          setTimeout(function() { wrap.classList.remove('is-toggling'); }, 180);
+          if (label) {
+            label.classList.remove('is-swapping');
+            void label.offsetWidth;
+            label.classList.add('is-swapping');
+          }
           oracleClockIs24 = !oracleClockIs24;
           localStorage.setItem('oracle_clock_24h', oracleClockIs24 ? 'true' : 'false');
-          updateOracleUtcClock();
+          setTimeout(function() {
+            updateOracleUtcClock();
+          }, 140);
+          setTimeout(function() {
+            wrap.classList.remove('is-toggling');
+            if (label) label.classList.remove('is-swapping');
+          }, 300);
         });
       }
 
