@@ -529,6 +529,15 @@ func requestOriginForCSRF(r *http.Request) string {
 	}
 	if proto := trustedProxyProto(r); proto != "" {
 		scheme = proto
+	} else {
+		// Fallback for TLS-terminating proxy deployments where TRUSTED_PROXY_CIDRS
+		// is not explicitly configured. This preserves same-origin CSRF checks based
+		// on forwarded protocol headers commonly set by reverse proxies.
+		if proto := parseForwardedProtoHeaderValue(r.Header.Get("Forwarded")); proto != "" {
+			scheme = proto
+		} else if proto := parseXForwardedProtoHeaderValue(r.Header.Get("X-Forwarded-Proto")); proto != "" {
+			scheme = proto
+		}
 	}
 	host := strings.TrimSpace(r.Host)
 	if host == "" {
