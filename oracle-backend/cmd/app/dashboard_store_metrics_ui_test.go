@@ -17,13 +17,15 @@ func loadDashboardIndexHTML(t *testing.T) string {
 	return string(body)
 }
 
-func TestDashboardStoreMetricsUI_HasOverviewCountersAndAnalyticsChart(t *testing.T) {
+func TestDashboardStoreMetricsUI_HasOverviewStoreAndReachCounters(t *testing.T) {
 	indexHTML := loadDashboardIndexHTML(t)
 
 	requiredSnippets := []string{
 		`id="stat-store-users"`,
 		`id="stat-store-reviews"`,
-		`id="chart-store-metrics"`,
+		`id="stat-cancelled"`,
+		`id="stat-countries-reached"`,
+		`id="stat-languages-reached"`,
 		`async function loadDeploymentStoreMetrics()`,
 	}
 
@@ -34,10 +36,23 @@ func TestDashboardStoreMetricsUI_HasOverviewCountersAndAnalyticsChart(t *testing
 	}
 }
 
-func TestDashboardStoreMetricsUI_RefreshesAfterSyncAndLoads(t *testing.T) {
+func TestDashboardStoreMetricsUI_RemovesStoreAnalyticsCardAndSuccessRateCard(t *testing.T) {
+	indexHTML := loadDashboardIndexHTML(t)
+	forbiddenSnippets := []string{
+		`id="chart-store-metrics"`,
+		`id="stat-rate"`,
+	}
+	for _, snippet := range forbiddenSnippets {
+		if strings.Contains(indexHTML, snippet) {
+			t.Fatalf("dashboard index must not include legacy snippet: %s", snippet)
+		}
+	}
+}
+
+func TestDashboardStoreMetricsUI_RefreshesOverviewAfterSyncAndLoads(t *testing.T) {
 	indexHTML := loadDashboardIndexHTML(t)
 	calls := strings.Count(indexHTML, "await loadDeploymentStoreMetrics();")
-	if calls < 4 {
-		t.Fatalf("expected at least 4 loadDeploymentStoreMetrics refresh calls, got %d", calls)
+	if calls < 3 {
+		t.Fatalf("expected at least 3 loadDeploymentStoreMetrics refresh calls, got %d", calls)
 	}
 }
