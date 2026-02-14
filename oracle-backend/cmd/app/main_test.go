@@ -203,6 +203,30 @@ func TestCSRFMiddleware_RejectsSchemeMismatchWithoutTrustedProxyProto(t *testing
 	}
 }
 
+func TestCSRFMiddleware_AllowsForwardedHTTPSWithoutTrustedProxyCIDRs(t *testing.T) {
+	prevOrigins := csrfAllowedOrigins
+	prevProxies := trustedProxyNets
+	defer func() {
+		csrfAllowedOrigins = prevOrigins
+		setTrustedProxyNets(prevProxies)
+	}()
+	csrfAllowedOrigins = nil
+	setTrustedProxyNets(nil)
+
+	handler := csrfHeaderMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	req := httptest.NewRequest(http.MethodPost, "http://oracle.local/api/admin/flags/update", bytes.NewBufferString(`{}`))
+	req.Header.Set("X-Requested-With", "XMLHttpRequest")
+	req.Header.Set("X-Forwarded-Proto", "https")
+	req.Header.Set("Origin", "https://oracle.local")
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected 204 when forwarded proto indicates https, got %d", rr.Code)
+	}
+}
+
 func TestCSRFMiddleware_AllowsConfiguredPublicOrigin(t *testing.T) {
 	prevOrigins := csrfAllowedOrigins
 	defer func() { csrfAllowedOrigins = prevOrigins }()
