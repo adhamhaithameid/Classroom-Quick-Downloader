@@ -206,21 +206,14 @@ function getColorDistance(hex1: string, hex2: string): number {
  * @param typeId - file type ID
  * @param position - position in the list (for triadic harmony)
  * @param usedColors - set of already assigned colors to avoid
+ * @param assignments - in-memory color assignment map
  */
 function getDistinctColorForTypeAtPosition(
   typeId: string, 
   position: number, 
-  usedColors: Set<string>
+  usedColors: Set<string>,
+  assignments: Record<string, string>
 ): string {
-  // Try to load existing assignments
-  let assignments: Record<string, string> = {};
-  try {
-    const stored = localStorage.getItem(COLOR_STORAGE_KEY);
-    assignments = stored ? JSON.parse(stored) : {};
-  } catch {
-    assignments = {};
-  }
-  
   const key = `${typeId}_pos${position}`;
   
   // Deterministic candidate generation
@@ -264,15 +257,31 @@ function getDistinctColorForTypeAtPosition(
      candidate = hslToHex(hsl.h, hsl.s, Math.max(20, Math.min(80, hsl.l + (attempts % 2 === 0 ? 20 : -20))));
   }
   
-  // Save the resolved color
+  // Save into the shared in-memory assignment map.
   assignments[key] = candidate;
+
+  return candidate;
+}
+
+function loadColorAssignments(): Record<string, string> {
+  try {
+    const stored = localStorage.getItem(COLOR_STORAGE_KEY);
+    const parsed = stored ? JSON.parse(stored) : {};
+    if (parsed && typeof parsed === 'object') {
+      return parsed as Record<string, string>;
+    }
+  } catch {
+    // Ignore storage parse/read failures and fall back to empty map.
+  }
+  return {};
+}
+
+function saveColorAssignments(assignments: Record<string, string>): void {
   try {
     localStorage.setItem(COLOR_STORAGE_KEY, JSON.stringify(assignments));
   } catch {
-    // Ignore
+    // Ignore storage write failures.
   }
-  
-  return candidate;
 }
 
 function App() {
@@ -400,9 +409,10 @@ function App() {
         const otherCount = others.reduce((acc, curr) => acc + curr[1], 0);
 
         const usedColors = new Set<string>();
+        const colorAssignments = loadColorAssignments();
 
         const mapped: StatItem[] = top.map(([key, val], index) => {
-          const color = getDistinctColorForTypeAtPosition(key, index, usedColors);
+          const color = getDistinctColorForTypeAtPosition(key, index, usedColors, colorAssignments);
           usedColors.add(color);
           return {
             id: key,
@@ -413,7 +423,7 @@ function App() {
         });
 
         if (otherCount > 0) {
-          const otherColor = getDistinctColorForTypeAtPosition('other', mapped.length, usedColors);
+          const otherColor = getDistinctColorForTypeAtPosition('other', mapped.length, usedColors, colorAssignments);
           usedColors.add(otherColor);
           mapped.push({
             id: 'other',
@@ -423,6 +433,7 @@ function App() {
           });
         }
 
+        saveColorAssignments(colorAssignments);
         setStats(mapped);
 
       } catch (e) {
