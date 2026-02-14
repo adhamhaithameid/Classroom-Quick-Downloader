@@ -567,9 +567,23 @@
 
       .container { padding: 20px; }
 
-      /* Page visibility */
-      .page { display: none; }
-      .page.active { display: block; }
+      /* Page visibility — fade + slide transition */
+      .page {
+        visibility: hidden;
+        position: absolute;
+        width: 100%;
+        opacity: 0;
+        transform: translateY(6px);
+        transition: opacity 0.22s ease-out, transform 0.22s ease-out;
+        pointer-events: none;
+      }
+      .page.active {
+        visibility: visible;
+        position: relative;
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+      }
 
       /* Stats Grid */
       .stats-grid {
