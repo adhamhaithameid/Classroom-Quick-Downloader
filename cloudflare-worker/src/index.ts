@@ -24,6 +24,20 @@ function getDashboardSecret(env: WorkerEnv): string | null {
   return env.DASHBOARD_PASSWORD || null;
 }
 
+/**
+ * Best-effort timing-safe string comparison for JavaScript.
+ *
+ * IMPORTANT: JavaScript does not guarantee constant-time execution.
+ * JIT compilers, garbage collection, and branch prediction can all
+ * introduce timing variations. This implementation minimizes the
+ * most obvious timing channels (early exit on length mismatch,
+ * character-by-character short-circuit) but is NOT equivalent to
+ * crypto.subtle.timingSafeEqual (unavailable in Workers runtime for
+ * arbitrary strings).
+ *
+ * For password verification, prefer bcrypt/scrypt which have their
+ * own timing-safe comparison built in.
+ */
 function timingSafeStringEqual(a: string, b: string): boolean {
   let mismatch = a.length ^ b.length;
   const maxLength = Math.max(a.length, b.length);
@@ -439,7 +453,7 @@ function corsAllowedHeadersForPath(pathname: string): string {
   if (isPublicCorsRoute(pathname)) {
     return "Content-Type";
   }
-  if (pathname === "/stats" || isAdminCorsRoute(pathname)) {
+  if (pathname === "/stats" || pathname === "/auth/verify-danger" || isAdminCorsRoute(pathname)) {
     return "Content-Type, X-Admin-Secret";
   }
   return "Content-Type";
@@ -574,21 +588,20 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
       );
     }
 
-    // Rate limit check
-    const rateLimitReq = new Request(new URL("/auth/login-attempt", request.url).toString(), {
-      method: "POST",
-      headers: { 
-        "Content-Type": "application/json",
-        "X-Admin-Secret": env.DO_SHARED_SECRET,
-      },
-      body: JSON.stringify({ ip: clientIp, success: false }),
-    });
-
     const form = await request.formData();
     const password = (form.get("password") || "").toString();
 
     // Validate password
     if (!timingSafeStringEqual(password, dashboardSecret)) {
+      // Rate limit: record failed attempt
+      const rateLimitReq = new Request(new URL("/auth/login-attempt", request.url).toString(), {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "X-Admin-Secret": env.DO_SHARED_SECRET,
+        },
+        body: JSON.stringify({ ip: clientIp, success: false }),
+      });
       const rateLimitRes = await stub.fetch(rateLimitReq);
       const rateLimitData = await rateLimitRes.json() as {
         allowed: boolean;
@@ -712,6 +725,12 @@ async function handleVerifyDangerPassword(request: Request, env: WorkerEnv): Pro
     return new Response("Method Not Allowed", { status: 405 });
   }
 
+  // Require authenticated context (session or X-Admin-Secret)
+  const auth = await resolveAuthContext(request, env);
+  if (!auth.hasValidSecret && !auth.hasValidSession) {
+    return unauthorizedResponse(request, env);
+  }
+
   const clientIp = request.headers.get("CF-Connecting-IP") || "unknown";
 
   // Rate limit check via DO (reuses login attempt tracking with "danger:" prefix)
@@ -798,29 +817,41 @@ async function handleVerifyDangerPassword(request: Request, env: WorkerEnv): Pro
 
 
 // ---------------------------------------------------------------------------
+// Shared Auth Context (session OR X-Admin-Secret)
+// ---------------------------------------------------------------------------
+
+type AuthContext = { hasValidSecret: boolean; hasValidSession: boolean };
+
+async function resolveAuthContext(request: Request, env: WorkerEnv): Promise<AuthContext> {
+  const clientIp = request.headers.get("CF-Connecting-IP") || "unknown";
+  const userAgent = request.headers.get("User-Agent") || "";
+  const adminSecret = request.headers.get("X-Admin-Secret");
+  const sessionToken = getSessionCookie(request);
+  const dashboardSecret = getDashboardSecret(env);
+  const bindingMode = sessionBindingModeFromEnv(env);
+
+  return {
+    hasValidSecret: !!adminSecret && timingSafeStringEqual(adminSecret, env.DO_SHARED_SECRET),
+    hasValidSession: !!dashboardSecret && !!sessionToken &&
+      await verifySessionToken(sessionToken, dashboardSecret, clientIp, userAgent, bindingMode),
+  };
+}
+
+function unauthorizedResponse(request: Request, env: WorkerEnv): Response {
+  return withCors(request, new Response(
+    JSON.stringify({ ok: false, error: "unauthorized", message: "Valid session or X-Admin-Secret required" }),
+    { status: 401, headers: { "content-type": "application/json" } }
+  ), env);
+}
+
+// ---------------------------------------------------------------------------
 // Protected Stats Endpoint (requires session or X-Admin-Secret)
 // ---------------------------------------------------------------------------
 
 async function handleProtectedStats(request: Request, env: WorkerEnv): Promise<Response> {
-  const clientIp = request.headers.get("CF-Connecting-IP") || "unknown";
-  const userAgent = request.headers.get("User-Agent") || "";
-  const sessionBindingMode = sessionBindingModeFromEnv(env);
-  const adminSecret = request.headers.get("X-Admin-Secret");
-  const sessionToken = getSessionCookie(request);
-  const dashboardSecret = getDashboardSecret(env);
-
-  // Check X-Admin-Secret header first (for API access)
-  const hasValidSecret = !!adminSecret && timingSafeStringEqual(adminSecret, env.DO_SHARED_SECRET);
-  
-  // Check session token (for browser/dashboard access)
-  const hasValidSession = !!dashboardSecret && sessionToken &&
-    await verifySessionToken(sessionToken, dashboardSecret, clientIp, userAgent, sessionBindingMode);
-
-  if (!hasValidSecret && !hasValidSession) {
-    return withCors(request, new Response(
-      JSON.stringify({ ok: false, error: "unauthorized", message: "Valid session or X-Admin-Secret required" }),
-      { status: 401, headers: { "content-type": "application/json" } }
-    ), env);
+  const auth = await resolveAuthContext(request, env);
+  if (!auth.hasValidSecret && !auth.hasValidSession) {
+    return unauthorizedResponse(request, env);
   }
 
   return proxyToDO(request, env);
@@ -834,25 +865,9 @@ async function handleProtectedStats(request: Request, env: WorkerEnv): Promise<R
 // ---------------------------------------------------------------------------
 
 async function handleProtectedAdminEndpoint(request: Request, env: WorkerEnv): Promise<Response> {
-  const clientIp = request.headers.get("CF-Connecting-IP") || "unknown";
-  const userAgent = request.headers.get("User-Agent") || "";
-  const sessionBindingMode = sessionBindingModeFromEnv(env);
-  const adminSecret = request.headers.get("X-Admin-Secret");
-  const sessionToken = getSessionCookie(request);
-  const dashboardSecret = getDashboardSecret(env);
-
-  // Check X-Admin-Secret header first (for direct API access)
-  const hasValidSecret = !!adminSecret && timingSafeStringEqual(adminSecret, env.DO_SHARED_SECRET);
-  
-  // Check session token (for browser/dashboard access)
-  const hasValidSession = !!dashboardSecret && sessionToken &&
-    await verifySessionToken(sessionToken, dashboardSecret, clientIp, userAgent, sessionBindingMode);
-
-  if (!hasValidSecret && !hasValidSession) {
-    return withCors(request, new Response(
-      JSON.stringify({ ok: false, error: "unauthorized", message: "Valid session or X-Admin-Secret required" }),
-      { status: 401, headers: { "content-type": "application/json" } }
-    ), env);
+  const auth = await resolveAuthContext(request, env);
+  if (!auth.hasValidSecret && !auth.hasValidSession) {
+    return unauthorizedResponse(request, env);
   }
 
   // If session-based auth but no secret header, inject the secret for DO
@@ -861,7 +876,7 @@ async function handleProtectedAdminEndpoint(request: Request, env: WorkerEnv): P
   const headers = new Headers(request.headers);
   
   // CRITICAL: Inject the real admin secret for DO authorization
-  if (!hasValidSecret) {
+  if (!auth.hasValidSecret) {
     headers.set("X-Admin-Secret", env.DO_SHARED_SECRET);
   }
   
