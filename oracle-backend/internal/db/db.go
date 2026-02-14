@@ -319,6 +319,24 @@ func Migrate(db *sql.DB) error {
 		`CREATE INDEX IF NOT EXISTS idx_backup_runs_started_at
 			ON backup_runs(started_at DESC);`,
 
+		// Google Sheets archiver flush history for dashboard "last flush" visibility.
+		`CREATE TABLE IF NOT EXISTS sheets_flush_runs (
+			id             INTEGER PRIMARY KEY AUTOINCREMENT,
+			flushed_at_utc INTEGER NOT NULL,
+			archived_day   TEXT,
+			status         TEXT NOT NULL,
+			sheet_id       TEXT,
+			api_url        TEXT,
+			row_json       TEXT,
+			summary_json   TEXT,
+			meta_json      TEXT,
+			error_message  TEXT,
+			created_at     INTEGER NOT NULL
+		);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_sheets_flush_runs_flushed
+			ON sheets_flush_runs(flushed_at_utc DESC);`,
+
 		// Storage pressure telemetry snapshots for operator visibility.
 		`CREATE TABLE IF NOT EXISTS storage_status_samples (
 			id                    INTEGER PRIMARY KEY AUTOINCREMENT,

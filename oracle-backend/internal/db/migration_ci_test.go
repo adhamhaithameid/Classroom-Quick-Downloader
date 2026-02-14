@@ -20,6 +20,7 @@ func TestMigrationBootstrapCleanDatabases(t *testing.T) {
 		"admin_audit_log",
 		"system_alerts",
 		"backup_runs",
+		"sheets_flush_runs",
 		"oracle_operation_logs",
 		"auth_sessions",
 		"auth_stepup_challenges",
