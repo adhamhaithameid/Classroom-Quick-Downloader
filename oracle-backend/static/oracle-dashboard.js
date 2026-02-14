@@ -364,6 +364,36 @@
         return fetchJSONWithInit(url);
       }
 
+      /**
+       * Wrapper around fetchJSON with a localStorage TTL cache.
+       * Serves cached data when fresh enough, reducing redundant API calls
+       * on rapid page navigations or re-renders.
+       *
+       * @param {string} url    API endpoint to fetch.
+       * @param {number} ttlMs  Cache lifetime in milliseconds.
+       * @returns {Promise<any>} Parsed JSON response (from cache or network).
+       * @throws {Error} Network/HTTP errors propagate to the caller; stale
+       *   cache entries are NOT used as a fallback on fetch failure.
+       */
+      function cachedFetchJSON(url, ttlMs) {
+        var key = 'orc_cache_' + url;
+        try {
+          var cached = localStorage.getItem(key);
+          if (cached) {
+            var parsed = JSON.parse(cached);
+            if (parsed.ts && Date.now() - parsed.ts < ttlMs) {
+              return Promise.resolve(parsed.data);
+            }
+          }
+        } catch (_) { /* ignore parse/storage errors */ }
+        return fetchJSON(url).then(function(data) {
+          try {
+            localStorage.setItem(key, JSON.stringify({ ts: Date.now(), data: data }));
+          } catch (e) { if (typeof console !== 'undefined') console.warn('[cachedFetchJSON] localStorage write failed:', e); }
+          return data;
+        });
+      }
+
       function mergeRequestHeaders(extraHeaders) {
         var headers = {};
         if (extraHeaders) {
@@ -840,7 +870,7 @@
         var container = document.getElementById('batch-info-content');
         container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading...</div>';
         try {
-          lastBatchData = await fetchJSON('/api/stats/summary');
+          lastBatchData = await cachedFetchJSON('/api/stats/summary', 30000);
           renderBatchContent();
         } catch (e) {
           container.innerHTML = '<div class="empty-state empty-state-danger">Failed to load</div>';
@@ -970,7 +1000,13 @@
         container.innerHTML = html;
       }
 
+      // Security: syntaxHighlight is ONLY safe for input from JSON.stringify().
+      // JSON.stringify guarantees no unquoted HTML-special characters in output.
+      // We escape &, <, > for defense-in-depth. Quotes are NOT escaped because
+      // the regex below matches JSON string delimiters — escaping them would
+      // break pattern matching. Do NOT pass untrusted raw strings here.
       function syntaxHighlight(json) {
+        if (typeof json !== 'string') return '';
         json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function(match) {
           var cls = 'json-number';
@@ -993,10 +1029,16 @@
           danger: ['danger']
         };
         var activePages = pageGroups[page] || [page];
-        document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
+        // Remove active from all pages (CSS transition handles fade-out)
+        document.querySelectorAll('.page').forEach(function(p) {
+          p.classList.remove('active');
+        });
+        // Add active to target pages (CSS visibility+opacity transition handles fade-in)
         activePages.forEach(function(p) {
           var el = document.getElementById('page-' + p);
-          if (el) el.classList.add('active');
+          if (el) {
+            el.classList.add('active');
+          }
         });
         document.querySelectorAll('.nav-item').forEach(function(n) {
           n.classList.toggle('active', n.dataset.page === page);
@@ -1032,7 +1074,7 @@
       // Overview Page
       async function loadOverview() {
         try {
-          var data = await fetchJSON("/api/stats/summary");
+          var data = await cachedFetchJSON("/api/stats/summary", 30000);
           var statusLabel = (data.status || "unknown");
           var statusLabelTitle = statusLabel.charAt(0).toUpperCase() + statusLabel.slice(1);
           document.getElementById("sidebar-status").className = "status-dot " + 
