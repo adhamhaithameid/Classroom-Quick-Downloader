@@ -153,6 +153,28 @@ describe('analytics storage', () => {
     expect(loaded.queue[0].id).toBe('idb-first');
   });
 
+  it('treats empty IndexedDB queue as authoritative after migration', async () => {
+    const staleLegacy = [makeEvent({ id: 'legacy-stale' })];
+    installStorageMock({
+      [STORAGE_KEYS.QUEUE]: staleLegacy,
+      [STORAGE_KEYS.INTEGRITY]: computeChecksum(JSON.stringify(staleLegacy)),
+      [STORAGE_KEYS.QUEUE_MIGRATED]: true,
+    });
+
+    const loaded = await loadQueue();
+    expect(loaded.queue).toEqual([]);
+    expect(loaded.valid).toBe(true);
+  });
+
+  it('keeps authoritative queue in IndexedDB when legacy clear fails', async () => {
+    installStorageMock({}, { failSet: true });
+    await saveQueue([makeEvent({ id: 'idb-authoritative' })]);
+
+    const loaded = await loadQueue();
+    expect(loaded.queue).toHaveLength(1);
+    expect(loaded.queue[0].id).toBe('idb-authoritative');
+  });
+
   it('falls back to legacy storage when IndexedDB open fails', async () => {
     vi.spyOn(indexedDB, 'open').mockImplementation(() => {
       throw new Error('indexeddb disabled');

@@ -393,19 +393,27 @@ function migrateConfig(raw: any): AnalyticsConfig {
 
 export async function loadQueue(): Promise<{ queue: AnalyticsEvent[]; valid: boolean }> {
   const idbQueue = await getQueueFromIdb();
-  if (idbQueue && Array.isArray(idbQueue) && idbQueue.length > 0) {
-    return { queue: idbQueue, valid: true };
+  const migrated = await storageGet(STORAGE_KEYS.QUEUE_MIGRATED);
+  if (idbQueue && Array.isArray(idbQueue)) {
+    // Once migration is marked complete, IndexedDB is authoritative even when empty.
+    if (idbQueue.length > 0 || migrated === true) {
+      return { queue: idbQueue, valid: true };
+    }
   }
 
   const stored = await loadQueueWithIntegrity();
   if (stored.queue.length > 0 && isIndexedDbSupported()) {
-    const migrated = await replaceQueueInIdb(stored.queue);
-    if (migrated) {
-      await storageSet({
+    const migratedToIdb = await replaceQueueInIdb(stored.queue);
+    if (migratedToIdb) {
+      const clearedLegacy = await storageSet({
         [STORAGE_KEYS.QUEUE]: [],
         [STORAGE_KEYS.INTEGRITY]: computeChecksum('[]'),
         [STORAGE_KEYS.QUEUE_MIGRATED]: true,
       });
+      if (!clearedLegacy) {
+        // Keep legacy queue in sync when clear fails, preventing stale replay fallback.
+        await saveQueueWithIntegrity(stored.queue);
+      }
     }
   }
   return stored;
@@ -424,11 +432,15 @@ export async function saveQueue(queue: AnalyticsEvent[]): Promise<void> {
   const nextQueue = compacted.queue;
   const savedToIdb = await replaceQueueInIdb(nextQueue);
   if (savedToIdb) {
-    await storageSet({
+    const clearedLegacy = await storageSet({
       [STORAGE_KEYS.QUEUE]: [],
       [STORAGE_KEYS.INTEGRITY]: computeChecksum('[]'),
       [STORAGE_KEYS.QUEUE_MIGRATED]: true,
     });
+    if (!clearedLegacy) {
+      // Keep legacy queue mirrored if clear fails, so fallback never replays stale data.
+      await saveQueueWithIntegrity(nextQueue);
+    }
     return;
   }
   await saveQueueWithIntegrity(nextQueue);
