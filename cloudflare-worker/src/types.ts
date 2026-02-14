@@ -340,7 +340,7 @@ export interface Env {
   CORS_ALLOWED_ORIGINS?: string;
   /**
    * Optional comma-separated strict origin allowlist for admin/debug routes.
-   * Falls back to CORS_ALLOWED_ORIGINS when not set.
+   * No fallback to CORS_ALLOWED_ORIGINS; admin/debug origins must be explicitly set.
    */
   ADMIN_CORS_ALLOWED_ORIGINS?: string;
 }
