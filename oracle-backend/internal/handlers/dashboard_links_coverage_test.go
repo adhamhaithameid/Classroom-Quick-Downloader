@@ -126,7 +126,16 @@ func TestDashboardLinksHandler_MethodNotAllowed(t *testing.T) {
 
 func TestGitHubOpenCountsHandler_FreshFetch(t *testing.T) {
 	fakeFetcher := func(_ context.Context, _ *http.Client, _ string, _ string) (githubCounts, error) {
-		return githubCounts{issues: 5, prs: 3, branches: 2, discussions: 1}, nil
+		return githubCounts{
+			issues:           5,
+			prs:              3,
+			branches:         2,
+			discussions:      1,
+			issuesKnown:      true,
+			prsKnown:         true,
+			branchesKnown:    true,
+			discussionsKnown: true,
+		}, nil
 	}
 	h := gitHubOpenCountsHandlerWithFetcher("user/repo", "token", time.Minute, fakeFetcher)
 	rr := httptest.NewRecorder()
@@ -143,13 +152,25 @@ func TestGitHubOpenCountsHandler_FreshFetch(t *testing.T) {
 	if resp.Cached {
 		t.Fatal("expected cached=false on first fetch")
 	}
+	if resp.Source != "live" || resp.Partial {
+		t.Fatalf("expected live non-partial response, got %+v", resp)
+	}
 }
 
 func TestGitHubOpenCountsHandler_CachedResponse(t *testing.T) {
 	calls := 0
 	fakeFetcher := func(_ context.Context, _ *http.Client, _ string, _ string) (githubCounts, error) {
 		calls++
-		return githubCounts{issues: 5, prs: 3, branches: 2, discussions: 1}, nil
+		return githubCounts{
+			issues:           5,
+			prs:              3,
+			branches:         2,
+			discussions:      1,
+			issuesKnown:      true,
+			prsKnown:         true,
+			branchesKnown:    true,
+			discussionsKnown: true,
+		}, nil
 	}
 	h := gitHubOpenCountsHandlerWithFetcher("user/repo", "token", time.Hour, fakeFetcher)
 
@@ -164,6 +185,9 @@ func TestGitHubOpenCountsHandler_CachedResponse(t *testing.T) {
 	json.Unmarshal(rr2.Body.Bytes(), &resp)
 	if !resp.Cached {
 		t.Fatal("expected cached=true on second call")
+	}
+	if resp.Source != "cache" {
+		t.Fatalf("expected cache source, got %+v", resp)
 	}
 	if calls != 1 {
 		t.Fatalf("expected 1 fetch call, got %d", calls)
@@ -189,6 +213,12 @@ func TestGitHubOpenCountsHandler_FetchError_NoCache(t *testing.T) {
 	if resp.Error != "github_unreachable" {
 		t.Fatalf("expected github_unreachable error, got %s", resp.Error)
 	}
+	if resp.Source != "unavailable" || !resp.Partial {
+		t.Fatalf("expected unavailable partial response, got %+v", resp)
+	}
+	if resp.IssuesKnown || resp.PRsKnown || resp.BranchesKnown || resp.DiscussionsKnown {
+		t.Fatalf("expected unknown counters when unreachable, got %+v", resp)
+	}
 }
 
 func TestGitHubOpenCountsHandler_FetchError_StaleCache(t *testing.T) {
@@ -196,7 +226,16 @@ func TestGitHubOpenCountsHandler_FetchError_StaleCache(t *testing.T) {
 	fakeFetcher := func(_ context.Context, _ *http.Client, _ string, _ string) (githubCounts, error) {
 		call++
 		if call == 1 {
-			return githubCounts{issues: 10, prs: 2, branches: 6, discussions: 4}, nil
+			return githubCounts{
+				issues:           10,
+				prs:              2,
+				branches:         6,
+				discussions:      4,
+				issuesKnown:      true,
+				prsKnown:         true,
+				branchesKnown:    true,
+				discussionsKnown: true,
+			}, nil
 		}
 		return githubCounts{}, errors.New("fail")
 	}
@@ -220,6 +259,9 @@ func TestGitHubOpenCountsHandler_FetchError_StaleCache(t *testing.T) {
 	}
 	if !resp.Stale {
 		t.Fatal("expected stale=true")
+	}
+	if resp.Source != "stale_cache" {
+		t.Fatalf("expected stale cache source, got %+v", resp)
 	}
 	if resp.OpenIssues != 10 {
 		t.Fatalf("expected stale issues=10, got %d", resp.OpenIssues)
@@ -252,7 +294,16 @@ func TestGitHubOpenCountsHandler_MethodNotAllowed(t *testing.T) {
 
 func TestGitHubOpenCountsHandler_NegativeTTL(t *testing.T) {
 	fakeFetcher := func(_ context.Context, _ *http.Client, _ string, _ string) (githubCounts, error) {
-		return githubCounts{issues: 1, prs: 1, branches: 1, discussions: 0}, nil
+		return githubCounts{
+			issues:           1,
+			prs:              1,
+			branches:         1,
+			discussions:      0,
+			issuesKnown:      true,
+			prsKnown:         true,
+			branchesKnown:    true,
+			discussionsKnown: true,
+		}, nil
 	}
 	// Negative TTL should be clamped to 1 minute
 	h := gitHubOpenCountsHandlerWithFetcher("user/repo", "", -time.Hour, fakeFetcher)

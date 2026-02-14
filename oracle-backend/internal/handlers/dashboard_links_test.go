@@ -58,7 +58,16 @@ func TestGitHubOpenCountsHandler_UsesCache(t *testing.T) {
 		5*time.Minute,
 		func(_ context.Context, _ *http.Client, _ string, _ string) (githubCounts, error) {
 			callCount++
-			return githubCounts{issues: 11, prs: 7, branches: 13, discussions: 5}, nil
+			return githubCounts{
+				issues:           11,
+				prs:              7,
+				branches:         13,
+				discussions:      5,
+				issuesKnown:      true,
+				prsKnown:         true,
+				branchesKnown:    true,
+				discussionsKnown: true,
+			}, nil
 		},
 	)
 
@@ -107,7 +116,16 @@ func TestGitHubOpenCountsHandler_ReturnsStaleOnFetchError(t *testing.T) {
 		func(_ context.Context, _ *http.Client, _ string, _ string) (githubCounts, error) {
 			callCount++
 			if callCount == 1 {
-				return githubCounts{issues: 3, prs: 2, branches: 4, discussions: 1}, nil
+				return githubCounts{
+					issues:           3,
+					prs:              2,
+					branches:         4,
+					discussions:      1,
+					issuesKnown:      true,
+					prsKnown:         true,
+					branchesKnown:    true,
+					discussionsKnown: true,
+				}, nil
 			}
 			return githubCounts{}, context.DeadlineExceeded
 		},
@@ -127,18 +145,23 @@ func TestGitHubOpenCountsHandler_ReturnsStaleOnFetchError(t *testing.T) {
 		t.Fatalf("expected stale fallback 200, got %d", rr2.Code)
 	}
 	var payload struct {
-		OK          bool  `json:"ok"`
-		OpenIssues  int64 `json:"openIssues"`
-		OpenPRs     int64 `json:"openPRs"`
-		Branches    int64 `json:"branches"`
-		Discussions int64 `json:"discussions"`
-		Stale       bool  `json:"stale"`
+		OK          bool   `json:"ok"`
+		OpenIssues  int64  `json:"openIssues"`
+		OpenPRs     int64  `json:"openPRs"`
+		Branches    int64  `json:"branches"`
+		Discussions int64  `json:"discussions"`
+		Stale       bool   `json:"stale"`
+		Source      string `json:"source"`
+		Partial     bool   `json:"partial"`
 	}
 	if err := json.Unmarshal(rr2.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode stale response: %v", err)
 	}
 	if !payload.OK || !payload.Stale {
 		t.Fatalf("expected stale ok response, got %+v", payload)
+	}
+	if payload.Source != "stale_cache" || payload.Partial {
+		t.Fatalf("expected stale cache source and non-partial values, got %+v", payload)
 	}
 	if payload.OpenIssues != 3 || payload.OpenPRs != 2 || payload.Branches != 4 || payload.Discussions != 1 {
 		t.Fatalf("unexpected stale counts: %+v", payload)

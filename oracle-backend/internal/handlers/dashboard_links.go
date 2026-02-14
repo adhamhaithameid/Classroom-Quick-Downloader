@@ -17,24 +17,34 @@ import (
 var githubRepoSlugPattern = regexp.MustCompile(`^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$`)
 
 type githubOpenCountsResponse struct {
-	OK          bool   `json:"ok"`
-	Error       string `json:"error,omitempty"`
-	Repo        string `json:"repo"`
-	OpenIssues  int64  `json:"openIssues"`
-	OpenPRs     int64  `json:"openPRs"`
-	Branches    int64  `json:"branches"`
-	Discussions int64  `json:"discussions"`
-	FetchedAt   int64  `json:"fetchedAt"`
-	Cached      bool   `json:"cached"`
-	Stale       bool   `json:"stale,omitempty"`
-	CacheTTLSec int64  `json:"cacheTtlSec"`
+	OK               bool   `json:"ok"`
+	Error            string `json:"error,omitempty"`
+	Repo             string `json:"repo"`
+	OpenIssues       int64  `json:"openIssues"`
+	OpenPRs          int64  `json:"openPRs"`
+	Branches         int64  `json:"branches"`
+	Discussions      int64  `json:"discussions"`
+	IssuesKnown      bool   `json:"issuesKnown"`
+	PRsKnown         bool   `json:"prsKnown"`
+	BranchesKnown    bool   `json:"branchesKnown"`
+	DiscussionsKnown bool   `json:"discussionsKnown"`
+	Source           string `json:"source,omitempty"`
+	Partial          bool   `json:"partial,omitempty"`
+	FetchedAt        int64  `json:"fetchedAt"`
+	Cached           bool   `json:"cached"`
+	Stale            bool   `json:"stale,omitempty"`
+	CacheTTLSec      int64  `json:"cacheTtlSec"`
 }
 
 type githubCounts struct {
-	issues      int64
-	prs         int64
-	branches    int64
-	discussions int64
+	issues           int64
+	prs              int64
+	branches         int64
+	discussions      int64
+	issuesKnown      bool
+	prsKnown         bool
+	branchesKnown    bool
+	discussionsKnown bool
 }
 
 type githubCountsCache struct {
@@ -110,15 +120,21 @@ func gitHubOpenCountsHandlerWithFetcher(repoSlug string, token string, cacheTTL 
 		mu.Lock()
 		if !cache.expiresAt.IsZero() && now.Before(cache.expiresAt) {
 			resp := githubOpenCountsResponse{
-				OK:          true,
-				Repo:        repoSlug,
-				OpenIssues:  cache.counts.issues,
-				OpenPRs:     cache.counts.prs,
-				Branches:    cache.counts.branches,
-				Discussions: cache.counts.discussions,
-				FetchedAt:   cache.fetchedAt.UnixMilli(),
-				Cached:      true,
-				CacheTTLSec: int64(cacheTTL.Seconds()),
+				OK:               true,
+				Repo:             repoSlug,
+				OpenIssues:       cache.counts.issues,
+				OpenPRs:          cache.counts.prs,
+				Branches:         cache.counts.branches,
+				Discussions:      cache.counts.discussions,
+				IssuesKnown:      cache.counts.issuesKnown,
+				PRsKnown:         cache.counts.prsKnown,
+				BranchesKnown:    cache.counts.branchesKnown,
+				DiscussionsKnown: cache.counts.discussionsKnown,
+				Source:           "cache",
+				Partial:          !allGitHubCountsKnown(cache.counts),
+				FetchedAt:        cache.fetchedAt.UnixMilli(),
+				Cached:           true,
+				CacheTTLSec:      int64(cacheTTL.Seconds()),
 			}
 			mu.Unlock()
 			w.Header().Set("Content-Type", "application/json")
@@ -132,16 +148,22 @@ func gitHubOpenCountsHandlerWithFetcher(repoSlug string, token string, cacheTTL 
 			mu.Lock()
 			staleAvailable := !cache.fetchedAt.IsZero()
 			resp := githubOpenCountsResponse{
-				OK:          staleAvailable,
-				Repo:        repoSlug,
-				OpenIssues:  cache.counts.issues,
-				OpenPRs:     cache.counts.prs,
-				Branches:    cache.counts.branches,
-				Discussions: cache.counts.discussions,
-				FetchedAt:   cache.fetchedAt.UnixMilli(),
-				Cached:      staleAvailable,
-				Stale:       staleAvailable,
-				CacheTTLSec: int64(cacheTTL.Seconds()),
+				OK:               staleAvailable,
+				Repo:             repoSlug,
+				OpenIssues:       cache.counts.issues,
+				OpenPRs:          cache.counts.prs,
+				Branches:         cache.counts.branches,
+				Discussions:      cache.counts.discussions,
+				IssuesKnown:      cache.counts.issuesKnown,
+				PRsKnown:         cache.counts.prsKnown,
+				BranchesKnown:    cache.counts.branchesKnown,
+				DiscussionsKnown: cache.counts.discussionsKnown,
+				Source:           "stale_cache",
+				Partial:          !allGitHubCountsKnown(cache.counts),
+				FetchedAt:        cache.fetchedAt.UnixMilli(),
+				Cached:           staleAvailable,
+				Stale:            staleAvailable,
+				CacheTTLSec:      int64(cacheTTL.Seconds()),
 			}
 			mu.Unlock()
 
@@ -152,17 +174,23 @@ func gitHubOpenCountsHandlerWithFetcher(repoSlug string, token string, cacheTTL 
 			}
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(githubOpenCountsResponse{
-				OK:          false,
-				Error:       "github_unreachable",
-				Repo:        repoSlug,
-				OpenIssues:  0,
-				OpenPRs:     0,
-				Branches:    0,
-				Discussions: 0,
-				FetchedAt:   0,
-				Cached:      false,
-				Stale:       true,
-				CacheTTLSec: int64(cacheTTL.Seconds()),
+				OK:               false,
+				Error:            "github_unreachable",
+				Repo:             repoSlug,
+				OpenIssues:       0,
+				OpenPRs:          0,
+				Branches:         0,
+				Discussions:      0,
+				IssuesKnown:      false,
+				PRsKnown:         false,
+				BranchesKnown:    false,
+				DiscussionsKnown: false,
+				Source:           "unavailable",
+				Partial:          true,
+				FetchedAt:        0,
+				Cached:           false,
+				Stale:            true,
+				CacheTTLSec:      int64(cacheTTL.Seconds()),
 			})
 			return
 		}
@@ -175,22 +203,41 @@ func gitHubOpenCountsHandlerWithFetcher(repoSlug string, token string, cacheTTL 
 
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(githubOpenCountsResponse{
-			OK:          true,
-			Repo:        repoSlug,
-			OpenIssues:  counts.issues,
-			OpenPRs:     counts.prs,
-			Branches:    counts.branches,
-			Discussions: counts.discussions,
-			FetchedAt:   now.UnixMilli(),
-			Cached:      false,
-			CacheTTLSec: int64(cacheTTL.Seconds()),
+			OK:               true,
+			Repo:             repoSlug,
+			OpenIssues:       counts.issues,
+			OpenPRs:          counts.prs,
+			Branches:         counts.branches,
+			Discussions:      counts.discussions,
+			IssuesKnown:      counts.issuesKnown,
+			PRsKnown:         counts.prsKnown,
+			BranchesKnown:    counts.branchesKnown,
+			DiscussionsKnown: counts.discussionsKnown,
+			Source:           "live",
+			Partial:          !allGitHubCountsKnown(counts),
+			FetchedAt:        now.UnixMilli(),
+			Cached:           false,
+			CacheTTLSec:      int64(cacheTTL.Seconds()),
 		})
 	}
 }
 
 func fetchGitHubOpenCounts(ctx context.Context, client *http.Client, repoSlug string, token string) (githubCounts, error) {
+	var (
+		issuesKnown      bool
+		prsKnown         bool
+		branchesKnown    bool
+		discussionsKnown bool
+	)
+
 	issues, issuesErr := fetchGitHubSearchOpenCount(ctx, client, repoSlug, true, token)
 	prs, prsErr := fetchGitHubSearchOpenCount(ctx, client, repoSlug, false, token)
+	if issuesErr == nil {
+		issuesKnown = true
+	}
+	if prsErr == nil {
+		prsKnown = true
+	}
 	if issuesErr != nil || prsErr != nil {
 		// Fallback path: derive issues using repo metadata (issues+PRs) minus open PR list count.
 		openIssuesAndPRs, err := fetchGitHubRepoOpenIssuesCount(ctx, client, repoSlug, token)
@@ -199,26 +246,54 @@ func fetchGitHubOpenCounts(ctx context.Context, client *http.Client, repoSlug st
 		}
 		if prsErr != nil {
 			prs, err = fetchGitHubRepoCollectionCount(ctx, client, repoSlug, "pulls", token)
-			if err != nil {
+			if err == nil {
+				prsKnown = true
+			} else {
 				prs = 0
 			}
 		}
 		if issuesErr != nil {
-			issues = openIssuesAndPRs - prs
-			if issues < 0 {
+			if prsKnown {
+				issues = openIssuesAndPRs - prs
+				if issues < 0 {
+					issues = 0
+				}
+				issuesKnown = true
+			} else {
+				// Without a known PR count, "open_issues_count" contains PRs too.
 				issues = openIssuesAndPRs
+				issuesKnown = false
 			}
 		}
 	}
 	branches, err := fetchGitHubRepoCollectionCount(ctx, client, repoSlug, "branches", token)
 	if err != nil {
 		branches = 0
+		branchesKnown = false
+	} else {
+		branchesKnown = true
 	}
 	discussions, err := fetchGitHubRepoCollectionCount(ctx, client, repoSlug, "discussions", token)
 	if err != nil {
 		discussions = 0
+		discussionsKnown = false
+	} else {
+		discussionsKnown = true
 	}
-	return githubCounts{issues: issues, prs: prs, branches: branches, discussions: discussions}, nil
+	return githubCounts{
+		issues:           issues,
+		prs:              prs,
+		branches:         branches,
+		discussions:      discussions,
+		issuesKnown:      issuesKnown,
+		prsKnown:         prsKnown,
+		branchesKnown:    branchesKnown,
+		discussionsKnown: discussionsKnown,
+	}, nil
+}
+
+func allGitHubCountsKnown(counts githubCounts) bool {
+	return counts.issuesKnown && counts.prsKnown && counts.branchesKnown && counts.discussionsKnown
 }
 
 func fetchGitHubSearchOpenCount(ctx context.Context, client *http.Client, repoSlug string, isIssue bool, token string) (int64, error) {
