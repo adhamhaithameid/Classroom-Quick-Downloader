@@ -263,3 +263,91 @@ func TestIntegrationAPIFlow_DeploymentSyncUpdatesOverviewAggregates(t *testing.T
 		t.Fatalf("expected reviewsTotal=29, got %v", payload.Aggregates.ReviewsTotal)
 	}
 }
+
+func TestIntegrationAPIFlow_TimeSeriesAndBreakdownRespectVersionData(t *testing.T) {
+	// Arrange
+	mux, sqlDB := newIntegrationMux(t)
+	defer sqlDB.Close()
+
+	batchV1 := newIntegrationBatch("integration-flow-version-v1", 10)
+	batchV2 := newIntegrationBatch("integration-flow-version-v2", 5)
+	batchV2.TimeBuckets[0].Counters.ByExtVer = map[string]int64{"2.0.0": 5}
+
+	for _, batch := range []model.OracleBatch{batchV1, batchV2} {
+		body, err := json.Marshal(batch)
+		if err != nil {
+			t.Fatalf("marshal batch failed: %v", err)
+		}
+		req := httptest.NewRequest(http.MethodPost, "/ingest-batch", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-DO-SECRET", "test-secret")
+		rr := httptest.NewRecorder()
+		mux.ServeHTTP(rr, req)
+		if rr.Code != http.StatusOK {
+			t.Fatalf("ingest failed for %s: %d %s", batch.BatchID, rr.Code, rr.Body.String())
+		}
+	}
+
+	// Act: query extVersion-filtered timeseries.
+	tsReq := httptest.NewRequest(http.MethodGet, "/api/stats/timeseries?range=all&granularity=day&extVersion=2.0.0", nil)
+	tsRR := httptest.NewRecorder()
+	mux.ServeHTTP(tsRR, tsReq)
+	if tsRR.Code != http.StatusOK {
+		t.Fatalf("timeseries query failed: %d %s", tsRR.Code, tsRR.Body.String())
+	}
+
+	// Assert: filtered series sums to version-specific downloads.
+	var tsPayload struct {
+		OK     bool `json:"ok"`
+		Points []struct {
+			Downloads int64 `json:"downloads"`
+		} `json:"points"`
+	}
+	if err := json.Unmarshal(tsRR.Body.Bytes(), &tsPayload); err != nil {
+		t.Fatalf("unmarshal timeseries payload failed: %v", err)
+	}
+	if !tsPayload.OK {
+		t.Fatalf("expected timeseries ok=true")
+	}
+	var filteredDownloads int64
+	for _, point := range tsPayload.Points {
+		filteredDownloads += point.Downloads
+	}
+	if filteredDownloads != 5 {
+		t.Fatalf("expected extVersion=2.0.0 downloads=5, got %d", filteredDownloads)
+	}
+
+	// Act: query version breakdown over all time.
+	breakdownReq := httptest.NewRequest(http.MethodGet, "/api/stats/breakdown?dimension=version&range=all", nil)
+	breakdownRR := httptest.NewRecorder()
+	mux.ServeHTTP(breakdownRR, breakdownReq)
+	if breakdownRR.Code != http.StatusOK {
+		t.Fatalf("breakdown query failed: %d %s", breakdownRR.Code, breakdownRR.Body.String())
+	}
+
+	// Assert: both versions appear with expected counts.
+	var breakdownPayload struct {
+		OK     bool `json:"ok"`
+		Values []struct {
+			Value string `json:"value"`
+			Count int64  `json:"count"`
+		} `json:"values"`
+	}
+	if err := json.Unmarshal(breakdownRR.Body.Bytes(), &breakdownPayload); err != nil {
+		t.Fatalf("unmarshal breakdown payload failed: %v", err)
+	}
+	if !breakdownPayload.OK {
+		t.Fatalf("expected breakdown ok=true")
+	}
+
+	counts := make(map[string]int64, len(breakdownPayload.Values))
+	for _, item := range breakdownPayload.Values {
+		counts[item.Value] = item.Count
+	}
+	if counts["1.0.0"] != 10 {
+		t.Fatalf("expected version 1.0.0 count=10, got %d", counts["1.0.0"])
+	}
+	if counts["2.0.0"] != 5 {
+		t.Fatalf("expected version 2.0.0 count=5, got %d", counts["2.0.0"])
+	}
+}
