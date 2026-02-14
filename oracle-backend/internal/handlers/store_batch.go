@@ -189,6 +189,11 @@ func IngestBatchHandlerV4(sqliteDB, postgresDB *sql.DB, sharedSecret string) htt
 		}
 		if usePostgresPrimary {
 			err = ingestBatchPostgres(ctx, postgresDB, &batch, bodyBytes)
+			if err == nil && sqliteDB != nil {
+				// Keep SQLite analytics tables in sync while stats endpoints still read SQLite.
+				// This mirror path is idempotent by batch_id and intentionally skips outbox/raw writes.
+				err = ingestBatchSQLiteMirror(ctx, sqliteDB, &batch)
+			}
 		} else {
 			err = ingestBatch(ctx, sqliteDB, &batch, bodyBytes, rawPayload)
 		}
@@ -334,6 +339,83 @@ func ingestBatchPostgres(ctx context.Context, postgresDB *sql.DB, batch *model.O
 	if !batchInserted {
 		return tx.Commit()
 	}
+	return tx.Commit()
+}
+
+func ingestBatchSQLiteMirror(ctx context.Context, db *sql.DB, batch *model.OracleBatch) error {
+	tx, err := db.BeginTx(ctx, &sql.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Idempotency: mirror once per batch ID.
+	var exists int
+	err = tx.QueryRowContext(ctx, `SELECT 1 FROM batches WHERE batch_id = ?`, batch.BatchID).Scan(&exists) // #nosec G701 -- SQL text is constant and parameters are bound.
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+	if err == nil {
+		return tx.Commit()
+	}
+
+	var totalEvents, totalDownloads, totalSuccess, totalFail int64
+	for _, b := range batch.TimeBuckets {
+		totalEvents += b.Totals.TotalEvents
+		totalDownloads += b.Totals.TotalDownloads
+		totalSuccess += b.Totals.TotalSuccess
+		totalFail += b.Totals.TotalFail
+	}
+	if len(batch.TimeBuckets) == 0 {
+		totalEvents = batch.Summary.Totals.TotalEvents
+		totalDownloads = batch.Summary.Totals.TotalDownloads
+		totalSuccess = batch.Summary.Totals.TotalSuccess
+		totalFail = batch.Summary.Totals.TotalFail
+	}
+
+	nowMs := time.Now().UnixMilli()
+	generatedAt := batch.GeneratedAt
+	if generatedAt == 0 {
+		generatedAt = nowMs
+	}
+
+	if _, err := tx.ExecContext( // #nosec G701 -- SQL text is constant and parameters are bound.
+		ctx,
+		`INSERT INTO batches (
+			batch_id, generated_at, ingested_at, time_zone,
+			events_count, downloads_count, success_count, fail_count
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		batch.BatchID,
+		generatedAt,
+		nowMs,
+		batch.TimeZone,
+		totalEvents,
+		totalDownloads,
+		totalSuccess,
+		totalFail,
+	); err != nil {
+		return err
+	}
+
+	if err := insertHourly(ctx, tx, batch); err != nil {
+		return err
+	}
+	if err := updateTotals(ctx, tx, batch); err != nil {
+		return err
+	}
+	if err := insertDOStateSnapshot(ctx, tx, batch); err != nil {
+		return err
+	}
+	if err := upsertDeliveryMetrics(ctx, tx, batch); err != nil {
+		return err
+	}
+	if err := insertFailureLogsFromBatch(ctx, tx, batch); err != nil {
+		return err
+	}
+	if err := cleanupOldFailureLogs(ctx, tx, failureLogRetentionDays); err != nil {
+		return err
+	}
+
 	return tx.Commit()
 }
 

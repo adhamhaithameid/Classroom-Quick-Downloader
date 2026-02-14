@@ -63,7 +63,7 @@ func TestIngestBatchHandlerV4_PostgresFlagWithoutPostgresFallsBackSQLite(t *test
 	}
 }
 
-func TestIngestBatchHandlerV4_PostgresPrimaryWritesPostgresOnly(t *testing.T) {
+func TestIngestBatchHandlerV4_PostgresPrimaryWritesPostgresAndMirrorsSQLiteStats(t *testing.T) {
 	dsn := os.Getenv("POSTGRES_DSN")
 	if dsn == "" {
 		t.Skip("POSTGRES_DSN not set")
@@ -103,8 +103,16 @@ func TestIngestBatchHandlerV4_PostgresPrimaryWritesPostgresOnly(t *testing.T) {
 	if err := sqlDB.QueryRow(`SELECT COUNT(*) FROM batches WHERE batch_id = ?`, batchID).Scan(&sqliteCount); err != nil {
 		t.Fatalf("query sqlite batches failed: %v", err)
 	}
-	if sqliteCount != 0 {
-		t.Fatalf("expected no sqlite writes when postgres primary ingest is enabled, got %d", sqliteCount)
+	if sqliteCount != 1 {
+		t.Fatalf("expected sqlite analytics mirror write when postgres primary ingest is enabled, got %d", sqliteCount)
+	}
+
+	var sqliteOutboxCount int64
+	if err := sqlDB.QueryRow(`SELECT COUNT(*) FROM ingest_outbox WHERE idempotency_key = ?`, "batch:"+batchID).Scan(&sqliteOutboxCount); err != nil {
+		t.Fatalf("query sqlite ingest_outbox failed: %v", err)
+	}
+	if sqliteOutboxCount != 0 {
+		t.Fatalf("expected sqlite mirror path to skip outbox writes, got %d", sqliteOutboxCount)
 	}
 
 	var pgCount int64
