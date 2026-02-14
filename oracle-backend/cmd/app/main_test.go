@@ -636,6 +636,65 @@ func TestGetClientIPTrustedProxyFallsBackToForwardedWhenXRealInvalid(t *testing.
 	}
 }
 
+func TestParseForwardedProtoHeaderValue(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		raw  string
+		want string
+	}{
+		{name: "forwarded https", raw: `for=203.0.113.10;proto=https`, want: "https"},
+		{name: "forwarded http uppercase", raw: `For=203.0.113.10; Proto=HTTP`, want: "http"},
+		{name: "forwarded invalid proto", raw: `for=203.0.113.10;proto=ftp`, want: ""},
+		{name: "forwarded missing proto", raw: `for=203.0.113.10`, want: ""},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := parseForwardedProtoHeaderValue(tc.raw); got != tc.want {
+				t.Fatalf("parseForwardedProtoHeaderValue(%q)=%q want=%q", tc.raw, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestParseXForwardedProtoHeaderValue(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		raw  string
+		want string
+	}{
+		{name: "https", raw: "https", want: "https"},
+		{name: "http first in list", raw: "http, https", want: "http"},
+		{name: "trim spaces", raw: "   HTTPS   ", want: "https"},
+		{name: "invalid value", raw: "ws", want: ""},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := parseXForwardedProtoHeaderValue(tc.raw); got != tc.want {
+				t.Fatalf("parseXForwardedProtoHeaderValue(%q)=%q want=%q", tc.raw, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestParseTrustedProxyCIDRs_IgnoresInvalidAndParsesIPv4IPv6(t *testing.T) {
+	t.Parallel()
+
+	nets := parseTrustedProxyCIDRs("10.0.0.0/8, invalid-entry, 203.0.113.9, 2001:db8::1")
+	if len(nets) != 3 {
+		t.Fatalf("expected 3 parsed trusted proxy entries, got %d", len(nets))
+	}
+}
+
 func TestNormalizeSessionCookieSecureMode(t *testing.T) {
 	cases := []struct {
 		in   string
