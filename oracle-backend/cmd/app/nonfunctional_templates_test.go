@@ -56,35 +56,46 @@ func TestNonFunctionalTemplate_AuthHeaderValidation(t *testing.T) {
 
 	cases := []struct {
 		name          string
+		path          string
 		authHeader    string
 		archiverToken string
 		wantStatus    int
 	}{
 		{
 			name:       "missing credentials",
+			path:       "/api/secure",
 			wantStatus: http.StatusUnauthorized,
 		},
 		{
 			name:       "authorization bearer does not bypass cookie auth",
+			path:       "/api/secure",
 			authHeader: "Bearer fake-jwt-token",
 			wantStatus: http.StatusUnauthorized,
 		},
 		{
 			name:          "invalid archiver token",
+			path:          "/api/stats/summary",
 			archiverToken: "wrong-secret",
 			wantStatus:    http.StatusUnauthorized,
 		},
 		{
-			name:          "valid archiver token",
+			name:          "valid archiver token on allowed path",
+			path:          "/api/stats/summary",
 			archiverToken: "archiver-secret",
 			wantStatus:    http.StatusOK,
+		},
+		{
+			name:          "valid archiver token on disallowed path",
+			path:          "/api/secure",
+			archiverToken: "archiver-secret",
+			wantStatus:    http.StatusUnauthorized,
 		},
 	}
 
 	// Act + Assert
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodGet, "/api/secure", nil)
+			req := httptest.NewRequest(http.MethodGet, tc.path, nil)
 			if tc.authHeader != "" {
 				req.Header.Set("Authorization", tc.authHeader)
 			}

@@ -143,6 +143,10 @@ func TestCSRFMiddleware_AllowsMutatingAPIWithHeader(t *testing.T) {
 }
 
 func TestCSRFMiddleware_RejectsCrossOriginMutatingAPI(t *testing.T) {
+	prevOrigins := csrfAllowedOrigins
+	defer func() { csrfAllowedOrigins = prevOrigins }()
+	csrfAllowedOrigins = nil
+
 	handler := csrfHeaderMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
@@ -152,11 +156,38 @@ func TestCSRFMiddleware_RejectsCrossOriginMutatingAPI(t *testing.T) {
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
 	if rr.Code != http.StatusForbidden {
-		t.Fatalf("expected 403 when origin mismatches host, got %d", rr.Code)
+		t.Fatalf("expected 403 when origin mismatches, got %d", rr.Code)
 	}
 }
 
 func TestCSRFMiddleware_AllowsMatchingOriginMutatingAPI(t *testing.T) {
+	prevOrigins := csrfAllowedOrigins
+	defer func() { csrfAllowedOrigins = prevOrigins }()
+	csrfAllowedOrigins = nil
+
+	handler := csrfHeaderMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	req := httptest.NewRequest(http.MethodPost, "https://oracle.local/api/admin/flags/update", bytes.NewBufferString(`{}`))
+	req.Header.Set("X-Requested-With", "XMLHttpRequest")
+	req.Header.Set("Origin", "https://oracle.local")
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected 204 when origin matches canonical request origin, got %d", rr.Code)
+	}
+}
+
+func TestCSRFMiddleware_RejectsSchemeMismatchWithoutTrustedProxyProto(t *testing.T) {
+	prevOrigins := csrfAllowedOrigins
+	prevProxies := trustedProxyNets
+	defer func() {
+		csrfAllowedOrigins = prevOrigins
+		setTrustedProxyNets(prevProxies)
+	}()
+	csrfAllowedOrigins = nil
+	setTrustedProxyNets(nil)
+
 	handler := csrfHeaderMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
@@ -165,8 +196,47 @@ func TestCSRFMiddleware_AllowsMatchingOriginMutatingAPI(t *testing.T) {
 	req.Header.Set("Origin", "https://oracle.local")
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
+	if rr.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 when origin scheme mismatches request context, got %d", rr.Code)
+	}
+}
+
+func TestCSRFMiddleware_AllowsConfiguredPublicOrigin(t *testing.T) {
+	prevOrigins := csrfAllowedOrigins
+	defer func() { csrfAllowedOrigins = prevOrigins }()
+	csrfAllowedOrigins = loadCSRFAllowedOrigins("https://dashboard.example.com", "")
+
+	handler := csrfHeaderMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	req := httptest.NewRequest(http.MethodPost, "http://internal-oracle:8080/api/admin/flags/update", bytes.NewBufferString(`{}`))
+	req.Header.Set("X-Requested-With", "XMLHttpRequest")
+	req.Header.Set("Origin", "https://dashboard.example.com")
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
 	if rr.Code != http.StatusNoContent {
-		t.Fatalf("expected 204 when origin matches host, got %d", rr.Code)
+		t.Fatalf("expected 204 when origin is in configured CSRF allowlist, got %d", rr.Code)
+	}
+}
+
+func TestNormalizeOriginValue_NormalizesSchemeHostAndDefaultPorts(t *testing.T) {
+	cases := []struct {
+		raw  string
+		want string
+	}{
+		{raw: " HTTPS://Oracle.Local:443/path ", want: "https://oracle.local"},
+		{raw: "http://oracle.local:80", want: "http://oracle.local"},
+		{raw: "http://oracle.local:8080", want: "http://oracle.local:8080"},
+		{raw: "https://[2001:db8::1]:443", want: "https://[2001:db8::1]"},
+	}
+	for _, tc := range cases {
+		got, err := normalizeOriginValue(tc.raw)
+		if err != nil {
+			t.Fatalf("normalizeOriginValue(%q) returned unexpected error: %v", tc.raw, err)
+		}
+		if got != tc.want {
+			t.Fatalf("normalizeOriginValue(%q)=%q want=%q", tc.raw, got, tc.want)
+		}
 	}
 }
 
@@ -277,6 +347,15 @@ func TestSecurityHeadersMiddleware_UsesScriptNonceWithoutUnsafeInline(t *testing
 	if strings.Contains(csp, "script-src-attr 'unsafe-inline'") || strings.Contains(csp, "script-src 'self' 'unsafe-inline'") {
 		t.Fatalf("expected CSP without unsafe-inline script permissions, got: %q", csp)
 	}
+	if !strings.Contains(csp, "style-src 'self' https: 'nonce-") {
+		t.Fatalf("expected nonce-based style CSP, got: %q", csp)
+	}
+	if strings.Contains(csp, "style-src 'self' 'unsafe-inline'") {
+		t.Fatalf("expected CSP without unsafe-inline style-src, got: %q", csp)
+	}
+	if strings.Contains(csp, "style-src-attr 'unsafe-inline'") {
+		t.Fatalf("expected CSP without unsafe-inline style-src-attr, got: %q", csp)
+	}
 }
 
 func TestIsValidSession_UsesPersistedAuthSessionWhenMemoryIsEmpty(t *testing.T) {
@@ -373,6 +452,43 @@ func TestMetricsRoute_RequiresAuthMiddleware(t *testing.T) {
 	}
 }
 
+func TestSecurityHeadersMiddleware_AddsNoStoreForSensitiveAPIs(t *testing.T) {
+	handler := securityHeadersMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	req := httptest.NewRequest(http.MethodPost, "/api/admin/flags/update", nil)
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("unexpected status: %d", rr.Code)
+	}
+	if got := rr.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("expected Cache-Control no-store, got %q", got)
+	}
+	if got := rr.Header().Get("Pragma"); got != "no-cache" {
+		t.Fatalf("expected Pragma no-cache, got %q", got)
+	}
+}
+
+func TestSecurityHeadersMiddleware_DoesNotForceNoStoreOnStaticPages(t *testing.T) {
+	handler := securityHeadersMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("unexpected status: %d", rr.Code)
+	}
+	if got := rr.Header().Get("Cache-Control"); got != "" {
+		t.Fatalf("expected no Cache-Control override for static pages, got %q", got)
+	}
+}
+
 func TestMetricsHandler_IncludesSchemaDriftMetricFromSQLite(t *testing.T) {
 	sqlDB, err := db.Init(filepath.Join(t.TempDir(), "metrics-schema.db"))
 	if err != nil {
@@ -452,6 +568,57 @@ func TestGetClientIPTrustedProxyUsesXRealIPWhenValid(t *testing.T) {
 	}
 }
 
+func TestGetClientIPTrustedProxyUsesForwardedHeaderForValue(t *testing.T) {
+	prev := trustedProxyNets
+	defer setTrustedProxyNets(prev)
+
+	setTrustedProxyNets(parseTrustedProxyCIDRs("10.0.0.0/8"))
+
+	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req.RemoteAddr = "10.1.2.3:1234"
+	req.Header.Set("Forwarded", `for="203.0.113.88";proto=https`)
+	req.Header.Set("X-Real-IP", "203.0.113.77")
+
+	ip := getClientIP(req)
+	if ip != "203.0.113.88" {
+		t.Fatalf("expected Forwarded for= to win, got %q", ip)
+	}
+}
+
+func TestGetClientIPTrustedProxyAcceptsForwardedHostPortValue(t *testing.T) {
+	prev := trustedProxyNets
+	defer setTrustedProxyNets(prev)
+
+	setTrustedProxyNets(parseTrustedProxyCIDRs("10.0.0.0/8"))
+
+	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req.RemoteAddr = "10.1.2.3:1234"
+	req.Header.Set("Forwarded", `for=203.0.113.10:443;proto=https`)
+	req.Header.Set("X-Forwarded-For", "203.0.113.44")
+
+	ip := getClientIP(req)
+	if ip != "203.0.113.10" {
+		t.Fatalf("expected Forwarded for=host:port to resolve to IP, got %q", ip)
+	}
+}
+
+func TestGetClientIPTrustedProxyAcceptsForwardedIPv6HostPortValue(t *testing.T) {
+	prev := trustedProxyNets
+	defer setTrustedProxyNets(prev)
+
+	setTrustedProxyNets(parseTrustedProxyCIDRs("10.0.0.0/8"))
+
+	req := httptest.NewRequest("GET", "http://example.com", nil)
+	req.RemoteAddr = "10.1.2.3:1234"
+	req.Header.Set("Forwarded", `for="[2001:db8::10]:8443";proto=https`)
+	req.Header.Set("X-Forwarded-For", "203.0.113.44")
+
+	ip := getClientIP(req)
+	if ip != "2001:db8::10" {
+		t.Fatalf("expected Forwarded IPv6 host:port to resolve to IP, got %q", ip)
+	}
+}
+
 func TestGetClientIPTrustedProxyFallsBackToForwardedWhenXRealInvalid(t *testing.T) {
 	prev := trustedProxyNets
 	defer setTrustedProxyNets(prev)
@@ -507,6 +674,48 @@ func TestCookieSecurityPolicy_RespectsModeOverride(t *testing.T) {
 	secure, sameSite = cookieSecurityPolicy(req)
 	if secure || sameSite != http.SameSiteLaxMode {
 		t.Fatalf("expected forced insecure lax cookie policy, got secure=%v sameSite=%v", secure, sameSite)
+	}
+}
+
+func TestCookieSecurityPolicy_UsesTrustedForwardedProto(t *testing.T) {
+	prevMode := sessionCookieSecureMode
+	prevProxy := trustedProxyNets
+	defer func() {
+		sessionCookieSecureMode = prevMode
+		setTrustedProxyNets(prevProxy)
+	}()
+
+	sessionCookieSecureMode = "auto"
+	setTrustedProxyNets(parseTrustedProxyCIDRs("10.0.0.0/8"))
+
+	req := httptest.NewRequest(http.MethodGet, "http://example.com", nil)
+	req.RemoteAddr = "10.1.2.3:1234"
+	req.Header.Set("X-Forwarded-Proto", "https")
+
+	secure, sameSite := cookieSecurityPolicy(req)
+	if !secure || sameSite != http.SameSiteStrictMode {
+		t.Fatalf("expected secure strict policy behind trusted https proxy, got secure=%v sameSite=%v", secure, sameSite)
+	}
+}
+
+func TestCookieSecurityPolicy_IgnoresUntrustedForwardedProto(t *testing.T) {
+	prevMode := sessionCookieSecureMode
+	prevProxy := trustedProxyNets
+	defer func() {
+		sessionCookieSecureMode = prevMode
+		setTrustedProxyNets(prevProxy)
+	}()
+
+	sessionCookieSecureMode = "auto"
+	setTrustedProxyNets(parseTrustedProxyCIDRs("10.0.0.0/8"))
+
+	req := httptest.NewRequest(http.MethodGet, "http://example.com", nil)
+	req.RemoteAddr = "192.168.1.7:4321"
+	req.Header.Set("X-Forwarded-Proto", "https")
+
+	secure, sameSite := cookieSecurityPolicy(req)
+	if secure || sameSite != http.SameSiteLaxMode {
+		t.Fatalf("expected untrusted forwarded proto to be ignored, got secure=%v sameSite=%v", secure, sameSite)
 	}
 }
 
@@ -688,5 +897,27 @@ func TestLoggingMiddleware_CapturesActorFromAuthMiddleware(t *testing.T) {
 	}
 	if tokenID == "" || tokenID == "none" {
 		t.Fatalf("expected non-empty token_id, got %q", tokenID)
+	}
+}
+
+func TestIsWeakSecretValue(t *testing.T) {
+	tests := []struct {
+		name   string
+		secret string
+		want   bool
+	}{
+		{name: "empty", secret: "", want: false},
+		{name: "strong secret", secret: "not-weak-secret-example", want: false},
+		{name: "trimmed weak value", secret: "  secret  ", want: true},
+		{name: "case-insensitive weak value", secret: "Change-Me-In-Production", want: true},
+		{name: "password weak value", secret: "password", want: true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := isWeakSecretValue(tc.secret); got != tc.want {
+				t.Fatalf("isWeakSecretValue(%q)=%v want %v", tc.secret, got, tc.want)
+			}
+		})
 	}
 }

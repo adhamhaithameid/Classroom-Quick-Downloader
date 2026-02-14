@@ -81,6 +81,25 @@ func TestSpaHandler_ReplacesCSPNoncePlaceholderInIndex(t *testing.T) {
 	}
 }
 
+func TestServeIndexWithNonce_RemovesPlaceholderWhenNonceUnavailable(t *testing.T) {
+	dir := t.TempDir()
+	indexPath := filepath.Join(dir, "index.html")
+	if err := os.WriteFile(indexPath, []byte(`<script nonce="__CSP_NONCE__">console.log("ok")</script>`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rr := httptest.NewRecorder()
+	serveIndexWithNonce(rr, req, dir)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200 for index, got %d", rr.Code)
+	}
+	body := rr.Body.String()
+	if strings.Contains(body, "__CSP_NONCE__") {
+		t.Fatalf("expected CSP placeholder to be removed when nonce missing")
+	}
+}
+
 func TestResolveArchiverPath_Validation(t *testing.T) {
 	tmp := t.TempDir()
 	execPath := filepath.Join(tmp, "archiver")
@@ -145,6 +164,36 @@ func TestAuthMiddleware_AllowsArchiverSecret(t *testing.T) {
 	}
 }
 
+func TestAuthMiddleware_RejectsArchiverSecretOnNonArchiverPath(t *testing.T) {
+	resetSessionStore()
+	protected := requireAuth(nil, "secret", "arch-secret", false)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/admin/flags", nil)
+	req.Header.Set("X-Archiver-Secret", "arch-secret")
+	rr := httptest.NewRecorder()
+	protected.ServeHTTP(rr, req)
+	if rr.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 on disallowed archiver path, got %d", rr.Code)
+	}
+}
+
+func TestAuthMiddleware_RejectsArchiverSecretOnNonGET(t *testing.T) {
+	resetSessionStore()
+	protected := requireAuth(nil, "secret", "arch-secret", false)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodPost, "/api/stats/summary", nil)
+	req.Header.Set("X-Archiver-Secret", "arch-secret")
+	rr := httptest.NewRecorder()
+	protected.ServeHTTP(rr, req)
+	if rr.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 for archiver secret on non-GET, got %d", rr.Code)
+	}
+}
+
 func TestPipelineEndpoints_RequireAuth(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "pipeline-auth.db")
 	sqlDB, err := db.Init(dbPath)
@@ -174,8 +223,16 @@ func TestPipelineEndpoints_RequireAuth(t *testing.T) {
 	req.Header.Set("X-Archiver-Secret", "arch-secret")
 	rr = httptest.NewRecorder()
 	metrics.ServeHTTP(rr, req)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected 200 for metrics with archiver secret, got %d", rr.Code)
+	if rr.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 for metrics with archiver secret, got %d", rr.Code)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/api/pipeline/failures", nil)
+	req.Header.Set("X-Archiver-Secret", "arch-secret")
+	rr = httptest.NewRecorder()
+	failures.ServeHTTP(rr, req)
+	if rr.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 for failures with archiver secret, got %d", rr.Code)
 	}
 }
 
@@ -795,5 +852,64 @@ func TestNewsletterSubscriberUpsert_AllowsViewerWithoutStepUp_DeleteStillProtect
 	del.ServeHTTP(delRR, delReq)
 	if delRR.Code != http.StatusForbidden {
 		t.Fatalf("expected delete to require step-up and return 403, got %d: %s", delRR.Code, delRR.Body.String())
+	}
+}
+
+func TestDeploymentsSync_AllowsViewerWithoutStepUp(t *testing.T) {
+	resetSessionStore()
+	resetLoginRateStore()
+	stepUpSessionStore.Lock()
+	stepUpSessionStore.tokens = make(map[string]stepUpSession)
+	stepUpSessionStore.Unlock()
+
+	dbPath := filepath.Join(t.TempDir(), "deploy-sync-no-stepup.db")
+	sqlDB, err := db.Init(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sqlDB.Close()
+
+	if _, err := sqlDB.Exec(`UPDATE feature_flags SET enabled = 1 WHERE name = 'feature_stepup_enforced'`); err != nil {
+		t.Fatalf("failed to enable stepup flag: %v", err)
+	}
+	if _, err := sqlDB.Exec(`UPDATE feature_flags SET enabled = 1 WHERE name = 'feature_management_hub_enabled'`); err != nil {
+		t.Fatalf("failed to enable management hub flag: %v", err)
+	}
+	if _, err := sqlDB.Exec(`UPDATE feature_flags SET enabled = 1 WHERE name = 'feature_sync_enabled'`); err != nil {
+		t.Fatalf("failed to enable sync flag: %v", err)
+	}
+
+	login := loginHandler(sqlDB, "viewer-secret")
+	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(`{"password":"viewer-secret"}`))
+	loginReq.Header.Set("Content-Type", "application/json")
+	loginRR := httptest.NewRecorder()
+	login.ServeHTTP(loginRR, loginReq)
+	if loginRR.Code != http.StatusOK {
+		t.Fatalf("login failed: %d %s", loginRR.Code, loginRR.Body.String())
+	}
+
+	var sessionCookie *http.Cookie
+	for _, c := range loginRR.Result().Cookies() {
+		if c.Name == sessionCookieName {
+			sessionCookie = c
+		}
+	}
+	if sessionCookie == nil {
+		t.Fatal("expected viewer session cookie")
+	}
+
+	authMW := requireAuth(sqlDB, "viewer-secret", "", false)
+	syncHandler := authMW(handlers.DeploymentsSyncHandler(sqlDB, nil, nil))
+	syncReq := httptest.NewRequest(
+		http.MethodPost,
+		"/api/admin/deployments/sync",
+		bytes.NewBufferString(`{"targets":["unknown"]}`),
+	)
+	syncReq.Header.Set("Content-Type", "application/json")
+	syncReq.AddCookie(sessionCookie)
+	syncRR := httptest.NewRecorder()
+	syncHandler.ServeHTTP(syncRR, syncReq)
+	if syncRR.Code != http.StatusBadRequest {
+		t.Fatalf("expected sync to be reachable without step-up and return 400 for unknown target, got %d: %s", syncRR.Code, syncRR.Body.String())
 	}
 }
