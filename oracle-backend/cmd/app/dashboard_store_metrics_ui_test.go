@@ -17,8 +17,29 @@ func loadDashboardIndexHTML(t *testing.T) string {
 	return string(body)
 }
 
+func loadDashboardJS(t *testing.T) string {
+	t.Helper()
+	jsPath := filepath.Join("..", "..", "static", "oracle-dashboard.js")
+	body, err := os.ReadFile(jsPath)
+	if err != nil {
+		t.Fatalf("failed to read dashboard JS: %v", err)
+	}
+	return string(body)
+}
+
+func loadDashboardCSS(t *testing.T) string {
+	t.Helper()
+	cssPath := filepath.Join("..", "..", "static", "oracle-dashboard.css")
+	body, err := os.ReadFile(cssPath)
+	if err != nil {
+		t.Fatalf("failed to read dashboard CSS: %v", err)
+	}
+	return string(body)
+}
+
 func TestDashboardStoreMetricsUI_HasOverviewStoreAndReachCounters(t *testing.T) {
 	indexHTML := loadDashboardIndexHTML(t)
+	dashboardJS := loadDashboardJS(t)
 
 	requiredSnippets := []string{
 		`id="stat-store-users"`,
@@ -26,13 +47,15 @@ func TestDashboardStoreMetricsUI_HasOverviewStoreAndReachCounters(t *testing.T) 
 		`id="stat-cancelled"`,
 		`id="stat-countries-reached"`,
 		`id="stat-languages-reached"`,
-		`async function loadDeploymentStoreMetrics()`,
 	}
 
 	for _, snippet := range requiredSnippets {
 		if !strings.Contains(indexHTML, snippet) {
 			t.Fatalf("dashboard index missing required store metrics snippet: %s", snippet)
 		}
+	}
+	if !strings.Contains(dashboardJS, `async function loadDeploymentStoreMetrics()`) {
+		t.Fatalf("dashboard JS missing required store metrics loader")
 	}
 }
 
@@ -50,24 +73,27 @@ func TestDashboardStoreMetricsUI_RemovesStoreAnalyticsCardAndSuccessRateCard(t *
 }
 
 func TestDashboardStoreMetricsUI_RefreshesOverviewAfterSyncAndLoads(t *testing.T) {
-	indexHTML := loadDashboardIndexHTML(t)
-	calls := strings.Count(indexHTML, "await loadDeploymentStoreMetrics();")
+	dashboardJS := loadDashboardJS(t)
+	calls := strings.Count(dashboardJS, "await loadDeploymentStoreMetrics();")
 	if calls < 3 {
 		t.Fatalf("expected at least 3 loadDeploymentStoreMetrics refresh calls, got %d", calls)
 	}
 }
 
 func TestDashboardStoreMetricsUI_HasUtcToggleAnimationAndStatusHoverHooks(t *testing.T) {
-	indexHTML := loadDashboardIndexHTML(t)
-	requiredSnippets := []string{
+	dashboardCSS := loadDashboardCSS(t)
+	cssSnippets := []string{
 		`.nav-utc-time.is-swapping`,
-		`label.classList.add('is-swapping');`,
 		`.status-indicator:hover`,
 		`#status-indicator:hover #sidebar-status-text`,
 	}
-	for _, snippet := range requiredSnippets {
-		if !strings.Contains(indexHTML, snippet) {
-			t.Fatalf("dashboard index missing interaction snippet: %s", snippet)
+	for _, snippet := range cssSnippets {
+		if !strings.Contains(dashboardCSS, snippet) {
+			t.Fatalf("dashboard CSS missing interaction snippet: %s", snippet)
 		}
+	}
+	dashboardJS := loadDashboardJS(t)
+	if !strings.Contains(dashboardJS, `label.classList.add('is-swapping');`) {
+		t.Fatalf("dashboard JS missing UTC toggle animation snippet")
 	}
 }
