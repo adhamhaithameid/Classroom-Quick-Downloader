@@ -31,7 +31,46 @@ html {
 
 *, *::before, *::after {
   box-sizing: inherit;
-  outline: none !important;
+}
+
+/* Global focus styles for keyboard accessibility */
+:focus-visible {
+  outline: 2px solid var(--cqd-blue);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Rounded Buttons Focus */
+.cqd-button:focus-visible,
+.cqd-coffee-button:focus-visible,
+.cqd-share-copy-btn:focus-visible,
+.cqd-brand-version:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--cqd-blue-soft), 0 0 0 1px var(--cqd-blue);
+}
+
+/* Toggle Switch Focus */
+.cqd-switch:focus-visible {
+  outline: none;
+}
+.cqd-switch:focus-visible .cqd-switch-slider {
+  box-shadow: 0 0 0 3px var(--cqd-blue-soft), 0 0 0 1px var(--cqd-blue);
+}
+
+/* Link Focus */
+.cqd-footer-link:focus-visible,
+.cqd-banner-close:focus-visible,
+.cqd-share-browser-icon:focus-visible {
+  outline: 2px solid var(--cqd-blue);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Legend Item Focus */
+.cqd-legend-item:focus-visible {
+  outline: none;
+  background: rgba(0, 0, 0, 0.05);
+  box-shadow: 0 0 0 2px var(--cqd-blue);
 }
 
 /* Hide scrollbars visually but allow scrolling */

@@ -795,6 +795,15 @@ function App() {
                               onMouseEnter={() => setHoveredStatId(stat.id)}
                               onMouseLeave={() => setHoveredStatId(null)}
                               style={{ cursor: 'pointer' }}
+                              tabIndex={0}
+                              role="button"
+                              onFocus={() => setHoveredStatId(stat.id)}
+                              onBlur={() => setHoveredStatId(null)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                }
+                              }}
                             >
                               <span
                                 className={`cqd-legend-dot ${hoveredStatId === stat.id ? 'hovered' : ''}`}
