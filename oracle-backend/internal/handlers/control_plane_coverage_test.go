@@ -151,8 +151,6 @@ func TestRecordsListHandlerV4_DisallowedType(t *testing.T) {
 	}
 }
 
-
-
 func TestRecordsListHandlerV4_EmptyDataJSON(t *testing.T) {
 	d := openControlPlaneDB(t)
 	_, _ = d.Exec(`INSERT INTO admin_records (record_type, record_key, data_json, created_at, updated_at)
