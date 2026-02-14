@@ -260,19 +260,19 @@ func TestExtractVersionCount_InvalidJSON(t *testing.T) {
 
 func TestColumnForDimension_AllValid(t *testing.T) {
 	cases := map[string]string{
-		"status":     "by_status_json",
-		"type":       "by_type_json",
-		"browser":    "by_browser_json",
-		"os":         "by_os_json",
-		"country":    "by_country_json",
-		"lang":       "by_lang_json",
-		"language":   "by_lang_json",
+		"status":      "by_status_json",
+		"type":        "by_type_json",
+		"browser":     "by_browser_json",
+		"os":          "by_os_json",
+		"country":     "by_country_json",
+		"lang":        "by_lang_json",
+		"language":    "by_lang_json",
 		"ext_version": "by_ext_ver_json",
-		"extVersion": "by_ext_ver_json",
-		"version":    "by_ext_ver_json",
-		"error_type": "by_error_type_json",
-		"errorType":  "by_error_type_json",
-		"error":      "by_error_type_json",
+		"extVersion":  "by_ext_ver_json",
+		"version":     "by_ext_ver_json",
+		"error_type":  "by_error_type_json",
+		"errorType":   "by_error_type_json",
+		"error":       "by_error_type_json",
 	}
 	for dim, want := range cases {
 		col, err := columnForDimension(dim)
@@ -319,8 +319,6 @@ func TestLoadTotals_WithData(t *testing.T) {
 		t.Fatalf("unexpected totals: %v", totals)
 	}
 }
-
-
 
 // ---------------------------------------------------------------------------
 // loadLastDOSnapshot
