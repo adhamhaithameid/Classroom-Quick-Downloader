@@ -204,7 +204,7 @@ func IngestBatchHandlerV4(sqliteDB, postgresDB *sql.DB, sharedSecret string) htt
 				"mode":    map[bool]string{true: "postgres_primary", false: "sqlite_primary"}[usePostgresPrimary],
 			})
 			recordOracleFailure(sqliteDB, "ingest", "ingest_failed", err.Error(), 1, batch.BatchID, "")
-			http.Error(w, "failed to ingest batch: "+err.Error(), http.StatusInternalServerError)
+			http.Error(w, "failed to ingest batch", http.StatusInternalServerError)
 			return
 		}
 

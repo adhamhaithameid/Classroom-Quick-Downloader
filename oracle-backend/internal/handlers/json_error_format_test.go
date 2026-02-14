@@ -38,9 +38,8 @@ func assertJSONError(t *testing.T, rr *httptest.ResponseRecorder, expectedStatus
 	if !exists {
 		t.Fatal("missing 'ok' field in JSON error response")
 	}
-	// writeJSONError uses map[string]string, so 'ok' is the string "false"
-	if okStr, isStr := okVal.(string); !isStr || okStr != "false" {
-		t.Fatalf("expected ok=\"false\" (string), got %v (%T)", okVal, okVal)
+	if okBool, isBool := okVal.(bool); !isBool || okBool {
+		t.Fatalf("expected ok=false (boolean), got %v (%T)", okVal, okVal)
 	}
 	if _, has := resp["error"]; !has {
 		t.Fatal("missing 'error' field in JSON error response")
@@ -49,8 +48,6 @@ func assertJSONError(t *testing.T, rr *httptest.ResponseRecorder, expectedStatus
 		t.Fatal("missing 'message' field in JSON error response")
 	}
 }
-
-
 
 // ---------------------------------------------------------------------------
 // writeJSONError unit test

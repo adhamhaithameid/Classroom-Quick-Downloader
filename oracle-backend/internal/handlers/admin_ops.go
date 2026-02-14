@@ -26,8 +26,8 @@ type featureFlagRow struct {
 func writeJSONError(w http.ResponseWriter, code, message string, status int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(map[string]string{
-		"ok":      "false",
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"ok":      false,
 		"error":   code,
 		"message": message,
 	})
