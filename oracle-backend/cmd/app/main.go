@@ -353,7 +353,7 @@ func deploymentsAutoSyncEnabled() bool {
 	case "false", "0", "no", "off":
 		return false
 	default:
-		log.Printf("[Scheduler] Invalid ORACLE_DEPLOYMENTS_AUTO_SYNC_ENABLED=%q, defaulting to enabled", sanitizeLogValue(raw))
+		log.Printf("[Scheduler] Invalid ORACLE_DEPLOYMENTS_AUTO_SYNC_ENABLED value; defaulting to enabled")
 		return true
 	}
 }
@@ -365,7 +365,7 @@ func deploymentsAutoSyncInterval() time.Duration {
 	}
 	seconds, err := strconv.Atoi(raw)
 	if err != nil || seconds <= 0 {
-		log.Printf("[Scheduler] Invalid ORACLE_DEPLOYMENTS_AUTO_SYNC_INTERVAL_SECONDS=%q, using default %s", sanitizeLogValue(raw), defaultDeploymentsAutoSyncInterval)
+		log.Printf("[Scheduler] Invalid ORACLE_DEPLOYMENTS_AUTO_SYNC_INTERVAL_SECONDS value; using default %s", defaultDeploymentsAutoSyncInterval)
 		return defaultDeploymentsAutoSyncInterval
 	}
 	interval := time.Duration(seconds) * time.Second
@@ -394,7 +394,7 @@ func HealthDBHandler(db *sql.DB) http.HandlerFunc {
 		}
 		var one int
 		// Execute a lightweight query to ensure the DB is not locked
-		err := db.QueryRowContext(r.Context(), "SELECT 1").Scan(&one)
+		err := db.QueryRowContext(r.Context(), "SELECT 1").Scan(&one) // #nosec G701 -- constant health probe query with no user-controlled input.
 		if err != nil {
 			log.Printf("Health Check Failed: %v", err)
 			http.Error(w, "Database Unhealthy", http.StatusInternalServerError)
@@ -487,7 +487,7 @@ func loadCSRFAllowedOrigins(rawList, publicBaseURL string) map[string]struct{} {
 	for _, candidate := range candidates {
 		normalized, err := normalizeOriginValue(candidate)
 		if err != nil {
-			log.Printf("[WARN] ignoring invalid CSRF origin %q: %v", candidate, err)
+			log.Printf("[WARN] ignoring invalid CSRF origin entry")
 			continue
 		}
 		origins[normalized] = struct{}{}
@@ -1126,7 +1126,7 @@ func archiverRunTimeout() time.Duration {
 	}
 	seconds, err := strconv.Atoi(raw)
 	if err != nil || seconds <= 0 {
-		log.Printf("[Scheduler] Invalid ARCHIVER_RUN_TIMEOUT_SECONDS %q, using default %s", sanitizeLogValue(raw), defaultArchiverRunTimeout)
+		log.Printf("[Scheduler] Invalid ARCHIVER_RUN_TIMEOUT_SECONDS value, using default %s", defaultArchiverRunTimeout)
 		return defaultArchiverRunTimeout
 	}
 
@@ -1157,7 +1157,7 @@ func resolveArchiverAPIURL(configuredURL, listenAddr string) string {
 				return parsed.String()
 			}
 		}
-		log.Printf("[Scheduler] Invalid ARCHIVER_API_URL %q, falling back to auto URL", sanitizeLogValue(rawURL))
+		log.Printf("[Scheduler] Invalid ARCHIVER_API_URL value, falling back to auto URL")
 	}
 
 	host := strings.TrimSpace(listenAddr)

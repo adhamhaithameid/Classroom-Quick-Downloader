@@ -97,7 +97,7 @@ func collectDeployStatus(now time.Time) DeployStatus {
 		}
 	} else {
 		// Fall back to git command
-		if full, err := runGitCommand("rev-parse", "HEAD"); err == nil {
+		if full, err := runGitRevParseHead(); err == nil {
 			status.CommitFull = full
 			if len(full) > 7 {
 				status.Commit = full[:7]
@@ -108,12 +108,12 @@ func collectDeployStatus(now time.Time) DeployStatus {
 	}
 
 	// Get commit message
-	if message, err := runGitCommand("log", "-1", "--pretty=%s"); err == nil {
+	if message, err := runGitLogSubject(); err == nil {
 		status.Message = message
 	}
 
 	// Get branch
-	if branch, err := runGitCommand("rev-parse", "--abbrev-ref", "HEAD"); err == nil {
+	if branch, err := runGitRevParseBranch(); err == nil {
 		status.Branch = branch
 	}
 
@@ -132,10 +132,30 @@ func collectDeployStatus(now time.Time) DeployStatus {
 	return status
 }
 
-func runGitCommand(args ...string) (string, error) {
+func runGitRevParseHead() (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), gitCommandTimeoutEach)
 	defer cancel()
-	out, err := exec.CommandContext(ctx, "git", args...).Output()
+	out, err := exec.CommandContext(ctx, "git", "rev-parse", "HEAD").Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
+func runGitLogSubject() (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), gitCommandTimeoutEach)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, "git", "log", "-1", "--pretty=%s").Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
+func runGitRevParseBranch() (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), gitCommandTimeoutEach)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, "git", "rev-parse", "--abbrev-ref", "HEAD").Output()
 	if err != nil {
 		return "", err
 	}
