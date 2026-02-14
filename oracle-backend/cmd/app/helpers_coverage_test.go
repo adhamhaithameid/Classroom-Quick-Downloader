@@ -315,6 +315,7 @@ func TestArchiverRunTimeout(t *testing.T) {
 }
 
 func TestDeploymentsAutoSyncEnabled(t *testing.T) {
+	t.Setenv("DEPLOYMENTS_AUTO_SYNC_ENABLED", "")
 	t.Setenv("ORACLE_DEPLOYMENTS_AUTO_SYNC_ENABLED", "")
 	if !deploymentsAutoSyncEnabled() {
 		t.Fatal("expected default auto-sync to be enabled")
@@ -329,9 +330,16 @@ func TestDeploymentsAutoSyncEnabled(t *testing.T) {
 	if !deploymentsAutoSyncEnabled() {
 		t.Fatal("expected auto-sync enabled when set to on")
 	}
+
+	t.Setenv("ORACLE_DEPLOYMENTS_AUTO_SYNC_ENABLED", "")
+	t.Setenv("DEPLOYMENTS_AUTO_SYNC_ENABLED", "false")
+	if deploymentsAutoSyncEnabled() {
+		t.Fatal("expected legacy env alias to disable auto-sync")
+	}
 }
 
 func TestDeploymentsAutoSyncInterval(t *testing.T) {
+	t.Setenv("DEPLOYMENTS_AUTO_SYNC_INTERVAL_SECONDS", "")
 	t.Setenv("ORACLE_DEPLOYMENTS_AUTO_SYNC_INTERVAL_SECONDS", "")
 	if got := deploymentsAutoSyncInterval(); got != defaultDeploymentsAutoSyncInterval {
 		t.Fatalf("expected default interval %s, got %s", defaultDeploymentsAutoSyncInterval, got)
@@ -350,5 +358,11 @@ func TestDeploymentsAutoSyncInterval(t *testing.T) {
 	t.Setenv("ORACLE_DEPLOYMENTS_AUTO_SYNC_INTERVAL_SECONDS", "999999")
 	if got := deploymentsAutoSyncInterval(); got != maxDeploymentsAutoSyncInterval {
 		t.Fatalf("expected maximum clamp %s, got %s", maxDeploymentsAutoSyncInterval, got)
+	}
+
+	t.Setenv("ORACLE_DEPLOYMENTS_AUTO_SYNC_INTERVAL_SECONDS", "")
+	t.Setenv("DEPLOYMENTS_AUTO_SYNC_INTERVAL_SECONDS", "120")
+	if got := deploymentsAutoSyncInterval(); got != 120*time.Second {
+		t.Fatalf("expected legacy interval alias to apply, got %s", got)
 	}
 }

@@ -809,6 +809,10 @@ Automatic deployment sync runs server-side in the background (all targets) and c
 - `ORACLE_DEPLOYMENTS_AUTO_SYNC_ENABLED` (`true` by default)
 - `ORACLE_DEPLOYMENTS_AUTO_SYNC_INTERVAL_SECONDS` (`900` by default, min `60`, max `86400`)
 
+Backward-compatible aliases are also accepted:
+- `DEPLOYMENTS_AUTO_SYNC_ENABLED`
+- `DEPLOYMENTS_AUTO_SYNC_INTERVAL_SECONDS`
+
 Reliability behavior:
 - Auto-sync runs immediately at startup (no need to wait for the first interval tick).
 - Each cycle retries transient full-failure runs automatically before waiting for the next schedule.

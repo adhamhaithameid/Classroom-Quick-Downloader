@@ -327,6 +327,15 @@ func getenv(key, def string) string {
 	return def
 }
 
+func getenvWithAliases(keys ...string) string {
+	for _, key := range keys {
+		if v := strings.TrimSpace(os.Getenv(key)); v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
 func getenvFloat(key string, def float64) float64 {
 	raw := strings.TrimSpace(os.Getenv(key))
 	if raw == "" {
@@ -346,20 +355,20 @@ const (
 )
 
 func deploymentsAutoSyncEnabled() bool {
-	raw := strings.ToLower(strings.TrimSpace(os.Getenv("ORACLE_DEPLOYMENTS_AUTO_SYNC_ENABLED")))
+	raw := strings.ToLower(getenvWithAliases("ORACLE_DEPLOYMENTS_AUTO_SYNC_ENABLED", "DEPLOYMENTS_AUTO_SYNC_ENABLED"))
 	switch raw {
 	case "", "true", "1", "yes", "on":
 		return true
 	case "false", "0", "no", "off":
 		return false
 	default:
-		log.Printf("[Scheduler] Invalid ORACLE_DEPLOYMENTS_AUTO_SYNC_ENABLED value; defaulting to enabled")
+		log.Printf("[Scheduler] Invalid deployments auto-sync enabled value; defaulting to enabled")
 		return true
 	}
 }
 
 func deploymentsAutoSyncInterval() time.Duration {
-	raw := strings.TrimSpace(os.Getenv("ORACLE_DEPLOYMENTS_AUTO_SYNC_INTERVAL_SECONDS"))
+	raw := getenvWithAliases("ORACLE_DEPLOYMENTS_AUTO_SYNC_INTERVAL_SECONDS", "DEPLOYMENTS_AUTO_SYNC_INTERVAL_SECONDS")
 	if raw == "" {
 		return defaultDeploymentsAutoSyncInterval
 	}
