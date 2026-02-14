@@ -4,10 +4,20 @@ import type { Env } from "../src/types";
 
 function mockEnv(overrides: Partial<Env> = {}): Env {
   const stub = {
-    fetch: async () => new Response(JSON.stringify({ ok: true }), {
-      status: 200,
-      headers: { "content-type": "application/json" },
-    }),
+    fetch: async (input: RequestInfo) => {
+      // Return rate-limit-compatible response for login-attempt checks
+      const url = typeof input === "string" ? input : input instanceof Request ? input.url : "";
+      if (url.includes("/auth/login-attempt")) {
+        return new Response(JSON.stringify({ ok: true, allowed: true }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    },
   };
   const namespace = {
     idFromName: (_name: string) => "downloads-id",
@@ -235,4 +245,120 @@ describe("Worker auth config hardening", () => {
     const differentPrefixRes = await worker.fetch(differentPrefixReq, env, {} as ExecutionContext);
     expect(differentPrefixRes.status).toBe(401);
   });
+
+  // ---------------------------------------------------------------------------
+  // /auth/verify-danger: Auth enforcement (Phase 2)
+  // ---------------------------------------------------------------------------
+
+  it("rejects unauthenticated /auth/verify-danger with 401", async () => {
+    const env = mockEnv();
+    const request = new Request("https://example.com/auth/verify-danger", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: "danger-secret" }),
+    });
+
+    const res = await worker.fetch(request, env, {} as ExecutionContext);
+    const body = await res.json() as { ok: boolean; error: string; message: string };
+
+    expect(res.status).toBe(401);
+    expect(body.ok).toBe(false);
+    expect(body.error).toBe("unauthorized");
+    expect(body.message).toContain("Valid session or X-Admin-Secret required");
+  });
+
+  it("allows /auth/verify-danger with valid X-Admin-Secret", async () => {
+    const env = mockEnv();
+    const request = new Request("https://example.com/auth/verify-danger", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Admin-Secret": "do-shared-secret",
+      },
+      body: JSON.stringify({ password: "danger-secret" }),
+    });
+
+    const res = await worker.fetch(request, env, {} as ExecutionContext);
+    const body = await res.json() as { ok: boolean };
+
+    // Should reach the password check, and since password is correct, return 200
+    expect(res.status).toBe(200);
+    expect(body.ok).toBe(true);
+  });
+
+  it("allows /auth/verify-danger with valid session cookie", async () => {
+    const env = mockEnv();
+
+    // First login to get a session cookie
+    const loginReq = new Request("https://example.com/", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        "CF-Connecting-IP": "203.0.113.10",
+      },
+      body: "password=dashboard-secret",
+    });
+    const loginRes = await worker.fetch(loginReq, env, {} as ExecutionContext);
+    expect(loginRes.status).toBe(302);
+    const setCookie = loginRes.headers.get("Set-Cookie") || "";
+    expect(setCookie).toContain("cqd_session=");
+
+    // Use session to call verify-danger
+    const dangerReq = new Request("https://example.com/auth/verify-danger", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: setCookie,
+        "CF-Connecting-IP": "203.0.113.10",
+      },
+      body: JSON.stringify({ password: "danger-secret" }),
+    });
+    const dangerRes = await worker.fetch(dangerReq, env, {} as ExecutionContext);
+    const body = await dangerRes.json() as { ok: boolean };
+
+    expect(dangerRes.status).toBe(200);
+    expect(body.ok).toBe(true);
+  });
+
+  // ---------------------------------------------------------------------------
+  // /auth/verify-danger: CORS (Phase 3)
+  // ---------------------------------------------------------------------------
+
+  it("includes X-Admin-Secret in allowed headers for /auth/verify-danger preflight", async () => {
+    const env = mockEnv({
+      CORS_ALLOWED_ORIGINS: "https://dashboard.example.com",
+    });
+    const request = new Request("https://example.com/auth/verify-danger", {
+      method: "OPTIONS",
+      headers: {
+        Origin: "https://dashboard.example.com",
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "Content-Type, X-Admin-Secret",
+      },
+    });
+
+    const res = await worker.fetch(request, env, {} as ExecutionContext);
+    expect(res.status).toBe(204);
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("https://dashboard.example.com");
+    expect(res.headers.get("Access-Control-Allow-Headers")).toContain("X-Admin-Secret");
+  });
+
+  it("rejects /auth/verify-danger preflight from disallowed origin", async () => {
+    const env = mockEnv({
+      CORS_ALLOWED_ORIGINS: "https://dashboard.example.com",
+    });
+    const request = new Request("https://example.com/auth/verify-danger", {
+      method: "OPTIONS",
+      headers: {
+        Origin: "https://evil.example.com",
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "Content-Type, X-Admin-Secret",
+      },
+    });
+
+    const res = await worker.fetch(request, env, {} as ExecutionContext);
+    expect(res.status).toBe(403);
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
+  });
 });
+
