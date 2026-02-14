@@ -9,6 +9,9 @@ on:
     paths:
       - "oracle-backend/**"
       - ".github/workflows/oracle-backend-ci.yml"
+  workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * *"
 
 concurrency:
   group: oracle-backend-ci-${{ github.ref }}
@@ -68,6 +71,70 @@ jobs:
         run: |
           go test ./internal/db -run 'TestMigrationBootstrapCleanDatabases|TestInitPostgres_Smoke' -count=1 -v
           go test ./... -count=1
+
+  oracle-runtime-smoke:
+    name: Oracle Runtime API Matrix
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.13"
+
+      - name: Start backend
+        working-directory: oracle-backend
+        env:
+          ADDR: 127.0.0.1:18080
+          DB_PATH: ${{ runner.temp }}/oracle-runtime-smoke.db
+          STATIC_DIR: ./static
+          DO_SHARED_SECRET: do-shared-2026-02-14-strong
+          DASHBOARD_PASSWORD: DashAuth#2026!Oracle
+          SUPER_ADMIN_PASSWORD: SuperAdmin#2026!Oracle
+          ARCHIVER_SHARED_SECRET: Archiver#2026!Oracle
+          SESSION_COOKIE_SECURE: "false"
+          ALLOW_INSECURE_COOKIES: "true"
+          ORACLE_ALLOW_HTTP_STORE_URLS: "true"
+        run: |
+          set -euo pipefail
+          go run ./cmd/app >"${RUNNER_TEMP}/oracle-runtime-smoke.log" 2>&1 &
+          echo $! > "${RUNNER_TEMP}/oracle-runtime-smoke.pid"
+          ready=0
+          for i in $(seq 1 50); do
+            if curl -fsS "http://127.0.0.1:18080/health" >/dev/null 2>&1; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+          if [[ "${ready}" != "1" ]]; then
+            echo "oracle backend did not become healthy"
+            cat "${RUNNER_TEMP}/oracle-runtime-smoke.log" || true
+            exit 1
+          fi
+
+      - name: Run API matrix smoke
+        working-directory: oracle-backend
+        env:
+          BASE_URL: http://127.0.0.1:18080
+          DASHBOARD_PASSWORD: DashAuth#2026!Oracle
+          SUPER_ADMIN_PASSWORD: SuperAdmin#2026!Oracle
+          ORACLE_ALLOW_HTTP_STORE_URLS: "true"
+        run: ./scripts/api-matrix-smoke.sh
+
+      - name: Dump runtime log on failure
+        if: failure()
+        run: |
+          cat "${RUNNER_TEMP}/oracle-runtime-smoke.log" || true
+
+      - name: Stop backend
+        if: always()
+        run: |
+          if [[ -f "${RUNNER_TEMP}/oracle-runtime-smoke.pid" ]]; then
+            kill "$(cat "${RUNNER_TEMP}/oracle-runtime-smoke.pid")" 2>/dev/null || true
+          fi
 
   oracle-security:
     name: Oracle Security Scan
