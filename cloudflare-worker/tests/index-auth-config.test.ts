@@ -195,4 +195,44 @@ describe("Worker auth config hardening", () => {
     const sameClientRes = await worker.fetch(sameClientReq, env, {} as ExecutionContext);
     expect(sameClientRes.status).toBe(200);
   });
+
+  it("normalizes compressed IPv6 prefixes for strict session binding", async () => {
+    const env = mockEnv({ SESSION_BINDING_MODE: "strict" });
+    const loginReq = new Request("https://example.com/", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        "CF-Connecting-IP": "2001:db8::1",
+        "User-Agent": "Oracle-Test-UA-IPv6",
+      },
+      body: "password=dashboard-secret",
+    });
+
+    const loginRes = await worker.fetch(loginReq, env, {} as ExecutionContext);
+    expect(loginRes.status).toBe(302);
+    const setCookie = loginRes.headers.get("Set-Cookie") || "";
+    expect(setCookie).toContain("cqd_session=");
+
+    const samePrefixReq = new Request("https://example.com/stats", {
+      method: "GET",
+      headers: {
+        Cookie: setCookie,
+        "CF-Connecting-IP": "2001:db8::abcd",
+        "User-Agent": "Oracle-Test-UA-IPv6",
+      },
+    });
+    const samePrefixRes = await worker.fetch(samePrefixReq, env, {} as ExecutionContext);
+    expect(samePrefixRes.status).toBe(200);
+
+    const differentPrefixReq = new Request("https://example.com/stats", {
+      method: "GET",
+      headers: {
+        Cookie: setCookie,
+        "CF-Connecting-IP": "2001:db8:1::1",
+        "User-Agent": "Oracle-Test-UA-IPv6",
+      },
+    });
+    const differentPrefixRes = await worker.fetch(differentPrefixReq, env, {} as ExecutionContext);
+    expect(differentPrefixRes.status).toBe(401);
+  });
 });

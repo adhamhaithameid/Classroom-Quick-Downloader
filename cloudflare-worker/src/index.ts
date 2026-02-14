@@ -64,11 +64,79 @@ function normalizeIPv4Prefix(ip: string): string | null {
 }
 
 function normalizeIPv6Prefix(ip: string): string | null {
-  const cleaned = ip.trim().toLowerCase().replace(/^\[/, "").replace(/\]$/, "");
+  let cleaned = ip.trim().toLowerCase().replace(/^\[/, "").replace(/\]$/, "");
   if (!cleaned.includes(":")) return null;
-  const segments = cleaned.split(":").filter((seg) => seg.length > 0).slice(0, 4);
-  if (!segments.length) return null;
-  return `${segments.join(":")}::/64`;
+  if (cleaned.includes("%")) return null;
+
+  let ipv4Tail: [number, number] | null = null;
+  if (cleaned.includes(".")) {
+    const lastColon = cleaned.lastIndexOf(":");
+    if (lastColon <= 0) return null;
+    const tail = cleaned.slice(lastColon + 1);
+    ipv4Tail = parseIPv4TailToHextets(tail);
+    if (!ipv4Tail) return null;
+    cleaned = cleaned.slice(0, lastColon);
+  }
+
+  const segments = parseIPv6Segments(cleaned, ipv4Tail);
+  if (!segments) return null;
+
+  const prefix = segments
+    .slice(0, 4)
+    .map((segment) => segment.toString(16))
+    .join(":");
+  return `${prefix}::/64`;
+}
+
+function parseIPv4TailToHextets(raw: string): [number, number] | null {
+  const parts = raw.split(".");
+  if (parts.length !== 4) return null;
+  const octets: number[] = [];
+  for (const part of parts) {
+    if (!/^\d{1,3}$/.test(part)) return null;
+    const n = Number(part);
+    if (!Number.isInteger(n) || n < 0 || n > 255) return null;
+    octets.push(n);
+  }
+  return [(octets[0] << 8) | octets[1], (octets[2] << 8) | octets[3]];
+}
+
+function parseIPv6Segments(raw: string, ipv4Tail: [number, number] | null): number[] | null {
+  const pieces = raw.split("::");
+  if (pieces.length > 2) return null;
+
+  const parsePart = (part: string): number[] | null => {
+    if (!part) return [];
+    const out: number[] = [];
+    for (const token of part.split(":")) {
+      if (!token || !/^[0-9a-f]{1,4}$/.test(token)) return null;
+      out.push(parseInt(token, 16));
+    }
+    return out;
+  };
+
+  const left = parsePart(pieces[0]);
+  if (!left) return null;
+  const right = pieces.length === 2 ? parsePart(pieces[1]) : [];
+  if (!right) return null;
+
+  const tailLen = ipv4Tail ? 2 : 0;
+  let segments: number[];
+  if (pieces.length === 2) {
+    const zeros = 8 - (left.length + right.length + tailLen);
+    if (zeros < 0) return null;
+    segments = [...left, ...Array(zeros).fill(0), ...right];
+  } else {
+    const expectedLen = ipv4Tail ? 6 : 8;
+    if (left.length !== expectedLen) return null;
+    segments = [...left];
+  }
+
+  if (ipv4Tail) {
+    segments.push(ipv4Tail[0], ipv4Tail[1]);
+  }
+  if (segments.length !== 8) return null;
+  return segments;
 }
 
 function coarseIPPrefix(ip: string): string {
