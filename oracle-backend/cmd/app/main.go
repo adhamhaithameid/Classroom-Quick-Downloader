@@ -631,7 +631,7 @@ func securityHeadersMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		nonce := generateCSPNonce()
 		scriptSrc := "script-src 'self'"
-		styleSrc := "style-src 'self'"
+		styleSrc := "style-src 'self' https://fonts.googleapis.com"
 		if nonce != "" {
 			scriptSrc += " 'nonce-" + nonce + "'"
 			styleSrc += " 'nonce-" + nonce + "'"
