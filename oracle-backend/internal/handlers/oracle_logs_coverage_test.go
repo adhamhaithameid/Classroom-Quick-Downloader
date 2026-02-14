@@ -101,9 +101,6 @@ func TestOracleLogsListHandler_DefaultParams(t *testing.T) {
 	}
 }
 
-
-
-
 // ---------------------------------------------------------------------------
 // OracleOperationLogsDeleteOlderHandler
 // ---------------------------------------------------------------------------
@@ -191,9 +188,6 @@ func TestOracleLogsDeleteOlder_DaysOverMax(t *testing.T) {
 	}
 }
 
-
-
-
 // ---------------------------------------------------------------------------
 // OracleOperationLogsClearAllHandler
 // ---------------------------------------------------------------------------
@@ -268,6 +262,3 @@ func TestOracleLogsClearAll_InvalidBody(t *testing.T) {
 		t.Fatalf("expected 400, got %d", rr.Code)
 	}
 }
-
-
-
