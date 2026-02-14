@@ -104,8 +104,6 @@ func TestPipelineMetricsHandler_WithData(t *testing.T) {
 	}
 }
 
-
-
 // ---------------------------------------------------------------------------
 // PipelineFailuresHandler comprehensive coverage
 // ---------------------------------------------------------------------------
@@ -134,5 +132,3 @@ func TestPipelineFailuresHandler_WithFailureData(t *testing.T) {
 		t.Fatalf("expected 200, got %d", rr.Code)
 	}
 }
-
-
