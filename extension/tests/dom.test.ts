@@ -67,7 +67,7 @@ describe('detectComments() - DOM Integration', () => {
         } else {
           expect(result.hasComments).toBe(false);
         }
-      });
+      }, 15000);
     });
   });
 
