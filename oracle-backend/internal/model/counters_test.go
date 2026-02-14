@@ -220,4 +220,3 @@ func TestDeliverySnapshot_JSON(t *testing.T) {
 		t.Fatalf("seq fields mismatch")
 	}
 }
-
