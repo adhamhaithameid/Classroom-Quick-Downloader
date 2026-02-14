@@ -532,6 +532,31 @@ func TestIngestBatchHandler_MissingSecret(t *testing.T) {
 	}
 }
 
+func TestIngestBatchHandler_ThrottlesUnauthorizedFailureRows(t *testing.T) {
+	sqlDB := newTestDB(t)
+	defer sqlDB.Close()
+	resetIngestUnauthorizedFailureThrottle()
+	t.Cleanup(resetIngestUnauthorizedFailureThrottle)
+
+	handler := IngestBatchHandler(sqlDB, "secret")
+	for i := 0; i < ingestUnauthorizedFailureBurst+5; i++ {
+		req := httptest.NewRequest(http.MethodPost, "/ingest-batch", strings.NewReader(`{}`))
+		rr := httptest.NewRecorder()
+		handler.ServeHTTP(rr, req)
+		if rr.Code != http.StatusUnauthorized {
+			t.Fatalf("expected 401 for unauthorized request #%d, got %d", i+1, rr.Code)
+		}
+	}
+
+	var count int
+	if err := sqlDB.QueryRow(`SELECT COUNT(*) FROM pipeline_failure_logs WHERE source = 'oracle-backend' AND stage = 'ingest_auth' AND error_code = 'unauthorized'`).Scan(&count); err != nil {
+		t.Fatalf("failed to query failure log count: %v", err)
+	}
+	if count != ingestUnauthorizedFailureBurst {
+		t.Fatalf("expected throttled failure rows to cap at %d, got %d", ingestUnauthorizedFailureBurst, count)
+	}
+}
+
 func TestIngestBatchHandler_InvalidJSON(t *testing.T) {
 	sqlDB := newTestDB(t)
 	defer sqlDB.Close()

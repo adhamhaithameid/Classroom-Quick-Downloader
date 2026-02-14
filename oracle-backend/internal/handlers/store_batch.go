@@ -16,6 +16,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	model "oracle-backend/internal/model"
@@ -31,6 +32,15 @@ type ingestResponse struct {
 const failureLogRetentionDays = 30
 const maxFailureFieldLen = 64
 const maxFailureDetailLen = 240
+const ingestUnauthorizedFailureBurst = 6
+const ingestUnauthorizedFailureWindow = time.Minute
+
+var ingestUnauthorizedFailureThrottle = struct {
+	sync.Mutex
+	windowStart int64
+	allowed     int
+	suppressed  int
+}{}
 
 func sanitizeFailureField(input string, fallback string) string {
 	v := input
@@ -52,6 +62,37 @@ func sanitizeFailureDetail(input string) string {
 		v = v[:maxFailureDetailLen]
 	}
 	return v
+}
+
+func allowIngestUnauthorizedFailure(now time.Time) (bool, int) {
+	nowMs := now.UnixMilli()
+	ingestUnauthorizedFailureThrottle.Lock()
+	defer ingestUnauthorizedFailureThrottle.Unlock()
+
+	if ingestUnauthorizedFailureThrottle.windowStart == 0 ||
+		nowMs-ingestUnauthorizedFailureThrottle.windowStart >= ingestUnauthorizedFailureWindow.Milliseconds() {
+		suppressed := ingestUnauthorizedFailureThrottle.suppressed
+		ingestUnauthorizedFailureThrottle.windowStart = nowMs
+		ingestUnauthorizedFailureThrottle.allowed = 0
+		ingestUnauthorizedFailureThrottle.suppressed = 0
+		ingestUnauthorizedFailureThrottle.allowed++
+		return true, suppressed
+	}
+
+	if ingestUnauthorizedFailureThrottle.allowed < ingestUnauthorizedFailureBurst {
+		ingestUnauthorizedFailureThrottle.allowed++
+		return true, 0
+	}
+	ingestUnauthorizedFailureThrottle.suppressed++
+	return false, 0
+}
+
+func resetIngestUnauthorizedFailureThrottle() {
+	ingestUnauthorizedFailureThrottle.Lock()
+	ingestUnauthorizedFailureThrottle.windowStart = 0
+	ingestUnauthorizedFailureThrottle.allowed = 0
+	ingestUnauthorizedFailureThrottle.suppressed = 0
+	ingestUnauthorizedFailureThrottle.Unlock()
 }
 
 func dayUTC(tsMs int64) string {
@@ -93,10 +134,16 @@ func IngestBatchHandlerV4(sqliteDB, postgresDB *sql.DB, sharedSecret string) htt
 		// Constant-time comparison for secret to prevent timing attacks
 		headerSecret := r.Header.Get("X-DO-SECRET")
 		if headerSecret == "" || subtle.ConstantTimeCompare([]byte(headerSecret), []byte(sharedSecret)) != 1 {
-			logEvent("warn", "ingest_unauthorized", map[string]interface{}{
-				"reason": "missing_or_invalid_secret",
-			})
-			recordOracleFailure(sqliteDB, "ingest_auth", "unauthorized", "missing_or_invalid_secret", 1, "", "")
+			if allowed, suppressed := allowIngestUnauthorizedFailure(time.Now()); allowed {
+				fields := map[string]interface{}{
+					"reason": "missing_or_invalid_secret",
+				}
+				if suppressed > 0 {
+					fields["suppressed"] = suppressed
+				}
+				logEvent("warn", "ingest_unauthorized", fields)
+				recordOracleFailure(sqliteDB, "ingest_auth", "unauthorized", "missing_or_invalid_secret", 1, "", "")
+			}
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
