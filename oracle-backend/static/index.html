@@ -17,7 +17,7 @@
       <!-- Sidebar -->
       <aside class="sidebar">
         <div class="sidebar-header">
-          <button class="btn btn-secondary nav-utc sidebar-utc" id="top-utc-clock" data-tooltip="Current UTC time for Oracle. Click to toggle 12h/24h." data-tooltip-position="bottom">
+          <button class="btn btn-secondary nav-utc sidebar-utc" id="top-utc-clock" data-tooltip="Current UTC time for Oracle. Click to toggle 12h/24h." data-tooltip-position="bottom" aria-label="UTC clock — click to toggle 12h/24h format">
             <div class="nav-utc-row">
               <span class="nav-utc-dot"></span>
               <small>UTC</small>
@@ -30,32 +30,32 @@
           <div class="nav-section">
             <div class="nav-label">Sections</div>
             <button class="nav-item active" data-page="overview" data-shortcut="Cmd+1"
-              data-tooltip="View summary statistics" data-tooltip-position="bottom">
+              data-tooltip="View summary statistics" data-tooltip-position="bottom" aria-label="Overview — summary statistics">
               <span class="nav-item-emoji" aria-hidden="true">🏠</span>
               <span class="nav-item-label">Overview</span>
             </button>
             <button class="nav-item" data-page="activity" data-shortcut="Cmd+2"
-              data-tooltip="View activity timeline and analytics charts" data-tooltip-position="bottom">
+              data-tooltip="View activity timeline and analytics charts" data-tooltip-position="bottom" aria-label="Activity and Charts — timeline and analytics">
               <span class="nav-item-emoji" aria-hidden="true">📊</span>
               <span class="nav-item-label">Activity &amp; Charts</span>
             </button>
             <button class="nav-item" data-page="dashboards" data-shortcut="Cmd+3"
-              data-tooltip="Dashboards, deployments, and notifications" data-tooltip-position="bottom">
+              data-tooltip="Dashboards, deployments, and notifications" data-tooltip-position="bottom" aria-label="Ops Hub — dashboards and deployments">
               <span class="nav-item-emoji" aria-hidden="true">🛰️</span>
               <span class="nav-item-label">Ops Hub</span>
             </button>
             <button class="nav-item" data-page="creative" data-shortcut="Cmd+4"
-              data-tooltip="Design, email templates, and newsletter management" data-tooltip-position="bottom">
+              data-tooltip="Design, email templates, and newsletter management" data-tooltip-position="bottom" aria-label="Creative Hub — email templates and newsletters">
               <span class="nav-item-emoji" aria-hidden="true">🎨</span>
               <span class="nav-item-label">Creative Hub</span>
             </button>
             <button class="nav-item" data-page="logs" data-shortcut="Cmd+5"
-              data-tooltip="Oracle backend request and admin operation logs" data-tooltip-position="bottom">
+              data-tooltip="Oracle backend request and admin operation logs" data-tooltip-position="bottom" aria-label="Oracle Logs — backend request and admin logs">
               <span class="nav-item-emoji" aria-hidden="true">🧾</span>
               <span class="nav-item-label">Oracle Logs</span>
             </button>
             <button class="nav-item" data-page="danger" data-shortcut="Cmd+0"
-              data-tooltip="Critical administrative operations" data-tooltip-position="bottom">
+              data-tooltip="Critical administrative operations" data-tooltip-position="bottom" aria-label="Danger Zone — critical administrative operations">
               <span class="nav-item-emoji" aria-hidden="true">☢️</span>
               <span class="nav-item-label">Danger Zone</span>
             </button>
@@ -77,7 +77,7 @@
         <div class="sidebar-footer">
           <div class="sidebar-controls">
             <div class="sidebar-controls-row top">
-              <button class="btn footer-batch-btn" id="batch-btn" data-shortcut="Cmd+B" data-tooltip="Open the latest processed batch details (Info/JSON)." data-tooltip-position="top">
+              <button class="btn footer-batch-btn" id="batch-btn" data-shortcut="Cmd+B" data-tooltip="Open the latest processed batch details (Info/JSON)." data-tooltip-position="top" aria-label="Last Batch — view latest processed batch details">
                 <span aria-hidden="true">📦</span>
                 <span class="footer-batch-label">Last Batch</span>
               </button>
@@ -87,7 +87,7 @@
                   <path d="M21 4v5h-5"></path>
                 </svg>
               </button>
-              <button class="btn footer-batch-btn" id="flush-btn" data-shortcut="Cmd+Shift+B" data-tooltip="Open the most recent Google Sheets flush details (Info/JSON)." data-tooltip-position="top">
+              <button class="btn footer-batch-btn" id="flush-btn" data-shortcut="Cmd+Shift+B" data-tooltip="Open the most recent Google Sheets flush details (Info/JSON)." data-tooltip-position="top" aria-label="Last Flush — view latest Google Sheets flush details">
                 <span aria-hidden="true">🧮</span>
                 <span class="footer-batch-label">Last Flush</span>
               </button>
@@ -734,10 +734,10 @@
               </div>
               <div class="card-body">
                 <div class="action-buttons-grid action-buttons-grid-four">
-                  <button class="btn btn-secondary" id="danger-dryrun-clear-btn">🧪 Dry Run Clear (All Non-Core)</button>
-                  <button class="btn btn-danger" id="danger-exec-clear-btn">💥 Execute Clear (All Non-Core)</button>
-                  <button class="btn btn-secondary" id="danger-run-backup-btn">💾 Run SQLite Backup</button>
-                  <button class="btn btn-secondary" id="stepup-btn" data-shortcut="Cmd+Shift+S">🛂 Step-Up Now</button>
+                  <button class="btn btn-secondary" id="danger-dryrun-clear-btn" aria-label="Dry run clear — preview non-core data deletion">🧪 Dry Run Clear (All Non-Core)</button>
+                  <button class="btn btn-danger" id="danger-exec-clear-btn" aria-label="Execute clear — permanently delete non-core data">💥 Execute Clear (All Non-Core)</button>
+                  <button class="btn btn-secondary" id="danger-run-backup-btn" aria-label="Run SQLite backup">💾 Run SQLite Backup</button>
+                  <button class="btn btn-secondary" id="stepup-btn" data-shortcut="Cmd+Shift+S" aria-label="Start step-up verification">🛂 Step-Up Now</button>
                 </div>
                 <div class="section-block">
                   <div class="section-caption">Operational Safety Actions</div>
@@ -746,16 +746,16 @@
                       <span class="danger-log-retention-label">🕒 Log Retention Window</span>
                       <span class="danger-log-retention-note">Used by delete-older actions in this page.</span>
                     </div>
-                    <input id="danger-log-retention-days" class="auth-input" type="number" min="1" max="36500" value="30" />
+                    <input id="danger-log-retention-days" class="auth-input" type="number" min="1" max="36500" value="30" aria-label="Log retention window in days" />
                   </div>
                   <div class="action-buttons-grid action-buttons-grid-four">
-                    <button class="btn btn-secondary" id="danger-alerts-btn">🚨 Load Alerts</button>
-                    <button class="btn btn-secondary" id="danger-audit-verify-btn">🔗 Verify Audit Chain</button>
-                    <button class="btn btn-secondary" id="danger-outbox-status-btn">📦 Outbox Status</button>
-                    <button class="btn btn-secondary" id="danger-flags-btn">⚙️ Load Feature Flags</button>
-                    <button class="btn btn-secondary" id="danger-logs-dry-run-btn">🧪 Dry Run Delete Older Logs</button>
-                    <button class="btn btn-secondary" id="danger-logs-delete-older-btn">🧹 Delete Older Logs</button>
-                    <button class="btn btn-danger" id="danger-logs-delete-all-btn">🗑️ Delete All Oracle Logs</button>
+                    <button class="btn btn-secondary" id="danger-alerts-btn" aria-label="Load operational alerts">🚨 Load Alerts</button>
+                    <button class="btn btn-secondary" id="danger-audit-verify-btn" aria-label="Verify audit hash-chain integrity">🔗 Verify Audit Chain</button>
+                    <button class="btn btn-secondary" id="danger-outbox-status-btn" aria-label="View relay outbox queue status">📦 Outbox Status</button>
+                    <button class="btn btn-secondary" id="danger-flags-btn" aria-label="Load server-side feature flags">⚙️ Load Feature Flags</button>
+                    <button class="btn btn-secondary" id="danger-logs-dry-run-btn" aria-label="Preview log deletion without deleting">🧪 Dry Run Delete Older Logs</button>
+                    <button class="btn btn-secondary" id="danger-logs-delete-older-btn" aria-label="Delete logs older than retention period">🧹 Delete Older Logs</button>
+                    <button class="btn btn-danger" id="danger-logs-delete-all-btn" aria-label="Permanently delete all Oracle logs">🗑️ Delete All Oracle Logs</button>
                   </div>
                 </div>
                 <div class="section-block">
