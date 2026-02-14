@@ -1,0 +1,3 @@
+## 2025-05-23 - Loop Merging and Allocation
+**Learning:** Merging multiple loops into a single pass (O(3N) -> O(N)) does not automatically guarantee performance improvements in V8 if the single loop body is complex or involves dynamic property access. The key win came from reducing object allocations (intermediate arrays) and avoiding expensive operations (like `Date.toISOString()` repeated N times).
+**Action:** When optimizing loops, prioritize removing expensive calls (like Date parsing) and reducing allocations over pure loop count reduction. Cache results of expensive computations if they are stable across iterations (e.g. time buckets).
