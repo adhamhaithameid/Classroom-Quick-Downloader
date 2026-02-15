@@ -168,4 +168,5 @@ jobs:
 
       - name: Run govulncheck
         working-directory: oracle-backend
-        run: "$(go env GOPATH)/bin/govulncheck" ./...
+        run: |
+          "$(go env GOPATH)/bin/govulncheck" ./...
