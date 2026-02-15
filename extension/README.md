@@ -1,5 +1,7 @@
 # 🕵️ For Mozilla Reviewers: Build Instructions
 
+> Update (2026-02-15): Latest changes include CI coverage-gate hardening for extension analytics storage migration fallback, popup stats race-condition guards, structured step-up auth error handling in Oracle dashboard, and backend/worker auth-security hardening. See /CHANGELOG.md for details.
+
 ## System Requirements
 - **OS:** Windows, macOS, or Linux (Tested on macOS/Linux)
 - **Node.js:** v22.14.0 (Required, see `.nvmrc`)

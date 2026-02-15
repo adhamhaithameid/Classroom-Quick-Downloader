@@ -1,5 +1,7 @@
 # Security Best Practices Report
 
+> Update (2026-02-15): Latest changes include CI coverage-gate hardening for extension analytics storage migration fallback, popup stats race-condition guards, structured step-up auth error handling in Oracle dashboard, and backend/worker auth-security hardening. See /CHANGELOG.md for details.
+
 ## Executive Summary
 This review covered the full repo security posture for the active stacks: Go (`oracle-backend`), TypeScript frontend (`oracle-backend/static` and `extension`), and TypeScript Worker (`cloudflare-worker`).
 

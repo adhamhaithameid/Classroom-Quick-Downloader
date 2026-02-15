@@ -1,5 +1,7 @@
 # 🧪 Testing Guide
 
+> Update (2026-02-15): Latest changes include CI coverage-gate hardening for extension analytics storage migration fallback, popup stats race-condition guards, structured step-up auth error handling in Oracle dashboard, and backend/worker auth-security hardening. See /CHANGELOG.md for details.
+
 This document describes the comprehensive test suite for the **Universal V4 Detection System**.
 
 ## Quick Start

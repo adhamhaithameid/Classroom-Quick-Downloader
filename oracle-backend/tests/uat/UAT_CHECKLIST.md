@@ -1,5 +1,7 @@
 # Oracle Backend UAT Checklist
 
+> Update (2026-02-15): Latest changes include CI coverage-gate hardening for extension analytics storage migration fallback, popup stats race-condition guards, structured step-up auth error handling in Oracle dashboard, and backend/worker auth-security hardening. See /CHANGELOG.md for details.
+
 ## Authentication and Session
 - [ ] Login succeeds with correct dashboard password and sets `oracle_session` cookie.
 - [ ] Login fails with incorrect password (`401`).

@@ -1,5 +1,7 @@
 # Oracle Backend Security Audit Report
 
+> Update (2026-02-15): Latest changes include CI coverage-gate hardening for extension analytics storage migration fallback, popup stats race-condition guards, structured step-up auth error handling in Oracle dashboard, and backend/worker auth-security hardening. See /CHANGELOG.md for details.
+
 Date: 2026-02-13
 Scope: `/Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/oracle-backend` (plus associated Cloudflare-origin linkage where directly tied to Oracle ingest path)
 Assessed by: Codex (SAST + manual review)
