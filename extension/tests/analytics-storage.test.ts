@@ -140,6 +140,19 @@ describe('analytics storage', () => {
     expect(loadedFromIdb.queue.map((ev) => ev.id)).toEqual(['legacy-1', 'legacy-2']);
   });
 
+  it('falls back to saving legacy queue when migration clear fails', async () => {
+    const queue = [makeEvent({ id: 'legacy-fallback-1' }), makeEvent({ id: 'legacy-fallback-2' })];
+    const raw = JSON.stringify(queue);
+    installStorageMock({
+      [STORAGE_KEYS.QUEUE]: queue,
+      [STORAGE_KEYS.INTEGRITY]: computeChecksum(raw),
+    }, { failSet: true });
+
+    const loaded = await loadQueue();
+    expect(typeof loaded.valid).toBe('boolean');
+    expect(loaded.queue.map((ev) => ev.id)).toEqual(['legacy-fallback-1', 'legacy-fallback-2']);
+  });
+
   it('prefers non-empty IndexedDB queue over legacy storage queue', async () => {
     await saveQueue([makeEvent({ id: 'idb-first' })]);
     const legacy = [makeEvent({ id: 'legacy-only' })];
