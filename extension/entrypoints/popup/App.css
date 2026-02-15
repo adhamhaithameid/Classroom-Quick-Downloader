@@ -31,7 +31,32 @@ html {
 
 *, *::before, *::after {
   box-sizing: inherit;
-  outline: none !important;
+  /* outline: none !important; */
+}
+
+/* Global focus */
+:focus-visible {
+  outline: 2px solid var(--cqd-blue);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Rounded Buttons Focus */
+.cqd-button:focus-visible,
+.cqd-coffee-button:focus-visible,
+.cqd-brand-version:focus-visible,
+.cqd-banner-close:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--cqd-blue);
+}
+
+/* Switch Focus */
+.cqd-switch:focus-visible .cqd-switch-slider {
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--cqd-blue);
+}
+
+.cqd-switch:focus-visible {
+  outline: none;
 }
 
 /* Hide scrollbars visually but allow scrolling */
