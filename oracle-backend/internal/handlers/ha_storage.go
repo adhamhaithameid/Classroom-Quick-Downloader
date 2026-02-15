@@ -22,15 +22,16 @@ import (
 )
 
 const (
-	defaultStorageSampleInterval  = 10 * time.Second
-	defaultRetentionFailureDays   = 30
-	defaultRetentionOutboxDays    = 30
-	defaultRetentionLogsDays      = 90
-	defaultRetentionBackupDays    = 180
-	defaultRetentionStorageDays   = 90
-	defaultRetentionAuthStaleDays = 7
-	defaultDRPromotionLagSeconds  = 300
-	defaultBackpressureRetrySec   = 30
+	defaultStorageSampleInterval     = 10 * time.Second
+	defaultRetentionFailureDays      = 30
+	defaultRetentionOutboxDays       = 30
+	defaultRetentionLogsDays         = 90
+	defaultRetentionRawSnapshotsDays = 30
+	defaultRetentionBackupDays       = 180
+	defaultRetentionStorageDays      = 90
+	defaultRetentionAuthStaleDays    = 7
+	defaultDRPromotionLagSeconds     = 300
+	defaultBackpressureRetrySec      = 30
 )
 
 type StorageWatermarks struct {
@@ -738,6 +739,13 @@ func RetentionRunHandler(sqliteDB, postgresDB *sql.DB) http.HandlerFunc {
 		if isSelected("oracle_operation_logs") {
 			cutoff := time.Now().UTC().AddDate(0, 0, -getenvIntWithDefault("ORACLE_RETENTION_OPERATION_LOGS_DAYS", defaultRetentionLogsDays)).UnixMilli()
 			if err := runSQLite("oracle_operation_logs", `SELECT COUNT(*) FROM oracle_operation_logs WHERE ts_utc < ?`, `DELETE FROM oracle_operation_logs WHERE ts_utc < ?`, cutoff); err != nil {
+				http.Error(w, "retention failed", http.StatusInternalServerError)
+				return
+			}
+		}
+		if isSelected("cf_snapshots_raw") {
+			cutoff := time.Now().UTC().AddDate(0, 0, -getenvIntWithDefault("ORACLE_RETENTION_RAW_SNAPSHOTS_DAYS", defaultRetentionRawSnapshotsDays)).UnixMilli()
+			if err := runSQLite("cf_snapshots_raw", `SELECT COUNT(*) FROM cf_snapshots_raw WHERE received_at < ?`, `DELETE FROM cf_snapshots_raw WHERE received_at < ?`, cutoff); err != nil {
 				http.Error(w, "retention failed", http.StatusInternalServerError)
 				return
 			}

@@ -220,6 +220,71 @@ func TestRetentionRunHandler_DryRunAndExecute(t *testing.T) {
 	}
 }
 
+func TestRetentionRunHandler_RawSnapshotsPolicyDryRunAndExecute(t *testing.T) {
+	sqlDB := newHAStorageTestDB(t)
+	defer sqlDB.Close()
+
+	oldReceivedAt := time.Now().UTC().AddDate(0, 0, -45).UnixMilli()
+	recentReceivedAt := time.Now().UTC().UnixMilli()
+	if _, err := sqlDB.Exec(
+		`INSERT INTO cf_snapshots_raw (source, endpoint, payload_json, schema_fingerprint, status, received_at) VALUES (?, ?, ?, ?, ?, ?)`,
+		"oracle-backend",
+		"/ingest-batch",
+		`{"k":"old"}`,
+		"fp-old",
+		"ok",
+		oldReceivedAt,
+	); err != nil {
+		t.Fatalf("failed to seed old raw snapshot: %v", err)
+	}
+	if _, err := sqlDB.Exec(
+		`INSERT INTO cf_snapshots_raw (source, endpoint, payload_json, schema_fingerprint, status, received_at) VALUES (?, ?, ?, ?, ?, ?)`,
+		"oracle-backend",
+		"/ingest-batch",
+		`{"k":"recent"}`,
+		"fp-recent",
+		"ok",
+		recentReceivedAt,
+	); err != nil {
+		t.Fatalf("failed to seed recent raw snapshot: %v", err)
+	}
+
+	dryReq := httptest.NewRequest(http.MethodPost, "/api/admin/retention/run", bytes.NewBufferString(`{"dryRun":true,"policies":["cf_snapshots_raw"]}`))
+	dryReq.Header.Set("Content-Type", "application/json")
+	dryRR := httptest.NewRecorder()
+	RetentionRunHandler(sqlDB, nil).ServeHTTP(dryRR, dryReq)
+	if dryRR.Code != http.StatusOK {
+		t.Fatalf("expected 200 from dry run, got %d: %s", dryRR.Code, dryRR.Body.String())
+	}
+	if !bytes.Contains(dryRR.Body.Bytes(), []byte(`"name":"cf_snapshots_raw"`)) {
+		t.Fatalf("expected dry run response to include cf_snapshots_raw action, got %s", dryRR.Body.String())
+	}
+
+	var afterDryRun int64
+	if err := sqlDB.QueryRow(`SELECT COUNT(*) FROM cf_snapshots_raw`).Scan(&afterDryRun); err != nil {
+		t.Fatalf("failed to count snapshots after dry run: %v", err)
+	}
+	if afterDryRun != 2 {
+		t.Fatalf("expected dry run to keep both rows, got %d", afterDryRun)
+	}
+
+	execReq := httptest.NewRequest(http.MethodPost, "/api/admin/retention/run", bytes.NewBufferString(`{"dryRun":false,"policies":["cf_snapshots_raw"]}`))
+	execReq.Header.Set("Content-Type", "application/json")
+	execRR := httptest.NewRecorder()
+	RetentionRunHandler(sqlDB, nil).ServeHTTP(execRR, execReq)
+	if execRR.Code != http.StatusOK {
+		t.Fatalf("expected 200 from execute run, got %d: %s", execRR.Code, execRR.Body.String())
+	}
+
+	var remaining int64
+	if err := sqlDB.QueryRow(`SELECT COUNT(*) FROM cf_snapshots_raw`).Scan(&remaining); err != nil {
+		t.Fatalf("failed to query retained raw snapshots: %v", err)
+	}
+	if remaining != 1 {
+		t.Fatalf("expected only recent snapshot to remain, remaining=%d", remaining)
+	}
+}
+
 func TestRetentionRunHandler_AuthPoliciesUseSecondCutoffs(t *testing.T) {
 	sqlDB := newHAStorageTestDB(t)
 	defer sqlDB.Close()
