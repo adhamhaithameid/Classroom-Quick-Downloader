@@ -94,6 +94,7 @@ jobs:
           DASHBOARD_PASSWORD: DashAuth#2026!Oracle
           SUPER_ADMIN_PASSWORD: SuperAdmin#2026!Oracle
           ARCHIVER_SHARED_SECRET: Archiver#2026!Oracle
+          ORACLE_AUDIT_CHECKPOINT_SECRET: AuditAnchor2026OracleStrong
           SESSION_COOKIE_SECURE: "false"
           ALLOW_INSECURE_COOKIES: "true"
           ORACLE_ALLOW_HTTP_STORE_URLS: "true"
