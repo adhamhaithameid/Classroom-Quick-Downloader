@@ -165,8 +165,8 @@ function quotaToFlag(quota?: QuotaDescriptor) {
       description: "High traffic (<80k).",
     };
   return {
-    label: "fuck",
-    className: "flag-fuck",
+    label: "critical",
+    className: "flag-critical",
     description: "Basically at limits (>80k).",
   };
 }
@@ -249,7 +249,8 @@ export function renderLoginPage(errorMessage?: string): string {
       </div>
       <button class="login-button" type="submit">Unlock →</button>
     </div>
-    ${errorMessage ? `<div class="login-error">${errorMessage}</div>` : ""}
+    ${errorMessage ? `<div class="login-error">${escapeHtml(errorMessage)}</div>` : ""}
+  </form>
   <script>document.getElementById("password-input")?.focus();</script>
 </body>
 </html>`;
@@ -2123,7 +2124,7 @@ export function renderDashboard(stats: StatsResponse): string {
     .flag-easy { background: var(--success-muted); color: #86efac; border: 1px solid rgba(34, 197, 94, 0.3); }
     .flag-normal { background: var(--accent-muted); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.3); }
     .flag-hard { background: var(--warning-muted); color: #fcd34d; border: 1px solid rgba(245, 158, 11, 0.3); }
-    .flag-fuck { background: var(--danger-muted); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.3); }
+    .flag-critical { background: var(--danger-muted); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.3); }
 
     /* ===== DANGER ZONE - GUARDED STYLE ===== */
     .danger-zone {
@@ -3977,15 +3978,12 @@ export function renderDashboard(stats: StatsResponse): string {
             <span class="quota-tag flag-easy">easy</span>
             <span class="quota-tag flag-normal">normal</span>
             <span class="quota-tag flag-hard">hard</span>
-            <span class="quota-tag flag-fuck">fuck</span>
+            <span class="quota-tag flag-critical">critical</span>
           </div>
           <div class="modal-item"><span>EASY</span> <span>&lt; 20k reqs</span></div>
           <div class="modal-item"><span>NORMAL</span> <span>&lt; 50k reqs</span></div>
           <div class="modal-item"><span>HARD</span> <span>&lt; 80k reqs</span></div>
-          <div class="modal-item">
-            <span style="color:#f87171">FUCK</span>
-            <span>&gt; 80k reqs</span>
-          </div>
+          <div class="modal-item"><span>CRITICAL</span> <span>&gt; 80k reqs</span></div>
         </div>
 
         <div class="modal-section">
@@ -4169,7 +4167,7 @@ export function renderDashboard(stats: StatsResponse): string {
         if (n <= 20000) return { label: "easy",   className: "flag-easy",   description: "Way below limits (<20k)." };
         if (n <= 50000) return { label: "normal", className: "flag-normal", description: "Comfortable usage (<50k)." };
         if (n <= 80000) return { label: "hard",   className: "flag-hard",   description: "High traffic (<80k)." };
-        return { label: "fuck", className: "flag-fuck", description: "Basically at limits (>80k)." };
+        return { label: "critical", className: "flag-critical", description: "Basically at limits (>80k)." };
       }
 
       function classifySuccessRateJS(success, fail) {
@@ -4205,7 +4203,9 @@ export function renderDashboard(stats: StatsResponse): string {
         entries.sort((a, b) => b[1] - a[1]);
         return entries
           .map(function ([k, v]) {
-            return "<tr><td>" + escapeHtmlJS(k) + "</td><td>" + v + "</td></tr>";
+            const numeric = Number(v);
+            const safeValue = Number.isFinite(numeric) ? numeric.toString() : "0";
+            return "<tr><td>" + escapeHtmlJS(k) + "</td><td>" + safeValue + "</td></tr>";
           })
           .join("");
       }

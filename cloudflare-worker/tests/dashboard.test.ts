@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { renderDashboard } from "../src/dashboard/main";
+import { renderDashboard, renderLoginPage as renderMainLoginPage } from "../src/dashboard/main";
+import { renderLoginPage as renderSimpleLoginPage } from "../src/dashboard/login";
 import type { StatsResponse } from "../src/types";
 
 function makeStats(overrides: Partial<StatsResponse> = {}): StatsResponse {
@@ -116,5 +117,21 @@ describe("Dashboard pipeline health UI", () => {
     expect(html).toContain("function msToMinutes");
     expect(html).toContain("readMinutesMs(\"cfg-health-notify-warn\"");
     expect(html).toContain("msToMinutes(merged.healthNotifyIntervalsMs.warn");
+  });
+});
+
+describe("Dashboard login rendering", () => {
+  it("escapes injected login error content in the full dashboard template", () => {
+    const html = renderMainLoginPage(`<img src=x onerror=alert("xss")>`);
+    expect(html).toContain("&lt;img src=x onerror=alert(&quot;xss&quot;)&gt;");
+    expect(html).not.toContain(`<img src=x onerror=alert("xss")>`);
+    expect(html).toContain("</form>");
+  });
+
+  it("escapes injected login error content in the lightweight login template", () => {
+    const html = renderSimpleLoginPage(`<img src=x onerror=alert("xss")>`);
+    expect(html).toContain("&lt;img src=x onerror=alert(&quot;xss&quot;)&gt;");
+    expect(html).not.toContain(`<img src=x onerror=alert("xss")>`);
+    expect(html).toContain("</form>");
   });
 });

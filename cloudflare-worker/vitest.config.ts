@@ -5,5 +5,11 @@ export default defineConfig({
     environment: "node",
     include: ["tests/**/*.test.ts"],
     clearMocks: true,
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "json"],
+      include: ["src/**/*.ts"],
+      exclude: ["**/*.d.ts", "**/node_modules/**"],
+    },
   },
 });

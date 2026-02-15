@@ -1,0 +1,2787 @@
+      // State
+      let currentPage = 'overview';
+      let activityRange = 'today';
+      let activityVersion = '';
+      let lastBatchData = null;
+      let batchTab = 'info';
+      let lastFlushData = null;
+      let flushTab = 'info';
+      let calendarMonthOffset = 0;
+      let allTimeActivityPoints = [];
+          let oracleClockIs24 = localStorage.getItem('oracle_clock_24h') !== 'false';
+      let refreshIntervalId = null;
+          const DEFAULT_INFRA_LINKS = {
+            cloudflare: 'https://cqd-analytics.adhamhaithameid.workers.dev/',
+            uptimeKuma: 'http://129.151.233.229:3001/status/cqd',
+            githubRepo: 'https://github.com/adhamhaithameid/Classroom-Quick-Downloader',
+            googleSheets: 'https://docs.google.com/spreadsheets/d/1ptzLKUVnAkyXnT635Zgb1C6Img9aeAZ1se3nRz_QZmI/edit?gid=0#gid=0',
+            figmaDesign: 'https://www.figma.com/design/hQLRpncinKnJQRG1lhCdQG/Google-Classroom-Downloade-Icon?node-id=0-1&t=5Eimhfrvp8RwFC19-1',
+            chromeDevDashboard: 'https://chrome.google.com/webstore/devconsole/9fe14497-b35b-4542-9af0-dedfdf6a194c',
+            firefoxDevDashboard: 'https://addons.mozilla.org/en-US/firefox/user/19632882/',
+            edgeDevDashboard: 'https://partner.microsoft.com/en-us/dashboard/microsoftedge/7b2c7f20-4ea7-4b63-bbdb-5acabc886215/analytics',
+            chromeStoreListing: 'https://chromewebstore.google.com/detail/classroom-quick-downloade/oemoongiefmpmomjikcjmkkkhffcbdid',
+            firefoxStoreListing: 'https://addons.mozilla.org/en-US/firefox/addon/classroom-quick-downloader/',
+            edgeStoreListing: 'https://microsoftedge.microsoft.com/addons/detail/classroom-quick-downloade/ecojbijjkcjdolpeoiemnccgmaeomcmn'
+          };
+
+      // Helpers
+      let authInFlight = null;
+      let authModalPromise = null;
+      let authModalResolve = null;
+      let authModalInitialized = false;
+      let stepUpInFlight = null;
+      let stepUpModalPromise = null;
+      let stepUpModalResolve = null;
+      let stepUpModalInitialized = false;
+      let stepUpChallengeId = '';
+
+      function setAuthError(message) {
+        const errorEl = document.getElementById('auth-error');
+        if (!errorEl) return;
+        if (!message) {
+          errorEl.textContent = '';
+          errorEl.classList.remove('visible');
+          return;
+        }
+        errorEl.textContent = message;
+        errorEl.classList.add('visible');
+      }
+
+      function showAuthModal() {
+        const modal = document.getElementById('auth-modal');
+        const input = document.getElementById('auth-password-input');
+        if (!modal || !input) return;
+        modal.classList.add('visible');
+        modal.setAttribute('aria-hidden', 'false');
+        input.value = '';
+        setAuthError('');
+        setTimeout(function() { input.focus(); }, 0);
+      }
+
+      function hideAuthModal() {
+        const modal = document.getElementById('auth-modal');
+        if (!modal) return;
+        modal.classList.remove('visible');
+        modal.setAttribute('aria-hidden', 'true');
+        setAuthError('');
+      }
+
+      function sleepMs(ms) {
+        return new Promise(function(resolve) {
+          setTimeout(resolve, ms);
+        });
+      }
+
+      async function fetchAuthCheckWithRetry(maxAttempts) {
+        var attempts = Number(maxAttempts || 1);
+        if (!Number.isFinite(attempts) || attempts < 1) attempts = 1;
+        attempts = Math.floor(attempts);
+
+        for (var i = 0; i < attempts; i++) {
+          try {
+            const checkRes = await fetch('/api/auth/check', {
+              cache: 'no-store',
+              credentials: 'same-origin',
+              headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            if (checkRes.ok) {
+              const checkPayload = await checkRes.json().catch(function() { return {}; });
+              if (checkPayload && (checkPayload.authRequired === false || checkPayload.authenticated === true)) {
+                return checkPayload;
+              }
+            }
+          } catch (_) {
+            // Retry below.
+          }
+
+          if (i < attempts - 1) {
+            await sleepMs(120 * (i + 1));
+          }
+        }
+
+        return { authenticated: false, authRequired: true };
+      }
+
+      function initAuthModal() {
+        if (authModalInitialized) return;
+        authModalInitialized = true;
+        const form = document.getElementById('auth-form');
+        const input = document.getElementById('auth-password-input');
+        const submitBtn = document.getElementById('auth-password-submit');
+        if (!form || !input || !submitBtn) return;
+
+        form.addEventListener('submit', async function(e) {
+          e.preventDefault();
+          if (submitBtn.disabled) return;
+          const password = input.value || '';
+          if (!password.trim()) {
+            setAuthError('Access key is required.');
+            input.focus();
+            return;
+          }
+
+          submitBtn.disabled = true;
+          submitBtn.textContent = 'Unlocking...';
+          setAuthError('');
+
+          try {
+            const loginRes = await fetch('/api/auth/login', {
+              method: 'POST',
+              credentials: 'same-origin',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+              },
+              body: JSON.stringify({ password: password }),
+            });
+
+            if (!loginRes.ok) {
+              if (loginRes.status === 429) {
+                setAuthError('Too many attempts. Please wait and try again.');
+              } else {
+                setAuthError('Authentication failed. Please try again.');
+              }
+              input.select();
+              input.focus();
+              return;
+            }
+
+            // Confirm the browser persisted the session cookie before closing modal.
+            // Some browsers can apply Set-Cookie from fetch responses with slight delay.
+            const checkPayload = await fetchAuthCheckWithRetry(4);
+            if (!checkPayload || (checkPayload.authRequired !== false && checkPayload.authenticated !== true)) {
+              setAuthError('Session cookie was not saved by your browser. Enable cookies and refresh. For HTTP mode set SESSION_COOKIE_SECURE=false.');
+              input.select();
+              input.focus();
+              return;
+            }
+
+            hideAuthModal();
+            if (authModalResolve) {
+              authModalResolve(true);
+            }
+            authModalResolve = null;
+            authModalPromise = null;
+          } catch {
+            setAuthError('Login request failed. Check your connection and try again.');
+          } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Unlock';
+          }
+        });
+      }
+
+      function requestAuthModalUnlock() {
+        initAuthModal();
+        if (authModalPromise) return authModalPromise;
+        showAuthModal();
+        authModalPromise = new Promise(function(resolve) {
+          authModalResolve = resolve;
+        });
+        return authModalPromise;
+      }
+
+      function setStepUpError(message) {
+        const errorEl = document.getElementById('stepup-error');
+        if (!errorEl) return;
+        if (!message) {
+          errorEl.textContent = '';
+          errorEl.classList.remove('visible');
+          return;
+        }
+        errorEl.textContent = message;
+        errorEl.classList.add('visible');
+      }
+
+      function showStepUpModal(challengeId) {
+        const modal = document.getElementById('stepup-modal');
+        const input = document.getElementById('stepup-password-input');
+        if (!modal || !input) return;
+        stepUpChallengeId = challengeId || '';
+        modal.classList.add('visible');
+        modal.setAttribute('aria-hidden', 'false');
+        input.value = '';
+        setStepUpError('');
+        setTimeout(function() { input.focus(); }, 0);
+      }
+
+      function hideStepUpModal() {
+        const modal = document.getElementById('stepup-modal');
+        if (!modal) return;
+        modal.classList.remove('visible');
+        modal.setAttribute('aria-hidden', 'true');
+        stepUpChallengeId = '';
+        setStepUpError('');
+      }
+
+      function resolveStepUpModal(result) {
+        if (stepUpModalResolve) {
+          stepUpModalResolve(!!result);
+        }
+        stepUpModalResolve = null;
+        stepUpModalPromise = null;
+      }
+
+      function closeStepUpModal() {
+        hideStepUpModal();
+        resolveStepUpModal(false);
+      }
+
+      function initStepUpModal() {
+        if (stepUpModalInitialized) return;
+        stepUpModalInitialized = true;
+        const modal = document.getElementById('stepup-modal');
+        const form = document.getElementById('stepup-form');
+        const input = document.getElementById('stepup-password-input');
+        const submitBtn = document.getElementById('stepup-password-submit');
+        const cancelBtn = document.getElementById('stepup-cancel-btn');
+        if (!modal || !form || !input || !submitBtn || !cancelBtn) return;
+
+        cancelBtn.addEventListener('click', function() {
+          closeStepUpModal();
+        });
+
+        modal.addEventListener('click', function(ev) {
+          if (ev.target === modal) {
+            closeStepUpModal();
+          }
+        });
+
+        form.addEventListener('submit', async function(e) {
+          e.preventDefault();
+          if (submitBtn.disabled) return;
+          const password = input.value || '';
+          if (!password.trim()) {
+            setStepUpError('Verification key is required.');
+            input.focus();
+            return;
+          }
+          if (!stepUpChallengeId) {
+            setStepUpError('Step-up challenge expired. Retry the action.');
+            return;
+          }
+
+          submitBtn.disabled = true;
+          cancelBtn.disabled = true;
+          submitBtn.textContent = 'Verifying...';
+          setStepUpError('');
+
+          try {
+            await fetchJSONWithInit('/api/auth/stepup/verify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ challengeId: stepUpChallengeId, password: password })
+            }, { retryOn401: false });
+            hideStepUpModal();
+            resolveStepUpModal(true);
+          } catch (e) {
+            var status = 0;
+            var code = '';
+            if (e && typeof e === 'object') {
+              if (typeof e.status === 'number') status = e.status;
+              if (typeof e.code === 'string') code = e.code;
+            }
+            if (status === 429 || code === 'too many attempts') {
+              setStepUpError('Too many attempts. Wait before retrying.');
+            } else if (code === 'invalid_or_expired_challenge' || code === 'missing_parent_session' || status === 400) {
+              setStepUpError('Step-up challenge expired. Retry the action.');
+              stepUpChallengeId = '';
+            } else if (code === 'unauthorized') {
+              setStepUpError('Session expired. Please sign in again.');
+              stepUpChallengeId = '';
+            } else if (code === 'invalid password' || (status === 401 && code !== 'unauthorized') || status === 403) {
+              setStepUpError('Verification failed. Please try again.');
+              input.select();
+            } else {
+              setStepUpError('Verification failed. Please try again.');
+            }
+            input.focus();
+          } finally {
+            submitBtn.disabled = false;
+            cancelBtn.disabled = false;
+            submitBtn.textContent = 'Verify';
+          }
+        });
+      }
+
+      function requestStepUpModal(challengeId) {
+        initStepUpModal();
+        if (stepUpModalPromise) {
+          if (challengeId) stepUpChallengeId = challengeId;
+          return stepUpModalPromise;
+        }
+        showStepUpModal(challengeId);
+        stepUpModalPromise = new Promise(function(resolve) {
+          stepUpModalResolve = resolve;
+        });
+        return stepUpModalPromise;
+      }
+
+      async function openStepUpModal() {
+        if (stepUpInFlight) return stepUpInFlight;
+        stepUpInFlight = (async () => {
+          try {
+            var start = await fetchJSONWithInit('/api/auth/stepup/start', { method: 'POST' });
+            if (!start.required) return true;
+            if (!start.challengeId) return false;
+            return requestStepUpModal(start.challengeId);
+          } catch (_) {
+            return false;
+          }
+        })();
+        var ok = await stepUpInFlight;
+        stepUpInFlight = null;
+        return ok;
+      }
+
+      async function ensureAuth() {
+        if (authInFlight) return authInFlight;
+        authInFlight = (async () => {
+          try {
+            const check = await fetchAuthCheckWithRetry(2);
+            if (check.authRequired === false || check.authenticated === true) {
+              hideAuthModal();
+              return true;
+            }
+            return requestAuthModalUnlock();
+          } catch {
+            return false;
+          }
+        })();
+        const ok = await authInFlight;
+        authInFlight = null;
+        return ok;
+      }
+
+      async function fetchJSONWithInit(url, init, options) {
+        var requestOptions = options ? Object.assign({}, options) : {};
+        var retryOn401 = requestOptions.retryOn401 !== false;
+        var requestInit = init ? Object.assign({}, init) : {};
+        requestInit.headers = mergeRequestHeaders(init && init.headers);
+        if (!requestInit.method) requestInit.method = 'GET';
+        if (!requestInit.credentials) requestInit.credentials = 'same-origin';
+        let res = await fetch(url, requestInit);
+        if (retryOn401 && res.status === 401) {
+          const ok = await ensureAuth();
+          if (!ok) throw new Error("HTTP 401");
+          res = await fetch(url, requestInit);
+        }
+        if (!res.ok) {
+          var payload = null;
+          var responseText = '';
+          try {
+            var contentType = (res.headers && typeof res.headers.get === 'function' && res.headers.get('Content-Type')) || '';
+            if (contentType.indexOf('application/json') !== -1) {
+              payload = await res.json();
+            } else {
+              responseText = await res.text();
+              if (responseText) {
+                try {
+                  payload = JSON.parse(responseText);
+                } catch (_) { /* non-json response body */ }
+              }
+            }
+          } catch (_) { /* ignore parse errors */ }
+
+          var err = new Error("HTTP " + res.status);
+          err.status = res.status;
+          if (payload && typeof payload === 'object') {
+            err.payload = payload;
+            if (typeof payload.error === 'string' && payload.error) {
+              err.code = payload.error;
+            }
+          }
+          throw err;
+        }
+        return res.json();
+      }
+
+      async function fetchJSON(url, options) {
+        return fetchJSONWithInit(url, null, options);
+      }
+
+      /**
+       * Wrapper around fetchJSON with a localStorage TTL cache.
+       * Serves cached data when fresh enough, reducing redundant API calls
+       * on rapid page navigations or re-renders.
+       *
+       * @param {string} url    API endpoint to fetch.
+       * @param {number} ttlMs  Cache lifetime in milliseconds.
+       * @returns {Promise<any>} Parsed JSON response (from cache or network).
+       * @throws {Error} Network/HTTP errors propagate to the caller; stale
+       *   cache entries are NOT used as a fallback on fetch failure.
+       */
+      function cachedFetchJSON(url, ttlMs, options) {
+        var fetchOptions = options ? Object.assign({}, options) : {};
+        var forceRefresh = !!fetchOptions.forceRefresh;
+        var key = 'orc_cache_' + url;
+        if (!forceRefresh) {
+          try {
+            var cached = localStorage.getItem(key);
+            if (cached) {
+              var parsed = JSON.parse(cached);
+              if (parsed.ts && Date.now() - parsed.ts < ttlMs) {
+                return Promise.resolve(parsed.data);
+              }
+            }
+          } catch (_) { /* ignore parse/storage errors */ }
+        }
+        return fetchJSON(url, fetchOptions).then(function(data) {
+          try {
+            localStorage.setItem(key, JSON.stringify({ ts: Date.now(), data: data }));
+          } catch (e) { if (typeof console !== 'undefined') console.warn('[cachedFetchJSON] localStorage write failed:', e); }
+          return data;
+        });
+      }
+
+      function mergeRequestHeaders(extraHeaders) {
+        var headers = {};
+        if (extraHeaders) {
+          if (typeof Headers !== 'undefined' && extraHeaders instanceof Headers) {
+            extraHeaders.forEach(function(v, k) { headers[k] = v; });
+          } else if (Array.isArray(extraHeaders)) {
+            extraHeaders.forEach(function(entry) {
+              if (!entry || entry.length < 2) return;
+              headers[String(entry[0])] = String(entry[1]);
+            });
+          } else {
+            Object.keys(extraHeaders).forEach(function(k) { headers[k] = extraHeaders[k]; });
+          }
+        }
+        headers['X-Requested-With'] = 'XMLHttpRequest';
+        return headers;
+      }
+
+      function formatOracleUtcClock(ts) {
+        return new Date(ts).toLocaleTimeString('en-US', {
+          timeZone: 'UTC',
+          hour12: !oracleClockIs24,
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        });
+      }
+
+      function updateOracleUtcClock() {
+        var wrap = document.getElementById('top-utc-clock');
+        if (!wrap) return;
+        var label = wrap.querySelector('.nav-utc-time');
+        if (!label) return;
+        var next = formatOracleUtcClock(Date.now());
+        if (label.textContent !== next) label.textContent = next;
+        label.classList.toggle('is-12h', !oracleClockIs24);
+      }
+
+      function initOracleUtcClock() {
+        var wrap = document.getElementById('top-utc-clock');
+        if (!wrap) return;
+        updateOracleUtcClock();
+        setInterval(updateOracleUtcClock, 1000);
+        wrap.addEventListener('click', function() {
+          var label = wrap.querySelector('.nav-utc-time');
+          wrap.classList.remove('is-toggling');
+          void wrap.offsetWidth;
+          wrap.classList.add('is-toggling');
+          if (label) {
+            label.classList.remove('is-swapping');
+            void label.offsetWidth;
+            label.classList.add('is-swapping');
+          }
+          oracleClockIs24 = !oracleClockIs24;
+          localStorage.setItem('oracle_clock_24h', oracleClockIs24 ? 'true' : 'false');
+          setTimeout(function() {
+            updateOracleUtcClock();
+          }, 140);
+          setTimeout(function() {
+            wrap.classList.remove('is-toggling');
+            if (label) label.classList.remove('is-swapping');
+          }, 300);
+        });
+      }
+
+      function fmtPct(v) { return (v * 100).toFixed(1) + "%"; }
+
+      // XSS prevention: escape untrusted strings for HTML context
+      function escapeHtml(str) {
+        if (typeof str !== 'string') return String(str);
+        return str
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#039;');
+      }
+
+      function safeDomIdPart(v) {
+        return encodeURIComponent(String(v || ''));
+      }
+
+      function deploymentInputId(field, key) {
+        return 'dep-' + field + '-' + safeDomIdPart(key);
+      }
+
+      
+      function fmtNumber(n) {
+        if (n >= 1000000) return (n / 1000000).toFixed(1) + "M";
+        if (n >= 1000) return (n / 1000).toFixed(1) + "K";
+        return (n || 0).toLocaleString();
+      }
+
+      function parseMaybeNumber(value) {
+        if (value === null || value === undefined || value === "") return null;
+        var n = Number(value);
+        return Number.isFinite(n) ? n : null;
+      }
+
+      function countUniqueMetricKeys(metricMap) {
+        var src = metricMap || {};
+        return Object.keys(src).filter(function(key) {
+          var trimmed = String(key || '').trim();
+          if (!trimmed) return false;
+          var val = Number(src[key] || 0);
+          return Number.isFinite(val) && val > 0;
+        }).length;
+      }
+
+      function parseApproxCountText(value) {
+        var text = String(value || '').trim().toLowerCase();
+        if (!text) return 0;
+        text = text.replace(/,/g, '').replace(/\s+/g, '');
+        if (text.endsWith('+')) text = text.slice(0, -1);
+        var multiplier = 1;
+        if (text.endsWith('k')) {
+          multiplier = 1000;
+          text = text.slice(0, -1);
+        } else if (text.endsWith('m')) {
+          multiplier = 1000000;
+          text = text.slice(0, -1);
+        }
+        var n = Number(text);
+        if (!Number.isFinite(n) || n < 0) return 0;
+        return Math.round(n * multiplier);
+      }
+
+      function metricCountValue(primaryValue, fallbackText) {
+        var n = parseMaybeNumber(primaryValue);
+        if (n !== null) return Math.max(0, Math.round(n));
+        return parseApproxCountText(fallbackText);
+      }
+
+      function fmtNumberOrNA(value, known) {
+        if (known === false) return "N/A";
+        var n = parseMaybeNumber(value);
+        if (n === null) return "N/A";
+        return fmtNumber(n);
+      }
+
+      function fmtUtcDateTimeFromMs(tsMs) {
+        var n = parseMaybeNumber(tsMs);
+        if (n === null || n <= 0) return "n/a";
+        var d = new Date(n);
+        if (isNaN(d.getTime())) return "n/a";
+        return d.toLocaleString("en-US", {
+          timeZone: "UTC",
+          hour12: false
+        });
+      }
+
+      function inferSummaryDataTimestampMs(summary) {
+        var candidates = [];
+        if (summary && summary.lastBatch) {
+          candidates.push(parseMaybeNumber(summary.lastBatch.ingestedAt));
+          candidates.push(parseMaybeNumber(summary.lastBatch.generatedAt));
+        }
+        if (summary && summary.doState) {
+          candidates.push(parseMaybeNumber(summary.doState.capturedAt));
+        }
+        candidates = candidates.filter(function(v) { return v !== null && v > 0; });
+        if (!candidates.length) return null;
+        return Math.max.apply(null, candidates);
+      }
+
+      function normalizeDeploymentStoreMetrics(payload) {
+        var targets = (payload && Array.isArray(payload.targets)) ? payload.targets : [];
+        var aggregate = (payload && payload.aggregates) ? payload.aggregates : {};
+        var browserRows = Array.isArray(aggregate.browsers) ? aggregate.browsers : [];
+        var rowByKey = {};
+
+        browserRows.forEach(function(row) {
+          var key = String(row.key || '').trim();
+          if (!key) return;
+          rowByKey[key] = {
+            key: key,
+            name: String(row.name || key),
+            usersCount: metricCountValue(row.usersCount, row.users || ''),
+            reviewsCount: metricCountValue(row.reviews, row.ratingCount || ''),
+            syncedAtUtc: metricCountValue(row.syncedAtUtc, '')
+          };
+        });
+
+        targets.forEach(function(item) {
+          var key = String((item && item.recordKey) || '').trim();
+          if (!key) return;
+          var data = (item && item.data) ? item.data : {};
+          var current = rowByKey[key] || { key: key };
+          current.name = current.name || String(data.name || key);
+          current.usersCount = metricCountValue(
+            (Object.prototype.hasOwnProperty.call(data, 'usersCount') ? data.usersCount : current.usersCount),
+            data.users || ''
+          );
+          current.reviewsCount = metricCountValue(
+            (Object.prototype.hasOwnProperty.call(data, 'ratingCount') ? data.ratingCount : current.reviewsCount),
+            ''
+          );
+          current.syncedAtUtc = Math.max(
+            metricCountValue(current.syncedAtUtc, ''),
+            metricCountValue(data.syncedAt, ''),
+            metricCountValue(item.updatedAt, '')
+          );
+          rowByKey[key] = current;
+        });
+
+        var rows = Object.keys(rowByKey).map(function(key) { return rowByKey[key]; });
+        rows.sort(function(a, b) {
+          if (b.usersCount === a.usersCount) return String(a.key).localeCompare(String(b.key));
+          return b.usersCount - a.usersCount;
+        });
+
+        var usersTotal = parseMaybeNumber(aggregate.usersTotal);
+        var reviewsTotal = parseMaybeNumber(aggregate.reviewsTotal);
+        if (usersTotal === null) {
+          usersTotal = rows.reduce(function(sum, row) { return sum + (row.usersCount || 0); }, 0);
+        }
+        if (reviewsTotal === null) {
+          reviewsTotal = rows.reduce(function(sum, row) { return sum + (row.reviewsCount || 0); }, 0);
+        }
+
+        var lastSyncedAtUtc = parseMaybeNumber(aggregate.lastSyncedAtUtc);
+        if (lastSyncedAtUtc === null) {
+          lastSyncedAtUtc = rows.reduce(function(maxSeen, row) {
+            return Math.max(maxSeen, row.syncedAtUtc || 0);
+          }, 0);
+        }
+
+        return {
+          usersTotal: Math.max(0, Math.round(usersTotal || 0)),
+          reviewsTotal: Math.max(0, Math.round(reviewsTotal || 0)),
+          browsers: rows,
+          lastSyncedAtUtc: Math.max(0, Math.round(lastSyncedAtUtc || 0))
+        };
+      }
+
+      function renderOverviewStoreMetrics(summary) {
+        var usersEl = document.getElementById('stat-store-users');
+        var reviewsEl = document.getElementById('stat-store-reviews');
+        var usersValue = parseMaybeNumber(summary && summary.usersTotal);
+        var reviewsValue = parseMaybeNumber(summary && summary.reviewsTotal);
+        if (usersEl) usersEl.textContent = usersValue === null ? '--' : fmtNumber(usersValue);
+        if (reviewsEl) reviewsEl.textContent = reviewsValue === null ? '--' : fmtNumber(reviewsValue);
+      }
+
+      async function loadDeploymentStoreMetrics() {
+        try {
+          var payload = await fetchJSON('/api/admin/deployments/targets');
+          var metrics = normalizeDeploymentStoreMetrics(payload || {});
+          renderOverviewStoreMetrics(metrics);
+        } catch (_) {
+          renderOverviewStoreMetrics({ usersTotal: null, reviewsTotal: null });
+        }
+      }
+
+      function sourceLabelFromCode(source) {
+        var s = String(source || "").toLowerCase();
+        if (s === "live") return "Live";
+        if (s === "cache") return "Cached";
+        if (s === "stale_cache") return "Stale Cache";
+        if (s === "unavailable") return "Unavailable";
+        return "Unknown";
+      }
+
+      function fmtTimestamp(ts, granularity) {
+        if (!ts) return '--';
+        const date = new Date(ts.includes('T') ? ts : ts + 'T00:00:00Z');
+        if (isNaN(date.getTime())) return ts;
+        
+        const now = new Date();
+        const todayKey = now.toISOString().slice(0, 10);
+        const dateKey = date.toISOString().slice(0, 10);
+        const yesterday = new Date(now);
+        yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+        const yesterdayKey = yesterday.toISOString().slice(0, 10);
+        const isToday = dateKey === todayKey;
+        const isYesterday = dateKey === yesterdayKey;
+        
+        if (granularity === 'hour') {
+          const hours = date.getUTCHours();
+          const ampm = hours >= 12 ? 'PM' : 'AM';
+          const h = hours % 12 || 12;
+          const timeStr = h + ':00 ' + ampm;
+          if (isToday) return 'Today, ' + timeStr;
+          if (isYesterday) return 'Yesterday, ' + timeStr;
+          return date.toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' }) + ', ' + timeStr;
+        }
+        
+        if (isToday) return 'Today';
+        if (isYesterday) return 'Yesterday';
+        return date.toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'short', month: 'short', day: 'numeric' });
+      }
+
+      function fmtShortTime(ts) {
+        if (!ts) return '';
+        const date = new Date(ts.includes('T') ? ts : ts + 'T00:00:00Z');
+        if (isNaN(date.getTime())) return ts.slice(-5);
+        if (ts.includes('T')) return date.getUTCHours() + ':00';
+        return date.toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' });
+      }
+
+      function fmtFullDateTime(ts) {
+        if (!ts) return '--';
+        const date = new Date(ts);
+        if (isNaN(date.getTime())) return ts;
+        return date.toLocaleString('en-US', {
+          timeZone: 'UTC',
+          weekday: 'short', month: 'short', day: 'numeric', 
+          hour: 'numeric', minute: '2-digit', hour12: true
+        });
+      }
+
+      function timeAgo(ts) {
+        if (!ts) return '';
+        const date = new Date(ts);
+        const now = new Date();
+        const diffMs = now - date;
+        const diffSec = Math.floor(diffMs / 1000);
+        const diffMin = Math.floor(diffSec / 60);
+        const diffHr = Math.floor(diffMin / 60);
+        const diffDay = Math.floor(diffHr / 24);
+        if (diffSec < 60) return 'just now';
+        if (diffMin < 60) return diffMin + 'm ago';
+        if (diffHr < 24) return diffHr + 'h ago';
+        return diffDay + 'd ago';
+      }
+
+      function getDateRange(days) {
+        const today = new Date();
+        const to = today.toISOString().slice(0, 10); // inclusive end (today)
+        const fromDate = new Date(today);
+        if (days > 1) fromDate.setUTCDate(fromDate.getUTCDate() - (days - 1));
+        const from = fromDate.toISOString().slice(0, 10);
+        return { from: from, to: to };
+      }
+
+      function activityRangeParams(range) {
+        switch (range) {
+          case 'today': return { range: 'today', granularity: 'hour' };
+          case 'week': return { range: 'week', granularity: 'day' };
+          case 'month': return { range: 'month', granularity: 'day' };
+          case 'year': return { range: 'year', granularity: 'day' };
+          case 'all': return { range: 'all', granularity: 'day' };
+          default: return { range: 'week', granularity: 'day' };
+        }
+      }
+
+      function getBrowserIcon(b) {
+        var icons = {
+          chrome: '🌐',
+          firefox: '🦊',
+          safari: '🧭',
+          edge: '🔷',
+          opera: '🎭',
+          brave: '🦁'
+        };
+        return icons[(b || '').toLowerCase()] || '🌐';
+      }
+
+      function getOSIcon(o) {
+        var icons = {
+          windows: '🪟',
+          macos: '🍎',
+          mac: '🍎',
+          linux: '🐧',
+          android: '🤖',
+          ios: '📱'
+        };
+        return icons[(o || '').toLowerCase()] || '💻';
+      }
+
+      function getFileIcon(t) {
+        var icons = {
+          pdf: '📕',
+          doc: '📝',
+          docx: '📝',
+          ppt: '📊',
+          pptx: '📊',
+          xls: '📗',
+          xlsx: '📗',
+          zip: '🗜️',
+          jpg: '🖼️',
+          png: '🖼️',
+          gif: '🖼️',
+          mp4: '🎬',
+          mp3: '🎵',
+          txt: '📄'
+        };
+        return icons[(t || '').toLowerCase()] || '📄';
+      }
+
+      // Floating tooltip
+      var tooltip = document.getElementById('chart-tooltip');
+      
+      // Command-key-based tooltip logic
+      var cmdHeld = false;
+      var canShowTooltip = false;
+      var cmdTimer = null;
+      var currentTooltipEvent = null;
+      var currentTooltipPayload = null;
+      var CMD_DELAY = 1000;
+
+      document.addEventListener('keydown', function(e) {
+        if ((e.key === 'Meta' || e.key === 'Control') && !cmdHeld) {
+          cmdHeld = true;
+          cmdTimer = setTimeout(function() {
+            canShowTooltip = true;
+            if (currentTooltipEvent && currentTooltipPayload) {
+              renderTooltip(currentTooltipEvent, currentTooltipPayload);
+            }
+          }, CMD_DELAY);
+        }
+      });
+
+      document.addEventListener('keyup', function(e) {
+        if (e.key === 'Meta' || e.key === 'Control') {
+          cmdHeld = false;
+          canShowTooltip = false;
+          if (cmdTimer) clearTimeout(cmdTimer);
+          cmdTimer = null;
+          hideTooltip();
+        }
+      });
+      
+      function renderTooltip(e, payload) {
+        var model = payload || {};
+        var title = String(model.title || '');
+        var rows = Array.isArray(model.rows) ? model.rows : [];
+        var html = '<div class="tooltip-title">' + escapeHtml(title) + '</div>';
+        rows.forEach(function(row) {
+          var label = String((row && row.label) || '');
+          var value = String((row && row.value) || '');
+          var cssClass = String((row && row.className) || '');
+          html += '<div class="tooltip-row"><span class="tooltip-label">' + escapeHtml(label) + '</span><span class="tooltip-value ' + escapeHtml(cssClass) + '">' + escapeHtml(value) + '</span></div>';
+        });
+        tooltip.innerHTML = html;
+        tooltip.classList.add('visible');
+      }
+
+      function showTooltip(e, payload) {
+        currentTooltipEvent = e;
+        currentTooltipPayload = payload;
+        if (canShowTooltip) {
+          renderTooltip(e, payload);
+        }
+      }
+      
+      function hideTooltip() { 
+        currentTooltipEvent = null;
+        currentTooltipPayload = null;
+        tooltip.classList.remove('visible'); 
+      }
+
+      // Batch Modal
+      function showBatchModal() {
+        document.getElementById('batch-modal').classList.add('visible');
+        loadBatchInfo();
+      }
+
+      function closeBatchModal(e) {
+        if (e && e.target !== e.currentTarget) return;
+        document.getElementById('batch-modal').classList.remove('visible');
+      }
+
+      function setBatchTab(tab) {
+        batchTab = tab;
+        var tabs = document.querySelectorAll('#batch-modal .modal-tabs .tab');
+        tabs.forEach(function(t) {
+          t.classList.toggle('active', t.textContent.includes(tab === 'info' ? 'Info' : 'JSON'));
+        });
+        renderBatchContent();
+      }
+
+      async function loadBatchInfo() {
+        var container = document.getElementById('batch-info-content');
+        container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading...</div>';
+        try {
+          lastBatchData = await cachedFetchJSON('/api/stats/summary', 30000);
+          renderBatchContent();
+        } catch (e) {
+          container.innerHTML = '<div class="empty-state empty-state-danger">Failed to load</div>';
+        }
+      }
+
+      function renderBatchContent() {
+        var container = document.getElementById('batch-info-content');
+        if (!lastBatchData) return;
+        
+        if (batchTab === 'json') {
+          container.innerHTML = '<div class="json-viewer">' + syntaxHighlight(JSON.stringify(lastBatchData, null, 2)) + '</div>';
+          return;
+        }
+        
+        var lb = lastBatchData.lastBatch;
+        var ds = lastBatchData.doState;
+        var html = '<div class="batch-info-grid">';
+        html += '<div class="batch-info-row"><span class="batch-info-label">Status</span><span class="batch-info-value">' + escapeHtml(lastBatchData.status || 'Unknown') + '</span></div>';
+        
+        if (lb) {
+          html += '<div class="batch-info-row"><span class="batch-info-label">Last Batch ID</span><span class="batch-info-value batch-id-value">' + escapeHtml(lb.batchId || '--') + '</span></div>';
+          html += '<div class="batch-info-row"><span class="batch-info-label">Received</span><span class="batch-info-value">' + fmtFullDateTime(lb.ingestedAt) + ' (' + timeAgo(lb.ingestedAt) + ')</span></div>';
+          html += '<div class="batch-info-row"><span class="batch-info-label">Generated</span><span class="batch-info-value">' + fmtFullDateTime(lb.generatedAt) + '</span></div>';
+          html += '<div class="batch-info-row"><span class="batch-info-label">Events</span><span class="batch-info-value">' + fmtNumber(lb.eventsCount) + '</span></div>';
+          html += '<div class="batch-info-row"><span class="batch-info-label">Downloads</span><span class="batch-info-value">' + fmtNumber(lb.downloadsCount) + '</span></div>';
+          html += '<div class="batch-info-row"><span class="batch-info-label">Success / Fail</span><span class="batch-info-value"><span class="text-success">' + fmtNumber(lb.successCount) + '</span> / <span class="text-danger">' + fmtNumber(lb.failCount) + '</span></span></div>';
+        } else {
+          html += '<div class="batch-info-row"><span class="batch-info-label">Last Batch</span><span class="batch-info-value text-muted">No batches yet</span></div>';
+        }
+        
+        if (ds) {
+          html += '<div class="batch-info-row"><span class="batch-info-label">Pending Events</span><span class="batch-info-value">' + fmtNumber(ds.pendingEvents) + '</span></div>';
+        }
+        html += '</div>';
+        container.innerHTML = html;
+      }
+
+      function showFlushModal() {
+        document.getElementById('flush-modal').classList.add('visible');
+        loadFlushInfo();
+      }
+
+      function closeFlushModal(e) {
+        if (e && e.target !== e.currentTarget) return;
+        document.getElementById('flush-modal').classList.remove('visible');
+      }
+
+      function setFlushTab(tab) {
+        flushTab = tab;
+        var tabs = document.querySelectorAll('#flush-modal .modal-tabs .tab');
+        tabs.forEach(function(t) {
+          t.classList.toggle('active', t.textContent.includes(tab === 'info' ? 'Info' : 'JSON'));
+        });
+        renderFlushContent();
+      }
+
+      async function loadFlushInfo() {
+        var container = document.getElementById('flush-info-content');
+        container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading...</div>';
+        try {
+          lastFlushData = await fetchJSON('/api/admin/sheets/last-flush');
+          renderFlushContent();
+        } catch (e) {
+          container.innerHTML = '<div class="empty-state empty-state-danger">Failed to load</div>';
+        }
+      }
+
+      function renderFlushContent() {
+        var container = document.getElementById('flush-info-content');
+        if (!lastFlushData) return;
+
+        if (flushTab === 'json') {
+          container.innerHTML = '<div class="json-viewer">' + syntaxHighlight(JSON.stringify(lastFlushData, null, 2)) + '</div>';
+          return;
+        }
+
+        if (!lastFlushData.exists || !lastFlushData.run) {
+          container.innerHTML = '<div class="empty-state">No Sheets flush recorded yet</div>';
+          return;
+        }
+
+        var run = lastFlushData.run || {};
+        var row = Array.isArray(run.row) ? run.row : [];
+        var columnNames = [
+          'Date',
+          'Total Downloads',
+          'Success',
+          'Fail',
+          'Success Rate',
+          'Top Browser',
+          'Top OS',
+          'Top Country',
+          'Top Type',
+          'All Browsers',
+          'All OS',
+          'All Countries',
+          'All Languages',
+          'All File Types',
+          'All Errors',
+          'Ext Versions',
+          'Total Cancelled'
+        ];
+
+        var html = '<div class="batch-info-grid">';
+        html += '<div class="batch-info-row"><span class="batch-info-label">Status</span><span class="batch-info-value">' + escapeHtml(String(run.status || 'unknown')) + '</span></div>';
+        html += '<div class="batch-info-row"><span class="batch-info-label">Flushed At</span><span class="batch-info-value">' + fmtFullDateTime(run.flushedAtUtc) + (run.flushedAtUtc ? ' (' + timeAgo(run.flushedAtUtc) + ')' : '') + '</span></div>';
+        html += '<div class="batch-info-row"><span class="batch-info-label">Archived Day</span><span class="batch-info-value">' + escapeHtml(String(run.archivedDay || '--')) + '</span></div>';
+        html += '<div class="batch-info-row"><span class="batch-info-label">Sheet ID</span><span class="batch-info-value">' + escapeHtml(String(run.sheetId || '--')) + '</span></div>';
+        html += '<div class="batch-info-row"><span class="batch-info-label">API URL</span><span class="batch-info-value">' + escapeHtml(String(run.apiUrl || '--')) + '</span></div>';
+        if (run.error) {
+          html += '<div class="batch-info-row"><span class="batch-info-label">Error</span><span class="batch-info-value text-danger">' + escapeHtml(String(run.error)) + '</span></div>';
+        }
+        html += '</div>';
+
+        if (row.length > 0) {
+          html += '<div class="batch-info-grid" style="margin-top:12px">';
+          for (var i = 0; i < row.length; i++) {
+            var label = columnNames[i] || ('Column ' + (i + 1));
+            var value = row[i];
+            var display = typeof value === 'string' ? value : JSON.stringify(value);
+            html += '<div class="batch-info-row"><span class="batch-info-label">' + escapeHtml(label) + '</span><span class="batch-info-value">' + escapeHtml(String(display || '')) + '</span></div>';
+          }
+          html += '</div>';
+        }
+
+        container.innerHTML = html;
+      }
+
+      // Security: syntaxHighlight is ONLY safe for input from JSON.stringify().
+      // JSON.stringify guarantees no unquoted HTML-special characters in output.
+      // We escape &, <, > for defense-in-depth. Quotes are NOT escaped because
+      // the regex below matches JSON string delimiters — escaping them would
+      // break pattern matching. Do NOT pass untrusted raw strings here.
+      function syntaxHighlight(json) {
+        if (typeof json !== 'string') return '';
+        json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function(match) {
+          var cls = 'json-number';
+          if (/^"/.test(match)) { cls = /:$/.test(match) ? 'json-key' : 'json-string'; }
+          else if (/true|false/.test(match)) { cls = 'json-boolean'; }
+          else if (/null/.test(match)) { cls = 'json-null'; }
+          return '<span class="' + cls + '">' + match + '</span>';
+        });
+      }
+
+      // Page Navigation
+      function showPage(page) {
+        currentPage = page;
+        var pageGroups = {
+          overview: ['overview'],
+          activity: ['activity', 'charts'],
+          dashboards: ['dashboards', 'deployments', 'notifications'],
+          creative: ['creative'],
+          logs: ['logs'],
+          danger: ['danger']
+        };
+        var activePages = pageGroups[page] || [page];
+        // Remove active from all pages (CSS transition handles fade-out)
+        document.querySelectorAll('.page').forEach(function(p) {
+          p.classList.remove('active');
+        });
+        // Add active to target pages (CSS visibility+opacity transition handles fade-in)
+        activePages.forEach(function(p) {
+          var el = document.getElementById('page-' + p);
+          if (el) {
+            el.classList.add('active');
+          }
+        });
+        document.querySelectorAll('.nav-item').forEach(function(n) {
+          n.classList.toggle('active', n.dataset.page === page);
+        });
+        var mobilePageSelect = document.getElementById('mobile-page-select');
+        if (mobilePageSelect && mobilePageSelect.value !== page) {
+          mobilePageSelect.value = page;
+        }
+        var titleMeta = {
+          overview: { icon: '🏠', label: 'Overview' },
+          activity: { icon: '📊', label: 'Activity & Charts' },
+          dashboards: { icon: '🛰️', label: 'Ops Hub' },
+          creative: { icon: '🎨', label: 'Creative Hub' },
+          logs: { icon: '🧾', label: 'Oracle Logs' },
+          danger: { icon: '☢️', label: 'Danger Zone' }
+        };
+        var t = titleMeta[page] || { icon: '📄', label: page };
+        document.getElementById('page-title').textContent = t.icon + ' ' + t.label;
+        if (page === 'activity') {
+          loadActivity();
+          loadCharts();
+          loadComparison();
+        }
+        if (page === 'dashboards') {
+          loadDashboardLinks();
+          loadDeploymentsHub();
+          loadNotifications();
+        }
+        if (page === 'creative') loadCreativeHub();
+        if (page === 'logs') loadOracleLogs();
+      }
+
+      // Overview Page
+      async function loadOverview(forceRefresh) {
+        try {
+          var data = await cachedFetchJSON("/api/stats/summary", 30000, { forceRefresh: !!forceRefresh });
+          var statusLabel = (data.status || "unknown");
+          var statusLabelTitle = statusLabel.charAt(0).toUpperCase() + statusLabel.slice(1);
+          document.getElementById("sidebar-status").className = "status-dot " + 
+            (statusLabel === "online" ? "" : statusLabel === "stale" ? "warning" : "error");
+          document.getElementById("sidebar-status-text").textContent = 
+            statusLabelTitle;
+          var statusIndicatorEl = document.getElementById("status-indicator");
+          if (statusIndicatorEl) {
+            var statusFlags = Array.isArray(data.flags) && data.flags.length ? (" Flags: " + data.flags.join(", ")) : "";
+            statusIndicatorEl.setAttribute("data-tooltip", "Backend status: " + statusLabelTitle + "." + statusFlags);
+          }
+          document.getElementById("stat-downloads").textContent = fmtNumber(data.totalDownloads);
+          document.getElementById("stat-success").textContent = fmtNumber(data.totalSuccess);
+          document.getElementById("stat-fail").textContent = fmtNumber(data.totalFail);
+          document.getElementById("stat-cancelled").textContent = fmtNumber((data.totals && data.totals.totalCancelled) || 0);
+          document.getElementById("stat-countries-reached").textContent = fmtNumber(countUniqueMetricKeys(data.countries || {}));
+          document.getElementById("stat-languages-reached").textContent = fmtNumber(countUniqueMetricKeys(data.languages || {}));
+          var summaryTs = inferSummaryDataTimestampMs(data);
+          document.getElementById("last-updated").textContent = "Data updated (UTC): " + (summaryTs ? fmtUtcDateTimeFromMs(summaryTs) : "n/a");
+
+          setAllTimeTop('browser', data.browsers || {});
+          setAllTimeTop('os', data.os || {});
+          setAllTimeTop('type', data.types || {});
+          setAllTimeTop('country', data.countries || {});
+          renderOverviewMiniCharts(data);
+          updateVersionFilterOptions(data.versions || {});
+          await loadDeploymentStoreMetrics();
+        } catch (e) {
+          document.getElementById("sidebar-status").className = "status-dot error";
+          document.getElementById("sidebar-status-text").textContent = "Error";
+          var statusIndicatorError = document.getElementById("status-indicator");
+          if (statusIndicatorError) {
+            statusIndicatorError.setAttribute("data-tooltip", "Backend status: Error. Last overview request failed.");
+          }
+        }
+      }
+
+      function setAllTimeTop(dim, valuesMap) {
+        var entries = Object.entries(valuesMap || {});
+        entries.sort(function(a, b) { return (b[1] || 0) - (a[1] || 0); });
+        var top = entries[0] || ['No data', 0];
+        var valueEl = document.getElementById('all-top-' + dim);
+        var countEl = document.getElementById('all-top-' + dim + '-count');
+        if (!valueEl || !countEl) return;
+        valueEl.textContent = top[0];
+        countEl.textContent = fmtNumber(top[1]) + ' downloads';
+      }
+
+      function renderOverviewMiniCharts(summary) {
+        var success = summary.totalSuccess || 0;
+        var fail = summary.totalFail || 0;
+        var downloads = summary.totalDownloads || 0;
+        var cancelled = (summary.totals && summary.totals.totalCancelled) ? summary.totals.totalCancelled : 0;
+        renderDonutChart('overview-success-fail-chart', {
+          centerLabel: 'Outcomes',
+          centerValue: fmtNumber(success + fail),
+          segments: [
+            { name: 'Success', value: success, color: '#14b8a6', dotClass: 'success' },
+            { name: 'Failure', value: fail, color: '#ef4444', dotClass: 'fail' }
+          ]
+        });
+        renderDonutChart('overview-cancelled-chart', {
+          centerLabel: 'All Events',
+          centerValue: fmtNumber(downloads + cancelled),
+          segments: [
+            { name: 'Downloads', value: downloads, color: '#3b82f6', dotClass: 'downloads' },
+            { name: 'Cancelled', value: cancelled, color: '#f59e0b', dotClass: 'cancelled' }
+          ]
+        });
+      }
+
+      function renderDonutChart(containerId, config) {
+        var container = document.getElementById(containerId);
+        if (!container) return;
+        var segments = config.segments || [];
+        var total = segments.reduce(function(acc, seg) { return acc + (seg.value || 0); }, 0);
+        var radius = 50;
+        var circumference = 2 * Math.PI * radius;
+        var offset = 0;
+        var svg = '<svg class="donut-svg" viewBox="0 0 120 120" aria-hidden="true">';
+        svg += '<circle class="donut-track" cx="60" cy="60" r="' + radius + '"></circle>';
+        if (total > 0) {
+          segments.forEach(function(seg) {
+            var value = Math.max(0, Number(seg.value || 0));
+            if (value <= 0) return;
+            var segLen = (value / total) * circumference;
+            svg += '<circle class="donut-segment" cx="60" cy="60" r="' + radius + '" stroke="' + escapeHtml(seg.color || '#3b82f6') + '" stroke-dasharray="' + segLen.toFixed(4) + ' ' + circumference.toFixed(4) + '" stroke-dashoffset="' + (-offset).toFixed(4) + '"></circle>';
+            offset += segLen;
+          });
+        }
+        svg += '</svg>';
+
+        var html = '<div class="donut-wrap">' + svg;
+        html += '<div class="donut-hole"><div><div class="donut-value">' + escapeHtml(config.centerValue || '0') + '</div><div class="donut-label">' + escapeHtml(config.centerLabel || 'Total') + '</div></div></div></div>';
+        html += '<div class="donut-legend">';
+        segments.forEach(function(seg) {
+          var pct = total > 0 ? (((seg.value || 0) / total) * 100) : 0;
+          html += '<div class="donut-row">';
+          html += '<span class="donut-dot ' + escapeHtml(seg.dotClass || '') + '"></span>';
+          html += '<span class="donut-name">' + escapeHtml(seg.name || '-') + '</span>';
+          html += '<span class="donut-count">' + escapeHtml(fmtNumber(seg.value || 0)) + '</span>';
+          html += '<span class="donut-pct">' + escapeHtml(pct.toFixed(1)) + '%</span>';
+          html += '</div>';
+        });
+        html += '</div>';
+        container.innerHTML = html;
+      }
+
+      function updateVersionFilterOptions(versionMap) {
+        var select = document.getElementById('activity-version-filter');
+        if (!select) return;
+        var current = activityVersion || '';
+        var versions = Object.keys(versionMap || {});
+        versions.sort(function(a, b) {
+          return (versionMap[b] || 0) - (versionMap[a] || 0);
+        });
+        var html = '<option value="">All Versions</option>';
+        versions.forEach(function(v) {
+          html += '<option value="' + escapeHtml(v) + '">' + escapeHtml(v) + '</option>';
+        });
+        select.innerHTML = html;
+        select.value = current;
+      }
+
+      async function loadTopToday() {
+        var dimensions = ['browser', 'os', 'type', 'country'];
+        for (var i = 0; i < dimensions.length; i++) {
+          var dim = dimensions[i];
+          try {
+            var data = await fetchJSON('/api/stats/breakdown?dimension=' + dim + '&range=today');
+            var valueEl = document.getElementById('top-' + dim);
+            var countEl = document.getElementById('top-' + dim + '-count');
+            var tiedEl = document.getElementById('top-' + dim + '-tied');
+            var iconEl = document.getElementById('top-' + dim + '-icon');
+            
+            if (data.values && data.values.length > 0) {
+              var top = data.values[0];
+              var topCount = top.count;
+              var tiedItems = data.values.filter(function(v) { return v.count === topCount; });
+              
+              if (tiedItems.length > 1) {
+                valueEl.textContent = tiedItems.map(function(t) { return t.value; }).join(' / ');
+                countEl.textContent = fmtNumber(topCount) + ' each';
+                tiedEl.textContent = tiedItems.length + '-way tie';
+              } else {
+                valueEl.textContent = top.value || 'Unknown';
+                countEl.textContent = fmtNumber(topCount) + ' downloads';
+                tiedEl.textContent = '';
+              }
+              
+              if (dim === 'browser') iconEl.textContent = getBrowserIcon(top.value);
+              if (dim === 'os') iconEl.textContent = getOSIcon(top.value);
+              if (dim === 'type') iconEl.textContent = getFileIcon(top.value);
+            } else {
+              valueEl.textContent = 'No data';
+              countEl.textContent = '';
+              tiedEl.textContent = '';
+            }
+          } catch (e) {
+            document.getElementById('top-' + dim).textContent = '--';
+            document.getElementById('top-' + dim + '-count').textContent = '';
+            document.getElementById('top-' + dim + '-tied').textContent = '';
+          }
+        }
+      }
+
+      // Activity Page
+      function setActivityRange(range) {
+        activityRange = range;
+        document.querySelectorAll('#activity-tabs .tab').forEach(function(t) {
+          t.classList.toggle('active', t.dataset.range === range);
+        });
+        loadActivity();
+      }
+
+      function onActivityVersionChange() {
+        var select = document.getElementById('activity-version-filter');
+        activityVersion = select ? select.value : '';
+        loadActivity();
+      }
+
+      async function loadActivity() {
+        var chartContainer = document.getElementById('activity-chart');
+        var logContainer = document.getElementById('activity-log');
+        chartContainer.innerHTML = '<div class="loading"><div class="spinner"></div>Loading...</div>';
+        logContainer.innerHTML = '<div class="loading"><div class="spinner"></div>Loading...</div>';
+        var range = activityRangeParams(activityRange);
+        var params = '?range=' + encodeURIComponent(range.range) + '&granularity=' + encodeURIComponent(range.granularity);
+        if (activityVersion) params += '&extVersion=' + encodeURIComponent(activityVersion);
+
+        try {
+          var data = await fetchJSON('/api/stats/timeseries' + params);
+          
+          if (!data.points || !data.points.length) {
+            chartContainer.innerHTML = '<div class="empty-state">No activity data</div>';
+            logContainer.innerHTML = '<div class="empty-state">No events</div>';
+            document.getElementById('log-summary').classList.add('hidden');
+            return;
+          }
+
+          // Store for sorting/export
+          currentGranularity = range.granularity;
+
+          renderBarChart(chartContainer, data.points, range.granularity);
+
+          var totalDownloads = 0, totalSuccess = 0, totalFail = 0;
+          data.points.forEach(function(p) {
+            totalDownloads += p.downloads || 0;
+            totalSuccess += p.success || 0;
+            totalFail += p.fail || 0;
+          });
+          
+          document.getElementById('activity-total').textContent = fmtNumber(totalDownloads);
+          document.getElementById('activity-success').textContent = fmtNumber(totalSuccess);
+          document.getElementById('activity-fail').textContent = fmtNumber(totalFail);
+
+          // Recent activity is always all-time and only sort-filtered by time order.
+          var logParams = '?range=all&granularity=day';
+          if (activityVersion) logParams += '&extVersion=' + encodeURIComponent(activityVersion);
+          var logData = await fetchJSON('/api/stats/timeseries' + logParams);
+          currentLogData = (logData && logData.points) ? logData.points : [];
+          allTimeActivityPoints = currentLogData.slice();
+          renderEnhancedLog(currentLogData, 'day');
+          renderActivityCalendar(allTimeActivityPoints);
+
+        } catch (e) {
+          chartContainer.innerHTML = '<div class="empty-state empty-state-danger">Failed: ' + escapeHtml(e.message) + '</div>';
+          logContainer.innerHTML = '<div class="empty-state empty-state-danger">Failed</div>';
+          document.getElementById('activity-calendar').innerHTML = '<div class="empty-state empty-state-danger">Failed</div>';
+        }
+      }
+
+      // Enhanced log state
+      var currentLogData = [];
+      var currentGranularity = 'hour';
+      var logSortAsc = false;
+
+      function toggleLogSort() {
+        logSortAsc = !logSortAsc;
+        var btn = document.getElementById('log-sort-btn');
+        btn.innerHTML = logSortAsc ? 'Oldest First' : 'Newest First';
+        btn.classList.toggle('active', logSortAsc);
+        renderEnhancedLog(currentLogData, currentGranularity);
+      }
+
+      function renderEnhancedLog(points, granularity) {
+        var logContainer = document.getElementById('activity-log');
+        
+        // Calculate stats
+        var downloads = points.map(function(p) { return p.downloads || 0; });
+        var maxDownloads = Math.max.apply(null, downloads);
+        var minDownloads = Math.min.apply(null, downloads);
+        var avgDownloads = downloads.reduce(function(a, b) { return a + b; }, 0) / downloads.length;
+        
+        // Find peak and low indices
+        var peakIdx = downloads.indexOf(maxDownloads);
+        var lowIdx = downloads.indexOf(minDownloads);
+
+        // Sort data
+        var sortedPoints = points.slice();
+        if (logSortAsc) {
+          // Already in chronological order from API
+        } else {
+          sortedPoints = sortedPoints.slice().reverse();
+          // Adjust indices for reversed array
+          peakIdx = sortedPoints.length - 1 - peakIdx;
+          lowIdx = sortedPoints.length - 1 - lowIdx;
+        }
+
+        // Build table
+        var tableHtml = '<table><thead><tr>';
+        tableHtml += '<th>Time</th>';
+        tableHtml += '<th>Downloads</th>';
+        tableHtml += '<th>Success</th>';
+        tableHtml += '<th>Failed</th>';
+        tableHtml += '<th>Rate</th>';
+        tableHtml += '<th>Trend</th>';
+        tableHtml += '</tr></thead><tbody>';
+
+        sortedPoints.forEach(function(p, i) {
+          var rate = p.successRate || 0;
+          var badgeClass = rate >= 0.9 ? 'badge-success' : rate >= 0.7 ? 'badge-warning' : 'badge-danger';
+          var barWidth = maxDownloads > 0 ? ((p.downloads || 0) / maxDownloads) * 100 : 0;
+          
+          // Trend indicator (compare with previous)
+          var trend = '';
+          var prevIdx = logSortAsc ? i - 1 : i + 1;
+          if (prevIdx >= 0 && prevIdx < sortedPoints.length) {
+            var prevDownloads = sortedPoints[prevIdx].downloads || 0;
+            var currDownloads = p.downloads || 0;
+            if (currDownloads > prevDownloads) {
+              trend = '<span class="trend-indicator trend-up">UP</span>';
+            } else if (currDownloads < prevDownloads) {
+              trend = '<span class="trend-indicator trend-down">DOWN</span>';
+            } else {
+              trend = '<span class="trend-indicator trend-stable">SAME</span>';
+            }
+          }
+
+          // Peak/low badges
+          var badges = '';
+          if (i === peakIdx && maxDownloads > 0) badges += '<span class="peak-badge">Peak</span>';
+          if (i === lowIdx && points.length > 1 && maxDownloads !== minDownloads) badges += '<span class="low-badge">Low</span>';
+
+          var rowClass = i === peakIdx ? 'log-row-highlight' : '';
+          
+          tableHtml += '<tr class="' + rowClass + '">';
+          tableHtml += '<td class="td-primary">' + escapeHtml(fmtTimestamp(p.timestamp, granularity)) + badges + '</td>';
+          tableHtml += '<td><progress class="mini-progress" max="100" value="' + Math.round(barWidth) + '"></progress>' + fmtNumber(p.downloads) + '</td>';
+          tableHtml += '<td class="text-success">' + fmtNumber(p.success) + '</td>';
+          tableHtml += '<td class="text-danger">' + fmtNumber(p.fail) + '</td>';
+          tableHtml += '<td><span class="badge ' + badgeClass + '">' + fmtPct(rate) + '</span></td>';
+          tableHtml += '<td>' + trend + '</td>';
+          tableHtml += '</tr>';
+        });
+
+        tableHtml += '</tbody></table>';
+        logContainer.innerHTML = tableHtml;
+
+        // Update summary
+        document.getElementById('log-summary').classList.remove('hidden');
+        document.getElementById('summary-periods').textContent = points.length;
+        document.getElementById('summary-peak').textContent = fmtNumber(maxDownloads);
+        document.getElementById('summary-avg').textContent = fmtNumber(Math.round(avgDownloads));
+        document.getElementById('summary-low').textContent = fmtNumber(minDownloads);
+      }
+
+      function exportLogCSV() {
+        if (!currentLogData.length) return;
+        
+        var csv = 'Time,Downloads,Success,Failed,Rate\n';
+        currentLogData.forEach(function(p) {
+          csv += fmtTimestamp(p.timestamp, currentGranularity) + ',';
+          csv += (p.downloads || 0) + ',';
+          csv += (p.success || 0) + ',';
+          csv += (p.fail || 0) + ',';
+          csv += fmtPct(p.successRate || 0) + '\n';
+        });
+
+        var blob = new Blob([csv], { type: 'text/csv' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'activity_log_' + new Date().toISOString().slice(0,10) + '.csv';
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+
+      function shiftCalendarMonth(delta) {
+        calendarMonthOffset += delta;
+        renderActivityCalendar(allTimeActivityPoints || []);
+      }
+
+      function renderActivityCalendar(points) {
+        var container = document.getElementById('activity-calendar');
+        if (!container) return;
+
+        var now = new Date();
+        var monthDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + calendarMonthOffset, 1));
+        var year = monthDate.getUTCFullYear();
+        var month = monthDate.getUTCMonth();
+        var daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+        var firstWeekday = new Date(Date.UTC(year, month, 1)).getUTCDay();
+        var weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+        var dayCounts = {};
+        (points || []).forEach(function(p) {
+          if (!p.timestamp) return;
+          var key = p.timestamp.slice(0, 10);
+          dayCounts[key] = (dayCounts[key] || 0) + (p.downloads || 0);
+        });
+
+        var html = '<div class="calendar-caption">' +
+          monthDate.toLocaleDateString('en-US', { timeZone: 'UTC', month: 'long', year: 'numeric' }) +
+          '</div>';
+        html += '<div class="calendar-grid">';
+        weekdayLabels.forEach(function(label) {
+          html += '<div class="calendar-header-cell">' + label + '</div>';
+        });
+        for (var i = 0; i < firstWeekday; i++) {
+          html += '<div class="calendar-day calendar-day-faded"></div>';
+        }
+        for (var d = 1; d <= daysInMonth; d++) {
+          var iso = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+          var hasData = (dayCounts[iso] || 0) > 0;
+          html += '<div class="calendar-day ' + (hasData ? 'has-data' : '') + '" title="' + iso + ' - ' + fmtNumber(dayCounts[iso] || 0) + ' downloads">';
+          html += '<div>' + d + '</div>';
+          html += hasData ? '<div class="calendar-dot"></div>' : '';
+          html += '</div>';
+        }
+        html += '</div>';
+        container.innerHTML = html;
+      }
+
+      function renderBarChart(container, points, granularity) {
+        var maxVal = Math.max.apply(null, points.map(function(p) { return p.downloads || 0; })) || 1;
+        var yLabels = [maxVal, Math.round(maxVal * 0.66), Math.round(maxVal * 0.33), 0];
+
+        var html = '<div class="chart-wrapper"><div class="chart-y-axis">';
+        yLabels.forEach(function(v) { html += '<span class="chart-y-label">' + fmtNumber(v) + '</span>'; });
+        html += '</div><div class="chart-grid"><div class="chart-grid-line"></div><div class="chart-grid-line"></div><div class="chart-grid-line"></div><div class="chart-grid-line"></div></div><div class="chart-bars">';
+
+        points.forEach(function(p, i) {
+          var height = ((p.downloads || 0) / maxVal) * 100;
+          var tooltipData = JSON.stringify({
+            time: fmtTimestamp(p.timestamp, granularity),
+            downloads: p.downloads || 0,
+            success: p.success || 0,
+            fail: p.fail || 0,
+            rate: fmtPct(p.successRate || 0)
+          }).replace(/"/g, '&quot;');
+          var y = Math.max(0, 100 - height);
+          var barHeight = Math.max(height, 2);
+          html += '<div class="chart-bar-wrapper"><svg class="chart-bar-svg" viewBox="0 0 10 100" preserveAspectRatio="none" data-point=\'' + tooltipData + '\'><rect class="chart-bar-rect" x="0" y="' + y + '" width="10" height="' + barHeight + '"></rect></svg></div>';
+        });
+
+        html += '</div><div class="chart-x-axis">';
+        var step = Math.ceil(points.length / 8);
+        points.forEach(function(p, i) {
+          var label = i % step === 0 ? fmtShortTime(p.timestamp) : '';
+          html += '<span class="chart-x-label">' + escapeHtml(label) + '</span>';
+        });
+        html += '</div></div>';
+        container.innerHTML = html;
+        bindChartBarHover(container);
+      }
+
+      function handleBarHover(e) { handleBarMove(e); }
+      function handleBarMove(e) {
+        var data = JSON.parse(e.target.dataset.point);
+        showTooltip(e, {
+          title: data.time,
+          rows: [
+            { label: 'Downloads', value: fmtNumber(data.downloads), className: '' },
+            { label: 'Success', value: fmtNumber(data.success), className: 'tooltip-success' },
+            { label: 'Failed', value: fmtNumber(data.fail), className: 'tooltip-fail' },
+            { label: 'Rate', value: data.rate, className: '' },
+          ],
+        });
+      }
+
+      function bindChartBarHover(container) {
+        container.querySelectorAll('.chart-bar-svg').forEach(function(bar) {
+          if (bar.dataset.hoverBound === '1') return;
+          bar.dataset.hoverBound = '1';
+          bar.addEventListener('mouseenter', handleBarHover);
+          bar.addEventListener('mousemove', handleBarMove);
+          bar.addEventListener('mouseleave', hideTooltip);
+        });
+      }
+
+      // Charts Page
+      async function loadCharts() {
+        var dimensions = ['browser', 'os', 'type', 'country'];
+        var colors = ['purple', 'blue', 'cyan', 'green'];
+        var range = getDateRange(7);
+
+        for (var i = 0; i < dimensions.length; i++) {
+          var dim = dimensions[i];
+          var container = document.getElementById('chart-' + dim);
+          try {
+            var data = await fetchJSON('/api/stats/breakdown?dimension=' + dim + '&from=' + range.from + '&to=' + range.to);
+            if (!data.values || !data.values.length) {
+              container.innerHTML = '<div class="empty-state">No data</div>';
+              continue;
+            }
+            var maxCount = Math.max.apply(null, data.values.map(function(v) { return v.count; }));
+            var html = '<div class="breakdown-bars">';
+            data.values.slice(0, 5).forEach(function(v) {
+              var pct = (v.count / maxCount) * 100;
+              html += '<div class="breakdown-bar-item"><span class="breakdown-bar-label">' + escapeHtml(v.value || 'Unknown') + '</span>';
+              html += '<div class="breakdown-bar-track"><progress class="breakdown-progress ' + colors[i] + '" max="100" value="' + Math.round(pct) + '"></progress><span class="breakdown-progress-value">' + Math.round(pct) + '%</span></div>';
+              html += '<span class="breakdown-bar-count">' + fmtNumber(v.count) + '</span></div>';
+            });
+            html += '</div>';
+            container.innerHTML = html;
+          } catch (e) {
+            container.innerHTML = '<div class="empty-state empty-state-danger">Failed</div>';
+          }
+        }
+
+        // Daily chart
+        var dailyContainer = document.getElementById('daily-chart');
+        try {
+          var range14 = getDateRange(14);
+          var data = await fetchJSON('/api/stats/timeseries?granularity=day&from=' + range14.from + '&to=' + range14.to);
+          if (!data.points || !data.points.length) {
+            dailyContainer.innerHTML = '<div class="empty-state">No data</div>';
+          } else {
+            renderBarChart(dailyContainer, data.points, 'day');
+          }
+        } catch (e) {
+          dailyContainer.innerHTML = '<div class="empty-state empty-state-danger">Failed</div>';
+        }
+      }
+
+      // Comparison feature
+      var currentComparisonMode = 'week';
+
+      function setComparison(mode) {
+        currentComparisonMode = mode;
+        document.getElementById('cmp-week').classList.toggle('active', mode === 'week');
+        document.getElementById('cmp-month').classList.toggle('active', mode === 'month');
+        loadComparison();
+      }
+
+      async function loadComparison() {
+        var container = document.getElementById('comparison-content');
+        container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading comparison...</div>';
+
+        var now = new Date();
+        var from1, to1, from2, to2, label1, label2;
+
+        if (currentComparisonMode === 'week') {
+          // This week vs Last week
+          var today = new Date(now);
+          var dayOfWeek = today.getUTCDay() || 7; // Sunday = 7
+          
+          // This week (Mon - Today)
+          var thisWeekStart = new Date(today);
+          thisWeekStart.setUTCDate(today.getUTCDate() - dayOfWeek + 1);
+          to2 = fmtDate(today);
+          from2 = fmtDate(thisWeekStart);
+          label2 = 'This Week';
+
+          // Last week (Mon - Sun)
+          var lastWeekEnd = new Date(thisWeekStart);
+          lastWeekEnd.setUTCDate(thisWeekStart.getUTCDate() - 1);
+          var lastWeekStart = new Date(lastWeekEnd);
+          lastWeekStart.setUTCDate(lastWeekEnd.getUTCDate() - 6);
+          to1 = fmtDate(lastWeekEnd);
+          from1 = fmtDate(lastWeekStart);
+          label1 = 'Last Week';
+        } else {
+          // This month vs Last month
+          var thisMonthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+          from2 = fmtDate(thisMonthStart);
+          to2 = fmtDate(now);
+          label2 = 'This Month';
+
+          var lastMonthEnd = new Date(thisMonthStart);
+          lastMonthEnd.setUTCDate(lastMonthEnd.getUTCDate() - 1);
+          var lastMonthStart = new Date(Date.UTC(lastMonthEnd.getUTCFullYear(), lastMonthEnd.getUTCMonth(), 1));
+          from1 = fmtDate(lastMonthStart);
+          to1 = fmtDate(lastMonthEnd);
+          label1 = 'Last Month';
+        }
+
+        try {
+          var url = '/api/stats/comparison?from1=' + from1 + '&to1=' + to1 + '&from2=' + from2 + '&to2=' + to2;
+          var data = await fetchJSON(url);
+
+          var p1 = data.period1;
+          var p2 = data.period2;
+          var change = data.change;
+          if (!p1 || !p2 || !change) {
+            container.innerHTML = '<div class="empty-state">No comparison data available</div>';
+            return;
+          }
+
+          var changeClass = function(str) {
+            if (str.startsWith('+') && str !== '+0%' && str !== '+0.0%') return 'positive';
+            if (str.startsWith('-')) return 'negative';
+            return 'neutral';
+          };
+
+          var html = '<div class="comparison-grid">';
+          
+          // Period 1
+          html += '<div class="period-card">';
+          html += '<div class="period-label">' + label1 + '</div>';
+          html += '<div class="period-dates">' + p1.from + ' to ' + p1.to + '</div>';
+          html += '<div class="period-value">' + fmtNumber(p1.downloads) + '</div>';
+          html += '<div class="period-stats">';
+          html += '<span class="period-stat">Success: <strong>' + fmtNumber(p1.success) + '</strong></span>';
+          html += '<span class="period-stat">Fail: <strong>' + fmtNumber(p1.fail) + '</strong></span>';
+          html += '<span class="period-stat">' + fmtPct(p1.successRate) + '</span>';
+          html += '</div></div>';
+
+          // Arrow
+          html += '<div class="comparison-arrow">vs</div>';
+
+          // Period 2
+          html += '<div class="period-card">';
+          html += '<div class="period-label">' + label2 + '</div>';
+          html += '<div class="period-dates">' + p2.from + ' to ' + p2.to + '</div>';
+          html += '<div class="period-value">' + fmtNumber(p2.downloads) + '</div>';
+          html += '<div class="period-stats">';
+          html += '<span class="period-stat">Success: <strong>' + fmtNumber(p2.success) + '</strong></span>';
+          html += '<span class="period-stat">Fail: <strong>' + fmtNumber(p2.fail) + '</strong></span>';
+          html += '<span class="period-stat">' + fmtPct(p2.successRate) + '</span>';
+          html += '</div></div>';
+
+          html += '</div>';
+
+          // Change summary
+          html += '<div class="change-summary">';
+          html += '<span class="change-badge ' + changeClass(change.downloads) + '">Downloads ' + change.downloads + '</span>';
+          html += '<span class="change-badge ' + changeClass(change.success) + '">Success ' + change.success + '</span>';
+          html += '<span class="change-badge ' + changeClass(change.fail) + '">Fails ' + change.fail + '</span>';
+          html += '</div>';
+
+          container.innerHTML = html;
+        } catch (e) {
+          container.innerHTML = '<div class="empty-state empty-state-danger">Failed to load: ' + escapeHtml(e.message) + '</div>';
+        }
+      }
+
+      function fmtDate(d) {
+        return d.toISOString().slice(0, 10);
+      }
+
+      // API Export button for Activity page
+      function exportAPICSV() {
+        var range = activityRangeParams(activityRange);
+        var url = '/api/stats/export?format=csv&range=' + encodeURIComponent(range.range) + '&granularity=' + encodeURIComponent(range.granularity);
+        window.open(url, '_blank');
+      }
+
+      function exportAPIJSON() {
+        var range = activityRangeParams(activityRange);
+        var url = '/api/stats/export?format=json&range=' + encodeURIComponent(range.range) + '&granularity=' + encodeURIComponent(range.granularity);
+        window.open(url, '_blank');
+      }
+
+      // Load deployment status
+      async function loadDeployStatus() {
+        var iconNodes = Array.from(document.querySelectorAll('[data-role="deploy-icon"]'));
+        var commitNodes = Array.from(document.querySelectorAll('[data-role="deploy-commit"]'));
+        var linkNodes = Array.from(document.querySelectorAll('[data-role="deploy-status-btn"]'));
+        if (!iconNodes.length || !commitNodes.length || !linkNodes.length) return;
+
+        function setStatusUI(iconText, commitText, href, tooltip, stale) {
+          iconNodes.forEach(function(node) { node.textContent = iconText; });
+          commitNodes.forEach(function(node) { node.textContent = commitText; });
+          linkNodes.forEach(function(node) {
+            if (href) node.href = href;
+            if (tooltip) node.setAttribute('data-tooltip', tooltip);
+            node.classList.toggle('btn-warning', !!stale);
+          });
+        }
+
+        try {
+          var data = await fetchJSON('/api/deploy-status');
+          if (data.commit && data.commit !== 'unknown') {
+            var commitHref = 'https://github.com/adhamhaithameid/Classroom-Quick-Downloader/commit/' + data.commit_full;
+            if (data.stale) {
+              setStatusUI('⚠️', data.commit, commitHref, 'Stale deployment (>24h) - ' + data.message, true);
+            } else {
+              var tip = 'Commit: ' + data.message + ' - Deployed: ' + new Date(data.deployed_at).toLocaleString('en-US', { timeZone: 'UTC' });
+              setStatusUI('✅', data.commit, commitHref, tip, false);
+            }
+          } else {
+            setStatusUI('❓', 'Unknown', '', 'Deployment status unknown', false);
+          }
+        } catch (e) {
+          setStatusUI('❌', 'Error', '', 'Failed to load deployment status', false);
+        }
+      }
+
+      // Dashboards / Management hub
+      function applyInfraLink(id, url) {
+        var node = document.getElementById(id);
+        if (!node) return;
+        if (url) {
+          node.href = url;
+          node.removeAttribute('aria-disabled');
+          node.classList.remove('disabled-link');
+        } else {
+          node.href = '#';
+          node.setAttribute('aria-disabled', 'true');
+          node.classList.add('disabled-link');
+        }
+      }
+
+      async function loadDashboardLinks() {
+        try {
+          var payload = await fetchJSON('/api/admin/dashboard-links');
+          var links = (payload && payload.links) ? payload.links : {};
+          applyInfraLink('infra-link-cloudflare', links.cloudflare || DEFAULT_INFRA_LINKS.cloudflare);
+          applyInfraLink('infra-link-uptime', links.uptimeKuma || DEFAULT_INFRA_LINKS.uptimeKuma);
+          applyInfraLink('infra-link-github', links.githubRepo || DEFAULT_INFRA_LINKS.githubRepo);
+          applyInfraLink('infra-link-sheets', links.googleSheets || DEFAULT_INFRA_LINKS.googleSheets);
+          applyInfraLink('infra-link-figma', links.figmaDesign || DEFAULT_INFRA_LINKS.figmaDesign);
+          applyInfraLink('infra-link-chrome-dev', links.chromeDevDashboard || DEFAULT_INFRA_LINKS.chromeDevDashboard);
+          applyInfraLink('infra-link-firefox-dev', links.firefoxDevDashboard || DEFAULT_INFRA_LINKS.firefoxDevDashboard);
+          applyInfraLink('infra-link-edge-dev', links.edgeDevDashboard || DEFAULT_INFRA_LINKS.edgeDevDashboard);
+          applyInfraLink('infra-link-chrome-store', links.chromeStoreListing || DEFAULT_INFRA_LINKS.chromeStoreListing);
+          applyInfraLink('infra-link-firefox-store', links.firefoxStoreListing || DEFAULT_INFRA_LINKS.firefoxStoreListing);
+          applyInfraLink('infra-link-edge-store', links.edgeStoreListing || DEFAULT_INFRA_LINKS.edgeStoreListing);
+        } catch (_) {
+          applyInfraLink('infra-link-cloudflare', DEFAULT_INFRA_LINKS.cloudflare);
+          applyInfraLink('infra-link-uptime', DEFAULT_INFRA_LINKS.uptimeKuma);
+          applyInfraLink('infra-link-github', DEFAULT_INFRA_LINKS.githubRepo);
+          applyInfraLink('infra-link-sheets', DEFAULT_INFRA_LINKS.googleSheets);
+          applyInfraLink('infra-link-figma', DEFAULT_INFRA_LINKS.figmaDesign);
+          applyInfraLink('infra-link-chrome-dev', DEFAULT_INFRA_LINKS.chromeDevDashboard);
+          applyInfraLink('infra-link-firefox-dev', DEFAULT_INFRA_LINKS.firefoxDevDashboard);
+          applyInfraLink('infra-link-edge-dev', DEFAULT_INFRA_LINKS.edgeDevDashboard);
+          applyInfraLink('infra-link-chrome-store', DEFAULT_INFRA_LINKS.chromeStoreListing);
+          applyInfraLink('infra-link-firefox-store', DEFAULT_INFRA_LINKS.firefoxStoreListing);
+          applyInfraLink('infra-link-edge-store', DEFAULT_INFRA_LINKS.edgeStoreListing);
+        }
+      }
+
+      async function loadDeploymentsHub() {
+        var container = document.getElementById('deployment-cards');
+        if (!container) return;
+        var targets = [];
+        var loadTargetsErr = '';
+        try {
+          var payload = await fetchJSON('/api/admin/deployments/targets');
+          targets = payload.targets || [];
+        } catch (e) {
+          loadTargetsErr = String((e && e.message) || e || 'Unknown error');
+        }
+        if (loadTargetsErr) {
+          container.innerHTML = '<div class="empty-state empty-state-danger">Failed to load deployment targets: ' + escapeHtml(loadTargetsErr) + '</div>';
+        } else {
+          var html = '';
+          targets.forEach(function(item) {
+            var key = String(item.recordKey || '');
+            var v = item.data || {};
+            var hasUsersCount = Object.prototype.hasOwnProperty.call(v, 'usersCount') && parseMaybeNumber(v.usersCount) !== null;
+            var hasRatingCount = Object.prototype.hasOwnProperty.call(v, 'ratingCount') && parseMaybeNumber(v.ratingCount) !== null;
+            var hasLatency = Object.prototype.hasOwnProperty.call(v, 'syncLatencyMs') && parseMaybeNumber(v.syncLatencyMs) !== null;
+            var usersCountText = fmtNumberOrNA(v.usersCount, hasUsersCount);
+            var ratingCountText = fmtNumberOrNA(v.ratingCount, hasRatingCount);
+            var latencyText = hasLatency ? fmtNumber(parseMaybeNumber(v.syncLatencyMs)) + 'ms' : 'N/A';
+            var sourceText = item.updatedAt > 0 ? 'Database' : 'Template';
+            var updatedAtText = item.updatedAt > 0 ? fmtUtcDateTimeFromMs(item.updatedAt) : 'never';
+            var statusBadge = '';
+            if (v.syncStatus === 'ok') statusBadge = '<span class="pill">Synced</span>';
+            if (v.syncStatus === 'error') statusBadge = '<span class="pill pill-error">Sync Error</span>';
+            var usersId = deploymentInputId('users', key);
+            var versionId = deploymentInputId('version', key);
+            var ratingId = deploymentInputId('rating', key);
+            var ratingCountId = deploymentInputId('ratingCount', key);
+            var urlId = deploymentInputId('url', key);
+            html += '<div class="deployment-card">';
+            html += '<div class="deployment-card-head">';
+            html += '<div class="deployment-card-title">' + escapeHtml(v.name || key) + '</div>';
+            html += statusBadge;
+            html += '</div>';
+            html += '<div class="deployment-card-body">';
+            html += '<input class="auth-input" id="' + escapeHtml(usersId) + '" placeholder="Users" value="' + escapeHtml(v.users || '') + '"/>';
+            html += '<input class="auth-input" id="' + escapeHtml(versionId) + '" placeholder="Current version" value="' + escapeHtml(v.version || '') + '"/>';
+            html += '<input class="auth-input" id="' + escapeHtml(ratingId) + '" placeholder="Rating (e.g. 5.0)" value="' + escapeHtml(v.rating || '') + '"/>';
+            html += '<input class="auth-input" id="' + escapeHtml(ratingCountId) + '" placeholder="Rating count" value="' + escapeHtml(v.ratingCount || '') + '"/>';
+            html += '<input class="auth-input" id="' + escapeHtml(urlId) + '" placeholder="Store dashboard URL" value="' + escapeHtml(v.url || '') + '"/>';
+            html += '<div class="pill-row"><span class="pill">UsersCount: ' + escapeHtml(usersCountText) + '</span><span class="pill">RatingCount: ' + escapeHtml(ratingCountText) + '</span><span class="pill">Latency: ' + escapeHtml(latencyText) + '</span></div>';
+            html += '<div class="pill-row"><span class="pill">Source: ' + escapeHtml(sourceText) + '</span><span class="pill">Updated (UTC): ' + escapeHtml(updatedAtText) + '</span></div>';
+            html += '<button class="btn btn-secondary" data-action="save-deployment-card" data-record-key="' + escapeHtml(key) + '">Save</button>';
+            html += '</div></div>';
+          });
+          container.innerHTML = html || '<div class="empty-state">No deployment targets found</div>';
+        }
+      }
+
+      function setDeploymentSyncOutput(payload) {
+        var out = document.getElementById('deployment-sync-output');
+        if (!out) return;
+        out.textContent = JSON.stringify(payload || {}, null, 2);
+        out.classList.remove('hidden');
+      }
+
+      async function syncDeploymentTargets() {
+        try {
+          var data = await fetchJSONWithInit('/api/admin/deployments/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+          });
+          setDeploymentSyncOutput(data);
+          await loadDeploymentsHub();
+          await loadDeploymentStoreMetrics();
+        } catch (e) {
+          setDeploymentSyncOutput({ ok: false, error: String(e) });
+        }
+      }
+
+      async function saveDeploymentCard(key) {
+        var usersEl = document.getElementById(deploymentInputId('users', key));
+        var versionEl = document.getElementById(deploymentInputId('version', key));
+        var ratingEl = document.getElementById(deploymentInputId('rating', key));
+        var ratingCountEl = document.getElementById(deploymentInputId('ratingCount', key));
+        var urlEl = document.getElementById(deploymentInputId('url', key));
+        if (!usersEl || !versionEl || !ratingEl || !ratingCountEl || !urlEl) {
+          setDeploymentSyncOutput({ ok: false, error: 'Deployment inputs are missing for key: ' + String(key || '') });
+          return;
+        }
+        var record = {
+          users: usersEl.value,
+          version: versionEl.value,
+          rating: ratingEl.value,
+          ratingCount: ratingCountEl.value,
+          url: urlEl.value
+        };
+        var ok = await ensureStepUp();
+        if (!ok) return;
+        try {
+          await fetchJSONWithInit('/api/admin/records/upsert', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ recordType: 'deployment_target', recordKey: key, data: record })
+          });
+          setDeploymentSyncOutput({ ok: true, action: 'manual_update', key: key });
+          await loadDeploymentsHub();
+          await loadDeploymentStoreMetrics();
+        } catch (e) {
+          setDeploymentSyncOutput({ ok: false, error: String(e) });
+        }
+      }
+
+      async function copyText(text) {
+        try { await navigator.clipboard.writeText(text); } catch (_) {}
+      }
+
+      function normalizeKey(input, fallbackPrefix) {
+        var v = (input || '').trim().toLowerCase().replace(/[^a-z0-9._-]+/g, '-');
+        if (!v) v = fallbackPrefix + '-' + Date.now();
+        return v;
+      }
+
+          async function loadCreativeHub() {
+        await loadCreativeEmails();
+          await loadNewsletterSubscribers();
+      }
+
+      async function loadCreativeEmails() {
+        var container = document.getElementById('creative-email-list');
+        if (!container) return;
+        try {
+          var payload = await fetchJSON('/api/admin/creative/emails');
+          var records = payload.records || [];
+          if (!records.length) {
+            container.innerHTML = '<div class="empty-state">No email templates yet</div>';
+            return;
+          }
+          var html = '';
+          records.forEach(function(item) {
+            var d = item.data || {};
+            var htmlBody = String(d.html || '');
+            html += '<div class="creative-card">';
+            html += '<h4>' + escapeHtml(d.title || item.recordKey) + '</h4>';
+            html += '<div class="creative-meta">Subject: ' + escapeHtml(d.subject || 'n/a') + '</div>';
+            html += '<div class="pill-row"><span class="pill">Version: ' + escapeHtml(d.version || 'n/a') + '</span><span class="pill">Schedule: ' + escapeHtml(d.scheduledAt || 'manual') + '</span></div>';
+            html += '<div class="creative-preview">' + escapeHtml(htmlBody.slice(0, 800)) + '</div>';
+            html += '<div class="inline-btn-row">';
+            html += '<button class="btn btn-secondary" data-action="copy-email-html" data-html="' + escapeHtml(htmlBody) + '">Copy HTML</button>';
+            html += '<button class="btn btn-danger" data-action="delete-creative-email" data-record-key="' + escapeHtml(item.recordKey || '') + '">Delete</button>';
+            html += '</div></div>';
+          });
+          container.innerHTML = html;
+        } catch (e) {
+          container.innerHTML = '<div class="empty-state empty-state-danger">Failed to load email templates</div>';
+        }
+      }
+
+      async function saveCreativeEmailTemplate(e) {
+        e.preventDefault();
+        var key = normalizeKey(document.getElementById('email-template-key').value, 'email-template');
+        var htmlBody = (document.getElementById('email-template-html').value || '').trim();
+        if (!htmlBody) return;
+        var data = {
+          title: (document.getElementById('email-template-title').value || '').trim(),
+          version: (document.getElementById('email-template-version').value || '').trim(),
+          subject: (document.getElementById('email-template-subject').value || '').trim(),
+          scheduledAt: (document.getElementById('email-template-scheduled-at').value || '').trim(),
+          html: htmlBody,
+          updatedAt: Date.now()
+        };
+        var ok = await ensureStepUp();
+        if (!ok) return;
+        try {
+          await fetchJSONWithInit('/api/admin/creative/emails/upsert', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ recordKey: key, data: data })
+          });
+          await loadCreativeEmails();
+        } catch (_) {}
+      }
+
+      async function deleteCreativeEmailTemplate(key) {
+        var ok = await ensureStepUp();
+        if (!ok) return;
+        if (!window.confirm('Delete email template "' + key + '"?')) return;
+        try {
+          await fetchJSONWithInit('/api/admin/creative/emails/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ recordKey: key })
+          });
+          await loadCreativeEmails();
+        } catch (_) {}
+      }
+
+      async function loadNewsletterSubscribers() {
+        var container = document.getElementById('newsletter-subscribers-list');
+        var summary = document.getElementById('newsletter-summary');
+        if (!container) return;
+        try {
+          var payload = await fetchJSON('/api/admin/newsletter/subscribers');
+          var records = payload.records || [];
+          if (!records.length) {
+            container.innerHTML = '<div class="empty-state">No subscribers yet</div>';
+            if (summary) {
+              summary.innerHTML =
+                '<span class="newsletter-tag">Total: 0</span>' +
+                '<span class="newsletter-tag">Active: 0</span>' +
+                '<span class="newsletter-tag">Paused: 0</span>' +
+                '<span class="newsletter-tag">Unsubscribed: 0</span>';
+            }
+            return;
+          }
+          var counts = { total: records.length, active: 0, paused: 0, unsubscribed: 0 };
+          var html = '';
+          records.forEach(function(item) {
+            var d = item.data || {};
+            var status = String(d.status || 'active').toLowerCase();
+            if (status === 'paused') counts.paused += 1;
+            else if (status === 'unsubscribed') counts.unsubscribed += 1;
+            else counts.active += 1;
+            var statusEmoji = status === 'paused' ? '⏸️' : (status === 'unsubscribed' ? '🚫' : '✅');
+            html += '<div class="creative-card">';
+            html += '<h4>📧 ' + escapeHtml(d.email || item.recordKey) + '</h4>';
+            html += '<div class="creative-meta">Name: ' + escapeHtml(d.name || 'n/a') + '</div>';
+            html += '<div class="pill-row"><span class="pill">' + statusEmoji + ' Status: ' + escapeHtml(status) + '</span></div>';
+            html += '<button class="btn btn-danger" data-action="delete-newsletter-subscriber" data-record-key="' + escapeHtml(item.recordKey || '') + '">🗑️ Delete</button>';
+            html += '</div>';
+          });
+          container.innerHTML = html;
+          if (summary) {
+            summary.innerHTML =
+              '<span class="newsletter-tag">Total: ' + fmtNumber(counts.total) + '</span>' +
+              '<span class="newsletter-tag">Active: ' + fmtNumber(counts.active) + '</span>' +
+              '<span class="newsletter-tag">Paused: ' + fmtNumber(counts.paused) + '</span>' +
+              '<span class="newsletter-tag">Unsubscribed: ' + fmtNumber(counts.unsubscribed) + '</span>';
+          }
+        } catch (e) {
+          container.innerHTML = '<div class="empty-state empty-state-danger">Failed to load subscribers</div>';
+          if (summary) summary.innerHTML = '';
+        }
+      }
+
+      async function saveNewsletterSubscriber(e) {
+        e.preventDefault();
+        var email = (document.getElementById('newsletter-email').value || '').trim();
+        if (!email) return;
+        var data = {
+          email: email,
+          name: (document.getElementById('newsletter-name').value || '').trim(),
+          status: (document.getElementById('newsletter-status').value || 'active').trim(),
+          updatedAt: Date.now()
+        };
+        try {
+          await fetchJSONWithInit('/api/admin/newsletter/subscribers/upsert', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ data: data })
+          });
+          var form = document.getElementById('newsletter-subscriber-form');
+          if (form) form.reset();
+          var statusEl = document.getElementById('newsletter-status');
+          if (statusEl) statusEl.value = 'active';
+          await loadNewsletterSubscribers();
+        } catch (_) {}
+      }
+
+      async function deleteNewsletterSubscriber(key) {
+        var ok = await ensureStepUp();
+        if (!ok) return;
+        if (!window.confirm('Delete subscriber "' + key + '"?')) return;
+        try {
+          await fetchJSONWithInit('/api/admin/newsletter/subscribers/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ recordKey: key })
+          });
+          await loadNewsletterSubscribers();
+        } catch (_) {}
+      }
+
+      async function loadNotifications() {
+        var container = document.getElementById('notification-counters');
+        var freshness = document.getElementById('notification-freshness');
+        if (!container) return;
+        container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading...</div>';
+        if (freshness) freshness.textContent = 'Source: loading...';
+        try {
+          var githubPayload = await fetchJSON('/api/admin/github/open-counts');
+          if (!githubPayload || githubPayload.ok === false) {
+            throw new Error((githubPayload && githubPayload.error) ? githubPayload.error : 'github_unreachable');
+          }
+          var known = {
+            openIssues: githubPayload.issuesKnown !== false,
+            openPRs: githubPayload.prsKnown !== false,
+            branches: githubPayload.branchesKnown !== false,
+            discussions: githubPayload.discussionsKnown !== false
+          };
+          var github = {
+            openIssues: Number(githubPayload.openIssues || 0),
+            openPRs: Number(githubPayload.openPRs || 0),
+            branches: Number(githubPayload.branches || 0),
+            discussions: Number(githubPayload.discussions || 0)
+          };
+          function renderNotificationCard(label, value, isKnown) {
+            var shown = isKnown ? fmtNumber(value) : 'N/A';
+            var valueClass = isKnown ? 'stat-value' : 'stat-value status-warning';
+            return '<div class="stat-card2"><div class="stat-label">' + label + '</div><div class="' + valueClass + '">' + shown + '</div></div>';
+          }
+          container.innerHTML =
+            renderNotificationCard('🐛 Open Issues', github.openIssues || 0, known.openIssues) +
+            renderNotificationCard('🔀 Open PRs', github.openPRs || 0, known.openPRs) +
+            renderNotificationCard('🌿 Branches', github.branches || 0, known.branches) +
+            renderNotificationCard('💬 Discussions', github.discussions || 0, known.discussions);
+          if (freshness) {
+            var sourceCode = String(githubPayload.source || (githubPayload.stale ? 'stale_cache' : (githubPayload.cached ? 'cache' : 'live')));
+            var parts = ['Source: ' + sourceLabelFromCode(sourceCode)];
+            var fetchedAt = fmtUtcDateTimeFromMs(githubPayload.fetchedAt);
+            if (fetchedAt !== 'n/a') parts.push('Fetched (UTC): ' + fetchedAt);
+            if (githubPayload.partial) parts.push('Partial data');
+            freshness.textContent = parts.join(' | ');
+          }
+        } catch (e) {
+          container.innerHTML = '<div class="empty-state empty-state-danger">Failed to load GitHub counters: ' + escapeHtml(String((e && e.message) || e || 'unknown')) + '</div>';
+          if (freshness) freshness.textContent = 'Source: unavailable';
+        }
+      }
+
+      function setOracleLogsOutput(payload) {
+        var out = document.getElementById('oracle-logs-output');
+        if (!out) return;
+        out.textContent = JSON.stringify(payload, null, 2);
+        out.classList.remove('hidden');
+      }
+
+      async function loadOracleLogs() {
+        var container = document.getElementById('oracle-logs-table');
+        if (!container) return;
+        container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading logs...</div>';
+        try {
+          var data = await fetchJSON('/api/admin/oracle-logs?limit=500');
+          var logs = (data && data.logs) ? data.logs : [];
+          if (!logs.length) {
+            container.innerHTML = '<div class="empty-state">No oracle operation logs yet</div>';
+            setOracleLogsOutput({ ok: true, count: 0 });
+            return;
+          }
+          var html = '<table><thead><tr>';
+          html += '<th>Time (UTC)</th>';
+          html += '<th>Action</th>';
+          html += '<th>Resource</th>';
+          html += '<th>Actor</th>';
+          html += '<th>Request</th>';
+          html += '<th>Status</th>';
+          html += '<th>Latency</th>';
+          html += '</tr></thead><tbody>';
+          logs.forEach(function(row) {
+            var statusClass = (row.result === 'ok') ? 'log-status-ok' : 'log-status-error';
+            var actor = (row.userId || 'anonymous') + ' (' + (row.role || 'viewer') + ')';
+            var reqInfo = (row.method || '') + ' ' + (row.path || '');
+            var resourceInfo = (row.resourceType || '-') + ' / ' + (row.resourceId || '-');
+            html += '<tr>';
+            html += '<td class="td-primary">' + escapeHtml(fmtFullDateTime(row.tsUtc)) + '</td>';
+            html += '<td><span class="badge badge-warning">' + escapeHtml(row.actionType || '-') + '</span></td>';
+            html += '<td class="log-cell-resource">' + escapeHtml(resourceInfo) + '</td>';
+            html += '<td class="log-cell-actor">' + escapeHtml(actor) + '</td>';
+            html += '<td class="log-cell-request">' + escapeHtml(reqInfo) + '</td>';
+            html += '<td><span class="' + statusClass + '">' + escapeHtml(String(row.statusCode || '')) + ' (' + escapeHtml(row.result || '') + ')</span></td>';
+            html += '<td>' + escapeHtml(String(row.latencyMs || 0)) + 'ms</td>';
+            html += '</tr>';
+          });
+          html += '</tbody></table>';
+          container.innerHTML = html;
+          setOracleLogsOutput({ ok: true, count: logs.length, latestTsUtc: logs[0].tsUtc || 0 });
+        } catch (e) {
+          container.innerHTML = '<div class="empty-state empty-state-danger">Failed to load logs</div>';
+          setOracleLogsOutput({ ok: false, error: String(e) });
+        }
+      }
+
+      function oracleLogsRetentionDays() {
+        var input = document.getElementById('oracle-logs-retention-days');
+        var days = parseInt((input && input.value) ? input.value : '30', 10);
+        if (!Number.isFinite(days) || days < 1 || days > 36500) {
+          return null;
+        }
+        return days;
+      }
+
+      async function oracleLogsDeleteOlder(dryRun) {
+        var days = oracleLogsRetentionDays();
+        if (days === null) {
+          setOracleLogsOutput({ ok: false, error: 'Retention days must be between 1 and 36500.' });
+          return;
+        }
+        var ok = await ensureStepUp();
+        if (!ok) return;
+        if (!dryRun && !window.confirm('Delete oracle logs older than ' + days + ' day(s)?')) return;
+        try {
+          var data = await fetchJSONWithInit('/api/admin/oracle-logs/delete-older', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ days: days, dryRun: dryRun })
+          });
+          setOracleLogsOutput(data);
+          if (!dryRun) await loadOracleLogs();
+        } catch (e) {
+          setOracleLogsOutput({ ok: false, error: String(e) });
+        }
+      }
+
+      async function oracleLogsClearAll() {
+        var ok = await ensureStepUp();
+        if (!ok) return;
+        if (!window.confirm('Delete ALL oracle operation logs?')) return;
+        try {
+          var data = await fetchJSONWithInit('/api/admin/oracle-logs/clear-all', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ confirm: 'CLEAR_ALL_LOGS', dryRun: false })
+          });
+          setOracleLogsOutput(data);
+          await loadOracleLogs();
+        } catch (e) {
+          setOracleLogsOutput({ ok: false, error: String(e) });
+        }
+      }
+
+      function dangerLogRetentionDays() {
+        var input = document.getElementById('danger-log-retention-days');
+        var days = parseInt((input && input.value) ? input.value : '30', 10);
+        if (!Number.isFinite(days) || days < 1 || days > 36500) return null;
+        return days;
+      }
+
+      async function dangerDeleteOlderLogs(dryRun) {
+        var days = dangerLogRetentionDays();
+        if (days === null) {
+          setDangerOutput({ ok: false, error: 'Retention days must be between 1 and 36500.' });
+          return;
+        }
+        var ok = await ensureStepUp();
+        if (!ok) return;
+        if (!dryRun && !window.confirm('Delete oracle logs older than ' + days + ' day(s)?')) return;
+        try {
+          var data = await fetchJSONWithInit('/api/admin/oracle-logs/delete-older', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ days: days, dryRun: dryRun })
+          });
+          setDangerOutput(data);
+          var logsInput = document.getElementById('oracle-logs-retention-days');
+          if (logsInput) logsInput.value = String(days);
+          if (!dryRun && currentPage === 'logs') await loadOracleLogs();
+        } catch (e) {
+          setDangerOutput({ ok: false, error: String(e) });
+        }
+      }
+
+      async function dangerDeleteAllLogs() {
+        var ok = await ensureStepUp();
+        if (!ok) return;
+        if (!window.confirm('Delete ALL oracle operation logs?')) return;
+        try {
+          var data = await fetchJSONWithInit('/api/admin/oracle-logs/clear-all', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ confirm: 'CLEAR_ALL_LOGS', dryRun: false })
+          });
+          setDangerOutput(data);
+          if (currentPage === 'logs') await loadOracleLogs();
+        } catch (e) {
+          setDangerOutput({ ok: false, error: String(e) });
+        }
+      }
+
+      // Danger / admin tooling
+      async function ensureStepUp() {
+        try {
+          var check = await fetchJSON('/api/auth/stepup/check');
+          if (!check.required || check.active) return true;
+          return openStepUpModal();
+        } catch (_) {
+          return false;
+        }
+      }
+
+      function setDangerOutput(payload) {
+        var out = document.getElementById('danger-output');
+        if (!out) return;
+        out.textContent = JSON.stringify(payload, null, 2);
+        out.classList.remove('hidden');
+      }
+
+      async function dangerDryRun(scope) {
+        var ok = await ensureStepUp();
+        if (!ok) return;
+        try {
+          var data = await fetchJSONWithInit('/api/admin/danger/clear-data', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ scope: scope, dryRun: true })
+          });
+          setDangerOutput(data);
+        } catch (e) {
+          setDangerOutput({ ok: false, error: String(e) });
+        }
+      }
+
+      async function dangerExecute(scope) {
+        var ok = await ensureStepUp();
+        if (!ok) return;
+        if (!window.confirm('Execute destructive clear-data operation?')) return;
+        try {
+          var data = await fetchJSONWithInit('/api/admin/danger/clear-data', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ scope: scope, dryRun: false })
+          });
+          setDangerOutput(data);
+        } catch (e) {
+          setDangerOutput({ ok: false, error: String(e) });
+        }
+      }
+
+      async function runBackup() {
+        var ok = await ensureStepUp();
+        if (!ok) return;
+        try {
+          var data = await fetchJSONWithInit('/api/admin/backup/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+          setDangerOutput(data);
+        } catch (e) {
+          setDangerOutput({ ok: false, error: String(e) });
+        }
+      }
+
+      async function dangerLoadOutboxStatus() {
+        try {
+          var data = await fetchJSON('/api/admin/outbox/status');
+          setDangerOutput(data);
+        } catch (e) {
+          setDangerOutput({ ok: false, error: String(e) });
+        }
+      }
+
+      async function dangerRetryOutbox() {
+        var ok = await ensureStepUp();
+        if (!ok) return;
+        try {
+          var data = await fetchJSONWithInit('/api/admin/outbox/retry', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+          });
+          setDangerOutput(data);
+        } catch (e) {
+          setDangerOutput({ ok: false, error: String(e) });
+        }
+      }
+
+      async function dangerReplayDeadLetter() {
+        var ok = await ensureStepUp();
+        if (!ok) return;
+        if (!window.confirm('Replay dead-letter rows back into the outbox queue?')) return;
+        try {
+          var data = await fetchJSONWithInit('/api/admin/outbox/replay-dead-letter', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+          });
+          setDangerOutput(data);
+        } catch (e) {
+          setDangerOutput({ ok: false, error: String(e) });
+        }
+      }
+
+      async function dangerVerifyAuditChain() {
+        try {
+          var data = await fetchJSON('/api/admin/audit/verify-chain');
+          setDangerOutput(data);
+        } catch (e) {
+          setDangerOutput({ ok: false, error: String(e) });
+        }
+      }
+
+      async function dangerLoadAlerts() {
+        try {
+          var data = await fetchJSON('/api/admin/alerts');
+          setDangerOutput(data);
+        } catch (e) {
+          setDangerOutput({ ok: false, error: String(e) });
+        }
+      }
+
+      async function dangerLoadFeatureFlags() {
+        try {
+          var data = await fetchJSON('/api/admin/flags');
+          setDangerOutput(data);
+        } catch (e) {
+          setDangerOutput({ ok: false, error: String(e) });
+        }
+      }
+
+      async function dangerLoadMigrationsStatus() {
+        try {
+          var data = await fetchJSON('/api/admin/migrations/status');
+          setDangerOutput(data);
+        } catch (e) {
+          setDangerOutput({ ok: false, error: String(e) });
+        }
+      }
+
+      async function dangerLoadOpsSnapshot() {
+        try {
+          var parts = await Promise.all([
+            fetchJSON('/api/admin/outbox/status').catch(function(e) { return { ok: false, error: String(e) }; }),
+            fetchJSON('/api/admin/alerts').catch(function(e) { return { ok: false, error: String(e) }; }),
+            fetchJSON('/api/admin/flags').catch(function(e) { return { ok: false, error: String(e) }; }),
+            fetchJSON('/api/admin/migrations/status').catch(function(e) { return { ok: false, error: String(e) }; }),
+            fetchJSON('/api/admin/audit/verify-chain').catch(function(e) { return { ok: false, error: String(e) }; })
+          ]);
+          setDangerOutput({
+            ok: true,
+            snapshotAtUtc: new Date().toISOString(),
+            outbox: parts[0],
+            alerts: parts[1],
+            flags: parts[2],
+            migrations: parts[3],
+            auditChain: parts[4]
+          });
+        } catch (e) {
+          setDangerOutput({ ok: false, error: String(e) });
+        }
+      }
+
+      // Keyboard shortcuts
+      var shortcutItems = [
+        { combo: 'Cmd/Ctrl+1', desc: 'Go to Overview', run: function() { showPage('overview'); } },
+        { combo: 'Cmd/Ctrl+2', desc: 'Go to Activity & Charts', run: function () { showPage('activity'); } },
+        { combo: 'Cmd/Ctrl+3', desc: 'Go to Ops Hub', run: function() { showPage('dashboards'); } },
+        { combo: 'Cmd/Ctrl+4', desc: 'Go to Creative Hub', run: function () { showPage('creative'); } },
+        { combo: 'Cmd/Ctrl+5', desc: 'Go to Logs', run: function () { showPage('logs'); } },
+        { combo: 'Cmd/Ctrl+0', desc: 'Go to Danger Zone', run: function() { showPage('danger'); } },
+        { combo: 'Cmd/Ctrl+R', desc: 'Refresh all data', run: function() { refreshAll(); } },
+        { combo: 'Cmd/Ctrl+B', desc: 'Open last batch modal', run: function() { showBatchModal(); } },
+        { combo: 'Cmd/Ctrl+Shift+B', desc: 'Open last sheets flush modal', run: function() { showFlushModal(); } },
+        { combo: 'Cmd/Ctrl+Shift+D', desc: 'Sync deployment stores', run: function() { syncDeploymentTargets(); } },
+        { combo: 'Cmd/Ctrl+Shift+S', desc: 'Open step-up modal', run: function() { openStepUpModal(); } },
+        { combo: 'Cmd/Ctrl+/', desc: 'Open shortcuts help', run: function() { openShortcutsModal(); } }
+      ];
+
+      function openShortcutsModal() {
+        var modal = document.getElementById('shortcuts-modal');
+        if (!modal) return;
+        modal.classList.add('visible');
+        modal.setAttribute('aria-hidden', 'false');
+      }
+
+      function closeShortcutsModal() {
+        var modal = document.getElementById('shortcuts-modal');
+        if (!modal) return;
+        modal.classList.remove('visible');
+        modal.setAttribute('aria-hidden', 'true');
+      }
+
+      function renderShortcutsList() {
+        var container = document.getElementById('shortcuts-list');
+        if (!container) return;
+        var html = '';
+        shortcutItems.forEach(function(item) {
+          html += '<div class="shortcut-row">';
+          html += '<span class="shortcut-key">' + escapeHtml(item.combo) + '</span>';
+          html += '<span class="shortcut-desc">' + escapeHtml(item.desc) + '</span>';
+          html += '</div>';
+        });
+        container.innerHTML = html;
+      }
+
+      function shouldIgnoreGlobalShortcut(e) {
+        var target = e && e.target;
+        if (!target) return false;
+        if (target.closest && target.closest('[data-shortcuts-capture="true"]')) return false;
+        var editable = target.closest
+          ? target.closest('input, textarea, select, [contenteditable], [role="textbox"]')
+          : null;
+        if (editable) return true;
+        var tag = (target.tagName || '').toLowerCase();
+        return tag === 'input' || tag === 'textarea' || tag === 'select' || !!target.isContentEditable;
+      }
+
+      function runKeyboardShortcut(e) {
+        if (shouldIgnoreGlobalShortcut(e)) return false;
+        var usesMod = e.metaKey || e.ctrlKey;
+        if (!usesMod) return false;
+        var key = (e.key || '').toLowerCase();
+        var withShift = !!e.shiftKey;
+
+        if (!withShift && key === '1') { showPage('overview'); return true; }
+        if (!withShift && key === '2') { showPage('activity'); return true; }
+        if (!withShift && key === '3') { showPage('dashboards'); return true; }
+        if (!withShift && key === '4') { showPage('creative'); return true; }
+        if (!withShift && key === '5') { showPage('logs'); return true; }
+        if (!withShift && key === '0') { showPage('danger'); return true; }
+        if (!withShift && key === 'r') { refreshAll(); return true; }
+        if (!withShift && key === 'b') { showBatchModal(); return true; }
+        if (withShift && key === 'b') { showFlushModal(); return true; }
+        if (withShift && key === 'd') { syncDeploymentTargets(); return true; }
+        if (withShift && key === 's') { openStepUpModal(); return true; }
+        if (!withShift && key === '/') { openShortcutsModal(); return true; }
+        return false;
+      }
+
+      function bindButtonActions() {
+        document.querySelectorAll('.nav-item[data-page]').forEach(function(btn) {
+          if (btn.dataset.boundClick === '1') return;
+          btn.dataset.boundClick = '1';
+          btn.addEventListener('click', function(ev) {
+            ev.preventDefault();
+            var page = btn.getAttribute('data-page');
+            if (page) showPage(page);
+          });
+        });
+
+        var mobilePageSelect = document.getElementById('mobile-page-select');
+        if (mobilePageSelect && mobilePageSelect.dataset.boundChange !== '1') {
+          mobilePageSelect.dataset.boundChange = '1';
+          mobilePageSelect.addEventListener('change', function() {
+            showPage(mobilePageSelect.value);
+          });
+        }
+
+        var activityVersionFilter = document.getElementById('activity-version-filter');
+        if (activityVersionFilter && activityVersionFilter.dataset.boundChange !== '1') {
+          activityVersionFilter.dataset.boundChange = '1';
+          activityVersionFilter.addEventListener('change', onActivityVersionChange);
+        }
+
+        var activityTabs = document.getElementById('activity-tabs');
+        if (activityTabs && activityTabs.dataset.boundClick !== '1') {
+          activityTabs.dataset.boundClick = '1';
+          activityTabs.addEventListener('click', function(ev) {
+            var btn = ev.target.closest('.tab[data-range]');
+            if (!btn) return;
+            ev.preventDefault();
+            setActivityRange(btn.dataset.range);
+          });
+        }
+
+        var comparisonTabs = document.querySelectorAll('[data-comparison-range]');
+        comparisonTabs.forEach(function(btn) {
+          if (btn.dataset.boundClick === '1') return;
+          btn.dataset.boundClick = '1';
+          btn.addEventListener('click', function(ev) {
+            ev.preventDefault();
+            setComparison(btn.getAttribute('data-comparison-range'));
+          });
+        });
+
+        [
+          ['shortcuts-btn', openShortcutsModal],
+          ['shortcuts-btn-mobile', openShortcutsModal],
+          ['batch-btn', showBatchModal],
+          ['batch-btn-mobile', showBatchModal],
+          ['flush-btn', showFlushModal],
+          ['flush-btn-mobile', showFlushModal],
+          ['refresh-btn', refreshAll],
+          ['refresh-btn-mobile', refreshAll],
+          ['deployment-sync-btn', syncDeploymentTargets],
+          ['stepup-btn', openStepUpModal],
+          ['log-sort-btn', toggleLogSort],
+          ['log-export-btn', exportLogCSV],
+          ['notifications-refresh-btn', loadNotifications],
+          ['logs-refresh-btn', loadOracleLogs],
+          ['logs-dry-run-delete-btn', function() { oracleLogsDeleteOlder(true); }],
+          ['logs-delete-older-btn', function() { oracleLogsDeleteOlder(false); }],
+          ['logs-delete-all-btn', oracleLogsClearAll],
+          ['danger-dryrun-clear-btn', function() { dangerDryRun('all_non_core'); }],
+          ['danger-exec-clear-btn', function() { dangerExecute('all_non_core'); }],
+          ['danger-run-backup-btn', runBackup],
+          ['danger-alerts-btn', dangerLoadAlerts],
+          ['danger-audit-verify-btn', dangerVerifyAuditChain],
+          ['danger-outbox-status-btn', dangerLoadOutboxStatus],
+          ['danger-flags-btn', dangerLoadFeatureFlags],
+          ['danger-logs-dry-run-btn', function() { dangerDeleteOlderLogs(true); }],
+          ['danger-logs-delete-older-btn', function() { dangerDeleteOlderLogs(false); }],
+          ['danger-logs-delete-all-btn', dangerDeleteAllLogs],
+          ['batch-modal-close-btn', closeBatchModal],
+          ['flush-modal-close-btn', closeFlushModal]
+        ].forEach(function(entry) {
+          var node = document.getElementById(entry[0]);
+          if (!node || node.dataset.boundClick === '1') return;
+          node.dataset.boundClick = '1';
+          node.addEventListener('click', function(ev) {
+            ev.preventDefault();
+            entry[1]();
+          });
+        });
+
+        [
+          ['creative-email-template-form', saveCreativeEmailTemplate],
+          ['newsletter-subscriber-form', saveNewsletterSubscriber]
+        ].forEach(function(entry) {
+          var form = document.getElementById(entry[0]);
+          if (!form || form.dataset.boundSubmit === '1') return;
+          form.dataset.boundSubmit = '1';
+          form.addEventListener('submit', entry[1]);
+        });
+
+        var batchModal = document.getElementById('batch-modal');
+        if (batchModal && batchModal.dataset.boundClick !== '1') {
+          batchModal.dataset.boundClick = '1';
+          batchModal.addEventListener('click', function(ev) {
+            if (ev.target === batchModal) closeBatchModal();
+          });
+        }
+        var batchModalCard = batchModal ? batchModal.querySelector('.modal') : null;
+        if (batchModalCard && batchModalCard.dataset.boundClick !== '1') {
+          batchModalCard.dataset.boundClick = '1';
+          batchModalCard.addEventListener('click', function(ev) {
+            ev.stopPropagation();
+          });
+        }
+        var batchTabs = document.getElementById('batch-modal-tabs');
+        if (batchTabs && batchTabs.dataset.boundClick !== '1') {
+          batchTabs.dataset.boundClick = '1';
+          batchTabs.addEventListener('click', function(ev) {
+            var btn = ev.target.closest('[data-batch-tab]');
+            if (!btn) return;
+            ev.preventDefault();
+            setBatchTab(btn.getAttribute('data-batch-tab'));
+          });
+        }
+
+        var flushModal = document.getElementById('flush-modal');
+        if (flushModal && flushModal.dataset.boundClick !== '1') {
+          flushModal.dataset.boundClick = '1';
+          flushModal.addEventListener('click', function(ev) {
+            if (ev.target === flushModal) closeFlushModal();
+          });
+        }
+        var flushModalCard = flushModal ? flushModal.querySelector('.modal') : null;
+        if (flushModalCard && flushModalCard.dataset.boundClick !== '1') {
+          flushModalCard.dataset.boundClick = '1';
+          flushModalCard.addEventListener('click', function(ev) {
+            ev.stopPropagation();
+          });
+        }
+        var flushTabs = document.getElementById('flush-modal-tabs');
+        if (flushTabs && flushTabs.dataset.boundClick !== '1') {
+          flushTabs.dataset.boundClick = '1';
+          flushTabs.addEventListener('click', function(ev) {
+            var btn = ev.target.closest('[data-flush-tab]');
+            if (!btn) return;
+            ev.preventDefault();
+            setFlushTab(btn.getAttribute('data-flush-tab'));
+          });
+        }
+
+        if (document.body.dataset.boundDynamicActions !== '1') {
+          document.body.dataset.boundDynamicActions = '1';
+          document.addEventListener('click', function(ev) {
+            var actionNode = ev.target.closest('[data-action]');
+            if (!actionNode) return;
+            var action = actionNode.getAttribute('data-action');
+            if (!action) return;
+            ev.preventDefault();
+            if (action === 'save-deployment-card') saveDeploymentCard(actionNode.getAttribute('data-record-key') || '');
+            if (action === 'copy-email-html') copyText(actionNode.getAttribute('data-html') || '');
+            if (action === 'delete-creative-email') deleteCreativeEmailTemplate(actionNode.getAttribute('data-record-key') || '');
+            if (action === 'delete-newsletter-subscriber') deleteNewsletterSubscriber(actionNode.getAttribute('data-record-key') || '');
+            if (action === 'shift-calendar-month') shiftCalendarMonth(Number(actionNode.getAttribute('data-delta') || '0'));
+          });
+        }
+      }
+
+      function startAutoRefreshLoop() {
+        if (refreshIntervalId) clearInterval(refreshIntervalId);
+        refreshIntervalId = setInterval(async function() {
+          if (document.visibilityState === 'hidden') return;
+          var ok = await ensureAuth();
+          if (!ok) return;
+          refreshAll();
+        }, 60000);
+      }
+
+      // Refresh all data
+      async function refreshAll() {
+        var refreshButtons = Array.from(document.querySelectorAll('[data-role="refresh-action"]'));
+        refreshButtons.forEach(function(btn) {
+          btn.disabled = true;
+          if (!btn.dataset.defaultHtml) {
+            btn.dataset.defaultHtml = btn.innerHTML;
+          }
+          if (btn.classList.contains('footer-icon-btn')) {
+            btn.innerHTML = '<div class="spinner"></div>';
+          } else {
+            btn.innerHTML = '<div class="spinner"></div> Refreshing...';
+          }
+        });
+        
+        await loadOverview(true);
+        await loadTopToday();
+        await loadDeployStatus();
+        
+        if (currentPage === 'activity') {
+          await loadActivity();
+          await loadCharts();
+          await loadComparison();
+        }
+        if (currentPage === 'dashboards') {
+          await loadDashboardLinks();
+          loadDeploymentsHub();
+          await loadNotifications();
+        }
+        if (currentPage === 'creative') await loadCreativeHub();
+        if (currentPage === 'logs') await loadOracleLogs();
+
+        refreshButtons.forEach(function(btn) {
+          btn.disabled = false;
+          if (btn.dataset.defaultHtml) {
+            btn.innerHTML = btn.dataset.defaultHtml;
+          } else {
+            btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 11-2.52-6.25"/><path d="M21 4v5h-5"/></svg> Refresh';
+          }
+        });
+      }
+
+      // Init
+      window.addEventListener("load", async function() {
+        initOracleUtcClock();
+        renderShortcutsList();
+        bindButtonActions();
+        document.addEventListener('keydown', function(e) {
+          if ((e.metaKey || e.ctrlKey) && !shouldIgnoreGlobalShortcut(e) && runKeyboardShortcut(e)) {
+            e.preventDefault();
+            return;
+          }
+
+          if (e.key === 'Escape') {
+            closeShortcutsModal();
+            closeBatchModal();
+            closeFlushModal();
+            closeStepUpModal();
+          }
+        });
+        document.addEventListener('visibilitychange', function() {
+          if (document.hidden) {
+            return;
+          }
+          ensureAuth().then(function(ok) {
+            if (!ok) return;
+            refreshAll();
+          });
+        });
+        var shortcutsModal = document.getElementById('shortcuts-modal');
+        if (shortcutsModal) {
+          shortcutsModal.addEventListener('click', function(ev) {
+            if (ev.target === shortcutsModal) closeShortcutsModal();
+          });
+        }
+        var authed = await ensureAuth();
+        if (authed) {
+          await loadDashboardLinks();
+          await refreshAll();
+        }
+        startAutoRefreshLoop();
+      });

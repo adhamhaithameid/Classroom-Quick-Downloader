@@ -47,7 +47,6 @@ USER appuser
 ENV ADDR=:8080
 ENV DB_PATH=/data/analytics.db
 ENV STATIC_DIR=/app/static
-ENV DO_SHARED_SECRET=change-me-in-production
 
 # Persistent data volume for SQLite
 VOLUME ["/data"]

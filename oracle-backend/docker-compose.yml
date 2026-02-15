@@ -15,13 +15,25 @@ services:
       - ADDR=:8080
       - DB_PATH=/data/analytics.db
       - STATIC_DIR=/app/static
+      - GOOGLE_CREDS_PATH=${GOOGLE_CREDS_PATH:-/run/secrets/google-credentials.json}
       - DO_SHARED_SECRET=${DO_SHARED_SECRET:?DO_SHARED_SECRET is required}
       - DASHBOARD_PASSWORD=${DASHBOARD_PASSWORD:?DASHBOARD_PASSWORD is required}
+      - SUPER_ADMIN_PASSWORD=${SUPER_ADMIN_PASSWORD:?SUPER_ADMIN_PASSWORD is required}
+      - ORACLE_AUDIT_CHECKPOINT_SECRET=${ORACLE_AUDIT_CHECKPOINT_SECRET:?ORACLE_AUDIT_CHECKPOINT_SECRET is required}
+      - POSTGRES_DSN=${POSTGRES_DSN:-}
+      - STORAGE_WATERMARK_WARN=${STORAGE_WATERMARK_WARN:-70}
+      - STORAGE_WATERMARK_CRITICAL=${STORAGE_WATERMARK_CRITICAL:-85}
+      - STORAGE_WATERMARK_EMERGENCY=${STORAGE_WATERMARK_EMERGENCY:-92}
+      - ORACLE_RETENTION_RAW_SNAPSHOTS_DAYS=${ORACLE_RETENTION_RAW_SNAPSHOTS_DAYS:-30}
+      - ORACLE_PRIMARY_REGION=${ORACLE_PRIMARY_REGION:-primary}
+      - ORACLE_DR_REGION=${ORACLE_DR_REGION:-warm-dr}
+      - ORACLE_DR_REPLICA_LAG_SECONDS=${ORACLE_DR_REPLICA_LAG_SECONDS:--1}
+      - ORACLE_DR_PROMOTION_MAX_LAG_SECONDS=${ORACLE_DR_PROMOTION_MAX_LAG_SECONDS:-300}
       - GIT_COMMIT=${GIT_COMMIT:-unknown}
       - DEPLOY_TIME=${DEPLOY_TIME:-}
     volumes:
       - oracle_data:/data
-      - ./google-credentials.json:/app/google-credentials.json:ro
+      - ${GOOGLE_CREDS_PATH_HOST:-/dev/null}:/run/secrets/google-credentials.json:ro
     restart: always
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]      

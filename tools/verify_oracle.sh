@@ -20,9 +20,13 @@ go test -v ./...
 echo -e "\n${GREEN}3. Verifying Docker Build (dry run)...${NC}"
 # Use DOCKER_BUILDKIT=1 for better performance and caching
 if command -v docker >/dev/null 2>&1; then
-  # We just build without saving the image to save time/disk
-  DOCKER_BUILDKIT=1 docker build . -t oracle-backend-test:latest
-  echo -e "${GREEN}Docker build succeeded.${NC}"
+  if docker info >/dev/null 2>&1; then
+    # We just build without saving the image to save time/disk
+    DOCKER_BUILDKIT=1 docker build . -t oracle-backend-test:latest
+    echo -e "${GREEN}Docker build succeeded.${NC}"
+  else
+    echo -e "${RED}Docker daemon is not running. Skipping Docker build verification.${NC}"
+  fi
 else
   echo -e "${RED}Docker not found. Skipping Docker build verification.${NC}"
 fi

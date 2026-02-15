@@ -2,56 +2,259 @@ name: CI
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [main, master]
   pull_request:
-    branches: [ main, master ]
+    branches: [main, master]
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# ──────────────────────────────────────────────
+# Extension
+# ──────────────────────────────────────────────
 jobs:
-  validate:
+  extension-tests:
+    name: Extension — Tests & Coverage
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Setup pnpm
-      uses: pnpm/action-setup@v3
-      with:
-        version: 10.28.2
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 10.28.2
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        cache: 'pnpm'
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
 
-    - name: Install Dependencies
-      run: pnpm install
+      - name: Install Dependencies
+        run: pnpm install
 
-    - name: Run Cloudflare Worker Tests
-      run: pnpm --filter cloudflare-worker test
+      - name: Run Extension Tests
+        run: pnpm -C extension test
 
-    - name: Run Extension Tests
-      run: pnpm -C extension test
+      - name: Run Extension Typecheck
+        run: pnpm -C extension compile
 
-    - name: Run Extension Typecheck
-      run: pnpm -C extension compile
+      - name: Enforce Extension Coverage Gates
+        run: pnpm -C extension test:coverage:all
 
-    - name: Enforce Extension Coverage Gates
-      run: pnpm -C extension test:coverage:all
+  # ──────────────────────────────────────────────
+  # Extension Build Matrix
+  # ──────────────────────────────────────────────
+  build-check:
+    name: Build — ${{ matrix.target }}
+    runs-on: ubuntu-latest
 
-    - name: Setup Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: '1.24.13'
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [chrome, firefox, edge, safari]
 
-    - name: Run Oracle Backend Tests
-      run: go test ./...
-      working-directory: oracle-backend
+    steps:
+      - uses: actions/checkout@v4
 
-    # Make sure the script is executable (Linux permissions)
-    - name: Make Script Executable
-      run: chmod +x tools/validate.sh
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 10.28.2
 
-    # Run the exact same script you use locally
-    - name: Run Full Validation Suite
-      run: ./tools/validate.sh
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install Dependencies
+        run: pnpm install
+
+      - name: Build Extension (${{ matrix.target }})
+        run: pnpm -C extension exec wxt build -b ${{ matrix.target }}
+
+  # ──────────────────────────────────────────────
+  # Cloudflare Worker
+  # ──────────────────────────────────────────────
+  cloudflare-worker-tests:
+    name: Cloudflare Worker — Tests & Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 10.28.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install Dependencies
+        run: pnpm install
+
+      - name: Run Cloudflare Worker Tests
+        run: pnpm -C cloudflare-worker test
+
+      - name: Run Static Analysis (Lint, Typecheck, Audit)
+        run: pnpm -C cloudflare-worker run validate
+
+  cloudflare-smoke:
+    name: Cloudflare Worker — Smoke Test
+    runs-on: ubuntu-latest
+    needs: cloudflare-worker-tests
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 10.28.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install Dependencies
+        run: pnpm install
+
+      - name: Make Script Executable
+        run: chmod +x tools/validate.sh
+
+      - name: Run Full Validation Suite
+        run: ./tools/validate.sh
+
+  # ──────────────────────────────────────────────
+  # Go — Security
+  # ──────────────────────────────────────────────
+  gosec:
+    name: Go — Security Scan (gosec)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ensure no committed Google credential files
+        run: |
+          if git ls-files --error-unmatch "oracle-backend/google-credentials.json" >/dev/null 2>&1; then
+            echo "oracle-backend/google-credentials.json must never be committed."
+            exit 1
+          fi
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.13"
+
+      - name: Install gosec
+        run: go install github.com/securego/gosec/v2/cmd/gosec@v2.23.0
+
+      - name: Run gosec (triaged profile)
+        working-directory: oracle-backend
+        run: |
+          "$(go env GOPATH)/bin/gosec" -track-suppressions ./...
+
+  # ──────────────────────────────────────────────
+  # Go — Oracle Backend Tests
+  # ──────────────────────────────────────────────
+  oracle-tests:
+    name: Go — Oracle Backend Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.13"
+
+      - name: Run Oracle Backend Tests
+        run: go test ./...
+        working-directory: oracle-backend
+
+  # ──────────────────────────────────────────────
+  # Go — Migration Smoke Test
+  # ──────────────────────────────────────────────
+  oracle-migration-smoke:
+    name: Go — Migration Smoke Test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: oracle_test
+          POSTGRES_USER: postgres
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d oracle_test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.13"
+
+      - name: Run Migration Bootstrap + Tests
+        working-directory: oracle-backend
+        env:
+          POSTGRES_DSN: postgres://postgres@localhost:5432/oracle_test?sslmode=disable
+        run: |
+          go test ./internal/db -run 'TestMigrationBootstrapCleanDatabases|TestInitPostgres_Smoke' -count=1 -v
+          go test ./... -count=1
+
+  # ──────────────────────────────────────────────
+  # Summary Gate (for branch protection)
+  # ──────────────────────────────────────────────
+  ci-passed:
+    name: CI ✅
+    if: always()
+    needs:
+      - extension-tests
+      - build-check
+      - cloudflare-worker-tests
+      - cloudflare-smoke
+      - gosec
+      - oracle-tests
+      - oracle-migration-smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check all jobs
+        run: |
+          echo "Extension Tests:        ${{ needs.extension-tests.result }}"
+          echo "Build Check:            ${{ needs.build-check.result }}"
+          echo "Worker Tests:           ${{ needs.cloudflare-worker-tests.result }}"
+          echo "Worker Smoke:           ${{ needs.cloudflare-smoke.result }}"
+          echo "gosec:                  ${{ needs.gosec.result }}"
+          echo "Oracle Tests:           ${{ needs.oracle-tests.result }}"
+          echo "Oracle Migration Smoke: ${{ needs.oracle-migration-smoke.result }}"
+
+          if [[ "${{ needs.extension-tests.result }}" != "success" ]] ||
+             [[ "${{ needs.build-check.result }}" != "success" ]] ||
+             [[ "${{ needs.cloudflare-worker-tests.result }}" != "success" ]] ||
+             [[ "${{ needs.cloudflare-smoke.result }}" != "success" ]] ||
+             [[ "${{ needs.gosec.result }}" != "success" ]] ||
+             [[ "${{ needs.oracle-tests.result }}" != "success" ]] ||
+             [[ "${{ needs.oracle-migration-smoke.result }}" != "success" ]]; then
+            echo "::error::One or more CI jobs failed."
+            exit 1
+          fi
+
+          echo "All CI checks passed!"

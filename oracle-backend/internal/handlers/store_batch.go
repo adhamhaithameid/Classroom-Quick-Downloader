@@ -3,13 +3,20 @@ package handlers
 
 import (
 	"context"
+	"crypto/sha256"
 	"crypto/subtle"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"net"
 	"net/http"
+	"sort"
 	"strconv"
+	"strings"
+	"sync"
 	"time"
 
 	model "oracle-backend/internal/model"
@@ -25,6 +32,15 @@ type ingestResponse struct {
 const failureLogRetentionDays = 30
 const maxFailureFieldLen = 64
 const maxFailureDetailLen = 240
+const ingestUnauthorizedFailureBurst = 6
+const ingestUnauthorizedFailureWindow = time.Minute
+
+var ingestUnauthorizedFailureThrottle = struct {
+	sync.Mutex
+	windowStart int64
+	allowed     int
+	suppressed  int
+}{}
 
 func sanitizeFailureField(input string, fallback string) string {
 	v := input
@@ -48,6 +64,37 @@ func sanitizeFailureDetail(input string) string {
 	return v
 }
 
+func allowIngestUnauthorizedFailure(now time.Time) (bool, int) {
+	nowMs := now.UnixMilli()
+	ingestUnauthorizedFailureThrottle.Lock()
+	defer ingestUnauthorizedFailureThrottle.Unlock()
+
+	if ingestUnauthorizedFailureThrottle.windowStart == 0 ||
+		nowMs-ingestUnauthorizedFailureThrottle.windowStart >= ingestUnauthorizedFailureWindow.Milliseconds() {
+		suppressed := ingestUnauthorizedFailureThrottle.suppressed
+		ingestUnauthorizedFailureThrottle.windowStart = nowMs
+		ingestUnauthorizedFailureThrottle.allowed = 0
+		ingestUnauthorizedFailureThrottle.suppressed = 0
+		ingestUnauthorizedFailureThrottle.allowed++
+		return true, suppressed
+	}
+
+	if ingestUnauthorizedFailureThrottle.allowed < ingestUnauthorizedFailureBurst {
+		ingestUnauthorizedFailureThrottle.allowed++
+		return true, 0
+	}
+	ingestUnauthorizedFailureThrottle.suppressed++
+	return false, 0
+}
+
+func resetIngestUnauthorizedFailureThrottle() {
+	ingestUnauthorizedFailureThrottle.Lock()
+	ingestUnauthorizedFailureThrottle.windowStart = 0
+	ingestUnauthorizedFailureThrottle.allowed = 0
+	ingestUnauthorizedFailureThrottle.suppressed = 0
+	ingestUnauthorizedFailureThrottle.Unlock()
+}
+
 func dayUTC(tsMs int64) string {
 	return time.UnixMilli(tsMs).UTC().Format("2006-01-02")
 }
@@ -60,6 +107,12 @@ func dayUTC(tsMs int64) string {
 //   - downloads_totals
 //   - do_state_snapshots
 func IngestBatchHandler(db *sql.DB, sharedSecret string) http.HandlerFunc {
+	return IngestBatchHandlerV4(db, nil, sharedSecret)
+}
+
+// IngestBatchHandlerV4 routes ingest writes through SQLite or Postgres primary mode
+// based on server-side feature flags.
+func IngestBatchHandlerV4(sqliteDB, postgresDB *sql.DB, sharedSecret string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			w.WriteHeader(http.StatusMethodNotAllowed)
@@ -70,7 +123,7 @@ func IngestBatchHandler(db *sql.DB, sharedSecret string) http.HandlerFunc {
 			logEvent("error", "ingest_misconfigured", map[string]interface{}{
 				"reason": "DO_SHARED_SECRET missing",
 			})
-			recordOracleFailure(db, "ingest", "misconfigured", "DO_SHARED_SECRET missing", 1, "", "")
+			recordOracleFailure(sqliteDB, "ingest", "misconfigured", "DO_SHARED_SECRET missing", 1, "", "")
 			http.Error(w, "server misconfigured: DO_SHARED_SECRET not set", http.StatusInternalServerError)
 			return
 		}
@@ -81,38 +134,83 @@ func IngestBatchHandler(db *sql.DB, sharedSecret string) http.HandlerFunc {
 		// Constant-time comparison for secret to prevent timing attacks
 		headerSecret := r.Header.Get("X-DO-SECRET")
 		if headerSecret == "" || subtle.ConstantTimeCompare([]byte(headerSecret), []byte(sharedSecret)) != 1 {
-			logEvent("warn", "ingest_unauthorized", map[string]interface{}{
-				"reason": "missing_or_invalid_secret",
-			})
-			recordOracleFailure(db, "ingest_auth", "unauthorized", "missing_or_invalid_secret", 1, "", "")
+			if allowed, suppressed := allowIngestUnauthorizedFailure(time.Now()); allowed {
+				fields := map[string]interface{}{
+					"reason": "missing_or_invalid_secret",
+				}
+				if suppressed > 0 {
+					fields["suppressed"] = suppressed
+				}
+				logEvent("warn", "ingest_unauthorized", fields)
+				recordOracleFailure(sqliteDB, "ingest_auth", "unauthorized", "missing_or_invalid_secret", 1, "", "")
+			}
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
 
+		bodyBytes, err := io.ReadAll(r.Body)
+		if err != nil {
+			recordOracleFailure(sqliteDB, "ingest", "body_read_failed", err.Error(), 1, "", "")
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
+
 		var batch model.OracleBatch
-		if err := json.NewDecoder(r.Body).Decode(&batch); err != nil {
+		if err := json.Unmarshal(bodyBytes, &batch); err != nil {
 			logEvent("warn", "ingest_invalid_json", map[string]interface{}{
 				"error": err.Error(),
 			})
-			recordOracleFailure(db, "ingest", "invalid_json", err.Error(), 1, "", "")
+			recordOracleFailure(sqliteDB, "ingest", "invalid_json", err.Error(), 1, "", "")
 			http.Error(w, "invalid JSON", http.StatusBadRequest)
 			return
 		}
 		if batch.BatchID == "" {
 			logEvent("warn", "ingest_missing_batch_id", nil)
-			recordOracleFailure(db, "ingest", "missing_batch_id", "batchId is required", 1, "", "")
+			recordOracleFailure(sqliteDB, "ingest", "missing_batch_id", "batchId is required", 1, "", "")
 			http.Error(w, "missing batchId", http.StatusBadRequest)
 			return
 		}
 
+		var rawPayload map[string]interface{}
+		if err := json.Unmarshal(bodyBytes, &rawPayload); err != nil {
+			rawPayload = map[string]interface{}{
+				"_parse_error": err.Error(),
+			}
+		}
+
 		ctx := r.Context()
-		if err := ingestBatch(ctx, db, &batch); err != nil {
+		usePostgresPrimary, evalErr := shouldUsePostgresPrimaryIngest(ctx, sqliteDB, postgresDB)
+		if evalErr != nil {
+			logEvent("error", "ingest_mode_eval_failed", map[string]interface{}{
+				"error": evalErr.Error(),
+			})
+			http.Error(w, "failed to evaluate ingest mode", http.StatusInternalServerError)
+			return
+		}
+		if usePostgresPrimary {
+			err = ingestBatchPostgres(ctx, postgresDB, &batch, bodyBytes)
+			if err == nil && sqliteDB != nil {
+				// Keep SQLite analytics tables in sync while stats endpoints still read SQLite.
+				// This mirror path is idempotent by batch_id and intentionally skips outbox/raw writes.
+				if mirrorErr := ingestBatchSQLiteMirror(ctx, sqliteDB, &batch); mirrorErr != nil {
+					logEvent("warn", "ingest_sqlite_mirror_failed", map[string]interface{}{
+						"batchId": batch.BatchID,
+						"error":   mirrorErr.Error(),
+					})
+					recordOracleFailure(sqliteDB, "ingest_mirror", "sqlite_mirror_failed", mirrorErr.Error(), 1, batch.BatchID, "")
+				}
+			}
+		} else {
+			err = ingestBatch(ctx, sqliteDB, &batch, bodyBytes, rawPayload)
+		}
+		if err != nil {
 			logEvent("error", "ingest_failed", map[string]interface{}{
 				"error":   err.Error(),
 				"batchId": batch.BatchID,
+				"mode":    map[bool]string{true: "postgres_primary", false: "sqlite_primary"}[usePostgresPrimary],
 			})
-			recordOracleFailure(db, "ingest", "ingest_failed", err.Error(), 1, batch.BatchID, "")
-			http.Error(w, "failed to ingest batch: "+err.Error(), http.StatusInternalServerError)
+			recordOracleFailure(sqliteDB, "ingest", "ingest_failed", err.Error(), 1, batch.BatchID, "")
+			http.Error(w, "failed to ingest batch", http.StatusInternalServerError)
 			return
 		}
 
@@ -126,7 +224,208 @@ func IngestBatchHandler(db *sql.DB, sharedSecret string) http.HandlerFunc {
 	}
 }
 
-func ingestBatch(ctx context.Context, db *sql.DB, batch *model.OracleBatch) error {
+func shouldUsePostgresPrimaryIngest(ctx context.Context, sqliteDB, postgresDB *sql.DB) (bool, error) {
+	if postgresDB == nil {
+		return false, nil
+	}
+	if sqliteDB == nil {
+		return true, nil
+	}
+	enabled, err := IsFeatureEnabled(ctx, sqliteDB, "feature_postgres_primary_ingest")
+	if err != nil {
+		return false, err
+	}
+	return enabled, nil
+}
+
+func ingestBatchPostgres(ctx context.Context, postgresDB *sql.DB, batch *model.OracleBatch, rawBody []byte) error {
+	if postgresDB == nil {
+		return errors.New("postgres primary ingest is not configured")
+	}
+	tx, err := postgresDB.BeginTx(ctx, &sql.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	nowMs := time.Now().UnixMilli()
+	generatedAt := batch.GeneratedAt
+	if generatedAt == 0 {
+		generatedAt = nowMs
+	}
+
+	// Keep ingestion idempotent on batch ID at the Postgres primary layer.
+	batchInserted := false
+	{
+		// Aggregate totals across all time buckets.
+		var totalEvents, totalDownloads, totalSuccess, totalFail int64
+		for _, b := range batch.TimeBuckets {
+			totalEvents += b.Totals.TotalEvents
+			totalDownloads += b.Totals.TotalDownloads
+			totalSuccess += b.Totals.TotalSuccess
+			totalFail += b.Totals.TotalFail
+		}
+		if len(batch.TimeBuckets) == 0 {
+			totalEvents = batch.Summary.Totals.TotalEvents
+			totalDownloads = batch.Summary.Totals.TotalDownloads
+			totalSuccess = batch.Summary.Totals.TotalSuccess
+			totalFail = batch.Summary.Totals.TotalFail
+		}
+
+		sanitizedBody := sanitizeRawSnapshotPayload(rawBody)
+		res, err := tx.ExecContext( // #nosec G701 -- SQL text is constant and values are passed as bound parameters.
+			ctx,
+			`INSERT INTO pg_ingest_batches (
+				batch_id, generated_at, ingested_at, time_zone,
+				events_count, downloads_count, success_count, fail_count, payload_json
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)
+			ON CONFLICT(batch_id) DO NOTHING`,
+			batch.BatchID,
+			generatedAt,
+			nowMs,
+			batch.TimeZone,
+			totalEvents,
+			totalDownloads,
+			totalSuccess,
+			totalFail,
+			string(sanitizedBody),
+		)
+		if err != nil {
+			return err
+		}
+		affected, _ := res.RowsAffected()
+		batchInserted = affected > 0
+		if !batchInserted {
+			return tx.Commit()
+		}
+
+		_, err = tx.ExecContext( // #nosec G701 -- SQL text is constant and values are passed as bound parameters.
+			ctx,
+			`INSERT INTO raw_ingest_events (event_type, payload_json, idempotency_key, created_at)
+			 VALUES ($1, $2::jsonb, $3, $4)
+			 ON CONFLICT (idempotency_key) DO NOTHING`,
+			"ingest_batch_committed",
+			string(sanitizedBody),
+			"batch:"+batch.BatchID,
+			nowMs,
+		)
+		if err != nil {
+			return err
+		}
+
+		outboxPayload, err := json.Marshal(map[string]any{
+			"batchId":      batch.BatchID,
+			"generatedAt":  generatedAt,
+			"ingestedAt":   nowMs,
+			"timeZone":     batch.TimeZone,
+			"events":       totalEvents,
+			"downloads":    totalDownloads,
+			"success":      totalSuccess,
+			"fail":         totalFail,
+			"snapshotHint": "raw_ingest_events",
+		})
+		if err != nil {
+			return err
+		}
+		_, err = tx.ExecContext( // #nosec G701 -- SQL text is constant and values are passed as bound parameters.
+			ctx,
+			`INSERT INTO pg_outbox (event_type, payload_json, idempotency_key, status, attempts, last_error, created_at, next_run_at)
+			 VALUES ($1, $2::jsonb, $3, 'pending', 0, '', $4, $4)
+			 ON CONFLICT(idempotency_key) DO NOTHING`,
+			"ingest_batch_committed",
+			string(outboxPayload),
+			"pg-ingest:"+batch.BatchID,
+			nowMs,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	if !batchInserted {
+		return tx.Commit()
+	}
+	return tx.Commit()
+}
+
+func ingestBatchSQLiteMirror(ctx context.Context, db *sql.DB, batch *model.OracleBatch) error {
+	tx, err := db.BeginTx(ctx, &sql.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Idempotency: mirror once per batch ID.
+	var exists int
+	err = tx.QueryRowContext(ctx, `SELECT 1 FROM batches WHERE batch_id = ?`, batch.BatchID).Scan(&exists) // #nosec G701 -- SQL text is constant and parameters are bound.
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+	if err == nil {
+		return tx.Commit()
+	}
+
+	var totalEvents, totalDownloads, totalSuccess, totalFail int64
+	for _, b := range batch.TimeBuckets {
+		totalEvents += b.Totals.TotalEvents
+		totalDownloads += b.Totals.TotalDownloads
+		totalSuccess += b.Totals.TotalSuccess
+		totalFail += b.Totals.TotalFail
+	}
+	if len(batch.TimeBuckets) == 0 {
+		totalEvents = batch.Summary.Totals.TotalEvents
+		totalDownloads = batch.Summary.Totals.TotalDownloads
+		totalSuccess = batch.Summary.Totals.TotalSuccess
+		totalFail = batch.Summary.Totals.TotalFail
+	}
+
+	nowMs := time.Now().UnixMilli()
+	generatedAt := batch.GeneratedAt
+	if generatedAt == 0 {
+		generatedAt = nowMs
+	}
+
+	if _, err := tx.ExecContext( // #nosec G701 -- SQL text is constant and parameters are bound.
+		ctx,
+		`INSERT INTO batches (
+			batch_id, generated_at, ingested_at, time_zone,
+			events_count, downloads_count, success_count, fail_count
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		batch.BatchID,
+		generatedAt,
+		nowMs,
+		batch.TimeZone,
+		totalEvents,
+		totalDownloads,
+		totalSuccess,
+		totalFail,
+	); err != nil {
+		return err
+	}
+
+	if err := insertHourly(ctx, tx, batch); err != nil {
+		return err
+	}
+	if err := updateTotals(ctx, tx, batch); err != nil {
+		return err
+	}
+	if err := insertDOStateSnapshot(ctx, tx, batch); err != nil {
+		return err
+	}
+	if err := upsertDeliveryMetrics(ctx, tx, batch); err != nil {
+		return err
+	}
+	if err := insertFailureLogsFromBatch(ctx, tx, batch); err != nil {
+		return err
+	}
+	if err := cleanupOldFailureLogs(ctx, tx, failureLogRetentionDays); err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+func ingestBatch(ctx context.Context, db *sql.DB, batch *model.OracleBatch, rawBody []byte, rawPayload map[string]interface{}) error {
 	tx, err := db.BeginTx(ctx, &sql.TxOptions{})
 	if err != nil {
 		return err
@@ -135,13 +434,23 @@ func ingestBatch(ctx context.Context, db *sql.DB, batch *model.OracleBatch) erro
 
 	// Idempotency: if batch_id exists, do nothing.
 	var exists int
-	err = tx.QueryRowContext(ctx, `SELECT 1 FROM batches WHERE batch_id = ?`, batch.BatchID).Scan(&exists)
+	err = tx.QueryRowContext(ctx, `SELECT 1 FROM batches WHERE batch_id = ?`, batch.BatchID).Scan(&exists) // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
 	if err == nil {
 		// Already ingested.
 		return tx.Commit()
+	}
+
+	// Persist full raw payload first (raw-to-projected model).
+	if err := insertRawSnapshot(ctx, tx, "cloudflare-do", "/ingest-batch", rawBody, "ok"); err != nil {
+		return err
+	}
+
+	// Register any new schema paths so drift is detected without breaking storage.
+	if err := registerSchemaPaths(ctx, tx, rawPayload); err != nil {
+		return err
 	}
 
 	// Aggregate totals across all time buckets.
@@ -152,6 +461,12 @@ func ingestBatch(ctx context.Context, db *sql.DB, batch *model.OracleBatch) erro
 		totalSuccess += b.Totals.TotalSuccess
 		totalFail += b.Totals.TotalFail
 	}
+	if len(batch.TimeBuckets) == 0 {
+		totalEvents = batch.Summary.Totals.TotalEvents
+		totalDownloads = batch.Summary.Totals.TotalDownloads
+		totalSuccess = batch.Summary.Totals.TotalSuccess
+		totalFail = batch.Summary.Totals.TotalFail
+	}
 
 	nowMs := time.Now().UnixMilli()
 	generatedAt := batch.GeneratedAt
@@ -160,7 +475,7 @@ func ingestBatch(ctx context.Context, db *sql.DB, batch *model.OracleBatch) erro
 	}
 
 	// Insert into batches.
-	if _, err := tx.ExecContext(
+	if _, err := tx.ExecContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 		ctx,
 		`INSERT INTO batches (
 			batch_id, generated_at, ingested_at, time_zone,
@@ -208,6 +523,26 @@ func ingestBatch(ctx context.Context, db *sql.DB, batch *model.OracleBatch) erro
 		return err
 	}
 
+	// SQLite-owned outbox event for asynchronous Postgres projection.
+	if err := enqueueSQLiteOutbox(
+		ctx,
+		tx,
+		"ingest_batch_committed",
+		map[string]interface{}{
+			"batchId":      batch.BatchID,
+			"generatedAt":  batch.GeneratedAt,
+			"ingestedAt":   nowMs,
+			"timeZone":     batch.TimeZone,
+			"downloads":    totalDownloads,
+			"success":      totalSuccess,
+			"fail":         totalFail,
+			"snapshotHint": "cf_snapshots_raw",
+		},
+		"batch:"+batch.BatchID,
+	); err != nil {
+		return err
+	}
+
 	// PRIVACY FIX: IP storage disabled per PRIVACY.md policy
 	// The privacy policy states IPs are never stored. Geo Map feature is disabled.
 	// To re-enable, update PRIVACY.md to disclose IP storage and uncomment the code below.
@@ -216,6 +551,245 @@ func ingestBatch(ctx context.Context, db *sql.DB, batch *model.OracleBatch) erro
 	// }
 
 	return tx.Commit()
+}
+
+func insertRawSnapshot(
+	ctx context.Context,
+	tx *sql.Tx,
+	source string,
+	endpoint string,
+	body []byte,
+	status string,
+) error {
+	if len(body) == 0 {
+		return nil
+	}
+	sanitizedBody := sanitizeRawSnapshotPayload(body)
+	sum := sha256.Sum256(sanitizedBody)
+	fingerprint := hex.EncodeToString(sum[:])
+	_, err := tx.ExecContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
+		ctx,
+		`INSERT INTO cf_snapshots_raw (
+			source, endpoint, payload_json, schema_fingerprint, status, received_at
+		) VALUES (?, ?, ?, ?, ?, ?)`,
+		source,
+		endpoint,
+		string(sanitizedBody),
+		fingerprint,
+		status,
+		time.Now().UnixMilli(),
+	)
+	return err
+}
+
+var rawSnapshotSensitiveKeys = map[string]struct{}{
+	"ip":         {},
+	"ipaddress":  {},
+	"clientip":   {},
+	"uniqueips":  {},
+	"rawips":     {},
+	"addressip":  {},
+	"iplist":     {},
+	"ipv4":       {},
+	"ipv6":       {},
+	"remoteaddr": {},
+}
+
+func sanitizeRawSnapshotPayload(body []byte) []byte {
+	var payload any
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return body
+	}
+	redactRawSnapshotValue(&payload)
+	sanitized, err := json.Marshal(payload)
+	if err != nil {
+		return body
+	}
+	return sanitized
+}
+
+func redactRawSnapshotValue(v *any) {
+	switch typed := (*v).(type) {
+	case map[string]any:
+		for key, child := range typed {
+			if isSensitiveRawSnapshotKey(key) {
+				typed[key] = redactedRawSnapshotValue(child)
+				continue
+			}
+			childAny := any(child)
+			redactRawSnapshotValue(&childAny)
+			typed[key] = childAny
+		}
+	case []any:
+		for i, child := range typed {
+			childAny := any(child)
+			redactRawSnapshotValue(&childAny)
+			typed[i] = childAny
+		}
+	case string:
+		if net.ParseIP(strings.TrimSpace(typed)) != nil {
+			*v = "[REDACTED_IP]"
+		}
+	}
+}
+
+func isSensitiveRawSnapshotKey(key string) bool {
+	lower := strings.ToLower(strings.TrimSpace(key))
+	clean := strings.NewReplacer("_", "", "-", "", " ", "").Replace(lower)
+	_, ok := rawSnapshotSensitiveKeys[clean]
+	return ok
+}
+
+func redactedRawSnapshotValue(value any) any {
+	switch cast := value.(type) {
+	case []any:
+		return map[string]any{
+			"redacted": true,
+			"count":    len(cast),
+		}
+	case map[string]any:
+		return map[string]any{
+			"redacted": true,
+			"keys":     len(cast),
+		}
+	default:
+		return "[REDACTED]"
+	}
+}
+
+func registerSchemaPaths(ctx context.Context, tx *sql.Tx, payload map[string]interface{}) error {
+	if len(payload) == 0 {
+		return nil
+	}
+	paths := make(map[string]string, 64)
+	walkJSONPaths("", payload, paths)
+	if len(paths) == 0 {
+		return nil
+	}
+
+	nowMs := time.Now().UnixMilli()
+	newCount := 0
+	keys := make([]string, 0, len(paths))
+	for k := range paths {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	for _, path := range keys {
+		sampleType := paths[path]
+		insertRes, err := tx.ExecContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
+			ctx,
+			`INSERT OR IGNORE INTO cf_schema_registry (json_path, first_seen_at, last_seen_at, sample_type, is_projected)
+			 VALUES (?, ?, ?, ?, 0)`,
+			path,
+			nowMs,
+			nowMs,
+			sampleType,
+		)
+		if err != nil {
+			return err
+		}
+
+		if rowsInserted, rowsErr := insertRes.RowsAffected(); rowsErr == nil && rowsInserted > 0 {
+			newCount++
+		}
+
+		if _, err := tx.ExecContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
+			ctx,
+			`UPDATE cf_schema_registry SET last_seen_at = ?, sample_type = ? WHERE json_path = ?`,
+			nowMs,
+			sampleType,
+			path,
+		); err != nil {
+			return err
+		}
+	}
+
+	if newCount > 0 {
+		alertPayload, _ := json.Marshal(map[string]interface{}{
+			"newPaths": newCount,
+		})
+		if _, err := tx.ExecContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
+			ctx,
+			`INSERT INTO system_alerts (alert_type, severity, message, status, payload_json, created_at, updated_at)
+			 VALUES (?, ?, ?, 'open', ?, ?, ?)`,
+			"schema_drift_detected",
+			"warning",
+			"new JSON schema paths detected from Cloudflare payload",
+			string(alertPayload),
+			nowMs,
+			nowMs,
+		); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func walkJSONPaths(prefix string, value interface{}, out map[string]string) {
+	switch v := value.(type) {
+	case map[string]interface{}:
+		for key, child := range v {
+			childPrefix := key
+			if prefix != "" {
+				childPrefix = prefix + "." + key
+			}
+			walkJSONPaths(childPrefix, child, out)
+		}
+	case []interface{}:
+		if prefix != "" {
+			out[prefix+"[]"] = "array"
+		}
+		for _, child := range v {
+			switch child.(type) {
+			case map[string]interface{}, []interface{}:
+				walkJSONPaths(prefix+"[]", child, out)
+			default:
+				// Keep array marker stable for scalar arrays.
+			}
+		}
+	case nil:
+		if prefix != "" {
+			out[prefix] = "null"
+		}
+	case bool:
+		if prefix != "" {
+			out[prefix] = "bool"
+		}
+	case float64:
+		if prefix != "" {
+			out[prefix] = "number"
+		}
+	case string:
+		if prefix != "" {
+			out[prefix] = "string"
+		}
+	default:
+		if prefix != "" {
+			out[prefix] = strings.ToLower(fmt.Sprintf("%T", v))
+		}
+	}
+}
+
+func enqueueSQLiteOutbox(ctx context.Context, tx *sql.Tx, eventType string, payload map[string]interface{}, key string) error {
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	nowMs := time.Now().UnixMilli()
+	_, err = tx.ExecContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
+		ctx,
+		`INSERT INTO ingest_outbox (event_type, payload_json, idempotency_key, status, attempts, last_error, created_at, next_run_at)
+		 VALUES (?, ?, ?, 'pending', 0, '', ?, ?)
+		 ON CONFLICT(idempotency_key) DO NOTHING`,
+		eventType,
+		string(raw),
+		key,
+		nowMs,
+		nowMs,
+	)
+	return err
 }
 
 // insertBatchIPs stores unique IPs for the Geo Map feature
@@ -296,6 +870,7 @@ func isValidIP(ip string) bool {
 }
 
 func insertHourly(ctx context.Context, tx *sql.Tx, batch *model.OracleBatch) error {
+	// #nosec G701 -- statement is static SQL; all dynamic values are bound parameters.
 	stmt, err := tx.PrepareContext(ctx, `
 		INSERT INTO downloads_hourly (
 			bucket_start,
@@ -398,6 +973,30 @@ func updateTotals(ctx context.Context, tx *sql.Tx, batch *model.OracleBatch) err
 			aggErrorType[k] += v
 		}
 	}
+	if len(batch.TimeBuckets) == 0 {
+		aggEvents = batch.Summary.Totals.TotalEvents
+		aggDownloads = batch.Summary.Totals.TotalDownloads
+		aggSuccess = batch.Summary.Totals.TotalSuccess
+		aggFail = batch.Summary.Totals.TotalFail
+		for k, v := range batch.Summary.Browsers {
+			aggBrowser[k] += v
+		}
+		for k, v := range batch.Summary.Os {
+			aggOs[k] += v
+		}
+		for k, v := range batch.Summary.Countries {
+			aggCountry[k] += v
+		}
+		for k, v := range batch.Summary.Languages {
+			aggLang[k] += v
+		}
+		for k, v := range batch.Summary.Versions {
+			aggExtVer[k] += v
+		}
+		for k, v := range batch.Summary.Types {
+			aggType[k] += v
+		}
+	}
 
 	// Lifetime totals (global).
 	if err := upsertTotal(ctx, tx, "totalEvents", aggEvents); err != nil {
@@ -476,6 +1075,7 @@ func upsertTotal(ctx context.Context, tx *sql.Tx, key string, delta int64) error
 	if delta == 0 {
 		return nil
 	}
+	// #nosec G701 -- statement is static SQL; key/delta are passed as bound parameters.
 	_, err := tx.ExecContext(ctx, `
 		INSERT INTO downloads_totals (key, value)
 		VALUES (?, ?)
@@ -522,7 +1122,7 @@ func insertDOStateSnapshot(ctx context.Context, tx *sql.Tx, batch *model.OracleB
 		}
 	}
 
-	_, err := tx.ExecContext(
+	_, err := tx.ExecContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 		ctx,
 		`INSERT INTO do_state_snapshots (
 			captured_at,
@@ -624,7 +1224,7 @@ func upsertDeliveryMetrics(ctx context.Context, tx *sql.Tx, batch *model.OracleB
 		if stage.count <= 0 {
 			continue
 		}
-		if _, err := tx.ExecContext(
+		if _, err := tx.ExecContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 			ctx,
 			`INSERT INTO pipeline_stage_daily (day_utc, stage, count, updated_at)
 			 VALUES (?, ?, ?, ?)
@@ -647,7 +1247,7 @@ func upsertDeliveryMetrics(ctx context.Context, tx *sql.Tx, batch *model.OracleB
 		status = "forwarded"
 	}
 
-	_, err := tx.ExecContext(
+	_, err := tx.ExecContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 		ctx,
 		`INSERT INTO pipeline_delivery_events (
 			delivery_id, batch_id, created_at, updated_at,
@@ -749,7 +1349,7 @@ func cleanupOldFailureLogs(ctx context.Context, tx *sql.Tx, retentionDays int) e
 		return nil
 	}
 	cutoff := time.Now().UTC().AddDate(0, 0, -retentionDays).UnixMilli()
-	_, err := tx.ExecContext(ctx, `DELETE FROM pipeline_failure_logs WHERE ts_utc < ?`, cutoff)
+	_, err := tx.ExecContext(ctx, `DELETE FROM pipeline_failure_logs WHERE ts_utc < ?`, cutoff) // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 	return err
 }
 

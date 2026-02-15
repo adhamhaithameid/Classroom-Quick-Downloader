@@ -1,5 +1,7 @@
 # 🏛️ Oracle Backend & Analytics Engine
 
+> Update (2026-02-15): Latest changes include CI coverage-gate hardening for extension analytics storage migration fallback, popup stats race-condition guards, structured step-up auth error handling in Oracle dashboard, and backend/worker auth-security hardening. See /CHANGELOG.md for details.
+
 ![Go](https://img.shields.io/badge/Go-1.24-00ADD8?logo=go&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-Pure_Go-003B57?logo=sqlite&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)
@@ -19,6 +21,83 @@ The **Oracle Backend** is a high-performance, low-footprint analytics server des
 | **Pre-Aggregated Storage** | Receives already-aggregated batches from Cloudflare DO, minimizing write operations. |
 | **Google Sheets Archiver** | A separate CLI tool pushes daily snapshots to Google Sheets for long-term reporting. |
 | **SPA Dashboard** | Serves a beautiful, embedded analytics dashboard with no external dependencies. |
+
+---
+
+## 🧭 Oracle Hub v4 Scope
+
+Oracle Hub v4 extends the backend from analytics-only to a full admin/control plane:
+
+- **Management Hub**: dashboards/deployments/versions records with API-backed CRUD.
+- **Creative Hub**: designs, HTML emails, newsletter subscribers, and campaigns.
+- **Danger Zone + SQL Console**: step-up protected destructive operations with feature flags and dry-run support.
+- **Dual-DB reliability**: outbox-driven SQLite ingestion relay and Postgres control-plane outbox events.
+- **Observability**: request-level structured logs, Prometheus metrics, alert sink, and Oracle operation logs APIs.
+- **UI productivity**: keyboard shortcuts panel + hold `Command`/`Ctrl` for 1 second to reveal shortcut badges.
+
+Full v4 reference:
+- [`docs/ORACLE_HUB_V4.md`](../docs/ORACLE_HUB_V4.md)
+
+---
+
+## 📱 Testing Oracle UI On This Device
+
+Use this to test from desktop and mobile devices on your local network:
+
+1. Start backend locally:
+```bash
+cd oracle-backend
+export DASHBOARD_PASSWORD='your-dashboard-password'
+export SUPER_ADMIN_PASSWORD='your-super-admin-password'
+go run ./cmd/app
+```
+2. Desktop test URL:
+```text
+http://localhost:8080
+```
+3. Find your LAN IP and test from phone/tablet on same Wi-Fi:
+```bash
+ipconfig getifaddr en0   # macOS Wi-Fi interface
+```
+4. Open on phone:
+```text
+http://<LAN_IP>:8080
+```
+5. Optional backend quality scan before manual UI test:
+```bash
+cd oracle-backend && make scan
+```
+
+6. One-command full API smoke matrix:
+```bash
+cd oracle-backend
+BASE_URL="http://127.0.0.1:8080" \
+DASHBOARD_PASSWORD="your-dashboard-password" \
+./scripts/api-matrix-smoke.sh
+```
+
+7. Include step-up protected dry-run checks (critical endpoints):
+```bash
+cd oracle-backend
+BASE_URL="http://127.0.0.1:8080" \
+DASHBOARD_PASSWORD="your-dashboard-password" \
+SUPER_ADMIN_PASSWORD="your-super-admin-password" \
+./scripts/api-matrix-smoke.sh
+```
+
+8. Strict mode (fail if policy-gated critical endpoints are blocked):
+```bash
+cd oracle-backend
+BASE_URL="http://127.0.0.1:8080" \
+DASHBOARD_PASSWORD="your-dashboard-password" \
+SUPER_ADMIN_PASSWORD="your-super-admin-password" \
+STRICT_CRITICAL=1 \
+./scripts/api-matrix-smoke.sh
+```
+
+Notes:
+- HTTP local testing works out of the box.
+- For internet exposure, always place Oracle behind HTTPS + reverse proxy.
 
 ---
 
@@ -141,10 +220,26 @@ All configuration is done via environment variables, defined in `docker-compose.
 | `STATIC_DIR` | `/app/static` | Directory containing dashboard static files. |
 | `DO_SHARED_SECRET` | *(required)* | Shared secret for authenticating Cloudflare Durable Object requests. |
 | `DASHBOARD_PASSWORD` | *(required)* | Password for dashboard login (enables auth). |
+| `SUPER_ADMIN_PASSWORD` | *(required)* | Password for step-up verification on critical admin operations. |
+| `ORACLE_AUDIT_CHECKPOINT_SECRET` | *(required)* | HMAC secret used to sign audit-chain checkpoint anchors. |
 | `ARCHIVER_SHARED_SECRET` | *(required when auth enabled)* | Secret header for the archiver to read stats. |
 | `ALLOW_LOOPBACK_BYPASS` | `false` | Set `true` to allow loopback auth bypass (dev only). |
-| `ALLOW_INSECURE_COOKIES` | `false` | Set `true` to allow cookies over HTTP (HTTP-only deployments). |
 | `ALLOW_EMPTY_DASHBOARD_PASSWORD` | `false` | Set `true` to allow an empty dashboard password (dev only). |
+| `SESSION_COOKIE_SECURE` | `auto` | Cookie Secure mode: `auto` (TLS-aware), `true` (always secure), `false` (always non-secure; needed for plain HTTP). |
+| `PUBLIC_BASE_URL` | *(optional)* | Canonical public origin (for CSRF origin allow checks), e.g. `https://oracle.example.com`. |
+| `CSRF_ALLOWED_ORIGINS` | *(optional)* | Comma-separated explicit CSRF origin allowlist (scheme + host), e.g. `https://oracle.example.com,https://admin.example.com`. |
+| `POSTGRES_DSN` | *(optional)* | Enables Postgres bootstrap and v4 cutover paths. |
+| `STORAGE_WATERMARK_WARN` | `70` | Disk usage warning watermark percentage. |
+| `STORAGE_WATERMARK_CRITICAL` | `85` | Disk usage critical watermark percentage. |
+| `STORAGE_WATERMARK_EMERGENCY` | `92` | Disk usage emergency watermark percentage. |
+| `ORACLE_PRIMARY_REGION` | `primary` | Label for primary region in DR status APIs. |
+| `ORACLE_DR_REGION` | `warm-dr` | Label for warm DR region in DR status APIs. |
+| `ORACLE_DR_REPLICA_LAG_SECONDS` | `-1` | Optional external replica lag feed for DR visibility. |
+| `ORACLE_DR_PROMOTION_MAX_LAG_SECONDS` | `300` | Promotion guardrail for DR eligibility checks. |
+| `ORACLE_RETENTION_RAW_SNAPSHOTS_DAYS` | `30` | Retention window for `cf_snapshots_raw` rows based on `received_at`. |
+
+Startup is **fail-closed** for auth secrets: the server exits if `SUPER_ADMIN_PASSWORD` is missing, and also exits if `DASHBOARD_PASSWORD` is missing while `ALLOW_EMPTY_DASHBOARD_PASSWORD=false`.
+Startup also exits if `ORACLE_AUDIT_CHECKPOINT_SECRET` is missing, and exits when `DO_SHARED_SECRET`, `DASHBOARD_PASSWORD`, `SUPER_ADMIN_PASSWORD`, `ARCHIVER_SHARED_SECRET`, or `ORACLE_AUDIT_CHECKPOINT_SECRET` are set to known weak placeholder values (for example `secret`, `password`, or `change-me-in-production`).
 
 When `DASHBOARD_PASSWORD` is set, the Oracle dashboard prompts for authentication using an **in-page login modal form** (not a browser-native prompt), matching the Cloudflare dashboard workflow.
 
@@ -176,13 +271,15 @@ The archiver requires a Google Cloud Service Account JSON file for Google Sheets
 1. Create a Service Account in Google Cloud Console.
 2. Enable the Google Sheets API.
 3. Download the JSON key file.
-4. Place it at `oracle-backend/google-credentials.json`.
+4. Store it outside the repository, e.g. `$HOME/.config/cqd/google-credentials.json`.
 5. Share your Google Sheet with the Service Account email.
 
-The file is mounted read-only in the container via `docker-compose.yml`:
+Mount credentials from an external path into the container:
 ```yaml
+environment:
+  - GOOGLE_CREDS_PATH=/run/secrets/google-credentials.json
 volumes:
-  - ./google-credentials.json:/app/google-credentials.json:ro
+  - ${GOOGLE_CREDS_PATH_HOST:-/dev/null}:/run/secrets/google-credentials.json:ro
 ```
 
 ---
@@ -346,6 +443,42 @@ curl "http://localhost:8080/api/pipeline/failures?days=14&limit=200"
 
 ---
 
+### `GET /api/admin/oracle-logs` — Oracle Operation Logs
+
+Returns request-level backend operation logs captured by the Oracle server.
+
+**Query params:**
+- `limit` (default `200`, max `2000`)
+- `offset` (default `0`)
+
+---
+
+### `POST /api/admin/oracle-logs/delete-older` — Retention Delete
+
+Deletes Oracle operation logs older than a configured number of days.
+
+**Body:**
+```json
+{ "days": 30, "dryRun": false }
+```
+
+**Auth:** Requires dashboard auth + step-up.
+
+---
+
+### `POST /api/admin/oracle-logs/clear-all` — Clear All Logs
+
+Deletes all Oracle operation logs.
+
+**Body:**
+```json
+{ "confirm": "CLEAR_ALL_LOGS", "dryRun": false }
+```
+
+**Auth:** Requires dashboard auth + step-up.
+
+---
+
 ### `GET /health` — Health Check
 
 Simple health probe for Docker health checks and load balancers.
@@ -362,6 +495,82 @@ curl http://localhost:8080/health
 
 ---
 
+### `GET /health/ready` — Readiness Gate
+
+Readiness probe for load balancers and failover automation.
+
+Checks:
+- SQLite connectivity + outbox health.
+- Postgres migration/init/outbox health when Postgres is configured.
+- Storage emergency state (ingest backpressure mode).
+
+Returns `503` with reasons when not ready.
+
+---
+
+### `GET /api/admin/ha/status` — HA Runtime Status
+
+Returns HA runtime state for operators:
+- active write mode (`sqlite_primary` or `postgres_primary`)
+- cutover feature flags
+- sqlite/postgres outbox backlog health
+- storage pressure snapshot
+- latest backup run metadata
+
+---
+
+### `GET /api/admin/storage/status` — Storage/Disk Status
+
+Returns host disk telemetry and growth indicators:
+- disk used/available bytes + percentage
+- configured warn/critical/emergency thresholds
+- current severity + ingest backpressure state
+- top high-row-count tables
+
+---
+
+### `GET /api/admin/dr/status` — DR Readiness Status
+
+Returns warm-DR visibility:
+- primary + DR region labels
+- replica lag feed value (if configured)
+- promotion eligibility decision
+- latest drill result metadata
+
+---
+
+### `POST /api/admin/dr/drill` — Record DR Drill
+
+Step-up protected endpoint for game-day drill records.
+
+Body:
+```json
+{
+  "dryRun": true,
+  "targetRegion": "warm-dr",
+  "simulatedOutcome": "passed",
+  "notes": "weekly validation"
+}
+```
+
+---
+
+### `POST /api/admin/retention/run` — Retention Executor
+
+Step-up protected retention action for bounded operational tables.
+
+Body:
+```json
+{
+  "dryRun": true,
+  "policies": ["pipeline_failure_logs", "oracle_operation_logs", "ingest_outbox_sent"]
+}
+```
+
+Applies retention to transient tables (failure logs, operation logs, sent outbox rows, storage samples, auth stale rows, and optional Postgres outbox rows).
+
+---
+
 ## 📊 Google Sheets Archiver
 
 The `archiver` CLI tool pushes daily analytics snapshots to a Google Sheet for long-term historical tracking.
@@ -369,6 +578,8 @@ The `archiver` CLI tool pushes daily analytics snapshots to a Google Sheet for l
 ### How It Works
 
 1. Fetches `/api/stats/summary` from the local server.
+   - It automatically scopes to a full UTC day window (`from=YYYY-MM-DD&to=YYYY-MM-DD`).
+   - Default archived day is `yesterday` (good for the 00:15 UTC scheduler run).
 2. Extracts totals, breakdowns, and top stats.
 3. Formats data as a spreadsheet row.
 4. Appends the row to the specified Google Sheet.
@@ -378,8 +589,9 @@ The `archiver` CLI tool pushes daily analytics snapshots to a Google Sheet for l
 ```bash
 ./archiver \
   --sheet "YOUR_GOOGLE_SHEET_ID" \
-  --creds "/app/google-credentials.json" \
-  --api "http://localhost:8080/api/stats/summary"
+  --creds "/run/secrets/google-credentials.json" \
+  --api "http://localhost:8080/api/stats/summary" \
+  --day "yesterday"
 ```
 
 ### Cron Job Setup
@@ -416,6 +628,7 @@ The archiver appends a row with the following columns:
 | N | All File Types (breakdown) |
 | O | All Errors (breakdown) |
 | P | Extension Versions (breakdown) |
+| Q | Total Cancelled |
 
 ---
 
@@ -568,6 +781,81 @@ docker cp cqd-oracle-backend:/data/analytics.db ./backup-$(date +%Y%m%d).db
 
 We use **Uptime Kuma** for self-hosted infrastructure monitoring. It runs on the same Oracle VM as the backend, providing 24/7 uptime tracking and instant alerts when something goes wrong.
 
+## Oracle Hub v4 Admin APIs
+
+The dashboard now exposes dedicated control-plane APIs for creative/content operations,
+Postgres-backed record management, and deployment synchronization.
+
+### Outbox Reliability
+
+- `GET /api/admin/outbox/status?source=all|sqlite|postgres`
+- `POST /api/admin/outbox/retry` with optional JSON body:
+  - `{"source":"sqlite","ids":[1,2]}`
+  - `{"source":"postgres"}`
+- `POST /api/admin/outbox/replay-dead-letter` (SQLite dead-letter replay)
+
+### Management + Deployment Sync
+
+- `GET /api/admin/deployments/targets`
+- `POST /api/admin/deployments/sync`
+- `GET /api/admin/sheets/last-flush`
+- `GET /api/admin/records/list?type=deployment_target`
+- `POST /api/admin/records/upsert`
+
+Deployment sync stores these fields per browser target:
+- `users`
+- `usersCount`
+- `version`
+- `rating`
+- `ratingCount`
+
+Automatic deployment sync runs server-side in the background (all targets) and can be tuned with:
+- `ORACLE_DEPLOYMENTS_AUTO_SYNC_ENABLED` (`true` by default)
+- `ORACLE_DEPLOYMENTS_AUTO_SYNC_INTERVAL_SECONDS` (`900` by default, min `60`, max `86400`)
+
+Backward-compatible aliases are also accepted:
+- `DEPLOYMENTS_AUTO_SYNC_ENABLED`
+- `DEPLOYMENTS_AUTO_SYNC_INTERVAL_SECONDS`
+
+Reliability behavior:
+- Auto-sync runs immediately at startup (no need to wait for the first interval tick).
+- Each cycle retries transient full-failure runs automatically before waiting for the next schedule.
+- Archiver runs persist latest Sheets flush metadata (`status`, archived day, row payload JSON) for dashboard visibility.
+
+### Creative Hub
+
+- `GET /api/admin/creative/designs`
+- `POST /api/admin/creative/designs/upsert`
+- `POST /api/admin/creative/designs/delete`
+- `GET /api/admin/creative/emails`
+- `POST /api/admin/creative/emails/upsert`
+- `POST /api/admin/creative/emails/delete`
+
+### Newsletter APIs
+
+- `GET /api/admin/newsletter/subscribers`
+- `POST /api/admin/newsletter/subscribers/upsert`
+- `POST /api/admin/newsletter/subscribers/delete`
+- `GET /api/admin/newsletter/campaigns`
+- `POST /api/admin/newsletter/campaigns/upsert`
+- `POST /api/admin/newsletter/campaigns/delete`
+
+### Security Scan Script
+
+Run all backend checks locally:
+
+```bash
+make scan
+```
+
+Fast local targets:
+
+```bash
+make test-app
+make test-handlers
+make test
+```
+
 ### Tooling
 
 | Component | Details |
@@ -695,13 +983,13 @@ This page shows:
 
 ### Archiver Fails with "Unable to read client secret file"
 
-**Symptom:** Archiver can't find `google-credentials.json`.
+**Symptom:** Archiver can't find Google credentials JSON.
 
 **Cause:** File not mounted or incorrect path.
 
 **Solution:**
-1. Verify `google-credentials.json` exists in `oracle-backend/`.
-2. Check `docker-compose.yml` volume mount is correct.
+1. Verify the credentials file exists at `GOOGLE_CREDS_PATH_HOST` on the host.
+2. Check the compose bind mount points to `/run/secrets/google-credentials.json`.
 3. Ensure Service Account has Sheets API enabled.
 
 ---
@@ -716,6 +1004,19 @@ This page shows:
 1. Check logs: `docker compose logs oracle-backend`.
 2. Verify port `8080` is not in use by another process.
 3. Ensure `DB_PATH` directory is writable.
+
+---
+
+### "Session cookie was not saved by your browser" on login
+
+**Symptom:** Dashboard login accepts password but auth modal does not unlock.
+
+**Cause:** Browser drops the session cookie due to Secure policy mismatch for HTTP deployments.
+
+**Solution:**
+1. For HTTPS deployments keep `SESSION_COOKIE_SECURE=auto` (or `true`).
+2. For plain HTTP deployments set `SESSION_COOKIE_SECURE=false`.
+3. Refresh the page and retry login after updating env vars.
 
 ---
 

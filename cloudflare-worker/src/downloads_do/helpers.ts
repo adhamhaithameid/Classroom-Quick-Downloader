@@ -14,13 +14,14 @@ export function todayUtcDate(): string {
  * Create a JSON Response with proper headers.
  */
 export function json<T>(obj: T, init: ResponseInit = {}): Response {
+  const headers = new Headers(init.headers);
+  if (!headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+
   return new Response(JSON.stringify(obj), {
     ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': '*',
-      ...(init.headers ?? {}),
-    },
+    headers,
   });
 }
 

@@ -6,7 +6,17 @@
 import { FAVICON_PNG_DATA_URI } from "../assets";
 import { LOGIN_STYLES } from "./styles";
 
+function escapeHtml(unsafe: string): string {
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 export function renderLoginPage(errorMessage?: string): string {
+  const safeError = errorMessage ? escapeHtml(errorMessage) : "";
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -28,7 +38,7 @@ export function renderLoginPage(errorMessage?: string): string {
       </div>
       <button class="login-button" type="submit">Unlock →</button>
     </div>
-    ${errorMessage ? `<div class="login-error">${errorMessage}</div>` : ""}
+    ${safeError ? `<div class="login-error">${safeError}</div>` : ""}
   </form>
   <script>document.getElementById("password-input")?.focus();</script>
 </body>

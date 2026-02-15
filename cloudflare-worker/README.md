@@ -1,5 +1,7 @@
 # ⚡ CQD Analytics Worker
 
+> Update (2026-02-15): Latest changes include CI coverage-gate hardening for extension analytics storage migration fallback, popup stats race-condition guards, structured step-up auth error handling in Oracle dashboard, and backend/worker auth-security hardening. See /CHANGELOG.md for details.
+
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
 ![Cloudflare Workers](https://img.shields.io/badge/Cloudflare_Workers-F38020?logo=cloudflare&logoColor=white)
 ![Durable Objects](https://img.shields.io/badge/Durable_Objects-Enabled-blueviolet)
@@ -141,6 +143,9 @@ All configuration is defined in `wrangler.toml`:
 | `DO_SHARED_SECRET`    | **Secret**                     | Shared secret for admin endpoints + Oracle communication. **Do NOT put in `[vars]`**.              | —                            |
 | `DASHBOARD_PASSWORD`  | **Secret**                     | Password for the Worker dashboard login/session tokens (separate from `DO_SHARED_SECRET`).         | —                            |
 | `DANGER_PASSWORD`     | **Secret**                     | Password for Danger Zone actions.                                                                   | —                            |
+| `SESSION_BINDING_MODE`| `[vars]` (optional)            | Session replay hardening mode: `off`, `optional`, or `strict` (coarse IP-prefix + UA fingerprint). | `strict`                     |
+| `CORS_ALLOWED_ORIGINS`| `[vars]` (optional)            | Comma-separated allowed origins for non-admin protected routes (`/stats`, `/auth/verify-danger`). | `https://oracle.example.com` |
+| `ADMIN_CORS_ALLOWED_ORIGINS`| `[vars]` (optional)     | Comma-separated allowed origins for admin/debug routes only (`/admin/*`, `/debug/*`). No fallback to `CORS_ALLOWED_ORIGINS`. | `https://admin.example.com` |
 | `DOWNLOADS_DO`        | `[[durable_objects.bindings]]` | The binding name for the Durable Object.                                                            | `DOWNLOADS_DO`                |
 
 ### 🔐 Setting `DO_SHARED_SECRET` Securely

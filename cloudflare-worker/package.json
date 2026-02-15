@@ -9,10 +9,12 @@
     "typecheck": "tsc --noEmit",
     "audit": "pnpm audit",
     "validate": "pnpm run lint && pnpm run typecheck && pnpm run audit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage.enabled --coverage.provider=v8 --coverage.reporter=json --coverage.reportsDirectory=coverage"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260210.0",
+    "@vitest/coverage-v8": "^4.0.18",
     "@eslint/js": "^10.0.1",
     "@typescript-eslint/eslint-plugin": "^8.55.0",
     "@typescript-eslint/parser": "^8.55.0",

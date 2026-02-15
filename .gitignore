@@ -10,6 +10,7 @@ extension/.output/
 extension/dev/.output/
 extension/.wxt/
 extension/coverage/
+cloudflare-worker/coverage/
 **/.vite/
 .wrangler/
 .dev.vars
@@ -17,7 +18,17 @@ AI/
 ai/
 oracle-backend/data/
 oracle-backend/docker_data/
+oracle-backend/app
+oracle-backend/coverage.out
+oracle-backend/coverage.project.out
+oracle-backend/coverage_all.out
+oracle-backend/coverage_all.func.txt
+oracle-backend/handler_cover.out
 *.db
 *.db-shm
 *.db-wal
 google-credentials.json
+oracle-backend/google-credentials*.json
+
+ownership-map-out/
+ownership-map-out-sensitive/

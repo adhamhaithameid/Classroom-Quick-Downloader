@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -56,9 +57,87 @@ func TestSpaHandler_AllowsStaticFilesAndBlocksTraversal(t *testing.T) {
 	}
 }
 
+func TestSpaHandler_ReplacesCSPNoncePlaceholderInIndex(t *testing.T) {
+	dir := t.TempDir()
+	indexPath := filepath.Join(dir, "index.html")
+	if err := os.WriteFile(indexPath, []byte(`<html><body><script nonce="__CSP_NONCE__">console.log("ok")</script></body></html>`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	h := securityHeadersMiddleware(spaHandler(dir))
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200 for index, got %d", rr.Code)
+	}
+	body := rr.Body.String()
+	if strings.Contains(body, "__CSP_NONCE__") {
+		t.Fatalf("expected CSP nonce placeholder to be replaced")
+	}
+	csp := rr.Header().Get("Content-Security-Policy")
+	if !strings.Contains(csp, "nonce-") {
+		t.Fatalf("expected nonce in CSP header, got %q", csp)
+	}
+}
+
+func TestServeIndexWithNonce_RemovesPlaceholderWhenNonceUnavailable(t *testing.T) {
+	dir := t.TempDir()
+	indexPath := filepath.Join(dir, "index.html")
+	if err := os.WriteFile(indexPath, []byte(`<script nonce="__CSP_NONCE__">console.log("ok")</script>`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rr := httptest.NewRecorder()
+	serveIndexWithNonce(rr, req, dir)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200 for index, got %d", rr.Code)
+	}
+	body := rr.Body.String()
+	if strings.Contains(body, "__CSP_NONCE__") {
+		t.Fatalf("expected CSP placeholder to be removed when nonce missing")
+	}
+}
+
+func TestResolveArchiverPath_Validation(t *testing.T) {
+	tmp := t.TempDir()
+	execPath := filepath.Join(tmp, "archiver")
+	if err := os.WriteFile(execPath, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatalf("failed to write exec file: %v", err)
+	}
+
+	resolved, err := resolveArchiverPath(execPath)
+	if err != nil {
+		t.Fatalf("expected executable file to resolve, got error: %v", err)
+	}
+	expected, err := filepath.Abs(execPath)
+	if err != nil {
+		t.Fatalf("filepath.Abs failed: %v", err)
+	}
+	if resolved != expected {
+		t.Fatalf("unexpected resolved path: got %s want %s", resolved, expected)
+	}
+
+	if _, err := resolveArchiverPath(""); err == nil {
+		t.Fatalf("expected empty path to fail")
+	}
+	if _, err := resolveArchiverPath(tmp); err == nil {
+		t.Fatalf("expected directory path to fail")
+	}
+
+	nonExecPath := filepath.Join(tmp, "archiver.txt")
+	if err := os.WriteFile(nonExecPath, []byte("plain"), 0o644); err != nil {
+		t.Fatalf("failed to write non-exec file: %v", err)
+	}
+	if _, err := resolveArchiverPath(nonExecPath); err == nil {
+		t.Fatalf("expected non-executable file to fail")
+	}
+}
+
 func TestAuthMiddleware_EnforcesSessionWhenEnabled(t *testing.T) {
 	resetSessionStore()
-	protected := requireAuth("secret", "", false)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	protected := requireAuth(nil, "secret", "", false)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -72,7 +151,7 @@ func TestAuthMiddleware_EnforcesSessionWhenEnabled(t *testing.T) {
 
 func TestAuthMiddleware_AllowsArchiverSecret(t *testing.T) {
 	resetSessionStore()
-	protected := requireAuth("secret", "arch-secret", false)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	protected := requireAuth(nil, "secret", "arch-secret", false)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -85,6 +164,36 @@ func TestAuthMiddleware_AllowsArchiverSecret(t *testing.T) {
 	}
 }
 
+func TestAuthMiddleware_RejectsArchiverSecretOnNonArchiverPath(t *testing.T) {
+	resetSessionStore()
+	protected := requireAuth(nil, "secret", "arch-secret", false)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/admin/flags", nil)
+	req.Header.Set("X-Archiver-Secret", "arch-secret")
+	rr := httptest.NewRecorder()
+	protected.ServeHTTP(rr, req)
+	if rr.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 on disallowed archiver path, got %d", rr.Code)
+	}
+}
+
+func TestAuthMiddleware_RejectsArchiverSecretOnNonGET(t *testing.T) {
+	resetSessionStore()
+	protected := requireAuth(nil, "secret", "arch-secret", false)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodPost, "/api/stats/summary", nil)
+	req.Header.Set("X-Archiver-Secret", "arch-secret")
+	rr := httptest.NewRecorder()
+	protected.ServeHTTP(rr, req)
+	if rr.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 for archiver secret on non-GET, got %d", rr.Code)
+	}
+}
+
 func TestPipelineEndpoints_RequireAuth(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "pipeline-auth.db")
 	sqlDB, err := db.Init(dbPath)
@@ -93,8 +202,8 @@ func TestPipelineEndpoints_RequireAuth(t *testing.T) {
 	}
 	defer sqlDB.Close()
 
-	metrics := requireAuth("secret", "arch-secret", false)(handlers.PipelineMetricsHandler(sqlDB))
-	failures := requireAuth("secret", "arch-secret", false)(handlers.PipelineFailuresHandler(sqlDB))
+	metrics := requireAuth(nil, "secret", "arch-secret", false)(handlers.PipelineMetricsHandler(sqlDB))
+	failures := requireAuth(nil, "secret", "arch-secret", false)(handlers.PipelineFailuresHandler(sqlDB))
 
 	req := httptest.NewRequest(http.MethodGet, "/api/pipeline/metrics", nil)
 	rr := httptest.NewRecorder()
@@ -114,15 +223,23 @@ func TestPipelineEndpoints_RequireAuth(t *testing.T) {
 	req.Header.Set("X-Archiver-Secret", "arch-secret")
 	rr = httptest.NewRecorder()
 	metrics.ServeHTTP(rr, req)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected 200 for metrics with archiver secret, got %d", rr.Code)
+	if rr.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 for metrics with archiver secret, got %d", rr.Code)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/api/pipeline/failures", nil)
+	req.Header.Set("X-Archiver-Secret", "arch-secret")
+	rr = httptest.NewRecorder()
+	failures.ServeHTTP(rr, req)
+	if rr.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 for failures with archiver secret, got %d", rr.Code)
 	}
 }
 
 func TestLoginHandler_SetsSecureCookieOnSuccess(t *testing.T) {
 	resetSessionStore()
 	resetLoginRateStore()
-	h := loginHandler("secret", false)
+	h := loginHandler(nil, "secret")
 
 	body := bytes.NewBufferString(`{"password":"secret"}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", body)
@@ -155,7 +272,7 @@ func TestLoginHandler_SetsSecureCookieOnSuccess(t *testing.T) {
 func TestLoginHandler_AllowsInsecureCookieOnHttpWhenAllowed(t *testing.T) {
 	resetSessionStore()
 	resetLoginRateStore()
-	h := loginHandler("secret", true)
+	h := loginHandler(nil, "secret")
 
 	body := bytes.NewBufferString(`{"password":"secret"}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", body)
@@ -182,10 +299,62 @@ func TestLoginHandler_AllowsInsecureCookieOnHttpWhenAllowed(t *testing.T) {
 	}
 }
 
+func TestLoginHandler_HTTPCookieRemainsUsableWhenInsecureDisabled(t *testing.T) {
+	resetSessionStore()
+	resetLoginRateStore()
+	h := loginHandler(nil, "secret")
+
+	body := bytes.NewBufferString(`{"password":"secret"}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", body)
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+	var found bool
+	for _, c := range rr.Result().Cookies() {
+		if c.Name != sessionCookieName {
+			continue
+		}
+		found = true
+		if c.Secure {
+			t.Fatalf("expected insecure cookie for HTTP deployments, got: %+v", c)
+		}
+		if c.SameSite != http.SameSiteLaxMode {
+			t.Fatalf("expected SameSite=Lax, got: %+v", c)
+		}
+	}
+	if !found {
+		t.Fatalf("expected cookie named %s", sessionCookieName)
+	}
+}
+
+func TestHashPassword_UsesBcrypt(t *testing.T) {
+	hashA, err := hashPassword("super-secret")
+	if err != nil {
+		t.Fatalf("hashPassword failed: %v", err)
+	}
+	hashB, err := hashPassword("super-secret")
+	if err != nil {
+		t.Fatalf("hashPassword failed: %v", err)
+	}
+	if hashA == hashB {
+		t.Fatalf("expected salted hashes to differ")
+	}
+	if !verifyPasswordHash(hashA, "super-secret") {
+		t.Fatalf("expected verifyPasswordHash to accept valid password")
+	}
+	if verifyPasswordHash(hashA, "wrong-password") {
+		t.Fatalf("expected verifyPasswordHash to reject invalid password")
+	}
+}
+
 func TestAuthCheckHandler_ReflectsSessionState(t *testing.T) {
 	resetSessionStore()
 	resetLoginRateStore()
-	login := loginHandler("secret", false)
+	login := loginHandler(nil, "secret")
 	body := bytes.NewBufferString(`{"password":"secret"}`)
 	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", body)
 	loginReq.TLS = &tls.ConnectionState{}
@@ -206,7 +375,7 @@ func TestAuthCheckHandler_ReflectsSessionState(t *testing.T) {
 		t.Fatal("missing session cookie")
 	}
 
-	check := authCheckHandler("secret")
+	check := authCheckHandler(nil, "secret")
 	checkReq := httptest.NewRequest(http.MethodGet, "/api/auth/check", nil)
 	checkReq.AddCookie(sessionCookie)
 	checkRR := httptest.NewRecorder()
@@ -244,7 +413,7 @@ func TestIngestBatchHandler_RejectsInvalidSecret(t *testing.T) {
 func TestLoginHandler_RateLimitsAfterFailures(t *testing.T) {
 	resetSessionStore()
 	resetLoginRateStore()
-	h := loginHandler("secret", false)
+	h := loginHandler(nil, "secret")
 
 	for i := 0; i < loginMaxAttempts; i++ {
 		body := bytes.NewBufferString(`{"password":"wrong"}`)
@@ -327,5 +496,418 @@ func TestIngestBatchHandler_AcceptsValidBatch(t *testing.T) {
 	}
 	if ingestedAt, ok := payload["ingestedAt"].(float64); !ok || ingestedAt <= 0 {
 		t.Fatalf("expected ingestedAt > 0, got %v", payload["ingestedAt"])
+	}
+}
+
+func TestCriticalStepUpFlow_EnforcedWhenFlagEnabled(t *testing.T) {
+	resetSessionStore()
+	resetLoginRateStore()
+	stepUpSessionStore.Lock()
+	stepUpSessionStore.tokens = make(map[string]stepUpSession)
+	stepUpSessionStore.Unlock()
+	stepUpChallengeStore.Lock()
+	stepUpChallengeStore.items = make(map[string]stepUpChallenge)
+	stepUpChallengeStore.Unlock()
+
+	dbPath := filepath.Join(t.TempDir(), "stepup.db")
+	sqlDB, err := db.Init(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sqlDB.Close()
+
+	if _, err := sqlDB.Exec(`UPDATE feature_flags SET enabled = 1 WHERE name = 'feature_stepup_enforced'`); err != nil {
+		t.Fatalf("failed to enable stepup flag: %v", err)
+	}
+
+	login := loginHandler(nil, "viewer-secret")
+	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(`{"password":"viewer-secret"}`))
+	loginReq.Header.Set("Content-Type", "application/json")
+	loginRR := httptest.NewRecorder()
+	login.ServeHTTP(loginRR, loginReq)
+	if loginRR.Code != http.StatusOK {
+		t.Fatalf("login failed: %d %s", loginRR.Code, loginRR.Body.String())
+	}
+	var sessionCookie *http.Cookie
+	for _, c := range loginRR.Result().Cookies() {
+		if c.Name == sessionCookieName {
+			sessionCookie = c
+		}
+	}
+	if sessionCookie == nil {
+		t.Fatal("expected viewer session cookie")
+	}
+
+	authMW := requireAuth(nil, "viewer-secret", "", false)
+	protected := authMW(requireStepUp(sqlDB, "super-secret")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})))
+
+	protectedReq := httptest.NewRequest(http.MethodPost, "/api/admin/flags/update", nil)
+	protectedReq.AddCookie(sessionCookie)
+	protectedRR := httptest.NewRecorder()
+	protected.ServeHTTP(protectedRR, protectedReq)
+	if protectedRR.Code != http.StatusForbidden {
+		t.Fatalf("expected forbidden without stepup, got %d", protectedRR.Code)
+	}
+
+	start := authMW(stepUpStartHandler(sqlDB))
+	startReq := httptest.NewRequest(http.MethodPost, "/api/auth/stepup/start", nil)
+	startReq.AddCookie(sessionCookie)
+	startRR := httptest.NewRecorder()
+	start.ServeHTTP(startRR, startReq)
+	if startRR.Code != http.StatusOK {
+		t.Fatalf("stepup start failed: %d %s", startRR.Code, startRR.Body.String())
+	}
+	var startPayload map[string]any
+	if err := json.Unmarshal(startRR.Body.Bytes(), &startPayload); err != nil {
+		t.Fatalf("invalid start payload: %v", err)
+	}
+	challengeID, _ := startPayload["challengeId"].(string)
+	if challengeID == "" {
+		t.Fatalf("missing challengeId: %v", startPayload)
+	}
+
+	verify := authMW(stepUpVerifyHandler(sqlDB, "super-secret"))
+	verifyReq := httptest.NewRequest(
+		http.MethodPost,
+		"/api/auth/stepup/verify",
+		bytes.NewBufferString(`{"challengeId":"`+challengeID+`","password":"super-secret"}`),
+	)
+	verifyReq.Header.Set("Content-Type", "application/json")
+	verifyReq.AddCookie(sessionCookie)
+	verifyRR := httptest.NewRecorder()
+	verify.ServeHTTP(verifyRR, verifyReq)
+	if verifyRR.Code != http.StatusOK {
+		t.Fatalf("stepup verify failed: %d %s", verifyRR.Code, verifyRR.Body.String())
+	}
+
+	var stepUpCookie *http.Cookie
+	for _, c := range verifyRR.Result().Cookies() {
+		if c.Name == stepUpSessionCookieName {
+			stepUpCookie = c
+		}
+	}
+	if stepUpCookie == nil {
+		t.Fatal("expected stepup session cookie")
+	}
+
+	protectedReq = httptest.NewRequest(http.MethodPost, "/api/admin/flags/update", nil)
+	protectedReq.AddCookie(sessionCookie)
+	protectedReq.AddCookie(stepUpCookie)
+	protectedRR = httptest.NewRecorder()
+	protected.ServeHTTP(protectedRR, protectedReq)
+	if protectedRR.Code != http.StatusOK {
+		t.Fatalf("expected success with stepup, got %d", protectedRR.Code)
+	}
+}
+
+func TestStepUpVerify_RateLimitsFailures(t *testing.T) {
+	resetSessionStore()
+	resetLoginRateStore()
+	stepUpRateStore.Lock()
+	stepUpRateStore.attempts = make(map[string]*stepUpAttempt)
+	stepUpRateStore.Unlock()
+	stepUpChallengeStore.Lock()
+	stepUpChallengeStore.items = make(map[string]stepUpChallenge)
+	stepUpChallengeStore.Unlock()
+
+	dbPath := filepath.Join(t.TempDir(), "stepup-rate.db")
+	sqlDB, err := db.Init(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sqlDB.Close()
+
+	if _, err := sqlDB.Exec(`UPDATE feature_flags SET enabled = 1 WHERE name = 'feature_stepup_enforced'`); err != nil {
+		t.Fatalf("failed to enable stepup flag: %v", err)
+	}
+
+	login := loginHandler(nil, "viewer-secret")
+	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(`{"password":"viewer-secret"}`))
+	loginReq.Header.Set("Content-Type", "application/json")
+	loginRR := httptest.NewRecorder()
+	login.ServeHTTP(loginRR, loginReq)
+	if loginRR.Code != http.StatusOK {
+		t.Fatalf("login failed: %d", loginRR.Code)
+	}
+	var sessionCookie *http.Cookie
+	for _, c := range loginRR.Result().Cookies() {
+		if c.Name == sessionCookieName {
+			sessionCookie = c
+		}
+	}
+	if sessionCookie == nil {
+		t.Fatal("missing session cookie")
+	}
+
+	authMW := requireAuth(nil, "viewer-secret", "", false)
+	start := authMW(stepUpStartHandler(sqlDB))
+	verify := authMW(stepUpVerifyHandler(sqlDB, "super-secret"))
+
+	for i := 0; i < stepUpMaxAttempts+1; i++ {
+		startReq := httptest.NewRequest(http.MethodPost, "/api/auth/stepup/start", nil)
+		startReq.AddCookie(sessionCookie)
+		startReq.RemoteAddr = "203.0.113.1:1234"
+		startRR := httptest.NewRecorder()
+		start.ServeHTTP(startRR, startReq)
+		if startRR.Code != http.StatusOK {
+			t.Fatalf("stepup start failed at %d: %d", i, startRR.Code)
+		}
+		var startPayload map[string]any
+		if err := json.Unmarshal(startRR.Body.Bytes(), &startPayload); err != nil {
+			t.Fatalf("invalid start payload: %v", err)
+		}
+		challengeID, _ := startPayload["challengeId"].(string)
+		verifyReq := httptest.NewRequest(
+			http.MethodPost,
+			"/api/auth/stepup/verify",
+			bytes.NewBufferString(`{"challengeId":"`+challengeID+`","password":"wrong"}`),
+		)
+		verifyReq.RemoteAddr = "203.0.113.1:1234"
+		verifyReq.Header.Set("Content-Type", "application/json")
+		verifyReq.AddCookie(sessionCookie)
+		verifyRR := httptest.NewRecorder()
+		verify.ServeHTTP(verifyRR, verifyReq)
+		if i >= stepUpMaxAttempts-1 && verifyRR.Code == http.StatusTooManyRequests {
+			return
+		}
+	}
+
+	t.Fatalf("expected stepup verify to eventually return 429")
+}
+
+func TestCriticalStepUpFlow_BindsStepUpToParentSession(t *testing.T) {
+	resetSessionStore()
+	resetLoginRateStore()
+	stepUpSessionStore.Lock()
+	stepUpSessionStore.tokens = make(map[string]stepUpSession)
+	stepUpSessionStore.Unlock()
+	stepUpChallengeStore.Lock()
+	stepUpChallengeStore.items = make(map[string]stepUpChallenge)
+	stepUpChallengeStore.Unlock()
+
+	dbPath := filepath.Join(t.TempDir(), "stepup-bind.db")
+	sqlDB, err := db.Init(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sqlDB.Close()
+
+	if _, err := sqlDB.Exec(`UPDATE feature_flags SET enabled = 1 WHERE name = 'feature_stepup_enforced'`); err != nil {
+		t.Fatalf("failed to enable stepup flag: %v", err)
+	}
+
+	login := loginHandler(nil, "viewer-secret")
+	loginAndGetSession := func(remote string) *http.Cookie {
+		t.Helper()
+		req := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(`{"password":"viewer-secret"}`))
+		req.RemoteAddr = remote
+		req.Header.Set("Content-Type", "application/json")
+		rr := httptest.NewRecorder()
+		login.ServeHTTP(rr, req)
+		if rr.Code != http.StatusOK {
+			t.Fatalf("login failed: %d %s", rr.Code, rr.Body.String())
+		}
+		for _, c := range rr.Result().Cookies() {
+			if c.Name == sessionCookieName {
+				return c
+			}
+		}
+		t.Fatalf("session cookie not found")
+		return nil
+	}
+
+	sessionA := loginAndGetSession("203.0.113.10:1111")
+	sessionB := loginAndGetSession("203.0.113.11:2222")
+
+	authMW := requireAuth(nil, "viewer-secret", "", false)
+	start := authMW(stepUpStartHandler(sqlDB))
+	verify := authMW(stepUpVerifyHandler(sqlDB, "super-secret"))
+
+	startReq := httptest.NewRequest(http.MethodPost, "/api/auth/stepup/start", nil)
+	startReq.RemoteAddr = "203.0.113.10:1111"
+	startReq.AddCookie(sessionA)
+	startRR := httptest.NewRecorder()
+	start.ServeHTTP(startRR, startReq)
+	if startRR.Code != http.StatusOK {
+		t.Fatalf("stepup start failed: %d %s", startRR.Code, startRR.Body.String())
+	}
+	var startPayload map[string]any
+	if err := json.Unmarshal(startRR.Body.Bytes(), &startPayload); err != nil {
+		t.Fatalf("invalid start payload: %v", err)
+	}
+	challengeID, _ := startPayload["challengeId"].(string)
+	if challengeID == "" {
+		t.Fatalf("missing challenge id: %v", startPayload)
+	}
+
+	verifyReq := httptest.NewRequest(
+		http.MethodPost,
+		"/api/auth/stepup/verify",
+		bytes.NewBufferString(`{"challengeId":"`+challengeID+`","password":"super-secret"}`),
+	)
+	verifyReq.RemoteAddr = "203.0.113.10:1111"
+	verifyReq.Header.Set("Content-Type", "application/json")
+	verifyReq.AddCookie(sessionA)
+	verifyRR := httptest.NewRecorder()
+	verify.ServeHTTP(verifyRR, verifyReq)
+	if verifyRR.Code != http.StatusOK {
+		t.Fatalf("stepup verify failed: %d %s", verifyRR.Code, verifyRR.Body.String())
+	}
+
+	var stepUpCookie *http.Cookie
+	for _, c := range verifyRR.Result().Cookies() {
+		if c.Name == stepUpSessionCookieName {
+			stepUpCookie = c
+		}
+	}
+	if stepUpCookie == nil {
+		t.Fatal("stepup session cookie not found")
+	}
+
+	protected := authMW(requireStepUp(sqlDB, "super-secret")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})))
+	protectedReq := httptest.NewRequest(http.MethodPost, "/api/admin/flags/update", nil)
+	protectedReq.AddCookie(sessionB)
+	protectedReq.AddCookie(stepUpCookie)
+	protectedRR := httptest.NewRecorder()
+	protected.ServeHTTP(protectedRR, protectedReq)
+	if protectedRR.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 for cross-session stepup reuse, got %d", protectedRR.Code)
+	}
+}
+
+func TestNewsletterSubscriberUpsert_RequiresStepUp(t *testing.T) {
+	resetSessionStore()
+	resetLoginRateStore()
+	stepUpSessionStore.Lock()
+	stepUpSessionStore.tokens = make(map[string]stepUpSession)
+	stepUpSessionStore.Unlock()
+	stepUpChallengeStore.Lock()
+	stepUpChallengeStore.items = make(map[string]stepUpChallenge)
+	stepUpChallengeStore.Unlock()
+
+	dbPath := filepath.Join(t.TempDir(), "newsletter-stepup.db")
+	sqlDB, err := db.Init(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sqlDB.Close()
+
+	if _, err := sqlDB.Exec(`UPDATE feature_flags SET enabled = 1 WHERE name = 'feature_stepup_enforced'`); err != nil {
+		t.Fatalf("failed to enable stepup flag: %v", err)
+	}
+	if _, err := sqlDB.Exec(`UPDATE feature_flags SET enabled = 1 WHERE name = 'feature_creative_hub_enabled'`); err != nil {
+		t.Fatalf("failed to enable creative hub flag: %v", err)
+	}
+
+	login := loginHandler(sqlDB, "viewer-secret")
+	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(`{"password":"viewer-secret"}`))
+	loginReq.Header.Set("Content-Type", "application/json")
+	loginRR := httptest.NewRecorder()
+	login.ServeHTTP(loginRR, loginReq)
+	if loginRR.Code != http.StatusOK {
+		t.Fatalf("login failed: %d %s", loginRR.Code, loginRR.Body.String())
+	}
+
+	var sessionCookie *http.Cookie
+	for _, c := range loginRR.Result().Cookies() {
+		if c.Name == sessionCookieName {
+			sessionCookie = c
+		}
+	}
+	if sessionCookie == nil {
+		t.Fatal("expected viewer session cookie")
+	}
+
+	authMW := requireAuth(sqlDB, "viewer-secret", "", false)
+
+	upsert := authMW(requireStepUp(sqlDB, "super-secret")(handlers.NewsletterSubscribersUpsertHandler(sqlDB, nil)))
+	upsertReq := httptest.NewRequest(
+		http.MethodPost,
+		"/api/admin/newsletter/subscribers/upsert",
+		bytes.NewBufferString(`{"data":{"email":"viewer@example.com","name":"Viewer","status":"active"}}`),
+	)
+	upsertReq.Header.Set("Content-Type", "application/json")
+	upsertReq.AddCookie(sessionCookie)
+	upsertRR := httptest.NewRecorder()
+	upsert.ServeHTTP(upsertRR, upsertReq)
+	if upsertRR.Code != http.StatusForbidden {
+		t.Fatalf("expected upsert to require step-up and return 403, got %d: %s", upsertRR.Code, upsertRR.Body.String())
+	}
+
+	del := authMW(requireStepUp(sqlDB, "super-secret")(handlers.NewsletterSubscribersDeleteHandler(sqlDB, nil)))
+	delReq := httptest.NewRequest(
+		http.MethodPost,
+		"/api/admin/newsletter/subscribers/delete",
+		bytes.NewBufferString(`{"recordKey":"viewer@example.com"}`),
+	)
+	delReq.Header.Set("Content-Type", "application/json")
+	delReq.AddCookie(sessionCookie)
+	delRR := httptest.NewRecorder()
+	del.ServeHTTP(delRR, delReq)
+	if delRR.Code != http.StatusForbidden {
+		t.Fatalf("expected delete to require step-up and return 403, got %d: %s", delRR.Code, delRR.Body.String())
+	}
+}
+
+func TestDeploymentsSync_AllowsViewerWithoutStepUp(t *testing.T) {
+	resetSessionStore()
+	resetLoginRateStore()
+	stepUpSessionStore.Lock()
+	stepUpSessionStore.tokens = make(map[string]stepUpSession)
+	stepUpSessionStore.Unlock()
+
+	dbPath := filepath.Join(t.TempDir(), "deploy-sync-no-stepup.db")
+	sqlDB, err := db.Init(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sqlDB.Close()
+
+	if _, err := sqlDB.Exec(`UPDATE feature_flags SET enabled = 1 WHERE name = 'feature_stepup_enforced'`); err != nil {
+		t.Fatalf("failed to enable stepup flag: %v", err)
+	}
+	if _, err := sqlDB.Exec(`UPDATE feature_flags SET enabled = 1 WHERE name = 'feature_management_hub_enabled'`); err != nil {
+		t.Fatalf("failed to enable management hub flag: %v", err)
+	}
+	if _, err := sqlDB.Exec(`UPDATE feature_flags SET enabled = 1 WHERE name = 'feature_sync_enabled'`); err != nil {
+		t.Fatalf("failed to enable sync flag: %v", err)
+	}
+
+	login := loginHandler(sqlDB, "viewer-secret")
+	loginReq := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(`{"password":"viewer-secret"}`))
+	loginReq.Header.Set("Content-Type", "application/json")
+	loginRR := httptest.NewRecorder()
+	login.ServeHTTP(loginRR, loginReq)
+	if loginRR.Code != http.StatusOK {
+		t.Fatalf("login failed: %d %s", loginRR.Code, loginRR.Body.String())
+	}
+
+	var sessionCookie *http.Cookie
+	for _, c := range loginRR.Result().Cookies() {
+		if c.Name == sessionCookieName {
+			sessionCookie = c
+		}
+	}
+	if sessionCookie == nil {
+		t.Fatal("expected viewer session cookie")
+	}
+
+	authMW := requireAuth(sqlDB, "viewer-secret", "", false)
+	syncHandler := authMW(handlers.DeploymentsSyncHandler(sqlDB, nil, nil))
+	syncReq := httptest.NewRequest(
+		http.MethodPost,
+		"/api/admin/deployments/sync",
+		bytes.NewBufferString(`{"targets":["unknown"]}`),
+	)
+	syncReq.Header.Set("Content-Type", "application/json")
+	syncReq.AddCookie(sessionCookie)
+	syncRR := httptest.NewRecorder()
+	syncHandler.ServeHTTP(syncRR, syncReq)
+	if syncRR.Code != http.StatusBadRequest {
+		t.Fatalf("expected sync to be reachable without step-up and return 400 for unknown target, got %d: %s", syncRR.Code, syncRR.Body.String())
 	}
 }

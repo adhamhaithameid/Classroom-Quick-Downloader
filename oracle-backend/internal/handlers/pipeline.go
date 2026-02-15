@@ -115,7 +115,7 @@ func PipelineMetricsHandler(db *sql.DB) http.HandlerFunc {
 			WeeklySummary: map[string]int64{},
 		}
 
-		rows, err := db.QueryContext(
+		rows, err := db.QueryContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 			ctx,
 			`SELECT day_utc, stage, count
 			 FROM pipeline_stage_daily
@@ -155,7 +155,7 @@ func PipelineMetricsHandler(db *sql.DB) http.HandlerFunc {
 		resp.Gaps["stored_minus_forwarded"] = resp.Totals["stored"] - resp.Totals["forwarded"]
 		resp.Gaps["forwarded_minus_committed"] = resp.Totals["forwarded"] - resp.Totals["committed"]
 
-		deliveryRows, err := db.QueryContext(
+		deliveryRows, err := db.QueryContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 			ctx,
 			`SELECT delivery_id, batch_id, created_at, updated_at,
 			        accepted_count, stored_count, forwarded_count, committed_count,
@@ -241,7 +241,7 @@ func PipelineFailuresHandler(db *sql.DB) http.HandlerFunc {
 			Daily:       []pipelineFailureSummaryItem{},
 		}
 
-		rows, err := db.QueryContext(
+		rows, err := db.QueryContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 			ctx,
 			`SELECT id, ts_utc, day_utc, source, stage, error_code, error_detail, sample_count, batch_id, delivery_id
 			 FROM pipeline_failure_logs
@@ -279,7 +279,7 @@ func PipelineFailuresHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		sumRows, err := db.QueryContext(
+		sumRows, err := db.QueryContext( // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 			ctx,
 			`SELECT day_utc, stage, error_code, SUM(sample_count) AS events, COUNT(*) AS occurrences
 			 FROM pipeline_failure_logs

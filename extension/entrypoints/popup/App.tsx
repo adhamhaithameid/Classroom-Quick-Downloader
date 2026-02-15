@@ -186,8 +186,6 @@ function isColorDark(hexColor: string): boolean {
  * Returns value between 0 (identical) and ~441 (opposite)
  */
 function getColorDistance(hex1: string, hex2: string): number {
-  const c1 = hexToHsl(hex1); // Use HSL for better perceptual tracking? Actually RGB is easier for simple diff
-  // Let's use RGB for distance
   const r1 = parseInt(hex1.slice(1, 3), 16);
   const g1 = parseInt(hex1.slice(3, 5), 16);
   const b1 = parseInt(hex1.slice(5, 7), 16);
@@ -208,21 +206,14 @@ function getColorDistance(hex1: string, hex2: string): number {
  * @param typeId - file type ID
  * @param position - position in the list (for triadic harmony)
  * @param usedColors - set of already assigned colors to avoid
+ * @param assignments - in-memory color assignment map
  */
 function getDistinctColorForTypeAtPosition(
   typeId: string, 
   position: number, 
-  usedColors: Set<string>
+  usedColors: Set<string>,
+  assignments: Record<string, string>
 ): string {
-  // Try to load existing assignments
-  let assignments: Record<string, string> = {};
-  try {
-    const stored = localStorage.getItem(COLOR_STORAGE_KEY);
-    assignments = stored ? JSON.parse(stored) : {};
-  } catch {
-    assignments = {};
-  }
-  
   const key = `${typeId}_pos${position}`;
   
   // Deterministic candidate generation
@@ -266,25 +257,39 @@ function getDistinctColorForTypeAtPosition(
      candidate = hslToHex(hsl.h, hsl.s, Math.max(20, Math.min(80, hsl.l + (attempts % 2 === 0 ? 20 : -20))));
   }
   
-  // Save the resolved color
+  // Save into the shared in-memory assignment map.
   assignments[key] = candidate;
+
+  return candidate;
+}
+
+function loadColorAssignments(): Record<string, string> {
+  try {
+    const stored = localStorage.getItem(COLOR_STORAGE_KEY);
+    const parsed = stored ? JSON.parse(stored) : {};
+    if (parsed && typeof parsed === 'object') {
+      return parsed as Record<string, string>;
+    }
+  } catch {
+    // Ignore storage parse/read failures and fall back to empty map.
+  }
+  return {};
+}
+
+function saveColorAssignments(assignments: Record<string, string>): void {
   try {
     localStorage.setItem(COLOR_STORAGE_KEY, JSON.stringify(assignments));
   } catch {
-    // Ignore
+    // Ignore storage write failures.
   }
-  
-  return candidate;
 }
 
 function App() {
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [tabId, setTabId] = useState<number | null>(null);
 
   const [isClassroomTab, setIsClassroomTab] = useState(false);
   const [loadingState, setLoadingState] = useState(true);
 
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState<string | null>(null);
 
@@ -351,7 +356,6 @@ function App() {
       }
       if (tabs && tabs.length > 0) {
         const url = tabs[0].url || '';
-        setTabId(tabs[0].id || null);
         // Use proper URL parsing to avoid security issues with substring matching
         try {
           const parsedUrl = new URL(url);
@@ -367,12 +371,20 @@ function App() {
 
   // --- STATS LOADING LOGIC ---
   useEffect(() => {
+    let isMounted = true;
+    let latestStatsRequestId = 0;
+
     // 1. Function to process stats from storage format to Chart format
     const loadStats = async () => {
+      const requestId = ++latestStatsRequestId;
+      const isStale = () => !isMounted || requestId !== latestStatsRequestId;
+
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const browserApi = (globalThis as any).chrome;
         if (!browserApi || !browserApi.storage || !browserApi.storage.local) {
+            if (isStale()) return;
+            setTotalDownloads(0);
             setStats([]); // Empty stats in dev
             return;
         }
@@ -389,9 +401,9 @@ function App() {
              }
            });
         });
+        if (isStale()) return;
         const raw = result.local_stats || { total: 0, byType: {} };
-        
-        setTotalDownloads(raw.total || 0);
+        const totalDownloadsNext = raw.total || 0;
 
         // Convert byType object to sorted array
         const entries = Object.entries(raw.byType as Record<string, number>);
@@ -405,9 +417,10 @@ function App() {
         const otherCount = others.reduce((acc, curr) => acc + curr[1], 0);
 
         const usedColors = new Set<string>();
+        const colorAssignments = loadColorAssignments();
 
         const mapped: StatItem[] = top.map(([key, val], index) => {
-          const color = getDistinctColorForTypeAtPosition(key, index, usedColors);
+          const color = getDistinctColorForTypeAtPosition(key, index, usedColors, colorAssignments);
           usedColors.add(color);
           return {
             id: key,
@@ -418,7 +431,7 @@ function App() {
         });
 
         if (otherCount > 0) {
-          const otherColor = getDistinctColorForTypeAtPosition('other', mapped.length, usedColors);
+          const otherColor = getDistinctColorForTypeAtPosition('other', mapped.length, usedColors, colorAssignments);
           usedColors.add(otherColor);
           mapped.push({
             id: 'other',
@@ -428,10 +441,16 @@ function App() {
           });
         }
 
+        if (isStale()) return;
+        saveColorAssignments(colorAssignments);
+        if (isStale()) return;
+        setTotalDownloads(totalDownloadsNext);
         setStats(mapped);
 
       } catch (e) {
-        console.warn('Failed to load stats', e);
+        if (!isStale()) {
+          console.warn('Failed to load stats', e);
+        }
       }
     };
 
@@ -440,18 +459,24 @@ function App() {
     // 2. Listen for live updates (if user downloads while popup is open)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const browserApi = (globalThis as any).chrome;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let listener: ((changes: any, area: string) => void) | null = null;
     if (browserApi && browserApi.storage && browserApi.storage.onChanged) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const listener = (changes: any, area: string) => {
+        listener = (changes: any, area: string) => {
           if (area === 'local' && changes.local_stats) {
             loadStats();
           }
         };
         browserApi.storage.onChanged.addListener(listener);
-        return () => {
-          browserApi.storage.onChanged.removeListener(listener);
-        };
     }
+    return () => {
+      isMounted = false;
+      latestStatsRequestId += 1;
+      if (listener && browserApi && browserApi.storage && browserApi.storage.onChanged) {
+        browserApi.storage.onChanged.removeListener(listener);
+      }
+    };
   }, []);
 
   // --- CHANGELOG LOADING ---
@@ -840,7 +865,7 @@ function App() {
                       label="Enable Extension"
                       description="Turn the extension on or off globally."
                       checked={settings?.extensionEnabled ?? true}
-                      loading={isLoadingSettings || saving}
+                      loading={isLoadingSettings}
                       onToggle={handleToggleExtension}
                       disabled={isLoadingSettings}
                       primary
