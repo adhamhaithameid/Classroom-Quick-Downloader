@@ -275,13 +275,21 @@
             hideStepUpModal();
             resolveStepUpModal(true);
           } catch (e) {
-            const msg = String(e || '');
-            if (msg.indexOf('429') !== -1) {
+            var status = 0;
+            var code = '';
+            if (e && typeof e === 'object') {
+              if (typeof e.status === 'number') status = e.status;
+              if (typeof e.code === 'string') code = e.code;
+            }
+            if (status === 429 || code === 'too many attempts') {
               setStepUpError('Too many attempts. Wait before retrying.');
-            } else if (msg.indexOf('400') !== -1) {
+            } else if (code === 'invalid_or_expired_challenge' || code === 'missing_parent_session' || status === 400) {
               setStepUpError('Step-up challenge expired. Retry the action.');
               stepUpChallengeId = '';
-            } else if (msg.indexOf('403') !== -1) {
+            } else if (code === 'unauthorized') {
+              setStepUpError('Session expired. Please sign in again.');
+              stepUpChallengeId = '';
+            } else if (code === 'invalid password' || (status === 401 && code !== 'unauthorized') || status === 403) {
               setStepUpError('Verification failed. Please try again.');
               input.select();
             } else {
@@ -358,7 +366,33 @@
           if (!ok) throw new Error("HTTP 401");
           res = await fetch(url, requestInit);
         }
-        if (!res.ok) throw new Error("HTTP " + res.status);
+        if (!res.ok) {
+          var payload = null;
+          var responseText = '';
+          try {
+            var contentType = (res.headers && typeof res.headers.get === 'function' && res.headers.get('Content-Type')) || '';
+            if (contentType.indexOf('application/json') !== -1) {
+              payload = await res.json();
+            } else {
+              responseText = await res.text();
+              if (responseText) {
+                try {
+                  payload = JSON.parse(responseText);
+                } catch (_) { /* non-json response body */ }
+              }
+            }
+          } catch (_) { /* ignore parse errors */ }
+
+          var err = new Error("HTTP " + res.status);
+          err.status = res.status;
+          if (payload && typeof payload === 'object') {
+            err.payload = payload;
+            if (typeof payload.error === 'string' && payload.error) {
+              err.code = payload.error;
+            }
+          }
+          throw err;
+        }
         return res.json();
       }
 

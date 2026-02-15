@@ -371,12 +371,20 @@ function App() {
 
   // --- STATS LOADING LOGIC ---
   useEffect(() => {
+    let isMounted = true;
+    let latestStatsRequestId = 0;
+
     // 1. Function to process stats from storage format to Chart format
     const loadStats = async () => {
+      const requestId = ++latestStatsRequestId;
+      const isStale = () => !isMounted || requestId !== latestStatsRequestId;
+
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const browserApi = (globalThis as any).chrome;
         if (!browserApi || !browserApi.storage || !browserApi.storage.local) {
+            if (isStale()) return;
+            setTotalDownloads(0);
             setStats([]); // Empty stats in dev
             return;
         }
@@ -393,9 +401,9 @@ function App() {
              }
            });
         });
+        if (isStale()) return;
         const raw = result.local_stats || { total: 0, byType: {} };
-        
-        setTotalDownloads(raw.total || 0);
+        const totalDownloadsNext = raw.total || 0;
 
         // Convert byType object to sorted array
         const entries = Object.entries(raw.byType as Record<string, number>);
@@ -433,11 +441,16 @@ function App() {
           });
         }
 
+        if (isStale()) return;
         saveColorAssignments(colorAssignments);
+        if (isStale()) return;
+        setTotalDownloads(totalDownloadsNext);
         setStats(mapped);
 
       } catch (e) {
-        console.warn('Failed to load stats', e);
+        if (!isStale()) {
+          console.warn('Failed to load stats', e);
+        }
       }
     };
 
@@ -446,18 +459,24 @@ function App() {
     // 2. Listen for live updates (if user downloads while popup is open)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const browserApi = (globalThis as any).chrome;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let listener: ((changes: any, area: string) => void) | null = null;
     if (browserApi && browserApi.storage && browserApi.storage.onChanged) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const listener = (changes: any, area: string) => {
+        listener = (changes: any, area: string) => {
           if (area === 'local' && changes.local_stats) {
             loadStats();
           }
         };
         browserApi.storage.onChanged.addListener(listener);
-        return () => {
-          browserApi.storage.onChanged.removeListener(listener);
-        };
     }
+    return () => {
+      isMounted = false;
+      latestStatsRequestId += 1;
+      if (listener && browserApi && browserApi.storage && browserApi.storage.onChanged) {
+        browserApi.storage.onChanged.removeListener(listener);
+      }
+    };
   }, []);
 
   // --- CHANGELOG LOADING ---
