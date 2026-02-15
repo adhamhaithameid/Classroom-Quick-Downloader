@@ -102,6 +102,7 @@ const BASE_COLORS = [
 
 // LocalStorage key for persistent color assignments
 const COLOR_STORAGE_KEY = 'cqd_type_color_assignments_v2';
+const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 
 /**
  * Convert hex to HSL
@@ -267,8 +268,14 @@ function loadColorAssignments(): Record<string, string> {
   try {
     const stored = localStorage.getItem(COLOR_STORAGE_KEY);
     const parsed = stored ? JSON.parse(stored) : {};
-    if (parsed && typeof parsed === 'object') {
-      return parsed as Record<string, string>;
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      const sanitized: Record<string, string> = {};
+      for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
+        if (typeof value === 'string' && HEX_COLOR_RE.test(value)) {
+          sanitized[key] = value;
+        }
+      }
+      return sanitized;
     }
   } catch {
     // Ignore storage parse/read failures and fall back to empty map.
