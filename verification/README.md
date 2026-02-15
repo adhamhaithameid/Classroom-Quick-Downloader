@@ -10,7 +10,14 @@ This folder contains browser-based verification scripts for the extension popup.
 pnpm --dir extension build
 ```
 
-2. Run the verification script:
+2. Install Python Playwright dependencies:
+
+```bash
+pip install playwright
+python3 -m playwright install chromium
+```
+
+3. Run the verification script:
 
 ```bash
 bash verification/run_verification.sh
