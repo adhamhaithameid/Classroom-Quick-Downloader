@@ -52,6 +52,17 @@ func isWeakSecretValue(secret string) bool {
 	return weak
 }
 
+func validateAuditCheckpointSecret(secret string) error {
+	trimmed := strings.TrimSpace(secret)
+	if trimmed == "" {
+		return errors.New("ORACLE_AUDIT_CHECKPOINT_SECRET is required for audit anchoring")
+	}
+	if isWeakSecretValue(trimmed) {
+		return errors.New("ORACLE_AUDIT_CHECKPOINT_SECRET is set to a weak placeholder value")
+	}
+	return nil
+}
+
 func main() {
 	addr := getenv("ADDR", ":8080")
 	dbPath := getenv("DB_PATH", "./data/analytics.db")
@@ -60,6 +71,7 @@ func main() {
 	dashboardPassword := os.Getenv("DASHBOARD_PASSWORD")
 	superAdminPassword := os.Getenv("SUPER_ADMIN_PASSWORD")
 	archiverSecret := os.Getenv("ARCHIVER_SHARED_SECRET")
+	auditCheckpointSecret := os.Getenv("ORACLE_AUDIT_CHECKPOINT_SECRET")
 	allowLoopbackBypass := os.Getenv("ALLOW_LOOPBACK_BYPASS") == "true"
 	allowEmptyDashboardPassword := os.Getenv("ALLOW_EMPTY_DASHBOARD_PASSWORD") == "true"
 	trustedProxyNets = parseTrustedProxyCIDRs(os.Getenv("TRUSTED_PROXY_CIDRS"))
@@ -77,6 +89,9 @@ func main() {
 	}
 	if archiverSecret != "" && isWeakSecretValue(archiverSecret) {
 		log.Fatal("[FATAL] ARCHIVER_SHARED_SECRET is set to a weak placeholder value")
+	}
+	if err := validateAuditCheckpointSecret(auditCheckpointSecret); err != nil {
+		log.Fatalf("[FATAL] %v", err)
 	}
 
 	if doSecret == "" {
@@ -109,6 +124,7 @@ func main() {
 	if len(csrfAllowedOrigins) > 0 {
 		log.Printf("[INFO] CSRF allowed origins loaded: %d", len(csrfAllowedOrigins))
 	}
+	handlers.SetAuditCheckpointSecret(auditCheckpointSecret)
 
 	// Ensure data directory exists.
 	if err := os.MkdirAll(filepath.Dir(dbPath), 0o750); err != nil {
@@ -439,7 +455,6 @@ func setActorContextOnWriter(w http.ResponseWriter, userID, tokenID, role string
 		carrier.SetActorContext(userID, tokenID, role)
 	}
 }
-
 
 func metricsHandler(reg *observability.Registry, sqliteDB *sql.DB) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1016,5 +1031,3 @@ func resolveArchiverPath(configuredPath string) (string, error) {
 
 	return absPath, nil
 }
-
-

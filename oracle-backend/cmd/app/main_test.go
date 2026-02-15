@@ -1013,6 +1013,27 @@ func TestIsWeakSecretValue(t *testing.T) {
 	}
 }
 
+func TestValidateAuditCheckpointSecret(t *testing.T) {
+	tests := []struct {
+		name    string
+		secret  string
+		wantErr bool
+	}{
+		{name: "missing secret", secret: "", wantErr: true},
+		{name: "weak secret", secret: "secret", wantErr: true},
+		{name: "valid secret", secret: "audit-anchor-secret-123", wantErr: false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateAuditCheckpointSecret(tc.secret)
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("validateAuditCheckpointSecret(%q) error=%v wantErr=%v", tc.secret, err, tc.wantErr)
+			}
+		})
+	}
+}
+
 func TestUpsertSystemAlert_ConcurrentSingleOpenRow(t *testing.T) {
 	sqlDB, err := db.Init(filepath.Join(t.TempDir(), "oracle-alert-upsert.db"))
 	if err != nil {
