@@ -529,6 +529,107 @@ func TestAuditVerifyChain_DetectsCheckpointRowHashMismatch(t *testing.T) {
 	}
 }
 
+func TestAuditVerifyChain_UsesLatestCheckpointByID(t *testing.T) {
+	d := openAuditTestDB(t)
+	prev := strings.Repeat("0", 64)
+
+	payload1 := `{"seq":1}`
+	payload1Sum := sha256.Sum256([]byte(payload1))
+	payload1Hash := hex.EncodeToString(payload1Sum[:])
+	row1Sum := sha256.Sum256([]byte(payload1 + ":" + prev))
+	row1Hash := hex.EncodeToString(row1Sum[:])
+	row1Res, err := d.Exec(
+		`INSERT INTO admin_audit_log (
+			ts_utc, request_id, correlation_id, user_id, token_id, role,
+			action_type, resource_type, resource_id, result, error_code,
+			payload_json, prev_hash, payload_hash, row_hash
+		) VALUES (?, 'r1', 'c1', 'u1', 't1', 'viewer', 'a', 'b', '1', 'ok', '', ?, ?, ?, ?)`,
+		time.Now().UnixMilli(),
+		payload1,
+		prev,
+		payload1Hash,
+		row1Hash,
+	)
+	if err != nil {
+		t.Fatalf("insert audit row #1 failed: %v", err)
+	}
+	row1ID, err := row1Res.LastInsertId()
+	if err != nil {
+		t.Fatalf("failed to load row #1 id: %v", err)
+	}
+
+	payload2 := `{"seq":2}`
+	payload2Sum := sha256.Sum256([]byte(payload2))
+	payload2Hash := hex.EncodeToString(payload2Sum[:])
+	row2Sum := sha256.Sum256([]byte(payload2 + ":" + row1Hash))
+	row2Hash := hex.EncodeToString(row2Sum[:])
+	row2Res, err := d.Exec(
+		`INSERT INTO admin_audit_log (
+			ts_utc, request_id, correlation_id, user_id, token_id, role,
+			action_type, resource_type, resource_id, result, error_code,
+			payload_json, prev_hash, payload_hash, row_hash
+		) VALUES (?, 'r2', 'c2', 'u2', 't2', 'viewer', 'a', 'b', '2', 'ok', '', ?, ?, ?, ?)`,
+		time.Now().UnixMilli(),
+		payload2,
+		row1Hash,
+		payload2Hash,
+		row2Hash,
+	)
+	if err != nil {
+		t.Fatalf("insert audit row #2 failed: %v", err)
+	}
+	row2ID, err := row2Res.LastInsertId()
+	if err != nil {
+		t.Fatalf("failed to load row #2 id: %v", err)
+	}
+
+	secret := getAuditCheckpointSecret()
+	sig1 := computeAuditCheckpointSignature(secret, row1ID, row1Hash)
+	if _, err := d.Exec(
+		`INSERT INTO admin_audit_checkpoints (audit_log_id, row_hash, hmac_sig, created_at) VALUES (?, ?, ?, ?)`,
+		row1ID,
+		row1Hash,
+		sig1,
+		int64(2000),
+	); err != nil {
+		t.Fatalf("insert checkpoint #1 failed: %v", err)
+	}
+	// Insert a newer checkpoint id with an older created_at value.
+	if _, err := d.Exec(
+		`INSERT INTO admin_audit_checkpoints (audit_log_id, row_hash, hmac_sig, created_at) VALUES (?, ?, ?, ?)`,
+		row2ID,
+		row2Hash,
+		"bad-signature",
+		int64(1000),
+	); err != nil {
+		t.Fatalf("insert checkpoint #2 failed: %v", err)
+	}
+
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/audit/verify", nil)
+	AuditVerifyChainHandler(d).ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp map[string]any
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("response decode failed: %v", err)
+	}
+	if resp["anchorStatus"] != "signature_mismatch" {
+		t.Fatalf("expected anchorStatus=signature_mismatch, got %v", resp["anchorStatus"])
+	}
+	if resp["anchorValid"] != false {
+		t.Fatalf("expected anchorValid=false, got %v", resp["anchorValid"])
+	}
+	if resp["valid"] != false {
+		t.Fatalf("expected valid=false when latest checkpoint signature mismatches, got %v", resp["valid"])
+	}
+	if gotID, _ := resp["anchorAuditRowId"].(float64); int64(gotID) != row2ID {
+		t.Fatalf("expected anchorAuditRowId=%d, got %v", row2ID, resp["anchorAuditRowId"])
+	}
+}
+
 func TestAuditVerifyChain_UnconfiguredAnchorSecret(t *testing.T) {
 	d := openAuditTestDB(t)
 	SetAuditCheckpointSecret("")
