@@ -4,15 +4,15 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
-	"io"
 	"log"
 	"net"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
+
+	"oracle-backend/internal/handlers"
 )
 
 const adminRequestBodyLimit = 1 << 20  // 1 MiB
@@ -164,19 +164,7 @@ func normalizeOriginValue(raw string) (string, error) {
 }
 
 func decodeJSONBodyStrict(r *http.Request, dst any) error {
-	dec := json.NewDecoder(r.Body)
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(dst); err != nil {
-		return err
-	}
-	var extra any
-	if err := dec.Decode(&extra); err != io.EOF {
-		if err == nil {
-			return errors.New("request body must contain only one JSON object")
-		}
-		return err
-	}
-	return nil
+	return handlers.DecodeJSONBodyStrict(r, dst)
 }
 
 type cspNonceContextKey struct{}
