@@ -282,7 +282,7 @@ func verifyAuditCheckpoint(ctx context.Context, db *sql.DB) (bool, string, int64
 	var checkpointSig string
 	err := db.QueryRowContext( // #nosec G701 -- SQL text is constant and uses bound parameters.
 		ctx,
-		`SELECT audit_log_id, row_hash, hmac_sig FROM admin_audit_checkpoints ORDER BY created_at DESC, id DESC LIMIT 1`,
+		`SELECT audit_log_id, row_hash, hmac_sig FROM admin_audit_checkpoints ORDER BY id DESC LIMIT 1`,
 	).Scan(&auditLogID, &checkpointRowHash, &checkpointSig)
 	if errors.Is(err, sql.ErrNoRows) {
 		return false, "missing", 0, nil
