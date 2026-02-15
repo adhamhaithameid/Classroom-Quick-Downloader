@@ -57,6 +57,18 @@ export function scheduleScan(): void {
 }
 
 /**
+ * Deduplicate roots to avoid scanning nested trees.
+ * Returns only the top-level roots.
+ */
+export function getDistinctRoots(roots: Set<QueryRoot>): QueryRoot[] {
+  const uniqueRoots = Array.from(roots);
+  return uniqueRoots.filter((root) => {
+    // Keep root if no OTHER root contains it
+    return !uniqueRoots.some((other) => other !== root && other.contains(root));
+  });
+}
+
+/**
  * Inject buttons for single file attachments.
  */
 export function injectSingleFileButtons(root: QueryRoot = document): void {
@@ -168,7 +180,9 @@ export function setupObservers(): void {
       if (roots.size === 0) {
         scheduleScan();
       } else {
-        roots.forEach((root) => scanForAttachments(root));
+        // Optimize: Only scan distinct roots (e.g. if we have parent and child, just scan parent)
+        const distinctRoots = getDistinctRoots(roots);
+        distinctRoots.forEach((root) => scanForAttachments(root));
         scheduleScan();
       }
     }
