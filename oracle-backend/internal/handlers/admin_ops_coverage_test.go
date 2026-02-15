@@ -16,6 +16,15 @@ import (
 
 func openAdminCoverageDB(t *testing.T) *sql.DB {
 	t.Helper()
+	prevSecret := getAuditCheckpointSecret()
+	SetAuditCheckpointSecret("audit-checkpoint-test-secret")
+	t.Cleanup(func() {
+		if len(prevSecret) == 0 {
+			SetAuditCheckpointSecret("")
+			return
+		}
+		SetAuditCheckpointSecret(string(prevSecret))
+	})
 	d, err := db.Init(t.TempDir() + "/admin_cov.db")
 	if err != nil {
 		t.Fatal(err)
@@ -1027,8 +1036,11 @@ func TestAuditVerifyChainHandler_EmptyChain(t *testing.T) {
 	}
 	var resp map[string]interface{}
 	json.Unmarshal(rr.Body.Bytes(), &resp)
-	if resp["valid"] != true {
-		t.Fatal("expected valid=true for empty chain")
+	if resp["valid"] != false {
+		t.Fatal("expected valid=false for empty chain without anchor")
+	}
+	if resp["anchorStatus"] != "missing" {
+		t.Fatalf("expected anchorStatus=missing, got %v", resp["anchorStatus"])
 	}
 }
 

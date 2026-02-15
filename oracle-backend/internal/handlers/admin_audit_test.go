@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"oracle-backend/internal/db"
 )
@@ -151,6 +152,15 @@ func TestTruncateSQLForAudit_WithLeadingWhitespace(t *testing.T) {
 
 func openAuditTestDB(t *testing.T) *sql.DB {
 	t.Helper()
+	prevSecret := getAuditCheckpointSecret()
+	SetAuditCheckpointSecret("audit-checkpoint-test-secret")
+	t.Cleanup(func() {
+		if len(prevSecret) == 0 {
+			SetAuditCheckpointSecret("")
+			return
+		}
+		SetAuditCheckpointSecret(string(prevSecret))
+	})
 	d, err := db.Init(t.TempDir() + "/audit_test.db")
 	if err != nil {
 		t.Fatal(err)
@@ -179,8 +189,14 @@ func TestAuditVerifyChain_EmptyChainReturnsValid(t *testing.T) {
 	}
 	var resp map[string]any
 	json.Unmarshal(rr.Body.Bytes(), &resp)
-	if resp["valid"] != true {
-		t.Fatal("expected valid=true for empty chain")
+	if resp["valid"] != false {
+		t.Fatal("expected valid=false for empty chain without anchor")
+	}
+	if resp["anchorValid"] != false {
+		t.Fatal("expected anchorValid=false for empty chain without anchor")
+	}
+	if resp["anchorStatus"] != "missing" {
+		t.Fatalf("expected anchorStatus=missing, got %v", resp["anchorStatus"])
 	}
 	if resp["totalRows"].(float64) != 0 {
 		t.Fatalf("expected 0 rows, got %v", resp["totalRows"])
@@ -360,9 +376,182 @@ func TestAppendAuditLog_VerifyChainResponseFormat(t *testing.T) {
 		t.Fatalf("response is not valid JSON: %v", err)
 	}
 	// Verify required fields
-	for _, field := range []string{"ok", "valid", "totalRows", "limit", "offset", "hasMore"} {
+	for _, field := range []string{"ok", "valid", "totalRows", "limit", "offset", "hasMore", "anchorValid", "anchorStatus"} {
 		if _, exists := resp[field]; !exists {
 			t.Fatalf("missing field %q in verify response", field)
 		}
+	}
+}
+
+func TestAppendAuditLog_CreatesCheckpoint(t *testing.T) {
+	d := openAuditTestDB(t)
+	if err := AppendAuditLog(context.Background(), d, "checkpoint_test", "audit", "1", "ok", map[string]any{"k": "v"}); err != nil {
+		t.Fatalf("append audit log failed: %v", err)
+	}
+
+	var auditLogID int64
+	var rowHash string
+	var signature string
+	if err := d.QueryRow(
+		`SELECT audit_log_id, row_hash, hmac_sig FROM admin_audit_checkpoints ORDER BY id DESC LIMIT 1`,
+	).Scan(&auditLogID, &rowHash, &signature); err != nil {
+		t.Fatalf("failed to load checkpoint: %v", err)
+	}
+	if auditLogID <= 0 || rowHash == "" || signature == "" {
+		t.Fatalf("expected checkpoint row fields to be populated, got audit_log_id=%d row_hash=%q hmac_sig=%q", auditLogID, rowHash, signature)
+	}
+
+	expected := computeAuditCheckpointSignature(getAuditCheckpointSecret(), auditLogID, rowHash)
+	if signature != expected {
+		t.Fatalf("unexpected checkpoint signature: got %q want %q", signature, expected)
+	}
+}
+
+func TestAuditVerifyChain_DetectsCheckpointSignatureMismatch(t *testing.T) {
+	d := openAuditTestDB(t)
+	payload := `{"a":1}`
+	prev := strings.Repeat("0", 64)
+	payloadSum := sha256.Sum256([]byte(payload))
+	payloadHash := hex.EncodeToString(payloadSum[:])
+	rowSum := sha256.Sum256([]byte(payload + ":" + prev))
+	rowHash := hex.EncodeToString(rowSum[:])
+
+	insertRes, err := d.Exec(
+		`INSERT INTO admin_audit_log (
+			ts_utc, request_id, correlation_id, user_id, token_id, role,
+			action_type, resource_type, resource_id, result, error_code,
+			payload_json, prev_hash, payload_hash, row_hash
+		) VALUES (?, 'r1', 'c1', 'u1', 't1', 'viewer', 'a', 'b', 'c', 'ok', '', ?, ?, ?, ?)`,
+		time.Now().UnixMilli(),
+		payload,
+		prev,
+		payloadHash,
+		rowHash,
+	)
+	if err != nil {
+		t.Fatalf("insert audit row failed: %v", err)
+	}
+	auditLogID, err := insertRes.LastInsertId()
+	if err != nil {
+		t.Fatalf("failed to load inserted id: %v", err)
+	}
+	if _, err := d.Exec(
+		`INSERT INTO admin_audit_checkpoints (audit_log_id, row_hash, hmac_sig, created_at) VALUES (?, ?, ?, ?)`,
+		auditLogID,
+		rowHash,
+		"bad-signature",
+		time.Now().UnixMilli(),
+	); err != nil {
+		t.Fatalf("insert checkpoint failed: %v", err)
+	}
+
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/audit/verify", nil)
+	AuditVerifyChainHandler(d).ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp map[string]any
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("response decode failed: %v", err)
+	}
+	if resp["anchorValid"] != false {
+		t.Fatalf("expected anchorValid=false, got %v", resp["anchorValid"])
+	}
+	if resp["anchorStatus"] != "signature_mismatch" {
+		t.Fatalf("expected anchorStatus=signature_mismatch, got %v", resp["anchorStatus"])
+	}
+	if resp["valid"] != false {
+		t.Fatalf("expected valid=false when anchor signature mismatches, got %v", resp["valid"])
+	}
+}
+
+func TestAuditVerifyChain_DetectsCheckpointRowHashMismatch(t *testing.T) {
+	d := openAuditTestDB(t)
+	payload := `{"a":1}`
+	prev := strings.Repeat("0", 64)
+	payloadSum := sha256.Sum256([]byte(payload))
+	payloadHash := hex.EncodeToString(payloadSum[:])
+	rowSum := sha256.Sum256([]byte(payload + ":" + prev))
+	rowHash := hex.EncodeToString(rowSum[:])
+
+	insertRes, err := d.Exec(
+		`INSERT INTO admin_audit_log (
+			ts_utc, request_id, correlation_id, user_id, token_id, role,
+			action_type, resource_type, resource_id, result, error_code,
+			payload_json, prev_hash, payload_hash, row_hash
+		) VALUES (?, 'r1', 'c1', 'u1', 't1', 'viewer', 'a', 'b', 'c', 'ok', '', ?, ?, ?, ?)`,
+		time.Now().UnixMilli(),
+		payload,
+		prev,
+		payloadHash,
+		rowHash,
+	)
+	if err != nil {
+		t.Fatalf("insert audit row failed: %v", err)
+	}
+	auditLogID, err := insertRes.LastInsertId()
+	if err != nil {
+		t.Fatalf("failed to load inserted id: %v", err)
+	}
+	mismatchedRowHash := strings.Repeat("a", 64)
+	signature := computeAuditCheckpointSignature(getAuditCheckpointSecret(), auditLogID, mismatchedRowHash)
+	if _, err := d.Exec(
+		`INSERT INTO admin_audit_checkpoints (audit_log_id, row_hash, hmac_sig, created_at) VALUES (?, ?, ?, ?)`,
+		auditLogID,
+		mismatchedRowHash,
+		signature,
+		time.Now().UnixMilli(),
+	); err != nil {
+		t.Fatalf("insert checkpoint failed: %v", err)
+	}
+
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/audit/verify", nil)
+	AuditVerifyChainHandler(d).ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp map[string]any
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("response decode failed: %v", err)
+	}
+	if resp["anchorValid"] != false {
+		t.Fatalf("expected anchorValid=false, got %v", resp["anchorValid"])
+	}
+	if resp["anchorStatus"] != "row_hash_mismatch" {
+		t.Fatalf("expected anchorStatus=row_hash_mismatch, got %v", resp["anchorStatus"])
+	}
+	if resp["valid"] != false {
+		t.Fatalf("expected valid=false when anchor row hash mismatches, got %v", resp["valid"])
+	}
+}
+
+func TestAuditVerifyChain_UnconfiguredAnchorSecret(t *testing.T) {
+	d := openAuditTestDB(t)
+	SetAuditCheckpointSecret("")
+	t.Cleanup(func() { SetAuditCheckpointSecret("audit-checkpoint-test-secret") })
+
+	if err := AppendAuditLog(context.Background(), d, "test", "resource", "id", "ok", map[string]any{"k": "v"}); err != nil {
+		t.Fatalf("append audit log failed: %v", err)
+	}
+
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/audit/verify", nil)
+	AuditVerifyChainHandler(d).ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var resp map[string]any
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("response decode failed: %v", err)
+	}
+	if resp["anchorStatus"] != "unconfigured" {
+		t.Fatalf("expected anchorStatus=unconfigured, got %v", resp["anchorStatus"])
+	}
+	if resp["valid"] != false {
+		t.Fatalf("expected valid=false when anchor secret is unconfigured, got %v", resp["valid"])
 	}
 }

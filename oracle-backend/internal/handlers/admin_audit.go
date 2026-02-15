@@ -2,19 +2,50 @@ package handlers
 
 import (
 	"context"
+	"crypto/hmac"
 	"crypto/sha256"
+	"crypto/subtle"
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"oracle-backend/internal/observability"
 )
+
+var (
+	auditCheckpointSecretMu sync.RWMutex
+	auditCheckpointSecret   []byte
+)
+
+func SetAuditCheckpointSecret(secret string) {
+	trimmed := strings.TrimSpace(secret)
+	auditCheckpointSecretMu.Lock()
+	defer auditCheckpointSecretMu.Unlock()
+	if trimmed == "" {
+		auditCheckpointSecret = nil
+		return
+	}
+	auditCheckpointSecret = []byte(trimmed)
+}
+
+func getAuditCheckpointSecret() []byte {
+	auditCheckpointSecretMu.RLock()
+	defer auditCheckpointSecretMu.RUnlock()
+	if len(auditCheckpointSecret) == 0 {
+		return nil
+	}
+	clone := make([]byte, len(auditCheckpointSecret))
+	copy(clone, auditCheckpointSecret)
+	return clone
+}
 
 func AppendAuditLog(
 	ctx context.Context,
@@ -70,7 +101,7 @@ func AppendAuditLog(
 	rowHash := sha256.Sum256([]byte(rowPreimage))
 	rowHashHex := hex.EncodeToString(rowHash[:])
 
-	if _, err := conn.ExecContext(
+	insertResult, err := conn.ExecContext(
 		ctx,
 		`INSERT INTO admin_audit_log (
 			ts_utc, request_id, correlation_id, user_id, token_id, role,
@@ -92,7 +123,15 @@ func AppendAuditLog(
 		prevHash,
 		payloadHashHex,
 		rowHashHex,
-	); err != nil {
+	)
+	if err != nil {
+		return err
+	}
+	auditLogID, err := insertResult.LastInsertId()
+	if err != nil {
+		return err
+	}
+	if err := appendAuditCheckpoint(ctx, conn, auditLogID, rowHashHex); err != nil {
 		return err
 	}
 
@@ -101,6 +140,29 @@ func AppendAuditLog(
 	}
 	committed = true
 	return nil
+}
+
+func appendAuditCheckpoint(ctx context.Context, conn *sql.Conn, auditLogID int64, rowHash string) error {
+	secret := getAuditCheckpointSecret()
+	if len(secret) == 0 {
+		return nil
+	}
+	signature := computeAuditCheckpointSignature(secret, auditLogID, rowHash)
+	_, err := conn.ExecContext(
+		ctx,
+		`INSERT INTO admin_audit_checkpoints (audit_log_id, row_hash, hmac_sig, created_at) VALUES (?, ?, ?, ?)`,
+		auditLogID,
+		rowHash,
+		signature,
+		time.Now().UnixMilli(),
+	)
+	return err
+}
+
+func computeAuditCheckpointSignature(secret []byte, auditLogID int64, rowHash string) string {
+	mac := hmac.New(sha256.New, secret)
+	_, _ = mac.Write([]byte(fmt.Sprintf("%d:%s", auditLogID, rowHash)))
+	return hex.EncodeToString(mac.Sum(nil))
 }
 
 func AuditVerifyChainHandler(db *sql.DB) http.HandlerFunc {
@@ -140,11 +202,10 @@ func AuditVerifyChainHandler(db *sql.DB) http.HandlerFunc {
 			PrevHash    string
 			PayloadHash string
 			RowHash     string
-			Recomputed  string
 		}
-		chain := make([]rowData, 0, 256)
+		rowCount := 0
 		prev := strings.Repeat("0", 64)
-		ok := true
+		chainValid := true
 		var breakAt int64
 		var breakReason string
 
@@ -157,21 +218,21 @@ func AuditVerifyChainHandler(db *sql.DB) http.HandlerFunc {
 			payloadSum := sha256.Sum256([]byte(item.Payload))
 			recomputedPayloadHash := hex.EncodeToString(payloadSum[:])
 			sum := sha256.Sum256([]byte(item.Payload + ":" + item.PrevHash))
-			item.Recomputed = hex.EncodeToString(sum[:])
-			chain = append(chain, item)
+			recomputedRowHash := hex.EncodeToString(sum[:])
+			rowCount++
 
-			if item.PrevHash != prev && ok {
-				ok = false
+			if item.PrevHash != prev && chainValid {
+				chainValid = false
 				breakAt = item.ID
 				breakReason = "prev_hash_mismatch"
 			}
-			if item.RowHash != item.Recomputed && ok {
-				ok = false
+			if item.RowHash != recomputedRowHash && chainValid {
+				chainValid = false
 				breakAt = item.ID
 				breakReason = "row_hash_mismatch"
 			}
-			if item.PayloadHash != recomputedPayloadHash && ok {
-				ok = false
+			if item.PayloadHash != recomputedPayloadHash && chainValid {
+				chainValid = false
 				breakAt = item.ID
 				breakReason = "payload_hash_mismatch"
 			}
@@ -181,22 +242,76 @@ func AuditVerifyChainHandler(db *sql.DB) http.HandlerFunc {
 			writeJSONError(w, "verify_failed", "Failed to verify audit chain", http.StatusInternalServerError)
 			return
 		}
+		anchorValid, anchorStatus, anchorAuditRowID, err := verifyAuditCheckpoint(r.Context(), db)
+		if err != nil {
+			writeJSONError(w, "verify_failed", "Failed to verify audit chain", http.StatusInternalServerError)
+			return
+		}
+		overallValid := chainValid && anchorValid
 
 		w.Header().Set("Content-Type", "application/json")
 		resp := map[string]any{
-			"ok":        true,
-			"valid":     ok,
-			"totalRows": len(chain),
-			"limit":     limit,
-			"offset":    offset,
-			"hasMore":   len(chain) == limit,
+			"ok":           true,
+			"valid":        overallValid,
+			"totalRows":    rowCount,
+			"limit":        limit,
+			"offset":       offset,
+			"hasMore":      rowCount == limit,
+			"anchorValid":  anchorValid,
+			"anchorStatus": anchorStatus,
 		}
-		if !ok {
+		if anchorAuditRowID > 0 {
+			resp["anchorAuditRowId"] = anchorAuditRowID
+		}
+		if !chainValid {
 			resp["breakAt"] = breakAt
 			resp["reason"] = breakReason
 		}
 		_ = json.NewEncoder(w).Encode(resp)
 	}
+}
+
+func verifyAuditCheckpoint(ctx context.Context, db *sql.DB) (bool, string, int64, error) {
+	secret := getAuditCheckpointSecret()
+	if len(secret) == 0 {
+		return false, "unconfigured", 0, nil
+	}
+
+	var auditLogID int64
+	var checkpointRowHash string
+	var checkpointSig string
+	err := db.QueryRowContext(
+		ctx,
+		`SELECT audit_log_id, row_hash, hmac_sig FROM admin_audit_checkpoints ORDER BY created_at DESC, id DESC LIMIT 1`,
+	).Scan(&auditLogID, &checkpointRowHash, &checkpointSig)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, "missing", 0, nil
+	}
+	if err != nil {
+		return false, "", 0, err
+	}
+
+	var auditRowHash string
+	err = db.QueryRowContext(
+		ctx,
+		`SELECT row_hash FROM admin_audit_log WHERE id = ?`,
+		auditLogID,
+	).Scan(&auditRowHash)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, "row_hash_mismatch", auditLogID, nil
+	}
+	if err != nil {
+		return false, "", auditLogID, err
+	}
+	if auditRowHash != checkpointRowHash {
+		return false, "row_hash_mismatch", auditLogID, nil
+	}
+
+	expectedSig := computeAuditCheckpointSignature(secret, auditLogID, checkpointRowHash)
+	if subtle.ConstantTimeCompare([]byte(checkpointSig), []byte(expectedSig)) != 1 {
+		return false, "signature_mismatch", auditLogID, nil
+	}
+	return true, "ok", auditLogID, nil
 }
 
 func canonicalJSON(payload map[string]any) (string, error) {

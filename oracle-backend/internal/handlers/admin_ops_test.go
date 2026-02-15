@@ -24,6 +24,15 @@ import (
 
 func newAdminTestDB(t *testing.T) *sql.DB {
 	t.Helper()
+	prevSecret := getAuditCheckpointSecret()
+	SetAuditCheckpointSecret("audit-checkpoint-test-secret")
+	t.Cleanup(func() {
+		if len(prevSecret) == 0 {
+			SetAuditCheckpointSecret("")
+			return
+		}
+		SetAuditCheckpointSecret(string(prevSecret))
+	})
 	dbPath := filepath.Join(t.TempDir(), "oracle-admin-test.db")
 	sqlDB, err := db.Init(dbPath)
 	if err != nil {

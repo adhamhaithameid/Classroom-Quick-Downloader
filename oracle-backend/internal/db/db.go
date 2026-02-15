@@ -291,6 +291,31 @@ func Migrate(db *sql.DB) error {
 				SELECT RAISE(ABORT, 'admin_audit_log is append-only');
 			END;`,
 
+		// Signed audit checkpoints for hash-chain anchoring.
+		`CREATE TABLE IF NOT EXISTS admin_audit_checkpoints (
+			id            INTEGER PRIMARY KEY AUTOINCREMENT,
+			audit_log_id  INTEGER NOT NULL UNIQUE,
+			row_hash      TEXT NOT NULL,
+			hmac_sig      TEXT NOT NULL,
+			created_at    INTEGER NOT NULL,
+			FOREIGN KEY(audit_log_id) REFERENCES admin_audit_log(id)
+		);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_admin_audit_checkpoints_created_at
+			ON admin_audit_checkpoints(created_at DESC);`,
+
+		`CREATE TRIGGER IF NOT EXISTS trg_admin_audit_checkpoints_no_update
+			BEFORE UPDATE ON admin_audit_checkpoints
+			BEGIN
+				SELECT RAISE(ABORT, 'admin_audit_checkpoints is append-only');
+			END;`,
+
+		`CREATE TRIGGER IF NOT EXISTS trg_admin_audit_checkpoints_no_delete
+			BEFORE DELETE ON admin_audit_checkpoints
+			BEGIN
+				SELECT RAISE(ABORT, 'admin_audit_checkpoints is append-only');
+			END;`,
+
 		// Alert sink for observability and dashboard surfacing.
 		`CREATE TABLE IF NOT EXISTS system_alerts (
 			id             INTEGER PRIMARY KEY AUTOINCREMENT,
