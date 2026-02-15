@@ -192,7 +192,13 @@ func IngestBatchHandlerV4(sqliteDB, postgresDB *sql.DB, sharedSecret string) htt
 			if err == nil && sqliteDB != nil {
 				// Keep SQLite analytics tables in sync while stats endpoints still read SQLite.
 				// This mirror path is idempotent by batch_id and intentionally skips outbox/raw writes.
-				err = ingestBatchSQLiteMirror(ctx, sqliteDB, &batch)
+				if mirrorErr := ingestBatchSQLiteMirror(ctx, sqliteDB, &batch); mirrorErr != nil {
+					logEvent("warn", "ingest_sqlite_mirror_failed", map[string]interface{}{
+						"batchId": batch.BatchID,
+						"error":   mirrorErr.Error(),
+					})
+					recordOracleFailure(sqliteDB, "ingest_mirror", "sqlite_mirror_failed", mirrorErr.Error(), 1, batch.BatchID, "")
+				}
 			}
 		} else {
 			err = ingestBatch(ctx, sqliteDB, &batch, bodyBytes, rawPayload)
