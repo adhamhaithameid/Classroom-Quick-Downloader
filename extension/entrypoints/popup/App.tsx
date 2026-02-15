@@ -284,6 +284,25 @@ function saveColorAssignments(assignments: Record<string, string>): void {
   }
 }
 
+function haveColorAssignmentsChanged(
+  previous: Record<string, string>,
+  next: Record<string, string>
+): boolean {
+  const previousKeys = Object.keys(previous);
+  const nextKeys = Object.keys(next);
+  if (previousKeys.length !== nextKeys.length) {
+    return true;
+  }
+
+  for (const key of nextKeys) {
+    if (previous[key] !== next[key]) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 function App() {
   const [settings, setSettings] = useState<Settings | null>(null);
 
@@ -417,7 +436,8 @@ function App() {
         const otherCount = others.reduce((acc, curr) => acc + curr[1], 0);
 
         const usedColors = new Set<string>();
-        const colorAssignments = loadColorAssignments();
+        const persistedAssignments = loadColorAssignments();
+        const colorAssignments = { ...persistedAssignments };
 
         const mapped: StatItem[] = top.map(([key, val], index) => {
           const color = getDistinctColorForTypeAtPosition(key, index, usedColors, colorAssignments);
@@ -442,7 +462,9 @@ function App() {
         }
 
         if (isStale()) return;
-        saveColorAssignments(colorAssignments);
+        if (haveColorAssignmentsChanged(persistedAssignments, colorAssignments)) {
+          saveColorAssignments(colorAssignments);
+        }
         if (isStale()) return;
         setTotalDownloads(totalDownloadsNext);
         setStats(mapped);
