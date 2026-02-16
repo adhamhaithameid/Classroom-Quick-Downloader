@@ -135,3 +135,38 @@ describe("Dashboard login rendering", () => {
     expect(html).toContain("</form>");
   });
 });
+
+describe("Dashboard security rendering", () => {
+  it("escapes changelog fields and script-embedded config JSON", () => {
+    const stats = makeStats({
+      changelog: [
+        {
+          id: `rel-1"><img src=x onerror=alert(1)>`,
+          version: `1.0.0"><script>alert("v")</script>`,
+          date: "2026-02-11",
+          changes: [`<script>alert('xss')</script>`],
+        },
+      ],
+      changelogConfig: {
+        rules: [
+          {
+            id: "rule-1",
+            target: "</script><script>alert(1)</script>",
+            priority: "normal",
+            effect: "none",
+          },
+        ],
+      },
+    });
+
+    const html = renderDashboard(stats);
+
+    expect(html).not.toContain(`<script>alert('xss')</script>`);
+    expect(html).not.toContain(`</script><script>alert(1)</script>`);
+    expect(html).not.toContain(`data-release-id="rel-1"><img src=x onerror=alert(1)>"`);
+
+    expect(html).toContain("&lt;script&gt;alert(&#039;xss&#039;)&lt;/script&gt;");
+    expect(html).toContain("\\u003c/script\\u003e\\u003cscript\\u003ealert(1)\\u003c/script\\u003e");
+    expect(html).toContain("data-release-id=\"rel-1&quot;&gt;&lt;img src=x onerror=alert(1)&gt;\"");
+  });
+});
