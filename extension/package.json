@@ -38,9 +38,9 @@
     "@wxt-dev/module-react": "^1.1.5",
     "fake-indexeddb": "^6.2.5",
     "happy-dom": "^20.6.1",
-    "jsdom": "^28.0.0",
+    "jsdom": "^28.1.0",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18",
-    "wxt": "latest"
+    "wxt": "^0.20.17"
   }
 }
