@@ -121,4 +121,63 @@ describe('content/observers', () => {
       enabled: false,
     }));
   });
+
+  it('deduplicates roots in MutationObserver callback', async () => {
+    const { mod, injectButtonIntoAttachment } = await loadObserversModule();
+
+    // Mock MutationObserver
+    let callback: (records: MutationRecord[], observer: MutationObserver) => void;
+    const observeFn = vi.fn();
+    const disconnectFn = vi.fn();
+
+    vi.stubGlobal('MutationObserver', class {
+      constructor(cb: any) {
+        callback = cb;
+      }
+      observe = observeFn;
+      disconnect = disconnectFn;
+    });
+
+    // Setup observers
+    mod.setupObservers();
+    expect(callback!).toBeDefined();
+
+    // Create a parent with a drive link and a child with a drive link
+    const parent = document.createElement('div');
+    parent.innerHTML = '<a href="https://drive.google.com/file/d/123">Link 1</a>';
+    const child = document.createElement('div');
+    child.innerHTML = '<a href="https://drive.google.com/file/d/456">Link 2</a>';
+    parent.appendChild(child);
+
+    // Simulate mutation where parent is added (so child is implicitly added)
+    // AND child is explicitly reported as added (which happens sometimes)
+    const records: Partial<MutationRecord>[] = [
+      {
+        type: 'childList',
+        addedNodes: [parent] as any,
+        target: document.body,
+      },
+      {
+        type: 'childList',
+        addedNodes: [child] as any,
+        target: parent,
+      }
+    ];
+
+    // Trigger callback
+    callback!(records as MutationRecord[], {} as MutationObserver);
+
+    // Wait for scan debounce/timeout if any, but setupObservers calls scanForAttachments synchronously inside callback?
+    // Wait, scanForAttachments calls injectSingleFileButtons synchronously.
+    // However, setupObservers might scheduleScan if roots is empty.
+    // But here we have roots. So it calls scanForAttachments immediately.
+
+    // If deduplication works, scanForAttachments is called only for parent.
+    // injectSingleFileButtons(parent) finds both links.
+    // So injectButtonIntoAttachment called 2 times.
+
+    expect(injectButtonIntoAttachment).toHaveBeenCalledTimes(2);
+    expect(injectButtonIntoAttachment).toHaveBeenCalledWith(expect.anything(), 'https://drive.google.com/file/d/123');
+    expect(injectButtonIntoAttachment).toHaveBeenCalledWith(expect.anything(), 'https://drive.google.com/file/d/456');
+  });
 });
