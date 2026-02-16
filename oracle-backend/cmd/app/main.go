@@ -63,6 +63,44 @@ func validateAuditCheckpointSecret(secret string) error {
 	return nil
 }
 
+func validateProductionSecurityConfig(
+	appEnv string,
+	allowLoopbackBypass bool,
+	allowEmptyDashboardPassword bool,
+	allowHTTPStoreURLs bool,
+	allowUntrustedStoreURLs bool,
+	trustedProxyNets []*net.IPNet,
+) error {
+	normalizedEnv := strings.ToLower(strings.TrimSpace(appEnv))
+	if normalizedEnv != "production" && normalizedEnv != "prod" {
+		return nil
+	}
+
+	if allowLoopbackBypass {
+		return errors.New("ALLOW_LOOPBACK_BYPASS must be false in production")
+	}
+	if allowEmptyDashboardPassword {
+		return errors.New("ALLOW_EMPTY_DASHBOARD_PASSWORD must be false in production")
+	}
+	if allowHTTPStoreURLs {
+		return errors.New("ORACLE_ALLOW_HTTP_STORE_URLS must be false in production")
+	}
+	if allowUntrustedStoreURLs {
+		return errors.New("ORACLE_ALLOW_UNTRUSTED_STORE_URLS must be false in production")
+	}
+	for _, network := range trustedProxyNets {
+		if network == nil {
+			continue
+		}
+		ones, bits := network.Mask.Size()
+		if ones == 0 && bits > 0 {
+			return errors.New("TRUSTED_PROXY_CIDRS cannot contain wildcard (0.0.0.0/0 or ::/0) in production")
+		}
+	}
+
+	return nil
+}
+
 func main() {
 	addr := getenv("ADDR", ":8080")
 	dbPath := getenv("DB_PATH", "./data/analytics.db")
@@ -78,26 +116,15 @@ func main() {
 	sessionCookieSecureMode = normalizeSessionCookieSecureMode(os.Getenv("SESSION_COOKIE_SECURE"))
 	csrfAllowedOrigins = loadCSRFAllowedOrigins(os.Getenv("CSRF_ALLOWED_ORIGINS"), os.Getenv("PUBLIC_BASE_URL"))
 
-	// SECURITY HARDENING: Enforce strict production configuration
-	if appEnv := strings.ToLower(strings.TrimSpace(os.Getenv("APP_ENV"))); appEnv == "production" || appEnv == "prod" {
-		if allowLoopbackBypass {
-			log.Fatal("[FATAL] ALLOW_LOOPBACK_BYPASS must be false in production")
-		}
-		if allowEmptyDashboardPassword {
-			log.Fatal("[FATAL] ALLOW_EMPTY_DASHBOARD_PASSWORD must be false in production")
-		}
-		if os.Getenv("ORACLE_ALLOW_HTTP_STORE_URLS") == "true" {
-			log.Fatal("[FATAL] ORACLE_ALLOW_HTTP_STORE_URLS must be false in production")
-		}
-		if os.Getenv("ORACLE_ALLOW_UNTRUSTED_STORE_URLS") == "true" {
-			log.Fatal("[FATAL] ORACLE_ALLOW_UNTRUSTED_STORE_URLS must be false in production")
-		}
-		for _, network := range trustedProxyNets {
-			ones, bits := network.Mask.Size()
-			if ones == 0 && bits > 0 {
-				log.Fatal("[FATAL] TRUSTED_PROXY_CIDRS cannot contain wildcard (0.0.0.0/0 or ::/0) in production")
-			}
-		}
+	if err := validateProductionSecurityConfig(
+		os.Getenv("APP_ENV"),
+		allowLoopbackBypass,
+		allowEmptyDashboardPassword,
+		os.Getenv("ORACLE_ALLOW_HTTP_STORE_URLS") == "true",
+		os.Getenv("ORACLE_ALLOW_UNTRUSTED_STORE_URLS") == "true",
+		trustedProxyNets,
+	); err != nil {
+		log.Fatalf("[FATAL] %v", err)
 	}
 
 	if isWeakSecretValue(doSecret) {
