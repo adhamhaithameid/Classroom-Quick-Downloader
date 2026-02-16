@@ -1,83 +1,123 @@
+import { describe, expect, it, vi } from "vitest";
+import worker from "../src/index";
+import type { Env } from "../src/types";
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import worker from '../src/index';
-
-describe('Authentication Timing Safety', () => {
-  const env = {
-    DO_SHARED_SECRET: 'secret123',
-    DASHBOARD_PASSWORD: 'password123',
-    DANGER_PASSWORD: 'danger123',
-    DOWNLOADS_DO: {
-      idFromName: vi.fn().mockReturnValue('stub-id'),
-      get: vi.fn().mockReturnValue({
-        fetch: vi.fn().mockImplementation((req) => {
-          // Mock responses based on URL
-          const url = req.url || '';
-          if (url.includes('/auth/check-ip-allowlist')) {
-             return Promise.resolve(new Response(JSON.stringify({ allowed: true, enabled: true }), { status: 200 }));
-          }
-          if (url.includes('/auth/login-attempt')) {
-             return Promise.resolve(new Response(JSON.stringify({ allowed: true }), { status: 200 }));
-          }
-          return Promise.resolve(new Response(JSON.stringify({ allowed: true }), { status: 200 }));
-        }),
-      }),
-    },
+function buildAuthEnv(overrides: Partial<Env> = {}) {
+  const doFetch = vi.fn(async (input: RequestInfo) => {
+    const url = typeof input === "string" ? input : input instanceof Request ? input.url : "";
+    if (url.includes("/auth/check-ip-allowlist")) {
+      return new Response(JSON.stringify({ allowed: true, enabled: true }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }
+    if (url.includes("/auth/login-attempt")) {
+      return new Response(JSON.stringify({ allowed: true, ok: true }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }
+    return new Response(JSON.stringify({ ok: true }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  });
+  const namespace = {
+    idFromName: vi.fn().mockReturnValue("stub-id"),
+    get: vi.fn().mockReturnValue({ fetch: doFetch }),
   };
 
-  it('should allow login with correct dashboard password', async () => {
-    const formData = new FormData();
-    formData.append('password', 'password123');
+  const env: Env = {
+    DO_SHARED_SECRET: "secret123",
+    DASHBOARD_PASSWORD: "password123",
+    DANGER_PASSWORD: "danger123",
+    DOWNLOADS_DO: namespace as unknown as DurableObjectNamespace,
+    ORACLE_ENDPOINT: "http://oracle.local/ingest-batch",
+    MAX_BATCH_EVENTS: "10000",
+    ...overrides,
+  };
+  return { env, doFetch };
+}
 
-    // Do NOT set Content-Type header manually when sending FormData
-    const request = new Request('http://localhost/', {
-      method: 'POST',
-      body: formData,
-    });
+function makeLoginRequest(password: string): Request {
+  const formData = new FormData();
+  formData.append("password", password);
+  return new Request("http://localhost/", {
+    method: "POST",
+    body: formData,
+  });
+}
 
-    const res = await worker.fetch(request, env as any, {} as any);
+function makeDangerRequest(password: string): Request {
+  return new Request("http://localhost/auth/verify-danger", {
+    method: "POST",
+    body: JSON.stringify({ password }),
+    headers: {
+      "content-type": "application/json",
+      "x-admin-secret": "secret123",
+    },
+  });
+}
+
+describe("Authentication timing safety", () => {
+  it("allows login with the correct dashboard password", async () => {
+    const { env } = buildAuthEnv();
+
+    const res = await worker.fetch(makeLoginRequest("password123"), env, {} as ExecutionContext);
+
     expect(res.status).toBe(302);
-    expect(res.headers.get('Location')).toBe('/dashboard');
+    expect(res.headers.get("Location")).toBe("/dashboard");
+    expect(res.headers.get("Set-Cookie")).toContain("cqd_session=");
   });
 
-  it('should deny login with incorrect dashboard password', async () => {
-    const formData = new FormData();
-    formData.append('password', 'wrong');
+  it("denies login with an incorrect dashboard password and records the failed attempt", async () => {
+    const { env, doFetch } = buildAuthEnv();
 
-    const request = new Request('http://localhost/', {
-      method: 'POST',
-      body: formData,
-    });
+    const res = await worker.fetch(makeLoginRequest("wrong"), env, {} as ExecutionContext);
+    const body = await res.text();
 
-    const res = await worker.fetch(request, env as any, {} as any);
     expect(res.status).toBe(401);
+    expect(body).toContain("Invalid password");
+
+    const loginAttemptCall = doFetch.mock.calls.find(([input]) => {
+      const url = typeof input === "string" ? input : input instanceof Request ? input.url : "";
+      return url.includes("/auth/login-attempt");
+    });
+    expect(loginAttemptCall).toBeDefined();
+    const loginAttemptRequest = loginAttemptCall?.[0] as Request;
+    const payload = await loginAttemptRequest.json() as { success: boolean };
+    expect(payload.success).toBe(false);
   });
 
-  it('should allow danger verification with correct password', async () => {
-    const request = new Request('http://localhost/auth/verify-danger', {
-      method: 'POST',
-      body: JSON.stringify({ password: 'danger123' }),
-      headers: {
-        'content-type': 'application/json',
-      }
-    });
+  it("allows danger verification with the correct password", async () => {
+    const { env } = buildAuthEnv();
 
-    const res = await worker.fetch(request, env as any, {} as any);
-    expect(res.status).toBe(200);
+    const res = await worker.fetch(makeDangerRequest("danger123"), env, {} as ExecutionContext);
     const body = await res.json();
+
+    expect(res.status).toBe(200);
     expect(body).toEqual({ ok: true });
   });
 
-  it('should deny danger verification with incorrect password', async () => {
-    const request = new Request('http://localhost/auth/verify-danger', {
-      method: 'POST',
-      body: JSON.stringify({ password: 'wrong' }),
-      headers: {
-        'content-type': 'application/json',
-      }
-    });
+  it("denies danger verification with an incorrect password", async () => {
+    const { env } = buildAuthEnv();
 
-    const res = await worker.fetch(request, env as any, {} as any);
+    const res = await worker.fetch(makeDangerRequest("wrong"), env, {} as ExecutionContext);
+    const body = await res.json() as { ok: boolean; error: string };
+
     expect(res.status).toBe(401);
+    expect(body.ok).toBe(false);
+    expect(body.error).toContain("Invalid danger password");
+  });
+
+  it("denies danger verification when DANGER_PASSWORD is not configured", async () => {
+    const { env } = buildAuthEnv({ DANGER_PASSWORD: undefined });
+
+    const res = await worker.fetch(makeDangerRequest("danger123"), env, {} as ExecutionContext);
+    const body = await res.json() as { ok: boolean; error: string };
+
+    expect(res.status).toBe(401);
+    expect(body.ok).toBe(false);
+    expect(body.error).toContain("Invalid danger password");
   });
 });
