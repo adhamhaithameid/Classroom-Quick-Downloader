@@ -712,7 +712,14 @@ function App() {
                 <h3 className="cqd-cl-title">
                   <span className="btn-bullet">📜</span> What's New
                 </h3>
-                <button className="cqd-cl-close" onClick={() => setShowChangelog(false)}>×</button>
+                <button
+                  className="cqd-cl-close"
+                  onClick={() => setShowChangelog(false)}
+                  aria-label="Close changelog"
+                  title="Close"
+                >
+                  ×
+                </button>
               </div>
               <div className="cqd-cl-body">
                 {changelogData?.entries?.length ? (
@@ -762,6 +769,7 @@ function App() {
                 className="cqd-banner-close"
                 onClick={() => setError(null)}
                 aria-label="Dismiss error message"
+                title="Dismiss error message"
               >
                 ×
               </button>
@@ -955,6 +963,7 @@ function App() {
                   rel="noreferrer"
                   className="cqd-button cqd-button-primary"
                   aria-label="Open the GitHub repository"
+                  title="Open the GitHub repository"
                 >
                   <span className="cqd-button-icon">
                     <svg
@@ -982,6 +991,7 @@ function App() {
                     )
                   }
                   aria-label="Support the developer on Buy Me a Coffee"
+                  title="Support the developer on Buy Me a Coffee"
                 >
                   <img
                     src={bmcLogoSrc}
