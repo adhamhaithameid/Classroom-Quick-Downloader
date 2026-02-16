@@ -1650,6 +1650,7 @@ export class DownloadsDurable {
       ev.browser = sanitizeString(ev.browser, 24, FIELD_PATTERNS.generic);
       ev.os = sanitizeString(ev.os, 24, FIELD_PATTERNS.generic);
       ev.language = sanitizeString(ev.language, 10, FIELD_PATTERNS.language);
+      ev.ext_version = sanitizeString(ev.ext_version, 32, FIELD_PATTERNS.generic, "0.0.0");
       if (ev.error_type) {
         ev.error_type = sanitizeString(ev.error_type, 32, FIELD_PATTERNS.generic);
       }
@@ -1696,7 +1697,7 @@ export class DownloadsDurable {
       const os = (ev.os || "unknown").toLowerCase();
       c.byOs[os] = (c.byOs[os] || 0) + eventCount;
 
-      const extVersion = ev.ext_version || "0.0.0";
+      const extVersion = ev.ext_version;
       c.byExtVersion[extVersion] =
         (c.byExtVersion[extVersion] || 0) + eventCount;
 
@@ -3089,7 +3090,7 @@ export class DownloadsDurable {
       const lang = (ev.language || "unknown").toLowerCase();
       summary.languages[lang] = (summary.languages[lang] || 0) + weight;
 
-      const ver = ev.ext_version || "0.0.0";
+      const ver = sanitizeString(ev.ext_version, 32, FIELD_PATTERNS.generic, "0.0.0");
       summary.versions[ver] = (summary.versions[ver] || 0) + weight;
 
       const type = (ev.file_type || "unknown").toLowerCase();
@@ -3210,7 +3211,7 @@ export class DownloadsDurable {
       const os = (ev.os || "unknown").toLowerCase();
       counters.byOs[os] = (counters.byOs[os] || 0) + weight;
 
-      const extVer = ev.ext_version || "0.0.0";
+      const extVer = sanitizeString(ev.ext_version, 32, FIELD_PATTERNS.generic, "0.0.0");
       counters.byExtVersion[extVer] = (counters.byExtVersion[extVer] || 0) + weight;
 
       const lang = (ev.language || "unknown").toLowerCase();

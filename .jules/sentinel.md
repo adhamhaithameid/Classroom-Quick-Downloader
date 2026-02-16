@@ -12,3 +12,8 @@
 **Vulnerability:** The `cloudflare-worker` dashboard was vulnerable to Stored XSS. User-controlled inputs (changelog versions, changes, IDs) were interpolated directly into HTML strings without escaping. Additionally, configuration JSON was injected into `<script>` tags using standard `JSON.stringify`, which allows closing the script tag via `</script>`.
 **Learning:** Server-side rendering (SSR) logic must explicitly escape all untrusted data. `JSON.stringify` is insufficient for embedding data in HTML `<script>` contexts because it does not escape HTML characters like `<` and `>`.
 **Prevention:** Always use an HTML escaping utility (like `escapeHtml`) for string interpolation in HTML. For JSON in `<script>` tags, use a safe serializer that unicode-escapes `<` and `>` (e.g., `\u003c`, `\u003e`).
+
+## 2026-02-12 - Input Sanitization Bypass in Analytics Event
+**Vulnerability:** The `ext_version` field in analytics events was not sanitized, unlike other fields. While total event size was limited (10KB), a malicious actor could send many events with unique, large `ext_version` strings (e.g. 9KB each), causing the Durable Object state (which aggregates by this key) to grow unbounded in memory, potentially leading to DoS.
+**Learning:** When implementing field-based aggregation, ALL keys must be sanitized and bounded, not just "high-cardinality" ones. Even "low-cardinality" fields like version numbers can be abused if the input is not validated.
+**Prevention:** Apply `sanitizeString` with strict length limits and regex patterns to ALL input fields used as map keys in aggregation logic.
