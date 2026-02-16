@@ -4881,7 +4881,17 @@ export function renderDashboard(stats: StatsResponse): string {
         if (statusEl) {
           statusEl.classList.remove("ok", "err");
           statusEl.classList.add(enabled ? "ok" : "err");
-          statusEl.innerHTML = 'Remote analytics: <strong>' + (enabled ? "ENABLED" : "PAUSED") + '</strong> · Reason: <span id="remote-enabled-reason">' + escapeHtmlJS(reason) + '</span>';
+
+          statusEl.textContent = "";
+          statusEl.appendChild(document.createTextNode("Remote analytics: "));
+          const strong = document.createElement("strong");
+          strong.textContent = enabled ? "ENABLED" : "PAUSED";
+          statusEl.appendChild(strong);
+          statusEl.appendChild(document.createTextNode(" · Reason: "));
+          const span = document.createElement("span");
+          span.id = "remote-enabled-reason";
+          span.textContent = reason;
+          statusEl.appendChild(span);
         } else if (reasonEl) {
           reasonEl.textContent = reason;
         }
@@ -5159,32 +5169,50 @@ export function renderDashboard(stats: StatsResponse): string {
          
          if (countEl) countEl.textContent = activeRules.length + " rules";
 
+         while (container.firstChild) {
+            container.removeChild(container.firstChild);
+         }
+
          if (activeRules.length === 0) {
-            container.innerHTML = '<div style="padding: 12px; text-align: center; color: var(--text-soft); font-style: italic;">No rules defined. Default styling applies.</div>';
+            const emptyDiv = document.createElement("div");
+            emptyDiv.style.cssText = "padding: 12px; text-align: center; color: var(--text-soft); font-style: italic;";
+            emptyDiv.textContent = "No rules defined. Default styling applies.";
+            container.appendChild(emptyDiv);
             return;
          }
 
-         container.innerHTML = activeRules.map((rule, idx) => \`
-            <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-subtle); border-radius: 6px;">
-               <div style="display: flex; align-items: center; gap: 12px;">
-                 <span style="font-family: monospace; font-size: 0.9em; background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px; color: \${rule.target === 'all' ? '#fbbf24' : '#fff'};">\${escapeHtmlJS(rule.target)}</span>
-                 
-                 <span style="font-size: 0.8em; color: var(--text-muted);">
-                    \${escapeHtmlJS(rule.priority)} + \${escapeHtmlJS(rule.effect)}
-                 </span>
-               </div>
-               <button type="button" class="btn-xs delete-rule-btn" data-idx="\${idx}" style="color: #fca5a5; border-color: rgba(239,68,68,0.3);">✕</button>
-            </div>
-         \`).join('');
+         activeRules.forEach((rule, idx) => {
+            const row = document.createElement("div");
+            row.style.cssText = "display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-subtle); border-radius: 6px;";
 
-         
-         // Attach delete listeners
-         container.querySelectorAll(".delete-rule-btn").forEach(btn => {
-            btn.onclick = () => {
-               const idx = parseInt(btn.dataset.idx);
+            const infoDiv = document.createElement("div");
+            infoDiv.style.cssText = "display: flex; align-items: center; gap: 12px;";
+
+            const targetSpan = document.createElement("span");
+            targetSpan.style.cssText = "font-family: monospace; font-size: 0.9em; background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px;";
+            targetSpan.style.color = rule.target === 'all' ? '#fbbf24' : '#fff';
+            targetSpan.textContent = rule.target;
+
+            const detailsSpan = document.createElement("span");
+            detailsSpan.style.cssText = "font-size: 0.8em; color: var(--text-muted);";
+            detailsSpan.textContent = rule.priority + " + " + rule.effect;
+
+            infoDiv.appendChild(targetSpan);
+            infoDiv.appendChild(detailsSpan);
+
+            const deleteBtn = document.createElement("button");
+            deleteBtn.type = "button";
+            deleteBtn.className = "btn-xs delete-rule-btn";
+            deleteBtn.style.cssText = "color: #fca5a5; border-color: rgba(239,68,68,0.3);";
+            deleteBtn.textContent = "✕";
+            deleteBtn.onclick = () => {
                activeRules.splice(idx, 1);
                renderRulesList();
             };
+
+            row.appendChild(infoDiv);
+            row.appendChild(deleteBtn);
+            container.appendChild(row);
          });
       }
 
@@ -5825,24 +5853,41 @@ export function renderDashboard(stats: StatsResponse): string {
         const container = document.getElementById('ip-list');
         const countEl = document.getElementById('ip-count');
         if (!container) return;
+
+        while (container.firstChild) {
+            container.removeChild(container.firstChild);
+        }
         
         if (ipAllowlistData.allowlist.length === 0) {
-          container.innerHTML = '<div style="padding: 12px; text-align: center; color: var(--text-disabled); font-size: 0.85rem; border: 1px dashed var(--border); border-radius: var(--radius-sm);">No IPs in allowlist</div>';
+          const emptyDiv = document.createElement("div");
+          emptyDiv.style.cssText = "padding: 12px; text-align: center; color: var(--text-disabled); font-size: 0.85rem; border: 1px dashed var(--border); border-radius: var(--radius-sm);";
+          emptyDiv.textContent = "No IPs in allowlist";
+          container.appendChild(emptyDiv);
         } else {
-          container.innerHTML = ipAllowlistData.allowlist.map(ip => 
-            '<div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: var(--bg-elevated); border-radius: var(--radius-sm); border: 1px solid var(--border);">' +
-              '<span style="font-family: monospace; color: var(--text-primary);">' + escapeHtmlJS(ip) + '</span>' +
-              (ip === currentUserIp ? '<span style="font-size: 0.7rem; color: var(--success); background: var(--success-bg); padding: 2px 8px; border-radius: 4px;">You</span>' : '') +
-              '<button class="btn-remove-ip" data-ip="' + escapeHtmlJS(ip) + '" style="background: var(--danger-bg); color: var(--danger); border: 1px solid rgba(239,68,68,0.3); padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; cursor: pointer;">Remove</button>' +
-            '</div>'
-          ).join('');
+          ipAllowlistData.allowlist.forEach(ip => {
+            const row = document.createElement("div");
+            row.style.cssText = "display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: var(--bg-elevated); border-radius: var(--radius-sm); border: 1px solid var(--border);";
 
-          
-          // Bind remove buttons
-          container.querySelectorAll('.btn-remove-ip').forEach(btn => {
-            btn.addEventListener('click', function() {
-              removeIp(this.getAttribute('data-ip'));
-            });
+            const ipSpan = document.createElement("span");
+            ipSpan.style.cssText = "font-family: monospace; color: var(--text-primary);";
+            ipSpan.textContent = ip;
+            row.appendChild(ipSpan);
+
+            if (ip === currentUserIp) {
+                const youSpan = document.createElement("span");
+                youSpan.style.cssText = "font-size: 0.7rem; color: var(--success); background: var(--success-bg); padding: 2px 8px; border-radius: 4px;";
+                youSpan.textContent = "You";
+                row.appendChild(youSpan);
+            }
+
+            const btn = document.createElement("button");
+            btn.className = "btn-remove-ip";
+            btn.style.cssText = "background: var(--danger-bg); color: var(--danger); border: 1px solid rgba(239,68,68,0.3); padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; cursor: pointer;";
+            btn.textContent = "Remove";
+            btn.onclick = () => removeIp(ip);
+
+            row.appendChild(btn);
+            container.appendChild(row);
           });
         }
         
