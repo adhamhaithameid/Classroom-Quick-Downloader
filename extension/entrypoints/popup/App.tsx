@@ -102,6 +102,7 @@ const BASE_COLORS = [
 
 // LocalStorage key for persistent color assignments
 const COLOR_STORAGE_KEY = 'cqd_type_color_assignments_v2';
+const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 
 /**
  * Convert hex to HSL
@@ -267,8 +268,14 @@ function loadColorAssignments(): Record<string, string> {
   try {
     const stored = localStorage.getItem(COLOR_STORAGE_KEY);
     const parsed = stored ? JSON.parse(stored) : {};
-    if (parsed && typeof parsed === 'object') {
-      return parsed as Record<string, string>;
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      const sanitized: Record<string, string> = {};
+      for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
+        if (typeof value === 'string' && HEX_COLOR_RE.test(value)) {
+          sanitized[key] = value;
+        }
+      }
+      return sanitized;
     }
   } catch {
     // Ignore storage parse/read failures and fall back to empty map.
@@ -282,6 +289,25 @@ function saveColorAssignments(assignments: Record<string, string>): void {
   } catch {
     // Ignore storage write failures.
   }
+}
+
+function haveColorAssignmentsChanged(
+  previous: Record<string, string>,
+  next: Record<string, string>
+): boolean {
+  const previousKeys = Object.keys(previous);
+  const nextKeys = Object.keys(next);
+  if (previousKeys.length !== nextKeys.length) {
+    return true;
+  }
+
+  for (const key of nextKeys) {
+    if (previous[key] !== next[key]) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function App() {
@@ -417,7 +443,8 @@ function App() {
         const otherCount = others.reduce((acc, curr) => acc + curr[1], 0);
 
         const usedColors = new Set<string>();
-        const colorAssignments = loadColorAssignments();
+        const persistedAssignments = loadColorAssignments();
+        const colorAssignments = { ...persistedAssignments };
 
         const mapped: StatItem[] = top.map(([key, val], index) => {
           const color = getDistinctColorForTypeAtPosition(key, index, usedColors, colorAssignments);
@@ -442,7 +469,9 @@ function App() {
         }
 
         if (isStale()) return;
-        saveColorAssignments(colorAssignments);
+        if (haveColorAssignmentsChanged(persistedAssignments, colorAssignments)) {
+          saveColorAssignments(colorAssignments);
+        }
         if (isStale()) return;
         setTotalDownloads(totalDownloadsNext);
         setStats(mapped);
