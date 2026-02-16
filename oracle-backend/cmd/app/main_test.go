@@ -1034,6 +1034,101 @@ func TestValidateAuditCheckpointSecret(t *testing.T) {
 	}
 }
 
+func TestValidateProductionSecurityConfig(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name                        string
+		appEnv                      string
+		allowLoopbackBypass         bool
+		allowEmptyDashboardPassword bool
+		allowHTTPStoreURLs          bool
+		allowUntrustedStoreURLs     bool
+		trustedProxyCIDRs           string
+		wantErrContains             string
+	}{
+		{
+			name:                        "non-production allows dev flags",
+			appEnv:                      "development",
+			allowLoopbackBypass:         true,
+			allowEmptyDashboardPassword: true,
+			allowHTTPStoreURLs:          true,
+			allowUntrustedStoreURLs:     true,
+			trustedProxyCIDRs:           "0.0.0.0/0,::/0",
+		},
+		{
+			name:                "prod rejects loopback bypass",
+			appEnv:              "production",
+			allowLoopbackBypass: true,
+			wantErrContains:     "ALLOW_LOOPBACK_BYPASS",
+		},
+		{
+			name:                        "prod rejects empty dashboard password",
+			appEnv:                      "production",
+			allowEmptyDashboardPassword: true,
+			wantErrContains:             "ALLOW_EMPTY_DASHBOARD_PASSWORD",
+		},
+		{
+			name:               "prod rejects http store urls",
+			appEnv:             "production",
+			allowHTTPStoreURLs: true,
+			wantErrContains:    "ORACLE_ALLOW_HTTP_STORE_URLS",
+		},
+		{
+			name:                    "prod rejects untrusted store urls",
+			appEnv:                  "production",
+			allowUntrustedStoreURLs: true,
+			wantErrContains:         "ORACLE_ALLOW_UNTRUSTED_STORE_URLS",
+		},
+		{
+			name:              "prod rejects ipv4 wildcard trusted proxy",
+			appEnv:            "production",
+			trustedProxyCIDRs: "0.0.0.0/0",
+			wantErrContains:   "TRUSTED_PROXY_CIDRS",
+		},
+		{
+			name:              "prod rejects ipv6 wildcard trusted proxy",
+			appEnv:            "production",
+			trustedProxyCIDRs: "::/0",
+			wantErrContains:   "TRUSTED_PROXY_CIDRS",
+		},
+		{
+			name:              "prod accepts strict trusted proxy cidrs",
+			appEnv:            "  PROD  ",
+			trustedProxyCIDRs: "10.0.0.0/8,2001:db8::/32",
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := validateProductionSecurityConfig(
+				tc.appEnv,
+				tc.allowLoopbackBypass,
+				tc.allowEmptyDashboardPassword,
+				tc.allowHTTPStoreURLs,
+				tc.allowUntrustedStoreURLs,
+				parseTrustedProxyCIDRs(tc.trustedProxyCIDRs),
+			)
+			if tc.wantErrContains == "" {
+				if err != nil {
+					t.Fatalf("expected no error, got %v", err)
+				}
+				return
+			}
+
+			if err == nil {
+				t.Fatalf("expected error containing %q, got nil", tc.wantErrContains)
+			}
+			if !strings.Contains(err.Error(), tc.wantErrContains) {
+				t.Fatalf("expected error containing %q, got %q", tc.wantErrContains, err.Error())
+			}
+		})
+	}
+}
+
 func TestUpsertSystemAlert_ConcurrentSingleOpenRow(t *testing.T) {
 	sqlDB, err := db.Init(filepath.Join(t.TempDir(), "oracle-alert-upsert.db"))
 	if err != nil {
