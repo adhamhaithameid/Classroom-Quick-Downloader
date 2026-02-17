@@ -1119,7 +1119,7 @@ function App() {
 
 // --- Subcomponents ---
 
-function ToggleRow({
+export function ToggleRow({
   label,
   description,
   checked,
