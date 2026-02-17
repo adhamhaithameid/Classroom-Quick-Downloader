@@ -77,7 +77,7 @@ describe("Downloads Durable Object Helpers", () => {
 
       expect(response).toBeInstanceOf(Response);
       expect(response.headers.get("Content-Type")).toBe("application/json");
-      expect(response.headers.get("Access-Control-Allow-Origin")).toBe("*");
+      expect(response.headers.get("Access-Control-Allow-Origin")).toBeNull();
 
       const body = await response.json();
       expect(body).toEqual(data);
@@ -89,8 +89,8 @@ describe("Downloads Durable Object Helpers", () => {
     });
 
     it("allows overriding default headers", () => {
-        const response = json({}, { headers: { "Access-Control-Allow-Origin": "example.com" } });
-        expect(response.headers.get("Access-Control-Allow-Origin")).toBe("example.com");
+      const response = json({}, { headers: { "Content-Type": "application/problem+json" } });
+      expect(response.headers.get("Content-Type")).toBe("application/problem+json");
     });
   });
 });
