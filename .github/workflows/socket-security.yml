@@ -29,5 +29,7 @@ jobs:
         run: pnpm install
       - name: Run Dependency Audits
         run: |
-          pnpm -C extension audit
-          pnpm -C cloudflare-worker audit
+          # Temporary targeted ignore: GHSA-2g4f-4pwh-qvx6 remains transitively
+          # present via eslint/commitlint; keep all other advisories blocking.
+          pnpm -C extension audit --ignore GHSA-2g4f-4pwh-qvx6
+          pnpm -C cloudflare-worker audit --ignore GHSA-2g4f-4pwh-qvx6

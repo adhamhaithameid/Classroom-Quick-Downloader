@@ -51,12 +51,8 @@ html {
 }
 
 /* Switch Focus */
-.cqd-switch:focus-visible .cqd-switch-slider {
+.cqd-switch input:focus-visible + .cqd-switch-slider {
   box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--cqd-blue);
-}
-
-.cqd-switch:focus-visible {
-  outline: none;
 }
 
 /* Hide scrollbars visually but allow scrolling */
@@ -833,7 +829,16 @@ body {
 }
 
 .cqd-switch input {
-  display: none;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+  opacity: 0;
 }
 
 .cqd-switch-slider {

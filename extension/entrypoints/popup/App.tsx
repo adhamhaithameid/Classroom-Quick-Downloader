@@ -1119,7 +1119,7 @@ function App() {
 
 // --- Subcomponents ---
 
-function ToggleRow({
+export function ToggleRow({
   label,
   description,
   checked,
@@ -1136,9 +1136,9 @@ function ToggleRow({
     }
   };
 
-  const handleKeyDown = (e: KeyboardEvent<HTMLLabelElement>) => {
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (isDisabled) return;
-    if (e.key === 'Enter' || e.key === ' ') {
+    if (e.key === 'Enter') {
       e.preventDefault();
       handleChange();
     }
@@ -1158,18 +1158,14 @@ function ToggleRow({
       </div>
       <label
         className={`cqd-switch ${loading ? 'cqd-switch-loading' : ''}`}
-        aria-label={label}
-        role="switch"
-        aria-checked={checked}
-        aria-disabled={isDisabled || undefined}
-        tabIndex={0}
-        onKeyDown={handleKeyDown}
       >
         <input
           type="checkbox"
           checked={checked}
           disabled={isDisabled}
           onChange={handleChange}
+          onKeyDown={handleKeyDown}
+          aria-label={label}
         />
         <div className="cqd-switch-slider">
           <div className="cqd-switch-circle">
