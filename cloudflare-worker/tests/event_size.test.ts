@@ -71,7 +71,7 @@ describe("event size validation", () => {
     expect(json.accepted).toBe(1);
   });
 
-  it("rejects events larger than 10KB", async () => {
+  it("rejects events larger than 10KB (fast path by length)", async () => {
     const { obj } = makeDO();
     await (obj as any).loaded;
 
@@ -82,6 +82,36 @@ describe("event size validation", () => {
       timestamp: Date.now(),
       payload: largeString,
     };
+    const res = await obj.fetch(makeTrackRequest([event]));
+    expect(res.status).toBe(400);
+    const json = await res.json() as any;
+    expect(json.ok).toBe(false);
+    expect(json.error).toBe("event_too_large");
+  });
+
+  it("rejects events larger than 10KB (slow path by encoding)", async () => {
+    const { obj } = makeDO();
+    await (obj as any).loaded;
+
+    // Use multi-byte characters to pass the length check but fail the byte check.
+    // '€' is 3 bytes.
+    // MAX_BYTES = 10240.
+    // Target length: > 3413 (to skip fast acceptance) AND < 10240 (to pass fast rejection).
+    // Target bytes: > 10240.
+
+    // 4000 characters * 3 bytes = 12000 bytes.
+    const multiByteString = "€".repeat(4000);
+    expect(multiByteString.length).toBeLessThan(MAX_BYTES);
+    expect(multiByteString.length).toBeGreaterThan(MAX_BYTES / 3);
+
+    // JSON overhead might add a few bytes, but 12000 is plenty over 10240.
+    const event = {
+      id: "heavy-event",
+      status: "success",
+      timestamp: Date.now(),
+      payload: multiByteString,
+    };
+
     const res = await obj.fetch(makeTrackRequest([event]));
     expect(res.status).toBe(400);
     const json = await res.json() as any;
