@@ -135,7 +135,7 @@ describe("quotaToFlag", () => {
   });
 
   it("handles critical flag (> 80,000)", () => {
-    const expected = { label: "critical", className: "flag-fuck", description: "At limits." };
+    const expected = { label: "critical", className: "flag-critical", description: "At limits." };
     expect(quotaToFlag(makeQuota(80001))).toEqual(expected);
     expect(quotaToFlag(makeQuota(100000))).toEqual(expected);
   });
