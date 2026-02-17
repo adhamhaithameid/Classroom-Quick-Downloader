@@ -1533,14 +1533,34 @@ export class DownloadsDurable {
     const encoder = new TextEncoder();
     for (const ev of events) {
       try {
-        const eventSize = encoder.encode(JSON.stringify(ev)).length;
-        if (eventSize > MAX_EVENT_SIZE_BYTES) {
+        const jsonString = JSON.stringify(ev);
+        const len = jsonString.length;
+
+        // Fast path: string length > max bytes implies byte length > max bytes
+        if (len > MAX_EVENT_SIZE_BYTES) {
           this.recordFailure("track_ingest", "event_too_large", `max=${MAX_EVENT_SIZE_BYTES}`, 1, now);
           await this.persist();
           return json(
             { ok: false, error: "event_too_large", maxBytes: MAX_EVENT_SIZE_BYTES },
             { status: 400 }
           );
+        }
+
+        // Fast path: string length small enough that byte length is guaranteed safe.
+        // Worst case expansion is usually 3x (BMP) or 4x (Emojis).
+        // Since limit is 10KB and typical event is <1KB, this skips expensive encoding for 99% of events.
+        if (len < MAX_EVENT_SIZE_BYTES / 3) {
+          // Safe, skip TextEncoder
+        } else {
+          const eventSize = encoder.encode(jsonString).length;
+          if (eventSize > MAX_EVENT_SIZE_BYTES) {
+            this.recordFailure("track_ingest", "event_too_large", `max=${MAX_EVENT_SIZE_BYTES}`, 1, now);
+            await this.persist();
+            return json(
+              { ok: false, error: "event_too_large", maxBytes: MAX_EVENT_SIZE_BYTES },
+              { status: 400 }
+            );
+          }
         }
       } catch {
         this.recordFailure("track_ingest", "invalid_event_structure", "failed to stringify event", 1, now);
