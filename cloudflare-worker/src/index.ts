@@ -40,24 +40,34 @@ function generateCSPNonce(): string {
  * This is resistant to timing attacks as comparison is constant-time
  * for the 32-byte hash length.
  */
-async function timingSafeStringEqual(a: string, b: string): Promise<boolean> {
+export async function timingSafeStringEqual(a: string, b: string): Promise<boolean> {
   const enc = new TextEncoder();
   const aBuf = enc.encode(a);
   const bBuf = enc.encode(b);
 
-  const aHash = await crypto.subtle.digest("SHA-256", aBuf);
-  const bHash = await crypto.subtle.digest("SHA-256", bBuf);
+  if (typeof crypto !== "undefined" && crypto.subtle && typeof crypto.subtle.digest === "function") {
+    const aHash = await crypto.subtle.digest("SHA-256", aBuf);
+    const bHash = await crypto.subtle.digest("SHA-256", bBuf);
 
-  if (typeof crypto !== "undefined" && crypto.subtle && typeof (crypto.subtle as any).timingSafeEqual === "function") {
-    return (crypto.subtle as any).timingSafeEqual(aHash, bHash);
+    if (typeof (crypto.subtle as any).timingSafeEqual === "function") {
+      return (crypto.subtle as any).timingSafeEqual(aHash, bHash);
+    }
+
+    // Fallback if timingSafeEqual is missing but digest is present
+    const aView = new Uint8Array(aHash);
+    const bView = new Uint8Array(bHash);
+    let mismatch = 0;
+    for (let i = 0; i < aView.length; i++) {
+      mismatch |= aView[i] ^ bView[i];
+    }
+    return mismatch === 0;
   }
 
-  // Fallback if timingSafeEqual is missing but digest is present
-  const aView = new Uint8Array(aHash);
-  const bView = new Uint8Array(bHash);
+  // Complete fallback (no crypto.subtle)
+  if (aBuf.byteLength !== bBuf.byteLength) return false;
   let mismatch = 0;
-  for (let i = 0; i < aView.length; i++) {
-    mismatch |= aView[i] ^ bView[i];
+  for (let i = 0; i < aBuf.byteLength; i++) {
+    mismatch |= aBuf[i] ^ bBuf[i];
   }
   return mismatch === 0;
 }

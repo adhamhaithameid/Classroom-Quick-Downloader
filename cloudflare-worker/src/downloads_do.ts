@@ -634,7 +634,7 @@ function json<T>(obj: T, init: ResponseInit = {}): Response {
 /**
  * Constant-time string comparison using Web Crypto API.
  */
-async function timingSafeStringEqual(a: string, b: string): Promise<boolean> {
+export async function timingSafeStringEqual(a: string, b: string): Promise<boolean> {
   const enc = new TextEncoder();
   const aBuf = enc.encode(a);
   const bBuf = enc.encode(b);
