@@ -489,3 +489,70 @@ func TestTimeSeriesHandler_MethodNotAllowed(t *testing.T) {
 		t.Fatalf("expected 405, got %d", rr.Code)
 	}
 }
+
+func TestCalcChange(t *testing.T) {
+	tests := []struct {
+		name     string
+		oldVal   int64
+		newVal   int64
+		expected string
+	}{
+		{
+			name:     "Zero to Zero",
+			oldVal:   0,
+			newVal:   0,
+			expected: "0%",
+		},
+		{
+			name:     "Zero to Positive",
+			oldVal:   0,
+			newVal:   10,
+			expected: "+∞",
+		},
+		{
+			name:     "Positive Increase",
+			oldVal:   100,
+			newVal:   200,
+			expected: "+100.0%",
+		},
+		{
+			name:     "Positive Decrease",
+			oldVal:   200,
+			newVal:   100,
+			expected: "-50.0%",
+		},
+		{
+			name:     "No Change",
+			oldVal:   100,
+			newVal:   100,
+			expected: "+0.0%",
+		},
+		{
+			name:     "Decrease to Zero",
+			oldVal:   100,
+			newVal:   0,
+			expected: "-100.0%",
+		},
+		{
+			name:     "Small Increase",
+			oldVal:   100,
+			newVal:   105,
+			expected: "+5.0%",
+		},
+		{
+			name:     "Small Decrease",
+			oldVal:   100,
+			newVal:   95,
+			expected: "-5.0%",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := calcChange(tt.oldVal, tt.newVal)
+			if got != tt.expected {
+				t.Errorf("calcChange(%d, %d) = %v; want %v", tt.oldVal, tt.newVal, got, tt.expected)
+			}
+		})
+	}
+}
