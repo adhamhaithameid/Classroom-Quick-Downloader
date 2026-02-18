@@ -1,6 +1,6 @@
 // filepath: extension/wxt.config.ts
 import { defineConfig } from 'wxt';
-import { buildExtensionPagesCsp, buildHostPermissions } from './src/config/manifest-security';
+import { buildExtensionPagesCsp, buildHostPermissions } from './config/manifest-security';
 
 // the runner should be webExt
 export default defineConfig({

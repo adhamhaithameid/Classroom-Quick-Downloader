@@ -3,7 +3,7 @@ import {
   buildExtensionPagesCsp,
   buildHostPermissions,
   resolveWorkerOrigin,
-} from '../src/config/manifest-security';
+} from '../config/manifest-security';
 
 describe('manifest security config', () => {
   it('resolves analytics origin from an HTTPS worker URL', () => {
