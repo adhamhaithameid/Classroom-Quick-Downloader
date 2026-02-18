@@ -147,6 +147,10 @@ describe("renderTableRows escaping", () => {
     expect(escapeHtml(value)).toBe("&lt;tag attr=&quot;x&quot;&gt;&amp;&#039;&lt;/tag&gt;");
   });
 
+  it("renders the empty-state row when there is no data", () => {
+    expect(renderTableRows({})).toBe("<tr><td colspan='2'>—</td></tr>");
+  });
+
   it("escapes object keys while rendering rows", () => {
     const html = renderTableRows({
       "<script>alert(1)</script>": 2,
@@ -156,5 +160,27 @@ describe("renderTableRows escaping", () => {
     expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
     expect(html).not.toContain("<script>alert(1)</script>");
     expect(html).toContain("<td>2</td>");
+  });
+
+  it("keeps descending value order while escaping only key content", () => {
+    const html = renderTableRows({
+      "<b>high</b>": 9,
+      normal: 3,
+      "<img src=x onerror=alert(1)>": 1,
+    });
+
+    const firstRow = html.indexOf("&lt;b&gt;high&lt;/b&gt;");
+    const secondRow = html.indexOf("normal");
+    const thirdRow = html.indexOf("&lt;img src=x onerror=alert(1)&gt;");
+
+    expect(firstRow).toBeGreaterThanOrEqual(0);
+    expect(secondRow).toBeGreaterThanOrEqual(0);
+    expect(thirdRow).toBeGreaterThanOrEqual(0);
+    expect(firstRow).toBeLessThan(secondRow);
+    expect(secondRow).toBeLessThan(thirdRow);
+
+    expect(html).toContain("<td>9</td>");
+    expect(html).toContain("<td>3</td>");
+    expect(html).toContain("<td>1</td>");
   });
 });
