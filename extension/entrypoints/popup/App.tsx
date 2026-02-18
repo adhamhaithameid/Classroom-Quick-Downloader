@@ -334,6 +334,30 @@ function App() {
   // CHANGELOG STATE
   const [changelogData, setChangelogData] = useState<ChangelogData | null>(null);
   const [showChangelog, setShowChangelog] = useState(false);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (showChangelog) {
+      previousFocusRef.current = document.activeElement as HTMLElement;
+      closeButtonRef.current?.focus();
+    } else {
+      if (previousFocusRef.current) {
+        previousFocusRef.current.focus();
+        previousFocusRef.current = null;
+      }
+    }
+  }, [showChangelog]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: globalThis.KeyboardEvent) => {
+      if (e.key === 'Escape' && showChangelog) {
+        setShowChangelog(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showChangelog]);
 
   // Track scroll to add blur/shadow under header when not at top
   useEffect(() => {
@@ -704,15 +728,28 @@ function App() {
 
         <div className="cqd-content-area">
           {/* ChangeLog Overlay */}
-          <div className={`cqd-changelog-overlay ${showChangelog ? 'open' : ''}`} onClick={(e) => {
-             if (e.target === e.currentTarget) setShowChangelog(false);
-          }}>
+          <div
+            className={`cqd-changelog-overlay ${showChangelog ? 'open' : ''}`}
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setShowChangelog(false);
+            }}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="changelog-title"
+          >
             <div className="cqd-changelog-card">
               <div className="cqd-cl-header">
-                <h3 className="cqd-cl-title">
+                <h3 className="cqd-cl-title" id="changelog-title">
                   <span className="btn-bullet">📜</span> What's New
                 </h3>
-                <button className="cqd-cl-close" onClick={() => setShowChangelog(false)}>×</button>
+                <button
+                  className="cqd-cl-close"
+                  onClick={() => setShowChangelog(false)}
+                  ref={closeButtonRef}
+                  aria-label="Close changelog"
+                >
+                  ×
+                </button>
               </div>
               <div className="cqd-cl-body">
                 {changelogData?.entries?.length ? (
