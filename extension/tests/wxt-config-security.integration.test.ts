@@ -32,6 +32,7 @@ describe('wxt config security integration', () => {
 
     expect(manifest.host_permissions).toContain(`${DEFAULT_WORKER_ORIGIN}/*`);
     expect(csp).toContain(DEFAULT_WORKER_ORIGIN);
+    expect(csp).toContain("default-src 'self';");
     expect(csp).toContain("script-src 'self';");
     expect(csp).not.toContain('unsafe-eval');
   });

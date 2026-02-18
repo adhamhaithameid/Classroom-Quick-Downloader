@@ -54,9 +54,9 @@ export function buildExtensionPagesCsp(workerUrl = process.env.VITE_WORKER_URL):
   ]);
 
   return [
+    'default-src \'self\';',
     'script-src \'self\';',
     'object-src \'self\';',
     `connect-src ${connectSrc.join(' ')};`,
   ].join(' ');
 }
-
