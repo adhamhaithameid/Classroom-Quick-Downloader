@@ -214,7 +214,7 @@ function topKey(data?: Record<string, number>): string {
   return entries[0][0];
 }
 
-export function renderLoginPage(errorMessage?: string): string {
+export function renderLoginPage(errorMessage?: string, nonce?: string): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -255,13 +255,13 @@ export function renderLoginPage(errorMessage?: string): string {
     </div>
     ${errorMessage ? `<div class="login-error">${escapeHtml(errorMessage)}</div>` : ""}
   </form>
-  <script>document.getElementById("password-input")?.focus();</script>
+  <script nonce="${nonce || ''}">document.getElementById("password-input")?.focus();</script>
 </body>
 </html>`;
 }
 
 // Notification Rules Engine UI
-function renderNotificationSection(entries: ChangelogEntry[], config: ChangelogConfig): string {
+function renderNotificationSection(entries: ChangelogEntry[], config: ChangelogConfig, nonce?: string): string {
   const sorted = [...entries].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   const knownVersions = Array.from(new Set(sorted.map(e => e.version)));
   const dataListOptions = [
@@ -279,7 +279,7 @@ function renderNotificationSection(entries: ChangelogEntry[], config: ChangelogC
         <span class="unsaved-dot" id="unsaved-indicator" title="Unsaved changes"></span>
       </h2>
       
-      <script>window.CURRENT_RULES = ${rulesJson};</script>
+      <script nonce="${nonce || ''}">window.CURRENT_RULES = ${rulesJson};</script>
       
       <div class="split-section" style="gap: 24px;">
         <!-- Left: Actions / Form -->
@@ -341,7 +341,7 @@ function renderNotificationSection(entries: ChangelogEntry[], config: ChangelogC
                <span id="rule-preview-pill" class="cqd-brand-version">v1.2.3</span>
             </div>
             
-            <script>
+            <script nonce="${nonce || ''}">
               (function() {
                 var pill = document.getElementById('rule-preview-pill');
                 function updatePreview() {
@@ -506,7 +506,7 @@ function renderReleaseManagementSection(entries: ChangelogEntry[], _config: Chan
   `;
 }
 
-export function renderDashboard(stats: StatsResponse): string {
+export function renderDashboard(stats: StatsResponse, nonce?: string): string {
   const quota = stats.quota;
   const stateTag = quotaToStateTag(quota);
   const flag = quotaToFlag(quota);
@@ -3647,7 +3647,7 @@ export function renderDashboard(stats: StatsResponse): string {
         </div>
       </section>
 
-      ${renderNotificationSection(stats.changelog || [], stats.changelogConfig || {})}
+      ${renderNotificationSection(stats.changelog || [], stats.changelogConfig || {}, nonce)}
       ${renderReleaseManagementSection(stats.changelog || [], stats.changelogConfig || {})}
 
       <!-- Raw /stats payload -->
@@ -4045,7 +4045,7 @@ export function renderDashboard(stats: StatsResponse): string {
     </div>
   </div>
 
-  <script>
+  <script nonce="${nonce || ''}">
     (function () {
       // XSS prevention: HTML escape for untrusted data
       function escapeHtmlJS(unsafe) {

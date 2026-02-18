@@ -1,4 +1,3 @@
-// filepath: cloudflare-worker/src/index.ts
 import { renderDashboard, renderLoginPage } from "./dashboard";
 import type { Env as WorkerEnv, StatsResponse } from "./types";
 
@@ -24,27 +23,41 @@ function getDashboardSecret(env: WorkerEnv): string | null {
   return env.DASHBOARD_PASSWORD || null;
 }
 
+function generateCSPNonce(): string {
+  const array = new Uint8Array(16);
+  crypto.getRandomValues(array);
+  let binary = "";
+  for (let i = 0; i < array.length; i++) {
+    binary += String.fromCharCode(array[i]);
+  }
+  return btoa(binary);
+}
+
 /**
- * Best-effort timing-safe string comparison for JavaScript.
+ * Async timing-safe string comparison using SHA-256 hashing.
  *
- * IMPORTANT: JavaScript does not guarantee constant-time execution.
- * JIT compilers, garbage collection, and branch prediction can all
- * introduce timing variations. This implementation minimizes the
- * most obvious timing channels (early exit on length mismatch,
- * character-by-character short-circuit) but is NOT equivalent to
- * crypto.subtle.timingSafeEqual (unavailable in Workers runtime for
- * arbitrary strings).
- *
- * For password verification, prefer bcrypt/scrypt which have their
- * own timing-safe comparison built in.
+ * Uses crypto.subtle.timingSafeEqual on SHA-256 hashes of the inputs.
+ * This is resistant to timing attacks as comparison is constant-time
+ * for the 32-byte hash length.
  */
-function timingSafeStringEqual(a: string, b: string): boolean {
-  let mismatch = a.length ^ b.length;
-  const maxLength = Math.max(a.length, b.length);
-  for (let i = 0; i < maxLength; i += 1) {
-    const aCode = i < a.length ? a.charCodeAt(i) : 0;
-    const bCode = i < b.length ? b.charCodeAt(i) : 0;
-    mismatch |= aCode ^ bCode;
+async function timingSafeStringEqual(a: string, b: string): Promise<boolean> {
+  const enc = new TextEncoder();
+  const aBuf = enc.encode(a);
+  const bBuf = enc.encode(b);
+
+  const aHash = await crypto.subtle.digest("SHA-256", aBuf);
+  const bHash = await crypto.subtle.digest("SHA-256", bBuf);
+
+  if (typeof crypto !== "undefined" && crypto.subtle && typeof crypto.subtle.timingSafeEqual === "function") {
+    return crypto.subtle.timingSafeEqual(aHash, bHash);
+  }
+
+  // Fallback if timingSafeEqual is missing but digest is present
+  const aView = new Uint8Array(aHash);
+  const bView = new Uint8Array(bHash);
+  let mismatch = 0;
+  for (let i = 0; i < aView.length; i++) {
+    mismatch |= aView[i] ^ bView[i];
   }
   return mismatch === 0;
 }
@@ -255,7 +268,7 @@ export async function verifySessionToken(
     }
 
     const expectedFingerprint = await buildSessionFingerprint(clientIp, clientUserAgent);
-    if (timingSafeStringEqual(payload.fp, expectedFingerprint)) {
+    if (await timingSafeStringEqual(payload.fp, expectedFingerprint)) {
       return true;
     }
     if (bindingMode === "strict") {
@@ -375,6 +388,14 @@ async function isIpAllowed(stub: DurableObjectStub, ip: string, env: WorkerEnv):
 function getDownloadsStub(env: WorkerEnv): DurableObjectStub {
   const id = env.DOWNLOADS_DO.idFromName("downloads");
   return env.DOWNLOADS_DO.get(id);
+}
+
+function addSecurityHeaders(headers: Headers, nonce: string) {
+  headers.set("Content-Security-Policy", `default-src 'self'; script-src 'self' 'nonce-${nonce}'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; font-src 'self' https://fonts.gstatic.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self';`);
+  headers.set("X-Content-Type-Options", "nosniff");
+  headers.set("X-Frame-Options", "DENY");
+  headers.set("Referrer-Policy", "no-referrer");
+  headers.set("Permissions-Policy", "accelerometer=(), camera=(), geolocation=(), microphone=(), payment=(), usb=()");
 }
 
 // --- CORS helpers -----------------------------------------------------------
@@ -542,10 +563,11 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
       // Valid session - redirect to dashboard
       return Response.redirect(new URL("/dashboard", request.url).toString(), 302);
     }
-    return new Response(renderLoginPage(), {
-      status: 200,
-      headers: { "content-type": "text/html; charset=utf-8" },
-    });
+    const nonce = generateCSPNonce();
+    const html = renderLoginPage(undefined, nonce);
+    const headers = new Headers({ "content-type": "text/html; charset=utf-8" });
+    addSecurityHeaders(headers, nonce);
+    return new Response(html, { status: 200, headers });
   }
 
   // POST: Handle login
@@ -601,7 +623,7 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
     const password = (form.get("password") || "").toString();
 
     // Validate password
-    if (!timingSafeStringEqual(password, dashboardSecret)) {
+    if (!await timingSafeStringEqual(password, dashboardSecret)) {
       // Rate limit: record failed attempt
       const rateLimitReq = new Request(new URL("/auth/login-attempt", request.url).toString(), {
         method: "POST",
@@ -645,17 +667,19 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
 
       if (!rateLimitData.allowed) {
         const mins = Math.ceil((rateLimitData.blockedForSeconds || 900) / 60);
-        return new Response(
-          renderLoginPage(`Too many failed attempts. Please try again in ${mins} minutes.`),
-          { status: 429, headers: { "content-type": "text/html; charset=utf-8" } }
-        );
+        const nonce = generateCSPNonce();
+        const html = renderLoginPage(`Too many failed attempts. Please try again in ${mins} minutes.`, nonce);
+        const headers = new Headers({ "content-type": "text/html; charset=utf-8" });
+        addSecurityHeaders(headers, nonce);
+        return new Response(html, { status: 429, headers });
       }
 
       const remaining = rateLimitData.attemptsRemaining ?? 4;
-      return new Response(
-        renderLoginPage(`Invalid password. ${remaining} attempts remaining.`),
-        { status: 401, headers: { "content-type": "text/html; charset=utf-8" } }
-      );
+      const nonce = generateCSPNonce();
+      const html = renderLoginPage(`Invalid password. ${remaining} attempts remaining.`, nonce);
+      const headers = new Headers({ "content-type": "text/html; charset=utf-8" });
+      addSecurityHeaders(headers, nonce);
+      return new Response(html, { status: 401, headers });
     }
 
     // Successful login - clear rate limit and create session
@@ -734,11 +758,14 @@ async function handleDashboard(request: Request, env: WorkerEnv): Promise<Respon
   }
 
   const stats = (await statsRes.json()) as StatsResponse;
-  const html = renderDashboard(stats);
+  const nonce = generateCSPNonce();
+  const html = renderDashboard(stats, nonce);
+  const headers = new Headers({ "content-type": "text/html; charset=utf-8" });
+  addSecurityHeaders(headers, nonce);
 
   return new Response(html, {
     status: 200,
-    headers: { "content-type": "text/html; charset=utf-8" },
+    headers,
   });
 }
 
@@ -817,7 +844,7 @@ async function handleVerifyDangerPassword(request: Request, env: WorkerEnv): Pro
   try {
     const { password } = await request.json() as { password: string };
 
-    if (!password || !env.DANGER_PASSWORD || !timingSafeStringEqual(password, env.DANGER_PASSWORD)) {
+    if (!password || !env.DANGER_PASSWORD || !await timingSafeStringEqual(password, env.DANGER_PASSWORD)) {
       // Record failed attempt
       await stub.fetch(new Request("https://do/auth/login-attempt", {
         method: "POST",
@@ -872,7 +899,7 @@ async function resolveAuthContext(request: Request, env: WorkerEnv): Promise<Aut
   const bindingMode = sessionBindingModeFromEnv(env);
 
   return {
-    hasValidSecret: !!adminSecret && timingSafeStringEqual(adminSecret, env.DO_SHARED_SECRET),
+    hasValidSecret: !!adminSecret && await timingSafeStringEqual(adminSecret, env.DO_SHARED_SECRET),
     hasValidSession: !!dashboardSecret && !!sessionToken &&
       await verifySessionToken(sessionToken, dashboardSecret, clientIp, userAgent, bindingMode),
   };

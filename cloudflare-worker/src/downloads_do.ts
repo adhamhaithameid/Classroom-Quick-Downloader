@@ -631,13 +631,38 @@ function json<T>(obj: T, init: ResponseInit = {}): Response {
  * For password verification, prefer bcrypt/scrypt which have their
  * own timing-safe comparison built in.
  */
-function timingSafeStringEqual(a: string, b: string): boolean {
-  let mismatch = a.length ^ b.length;
-  const maxLength = Math.max(a.length, b.length);
-  for (let i = 0; i < maxLength; i += 1) {
-    const aCode = i < a.length ? a.charCodeAt(i) : 0;
-    const bCode = i < b.length ? b.charCodeAt(i) : 0;
-    mismatch |= aCode ^ bCode;
+/**
+ * Constant-time string comparison using Web Crypto API.
+ */
+async function timingSafeStringEqual(a: string, b: string): Promise<boolean> {
+  const enc = new TextEncoder();
+  const aBuf = enc.encode(a);
+  const bBuf = enc.encode(b);
+
+  if (typeof crypto !== "undefined" && crypto.subtle && typeof crypto.subtle.digest === "function") {
+    // Use SHA-256 to get constant time comparison regardless of input length
+    const aHash = await crypto.subtle.digest("SHA-256", aBuf);
+    const bHash = await crypto.subtle.digest("SHA-256", bBuf);
+
+    if (typeof crypto.subtle.timingSafeEqual === "function") {
+      return crypto.subtle.timingSafeEqual(aHash, bHash);
+    }
+
+    // Fallback if timingSafeEqual is missing but digest is present
+    const aView = new Uint8Array(aHash);
+    const bView = new Uint8Array(bHash);
+    let mismatch = 0;
+    for (let i = 0; i < aView.length; i++) {
+      mismatch |= aView[i] ^ bView[i];
+    }
+    return mismatch === 0;
+  }
+
+  // Complete fallback (no crypto.subtle)
+  if (aBuf.byteLength !== bBuf.byteLength) return false;
+  let mismatch = 0;
+  for (let i = 0; i < aBuf.byteLength; i++) {
+    mismatch |= aBuf[i] ^ bBuf[i];
   }
   return mismatch === 0;
 }
@@ -1258,11 +1283,11 @@ export class DownloadsDurable {
     return { allowed: true };
   }
 
-  private isAuthorizedAdmin(request: Request): boolean {
+  private async isAuthorizedAdmin(request: Request): Promise<boolean> {
     const header = request.headers.get("X-Admin-Secret") || "";
     const expected = this.env.DO_SHARED_SECRET;
     if (!expected) return false;
-    return timingSafeStringEqual(header, expected);
+    return await timingSafeStringEqual(header, expected);
   }
 
   // ---------------------------------------------------------------------------
@@ -1297,7 +1322,7 @@ export class DownloadsDurable {
 
     if (pathname === "/debug/flush" && request.method === "POST") {
       // Require admin auth for debug endpoints
-      if (!this.isAuthorizedAdmin(request)) {
+      if (!await this.isAuthorizedAdmin(request)) {
         return json({ ok: false, error: "unauthorized" }, { status: 401 });
       }
       return this.handleDebugFlush();
@@ -1305,7 +1330,7 @@ export class DownloadsDurable {
 
     if (pathname === "/debug/reset" && request.method === "POST") {
       // Require admin auth for debug endpoints
-      if (!this.isAuthorizedAdmin(request)) {
+      if (!await this.isAuthorizedAdmin(request)) {
         return json({ ok: false, error: "unauthorized" }, { status: 401 });
       }
       return this.handleDebugReset();
@@ -2079,7 +2104,7 @@ export class DownloadsDurable {
   private async handlePipelineHealth(request: Request): Promise<Response> {
     this.ensureRequestDay();
     const payload = this.buildPipelineHealthPayload();
-    if (this.isAuthorizedAdmin(request)) {
+    if (await this.isAuthorizedAdmin(request)) {
       this.state.waitUntil(this.notifyHealthIfNeeded(payload).catch(() => {}));
     }
     return json(payload);
@@ -2218,7 +2243,7 @@ export class DownloadsDurable {
   }
 
   private async handleAdminForceFlush(request: Request): Promise<Response> {
-    if (!this.isAuthorizedAdmin(request)) {
+    if (!await this.isAuthorizedAdmin(request)) {
       return json({ ok: false, error: "unauthorized" }, { status: 401 });
     }
 
@@ -2254,7 +2279,7 @@ export class DownloadsDurable {
    *         cancelHoldDelayMs?: number, allowLegacyEvents?: boolean }
    */
   private async handleAdminUpdateConfig(request: Request): Promise<Response> {
-    if (!this.isAuthorizedAdmin(request)) {
+    if (!await this.isAuthorizedAdmin(request)) {
       return json({ ok: false, error: "unauthorized" }, { status: 401 });
     }
 
@@ -2543,7 +2568,7 @@ export class DownloadsDurable {
   }
 
   private async handleAdminCutPower(request: Request): Promise<Response> {
-    if (!this.isAuthorizedAdmin(request)) {
+    if (!await this.isAuthorizedAdmin(request)) {
       return json({ ok: false, error: "unauthorized" }, { status: 401 });
     }
 
@@ -2564,7 +2589,7 @@ export class DownloadsDurable {
   }
 
   private async handleAdminRestorePower(request: Request): Promise<Response> {
-    if (!this.isAuthorizedAdmin(request)) {
+    if (!await this.isAuthorizedAdmin(request)) {
       return json({ ok: false, error: "unauthorized" }, { status: 401 });
     }
 
@@ -2585,7 +2610,7 @@ export class DownloadsDurable {
   }
 
   private async handleAdminFullSync(request: Request): Promise<Response> {
-    if (!this.isAuthorizedAdmin(request)) {
+    if (!await this.isAuthorizedAdmin(request)) {
       return json({ ok: false, error: "unauthorized" }, { status: 401 });
     }
 
@@ -3486,7 +3511,7 @@ export class DownloadsDurable {
    * Expects JSON body with `changelog` (array) or `config` (object) or both.
    */
   private async handleAdminUpdateChangelog(request: Request): Promise<Response> {
-    if (!this.isAuthorizedAdmin(request)) {
+    if (!await this.isAuthorizedAdmin(request)) {
       return json({ ok: false, error: "unauthorized" }, { status: 401 });
     }
 
@@ -3537,7 +3562,7 @@ export class DownloadsDurable {
    * Returns: { allowed: boolean, attemptsRemaining?: number, blockedUntil?: number }
    */
   private async handleLoginAttempt(request: Request): Promise<Response> {
-    if (!this.isAuthorizedAdmin(request)) {
+    if (!await this.isAuthorizedAdmin(request)) {
       return json({ ok: false, error: "unauthorized" }, { status: 401 });
     }
     const MAX_ATTEMPTS = 5;
@@ -3675,7 +3700,7 @@ export class DownloadsDurable {
    * Returns: { allowed: boolean }
    */
   private async handleCheckIpAllowlist(request: Request): Promise<Response> {
-    if (!this.isAuthorizedAdmin(request)) {
+    if (!await this.isAuthorizedAdmin(request)) {
       return json({ allowed: false, error: "unauthorized" }, { status: 401 });
     }
     let body: { ip?: string };
@@ -3704,7 +3729,7 @@ export class DownloadsDurable {
    * Requires X-Admin-Secret
    */
   private async handleGetIpAllowlist(request: Request): Promise<Response> {
-    if (!this.isAuthorizedAdmin(request)) {
+    if (!await this.isAuthorizedAdmin(request)) {
       return json({ ok: false, error: "unauthorized" }, { status: 401 });
     }
 
@@ -3726,7 +3751,7 @@ export class DownloadsDurable {
    * Requires X-Admin-Secret
    */
   private async handleAdminIpAllowlist(request: Request): Promise<Response> {
-    if (!this.isAuthorizedAdmin(request)) {
+    if (!await this.isAuthorizedAdmin(request)) {
       return json({ ok: false, error: "unauthorized" }, { status: 401 });
     }
 

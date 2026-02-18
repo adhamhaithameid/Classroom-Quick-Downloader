@@ -17,3 +17,8 @@
 **Vulnerability:** The `ext_version` field in analytics events was not sanitized, unlike other fields. While total event size was limited (10KB), a malicious actor could send many events with unique, large `ext_version` strings (e.g. 9KB each), causing the Durable Object state (which aggregates by this key) to grow unbounded in memory, potentially leading to DoS.
 **Learning:** When implementing field-based aggregation, ALL keys must be sanitized and bounded, not just "high-cardinality" ones. Even "low-cardinality" fields like version numbers can be abused if the input is not validated.
 **Prevention:** Apply `sanitizeString` with strict length limits and regex patterns to ALL input fields used as map keys in aggregation logic.
+
+## 2026-02-18 - Async Web Crypto Environment Gaps
+**Vulnerability:** Relying on `crypto.subtle.timingSafeEqual` for secure string comparison caused failures in environments where the Web Crypto API is incomplete (e.g., test runners vs Cloudflare Workers). This could lead to developers reverting to insecure implementations to fix tests.
+**Learning:** `crypto.subtle` support varies significantly between runtimes (Node, JSDOM, Workers). Specifically, `timingSafeEqual` may be missing even if `digest` is present.
+**Prevention:** Implement robust feature detection and fallbacks. Use a hybrid approach: hash with `crypto.subtle.digest` (widely supported) to constant-length buffers, then attempt `timingSafeEqual`, falling back to a manual constant-time loop if necessary. This ensures security in production while maintaining testability.

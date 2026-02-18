@@ -169,4 +169,19 @@ describe("Dashboard security rendering", () => {
     expect(html).toContain("\\u003c/script\\u003e\\u003cscript\\u003ealert(1)\\u003c/script\\u003e");
     expect(html).toContain("data-release-id=\"rel-1&quot;&gt;&lt;img src=x onerror=alert(1)&gt;\"");
   });
+
+  it("injects nonce into scripts", () => {
+    const nonce = "test-nonce-123";
+    const html = renderDashboard(makeStats(), nonce);
+    expect(html).toContain('nonce="test-nonce-123"');
+    // Check specific scripts
+    expect(html).toContain('<script nonce="test-nonce-123">window.CURRENT_RULES =');
+    expect(html).toContain('<script nonce="test-nonce-123">');
+  });
+
+  it("injects nonce into login page scripts", () => {
+    const nonce = "login-nonce-456";
+    const html = renderMainLoginPage(undefined, nonce);
+    expect(html).toContain('nonce="login-nonce-456"');
+  });
 });
