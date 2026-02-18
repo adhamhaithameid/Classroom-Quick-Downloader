@@ -48,8 +48,8 @@ async function timingSafeStringEqual(a: string, b: string): Promise<boolean> {
   const aHash = await crypto.subtle.digest("SHA-256", aBuf);
   const bHash = await crypto.subtle.digest("SHA-256", bBuf);
 
-  if (typeof crypto !== "undefined" && crypto.subtle && typeof crypto.subtle.timingSafeEqual === "function") {
-    return crypto.subtle.timingSafeEqual(aHash, bHash);
+  if (typeof crypto !== "undefined" && crypto.subtle && typeof (crypto.subtle as any).timingSafeEqual === "function") {
+    return (crypto.subtle as any).timingSafeEqual(aHash, bHash);
   }
 
   // Fallback if timingSafeEqual is missing but digest is present
