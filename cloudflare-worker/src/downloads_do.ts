@@ -645,6 +645,7 @@ export async function timingSafeStringEqual(a: string, b: string): Promise<boole
     const bHash = await crypto.subtle.digest("SHA-256", bBuf);
 
     // Check for timingSafeEqual, present in Node/CF Workers but missing in older dom types
+    // Using unknown -> custom interface to satisfy linter (avoid explicit any)
     const subtle = crypto.subtle as unknown as { timingSafeEqual?: (a: ArrayBuffer, b: ArrayBuffer) => boolean };
     if (typeof subtle.timingSafeEqual === "function") {
       return subtle.timingSafeEqual(aHash, bHash);

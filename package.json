@@ -13,7 +13,8 @@
       "@commitlint/config-validator>ajv": "8.18.0",
       "eslint>ajv": "8.18.0",
       "undici": ">=7.18.2",
-      "@isaacs/brace-expansion": ">=5.0.1"
+      "@isaacs/brace-expansion": ">=5.0.1",
+      "minimatch@<10.2.1": ">=10.2.1"
     },
     "packageExtensions": {
       "eslint@10.0.0": {
