@@ -1,6 +1,6 @@
 
 import { describe, it, expect } from "vitest";
-import { quotaToStateTag, quotaToFlag } from "../src/dashboard/utils";
+import { quotaToStateTag, quotaToFlag, escapeHtml, renderTableRows } from "../src/dashboard/utils";
 import type { QuotaDescriptor } from "../src/types";
 
 function makeQuota(requestsToday: number): QuotaDescriptor {
@@ -138,5 +138,23 @@ describe("quotaToFlag", () => {
     const expected = { label: "critical", className: "flag-critical", description: "At limits." };
     expect(quotaToFlag(makeQuota(80001))).toEqual(expected);
     expect(quotaToFlag(makeQuota(100000))).toEqual(expected);
+  });
+});
+
+describe("renderTableRows escaping", () => {
+  it("escapes html-sensitive characters", () => {
+    const value = `<tag attr="x">&'</tag>`;
+    expect(escapeHtml(value)).toBe("&lt;tag attr=&quot;x&quot;&gt;&amp;&#039;&lt;/tag&gt;");
+  });
+
+  it("escapes object keys while rendering rows", () => {
+    const html = renderTableRows({
+      "<script>alert(1)</script>": 2,
+      safe: 1,
+    });
+
+    expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
+    expect(html).not.toContain("<script>alert(1)</script>");
+    expect(html).toContain("<td>2</td>");
   });
 });
