@@ -247,7 +247,7 @@ The analytics module sends data to the Cloudflare Worker. The endpoint is config
 const VITE_WORKER_URL = 'http://localhost:8787/track';
 ```
 
-The remote can be disabled entirely by setting `WORKER_URL` to an empty string.
+The remote can be disabled entirely by setting `VITE_WORKER_URL` to an empty string.
 
 ### Dynamic Configuration
 
