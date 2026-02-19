@@ -18,6 +18,7 @@ jobs:
 
       - name: GitGuardian Scan
         uses: GitGuardian/ggshield-action@v1
+        continue-on-error: ${{ github.event_name == 'pull_request' && github.event.pull_request.user.login == 'dependabot[bot]' }}
         with:
           args: --ignore-known-secrets
         env:

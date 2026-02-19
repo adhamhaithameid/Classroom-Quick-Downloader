@@ -1,0 +1,83 @@
+diff --git a/lib/shared/ajv.js b/lib/shared/ajv.js
+index 5c5c41bd7470bd190bd4efb5caab88c73ae01f56..5e0835a1c7099dd214892732d9613c0e21f88ada 100644
+--- a/lib/shared/ajv.js
++++ b/lib/shared/ajv.js
+@@ -8,27 +8,62 @@
+ // Requirements
+ //------------------------------------------------------------------------------
+ 
+-const Ajv = require("ajv"),
++const AjvImport = require("ajv");
++const Ajv = AjvImport.default || AjvImport;
++
++const DEFAULT_DRAFT4_META = "http://json-schema.org/draft-04/schema#";
++
++let metaSchema;
++try {
+ 	metaSchema = require("ajv/lib/refs/json-schema-draft-04.json");
++} catch {
++	metaSchema = require("ajv-draft-04/dist/refs/json-schema-draft-04.json");
++}
+ 
+ //------------------------------------------------------------------------------
+ // Public Interface
+ //------------------------------------------------------------------------------
+ 
+ module.exports = (additionalOptions = {}) => {
+-	const ajv = new Ajv({
+-		meta: false,
+-		useDefaults: true,
+-		validateSchema: false,
+-		missingRefs: "ignore",
+-		verbose: true,
+-		schemaId: "auto",
+-		...additionalOptions,
+-	});
+-
+-	ajv.addMetaSchema(metaSchema);
+-	// eslint-disable-next-line no-underscore-dangle -- Ajv's API
+-	ajv._opts.defaultMeta = metaSchema.id;
+-
+-	return ajv;
++	const options = { ...additionalOptions };
++	const defaultMeta = metaSchema.id || metaSchema.$id || DEFAULT_DRAFT4_META;
++
++	// Ajv v8 removed strictDefaults. Keep behavior by mapping to strict mode.
++	if (Object.hasOwn(options, "strictDefaults")) {
++		options.strict = options.strictDefaults ? "log" : false;
++		delete options.strictDefaults;
++	}
++
++	try {
++		const AjvDraft04 = require("ajv-draft-04");
++		const ajv = new AjvDraft04({
++			meta: false,
++			useDefaults: true,
++			validateSchema: false,
++			verbose: true,
++			strict: false,
++			...options,
++		});
++
++		ajv.addMetaSchema(metaSchema);
++		// eslint-disable-next-line no-underscore-dangle -- Ajv's API changed in v8
++		if (ajv._opts) ajv._opts.defaultMeta = defaultMeta;
++		if (ajv.opts) ajv.opts.defaultMeta = defaultMeta;
++		return ajv;
++	} catch {
++		const ajv = new Ajv({
++			meta: false,
++			useDefaults: true,
++			validateSchema: false,
++			missingRefs: "ignore",
++			verbose: true,
++			schemaId: "auto",
++			...options,
++		});
++
++		ajv.addMetaSchema(metaSchema);
++		// eslint-disable-next-line no-underscore-dangle -- Ajv's API
++		ajv._opts.defaultMeta = defaultMeta;
++		return ajv;
++	}
+ };
