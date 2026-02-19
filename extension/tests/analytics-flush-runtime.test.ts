@@ -1006,14 +1006,67 @@ describe('analytics flush runtime', () => {
     await mod.updateLocalStats(makeEvent({ status: 'success', duration_ms: 1000, bypass_used: true }));
     await mod.updateLocalStats(makeEvent({ status: 'fail', error_type: 'NETWORK', duration_ms: 5000 }));
     await mod.updateLocalStats(makeEvent({ status: 'cancelled', duration_ms: 20000, language: 'ar' }));
-    expect(state.stats.total).toBe(3);
+    expect(state.stats.total).toBe(2);
+    expect(state.stats.byType?.pdf).toBe(2);
     expect(state.stats.success).toBe(1);
     expect(state.stats.fail).toBe(1);
     expect(state.stats.cancelled).toBe(1);
+    expect(state.stats.attempts).toBe(3);
     expect(state.stats.failByErrorType?.NETWORK).toBe(1);
     expect(state.stats.bySpeed?.fast).toBe(1);
     expect(state.stats.bySpeed?.medium).toBe(1);
     expect(state.stats.bySpeed?.slow).toBe(1);
+  });
+
+  it('updateLocalStats does not count cancelled-only file types in totals', async () => {
+    const state: FlushTestState = {
+      cfg: {
+        configVersion: 2,
+        batchSize: 10,
+        maxDailyRequests: 50,
+        maxRetry: 2,
+        flushMode: 'next_day',
+        lowUsageFlushMinutes: 1440,
+        midUsageFlushMinutes: 1440,
+        highUsageFlushMinutes: 1440,
+        remoteEnabled: true,
+        cancelHoldDelayMs: 1000,
+        dailyFlushWindowStartUtc: 1,
+        dailyFlushWindowMinutes: 120,
+        maxEventsPerRequest: 5000,
+      },
+      meta: {
+        lastFlushAt: null,
+        nextRetryAt: null,
+        backoffIndex: 0,
+      },
+      queue: [],
+      stats: {
+        total: 0,
+        byType: {},
+        success: 0,
+        fail: 0,
+        cancelled: 0,
+        attempts: 0,
+        bySpeed: { fast: 0, medium: 0, slow: 0 },
+        bypassCount: 0,
+        failByErrorType: {},
+        byLanguage: {},
+        lastUpdated: Date.now(),
+      },
+      validQueue: true,
+    };
+    const { mod } = await loadFlushModule(state, true);
+    await mod.updateLocalStats(makeEvent({ status: 'success', file_type: 'pdf' }));
+    await mod.updateLocalStats(makeEvent({ status: 'cancelled', file_type: 'pptx' }));
+    await mod.updateLocalStats(makeEvent({ status: 'cancelled', file_type: 'docx' }));
+
+    expect(state.stats.total).toBe(1);
+    expect(state.stats.byType?.pdf).toBe(1);
+    expect(state.stats.byType?.pptx).toBeUndefined();
+    expect(state.stats.byType?.docx).toBeUndefined();
+    expect(state.stats.cancelled).toBe(2);
+    expect(state.stats.attempts).toBe(3);
   });
 
   it('updateLocalStats initializes nullable counters/maps when stats are partially populated', async () => {
@@ -1074,6 +1127,8 @@ describe('analytics flush runtime', () => {
       language: 'fr',
     }));
 
+    expect(state.stats.total).toBe(3);
+    expect(state.stats.byType?.pdf).toBe(3);
     expect(state.stats.fail).toBe(2);
     expect(state.stats.cancelled).toBe(1);
     expect(state.stats.success).toBe(1);

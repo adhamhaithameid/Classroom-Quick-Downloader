@@ -331,8 +331,11 @@ function getFlushDecision(
 export async function updateLocalStats(event: AnalyticsEvent): Promise<void> {
   const stats = await loadStats();
 
-  stats.total++;
-  stats.byType[event.file_type] = (stats.byType[event.file_type] ?? 0) + 1;
+  const isCountedDownload = event.status === 'success' || event.status === 'fail';
+  if (isCountedDownload) {
+    stats.total++;
+    stats.byType[event.file_type] = (stats.byType[event.file_type] ?? 0) + 1;
+  }
 
   if (event.status === 'success') {
     stats.success = (stats.success ?? 0) + 1;
