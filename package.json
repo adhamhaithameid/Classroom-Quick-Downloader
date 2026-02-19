@@ -4,31 +4,16 @@
   "private": true,
   "packageManager": "pnpm@10.28.2",
   "scripts": {
+    "preinstall": "node tools/enforce-pnpm.cjs",
     "dev:ext": "pnpm --filter extension dev",
     "build:ext": "pnpm --filter extension build",
     "prepare": "husky"
   },
   "pnpm": {
     "overrides": {
-      "@commitlint/config-validator>ajv": "8.18.0",
-      "eslint>ajv": "8.18.0",
       "undici": ">=7.18.2",
-      "@isaacs/brace-expansion": ">=5.0.1"
-    },
-    "packageExtensions": {
-      "eslint@10.0.0": {
-        "dependencies": {
-          "ajv-draft-04": "1.0.0"
-        }
-      }
-    },
-    "patchedDependencies": {
-      "eslint@10.0.0": "patches/eslint@10.0.0.patch"
-    },
-    "auditConfig": {
-      "ignoreCves": [
-        "GHSA-2g4f-4pwh-qvx6"
-      ]
+      "@isaacs/brace-expansion": ">=5.0.1",
+      "minimatch": "^10.2.1"
     }
   },
   "devDependencies": {

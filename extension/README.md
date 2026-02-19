@@ -186,19 +186,19 @@ extension/
 ### Prerequisites
 
 - **Node.js** 20+ ([Download](https://nodejs.org/))
-- **npm** or **pnpm**
+- **pnpm** (required)
 
 ### Setup
 
 ```bash
 cd extension
-npm install
+pnpm install
 ```
 
 ### Development Server
 
 ```bash
-npm run dev
+pnpm run dev
 ```
 
 This command:
@@ -213,7 +213,7 @@ This command:
 ### Build for Production
 
 ```bash
-npm run build
+pnpm run build
 ```
 
 This creates an optimized production build in `.output/chrome-mv3/`.
@@ -221,7 +221,7 @@ This creates an optimized production build in `.output/chrome-mv3/`.
 ### Create ZIP for Web Store
 
 ```bash
-npm run zip
+pnpm run zip
 ```
 
 Generates a `.zip` file in `.output/` ready for Chrome Web Store submission.
@@ -229,9 +229,9 @@ Generates a `.zip` file in `.output/` ready for Chrome Web Store submission.
 ### Firefox Support
 
 ```bash
-npm run dev:firefox     # Development
-npm run build:firefox   # Production build
-npm run zip:firefox     # Web Store ZIP
+pnpm run dev:firefox     # Development
+pnpm run build:firefox   # Production build
+pnpm run zip:firefox     # Web Store ZIP
 ```
 
 ---
@@ -315,12 +315,12 @@ The extension requires these permissions (defined in `wxt.config.ts`):
 ### Type Checking
 
 ```bash
-npm run compile
+pnpm run compile
 ```
 
 ### Loading Unpacked Extension
 
-1. Build the extension: `npm run build`
+1. Build the extension: `pnpm run build`
 2. Open Chrome → `chrome://extensions/`
 3. Enable "Developer mode" (top right)
 4. Click "Load unpacked"

@@ -5,7 +5,9 @@
   "private": true,
   "version": "1.3.0",
   "type": "module",
+  "packageManager": "pnpm@10.28.2",
   "scripts": {
+    "preinstall": "node ../tools/enforce-pnpm.cjs",
     "dev": "wxt",
     "build": "wxt build",
     "zip": "wxt zip",
