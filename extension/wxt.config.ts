@@ -1,6 +1,5 @@
 // filepath: extension/wxt.config.ts
 import { defineConfig } from 'wxt';
-import { buildExtensionPagesCsp, buildHostPermissions } from './config/manifest-security';
 
 // the runner should be webExt
 export default defineConfig({
@@ -28,9 +27,15 @@ export default defineConfig({
       'unlimitedStorage',
       'alarms'
     ],
-    host_permissions: buildHostPermissions(),
+    host_permissions: [
+      'https://drive.google.com/*',
+      'https://classroom.google.com/*',
+      'https://drive.usercontent.google.com/*',
+      'https://accounts.google.com/*',
+      'https://cqd-analytics.adhamhaithameid.workers.dev/*',
+    ],
     content_security_policy: {
-      extension_pages: buildExtensionPagesCsp(),
+      extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self' https://cqd-analytics.adhamhaithameid.workers.dev https://drive.google.com https://classroom.google.com https://drive.usercontent.google.com https://accounts.google.com;"
     },
     icons: {
       "16": "icon/16.png",

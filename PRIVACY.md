@@ -1,7 +1,5 @@
 # 🔒 Privacy Policy
 
-> Last updated: 2026-02-19 (v1.3.5).
-
 > Update (2026-02-15): Latest changes include CI coverage-gate hardening for extension analytics storage migration fallback, popup stats race-condition guards, structured step-up auth error handling in Oracle dashboard, and backend/worker auth-security hardening. See /CHANGELOG.md for details.
 
 **Classroom Quick Downloader** — Privacy Policy
