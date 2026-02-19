@@ -5,10 +5,10 @@ go 1.24.13
 
 require (
 	github.com/jackc/pgx/v5 v5.8.0
-	golang.org/x/crypto v0.48.0
+	golang.org/x/crypto v0.47.0
 	golang.org/x/oauth2 v0.35.0
-	google.golang.org/api v0.267.0
-	modernc.org/sqlite v1.46.1
+	google.golang.org/api v0.266.0
+	modernc.org/sqlite v1.45.0
 )
 
 require (
@@ -38,8 +38,8 @@ require (
 	golang.org/x/exp v0.0.0-20251023183803-a4bb9ffd2546 // indirect
 	golang.org/x/net v0.49.0 // indirect
 	golang.org/x/sync v0.19.0 // indirect
-	golang.org/x/sys v0.41.0 // indirect
-	golang.org/x/text v0.34.0 // indirect
+	golang.org/x/sys v0.40.0 // indirect
+	golang.org/x/text v0.33.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260203192932-546029d2fa20 // indirect
 	google.golang.org/grpc v1.78.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
