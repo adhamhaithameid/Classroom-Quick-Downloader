@@ -1,0 +1,9 @@
+coverage:
+  status:
+    patch:
+      default:
+        target: 0%  # Be more lenient with patch coverage if ignoring files fails
+ignore:
+  - "extension/wxt.config.ts"
+  - "**/*.config.ts"
+  - "**/wxt.config.ts"

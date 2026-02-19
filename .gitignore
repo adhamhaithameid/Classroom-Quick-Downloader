@@ -16,6 +16,10 @@ cloudflare-worker/coverage/
 .dev.vars
 AI/
 ai/
+.jules/
+verification/*.png
+**/security_best_practices_report.md
+ownership-sensitive-rules.csv
 oracle-backend/data/
 oracle-backend/docker_data/
 oracle-backend/app

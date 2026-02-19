@@ -43,20 +43,11 @@ export function topKey(data?: Record<string, number>): string {
   return entries[0][0];
 }
 
-export function escapeHtml(unsafe: string): string {
-  return unsafe
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
-
 export function renderTableRows(data: Record<string, number>): string {
   const keys = Object.keys(data).sort((a, b) => data[b] - data[a]);
   if (keys.length === 0) return "<tr><td colspan='2'>—</td></tr>";
   return keys
-    .map((k) => `<tr><td>${escapeHtml(k)}</td><td>${data[k]}</td></tr>`)
+    .map((k) => `<tr><td>${k}</td><td>${data[k]}</td></tr>`)
     .join("");
 }
 

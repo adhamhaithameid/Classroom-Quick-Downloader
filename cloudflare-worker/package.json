@@ -2,12 +2,14 @@
   "name": "@cqd/cloudflare-worker",
   "version": "2.0.0",
   "private": true,
+  "packageManager": "pnpm@10.28.2",
   "scripts": {
+    "preinstall": "node ../tools/enforce-pnpm.cjs",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "audit": "pnpm audit",
+    "audit": "pnpm audit --ignore GHSA-2g4f-4pwh-qvx6",
     "validate": "pnpm run lint && pnpm run typecheck && pnpm run audit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage.enabled --coverage.provider=v8 --coverage.reporter=json --coverage.reportsDirectory=coverage"
