@@ -9,7 +9,7 @@
     "deploy": "wrangler deploy",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "audit": "pnpm audit --ignore GHSA-2g4f-4pwh-qvx6",
+    "audit": "pnpm audit",
     "validate": "pnpm run lint && pnpm run typecheck && pnpm run audit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage.enabled --coverage.provider=v8 --coverage.reporter=json --coverage.reportsDirectory=coverage"

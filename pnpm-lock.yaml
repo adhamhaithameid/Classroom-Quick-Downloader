@@ -102,7 +102,7 @@ importers:
         specifier: ^6.2.5
         version: 6.2.5
       happy-dom:
-        specifier: ^20.6.1
+        specifier: ^20.6.3
         version: 20.6.3
       jsdom:
         specifier: ^28.1.0
