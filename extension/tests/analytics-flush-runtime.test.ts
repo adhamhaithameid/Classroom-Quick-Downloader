@@ -1136,4 +1136,160 @@ describe('analytics flush runtime', () => {
     expect(state.stats.byLanguage?.fr).toBe(5);
     expect(state.stats.failByErrorType?.TIMEOUT).toBe(1);
   });
+
+  describe('issue #156 cancelled accounting contract', () => {
+    const baseState = (): FlushTestState => ({
+      cfg: {
+        configVersion: 2,
+        batchSize: 10,
+        maxDailyRequests: 50,
+        maxRetry: 2,
+        flushMode: 'next_day',
+        lowUsageFlushMinutes: 1440,
+        midUsageFlushMinutes: 1440,
+        highUsageFlushMinutes: 1440,
+        remoteEnabled: true,
+        cancelHoldDelayMs: 1000,
+        dailyFlushWindowStartUtc: 1,
+        dailyFlushWindowMinutes: 120,
+        maxEventsPerRequest: 5000,
+      },
+      meta: {
+        lastFlushAt: null,
+        nextRetryAt: null,
+        backoffIndex: 0,
+      },
+      queue: [],
+      stats: {
+        total: 0,
+        byType: {},
+        success: 0,
+        fail: 0,
+        cancelled: 0,
+        attempts: 0,
+        bySpeed: { fast: 0, medium: 0, slow: 0 },
+        bypassCount: 0,
+        failByErrorType: {},
+        byLanguage: {},
+        lastUpdated: Date.now(),
+      },
+      validQueue: true,
+    });
+
+    const resetStats = (state: FlushTestState): void => {
+      state.stats = {
+        total: 0,
+        byType: {},
+        success: 0,
+        fail: 0,
+        cancelled: 0,
+        attempts: 0,
+        bySpeed: { fast: 0, medium: 0, slow: 0 },
+        bypassCount: 0,
+        failByErrorType: {},
+        byLanguage: {},
+        lastUpdated: Date.now(),
+      };
+    };
+
+    it('keeps total equal to success + fail across all 3-event status permutations', async () => {
+      const statuses: Array<AnalyticsEvent['status']> = ['success', 'fail', 'cancelled'];
+      const fileTypes: Array<AnalyticsEvent['file_type']> = ['pdf', 'docx', 'pptx'];
+      const state = baseState();
+      const { mod } = await loadFlushModule(state, true);
+
+      for (const first of statuses) {
+        for (const second of statuses) {
+          for (const third of statuses) {
+            const sequence = [first, second, third];
+            resetStats(state);
+
+            for (let i = 0; i < sequence.length; i += 1) {
+              await mod.updateLocalStats(makeEvent({
+                status: sequence[i],
+                file_type: fileTypes[i],
+                duration_ms: i === 0 ? 1000 : i === 1 ? 3000 : 15000,
+                language: i === 2 ? 'ar' : 'en',
+                bypass_used: i !== 1,
+              }));
+            }
+
+            const successCount = sequence.filter((status) => status === 'success').length;
+            const failCount = sequence.filter((status) => status === 'fail').length;
+            const cancelledCount = sequence.filter((status) => status === 'cancelled').length;
+            const expectedCountedTotal = successCount + failCount;
+
+            expect(state.stats.total).toBe(expectedCountedTotal);
+            expect(state.stats.success).toBe(successCount);
+            expect(state.stats.fail).toBe(failCount);
+            expect(state.stats.cancelled).toBe(cancelledCount);
+            expect(state.stats.total).toBe((state.stats.success ?? 0) + (state.stats.fail ?? 0));
+
+            const byTypeTotal = Object.values(state.stats.byType ?? {}).reduce((sum, value) => sum + value, 0);
+            expect(byTypeTotal).toBe(expectedCountedTotal);
+          }
+        }
+      }
+    });
+
+    it('does not create new byType entries from cancelled-only events and does not bump existing byType counts', async () => {
+      const state = baseState();
+      const { mod } = await loadFlushModule(state, true);
+
+      await mod.updateLocalStats(makeEvent({ status: 'success', file_type: 'pdf' }));
+      await mod.updateLocalStats(makeEvent({ status: 'cancelled', file_type: 'pdf' }));
+      await mod.updateLocalStats(makeEvent({ status: 'cancelled', file_type: 'xlsx' }));
+      await mod.updateLocalStats(makeEvent({ status: 'cancelled', file_type: 'xlsx' }));
+
+      expect(state.stats.total).toBe(1);
+      expect(state.stats.success).toBe(1);
+      expect(state.stats.fail).toBe(0);
+      expect(state.stats.cancelled).toBe(3);
+      expect(state.stats.byType?.pdf).toBe(1);
+      expect(state.stats.byType?.xlsx).toBeUndefined();
+    });
+
+    it('still tracks attempts, speed, bypass, and language for cancelled events while leaving failByErrorType untouched', async () => {
+      const state = baseState();
+      const { mod } = await loadFlushModule(state, true);
+
+      await mod.updateLocalStats(makeEvent({
+        status: 'cancelled',
+        file_type: 'docx',
+        duration_ms: 1500,
+        bypass_used: true,
+        language: 'en',
+        error_type: 'NETWORK',
+      }));
+      await mod.updateLocalStats(makeEvent({
+        status: 'cancelled',
+        file_type: 'docx',
+        duration_ms: 3000,
+        bypass_used: false,
+        language: 'en',
+        error_type: 'TIMEOUT',
+      }));
+      await mod.updateLocalStats(makeEvent({
+        status: 'cancelled',
+        file_type: 'docx',
+        duration_ms: 15000,
+        bypass_used: true,
+        language: 'ar',
+      }));
+
+      expect(state.stats.total).toBe(0);
+      expect(state.stats.success).toBe(0);
+      expect(state.stats.fail).toBe(0);
+      expect(state.stats.cancelled).toBe(3);
+      expect(state.stats.attempts).toBe(3);
+      expect(state.stats.byType?.docx).toBeUndefined();
+      expect(state.stats.bySpeed?.fast).toBe(1);
+      expect(state.stats.bySpeed?.medium).toBe(1);
+      expect(state.stats.bySpeed?.slow).toBe(1);
+      expect(state.stats.bypassCount).toBe(2);
+      expect(state.stats.byLanguage?.en).toBe(2);
+      expect(state.stats.byLanguage?.ar).toBe(1);
+      expect(state.stats.failByErrorType).toEqual({});
+    });
+  });
 });
