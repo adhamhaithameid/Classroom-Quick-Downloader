@@ -3,7 +3,7 @@
  * IP Canonicalization Test Script
  * Uses production canonicalizeIp implementation to avoid drift.
  *
- * Run with: npx tsx scripts/ip_canonicalize_check.ts
+ * Run with: pnpm dlx tsx scripts/ip_canonicalize_check.ts
  */
 
 import { canonicalizeIp } from "../src/ip_utils";

@@ -172,10 +172,10 @@ pnpm test
 pnpm test:watch
 
 # Run a specific test file
-npx vitest run tests/cancel.test.ts
+pnpm exec vitest run tests/cancel.test.ts
 
 # Run tests matching a pattern
-npx vitest run --reporter=verbose -t "button state"
+pnpm exec vitest run --reporter=verbose -t "button state"
 ```
 
 ### Coverage Profiles
@@ -259,7 +259,7 @@ cd cloudflare-worker
 pnpm test
 
 # Run a specific file
-npx vitest run tests/security.test.ts
+pnpm exec vitest run tests/security.test.ts
 ```
 
 ---

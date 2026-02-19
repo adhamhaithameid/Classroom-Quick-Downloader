@@ -154,7 +154,7 @@ The shared secret **must not** be committed to `wrangler.toml`. Use Wrangler's s
 
 ```bash
 # Set the secret interactively
-npx wrangler secret put DO_SHARED_SECRET
+pnpm exec wrangler secret put DO_SHARED_SECRET
 
 # You'll be prompted to enter the value
 # Enter your strong, random secret (e.g., from `openssl rand -hex 32`)
@@ -500,20 +500,20 @@ This design means Oracle receives an already-analyzed summary, drastically reduc
 ### Prerequisites
 
 * [Node.js](https://nodejs.org/) (v18+ recommended)
-* [npm](https://www.npmjs.com/) or [pnpm](https://pnpm.io/)
-* [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/install-and-update/) (`npm install -g wrangler`)
+* [pnpm](https://pnpm.io/)
+* [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/install-and-update/) (`pnpm add -g wrangler`)
 
 ### Install Dependencies
 
 ```bash
 cd cloudflare-worker
-npm install
+pnpm install
 ```
 
 ### Run Local Development Server
 
 ```bash
-npm run dev
+pnpm run dev
 # Wrangler starts a local server, typically at http://localhost:8787
 ```
 
@@ -522,21 +522,21 @@ npm run dev
 ### Type Checking & Linting
 
 ```bash
-npm run typecheck  # tsc --noEmit
-npm run lint       # eslint
+pnpm run typecheck  # tsc --noEmit
+pnpm run lint       # eslint
 ```
 
 ### Deploy to Production
 
 ```bash
 # Ensure you're logged in
-npx wrangler login
+pnpm exec wrangler login
 
 # Set secrets (only once, or when they change)
-npx wrangler secret put DO_SHARED_SECRET
+pnpm exec wrangler secret put DO_SHARED_SECRET
 
 # Deploy
-npm run deploy
+pnpm run deploy
 ```
 
 The Worker will be deployed to `https://cqd-analytics.<your-subdomain>.workers.dev`.
@@ -578,7 +578,7 @@ The Worker will be deployed to `https://cqd-analytics.<your-subdomain>.workers.d
 
 1. Check `wrangler.toml` for `ORACLE_ENDPOINT` under `[vars]`.
 2. Ensure `DO_SHARED_SECRET` was set via `wrangler secret put`.
-3. Redeploy after making changes: `npm run deploy`.
+3. Redeploy after making changes: `pnpm run deploy`.
 
 ---
 
