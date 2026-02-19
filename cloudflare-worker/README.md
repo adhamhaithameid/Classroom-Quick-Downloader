@@ -1,5 +1,7 @@
 # ⚡ CQD Analytics Worker
 
+> Last updated: 2026-02-19 (v1.3.5).
+
 > Update (2026-02-15): Latest changes include CI coverage-gate hardening for extension analytics storage migration fallback, popup stats race-condition guards, structured step-up auth error handling in Oracle dashboard, and backend/worker auth-security hardening. See /CHANGELOG.md for details.
 
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
@@ -171,9 +173,9 @@ This secret must match the `DO_SHARED_SECRET` environment variable on your Oracl
 The Worker also hosts a **Notification Rules Engine** to control the "Update Available" styling in the extension.
 
 - **Admin Dashboard**: Manage styling rules via the `/stats` dashboard.
-  - **Granular Control**: Target "All" versions or specific versions (e.g., `1.2.3`).
+  - **Granular Control**: Target "All" versions or specific versions (e.g., `1.3.5`).
   - **Visual Effects**: Toggle "Glow" (Blue Pulse) or "Dot" (Red Indicator).
-  - **Priority System**: Specific rules (e.g., `1.2.3`) override global wildcard rules (`all`).
+  - **Priority System**: Specific rules (e.g., `1.3.5`) override global wildcard rules (`all`).
 - **Extension Integration**: The extension fetches these rules via `GET /config` and dynamically styles the version pill.
 
 ---
@@ -200,7 +202,7 @@ curl -X POST https://cqd-analytics.your-subdomain.workers.dev/track \
         "file_type": "pdf",
         "browser": "chrome",
         "os": "windows",
-        "ext_version": "1.2.0",
+        "ext_version": "1.3.5",
         "duration_ms": 1500,
         "bypass_used": false,
         "language": "en",
@@ -212,7 +214,7 @@ curl -X POST https://cqd-analytics.your-subdomain.workers.dev/track \
         "file_type": "docx",
         "browser": "firefox",
         "os": "macos",
-        "ext_version": "1.2.0",
+        "ext_version": "1.3.5",
         "duration_ms": 3000,
         "bypass_used": true,
         "language": "ar",
@@ -253,7 +255,7 @@ curl -X POST https://cqd-analytics.your-subdomain.workers.dev/track \
 | `file_type`   | `string`                | ✅       | File extension (e.g., "pdf", "docx").                      |
 | `browser`     | `string`                | ✅       | Browser name (e.g., "chrome", "firefox").                  |
 | `os`          | `string`                | ✅       | Operating system (e.g., "windows", "macos").               |
-| `ext_version` | `string`                | ✅       | Extension version (e.g., "1.2.0").                         |
+| `ext_version` | `string`                | ✅       | Extension version (e.g., "1.3.5").                         |
 | `duration_ms` | `number`                | ✅       | Time taken for the download attempt in milliseconds.       |
 | `bypass_used` | `boolean`               | ✅       | Whether a bypass mechanism was used.                       |
 | `language`    | `string`                | ✅       | User's browser language.                                   |

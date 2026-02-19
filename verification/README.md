@@ -1,5 +1,7 @@
 # Popup Verification
 
+> Last updated: 2026-02-19 (v1.3.5).
+
 This folder contains browser-based verification scripts for the extension popup.
 
 ## Run the popup load verification

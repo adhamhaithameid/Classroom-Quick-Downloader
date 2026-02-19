@@ -1,5 +1,7 @@
 # Changelog
 
+> Last updated: 2026-02-19 (v1.3.5).
+
 All notable changes to **Classroom Quick Downloader** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
@@ -29,6 +31,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Tests
 - `pnpm -C extension test:coverage:all` now passes at 100% for both critical and runtime coverage profiles.
 - Verified targeted backend and extension checks after each auth/storage hardening change.
+
+## [1.3.5] - 2026-02-19
+
+### Added
+- Extension CSP hardening tests now include integration coverage for WXT manifest wiring (`extension/tests/wxt-config-security.integration.test.ts`).
+- Added edge-case unit tests for manifest security helpers (`resolveWorkerOrigin('')`, `resolveWorkerOrigin(undefined)`, and localhost worker host-permissions).
+
+### Changed
+- Extension package version bumped to `1.3.5`.
+- Extension pages CSP now includes `default-src 'self'` as a defense-in-depth fallback.
+
+### Fixed
+- Security config helper placement was finalized under `extension/config/` to avoid leaking config helpers into extension build assets.
 
 ## [1.3.0] - 2026-02-09
 
