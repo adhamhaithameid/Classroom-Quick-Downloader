@@ -8,7 +8,8 @@
   "packageManager": "pnpm@10.28.2",
   "scripts": {
     "preinstall": "node ../tools/enforce-pnpm.cjs",
-    "dev": "wxt",
+    "dev": "node ../tools/dev-browser.cjs",
+    "dev:wxt": "wxt",
     "build": "wxt build",
     "zip": "wxt zip",
     "compile": "tsc --noEmit",
