@@ -6,12 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
-- Oracle Hub v4 reference document at `docs/ORACLE_HUB_V4.md` consolidating:
+- Oracle Hub v4.1 reference document at `docs/ORACLE_HUB_V4.md` consolidating:
   - architecture and reliability model,
   - security baseline and hardening controls,
   - observability and feature flags,
   - admin API map and verification commands.
-- Backend README now links directly to the Oracle Hub v4 reference.
+- Backend README now links directly to the Oracle Hub v4.1 reference.
 - Added extension coverage test for analytics storage migration fallback path to keep CI coverage gates at 100%.
 
 ### Changed

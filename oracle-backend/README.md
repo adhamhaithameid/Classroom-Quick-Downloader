@@ -24,9 +24,9 @@ The **Oracle Backend** is a high-performance, low-footprint analytics server des
 
 ---
 
-## 🧭 Oracle Hub v4 Scope
+## 🧭 Oracle Hub v4.1 Scope
 
-Oracle Hub v4 extends the backend from analytics-only to a full admin/control plane:
+Oracle Hub v4.1 extends the backend from analytics-only to a full admin/control plane:
 
 - **Management Hub**: dashboards/deployments/versions records with API-backed CRUD.
 - **Creative Hub**: designs, HTML emails, newsletter subscribers, and campaigns.
@@ -35,7 +35,7 @@ Oracle Hub v4 extends the backend from analytics-only to a full admin/control pl
 - **Observability**: request-level structured logs, Prometheus metrics, alert sink, and Oracle operation logs APIs.
 - **UI productivity**: keyboard shortcuts panel + hold `Command`/`Ctrl` for 1 second to reveal shortcut badges.
 
-Full v4 reference:
+Full v4.1 reference:
 - [`docs/ORACLE_HUB_V4.md`](../docs/ORACLE_HUB_V4.md)
 
 ---
@@ -228,7 +228,7 @@ All configuration is done via environment variables, defined in `docker-compose.
 | `SESSION_COOKIE_SECURE` | `auto` | Cookie Secure mode: `auto` (TLS-aware), `true` (always secure), `false` (always non-secure; needed for plain HTTP). |
 | `PUBLIC_BASE_URL` | *(optional)* | Canonical public origin (for CSRF origin allow checks), e.g. `https://oracle.example.com`. |
 | `CSRF_ALLOWED_ORIGINS` | *(optional)* | Comma-separated explicit CSRF origin allowlist (scheme + host), e.g. `https://oracle.example.com,https://admin.example.com`. |
-| `POSTGRES_DSN` | *(optional)* | Enables Postgres bootstrap and v4 cutover paths. |
+| `POSTGRES_DSN` | *(optional)* | Enables Postgres bootstrap and v4.1 cutover paths. |
 | `STORAGE_WATERMARK_WARN` | `70` | Disk usage warning watermark percentage. |
 | `STORAGE_WATERMARK_CRITICAL` | `85` | Disk usage critical watermark percentage. |
 | `STORAGE_WATERMARK_EMERGENCY` | `92` | Disk usage emergency watermark percentage. |
@@ -781,7 +781,7 @@ docker cp cqd-oracle-backend:/data/analytics.db ./backup-$(date +%Y%m%d).db
 
 We use **Uptime Kuma** for self-hosted infrastructure monitoring. It runs on the same Oracle VM as the backend, providing 24/7 uptime tracking and instant alerts when something goes wrong.
 
-## Oracle Hub v4 Admin APIs
+## Oracle Hub v4.1 Admin APIs
 
 The dashboard now exposes dedicated control-plane APIs for creative/content operations,
 Postgres-backed record management, and deployment synchronization.
