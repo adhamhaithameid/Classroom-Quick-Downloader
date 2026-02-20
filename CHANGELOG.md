@@ -30,6 +30,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `pnpm -C extension test:coverage:all` now passes at 100% for both critical and runtime coverage profiles.
 - Verified targeted backend and extension checks after each auth/storage hardening change.
 
+## [1.3.6] - 2026-02-20
+
+### Fixed
+- Dev browser launch no longer crashes on `minimatch` ESM/CJS export mismatch by scoping dependency overrides for `web-ext-run` compatibility.
+
+### Changed
+- Documentation examples now reference the current extension release version `1.3.6`.
+
 ## [1.3.0] - 2026-02-09
 
 ### Added
