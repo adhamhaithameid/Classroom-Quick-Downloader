@@ -10,6 +10,7 @@
     "build:ext": "pnpm --filter extension build",
     "test:oracle": "pnpm -C oracle-backend test",
     "validate:oracle": "pnpm -C oracle-backend validate",
+    "changelog:full": "node tools/generate-full-changelog.mjs",
     "prepare": "husky"
   },
   "pnpm": {
