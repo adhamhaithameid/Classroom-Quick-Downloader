@@ -26,6 +26,9 @@ type StoredState = {
   totalFail?: number;
   totalCancelled?: number;
   pendingEvents?: number;
+  reqCountToday?: number;
+  reqCountDate?: string | null;
+  reqDailyCounts?: Record<string, number>;
   counters?: {
     byStatus?: Record<string, number>;
     byType?: Record<string, number>;
@@ -503,6 +506,50 @@ describe("Durable Object security behaviors", () => {
     expect(payload.remoteConfig?.healthThresholds?.criticalPendingBatches).toBe(8);
     expect(payload.remoteConfig?.healthNotifyIntervalsMs?.warn).toBe(60 * 60 * 1000);
     expect(payload.remoteConfig?.healthNotifyIntervalsMs?.critical).toBe(20 * 60 * 1000);
+  });
+
+  it("reports weekly/monthly request windows and unique country reach in stats", async () => {
+    const base = new Date();
+    base.setUTCHours(0, 0, 0, 0);
+    const dateKey = (offset: number) => {
+      const d = new Date(base);
+      d.setUTCDate(d.getUTCDate() + offset);
+      return d.toISOString().slice(0, 10);
+    };
+
+    const stored: StoredState = {
+      reqCountDate: dateKey(0),
+      reqCountToday: 5,
+      reqDailyCounts: {
+        [dateKey(0)]: 5,
+        [dateKey(-1)]: 4,
+        [dateKey(-6)]: 2,
+        [dateKey(-7)]: 99,
+        [dateKey(-29)]: 1,
+        [dateKey(-30)]: 50,
+      },
+      counters: {
+        byCountry: {
+          us: 12,
+          eg: 3,
+          xx: 2,
+          unknown: 1,
+        },
+      },
+    };
+
+    const { obj } = makeDOWithStored(stored);
+    const statsRes = await callDOGet(obj, "/stats");
+    expect(statsRes.status).toBe(200);
+    const payload = await statsRes.json() as {
+      weeklyRequests?: number;
+      monthlyRequests?: number;
+      uniqueCountriesAllTime?: number;
+    };
+
+    expect(payload.weeklyRequests).toBe(11);
+    expect(payload.monthlyRequests).toBe(111);
+    expect(payload.uniqueCountriesAllTime).toBe(2);
   });
 
   it("persists allowLegacyEvents in config", async () => {
