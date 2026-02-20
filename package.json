@@ -8,6 +8,8 @@
     "dev": "node tools/dev-browser.cjs",
     "dev:ext": "pnpm --filter extension dev",
     "build:ext": "pnpm --filter extension build",
+    "test:oracle": "pnpm -C oracle-backend test",
+    "validate:oracle": "pnpm -C oracle-backend validate",
     "prepare": "husky"
   },
   "pnpm": {
