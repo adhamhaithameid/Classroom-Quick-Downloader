@@ -31,7 +31,7 @@ We collect **anonymous telemetry** to monitor system health and improve the exte
 | **File Type** | `"pdf"`, `"docx"`, `"pptx"` | Understand which file types are most common |
 | **Browser** | `"chrome"`, `"edge"`, `"firefox"` | Ensure compatibility across browsers |
 | **Operating System** | `"win"`, `"mac"`, `"linux"` | Ensure compatibility across platforms |
-| **Extension Version** | `"2.1.0"` | Track adoption of new versions |
+| **Extension Version** | `"1.3.6"` | Track adoption of new versions |
 | **Download Duration** | `1500` (milliseconds) | Monitor download speeds |
 | **Bypass Used** | `true` or `false` | Track usage of the Drive bypass feature |
 | **Error Type** | `"NETWORK_ERROR"` | Diagnose and fix bugs |
