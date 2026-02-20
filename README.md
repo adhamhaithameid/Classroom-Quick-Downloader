@@ -37,12 +37,12 @@
 ![PRs Welcome](https://img.shields.io/badge/PRs-Welcome-brightgreen)
 ![Current Version](https://img.shields.io/github/v/release/adhamhaithameid/Classroom-Quick-Downloader?label=Version&color=blue)
 
-<!-- Uptime Kuma Live Status -->
+<!-- CI and Security Status -->
 
-[![Oracle Backend](http://129.151.233.229:3001/api/badge/1/status?style=flat&label=Oracle+Backend)](http://129.151.233.229:3001/status/cqd)
-[![SQLite Database](http://129.151.233.229:3001/api/badge/2/status?style=flat&label=SQLite+Database)](http://129.151.233.229:3001/status/cqd)
-[![Cloudflare Worker](http://129.151.233.229:3001/api/badge/4/status?style=flat&label=Cloudflare+Worker+DO)](http://129.151.233.229:3001/status/cqd)
-[![Daily Archiver](http://129.151.233.229:3001/api/badge/3/status?style=flat&label=Daily+Archiver)](http://129.151.233.229:3001/status/cqd)
+[![CI](https://img.shields.io/github/actions/workflow/status/adhamhaithameid/Classroom-Quick-Downloader/ci.yml?branch=main&label=CI)](https://github.com/adhamhaithameid/Classroom-Quick-Downloader/actions/workflows/ci.yml)
+[![Oracle Backend CI](https://img.shields.io/github/actions/workflow/status/adhamhaithameid/Classroom-Quick-Downloader/oracle-backend-ci.yml?branch=main&label=Oracle+Backend+CI)](https://github.com/adhamhaithameid/Classroom-Quick-Downloader/actions/workflows/oracle-backend-ci.yml)
+[![CodeQL](https://img.shields.io/github/actions/workflow/status/adhamhaithameid/Classroom-Quick-Downloader/codeql.yml?branch=main&label=CodeQL)](https://github.com/adhamhaithameid/Classroom-Quick-Downloader/actions/workflows/codeql.yml)
+[![Socket Security](https://img.shields.io/github/actions/workflow/status/adhamhaithameid/Classroom-Quick-Downloader/socket-security.yml?branch=main&label=Socket+Security)](https://github.com/adhamhaithameid/Classroom-Quick-Downloader/actions/workflows/socket-security.yml)
 
 ---
 
