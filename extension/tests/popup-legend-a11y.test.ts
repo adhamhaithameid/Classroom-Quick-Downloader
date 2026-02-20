@@ -77,6 +77,17 @@ async function waitForLegendItem(container: HTMLElement): Promise<HTMLLIElement 
   return null;
 }
 
+async function waitForCancelledCounter(container: HTMLElement): Promise<HTMLElement | null> {
+  for (let i = 0; i < 20; i += 1) {
+    const counter = container.querySelector('.cqd-temp-cancelled-counter') as HTMLElement | null;
+    if (counter) return counter;
+    await act(async () => {
+      await tick();
+    });
+  }
+  return null;
+}
+
 describe('popup legend keyboard accessibility', () => {
   let container: HTMLDivElement;
   let root: Root;
@@ -92,6 +103,7 @@ describe('popup legend keyboard accessibility', () => {
     const chromeMock = createChromeMock({
       local_stats: {
         total: 3,
+        cancelled: 2,
         byType: {
           pdf: 2,
           doc: 1,
@@ -129,6 +141,11 @@ describe('popup legend keyboard accessibility', () => {
     expect(legendItem).not.toBeNull();
     expect(legendItem?.getAttribute('tabindex')).toBe('0');
     expect(legendItem?.getAttribute('role')).toBe('button');
+
+    const cancelledCounter = await waitForCancelledCounter(container);
+    expect(cancelledCounter).not.toBeNull();
+    expect(cancelledCounter?.textContent).toContain('Temporary cancelled counter');
+    expect(cancelledCounter?.textContent).toContain('2');
 
     await act(async () => {
       legendItem?.focus();
