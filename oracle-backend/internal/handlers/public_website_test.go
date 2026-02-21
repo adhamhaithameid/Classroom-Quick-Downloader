@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -214,5 +215,120 @@ func TestPublicWebsiteHandlers_PreflightForAllowedOrigin(t *testing.T) {
 	}
 	if rr.Header().Get("Access-Control-Allow-Origin") != "https://adhamhaithameid.github.io" {
 		t.Fatalf("expected preflight origin header, got %q", rr.Header().Get("Access-Control-Allow-Origin"))
+	}
+}
+
+func TestPublicWebsiteUninstallHandler_SubmitsAndAggregatesFeedback(t *testing.T) {
+	sqlDB := openPublicWebsiteDB(t)
+	t.Setenv("PUBLIC_WEBSITE_ALLOWED_ORIGINS", "https://adhamhaithameid.github.io")
+
+	body := `{
+		"reason":"I found another workflow",
+		"browser":"chrome",
+		"version":"1.3.6",
+		"source":"extension",
+		"notes":"Need fewer clicks."
+	}`
+
+	req := httptest.NewRequest(http.MethodPost, "/api/public/website/uninstall", bytes.NewBufferString(body))
+	req.Header.Set("Origin", "https://adhamhaithameid.github.io")
+	req.Header.Set("X-Requested-With", "XMLHttpRequest")
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	PublicWebsiteUninstallHandler(sqlDB).ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var response struct {
+		OK           bool  `json:"ok"`
+		SubmissionID int64 `json:"submissionId"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if !response.OK || response.SubmissionID <= 0 {
+		t.Fatalf("unexpected submit response: %+v", response)
+	}
+
+	statsReq := httptest.NewRequest(http.MethodGet, "/api/public/website/uninstall", nil)
+	statsReq.Header.Set("Origin", "https://adhamhaithameid.github.io")
+	statsRR := httptest.NewRecorder()
+	PublicWebsiteUninstallHandler(sqlDB).ServeHTTP(statsRR, statsReq)
+	if statsRR.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", statsRR.Code, statsRR.Body.String())
+	}
+
+	var stats struct {
+		OK    bool `json:"ok"`
+		Stats struct {
+			TotalSubmissions int64 `json:"totalSubmissions"`
+			TopReasons       []struct {
+				Reason string `json:"reason"`
+				Count  int64  `json:"count"`
+			} `json:"topReasons"`
+		} `json:"stats"`
+	}
+	if err := json.Unmarshal(statsRR.Body.Bytes(), &stats); err != nil {
+		t.Fatalf("failed to decode stats payload: %v", err)
+	}
+	if !stats.OK || stats.Stats.TotalSubmissions != 1 {
+		t.Fatalf("unexpected stats payload: %+v", stats)
+	}
+	if len(stats.Stats.TopReasons) == 0 || stats.Stats.TopReasons[0].Reason != "I found another workflow" {
+		t.Fatalf("expected top reason to be recorded, got %+v", stats.Stats.TopReasons)
+	}
+}
+
+func TestPublicWebsiteUninstallHandler_RejectsBadInputs(t *testing.T) {
+	sqlDB := openPublicWebsiteDB(t)
+	t.Setenv("PUBLIC_WEBSITE_ALLOWED_ORIGINS", "https://adhamhaithameid.github.io")
+
+	cases := []struct {
+		name       string
+		origin     string
+		header     string
+		body       string
+		wantStatus int
+	}{
+		{
+			name:       "disallowed origin",
+			origin:     "https://evil.example",
+			header:     "XMLHttpRequest",
+			body:       `{"reason":"x","browser":"chrome","version":"1","source":"website"}`,
+			wantStatus: http.StatusForbidden,
+		},
+		{
+			name:       "missing required header",
+			origin:     "https://adhamhaithameid.github.io",
+			header:     "",
+			body:       `{"reason":"x","browser":"chrome","version":"1","source":"website"}`,
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "missing reason",
+			origin:     "https://adhamhaithameid.github.io",
+			header:     "XMLHttpRequest",
+			body:       `{"reason":"","browser":"chrome","version":"1","source":"website"}`,
+			wantStatus: http.StatusBadRequest,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/api/public/website/uninstall", bytes.NewBufferString(tc.body))
+			req.Header.Set("Origin", tc.origin)
+			if tc.header != "" {
+				req.Header.Set("X-Requested-With", tc.header)
+			}
+			req.Header.Set("Content-Type", "application/json")
+
+			rr := httptest.NewRecorder()
+			PublicWebsiteUninstallHandler(sqlDB).ServeHTTP(rr, req)
+			if rr.Code != tc.wantStatus {
+				t.Fatalf("expected %d, got %d: %s", tc.wantStatus, rr.Code, rr.Body.String())
+			}
+		})
 	}
 }

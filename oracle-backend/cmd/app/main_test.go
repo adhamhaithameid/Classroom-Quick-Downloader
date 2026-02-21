@@ -144,6 +144,18 @@ func TestCSRFMiddleware_AllowsMutatingAPIWithHeader(t *testing.T) {
 	}
 }
 
+func TestCSRFMiddleware_SkipsPublicWebsiteEndpoints(t *testing.T) {
+	handler := csrfHeaderMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	req := httptest.NewRequest(http.MethodPost, "/api/public/website/uninstall", bytes.NewBufferString(`{}`))
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected 204 for public website endpoint, got %d", rr.Code)
+	}
+}
+
 func TestCSRFMiddleware_RejectsCrossOriginMutatingAPI(t *testing.T) {
 	prevOrigins := csrfAllowedOrigins
 	defer func() { csrfAllowedOrigins = prevOrigins }()
