@@ -75,6 +75,9 @@ const WORKER_URL = import.meta.env.VITE_WORKER_URL as string || '';
 export const WORKER_BASE_URL = WORKER_URL.replace(/\/+track$/, '');
 export const CONFIG_URL = WORKER_BASE_URL ? `${WORKER_BASE_URL}/config` : '';
 export const CHANGELOG_URL = WORKER_BASE_URL ? `${WORKER_BASE_URL}/changelog` : '';
+export const CHANGELOG_SITE_URL = WORKER_BASE_URL
+  ? `${WORKER_BASE_URL}/release-notes`
+  : 'https://github.com/adhamhaithameid/Classroom-Quick-Downloader/blob/main/CHANGELOG.md';
 export const TRACK_URL = WORKER_URL;
 
 // --- Rate Limits ---

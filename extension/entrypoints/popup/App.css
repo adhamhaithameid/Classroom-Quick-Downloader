@@ -1488,7 +1488,11 @@ body {
   padding: 16px 20px;
   border-top: 1px solid #e2e8f0;
   background: white;
-  text-align: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
   position: relative;
   z-index: 5;
 }
@@ -1518,6 +1522,19 @@ body {
 
 .cqd-cl-footer-link:active {
   transform: translateY(0);
+}
+
+.cqd-cl-footer-link-secondary {
+  background: #f8fafc;
+  border-color: #dbe5f2;
+  color: #334155;
+}
+
+.cqd-cl-footer-link-secondary:hover {
+  background: #0f172a;
+  border-color: #0f172a;
+  color: #ffffff;
+  box-shadow: 0 8px 15px -3px rgba(15, 23, 42, 0.25);
 }
 
 

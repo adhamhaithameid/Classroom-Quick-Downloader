@@ -146,6 +146,20 @@ describe('popup legend keyboard accessibility', () => {
     expect(cancelledCounter?.textContent).toContain('Temporary cancelled counter');
     expect(cancelledCounter?.textContent).toContain('2');
 
+    const versionButton = container.querySelector('.cqd-brand-version') as HTMLButtonElement | null;
+    expect(versionButton).not.toBeNull();
+
+    await act(async () => {
+      versionButton?.click();
+      await tick();
+    });
+
+    const releaseNotesLink = container.querySelector('.cqd-cl-footer-link-secondary') as HTMLAnchorElement | null;
+    expect(releaseNotesLink).not.toBeNull();
+    const releaseHref = releaseNotesLink?.getAttribute('href') ?? '';
+    expect(releaseHref.length).toBeGreaterThan(0);
+    expect(/release-notes|CHANGELOG\.md/.test(releaseHref)).toBe(true);
+
     await act(async () => {
       legendItem?.focus();
       await tick();

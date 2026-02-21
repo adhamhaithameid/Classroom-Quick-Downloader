@@ -9,6 +9,7 @@ import chromeSvg from '../../assets/Chrome.svg';
 import firefoxSvg from '../../assets/Firefox.svg';
 import edgeSvg from '../../assets/Edge.svg';
 import { fetchChangelog, getMatchingRule, getRuleClasses, isVersionSeen, markAsSeen, getLatestChange, type ChangelogData } from '../utils/changelog';
+import { CHANGELOG_SITE_URL } from '../utils/analytics/constants';
 
 // External Links
 const SURVEY_URL = 'https://forms.gle/wPU2b1Qxa7svHqJa6';
@@ -759,6 +760,14 @@ function App() {
               
               {/* Footer Link */}
               <div className="cqd-cl-footer">
+                <a
+                  href={CHANGELOG_SITE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="cqd-cl-footer-link cqd-cl-footer-link-secondary"
+                >
+                  🗞️ View full release notes ↗
+                </a>
                 <a 
                   href={SURVEY_URL} 
                   target="_blank" 
