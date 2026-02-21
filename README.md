@@ -48,6 +48,8 @@
 
 **Downloading files from Google Classroom shouldn't feel like a chore.** CQD transforms bulk file downloads into a single click while powering an enterprise-grade analytics pipeline that tracks millions of download events at the edge.
 
+Telemetry is used to improve download reliability, prioritize bug fixes, and guide focused development across the extension, edge worker, and Oracle backend services.
+
 [📦 Get the Extension](#-installation) · [📖 Documentation](#-documentation) · [📝 Changelog](CHANGELOG.md) · [🏗️ Architecture](ARCHITECTURE.md) · [🔒 Privacy](PRIVACY.md)
 
 </div>
@@ -206,7 +208,7 @@ graph TD
 
 Every download attempt in the [Extension](./extension/) triggers an analytics event. Here's its complete journey through the system:
 
-1. **📥 Capture (Client)** — The [Extension](./extension/) records: file type, browser, OS, duration, and success/fail status. Events are queued locally in `chrome.storage`.
+1. **📥 Capture (Client)** — The [Extension](./extension/) records: file type, browser, OS, duration, and success/fail/cancelled status. Events are queued locally in `chrome.storage`.
 2. **📤 Batch & Send (Client → Edge)** — When the queue reaches 50 events (or after a time threshold), the extension POSTs the batch to the [Cloudflare Worker](./cloudflare-worker/).
 3. **🔄 Buffer & Aggregate (Edge)** — The [Worker](./cloudflare-worker/) forwards events to its [Durable Object](./cloudflare-worker/README.md#why-durable-objects), which:
 
@@ -230,6 +232,10 @@ Every download attempt in the [Extension](./extension/) triggers an analytics ev
 
 * Fetches the current summary from the local API.
 * Appends a row to Google Sheets with all dimension breakdowns.
+
+### Analytics Accuracy Note
+
+Cancellation metrics are highly accurate overall, but extremely fast "near-cancel" actions (cancel clicked immediately after download, roughly within ~1 second) can be undercounted due to browser/event timing races. This known limitation is documented intentionally and used to drive ongoing instrumentation improvements.
 
 
 ---
