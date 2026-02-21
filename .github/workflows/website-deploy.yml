@@ -5,6 +5,8 @@ on:
     branches: [main, master]
     paths:
       - "website/**"
+      - "CHANGELOG.md"
+      - "PRIVACY.md"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
       - ".github/workflows/website-deploy.yml"
@@ -45,6 +47,9 @@ jobs:
       - name: Build Website
         env:
           PUBLIC_BASE_PATH: /${{ github.event.repository.name }}
+          PUBLIC_ORACLE_API_BASE_URL: ${{ vars.PUBLIC_ORACLE_API_BASE_URL }}
+          PUBLIC_WORKER_BASE_URL: ${{ vars.PUBLIC_WORKER_BASE_URL }}
+          PUBLIC_SITE_URL: https://adhamhaithameid.github.io/${{ github.event.repository.name }}
         run: |
           pnpm -C website build
           touch website/build/.nojekyll
