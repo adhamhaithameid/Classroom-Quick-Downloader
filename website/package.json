@@ -11,12 +11,16 @@
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"test": "vitest run",
+		"test:unit": "vitest run src/lib/api/publicSite.test.ts src/lib/api/changelog.test.ts",
+		"test:integration": "vitest run src/lib/api/publicSite.integration.test.ts",
+		"test:acceptance": "vitest run src/lib/content/repoMarkdown.acceptance.test.ts",
 		"test:watch": "vitest"
 	},
 	"dependencies": {
 		"d3-geo": "^3.1.1",
 		"d3-scale": "^4.0.2",
 		"iso-3166-1": "^2.1.1",
+		"marked": "^16.4.0",
 		"topojson-client": "^3.1.0",
 		"world-atlas": "^2.0.2"
 	},

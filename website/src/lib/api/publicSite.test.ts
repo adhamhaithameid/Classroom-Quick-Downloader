@@ -1,5 +1,14 @@
-import { describe, expect, it } from 'vitest';
-import { coerceMapPayload, coerceOverviewPayload } from './publicSite';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  coerceMapPayload,
+  coerceOverviewPayload,
+  fetchUninstallStats,
+  submitUninstallFeedback
+} from './publicSite';
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe('coerceOverviewPayload', () => {
   it('normalizes malformed overview payloads', () => {
@@ -46,5 +55,56 @@ describe('coerceMapPayload', () => {
 
     expect(payload.countries).toEqual([{ countryCode: 'US', count: 12 }]);
     expect(payload.totals.downloads).toBe(12);
+  });
+});
+
+describe('uninstall feedback API', () => {
+  it('fetches and normalizes uninstall stats payload', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        new Response(
+          JSON.stringify({
+            ok: true,
+            generatedAt: 1700000000000,
+            stats: {
+              totalSubmissions: 4,
+              lastSubmittedAtUtc: 1700000000001,
+              topReasons: [{ reason: 'Temporary uninstall', count: 2 }]
+            }
+          }),
+          { status: 200 }
+        )
+      )
+    );
+
+    const payload = await fetchUninstallStats();
+    expect(payload.ok).toBe(true);
+    expect(payload.stats.totalSubmissions).toBe(4);
+    expect(payload.stats.topReasons[0]?.reason).toBe('Temporary uninstall');
+  });
+
+  it('submits uninstall feedback payload', async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify({ ok: true, generatedAt: 1700001, submissionId: 12, message: 'ok' }), {
+        status: 201
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await submitUninstallFeedback({
+      reason: 'Temporary uninstall',
+      browser: 'chrome',
+      version: '1.3.6',
+      source: 'extension',
+      notes: 'Testing'
+    });
+
+    expect(response.ok).toBe(true);
+    expect(response.submissionId).toBe(12);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const call = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    const [, init] = call;
+    expect(init?.method).toBe('POST');
   });
 });
