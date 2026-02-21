@@ -96,6 +96,24 @@ func Migrate(db *sql.DB) error {
 			value INTEGER NOT NULL DEFAULT 0
 		);`,
 
+		// Public uninstall feedback submissions from the website.
+		`CREATE TABLE IF NOT EXISTS website_uninstall_feedback (
+			id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+			reason             TEXT NOT NULL,
+			browser            TEXT NOT NULL,
+			extension_version  TEXT NOT NULL,
+			source             TEXT NOT NULL,
+			notes              TEXT NOT NULL DEFAULT '',
+			origin             TEXT NOT NULL DEFAULT '',
+			created_at         INTEGER NOT NULL
+		);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_website_uninstall_feedback_created_at
+			ON website_uninstall_feedback(created_at DESC);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_website_uninstall_feedback_reason
+			ON website_uninstall_feedback(reason);`,
+
 		// DO state history (health + backlog + quota).
 		`CREATE TABLE IF NOT EXISTS do_state_snapshots (
 			snapshot_id           INTEGER PRIMARY KEY AUTOINCREMENT,

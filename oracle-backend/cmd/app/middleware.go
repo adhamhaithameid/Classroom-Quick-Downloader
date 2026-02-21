@@ -34,6 +34,12 @@ func requestBodyLimitMiddleware(next http.Handler) http.Handler {
 
 func csrfHeaderMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Public website endpoints apply their own strict origin/CORS validation.
+		if strings.HasPrefix(r.URL.Path, "/api/public/website/") {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		if strings.HasPrefix(r.URL.Path, "/api/") {
 			switch r.Method {
 			case http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:

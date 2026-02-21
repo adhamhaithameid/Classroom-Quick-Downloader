@@ -66,6 +66,38 @@ type publicWebsiteMapResponse struct {
 	PrivacyNote string                     `json:"privacyNote"`
 }
 
+type publicWebsiteUninstallRequest struct {
+	Reason  string `json:"reason"`
+	Browser string `json:"browser"`
+	Version string `json:"version"`
+	Source  string `json:"source"`
+	Notes   string `json:"notes"`
+}
+
+type publicWebsiteUninstallResponse struct {
+	OK           bool   `json:"ok"`
+	GeneratedAt  int64  `json:"generatedAt"`
+	SubmissionID int64  `json:"submissionId"`
+	Message      string `json:"message"`
+}
+
+type publicWebsiteUninstallStatsResponse struct {
+	OK          bool                        `json:"ok"`
+	GeneratedAt int64                       `json:"generatedAt"`
+	Stats       publicWebsiteUninstallStats `json:"stats"`
+}
+
+type publicWebsiteUninstallStats struct {
+	TotalSubmissions   int64                      `json:"totalSubmissions"`
+	LastSubmittedAtUTC *int64                     `json:"lastSubmittedAtUtc"`
+	TopReasons         []publicWebsiteReasonCount `json:"topReasons"`
+}
+
+type publicWebsiteReasonCount struct {
+	Reason string `json:"reason"`
+	Count  int64  `json:"count"`
+}
+
 type publicWebsiteTotals struct {
 	Downloads int64 `json:"downloads"`
 	Success   int64 `json:"success"`
@@ -125,7 +157,9 @@ type gitHubReleaseInfo struct {
 func PublicWebsiteOverviewHandler(sqliteDB, postgresDB *sql.DB) http.HandlerFunc {
 	store := newControlPlaneStore(sqliteDB, postgresDB)
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !preparePublicWebsiteCORS(w, r) {
+		if !preparePublicWebsiteCORSWithOptions(w, r, publicWebsiteCORSOptions{
+			AllowedMethods: "GET, OPTIONS",
+		}) {
 			return
 		}
 		if r.Method != http.MethodGet {
@@ -145,7 +179,9 @@ func PublicWebsiteOverviewHandler(sqliteDB, postgresDB *sql.DB) http.HandlerFunc
 
 func PublicWebsiteMapHandler(sqliteDB *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !preparePublicWebsiteCORS(w, r) {
+		if !preparePublicWebsiteCORSWithOptions(w, r, publicWebsiteCORSOptions{
+			AllowedMethods: "GET, OPTIONS",
+		}) {
 			return
 		}
 		if r.Method != http.MethodGet {
@@ -197,7 +233,9 @@ func PublicWebsiteMapHandler(sqliteDB *sql.DB) http.HandlerFunc {
 
 func PublicWebsiteStatusHandler(sqliteDB *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !preparePublicWebsiteCORS(w, r) {
+		if !preparePublicWebsiteCORSWithOptions(w, r, publicWebsiteCORSOptions{
+			AllowedMethods: "GET, OPTIONS",
+		}) {
 			return
 		}
 		if r.Method != http.MethodGet {
@@ -216,6 +254,81 @@ func PublicWebsiteStatusHandler(sqliteDB *sql.DB) http.HandlerFunc {
 			GeneratedAt: time.Now().UTC().UnixMilli(),
 			Status:      status,
 		})
+	}
+}
+
+func PublicWebsiteUninstallHandler(sqliteDB *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !preparePublicWebsiteCORSWithOptions(w, r, publicWebsiteCORSOptions{
+			AllowedMethods:        "GET, POST, OPTIONS",
+			RequireOriginForWrite: true,
+		}) {
+			return
+		}
+
+		switch r.Method {
+		case http.MethodGet:
+			stats, err := loadPublicWebsiteUninstallStats(r.Context(), sqliteDB)
+			if err != nil {
+				http.Error(w, "failed to load uninstall stats", http.StatusInternalServerError)
+				return
+			}
+			writePublicWebsiteJSON(w, http.StatusOK, publicWebsiteUninstallStatsResponse{
+				OK:          true,
+				GeneratedAt: time.Now().UTC().UnixMilli(),
+				Stats:       stats,
+			})
+			return
+		case http.MethodPost:
+			if strings.TrimSpace(r.Header.Get("X-Requested-With")) != "XMLHttpRequest" {
+				http.Error(w, "missing required header", http.StatusBadRequest)
+				return
+			}
+
+			var req publicWebsiteUninstallRequest
+			if err := decodeJSONBodyStrict(r, &req); err != nil {
+				http.Error(w, "invalid request body", http.StatusBadRequest)
+				return
+			}
+
+			clean := sanitizePublicWebsiteUninstallRequest(req)
+			if clean.Reason == "" {
+				http.Error(w, "reason is required", http.StatusBadRequest)
+				return
+			}
+
+			now := time.Now().UTC().UnixMilli()
+			origin := normalizeRequestOriginHeader(r.Header.Get("Origin"))
+			res, err := sqliteDB.ExecContext(
+				r.Context(),
+				`INSERT INTO website_uninstall_feedback (
+					reason, browser, extension_version, source, notes, origin, created_at
+				) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+				clean.Reason,
+				clean.Browser,
+				clean.Version,
+				clean.Source,
+				clean.Notes,
+				origin,
+				now,
+			)
+			if err != nil {
+				http.Error(w, "failed to save feedback", http.StatusInternalServerError)
+				return
+			}
+
+			submissionID, _ := res.LastInsertId()
+			writePublicWebsiteJSON(w, http.StatusCreated, publicWebsiteUninstallResponse{
+				OK:           true,
+				GeneratedAt:  now,
+				SubmissionID: submissionID,
+				Message:      "Thanks. Your feedback was submitted successfully.",
+			})
+			return
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
 	}
 }
 
@@ -304,6 +417,87 @@ func loadPublicLiveSinceUTC(ctx context.Context, sqliteDB *sql.DB) (*int64, erro
 	}
 	value := firstIngest.Int64
 	return &value, nil
+}
+
+func loadPublicWebsiteUninstallStats(ctx context.Context, sqliteDB *sql.DB) (publicWebsiteUninstallStats, error) {
+	var stats publicWebsiteUninstallStats
+	var lastSubmitted sql.NullInt64
+	if err := sqliteDB.QueryRowContext(
+		ctx,
+		`SELECT COUNT(*), MAX(created_at) FROM website_uninstall_feedback`,
+	).Scan(&stats.TotalSubmissions, &lastSubmitted); err != nil {
+		return publicWebsiteUninstallStats{}, err
+	}
+	if lastSubmitted.Valid && lastSubmitted.Int64 > 0 {
+		value := lastSubmitted.Int64
+		stats.LastSubmittedAtUTC = &value
+	}
+
+	rows, err := sqliteDB.QueryContext(
+		ctx,
+		`SELECT reason, COUNT(*) AS c
+		 FROM website_uninstall_feedback
+		 GROUP BY reason
+		 ORDER BY c DESC, reason ASC
+		 LIMIT 8`,
+	)
+	if err != nil {
+		return publicWebsiteUninstallStats{}, err
+	}
+	defer rows.Close()
+
+	topReasons := make([]publicWebsiteReasonCount, 0, 8)
+	for rows.Next() {
+		var row publicWebsiteReasonCount
+		if err := rows.Scan(&row.Reason, &row.Count); err != nil {
+			return publicWebsiteUninstallStats{}, err
+		}
+		topReasons = append(topReasons, row)
+	}
+	if err := rows.Err(); err != nil {
+		return publicWebsiteUninstallStats{}, err
+	}
+
+	stats.TopReasons = topReasons
+	return stats, nil
+}
+
+func sanitizePublicWebsiteUninstallRequest(input publicWebsiteUninstallRequest) publicWebsiteUninstallRequest {
+	reason := trimAndLimit(input.Reason, 120)
+	browser := strings.ToLower(trimAndLimit(input.Browser, 32))
+	version := trimAndLimit(input.Version, 64)
+	source := trimAndLimit(input.Source, 64)
+	notes := trimAndLimit(input.Notes, 1000)
+
+	if browser == "" {
+		browser = "unknown"
+	}
+	if version == "" {
+		version = "unknown"
+	}
+	if source == "" {
+		source = "website"
+	}
+
+	return publicWebsiteUninstallRequest{
+		Reason:  reason,
+		Browser: browser,
+		Version: version,
+		Source:  source,
+		Notes:   notes,
+	}
+}
+
+func trimAndLimit(input string, maxLen int) string {
+	input = strings.TrimSpace(input)
+	if input == "" || maxLen <= 0 {
+		return ""
+	}
+	runes := []rune(input)
+	if len(runes) <= maxLen {
+		return input
+	}
+	return string(runes[:maxLen])
 }
 
 func buildPublicWebsiteInstalls(ctx context.Context, store *controlPlaneStore) (publicWebsiteInstalls, publicWebsiteLinks) {
@@ -458,13 +652,33 @@ func writePublicWebsiteJSON(w http.ResponseWriter, statusCode int, payload any) 
 	_ = json.NewEncoder(w).Encode(payload)
 }
 
+type publicWebsiteCORSOptions struct {
+	AllowedMethods        string
+	RequireOriginForWrite bool
+}
+
 func preparePublicWebsiteCORS(w http.ResponseWriter, r *http.Request) bool {
+	return preparePublicWebsiteCORSWithOptions(w, r, publicWebsiteCORSOptions{
+		AllowedMethods: "GET, OPTIONS",
+	})
+}
+
+func preparePublicWebsiteCORSWithOptions(w http.ResponseWriter, r *http.Request, options publicWebsiteCORSOptions) bool {
 	origin := normalizeRequestOriginHeader(r.Header.Get("Origin"))
 	allowAllNoOrigin := origin == ""
 	allowed := resolvePublicWebsiteAllowedOrigins()
+	allowedMethods := strings.TrimSpace(options.AllowedMethods)
+	if allowedMethods == "" {
+		allowedMethods = "GET, OPTIONS"
+	}
+	requireOrigin := options.RequireOriginForWrite && r.Method != http.MethodGet
 
 	if r.Method == http.MethodOptions {
-		if !allowAllNoOrigin && !isOriginAllowed(origin, allowed) {
+		if origin == "" && requireOrigin {
+			http.Error(w, "origin required", http.StatusForbidden)
+			return false
+		}
+		if origin != "" && !isOriginAllowed(origin, allowed) {
 			http.Error(w, "origin not allowed", http.StatusForbidden)
 			return false
 		}
@@ -472,10 +686,15 @@ func preparePublicWebsiteCORS(w http.ResponseWriter, r *http.Request) bool {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Vary", "Origin")
 		}
-		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.Header().Set("Access-Control-Allow-Methods", allowedMethods)
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-Requested-With")
 		w.Header().Set("Access-Control-Max-Age", "86400")
 		w.WriteHeader(http.StatusNoContent)
+		return false
+	}
+
+	if requireOrigin && origin == "" {
+		http.Error(w, "origin required", http.StatusForbidden)
 		return false
 	}
 
