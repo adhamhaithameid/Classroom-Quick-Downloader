@@ -1,0 +1,137 @@
+import { ORACLE_API_BASE_URL } from '$lib/config';
+import type { InstallBrowser, MapResponse, OverviewResponse, WorkerHealth } from '$lib/types/public';
+
+const REQUEST_TIMEOUT_MS = 8000;
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('Request timeout')), timeoutMs);
+    promise
+      .then((value) => {
+        clearTimeout(timer);
+        resolve(value);
+      })
+      .catch((error) => {
+        clearTimeout(timer);
+        reject(error);
+      });
+  });
+}
+
+async function fetchJSON(pathname: string): Promise<unknown> {
+  if (!ORACLE_API_BASE_URL) {
+    throw new Error('Missing PUBLIC_ORACLE_API_BASE_URL');
+  }
+  const response = await withTimeout(fetch(`${ORACLE_API_BASE_URL}${pathname}`), REQUEST_TIMEOUT_MS);
+  if (!response.ok) {
+    throw new Error(`Public API request failed (${response.status})`);
+  }
+  return response.json();
+}
+
+function asString(value: unknown): string {
+  return typeof value === 'string' ? value : '';
+}
+
+function asNumber(value: unknown): number {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  return 0;
+}
+
+function asNullableString(value: unknown): string | null {
+  if (typeof value === 'string' && value.trim()) return value;
+  return null;
+}
+
+function asNullableNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  return null;
+}
+
+function asWorkerHealth(value: unknown): WorkerHealth {
+  if (value === 'up' || value === 'degraded' || value === 'down') {
+    return value;
+  }
+  return 'down';
+}
+
+function normalizeBrowser(input: unknown): InstallBrowser {
+  const candidate = input as Partial<InstallBrowser>;
+  return {
+    key: asString(candidate?.key),
+    name: asString(candidate?.name),
+    usersCount: asNumber(candidate?.usersCount),
+    version: asString(candidate?.version),
+    rating: asString(candidate?.rating),
+    ratingCount: asNumber(candidate?.ratingCount)
+  };
+}
+
+export function coerceOverviewPayload(input: unknown): OverviewResponse {
+  const source = input as Partial<OverviewResponse>;
+  return {
+    ok: source?.ok === true,
+    generatedAt: asNumber(source?.generatedAt),
+    totals: {
+      downloads: asNumber(source?.totals?.downloads),
+      success: asNumber(source?.totals?.success),
+      fail: asNumber(source?.totals?.fail)
+    },
+    installs: {
+      usersTotal: asNumber(source?.installs?.usersTotal),
+      lastSyncedAtUtc: asNumber(source?.installs?.lastSyncedAtUtc),
+      browsers: Array.isArray(source?.installs?.browsers)
+        ? source.installs.browsers.map(normalizeBrowser)
+        : []
+    },
+    versions: {
+      github: asNullableString(source?.versions?.github),
+      chrome: asNullableString(source?.versions?.chrome),
+      firefox: asNullableString(source?.versions?.firefox),
+      edge: asNullableString(source?.versions?.edge)
+    },
+    status: {
+      systemLive: source?.status?.systemLive === true,
+      liveSinceUtc: asNullableNumber(source?.status?.liveSinceUtc),
+      workerHealth: asWorkerHealth(source?.status?.workerHealth)
+    },
+    links: {
+      chrome: asString(source?.links?.chrome),
+      firefox: asString(source?.links?.firefox),
+      edge: asString(source?.links?.edge),
+      github: asString(source?.links?.github)
+    }
+  };
+}
+
+export function coerceMapPayload(input: unknown): MapResponse {
+  const source = input as Partial<MapResponse>;
+  return {
+    ok: source?.ok === true,
+    generatedAt: asNumber(source?.generatedAt),
+    granularity: 'country',
+    countries: Array.isArray(source?.countries)
+      ? source.countries
+          .map((item) => ({
+            countryCode: asString(item?.countryCode).toUpperCase(),
+            count: asNumber(item?.count)
+          }))
+          .filter((item) => item.countryCode.length === 2 && item.count > 0)
+      : [],
+    totals: {
+      countries: asNumber(source?.totals?.countries),
+      downloads: asNumber(source?.totals?.downloads)
+    },
+    privacyNote: asString(source?.privacyNote)
+  };
+}
+
+export async function fetchOverview(): Promise<OverviewResponse> {
+  const payload = await fetchJSON('/api/public/website/overview');
+  return coerceOverviewPayload(payload);
+}
+
+export async function fetchMapData(): Promise<MapResponse> {
+  const payload = await fetchJSON('/api/public/website/map');
+  return coerceMapPayload(payload);
+}
