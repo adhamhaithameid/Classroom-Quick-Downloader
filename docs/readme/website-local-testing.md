@@ -23,8 +23,23 @@ Open in browser:
 
 ```bash
 pnpm -C website check
-pnpm -C website test
+pnpm -C website test:unit
+pnpm -C website test:integration
+pnpm -C website test:acceptance
 pnpm -C website build
+```
+
+## Run Oracle API Locally (for real website data)
+
+```bash
+cd /Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader
+pnpm -C oracle-backend dev
+```
+
+Then run website dev in another terminal:
+
+```bash
+pnpm -C website dev
 ```
 
 ## Preview Production Build

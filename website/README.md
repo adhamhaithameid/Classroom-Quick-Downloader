@@ -40,16 +40,28 @@ pnpm -C website check
 ### 2) Unit tests
 
 ```bash
-pnpm -C website test
+pnpm -C website test:unit
 ```
 
-### 3) Production build (default local base path)
+### 3) Integration tests
+
+```bash
+pnpm -C website test:integration
+```
+
+### 4) Acceptance tests
+
+```bash
+pnpm -C website test:acceptance
+```
+
+### 5) Production build (default local base path)
 
 ```bash
 pnpm -C website build
 ```
 
-### 4) Preview production output
+### 6) Preview production output
 
 ```bash
 pnpm -C website preview
@@ -80,6 +92,7 @@ pnpm -C website preview
   - Set to `/${REPO_NAME}` in GitHub Pages deploy.
 - `PUBLIC_ORACLE_API_BASE_URL`
   - Oracle backend base URL for public website API.
+  - Defaults to `http://localhost:8080` for local development.
 - `PUBLIC_WORKER_BASE_URL`
   - Cloudflare Worker base URL for changelog feed.
 - `PUBLIC_SITE_URL`
@@ -89,3 +102,5 @@ pnpm -C website preview
 
 - This website intentionally consumes sanitized public endpoints.
 - Country map is aggregate-only; no raw IP data is shown.
+- `/changelog` is rendered directly from repository `CHANGELOG.md`.
+- `/privacy` is rendered directly from repository `PRIVACY.md`.
