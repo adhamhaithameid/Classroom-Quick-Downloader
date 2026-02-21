@@ -1,5 +1,13 @@
 import { ORACLE_API_BASE_URL } from '$lib/config';
-import type { InstallBrowser, MapResponse, OverviewResponse, WorkerHealth } from '$lib/types/public';
+import type {
+  InstallBrowser,
+  MapResponse,
+  OverviewResponse,
+  UninstallFeedbackRequest,
+  UninstallFeedbackResponse,
+  UninstallStatsResponse,
+  WorkerHealth
+} from '$lib/types/public';
 
 const REQUEST_TIMEOUT_MS = 8000;
 
@@ -126,6 +134,36 @@ export function coerceMapPayload(input: unknown): MapResponse {
   };
 }
 
+function coerceUninstallStatsPayload(input: unknown): UninstallStatsResponse {
+  const source = input as Partial<UninstallStatsResponse>;
+  return {
+    ok: source?.ok === true,
+    generatedAt: asNumber(source?.generatedAt),
+    stats: {
+      totalSubmissions: asNumber(source?.stats?.totalSubmissions),
+      lastSubmittedAtUtc: asNullableNumber(source?.stats?.lastSubmittedAtUtc),
+      topReasons: Array.isArray(source?.stats?.topReasons)
+        ? source.stats.topReasons
+            .map((item) => ({
+              reason: asString(item?.reason),
+              count: asNumber(item?.count)
+            }))
+            .filter((item) => item.reason.length > 0 && item.count > 0)
+        : []
+    }
+  };
+}
+
+function coerceUninstallSubmitPayload(input: unknown): UninstallFeedbackResponse {
+  const source = input as Partial<UninstallFeedbackResponse>;
+  return {
+    ok: source?.ok === true,
+    generatedAt: asNumber(source?.generatedAt),
+    submissionId: asNumber(source?.submissionId),
+    message: asString(source?.message)
+  };
+}
+
 export async function fetchOverview(): Promise<OverviewResponse> {
   const payload = await fetchJSON('/api/public/website/overview');
   return coerceOverviewPayload(payload);
@@ -134,4 +172,28 @@ export async function fetchOverview(): Promise<OverviewResponse> {
 export async function fetchMapData(): Promise<MapResponse> {
   const payload = await fetchJSON('/api/public/website/map');
   return coerceMapPayload(payload);
+}
+
+export async function fetchUninstallStats(): Promise<UninstallStatsResponse> {
+  const payload = await fetchJSON('/api/public/website/uninstall');
+  return coerceUninstallStatsPayload(payload);
+}
+
+export async function submitUninstallFeedback(body: UninstallFeedbackRequest): Promise<UninstallFeedbackResponse> {
+  const response = await withTimeout(
+    fetch(`${ORACLE_API_BASE_URL}/api/public/website/uninstall`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      body: JSON.stringify(body)
+    }),
+    REQUEST_TIMEOUT_MS
+  );
+  if (!response.ok) {
+    throw new Error(`Uninstall feedback request failed (${response.status})`);
+  }
+  const payload = await response.json();
+  return coerceUninstallSubmitPayload(payload);
 }

@@ -1,5 +1,6 @@
 const DEFAULT_SITE_URL = 'https://adhamhaithameid.github.io/Classroom-Quick-Downloader';
 const DEFAULT_WORKER_URL = 'https://cqd-analytics.adhamhaithameid.workers.dev';
+const DEFAULT_ORACLE_URL = 'http://localhost:8080';
 
 function cleanBaseUrl(value: string): string {
   return value.trim().replace(/\/+$/, '');
@@ -19,11 +20,8 @@ function ensureUrl(value: string, fallback: string): string {
 const env = import.meta.env;
 
 export const SITE_URL = ensureUrl(env.PUBLIC_SITE_URL ?? '', DEFAULT_SITE_URL);
-export const ORACLE_API_BASE_URL = cleanBaseUrl(env.PUBLIC_ORACLE_API_BASE_URL ?? '');
+export const ORACLE_API_BASE_URL = ensureUrl(env.PUBLIC_ORACLE_API_BASE_URL ?? '', DEFAULT_ORACLE_URL);
 export const WORKER_BASE_URL = ensureUrl(env.PUBLIC_WORKER_BASE_URL ?? '', DEFAULT_WORKER_URL);
-
-export const GOOGLE_FORM_URL =
-  'https://docs.google.com/forms/d/1nB95r35O_h98odg8Y6_OrfYdjKGBqhrUCb_wFHA-RA8/viewform';
 
 export const STORE_LINKS = {
   chrome:

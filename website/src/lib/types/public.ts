@@ -60,3 +60,31 @@ export type ChangelogResponse = {
     isImportant?: boolean;
   }>;
 };
+
+export type UninstallFeedbackRequest = {
+  reason: string;
+  browser: string;
+  version: string;
+  source: string;
+  notes?: string;
+};
+
+export type UninstallFeedbackResponse = {
+  ok: boolean;
+  generatedAt: number;
+  submissionId: number;
+  message: string;
+};
+
+export type UninstallStatsResponse = {
+  ok: boolean;
+  generatedAt: number;
+  stats: {
+    totalSubmissions: number;
+    lastSubmittedAtUtc: number | null;
+    topReasons: Array<{
+      reason: string;
+      count: number;
+    }>;
+  };
+};
