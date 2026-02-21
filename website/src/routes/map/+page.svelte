@@ -146,7 +146,6 @@
 
 <section class="card map-page">
   <div class="intro">
-    <span class="tag">Issue #135</span>
     <h1>Global Usage Map (Country Aggregates)</h1>
     <p>
       This map uses privacy-safe, country-level aggregation. No raw IP addresses are exposed on this page.

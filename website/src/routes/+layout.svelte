@@ -1,5 +1,6 @@
 <script lang="ts">
   import { base } from '$app/paths';
+  import logo from '$lib/assets/cqd-logo.svg';
   import '../app.css';
 
   const nav = [
@@ -15,8 +16,11 @@
   <header class="site-header">
     <div class="page-shell header-inner">
       <a class="brand" href="{base}/">
-        <span class="brand-mark">CQD</span>
-        <span>Classroom Quick Downloader</span>
+        <img src={logo} alt="Classroom Quick Downloader logo" class="brand-logo" />
+        <span class="brand-text">
+          <strong>Classroom Quick Downloader</strong>
+          <small>Fast downloads for Google Classroom</small>
+        </span>
       </a>
       <nav class="site-nav" aria-label="Primary">
         {#each nav as item}
@@ -41,8 +45,8 @@
     position: sticky;
     top: 0;
     z-index: 10;
-    backdrop-filter: blur(12px);
-    background: color-mix(in srgb, var(--bg), transparent 16%);
+    backdrop-filter: blur(14px);
+    background: rgba(238, 245, 255, 0.76);
     border-bottom: 1px solid var(--border);
   }
 
@@ -61,19 +65,32 @@
     gap: 10px;
     color: var(--text);
     font-weight: 700;
+    animation: riseIn 0.5s ease both;
   }
 
-  .brand-mark {
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background: linear-gradient(140deg, var(--accent), var(--accent-2));
-    color: #fff;
-    font-weight: 900;
-    letter-spacing: 0.02em;
+  .brand-logo {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    box-shadow: 0 10px 20px rgba(17, 62, 163, 0.22);
+    background: white;
+    padding: 4px;
+  }
+
+  .brand-text {
+    display: grid;
+    gap: 2px;
+  }
+
+  .brand-text strong {
+    line-height: 1;
+    letter-spacing: -0.02em;
+  }
+
+  .brand-text small {
+    color: var(--muted);
+    font-weight: 600;
+    font-size: 11px;
   }
 
   .site-nav {
@@ -88,15 +105,18 @@
     text-decoration: none;
     font-size: 14px;
     font-weight: 600;
-    border: 1px solid transparent;
+    border: 1px solid var(--border);
     border-radius: 10px;
-    padding: 6px 10px;
+    padding: 8px 11px;
+    background: rgba(255, 255, 255, 0.67);
+    transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease;
   }
 
   .site-nav a:hover {
     color: var(--text);
-    border-color: var(--border);
+    border-color: #96addd;
     background: var(--surface);
+    transform: translateY(-1px);
   }
 
   .site-main {

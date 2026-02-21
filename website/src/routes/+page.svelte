@@ -1,13 +1,15 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { base } from '$app/paths';
-  import { fetchOverview } from '$lib/api/publicSite';
+  import logo from '$lib/assets/cqd-logo.svg';
+  import { fetchMapData, fetchOverview } from '$lib/api/publicSite';
   import { STORE_LINKS } from '$lib/config';
   import type { OverviewResponse } from '$lib/types/public';
 
   let state: 'loading' | 'ready' | 'error' = 'loading';
   let error = '';
   let overview: OverviewResponse | null = null;
+  let topCountries: Array<{ countryCode: string; count: number }> = [];
 
   function detectBrowserKey(): 'chrome' | 'firefox' | 'edge' {
     const ua = navigator.userAgent.toLowerCase();
@@ -41,7 +43,18 @@
     state = 'loading';
     error = '';
     try {
-      overview = await fetchOverview();
+      const [overviewResult, mapResult] = await Promise.allSettled([fetchOverview(), fetchMapData()]);
+
+      if (overviewResult.status !== 'fulfilled') {
+        throw overviewResult.reason;
+      }
+      overview = overviewResult.value;
+
+      if (mapResult.status === 'fulfilled') {
+        topCountries = mapResult.value.countries.slice(0, 3);
+      } else {
+        topCountries = [];
+      }
       state = 'ready';
     } catch (err) {
       error = err instanceof Error ? err.message : 'Failed to load public metrics.';
@@ -57,17 +70,24 @@
 
 <section class="hero card">
   <div class="hero-copy">
-    <span class="tag">Issue #133 + #100</span>
-    <h1>Download your Google Classroom files faster.</h1>
-    <p>
-      Classroom Quick Downloader is built for students: fewer clicks, faster file access, and a transparent
-      status page for reliability.
+    <div class="hero-logo-row">
+      <img src={logo} alt="Classroom Quick Downloader logo" />
+      <div>
+        <p class="eyebrow">Public Product Website</p>
+        <h1>Download Classroom files in one smooth flow.</h1>
+      </div>
+    </div>
+
+    <p class="hero-description">
+      Classroom Quick Downloader removes repetitive clicks and keeps performance transparent with live public metrics.
     </p>
+
     <div class="hero-actions">
       <a class="cta primary" href={browserLink(preferredBrowser)} target="_blank" rel="noopener noreferrer">
         Install for {preferredBrowser[0].toUpperCase() + preferredBrowser.slice(1)}
       </a>
-      <a class="cta" href="{base}/changelog">Read release notes</a>
+      <a class="cta" href="{base}/changelog">Read `CHANGELOG.md`</a>
+      <a class="cta ghost" href="{base}/privacy">Review privacy policy</a>
     </div>
   </div>
 
@@ -76,11 +96,12 @@
     <strong>{formatNumber(overview?.totals.downloads ?? 0)}</strong>
     <small>
       {#if overview?.status.systemLive}
-        System Live since {formatDate(overview.status.liveSinceUtc)} (UTC)
+        System live since {formatDate(overview.status.liveSinceUtc)} (UTC)
       {:else}
-        System status is currently warming up.
+        Status monitor is warming up.
       {/if}
     </small>
+    <div class="pulse" aria-hidden="true"></div>
   </div>
 </section>
 
@@ -116,8 +137,8 @@
 
   <section class="card section-gap availability">
     <div class="section-head">
-      <h2>Availability</h2>
-      <span>Live store versions from Oracle public API</span>
+      <h2>Install & Version Data</h2>
+      <span>Live values from Oracle public APIs</span>
     </div>
 
     <div class="store-grid">
@@ -144,15 +165,28 @@
 
   <section class="card section-gap trust">
     <div class="section-head">
-      <h2>Trust & Transparency</h2>
-      <span>Public pages mapped to issues #100, #132, #135, #129, #178</span>
+      <h2>Global Reach Snapshot</h2>
+      <span>Country-level aggregate usage</span>
     </div>
 
+    {#if topCountries.length > 0}
+      <ul class="top-countries">
+        {#each topCountries as country}
+          <li>
+            <span>{country.countryCode}</span>
+            <strong>{formatNumber(country.count)}</strong>
+          </li>
+        {/each}
+      </ul>
+    {:else}
+      <div class="state-empty">Country snapshot is temporarily unavailable.</div>
+    {/if}
+
     <div class="trust-links">
-      <a href="{base}/privacy">Privacy policy (public summary)</a>
-      <a href="{base}/map">Global country heatmap</a>
-      <a href="{base}/uninstall">Uninstall feedback page</a>
-      <a href="{base}/changelog">Arc-style release notes</a>
+      <a href="{base}/privacy">Read privacy policy</a>
+      <a href="{base}/map">Open global map</a>
+      <a href="{base}/uninstall">Send uninstall feedback</a>
+      <a href="{base}/changelog">Read full changelog</a>
     </div>
   </section>
 {/if}
@@ -166,21 +200,59 @@
     display: grid;
     grid-template-columns: 1.5fr 1fr;
     gap: 16px;
-    padding: 22px;
+    padding: 24px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero::after {
+    content: '';
+    position: absolute;
+    width: 320px;
+    height: 320px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(40, 98, 255, 0.2), transparent 65%);
+    right: -110px;
+    top: -120px;
+  }
+
+  .hero-logo-row {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 14px;
+    align-items: center;
+  }
+
+  .hero-logo-row img {
+    width: 74px;
+    height: 74px;
+    border-radius: 16px;
+    background: white;
+    box-shadow: 0 16px 30px rgba(20, 61, 160, 0.22);
+    padding: 8px;
+  }
+
+  .eyebrow {
+    margin: 0;
+    color: #3b5aa5;
+    font-weight: 700;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
   }
 
   .hero-copy h1 {
-    margin: 12px 0 10px;
-    font-size: clamp(30px, 5vw, 45px);
-    letter-spacing: -0.03em;
-    line-height: 1.03;
+    margin: 8px 0 0;
+    font-size: clamp(34px, 5vw, 56px);
+    letter-spacing: -0.04em;
+    line-height: 1;
   }
 
-  .hero-copy p {
+  .hero-description {
+    margin: 16px 0 0;
     color: var(--muted);
-    max-width: 60ch;
-    line-height: 1.6;
-    margin: 0;
+    max-width: 62ch;
+    line-height: 1.75;
   }
 
   .hero-actions {
@@ -194,10 +266,16 @@
     text-decoration: none;
     border-radius: 12px;
     border: 1px solid var(--border);
-    padding: 10px 14px;
+    padding: 11px 14px;
     font-weight: 700;
     color: var(--text);
     background: var(--surface);
+    transition: transform 0.2s ease, border-color 0.2s ease;
+  }
+
+  .cta:hover {
+    transform: translateY(-1px);
+    border-color: #96addd;
   }
 
   .cta.primary {
@@ -206,33 +284,63 @@
     color: #fff;
   }
 
+  .cta.ghost {
+    background: rgba(255, 255, 255, 0.62);
+  }
+
   .hero-metric {
-    border-radius: 16px;
-    background: linear-gradient(170deg, #1b2f59, #274794);
+    border-radius: 18px;
+    background: linear-gradient(180deg, #132f6c, #1f52b4);
     color: #f6f9ff;
     padding: 18px;
+    position: relative;
+    overflow: hidden;
   }
 
   .hero-metric p {
     margin: 0;
     font-size: 12px;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.08em;
     opacity: 0.82;
   }
 
   .hero-metric strong {
     display: block;
     margin-top: 8px;
-    font-size: clamp(34px, 4vw, 48px);
-    line-height: 1;
+    font-size: clamp(38px, 5vw, 56px);
+    line-height: 0.94;
     letter-spacing: -0.03em;
   }
 
   .hero-metric small {
     display: block;
-    margin-top: 10px;
+    margin-top: 12px;
     color: #dce7ff;
+    line-height: 1.5;
+  }
+
+  .pulse {
+    position: absolute;
+    width: 180px;
+    height: 180px;
+    border-radius: 50%;
+    right: -45px;
+    bottom: -65px;
+    border: 1px solid rgba(204, 224, 255, 0.3);
+    animation: pulse 4s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%,
+    100% {
+      transform: scale(1);
+      opacity: 0.7;
+    }
+    50% {
+      transform: scale(1.08);
+      opacity: 0.34;
+    }
   }
 
   .retry {
@@ -262,7 +370,7 @@
 
   .availability,
   .trust {
-    padding: 16px;
+    padding: 18px;
   }
 
   .section-head {
@@ -275,8 +383,8 @@
 
   .section-head h2 {
     margin: 0;
-    font-size: 24px;
-    letter-spacing: -0.02em;
+    font-size: 26px;
+    letter-spacing: -0.03em;
   }
 
   .section-head span {
@@ -287,21 +395,23 @@
   .store-grid {
     margin-top: 12px;
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
     gap: 10px;
   }
 
   .store-card {
     text-decoration: none;
-    border-radius: 14px;
+    border-radius: 16px;
     border: 1px solid var(--border);
-    padding: 12px;
+    padding: 13px;
     background: var(--surface-2);
     color: var(--text);
+    transition: transform 0.2s ease, border-color 0.2s ease;
   }
 
   .store-card:hover {
-    border-color: #afbfdd;
+    transform: translateY(-2px);
+    border-color: #9cb3df;
   }
 
   .store-card.preferred {
@@ -336,8 +446,26 @@
     font-size: 14px;
   }
 
+  .top-countries {
+    list-style: none;
+    margin: 12px 0 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 8px;
+  }
+
+  .top-countries li {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px;
+    background: var(--surface-2);
+    display: flex;
+    justify-content: space-between;
+  }
+
   .trust-links {
-    margin-top: 10px;
+    margin-top: 12px;
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: 8px;
@@ -347,10 +475,16 @@
     text-decoration: none;
     color: var(--accent-2);
     border: 1px solid var(--border);
-    border-radius: 10px;
+    border-radius: 12px;
     background: var(--surface-2);
     padding: 10px;
     font-weight: 600;
+    transition: transform 0.2s ease, border-color 0.2s ease;
+  }
+
+  .trust-links a:hover {
+    transform: translateY(-1px);
+    border-color: #97addb;
   }
 
   @media (max-width: 900px) {
