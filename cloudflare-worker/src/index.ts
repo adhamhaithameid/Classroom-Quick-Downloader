@@ -1,5 +1,6 @@
 // filepath: cloudflare-worker/src/index.ts
 import { renderDashboard, renderLoginPage } from "./dashboard";
+import { renderReleaseNotesPage, sanitizeReleaseEntries } from "./release-notes";
 import type { Env as WorkerEnv, StatsResponse } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -966,6 +967,37 @@ async function proxyToDO(request: Request, env: WorkerEnv): Promise<Response> {
   return withCors(request, res, env);
 }
 
+async function handleReleaseNotes(request: Request, env: WorkerEnv): Promise<Response> {
+  const stub = getDownloadsStub(env);
+  let entries: unknown[] = [];
+
+  try {
+    const upstream = await stub.fetch(new Request("https://do/changelog", { method: "GET" }));
+    if (upstream.ok) {
+      const payload = await upstream.json() as { entries?: unknown[] };
+      if (Array.isArray(payload.entries)) {
+        entries = payload.entries;
+      }
+    }
+  } catch (error) {
+    console.warn("[release-notes] Failed to load changelog entries:", error);
+  }
+
+  const safeEntries = sanitizeReleaseEntries(entries);
+  const html = renderReleaseNotesPage(safeEntries, new URL(request.url).origin);
+
+  return new Response(html, {
+    status: 200,
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "public, max-age=300",
+      "x-content-type-options": "nosniff",
+      "x-frame-options": "DENY",
+      "referrer-policy": "no-referrer",
+    },
+  });
+}
+
 export default {
   async fetch(request: Request, env: WorkerEnv, _ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
@@ -990,6 +1022,11 @@ export default {
     // Login page
     if (pathname === "/") {
       return handleRoot(request, env);
+    }
+
+    // Public changelog website
+    if (pathname === "/release-notes" && request.method === "GET") {
+      return handleReleaseNotes(request, env);
     }
 
     // Dashboard (requires session)

@@ -247,6 +247,53 @@ describe("Worker auth config hardening", () => {
     expect(res.status).toBe(403);
   });
 
+  it("serves public release-notes HTML using changelog entries", async () => {
+    const stub = {
+      fetch: async (input: RequestInfo) => {
+        const url = typeof input === "string" ? input : input instanceof Request ? input.url : "";
+        if (url.includes("/changelog")) {
+          return new Response(JSON.stringify({
+            ok: true,
+            entries: [
+              {
+                id: "entry-1",
+                version: "1.3.6",
+                date: "2026-02-20T00:00:00.000Z",
+                changes: ['Escaped <script>alert("xss")</script> content'],
+              },
+            ],
+          }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      },
+    };
+    const namespace = {
+      idFromName: (_name: string) => "downloads-id",
+      get: (_id: string) => stub,
+    };
+    const env = mockEnv({ DOWNLOADS_DO: namespace as unknown as DurableObjectNamespace });
+
+    const request = new Request("https://example.com/release-notes", {
+      method: "GET",
+    });
+
+    const res = await worker.fetch(request, env, {} as ExecutionContext);
+    const html = await res.text();
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("text/html");
+    expect(html).toContain("Release Notes");
+    expect(html).toContain("v1.3.6");
+    expect(html).toContain("&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;");
+    expect(html).not.toContain('<script>alert("xss")</script>');
+  });
+
   it("enforces strict session binding on protected endpoints", async () => {
     const env = mockEnv({ SESSION_BINDING_MODE: "strict" });
     const loginReq = new Request("https://example.com/", {
