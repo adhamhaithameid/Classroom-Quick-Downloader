@@ -12,26 +12,23 @@ Built for students who want speed, fewer clicks, and less friction during busy w
 
 [Install on Chrome](https://chromewebstore.google.com/detail/classroom-quick-downloade/oemoongiefmpmomjikcjmkkkhffcbdid) · [Install on Firefox](https://addons.mozilla.org/en-US/firefox/addon/classroom-quick-downloader/) · [Install on Edge](https://microsoftedge.microsoft.com/addons/detail/classroom-quick-downloade/ecojbijjkcjdolpeoiemnccgmaeomcmn)
 
-<!-- Active badge set: Balanced (Set B) -->
+<!-- Active badge set: Minimal Trust (Set A) -->
 
 ![Current Version](https://img.shields.io/github/v/release/adhamhaithameid/Classroom-Quick-Downloader?label=Version&color=blue)
-![License](https://img.shields.io/badge/License-MIT-blue)
+![License](https://img.shields.io/badge/License-Proprietary%20%26%20Source%20Available-B22222)
 [![CI](https://img.shields.io/github/actions/workflow/status/adhamhaithameid/Classroom-Quick-Downloader/ci.yml?branch=main&label=CI)](https://github.com/adhamhaithameid/Classroom-Quick-Downloader/actions/workflows/ci.yml)
-[![Chrome](https://img.shields.io/badge/Chrome-Available-green?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/classroom-quick-downloade/oemoongiefmpmomjikcjmkkkhffcbdid)
-[![Firefox](https://img.shields.io/badge/Firefox-Available-green?logo=firefoxbrowser&logoColor=white)](https://addons.mozilla.org/en-US/firefox/addon/classroom-quick-downloader/)
-[![Edge](https://img.shields.io/badge/Edge-Available-green?logo=microsoft-edge&logoColor=white)](https://microsoftedge.microsoft.com/addons/detail/classroom-quick-downloade/ecojbijjkcjdolpeoiemnccgmaeomcmn)
 
 <details>
 <summary>Badge Set Options (for quick switching)</summary>
 
 ### Set A: Minimal Trust
 ![Current Version](https://img.shields.io/github/v/release/adhamhaithameid/Classroom-Quick-Downloader?label=Version&color=blue)
-![License](https://img.shields.io/badge/License-MIT-blue)
+![License](https://img.shields.io/badge/License-Proprietary%20%26%20Source%20Available-B22222)
 [![CI](https://img.shields.io/github/actions/workflow/status/adhamhaithameid/Classroom-Quick-Downloader/ci.yml?branch=main&label=CI)](https://github.com/adhamhaithameid/Classroom-Quick-Downloader/actions/workflows/ci.yml)
 
 ### Set B: Balanced (Recommended)
 ![Current Version](https://img.shields.io/github/v/release/adhamhaithameid/Classroom-Quick-Downloader?label=Version&color=blue)
-![License](https://img.shields.io/badge/License-MIT-blue)
+![License](https://img.shields.io/badge/License-Proprietary%20%26%20Source%20Available-B22222)
 [![CI](https://img.shields.io/github/actions/workflow/status/adhamhaithameid/Classroom-Quick-Downloader/ci.yml?branch=main&label=CI)](https://github.com/adhamhaithameid/Classroom-Quick-Downloader/actions/workflows/ci.yml)
 [![Chrome](https://img.shields.io/badge/Chrome-Available-green?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/classroom-quick-downloade/oemoongiefmpmomjikcjmkkkhffcbdid)
 [![Firefox](https://img.shields.io/badge/Firefox-Available-green?logo=firefoxbrowser&logoColor=white)](https://addons.mozilla.org/en-US/firefox/addon/classroom-quick-downloader/)
@@ -39,7 +36,7 @@ Built for students who want speed, fewer clicks, and less friction during busy w
 
 ### Set C: Full Trust
 ![Current Version](https://img.shields.io/github/v/release/adhamhaithameid/Classroom-Quick-Downloader?label=Version&color=blue)
-![License](https://img.shields.io/badge/License-MIT-blue)
+![License](https://img.shields.io/badge/License-Proprietary%20%26%20Source%20Available-B22222)
 [![CI](https://img.shields.io/github/actions/workflow/status/adhamhaithameid/Classroom-Quick-Downloader/ci.yml?branch=main&label=CI)](https://github.com/adhamhaithameid/Classroom-Quick-Downloader/actions/workflows/ci.yml)
 [![CodeQL](https://img.shields.io/github/actions/workflow/status/adhamhaithameid/Classroom-Quick-Downloader/codeql.yml?branch=main&label=CodeQL)](https://github.com/adhamhaithameid/Classroom-Quick-Downloader/actions/workflows/codeql.yml)
 [![Socket Security](https://img.shields.io/github/actions/workflow/status/adhamhaithameid/Classroom-Quick-Downloader/socket-security.yml?branch=main&label=Socket+Security)](https://github.com/adhamhaithameid/Classroom-Quick-Downloader/actions/workflows/socket-security.yml)
@@ -136,7 +133,7 @@ What began as sketches on paper turned into a production extension used across m
 
 ### 📝 The Paper Manifesto
 
-The original system idea started in a university lecture as handwritten architecture notes, then moved into iterative builds and testing.
+The original system idea started in a university lecture as handwritten architecture notes, then moved into iterative builds and testing. [View the original handwritten system sketch.](docs/readme/handwritten-system-design.jpg)
 
 ### 📈 The Evolution
 
