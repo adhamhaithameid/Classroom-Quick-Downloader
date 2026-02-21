@@ -75,9 +75,22 @@ const WORKER_URL = import.meta.env.VITE_WORKER_URL as string || '';
 export const WORKER_BASE_URL = WORKER_URL.replace(/\/+track$/, '');
 export const CONFIG_URL = WORKER_BASE_URL ? `${WORKER_BASE_URL}/config` : '';
 export const CHANGELOG_URL = WORKER_BASE_URL ? `${WORKER_BASE_URL}/changelog` : '';
-export const CHANGELOG_SITE_URL = WORKER_BASE_URL
-  ? `${WORKER_BASE_URL}/release-notes`
-  : 'https://github.com/adhamhaithameid/Classroom-Quick-Downloader/blob/main/CHANGELOG.md';
+const DEFAULT_WEBSITE_BASE_URL = 'https://adhamhaithameid.github.io/Classroom-Quick-Downloader';
+const WEBSITE_URL = (import.meta.env.VITE_PUBLIC_SITE_URL as string) || DEFAULT_WEBSITE_BASE_URL;
+
+function normalizeBaseUrl(value: string): string {
+  const trimmed = value.trim().replace(/\/+$/, '');
+  if (!trimmed) return '';
+  try {
+    const parsed = new URL(trimmed);
+    return `${parsed.origin}${parsed.pathname}`.replace(/\/+$/, '');
+  } catch {
+    return '';
+  }
+}
+
+export const WEBSITE_BASE_URL = normalizeBaseUrl(WEBSITE_URL) || DEFAULT_WEBSITE_BASE_URL;
+export const CHANGELOG_SITE_URL = `${WEBSITE_BASE_URL}/changelog`;
 export const TRACK_URL = WORKER_URL;
 
 // --- Rate Limits ---
