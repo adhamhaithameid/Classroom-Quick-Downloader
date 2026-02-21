@@ -2,4 +2,7 @@ packages:
   - "extension"
   - "cloudflare-worker"
   - "oracle-backend"
+  - "website"
   - "tools/*"
+onlyBuiltDependencies:
+  - esbuild
