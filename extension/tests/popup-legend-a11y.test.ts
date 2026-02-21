@@ -158,7 +158,7 @@ describe('popup legend keyboard accessibility', () => {
     expect(releaseNotesLink).not.toBeNull();
     const releaseHref = releaseNotesLink?.getAttribute('href') ?? '';
     expect(releaseHref.length).toBeGreaterThan(0);
-    expect(/release-notes|CHANGELOG\.md/.test(releaseHref)).toBe(true);
+    expect(/\/changelog|CHANGELOG\.md/.test(releaseHref)).toBe(true);
 
     await act(async () => {
       legendItem?.focus();
