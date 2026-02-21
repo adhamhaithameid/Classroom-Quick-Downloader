@@ -230,6 +230,11 @@ func main() {
 	// Backwards-compatible alias, if you ever used /storeBatch naming.
 	mux.HandleFunc("/storeBatch", ingestHandler)
 
+	// Public website endpoints (unauthenticated, sanitized, CORS restricted).
+	mux.Handle("/api/public/website/overview", handlers.PublicWebsiteOverviewHandler(sqlDB, postgresDB))
+	mux.Handle("/api/public/website/map", handlers.PublicWebsiteMapHandler(sqlDB))
+	mux.Handle("/api/public/website/status", handlers.PublicWebsiteStatusHandler(sqlDB))
+
 	// Analytics API endpoints (protected by auth when DASHBOARD_PASSWORD is set).
 	setAuthStateDB(sqlDB)
 	authMiddleware := requireAuth(sqlDB, dashboardPassword, archiverSecret, allowLoopbackBypass)
