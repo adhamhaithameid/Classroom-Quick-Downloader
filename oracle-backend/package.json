@@ -1,0 +1,13 @@
+{
+  "name": "@cqd/oracle-backend",
+  "version": "4.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.28.2",
+  "scripts": {
+    "preinstall": "node ../tools/enforce-pnpm.cjs",
+    "test": "go test ./...",
+    "vet": "go vet ./...",
+    "validate": "pnpm run test && pnpm run vet",
+    "gosec": "\"$(go env GOPATH)/bin/gosec\" -track-suppressions ./..."
+  }
+}

@@ -530,12 +530,16 @@ export function renderDashboard(stats: StatsResponse): string {
 
   const workerUrl = "https://cqd-analytics.adhamhaithameid.workers.dev";
   
-  // Unique IPs tracking with cap indicator
-  const uniqueIpsCount = stats.uniqueRequestsToday ?? stats.uniqueIpsToday ?? 0;
   const isApproximated = stats.isApproximated ?? false;
-  const uniqueIpsDisplay = isApproximated 
-    ? `${uniqueIpsCount.toLocaleString()}+ (capped)`
-    : uniqueIpsCount.toLocaleString();
+  const uniqueCountriesAllTime =
+    stats.uniqueCountriesAllTime ??
+    Object.keys(stats.counters?.byCountry || {}).filter((country) => {
+      const normalized = String(country || "").trim().toLowerCase();
+      return normalized !== "" && normalized !== "xx" && normalized !== "unknown";
+    }).length;
+  const uniqueIpsDisplay = uniqueCountriesAllTime.toLocaleString();
+  const weeklyRequests = stats.weeklyRequests ?? requestsToday;
+  const monthlyRequests = stats.monthlyRequests ?? weeklyRequests;
 
   const remoteConfig = stats.remoteConfig || {};
   const cfgVersion = remoteConfig.configVersion ?? 1;
@@ -3349,16 +3353,16 @@ export function renderDashboard(stats: StatsResponse): string {
               <span class="quota-val" data-bind="requestsToday">${requestsToday}</span>
             </div>
             <div class="quota-stat">
-              <span class="quota-label">Unique IPs</span>
+              <span class="quota-label">Unique IPs / Countries</span>
               <span class="quota-val" data-bind="uniqueIps" style="color:${isApproximated ? 'var(--warning)' : 'inherit'}">${uniqueIpsDisplay}</span>
             </div>
             <div class="quota-stat">
               <span class="quota-label">Weekly Events</span>
-              <span class="quota-val" data-bind="weeklyEvents" style="color:var(--success)">${Math.round((stats.totalEvents ?? 0) / 4)}</span>
+              <span class="quota-val" data-bind="weeklyEvents" style="color:var(--success)">${weeklyRequests.toLocaleString()}</span>
             </div>
             <div class="quota-stat">
               <span class="quota-label">Monthly Events</span>
-              <span class="quota-val" data-bind="monthlyEvents" style="color:var(--accent)">${stats.totalEvents ?? 0}</span>
+              <span class="quota-val" data-bind="monthlyEvents" style="color:var(--accent)">${monthlyRequests.toLocaleString()}</span>
             </div>
             <div class="quota-stat">
               <span class="quota-label">Status</span>
@@ -4461,13 +4465,23 @@ export function renderDashboard(stats: StatsResponse): string {
           map.quotaLevel = stats.quota.quotaLevel || "UNKNOWN";
           map.batchSize = stats.quota.batchSizeSuggestion || 0;
         }
+        const requestsToday = Number(map.requestsToday ?? stats.requestsToday ?? 0);
+        map.weeklyEvents = stats.weeklyRequests ?? requestsToday;
+        map.monthlyEvents = stats.monthlyRequests ?? map.weeklyEvents;
         
-        // APPROXIMATION-AWARE: Format unique IPs with capped indicator
+        const uniqueCountriesAllTime = Number.isFinite(stats.uniqueCountriesAllTime)
+          ? Number(stats.uniqueCountriesAllTime)
+          : Object.keys(stats.counters?.byCountry || {}).filter(function (country) {
+              var normalized = String(country || "").trim().toLowerCase();
+              return normalized !== "" && normalized !== "xx" && normalized !== "unknown";
+            }).length;
         const uniqueIpsCount = stats.uniqueRequestsToday ?? stats.uniqueIpsToday ?? 0;
-        const isApproximated = stats.isApproximated ?? false;
-        map.uniqueIps = isApproximated 
-          ? uniqueIpsCount.toLocaleString() + "+ (capped)"
-          : uniqueIpsCount.toLocaleString();
+        const useCountryReach = uniqueCountriesAllTime > 0;
+        const isApproximated = !useCountryReach && (stats.isApproximated ?? false);
+        const uniqueReach = useCountryReach ? uniqueCountriesAllTime : uniqueIpsCount;
+        map.uniqueIps = isApproximated
+          ? uniqueReach.toLocaleString() + "+ (capped)"
+          : uniqueReach.toLocaleString();
 
         for (const [key, val] of Object.entries(map)) {
           const els = document.querySelectorAll('[data-bind="' + key + '"]');

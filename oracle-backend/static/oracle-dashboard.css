@@ -565,12 +565,17 @@
         cursor: pointer;
       }
 
-      .container { padding: 20px; }
+      .container {
+        padding: 20px;
+        position: relative;
+      }
 
       /* Page visibility — fade + slide transition */
       .page {
         visibility: hidden;
         position: absolute;
+        top: 0;
+        left: 0;
         width: 100%;
         opacity: 0;
         transform: translateY(6px);

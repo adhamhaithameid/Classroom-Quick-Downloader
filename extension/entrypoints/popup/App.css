@@ -542,6 +542,33 @@ body {
   flex-shrink: 0;
 }
 
+.cqd-temp-cancelled-counter {
+  margin-top: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px dashed #f59e0b;
+  background: #fff7ed;
+}
+
+.cqd-temp-cancelled-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: #9a3412;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.cqd-temp-cancelled-value {
+  min-width: 18px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 800;
+  color: #7c2d12;
+}
+
 .cqd-muted-text {
   font-size: 11px;
   color: var(--cqd-text-muted);
@@ -1293,7 +1320,6 @@ body {
 .cqd-cl-close {
   background: rgba(255, 255, 255, 0.15);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  font-size: 20px;
   color: white;
   cursor: pointer;
   padding: 0;
@@ -1303,16 +1329,23 @@ body {
   justify-content: center;
   width: 32px;
   height: 32px;
-  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  line-height: 0;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.cqd-cl-close-icon {
+  width: 14px;
+  height: 14px;
+  display: block;
 }
 
 .cqd-cl-close:hover {
   background: rgba(255, 255, 255, 0.3);
-  transform: rotate(90deg) scale(1.1);
+  border-color: rgba(255, 255, 255, 0.24);
 }
 
 .cqd-cl-close:active {
-  transform: rotate(90deg) scale(0.95);
+  background: rgba(255, 255, 255, 0.22);
 }
 
 /* Body */

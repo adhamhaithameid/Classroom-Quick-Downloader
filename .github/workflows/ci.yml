@@ -33,7 +33,7 @@ jobs:
           cache: "pnpm"
 
       - name: Install Dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Run Extension Tests
         run: pnpm -C extension test
@@ -71,7 +71,7 @@ jobs:
           cache: "pnpm"
 
       - name: Install Dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Build Extension (${{ matrix.target }})
         run: pnpm -C extension exec wxt build -b ${{ matrix.target }}
@@ -98,7 +98,7 @@ jobs:
           cache: "pnpm"
 
       - name: Install Dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Run Cloudflare Worker Tests
         run: pnpm -C cloudflare-worker test
@@ -126,7 +126,7 @@ jobs:
           cache: "pnpm"
 
       - name: Install Dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Make Script Executable
         run: chmod +x tools/validate.sh

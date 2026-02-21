@@ -5,8 +5,12 @@
   "packageManager": "pnpm@10.28.2",
   "scripts": {
     "preinstall": "node tools/enforce-pnpm.cjs",
+    "dev": "node tools/dev-browser.cjs",
     "dev:ext": "pnpm --filter extension dev",
     "build:ext": "pnpm --filter extension build",
+    "test:oracle": "pnpm -C oracle-backend test",
+    "validate:oracle": "pnpm -C oracle-backend validate",
+    "changelog:full": "node tools/generate-full-changelog.mjs",
     "prepare": "husky"
   },
   "pnpm": {
@@ -15,22 +19,23 @@
       "eslint>ajv": "8.18.0",
       "undici": ">=7.18.2",
       "@isaacs/brace-expansion": ">=5.0.1",
-      "minimatch": "^10.2.1"
+      "minimatch": "^10.2.1",
+      "web-ext-run>multimatch": "8.0.0"
     },
     "packageExtensions": {
-      "eslint@10.0.0": {
+      "eslint@10.0.1": {
         "dependencies": {
           "ajv-draft-04": "1.0.0"
         }
       }
     },
     "patchedDependencies": {
-      "eslint@10.0.0": "patches/eslint@10.0.0.patch"
+      "eslint@10.0.1": "patches/eslint@10.0.1.patch"
     }
   },
   "devDependencies": {
-    "@commitlint/cli": "^20.4.1",
-    "@commitlint/config-conventional": "^20.4.1",
+    "@commitlint/cli": "^20.4.2",
+    "@commitlint/config-conventional": "^20.4.2",
     "husky": "^9.1.7"
   }
 }
