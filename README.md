@@ -1,7 +1,5 @@
 <div align="center">
 
-> Update (2026-02-15): Latest changes include CI coverage-gate hardening for extension analytics storage migration fallback, popup stats race-condition guards, structured step-up auth error handling in Oracle dashboard, and backend/worker auth-security hardening. See /CHANGELOG.md for details.
-
 # 🎓 Classroom Quick Downloader
 
 ![Classroom Quick Downloader Hero](docs/readme/hero-marquee.png)
@@ -17,34 +15,6 @@ Built for students who want speed, fewer clicks, and less friction during busy w
 ![Current Version](https://img.shields.io/github/v/release/adhamhaithameid/Classroom-Quick-Downloader?label=Version&color=blue)
 ![License](https://img.shields.io/badge/License-Proprietary%20%26%20Source%20Available-B22222)
 [![CI](https://img.shields.io/github/actions/workflow/status/adhamhaithameid/Classroom-Quick-Downloader/ci.yml?branch=main&label=CI)](https://github.com/adhamhaithameid/Classroom-Quick-Downloader/actions/workflows/ci.yml)
-
-<details>
-<summary>Badge Set Options (for quick switching)</summary>
-
-### Set A: Minimal Trust
-![Current Version](https://img.shields.io/github/v/release/adhamhaithameid/Classroom-Quick-Downloader?label=Version&color=blue)
-![License](https://img.shields.io/badge/License-Proprietary%20%26%20Source%20Available-B22222)
-[![CI](https://img.shields.io/github/actions/workflow/status/adhamhaithameid/Classroom-Quick-Downloader/ci.yml?branch=main&label=CI)](https://github.com/adhamhaithameid/Classroom-Quick-Downloader/actions/workflows/ci.yml)
-
-### Set B: Balanced (Recommended)
-![Current Version](https://img.shields.io/github/v/release/adhamhaithameid/Classroom-Quick-Downloader?label=Version&color=blue)
-![License](https://img.shields.io/badge/License-Proprietary%20%26%20Source%20Available-B22222)
-[![CI](https://img.shields.io/github/actions/workflow/status/adhamhaithameid/Classroom-Quick-Downloader/ci.yml?branch=main&label=CI)](https://github.com/adhamhaithameid/Classroom-Quick-Downloader/actions/workflows/ci.yml)
-[![Chrome](https://img.shields.io/badge/Chrome-Available-green?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/classroom-quick-downloade/oemoongiefmpmomjikcjmkkkhffcbdid)
-[![Firefox](https://img.shields.io/badge/Firefox-Available-green?logo=firefoxbrowser&logoColor=white)](https://addons.mozilla.org/en-US/firefox/addon/classroom-quick-downloader/)
-[![Edge](https://img.shields.io/badge/Edge-Available-green?logo=microsoft-edge&logoColor=white)](https://microsoftedge.microsoft.com/addons/detail/classroom-quick-downloade/ecojbijjkcjdolpeoiemnccgmaeomcmn)
-
-### Set C: Full Trust
-![Current Version](https://img.shields.io/github/v/release/adhamhaithameid/Classroom-Quick-Downloader?label=Version&color=blue)
-![License](https://img.shields.io/badge/License-Proprietary%20%26%20Source%20Available-B22222)
-[![CI](https://img.shields.io/github/actions/workflow/status/adhamhaithameid/Classroom-Quick-Downloader/ci.yml?branch=main&label=CI)](https://github.com/adhamhaithameid/Classroom-Quick-Downloader/actions/workflows/ci.yml)
-[![CodeQL](https://img.shields.io/github/actions/workflow/status/adhamhaithameid/Classroom-Quick-Downloader/codeql.yml?branch=main&label=CodeQL)](https://github.com/adhamhaithameid/Classroom-Quick-Downloader/actions/workflows/codeql.yml)
-[![Socket Security](https://img.shields.io/github/actions/workflow/status/adhamhaithameid/Classroom-Quick-Downloader/socket-security.yml?branch=main&label=Socket+Security)](https://github.com/adhamhaithameid/Classroom-Quick-Downloader/actions/workflows/socket-security.yml)
-[![Chrome](https://img.shields.io/badge/Chrome-Available-green?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/classroom-quick-downloade/oemoongiefmpmomjikcjmkkkhffcbdid)
-[![Firefox](https://img.shields.io/badge/Firefox-Available-green?logo=firefoxbrowser&logoColor=white)](https://addons.mozilla.org/en-US/firefox/addon/classroom-quick-downloader/)
-[![Edge](https://img.shields.io/badge/Edge-Available-green?logo=microsoft-edge&logoColor=white)](https://microsoftedge.microsoft.com/addons/detail/classroom-quick-downloade/ecojbijjkcjdolpeoiemnccgmaeomcmn)
-
-</details>
 
 </div>
 
