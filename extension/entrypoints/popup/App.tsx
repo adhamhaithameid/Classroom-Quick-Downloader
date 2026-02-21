@@ -329,6 +329,7 @@ function App() {
   // REAL STATS STATE
   const [stats, setStats] = useState<StatItem[]>([]);
   const [totalDownloads, setTotalDownloads] = useState(0);
+  const [cancelledDownloads, setCancelledDownloads] = useState(0);
   const [hoveredStatId, setHoveredStatId] = useState<string | null>(null);
 
   // CHANGELOG STATE
@@ -411,6 +412,7 @@ function App() {
         if (!browserApi || !browserApi.storage || !browserApi.storage.local) {
             if (isStale()) return;
             setTotalDownloads(0);
+            setCancelledDownloads(0);
             setStats([]); // Empty stats in dev
             return;
         }
@@ -430,6 +432,10 @@ function App() {
         if (isStale()) return;
         const raw = result.local_stats || { total: 0, byType: {} };
         const totalDownloadsNext = raw.total || 0;
+        const rawCancelled = Number(raw.cancelled);
+        const cancelledDownloadsNext = Number.isFinite(rawCancelled)
+          ? Math.max(0, Math.floor(rawCancelled))
+          : 0;
 
         // Convert byType object to sorted array
         const entries = Object.entries(raw.byType as Record<string, number>);
@@ -474,6 +480,7 @@ function App() {
         }
         if (isStale()) return;
         setTotalDownloads(totalDownloadsNext);
+        setCancelledDownloads(cancelledDownloadsNext);
         setStats(mapped);
 
       } catch (e) {
@@ -712,7 +719,23 @@ function App() {
                 <h3 className="cqd-cl-title">
                   <span className="btn-bullet">📜</span> What's New
                 </h3>
-                <button className="cqd-cl-close" onClick={() => setShowChangelog(false)}>×</button>
+                <button
+                  type="button"
+                  className="cqd-cl-close"
+                  onClick={() => setShowChangelog(false)}
+                  aria-label="Close changelog"
+                >
+                  <svg
+                    className="cqd-cl-close-icon"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    aria-hidden="true"
+                  >
+                    <path d="M6 6L18 18M18 6L6 18" />
+                  </svg>
+                </button>
               </div>
               <div className="cqd-cl-body">
                 {changelogData?.entries?.length ? (
@@ -884,6 +907,10 @@ function App() {
                           <li className="cqd-muted-text">No downloads yet</li>
                         )}
                       </ul>
+                      <div className="cqd-temp-cancelled-counter" role="status" aria-live="polite">
+                        <span className="cqd-temp-cancelled-label">Temporary cancelled counter</span>
+                        <span className="cqd-temp-cancelled-value">{cancelledDownloads}</span>
+                      </div>
                     </div>
                   </div>
                 </div>

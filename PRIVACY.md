@@ -4,7 +4,7 @@
 
 **Classroom Quick Downloader** — Privacy Policy
 
-> *Last Updated: December 2025*
+> *Last Updated: February 2026*
 
 ---
 
@@ -27,17 +27,24 @@ We collect **anonymous telemetry** to monitor system health and improve the exte
 
 | Data Point | Example | Purpose |
 |---|---|---|
-| **Status** | `"success"` or `"fail"` | Track download success rates |
+| **Status** | `"success"`, `"fail"`, or `"cancelled"` | Track completion outcomes and cancellation behavior |
 | **File Type** | `"pdf"`, `"docx"`, `"pptx"` | Understand which file types are most common |
 | **Browser** | `"chrome"`, `"edge"`, `"firefox"` | Ensure compatibility across browsers |
 | **Operating System** | `"win"`, `"mac"`, `"linux"` | Ensure compatibility across platforms |
-| **Extension Version** | `"2.1.0"` | Track adoption of new versions |
+| **Extension Version** | `"1.3.6"` | Track adoption of new versions |
 | **Download Duration** | `1500` (milliseconds) | Monitor download speeds |
 | **Bypass Used** | `true` or `false` | Track usage of the Drive bypass feature |
 | **Error Type** | `"NETWORK_ERROR"` | Diagnose and fix bugs |
 | **Language** | `"en-US"`, `"ar-EG"` | Understand our global user base |
 | **Country** | `"US"`, `"EG"`, `"IN"` | Geographic distribution (see below) |
 | **Timestamp** | Unix timestamp | Aggregate data into hourly buckets |
+
+### Accuracy Notes (Transparency)
+
+- Download analytics are designed to be highly accurate, but cancellation metrics are **best effort** at very small time windows.
+- If a user clicks **Cancel immediately after clicking Download** (roughly the first ~1 second), that cancellation can be undercounted due to browser/event timing races.
+- Cancellations triggered after this brief startup window are tracked normally.
+- We keep this behavior documented on purpose so analytics expectations stay honest while we continue improving instrumentation.
 
 ### How We Determine Your Location
 
@@ -80,6 +87,7 @@ All collected data serves **one purpose**: making the extension better for every
 | **System Health Monitoring** | "Are downloads failing today? Is there a bug in the latest version?" |
 | **Bug Diagnosis** | "PDF downloads from Firefox are failing with error `NETWORK_ERROR`. We need to investigate." |
 | **Feature Usage** | "The Drive bypass feature is used by 30% of downloads. It's worth keeping." |
+| **Product Improvement Prioritization** | "Near-cancel timing is undercounted in a small window; prioritize client instrumentation improvements in extension/worker/backend." |
 | **Geographic Distribution** | "We have a large user base in Egypt. Should we add Arabic support?" |
 
 ### Aggregation, Not Individual Tracking
@@ -182,6 +190,7 @@ We take every privacy concern seriously and will respond promptly.
 | **Do you know who I am?** | No. There is no user ID, login, or tracking mechanism. |
 | **Where is my data stored?** | On secure servers operated by Cloudflare and Oracle Cloud. |
 | **Can I opt out?** | Analytics is minimal and anonymous, but you can disable the extension if preferred. |
+| **Are cancellation metrics always 100% exact?** | Almost. Very fast "near-cancel" actions right after clicking download can be undercounted; this is a known, documented limitation. |
 
 ---
 

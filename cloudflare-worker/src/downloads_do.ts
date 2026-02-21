@@ -38,6 +38,7 @@ type DurableStateShape = {
   // daily request counting for quota awareness
   reqCountToday: number;
   reqCountDate: string | null; // "YYYY-MM-DD" UTC
+  reqDailyCounts: Record<string, number>;
 
   // admin switch: when true, remote analytics is forced OFF
   hardRemoteOff: boolean;
@@ -279,12 +280,32 @@ const HEALTH_NOTIFY_CRIT_INTERVAL_MS = 10 * 60 * 1000;
 const TRACK_RATE_LIMIT_PER_MIN = 120;
 const TRACK_RATE_PRUNE_AFTER_MIN = 10;
 const TRACK_RATE_MAX_KEYS = 5000;
+const REQUEST_HISTORY_DAYS = 400;
 
 // Storage key inside DO storage
 const STORAGE_KEY = "analytics_state";
 
 function todayUtcDate(): string {
   return new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+}
+
+function shiftUtcDateByDays(dateKey: string, deltaDays: number): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return null;
+  const dt = new Date(`${dateKey}T00:00:00.000Z`);
+  if (Number.isNaN(dt.getTime())) return null;
+  dt.setUTCDate(dt.getUTCDate() + deltaDays);
+  return dt.toISOString().slice(0, 10);
+}
+
+function normalizeReqDailyCounts(input: unknown): Record<string, number> {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return {};
+  const out: Record<string, number> = {};
+  for (const [key, raw] of Object.entries(input)) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) continue;
+    const n = clampInt(raw, 0, Number.MAX_SAFE_INTEGER, 0);
+    out[key] = n;
+  }
+  return out;
 }
 
 function clampInt(value: unknown, min: number, max: number, fallback: number): number {
@@ -722,6 +743,7 @@ export class DownloadsDurable {
 
       reqCountToday: 0,
       reqCountDate: null,
+      reqDailyCounts: {},
       hardRemoteOff: false,
 
       buffer: [],
@@ -808,6 +830,7 @@ export class DownloadsDurable {
 
       reqCountToday: stored.reqCountToday ?? 0,
       reqCountDate: stored.reqCountDate ?? null,
+      reqDailyCounts: normalizeReqDailyCounts(stored.reqDailyCounts),
       hardRemoteOff: stored.hardRemoteOff ?? false,
 
       buffer: Array.isArray(stored.buffer) ? stored.buffer : [],
@@ -928,6 +951,16 @@ export class DownloadsDurable {
       lastHealthStatus: stored.lastHealthStatus ?? base.lastHealthStatus,
       lastHealthNotifyAt: stored.lastHealthNotifyAt ?? base.lastHealthNotifyAt,
     };
+
+    if (this.data.reqCountDate && /^\d{4}-\d{2}-\d{2}$/.test(this.data.reqCountDate)) {
+      const existing = this.data.reqDailyCounts[this.data.reqCountDate];
+      if (typeof existing === "number" && Number.isFinite(existing) && existing >= 0) {
+        this.data.reqCountToday = existing;
+      } else {
+        this.data.reqDailyCounts[this.data.reqCountDate] = this.data.reqCountToday;
+      }
+      this.compactRequestHistory(this.data.reqCountDate);
+    }
 
     if (Array.isArray(this.data.pendingBatches)) {
       this.data.pendingBatches = this.data.pendingBatches
@@ -1221,6 +1254,42 @@ export class DownloadsDurable {
       
       // hardRemoteOff is NOT reset automatically here.
     }
+
+    if (!this.d.reqDailyCounts || typeof this.d.reqDailyCounts !== "object") {
+      this.d.reqDailyCounts = {};
+    }
+
+    const todayCount = this.d.reqDailyCounts[today];
+    if (typeof todayCount === "number" && Number.isFinite(todayCount) && todayCount >= 0) {
+      this.d.reqCountToday = todayCount;
+    } else {
+      this.d.reqDailyCounts[today] = this.d.reqCountToday;
+    }
+
+    this.compactRequestHistory(today);
+  }
+
+  private compactRequestHistory(today: string): void {
+    const cutoff = shiftUtcDateByDays(today, -(REQUEST_HISTORY_DAYS - 1));
+    if (!cutoff) return;
+    for (const key of Object.keys(this.d.reqDailyCounts)) {
+      if (key < cutoff) {
+        delete this.d.reqDailyCounts[key];
+      }
+    }
+  }
+
+  private sumRecentRequestHistory(days: number): number {
+    if (days <= 0) return 0;
+    this.ensureRequestDay();
+    const today = this.d.reqCountDate || todayUtcDate();
+    let total = 0;
+    for (let i = 0; i < days; i += 1) {
+      const dateKey = shiftUtcDateByDays(today, -i);
+      if (!dateKey) break;
+      total += this.d.reqDailyCounts[dateKey] ?? 0;
+    }
+    return total;
   }
 
   private getClientIp(request: Request): string {
@@ -1422,7 +1491,10 @@ export class DownloadsDurable {
   private async handleTrack(request: Request): Promise<Response> {
     // Update daily request counters (for dashboard monitoring only)
     this.ensureRequestDay();
-    this.d.reqCountToday += 1;
+    const today = this.d.reqCountDate || todayUtcDate();
+    const nextReqCount = (this.d.reqDailyCounts[today] ?? this.d.reqCountToday ?? 0) + 1;
+    this.d.reqCountToday = nextReqCount;
+    this.d.reqDailyCounts[today] = nextReqCount;
 
     const now = Date.now();
     const clientIp = this.getClientIp(request);
@@ -1838,6 +1910,12 @@ export class DownloadsDurable {
       maxSize: remoteConfig.maxBufferSize,
       utilizationPercent: ((this.d.buffer?.length ?? 0) / remoteConfig.maxBufferSize * 100).toFixed(2),
     };
+    const weeklyRequests = this.sumRecentRequestHistory(7);
+    const monthlyRequests = this.sumRecentRequestHistory(30);
+    const uniqueCountriesAllTime = Object.keys(this.d.counters?.byCountry ?? {}).filter((country) => {
+      const normalized = country.trim().toLowerCase();
+      return normalized !== "" && normalized !== "xx" && normalized !== "unknown";
+    }).length;
 
     const payload = {
       ok: true,
@@ -1865,6 +1943,9 @@ export class DownloadsDurable {
       uniqueRequestsToday: this.d.uniqueRequestsToday ?? 0,
       // BACKWARDS COMPATIBILITY: Legacy dashboard uses uniqueIpsToday
       uniqueIpsToday: this.d.uniqueRequestsToday ?? 0,
+      weeklyRequests,
+      monthlyRequests,
+      uniqueCountriesAllTime,
       // IP tracking disabled -> unique counts are not approximated
       isApproximated: false,
       
@@ -2192,6 +2273,7 @@ export class DownloadsDurable {
       retryState: { ...DEFAULT_RETRY_STATE },
       reqCountToday: 0,
       reqCountDate: today,
+      reqDailyCounts: { [today]: 0 },
       hardRemoteOff: false,
       buffer: [],
       batchSeq: 0,
