@@ -1121,7 +1121,11 @@ export default {
       pathname === "/admin/restore-power" ||
       pathname === "/admin/full-sync" ||
       pathname === "/admin/update-config" ||
-      pathname === "/admin/ip-allowlist"
+      pathname === "/admin/ip-allowlist" ||
+      pathname === "/admin/website/status" ||
+      pathname === "/admin/website/flush-now" ||
+      pathname === "/admin/website/override" ||
+      pathname === "/admin/website/refresh-toggle"
     ) {
       return handleProtectedAdminEndpoint(request, env);
     }
