@@ -4,11 +4,11 @@
   import '../app.css';
 
   const nav = [
-    { href: '/', label: 'Overview' },
+    { href: '/', label: 'Home' },
     { href: '/map', label: 'Global Map' },
-    { href: '/changelog', label: 'Changelog' },
+    { href: '/changelog', label: "What's New" },
     { href: '/privacy', label: 'Privacy' },
-    { href: '/uninstall', label: 'Uninstall' }
+    { href: '/uninstall', label: 'Feedback' }
   ];
 </script>
 
@@ -19,7 +19,7 @@
         <img src={logo} alt="Classroom Quick Downloader logo" class="brand-logo" />
         <span class="brand-text">
           <strong>Classroom Quick Downloader</strong>
-          <small>Fast downloads for Google Classroom</small>
+          <small>Made for students, teachers, and faster workflows</small>
         </span>
       </a>
       <nav class="site-nav" aria-label="Primary">
