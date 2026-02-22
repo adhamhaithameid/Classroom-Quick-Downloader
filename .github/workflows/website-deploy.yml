@@ -37,6 +37,9 @@ jobs:
             exit 1
           fi
 
+      - name: Show deploy target
+        run: echo "Deploying Cloudflare Pages project: ${{ vars.CLOUDFLARE_PAGES_PROJECT_NAME }}"
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v3
         with:
