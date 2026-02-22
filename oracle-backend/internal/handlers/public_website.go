@@ -406,7 +406,7 @@ func PublicWebsiteUninstallHandler(sqliteDB *sql.DB) http.HandlerFunc {
 				clean.Notes,
 				origin,
 				now,
-			)
+			) // #nosec G701 -- static INSERT with placeholders and bound parameters.
 			if err != nil {
 				http.Error(w, "failed to save feedback", http.StatusInternalServerError)
 				return
@@ -737,7 +737,7 @@ func derivePublicWorkerHealth(snapshot *summaryDOStateInfo) string {
 
 func loadPublicLiveSinceUTC(ctx context.Context, sqliteDB *sql.DB) (*int64, error) {
 	var firstIngest sql.NullInt64
-	if err := sqliteDB.QueryRowContext(ctx, `SELECT MIN(ingested_at) FROM batches`).Scan(&firstIngest); err != nil {
+	if err := sqliteDB.QueryRowContext(ctx, `SELECT MIN(ingested_at) FROM batches`).Scan(&firstIngest); err != nil { // #nosec G701 -- static aggregate query with no user input.
 		return nil, err
 	}
 	if !firstIngest.Valid || firstIngest.Int64 <= 0 {
@@ -753,7 +753,7 @@ func loadPublicWebsiteUninstallStats(ctx context.Context, sqliteDB *sql.DB) (pub
 	if err := sqliteDB.QueryRowContext(
 		ctx,
 		`SELECT COUNT(*), MAX(created_at) FROM website_uninstall_feedback`,
-	).Scan(&stats.TotalSubmissions, &lastSubmitted); err != nil {
+	).Scan(&stats.TotalSubmissions, &lastSubmitted); err != nil { // #nosec G701 -- static aggregate query with no dynamic SQL segments.
 		return publicWebsiteUninstallStats{}, err
 	}
 	if lastSubmitted.Valid && lastSubmitted.Int64 > 0 {
@@ -768,7 +768,7 @@ func loadPublicWebsiteUninstallStats(ctx context.Context, sqliteDB *sql.DB) (pub
 		 GROUP BY reason
 		 ORDER BY c DESC, reason ASC
 		 LIMIT 8`,
-	)
+	) // #nosec G701 -- static reporting query with no user-provided SQL fragments.
 	if err != nil {
 		return publicWebsiteUninstallStats{}, err
 	}
@@ -948,7 +948,7 @@ func fetchLatestGitHubVersion(ctx context.Context) (*string, error) {
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
 
-	res, err := http.DefaultClient.Do(req)
+	res, err := http.DefaultClient.Do(req) // #nosec G107,G704 -- fixed GitHub API host with bounded timeout and static path pattern.
 	if err != nil {
 		return nil, err
 	}
