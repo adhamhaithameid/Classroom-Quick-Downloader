@@ -54,6 +54,7 @@ pnpm -C website preview
 Preview URL:
 
 - `http://localhost:4173`
+- `pnpm -C website dev:pages` can emulate the built output through Wrangler Pages locally.
 
 ## Cloudflare Pages Deployment
 
