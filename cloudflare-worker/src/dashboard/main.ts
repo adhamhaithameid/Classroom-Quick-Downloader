@@ -3850,6 +3850,55 @@ export function renderDashboard(stats: StatsResponse): string {
               Last sync: ${ageLastFlush}
             </div>
           </div>
+          
+          <!-- Website Sync Card -->
+          <div class="info-card" style="padding: 20px; background: var(--bg-surface); border-radius: var(--radius); border: 1px solid var(--border);">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+              <span style="font-size: 1.2rem;">🌐</span>
+              <div style="font-weight: 600; color: var(--text-primary);">Website Sync</div>
+            </div>
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 14px;">
+              Manage public website metrics snapshot and website-control actions.
+            </div>
+            <div style="display:flex; flex-direction:column; gap:10px; margin-bottom: 12px;">
+              <div style="display:flex; justify-content:space-between; gap:10px; font-size:0.78rem;">
+                <span style="color: var(--text-muted);">Last Batch Slot</span>
+                <strong id="website-last-batch-slot" style="color:var(--text-primary);">—</strong>
+              </div>
+              <div style="display:flex; justify-content:space-between; gap:10px; font-size:0.78rem;">
+                <span style="color: var(--text-muted);">Last Refresh (UTC)</span>
+                <strong id="website-last-refresh-at" style="color:var(--text-primary);">—</strong>
+              </div>
+              <div style="display:flex; justify-content:space-between; gap:10px; font-size:0.78rem;">
+                <span style="color: var(--text-muted);">Refresh Mode</span>
+                <strong id="website-refresh-mode" style="color:var(--text-primary);">—</strong>
+              </div>
+              <div style="display:flex; justify-content:space-between; gap:10px; font-size:0.78rem;">
+                <span style="color: var(--text-muted);">Last Manual Flush (UTC)</span>
+                <strong id="website-last-manual-flush" style="color:var(--text-primary);">—</strong>
+              </div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:8px; margin-bottom: 10px;">
+              <label style="display:flex; align-items:center; gap:8px; font-size:0.78rem; color:var(--text-secondary);">
+                <input id="website-refresh-enabled" type="checkbox" checked />
+                Enable scheduled website refreshes
+              </label>
+              <label style="display:flex; align-items:center; gap:8px; font-size:0.78rem; color:var(--text-secondary);">
+                <input id="website-override-enabled" type="checkbox" />
+                Enable public website override
+              </label>
+              <input id="website-override-downloads" type="number" min="0" placeholder="Override total downloads" style="width:100%; padding:8px 10px; background: var(--bg-elevated); border:1px solid var(--border); color:var(--text-primary); border-radius:8px; font-size:0.8rem;" />
+              <textarea id="website-override-countries" placeholder='Override countries JSON [{"countryCode":"US","count":123}]' style="width:100%; min-height:84px; padding:8px 10px; resize:vertical; background: var(--bg-elevated); border:1px solid var(--border); color:var(--text-primary); border-radius:8px; font-size:0.78rem;"></textarea>
+            </div>
+            <div style="display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px;">
+              <button id="btn-website-status-refresh" class="btn" style="justify-content:center; padding: 8px 10px; font-size:0.78rem;">Refresh State</button>
+              <button id="btn-website-flush-now" class="btn" style="justify-content:center; padding: 8px 10px; font-size:0.78rem;">Flush Data Now</button>
+              <button id="btn-website-refresh-toggle" class="btn" style="justify-content:center; padding: 8px 10px; font-size:0.78rem;">Save Refresh Toggle</button>
+              <button id="btn-website-override-save" class="btn" style="justify-content:center; padding: 8px 10px; font-size:0.78rem;">Save Override</button>
+            </div>
+            <pre id="website-admin-output" class="code-block code-block-large" style="margin-top:10px; max-height:180px; overflow:auto;">{"status":"idle"}</pre>
+          </div>
+        </div>
       </section>
 
       <!-- Admin Controls / Danger Zone -->
@@ -6061,6 +6110,175 @@ export function renderDashboard(stats: StatsResponse): string {
           .catch(() => showToast('Network error', 'error'))
           .finally(() => { if (btn) btn.disabled = false; });
       });
+
+      function setWebsiteAdminOutput(payload) {
+        const out = document.getElementById('website-admin-output');
+        if (!out) return;
+        out.textContent = JSON.stringify(payload || {}, null, 2);
+      }
+
+      function normalizeWebsiteCountriesFromInput(raw) {
+        const text = String(raw || '').trim();
+        if (!text) return { ok: true, countries: [] };
+        let parsed;
+        try {
+          parsed = JSON.parse(text);
+        } catch (_) {
+          return { ok: false, error: 'Invalid countries JSON.' };
+        }
+        if (!Array.isArray(parsed)) {
+          return { ok: false, error: 'Countries must be a JSON array.' };
+        }
+        const out = [];
+        parsed.forEach((row) => {
+          if (!row || typeof row !== 'object') return;
+          const code = String(row.countryCode || '').trim().toUpperCase();
+          if (!/^[A-Z]{2}$/.test(code)) return;
+          if (code === 'XX' || code === 'ZZ' || code === 'UN' || code === 'EU') return;
+          const count = Number(row.count || 0);
+          if (!Number.isFinite(count) || count <= 0) return;
+          out.push({ countryCode: code, count: Math.floor(count) });
+        });
+        return { ok: true, countries: out };
+      }
+
+      function applyWebsiteStatus(payload) {
+        const website = payload && payload.website ? payload.website : {};
+        const snapshot = payload && payload.publicSnapshot ? payload.publicSnapshot : {};
+        const totals = snapshot && snapshot.totals ? snapshot.totals : {};
+        const refreshHours = Array.isArray(website.refreshHoursUtc) ? website.refreshHoursUtc.join(', ') : '3,6,9,12,15,18,21';
+
+        const setText = (id, value) => {
+          const node = document.getElementById(id);
+          if (node) node.textContent = value;
+        };
+
+        setText('website-last-batch-slot', snapshot.snapshotAtUtc ? new Date(snapshot.snapshotAtUtc).toISOString().slice(0, 13) + ':00 UTC' : '—');
+        setText('website-last-refresh-at', snapshot.snapshotAtUtc ? formatTs(snapshot.snapshotAtUtc) : '—');
+        setText('website-refresh-mode', website.refreshEnabled ? ('AUTO (' + refreshHours + ')') : 'MANUAL ONLY');
+        setText('website-last-manual-flush', website.lastManualFlushAtUtc ? formatTs(website.lastManualFlushAtUtc) : '—');
+
+        const refreshEnabled = document.getElementById('website-refresh-enabled');
+        if (refreshEnabled) {
+          refreshEnabled.checked = !!website.refreshEnabled;
+        }
+        const overrideEnabled = document.getElementById('website-override-enabled');
+        if (overrideEnabled) {
+          overrideEnabled.checked = !!website.overrideEnabled;
+        }
+        const overrideDownloads = document.getElementById('website-override-downloads');
+        if (overrideDownloads && document.activeElement !== overrideDownloads) {
+          overrideDownloads.value = String(Number(website.overrideDownloads || totals.downloads || 0));
+        }
+        const overrideCountries = document.getElementById('website-override-countries');
+        if (overrideCountries && document.activeElement !== overrideCountries) {
+          overrideCountries.value = JSON.stringify(website.overrideCountries || snapshot.countries || [], null, 2);
+        }
+      }
+
+      function fetchWebsiteStatus() {
+        fetch('/admin/website/status', { method: 'GET', credentials: 'same-origin' })
+          .then(r => r.json())
+          .then((data) => {
+            if (!data || !data.ok) {
+              setWebsiteAdminOutput(data || { ok: false, error: 'failed_to_load_status' });
+              return;
+            }
+            applyWebsiteStatus(data);
+            setWebsiteAdminOutput(data);
+          })
+          .catch(() => setWebsiteAdminOutput({ ok: false, error: 'network_error' }));
+      }
+
+      bind('btn-website-status-refresh', () => {
+        fetchWebsiteStatus();
+      });
+
+      bind('btn-website-flush-now', () => {
+        const btn = document.getElementById('btn-website-flush-now');
+        if (btn) btn.disabled = true;
+        fetch('/admin/website/flush-now', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        })
+          .then(r => r.json())
+          .then((data) => {
+            setWebsiteAdminOutput(data);
+            if (data && data.ok) {
+              showToast('Website data flushed.', 'success');
+              fetchWebsiteStatus();
+            } else {
+              showToast('Flush failed.', 'error');
+            }
+          })
+          .catch(() => showToast('Network error', 'error'))
+          .finally(() => { if (btn) btn.disabled = false; });
+      });
+
+      bind('btn-website-refresh-toggle', () => {
+        const btn = document.getElementById('btn-website-refresh-toggle');
+        const checkbox = document.getElementById('website-refresh-enabled');
+        const enabled = !!(checkbox && checkbox.checked);
+        if (btn) btn.disabled = true;
+        fetch('/admin/website/refresh-toggle', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled }),
+        })
+          .then(r => r.json())
+          .then((data) => {
+            setWebsiteAdminOutput(data);
+            if (data && data.ok) {
+              showToast('Website refresh mode updated.', 'success');
+              fetchWebsiteStatus();
+            } else {
+              showToast('Failed to update refresh mode.', 'error');
+            }
+          })
+          .catch(() => showToast('Network error', 'error'))
+          .finally(() => { if (btn) btn.disabled = false; });
+      });
+
+      bind('btn-website-override-save', () => {
+        const btn = document.getElementById('btn-website-override-save');
+        const enabled = !!(document.getElementById('website-override-enabled') && document.getElementById('website-override-enabled').checked);
+        const downloads = Number((document.getElementById('website-override-downloads') && document.getElementById('website-override-downloads').value) || 0);
+        const countriesRaw = (document.getElementById('website-override-countries') && document.getElementById('website-override-countries').value) || '';
+        const parsed = normalizeWebsiteCountriesFromInput(countriesRaw);
+        if (!parsed.ok) {
+          showToast(parsed.error || 'Invalid override payload.', 'error');
+          setWebsiteAdminOutput({ ok: false, error: parsed.error || 'invalid_override_payload' });
+          return;
+        }
+        if (btn) btn.disabled = true;
+        fetch('/admin/website/override', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            enabled,
+            downloads: Number.isFinite(downloads) && downloads > 0 ? Math.floor(downloads) : 0,
+            countries: parsed.countries,
+          }),
+        })
+          .then(r => r.json())
+          .then((data) => {
+            setWebsiteAdminOutput(data);
+            if (data && data.ok) {
+              showToast('Website override saved.', 'success');
+              fetchWebsiteStatus();
+            } else {
+              showToast('Failed to save website override.', 'error');
+            }
+          })
+          .catch(() => showToast('Network error', 'error'))
+          .finally(() => { if (btn) btn.disabled = false; });
+      });
+
+      fetchWebsiteStatus();
 
       updateLiveIndicator();
       setInterval(updateLiveIndicator, 5000);
