@@ -98,6 +98,9 @@ type DurableStateShape = {
   changelog: ChangelogEntry[];
   changelogConfig: ChangelogConfig;
 
+  // Public website metrics snapshot refreshed on a fixed UTC schedule.
+  publicSiteMetricsSnapshot: PublicSiteMetricsSnapshot | null;
+
   // =========================================================================
   // REMOTE CONFIG - Controllable from Cloudflare Dashboard
   // =========================================================================
@@ -203,6 +206,18 @@ type FailureRollupState = {
   lastTs: number;
 };
 
+type PublicSiteCountryCount = {
+  countryCode: string;
+  count: number;
+};
+
+type PublicSiteMetricsSnapshot = {
+  slotKey: string;
+  snapshotAtUtc: number;
+  downloads: number;
+  countries: PublicSiteCountryCount[];
+};
+
 const DEFAULT_RETRY_STATE: RetryState = {
   consecutiveFailures: 0,
 };
@@ -281,12 +296,57 @@ const TRACK_RATE_LIMIT_PER_MIN = 120;
 const TRACK_RATE_PRUNE_AFTER_MIN = 10;
 const TRACK_RATE_MAX_KEYS = 5000;
 const REQUEST_HISTORY_DAYS = 400;
+const PUBLIC_SITE_METRICS_REFRESH_HOURS_UTC = [3, 6, 9, 12, 15, 18, 21] as const;
+const ISO_ALPHA2_PATTERN = /^[A-Z]{2}$/;
 
 // Storage key inside DO storage
 const STORAGE_KEY = "analytics_state";
 
 function todayUtcDate(): string {
   return new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+}
+
+function currentUtcHour(ts: number): number {
+  return new Date(ts).getUTCHours();
+}
+
+function makeSlotKey(ts: number): string {
+  const now = new Date(ts);
+  const year = now.getUTCFullYear();
+  const month = String(now.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(now.getUTCDate()).padStart(2, "0");
+  const hour = String(now.getUTCHours()).padStart(2, "0");
+  return `${year}-${month}-${day}T${hour}`;
+}
+
+function normalizePublicCountryCode(input: string): string | null {
+  const normalized = input.trim().toUpperCase();
+  if (!ISO_ALPHA2_PATTERN.test(normalized)) return null;
+  if (normalized === "XX" || normalized === "ZZ") return null;
+  if (normalized === "UN" || normalized === "EU") return null;
+  return normalized;
+}
+
+function normalizeCountryCountsForPublicMap(
+  byCountry: Record<string, number> | undefined,
+): PublicSiteCountryCount[] {
+  if (!byCountry || typeof byCountry !== "object") return [];
+
+  const merged = new Map<string, number>();
+  for (const [rawCountry, rawCount] of Object.entries(byCountry)) {
+    const count = clampInt(rawCount, 0, Number.MAX_SAFE_INTEGER, 0);
+    if (count <= 0) continue;
+    const code = normalizePublicCountryCode(rawCountry);
+    if (!code) continue;
+    merged.set(code, (merged.get(code) ?? 0) + count);
+  }
+
+  const countries = [...merged.entries()].map(([countryCode, count]) => ({ countryCode, count }));
+  countries.sort((a, b) => {
+    if (a.count === b.count) return a.countryCode.localeCompare(b.countryCode);
+    return b.count - a.count;
+  });
+  return countries;
 }
 
 function shiftUtcDateByDays(dateKey: string, deltaDays: number): string | null {
@@ -796,6 +856,7 @@ export class DownloadsDurable {
         rules: [],
         lastUpdated: Date.now(),
       },
+      publicSiteMetricsSnapshot: null,
 
       lastHealthStatus: "ok",
       lastHealthNotifyAt: null,
@@ -947,6 +1008,31 @@ export class DownloadsDurable {
 
       changelog: Array.isArray(stored.changelog) ? stored.changelog : base.changelog,
       changelogConfig: stored.changelogConfig ?? base.changelogConfig,
+      publicSiteMetricsSnapshot: (() => {
+        const snapshot = (stored as unknown as Record<string, unknown>).publicSiteMetricsSnapshot;
+        if (!isPlainObject(snapshot)) return null;
+        const countriesRaw = Array.isArray(snapshot.countries) ? snapshot.countries : [];
+        const countries = countriesRaw
+          .filter((entry) => isPlainObject(entry))
+          .map((entry) => {
+            const row = entry as Record<string, unknown>;
+            return {
+              countryCode: normalizePublicCountryCode(typeof row.countryCode === "string" ? row.countryCode : "") ?? "",
+              count: clampInt(row.count, 0, Number.MAX_SAFE_INTEGER, 0),
+            };
+          })
+          .filter((entry) => entry.countryCode !== "" && entry.count > 0);
+        countries.sort((a, b) => {
+          if (a.count === b.count) return a.countryCode.localeCompare(b.countryCode);
+          return b.count - a.count;
+        });
+
+        const snapshotAtUtc = clampInt(snapshot.snapshotAtUtc, 0, Number.MAX_SAFE_INTEGER, 0);
+        const slotKey = typeof snapshot.slotKey === "string" ? snapshot.slotKey.slice(0, 32) : "";
+        const downloads = clampInt(snapshot.downloads, 0, Number.MAX_SAFE_INTEGER, 0);
+        if (!slotKey || snapshotAtUtc <= 0) return null;
+        return { slotKey, snapshotAtUtc, downloads, countries };
+      })(),
 
       lastHealthStatus: stored.lastHealthStatus ?? base.lastHealthStatus,
       lastHealthNotifyAt: stored.lastHealthNotifyAt ?? base.lastHealthNotifyAt,
@@ -1406,6 +1492,10 @@ export class DownloadsDurable {
       return this.handleGetChangelog();
     }
 
+    if (pathname === "/public/site-metrics" && request.method === "GET") {
+      return this.handlePublicSiteMetrics();
+    }
+
     // Admin Changelog Update
     if (pathname === "/admin/changelog" && request.method === "POST") {
       return this.handleAdminUpdateChangelog(request);
@@ -1846,6 +1936,78 @@ export class DownloadsDurable {
     }, { status: 202 });
   }
 
+  private computeNextPublicMetricsRefreshAt(now: number): number {
+    const sortedHours = [...PUBLIC_SITE_METRICS_REFRESH_HOURS_UTC].sort((a, b) => a - b);
+    const current = new Date(now);
+    for (const hour of sortedHours) {
+      const candidate = new Date(current);
+      candidate.setUTCHours(hour, 0, 0, 0);
+      if (candidate.getTime() > now) {
+        return candidate.getTime();
+      }
+    }
+
+    const nextDay = new Date(current);
+    nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+    nextDay.setUTCHours(sortedHours[0], 0, 0, 0);
+    return nextDay.getTime();
+  }
+
+  private buildPublicSiteMetricsSnapshot(now: number, slotKey: string): PublicSiteMetricsSnapshot {
+    return {
+      slotKey,
+      snapshotAtUtc: now,
+      downloads: clampInt(this.d.totalDownloads, 0, Number.MAX_SAFE_INTEGER, 0),
+      countries: normalizeCountryCountsForPublicMap(this.d.counters?.byCountry),
+    };
+  }
+
+  private shouldRefreshPublicSiteSnapshot(now: number, currentSlotKey: string): boolean {
+    const snapshot = this.d.publicSiteMetricsSnapshot;
+    if (!snapshot) return true;
+
+    const hour = currentUtcHour(now);
+    const refreshHour = PUBLIC_SITE_METRICS_REFRESH_HOURS_UTC.includes(hour as (typeof PUBLIC_SITE_METRICS_REFRESH_HOURS_UTC)[number]);
+    if (!refreshHour) {
+      return false;
+    }
+
+    return snapshot.slotKey !== currentSlotKey;
+  }
+
+  private async handlePublicSiteMetrics(): Promise<Response> {
+    const now = Date.now();
+    const slotKey = makeSlotKey(now);
+
+    if (this.shouldRefreshPublicSiteSnapshot(now, slotKey)) {
+      this.d.publicSiteMetricsSnapshot = this.buildPublicSiteMetricsSnapshot(now, slotKey);
+      await this.persist();
+    }
+
+    const snapshot = this.d.publicSiteMetricsSnapshot ?? this.buildPublicSiteMetricsSnapshot(now, slotKey);
+    const activeHour = currentUtcHour(now);
+    const isRefreshWindow = PUBLIC_SITE_METRICS_REFRESH_HOURS_UTC.includes(activeHour as (typeof PUBLIC_SITE_METRICS_REFRESH_HOURS_UTC)[number]);
+
+    return json({
+      ok: true,
+      source: "cloudflare-worker",
+      generatedAt: now,
+      snapshotAtUtc: snapshot.snapshotAtUtc,
+      totals: {
+        downloads: snapshot.downloads,
+        countries: snapshot.countries.length,
+      },
+      countries: snapshot.countries,
+      schedule: {
+        refreshHoursUtc: PUBLIC_SITE_METRICS_REFRESH_HOURS_UTC,
+        activeHourUtc: activeHour,
+        isRefreshWindow,
+        lastRefreshAtUtc: snapshot.snapshotAtUtc,
+        nextRefreshAtUtc: this.computeNextPublicMetricsRefreshAt(now),
+      },
+    });
+  }
+
   private async handleStats(): Promise<Response> {
     this.ensureRequestDay();
     const quota = computeQuotaDescriptor(
@@ -2258,6 +2420,7 @@ export class DownloadsDurable {
         showNotification: false,
         lastUpdated: Date.now(),
       },
+      publicSiteMetricsSnapshot: this.d.publicSiteMetricsSnapshot ?? null,
     };
     
     this.data = {
