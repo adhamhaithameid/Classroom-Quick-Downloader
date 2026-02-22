@@ -1,16 +1,24 @@
 # Classroom Quick Downloader Website
 
-Public, multi-page SvelteKit website for Classroom Quick Downloader.
+Public multi-page SvelteKit website for Classroom Quick Downloader users.
 
-This package is static (`@sveltejs/adapter-static`) and deploys to GitHub Pages.
+This package is static (`@sveltejs/adapter-static`) and deploys to Cloudflare Pages.
 
 ## What This Website Includes
 
-- Landing page (`/`) for users
-- Privacy page (`/privacy`)
-- Uninstall page (`/uninstall`)
-- Global map page (`/map`) with country-level aggregation
-- Changelog page (`/changelog`)
+- Landing page (`/`) for users with live public metrics
+- User changelog page (`/changelog`) from Oracle public API
+- User privacy page (`/privacy`) from Oracle public API
+- Uninstall feedback page (`/uninstall`) posting directly to Oracle
+- Global map (`/map`) with country-level aggregate usage
+
+## Data Source Schedule (UTC)
+
+- Worker metrics refresh windows: `03:00`, `06:00`, `09:00`, `12:00`, `15:00`, `18:00`, `21:00`
+- Oracle metrics window: `21:00` through `02:59`
+- Primary Oracle refresh target hour: `01:00`
+
+`Total Downloads` and map country counts follow the schedule above.
 
 ## Requirements
 
@@ -21,86 +29,50 @@ This package is static (`@sveltejs/adapter-static`) and deploys to GitHub Pages.
 ## Quick Start (From Repo Root)
 
 ```bash
+cd /Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader
 pnpm install
-pnpm -C website dev
+PUBLIC_ORACLE_API_BASE_URL=http://127.0.0.1:8080 PUBLIC_WORKER_BASE_URL=http://127.0.0.1:8787 pnpm -C website dev
 ```
 
-Then open:
+Open:
 
 - `http://localhost:5173`
 
-## Manual Local Testing Commands
-
-### 1) Typecheck
+## Local Validation Commands
 
 ```bash
 pnpm -C website check
-```
-
-### 2) Unit tests
-
-```bash
 pnpm -C website test:unit
-```
-
-### 3) Integration tests
-
-```bash
 pnpm -C website test:integration
-```
-
-### 4) Acceptance tests
-
-```bash
 pnpm -C website test:acceptance
-```
-
-### 5) Production build (default local base path)
-
-```bash
+pnpm -C website test:component
+pnpm -C website test:system
 pnpm -C website build
-```
-
-### 6) Preview production output
-
-```bash
 pnpm -C website preview
 ```
 
-Then open:
+Preview URL:
 
 - `http://localhost:4173`
 
-## Testing GitHub Pages Base Path Locally
+## Cloudflare Pages Deployment
 
-GitHub Pages serves this repo under:
+Workflow file:
 
-- `/Classroom-Quick-Downloader`
+- `.github/workflows/website-deploy.yml`
 
-To emulate this behavior locally during build:
+Required GitHub repository configuration:
 
-```bash
-PUBLIC_BASE_PATH=/Classroom-Quick-Downloader pnpm -C website build
-pnpm -C website preview
-```
+- Variable: `CLOUDFLARE_PAGES_PROJECT_NAME`
+- Variable: `PUBLIC_ORACLE_API_BASE_URL`
+- Variable: `PUBLIC_WORKER_BASE_URL`
+- Variable: `PUBLIC_SITE_URL`
+- Secret: `CLOUDFLARE_API_TOKEN`
+- Secret: `CLOUDFLARE_ACCOUNT_ID`
 
 ## Runtime Environment Variables
 
-- `PUBLIC_BASE_PATH`
-  - Base path for SvelteKit routes/assets.
-  - Empty in local dev.
-  - Set to `/${REPO_NAME}` in GitHub Pages deploy.
-- `PUBLIC_ORACLE_API_BASE_URL`
-  - Oracle backend base URL for public website API.
-  - Defaults to `http://localhost:8080` for local development.
-- `PUBLIC_WORKER_BASE_URL`
-  - Cloudflare Worker base URL for changelog feed.
-- `PUBLIC_SITE_URL`
-  - Canonical public site URL used for links.
-
-## Notes
-
-- This website intentionally consumes sanitized public endpoints.
-- Country map is aggregate-only; no raw IP data is shown.
-- `/changelog` is rendered directly from repository `CHANGELOG.md`.
-- `/privacy` is rendered directly from repository `PRIVACY.md`.
+- `PUBLIC_ORACLE_API_BASE_URL`: Oracle public API base URL
+- `PUBLIC_WORKER_BASE_URL`: Cloudflare Worker base URL
+- `PUBLIC_SITE_URL`: canonical public website URL
+- `PUBLIC_BASE_PATH`: keep empty for Cloudflare Pages root deployment
