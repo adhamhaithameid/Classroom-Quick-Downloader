@@ -219,6 +219,95 @@ describe("Worker auth config hardening", () => {
     expect(res.headers.get("Access-Control-Allow-Headers")).not.toContain("X-Admin-Secret");
   });
 
+  it("serves public site metrics with wildcard CORS", async () => {
+    const stub = {
+      fetch: async (input: RequestInfo) => {
+        const url = typeof input === "string" ? input : input instanceof Request ? input.url : "";
+        if (url.includes("/public/site-metrics")) {
+          return new Response(
+            JSON.stringify({
+              ok: true,
+              source: "cloudflare-worker",
+              generatedAt: 1771700000000,
+              snapshotAtUtc: 1771699200000,
+              totals: { downloads: 1200, countries: 2 },
+              countries: [
+                { countryCode: "US", count: 700 },
+                { countryCode: "GB", count: 500 },
+              ],
+              schedule: {
+                refreshHoursUtc: [3, 6, 9, 12, 15, 18, 21],
+                activeHourUtc: 12,
+                isRefreshWindow: true,
+                lastRefreshAtUtc: 1771699200000,
+                nextRefreshAtUtc: 1771702800000,
+              },
+            }),
+            {
+              status: 200,
+              headers: { "content-type": "application/json" },
+            },
+          );
+        }
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      },
+    };
+    const namespace = {
+      idFromName: (_name: string) => "downloads-id",
+      get: (_id: string) => stub,
+    };
+    const env = mockEnv({ DOWNLOADS_DO: namespace as unknown as DurableObjectNamespace });
+    const request = new Request("https://example.com/public/site-metrics", {
+      method: "GET",
+      headers: {
+        Origin: "https://evil.example",
+      },
+    });
+
+    const res = await worker.fetch(request, env, {} as ExecutionContext);
+    const payload = await res.json() as { totals?: { downloads?: number } };
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    expect(payload.totals?.downloads).toBe(1200);
+  });
+
+  it("returns 502 when public site metrics upstream is unavailable", async () => {
+    const stub = {
+      fetch: async (input: RequestInfo) => {
+        const url = typeof input === "string" ? input : input instanceof Request ? input.url : "";
+        if (url.includes("/public/site-metrics")) {
+          throw new Error("do-offline");
+        }
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      },
+    };
+    const namespace = {
+      idFromName: (_name: string) => "downloads-id",
+      get: (_id: string) => stub,
+    };
+    const env = mockEnv({ DOWNLOADS_DO: namespace as unknown as DurableObjectNamespace });
+    const request = new Request("https://example.com/public/site-metrics", {
+      method: "GET",
+      headers: {
+        Origin: "https://any.example",
+      },
+    });
+
+    const res = await worker.fetch(request, env, {} as ExecutionContext);
+    const payload = await res.json() as { ok?: boolean; error?: string };
+    expect(res.status).toBe(502);
+    expect(payload.ok).toBe(false);
+    expect(payload.error).toBe("upstream_unavailable");
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+  });
+
   it("does not emit CORS origin for protected requests without Origin header", async () => {
     const env = mockEnv();
     const request = new Request("https://example.com/stats", {
