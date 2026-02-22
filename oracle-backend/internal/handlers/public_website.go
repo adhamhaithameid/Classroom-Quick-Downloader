@@ -234,26 +234,35 @@ func PublicWebsiteMapHandler(sqliteDB *sql.DB) http.HandlerFunc {
 			http.Error(w, "failed to load totals", http.StatusInternalServerError)
 			return
 		}
+
+		downloads := rawTotals["totalDownloads"]
 		countries := make([]publicWebsiteCountryCell, 0, len(rawTotals))
-		for key, value := range rawTotals {
-			if !strings.HasPrefix(key, "country:") || value <= 0 {
-				continue
+
+		published, publishedErr := loadWebsitePublishedDataset(r.Context(), sqliteDB)
+		if publishedErr == nil && published.Active {
+			downloads = maxInt64(published.Downloads, 0)
+			countries = normalizeWebsiteCountryCells(published.Countries, 300)
+		} else {
+			for key, value := range rawTotals {
+				if !strings.HasPrefix(key, "country:") || value <= 0 {
+					continue
+				}
+				code := strings.ToUpper(strings.TrimSpace(strings.TrimPrefix(key, "country:")))
+				if code == "XX" || code == "UNKNOWN" || !isoCountryCodePattern.MatchString(code) {
+					continue
+				}
+				countries = append(countries, publicWebsiteCountryCell{
+					CountryCode: code,
+					Count:       value,
+				})
 			}
-			code := strings.ToUpper(strings.TrimSpace(strings.TrimPrefix(key, "country:")))
-			if code == "XX" || code == "UNKNOWN" || !isoCountryCodePattern.MatchString(code) {
-				continue
-			}
-			countries = append(countries, publicWebsiteCountryCell{
-				CountryCode: code,
-				Count:       value,
+			sort.Slice(countries, func(i, j int) bool {
+				if countries[i].Count == countries[j].Count {
+					return countries[i].CountryCode < countries[j].CountryCode
+				}
+				return countries[i].Count > countries[j].Count
 			})
 		}
-		sort.Slice(countries, func(i, j int) bool {
-			if countries[i].Count == countries[j].Count {
-				return countries[i].CountryCode < countries[j].CountryCode
-			}
-			return countries[i].Count > countries[j].Count
-		})
 
 		payload := publicWebsiteMapResponse{
 			OK:          true,
@@ -262,7 +271,7 @@ func PublicWebsiteMapHandler(sqliteDB *sql.DB) http.HandlerFunc {
 			Countries:   countries,
 			Totals: publicWebsiteMapTotals{
 				Countries: len(countries),
-				Downloads: rawTotals["totalDownloads"],
+				Downloads: downloads,
 			},
 			PrivacyNote: "Country-level usage is aggregated without storing raw IP addresses. VPN/proxy users may appear at exit-node locations.",
 		}
@@ -404,6 +413,19 @@ func PublicWebsiteUninstallHandler(sqliteDB *sql.DB) http.HandlerFunc {
 			}
 
 			submissionID, _ := res.LastInsertId()
+			if err := RecordWebsiteToOracleBatch(
+				r.Context(),
+				sqliteDB,
+				submissionID,
+				clean.Browser,
+				clean.Version,
+				clean.Source,
+			); err != nil {
+				logEvent("warn", "website_uninstall_batch_record_failed", map[string]interface{}{
+					"error":        err.Error(),
+					"submissionId": submissionID,
+				})
+			}
 			writePublicWebsiteJSON(w, http.StatusCreated, publicWebsiteUninstallResponse{
 				OK:           true,
 				GeneratedAt:  now,
@@ -423,6 +445,11 @@ func buildPublicWebsiteOverview(ctx context.Context, sqliteDB *sql.DB, store *co
 	if err != nil {
 		return publicWebsiteOverviewResponse{}, err
 	}
+	downloads := rawTotals["totalDownloads"]
+	published, publishedErr := loadWebsitePublishedDataset(ctx, sqliteDB)
+	if publishedErr == nil && published.Active {
+		downloads = maxInt64(published.Downloads, 0)
+	}
 
 	installs, links := buildPublicWebsiteInstalls(ctx, store)
 	status, err := buildPublicWebsiteStatus(ctx, sqliteDB)
@@ -439,7 +466,7 @@ func buildPublicWebsiteOverview(ctx context.Context, sqliteDB *sql.DB, store *co
 		OK:          true,
 		GeneratedAt: time.Now().UTC().UnixMilli(),
 		Totals: publicWebsiteTotals{
-			Downloads: rawTotals["totalDownloads"],
+			Downloads: downloads,
 			Success:   rawTotals["totalSuccess"],
 			Fail:      rawTotals["totalFail"],
 		},

@@ -267,6 +267,23 @@ func TestPublicWebsiteUninstallHandler_SubmitsAndAggregatesFeedback(t *testing.T
 	if !response.OK || response.SubmissionID <= 0 {
 		t.Fatalf("unexpected submit response: %+v", response)
 	}
+	var websiteToOracleCount int64
+	if err := sqlDB.QueryRow(
+		`SELECT COUNT(*) FROM website_sync_batches WHERE direction = ?`,
+		websiteSyncDirectionWebsiteToOracle,
+	).Scan(&websiteToOracleCount); err != nil {
+		t.Fatalf("query website_sync_batches failed: %v", err)
+	}
+	if websiteToOracleCount != 1 {
+		t.Fatalf("expected one website_to_oracle sync batch, got %d", websiteToOracleCount)
+	}
+	var lastWebsiteIngest sql.NullInt64
+	if err := sqlDB.QueryRow(`SELECT last_website_ingest_at FROM website_sync_control WHERE id = 1`).Scan(&lastWebsiteIngest); err != nil {
+		t.Fatalf("query website_sync_control failed: %v", err)
+	}
+	if !lastWebsiteIngest.Valid || lastWebsiteIngest.Int64 <= 0 {
+		t.Fatalf("expected last_website_ingest_at to be set, got %+v", lastWebsiteIngest)
+	}
 
 	statsReq := httptest.NewRequest(http.MethodGet, "/api/public/website/uninstall", nil)
 	statsReq.Header.Set("Origin", "https://adhamhaithameid.github.io")
