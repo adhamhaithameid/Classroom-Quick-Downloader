@@ -49,7 +49,17 @@
               <span class="nav-item-emoji" aria-hidden="true">🎨</span>
               <span class="nav-item-label">Creative Hub</span>
             </button>
-            <button class="nav-item" data-page="logs" data-shortcut="Cmd+5"
+            <button class="nav-item" data-page="content-changelog" data-shortcut="Cmd+5"
+              data-tooltip="Manage user-facing changelog content for the public website" data-tooltip-position="bottom" aria-label="User Changelog content manager">
+              <span class="nav-item-emoji" aria-hidden="true">🗞️</span>
+              <span class="nav-item-label">User Changelog</span>
+            </button>
+            <button class="nav-item" data-page="content-privacy" data-shortcut="Cmd+6"
+              data-tooltip="Manage user-facing privacy content for the public website" data-tooltip-position="bottom" aria-label="User Privacy content manager">
+              <span class="nav-item-emoji" aria-hidden="true">🔐</span>
+              <span class="nav-item-label">User Privacy</span>
+            </button>
+            <button class="nav-item" data-page="logs" data-shortcut="Cmd+7"
               data-tooltip="Oracle backend request and admin operation logs" data-tooltip-position="bottom" aria-label="Oracle Logs — backend request and admin logs">
               <span class="nav-item-emoji" aria-hidden="true">🧾</span>
               <span class="nav-item-label">Oracle Logs</span>
@@ -127,6 +137,8 @@
               <option value="activity">Activity &amp; Charts</option>
               <option value="dashboards">Ops Hub</option>
               <option value="creative">Creative Hub</option>
+              <option value="content-changelog">User Changelog</option>
+              <option value="content-privacy">User Privacy</option>
               <option value="logs">Oracle Logs</option>
               <option value="danger">Danger Zone</option>
             </select>
@@ -670,6 +682,73 @@
                     <div id="newsletter-subscribers-list" class="creative-grid"></div>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="page" id="page-content-changelog">
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <div class="card-title">User Changelog Content</div>
+                  <div class="card-subtitle">Public release notes shown to students on the website</div>
+                </div>
+                <div class="action-buttons-grid action-buttons-grid-two">
+                  <button class="btn btn-secondary" id="user-changelog-refresh-btn">Refresh</button>
+                  <a
+                    class="btn btn-secondary"
+                    href="https://github.com/adhamhaithameid/Classroom-Quick-Downloader/blob/main/CHANGELOG.md"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >View Full on GitHub</a>
+                </div>
+              </div>
+              <div class="card-body">
+                <form class="form-grid" id="user-changelog-form">
+                  <div class="creative-grid">
+                    <input id="user-changelog-key" class="auth-input" placeholder="Record key (e.g., v1-3-6)" required />
+                    <input id="user-changelog-version" class="auth-input" placeholder="Version (e.g., 1.3.6)" required />
+                    <input id="user-changelog-title" class="auth-input" placeholder="Title (e.g., Stability improvements)" required />
+                    <input id="user-changelog-released-at" class="auth-input" placeholder="Released at UTC (ms, optional)" />
+                  </div>
+                  <textarea id="user-changelog-summary" class="auth-input auth-input-lg" placeholder="Short summary for users" required></textarea>
+                  <textarea id="user-changelog-highlights" class="auth-input auth-input-lg" placeholder="Highlights (one line per item)"></textarea>
+                  <button class="btn btn-start" type="submit">Save User Changelog Entry</button>
+                </form>
+                <div id="user-changelog-list" class="creative-grid creative-grid-spaced"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="page" id="page-content-privacy">
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <div class="card-title">User Privacy Content</div>
+                  <div class="card-subtitle">Simple privacy language displayed on the public website</div>
+                </div>
+                <div class="action-buttons-grid action-buttons-grid-two">
+                  <button class="btn btn-secondary" id="user-privacy-refresh-btn">Refresh</button>
+                  <a
+                    class="btn btn-secondary"
+                    href="https://github.com/adhamhaithameid/Classroom-Quick-Downloader/blob/main/PRIVACY.md"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >View Full on GitHub</a>
+                </div>
+              </div>
+              <div class="card-body">
+                <form class="form-grid" id="user-privacy-form">
+                  <div class="creative-grid">
+                    <input id="user-privacy-key" class="auth-input" placeholder="Record key (e.g., what-we-collect)" required />
+                    <input id="user-privacy-title" class="auth-input" placeholder="Section title" required />
+                    <input id="user-privacy-priority" class="auth-input" type="number" min="1" max="99" value="1" placeholder="Display order" />
+                  </div>
+                  <textarea id="user-privacy-summary" class="auth-input auth-input-lg" placeholder="Short explanation for users" required></textarea>
+                  <textarea id="user-privacy-bullets" class="auth-input auth-input-lg" placeholder="Bullets (one line per item)"></textarea>
+                  <button class="btn btn-start" type="submit">Save User Privacy Section</button>
+                </form>
+                <div id="user-privacy-list" class="creative-grid creative-grid-spaced"></div>
               </div>
             </div>
           </div>
