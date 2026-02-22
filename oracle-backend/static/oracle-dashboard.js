@@ -23,6 +23,8 @@
             firefoxStoreListing: 'https://addons.mozilla.org/en-US/firefox/addon/classroom-quick-downloader/',
             edgeStoreListing: 'https://microsoftedge.microsoft.com/addons/detail/classroom-quick-downloade/ecojbijjkcjdolpeoiemnccgmaeomcmn'
           };
+      const USER_CHANGELOG_RECORD_TYPE = 'website_user_changelog_entry';
+      const USER_PRIVACY_RECORD_TYPE = 'website_user_privacy_section';
 
       // Helpers
       let authInFlight = null;
@@ -1065,6 +1067,8 @@
           activity: ['activity', 'charts'],
           dashboards: ['dashboards', 'deployments', 'notifications'],
           creative: ['creative'],
+          'content-changelog': ['content-changelog'],
+          'content-privacy': ['content-privacy'],
           logs: ['logs'],
           danger: ['danger']
         };
@@ -1092,6 +1096,8 @@
           activity: { icon: '📊', label: 'Activity & Charts' },
           dashboards: { icon: '🛰️', label: 'Ops Hub' },
           creative: { icon: '🎨', label: 'Creative Hub' },
+          'content-changelog': { icon: '🗞️', label: 'User Changelog' },
+          'content-privacy': { icon: '🔐', label: 'User Privacy' },
           logs: { icon: '🧾', label: 'Oracle Logs' },
           danger: { icon: '☢️', label: 'Danger Zone' }
         };
@@ -1108,6 +1114,8 @@
           loadNotifications();
         }
         if (page === 'creative') loadCreativeHub();
+        if (page === 'content-changelog') loadUserChangelogRecords();
+        if (page === 'content-privacy') loadUserPrivacyRecords();
         if (page === 'logs') loadOracleLogs();
       }
 
@@ -1939,9 +1947,193 @@
         return v;
       }
 
-          async function loadCreativeHub() {
+      function parseMultilineList(value, maxItems, maxLen) {
+        var out = [];
+        var lines = String(value || '').split(/\r?\n/);
+        for (var i = 0; i < lines.length; i += 1) {
+          var item = (lines[i] || '').trim();
+          if (!item) continue;
+          if (item.length > maxLen) item = item.slice(0, maxLen);
+          out.push(item);
+          if (out.length >= maxItems) break;
+        }
+        return out;
+      }
+
+      async function loadCreativeHub() {
         await loadCreativeEmails();
-          await loadNewsletterSubscribers();
+        await loadNewsletterSubscribers();
+      }
+
+      async function loadUserChangelogRecords() {
+        var container = document.getElementById('user-changelog-list');
+        if (!container) return;
+        try {
+          var payload = await fetchJSON('/api/admin/records/list?type=' + encodeURIComponent(USER_CHANGELOG_RECORD_TYPE));
+          var records = payload.records || [];
+          if (!records.length) {
+            container.innerHTML = '<div class="empty-state">No user changelog entries yet.</div>';
+            return;
+          }
+
+          var html = '';
+          records.forEach(function(item) {
+            var d = item.data || {};
+            var highlights = Array.isArray(d.highlights) ? d.highlights : [];
+            html += '<div class="creative-card">';
+            html += '<h4>' + escapeHtml(d.version || item.recordKey || 'Untitled') + ' — ' + escapeHtml(d.title || 'Update') + '</h4>';
+            html += '<div class="creative-meta">Record key: ' + escapeHtml(item.recordKey || '') + '</div>';
+            html += '<div class="creative-meta">Released (UTC ms): ' + escapeHtml(String(d.releasedAtUtc || '')) + '</div>';
+            html += '<div class="creative-preview">' + escapeHtml(String(d.summary || '').slice(0, 500)) + '</div>';
+            if (highlights.length) {
+              html += '<div class="pill-row">';
+              highlights.slice(0, 4).forEach(function(point) {
+                html += '<span class="pill">' + escapeHtml(String(point)) + '</span>';
+              });
+              html += '</div>';
+            }
+            html += '<div class="inline-btn-row">';
+            html += '<button class="btn btn-danger" data-action="delete-user-changelog-record" data-record-key="' + escapeHtml(item.recordKey || '') + '">Delete</button>';
+            html += '</div>';
+            html += '</div>';
+          });
+          container.innerHTML = html;
+        } catch (e) {
+          container.innerHTML = '<div class="empty-state empty-state-danger">Failed to load user changelog entries.</div>';
+        }
+      }
+
+      async function saveUserChangelogRecord(e) {
+        e.preventDefault();
+        var key = normalizeKey(document.getElementById('user-changelog-key').value, 'release');
+        var version = (document.getElementById('user-changelog-version').value || '').trim();
+        var title = (document.getElementById('user-changelog-title').value || '').trim();
+        var summary = (document.getElementById('user-changelog-summary').value || '').trim();
+        var releasedAtRaw = (document.getElementById('user-changelog-released-at').value || '').trim();
+        var highlightsRaw = (document.getElementById('user-changelog-highlights').value || '').trim();
+        if (!version || !title || !summary) return;
+        var releasedAtUtc = Number(releasedAtRaw || Date.now());
+        if (!Number.isFinite(releasedAtUtc) || releasedAtUtc <= 0) releasedAtUtc = Date.now();
+        var data = {
+          version: version.slice(0, 64),
+          title: title.slice(0, 120),
+          summary: summary.slice(0, 500),
+          releasedAtUtc: releasedAtUtc,
+          highlights: parseMultilineList(highlightsRaw, 6, 180),
+          updatedAtUtc: Date.now()
+        };
+        var ok = await ensureStepUp();
+        if (!ok) return;
+        try {
+          await fetchJSONWithInit('/api/admin/records/upsert', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ recordType: USER_CHANGELOG_RECORD_TYPE, recordKey: key, data: data })
+          });
+          var form = document.getElementById('user-changelog-form');
+          if (form) form.reset();
+          await loadUserChangelogRecords();
+        } catch (_) {}
+      }
+
+      async function deleteUserChangelogRecord(key) {
+        var ok = await ensureStepUp();
+        if (!ok) return;
+        if (!window.confirm('Delete user changelog entry "' + key + '"?')) return;
+        try {
+          await fetchJSONWithInit('/api/admin/records/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ recordType: USER_CHANGELOG_RECORD_TYPE, recordKey: key })
+          });
+          await loadUserChangelogRecords();
+        } catch (_) {}
+      }
+
+      async function loadUserPrivacyRecords() {
+        var container = document.getElementById('user-privacy-list');
+        if (!container) return;
+        try {
+          var payload = await fetchJSON('/api/admin/records/list?type=' + encodeURIComponent(USER_PRIVACY_RECORD_TYPE));
+          var records = payload.records || [];
+          if (!records.length) {
+            container.innerHTML = '<div class="empty-state">No user privacy sections yet.</div>';
+            return;
+          }
+
+          var html = '';
+          records.forEach(function(item) {
+            var d = item.data || {};
+            var bullets = Array.isArray(d.bullets) ? d.bullets : [];
+            html += '<div class="creative-card">';
+            html += '<h4>' + escapeHtml(d.title || item.recordKey || 'Untitled section') + '</h4>';
+            html += '<div class="creative-meta">Record key: ' + escapeHtml(item.recordKey || '') + '</div>';
+            html += '<div class="creative-meta">Priority: ' + escapeHtml(String(d.priority || 0)) + '</div>';
+            html += '<div class="creative-preview">' + escapeHtml(String(d.summary || '').slice(0, 500)) + '</div>';
+            if (bullets.length) {
+              html += '<div class="pill-row">';
+              bullets.slice(0, 4).forEach(function(point) {
+                html += '<span class="pill">' + escapeHtml(String(point)) + '</span>';
+              });
+              html += '</div>';
+            }
+            html += '<div class="inline-btn-row">';
+            html += '<button class="btn btn-danger" data-action="delete-user-privacy-record" data-record-key="' + escapeHtml(item.recordKey || '') + '">Delete</button>';
+            html += '</div>';
+            html += '</div>';
+          });
+          container.innerHTML = html;
+        } catch (e) {
+          container.innerHTML = '<div class="empty-state empty-state-danger">Failed to load user privacy sections.</div>';
+        }
+      }
+
+      async function saveUserPrivacyRecord(e) {
+        e.preventDefault();
+        var key = normalizeKey(document.getElementById('user-privacy-key').value, 'privacy');
+        var title = (document.getElementById('user-privacy-title').value || '').trim();
+        var summary = (document.getElementById('user-privacy-summary').value || '').trim();
+        var priorityRaw = (document.getElementById('user-privacy-priority').value || '1').trim();
+        var bulletsRaw = (document.getElementById('user-privacy-bullets').value || '').trim();
+        if (!title || !summary) return;
+        var priority = Number(priorityRaw || 1);
+        if (!Number.isFinite(priority)) priority = 1;
+        priority = Math.max(1, Math.min(99, Math.floor(priority)));
+        var data = {
+          title: title.slice(0, 120),
+          summary: summary.slice(0, 550),
+          priority: priority,
+          bullets: parseMultilineList(bulletsRaw, 7, 220),
+          updatedAtUtc: Date.now()
+        };
+        var ok = await ensureStepUp();
+        if (!ok) return;
+        try {
+          await fetchJSONWithInit('/api/admin/records/upsert', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ recordType: USER_PRIVACY_RECORD_TYPE, recordKey: key, data: data })
+          });
+          var form = document.getElementById('user-privacy-form');
+          if (form) form.reset();
+          var priorityEl = document.getElementById('user-privacy-priority');
+          if (priorityEl) priorityEl.value = '1';
+          await loadUserPrivacyRecords();
+        } catch (_) {}
+      }
+
+      async function deleteUserPrivacyRecord(key) {
+        var ok = await ensureStepUp();
+        if (!ok) return;
+        if (!window.confirm('Delete user privacy section "' + key + '"?')) return;
+        try {
+          await fetchJSONWithInit('/api/admin/records/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ recordType: USER_PRIVACY_RECORD_TYPE, recordKey: key })
+          });
+          await loadUserPrivacyRecords();
+        } catch (_) {}
       }
 
       async function loadCreativeEmails() {
@@ -2459,7 +2651,9 @@
         { combo: 'Cmd/Ctrl+2', desc: 'Go to Activity & Charts', run: function () { showPage('activity'); } },
         { combo: 'Cmd/Ctrl+3', desc: 'Go to Ops Hub', run: function() { showPage('dashboards'); } },
         { combo: 'Cmd/Ctrl+4', desc: 'Go to Creative Hub', run: function () { showPage('creative'); } },
-        { combo: 'Cmd/Ctrl+5', desc: 'Go to Logs', run: function () { showPage('logs'); } },
+        { combo: 'Cmd/Ctrl+5', desc: 'Go to User Changelog', run: function () { showPage('content-changelog'); } },
+        { combo: 'Cmd/Ctrl+6', desc: 'Go to User Privacy', run: function () { showPage('content-privacy'); } },
+        { combo: 'Cmd/Ctrl+7', desc: 'Go to Logs', run: function () { showPage('logs'); } },
         { combo: 'Cmd/Ctrl+0', desc: 'Go to Danger Zone', run: function() { showPage('danger'); } },
         { combo: 'Cmd/Ctrl+R', desc: 'Refresh all data', run: function() { refreshAll(); } },
         { combo: 'Cmd/Ctrl+B', desc: 'Open last batch modal', run: function() { showBatchModal(); } },
@@ -2519,7 +2713,9 @@
         if (!withShift && key === '2') { showPage('activity'); return true; }
         if (!withShift && key === '3') { showPage('dashboards'); return true; }
         if (!withShift && key === '4') { showPage('creative'); return true; }
-        if (!withShift && key === '5') { showPage('logs'); return true; }
+        if (!withShift && key === '5') { showPage('content-changelog'); return true; }
+        if (!withShift && key === '6') { showPage('content-privacy'); return true; }
+        if (!withShift && key === '7') { showPage('logs'); return true; }
         if (!withShift && key === '0') { showPage('danger'); return true; }
         if (!withShift && key === 'r') { refreshAll(); return true; }
         if (!withShift && key === 'b') { showBatchModal(); return true; }
@@ -2590,6 +2786,8 @@
           ['log-sort-btn', toggleLogSort],
           ['log-export-btn', exportLogCSV],
           ['notifications-refresh-btn', loadNotifications],
+          ['user-changelog-refresh-btn', loadUserChangelogRecords],
+          ['user-privacy-refresh-btn', loadUserPrivacyRecords],
           ['logs-refresh-btn', loadOracleLogs],
           ['logs-dry-run-delete-btn', function() { oracleLogsDeleteOlder(true); }],
           ['logs-delete-older-btn', function() { oracleLogsDeleteOlder(false); }],
@@ -2618,7 +2816,9 @@
 
         [
           ['creative-email-template-form', saveCreativeEmailTemplate],
-          ['newsletter-subscriber-form', saveNewsletterSubscriber]
+          ['newsletter-subscriber-form', saveNewsletterSubscriber],
+          ['user-changelog-form', saveUserChangelogRecord],
+          ['user-privacy-form', saveUserPrivacyRecord]
         ].forEach(function(entry) {
           var form = document.getElementById(entry[0]);
           if (!form || form.dataset.boundSubmit === '1') return;
@@ -2688,6 +2888,8 @@
             if (action === 'copy-email-html') copyText(actionNode.getAttribute('data-html') || '');
             if (action === 'delete-creative-email') deleteCreativeEmailTemplate(actionNode.getAttribute('data-record-key') || '');
             if (action === 'delete-newsletter-subscriber') deleteNewsletterSubscriber(actionNode.getAttribute('data-record-key') || '');
+            if (action === 'delete-user-changelog-record') deleteUserChangelogRecord(actionNode.getAttribute('data-record-key') || '');
+            if (action === 'delete-user-privacy-record') deleteUserPrivacyRecord(actionNode.getAttribute('data-record-key') || '');
             if (action === 'shift-calendar-month') shiftCalendarMonth(Number(actionNode.getAttribute('data-delta') || '0'));
           });
         }
@@ -2733,6 +2935,8 @@
           await loadNotifications();
         }
         if (currentPage === 'creative') await loadCreativeHub();
+        if (currentPage === 'content-changelog') await loadUserChangelogRecords();
+        if (currentPage === 'content-privacy') await loadUserPrivacyRecords();
         if (currentPage === 'logs') await loadOracleLogs();
 
         refreshButtons.forEach(function(btn) {
