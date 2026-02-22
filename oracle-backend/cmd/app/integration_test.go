@@ -39,6 +39,12 @@ func newIntegrationMux(t *testing.T) (*http.ServeMux, *sql.DB) {
 	mux.Handle("/health/db", handlers.DBHealthHandler(sqlDB))
 	mux.Handle("/ingest-batch", handlers.IngestBatchHandler(sqlDB, "test-secret"))
 	mux.Handle("/storeBatch", handlers.IngestBatchHandler(sqlDB, "test-secret"))
+	mux.Handle("/api/public/website/overview", handlers.PublicWebsiteOverviewHandler(sqlDB, nil))
+	mux.Handle("/api/public/website/map", handlers.PublicWebsiteMapHandler(sqlDB))
+	mux.Handle("/api/public/website/status", handlers.PublicWebsiteStatusHandler(sqlDB))
+	mux.Handle("/api/public/website/changelog", handlers.PublicWebsiteUserChangelogHandler(sqlDB, nil))
+	mux.Handle("/api/public/website/privacy", handlers.PublicWebsiteUserPrivacyHandler(sqlDB, nil))
+	mux.Handle("/api/public/website/uninstall", handlers.PublicWebsiteUninstallHandler(sqlDB))
 
 	// Stats routes (no auth wrapper for integration test)
 	mux.Handle("/api/stats/summary", handlers.SummaryHandler(sqlDB))
@@ -52,13 +58,15 @@ func newIntegrationMux(t *testing.T) (*http.ServeMux, *sql.DB) {
 
 	// Admin routes (no auth wrapper for integration test)
 	allowedRecordTypes := map[string]struct{}{
-		"deployment_target":          {},
-		"deployment_update_sentence": {},
-		"extension_version_note":     {},
-		"creative_design":            {},
-		"creative_email_template":    {},
-		"newsletter_subscriber":      {},
-		"newsletter_campaign":        {},
+		"deployment_target":            {},
+		"deployment_update_sentence":   {},
+		"extension_version_note":       {},
+		"creative_design":              {},
+		"creative_email_template":      {},
+		"newsletter_subscriber":        {},
+		"newsletter_campaign":          {},
+		"website_user_changelog_entry": {},
+		"website_user_privacy_section": {},
 	}
 	mux.Handle("/api/admin/flags", handlers.FeatureFlagsHandler(sqlDB))
 	mux.Handle("/api/admin/alerts", handlers.AlertsHandler(sqlDB))
@@ -97,6 +105,12 @@ func TestIntegration_AllRegisteredRoutesRespondNon404(t *testing.T) {
 		"/health/api",
 		"/health/db",
 		"/api/stats/summary",
+		"/api/public/website/overview",
+		"/api/public/website/map",
+		"/api/public/website/status",
+		"/api/public/website/changelog",
+		"/api/public/website/privacy",
+		"/api/public/website/uninstall",
 		"/api/stats/timeseries?from=2026-01-01&to=2026-01-31",
 		"/api/stats/breakdown?from=2026-01-01&to=2026-01-31",
 		"/api/stats/comparison?from1=2026-01-01&to1=2026-01-15&from2=2026-01-16&to2=2026-01-31",
