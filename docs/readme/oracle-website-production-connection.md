@@ -37,6 +37,10 @@ Set GitHub repository variables:
 - `PUBLIC_SITE_URL=https://<your-cloudflare-pages-domain>`
 - `CLOUDFLARE_PAGES_PROJECT_NAME=<cloudflare-pages-project-name>`
 
+Set Oracle runtime allowlist:
+
+- `PUBLIC_WEBSITE_ALLOWED_ORIGINS=https://<your-cloudflare-pages-domain>,http://localhost:5173`
+
 Set GitHub repository secrets:
 
 - `CLOUDFLARE_API_TOKEN`
