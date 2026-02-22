@@ -234,6 +234,8 @@ func main() {
 	mux.Handle("/api/public/website/overview", handlers.PublicWebsiteOverviewHandler(sqlDB, postgresDB))
 	mux.Handle("/api/public/website/map", handlers.PublicWebsiteMapHandler(sqlDB))
 	mux.Handle("/api/public/website/status", handlers.PublicWebsiteStatusHandler(sqlDB))
+	mux.Handle("/api/public/website/changelog", handlers.PublicWebsiteUserChangelogHandler(sqlDB, postgresDB))
+	mux.Handle("/api/public/website/privacy", handlers.PublicWebsiteUserPrivacyHandler(sqlDB, postgresDB))
 	mux.Handle("/api/public/website/uninstall", handlers.PublicWebsiteUninstallHandler(sqlDB))
 
 	// Analytics API endpoints (protected by auth when DASHBOARD_PASSWORD is set).
@@ -241,13 +243,15 @@ func main() {
 	authMiddleware := requireAuth(sqlDB, dashboardPassword, archiverSecret, allowLoopbackBypass)
 	criticalMiddleware := requireStepUp(sqlDB, superAdminPassword)
 	allowedRecordTypes := map[string]struct{}{
-		"deployment_target":          {},
-		"deployment_update_sentence": {},
-		"extension_version_note":     {},
-		"creative_design":            {},
-		"creative_email_template":    {},
-		"newsletter_subscriber":      {},
-		"newsletter_campaign":        {},
+		"deployment_target":            {},
+		"deployment_update_sentence":   {},
+		"extension_version_note":       {},
+		"creative_design":              {},
+		"creative_email_template":      {},
+		"newsletter_subscriber":        {},
+		"newsletter_campaign":          {},
+		"website_user_changelog_entry": {},
+		"website_user_privacy_section": {},
 	}
 	mux.Handle("/api/stats/summary", authMiddleware(handlers.SummaryHandler(sqlDB)))
 	mux.Handle("/api/stats/timeseries", authMiddleware(handlers.TimeSeriesHandler(sqlDB)))
