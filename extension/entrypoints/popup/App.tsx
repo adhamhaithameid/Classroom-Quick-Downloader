@@ -766,7 +766,7 @@ function App() {
                   rel="noopener noreferrer"
                   className="cqd-cl-footer-link cqd-cl-footer-link-secondary"
                 >
-                  🗞️ View full release notes ↗
+                  🗞️ View user changelog ↗
                 </a>
                 <a 
                   href={SURVEY_URL} 
