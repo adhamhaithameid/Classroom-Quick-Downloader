@@ -408,7 +408,14 @@ function parseAllowedOrigins(raw: string | undefined): Set<string> {
 }
 
 function isPublicCorsRoute(pathname: string): boolean {
-  return pathname === "/config" || pathname === "/health" || pathname === "/pipeline-health" || pathname === "/changelog" || pathname === "/track";
+  return (
+    pathname === "/config" ||
+    pathname === "/health" ||
+    pathname === "/pipeline-health" ||
+    pathname === "/changelog" ||
+    pathname === "/track" ||
+    pathname === "/public/site-metrics"
+  );
 }
 
 function isAdminCorsRoute(pathname: string): boolean {
@@ -998,6 +1005,46 @@ async function handleReleaseNotes(request: Request, env: WorkerEnv): Promise<Res
   });
 }
 
+async function handlePublicSiteMetrics(request: Request, env: WorkerEnv): Promise<Response> {
+  const stub = getDownloadsStub(env);
+  try {
+    const upstream = await stub.fetch(new Request("https://do/public/site-metrics", { method: "GET" }));
+
+    if (!upstream.ok) {
+      return withCors(
+        request,
+        new Response(JSON.stringify({ ok: false, error: "upstream_unavailable" }), {
+          status: 502,
+          headers: { "content-type": "application/json; charset=utf-8" },
+        }),
+        env,
+      );
+    }
+
+    const body = await upstream.text();
+    return withCors(
+      request,
+      new Response(body, {
+        status: 200,
+        headers: {
+          "content-type": "application/json; charset=utf-8",
+          "cache-control": "public, max-age=300, stale-while-revalidate=180",
+        },
+      }),
+      env,
+    );
+  } catch {
+    return withCors(
+      request,
+      new Response(JSON.stringify({ ok: false, error: "upstream_unavailable" }), {
+        status: 502,
+        headers: { "content-type": "application/json; charset=utf-8" },
+      }),
+      env,
+    );
+  }
+}
+
 export default {
   async fetch(request: Request, env: WorkerEnv, _ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
@@ -1027,6 +1074,10 @@ export default {
     // Public changelog website
     if (pathname === "/release-notes" && request.method === "GET") {
       return handleReleaseNotes(request, env);
+    }
+
+    if (pathname === "/public/site-metrics" && request.method === "GET") {
+      return handlePublicSiteMetrics(request, env);
     }
 
     // Dashboard (requires session)
