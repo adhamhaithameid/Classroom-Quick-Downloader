@@ -1652,6 +1652,7 @@
       }
       .action-buttons-grid-five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
       .action-buttons-grid-four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .action-buttons-grid-two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .action-buttons-grid-logs {
         grid-template-columns: auto auto auto auto auto;
         max-width: 920px;
