@@ -29,6 +29,7 @@
 
   let state: 'loading' | 'ready' | 'error' = 'loading';
   let error = '';
+  let refreshing = false;
   let mapData: MapResponse | null = null;
 
   let countries: WorldFeature[] = [];
@@ -125,8 +126,9 @@
     return new Intl.NumberFormat('en-US').format(value || 0);
   }
 
-  async function loadMap(): Promise<void> {
-    state = 'loading';
+  async function loadMap(force = false): Promise<void> {
+    if (!force) state = 'loading';
+    if (force) refreshing = true;
     error = '';
     try {
       mapData = await fetchMapData();
@@ -135,6 +137,8 @@
     } catch (err) {
       error = err instanceof Error ? err.message : 'Failed to load map data.';
       state = 'error';
+    } finally {
+      refreshing = false;
     }
   }
 
@@ -146,10 +150,13 @@
 
 <section class="card map-page">
   <div class="intro">
-    <h1>Global Usage Map (Country Aggregates)</h1>
-    <p>
-      This map uses privacy-safe, country-level aggregation. No raw IP addresses are exposed on this page.
-    </p>
+    <h1>Where Students Use CQD</h1>
+    <p>This map shows country-level activity only. It is an approximate, privacy-safe view.</p>
+  </div>
+  <div class="intro-actions">
+    <button type="button" class="retry" on:click={() => loadMap(true)} disabled={refreshing}>
+      {refreshing ? 'Refreshing…' : 'Refresh map data'}
+    </button>
   </div>
 
   {#if state === 'loading'}
@@ -158,7 +165,7 @@
     <div class="state-error">
       <strong>Could not load map data.</strong>
       <p>{error}</p>
-      <button type="button" class="retry" on:click={loadMap}>Retry</button>
+      <button type="button" class="retry" on:click={() => loadMap(true)} disabled={refreshing}>Retry</button>
     </div>
   {:else}
     <div class="summary-grid">
@@ -246,6 +253,11 @@
     max-width: 70ch;
   }
 
+  .intro-actions {
+    display: flex;
+    justify-content: flex-end;
+  }
+
   .summary-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
@@ -331,5 +343,10 @@
     background: var(--surface);
     padding: 6px 10px;
     cursor: pointer;
+  }
+
+  .retry:disabled {
+    opacity: 0.72;
+    cursor: wait;
   }
 </style>
