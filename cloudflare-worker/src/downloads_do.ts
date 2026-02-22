@@ -100,6 +100,11 @@ type DurableStateShape = {
 
   // Public website metrics snapshot refreshed on a fixed UTC schedule.
   publicSiteMetricsSnapshot: PublicSiteMetricsSnapshot | null;
+  websitePublicSyncEnabled: boolean;
+  websiteManualFlushAt: number | null;
+  websiteOverrideEnabled: boolean;
+  websiteOverrideDownloads: number;
+  websiteOverrideCountries: PublicSiteCountryCount[];
 
   // =========================================================================
   // REMOTE CONFIG - Controllable from Cloudflare Dashboard
@@ -297,6 +302,7 @@ const TRACK_RATE_PRUNE_AFTER_MIN = 10;
 const TRACK_RATE_MAX_KEYS = 5000;
 const REQUEST_HISTORY_DAYS = 400;
 const PUBLIC_SITE_METRICS_REFRESH_HOURS_UTC = [3, 6, 9, 12, 15, 18, 21] as const;
+const MAX_PUBLIC_SITE_COUNTRIES = 300;
 const ISO_ALPHA2_PATTERN = /^[A-Z]{2}$/;
 
 // Storage key inside DO storage
@@ -346,7 +352,27 @@ function normalizeCountryCountsForPublicMap(
     if (a.count === b.count) return a.countryCode.localeCompare(b.countryCode);
     return b.count - a.count;
   });
-  return countries;
+  return countries.slice(0, MAX_PUBLIC_SITE_COUNTRIES);
+}
+
+function normalizePublicSiteCountryList(input: unknown): PublicSiteCountryCount[] {
+  if (!Array.isArray(input)) return [];
+  const merged = new Map<string, number>();
+  for (const row of input) {
+    if (!isPlainObject(row)) continue;
+    const raw = row as Record<string, unknown>;
+    const code = normalizePublicCountryCode(typeof raw.countryCode === "string" ? raw.countryCode : "");
+    if (!code) continue;
+    const count = clampInt(raw.count, 0, Number.MAX_SAFE_INTEGER, 0);
+    if (count <= 0) continue;
+    merged.set(code, (merged.get(code) ?? 0) + count);
+  }
+  const countries = [...merged.entries()].map(([countryCode, count]) => ({ countryCode, count }));
+  countries.sort((a, b) => {
+    if (a.count === b.count) return a.countryCode.localeCompare(b.countryCode);
+    return b.count - a.count;
+  });
+  return countries.slice(0, MAX_PUBLIC_SITE_COUNTRIES);
 }
 
 function shiftUtcDateByDays(dateKey: string, deltaDays: number): string | null {
@@ -857,6 +883,11 @@ export class DownloadsDurable {
         lastUpdated: Date.now(),
       },
       publicSiteMetricsSnapshot: null,
+      websitePublicSyncEnabled: true,
+      websiteManualFlushAt: null,
+      websiteOverrideEnabled: false,
+      websiteOverrideDownloads: 0,
+      websiteOverrideCountries: [],
 
       lastHealthStatus: "ok",
       lastHealthNotifyAt: null,
@@ -1033,6 +1064,32 @@ export class DownloadsDurable {
         if (!slotKey || snapshotAtUtc <= 0) return null;
         return { slotKey, snapshotAtUtc, downloads, countries };
       })(),
+      websitePublicSyncEnabled:
+        typeof (stored as unknown as Record<string, unknown>).websitePublicSyncEnabled === "boolean"
+          ? Boolean((stored as unknown as Record<string, unknown>).websitePublicSyncEnabled)
+          : base.websitePublicSyncEnabled,
+      websiteManualFlushAt: (() => {
+        const value = clampInt(
+          (stored as unknown as Record<string, unknown>).websiteManualFlushAt,
+          0,
+          Number.MAX_SAFE_INTEGER,
+          0,
+        );
+        return value > 0 ? value : null;
+      })(),
+      websiteOverrideEnabled:
+        typeof (stored as unknown as Record<string, unknown>).websiteOverrideEnabled === "boolean"
+          ? Boolean((stored as unknown as Record<string, unknown>).websiteOverrideEnabled)
+          : base.websiteOverrideEnabled,
+      websiteOverrideDownloads: clampInt(
+        (stored as unknown as Record<string, unknown>).websiteOverrideDownloads,
+        0,
+        Number.MAX_SAFE_INTEGER,
+        0,
+      ),
+      websiteOverrideCountries: normalizePublicSiteCountryList(
+        (stored as unknown as Record<string, unknown>).websiteOverrideCountries,
+      ),
 
       lastHealthStatus: stored.lastHealthStatus ?? base.lastHealthStatus,
       lastHealthNotifyAt: stored.lastHealthNotifyAt ?? base.lastHealthNotifyAt,
@@ -1485,6 +1542,22 @@ export class DownloadsDurable {
 
     if (pathname === "/admin/full-sync" && request.method === "POST") {
       return this.handleAdminFullSync(request);
+    }
+
+    if (pathname === "/admin/website/status" && request.method === "GET") {
+      return this.handleAdminWebsiteStatus(request);
+    }
+
+    if (pathname === "/admin/website/flush-now" && request.method === "POST") {
+      return this.handleAdminWebsiteFlushNow(request);
+    }
+
+    if (pathname === "/admin/website/override" && request.method === "POST") {
+      return this.handleAdminWebsiteOverride(request);
+    }
+
+    if (pathname === "/admin/website/refresh-toggle" && request.method === "POST") {
+      return this.handleAdminWebsiteRefreshToggle(request);
     }
 
     // Public Changelog
@@ -1964,6 +2037,9 @@ export class DownloadsDurable {
 
   private shouldRefreshPublicSiteSnapshot(now: number, currentSlotKey: string): boolean {
     const snapshot = this.d.publicSiteMetricsSnapshot;
+    if (!this.d.websitePublicSyncEnabled) {
+      return !snapshot;
+    }
     if (!snapshot) return true;
 
     const hour = currentUtcHour(now);
@@ -1973,6 +2049,18 @@ export class DownloadsDurable {
     }
 
     return snapshot.slotKey !== currentSlotKey;
+  }
+
+  private resolveEffectivePublicSiteSnapshot(baseSnapshot: PublicSiteMetricsSnapshot): PublicSiteMetricsSnapshot {
+    if (!this.d.websiteOverrideEnabled) {
+      return baseSnapshot;
+    }
+    return {
+      slotKey: baseSnapshot.slotKey,
+      snapshotAtUtc: baseSnapshot.snapshotAtUtc,
+      downloads: clampInt(this.d.websiteOverrideDownloads, 0, Number.MAX_SAFE_INTEGER, 0),
+      countries: normalizePublicSiteCountryList(this.d.websiteOverrideCountries),
+    };
   }
 
   private async handlePublicSiteMetrics(): Promise<Response> {
@@ -1985,25 +2073,171 @@ export class DownloadsDurable {
     }
 
     const snapshot = this.d.publicSiteMetricsSnapshot ?? this.buildPublicSiteMetricsSnapshot(now, slotKey);
+    const effectiveSnapshot = this.resolveEffectivePublicSiteSnapshot(snapshot);
     const activeHour = currentUtcHour(now);
     const isRefreshWindow = PUBLIC_SITE_METRICS_REFRESH_HOURS_UTC.includes(activeHour as (typeof PUBLIC_SITE_METRICS_REFRESH_HOURS_UTC)[number]);
 
     return json({
       ok: true,
       source: "cloudflare-worker",
+      dataSource: this.d.websiteOverrideEnabled ? "override" : "snapshot",
       generatedAt: now,
-      snapshotAtUtc: snapshot.snapshotAtUtc,
+      snapshotAtUtc: effectiveSnapshot.snapshotAtUtc,
       totals: {
-        downloads: snapshot.downloads,
-        countries: snapshot.countries.length,
+        downloads: effectiveSnapshot.downloads,
+        countries: effectiveSnapshot.countries.length,
       },
-      countries: snapshot.countries,
+      countries: effectiveSnapshot.countries,
       schedule: {
         refreshHoursUtc: PUBLIC_SITE_METRICS_REFRESH_HOURS_UTC,
         activeHourUtc: activeHour,
         isRefreshWindow,
+        autoRefreshEnabled: this.d.websitePublicSyncEnabled,
+        overrideEnabled: this.d.websiteOverrideEnabled,
         lastRefreshAtUtc: snapshot.snapshotAtUtc,
         nextRefreshAtUtc: this.computeNextPublicMetricsRefreshAt(now),
+      },
+    });
+  }
+
+  private async handleAdminWebsiteStatus(request: Request): Promise<Response> {
+    if (!this.isAuthorizedAdmin(request)) {
+      return json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+    const now = Date.now();
+    const slotKey = makeSlotKey(now);
+    const snapshot = this.d.publicSiteMetricsSnapshot ?? this.buildPublicSiteMetricsSnapshot(now, slotKey);
+    const effectiveSnapshot = this.resolveEffectivePublicSiteSnapshot(snapshot);
+    const activeHour = currentUtcHour(now);
+    const isRefreshWindow = PUBLIC_SITE_METRICS_REFRESH_HOURS_UTC.includes(activeHour as (typeof PUBLIC_SITE_METRICS_REFRESH_HOURS_UTC)[number]);
+    return json({
+      ok: true,
+      generatedAt: now,
+      website: {
+        refreshEnabled: this.d.websitePublicSyncEnabled,
+        overrideEnabled: this.d.websiteOverrideEnabled,
+        overrideDownloads: clampInt(this.d.websiteOverrideDownloads, 0, Number.MAX_SAFE_INTEGER, 0),
+        overrideCountries: normalizePublicSiteCountryList(this.d.websiteOverrideCountries),
+        lastSnapshotAtUtc: snapshot.snapshotAtUtc,
+        lastManualFlushAtUtc: this.d.websiteManualFlushAt ?? null,
+        refreshHoursUtc: PUBLIC_SITE_METRICS_REFRESH_HOURS_UTC,
+        activeHourUtc: activeHour,
+        isRefreshWindow,
+        nextRefreshAtUtc: this.computeNextPublicMetricsRefreshAt(now),
+      },
+      publicSnapshot: {
+        source: this.d.websiteOverrideEnabled ? "override" : "snapshot",
+        snapshotAtUtc: effectiveSnapshot.snapshotAtUtc,
+        totals: {
+          downloads: effectiveSnapshot.downloads,
+          countries: effectiveSnapshot.countries.length,
+        },
+        countries: effectiveSnapshot.countries,
+      },
+    });
+  }
+
+  private async handleAdminWebsiteFlushNow(request: Request): Promise<Response> {
+    if (!this.isAuthorizedAdmin(request)) {
+      return json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+    const now = Date.now();
+    const slotKey = makeSlotKey(now);
+    this.d.publicSiteMetricsSnapshot = this.buildPublicSiteMetricsSnapshot(now, slotKey);
+    this.d.websiteManualFlushAt = now;
+    await this.persist();
+
+    const effectiveSnapshot = this.resolveEffectivePublicSiteSnapshot(this.d.publicSiteMetricsSnapshot);
+    return json({
+      ok: true,
+      flushedAtUtc: now,
+      source: this.d.websiteOverrideEnabled ? "override" : "snapshot",
+      snapshotAtUtc: effectiveSnapshot.snapshotAtUtc,
+      totals: {
+        downloads: effectiveSnapshot.downloads,
+        countries: effectiveSnapshot.countries.length,
+      },
+      countries: effectiveSnapshot.countries,
+    });
+  }
+
+  private async handleAdminWebsiteRefreshToggle(request: Request): Promise<Response> {
+    if (!this.isAuthorizedAdmin(request)) {
+      return json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+
+    let body: Record<string, unknown>;
+    try {
+      body = await request.json();
+    } catch {
+      return json({ ok: false, error: "invalid_json" }, { status: 400 });
+    }
+    if (!isPlainObject(body) || typeof body.enabled !== "boolean") {
+      return json({ ok: false, error: "invalid_payload", field: "enabled" }, { status: 400 });
+    }
+
+    this.d.websitePublicSyncEnabled = body.enabled;
+    await this.persist();
+    return json({
+      ok: true,
+      refreshEnabled: this.d.websitePublicSyncEnabled,
+    });
+  }
+
+  private async handleAdminWebsiteOverride(request: Request): Promise<Response> {
+    if (!this.isAuthorizedAdmin(request)) {
+      return json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+
+    let body: Record<string, unknown>;
+    try {
+      body = await request.json();
+    } catch {
+      return json({ ok: false, error: "invalid_json" }, { status: 400 });
+    }
+    if (!isPlainObject(body)) {
+      return json({ ok: false, error: "invalid_payload" }, { status: 400 });
+    }
+
+    if ("enabled" in body) {
+      if (typeof body.enabled !== "boolean") {
+        return json({ ok: false, error: "invalid_payload", field: "enabled" }, { status: 400 });
+      }
+      this.d.websiteOverrideEnabled = body.enabled;
+    }
+
+    if ("downloads" in body) {
+      if (typeof body.downloads !== "number" || !Number.isFinite(body.downloads)) {
+        return json({ ok: false, error: "invalid_payload", field: "downloads" }, { status: 400 });
+      }
+      this.d.websiteOverrideDownloads = clampInt(body.downloads, 0, Number.MAX_SAFE_INTEGER, 0);
+    }
+
+    if ("countries" in body) {
+      this.d.websiteOverrideCountries = normalizePublicSiteCountryList(body.countries);
+    }
+
+    await this.persist();
+    const now = Date.now();
+    const slotKey = makeSlotKey(now);
+    const snapshot = this.d.publicSiteMetricsSnapshot ?? this.buildPublicSiteMetricsSnapshot(now, slotKey);
+    const effectiveSnapshot = this.resolveEffectivePublicSiteSnapshot(snapshot);
+
+    return json({
+      ok: true,
+      override: {
+        enabled: this.d.websiteOverrideEnabled,
+        downloads: clampInt(this.d.websiteOverrideDownloads, 0, Number.MAX_SAFE_INTEGER, 0),
+        countries: normalizePublicSiteCountryList(this.d.websiteOverrideCountries),
+      },
+      publicSnapshot: {
+        source: this.d.websiteOverrideEnabled ? "override" : "snapshot",
+        snapshotAtUtc: effectiveSnapshot.snapshotAtUtc,
+        totals: {
+          downloads: effectiveSnapshot.downloads,
+          countries: effectiveSnapshot.countries.length,
+        },
+        countries: effectiveSnapshot.countries,
       },
     });
   }
@@ -2421,6 +2655,13 @@ export class DownloadsDurable {
         lastUpdated: Date.now(),
       },
       publicSiteMetricsSnapshot: this.d.publicSiteMetricsSnapshot ?? null,
+      websitePublicSyncEnabled:
+        typeof this.d.websitePublicSyncEnabled === "boolean" ? this.d.websitePublicSyncEnabled : true,
+      websiteManualFlushAt: this.d.websiteManualFlushAt ?? null,
+      websiteOverrideEnabled:
+        typeof this.d.websiteOverrideEnabled === "boolean" ? this.d.websiteOverrideEnabled : false,
+      websiteOverrideDownloads: clampInt(this.d.websiteOverrideDownloads, 0, Number.MAX_SAFE_INTEGER, 0),
+      websiteOverrideCountries: normalizePublicSiteCountryList(this.d.websiteOverrideCountries),
     };
     
     this.data = {
