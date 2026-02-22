@@ -1,12 +1,16 @@
 <script lang="ts">
-  import type { PageData } from './$types';
+  import { onMount } from 'svelte';
+  import { fetchUserPrivacy } from '$lib/api/publicSite';
+  import type { UserPrivacyResponse } from '$lib/types/public';
 
-  export let data: PageData;
+  let state: 'loading' | 'ready' | 'error' = 'loading';
+  let error = '';
+  let privacy: UserPrivacyResponse | null = null;
+  let refreshing = false;
 
-  function formatDate(value: string): string {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return value;
-    return date.toLocaleString('en-US', {
+  function formatDate(value: number | null): string {
+    if (!value) return 'N/A';
+    return new Date(value).toLocaleString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -15,74 +19,147 @@
       timeZone: 'UTC'
     });
   }
+
+  async function load(force = false): Promise<void> {
+    if (force) refreshing = true;
+    if (!force) state = 'loading';
+    error = '';
+    try {
+      privacy = await fetchUserPrivacy();
+      state = 'ready';
+    } catch (err) {
+      state = 'error';
+      error = err instanceof Error ? err.message : 'Failed to load user privacy content.';
+    } finally {
+      refreshing = false;
+    }
+  }
+
+  onMount(async () => {
+    await load();
+  });
 </script>
 
-<section class="card markdown-page">
+<section class="card user-page">
   <header class="intro">
-    <h1>Privacy Policy</h1>
-    <p>
-      This page is rendered directly from <code>PRIVACY.md</code>. Any update to that file is reflected on the next
-      site build/deploy.
-    </p>
-    <small>Last updated (UTC): {formatDate(data.doc.updatedAtIso)}</small>
+    <div>
+      <h1>{privacy?.headline || 'Privacy at a glance'}</h1>
+      <p>{privacy?.description || 'Simple language for users. Full privacy details are on GitHub.'}</p>
+      <small>Last updated (UTC): {formatDate(privacy?.lastUpdatedAtUtc ?? null)}</small>
+    </div>
+    <div class="actions">
+      <button type="button" class="refresh" on:click={() => load(true)} disabled={refreshing}>
+        {refreshing ? 'Refreshing…' : 'Refresh'}
+      </button>
+      <a href={privacy?.fullPrivacyUrl || 'https://github.com/adhamhaithameid/Classroom-Quick-Downloader/blob/main/PRIVACY.md'} target="_blank" rel="noopener noreferrer">
+        Full privacy document on GitHub
+      </a>
+    </div>
   </header>
 
-  <article class="markdown-body">
-    {@html data.doc.html}
-  </article>
+  {#if state === 'loading'}
+    <div class="state-loading">Loading privacy details…</div>
+  {:else if state === 'error'}
+    <div class="state-error">
+      <strong>Could not load privacy details.</strong>
+      <p>{error}</p>
+      <button type="button" class="refresh" on:click={() => load(true)} disabled={refreshing}>Retry</button>
+    </div>
+  {:else}
+    <div class="section-list">
+      {#each privacy?.sections ?? [] as section}
+        <article class="section card">
+          <h2>{section.title}</h2>
+          <p>{section.summary}</p>
+          {#if section.bullets.length > 0}
+            <ul>
+              {#each section.bullets as bullet}
+                <li>{bullet}</li>
+              {/each}
+            </ul>
+          {/if}
+        </article>
+      {/each}
+    </div>
+  {/if}
 </section>
 
 <style>
-  .markdown-page {
+  .user-page {
     padding: 22px;
     display: grid;
     gap: 14px;
   }
 
-  .intro h1 {
+  .intro {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  h1 {
     margin: 0;
     font-size: clamp(30px, 5vw, 50px);
     letter-spacing: -0.03em;
   }
 
-  .intro p {
+  p {
     margin: 10px 0 0;
     color: var(--muted);
     line-height: 1.65;
   }
 
-  .intro small {
-    margin-top: 8px;
-    color: var(--muted);
+  small {
     display: block;
+    margin-top: 10px;
+    color: var(--muted);
   }
 
-  :global(.markdown-body) {
+  .actions {
+    display: grid;
+    gap: 8px;
+    min-width: 220px;
+  }
+
+  .actions a,
+  .refresh {
     border: 1px solid var(--border);
-    border-radius: 16px;
+    border-radius: 12px;
+    padding: 9px 12px;
+    text-decoration: none;
     background: var(--surface-2);
-    padding: 16px;
-    line-height: 1.7;
+    color: var(--text);
+    font-weight: 700;
+    text-align: center;
+    cursor: pointer;
   }
 
-  :global(.markdown-body h1),
-  :global(.markdown-body h2),
-  :global(.markdown-body h3) {
+  .refresh:disabled {
+    opacity: 0.75;
+    cursor: wait;
+  }
+
+  .section-list {
+    display: grid;
+    gap: 10px;
+  }
+
+  .section {
+    padding: 14px;
+    border-radius: 16px;
+  }
+
+  .section h2 {
+    margin: 0;
+    font-size: 22px;
     letter-spacing: -0.02em;
   }
 
-  :global(.markdown-body code) {
-    background: #e8eefb;
-    border: 1px solid #ccd8f2;
-    border-radius: 6px;
-    padding: 1px 6px;
-  }
-
-  :global(.markdown-body pre) {
-    overflow-x: auto;
-    padding: 12px;
-    border-radius: 12px;
-    background: #0f1f3f;
-    color: #f4f8ff;
+  .section ul {
+    margin: 10px 0 0;
+    padding-left: 18px;
+    line-height: 1.6;
   }
 </style>
