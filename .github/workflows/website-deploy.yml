@@ -1,4 +1,4 @@
-name: Deploy Website
+name: Deploy Website (Cloudflare Pages)
 
 on:
   push:
@@ -10,25 +10,32 @@ on:
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
       - ".github/workflows/website-deploy.yml"
+  schedule:
+    - cron: "0 1 * * *"
   workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: website-pages
+  group: website-cloudflare-pages
   cancel-in-progress: true
 
 jobs:
-  build:
-    name: Build Website
+  deploy:
+    name: Build and Deploy to Cloudflare Pages
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Validate Cloudflare Pages project variable
+        run: |
+          if [ -z "${{ vars.CLOUDFLARE_PAGES_PROJECT_NAME }}" ]; then
+            echo "CLOUDFLARE_PAGES_PROJECT_NAME GitHub variable is required."
+            exit 1
+          fi
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v3
@@ -41,33 +48,20 @@ jobs:
           node-version: "20"
           cache: "pnpm"
 
-      - name: Install Dependencies
+      - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build Website
+      - name: Build website
         env:
-          PUBLIC_BASE_PATH: /${{ github.event.repository.name }}
+          PUBLIC_BASE_PATH: ""
           PUBLIC_ORACLE_API_BASE_URL: ${{ vars.PUBLIC_ORACLE_API_BASE_URL }}
           PUBLIC_WORKER_BASE_URL: ${{ vars.PUBLIC_WORKER_BASE_URL }}
-          PUBLIC_SITE_URL: https://adhamhaithameid.github.io/${{ github.event.repository.name }}
-        run: |
-          pnpm -C website build
-          touch website/build/.nojekyll
+          PUBLIC_SITE_URL: ${{ vars.PUBLIC_SITE_URL }}
+        run: pnpm -C website build
 
-      - name: Upload Pages Artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: Deploy website artifact
+        uses: cloudflare/wrangler-action@v3
         with:
-          path: website/build
-
-  deploy:
-    name: Deploy to GitHub Pages
-    runs-on: ubuntu-latest
-    needs: build
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-
-    steps:
-      - name: Deploy
-        id: deployment
-        uses: actions/deploy-pages@v4
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy website/build --project-name=${{ vars.CLOUDFLARE_PAGES_PROJECT_NAME }} --branch=${{ github.ref_name }}
