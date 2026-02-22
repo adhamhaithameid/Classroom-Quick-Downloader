@@ -1,17 +1,6 @@
 name: Deploy Website (Cloudflare Pages)
 
 on:
-  push:
-    branches: [main, master]
-    paths:
-      - "website/**"
-      - "CHANGELOG.md"
-      - "PRIVACY.md"
-      - "pnpm-lock.yaml"
-      - "pnpm-workspace.yaml"
-      - ".github/workflows/website-deploy.yml"
-  schedule:
-    - cron: "0 1 * * *"
   workflow_dispatch:
 
 permissions:
