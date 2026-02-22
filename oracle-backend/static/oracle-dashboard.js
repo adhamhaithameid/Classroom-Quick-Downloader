@@ -1066,6 +1066,7 @@
           overview: ['overview'],
           activity: ['activity', 'charts'],
           dashboards: ['dashboards', 'deployments', 'notifications'],
+          'website-sync': ['website-sync'],
           creative: ['creative'],
           'content-changelog': ['content-changelog'],
           'content-privacy': ['content-privacy'],
@@ -1095,6 +1096,7 @@
           overview: { icon: '🏠', label: 'Overview' },
           activity: { icon: '📊', label: 'Activity & Charts' },
           dashboards: { icon: '🛰️', label: 'Ops Hub' },
+          'website-sync': { icon: '🌐', label: 'Website Sync' },
           creative: { icon: '🎨', label: 'Creative Hub' },
           'content-changelog': { icon: '🗞️', label: 'User Changelog' },
           'content-privacy': { icon: '🔐', label: 'User Privacy' },
@@ -1113,6 +1115,7 @@
           loadDeploymentsHub();
           loadNotifications();
         }
+        if (page === 'website-sync') loadWebsiteSyncState();
         if (page === 'creative') loadCreativeHub();
         if (page === 'content-changelog') loadUserChangelogRecords();
         if (page === 'content-privacy') loadUserPrivacyRecords();
@@ -2338,6 +2341,189 @@
         }
       }
 
+      function setWebsiteSyncOutput(payload) {
+        var out = document.getElementById('website-sync-output');
+        if (!out) return;
+        out.textContent = JSON.stringify(payload || {}, null, 2);
+        out.classList.remove('hidden');
+      }
+
+      function setWebsiteSyncText(id, value) {
+        var node = document.getElementById(id);
+        if (!node) return;
+        node.textContent = value;
+      }
+
+      function formatWebsiteSyncTimestamp(ts) {
+        if (!Number.isFinite(Number(ts)) || Number(ts) <= 0) {
+          return '--';
+        }
+        return fmtUtcDateTimeFromMs(Number(ts)) + ' (' + timeAgo(Number(ts)) + ')';
+      }
+
+      function formatWebsiteSyncBatch(batch) {
+        if (!batch) return '--';
+        var status = String(batch.status || 'unknown').trim().slice(0, 24) || 'unknown';
+        var batchId = String(batch.batchId || batch.batch_id || '--').trim().slice(0, 64) || '--';
+        var createdAt = Number(batch.createdAt || batch.created_at || 0);
+        return status + ' · ' + batchId + ' · ' + formatWebsiteSyncTimestamp(createdAt);
+      }
+
+      function parseWebsiteOverrideCountries(raw) {
+        var trimmed = String(raw || '').trim();
+        if (!trimmed) return { ok: true, value: [] };
+        var parsed;
+        try {
+          parsed = JSON.parse(trimmed);
+        } catch (_) {
+          return { ok: false, error: 'Override countries JSON is invalid.' };
+        }
+        if (!Array.isArray(parsed)) {
+          return { ok: false, error: 'Override countries must be a JSON array.' };
+        }
+        var out = [];
+        for (var i = 0; i < parsed.length; i += 1) {
+          var row = parsed[i];
+          if (!row || typeof row !== 'object') continue;
+          var code = String(row.countryCode || '').trim().toUpperCase();
+          if (!/^[A-Z]{2}$/.test(code)) continue;
+          if (code === 'XX' || code === 'ZZ' || code === 'UN' || code === 'EU') continue;
+          var count = Number(row.count || 0);
+          if (!Number.isFinite(count) || count <= 0) continue;
+          out.push({ countryCode: code, count: Math.floor(count) });
+          if (out.length >= 300) break;
+        }
+        return { ok: true, value: out };
+      }
+
+      async function loadWebsiteSyncState() {
+        var stateNode = document.getElementById('website-sync-published-source');
+        if (!stateNode) return;
+        try {
+          var data = await fetchJSON('/api/admin/website/state');
+          var control = data.control || {};
+          var overrideCountries = Array.isArray(control.overrideCountries) ? control.overrideCountries : [];
+          var publishedCountries = Array.isArray(control.publishedCountries) ? control.publishedCountries : [];
+          var oneAmEnabled = !!control.oneAmFlushEnabled;
+          var overrideEnabled = !!control.overrideEnabled;
+
+          setWebsiteSyncText('website-sync-published-source', String(control.publishedSource || 'n/a'));
+          setWebsiteSyncText('website-sync-published-downloads', fmtNumber(Number(control.publishedDownloads || 0)));
+          setWebsiteSyncText('website-sync-published-countries', fmtNumber(publishedCountries.length));
+          setWebsiteSyncText('website-sync-oneam-state', oneAmEnabled ? 'Enabled' : 'Disabled');
+          setWebsiteSyncText('website-sync-override-state', overrideEnabled ? 'Enabled' : 'Disabled');
+          setWebsiteSyncText('website-sync-last-oracle', formatWebsiteSyncTimestamp(Number(control.lastOraclePushAt || 0)));
+          setWebsiteSyncText('website-sync-last-cloudflare', formatWebsiteSyncTimestamp(Number(control.lastCloudflarePushAt || 0)));
+          setWebsiteSyncText('website-sync-last-website', formatWebsiteSyncTimestamp(Number(control.lastWebsiteIngestAt || 0)));
+          setWebsiteSyncText('website-sync-last-batch-oracle', formatWebsiteSyncBatch(data.lastBatches && data.lastBatches.oracleToWebsite));
+          setWebsiteSyncText('website-sync-last-batch-cloudflare', formatWebsiteSyncBatch(data.lastBatches && data.lastBatches.cloudflareToWebsite));
+          setWebsiteSyncText('website-sync-last-batch-website', formatWebsiteSyncBatch(data.lastBatches && data.lastBatches.websiteToOracle));
+
+          var oneAmCheckbox = document.getElementById('website-sync-oneam-checkbox');
+          if (oneAmCheckbox) {
+            oneAmCheckbox.checked = oneAmEnabled;
+          }
+          var overrideEnabledCheckbox = document.getElementById('website-sync-override-enabled');
+          if (overrideEnabledCheckbox) {
+            overrideEnabledCheckbox.checked = overrideEnabled;
+          }
+          var overrideDownloadsInput = document.getElementById('website-sync-override-downloads');
+          if (overrideDownloadsInput && document.activeElement !== overrideDownloadsInput) {
+            overrideDownloadsInput.value = String(Math.max(0, Number(control.overrideDownloads || 0)));
+          }
+          var overrideCountriesInput = document.getElementById('website-sync-override-countries');
+          if (overrideCountriesInput && document.activeElement !== overrideCountriesInput) {
+            overrideCountriesInput.value = JSON.stringify(overrideCountries, null, 2);
+          }
+        } catch (e) {
+          setWebsiteSyncOutput({ ok: false, error: String(e) });
+        }
+      }
+
+      async function websiteSyncForcePush() {
+        var ok = await ensureStepUp();
+        if (!ok) return;
+        try {
+          var payload = await fetchJSONWithInit('/api/admin/website/force-push', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+          });
+          setWebsiteSyncOutput(payload);
+          await loadWebsiteSyncState();
+        } catch (e) {
+          setWebsiteSyncOutput({ ok: false, error: String(e) });
+        }
+      }
+
+      async function websiteSyncPullCloudflare() {
+        var ok = await ensureStepUp();
+        if (!ok) return;
+        try {
+          var payload = await fetchJSONWithInit('/api/admin/website/pull-cloudflare', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+          });
+          setWebsiteSyncOutput(payload);
+          await loadWebsiteSyncState();
+        } catch (e) {
+          setWebsiteSyncOutput({ ok: false, error: String(e) });
+        }
+      }
+
+      async function websiteSyncSaveOneAM() {
+        var checkbox = document.getElementById('website-sync-oneam-checkbox');
+        var enabled = !!(checkbox && checkbox.checked);
+        var ok = await ensureStepUp();
+        if (!ok) return;
+        try {
+          var payload = await fetchJSONWithInit('/api/admin/website/one-am-toggle', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled: enabled })
+          });
+          setWebsiteSyncOutput(payload);
+          await loadWebsiteSyncState();
+        } catch (e) {
+          setWebsiteSyncOutput({ ok: false, error: String(e) });
+        }
+      }
+
+      async function websiteSyncSaveOverride() {
+        var enabledEl = document.getElementById('website-sync-override-enabled');
+        var downloadsEl = document.getElementById('website-sync-override-downloads');
+        var countriesEl = document.getElementById('website-sync-override-countries');
+        var enabled = !!(enabledEl && enabledEl.checked);
+        var downloads = Number(downloadsEl && downloadsEl.value ? downloadsEl.value : 0);
+        if (!Number.isFinite(downloads) || downloads < 0) downloads = 0;
+        downloads = Math.floor(downloads);
+
+        var countriesResult = parseWebsiteOverrideCountries(countriesEl && countriesEl.value ? countriesEl.value : '[]');
+        if (!countriesResult.ok) {
+          setWebsiteSyncOutput({ ok: false, error: countriesResult.error });
+          return;
+        }
+
+        var ok = await ensureStepUp();
+        if (!ok) return;
+        try {
+          var payload = await fetchJSONWithInit('/api/admin/website/override', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              enabled: enabled,
+              downloads: downloads,
+              countries: countriesResult.value
+            })
+          });
+          setWebsiteSyncOutput(payload);
+          await loadWebsiteSyncState();
+        } catch (e) {
+          setWebsiteSyncOutput({ ok: false, error: String(e) });
+        }
+      }
+
       function setOracleLogsOutput(payload) {
         var out = document.getElementById('oracle-logs-output');
         if (!out) return;
@@ -2650,6 +2836,7 @@
         { combo: 'Cmd/Ctrl+1', desc: 'Go to Overview', run: function() { showPage('overview'); } },
         { combo: 'Cmd/Ctrl+2', desc: 'Go to Activity & Charts', run: function () { showPage('activity'); } },
         { combo: 'Cmd/Ctrl+3', desc: 'Go to Ops Hub', run: function() { showPage('dashboards'); } },
+        { combo: 'Cmd/Ctrl+8', desc: 'Go to Website Sync', run: function() { showPage('website-sync'); } },
         { combo: 'Cmd/Ctrl+4', desc: 'Go to Creative Hub', run: function () { showPage('creative'); } },
         { combo: 'Cmd/Ctrl+5', desc: 'Go to User Changelog', run: function () { showPage('content-changelog'); } },
         { combo: 'Cmd/Ctrl+6', desc: 'Go to User Privacy', run: function () { showPage('content-privacy'); } },
@@ -2712,6 +2899,7 @@
         if (!withShift && key === '1') { showPage('overview'); return true; }
         if (!withShift && key === '2') { showPage('activity'); return true; }
         if (!withShift && key === '3') { showPage('dashboards'); return true; }
+        if (!withShift && key === '8') { showPage('website-sync'); return true; }
         if (!withShift && key === '4') { showPage('creative'); return true; }
         if (!withShift && key === '5') { showPage('content-changelog'); return true; }
         if (!withShift && key === '6') { showPage('content-privacy'); return true; }
@@ -2786,6 +2974,11 @@
           ['log-sort-btn', toggleLogSort],
           ['log-export-btn', exportLogCSV],
           ['notifications-refresh-btn', loadNotifications],
+          ['website-sync-refresh-btn', loadWebsiteSyncState],
+          ['website-sync-force-push-btn', websiteSyncForcePush],
+          ['website-sync-pull-cloudflare-btn', websiteSyncPullCloudflare],
+          ['website-sync-oneam-save-btn', websiteSyncSaveOneAM],
+          ['website-sync-override-save-btn', websiteSyncSaveOverride],
           ['user-changelog-refresh-btn', loadUserChangelogRecords],
           ['user-privacy-refresh-btn', loadUserPrivacyRecords],
           ['logs-refresh-btn', loadOracleLogs],
@@ -2934,6 +3127,7 @@
           loadDeploymentsHub();
           await loadNotifications();
         }
+        if (currentPage === 'website-sync') await loadWebsiteSyncState();
         if (currentPage === 'creative') await loadCreativeHub();
         if (currentPage === 'content-changelog') await loadUserChangelogRecords();
         if (currentPage === 'content-privacy') await loadUserPrivacyRecords();
