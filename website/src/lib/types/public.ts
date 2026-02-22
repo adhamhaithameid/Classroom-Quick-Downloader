@@ -1,4 +1,5 @@
 export type WorkerHealth = 'up' | 'degraded' | 'down';
+export type PublicMetricsSource = 'oracle' | 'worker';
 
 export type InstallBrowser = {
   key: 'chrome' | 'firefox' | 'edge' | string;
@@ -50,6 +51,25 @@ export type MapResponse = {
   privacyNote: string;
 };
 
+export type WorkerSiteMetricsResponse = {
+  ok: boolean;
+  source: 'cloudflare-worker';
+  generatedAt: number;
+  snapshotAtUtc: number;
+  totals: {
+    downloads: number;
+    countries: number;
+  };
+  countries: Array<{ countryCode: string; count: number }>;
+  schedule: {
+    refreshHoursUtc: number[];
+    activeHourUtc: number;
+    isRefreshWindow: boolean;
+    lastRefreshAtUtc: number;
+    nextRefreshAtUtc: number;
+  };
+};
+
 export type ChangelogResponse = {
   ok: boolean;
   entries: Array<{
@@ -59,6 +79,43 @@ export type ChangelogResponse = {
     changes: string[];
     isImportant?: boolean;
   }>;
+};
+
+export type UserChangelogEntry = {
+  id: string;
+  version: string;
+  title: string;
+  summary: string;
+  highlights: string[];
+  releasedAtUtc: number | null;
+};
+
+export type UserChangelogResponse = {
+  ok: boolean;
+  generatedAt: number;
+  headline: string;
+  description: string;
+  entries: UserChangelogEntry[];
+  fullChangelogUrl: string;
+  lastUpdatedAtUtc: number | null;
+};
+
+export type UserPrivacySection = {
+  id: string;
+  title: string;
+  summary: string;
+  bullets: string[];
+  priority: number;
+};
+
+export type UserPrivacyResponse = {
+  ok: boolean;
+  generatedAt: number;
+  headline: string;
+  description: string;
+  sections: UserPrivacySection[];
+  fullPrivacyUrl: string;
+  lastUpdatedAtUtc: number | null;
 };
 
 export type UninstallFeedbackRequest = {
