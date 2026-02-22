@@ -750,10 +750,11 @@ func loadPublicLiveSinceUTC(ctx context.Context, sqliteDB *sql.DB) (*int64, erro
 func loadPublicWebsiteUninstallStats(ctx context.Context, sqliteDB *sql.DB) (publicWebsiteUninstallStats, error) {
 	var stats publicWebsiteUninstallStats
 	var lastSubmitted sql.NullInt64
+	// #nosec G701 -- static aggregate query with no dynamic SQL segments.
 	if err := sqliteDB.QueryRowContext(
 		ctx,
 		`SELECT COUNT(*), MAX(created_at) FROM website_uninstall_feedback`,
-	).Scan(&stats.TotalSubmissions, &lastSubmitted); err != nil { // #nosec G701 -- static aggregate query with no dynamic SQL segments.
+	).Scan(&stats.TotalSubmissions, &lastSubmitted); err != nil {
 		return publicWebsiteUninstallStats{}, err
 	}
 	if lastSubmitted.Valid && lastSubmitted.Int64 > 0 {
