@@ -311,6 +311,12 @@ func main() {
 	mux.Handle("/api/admin/oracle-logs/delete-older", authMiddleware(criticalMiddleware(handlers.OracleOperationLogsDeleteOlderHandler(sqlDB))))
 	mux.Handle("/api/admin/oracle-logs/clear-all", authMiddleware(criticalMiddleware(handlers.OracleOperationLogsClearAllHandler(sqlDB))))
 	mux.Handle("/api/admin/sheets/last-flush", authMiddleware(handlers.SheetsLastFlushHandler(sqlDB)))
+	cloudflarePublicSiteMetricsURL := getenv("CLOUDFLARE_PUBLIC_SITE_METRICS_URL", "")
+	mux.Handle("/api/admin/website/state", authMiddleware(handlers.WebsiteOpsStateHandler(sqlDB)))
+	mux.Handle("/api/admin/website/force-push", authMiddleware(criticalMiddleware(handlers.WebsiteOpsForcePushHandler(sqlDB))))
+	mux.Handle("/api/admin/website/pull-cloudflare", authMiddleware(criticalMiddleware(handlers.WebsiteOpsPullCloudflareHandler(sqlDB, cloudflarePublicSiteMetricsURL))))
+	mux.Handle("/api/admin/website/override", authMiddleware(criticalMiddleware(handlers.WebsiteOpsOverrideHandler(sqlDB))))
+	mux.Handle("/api/admin/website/one-am-toggle", authMiddleware(criticalMiddleware(handlers.WebsiteOpsOneAMToggleHandler(sqlDB))))
 	mux.Handle("/metrics", authMiddleware(metricsHandler(appMetrics, sqlDB)))
 
 	// Auth endpoints
@@ -340,6 +346,7 @@ func main() {
 		log.Printf("[Scheduler] deployment auto-sync enabled (interval=%s)", interval)
 		go handlers.StartDeploymentsAutoSyncLoop(serverCtx, sqlDB, postgresDB, appMetrics, interval)
 	}
+	go handlers.StartWebsiteOneAMPublisherLoop(serverCtx, sqlDB)
 	go startInMemoryStoreCleanupLoop(serverCtx, 15*time.Minute)
 	log.Println("[WARN] Session stores are in-memory. Sessions will NOT survive restarts and are NOT shared " +
 		"across multiple replicas. For HA deployments, configure POSTGRES_DSN to enable persisted auth state, " +

@@ -114,6 +114,42 @@ func Migrate(db *sql.DB) error {
 		`CREATE INDEX IF NOT EXISTS idx_website_uninstall_feedback_reason
 			ON website_uninstall_feedback(reason);`,
 
+		// Website sync control plane (Oracle/Cloudflare/Website transfer state).
+		`CREATE TABLE IF NOT EXISTS website_sync_control (
+			id                         INTEGER PRIMARY KEY CHECK (id = 1),
+			one_am_flush_enabled       INTEGER NOT NULL DEFAULT 1,
+			override_enabled           INTEGER NOT NULL DEFAULT 0,
+			override_downloads         INTEGER NOT NULL DEFAULT 0,
+			override_countries_json    TEXT NOT NULL DEFAULT '[]',
+			published_downloads        INTEGER NOT NULL DEFAULT 0,
+			published_countries_json   TEXT NOT NULL DEFAULT '[]',
+			published_source           TEXT NOT NULL DEFAULT 'oracle',
+			last_oracle_push_at        INTEGER,
+			last_cloudflare_push_at    INTEGER,
+			last_website_ingest_at     INTEGER,
+			updated_at                 INTEGER NOT NULL
+		);`,
+
+		`INSERT OR IGNORE INTO website_sync_control (
+			id, one_am_flush_enabled, override_enabled, override_downloads,
+			override_countries_json, published_downloads, published_countries_json,
+			published_source, last_oracle_push_at, last_cloudflare_push_at,
+			last_website_ingest_at, updated_at
+		) VALUES (1, 1, 0, 0, '[]', 0, '[]', 'oracle', NULL, NULL, NULL, 0);`,
+
+		`CREATE TABLE IF NOT EXISTS website_sync_batches (
+			id             INTEGER PRIMARY KEY AUTOINCREMENT,
+			direction      TEXT NOT NULL,
+			batch_id       TEXT NOT NULL,
+			triggered_by   TEXT NOT NULL DEFAULT '',
+			status         TEXT NOT NULL DEFAULT 'ok',
+			details_json   TEXT NOT NULL DEFAULT '{}',
+			created_at     INTEGER NOT NULL
+		);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_website_sync_batches_direction_created
+			ON website_sync_batches(direction, created_at DESC);`,
+
 		// DO state history (health + backlog + quota).
 		`CREATE TABLE IF NOT EXISTS do_state_snapshots (
 			snapshot_id           INTEGER PRIMARY KEY AUTOINCREMENT,
