@@ -243,6 +243,13 @@ if [[ "$(cat "$health_db_out")" != "ok" ]]; then
 fi
 pass "health db"
 
+run_get_json "/api/public/website/overview" '.ok == true and (.totals|type=="object") and (.installs|type=="object") and (.status|type=="object")' "public website overview"
+run_get_json "/api/public/website/map" '.ok == true and .granularity == "country" and (.countries|type=="array")' "public website map"
+run_get_json "/api/public/website/status" '.ok == true and (.status|type=="object")' "public website status"
+run_get_json "/api/public/website/changelog" '.ok == true and (.entries|type=="array") and (.fullChangelogUrl|type=="string")' "public website changelog"
+run_get_json "/api/public/website/privacy" '.ok == true and (.sections|type=="array") and (.fullPrivacyUrl|type=="string")' "public website privacy"
+run_get_json "/api/public/website/uninstall" '.ok == true and (.stats|type=="object")' "public website uninstall stats"
+
 # Prime cookies + CSRF preconditions for auth POST endpoints.
 curl -sS -o /dev/null -c "$COOKIE_JAR" -b "$COOKIE_JAR" "$BASE_URL/"
 login_payload="$(jq -cn --arg password "$DASHBOARD_PASSWORD" '{password:$password}')"
@@ -312,6 +319,8 @@ run_get_json "/api/admin/records/list?type=creative_design" '.ok == true and (.r
 run_get_json "/api/admin/records/list?type=creative_email_template" '.ok == true and (.records|type=="array")' "records creative_email_template"
 run_get_json "/api/admin/records/list?type=newsletter_subscriber" '.ok == true and (.records|type=="array")' "records newsletter_subscriber"
 run_get_json "/api/admin/records/list?type=newsletter_campaign" '.ok == true and (.records|type=="array")' "records newsletter_campaign"
+run_get_json "/api/admin/records/list?type=website_user_changelog_entry" '.ok == true and (.records|type=="array")' "records website_user_changelog_entry"
+run_get_json "/api/admin/records/list?type=website_user_privacy_section" '.ok == true and (.records|type=="array")' "records website_user_privacy_section"
 
 stepup_required="$(jq -r '.required // false' "$TMP_DIR/_api_auth_stepup_check.json")"
 if [[ "$stepup_required" != "true" ]]; then
