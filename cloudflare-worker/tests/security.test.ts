@@ -57,6 +57,17 @@ type StoredState = {
     recent?: Array<Record<string, unknown>>;
   };
   failureRollups?: Array<Record<string, unknown>>;
+  publicSiteMetricsSnapshot?: {
+    slotKey?: string;
+    snapshotAtUtc?: number;
+    downloads?: number;
+    countries?: Array<{ countryCode?: string; count?: number }>;
+  } | null;
+  websitePublicSyncEnabled?: boolean;
+  websiteManualFlushAt?: number | null;
+  websiteOverrideEnabled?: boolean;
+  websiteOverrideDownloads?: number;
+  websiteOverrideCountries?: Array<{ countryCode?: string; count?: number }>;
 };
 
 type TestEvent = {
@@ -326,6 +337,71 @@ describe("public site metrics snapshot endpoint", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("supports admin website override for public metrics output", async () => {
+    const { obj } = makeDOWithStored({
+      totalDownloads: 1200,
+      counters: {
+        byCountry: {
+          us: 400,
+          gb: 220,
+        },
+      },
+    });
+
+    const overrideRes = await callDO(obj, "/admin/website/override", {
+      enabled: true,
+      downloads: 777,
+      countries: [
+        { countryCode: "US", count: 600 },
+        { countryCode: "CA", count: 177 },
+        { countryCode: "xx", count: 123 },
+      ],
+    }, { "X-Admin-Secret": "secret" });
+    expect(overrideRes.status).toBe(200);
+
+    const publicRes = await callDOGet(obj, "/public/site-metrics");
+    expect(publicRes.status).toBe(200);
+    const payload = await publicRes.json() as {
+      totals?: { downloads?: number; countries?: number };
+      dataSource?: string;
+      countries?: Array<{ countryCode?: string; count?: number }>;
+    };
+    expect(payload.dataSource).toBe("override");
+    expect(payload.totals?.downloads).toBe(777);
+    expect(payload.totals?.countries).toBe(2);
+    expect(payload.countries).toEqual([
+      { countryCode: "US", count: 600 },
+      { countryCode: "CA", count: 177 },
+    ]);
+  });
+
+  it("allows toggling website auto refresh and forcing flush now", async () => {
+    const { obj } = makeDOWithStored({
+      totalDownloads: 90,
+      counters: { byCountry: { us: 90 } },
+    });
+
+    const toggleRes = await callDO(obj, "/admin/website/refresh-toggle", {
+      enabled: false,
+    }, { "X-Admin-Secret": "secret" });
+    expect(toggleRes.status).toBe(200);
+
+    const flushRes = await callDO(obj, "/admin/website/flush-now", {}, { "X-Admin-Secret": "secret" });
+    expect(flushRes.status).toBe(200);
+
+    const statusRes = await callDOGetWithAdmin(obj, "/admin/website/status");
+    expect(statusRes.status).toBe(200);
+    const statusPayload = await statusRes.json() as {
+      ok: boolean;
+      website?: { refreshEnabled?: boolean; lastManualFlushAtUtc?: number | null };
+      publicSnapshot?: { totals?: { downloads?: number } };
+    };
+    expect(statusPayload.ok).toBe(true);
+    expect(statusPayload.website?.refreshEnabled).toBe(false);
+    expect(typeof statusPayload.website?.lastManualFlushAtUtc).toBe("number");
+    expect(statusPayload.publicSnapshot?.totals?.downloads).toBe(90);
   });
 });
 
