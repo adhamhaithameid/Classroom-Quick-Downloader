@@ -120,6 +120,17 @@ describe("Dashboard pipeline health UI", () => {
   });
 });
 
+describe("Dashboard website sync UI", () => {
+  it("renders website sync controls in the data hub", () => {
+    const html = renderDashboard(makeStats());
+    expect(html).toContain('id="btn-website-status-refresh"');
+    expect(html).toContain('id="btn-website-flush-now"');
+    expect(html).toContain('id="btn-website-refresh-toggle"');
+    expect(html).toContain('id="btn-website-override-save"');
+    expect(html).toContain('id="website-admin-output"');
+  });
+});
+
 describe("Dashboard login rendering", () => {
   it("escapes injected login error content in the full dashboard template", () => {
     const html = renderMainLoginPage(`<img src=x onerror=alert("xss")>`);
