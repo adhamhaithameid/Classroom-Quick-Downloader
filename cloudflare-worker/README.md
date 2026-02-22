@@ -53,6 +53,7 @@ The **CQD Analytics Worker** is a high-performance, edge-deployed analytics inge
 │     GET  /stats          - Dashboard stats                                    │
 │     GET  /config         - Extension config                                   │
 │     GET  /health         - Health check                                       │
+│     GET  /public/site-metrics - Public website metrics snapshot                │
 │     POST /admin/*        - Admin actions (force-flush, cut-power, etc.)       │
 └───────────────────────────────────────┬───────────────────────────────────────┘
                                         │
@@ -381,6 +382,46 @@ Simple health probe.
 
 ```bash
 curl https://cqd-analytics.your-subdomain.workers.dev/health
+```
+
+### `GET /public/site-metrics` — Public Website Metrics Snapshot
+
+Returns a sanitized, country-level aggregate payload for the user website.
+
+- No raw IP data
+- No admin-only counters
+- Snapshot refresh windows (UTC): `03:00`, `06:00`, `09:00`, `12:00`, `15:00`, `18:00`, `21:00`
+
+**Request:**
+
+```bash
+curl https://cqd-analytics.your-subdomain.workers.dev/public/site-metrics
+```
+
+**Response (example):**
+
+```json
+{
+  "ok": true,
+  "source": "cloudflare-worker",
+  "generatedAt": 1771700000000,
+  "snapshotAtUtc": 1771699200000,
+  "totals": {
+    "downloads": 1200,
+    "countries": 2
+  },
+  "countries": [
+    { "countryCode": "US", "count": 700 },
+    { "countryCode": "GB", "count": 500 }
+  ],
+  "schedule": {
+    "refreshHoursUtc": [3, 6, 9, 12, 15, 18, 21],
+    "activeHourUtc": 12,
+    "isRefreshWindow": true,
+    "lastRefreshAtUtc": 1771699200000,
+    "nextRefreshAtUtc": 1771702800000
+  }
+}
 ```
 
 ```json
