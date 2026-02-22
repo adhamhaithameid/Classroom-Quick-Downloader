@@ -259,6 +259,76 @@ describe("Worker security helpers", () => {
   });
 });
 
+describe("public site metrics snapshot endpoint", () => {
+  it("returns sanitized country-level metrics without leaking internal counters", async () => {
+    const { obj } = makeDOWithStored({
+      totalDownloads: 1200,
+      counters: {
+        byCountry: {
+          us: 400,
+          gb: 220,
+          unknown: 99,
+          xx: 77,
+          u1: 55,
+        },
+      },
+    });
+
+    const res = await callDOGet(obj, "/public/site-metrics");
+    expect(res.status).toBe(200);
+
+    const payload = await res.json() as {
+      ok: boolean;
+      source: string;
+      totals?: { downloads?: number; countries?: number };
+      countries?: Array<{ countryCode?: string; count?: number }>;
+      counters?: unknown;
+      schedule?: { refreshHoursUtc?: number[] };
+    };
+
+    expect(payload.ok).toBe(true);
+    expect(payload.source).toBe("cloudflare-worker");
+    expect(payload.totals?.downloads).toBe(1200);
+    expect(payload.totals?.countries).toBe(2);
+    expect(payload.countries).toEqual([
+      { countryCode: "US", count: 400 },
+      { countryCode: "GB", count: 220 },
+    ]);
+    expect(payload.counters).toBeUndefined();
+    expect(payload.schedule?.refreshHoursUtc).toEqual([3, 6, 9, 12, 15, 18, 21]);
+  });
+
+  it("refreshes snapshots only once per scheduled UTC slot", async () => {
+    vi.useFakeTimers();
+    try {
+      const { obj } = makeDOWithStored({
+        totalDownloads: 10,
+        counters: {
+          byCountry: {
+            us: 10,
+          },
+        },
+      });
+
+      vi.setSystemTime(new Date("2026-02-21T04:10:00.000Z"));
+      const first = await callDOGet(obj, "/public/site-metrics");
+      const firstPayload = await first.json() as { snapshotAtUtc: number };
+
+      vi.setSystemTime(new Date("2026-02-21T04:50:00.000Z"));
+      const second = await callDOGet(obj, "/public/site-metrics");
+      const secondPayload = await second.json() as { snapshotAtUtc: number };
+      expect(secondPayload.snapshotAtUtc).toBe(firstPayload.snapshotAtUtc);
+
+      vi.setSystemTime(new Date("2026-02-21T06:05:00.000Z"));
+      const third = await callDOGet(obj, "/public/site-metrics");
+      const thirdPayload = await third.json() as { snapshotAtUtc: number };
+      expect(thirdPayload.snapshotAtUtc).toBeGreaterThan(firstPayload.snapshotAtUtc);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
 describe("Durable Object security behaviors", () => {
   it("checkOnly login attempts do not mutate state", async () => {
     const { obj, state } = makeDO();
