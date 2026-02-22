@@ -44,6 +44,11 @@
               <span class="nav-item-emoji" aria-hidden="true">🛰️</span>
               <span class="nav-item-label">Ops Hub</span>
             </button>
+            <button class="nav-item" data-page="website-sync" data-shortcut="Cmd+8"
+              data-tooltip="Website sync batches and public website controls" data-tooltip-position="bottom" aria-label="Website Sync controls">
+              <span class="nav-item-emoji" aria-hidden="true">🌐</span>
+              <span class="nav-item-label">Website Sync</span>
+            </button>
             <button class="nav-item" data-page="creative" data-shortcut="Cmd+4"
               data-tooltip="Design, email templates, and newsletter management" data-tooltip-position="bottom" aria-label="Creative Hub — email templates and newsletters">
               <span class="nav-item-emoji" aria-hidden="true">🎨</span>
@@ -136,6 +141,7 @@
               <option value="overview">Overview</option>
               <option value="activity">Activity &amp; Charts</option>
               <option value="dashboards">Ops Hub</option>
+              <option value="website-sync">Website Sync</option>
               <option value="creative">Creative Hub</option>
               <option value="content-changelog">User Changelog</option>
               <option value="content-privacy">User Privacy</option>
@@ -622,6 +628,96 @@
               </div>
               <div class="card-body card-body-top">
                 <pre id="deployment-sync-output" class="json-viewer json-viewer-compact hidden"></pre>
+              </div>
+            </div>
+          </div>
+
+          <div class="page" id="page-website-sync">
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <div class="card-title">Website Sync Actions</div>
+                  <div class="card-subtitle">Oracle, Cloudflare, and Website transfer control plane</div>
+                </div>
+                <div class="action-buttons-grid action-buttons-grid-three">
+                  <button class="btn btn-secondary" id="website-sync-refresh-btn">Refresh</button>
+                  <button class="btn btn-secondary" id="website-sync-force-push-btn">Force Push Oracle → Website</button>
+                  <button class="btn btn-secondary" id="website-sync-pull-cloudflare-btn">Pull Cloudflare → Website</button>
+                </div>
+              </div>
+              <div class="card-body">
+                <div class="section-block">
+                  <div class="section-caption">Current State</div>
+                  <div class="stats-grid">
+                    <div class="stat-card2">
+                      <div class="stat-label">Published Source</div>
+                      <div class="stat-value" id="website-sync-published-source">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Published Downloads</div>
+                      <div class="stat-value" id="website-sync-published-downloads">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Published Countries</div>
+                      <div class="stat-value" id="website-sync-published-countries">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">1AM Flush</div>
+                      <div class="stat-value" id="website-sync-oneam-state">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Override</div>
+                      <div class="stat-value" id="website-sync-override-state">--</div>
+                    </div>
+                  </div>
+                  <div class="pill-row" id="website-sync-times-row">
+                    <span class="pill">Last Oracle Push: <strong id="website-sync-last-oracle">--</strong></span>
+                    <span class="pill">Last Cloudflare Push: <strong id="website-sync-last-cloudflare">--</strong></span>
+                    <span class="pill">Last Website Ingest: <strong id="website-sync-last-website">--</strong></span>
+                  </div>
+                </div>
+
+                <div class="section-block">
+                  <div class="section-caption">Latest Batches</div>
+                  <div class="stats-grid">
+                    <div class="stat-card2">
+                      <div class="stat-label">Oracle → Website</div>
+                      <div class="stat-value" id="website-sync-last-batch-oracle">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Cloudflare → Website</div>
+                      <div class="stat-value" id="website-sync-last-batch-cloudflare">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Website → Oracle</div>
+                      <div class="stat-value" id="website-sync-last-batch-website">--</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="section-block">
+                  <div class="section-caption">Admin Controls</div>
+                  <div class="action-buttons-grid action-buttons-grid-two">
+                    <label class="auth-field-inline">
+                      <input type="checkbox" id="website-sync-oneam-checkbox" />
+                      <span>Enable 1AM Oracle publish scheduler</span>
+                    </label>
+                    <button class="btn btn-secondary" id="website-sync-oneam-save-btn">Save 1AM Setting</button>
+                  </div>
+                  <div class="section-block">
+                    <label class="auth-field-inline">
+                      <input type="checkbox" id="website-sync-override-enabled" />
+                      <span>Enable override for website public data</span>
+                    </label>
+                    <div class="form-grid">
+                      <input id="website-sync-override-downloads" class="auth-input" type="number" min="0" placeholder="Override total downloads" />
+                      <textarea id="website-sync-override-countries" class="auth-input auth-input-lg" placeholder='Override countries JSON (e.g. [{"countryCode":"US","count":1234}])'></textarea>
+                      <button class="btn btn-danger" id="website-sync-override-save-btn">Save Override</button>
+                    </div>
+                  </div>
+                </div>
+
+                <pre id="website-sync-output" class="json-viewer json-viewer-compact hidden"></pre>
               </div>
             </div>
           </div>

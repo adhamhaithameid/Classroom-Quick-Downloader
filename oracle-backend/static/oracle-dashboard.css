@@ -1652,11 +1652,26 @@
       }
       .action-buttons-grid-five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
       .action-buttons-grid-four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .action-buttons-grid-three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
       .action-buttons-grid-two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .action-buttons-grid-logs {
         grid-template-columns: auto auto auto auto auto;
         max-width: 920px;
         align-items: center;
+      }
+      .auth-field-inline {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 12px;
+        border: 1px solid var(--border-primary);
+        border-radius: 10px;
+        background: rgba(255,255,255,0.03);
+        color: var(--text-secondary);
+        font-size: 13px;
+      }
+      .auth-field-inline input[type="checkbox"] {
+        accent-color: var(--accent);
       }
       .inline-controls {
         display: flex;
