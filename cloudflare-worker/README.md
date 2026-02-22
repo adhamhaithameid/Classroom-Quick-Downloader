@@ -391,6 +391,7 @@ Returns a sanitized, country-level aggregate payload for the user website.
 - No raw IP data
 - No admin-only counters
 - Snapshot refresh windows (UTC): `03:00`, `06:00`, `09:00`, `12:00`, `15:00`, `18:00`, `21:00`
+- CORS is wildcard (`Access-Control-Allow-Origin: *`) for safe public website reads.
 
 **Request:**
 
