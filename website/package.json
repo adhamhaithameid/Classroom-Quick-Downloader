@@ -5,15 +5,18 @@
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
+		"dev:pages": "npx wrangler pages dev build",
 		"build": "vite build",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"test": "vitest run",
-		"test:unit": "vitest run src/lib/api/publicSite.test.ts src/lib/api/changelog.test.ts",
+		"test:unit": "vitest run src/lib/api/metrics-source.test.ts src/lib/api/publicSite.test.ts src/lib/api/changelog.test.ts",
 		"test:integration": "vitest run src/lib/api/publicSite.integration.test.ts",
-		"test:acceptance": "vitest run src/lib/content/repoMarkdown.acceptance.test.ts",
+		"test:component": "vitest run src/lib/uninstall/feedback.component.test.ts",
+		"test:acceptance": "vitest run src/lib/api/publicSite.acceptance.test.ts",
+		"test:system": "pnpm run test:integration && pnpm run test:component && pnpm run test:acceptance",
 		"test:watch": "vitest"
 	},
 	"dependencies": {
