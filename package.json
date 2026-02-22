@@ -14,6 +14,8 @@
     "test:unit": "pnpm -C website test:unit",
     "test:integration": "pnpm -C website test:integration && (cd oracle-backend && go test ./internal/handlers -run PublicWebsite -count=1)",
     "test:acceptance": "pnpm -C website test:acceptance",
+    "test:component": "pnpm -C website test:component",
+    "test:system": "pnpm -C website test:system && (cd oracle-backend && go test ./cmd/app -run Integration -count=1)",
     "test:oracle": "pnpm -C oracle-backend test",
     "validate:oracle": "pnpm -C oracle-backend validate",
     "changelog:full": "node tools/generate-full-changelog.mjs",
@@ -26,7 +28,8 @@
       "undici": ">=7.18.2",
       "@isaacs/brace-expansion": ">=5.0.1",
       "minimatch": "^10.2.1",
-      "web-ext-run>multimatch": "8.0.0"
+      "web-ext-run>multimatch": "8.0.0",
+      "cookie": "0.7.2"
     },
     "packageExtensions": {
       "eslint@10.0.1": {
