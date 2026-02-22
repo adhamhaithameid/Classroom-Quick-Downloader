@@ -24,6 +24,7 @@ describe('metrics source schedule', () => {
   });
 
   it('resolves source from UTC hour', () => {
+    expect(resolveMetricsSource(new Date('2026-02-21T20:59:59.000Z'))).toBe('worker');
     expect(resolveMetricsSource(new Date('2026-02-21T22:00:00.000Z'))).toBe('oracle');
     expect(resolveMetricsSource(new Date('2026-02-21T01:00:00.000Z'))).toBe('oracle');
     expect(resolveMetricsSource(new Date('2026-02-21T09:00:00.000Z'))).toBe('worker');
