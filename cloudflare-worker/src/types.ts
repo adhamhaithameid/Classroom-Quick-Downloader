@@ -244,6 +244,28 @@ export interface StatsResponse {
   };
 }
 
+export interface PublicSiteMetricsResponse {
+  ok: boolean;
+  source: "cloudflare-worker";
+  generatedAt: number;
+  snapshotAtUtc: number;
+  totals: {
+    downloads: number;
+    countries: number;
+  };
+  countries: Array<{
+    countryCode: string;
+    count: number;
+  }>;
+  schedule: {
+    refreshHoursUtc: number[];
+    activeHourUtc: number;
+    isRefreshWindow: boolean;
+    lastRefreshAtUtc: number;
+    nextRefreshAtUtc: number;
+  };
+}
+
 /**
  * Response payload for /config (used by the extension).
  */
