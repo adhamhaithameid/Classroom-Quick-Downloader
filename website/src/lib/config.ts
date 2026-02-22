@@ -1,4 +1,4 @@
-const DEFAULT_SITE_URL = 'https://adhamhaithameid.github.io/Classroom-Quick-Downloader';
+const DEFAULT_SITE_URL = 'https://classroom-quick-downloader.pages.dev';
 const DEFAULT_WORKER_URL = 'https://cqd-analytics.adhamhaithameid.workers.dev';
 const DEFAULT_ORACLE_URL = 'http://localhost:8080';
 
