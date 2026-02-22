@@ -8,6 +8,7 @@
 
   let state: 'loading' | 'ready' | 'error' = 'loading';
   let error = '';
+  let refreshing = false;
   let overview: OverviewResponse | null = null;
   let topCountries: Array<{ countryCode: string; count: number }> = [];
 
@@ -39,8 +40,9 @@
     return dynamic || STORE_LINKS[key];
   }
 
-  async function loadOverview(): Promise<void> {
-    state = 'loading';
+  async function loadOverview(force = false): Promise<void> {
+    if (!force) state = 'loading';
+    if (force) refreshing = true;
     error = '';
     try {
       const [overviewResult, mapResult] = await Promise.allSettled([fetchOverview(), fetchMapData()]);
@@ -59,6 +61,8 @@
     } catch (err) {
       error = err instanceof Error ? err.message : 'Failed to load public metrics.';
       state = 'error';
+    } finally {
+      refreshing = false;
     }
   }
 
@@ -79,15 +83,19 @@
     </div>
 
     <p class="hero-description">
-      Classroom Quick Downloader removes repetitive clicks and keeps performance transparent with live public metrics.
+      Classroom Quick Downloader helps students save time by downloading Classroom materials faster with fewer manual steps.
     </p>
 
     <div class="hero-actions">
       <a class="cta primary" href={browserLink(preferredBrowser)} target="_blank" rel="noopener noreferrer">
         Install for {preferredBrowser[0].toUpperCase() + preferredBrowser.slice(1)}
       </a>
-      <a class="cta" href="{base}/changelog">Read `CHANGELOG.md`</a>
-      <a class="cta ghost" href="{base}/privacy">Review privacy policy</a>
+      <a class="cta" href="{base}/changelog">What's new</a>
+      <a class="cta ghost" href="{base}/privacy">Privacy at a glance</a>
+      <a class="cta ghost" href={STORE_LINKS.github} target="_blank" rel="noopener noreferrer">Star on GitHub</a>
+      <button class="cta" type="button" on:click={() => loadOverview(true)} disabled={refreshing}>
+        {refreshing ? 'Refreshing…' : 'Refresh data'}
+      </button>
     </div>
   </div>
 
@@ -95,7 +103,9 @@
     <p>Total Downloads</p>
     <strong>{formatNumber(overview?.totals.downloads ?? 0)}</strong>
     <small>
-      {#if overview?.status.systemLive}
+      {#if (overview?.totals.downloads ?? 0) === 0}
+        Status monitor is warming up to take the total downloads.
+      {:else if overview?.status.systemLive}
         System live since {formatDate(overview.status.liveSinceUtc)} (UTC)
       {:else}
         Status monitor is warming up.
@@ -107,38 +117,24 @@
 
 {#if state === 'loading'}
   <div class="state-loading">Loading live project metrics…</div>
-{:else if state === 'error'}
-  <div class="state-error">
-    <strong>Could not load live metrics.</strong>
-    <p>{error}</p>
-    <button type="button" class="retry" on:click={loadOverview}>Retry</button>
-  </div>
-{:else}
+  {:else if state === 'error'}
+    <div class="state-error">
+      <strong>Could not load live metrics.</strong>
+      <p>{error}</p>
+      <button type="button" class="retry" on:click={() => loadOverview()}>Retry</button>
+    </div>
+  {:else}
   <section class="metric-grid section-gap">
-    <article class="metric">
-      <div class="metric-label">Successful Downloads</div>
-      <div class="metric-value">{formatNumber(overview?.totals.success ?? 0)}</div>
-    </article>
-    <article class="metric">
-      <div class="metric-label">Failed Downloads</div>
-      <div class="metric-value">{formatNumber(overview?.totals.fail ?? 0)}</div>
-    </article>
     <article class="metric">
       <div class="metric-label">Store Installs (Combined)</div>
       <div class="metric-value">{formatNumber(overview?.installs.usersTotal ?? 0)}</div>
     </article>
-    <article class="metric">
-      <div class="metric-label">Worker Health</div>
-      <div class="metric-value metric-state {overview?.status.workerHealth}">
-        {overview?.status.workerHealth.toUpperCase()}
-      </div>
-    </article>
   </section>
 
   <section class="card section-gap availability">
-    <div class="section-head">
-      <h2>Install & Version Data</h2>
-      <span>Live values from Oracle public APIs</span>
+      <div class="section-head">
+        <h2>Install Availability</h2>
+      <span>Total installs across supported browsers</span>
     </div>
 
     <div class="store-grid">
@@ -155,9 +151,7 @@
               <span class="badge">Detected Browser</span>
             {/if}
           </div>
-          <p><strong>{formatNumber(browser.usersCount)}</strong> users</p>
-          <p>Version: <code>{browser.version || 'N/A'}</code></p>
-          <p>Rating: <code>{browser.rating || 'N/A'}</code> ({formatNumber(browser.ratingCount)} reviews)</p>
+          <p><strong>{formatNumber(browser.usersCount)}</strong> installs</p>
         </a>
       {/each}
     </div>
@@ -186,7 +180,7 @@
       <a href="{base}/privacy">Read privacy policy</a>
       <a href="{base}/map">Open global map</a>
       <a href="{base}/uninstall">Send uninstall feedback</a>
-      <a href="{base}/changelog">Read full changelog</a>
+      <a href="{base}/changelog">Read user changelog</a>
     </div>
   </section>
 {/if}
@@ -271,6 +265,8 @@
     color: var(--text);
     background: var(--surface);
     transition: transform 0.2s ease, border-color 0.2s ease;
+    cursor: pointer;
+    font-size: 14px;
   }
 
   .cta:hover {
@@ -286,6 +282,12 @@
 
   .cta.ghost {
     background: rgba(255, 255, 255, 0.62);
+  }
+
+  .cta:disabled {
+    opacity: 0.75;
+    cursor: wait;
+    transform: none;
   }
 
   .hero-metric {
@@ -350,22 +352,6 @@
     background: var(--surface);
     padding: 6px 10px;
     cursor: pointer;
-  }
-
-  .metric-state {
-    font-size: 16px;
-  }
-
-  .metric-state.up {
-    color: var(--good);
-  }
-
-  .metric-state.degraded {
-    color: var(--warn);
-  }
-
-  .metric-state.down {
-    color: var(--danger);
   }
 
   .availability,
