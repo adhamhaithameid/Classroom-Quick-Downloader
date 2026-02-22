@@ -43,6 +43,7 @@ pnpm -C website dev
 
 - Open `http://localhost:5173` in your browser.
 - Open `http://localhost:4173` after running `pnpm -C website preview`.
+- Optional Cloudflare Pages emulation: `pnpm -C website dev:pages` (after `pnpm -C website build`).
 
 ## 6) Verify Live Endpoints
 
