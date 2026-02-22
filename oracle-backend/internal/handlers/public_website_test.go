@@ -200,6 +200,22 @@ func TestPublicWebsiteHandlers_RejectDisallowedOrigin(t *testing.T) {
 	}
 }
 
+func TestPublicWebsiteHandlers_AllowsCloudflarePagesDefaultOrigin(t *testing.T) {
+	sqlDB := openPublicWebsiteDB(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/public/website/map", nil)
+	req.Header.Set("Origin", "https://classroom-quick-downloader.pages.dev")
+	rr := httptest.NewRecorder()
+	PublicWebsiteMapHandler(sqlDB).ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+	if rr.Header().Get("Access-Control-Allow-Origin") != "https://classroom-quick-downloader.pages.dev" {
+		t.Fatalf("unexpected CORS origin header: %q", rr.Header().Get("Access-Control-Allow-Origin"))
+	}
+}
+
 func TestPublicWebsiteHandlers_PreflightForAllowedOrigin(t *testing.T) {
 	sqlDB := openPublicWebsiteDB(t)
 	t.Setenv("PUBLIC_WEBSITE_ALLOWED_ORIGINS", "https://adhamhaithameid.github.io")
@@ -328,6 +344,176 @@ func TestPublicWebsiteUninstallHandler_RejectsBadInputs(t *testing.T) {
 			PublicWebsiteUninstallHandler(sqlDB).ServeHTTP(rr, req)
 			if rr.Code != tc.wantStatus {
 				t.Fatalf("expected %d, got %d: %s", tc.wantStatus, rr.Code, rr.Body.String())
+			}
+		})
+	}
+}
+
+func TestPublicWebsiteUserChangelogHandler_ReturnsSanitizedEntries(t *testing.T) {
+	sqlDB := openPublicWebsiteDB(t)
+	t.Setenv("PUBLIC_WEBSITE_ALLOWED_ORIGINS", "https://adhamhaithameid.github.io")
+
+	if _, err := sqlDB.Exec(`INSERT INTO admin_records
+		(record_type, record_key, data_json, created_at, updated_at)
+		VALUES
+		('website_user_changelog_entry', 'release-136', '{"version":"1.3.6","title":"Faster downloads","summary":"Improved download stability and speed.","highlights":["Fewer failed requests","Cleaner progress feedback"],"releasedAtUtc":1771600000000}', 1771600000000, 1771600000000),
+		('website_user_changelog_entry', 'bad-entry', '{"version":"","title":"bad","summary":""}', 1771600000001, 1771600000001)
+	`); err != nil {
+		t.Fatalf("seed changelog records failed: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/public/website/changelog", nil)
+	req.Header.Set("Origin", "https://adhamhaithameid.github.io")
+	rr := httptest.NewRecorder()
+	PublicWebsiteUserChangelogHandler(sqlDB, nil).ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var payload struct {
+		OK      bool `json:"ok"`
+		Entries []struct {
+			ID         string   `json:"id"`
+			Version    string   `json:"version"`
+			Summary    string   `json:"summary"`
+			Highlights []string `json:"highlights"`
+		} `json:"entries"`
+		FullChangelogURL string `json:"fullChangelogUrl"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode payload failed: %v", err)
+	}
+
+	if !payload.OK {
+		t.Fatal("expected ok=true")
+	}
+	if len(payload.Entries) != 1 {
+		t.Fatalf("expected one valid changelog entry, got %d", len(payload.Entries))
+	}
+	if payload.Entries[0].Version != "1.3.6" {
+		t.Fatalf("unexpected version: %+v", payload.Entries[0])
+	}
+	if !strings.Contains(payload.FullChangelogURL, "CHANGELOG.md") {
+		t.Fatalf("unexpected full changelog URL: %s", payload.FullChangelogURL)
+	}
+	if strings.Contains(rr.Body.String(), "record_type") || strings.Contains(rr.Body.String(), "data_json") {
+		t.Fatalf("payload leaked internal fields: %s", rr.Body.String())
+	}
+}
+
+func TestPublicWebsiteUserPrivacyHandler_ReturnsUserFriendlySections(t *testing.T) {
+	sqlDB := openPublicWebsiteDB(t)
+	t.Setenv("PUBLIC_WEBSITE_ALLOWED_ORIGINS", "https://adhamhaithameid.github.io")
+
+	if _, err := sqlDB.Exec(`INSERT INTO admin_records
+		(record_type, record_key, data_json, created_at, updated_at)
+		VALUES
+		('website_user_privacy_section', 'what-we-collect', '{"title":"What we collect","summary":"Only aggregate usage signals.","bullets":["No document content","No student passwords"],"priority":1}', 1771600000000, 1771600000000)
+	`); err != nil {
+		t.Fatalf("seed privacy records failed: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/public/website/privacy", nil)
+	req.Header.Set("Origin", "https://adhamhaithameid.github.io")
+	rr := httptest.NewRecorder()
+	PublicWebsiteUserPrivacyHandler(sqlDB, nil).ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var payload struct {
+		OK       bool `json:"ok"`
+		Sections []struct {
+			ID      string   `json:"id"`
+			Title   string   `json:"title"`
+			Summary string   `json:"summary"`
+			Bullets []string `json:"bullets"`
+		} `json:"sections"`
+		FullPrivacyURL string `json:"fullPrivacyUrl"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode payload failed: %v", err)
+	}
+	if !payload.OK {
+		t.Fatal("expected ok=true")
+	}
+	if len(payload.Sections) != 1 {
+		t.Fatalf("expected one section, got %d", len(payload.Sections))
+	}
+	if payload.Sections[0].Title != "What we collect" {
+		t.Fatalf("unexpected section title: %+v", payload.Sections[0])
+	}
+	if !strings.Contains(payload.FullPrivacyURL, "PRIVACY.md") {
+		t.Fatalf("unexpected full privacy URL: %s", payload.FullPrivacyURL)
+	}
+}
+
+func TestPublicWebsiteContentHandlers_RejectDisallowedOrigin(t *testing.T) {
+	sqlDB := openPublicWebsiteDB(t)
+	t.Setenv("PUBLIC_WEBSITE_ALLOWED_ORIGINS", "https://adhamhaithameid.github.io")
+
+	tests := []struct {
+		name    string
+		handler http.HandlerFunc
+		path    string
+	}{
+		{
+			name:    "changelog",
+			handler: PublicWebsiteUserChangelogHandler(sqlDB, nil),
+			path:    "/api/public/website/changelog",
+		},
+		{
+			name:    "privacy",
+			handler: PublicWebsiteUserPrivacyHandler(sqlDB, nil),
+			path:    "/api/public/website/privacy",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, tt.path, nil)
+			req.Header.Set("Origin", "https://evil.example")
+			rr := httptest.NewRecorder()
+			tt.handler.ServeHTTP(rr, req)
+			if rr.Code != http.StatusForbidden {
+				t.Fatalf("expected 403, got %d", rr.Code)
+			}
+		})
+	}
+}
+
+func TestPublicWebsiteContentHandlers_RejectInvalidMethods(t *testing.T) {
+	sqlDB := openPublicWebsiteDB(t)
+	t.Setenv("PUBLIC_WEBSITE_ALLOWED_ORIGINS", "https://adhamhaithameid.github.io")
+
+	tests := []struct {
+		name    string
+		handler http.HandlerFunc
+		path    string
+	}{
+		{
+			name:    "changelog-post-not-allowed",
+			handler: PublicWebsiteUserChangelogHandler(sqlDB, nil),
+			path:    "/api/public/website/changelog",
+		},
+		{
+			name:    "privacy-post-not-allowed",
+			handler: PublicWebsiteUserPrivacyHandler(sqlDB, nil),
+			path:    "/api/public/website/privacy",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, tt.path, bytes.NewBufferString(`{}`))
+			req.Header.Set("Origin", "https://adhamhaithameid.github.io")
+			req.Header.Set("X-Requested-With", "XMLHttpRequest")
+			rr := httptest.NewRecorder()
+			tt.handler.ServeHTTP(rr, req)
+			if rr.Code != http.StatusMethodNotAllowed {
+				t.Fatalf("expected 405, got %d", rr.Code)
 			}
 		})
 	}
