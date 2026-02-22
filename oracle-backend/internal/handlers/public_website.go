@@ -16,8 +16,10 @@ import (
 )
 
 const (
-	publicWebsiteCacheControl = "public, max-age=120, stale-while-revalidate=60"
-	defaultGitHubRepoSlug     = "adhamhaithameid/Classroom-Quick-Downloader"
+	publicWebsiteCacheControl            = "public, max-age=120, stale-while-revalidate=60"
+	defaultGitHubRepoSlug                = "adhamhaithameid/Classroom-Quick-Downloader"
+	publicWebsiteUserChangelogRecordType = "website_user_changelog_entry"
+	publicWebsiteUserPrivacyRecordType   = "website_user_privacy_section"
 )
 
 var (
@@ -25,6 +27,7 @@ var (
 
 	defaultPublicWebsiteAllowedOrigins = []string{
 		"https://adhamhaithameid.github.io",
+		"https://classroom-quick-downloader.pages.dev",
 		"http://localhost:5173",
 		"http://127.0.0.1:5173",
 	}
@@ -64,6 +67,43 @@ type publicWebsiteMapResponse struct {
 	Countries   []publicWebsiteCountryCell `json:"countries"`
 	Totals      publicWebsiteMapTotals     `json:"totals"`
 	PrivacyNote string                     `json:"privacyNote"`
+}
+
+type publicWebsiteUserChangelogResponse struct {
+	OK               bool                              `json:"ok"`
+	GeneratedAt      int64                             `json:"generatedAt"`
+	Headline         string                            `json:"headline"`
+	Description      string                            `json:"description"`
+	Entries          []publicWebsiteUserChangelogEntry `json:"entries"`
+	FullChangelogURL string                            `json:"fullChangelogUrl"`
+	LastUpdatedAtUTC *int64                            `json:"lastUpdatedAtUtc"`
+}
+
+type publicWebsiteUserChangelogEntry struct {
+	ID            string   `json:"id"`
+	Version       string   `json:"version"`
+	Title         string   `json:"title"`
+	Summary       string   `json:"summary"`
+	Highlights    []string `json:"highlights"`
+	ReleasedAtUTC *int64   `json:"releasedAtUtc"`
+}
+
+type publicWebsiteUserPrivacyResponse struct {
+	OK             bool                            `json:"ok"`
+	GeneratedAt    int64                           `json:"generatedAt"`
+	Headline       string                          `json:"headline"`
+	Description    string                          `json:"description"`
+	Sections       []publicWebsiteUserPrivacyEntry `json:"sections"`
+	FullPrivacyURL string                          `json:"fullPrivacyUrl"`
+	LastUpdatedAt  *int64                          `json:"lastUpdatedAtUtc"`
+}
+
+type publicWebsiteUserPrivacyEntry struct {
+	ID       string   `json:"id"`
+	Title    string   `json:"title"`
+	Summary  string   `json:"summary"`
+	Bullets  []string `json:"bullets"`
+	Priority int64    `json:"priority"`
 }
 
 type publicWebsiteUninstallRequest struct {
@@ -257,6 +297,52 @@ func PublicWebsiteStatusHandler(sqliteDB *sql.DB) http.HandlerFunc {
 	}
 }
 
+func PublicWebsiteUserChangelogHandler(sqliteDB, postgresDB *sql.DB) http.HandlerFunc {
+	store := newControlPlaneStore(sqliteDB, postgresDB)
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !preparePublicWebsiteCORSWithOptions(w, r, publicWebsiteCORSOptions{
+			AllowedMethods: "GET, OPTIONS",
+		}) {
+			return
+		}
+		if r.Method != http.MethodGet {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+
+		payload, err := buildPublicWebsiteUserChangelog(r.Context(), store)
+		if err != nil {
+			http.Error(w, "failed to load changelog", http.StatusInternalServerError)
+			return
+		}
+
+		writePublicWebsiteJSON(w, http.StatusOK, payload)
+	}
+}
+
+func PublicWebsiteUserPrivacyHandler(sqliteDB, postgresDB *sql.DB) http.HandlerFunc {
+	store := newControlPlaneStore(sqliteDB, postgresDB)
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !preparePublicWebsiteCORSWithOptions(w, r, publicWebsiteCORSOptions{
+			AllowedMethods: "GET, OPTIONS",
+		}) {
+			return
+		}
+		if r.Method != http.MethodGet {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+
+		payload, err := buildPublicWebsiteUserPrivacy(r.Context(), store)
+		if err != nil {
+			http.Error(w, "failed to load privacy content", http.StatusInternalServerError)
+			return
+		}
+
+		writePublicWebsiteJSON(w, http.StatusOK, payload)
+	}
+}
+
 func PublicWebsiteUninstallHandler(sqliteDB *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !preparePublicWebsiteCORSWithOptions(w, r, publicWebsiteCORSOptions{
@@ -369,6 +455,163 @@ func buildPublicWebsiteOverview(ctx context.Context, sqliteDB *sql.DB, store *co
 	}, nil
 }
 
+func buildPublicWebsiteUserChangelog(ctx context.Context, store *controlPlaneStore) (publicWebsiteUserChangelogResponse, error) {
+	now := time.Now().UTC().UnixMilli()
+	fullURL := githubMarkdownURL("CHANGELOG.md")
+	records, err := store.listRecords(ctx, publicWebsiteUserChangelogRecordType)
+	if err != nil {
+		return publicWebsiteUserChangelogResponse{}, err
+	}
+
+	entries := make([]publicWebsiteUserChangelogEntry, 0, len(records))
+	var lastUpdated *int64
+	for _, row := range records {
+		data := decodeRecordDataMap(row.Data)
+		version := trimAndLimit(stringFromAny(data["version"]), 64)
+		title := trimAndLimit(stringFromAny(data["title"]), 120)
+		summary := trimAndLimit(stringFromAny(data["summary"]), 500)
+		if version == "" || summary == "" {
+			continue
+		}
+		highlights := normalizeStringList(data["highlights"], 6, 180)
+		releasedAt := int64PtrFromAny(data["releasedAtUtc"])
+		entries = append(entries, publicWebsiteUserChangelogEntry{
+			ID:            trimAndLimit(row.RecordKey, 120),
+			Version:       version,
+			Title:         title,
+			Summary:       summary,
+			Highlights:    highlights,
+			ReleasedAtUTC: releasedAt,
+		})
+		if row.UpdatedAt > 0 && (lastUpdated == nil || row.UpdatedAt > *lastUpdated) {
+			updated := row.UpdatedAt
+			lastUpdated = &updated
+		}
+	}
+
+	sort.Slice(entries, func(i, j int) bool {
+		iTs := int64(0)
+		jTs := int64(0)
+		if entries[i].ReleasedAtUTC != nil {
+			iTs = *entries[i].ReleasedAtUTC
+		}
+		if entries[j].ReleasedAtUTC != nil {
+			jTs = *entries[j].ReleasedAtUTC
+		}
+		if iTs == jTs {
+			return entries[i].Version > entries[j].Version
+		}
+		return iTs > jTs
+	})
+
+	if len(entries) == 0 {
+		latestVersion := "latest"
+		if gitHubVersion := fetchGitHubVersionCached(ctx); gitHubVersion != nil && strings.TrimSpace(*gitHubVersion) != "" {
+			latestVersion = strings.TrimSpace(*gitHubVersion)
+		}
+		entries = append(entries, publicWebsiteUserChangelogEntry{
+			ID:      "default-latest",
+			Version: latestVersion,
+			Title:   "Stability and security improvements",
+			Summary: "This release focuses on faster downloads, better reliability, and safer handling across supported browsers.",
+			Highlights: []string{
+				"More stable download handling for large coursework files.",
+				"Improved compatibility with recent browser updates.",
+				"Security and reliability hardening.",
+			},
+			ReleasedAtUTC: &now,
+		})
+		lastUpdated = &now
+	}
+
+	return publicWebsiteUserChangelogResponse{
+		OK:               true,
+		GeneratedAt:      now,
+		Headline:         "What's new for students",
+		Description:      "Simple release notes focused on what changed and why it helps your daily workflow.",
+		Entries:          entries,
+		FullChangelogURL: fullURL,
+		LastUpdatedAtUTC: lastUpdated,
+	}, nil
+}
+
+func buildPublicWebsiteUserPrivacy(ctx context.Context, store *controlPlaneStore) (publicWebsiteUserPrivacyResponse, error) {
+	now := time.Now().UTC().UnixMilli()
+	fullURL := githubMarkdownURL("PRIVACY.md")
+	records, err := store.listRecords(ctx, publicWebsiteUserPrivacyRecordType)
+	if err != nil {
+		return publicWebsiteUserPrivacyResponse{}, err
+	}
+
+	sections := make([]publicWebsiteUserPrivacyEntry, 0, len(records))
+	var lastUpdated *int64
+	for _, row := range records {
+		data := decodeRecordDataMap(row.Data)
+		title := trimAndLimit(stringFromAny(data["title"]), 120)
+		summary := trimAndLimit(stringFromAny(data["summary"]), 550)
+		if title == "" || summary == "" {
+			continue
+		}
+		priority := int64FromAny(data["priority"])
+		bullets := normalizeStringList(data["bullets"], 7, 220)
+		sections = append(sections, publicWebsiteUserPrivacyEntry{
+			ID:       trimAndLimit(row.RecordKey, 120),
+			Title:    title,
+			Summary:  summary,
+			Bullets:  bullets,
+			Priority: priority,
+		})
+		if row.UpdatedAt > 0 && (lastUpdated == nil || row.UpdatedAt > *lastUpdated) {
+			updated := row.UpdatedAt
+			lastUpdated = &updated
+		}
+	}
+
+	sort.Slice(sections, func(i, j int) bool {
+		if sections[i].Priority == sections[j].Priority {
+			return sections[i].Title < sections[j].Title
+		}
+		return sections[i].Priority < sections[j].Priority
+	})
+
+	if len(sections) == 0 {
+		sections = []publicWebsiteUserPrivacyEntry{
+			{
+				ID:       "data-we-collect",
+				Title:    "What data we collect",
+				Summary:  "We collect aggregated extension analytics such as download success/failure counts, browser type, and country-level usage trends.",
+				Bullets:  []string{"No document content is collected.", "No account passwords are collected."},
+				Priority: 1,
+			},
+			{
+				ID:       "what-we-do-not-collect",
+				Title:    "What we never store",
+				Summary:  "We do not store raw IP lists in public website responses and we do not publish personally identifying information.",
+				Bullets:  []string{"No public IP list is exposed.", "No private classroom content is shared."},
+				Priority: 2,
+			},
+			{
+				ID:       "why-this-helps",
+				Title:    "Why this helps users",
+				Summary:  "Anonymous aggregate data helps prioritize fixes, improve reliability, and keep the extension fast for students.",
+				Bullets:  []string{"Guides bug fixing and compatibility work.", "Improves stability across browsers."},
+				Priority: 3,
+			},
+		}
+		lastUpdated = &now
+	}
+
+	return publicWebsiteUserPrivacyResponse{
+		OK:             true,
+		GeneratedAt:    now,
+		Headline:       "Privacy in simple words",
+		Description:    "A short, user-friendly summary. The full legal/privacy text is available on GitHub.",
+		Sections:       sections,
+		FullPrivacyURL: fullURL,
+		LastUpdatedAt:  lastUpdated,
+	}, nil
+}
+
 func buildPublicWebsiteStatus(ctx context.Context, sqliteDB *sql.DB) (publicWebsiteStatus, error) {
 	liveSinceUTC, err := loadPublicLiveSinceUTC(ctx, sqliteDB)
 	if err != nil {
@@ -385,6 +628,64 @@ func buildPublicWebsiteStatus(ctx context.Context, sqliteDB *sql.DB) (publicWebs
 		LiveSinceUTC: liveSinceUTC,
 		WorkerHealth: derivePublicWorkerHealth(doSnapshot),
 	}, nil
+}
+
+func githubMarkdownURL(filename string) string {
+	repoSlug := strings.TrimSpace(os.Getenv("GITHUB_REPO_SLUG"))
+	if repoSlug == "" {
+		repoSlug = defaultGitHubRepoSlug
+	}
+	filename = strings.TrimSpace(filename)
+	if filename == "" {
+		return "https://github.com/" + repoSlug
+	}
+	return "https://github.com/" + repoSlug + "/blob/main/" + filename
+}
+
+func decodeRecordDataMap(raw json.RawMessage) map[string]any {
+	out := make(map[string]any)
+	if len(raw) == 0 {
+		return out
+	}
+	_ = json.Unmarshal(raw, &out)
+	return out
+}
+
+func int64PtrFromAny(value any) *int64 {
+	v := int64FromAny(value)
+	if v <= 0 {
+		return nil
+	}
+	return &v
+}
+
+func normalizeStringList(value any, maxItems, maxLen int) []string {
+	items := make([]string, 0, maxItems)
+	switch typed := value.(type) {
+	case []string:
+		for _, item := range typed {
+			normalized := trimAndLimit(item, maxLen)
+			if normalized == "" {
+				continue
+			}
+			items = append(items, normalized)
+			if len(items) >= maxItems {
+				break
+			}
+		}
+	case []any:
+		for _, item := range typed {
+			normalized := trimAndLimit(stringFromAny(item), maxLen)
+			if normalized == "" {
+				continue
+			}
+			items = append(items, normalized)
+			if len(items) >= maxItems {
+				break
+			}
+		}
+	}
+	return items
 }
 
 func derivePublicWorkerHealth(snapshot *summaryDOStateInfo) string {
