@@ -613,11 +613,15 @@ export function renderDashboard(stats: StatsResponse): string {
   const cfgHealthNotifyWarnMin = Math.round((cfgHealthNotify.warn ?? 1800000) / 60000);
   const cfgHealthNotifyCritMin = Math.round((cfgHealthNotify.critical ?? 600000) / 60000);
 
-  const renderTableRows = (data: Record<string, number>) => {
+  const renderTableRows = (data: Record<string, number>, dimension?: string) => {
     const keys = Object.keys(data).sort((a, b) => data[b] - data[a]);
     if (keys.length === 0) return "<tr><td colspan='2'>—</td></tr>";
     return keys
-      .map((k) => `<tr><td>${escapeHtml(k)}</td><td>${data[k]}</td></tr>`)
+      .map((k) => {
+        const countryName = dimension === "country" ? countryNameFromCode(k) : "";
+        const tooltipAttr = countryName ? ` data-tooltip="${escapeHtml(countryName)}"` : "";
+        return `<tr><td${tooltipAttr}>${escapeHtml(k)}</td><td>${data[k]}</td></tr>`;
+      })
       .join("");
   };
 
