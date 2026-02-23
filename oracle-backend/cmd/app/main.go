@@ -235,7 +235,6 @@ func main() {
 	mux.Handle("/api/public/website/map", handlers.PublicWebsiteMapHandler(sqlDB))
 	mux.Handle("/api/public/website/status", handlers.PublicWebsiteStatusHandler(sqlDB))
 	mux.Handle("/api/public/website/changelog", handlers.PublicWebsiteUserChangelogHandler(sqlDB, postgresDB))
-	mux.Handle("/api/public/website/privacy", handlers.PublicWebsiteUserPrivacyHandler(sqlDB, postgresDB))
 	mux.Handle("/api/public/website/uninstall", handlers.PublicWebsiteUninstallHandler(sqlDB))
 
 	// Analytics API endpoints (protected by auth when DASHBOARD_PASSWORD is set).
