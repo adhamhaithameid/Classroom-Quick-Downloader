@@ -99,7 +99,7 @@ describe('public website API integration', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it('loads user changelog and privacy from Oracle public APIs', async () => {
+  it('loads user changelog from Oracle public APIs', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(
         new Response(
