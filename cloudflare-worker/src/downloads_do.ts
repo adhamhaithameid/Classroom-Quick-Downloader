@@ -15,9 +15,11 @@ import {
   ChangelogEntry,
   ChangelogConfig,
 } from "./types";
+import { resolveOracleEndpoint } from "./oracle-endpoint";
 
 export interface Env {
   ORACLE_ENDPOINT: string;
+  ALLOW_INSECURE_ORACLE_ENDPOINT?: string;
   DO_SHARED_SECRET: string;
   MAX_BATCH_EVENTS: string;
   ALERT_WEBHOOK_URL?: string;
