@@ -1,6 +1,7 @@
 // filepath: cloudflare-worker/src/dashboard/main.ts
 import type { StatsResponse, QuotaDescriptor, ChangelogEntry, ChangelogConfig } from "../types";
 import { FAVICON_PNG_DATA_URI } from "../assets";
+import { resolveOracleEndpoint } from "../oracle-endpoint";
 
 function escapeHtml(unsafe: string): string {
   return unsafe
