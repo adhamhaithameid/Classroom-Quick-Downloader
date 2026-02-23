@@ -347,6 +347,7 @@ func main() {
 		go handlers.StartDeploymentsAutoSyncLoop(serverCtx, sqlDB, postgresDB, appMetrics, interval)
 	}
 	go handlers.StartWebsiteOneAMPublisherLoop(serverCtx, sqlDB)
+	go handlers.StartWebsiteCloudflareSlotPullLoop(serverCtx, sqlDB, cloudflarePublicSiteMetricsURL)
 	go startInMemoryStoreCleanupLoop(serverCtx, 15*time.Minute)
 	log.Println("[WARN] Session stores are in-memory. Sessions will NOT survive restarts and are NOT shared " +
 		"across multiple replicas. For HA deployments, configure POSTGRES_DSN to enable persisted auth state, " +
