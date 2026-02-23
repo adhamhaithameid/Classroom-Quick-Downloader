@@ -302,6 +302,11 @@ export async function fetchMapData(): Promise<MapResponse> {
   return fetchOracleMap();
 }
 
+export function resetWebsiteSnapshotCacheForTests(): void {
+  cachedSnapshot = null;
+  snapshotInFlight = null;
+}
+
 export async function fetchUserChangelog(): Promise<UserChangelogResponse> {
   const payload = await fetchOracleJSON('/api/public/website/changelog');
   return coerceUserChangelogPayload(payload);
