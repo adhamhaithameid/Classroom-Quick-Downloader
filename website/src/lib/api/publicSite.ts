@@ -247,6 +247,53 @@ async function fetchOracleMap(): Promise<MapResponse> {
   return coerceMapPayload(payload);
 }
 
+function buildSnapshot(overview: OverviewResponse, map: MapResponse): WebsiteSnapshot {
+  const browsersTotal = overview.installs.browsers.reduce((sum, item) => sum + (item.usersCount || 0), 0);
+  const normalizedUsersTotal = Math.max(overview.installs.usersTotal, browsersTotal);
+  const normalizedOverview: OverviewResponse = {
+    ...overview,
+    installs: {
+      ...overview.installs,
+      usersTotal: normalizedUsersTotal
+    }
+  };
+
+  const now = Date.now();
+  return {
+    source: 'oracle',
+    fetchedAtUtc: now,
+    nextRefreshAtUtc: now + ORACLE_SNAPSHOT_REFRESH_MS,
+    overview: normalizedOverview,
+    map
+  };
+}
+
+export async function fetchWebsiteSnapshot(options: { force?: boolean } = {}): Promise<WebsiteSnapshot> {
+  if (!options.force && cachedSnapshot && isSnapshotFresh(cachedSnapshot)) {
+    return cachedSnapshot;
+  }
+  if (!options.force && snapshotInFlight) {
+    return snapshotInFlight;
+  }
+
+  const runner = (async () => {
+    const [overview, map] = await Promise.all([fetchOracleOverview(), fetchOracleMap()]);
+    const snapshot = buildSnapshot(overview, map);
+    cachedSnapshot = snapshot;
+    return snapshot;
+  })()
+    .catch((error) => {
+      if (cachedSnapshot) return cachedSnapshot;
+      throw error;
+    })
+    .finally(() => {
+      snapshotInFlight = null;
+    });
+
+  snapshotInFlight = runner;
+  return runner;
+}
+
 export async function fetchOverview(): Promise<OverviewResponse> {
   return fetchOracleOverview();
 }
