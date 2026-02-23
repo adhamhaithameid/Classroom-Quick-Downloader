@@ -3226,7 +3226,7 @@ export function renderDashboard(stats: StatsResponse): string {
               </div>
               <div class="hot-item">
                 <div class="hot-label">Country</div>
-                <div class="hot-value" data-bind="hotCountryAllTime">${escapeHtml(hotCountry)}</div>
+                <div class="hot-value" data-bind="hotCountryAllTime"${hotCountryTooltipAttr}>${escapeHtml(hotCountry)}</div>
               </div>
             </div>
           </div>
