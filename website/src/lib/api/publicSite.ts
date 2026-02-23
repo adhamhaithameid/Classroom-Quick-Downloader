@@ -7,10 +7,19 @@ import type {
   UninstallFeedbackRequest,
   UninstallFeedbackResponse,
   UninstallStatsResponse,
+  WebsiteSnapshot,
   WorkerHealth
 } from '$lib/types/public';
 
 const REQUEST_TIMEOUT_MS = 8000;
+export const ORACLE_SNAPSHOT_REFRESH_MS = 3 * 60 * 60 * 1000;
+
+let cachedSnapshot: WebsiteSnapshot | null = null;
+let snapshotInFlight: Promise<WebsiteSnapshot> | null = null;
+
+function isSnapshotFresh(snapshot: WebsiteSnapshot): boolean {
+  return Date.now() < snapshot.nextRefreshAtUtc;
+}
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   return new Promise<T>((resolve, reject) => {
