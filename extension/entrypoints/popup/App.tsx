@@ -15,6 +15,9 @@ import { CHANGELOG_SITE_URL } from '../utils/analytics/constants';
 const SURVEY_URL = 'https://forms.gle/wPU2b1Qxa7svHqJa6';
 const GITHUB_REPO_URL =
   'https://github.com/adhamhaithameid/classroom-quick-downloader';
+const GITHUB_PROFILE_URL = 'https://github.com/adhamhaithameid';
+const GITHUB_STAR_URL = `${GITHUB_REPO_URL}/stargazers`;
+const GITHUB_AVATAR_URL = 'https://github.com/adhamhaithameid.png?size=80';
 const BUY_ME_COFFEE_URL = 'https://buymeacoffee.com/adhamhaithameid';
 
 // Extension Store URLs for each browser
