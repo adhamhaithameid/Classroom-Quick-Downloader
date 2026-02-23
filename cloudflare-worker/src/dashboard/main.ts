@@ -4284,7 +4284,30 @@ export function renderDashboard(stats: StatsResponse): string {
         };
       }
 
-      function renderTableRowsJS(data) {
+      const COUNTRY_CODE_RE = /^[A-Z]{2}$/;
+      const COUNTRY_ALIASES = {
+        UK: "United Kingdom",
+        EL: "Greece",
+      };
+      const countryDisplayNamesJS =
+        typeof Intl !== "undefined" && typeof Intl.DisplayNames === "function"
+          ? new Intl.DisplayNames(["en"], { type: "region" })
+          : null;
+
+      function countryNameFromCodeJS(code) {
+        const normalized = String(code || "").trim().toUpperCase();
+        if (!COUNTRY_CODE_RE.test(normalized)) return "";
+        if (normalized === "XX" || normalized === "ZZ" || normalized === "UN" || normalized === "EU") return "";
+        if (COUNTRY_ALIASES[normalized]) return COUNTRY_ALIASES[normalized];
+        if (!countryDisplayNamesJS) return "";
+        try {
+          return countryDisplayNamesJS.of(normalized) || "";
+        } catch (_) {
+          return "";
+        }
+      }
+
+      function renderTableRowsJS(data, dimension) {
         const entries = Object.entries(data || {});
         if (!entries.length) return "<tr><td colspan='2'>—</td></tr>";
         entries.sort((a, b) => b[1] - a[1]);
