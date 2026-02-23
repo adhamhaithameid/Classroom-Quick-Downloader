@@ -34,7 +34,7 @@ function makeStats(overrides: Partial<StatsResponse> = {}): StatsResponse {
     },
     envSnapshot: {
       maxBatchEvents: "10000",
-      oracleEndpoint: "http://example.com",
+      oracleEndpoint: "https://example.com",
     },
     requestsToday: 0,
     requestDate: "2026-02-09",
