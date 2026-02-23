@@ -273,10 +273,10 @@
           <div class="state-empty">No country data available yet.</div>
         {:else}
           <ul>
-            {#each topCountries as item}
+            {#each topCountries as item, ti}
               <li>
-                <span>{item.name} ({item.countryCode})</span>
-                <strong>{formatNumber(item.count)}</strong>
+                <span class="country-name">{item.name}</span>
+                <strong><AnimatedNumber value={item.count} /></strong>
               </li>
             {/each}
           </ul>
