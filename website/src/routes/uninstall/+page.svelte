@@ -127,7 +127,7 @@
 
   <!-- Step 3: Features -->
   <section class="step card">
-    <h2><AnimatedNumber value={2} format={{ useGrouping: false }} />. What would bring you back?</h2>
+    <h2><AnimatedNumber value={2} format={{ useGrouping: false }} animated />. What would bring you back?</h2>
     <div class="option-grid compact">
       {#each featureChoices as feature}
         <button
