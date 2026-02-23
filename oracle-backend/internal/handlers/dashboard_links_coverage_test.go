@@ -93,10 +93,13 @@ func TestDashboardLinksHandler_Success(t *testing.T) {
 	if links["cloudflare"].(string) != "https://dash.cloudflare.com" {
 		t.Fatal("wrong cloudflare URL")
 	}
+	if links["website"].(string) != "https://classroom-quick-downloader-website.pages.dev" {
+		t.Fatal("wrong website URL")
+	}
 }
 
 func TestDashboardLinksHandler_EmptyURLs(t *testing.T) {
-	h := DashboardLinksHandler("", "", "", "", "")
+	h := DashboardLinksHandler("", "", "", "", "", "")
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/dashboard/links", nil)
 	h.ServeHTTP(rr, req)
