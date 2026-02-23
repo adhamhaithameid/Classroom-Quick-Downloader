@@ -1,5 +1,4 @@
 export type WorkerHealth = 'up' | 'degraded' | 'down';
-export type PublicMetricsSource = 'oracle' | 'worker';
 
 export type InstallBrowser = {
   key: 'chrome' | 'firefox' | 'edge' | string;
