@@ -80,46 +80,43 @@
   });
 </script>
 
-<section class="card uninstall-page">
+<div class="uninstall-page">
+  <!-- Hero -->
   <header class="hero">
-    <div>
-      <h1>Before you uninstall, tell us what to fix</h1>
-      <p>
-        Your feedback helps us prioritize the next update and improve the extension for students. You can reinstall any
-        time using the buttons below.
-      </p>
+    <div class="hero-icon">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--gc-green)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
     </div>
+    <h1>Before you go, help us improve</h1>
+    <p>Your feedback shapes the next update. Takes <AnimatedNumber value={30} format={{ useGrouping: false }} /> seconds.</p>
   </header>
 
-  <section class="section">
-    <h2>What is the main reason?</h2>
-    <div class="reason-grid">
+  <!-- Step 1: Reason -->
+  <section class="step card">
+    <h2><AnimatedNumber value={1} format={{ useGrouping: false }} />. Why are you uninstalling?</h2>
+    <div class="option-grid">
       {#each reasonOptions as reason}
         <button
           type="button"
+          class="option"
           class:selected={selectedReason === reason}
-          on:click={() => {
-            selectedReason = reason;
-          }}
-        >
-          {reason}
-        </button>
+          on:click={() => { selectedReason = reason; }}
+        >{reason}</button>
       {/each}
     </div>
   </section>
 
-  <section class="section dual">
+  <!-- Step 2: Quick selects -->
+  <section class="step card two-col">
     <label class="field">
-      <span>How likely are you to reinstall if we improve this?</span>
+      <span>Likely to reinstall?</span>
       <select bind:value={confidenceToReinstall}>
         <option>Very likely</option>
         <option>Maybe</option>
         <option>Unlikely</option>
       </select>
     </label>
-
     <label class="field">
-      <span>How urgent is this issue for you?</span>
+      <span>How urgent is this?</span>
       <select bind:value={urgency}>
         <option>Low</option>
         <option>Normal</option>
