@@ -810,9 +810,10 @@
   .l2-visual-col { min-height: 240px; display: flex; align-items: center; justify-content: center; }
   .l2-problem-visual { width: 100%; max-width: 420px; margin: 0 auto; }
   .l2-problem-browser {
-    background: var(--card); border: 1px solid var(--border);
-    border-radius: 12px; overflow: hidden;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.08);
+    background: rgba(255, 255, 255, 0.72); border: 1px solid var(--border-subtle);
+    border-radius: 14px; overflow: hidden;
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
   }
   .l2-browser-bar {
     display: flex; align-items: center; gap: 6px;
