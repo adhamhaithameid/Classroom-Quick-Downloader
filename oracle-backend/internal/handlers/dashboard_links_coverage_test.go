@@ -112,10 +112,13 @@ func TestDashboardLinksHandler_EmptyURLs(t *testing.T) {
 	if links["cloudflare"].(string) != "" {
 		t.Fatal("expected empty cloudflare URL")
 	}
+	if links["website"].(string) != "" {
+		t.Fatal("expected empty website URL")
+	}
 }
 
 func TestDashboardLinksHandler_MethodNotAllowed(t *testing.T) {
-	h := DashboardLinksHandler("", "", "", "", "")
+	h := DashboardLinksHandler("", "", "", "", "", "")
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/api/dashboard/links", nil)
 	h.ServeHTTP(rr, req)
