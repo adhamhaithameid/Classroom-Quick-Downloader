@@ -161,42 +161,6 @@ export function coerceMapPayload(input: unknown): MapResponse {
   };
 }
 
-function coerceWorkerSiteMetricsPayload(input: unknown): WorkerSiteMetricsResponse {
-  const source = input as Partial<WorkerSiteMetricsResponse>;
-  const countries = Array.isArray(source?.countries)
-    ? source.countries
-        .map((item) => ({
-          countryCode: asString(item?.countryCode).toUpperCase(),
-          count: asNumber(item?.count)
-        }))
-        .filter((item) => item.countryCode.length === 2 && item.count > 0)
-    : [];
-
-  countries.sort((a, b) => {
-    if (a.count === b.count) return a.countryCode.localeCompare(b.countryCode);
-    return b.count - a.count;
-  });
-
-  return {
-    ok: source?.ok === true,
-    source: 'cloudflare-worker',
-    generatedAt: asNumber(source?.generatedAt),
-    snapshotAtUtc: asNumber(source?.snapshotAtUtc),
-    totals: {
-      downloads: asNumber(source?.totals?.downloads),
-      countries: asNumber(source?.totals?.countries)
-    },
-    countries,
-    schedule: {
-      refreshHoursUtc: asNumberArray(source?.schedule?.refreshHoursUtc),
-      activeHourUtc: asNumber(source?.schedule?.activeHourUtc),
-      isRefreshWindow: source?.schedule?.isRefreshWindow === true,
-      lastRefreshAtUtc: asNumber(source?.schedule?.lastRefreshAtUtc),
-      nextRefreshAtUtc: asNumber(source?.schedule?.nextRefreshAtUtc)
-    }
-  };
-}
-
 function coerceUninstallStatsPayload(input: unknown): UninstallStatsResponse {
   const source = input as Partial<UninstallStatsResponse>;
   return {
