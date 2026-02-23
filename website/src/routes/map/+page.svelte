@@ -99,7 +99,7 @@
     countByCountryId = new Map<number, number>();
     topCountries = [];
     maxCount = 1;
-    colorScale = scaleLinear<string>().domain([0, 1]).range(['#e8eefc', '#1549a8']);
+    colorScale = scaleLinear<string>().domain([0, 1]).range(['#e0f2e9', '#137a47']);
 
     if (!mapData) return;
 
