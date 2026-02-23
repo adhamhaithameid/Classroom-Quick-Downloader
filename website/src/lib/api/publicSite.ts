@@ -32,7 +32,15 @@ async function fetchJSONFromBase(baseUrl: string, pathname: string, sourceLabel:
   if (!normalizedBase) {
     throw new Error(`Missing ${sourceLabel} base URL`);
   }
-  const response = await withTimeout(fetch(`${normalizedBase}${pathname}`), REQUEST_TIMEOUT_MS);
+  const response = await withTimeout(
+    fetch(`${normalizedBase}${pathname}`, {
+      cache: 'no-store',
+      headers: {
+        Accept: 'application/json'
+      }
+    }),
+    REQUEST_TIMEOUT_MS
+  );
   if (!response.ok) {
     throw new Error(`${sourceLabel} request failed (${response.status})`);
   }
