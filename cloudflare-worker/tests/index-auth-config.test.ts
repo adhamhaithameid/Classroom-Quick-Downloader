@@ -308,6 +308,156 @@ describe("Worker auth config hardening", () => {
     expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
   });
 
+  it("proxies Oracle public website overview through the Worker with wildcard CORS", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.toString()
+            : input.url;
+      if (url === "https://oracle.local/api/public/website/overview") {
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            generatedAt: 1771700000000,
+            totals: { downloads: 42, success: 40, fail: 2 },
+          }),
+          {
+            status: 200,
+            headers: {
+              "content-type": "application/json; charset=utf-8",
+              "cache-control": "public, max-age=120",
+            },
+          },
+        );
+      }
+      return new Response(JSON.stringify({ ok: false, error: "not_found" }), {
+        status: 404,
+        headers: { "content-type": "application/json; charset=utf-8" },
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const env = mockEnv({ ORACLE_ENDPOINT: "https://oracle.local" });
+    const request = new Request("https://example.com/api/public/website/overview", {
+      method: "GET",
+      headers: { Origin: "https://any-origin.example" },
+    });
+
+    const res = await worker.fetch(request, env, {} as ExecutionContext);
+    const payload = await res.json() as { ok?: boolean; totals?: { downloads?: number } };
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    expect(res.headers.get("Cache-Control")).toContain("max-age=120");
+    expect(payload.ok).toBe(true);
+    expect(payload.totals?.downloads).toBe(42);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    vi.unstubAllGlobals();
+  });
+
+  it("proxies uninstall feedback POST with x-requested-with header", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.toString()
+            : input.url;
+      if (url === "https://oracle.local/api/public/website/uninstall") {
+        const headers = new Headers(init?.headers as HeadersInit);
+        expect(headers.get("content-type")).toContain("application/json");
+        expect(headers.get("x-requested-with")).toBe("XMLHttpRequest");
+        expect(headers.get("origin")).toBe("https://website.example");
+        return new Response(
+          JSON.stringify({ ok: true, generatedAt: 1771700000000, submissionId: 5, message: "recorded" }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json; charset=utf-8" },
+          },
+        );
+      }
+      return new Response(JSON.stringify({ ok: false, error: "not_found" }), {
+        status: 404,
+        headers: { "content-type": "application/json; charset=utf-8" },
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const env = mockEnv({ ORACLE_ENDPOINT: "https://oracle.local" });
+    const request = new Request("https://example.com/api/public/website/uninstall", {
+      method: "POST",
+      headers: {
+        Origin: "https://website.example",
+        "content-type": "application/json",
+        "x-requested-with": "XMLHttpRequest",
+      },
+      body: JSON.stringify({ reason: "test" }),
+    });
+
+    const res = await worker.fetch(request, env, {} as ExecutionContext);
+    const payload = await res.json() as { ok?: boolean; submissionId?: number };
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    expect(payload.ok).toBe(true);
+    expect(payload.submissionId).toBe(5);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    const preflight = await worker.fetch(
+      new Request("https://example.com/api/public/website/uninstall", {
+        method: "OPTIONS",
+        headers: {
+          Origin: "https://website.example",
+          "Access-Control-Request-Method": "POST",
+          "Access-Control-Request-Headers": "Content-Type, X-Requested-With",
+        },
+      }),
+      env,
+      {} as ExecutionContext,
+    );
+    expect(preflight.status).toBe(204);
+    expect(preflight.headers.get("Access-Control-Allow-Headers")).toContain("X-Requested-With");
+
+    vi.unstubAllGlobals();
+  });
+
+  it("returns 503 for proxied Oracle public routes when ORACLE_ENDPOINT is missing", async () => {
+    const env = mockEnv({ ORACLE_ENDPOINT: "" });
+    const request = new Request("https://example.com/api/public/website/changelog", {
+      method: "GET",
+      headers: {
+        Origin: "https://website.example",
+      },
+    });
+
+    const res = await worker.fetch(request, env, {} as ExecutionContext);
+    const payload = await res.json() as { ok?: boolean; error?: string };
+
+    expect(res.status).toBe(503);
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    expect(payload.ok).toBe(false);
+    expect(payload.error).toBe("oracle_endpoint_missing");
+  });
+
+  it("rejects insecure non-loopback ORACLE_ENDPOINT without explicit override", async () => {
+    const env = mockEnv({ ORACLE_ENDPOINT: "http://oracle.local" });
+    const request = new Request("https://example.com/api/public/website/overview", {
+      method: "GET",
+      headers: {
+        Origin: "https://website.example",
+      },
+    });
+
+    const res = await worker.fetch(request, env, {} as ExecutionContext);
+    const payload = await res.json() as { ok?: boolean; error?: string };
+
+    expect(res.status).toBe(503);
+    expect(payload.ok).toBe(false);
+    expect(payload.error).toBe("oracle_endpoint_insecure");
+  });
+
   it("does not emit CORS origin for protected requests without Origin header", async () => {
     const env = mockEnv();
     const request = new Request("https://example.com/stats", {
