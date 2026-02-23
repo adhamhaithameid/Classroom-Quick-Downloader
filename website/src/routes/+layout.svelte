@@ -286,18 +286,19 @@
     transition: all 0.2s ease;
   }
 
-  .footer-links a:hover {
+  .l2-footer-links a:hover {
     color: var(--gc-green);
     background: var(--gc-green-bg);
   }
 
-  .footer-right {
+  .l2-footer-right {
     display: flex;
     align-items: center;
     gap: 10px;
+    flex-shrink: 0;
   }
 
-  .credit-link {
+  .l2-footer-credit-link {
     display: inline-flex;
     align-items: center;
     gap: 6px;
