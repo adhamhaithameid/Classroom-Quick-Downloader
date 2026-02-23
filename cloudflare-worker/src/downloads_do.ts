@@ -2308,8 +2308,6 @@ export class DownloadsDurable {
       maxSize: remoteConfig.maxBufferSize,
       utilizationPercent: ((this.d.buffer?.length ?? 0) / remoteConfig.maxBufferSize * 100).toFixed(2),
     };
-    const weeklyRequests = this.sumRecentRequestHistory(7);
-    const monthlyRequests = this.sumRecentRequestHistory(30);
     const uniqueCountriesAllTime = Object.keys(this.d.counters?.byCountry ?? {}).filter((country) => {
       const normalized = country.trim().toLowerCase();
       return normalized !== "" && normalized !== "xx" && normalized !== "unknown";
