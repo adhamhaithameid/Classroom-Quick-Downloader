@@ -43,7 +43,6 @@ func newIntegrationMux(t *testing.T) (*http.ServeMux, *sql.DB) {
 	mux.Handle("/api/public/website/map", handlers.PublicWebsiteMapHandler(sqlDB))
 	mux.Handle("/api/public/website/status", handlers.PublicWebsiteStatusHandler(sqlDB))
 	mux.Handle("/api/public/website/changelog", handlers.PublicWebsiteUserChangelogHandler(sqlDB, nil))
-	mux.Handle("/api/public/website/privacy", handlers.PublicWebsiteUserPrivacyHandler(sqlDB, nil))
 	mux.Handle("/api/public/website/uninstall", handlers.PublicWebsiteUninstallHandler(sqlDB))
 
 	// Stats routes (no auth wrapper for integration test)
