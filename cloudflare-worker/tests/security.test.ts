@@ -134,7 +134,7 @@ class MockState {
 function makeDO() {
   const state = new MockState();
   const env: Env = {
-    ORACLE_ENDPOINT: "http://example.com",
+    ORACLE_ENDPOINT: "https://example.com",
     DO_SHARED_SECRET: "secret",
     MAX_BATCH_EVENTS: "10000",
   } as Env;
