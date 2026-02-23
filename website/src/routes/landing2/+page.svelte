@@ -127,21 +127,44 @@
     return () => cancelAnimationFrame(rafId);
   }
 
+  async function loadSiteData(force = false): Promise<void> {
+    mapState = force ? mapState : 'loading';
+    mapError = '';
+    try {
+      const snapshot = await fetchWebsiteSnapshot({ force });
+      overview = snapshot.overview;
+      mapData = snapshot.map;
+      downloadCount = snapshot.overview.totals.downloads || 0;
+      userCount = computeUsersTotal(snapshot.overview);
+      countryCount = snapshot.map.totals.countries || 0;
+      mapState = 'ready';
+    } catch (error) {
+      mapError = error instanceof Error ? error.message : 'Failed to load map data.';
+      mapState = 'error';
+    }
+  }
+
   onMount(async () => {
     detectedBrowser = detectBrowser();
-    try {
-      const result = await fetchOverview();
-      overview = result;
-      downloadCount = result.totals.downloads || 0;
-      userCount = (result.installs?.browsers ?? []).reduce((sum: number, b: { usersCount?: number }) => sum + (b.usersCount || 0), 0);
-      countryCount = 59;
-    } catch { /* silent */ }
+    await loadSiteData();
     requestAnimationFrame(() => setupReveal());
-    requestAnimationFrame(() => initMarquee());
+    const stopMarquee = initMarquee();
+    const timer = window.setInterval(() => {
+      void loadSiteData(true);
+    }, ORACLE_SNAPSHOT_REFRESH_MS);
+    return () => {
+      if (typeof stopMarquee === 'function') stopMarquee();
+      window.clearInterval(timer);
+      document.body.classList.remove('l2-map-modal-open');
+    };
   });
+
+  $: if (typeof document !== 'undefined') {
+    document.body.classList.toggle('l2-map-modal-open', mapExpanded);
+  }
 </script>
 
-<svelte:window bind:scrollY />
+<svelte:window bind:scrollY on:keydown={handleGlobalKeydown} />
 
 <svelte:head>
   <title>Classroom Quick Downloader — The Free Extension That Supercharges Google Classroom</title>
