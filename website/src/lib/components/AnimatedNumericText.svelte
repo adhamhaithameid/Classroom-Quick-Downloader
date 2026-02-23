@@ -46,7 +46,7 @@
 
 {#each segments as segment}
   {#if segment.kind === 'number'}
-    <AnimatedNumber value={segment.value} format={segment.format} />
+    <AnimatedNumber value={segment.value} format={segment.format} {animated} />
   {:else}
     {segment.value}
   {/if}
