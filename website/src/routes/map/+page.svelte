@@ -44,7 +44,8 @@
     if (force) refreshing = true;
     error = '';
     try {
-      mapData = await fetchMapData();
+      const snapshot = await fetchWebsiteSnapshot({ force });
+      mapData = snapshot.map;
       syncMapCounts();
       state = 'ready';
     } catch (err) {
