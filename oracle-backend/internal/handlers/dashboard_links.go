@@ -55,7 +55,7 @@ type githubCountsCache struct {
 
 type githubCountsFetcher func(ctx context.Context, client *http.Client, repoSlug string, token string) (githubCounts, error)
 
-func DashboardLinksHandler(cloudflareURL, uptimeKumaURL, githubRepoURL, googleSheetsURL, figmaDesignURL string) http.HandlerFunc {
+func DashboardLinksHandler(cloudflareURL, websiteURL, uptimeKumaURL, githubRepoURL, googleSheetsURL, figmaDesignURL string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			w.WriteHeader(http.StatusMethodNotAllowed)
