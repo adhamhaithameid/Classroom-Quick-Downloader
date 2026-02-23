@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { base } from '$app/paths';
   import logo from '$lib/assets/cqd-logo.svg';
-  import { fetchMapData, fetchOverview } from '$lib/api/publicSite';
+  import { fetchWebsiteSnapshot, ORACLE_SNAPSHOT_REFRESH_MS } from '$lib/api/publicSite';
   import { STORE_LINKS } from '$lib/config';
   import type { OverviewResponse } from '$lib/types/public';
   import AnimatedNumber from '$lib/components/AnimatedNumber.svelte';
