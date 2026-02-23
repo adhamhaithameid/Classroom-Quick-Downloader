@@ -61,6 +61,23 @@
     return { totalSeconds, hours, clicks };
   }
 
+  function computeUsersTotal(source: OverviewResponse): number {
+    if (source.installs.usersTotal > 0) return source.installs.usersTotal;
+    return source.installs.browsers.reduce((sum, item) => sum + (item.usersCount || 0), 0);
+  }
+
+  function toggleMapExpanded(): void {
+    mapExpanded = !mapExpanded;
+  }
+
+  function closeMapExpanded(): void {
+    mapExpanded = false;
+  }
+
+  function handleGlobalKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Escape' && mapExpanded) closeMapExpanded();
+  }
+
   function setupReveal(): void {
     const observer = new IntersectionObserver(
       (entries) => {
