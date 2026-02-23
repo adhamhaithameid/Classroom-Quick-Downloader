@@ -50,6 +50,14 @@ export type MapResponse = {
   privacyNote: string;
 };
 
+export type WebsiteSnapshot = {
+  source: 'oracle';
+  fetchedAtUtc: number;
+  nextRefreshAtUtc: number;
+  overview: OverviewResponse;
+  map: MapResponse;
+};
+
 export type ChangelogResponse = {
   ok: boolean;
   entries: Array<{
