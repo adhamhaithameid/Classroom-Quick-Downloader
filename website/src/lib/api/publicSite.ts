@@ -219,33 +219,6 @@ function coerceUserChangelogPayload(input: unknown): UserChangelogResponse {
   };
 }
 
-function coerceUserPrivacyPayload(input: unknown): UserPrivacyResponse {
-  const source = input as Partial<UserPrivacyResponse>;
-  const sections = Array.isArray(source?.sections)
-    ? source.sections
-        .map((section) => ({
-          id: asString(section?.id),
-          title: asString(section?.title),
-          summary: asString(section?.summary),
-          bullets: asStringArray(section?.bullets, 7),
-          priority: asNumber(section?.priority)
-        }))
-        .filter((section) => section.id.length > 0 && section.title.length > 0 && section.summary.length > 0)
-    : [];
-
-  sections.sort((a, b) => a.priority - b.priority || a.title.localeCompare(b.title));
-
-  return {
-    ok: source?.ok === true,
-    generatedAt: asNumber(source?.generatedAt),
-    headline: asString(source?.headline),
-    description: asString(source?.description),
-    sections,
-    fullPrivacyUrl: asString(source?.fullPrivacyUrl),
-    lastUpdatedAtUtc: asNullableNumber(source?.lastUpdatedAtUtc)
-  };
-}
-
 async function fetchOracleOverview(): Promise<OverviewResponse> {
   const payload = await fetchOracleJSON('/api/public/website/overview');
   return coerceOverviewPayload(payload);
