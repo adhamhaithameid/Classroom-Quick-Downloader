@@ -309,6 +309,7 @@ func main() {
 	mux.Handle("/api/admin/oracle-logs", authMiddleware(handlers.OracleOperationLogsListHandler(sqlDB)))
 	mux.Handle("/api/admin/oracle-logs/delete-older", authMiddleware(criticalMiddleware(handlers.OracleOperationLogsDeleteOlderHandler(sqlDB))))
 	mux.Handle("/api/admin/oracle-logs/clear-all", authMiddleware(criticalMiddleware(handlers.OracleOperationLogsClearAllHandler(sqlDB))))
+	mux.Handle("/api/admin/sheets/flush-now", authMiddleware(criticalMiddleware(ManualSheetsFlushHandler(sqlDB))))
 	mux.Handle("/api/admin/sheets/last-flush", authMiddleware(handlers.SheetsLastFlushHandler(sqlDB)))
 	cloudflarePublicSiteMetricsURL := getenv("CLOUDFLARE_PUBLIC_SITE_METRICS_URL", "")
 	mux.Handle("/api/admin/website/state", authMiddleware(handlers.WebsiteOpsStateHandler(sqlDB)))
