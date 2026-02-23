@@ -844,6 +844,61 @@ func WebsiteOpsPullCloudflareHandler(db *sql.DB, cloudflareMetricsURL string) ht
 	}
 }
 
+func PullWebsiteDatasetFromCloudflare(
+	ctx context.Context,
+	db *sql.DB,
+	cloudflareMetricsURL string,
+	triggeredBy string,
+) (websiteSyncControlRow, cloudflareSiteMetricsPayload, error) {
+	targetURL := strings.TrimSpace(cloudflareMetricsURL)
+	if targetURL == "" {
+		targetURL = defaultCloudflarePublicSiteMetricsURL
+	}
+	metrics, err := fetchCloudflareWebsiteMetrics(ctx, targetURL)
+	if err != nil {
+		return websiteSyncControlRow{}, cloudflareSiteMetricsPayload{}, fmt.Errorf("%w: %v", errCloudflareWebsiteFetch, err)
+	}
+
+	countries := make([]publicWebsiteCountryCell, 0, len(metrics.Countries))
+	for _, row := range metrics.Countries {
+		countries = append(countries, publicWebsiteCountryCell{
+			CountryCode: row.CountryCode,
+			Count:       row.Count,
+		})
+	}
+	countries = normalizeWebsiteCountryCells(countries, 300)
+
+	row, err := publishWebsiteDataset(
+		ctx,
+		db,
+		"cloudflare",
+		metrics.Totals.Downloads,
+		countries,
+		false,
+		true,
+	)
+	if err != nil {
+		return websiteSyncControlRow{}, cloudflareSiteMetricsPayload{}, fmt.Errorf("%w: %v", errCloudflareWebsitePublish, err)
+	}
+
+	_ = insertWebsiteSyncBatch(
+		ctx,
+		db,
+		websiteSyncDirectionCloudflareToWebsite,
+		newWebsiteBatchID(websiteSyncDirectionCloudflareToWebsite),
+		triggeredBy,
+		"ok",
+		map[string]any{
+			"downloads":     metrics.Totals.Downloads,
+			"countries":     len(countries),
+			"snapshotAtUtc": metrics.SnapshotAtUtc,
+			"generatedAt":   metrics.GeneratedAt,
+		},
+	)
+
+	return row, metrics, nil
+}
+
 func fetchCloudflareWebsiteMetrics(ctx context.Context, endpoint string) (cloudflareSiteMetricsPayload, error) {
 	reqCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
 	defer cancel()
