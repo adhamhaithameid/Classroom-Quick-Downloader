@@ -385,6 +385,28 @@ func newWebsiteBatchID(direction string) string {
 	return fmt.Sprintf("ws-%s-%d", short, time.Now().UTC().UnixMilli())
 }
 
+func isWebsiteCloudflarePullHour(hourUTC int) bool {
+	for _, item := range websiteCloudflarePullHoursUTC {
+		if item == hourUTC {
+			return true
+		}
+	}
+	return false
+}
+
+func makeWebsiteCloudflareSlotKey(now time.Time) string {
+	return now.UTC().Format("2006-01-02T15")
+}
+
+func shouldRunWebsiteCloudflarePull(now time.Time) bool {
+	now = now.UTC()
+	if !isWebsiteCloudflarePullHour(now.Hour()) {
+		return false
+	}
+	// Allow first few minutes in case scheduler tick is slightly delayed.
+	return now.Minute() >= 0 && now.Minute() <= 5
+}
+
 func insertWebsiteSyncBatch(
 	ctx context.Context,
 	db *sql.DB,
