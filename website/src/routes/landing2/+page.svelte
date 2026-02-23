@@ -196,24 +196,44 @@
     </div>
   </nav>
 
+  <!-- ━━━━ Page-wide decorative layer ━━━━ -->
+  <div class="l2-page-orbs" aria-hidden="true">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+    <div class="orb orb-4"></div>
+    <div class="orb orb-5"></div>
+    <div class="orb orb-6"></div>
+    <div class="orb orb-7"></div>
+    <div class="orb orb-8"></div>
+    <div class="orb orb-9"></div>
+    <div class="orb orb-10"></div>
+    <div class="orb orb-11"></div>
+    <div class="orb orb-12"></div>
+  </div>
+  <div class="l2-page-grid" aria-hidden="true"></div>
+  <div class="l2-page-floats" aria-hidden="true">
+    <svg class="l2-float-svg fs-1" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 56V16l8-8h24l8 8v40H12z"/><path d="M20 8v12h24V8"/><line x1="22" y1="28" x2="42" y2="28"/><line x1="22" y1="36" x2="42" y2="36"/><line x1="22" y1="44" x2="34" y2="44"/></svg>
+    <svg class="l2-float-svg fs-2" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10 54l6-40h4l6 40"/><circle cx="16" cy="10" r="3"/><path d="M38 54l6-40h4l6 40"/><circle cx="44" cy="10" r="3"/></svg>
+    <svg class="l2-float-svg fs-3" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="8" y="6" width="48" height="52" rx="4"/><line x1="8" y1="16" x2="56" y2="16"/><line x1="20" y1="6" x2="20" y2="16"/><line x1="16" y1="26" x2="48" y2="26"/><line x1="16" y1="34" x2="48" y2="34"/><line x1="16" y1="42" x2="36" y2="42"/></svg>
+    <svg class="l2-float-svg fs-4" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M32 4L4 20l28 16 28-16L32 4z"/><path d="M4 20v20l28 16 28-16V20"/><path d="M32 36v20"/></svg>
+    <svg class="l2-float-svg fs-5" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 56l4-44 6-4 4 4 4-4 6 4 4-4 6 4 4-4 6 4 4 44H8z"/><line x1="16" y1="20" x2="48" y2="20"/><line x1="16" y1="28" x2="48" y2="28"/><line x1="16" y1="36" x2="36" y2="36"/></svg>
+    <svg class="l2-float-svg fs-6" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M32 4L4 20l28 16 28-16L32 4z"/><path d="M4 20v20l28 16 28-16V20"/></svg>
+    <svg class="l2-float-svg fs-7" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="8" y="6" width="48" height="52" rx="4"/><line x1="8" y1="16" x2="56" y2="16"/><line x1="16" y1="26" x2="48" y2="26"/><line x1="16" y1="34" x2="48" y2="34"/></svg>
+    <svg class="l2-float-svg fs-8" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 56V16l8-8h24l8 8v40H12z"/><path d="M20 8v12h24V8"/><line x1="22" y1="28" x2="42" y2="28"/><line x1="22" y1="36" x2="42" y2="36"/></svg>
+    <svg class="l2-float-svg fs-9" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="32" cy="20" r="12"/><path d="M20 58V42a12 12 0 0 1 24 0v16"/></svg>
+    <svg class="l2-float-svg fs-10" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 56l4-44 6-4 4 4 4-4 6 4 4-4 6 4 4-4 6 4 4 44H8z"/><line x1="16" y1="20" x2="48" y2="20"/><line x1="16" y1="28" x2="48" y2="28"/></svg>
+    <!-- Additional floating SVGs -->
+    <svg class="l2-float-svg fs-11" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 56V12l4-4h16l4 4v44"/><path d="M24 8h16"/><line x1="28" y1="20" x2="40" y2="20"/><line x1="28" y1="28" x2="40" y2="28"/><line x1="28" y1="36" x2="36" y2="36"/></svg>
+    <svg class="l2-float-svg fs-12" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="32" cy="24" r="16"/><path d="M24 40h16v8H24z"/><line x1="32" y1="48" x2="32" y2="56"/><line x1="26" y1="56" x2="38" y2="56"/></svg>
+    <svg class="l2-float-svg fs-13" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="12" y="4" width="40" height="56" rx="4"/><path d="M24 4v8h16V4"/><line x1="20" y1="24" x2="44" y2="24"/><line x1="20" y1="32" x2="44" y2="32"/><line x1="20" y1="40" x2="36" y2="40"/></svg>
+    <svg class="l2-float-svg fs-14" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M16 32l10 10 22-22"/></svg>
+    <svg class="l2-float-svg fs-15" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 28v28h48V20H32L24 12H8v16z"/><line x1="8" y1="28" x2="56" y2="28"/></svg>
+    <svg class="l2-float-svg fs-16" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M32 4l8 16h18l-14 12 5 18-17-10-17 10 5-18L6 20h18z"/></svg>
+  </div>
+
   <!-- ━━━━ Hero ━━━━ -->
   <section class="l2-hero l2-snap">
-    <div class="l2-hero-orbs">
-      <div class="orb orb-1"></div>
-      <div class="orb orb-2"></div>
-      <div class="orb orb-3"></div>
-    </div>
-    <div class="l2-hero-grid"></div>
-
-    <!-- Floating school SVGs -->
-    <div class="l2-float-svgs" aria-hidden="true">
-      <svg class="l2-float-svg fs-1" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 56V16l8-8h24l8 8v40H12z"/><path d="M20 8v12h24V8"/><line x1="22" y1="28" x2="42" y2="28"/><line x1="22" y1="36" x2="42" y2="36"/><line x1="22" y1="44" x2="34" y2="44"/></svg>
-      <svg class="l2-float-svg fs-2" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10 54l6-40h4l6 40"/><circle cx="16" cy="10" r="3"/><path d="M38 54l6-40h4l6 40"/><circle cx="44" cy="10" r="3"/></svg>
-      <svg class="l2-float-svg fs-3" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="8" y="6" width="48" height="52" rx="4"/><line x1="8" y1="16" x2="56" y2="16"/><line x1="20" y1="6" x2="20" y2="16"/><line x1="16" y1="26" x2="48" y2="26"/><line x1="16" y1="34" x2="48" y2="34"/><line x1="16" y1="42" x2="36" y2="42"/></svg>
-      <svg class="l2-float-svg fs-4" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M32 4L4 20l28 16 28-16L32 4z"/><path d="M4 20v20l28 16 28-16V20"/><path d="M32 36v20"/></svg>
-      <svg class="l2-float-svg fs-5" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 56l4-44 6-4 4 4 4-4 6 4 4-4 6 4 4-4 6 4 4 44H8z"/><line x1="16" y1="20" x2="48" y2="20"/><line x1="16" y1="28" x2="48" y2="28"/><line x1="16" y1="36" x2="36" y2="36"/></svg>
-    </div>
-
     <div class="l2-wrap l2-hero-content">
       <span class="l2-pill">
         <span class="l2-pill-dot"></span>
