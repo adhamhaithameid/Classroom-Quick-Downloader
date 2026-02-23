@@ -66,6 +66,7 @@ func DashboardLinksHandler(cloudflareURL, websiteURL, uptimeKumaURL, githubRepoU
 			"ok": true,
 			"links": map[string]string{
 				"cloudflare":   normalizeExternalURL(cloudflareURL),
+				"website":      normalizeExternalURL(websiteURL),
 				"uptimeKuma":   normalizeExternalURL(uptimeKumaURL),
 				"githubRepo":   normalizeExternalURL(githubRepoURL),
 				"googleSheets": normalizeExternalURL(googleSheetsURL),
