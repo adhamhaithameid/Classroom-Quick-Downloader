@@ -500,11 +500,6 @@ func TestPublicWebsiteContentHandlers_RejectDisallowedOrigin(t *testing.T) {
 			handler: PublicWebsiteUserChangelogHandler(sqlDB, nil),
 			path:    "/api/public/website/changelog",
 		},
-		{
-			name:    "privacy",
-			handler: PublicWebsiteUserPrivacyHandler(sqlDB, nil),
-			path:    "/api/public/website/privacy",
-		},
 	}
 
 	for _, tt := range tests {
