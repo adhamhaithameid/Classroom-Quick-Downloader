@@ -109,8 +109,8 @@
               {/if}
             </div>
             <div class="entry-body">
-              <span class="entry-date"><AnimatedNumericText text={formatDateShort(entry.releasedAtUtc)} /></span>
-              <h2><AnimatedNumericText text={`v${entry.version}`} /> — {entry.title}</h2>
+              <span class="entry-date"><AnimatedNumericText text={formatDateShort(entry.releasedAtUtc)} animated /></span>
+              <h2><AnimatedNumericText text={`v${entry.version}`} animated /> — {entry.title}</h2>
               <p class="entry-summary">{entry.summary}</p>
               {#if entry.highlights.length > 0}
                 <ul>
