@@ -5,7 +5,6 @@ import {
   fetchMapData,
   fetchOverview,
   fetchUserChangelog,
-  fetchUserPrivacy,
   fetchUninstallStats,
   submitUninstallFeedback
 } from './publicSite';
