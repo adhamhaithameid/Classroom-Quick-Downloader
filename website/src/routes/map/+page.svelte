@@ -7,6 +7,7 @@
   import worldAtlas from 'world-atlas/countries-110m.json';
   import { fetchMapData } from '$lib/api/publicSite';
   import type { MapResponse } from '$lib/types/public';
+  import AnimatedNumber from '$lib/components/AnimatedNumber.svelte';
 
   type WorldFeature = {
     id?: string | number;
