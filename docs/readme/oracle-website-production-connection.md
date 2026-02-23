@@ -90,7 +90,6 @@ curl https://<worker-domain>/public/site-metrics
 curl https://<oracle-domain>/api/public/website/overview
 curl https://<oracle-domain>/api/public/website/map
 curl https://<oracle-domain>/api/public/website/changelog
-curl https://<oracle-domain>/api/public/website/privacy
 curl https://<oracle-domain>/api/public/website/uninstall
 ```
 
