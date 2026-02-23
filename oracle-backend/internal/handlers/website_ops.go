@@ -801,48 +801,23 @@ func WebsiteOpsPullCloudflareHandler(db *sql.DB, cloudflareMetricsURL string) ht
 			return
 		}
 
-		metrics, err := fetchCloudflareWebsiteMetrics(r.Context(), targetURL)
-		if err != nil {
-			writeJSONError(w, "cloudflare_pull_failed", "Failed to fetch Cloudflare website metrics", http.StatusBadGateway)
-			return
-		}
-
-		countries := make([]publicWebsiteCountryCell, 0, len(metrics.Countries))
-		for _, row := range metrics.Countries {
-			countries = append(countries, publicWebsiteCountryCell{
-				CountryCode: row.CountryCode,
-				Count:       row.Count,
-			})
-		}
-		countries = normalizeWebsiteCountryCells(countries, 300)
-		row, err := publishWebsiteDataset(
+		row, metrics, err := PullWebsiteDatasetFromCloudflare(
 			r.Context(),
 			db,
-			"cloudflare",
-			metrics.Totals.Downloads,
-			countries,
-			false,
-			true,
-		)
-		if err != nil {
-			writeJSONError(w, "cloudflare_pull_failed", "Failed to store Cloudflare website metrics", http.StatusInternalServerError)
-			return
-		}
-
-		_ = insertWebsiteSyncBatch(
-			r.Context(),
-			db,
-			websiteSyncDirectionCloudflareToWebsite,
-			newWebsiteBatchID(websiteSyncDirectionCloudflareToWebsite),
+			targetURL,
 			"oracle_admin_pull_cloudflare",
-			"ok",
-			map[string]any{
-				"downloads":     metrics.Totals.Downloads,
-				"countries":     len(countries),
-				"snapshotAtUtc": metrics.SnapshotAtUtc,
-				"generatedAt":   metrics.GeneratedAt,
-			},
 		)
+		if err != nil {
+			statusCode := http.StatusBadGateway
+			message := "Failed to fetch Cloudflare website metrics"
+			if errors.Is(err, errCloudflareWebsitePublish) {
+				statusCode = http.StatusInternalServerError
+				message = "Failed to store Cloudflare website metrics"
+			}
+			writeJSONError(w, "cloudflare_pull_failed", message, statusCode)
+			return
+		}
+
 		_ = AppendAuditLog(
 			r.Context(),
 			db,
