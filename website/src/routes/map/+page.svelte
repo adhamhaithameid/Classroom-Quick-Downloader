@@ -200,8 +200,8 @@
     <p>This map shows country-level activity only. It is an approximate, privacy-safe view.</p>
   </div>
   <div class="intro-actions">
-    <button type="button" class="retry" on:click={() => loadMap(true)} disabled={refreshing}>
-      {refreshing ? 'Refreshing…' : 'Refresh map data'}
+    <button type="button" class="refresh-btn" on:click={() => loadMap(true)} disabled={refreshing}>
+      {refreshing ? 'Refreshing…' : '↻ Refresh map data'}
     </button>
   </div>
 
