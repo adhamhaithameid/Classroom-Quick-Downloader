@@ -551,21 +551,24 @@
   .l2 {
     --green: #1a8b55;
     --green-light: #22c55e;
-    --green-bg: rgba(26, 139, 85, 0.08);
-    --green-border: rgba(26, 139, 85, 0.15);
+    --green-bg: rgba(26, 139, 85, 0.06);
+    --green-border: rgba(26, 139, 85, 0.12);
     --dark: #0f1419;
     --text: #1a1a2e;
     --text-secondary: #64748b;
     --muted: #94a3b8;
-    --bg: #f8fafb;
-    --card: #ffffff;
-    --border: #e2e8f0;
+    --bg: #fafcfb;
+    --card: rgba(255, 255, 255, 0.6);
+    --card-solid: #ffffff;
+    --border: rgba(226, 232, 240, 0.6);
+    --border-subtle: rgba(226, 232, 240, 0.35);
     --radius: 16px;
     --wrap: 1280px;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     background: var(--bg);
     color: var(--text);
     overflow-x: hidden;
+    position: relative;
     scroll-snap-type: y proximity;
   }
 
