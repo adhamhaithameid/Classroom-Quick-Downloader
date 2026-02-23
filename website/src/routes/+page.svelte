@@ -94,6 +94,10 @@
     preferredBrowser = detectBrowserKey();
     await loadOverview();
     requestAnimationFrame(() => setupScrollReveal());
+    const timer = window.setInterval(() => {
+      void loadOverview(true);
+    }, ORACLE_SNAPSHOT_REFRESH_MS);
+    return () => window.clearInterval(timer);
   });
 </script>
 
