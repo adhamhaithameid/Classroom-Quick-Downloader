@@ -11,6 +11,7 @@ import {
 afterEach(() => {
   vi.restoreAllMocks();
   vi.useRealTimers();
+  resetWebsiteSnapshotCacheForTests();
 });
 
 describe('public website API integration', () => {
