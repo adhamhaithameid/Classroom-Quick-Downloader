@@ -785,8 +785,15 @@
                   <div class="card-title">User Changelog Content</div>
                   <div class="card-subtitle">Public release notes shown to students on the website</div>
                 </div>
-                <div class="action-buttons-grid action-buttons-grid-two">
+                <div class="action-buttons-grid action-buttons-grid-three">
                   <button class="btn btn-secondary" id="user-changelog-refresh-btn">Refresh</button>
+                  <a
+                    class="btn btn-secondary"
+                    href="https://classroom-quick-downloader-website.pages.dev/changelog"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    id="user-changelog-open-website"
+                  >Open Website Tap</a>
                   <a
                     class="btn btn-secondary"
                     href="https://github.com/adhamhaithameid/Classroom-Quick-Downloader/blob/main/CHANGELOG.md"
@@ -796,51 +803,32 @@
                 </div>
               </div>
               <div class="card-body">
-                <form class="form-grid" id="user-changelog-form">
-                  <div class="creative-grid">
-                    <input id="user-changelog-key" class="auth-input" placeholder="Record key (e.g., v1-3-6)" required />
-                    <input id="user-changelog-version" class="auth-input" placeholder="Version (e.g., 1.3.6)" required />
-                    <input id="user-changelog-title" class="auth-input" placeholder="Title (e.g., Stability improvements)" required />
-                    <input id="user-changelog-released-at" class="auth-input" placeholder="Released at UTC (ms, optional)" />
-                  </div>
-                  <textarea id="user-changelog-summary" class="auth-input auth-input-lg" placeholder="Short summary for users" required></textarea>
-                  <textarea id="user-changelog-highlights" class="auth-input auth-input-lg" placeholder="Highlights (one line per item)"></textarea>
-                  <button class="btn btn-start" type="submit">Save User Changelog Entry</button>
-                </form>
-                <div id="user-changelog-list" class="creative-grid creative-grid-spaced"></div>
-              </div>
-            </div>
-          </div>
-
-          <div class="page" id="page-content-privacy">
-            <div class="card">
-              <div class="card-header">
-                <div>
-                  <div class="card-title">User Privacy Content</div>
-                  <div class="card-subtitle">Simple privacy language displayed on the public website</div>
+                <div class="section-block">
+                  <div class="section-caption">Create / Update Entry</div>
+                  <form class="form-grid" id="user-changelog-form">
+                    <div class="creative-grid">
+                      <input id="user-changelog-key" class="auth-input" placeholder="Record key (e.g., v1-3-6)" required />
+                      <input id="user-changelog-version" class="auth-input" placeholder="Version (e.g., 1.3.6)" required />
+                      <input id="user-changelog-title" class="auth-input" placeholder="Title (e.g., Stability improvements)" required />
+                      <input id="user-changelog-released-at" class="auth-input" placeholder="Released at UTC (ms, optional)" />
+                    </div>
+                    <textarea id="user-changelog-summary" class="auth-input auth-input-lg" placeholder="Short summary for users" required></textarea>
+                    <textarea id="user-changelog-highlights" class="auth-input auth-input-lg" placeholder="Highlights (one line per item)"></textarea>
+                    <button class="btn btn-start" type="submit">Save User Changelog Entry</button>
+                  </form>
                 </div>
-                <div class="action-buttons-grid action-buttons-grid-two">
-                  <button class="btn btn-secondary" id="user-privacy-refresh-btn">Refresh</button>
-                  <a
-                    class="btn btn-secondary"
-                    href="https://github.com/adhamhaithameid/Classroom-Quick-Downloader/blob/main/PRIVACY.md"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >View Full on GitHub</a>
+                <div class="section-block">
+                  <div class="section-caption">Saved Entries</div>
+                  <div id="user-changelog-list" class="content-record-grid"></div>
                 </div>
-              </div>
-              <div class="card-body">
-                <form class="form-grid" id="user-privacy-form">
-                  <div class="creative-grid">
-                    <input id="user-privacy-key" class="auth-input" placeholder="Record key (e.g., what-we-collect)" required />
-                    <input id="user-privacy-title" class="auth-input" placeholder="Section title" required />
-                    <input id="user-privacy-priority" class="auth-input" type="number" min="1" max="99" value="1" placeholder="Display order" />
+                <div class="section-block">
+                  <div class="section-caption">Website API Sync</div>
+                  <div class="pill-row">
+                    <span class="pill">Public API status: <strong id="user-changelog-sync-status">--</strong></span>
+                    <span class="pill">Tap: <strong>/changelog</strong></span>
                   </div>
-                  <textarea id="user-privacy-summary" class="auth-input auth-input-lg" placeholder="Short explanation for users" required></textarea>
-                  <textarea id="user-privacy-bullets" class="auth-input auth-input-lg" placeholder="Bullets (one line per item)"></textarea>
-                  <button class="btn btn-start" type="submit">Save User Privacy Section</button>
-                </form>
-                <div id="user-privacy-list" class="creative-grid creative-grid-spaced"></div>
+                  <pre id="user-changelog-output" class="json-viewer json-viewer-compact hidden"></pre>
+                </div>
               </div>
             </div>
           </div>
