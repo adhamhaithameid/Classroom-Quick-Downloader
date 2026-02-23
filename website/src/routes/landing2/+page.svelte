@@ -1137,10 +1137,6 @@
     0%, 100% { opacity: 1; transform: scale(1); }
     50% { opacity: 0.5; transform: scale(0.8); }
   }
-  @keyframes pulse-ring {
-    0%, 100% { transform: scale(1); opacity: 0.4; }
-    50% { transform: scale(1.1); opacity: 0.15; }
-  }
   @keyframes gradient-shift {
     0%, 100% { background-position: 0% 50%; }
     50% { background-position: 100% 50%; }
