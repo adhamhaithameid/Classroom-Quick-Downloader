@@ -333,7 +333,6 @@ function App() {
   // REAL STATS STATE
   const [stats, setStats] = useState<StatItem[]>([]);
   const [totalDownloads, setTotalDownloads] = useState(0);
-  const [cancelledDownloads, setCancelledDownloads] = useState(0);
   const [hoveredStatId, setHoveredStatId] = useState<string | null>(null);
 
   // CHANGELOG STATE
