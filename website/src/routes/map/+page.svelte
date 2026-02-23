@@ -109,10 +109,10 @@
           <div class="state-empty">No country data available yet.</div>
         {:else}
           <ul>
-            {#each topCountries as item, ti}
+            {#each topCountries as item}
               <li>
                 <span class="country-name">{item.name}</span>
-                <strong><AnimatedNumber value={item.count} /></strong>
+                <strong><AnimatedNumber value={item.count} animated /></strong>
               </li>
             {/each}
           </ul>
