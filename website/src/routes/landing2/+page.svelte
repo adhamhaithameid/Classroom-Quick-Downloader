@@ -1089,7 +1089,8 @@
 
   /* ── Footer ────────────────────────── */
   .l2-footer {
-    background: var(--card); border-top: 1px solid var(--border); padding: 18px 0;
+    background: #ffffff; border-top: 1px solid var(--border-subtle); padding: 18px 0;
+    position: relative; z-index: 2;
   }
   .l2-footer-inner { display: flex; align-items: center; gap: 20px; flex-wrap: nowrap; white-space: nowrap; max-width: 100%; padding: 0 32px; margin: 0 auto; }
   .l2-footer-brand {
