@@ -1,16 +1,13 @@
-import { resolveMetricsSource } from '$lib/api/metrics-source';
-import { ORACLE_API_BASE_URL, STORE_LINKS, WORKER_BASE_URL } from '$lib/config';
+import { ORACLE_API_BASE_URL, STORE_LINKS } from '$lib/config';
 import type {
   InstallBrowser,
   MapResponse,
   OverviewResponse,
   UserChangelogResponse,
-  UserPrivacyResponse,
   UninstallFeedbackRequest,
   UninstallFeedbackResponse,
   UninstallStatsResponse,
-  WorkerHealth,
-  WorkerSiteMetricsResponse
+  WorkerHealth
 } from '$lib/types/public';
 
 const REQUEST_TIMEOUT_MS = 8000;
