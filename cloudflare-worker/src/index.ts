@@ -1061,6 +1061,83 @@ async function handlePublicSiteMetrics(request: Request, env: WorkerEnv): Promis
   }
 }
 
+async function handleOraclePublicWebsiteProxy(request: Request, env: WorkerEnv): Promise<Response> {
+  const pathname = new URL(request.url).pathname;
+  const isUninstallPath = pathname === "/api/public/website/uninstall";
+  const allowedMethods = isUninstallPath ? new Set(["GET", "POST"]) : new Set(["GET"]);
+
+  if (!allowedMethods.has(request.method)) {
+    return withCors(
+      request,
+      new Response(JSON.stringify({ ok: false, error: "method_not_allowed" }), {
+        status: 405,
+        headers: { "content-type": "application/json; charset=utf-8" },
+      }),
+      env,
+    );
+  }
+
+  const resolvedOracleEndpoint = resolveOracleEndpoint(env.ORACLE_ENDPOINT, {
+    allowInsecureHttp: env.ALLOW_INSECURE_ORACLE_ENDPOINT === "true",
+  });
+  if (!resolvedOracleEndpoint.ok) {
+    return withCors(
+      request,
+      new Response(JSON.stringify({ ok: false, error: resolvedOracleEndpoint.error }), {
+        status: 503,
+        headers: { "content-type": "application/json; charset=utf-8" },
+      }),
+      env,
+    );
+  }
+
+  const targetUrl = `${resolvedOracleEndpoint.baseUrl}${pathname}`;
+  const upstreamHeaders = new Headers();
+  const contentType = request.headers.get("content-type");
+  if (contentType) upstreamHeaders.set("content-type", contentType);
+  const requestedWith = request.headers.get("x-requested-with");
+  if (requestedWith) upstreamHeaders.set("x-requested-with", requestedWith);
+  const origin = request.headers.get("origin");
+  if (origin) upstreamHeaders.set("origin", origin);
+  const forwardedFor = request.headers.get("cf-connecting-ip");
+  if (forwardedFor) upstreamHeaders.set("x-forwarded-for", forwardedFor);
+
+  const hasBody = request.method !== "GET" && request.method !== "HEAD";
+  const requestBody = hasBody ? await request.text() : undefined;
+
+  try {
+    const upstream = await fetch(targetUrl, {
+      method: request.method,
+      headers: upstreamHeaders,
+      body: requestBody,
+      redirect: "follow",
+    });
+    const body = await upstream.text();
+    const responseHeaders = new Headers({
+      "content-type": upstream.headers.get("content-type") || "application/json; charset=utf-8",
+    });
+    const cacheControl = upstream.headers.get("cache-control");
+    if (cacheControl) responseHeaders.set("cache-control", cacheControl);
+    return withCors(
+      request,
+      new Response(body, {
+        status: upstream.status,
+        headers: responseHeaders,
+      }),
+      env,
+    );
+  } catch {
+    return withCors(
+      request,
+      new Response(JSON.stringify({ ok: false, error: "upstream_unavailable" }), {
+        status: 502,
+        headers: { "content-type": "application/json; charset=utf-8" },
+      }),
+      env,
+    );
+  }
+}
+
 export default {
   async fetch(request: Request, env: WorkerEnv, _ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
