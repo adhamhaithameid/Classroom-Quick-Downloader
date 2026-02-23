@@ -631,7 +631,7 @@ export function renderDashboard(stats: StatsResponse): string {
   const byOsRows = renderTableRows(stats.counters.byOs || {});
   const byExtVersionRows = renderTableRows(stats.counters.byExtVersion || {});
   const byLangRows = renderTableRows(stats.counters.byLanguage || {});
-  const byCountryRows = renderTableRows(stats.counters.byCountry || {});
+  const byCountryRows = renderTableRows(stats.counters.byCountry || {}, "country");
   const byErrorRows = renderTableRows(stats.counters.byErrorType || {});
 
   const totalSuccess = stats.totalSuccess || 0;
