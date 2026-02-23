@@ -310,29 +310,6 @@ func PublicWebsiteUserChangelogHandler(sqliteDB, postgresDB *sql.DB) http.Handle
 	}
 }
 
-func PublicWebsiteUserPrivacyHandler(sqliteDB, postgresDB *sql.DB) http.HandlerFunc {
-	store := newControlPlaneStore(sqliteDB, postgresDB)
-	return func(w http.ResponseWriter, r *http.Request) {
-		if !preparePublicWebsiteCORSWithOptions(w, r, publicWebsiteCORSOptions{
-			AllowedMethods: "GET, OPTIONS",
-		}) {
-			return
-		}
-		if r.Method != http.MethodGet {
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			return
-		}
-
-		payload, err := buildPublicWebsiteUserPrivacy(r.Context(), store)
-		if err != nil {
-			http.Error(w, "failed to load privacy content", http.StatusInternalServerError)
-			return
-		}
-
-		writePublicWebsiteJSON(w, http.StatusOK, payload)
-	}
-}
-
 func PublicWebsiteUninstallHandler(sqliteDB *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !preparePublicWebsiteCORSWithOptions(w, r, publicWebsiteCORSOptions{
