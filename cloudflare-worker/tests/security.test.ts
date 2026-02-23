@@ -693,8 +693,8 @@ describe("Durable Object security behaviors", () => {
       uniqueCountriesAllTime?: number;
     };
 
-    expect(payload.weeklyRequests).toBe(11);
-    expect(payload.monthlyRequests).toBe(111);
+    expect(payload.weeklyRequests).toBeUndefined();
+    expect(payload.monthlyRequests).toBeUndefined();
     expect(payload.uniqueCountriesAllTime).toBe(2);
   });
 
