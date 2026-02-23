@@ -77,16 +77,6 @@ async function waitForLegendItem(container: HTMLElement): Promise<HTMLLIElement 
   return null;
 }
 
-async function waitForCancelledCounter(container: HTMLElement): Promise<HTMLElement | null> {
-  for (let i = 0; i < 20; i += 1) {
-    const counter = container.querySelector('.cqd-temp-cancelled-counter') as HTMLElement | null;
-    if (counter) return counter;
-    await act(async () => {
-      await tick();
-    });
-  }
-  return null;
-}
 describe('popup legend keyboard accessibility', () => {
   let container: HTMLDivElement;
   let root: Root;
