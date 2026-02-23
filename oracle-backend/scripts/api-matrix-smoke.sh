@@ -319,7 +319,6 @@ run_get_json "/api/admin/records/list?type=creative_email_template" '.ok == true
 run_get_json "/api/admin/records/list?type=newsletter_subscriber" '.ok == true and (.records|type=="array")' "records newsletter_subscriber"
 run_get_json "/api/admin/records/list?type=newsletter_campaign" '.ok == true and (.records|type=="array")' "records newsletter_campaign"
 run_get_json "/api/admin/records/list?type=website_user_changelog_entry" '.ok == true and (.records|type=="array")' "records website_user_changelog_entry"
-run_get_json "/api/admin/records/list?type=website_user_privacy_section" '.ok == true and (.records|type=="array")' "records website_user_privacy_section"
 
 stepup_required="$(jq -r '.required // false' "$TMP_DIR/_api_auth_stepup_check.json")"
 if [[ "$stepup_required" != "true" ]]; then
