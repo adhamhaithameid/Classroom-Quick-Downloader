@@ -355,7 +355,7 @@
               <div class="l2-file-row"><span class="l2-file-icon">📄</span><span>Reading_Chapter.pdf</span><span class="l2-file-btn l2-file-btn-cqd">⬇ Download</span></div>
               <div class="l2-file-row"><span class="l2-file-icon">📄</span><span>Slides_Week.pptx</span><span class="l2-file-btn l2-file-btn-cqd">⬇ Download</span></div>
             </div>
-            <div class="l2-solution-badge">✨ Download All — <AnimatedNumber value={1} format={{ useGrouping: false }} /> click</div>
+            <div class="l2-solution-badge">✨ Download All — <AnimatedNumber value={1} format={{ useGrouping: false }} animated /> click</div>
           </div>
         </div>
       </div>
