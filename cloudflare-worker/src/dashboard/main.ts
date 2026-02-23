@@ -580,6 +580,14 @@ export function renderDashboard(stats: StatsResponse): string {
   const cfgAllowLegacy = remoteConfig.allowLegacyEvents ?? true;
   const cfgRemoteReason = remoteConfig.remoteEnabledReason ?? "ok";
   const pipelineHealthUrl = `${workerUrl}/pipeline-health`;
+  const oracleDashboardUrl = (() => {
+    const resolved = resolveOracleEndpoint(oracleEndpoint);
+    if (resolved.ok && resolved.protocol === "https:") {
+      return `${resolved.baseUrl}/`;
+    }
+    return `${workerUrl}/api/public/website/overview`;
+  })();
+  const uptimeStatusUrl = pipelineHealthUrl;
   const cfgHealth = remoteConfig.healthThresholds || {
     warnPendingBatches: 10,
     criticalPendingBatches: 25,
