@@ -189,14 +189,14 @@
     <div class="stat-item">
       <span class="stat-icon">📥</span>
       <div>
-        <strong class="stat-val"><AnimatedNumber value={overview?.totals.downloads ?? 0} /></strong>
+        <strong class="stat-val"><AnimatedNumber value={overview?.totals.downloads ?? 0} animated /></strong>
         <span class="stat-label-text">Total Downloads</span>
       </div>
     </div>
     <div class="stat-item">
       <span class="stat-icon">🌍</span>
       <div>
-        <strong class="stat-val"><AnimatedNumber value={countryCount} /></strong>
+        <strong class="stat-val"><AnimatedNumber value={countryCount} animated /></strong>
         <span class="stat-label-text">Countries</span>
       </div>
     </div>
