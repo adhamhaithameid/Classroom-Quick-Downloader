@@ -1173,6 +1173,10 @@ export default {
       return handlePublicSiteMetrics(request, env);
     }
 
+    if (isOraclePublicWebsiteRoute(pathname)) {
+      return handleOraclePublicWebsiteProxy(request, env);
+    }
+
     // Dashboard (requires session)
     if (pathname === "/dashboard") {
       return handleDashboard(request, env);
