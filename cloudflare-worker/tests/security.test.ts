@@ -654,7 +654,7 @@ describe("Durable Object security behaviors", () => {
     expect(payload.remoteConfig?.healthNotifyIntervalsMs?.critical).toBe(20 * 60 * 1000);
   });
 
-  it("reports weekly/monthly request windows and unique country reach in stats", async () => {
+  it("reports unique country reach in stats without weekly/monthly dashboard counters", async () => {
     const base = new Date();
     base.setUTCHours(0, 0, 0, 0);
     const dateKey = (offset: number) => {
