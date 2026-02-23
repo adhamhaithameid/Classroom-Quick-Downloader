@@ -317,8 +317,8 @@ func TestArchiverRunTimeout(t *testing.T) {
 func TestDeploymentsAutoSyncEnabled(t *testing.T) {
 	t.Setenv("DEPLOYMENTS_AUTO_SYNC_ENABLED", "")
 	t.Setenv("ORACLE_DEPLOYMENTS_AUTO_SYNC_ENABLED", "")
-	if deploymentsAutoSyncEnabled() {
-		t.Fatal("expected default auto-sync to be disabled when env is empty")
+	if !deploymentsAutoSyncEnabled() {
+		t.Fatal("expected default auto-sync to be enabled when env is empty")
 	}
 
 	t.Setenv("ORACLE_DEPLOYMENTS_AUTO_SYNC_ENABLED", "true")
