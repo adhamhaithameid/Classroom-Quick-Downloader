@@ -139,7 +139,7 @@ All configuration is defined in `wrangler.toml`:
 
 | Variable              | Type                           | Description                                                                                         | Example                       |
 | --------------------- | ------------------------------ | --------------------------------------------------------------------------------------------------- | ----------------------------- |
-| `ORACLE_ENDPOINT`     | `[vars]`                       | Base URL of the Oracle backend. Do not include`/ingest-batch`.                                      | `http://your-server.com:8080` |
+| `ORACLE_ENDPOINT`     | `[vars]`                       | Base URL of the Oracle backend. Do not include`/ingest-batch`. Use HTTPS in production.             | `https://your-server.com` |
 | `MAX_BATCH_EVENTS`    | `[vars]`                       | Maximum events per flush. When buffer reaches this size, a flush is triggered.                      | `10000`                       |
 | `DO_SHARED_SECRET`    | **Secret**                     | Shared secret for admin endpoints + Oracle communication. **Do NOT put in `[vars]`**.              | —                            |
 | `DASHBOARD_PASSWORD`  | **Secret**                     | Password for the Worker dashboard login/session tokens (separate from `DO_SHARED_SECRET`).         | —                            |
