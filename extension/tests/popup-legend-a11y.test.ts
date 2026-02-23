@@ -92,7 +92,6 @@ describe('popup legend keyboard accessibility', () => {
     const chromeMock = createChromeMock({
       local_stats: {
         total: 3,
-        cancelled: 2,
         byType: {
           pdf: 2,
           doc: 1,
