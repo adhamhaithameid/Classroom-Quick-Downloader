@@ -290,21 +290,21 @@
 
     <div class="steps-row">
       <div class="step-card">
-        <div class="step-num"><AnimatedNumber value={1} format={{ useGrouping: false }} /></div>
+        <div class="step-num"><AnimatedNumber value={1} format={{ useGrouping: false }} animated /></div>
         <div>
           <h3>Install the Extension</h3>
-          <p>Add CQD to your browser from the Chrome Web Store, Firefox Add-ons, or Edge Add-ons. Takes less than <AnimatedNumber value={10} format={{ useGrouping: false }} /> seconds.</p>
+          <p>Add CQD to your browser from the Chrome Web Store, Firefox Add-ons, or Edge Add-ons. Takes less than <AnimatedNumber value={10} format={{ useGrouping: false }} animated /> seconds.</p>
         </div>
       </div>
       <div class="step-card">
-        <div class="step-num"><AnimatedNumber value={2} format={{ useGrouping: false }} /></div>
+        <div class="step-num"><AnimatedNumber value={2} format={{ useGrouping: false }} animated /></div>
         <div>
           <h3>Open Google Classroom</h3>
           <p>Navigate to any class. CQD automatically detects downloadable materials and assignments.</p>
         </div>
       </div>
       <div class="step-card">
-        <div class="step-num"><AnimatedNumber value={3} format={{ useGrouping: false }} /></div>
+        <div class="step-num"><AnimatedNumber value={3} format={{ useGrouping: false }} animated /></div>
         <div>
           <h3>Download Everything</h3>
           <p>Click once to batch-download all files. No more clicking each file individually.</p>
