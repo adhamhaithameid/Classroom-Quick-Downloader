@@ -64,7 +64,6 @@ Required GitHub repository configuration:
 
 - Variable: `CLOUDFLARE_PAGES_PROJECT_NAME`
 - Variable: `PUBLIC_ORACLE_API_BASE_URL`
-- Variable: `PUBLIC_WORKER_BASE_URL`
 - Variable: `PUBLIC_SITE_URL`
 - Secret: `CLOUDFLARE_API_TOKEN`
 - Secret: `CLOUDFLARE_ACCOUNT_ID`
