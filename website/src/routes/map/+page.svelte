@@ -1,19 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { feature } from 'topojson-client';
-  import { geoNaturalEarth1, geoPath } from 'd3-geo';
-  import { scaleLinear } from 'd3-scale';
-  import iso3166 from 'iso-3166-1';
-  import worldAtlas from 'world-atlas/countries-110m.json';
-  import { fetchMapData } from '$lib/api/publicSite';
+  import { fetchWebsiteSnapshot, ORACLE_SNAPSHOT_REFRESH_MS } from '$lib/api/publicSite';
   import type { MapResponse } from '$lib/types/public';
   import AnimatedNumber from '$lib/components/AnimatedNumber.svelte';
-
-  type WorldFeature = {
-    id?: string | number;
-    geometry: unknown;
-    properties?: { name?: string };
-  };
+  import CountryHeatmap from '$lib/components/CountryHeatmap.svelte';
 
   type TopCountry = {
     countryCode: string;
