@@ -46,6 +46,29 @@ function formatAge(ts: number | null): string {
   return `${sec}s`;
 }
 
+const COUNTRY_NAME_ALIASES: Record<string, string> = {
+  UK: "United Kingdom",
+  EL: "Greece",
+};
+const COUNTRY_CODE_PATTERN = /^[A-Z]{2}$/;
+const countryDisplayNames =
+  typeof Intl !== "undefined" && typeof Intl.DisplayNames === "function"
+    ? new Intl.DisplayNames(["en"], { type: "region" })
+    : null;
+
+function countryNameFromCode(code: string): string {
+  const normalized = String(code || "").trim().toUpperCase();
+  if (!COUNTRY_CODE_PATTERN.test(normalized)) return "";
+  if (normalized === "XX" || normalized === "ZZ" || normalized === "UN" || normalized === "EU") return "";
+  if (COUNTRY_NAME_ALIASES[normalized]) return COUNTRY_NAME_ALIASES[normalized];
+  if (!countryDisplayNames) return "";
+  try {
+    return countryDisplayNames.of(normalized) || "";
+  } catch {
+    return "";
+  }
+}
+
 function quotaToStateTag(quota?: QuotaDescriptor) {
   if (!quota) {
     return {
