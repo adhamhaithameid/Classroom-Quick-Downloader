@@ -662,6 +662,10 @@ export function renderDashboard(stats: StatsResponse): string {
   const hotBrowser = topKey(stats.counters.byBrowser);
   const hotOs = topKey(stats.counters.byOs);
   const hotCountry = topKey(stats.counters.byCountry);
+  const hotCountryTooltipAttr = (() => {
+    const countryName = countryNameFromCode(hotCountry);
+    return countryName ? ` data-tooltip="${escapeHtml(countryName)}"` : "";
+  })();
 
   const rawStatsJson = JSON.stringify(stats, null, 2)
     .replace(/&/g, "&amp;")
