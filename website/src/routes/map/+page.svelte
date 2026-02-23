@@ -21,143 +21,22 @@
   let refreshing = false;
   let mapData: MapResponse | null = null;
 
-  let countries: WorldFeature[] = [];
-  let pathByCountryId = new Map<number, string>();
-  let countByCountryId = new Map<number, number>();
-  let maxCount = 1;
-  let colorScale = scaleLinear<string>().domain([0, 1]).range(['#e0f2e9', '#137a47']);
   let topCountries: TopCountry[] = [];
-
-  // Hover tooltip state
-  let hoveredCountry: { name: string; count: number; x: number; y: number; alignRight: boolean } | null = null;
-
-  // Lookup: numeric ID -> country name
-  let nameByCountryId = new Map<number, string>();
 
   function toCountryName(code: string): string {
     const label = displayNames?.of(code.toUpperCase());
     return label || code.toUpperCase();
   }
 
-  function toNumericCountryId(countryCode: string): number | null {
-    const normalized = countryCode.trim().toUpperCase();
-    if (!normalized) return null;
-    const resolved = iso3166.whereAlpha2(normalized);
-    if (!resolved?.numeric) return null;
-    const numeric = Number(resolved.numeric);
-    if (!Number.isFinite(numeric)) return null;
-    return numeric;
-  }
-
-  function numericIdToName(numericId: number): string {
-    const cached = nameByCountryId.get(numericId);
-    if (cached) return cached;
-    const resolved = iso3166.whereNumeric(String(numericId).padStart(3, '0'));
-    if (resolved?.country) {
-      nameByCountryId.set(numericId, resolved.country);
-      return resolved.country;
-    }
-    return 'Unknown';
-  }
-
-  function buildWorldGeometry(): void {
-    const topology = worldAtlas as Record<string, unknown>;
-    const objects = topology.objects as Record<string, unknown>;
-    const countriesObject = objects?.countries;
-    if (!countriesObject) return;
-
-    const collection = feature(topology as never, countriesObject as never) as {
-      features?: WorldFeature[];
-    };
-    countries = Array.isArray(collection.features) ? collection.features : [];
-
-    const projection = geoNaturalEarth1().fitSize([svgWidth, svgHeight], collection as never);
-    const path = geoPath(projection);
-
-    pathByCountryId = new Map<number, string>();
-    for (const item of countries) {
-      const id = Number(item.id);
-      if (!Number.isFinite(id)) continue;
-      const pathValue = path(item as never) ?? '';
-      pathByCountryId.set(id, pathValue);
-    }
-  }
-
   function syncMapCounts(): void {
-    countByCountryId = new Map<number, number>();
     topCountries = [];
-    maxCount = 1;
-    colorScale = scaleLinear<string>().domain([0, 1]).range(['#e0f2e9', '#137a47']);
-
     if (!mapData) return;
 
-    const validCounts: number[] = [];
-    const top: TopCountry[] = [];
-
-    for (const entry of mapData.countries) {
-      const id = toNumericCountryId(entry.countryCode);
-      if (id == null) continue;
-      const count = Math.max(0, entry.count || 0);
-      if (count <= 0) continue;
-
-      countByCountryId.set(id, count);
-      validCounts.push(count);
-      top.push({
-        countryCode: entry.countryCode.toUpperCase(),
-        count,
-        name: toCountryName(entry.countryCode)
-      });
-    }
-
-    maxCount = validCounts.length ? Math.max(...validCounts) : 1;
-    colorScale = scaleLinear<string>().domain([0, maxCount]).range(['#d5efe0', '#137a47']);
-    topCountries = top.slice(0, 12);
-  }
-
-  function fillForCountry(rawId: string | number | undefined): string {
-    const id = Number(rawId);
-    if (!Number.isFinite(id)) return '#f0f5f2';
-    const count = countByCountryId.get(id);
-    if (!count) return '#f0f5f2';
-    return colorScale(count);
-  }
-
-  function borderForCountry(rawId: string | number | undefined): string {
-    const id = Number(rawId);
-    if (!Number.isFinite(id)) return '#d6e4da';
-    return countByCountryId.has(id) ? '#5daa82' : '#d6e4da';
-  }
-
-  function handleCountryHover(event: MouseEvent, item: WorldFeature): void {
-    const id = Number(item.id);
-    const count = Number.isFinite(id) ? countByCountryId.get(id) ?? 0 : 0;
-    // Only show tooltip for countries with at least 1 download
-    if (count < 1) {
-      hoveredCountry = null;
-      return;
-    }
-    const name = Number.isFinite(id) ? numericIdToName(id) : 'Unknown';
-    const mapShell = (event.target as Element).closest('.map-shell');
-    if (!mapShell) return;
-    const shellRect = mapShell.getBoundingClientRect();
-    const mouseX = event.clientX - shellRect.left;
-    const mouseY = event.clientY - shellRect.top;
-    const shellWidth = shellRect.width;
-    // Position tooltip to the right of cursor, or left if too close to edge
-    const tooltipWidth = 160;
-    const offset = 16;
-    const showLeft = mouseX + tooltipWidth + offset > shellWidth;
-    hoveredCountry = {
-      name,
-      count,
-      x: showLeft ? mouseX - offset : mouseX + offset,
-      y: mouseY,
-      alignRight: showLeft
-    };
-  }
-
-  function clearHover(): void {
-    hoveredCountry = null;
+    topCountries = mapData.countries.slice(0, 12).map((entry) => ({
+      countryCode: entry.countryCode.toUpperCase(),
+      count: entry.count,
+      name: toCountryName(entry.countryCode)
+    }));
   }
 
   async function loadMap(force = false): Promise<void> {
