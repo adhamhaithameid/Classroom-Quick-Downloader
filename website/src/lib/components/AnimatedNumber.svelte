@@ -90,8 +90,9 @@
     {format}
     {prefix}
     {suffix}
+    {animated}
     transformTiming={noHorizontalTransform}
-    spinTiming={defaultSpinTiming}
+    spinTiming={animated ? defaultSpinTiming : undefined}
     plugins={[continuous]}
     willChange
   />
