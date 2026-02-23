@@ -90,8 +90,8 @@
           <nav class="sidebar-links">
             {#each changelog?.entries ?? [] as entry}
               <a href="#v{entry.version}">
-                <span class="sv"><AnimatedNumericText text={`v${entry.version}`} /></span>
-                <span class="sd"><AnimatedNumericText text={formatDateShort(entry.releasedAtUtc)} /></span>
+                <span class="sv"><AnimatedNumericText text={`v${entry.version}`} animated /></span>
+                <span class="sd"><AnimatedNumericText text={formatDateShort(entry.releasedAtUtc)} animated /></span>
               </a>
             {/each}
           </nav>
