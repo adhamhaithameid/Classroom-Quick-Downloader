@@ -37,8 +37,8 @@
         </div>
         <h1>{privacy.headline}</h1>
       </div>
-      <p class="privacy-desc"><AnimatedNumericText text={privacy.description} /></p>
-      <small class="privacy-updated">Last updated (UTC): <AnimatedNumericText text={formatDate(privacy.lastUpdatedAtUtc)} /></small>
+      <p class="privacy-desc"><AnimatedNumericText text={privacy.description} animated /></p>
+      <small class="privacy-updated">Last updated (UTC): <AnimatedNumericText text={formatDate(privacy.lastUpdatedAtUtc)} animated /></small>
     </div>
     <div class="actions">
       <a class="action-btn" href={privacy.fullPrivacyUrl} target="_blank" rel="noopener noreferrer">
