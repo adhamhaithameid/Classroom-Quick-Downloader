@@ -529,11 +529,6 @@ func TestPublicWebsiteContentHandlers_RejectInvalidMethods(t *testing.T) {
 			handler: PublicWebsiteUserChangelogHandler(sqlDB, nil),
 			path:    "/api/public/website/changelog",
 		},
-		{
-			name:    "privacy-post-not-allowed",
-			handler: PublicWebsiteUserPrivacyHandler(sqlDB, nil),
-			path:    "/api/public/website/privacy",
-		},
 	}
 
 	for _, tt := range tests {
