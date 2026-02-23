@@ -677,27 +677,43 @@
     animation: gradient-shift 5s ease-in-out infinite;
   }
   .l2-sub {
-    font-size: 18px; line-height: 1.7; color: var(--text-secondary);
+    font-size: 18px; line-height: 1.7; color: var(--text);
+    opacity: 0.7;
     max-width: 640px; margin: 0 auto 40px;
   }
   .l2-compat {
-    font-size: 12px; color: var(--muted); margin-top: 16px;
+    font-size: 13px; color: var(--text-secondary); margin-top: 16px;
+    font-weight: 500; letter-spacing: 0.01em;
   }
 
-  /* ── Floating SVGs ─────────────────── */
-  .l2-float-svgs {
-    position: absolute; inset: 0; pointer-events: none; overflow: hidden;
+  /* ── Floating SVGs (page-wide) ───── */
+  .l2-page-floats {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none; overflow: hidden; z-index: 0;
   }
   .l2-float-svg {
-    position: absolute; color: var(--green); opacity: 0.06;
+    position: absolute; color: var(--green); opacity: 0.05;
   }
-  .fs-1 { width: 120px; top: 8%; left: 5%; animation: float-a 25s ease-in-out infinite; }
-  .fs-2 { width: 90px; top: 15%; right: 8%; animation: float-b 20s ease-in-out infinite; }
-  .fs-3 { width: 140px; bottom: 20%; left: 10%; animation: float-a 30s ease-in-out infinite reverse; }
-  .fs-4 { width: 100px; top: 50%; right: 15%; animation: float-b 22s ease-in-out infinite; }
-  .fs-5 { width: 80px; bottom: 10%; right: 5%; animation: float-a 18s ease-in-out infinite; }
-  .fs-6 { width: 110px; top: 15%; left: 5%; animation: float-b 24s ease-in-out infinite; }
-  .fs-7 { width: 100px; bottom: 20%; right: 8%; animation: float-a 28s ease-in-out infinite; }
+  /* Hero-level floats */
+  .fs-1 { width: 120px; top: 2%; left: 5%; animation: float-a 25s ease-in-out infinite; }
+  .fs-2 { width: 90px; top: 5%; right: 8%; animation: float-b 20s ease-in-out infinite; }
+  .fs-3 { width: 140px; top: 14%; left: 10%; animation: float-a 30s ease-in-out infinite reverse; }
+  .fs-4 { width: 100px; top: 10%; right: 15%; animation: float-b 22s ease-in-out infinite; }
+  .fs-5 { width: 80px; top: 18%; right: 5%; animation: float-a 18s ease-in-out infinite; }
+  /* Mid-page floats */
+  .fs-6 { width: 110px; top: 38%; left: 3%; animation: float-b 24s ease-in-out infinite; }
+  .fs-7 { width: 100px; top: 50%; right: 6%; animation: float-a 28s ease-in-out infinite; }
+  .fs-8 { width: 95px; top: 58%; left: 8%; animation: float-b 26s ease-in-out infinite reverse; }
+  /* Bottom-page floats */
+  .fs-9 { width: 85px; top: 72%; right: 4%; animation: float-a 20s ease-in-out infinite; }
+  .fs-10 { width: 105px; top: 85%; left: 6%; animation: float-b 23s ease-in-out infinite reverse; }
+  /* Extra density floats */
+  .fs-11 { width: 75px; top: 25%; right: 12%; animation: float-a 27s ease-in-out infinite; }
+  .fs-12 { width: 90px; top: 33%; left: 15%; animation: float-b 19s ease-in-out infinite reverse; }
+  .fs-13 { width: 110px; top: 42%; right: 10%; animation: float-a 22s ease-in-out infinite; }
+  .fs-14 { width: 70px; top: 62%; left: 12%; animation: float-b 21s ease-in-out infinite; }
+  .fs-15 { width: 100px; top: 76%; right: 9%; animation: float-a 24s ease-in-out infinite reverse; }
+  .fs-16 { width: 80px; top: 92%; left: 18%; animation: float-b 26s ease-in-out infinite; }
 
   @keyframes float-a {
     0%, 100% { transform: translateY(0) rotate(0deg); }
