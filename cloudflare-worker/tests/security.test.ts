@@ -160,7 +160,7 @@ function makeDOWithEnv(envOverride: Partial<Env>, stored?: StoredState) {
     state.storage.seed(STORAGE_KEY, stored);
   }
   const env: Env = {
-    ORACLE_ENDPOINT: "http://example.com",
+    ORACLE_ENDPOINT: "https://example.com",
     DO_SHARED_SECRET: "secret",
     MAX_BATCH_EVENTS: "10000",
     ...envOverride,
