@@ -308,28 +308,28 @@
     transition: color 0.2s ease;
   }
 
-  .credit-link:hover {
+  .l2-footer-credit-link:hover {
     color: var(--gc-green);
   }
 
-  .credit-link strong {
+  .l2-footer-credit-link strong {
     color: var(--text);
     font-weight: 600;
   }
 
-  .credit-avatar {
+  .l2-footer-avatar {
     width: 20px;
     height: 20px;
     border-radius: 50%;
     border: 1px solid var(--border);
   }
 
-  .footer-sep {
+  .l2-footer-sep {
     color: var(--border);
     font-size: 10px;
   }
 
-  .footer-version a {
+  .l2-footer-version a {
     color: var(--gc-green);
     font-size: 11px;
     font-weight: 600;
