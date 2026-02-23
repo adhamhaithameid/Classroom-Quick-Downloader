@@ -636,12 +636,34 @@ body {
 .cqd-designer-main-line {
   display: inline-flex;
   align-items: center;
+  gap: 7px;
+  color: inherit;
+  text-decoration: none;
+  border-radius: 999px;
+  transition:
+    color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.cqd-designer-main-line:hover {
+  color: var(--cqd-blue);
+  transform: translateY(-1px);
+}
+
+.cqd-designer-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  border: 1px solid rgba(37, 99, 235, 0.3);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.15);
+  object-fit: cover;
+  flex-shrink: 0;
 }
 
 .cqd-designer-name {
   font-weight: 600;
   color: var(--cqd-blue);
-  margin-left: 4px;
+  margin-left: 2px;
 }
 
 .cqd-designer-extra {
