@@ -75,7 +75,11 @@
     return () => observer.disconnect();
   });
 
-  $: if (hasAnimatedInView && !priming && displayValue !== value) {
+  $: if (!animated && displayValue !== value) {
+    displayValue = value;
+  }
+
+  $: if (animated && hasAnimatedInView && !priming && displayValue !== value) {
     displayValue = value;
   }
 </script>
