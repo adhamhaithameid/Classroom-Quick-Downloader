@@ -129,6 +129,35 @@ describe("Dashboard website sync UI", () => {
     expect(html).toContain('id="btn-website-override-save"');
     expect(html).toContain('id="website-admin-output"');
   });
+
+  it("does not render weekly or monthly events rows in quota usage", () => {
+    const html = renderDashboard(makeStats());
+    expect(html).not.toContain("Weekly Events");
+    expect(html).not.toContain("Monthly Events");
+    expect(html).not.toContain('data-bind="weeklyEvents"');
+    expect(html).not.toContain('data-bind="monthlyEvents"');
+  });
+});
+
+describe("Dashboard country label tooltips", () => {
+  it("adds human-readable country names for ISO-2 country codes on hover", () => {
+    const html = renderDashboard(
+      makeStats({
+        counters: {
+          byStatus: {},
+          byType: {},
+          byBrowser: {},
+          byOs: {},
+          byExtVersion: {},
+          byLanguage: {},
+          byCountry: { EG: 12 },
+          byErrorType: {},
+        },
+      })
+    );
+    expect(html).toContain('data-tooltip="Egypt"');
+    expect(html).toContain(">EG<");
+  });
 });
 
 describe("Dashboard login rendering", () => {
