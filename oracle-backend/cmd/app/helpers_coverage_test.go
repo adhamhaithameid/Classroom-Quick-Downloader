@@ -350,8 +350,8 @@ func TestDeploymentsAutoSyncEnabled(t *testing.T) {
 
 	t.Setenv("ORACLE_DEPLOYMENTS_AUTO_SYNC_ENABLED", "garbage")
 	t.Setenv("DEPLOYMENTS_AUTO_SYNC_ENABLED", "")
-	if deploymentsAutoSyncEnabled() {
-		t.Fatal("expected invalid value to default to disabled")
+	if !deploymentsAutoSyncEnabled() {
+		t.Fatal("expected invalid value to default to enabled")
 	}
 }
 
