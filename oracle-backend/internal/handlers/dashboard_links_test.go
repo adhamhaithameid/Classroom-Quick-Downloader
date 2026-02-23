@@ -12,6 +12,7 @@ import (
 func TestDashboardLinksHandler_NormalizesInvalidValues(t *testing.T) {
 	h := DashboardLinksHandler(
 		"https://example.com/a",
+		"https://classroom-quick-downloader-website.pages.dev",
 		"javascript:alert(1)",
 		"http://github.com/example/repo",
 		"not-a-url",
