@@ -318,7 +318,7 @@
               <div class="l2-file-row"><span class="l2-file-icon">📄</span><span>Reading_Chapter.pdf</span><span class="l2-file-btn l2-file-btn-manual">⋯ → Download</span></div>
               <div class="l2-file-row l2-file-row-fade"><span class="l2-file-icon">📄</span><span>Slides_Week.pptx</span><span class="l2-file-btn l2-file-btn-manual">⋯ → Download</span></div>
             </div>
-            <div class="l2-problem-badge">⏱ ~<AnimatedNumber value={14.5} format={{ useGrouping: false, minimumFractionDigits: 1, maximumFractionDigits: 1 }} /> seconds per file</div>
+            <div class="l2-problem-badge">⏱ ~<AnimatedNumber value={14.5} format={{ useGrouping: false, minimumFractionDigits: 1, maximumFractionDigits: 1 }} animated /> seconds per file</div>
           </div>
         </div>
       </div>
