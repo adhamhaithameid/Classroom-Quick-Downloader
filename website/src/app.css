@@ -1,20 +1,37 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Manrope:wght@500;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Inter:wght@400;500;600;700;800&display=swap');
 
 :root {
-  --bg: #f4f8ff;
-  --bg-deep: #e7eeff;
-  --surface: rgba(255, 255, 255, 0.92);
-  --surface-2: rgba(246, 250, 255, 0.86);
-  --border: #ccd9f2;
-  --text: #0f2142;
-  --muted: #5d7297;
-  --accent: #2f5df6;
-  --accent-2: #173fa8;
-  --accent-3: #05a7b7;
-  --good: #0f766e;
-  --warn: #b45309;
-  --danger: #be123c;
-  --shadow: 0 22px 45px rgba(17, 44, 95, 0.12);
+  /* Google Classroom-inspired palette */
+  --gc-green: #1a8b55;
+  --gc-green-light: #57bb8a;
+  --gc-green-dark: #137a47;
+  --gc-green-bg: #e8f5e9;
+  --gc-green-surface: rgba(26, 139, 85, 0.06);
+  --gc-blue: #4285f4;
+  --gc-yellow: #fbbc04;
+  --gc-red: #ea4335;
+
+  /* Layout tokens */
+  --bg: #fafcfa;
+  --bg-deep: #f1f6f2;
+  --surface: rgba(255, 255, 255, 0.95);
+  --surface-2: rgba(248, 252, 249, 0.92);
+  --border: #d6e4da;
+  --border-hover: #a3c5ad;
+  --text: #1a2e23;
+  --text-secondary: #4a6b56;
+  --muted: #6d8a77;
+  --accent: var(--gc-green);
+  --accent-2: var(--gc-green-dark);
+
+  --shadow-sm: 0 1px 3px rgba(26, 46, 35, 0.06);
+  --shadow: 0 4px 20px rgba(26, 46, 35, 0.08);
+  --shadow-lg: 0 12px 40px rgba(26, 46, 35, 0.1);
+  --shadow-green: 0 4px 24px rgba(26, 139, 85, 0.12);
+
+  --radius: 16px;
+  --radius-sm: 10px;
+  --radius-lg: 24px;
 }
 
 * {
