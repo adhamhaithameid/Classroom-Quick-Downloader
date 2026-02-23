@@ -4,6 +4,7 @@ import {
   coerceOverviewPayload,
   fetchMapData,
   fetchOverview,
+  resetWebsiteSnapshotCacheForTests,
   fetchUserChangelog,
   fetchUninstallStats,
   submitUninstallFeedback
