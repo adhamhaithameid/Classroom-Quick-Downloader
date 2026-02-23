@@ -4338,6 +4338,7 @@ export function renderDashboard(stats: StatsResponse): string {
           hotBrowser: topKeyJS(counters.byBrowser),
           hotOs: topKeyJS(counters.byOs),
           hotCountry: topKeyJS(counters.byCountry),
+          hotCountryAllTime: topKeyJS(counters.byCountry),
         };
         Object.entries(values).forEach(function ([key, value]) {
           const els = document.querySelectorAll('[data-bind="' + key + '"]');
