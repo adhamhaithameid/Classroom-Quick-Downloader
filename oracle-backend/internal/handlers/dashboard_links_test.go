@@ -37,6 +37,9 @@ func TestDashboardLinksHandler_NormalizesInvalidValues(t *testing.T) {
 	if payload.Links["cloudflare"] != "https://example.com/a" {
 		t.Fatalf("unexpected cloudflare url: %q", payload.Links["cloudflare"])
 	}
+	if payload.Links["website"] != "https://classroom-quick-downloader-website.pages.dev" {
+		t.Fatalf("unexpected website url: %q", payload.Links["website"])
+	}
 	if payload.Links["uptimeKuma"] != "" {
 		t.Fatalf("expected invalid uptime url to be blank, got %q", payload.Links["uptimeKuma"])
 	}
