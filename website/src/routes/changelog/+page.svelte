@@ -60,7 +60,7 @@
       <div>
         <h1>{changelog?.headline || "What's new"}</h1>
         <p class="header-desc">{changelog?.description || 'Simple updates focused on students and daily use.'}</p>
-        <small class="header-meta">Last updated: <AnimatedNumericText text={formatDate(changelog?.lastUpdatedAtUtc ?? null)} /></small>
+        <small class="header-meta">Last updated: <AnimatedNumericText text={formatDate(changelog?.lastUpdatedAtUtc ?? null)} animated /></small>
       </div>
     </div>
     <div class="header-actions">
