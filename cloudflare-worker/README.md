@@ -304,7 +304,7 @@ curl https://cqd-analytics.your-subdomain.workers.dev/stats
   },
   "envSnapshot": {
     "maxBatchEvents": "10000",
-    "oracleEndpoint": "http://..."
+    "oracleEndpoint": "https://..."
   },
   "deliveryMetrics": {
     "totals": {
