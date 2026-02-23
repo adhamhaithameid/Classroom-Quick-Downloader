@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fetchOverview, fetchUserChangelog, fetchUserPrivacy } from './publicSite';
+import { fetchOverview, fetchUserChangelog } from './publicSite';
 
 afterEach(() => {
   vi.restoreAllMocks();
