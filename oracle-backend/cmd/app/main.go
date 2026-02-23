@@ -250,7 +250,6 @@ func main() {
 		"newsletter_subscriber":        {},
 		"newsletter_campaign":          {},
 		"website_user_changelog_entry": {},
-		"website_user_privacy_section": {},
 	}
 	mux.Handle("/api/stats/summary", authMiddleware(handlers.SummaryHandler(sqlDB)))
 	mux.Handle("/api/stats/timeseries", authMiddleware(handlers.TimeSeriesHandler(sqlDB)))
