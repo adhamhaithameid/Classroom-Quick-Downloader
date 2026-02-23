@@ -58,24 +58,14 @@
     if (force) refreshing = true;
     error = '';
     try {
-      const [overviewResult, mapResult] = await Promise.allSettled([fetchOverview(), fetchMapData()]);
-
-      if (overviewResult.status !== 'fulfilled') {
-        throw overviewResult.reason;
-      }
-      overview = overviewResult.value;
-
-      if (mapResult.status === 'fulfilled') {
-        countryCount = mapResult.value.totals.countries || 0;
-        topCountries = mapResult.value.countries.slice(0, 5).map(c => ({
-          countryCode: c.countryCode,
-          count: c.count,
-          name: toCountryName(c.countryCode)
-        }));
-      } else {
-        topCountries = [];
-        countryCount = 0;
-      }
+      const snapshot = await fetchWebsiteSnapshot({ force });
+      overview = snapshot.overview;
+      countryCount = snapshot.map.totals.countries || 0;
+      topCountries = snapshot.map.countries.slice(0, 5).map((c) => ({
+        countryCode: c.countryCode,
+        count: c.count,
+        name: toCountryName(c.countryCode)
+      }));
       state = 'ready';
     } catch (err) {
       error = err instanceof Error ? err.message : 'Failed to load public metrics.';
