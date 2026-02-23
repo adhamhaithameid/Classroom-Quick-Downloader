@@ -125,86 +125,155 @@
     </label>
   </section>
 
-  <section class="section">
-    <h2>Which improvements would make you reinstall?</h2>
-    <div class="feature-grid">
+  <!-- Step 3: Features -->
+  <section class="step card">
+    <h2><AnimatedNumber value={2} format={{ useGrouping: false }} />. What would bring you back?</h2>
+    <div class="option-grid compact">
       {#each featureChoices as feature}
         <button
           type="button"
+          class="option small"
           class:selected={selectedFeatures.includes(feature)}
           on:click={() => toggleFeature(feature)}
-        >
-          {feature}
-        </button>
+        >{feature}</button>
       {/each}
     </div>
   </section>
 
-  <label class="notes-field" for="notes-input">
-    <span>Extra details (optional)</span>
-    <textarea
-      id="notes-input"
-      bind:value={notes}
-      maxlength="1200"
-      placeholder="What happened, when did it happen, and what should change?"
-    ></textarea>
-  </label>
+  <!-- Step 4: Notes -->
+  <section class="step card">
+    <label class="notes-wrap">
+      <span>Anything else? <em>(optional)</em></span>
+      <textarea
+        bind:value={notes}
+        maxlength="1200"
+        placeholder="What happened, when, and what should change?"
+      ></textarea>
+    </label>
+  </section>
 
-  <div class="actions">
-    <button class="primary" type="button" disabled={submitState === 'sending'} on:click={submitFeedback}>
+  <!-- Actions -->
+  <div class="bottom-actions">
+    <button class="submit-btn" type="button" disabled={submitState === 'sending'} on:click={submitFeedback}>
       {submitState === 'sending' ? 'Submitting…' : 'Submit feedback'}
     </button>
-    <a href={STORE_LINKS.chrome} target="_blank" rel="noopener noreferrer">Reinstall on Chrome</a>
-    <a href={STORE_LINKS.firefox} target="_blank" rel="noopener noreferrer">Reinstall on Firefox</a>
-    <a href={STORE_LINKS.edge} target="_blank" rel="noopener noreferrer">Reinstall on Edge</a>
-    <a href={STORE_LINKS.github + '/issues'} target="_blank" rel="noopener noreferrer">Report a bug</a>
   </div>
 
   {#if submitMessage}
-    <p class="submit-message {submitState === 'done' ? 'ok' : 'bad'}">{submitMessage}</p>
+    <p class="result-msg {submitState === 'done' ? 'ok' : 'bad'}">{submitMessage}</p>
   {/if}
-</section>
+
+  <!-- Reinstall links -->
+  <div class="reinstall-row">
+    <span class="reinstall-label">Changed your mind?</span>
+    <a href={STORE_LINKS.chrome} target="_blank" rel="noopener noreferrer">Reinstall on Chrome</a>
+    <a href={STORE_LINKS.firefox} target="_blank" rel="noopener noreferrer">Reinstall on Firefox</a>
+    <a href={STORE_LINKS.edge} target="_blank" rel="noopener noreferrer">Reinstall on Edge</a>
+    <span class="reinstall-or">or</span>
+    <a href={STORE_LINKS.github + '/issues'} target="_blank" rel="noopener noreferrer">Report a bug</a>
+  </div>
+</div>
 
 <style>
   .uninstall-page {
-    padding: 22px;
-    display: grid;
-    gap: 14px;
+    max-width: 680px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
   }
 
+  /* ── Hero ──────────────────────────── */
   .hero {
+    text-align: center;
+    padding: 40px 20px 24px;
+    animation: riseIn 0.5s ease both;
+  }
+
+  .hero-icon {
+    width: 56px;
+    height: 56px;
+    margin: 0 auto 14px;
     display: flex;
-    justify-content: space-between;
-    gap: 14px;
-    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    background: var(--gc-green-bg);
+    border-radius: 16px;
+    border: 1px solid rgba(26, 139, 85, 0.12);
   }
 
   h1 {
     margin: 0;
-    font-size: clamp(30px, 4vw, 46px);
+    font-size: clamp(24px, 4vw, 36px);
     letter-spacing: -0.03em;
+    font-weight: 800;
   }
 
-  h2 {
-    margin: 0;
-    font-size: 20px;
+  .hero p {
+    margin: 8px 0 0;
+    color: var(--text-secondary);
+    font-size: 15px;
+  }
+
+  /* ── Steps ─────────────────────────── */
+  .step {
+    padding: 24px;
+  }
+
+  .step h2 {
+    margin: 0 0 14px;
+    font-size: 16px;
+    font-weight: 700;
     letter-spacing: -0.01em;
   }
 
-  p {
-    margin: 10px 0 0;
-    color: var(--muted);
-    line-height: 1.65;
-    max-width: 72ch;
-  }
-
-  .section {
-    display: grid;
+  /* ── Option grid ───────────────────── */
+  .option-grid {
+    display: flex;
+    flex-wrap: wrap;
     gap: 8px;
   }
 
-  .dual {
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  .option-grid.compact {
+    gap: 8px;
+  }
+
+  .option {
+    text-align: left;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: white;
+    padding: 10px 18px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 14px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .option:hover {
+    border-color: var(--border-hover);
+    color: var(--text);
+  }
+
+  .option.selected {
+    border-color: var(--gc-green);
+    background: var(--gc-green-bg);
+    color: var(--gc-green-dark);
+    font-weight: 600;
+  }
+
+  .option.small {
+    padding: 8px 14px;
+    font-size: 13px;
+  }
+
+  /* ── Two-col selects ───────────────── */
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
   }
 
   .field {
@@ -214,116 +283,182 @@
 
   .field span {
     color: var(--muted);
-    font-size: 13px;
-    font-weight: 700;
+    font-size: 12px;
+    font-weight: 600;
   }
 
   .field select {
-    border-radius: 12px;
+    border-radius: var(--radius-sm);
     border: 1px solid var(--border);
-    background: var(--surface);
+    background: white;
     color: var(--text);
-    padding: 10px;
+    padding: 10px 12px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: border-color 0.2s ease;
   }
 
-  .reason-grid,
-  .feature-grid {
+  .field select:focus {
+    outline: none;
+    border-color: var(--gc-green);
+    box-shadow: 0 0 0 3px rgba(26, 139, 85, 0.1);
+  }
+
+  /* ── Notes ──────────────────────────── */
+  .notes-wrap {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: 8px;
   }
 
-  .reason-grid button,
-  .feature-grid button {
-    text-align: left;
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    background: var(--surface);
-    padding: 12px;
-    color: var(--text);
-    cursor: pointer;
-    transition: border-color 0.2s ease, transform 0.2s ease, background 0.2s ease;
-  }
-
-  .reason-grid button:hover,
-  .feature-grid button:hover {
-    transform: translateY(-1px);
-    border-color: #9eb3df;
-  }
-
-  .reason-grid button.selected,
-  .feature-grid button.selected {
-    border-color: #6f8ddd;
-    background: #edf2ff;
-  }
-
-  .notes-field {
-    display: grid;
-    gap: 6px;
-  }
-
-  .notes-field span {
+  .notes-wrap span {
     color: var(--muted);
     font-size: 13px;
-    font-weight: 700;
+    font-weight: 600;
   }
 
-  .notes-field textarea {
-    min-height: 130px;
-    border-radius: 14px;
+  .notes-wrap em {
+    font-weight: 400;
+    color: var(--muted);
+  }
+
+  .notes-wrap textarea {
+    min-height: 100px;
+    border-radius: var(--radius-sm);
     border: 1px solid var(--border);
-    background: var(--surface);
+    background: white;
     padding: 12px;
     color: var(--text);
     resize: vertical;
+    transition: border-color 0.2s ease;
+    font-size: 14px;
+    line-height: 1.6;
   }
 
-  .actions {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-    gap: 8px;
+  .notes-wrap textarea:focus {
+    outline: none;
+    border-color: var(--gc-green);
+    box-shadow: 0 0 0 3px rgba(26, 139, 85, 0.1);
   }
 
-  .actions a,
-  .actions button {
-    text-decoration: none;
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 10px 11px;
-    background: var(--surface-2);
-    color: var(--accent-2);
-    font-weight: 700;
-    text-align: center;
-    cursor: pointer;
+  .notes-wrap textarea::placeholder {
+    color: var(--muted);
   }
 
-  .actions .primary {
-    background: linear-gradient(140deg, var(--accent), var(--accent-2));
+  /* ── Bottom ────────────────────────── */
+  .bottom-actions {
+    display: flex;
+    justify-content: center;
+    padding: 4px 0;
+  }
+
+  .submit-btn {
+    background: var(--gc-green);
     color: white;
-    border: 0;
-  }
-
-  .actions .primary:disabled {
-    opacity: 0.75;
-    cursor: wait;
-  }
-
-  .submit-message {
-    padding: 10px 12px;
-    border-radius: 10px;
-    border: 1px solid var(--border);
+    border: none;
+    border-radius: 999px;
+    padding: 14px 36px;
     font-weight: 700;
+    font-size: 15px;
+    cursor: pointer;
+    box-shadow: var(--shadow-green);
+    transition: all 0.25s ease;
   }
 
-  .submit-message.ok {
+  .submit-btn:hover {
+    background: var(--gc-green-dark);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 28px rgba(26, 139, 85, 0.2);
+  }
+
+  .submit-btn:disabled {
+    opacity: 0.6;
+    cursor: wait;
+    transform: none;
+  }
+
+  .result-msg {
+    padding: 12px 16px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    font-weight: 600;
+    font-size: 14px;
+    text-align: center;
+    animation: riseIn 0.3s ease both;
+  }
+
+  .result-msg.ok {
     background: #ecfdf5;
     color: #0f766e;
     border-color: #9ae6cf;
   }
 
-  .submit-message.bad {
+  .result-msg.bad {
     background: #fff1f2;
     color: #be123c;
     border-color: #fecdd3;
+  }
+
+  /* ── Reinstall row ─────────────────── */
+  .reinstall-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding: 16px 0 4px;
+    border-top: 1px solid var(--border);
+    margin-top: 4px;
+  }
+
+  .reinstall-label {
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  .reinstall-row a {
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    transition: all 0.2s ease;
+    background: white;
+  }
+
+  .reinstall-row a:hover {
+    border-color: var(--border-hover);
+    color: var(--gc-green);
+  }
+
+  .reinstall-or {
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 500;
+    font-style: italic;
+  }
+
+  @media (max-width: 600px) {
+    .uninstall-page {
+      gap: 12px;
+    }
+
+    .hero {
+      padding: 28px 16px 16px;
+    }
+
+    .step {
+      padding: 18px;
+    }
+
+    .two-col {
+      grid-template-columns: 1fr;
+    }
+
+    .option {
+      white-space: normal;
+    }
   }
 </style>
