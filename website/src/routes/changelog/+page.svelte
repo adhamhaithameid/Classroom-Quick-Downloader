@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { fetchUserChangelog } from '$lib/api/publicSite';
   import type { UserChangelogResponse } from '$lib/types/public';
+  import AnimatedNumericText from '$lib/components/AnimatedNumericText.svelte';
 
   let state: 'loading' | 'ready' | 'error' = 'loading';
   let error = '';
