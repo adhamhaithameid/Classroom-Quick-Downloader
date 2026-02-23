@@ -87,24 +87,6 @@ type publicWebsiteUserChangelogEntry struct {
 	ReleasedAtUTC *int64   `json:"releasedAtUtc"`
 }
 
-type publicWebsiteUserPrivacyResponse struct {
-	OK             bool                            `json:"ok"`
-	GeneratedAt    int64                           `json:"generatedAt"`
-	Headline       string                          `json:"headline"`
-	Description    string                          `json:"description"`
-	Sections       []publicWebsiteUserPrivacyEntry `json:"sections"`
-	FullPrivacyURL string                          `json:"fullPrivacyUrl"`
-	LastUpdatedAt  *int64                          `json:"lastUpdatedAtUtc"`
-}
-
-type publicWebsiteUserPrivacyEntry struct {
-	ID       string   `json:"id"`
-	Title    string   `json:"title"`
-	Summary  string   `json:"summary"`
-	Bullets  []string `json:"bullets"`
-	Priority int64    `json:"priority"`
-}
-
 type publicWebsiteUninstallRequest struct {
 	Reason  string `json:"reason"`
 	Browser string `json:"browser"`
