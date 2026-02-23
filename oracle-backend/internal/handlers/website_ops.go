@@ -22,6 +22,13 @@ const (
 	websiteOpsBodyLimitBytes              = 256 << 10 // 256 KiB
 )
 
+var websiteCloudflarePullHoursUTC = []int{3, 6, 9, 12, 15, 18, 21}
+
+var (
+	errCloudflareWebsiteFetch   = errors.New("cloudflare_website_fetch_failed")
+	errCloudflareWebsitePublish = errors.New("cloudflare_website_publish_failed")
+)
+
 type websiteOpsCountryCount struct {
 	CountryCode string `json:"countryCode"`
 	Count       int64  `json:"count"`
