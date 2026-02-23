@@ -401,32 +401,108 @@
     <div class="l2-wrap l2-reveal">
       <div class="l2-section-head">
         <span class="l2-label">TRUSTED WORLDWIDE</span>
-        <h2>Used in <AnimatedNumber value={countryCount} suffix="+" /> countries.</h2>
+        <h2>Used in <AnimatedNumber value={countryCount} suffix="+" animated /> countries.</h2>
         <p>Students, teachers, and universities around the world trust Classroom Quick Downloader.</p>
       </div>
       <div class="l2-proof-grid">
-        <div class="l2-proof-card"><div class="l2-proof-num"><AnimatedNumber value={downloadCount} /></div><div class="l2-proof-label">Total Downloads</div></div>
-        <div class="l2-proof-card"><div class="l2-proof-num"><AnimatedNumber value={userCount} /></div><div class="l2-proof-label">Active Users</div></div>
-        <div class="l2-proof-card"><div class="l2-proof-num"><AnimatedNumber value={countryCount} suffix="+" /></div><div class="l2-proof-label">Countries</div></div>
-        <div class="l2-proof-card"><div class="l2-proof-num"><AnimatedNumericText text="v1.3.7" /></div><div class="l2-proof-label">Latest Release</div></div>
+        <div class="l2-proof-card"><div class="l2-proof-num"><AnimatedNumber value={downloadCount} animated /></div><div class="l2-proof-label">Total Downloads</div></div>
+        <div class="l2-proof-card"><div class="l2-proof-num"><AnimatedNumber value={userCount} animated /></div><div class="l2-proof-label">Active Users</div></div>
+        <div class="l2-proof-card"><div class="l2-proof-num"><AnimatedNumber value={countryCount} suffix="+" animated /></div><div class="l2-proof-label">Countries</div></div>
+        <div class="l2-proof-card"><div class="l2-proof-num"><AnimatedNumericText text="v1.3.7" animated /></div><div class="l2-proof-label">Latest Release</div></div>
       </div>
     </div>
   </section>
 
+  <!-- ━━━━ Global Map ━━━━ -->
+  <section id="global-map" class="l2-block l2-snap l2-map-section">
+    <div class="l2-wrap l2-reveal l2-map-wrap">
+      <div class="l2-section-head l2-map-head">
+        <span class="l2-label">GLOBAL MAP</span>
+        <h2>See where Classroom Quick Downloader is used around the world.</h2>
+        <p>Live usage data from around the world.</p>
+      </div>
+      {#if mapState === 'loading'}
+        <div class="l2-map-state-card">
+          <div class="state-loading">Loading live global map…</div>
+        </div>
+      {:else if mapState === 'error'}
+        <div class="l2-map-state-card">
+          <div class="state-error">
+            <strong>Could not load global map.</strong>
+            <p>{mapError}</p>
+          </div>
+        </div>
+      {:else}
+        <div class="l2-map-shell">
+          <div class="l2-map-frame">
+            <button
+              type="button"
+              class="l2-map-expand-btn"
+              on:click={toggleMapExpanded}
+              aria-pressed={mapExpanded}
+              aria-label="Expand map to full screen popup"
+              title="Expand map"
+            >
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5" />
+                <path d="M9 9 3 3M15 9l6-6M9 15l-6 6M15 15l6 6" />
+              </svg>
+            </button>
+            <CountryHeatmap
+              mapData={mapData}
+              className="l2-main-heatmap"
+              showLegend={false}
+              showLegendLabels={false}
+              tooltipAnimated={false}
+            />
+          </div>
+        </div>
+      {/if}
+    </div>
+  </section>
+
+  {#if mapExpanded}
+    <div
+      class="l2-map-modal-backdrop"
+      transition:fade={{ duration: 180 }}
+      on:click|self={closeMapExpanded}
+      role="presentation"
+    >
+      <div
+        class="l2-map-modal"
+        transition:scale={{ duration: 220, start: 0.96 }}
+        role="dialog"
+        tabindex="-1"
+        aria-modal="true"
+        aria-label="Expanded global map"
+      >
+        <button
+          type="button"
+          class="l2-map-modal-close"
+          on:click={closeMapExpanded}
+          aria-label="Close expanded map"
+          title="Close"
+        >
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M6 6l12 12M18 6 6 18" />
+          </svg>
+        </button>
+        <CountryHeatmap
+          mapData={mapData}
+          className="l2-main-heatmap l2-main-heatmap-modal"
+          showLegend={false}
+          showLegendLabels={false}
+          tooltipAnimated={false}
+        />
+      </div>
+    </div>
+  {/if}
+
   <!-- ━━━━ Final CTA ━━━━ -->
   <section class="l2-cta-section l2-snap">
-    <div class="l2-cta-bg">
-      <div class="orb orb-cta-1"></div>
-      <div class="orb orb-cta-2"></div>
-    </div>
-    <!-- Floating school SVGs for CTA -->
-    <div class="l2-float-svgs l2-float-svgs-cta" aria-hidden="true">
-      <svg class="l2-float-svg fs-6" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M32 4L4 20l28 16 28-16L32 4z"/><path d="M4 20v20l28 16 28-16V20"/></svg>
-      <svg class="l2-float-svg fs-7" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="8" y="6" width="48" height="52" rx="4"/><line x1="8" y1="16" x2="56" y2="16"/><line x1="16" y1="26" x2="48" y2="26"/><line x1="16" y1="34" x2="48" y2="34"/></svg>
-    </div>
     <div class="l2-wrap l2-cta-content l2-reveal">
       <h2>Ready to save hours?</h2>
-      <p>Install Classroom Quick Downloader in <AnimatedNumber value={10} format={{ useGrouping: false }} /> seconds. Free, forever. No account required.</p>
+      <p>Install Classroom Quick Downloader in <AnimatedNumber value={10} format={{ useGrouping: false }} animated /> seconds. Free, forever. No account required.</p>
       <div class="l2-hero-actions">
         {#each ['chrome', 'firefox', 'edge'] as b}
           <a
