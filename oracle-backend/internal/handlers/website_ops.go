@@ -827,7 +827,7 @@ func WebsiteOpsPullCloudflareHandler(db *sql.DB, cloudflareMetricsURL string) ht
 			"ok",
 			map[string]any{
 				"downloads": metrics.Totals.Downloads,
-				"countries": len(countries),
+				"countries": len(metrics.Countries),
 			},
 		)
 
