@@ -478,7 +478,6 @@ function App() {
         }
         if (isStale()) return;
         setTotalDownloads(totalDownloadsNext);
-        setCancelledDownloads(cancelledDownloadsNext);
         setStats(mapped);
 
       } catch (e) {
