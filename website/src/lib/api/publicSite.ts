@@ -229,79 +229,12 @@ async function fetchOracleMap(): Promise<MapResponse> {
   return coerceMapPayload(payload);
 }
 
-async function fetchWorkerSiteMetrics(): Promise<WorkerSiteMetricsResponse> {
-  const payload = await fetchWorkerJSON('/public/site-metrics');
-  return coerceWorkerSiteMetricsPayload(payload);
-}
-
-function mergeOverviewWithWorkerMetrics(base: OverviewResponse, worker: WorkerSiteMetricsResponse): OverviewResponse {
-  return {
-    ...base,
-    ok: base.ok || worker.ok,
-    generatedAt: worker.generatedAt || base.generatedAt,
-    totals: {
-      ...base.totals,
-      downloads: worker.totals.downloads
-    },
-    status: {
-      ...base.status,
-      systemLive: worker.totals.downloads > 0,
-      liveSinceUtc: worker.snapshotAtUtc || base.status.liveSinceUtc,
-      workerHealth: 'up'
-    }
-  };
-}
-
-function mapFromWorkerMetrics(worker: WorkerSiteMetricsResponse): MapResponse {
-  const privacyNote =
-    'Country-level usage is aggregated without storing raw IP addresses. VPN/proxy users may appear at exit-node locations.';
-
-  return {
-    ok: worker.ok,
-    generatedAt: worker.generatedAt,
-    granularity: 'country',
-    countries: worker.countries,
-    totals: {
-      countries: worker.totals.countries || worker.countries.length,
-      downloads: worker.totals.downloads
-    },
-    privacyNote
-  };
-}
-
 export async function fetchOverview(): Promise<OverviewResponse> {
-  const source = resolveMetricsSource();
-  if (source === 'oracle') {
-    return fetchOracleOverview();
-  }
-
-  const [workerResult, oracleResult] = await Promise.allSettled([fetchWorkerSiteMetrics(), fetchOracleOverview()]);
-
-  if (workerResult.status === 'fulfilled') {
-    const oracleOverview =
-      oracleResult.status === 'fulfilled' ? oracleResult.value : coerceOverviewPayload({ links: STORE_LINKS });
-    return mergeOverviewWithWorkerMetrics(oracleOverview, workerResult.value);
-  }
-
-  if (oracleResult.status === 'fulfilled') {
-    return oracleResult.value;
-  }
-
-  throw workerResult.reason instanceof Error ? workerResult.reason : new Error('Failed to load overview data.');
+  return fetchOracleOverview();
 }
 
 export async function fetchMapData(): Promise<MapResponse> {
-  const source = resolveMetricsSource();
-  if (source === 'oracle') {
-    return fetchOracleMap();
-  }
-
-  try {
-    const workerMetrics = await fetchWorkerSiteMetrics();
-    return mapFromWorkerMetrics(workerMetrics);
-  } catch {
-    return fetchOracleMap();
-  }
+  return fetchOracleMap();
 }
 
 export async function fetchUserChangelog(): Promise<UserChangelogResponse> {
