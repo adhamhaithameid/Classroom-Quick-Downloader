@@ -34,9 +34,16 @@
   }
 
   onMount(() => {
+    if (!animated) {
+      hasAnimatedInView = true;
+      isInView = true;
+      displayValue = value;
+      return;
+    }
     if (!animateOnView) {
       hasAnimatedInView = true;
-      displayValue = value;
+      isInView = true;
+      kickstart();
       return;
     }
     if (!hostEl || typeof IntersectionObserver === 'undefined') {
