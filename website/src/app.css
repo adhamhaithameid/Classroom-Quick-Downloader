@@ -164,17 +164,32 @@ select {
 }
 
 @keyframes floatOrb {
-  0%,
-  100% {
+  0%, 100% {
     transform: translateY(0) scale(1);
   }
   50% {
-    transform: translateY(-16px) scale(1.04);
+    transform: translateY(-20px) scale(1.04);
   }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+::selection {
+  background: rgba(26, 139, 85, 0.2);
+  color: var(--text);
 }
 
 @media (max-width: 860px) {
   .page-shell {
-    width: calc(100% - 18px);
+    width: calc(100% - 20px);
   }
 }
