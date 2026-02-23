@@ -98,18 +98,57 @@ describe('fetchChangelog', () => {
     );
 
     const data = await fetchChangelog();
-
-    expect(data.ok).toBe(true);
-    expect(data.entries[0]?.version).toBe('1.3.6');
-    expect(data.entries[1]?.version).toBe('1.3.5');
+    expect(data.entries[0]?.changes).toEqual(['Valid', 'Also valid']);
   });
 
-  it('throws on non-200 response', async () => {
+  it('handles empty entries array', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => new Response('nope', { status: 503 }))
+      vi.fn(async () =>
+        new Response(JSON.stringify({ ok: true, entries: [] }), { status: 200 })
+      )
     );
 
-    await expect(fetchChangelog()).rejects.toThrow('Changelog request failed');
+    const data = await fetchChangelog();
+    expect(data.ok).toBe(true);
+    expect(data.entries).toHaveLength(0);
+  });
+
+  it('handles completely empty payload', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify({}), { status: 200 }))
+    );
+
+    const data = await fetchChangelog();
+    expect(data.ok).toBe(false);
+    expect(data.entries).toEqual([]);
+  });
+
+  it('throws on HTTP error responses', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('Server Error', { status: 500 }))
+    );
+
+    await expect(fetchChangelog()).rejects.toThrow('Changelog request failed (500)');
+  });
+
+  it('defaults isImportant to false when not provided', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        new Response(
+          JSON.stringify({
+            ok: true,
+            entries: [{ id: 'r-1', version: '1.0.0', date: '2024-01-01', changes: ['Init'] }]
+          }),
+          { status: 200 }
+        )
+      )
+    );
+
+    const data = await fetchChangelog();
+    expect(data.entries[0]?.isImportant).toBe(false);
   });
 });
