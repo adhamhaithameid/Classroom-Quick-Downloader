@@ -562,8 +562,6 @@ export function renderDashboard(stats: StatsResponse): string {
       return normalized !== "" && normalized !== "xx" && normalized !== "unknown";
     }).length;
   const uniqueIpsDisplay = uniqueCountriesAllTime.toLocaleString();
-  const weeklyRequests = stats.weeklyRequests ?? requestsToday;
-  const monthlyRequests = stats.monthlyRequests ?? weeklyRequests;
 
   const remoteConfig = stats.remoteConfig || {};
   const cfgVersion = remoteConfig.configVersion ?? 1;
