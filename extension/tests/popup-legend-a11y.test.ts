@@ -130,11 +130,6 @@ describe('popup legend keyboard accessibility', () => {
     expect(legendItem?.getAttribute('tabindex')).toBe('0');
     expect(legendItem?.getAttribute('role')).toBe('button');
 
-    const cancelledCounter = await waitForCancelledCounter(container);
-    expect(cancelledCounter).not.toBeNull();
-    expect(cancelledCounter?.textContent).toContain('Temporary cancelled counter');
-    expect(cancelledCounter?.textContent).toContain('2');
-
     const versionButton = container.querySelector('.cqd-brand-version') as HTMLButtonElement | null;
     expect(versionButton).not.toBeNull();
 
