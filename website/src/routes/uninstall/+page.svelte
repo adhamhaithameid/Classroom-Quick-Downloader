@@ -3,6 +3,7 @@
   import { submitUninstallFeedback } from '$lib/api/publicSite';
   import { STORE_LINKS } from '$lib/config';
   import { buildUninstallNotesPayload, detectBrowserFromUserAgent } from '$lib/uninstall/feedback';
+  import AnimatedNumber from '$lib/components/AnimatedNumber.svelte';
 
   const reasonOptions = [
     'I only needed it for a short period',
