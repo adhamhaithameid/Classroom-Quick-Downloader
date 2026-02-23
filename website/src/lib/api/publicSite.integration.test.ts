@@ -4,7 +4,6 @@ import {
   fetchOverview,
   fetchUninstallStats,
   fetchUserChangelog,
-  fetchUserPrivacy,
   submitUninstallFeedback
 } from './publicSite';
 
