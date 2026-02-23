@@ -75,7 +75,7 @@ const WORKER_URL = import.meta.env.VITE_WORKER_URL as string || '';
 export const WORKER_BASE_URL = WORKER_URL.replace(/\/+track$/, '');
 export const CONFIG_URL = WORKER_BASE_URL ? `${WORKER_BASE_URL}/config` : '';
 export const CHANGELOG_URL = WORKER_BASE_URL ? `${WORKER_BASE_URL}/changelog` : '';
-const DEFAULT_WEBSITE_BASE_URL = 'https://classroom-quick-downloader.pages.dev';
+const DEFAULT_WEBSITE_BASE_URL = 'https://classroom-quick-downloader-website.pages.dev';
 const WEBSITE_URL = (import.meta.env.VITE_PUBLIC_SITE_URL as string) || DEFAULT_WEBSITE_BASE_URL;
 
 function normalizeBaseUrl(value: string): string {
