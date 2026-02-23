@@ -1,20 +1,39 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { base } from '$app/paths';
   import { page } from '$app/stores';
   import logo from '$lib/assets/cqd-logo.svg';
   import AnimatedNumber from '$lib/components/AnimatedNumber.svelte';
   import AnimatedNumericText from '$lib/components/AnimatedNumericText.svelte';
+  import { STORE_LINKS } from '$lib/config';
   import '../app.css';
 
   const nav = [
     { href: '/', label: 'Home' },
-    { href: '/map', label: 'Global Map' },
-    { href: '/changelog', label: "What's New" },
     { href: '/faq', label: 'FAQ' },
     { href: '/privacy', label: 'Privacy' },
-    { href: '/landing2', label: 'Landing 2' },
-    { href: '/uninstall', label: 'Feedback' }
+    { href: '/changelog', label: 'Changelog' },
+    { href: '/map', label: 'Map' }
   ];
+
+  let detectedBrowser: 'chrome' | 'firefox' | 'edge' = 'chrome';
+  const currentYear = new Date().getFullYear();
+
+  function detectBrowser(): 'chrome' | 'firefox' | 'edge' {
+    const ua = navigator.userAgent.toLowerCase();
+    if (ua.includes('edg/') || ua.includes('edge')) return 'edge';
+    if (ua.includes('firefox')) return 'firefox';
+    return 'chrome';
+  }
+
+  function browserDisplayName(key: string): string {
+    const map: Record<string, string> = { chrome: 'Chrome', firefox: 'Firefox', edge: 'Edge' };
+    return map[key] || key;
+  }
+
+  function browserLink(key: 'chrome' | 'firefox' | 'edge'): string {
+    return STORE_LINKS[key];
+  }
 
   function isActive(navHref: string, currentPath: string): boolean {
     const normalizedCurrent = currentPath.replace(/\/$/, '') || '/';
