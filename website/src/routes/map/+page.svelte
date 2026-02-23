@@ -122,26 +122,54 @@
     }
 
     maxCount = validCounts.length ? Math.max(...validCounts) : 1;
-    colorScale = scaleLinear<string>().domain([0, maxCount]).range(['#dbe6fb', '#1648a1']);
+    colorScale = scaleLinear<string>().domain([0, maxCount]).range(['#d5efe0', '#137a47']);
     topCountries = top.slice(0, 12);
   }
 
   function fillForCountry(rawId: string | number | undefined): string {
     const id = Number(rawId);
-    if (!Number.isFinite(id)) return '#edf2fb';
+    if (!Number.isFinite(id)) return '#f0f5f2';
     const count = countByCountryId.get(id);
-    if (!count) return '#edf2fb';
+    if (!count) return '#f0f5f2';
     return colorScale(count);
   }
 
   function borderForCountry(rawId: string | number | undefined): string {
     const id = Number(rawId);
-    if (!Number.isFinite(id)) return '#d0d9ea';
-    return countByCountryId.has(id) ? '#7d95bf' : '#d0d9ea';
+    if (!Number.isFinite(id)) return '#d6e4da';
+    return countByCountryId.has(id) ? '#5daa82' : '#d6e4da';
   }
 
-  function formatNumber(value: number): string {
-    return new Intl.NumberFormat('en-US').format(value || 0);
+  function handleCountryHover(event: MouseEvent, item: WorldFeature): void {
+    const id = Number(item.id);
+    const count = Number.isFinite(id) ? countByCountryId.get(id) ?? 0 : 0;
+    // Only show tooltip for countries with at least 1 download
+    if (count < 1) {
+      hoveredCountry = null;
+      return;
+    }
+    const name = Number.isFinite(id) ? numericIdToName(id) : 'Unknown';
+    const mapShell = (event.target as Element).closest('.map-shell');
+    if (!mapShell) return;
+    const shellRect = mapShell.getBoundingClientRect();
+    const mouseX = event.clientX - shellRect.left;
+    const mouseY = event.clientY - shellRect.top;
+    const shellWidth = shellRect.width;
+    // Position tooltip to the right of cursor, or left if too close to edge
+    const tooltipWidth = 160;
+    const offset = 16;
+    const showLeft = mouseX + tooltipWidth + offset > shellWidth;
+    hoveredCountry = {
+      name,
+      count,
+      x: showLeft ? mouseX - offset : mouseX + offset,
+      y: mouseY,
+      alignRight: showLeft
+    };
+  }
+
+  function clearHover(): void {
+    hoveredCountry = null;
   }
 
   async function loadMap(force = false): Promise<void> {
