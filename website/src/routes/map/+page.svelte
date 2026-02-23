@@ -324,15 +324,18 @@
 
   .summary-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-    gap: 10px;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
   }
 
+  /* ── Map ───────────────────────────── */
   .map-shell {
+    position: relative;
     border: 1px solid var(--border);
-    border-radius: 16px;
-    background: linear-gradient(180deg, #f6f9ff, #edf3fb);
-    padding: 8px;
+    border-radius: var(--radius);
+    background: linear-gradient(180deg, #f5faf7, #ecf4ef);
+    padding: 10px;
+    overflow: hidden;
   }
 
   .map-shell svg {
