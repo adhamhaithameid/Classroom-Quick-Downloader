@@ -61,6 +61,17 @@
     return numeric;
   }
 
+  function numericIdToName(numericId: number): string {
+    const cached = nameByCountryId.get(numericId);
+    if (cached) return cached;
+    const resolved = iso3166.whereNumeric(String(numericId).padStart(3, '0'));
+    if (resolved?.country) {
+      nameByCountryId.set(numericId, resolved.country);
+      return resolved.country;
+    }
+    return 'Unknown';
+  }
+
   function buildWorldGeometry(): void {
     const topology = worldAtlas as Record<string, unknown>;
     const objects = topology.objects as Record<string, unknown>;
