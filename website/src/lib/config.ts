@@ -1,6 +1,8 @@
-const DEFAULT_SITE_URL = 'https://classroom-quick-downloader.pages.dev';
+import { env } from '$env/dynamic/public';
+
+const DEFAULT_SITE_URL = 'https://classroom-quick-downloader-website.pages.dev';
 const DEFAULT_WORKER_URL = 'https://cqd-analytics.adhamhaithameid.workers.dev';
-const DEFAULT_ORACLE_URL = 'http://localhost:8080';
+const DEFAULT_ORACLE_URL = DEFAULT_WORKER_URL;
 
 function cleanBaseUrl(value: string): string {
   return value.trim().replace(/\/+$/, '');
