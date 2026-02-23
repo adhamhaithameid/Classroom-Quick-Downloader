@@ -19,7 +19,6 @@ const (
 	publicWebsiteCacheControl            = "public, max-age=120, stale-while-revalidate=60"
 	defaultGitHubRepoSlug                = "adhamhaithameid/Classroom-Quick-Downloader"
 	publicWebsiteUserChangelogRecordType = "website_user_changelog_entry"
-	publicWebsiteUserPrivacyRecordType   = "website_user_privacy_section"
 )
 
 var (
