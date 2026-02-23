@@ -249,7 +249,7 @@
             </div>
           </div>
           <div class="browser-stats">
-            <span class="browser-count"><AnimatedNumber value={browser.usersCount ?? 0} /></span>
+            <span class="browser-count"><AnimatedNumber value={browser.usersCount ?? 0} animated /></span>
             <span class="browser-unit">active installs</span>
           </div>
           <span class="install-cta">
