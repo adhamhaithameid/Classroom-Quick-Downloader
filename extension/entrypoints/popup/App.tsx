@@ -981,12 +981,26 @@ function App() {
                 <h2 className="cqd-card-title">About</h2>
                 <div className="cqd-designer-wrapper">
                   <p className="cqd-designer-credit">
-                    <span className="cqd-designer-main-line">
-                      Designed &amp; built by{' '}
-                      <span className="cqd-designer-name">Adham Haitham</span>
-                    </span>
+                    <a
+                      className="cqd-designer-main-line"
+                      href={GITHUB_PROFILE_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label="Open Adham Haitham GitHub profile"
+                      title="Open GitHub profile"
+                    >
+                      <img
+                        src={GITHUB_AVATAR_URL}
+                        alt="Adham Haitham avatar"
+                        className="cqd-designer-avatar"
+                      />
+                      <span>
+                        Designed &amp; built by{' '}
+                        <span className="cqd-designer-name">Adham Haitham</span>
+                      </span>
+                    </a>
                     <span className="cqd-designer-extra">
-                      Junior Software Engineer
+                      Junior Software Engineer • UI/UX Designer
                     </span>
                   </p>
                 </div>
