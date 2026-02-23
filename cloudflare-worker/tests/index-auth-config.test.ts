@@ -28,7 +28,7 @@ function mockEnv(overrides: Partial<Env> = {}): Env {
     DOWNLOADS_DO: namespace as unknown as DurableObjectNamespace,
     DO_SHARED_SECRET: "do-shared-secret",
     DANGER_PASSWORD: "danger-secret",
-    ORACLE_ENDPOINT: "http://oracle.local/ingest-batch",
+    ORACLE_ENDPOINT: "https://oracle.local/ingest-batch",
     MAX_BATCH_EVENTS: "10000",
     DASHBOARD_PASSWORD: "dashboard-secret",
     ...overrides,
