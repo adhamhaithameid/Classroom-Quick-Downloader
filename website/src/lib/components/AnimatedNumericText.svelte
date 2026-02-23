@@ -3,6 +3,7 @@
 
   export let text = '';
   export let useGrouping = false;
+  export let animated = false;
 
   type Segment =
     | { kind: 'text'; value: string }
