@@ -610,22 +610,42 @@
 
   /* ── Hero ───────────────────────────── */
   .l2-hero {
-    position: relative;
+    position: relative; z-index: 2;
     min-height: 100vh; display: flex; align-items: center; justify-content: center;
-    text-align: center; overflow: hidden;
+    text-align: center;
     padding: 100px 24px 60px;
   }
-  .l2-hero-orbs { position: absolute; inset: 0; pointer-events: none; }
+
+  /* ── Page-wide decorative layers ──── */
+  .l2-page-orbs {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none; z-index: 0;
+  }
   .orb {
     position: absolute; border-radius: 50%;
-    filter: blur(80px); opacity: 0.4;
+    filter: blur(120px);
   }
-  .orb-1 { width: 500px; height: 500px; background: #bbf7d0; top: -15%; right: -10%; animation: orb-drift 18s ease-in-out infinite alternate; }
-  .orb-2 { width: 400px; height: 400px; background: #a5f3fc; bottom: -10%; left: -8%; animation: orb-drift 22s ease-in-out infinite alternate-reverse; }
-  .orb-3 { width: 300px; height: 300px; background: #e0e7ff; top: 40%; left: 50%; animation: orb-drift 15s ease-in-out infinite alternate; }
+  /* Hero-region orbs */
+  .orb-1 { width: 560px; height: 560px; background: #bbf7d0; top: 1%; right: -4%; opacity: 0.35; animation: orb-drift 18s ease-in-out infinite alternate; }
+  .orb-2 { width: 480px; height: 480px; background: #a5f3fc; top: 8%; left: -4%; opacity: 0.28; animation: orb-drift 22s ease-in-out infinite alternate-reverse; }
+  .orb-3 { width: 360px; height: 360px; background: #e0e7ff; top: 5%; left: 42%; opacity: 0.22; animation: orb-drift 15s ease-in-out infinite alternate; }
+  /* Mid-page orbs */
+  .orb-4 { width: 500px; height: 500px; background: #bbf7d0; top: 30%; left: -3%; opacity: 0.25; animation: orb-drift 20s ease-in-out infinite alternate; }
+  .orb-5 { width: 440px; height: 440px; background: #a5f3fc; top: 45%; right: -2%; opacity: 0.22; animation: orb-drift 24s ease-in-out infinite alternate-reverse; }
+  /* Lower-page orbs */
+  .orb-6 { width: 520px; height: 520px; background: #bbf7d0; top: 65%; right: 5%; opacity: 0.28; animation: orb-drift 19s ease-in-out infinite alternate; }
+  .orb-7 { width: 400px; height: 400px; background: #e0e7ff; top: 80%; left: 5%; opacity: 0.2; animation: orb-drift 26s ease-in-out infinite alternate-reverse; }
+  /* Extra density orbs */
+  .orb-8 { width: 380px; height: 380px; background: #bbf7d0; top: 20%; right: 15%; opacity: 0.2; animation: orb-drift 21s ease-in-out infinite alternate; }
+  .orb-9 { width: 420px; height: 420px; background: #a5f3fc; top: 38%; left: 20%; opacity: 0.18; animation: orb-drift 25s ease-in-out infinite alternate-reverse; }
+  .orb-10 { width: 460px; height: 460px; background: #e0e7ff; top: 55%; right: -2%; opacity: 0.2; animation: orb-drift 17s ease-in-out infinite alternate; }
+  .orb-11 { width: 340px; height: 340px; background: #bbf7d0; top: 72%; left: 30%; opacity: 0.22; animation: orb-drift 23s ease-in-out infinite alternate-reverse; }
+  .orb-12 { width: 480px; height: 480px; background: #a5f3fc; top: 90%; right: 8%; opacity: 0.18; animation: orb-drift 27s ease-in-out infinite alternate; }
 
-  .l2-hero-grid {
-    position: absolute; inset: 0; pointer-events: none; opacity: 0.025;
+  .l2-page-grid {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none; z-index: 0;
+    opacity: 0.03;
     background-image: linear-gradient(var(--text) 1px, transparent 1px),
                        linear-gradient(90deg, var(--text) 1px, transparent 1px);
     background-size: 60px 60px;
