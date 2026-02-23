@@ -408,28 +408,32 @@
     justify-content: space-between;
     color: var(--muted);
     font-size: 12px;
+    font-weight: 500;
   }
 
+  /* ── Bottom ─────────────────────────── */
   .bottom-grid {
     display: grid;
-    gap: 10px;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 14px;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   }
 
   .mini {
-    padding: 14px;
+    padding: 20px;
   }
 
   .mini h2 {
-    margin: 0 0 8px;
-    font-size: 19px;
+    margin: 0 0 12px;
+    font-size: 18px;
     letter-spacing: -0.02em;
+    font-weight: 700;
   }
 
   .mini p {
-    margin: 8px 0 0;
-    line-height: 1.6;
-    color: var(--muted);
+    margin: 10px 0 0;
+    line-height: 1.7;
+    color: var(--text-secondary);
+    font-size: 14px;
   }
 
   .mini ul {
