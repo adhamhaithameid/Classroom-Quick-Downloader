@@ -11,8 +11,6 @@
     name: string;
   };
 
-  const svgWidth = 960;
-  const svgHeight = 510;
   const displayNames =
     typeof Intl !== 'undefined' && 'DisplayNames' in Intl
       ? new Intl.DisplayNames(['en'], { type: 'region' })
