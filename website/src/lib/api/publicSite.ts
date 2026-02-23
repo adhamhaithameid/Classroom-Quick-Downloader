@@ -150,21 +150,30 @@ export function coerceOverviewPayload(input: unknown): OverviewResponse {
 
 export function coerceMapPayload(input: unknown): MapResponse {
   const source = input as Partial<MapResponse>;
+  const bucket = new Map<string, number>();
+
+  if (Array.isArray(source?.countries)) {
+    for (const item of source.countries) {
+      const code = asString(item?.countryCode).toUpperCase();
+      const count = asNumber(item?.count);
+      if (code.length !== 2 || count <= 0) continue;
+      bucket.set(code, (bucket.get(code) ?? 0) + count);
+    }
+  }
+
+  const countries = Array.from(bucket.entries())
+    .map(([countryCode, count]) => ({ countryCode, count }))
+    .sort((a, b) => b.count - a.count || a.countryCode.localeCompare(b.countryCode));
+  const totalDownloads = countries.reduce((sum, item) => sum + item.count, 0);
+
   return {
     ok: source?.ok === true,
     generatedAt: asNumber(source?.generatedAt),
     granularity: 'country',
-    countries: Array.isArray(source?.countries)
-      ? source.countries
-          .map((item) => ({
-            countryCode: asString(item?.countryCode).toUpperCase(),
-            count: asNumber(item?.count)
-          }))
-          .filter((item) => item.countryCode.length === 2 && item.count > 0)
-      : [],
+    countries,
     totals: {
-      countries: asNumber(source?.totals?.countries),
-      downloads: asNumber(source?.totals?.downloads)
+      countries: countries.length,
+      downloads: totalDownloads
     },
     privacyNote: asString(source?.privacyNote)
   };
