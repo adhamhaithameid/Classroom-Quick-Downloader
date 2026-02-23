@@ -242,11 +242,6 @@ export async function fetchUserChangelog(): Promise<UserChangelogResponse> {
   return coerceUserChangelogPayload(payload);
 }
 
-export async function fetchUserPrivacy(): Promise<UserPrivacyResponse> {
-  const payload = await fetchOracleJSON('/api/public/website/privacy');
-  return coerceUserPrivacyPayload(payload);
-}
-
 export async function fetchUninstallStats(): Promise<UninstallStatsResponse> {
   const payload = await fetchOracleJSON('/api/public/website/uninstall');
   return coerceUninstallStatsPayload(payload);
