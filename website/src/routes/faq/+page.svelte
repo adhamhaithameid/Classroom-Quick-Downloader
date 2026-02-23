@@ -77,11 +77,11 @@
         aria-expanded={openIndex === i}
       >
         <div class="faq-question">
-          <span class="faq-q-text"><AnimatedNumericText text={faq.q} /></span>
+          <span class="faq-q-text"><AnimatedNumericText text={faq.q} animated /></span>
           <span class="faq-chevron">{openIndex === i ? '−' : '+'}</span>
         </div>
         {#if openIndex === i}
-          <p class="faq-answer"><AnimatedNumericText text={faq.a} /></p>
+          <p class="faq-answer"><AnimatedNumericText text={faq.a} animated /></p>
         {/if}
       </button>
     {/each}
