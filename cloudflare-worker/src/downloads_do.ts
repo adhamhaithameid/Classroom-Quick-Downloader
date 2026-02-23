@@ -3737,12 +3737,20 @@ export class DownloadsDurable {
       return { ok: true, sent: 0 };
     }
 
-    if (!this.env.ORACLE_ENDPOINT || !this.env.DO_SHARED_SECRET) {
-      const msg = "ORACLE_ENDPOINT or DO_SHARED_SECRET not configured";
+    const resolvedOracleEndpoint = resolveOracleEndpoint(this.env.ORACLE_ENDPOINT, {
+      allowInsecureHttp: this.env.ALLOW_INSECURE_ORACLE_ENDPOINT === "true",
+    });
+    if (!resolvedOracleEndpoint.ok || !this.env.DO_SHARED_SECRET) {
+      const msg = !resolvedOracleEndpoint.ok
+        ? resolvedOracleEndpoint.message
+        : "DO_SHARED_SECRET is not configured";
       if (!this.d.retryState) this.d.retryState = { ...DEFAULT_RETRY_STATE };
       this.d.retryState.lastError = msg;
       this.d.retryState.lastFlushAttemptAt = now;
-      logEvent("error", "oracle_flush_misconfigured", { error: msg });
+      logEvent("error", "oracle_flush_misconfigured", {
+        error: msg,
+        reason: !resolvedOracleEndpoint.ok ? resolvedOracleEndpoint.error : "do_shared_secret_missing",
+      });
       this.recordFailure("oracle_forward", "misconfigured", msg, 1, now);
       // Don't schedule retries if endpoint is missing - just report error
       await this.state.storage.deleteAlarm();
