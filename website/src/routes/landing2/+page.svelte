@@ -784,8 +784,8 @@
   .l2-mq-dot { color: var(--border); font-size: 20px; }
 
   /* ── Content Blocks ────────────────── */
-  .l2-block { padding: 100px 0; }
-  .l2-block-alt { background: var(--card); }
+  .l2-block { padding: 80px 0; position: relative; z-index: 2; }
+  .l2-block-alt { background: transparent; }
   .l2-grid {
     display: grid; grid-template-columns: 1fr 1fr; gap: 60px;
     align-items: center;
