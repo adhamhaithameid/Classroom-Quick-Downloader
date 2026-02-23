@@ -61,94 +61,55 @@ describe('coerceMapPayload', () => {
   });
 });
 
-describe('worker/oracle source routing', () => {
-  it('merges worker downloads into overview outside Oracle window', async () => {
-    vi.useFakeTimers();
-    try {
-      vi.setSystemTime(new Date('2026-02-21T09:00:00.000Z'));
-      const fetchMock = vi
-        .fn()
-        .mockResolvedValueOnce(
-          new Response(
-            JSON.stringify({
-              ok: true,
-              source: 'cloudflare-worker',
-              generatedAt: 1771700000000,
-              snapshotAtUtc: 1771699200000,
-              totals: { downloads: 77, countries: 2 },
-              countries: [
-                { countryCode: 'US', count: 50 },
-                { countryCode: 'GB', count: 27 }
-              ],
-              schedule: {
-                refreshHoursUtc: [3, 6, 9, 12, 15, 18, 21],
-                activeHourUtc: 9,
-                isRefreshWindow: true,
-                lastRefreshAtUtc: 1771699200000,
-                nextRefreshAtUtc: 1771702800000
-              }
-            }),
-            { status: 200 }
-          )
-        )
-        .mockResolvedValueOnce(
-          new Response(
-            JSON.stringify({
-              ok: true,
-              generatedAt: 1771700000000,
-              totals: { downloads: 10, success: 8, fail: 2 },
-              installs: { usersTotal: 20, lastSyncedAtUtc: 1771699200000, browsers: [] },
-              versions: { github: '1.3.6', chrome: '1.3.6', firefox: null, edge: null },
-              status: { systemLive: true, liveSinceUtc: 1771600000000, workerHealth: 'up' },
-              links: { chrome: 'https://c', firefox: 'https://f', edge: 'https://e', github: 'https://g' }
-            }),
-            { status: 200 }
-          )
-        );
-      vi.stubGlobal('fetch', fetchMock);
+describe('oracle-only website data source routing', () => {
+  it('reads overview from Oracle public endpoint', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      expect(url).toContain('/api/public/website/overview');
+      expect(url).not.toContain('/public/site-metrics');
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          generatedAt: 1771700000000,
+          totals: { downloads: 77, success: 75, fail: 2 },
+          installs: { usersTotal: 20, lastSyncedAtUtc: 1771699200000, browsers: [] },
+          versions: { github: '1.3.6', chrome: '1.3.6', firefox: null, edge: null },
+          status: { systemLive: true, liveSinceUtc: 1771600000000, workerHealth: 'up' },
+          links: { chrome: 'https://c', firefox: 'https://f', edge: 'https://e', github: 'https://g' }
+        }),
+        { status: 200 }
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
 
-      const payload = await fetchOverview();
-      expect(payload.totals.downloads).toBe(77);
-      expect(payload.installs.usersTotal).toBe(20);
-    } finally {
-      vi.useRealTimers();
-    }
+    const payload = await fetchOverview();
+    expect(payload.totals.downloads).toBe(77);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('builds map payload from worker snapshot outside Oracle window', async () => {
-    vi.useFakeTimers();
-    try {
-      vi.setSystemTime(new Date('2026-02-21T12:00:00.000Z'));
-      vi.stubGlobal(
-        'fetch',
-        vi.fn(async () =>
-          new Response(
-            JSON.stringify({
-              ok: true,
-              source: 'cloudflare-worker',
-              generatedAt: 1771700000000,
-              snapshotAtUtc: 1771699200000,
-              totals: { downloads: 88, countries: 1 },
-              countries: [{ countryCode: 'us', count: 88 }],
-              schedule: {
-                refreshHoursUtc: [3, 6, 9, 12, 15, 18, 21],
-                activeHourUtc: 12,
-                isRefreshWindow: true,
-                lastRefreshAtUtc: 1771699200000,
-                nextRefreshAtUtc: 1771702800000
-              }
-            }),
-            { status: 200 }
-          )
-        )
+  it('reads map from Oracle public endpoint', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      expect(url).toContain('/api/public/website/map');
+      expect(url).not.toContain('/public/site-metrics');
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          generatedAt: 1771700000000,
+          granularity: 'country',
+          countries: [{ countryCode: 'us', count: 88 }],
+          totals: { downloads: 88, countries: 1 },
+          privacyNote: 'country only'
+        }),
+        { status: 200 }
       );
+    });
+    vi.stubGlobal('fetch', fetchMock);
 
-      const payload = await fetchMapData();
-      expect(payload.totals.downloads).toBe(88);
-      expect(payload.countries).toEqual([{ countryCode: 'US', count: 88 }]);
-    } finally {
-      vi.useRealTimers();
-    }
+    const payload = await fetchMapData();
+    expect(payload.totals.downloads).toBe(88);
+    expect(payload.countries).toEqual([{ countryCode: 'US', count: 88 }]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
 
