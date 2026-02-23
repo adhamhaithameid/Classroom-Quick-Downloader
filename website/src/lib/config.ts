@@ -19,8 +19,6 @@ function ensureUrl(value: string, fallback: string): string {
   }
 }
 
-const env = import.meta.env;
-
 export const SITE_URL = ensureUrl(env.PUBLIC_SITE_URL ?? '', DEFAULT_SITE_URL);
 export const ORACLE_API_BASE_URL = ensureUrl(env.PUBLIC_ORACLE_API_BASE_URL ?? '', DEFAULT_ORACLE_URL);
 export const WORKER_BASE_URL = ensureUrl(env.PUBLIC_WORKER_BASE_URL ?? '', DEFAULT_WORKER_URL);
