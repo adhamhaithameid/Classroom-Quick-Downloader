@@ -3827,7 +3827,7 @@ export class DownloadsDurable {
       this.mergePendingBatchesIfNeeded();
     };
 
-    const targetUrl = this.env.ORACLE_ENDPOINT + "/ingest-batch";
+    const targetUrl = resolvedOracleEndpoint.ingestUrl;
     logEvent("info", "oracle_flush_attempt", {
       target: "/ingest-batch",
       fromPendingBatch: !!pendingMeta,
