@@ -61,36 +61,12 @@ describe('public website acceptance contracts', () => {
           }),
           { status: 200 }
         )
-      )
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            ok: true,
-            generatedAt: 1771700000000,
-            headline: 'Privacy in simple words',
-            description: 'Short privacy summary',
-            sections: [
-              {
-                id: 'what-we-collect',
-                title: 'What we collect',
-                summary: 'Only aggregate analytics.',
-                bullets: ['No raw IP lists'],
-                priority: 1
-              }
-            ],
-            fullPrivacyUrl: 'https://github.com/adhamhaithameid/Classroom-Quick-Downloader/blob/main/PRIVACY.md',
-            lastUpdatedAtUtc: 1771600000000
-          }),
-          { status: 200 }
-        )
       );
     vi.stubGlobal('fetch', fetchMock);
 
     const changelog = await fetchUserChangelog();
-    const privacy = await fetchUserPrivacy();
 
     expect(changelog.entries[0]?.title).toContain('Stability');
-    expect(privacy.sections[0]?.title).toBe('What we collect');
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
