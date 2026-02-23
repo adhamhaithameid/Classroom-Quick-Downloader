@@ -437,11 +437,13 @@ func deploymentsAutoSyncEnabled() bool {
 	switch raw {
 	case "true", "1", "yes", "on":
 		return true
-	case "", "false", "0", "no", "off":
+	case "":
+		return true
+	case "false", "0", "no", "off":
 		return false
 	default:
-		log.Printf("[Scheduler] Invalid deployments auto-sync enabled value; defaulting to disabled")
-		return false
+		log.Printf("[Scheduler] Invalid deployments auto-sync enabled value; defaulting to enabled")
+		return true
 	}
 }
 
