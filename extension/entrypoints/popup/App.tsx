@@ -760,17 +760,23 @@ function App() {
                   href={CHANGELOG_SITE_URL}
                   target="_blank"
                   rel="noopener noreferrer"
+                  aria-label="Open changelog website"
                   className="cqd-cl-footer-link cqd-cl-footer-link-secondary"
                 >
-                  🗞️ View user changelog ↗
+                  <span className="cqd-cl-footer-link-content">
+                    <span className="cqd-cl-footer-link-title">Changelog</span>
+                  </span>
                 </a>
                 <a 
                   href={SURVEY_URL} 
                   target="_blank" 
                   rel="noopener noreferrer"
+                  aria-label="Report an issue or request a feature"
                   className="cqd-cl-footer-link"
                 >
-                  💡 Request a feature / Report a bug ↗
+                  <span className="cqd-cl-footer-link-content">
+                    <span className="cqd-cl-footer-link-title">Report Issue</span>
+                  </span>
                 </a>
               </div>
             </div>
