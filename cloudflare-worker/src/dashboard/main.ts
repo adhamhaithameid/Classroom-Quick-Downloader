@@ -4374,21 +4374,22 @@ export function renderDashboard(stats: StatsResponse): string {
       function updateBreakdowns(counters) {
         if (!counters) return;
         const mapping = [
-          ["tbody-type", counters.byType],
-          ["tbody-status", counters.byStatus],
-          ["tbody-browser", counters.byBrowser],
-          ["tbody-os", counters.byOs],
-          ["tbody-ext", counters.byExtVersion],
-          ["tbody-lang", counters.byLanguage],
-          ["tbody-country", counters.byCountry],
-          ["tbody-error", counters.byErrorType], // NEW
+          ["tbody-type", counters.byType, "type"],
+          ["tbody-status", counters.byStatus, "status"],
+          ["tbody-browser", counters.byBrowser, "browser"],
+          ["tbody-os", counters.byOs, "os"],
+          ["tbody-ext", counters.byExtVersion, "ext"],
+          ["tbody-lang", counters.byLanguage, "language"],
+          ["tbody-country", counters.byCountry, "country"],
+          ["tbody-error", counters.byErrorType, "error"], // NEW
         ];
         mapping.forEach(function (item) {
           const id = item[0];
           const data = item[1] || {};
+          const dimension = item[2] || "";
           const el = document.getElementById(id);
           if (!el) return;
-          const next = renderTableRowsJS(data);
+          const next = renderTableRowsJS(data, dimension);
           if (el.innerHTML !== next) {
             el.innerHTML = next;
             const parent =
