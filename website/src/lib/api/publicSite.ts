@@ -90,19 +90,6 @@ function asStringArray(value: unknown, maxItems = 8): string[] {
   return out;
 }
 
-function asNumberArray(value: unknown, maxItems = 24): number[] {
-  if (!Array.isArray(value)) return [];
-  const out: number[] = [];
-  for (const item of value) {
-    if (typeof item !== 'number' || !Number.isFinite(item)) continue;
-    const hour = Math.trunc(item);
-    if (hour < 0 || hour > 23) continue;
-    out.push(hour);
-    if (out.length >= maxItems) break;
-  }
-  return out;
-}
-
 function normalizeBrowser(input: unknown): InstallBrowser {
   const candidate = input as Partial<InstallBrowser>;
   return {
