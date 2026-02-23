@@ -35,7 +35,6 @@ pnpm -C cloudflare-worker dev
 ```bash
 cd /Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader
 PUBLIC_ORACLE_API_BASE_URL=http://127.0.0.1:8080 \
-PUBLIC_WORKER_BASE_URL=http://127.0.0.1:8787 \
 pnpm -C website dev
 ```
 
