@@ -211,17 +211,17 @@
     <div class="state-error">
       <strong>Could not load map data.</strong>
       <p>{error}</p>
-      <button type="button" class="retry" on:click={() => loadMap(true)} disabled={refreshing}>Retry</button>
+      <button type="button" class="refresh-btn" on:click={() => loadMap(true)} disabled={refreshing}>Retry</button>
     </div>
   {:else}
     <div class="summary-grid">
       <article class="metric">
         <div class="metric-label">Total Downloads Represented</div>
-        <div class="metric-value">{formatNumber(mapData?.totals.downloads ?? 0)}</div>
+        <div class="metric-value"><AnimatedNumber value={mapData?.totals.downloads ?? 0} /></div>
       </article>
       <article class="metric">
         <div class="metric-label">Countries Represented</div>
-        <div class="metric-value">{formatNumber(mapData?.totals.countries ?? 0)}</div>
+        <div class="metric-value"><AnimatedNumber value={mapData?.totals.countries ?? 0} /></div>
       </article>
       <article class="metric">
         <div class="metric-label">Map Granularity</div>
