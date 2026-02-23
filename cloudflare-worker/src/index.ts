@@ -480,6 +480,9 @@ function isCorsOriginAllowedForPath(request: Request, env: WorkerEnv, pathname: 
 }
 
 function corsAllowedHeadersForPath(pathname: string): string {
+  if (isOraclePublicWebsiteRoute(pathname)) {
+    return "Content-Type, X-Requested-With";
+  }
   if (isPublicCorsRoute(pathname)) {
     return "Content-Type";
   }
