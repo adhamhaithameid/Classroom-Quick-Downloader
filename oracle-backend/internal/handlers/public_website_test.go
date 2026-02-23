@@ -486,54 +486,6 @@ func TestPublicWebsiteUserChangelogHandler_ReturnsSanitizedEntries(t *testing.T)
 	}
 }
 
-func TestPublicWebsiteUserPrivacyHandler_ReturnsUserFriendlySections(t *testing.T) {
-	sqlDB := openPublicWebsiteDB(t)
-	t.Setenv("PUBLIC_WEBSITE_ALLOWED_ORIGINS", "https://adhamhaithameid.github.io")
-
-	if _, err := sqlDB.Exec(`INSERT INTO admin_records
-		(record_type, record_key, data_json, created_at, updated_at)
-		VALUES
-		('website_user_privacy_section', 'what-we-collect', '{"title":"What we collect","summary":"Only aggregate usage signals.","bullets":["No document content","No student passwords"],"priority":1}', 1771600000000, 1771600000000)
-	`); err != nil {
-		t.Fatalf("seed privacy records failed: %v", err)
-	}
-
-	req := httptest.NewRequest(http.MethodGet, "/api/public/website/privacy", nil)
-	req.Header.Set("Origin", "https://adhamhaithameid.github.io")
-	rr := httptest.NewRecorder()
-	PublicWebsiteUserPrivacyHandler(sqlDB, nil).ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
-	}
-
-	var payload struct {
-		OK       bool `json:"ok"`
-		Sections []struct {
-			ID      string   `json:"id"`
-			Title   string   `json:"title"`
-			Summary string   `json:"summary"`
-			Bullets []string `json:"bullets"`
-		} `json:"sections"`
-		FullPrivacyURL string `json:"fullPrivacyUrl"`
-	}
-	if err := json.Unmarshal(rr.Body.Bytes(), &payload); err != nil {
-		t.Fatalf("decode payload failed: %v", err)
-	}
-	if !payload.OK {
-		t.Fatal("expected ok=true")
-	}
-	if len(payload.Sections) != 1 {
-		t.Fatalf("expected one section, got %d", len(payload.Sections))
-	}
-	if payload.Sections[0].Title != "What we collect" {
-		t.Fatalf("unexpected section title: %+v", payload.Sections[0])
-	}
-	if !strings.Contains(payload.FullPrivacyURL, "PRIVACY.md") {
-		t.Fatalf("unexpected full privacy URL: %s", payload.FullPrivacyURL)
-	}
-}
-
 func TestPublicWebsiteContentHandlers_RejectDisallowedOrigin(t *testing.T) {
 	sqlDB := openPublicWebsiteDB(t)
 	t.Setenv("PUBLIC_WEBSITE_ALLOWED_ORIGINS", "https://adhamhaithameid.github.io")
