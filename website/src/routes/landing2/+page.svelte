@@ -1,19 +1,25 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { fade, scale } from 'svelte/transition';
   import { base } from '$app/paths';
   import { STORE_LINKS } from '$lib/config';
-  import { fetchOverview } from '$lib/api/publicSite';
-  import type { OverviewResponse } from '$lib/types/public';
+  import { fetchWebsiteSnapshot, ORACLE_SNAPSHOT_REFRESH_MS } from '$lib/api/publicSite';
+  import type { MapResponse, OverviewResponse } from '$lib/types/public';
   import logo from '$lib/assets/cqd-logo.svg';
   import AnimatedNumber from '$lib/components/AnimatedNumber.svelte';
   import AnimatedNumericText from '$lib/components/AnimatedNumericText.svelte';
+  import CountryHeatmap from '$lib/components/CountryHeatmap.svelte';
 
   let overview: OverviewResponse | null = null;
+  let mapData: MapResponse | null = null;
   let downloadCount = 0;
   let userCount = 0;
   let countryCount = 0;
   let scrollY = 0;
   let detectedBrowser: 'chrome' | 'firefox' | 'edge' = 'chrome';
+  let mapState: 'loading' | 'ready' | 'error' = 'loading';
+  let mapError = '';
+  let mapExpanded = false;
   const currentYear = new Date().getFullYear();
 
   /* Computed from downloadCount — used in marquee (raw) */
