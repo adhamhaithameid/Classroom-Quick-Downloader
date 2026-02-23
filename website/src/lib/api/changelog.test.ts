@@ -89,8 +89,7 @@ describe('fetchChangelog', () => {
           JSON.stringify({
             ok: true,
             entries: [
-              { id: 'a', version: '1.3.5', date: '2026-01-01T00:00:00Z', changes: ['A'] },
-              { id: 'b', version: '1.3.6', date: '2026-02-01T00:00:00Z', changes: ['B'] }
+              { id: 'r-1', version: '1.3.7', date: '2026-02-20', changes: ['Valid', 42, null, '', 'Also valid'] }
             ]
           }),
           { status: 200 }
