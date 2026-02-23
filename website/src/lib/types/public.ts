@@ -50,25 +50,6 @@ export type MapResponse = {
   privacyNote: string;
 };
 
-export type WorkerSiteMetricsResponse = {
-  ok: boolean;
-  source: 'cloudflare-worker';
-  generatedAt: number;
-  snapshotAtUtc: number;
-  totals: {
-    downloads: number;
-    countries: number;
-  };
-  countries: Array<{ countryCode: string; count: number }>;
-  schedule: {
-    refreshHoursUtc: number[];
-    activeHourUtc: number;
-    isRefreshWindow: boolean;
-    lastRefreshAtUtc: number;
-    nextRefreshAtUtc: number;
-  };
-};
-
 export type ChangelogResponse = {
   ok: boolean;
   entries: Array<{
