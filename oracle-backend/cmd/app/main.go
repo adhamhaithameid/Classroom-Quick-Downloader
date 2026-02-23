@@ -808,7 +808,12 @@ func scheduleSheetsArchiver() {
 
 		// Run the archiver
 		log.Println("[Scheduler] Running scheduled Sheets export...")
+		if !tryAcquireManualSheetsFlush() {
+			log.Println("[Scheduler] Skipping scheduled Sheets export because a flush is already running")
+			continue
+		}
 		runArchiver(sheetsID, credsPath, kumaPushURL, archiverSecret, archiverAPI)
+		releaseManualSheetsFlush()
 	}
 }
 
