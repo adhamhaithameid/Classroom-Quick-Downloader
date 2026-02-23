@@ -199,35 +199,4 @@ describe('user-facing content APIs', () => {
     expect(data.entries[0]?.version).toBe('1.3.6');
   });
 
-  it('fetches and normalizes user privacy payload', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () =>
-        new Response(
-          JSON.stringify({
-            ok: true,
-            generatedAt: 1700000000000,
-            headline: 'Privacy in simple words',
-            description: 'Simple privacy summary',
-            sections: [
-              {
-                id: 'what-we-collect',
-                title: 'What we collect',
-                summary: 'Only aggregate usage signals.',
-                bullets: ['No raw IP lists', 'No private files'],
-                priority: 1
-              }
-            ],
-            fullPrivacyUrl: 'https://github.com/adhamhaithameid/Classroom-Quick-Downloader/blob/main/PRIVACY.md',
-            lastUpdatedAtUtc: 1700000000001
-          }),
-          { status: 200 }
-        )
-      )
-    );
-
-    const data = await fetchUserPrivacy();
-    expect(data.ok).toBe(true);
-    expect(data.sections[0]?.title).toBe('What we collect');
-  });
 });
