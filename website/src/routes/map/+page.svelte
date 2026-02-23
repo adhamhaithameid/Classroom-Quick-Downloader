@@ -57,8 +57,11 @@
   }
 
   onMount(async () => {
-    buildWorldGeometry();
     await loadMap();
+    const timer = window.setInterval(() => {
+      void loadMap(true);
+    }, ORACLE_SNAPSHOT_REFRESH_MS);
+    return () => window.clearInterval(timer);
   });
 </script>
 
