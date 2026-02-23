@@ -344,6 +344,11 @@ export interface Env {
   DASHBOARD_PASSWORD?: string;
   DANGER_PASSWORD: string;
   ORACLE_ENDPOINT: string;
+  /**
+   * Optional emergency/dev override to allow non-loopback HTTP Oracle endpoints.
+   * Keep unset in production once HTTPS Oracle endpoint is available.
+   */
+  ALLOW_INSECURE_ORACLE_ENDPOINT?: string;
   MAX_BATCH_EVENTS: string;
   ALERT_WEBHOOK_URL?: string;
   /**
