@@ -1,12 +1,8 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { fetchUserPrivacy } from '$lib/api/publicSite';
-  import type { UserPrivacyResponse } from '$lib/types/public';
+  import { privacyContent as privacy } from '$lib/content/privacy';
+  import AnimatedNumericText from '$lib/components/AnimatedNumericText.svelte';
 
-  let state: 'loading' | 'ready' | 'error' = 'loading';
-  let error = '';
-  let privacy: UserPrivacyResponse | null = null;
-  let refreshing = false;
+  const sectionIcons = ['🔒', '📊', '🛡️', '🌍', '🔑', '📱', '⚙️', '📋', '✅', '💡'];
 
   function formatDate(value: number | null): string {
     if (!value) return 'N/A';
