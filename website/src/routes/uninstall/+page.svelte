@@ -87,12 +87,12 @@
       <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--gc-green)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
     </div>
     <h1>Before you go, help us improve</h1>
-    <p>Your feedback shapes the next update. Takes <AnimatedNumber value={30} format={{ useGrouping: false }} /> seconds.</p>
+    <p>Your feedback shapes the next update. Takes <AnimatedNumber value={30} format={{ useGrouping: false }} animated /> seconds.</p>
   </header>
 
   <!-- Step 1: Reason -->
   <section class="step card">
-    <h2><AnimatedNumber value={1} format={{ useGrouping: false }} />. Why are you uninstalling?</h2>
+    <h2><AnimatedNumber value={1} format={{ useGrouping: false }} animated />. Why are you uninstalling?</h2>
     <div class="option-grid">
       {#each reasonOptions as reason}
         <button
