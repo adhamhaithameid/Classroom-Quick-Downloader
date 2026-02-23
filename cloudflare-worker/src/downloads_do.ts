@@ -2339,8 +2339,6 @@ export class DownloadsDurable {
       uniqueRequestsToday: this.d.uniqueRequestsToday ?? 0,
       // BACKWARDS COMPATIBILITY: Legacy dashboard uses uniqueIpsToday
       uniqueIpsToday: this.d.uniqueRequestsToday ?? 0,
-      weeklyRequests,
-      monthlyRequests,
       uniqueCountriesAllTime,
       // IP tracking disabled -> unique counts are not approximated
       isApproximated: false,
