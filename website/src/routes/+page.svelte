@@ -328,7 +328,7 @@
         {#each topCountries as country, ci}
           <div class="country-chip">
             <span class="country-name">{country.name}</span>
-            <strong><AnimatedNumber value={country.count} /></strong>
+            <strong><AnimatedNumber value={country.count} animated /></strong>
           </div>
         {/each}
       </div>
