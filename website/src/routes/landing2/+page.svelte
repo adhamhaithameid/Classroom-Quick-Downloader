@@ -906,23 +906,181 @@
   /* ── Social Proof ──────────────────── */
   .l2-proof-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
   .l2-proof-card {
-    background: var(--bg); border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.65); border: 1px solid var(--border-subtle);
     border-radius: var(--radius); padding: 28px; text-align: center;
-    transition: all 0.25s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
   }
-  .l2-proof-card:hover { border-color: var(--green-border); transform: translateY(-2px); }
+  .l2-proof-card:hover { border-color: var(--green-border); transform: translateY(-3px); box-shadow: 0 10px 28px rgba(0, 0, 0, 0.05); }
   .l2-proof-num { font-size: 28px; font-weight: 800; color: var(--green); margin-bottom: 6px; }
   .l2-proof-label { font-size: 13px; font-weight: 500; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em; }
 
+  /* ── Map spotlight ────────────────── */
+  .l2-map-section {
+    background: transparent;
+    border: 0;
+  }
+
+  .l2-map-wrap.l2-wrap {
+    max-width: 1240px;
+  }
+
+  .l2-map-head {
+    margin-bottom: 26px;
+    max-width: 700px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .l2-map-shell {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+  }
+
+  .l2-map-state-card {
+    border-radius: 18px;
+    border: 1px solid rgba(15, 20, 25, 0.1);
+    background: rgba(255, 255, 255, 0.82);
+    box-shadow: 0 10px 26px rgba(15, 20, 25, 0.08);
+    padding: 30px;
+  }
+
+  .l2-map-frame {
+    position: relative;
+    width: min(100%, 1080px);
+  }
+
+  .l2-map-expand-btn {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: 38px;
+    height: 38px;
+    border: 1px solid rgba(19, 122, 71, 0.24);
+    background: rgba(255, 255, 255, 0.84);
+    color: var(--green);
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    z-index: 4;
+    backdrop-filter: blur(6px);
+    transition:
+      background-color 0.2s ease,
+      border-color 0.2s ease,
+      transform 0.2s ease,
+      box-shadow 0.2s ease;
+  }
+
+  .l2-map-expand-btn:hover {
+    border-color: rgba(19, 122, 71, 0.38);
+    background: rgba(255, 255, 255, 0.98);
+    transform: translateY(-1px);
+    box-shadow: 0 8px 16px rgba(15, 20, 25, 0.14);
+  }
+
+  .l2-map-expand-btn svg {
+    width: 16px;
+    height: 16px;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  :global(.l2-main-heatmap) {
+    width: 100%;
+    max-width: none;
+    margin: 0 auto;
+    box-shadow: 0 12px 32px rgba(15, 20, 25, 0.08);
+    border-radius: 18px;
+  }
+
+  .l2-map-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(3, 9, 14, 0.72);
+    backdrop-filter: blur(3px);
+    z-index: 220;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 14px;
+  }
+
+  .l2-map-modal {
+    position: relative;
+    width: min(96vw, 1720px);
+    max-height: calc(100vh - 28px);
+    overflow: auto;
+    border-radius: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    background: linear-gradient(180deg, #f7fbf8, #edf5f0);
+    padding: 14px;
+    box-shadow: 0 38px 80px rgba(0, 0, 0, 0.42);
+  }
+
+  .l2-map-modal-close {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: 40px;
+    height: 40px;
+    border: 1px solid rgba(11, 17, 24, 0.2);
+    background: rgba(255, 255, 255, 0.9);
+    color: #123222;
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    z-index: 3;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+  }
+
+  .l2-map-modal-close:hover {
+    transform: translateY(-1px);
+    background: #fff;
+    box-shadow: 0 12px 22px rgba(0, 0, 0, 0.16);
+  }
+
+  .l2-map-modal-close svg {
+    width: 18px;
+    height: 18px;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  :global(.l2-main-heatmap-modal) {
+    width: 100%;
+    max-width: none;
+    border-radius: 14px;
+    box-shadow: none;
+    margin: 0;
+    min-height: min(84vh, 860px);
+  }
+
+  :global(body.l2-map-modal-open) {
+    overflow: hidden;
+  }
+
   /* ── Final CTA ─────────────────────── */
   .l2-cta-section {
-    position: relative; padding: 100px 0; text-align: center; overflow: hidden;
-    background: linear-gradient(180deg, var(--bg) 0%, #ecfdf5 100%);
+    position: relative; z-index: 2; padding: 80px 0; text-align: center;
+    background: transparent;
   }
-  .l2-cta-bg { position: absolute; inset: 0; pointer-events: none; }
-  .orb-cta-1 { width: 400px; height: 400px; background: #bbf7d0; top: -20%; left: 30%; animation: orb-drift 20s ease-in-out infinite alternate; }
-  .orb-cta-2 { width: 300px; height: 300px; background: #a5f3fc; bottom: -15%; right: 20%; animation: orb-drift 16s ease-in-out infinite alternate-reverse; }
-  .l2-cta-content { position: relative; z-index: 2; }
+  .l2-cta-content {
+    position: relative; z-index: 2;
+    background: rgba(255, 255, 255, 0.55);
+    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--border-subtle);
+    border-radius: 24px;
+    padding: 64px 48px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.04);
+  }
   .l2-cta-content h2 {
     font-size: clamp(32px, 4vw, 48px); font-weight: 900;
     letter-spacing: -0.03em; margin: 0 0 16px;
