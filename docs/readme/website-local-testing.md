@@ -50,10 +50,13 @@ pnpm -C website dev
 curl http://127.0.0.1:8080/api/public/website/overview
 curl http://127.0.0.1:8080/api/public/website/map
 curl http://127.0.0.1:8080/api/public/website/changelog
-curl http://127.0.0.1:8080/api/public/website/privacy
 curl http://127.0.0.1:8080/api/public/website/uninstall
+# Optional (for Oracle cloudflare-pull scheduler/manual admin pull validation):
 curl http://127.0.0.1:8787/public/site-metrics
 ```
+
+Privacy page content is manual and local:
+- Edit `website/src/lib/content/privacy.ts`.
 
 ## 7) Run Full Website Validation
 
