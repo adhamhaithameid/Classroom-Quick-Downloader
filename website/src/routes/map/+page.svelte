@@ -37,8 +37,14 @@
   let pathByCountryId = new Map<number, string>();
   let countByCountryId = new Map<number, number>();
   let maxCount = 1;
-  let colorScale = scaleLinear<string>().domain([0, 1]).range(['#e8eefc', '#1549a8']);
+  let colorScale = scaleLinear<string>().domain([0, 1]).range(['#e0f2e9', '#137a47']);
   let topCountries: TopCountry[] = [];
+
+  // Hover tooltip state
+  let hoveredCountry: { name: string; count: number; x: number; y: number; alignRight: boolean } | null = null;
+
+  // Lookup: numeric ID -> country name
+  let nameByCountryId = new Map<number, string>();
 
   function toCountryName(code: string): string {
     const label = displayNames?.of(code.toUpperCase());
