@@ -52,11 +52,11 @@
       <article class="privacy-section card" style="animation-delay: {i * 0.07}s">
         <div class="section-icon">{sectionIcons[i % sectionIcons.length]}</div>
         <h2>{section.title}</h2>
-        <p class="section-summary"><AnimatedNumericText text={section.summary} /></p>
+        <p class="section-summary"><AnimatedNumericText text={section.summary} animated /></p>
         {#if section.bullets.length > 0}
           <ul>
             {#each section.bullets as bullet}
-              <li><AnimatedNumericText text={bullet} /></li>
+              <li><AnimatedNumericText text={bullet} animated /></li>
             {/each}
           </ul>
         {/if}
