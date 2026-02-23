@@ -150,8 +150,6 @@ export interface StatsResponse {
   requestDate: string | null;
   uniqueRequestsToday: number;
   uniqueIpsToday: number; // Backwards compatibility
-  weeklyRequests?: number;
-  monthlyRequests?: number;
   uniqueCountriesAllTime?: number;
   // CAP INDICATOR: true when unique counts are approximated (10,000+ capped)
   isApproximated: boolean;
