@@ -37,7 +37,7 @@ describe('public website acceptance contracts', () => {
     expect(payload.status.workerHealth).toBe('up');
   });
 
-  it('accepts user changelog and privacy contracts from Oracle', async () => {
+  it('accepts user changelog contract from Oracle', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(
         new Response(
