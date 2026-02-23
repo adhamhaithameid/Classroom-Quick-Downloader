@@ -870,12 +870,14 @@
     display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
   }
   .l2-fcard {
-    background: var(--bg); border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.65); border: 1px solid var(--border-subtle);
     border-radius: var(--radius); padding: 28px 24px;
-    transition: all 0.25s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
   }
-  .l2-fcard:hover { border-color: var(--green-border); transform: translateY(-4px); box-shadow: 0 8px 24px rgba(0,0,0,0.06); }
-  .l2-fcard-icon { font-size: 28px; margin-bottom: 14px; }
+  .l2-fcard:hover { border-color: var(--green-border); transform: translateY(-4px); box-shadow: 0 16px 40px rgba(0, 0, 0, 0.08); }
+  .l2-fcard-icon { font-size: 36px; margin-bottom: 14px; }
   .l2-fcard h3 { font-size: 17px; font-weight: 700; margin: 0 0 8px; }
   .l2-fcard p { font-size: 14px; color: var(--text-secondary); line-height: 1.6; margin: 0; }
 
