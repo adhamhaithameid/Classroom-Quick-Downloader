@@ -90,61 +90,72 @@ select {
 }
 
 .page-shell {
-  width: min(1160px, calc(100% - 30px));
+  width: min(1200px, calc(100% - 32px));
   margin: 0 auto;
 }
 
 .card {
-  border-radius: 20px;
+  border-radius: var(--radius);
   border: 1px solid var(--border);
   background: var(--surface);
   box-shadow: var(--shadow);
-  backdrop-filter: blur(12px);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 .state-loading,
 .state-error,
 .state-empty {
-  border-radius: 14px;
+  border-radius: var(--radius-sm);
   border: 1px dashed var(--border);
   background: var(--surface-2);
-  padding: 16px;
+  padding: 20px;
   color: var(--muted);
   font-size: 14px;
+  text-align: center;
 }
 
 .metric-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
 }
 
 .metric {
-  border-radius: 16px;
+  border-radius: var(--radius);
   border: 1px solid var(--border);
   background: var(--surface);
-  padding: 12px;
-  animation: riseIn 0.5s ease both;
+  padding: 18px;
+  animation: riseIn 0.6s ease both;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.3s ease;
+}
+
+.metric:hover {
+  border-color: var(--border-hover);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
 }
 
 .metric-label {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--muted);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin-bottom: 6px;
+  letter-spacing: 0.1em;
+  font-weight: 600;
+  margin-bottom: 8px;
 }
 
 .metric-value {
-  font-size: 24px;
+  font-size: 28px;
   font-weight: 800;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
+  color: var(--gc-green);
 }
 
 @keyframes riseIn {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(14px);
   }
   to {
     opacity: 1;
