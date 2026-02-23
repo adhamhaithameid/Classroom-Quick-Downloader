@@ -3395,14 +3395,6 @@ export function renderDashboard(stats: StatsResponse): string {
               <span class="quota-val" data-bind="uniqueIps" style="color:${isApproximated ? 'var(--warning)' : 'inherit'}">${uniqueIpsDisplay}</span>
             </div>
             <div class="quota-stat">
-              <span class="quota-label">Weekly Events</span>
-              <span class="quota-val" data-bind="weeklyEvents" style="color:var(--success)">${weeklyRequests.toLocaleString()}</span>
-            </div>
-            <div class="quota-stat">
-              <span class="quota-label">Monthly Events</span>
-              <span class="quota-val" data-bind="monthlyEvents" style="color:var(--accent)">${monthlyRequests.toLocaleString()}</span>
-            </div>
-            <div class="quota-stat">
               <span class="quota-label">Status</span>
               <span
                 class="quota-tag ${stateTag.className}"
