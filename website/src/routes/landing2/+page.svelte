@@ -896,7 +896,9 @@
   }
   .l2-step-line {
     position: absolute; top: 24px; left: calc(50% + 30px); right: calc(-50% + 30px);
-    height: 2px; background: var(--border);
+    height: 2px;
+    background: linear-gradient(90deg, var(--green-border), var(--border), var(--green-border));
+    opacity: 0.7;
   }
   .l2-step h3 { font-size: 16px; font-weight: 700; margin: 0 0 8px; }
   .l2-step p { font-size: 14px; color: var(--text-secondary); line-height: 1.6; margin: 0; }
