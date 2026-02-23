@@ -80,24 +80,6 @@ export type UserChangelogResponse = {
   lastUpdatedAtUtc: number | null;
 };
 
-export type UserPrivacySection = {
-  id: string;
-  title: string;
-  summary: string;
-  bullets: string[];
-  priority: number;
-};
-
-export type UserPrivacyResponse = {
-  ok: boolean;
-  generatedAt: number;
-  headline: string;
-  description: string;
-  sections: UserPrivacySection[];
-  fullPrivacyUrl: string;
-  lastUpdatedAtUtc: number | null;
-};
-
 export type UninstallFeedbackRequest = {
   reason: string;
   browser: string;
