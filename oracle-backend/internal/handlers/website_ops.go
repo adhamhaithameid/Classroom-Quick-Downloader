@@ -600,6 +600,54 @@ func StartWebsiteOneAMPublisherLoop(ctx context.Context, db *sql.DB) {
 	}
 }
 
+func StartWebsiteCloudflareSlotPullLoop(ctx context.Context, db *sql.DB, cloudflareMetricsURL string) {
+	if db == nil {
+		return
+	}
+	targetURL := strings.TrimSpace(cloudflareMetricsURL)
+	if targetURL == "" {
+		targetURL = defaultCloudflarePublicSiteMetricsURL
+	}
+	ticker := time.NewTicker(1 * time.Minute)
+	defer ticker.Stop()
+
+	lastProcessedSlot := ""
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			now := time.Now().UTC()
+			if !shouldRunWebsiteCloudflarePull(now) {
+				continue
+			}
+			slotKey := makeWebsiteCloudflareSlotKey(now)
+			if slotKey == lastProcessedSlot {
+				continue
+			}
+			_, metrics, err := PullWebsiteDatasetFromCloudflare(
+				context.Background(),
+				db,
+				targetURL,
+				"oracle_scheduler_cloudflare_slot",
+			)
+			if err != nil {
+				logEvent("error", "website_scheduler_cloudflare_pull_failed", map[string]interface{}{
+					"error": err.Error(),
+					"slot":  slotKey,
+				})
+			} else {
+				logEvent("info", "website_scheduler_cloudflare_pull_ok", map[string]interface{}{
+					"slot":      slotKey,
+					"downloads": metrics.Totals.Downloads,
+					"countries": len(metrics.Countries),
+				})
+			}
+			lastProcessedSlot = slotKey
+		}
+	}
+}
+
 func RecordWebsiteToOracleBatch(
 	ctx context.Context,
 	db *sql.DB,
