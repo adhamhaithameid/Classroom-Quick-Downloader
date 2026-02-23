@@ -11,6 +11,7 @@
   export let suffix: string = '';
   export let prefix: string = '';
   export let format: Intl.NumberFormatOptions = { useGrouping: true };
+  export let animated = false;
   export let animateOnView = true;
   export let threshold = 0;
   export let rootMargin = '0px 0px -8% 0px';
