@@ -542,33 +542,6 @@ body {
   flex-shrink: 0;
 }
 
-.cqd-temp-cancelled-counter {
-  margin-top: 10px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
-  border-radius: 999px;
-  border: 1px dashed #f59e0b;
-  background: #fff7ed;
-}
-
-.cqd-temp-cancelled-label {
-  font-size: 10px;
-  font-weight: 600;
-  color: #9a3412;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-}
-
-.cqd-temp-cancelled-value {
-  min-width: 18px;
-  text-align: center;
-  font-size: 11px;
-  font-weight: 800;
-  color: #7c2d12;
-}
-
 .cqd-muted-text {
   font-size: 11px;
   color: var(--cqd-text-muted);
