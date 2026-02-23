@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fetchOverview, fetchUserChangelog } from './publicSite';
+import { fetchOverview, fetchUserChangelog, resetWebsiteSnapshotCacheForTests } from './publicSite';
 
 afterEach(() => {
   vi.restoreAllMocks();
   vi.useRealTimers();
+  resetWebsiteSnapshotCacheForTests();
 });
 
 describe('public website acceptance contracts', () => {
