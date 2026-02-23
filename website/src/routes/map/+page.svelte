@@ -88,11 +88,11 @@
     <div class="summary-grid">
       <article class="metric">
         <div class="metric-label">Total Downloads Represented</div>
-        <div class="metric-value"><AnimatedNumber value={mapData?.totals.downloads ?? 0} /></div>
+        <div class="metric-value"><AnimatedNumber value={mapData?.totals.downloads ?? 0} animated /></div>
       </article>
       <article class="metric">
         <div class="metric-label">Countries Represented</div>
-        <div class="metric-value"><AnimatedNumber value={mapData?.totals.countries ?? 0} /></div>
+        <div class="metric-value"><AnimatedNumber value={mapData?.totals.countries ?? 0} animated /></div>
       </article>
       <article class="metric">
         <div class="metric-label">Map Granularity</div>
