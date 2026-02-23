@@ -295,7 +295,8 @@ func main() {
 	mux.Handle("/api/admin/deployments/sync", authMiddleware(handlers.DeploymentsSyncHandler(sqlDB, postgresDB, appMetrics)))
 	mux.Handle("/api/admin/dashboard-links", authMiddleware(handlers.DashboardLinksHandler(
 		getenv("CLOUDFLARE_DASHBOARD_URL", "https://cqd-analytics.adhamhaithameid.workers.dev/"),
-		getenv("UPTIME_KUMA_URL", "http://129.151.233.229:3001/status/cqd"),
+		getenv("PUBLIC_SITE_URL", "https://classroom-quick-downloader-website.pages.dev"),
+		getenv("UPTIME_KUMA_URL", "https://cqd-analytics.adhamhaithameid.workers.dev/pipeline-health"),
 		getenv("GITHUB_REPO_URL", "https://github.com/adhamhaithameid/Classroom-Quick-Downloader"),
 		getenv("GOOGLE_SHEETS_URL", "https://docs.google.com/spreadsheets/d/1ptzLKUVnAkyXnT635Zgb1C6Img9aeAZ1se3nRz_QZmI/edit?gid=0#gid=0"),
 		getenv("FIGMA_DESIGN_URL", "https://www.figma.com/design/hQLRpncinKnJQRG1lhCdQG/Google-Classroom-Downloade-Icon?node-id=0-1&t=5Eimhfrvp8RwFC19-1"),
