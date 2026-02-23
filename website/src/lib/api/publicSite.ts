@@ -51,10 +51,6 @@ async function fetchOracleJSON(pathname: string): Promise<unknown> {
   return fetchJSONFromBase(ORACLE_API_BASE_URL, pathname, 'Oracle public API');
 }
 
-async function fetchWorkerJSON(pathname: string): Promise<unknown> {
-  return fetchJSONFromBase(WORKER_BASE_URL, pathname, 'Cloudflare Worker public API');
-}
-
 function asString(value: unknown): string {
   return typeof value === 'string' ? value : '';
 }
