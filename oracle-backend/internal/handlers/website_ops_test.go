@@ -175,3 +175,108 @@ func TestWebsiteOpsPullCloudflareAndToggleOneAM(t *testing.T) {
 		t.Fatal("expected lastCloudflarePushAt to be set")
 	}
 }
+
+func TestPullWebsiteDatasetFromCloudflare_Success(t *testing.T) {
+	sqlDB := openPublicWebsiteDB(t)
+
+	mockCF := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"ok": true,
+			"totals": {"downloads": 987},
+			"countries": [{"countryCode":"US","count":500},{"countryCode":"EG","count":487}],
+			"generatedAt": 1770000000000,
+			"snapshotAtUtc": 1770000000000
+		}`))
+	}))
+	defer mockCF.Close()
+
+	row, metrics, err := PullWebsiteDatasetFromCloudflare(
+		t.Context(),
+		sqlDB,
+		mockCF.URL,
+		"test_scheduler_slot",
+	)
+	if err != nil {
+		t.Fatalf("expected success, got error: %v", err)
+	}
+	if row.PublishedSource != "cloudflare" {
+		t.Fatalf("expected published source cloudflare, got %q", row.PublishedSource)
+	}
+	if row.PublishedDownloads != 987 {
+		t.Fatalf("expected published downloads 987, got %d", row.PublishedDownloads)
+	}
+	if metrics.Totals.Downloads != 987 {
+		t.Fatalf("expected metrics downloads 987, got %d", metrics.Totals.Downloads)
+	}
+
+	batch, err := loadLatestWebsiteSyncBatch(t.Context(), sqlDB, websiteSyncDirectionCloudflareToWebsite)
+	if err != nil {
+		t.Fatalf("loadLatestWebsiteSyncBatch failed: %v", err)
+	}
+	if batch == nil {
+		t.Fatal("expected a cloudflare_to_website batch row")
+	}
+	if batch.TriggeredBy != "test_scheduler_slot" {
+		t.Fatalf("expected triggeredBy test_scheduler_slot, got %q", batch.TriggeredBy)
+	}
+}
+
+func TestPullWebsiteDatasetFromCloudflare_ErrorClassification(t *testing.T) {
+	sqlDB := openPublicWebsiteDB(t)
+
+	// Fetch classification.
+	_, _, err := PullWebsiteDatasetFromCloudflare(
+		t.Context(),
+		sqlDB,
+		"http://127.0.0.1:1",
+		"test_fetch_error",
+	)
+	if err == nil || !errors.Is(err, errCloudflareWebsiteFetch) {
+		t.Fatalf("expected errCloudflareWebsiteFetch, got: %v", err)
+	}
+
+	// Publish classification (nil DB).
+	mockCF := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"ok":true,"totals":{"downloads":1},"countries":[{"countryCode":"US","count":1}]}`))
+	}))
+	defer mockCF.Close()
+
+	_, _, err = PullWebsiteDatasetFromCloudflare(
+		t.Context(),
+		nil,
+		mockCF.URL,
+		"test_publish_error",
+	)
+	if err == nil || !errors.Is(err, errCloudflareWebsitePublish) {
+		t.Fatalf("expected errCloudflareWebsitePublish, got: %v", err)
+	}
+}
+
+func TestWebsiteCloudflareSlotScheduleHelpers(t *testing.T) {
+	if !isWebsiteCloudflarePullHour(3) || !isWebsiteCloudflarePullHour(21) {
+		t.Fatal("expected 3 and 21 to be valid Cloudflare pull hours")
+	}
+	if isWebsiteCloudflarePullHour(2) || isWebsiteCloudflarePullHour(22) {
+		t.Fatal("expected 2 and 22 to be outside Cloudflare pull hours")
+	}
+
+	valid := time.Date(2026, 2, 22, 9, 2, 0, 0, time.UTC)
+	if !shouldRunWebsiteCloudflarePull(valid) {
+		t.Fatalf("expected slot at %s to be runnable", valid)
+	}
+	invalidMinute := time.Date(2026, 2, 22, 9, 12, 0, 0, time.UTC)
+	if shouldRunWebsiteCloudflarePull(invalidMinute) {
+		t.Fatalf("did not expect minute 12 slot to run: %s", invalidMinute)
+	}
+	invalidHour := time.Date(2026, 2, 22, 8, 1, 0, 0, time.UTC)
+	if shouldRunWebsiteCloudflarePull(invalidHour) {
+		t.Fatalf("did not expect hour 8 slot to run: %s", invalidHour)
+	}
+
+	slotKey := makeWebsiteCloudflareSlotKey(time.Date(2026, 2, 22, 15, 59, 0, 0, time.UTC))
+	if slotKey != "2026-02-22T15" {
+		t.Fatalf("unexpected slot key: %s", slotKey)
+	}
+}
