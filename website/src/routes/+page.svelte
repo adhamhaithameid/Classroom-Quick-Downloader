@@ -117,7 +117,7 @@
     <div class="hero-left">
       <span class="hero-badge">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c0 1.1 2.7 3 6 3s6-1.9 6-3v-5"/></svg>
-        Built for Google Classroom &nbsp;•&nbsp; <strong><AnimatedNumericText text="v1.3.6" /></strong>
+        Built for Google Classroom &nbsp;•&nbsp; <strong><AnimatedNumericText text="v1.3.6" animated /></strong>
       </span>
 
       <h1>Download your<br/>Classroom files —<br/><span class="accent">effortlessly.</span></h1>
