@@ -100,42 +100,7 @@
       </article>
     </div>
 
-    <div class="map-shell" role="presentation" on:mouseleave={clearHover}>
-      <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} role="img" aria-label="Country-level extension usage map">
-        {#each countries as item}
-          <path
-            class="country-path"
-            role="img"
-            d={pathByCountryId.get(Number(item.id)) ?? ''}
-            fill={fillForCountry(item.id)}
-            stroke={borderForCountry(item.id)}
-            stroke-width="0.7"
-            on:mouseenter={(e) => handleCountryHover(e, item)}
-            on:mousemove={(e) => handleCountryHover(e, item)}
-            on:mouseleave={clearHover}
-          />
-        {/each}
-      </svg>
-
-      {#if hoveredCountry}
-        <div
-          class="map-tooltip"
-          class:align-right={hoveredCountry.alignRight}
-          style="left: {hoveredCountry.x}px; top: {hoveredCountry.y}px"
-        >
-          <strong>{hoveredCountry.name}</strong>
-          <span><AnimatedNumber value={hoveredCountry.count} /> downloads</span>
-        </div>
-      {/if}
-    </div>
-
-    <div class="legend">
-      <div class="legend-gradient" aria-hidden="true"></div>
-      <div class="legend-labels">
-        <span>Lower usage</span>
-        <span>Higher usage</span>
-      </div>
-    </div>
+    <CountryHeatmap {mapData} ariaLabel="Country-level extension usage map" />
 
     <div class="bottom-grid">
       <section class="card mini">
