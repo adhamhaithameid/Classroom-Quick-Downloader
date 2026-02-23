@@ -434,10 +434,6 @@ function App() {
         if (isStale()) return;
         const raw = result.local_stats || { total: 0, byType: {} };
         const totalDownloadsNext = raw.total || 0;
-        const rawCancelled = Number(raw.cancelled);
-        const cancelledDownloadsNext = Number.isFinite(rawCancelled)
-          ? Math.max(0, Math.floor(rawCancelled))
-          : 0;
 
         // Convert byType object to sorted array
         const entries = Object.entries(raw.byType as Record<string, number>);
