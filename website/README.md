@@ -29,7 +29,7 @@ This package is static (`@sveltejs/adapter-static`) and deploys to Cloudflare Pa
 ```bash
 cd /Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader
 pnpm install
-PUBLIC_ORACLE_API_BASE_URL=http://127.0.0.1:8080 PUBLIC_WORKER_BASE_URL=http://127.0.0.1:8787 pnpm -C website dev
+PUBLIC_ORACLE_API_BASE_URL=http://127.0.0.1:8080 pnpm -C website dev
 ```
 
 Open:
