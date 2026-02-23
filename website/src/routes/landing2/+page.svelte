@@ -578,9 +578,9 @@
   /* ── Navbar ────────────────────────── */
   .l2-nav {
     position: sticky; top: 0; z-index: 100;
-    background: rgba(248, 250, 251, 0.85);
-    backdrop-filter: blur(14px);
-    border-bottom: 1px solid var(--border);
+    background: rgba(250, 252, 251, 0.75);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border-subtle);
     padding: 12px 0;
   }
   .l2-nav-inner { display: flex; align-items: center; gap: 24px; }
