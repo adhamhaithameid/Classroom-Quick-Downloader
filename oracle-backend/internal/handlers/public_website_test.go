@@ -186,6 +186,73 @@ func TestPublicWebsiteMapHandler_ReturnsIsoCountryBreakdown(t *testing.T) {
 	}
 }
 
+func TestPublicWebsiteHandlers_UsePublishedOracleWebsiteDataset(t *testing.T) {
+	sqlDB := openPublicWebsiteDB(t)
+	seedPublicWebsiteFixture(t, sqlDB)
+
+	if _, err := sqlDB.Exec(
+		`UPDATE website_sync_control
+		 SET published_downloads = ?,
+		     published_countries_json = ?,
+		     published_source = ?,
+		     last_cloudflare_push_at = ?,
+		     updated_at = ?
+		 WHERE id = 1`,
+		4321,
+		`[{"countryCode":"US","count":3000},{"countryCode":"EG","count":1321}]`,
+		"cloudflare",
+		1771700000000,
+		1771700000000,
+	); err != nil {
+		t.Fatalf("failed to seed website_sync_control published data: %v", err)
+	}
+
+	overviewReq := httptest.NewRequest(http.MethodGet, "/api/public/website/overview", nil)
+	overviewRR := httptest.NewRecorder()
+	PublicWebsiteOverviewHandler(sqlDB, nil).ServeHTTP(overviewRR, overviewReq)
+	if overviewRR.Code != http.StatusOK {
+		t.Fatalf("expected 200 from overview, got %d: %s", overviewRR.Code, overviewRR.Body.String())
+	}
+
+	var overviewPayload struct {
+		Totals struct {
+			Downloads int64 `json:"downloads"`
+		} `json:"totals"`
+	}
+	if err := json.Unmarshal(overviewRR.Body.Bytes(), &overviewPayload); err != nil {
+		t.Fatalf("unmarshal overview payload failed: %v", err)
+	}
+	if overviewPayload.Totals.Downloads != 4321 {
+		t.Fatalf("expected published downloads=4321, got %d", overviewPayload.Totals.Downloads)
+	}
+
+	mapReq := httptest.NewRequest(http.MethodGet, "/api/public/website/map", nil)
+	mapRR := httptest.NewRecorder()
+	PublicWebsiteMapHandler(sqlDB).ServeHTTP(mapRR, mapReq)
+	if mapRR.Code != http.StatusOK {
+		t.Fatalf("expected 200 from map, got %d: %s", mapRR.Code, mapRR.Body.String())
+	}
+
+	var mapPayload struct {
+		Totals struct {
+			Downloads int64 `json:"downloads"`
+		} `json:"totals"`
+		Countries []struct {
+			CountryCode string `json:"countryCode"`
+			Count       int64  `json:"count"`
+		} `json:"countries"`
+	}
+	if err := json.Unmarshal(mapRR.Body.Bytes(), &mapPayload); err != nil {
+		t.Fatalf("unmarshal map payload failed: %v", err)
+	}
+	if mapPayload.Totals.Downloads != 4321 {
+		t.Fatalf("expected map downloads=4321, got %d", mapPayload.Totals.Downloads)
+	}
+	if len(mapPayload.Countries) != 2 || mapPayload.Countries[0].CountryCode != "US" || mapPayload.Countries[1].CountryCode != "EG" {
+		t.Fatalf("expected published country list [US, EG], got %+v", mapPayload.Countries)
+	}
+}
+
 func TestPublicWebsiteHandlers_RejectDisallowedOrigin(t *testing.T) {
 	sqlDB := openPublicWebsiteDB(t)
 	t.Setenv("PUBLIC_WEBSITE_ALLOWED_ORIGINS", "https://adhamhaithameid.github.io")
