@@ -389,9 +389,9 @@
         <h2>Three steps. Ten seconds.</h2>
       </div>
       <div class="l2-steps">
-        <div class="l2-step"><div class="l2-step-num"><AnimatedNumber value={1} format={{ useGrouping: false }} /></div><div class="l2-step-line"></div><h3>Install</h3><p>Add Classroom Quick Downloader from the Chrome Web Store, Firefox Add-ons, or Edge Add-ons.</p></div>
-        <div class="l2-step"><div class="l2-step-num"><AnimatedNumber value={2} format={{ useGrouping: false }} /></div><div class="l2-step-line"></div><h3>Open Classroom</h3><p>Navigate to any class. Classroom Quick Downloader detects all downloadable materials automatically.</p></div>
-        <div class="l2-step"><div class="l2-step-num"><AnimatedNumber value={3} format={{ useGrouping: false }} /></div><h3>Download</h3><p>Click once. All files download simultaneously to your device.</p></div>
+        <div class="l2-step"><div class="l2-step-num"><AnimatedNumber value={1} format={{ useGrouping: false }} animated /></div><div class="l2-step-line"></div><h3>Install</h3><p>Add Classroom Quick Downloader from the Chrome Web Store, Firefox Add-ons, or Edge Add-ons.</p></div>
+        <div class="l2-step"><div class="l2-step-num"><AnimatedNumber value={2} format={{ useGrouping: false }} animated /></div><div class="l2-step-line"></div><h3>Open Classroom</h3><p>Navigate to any class. Classroom Quick Downloader detects all downloadable materials automatically.</p></div>
+        <div class="l2-step"><div class="l2-step-num"><AnimatedNumber value={3} format={{ useGrouping: false }} animated /></div><h3>Download</h3><p>Click once. All files download simultaneously to your device.</p></div>
       </div>
     </div>
   </section>
