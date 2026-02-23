@@ -4357,6 +4357,16 @@ export function renderDashboard(stats: StatsResponse): string {
                 parent.classList.add("updated");
               }
             }
+            if (key === "hotCountry" || key === "hotCountryAllTime") {
+              const countryName = countryNameFromCodeJS(next);
+              if (countryName) {
+                el.setAttribute("data-tooltip", countryName);
+              } else {
+                el.removeAttribute("data-tooltip");
+              }
+            } else {
+              el.removeAttribute("data-tooltip");
+            }
           });
         });
       }
