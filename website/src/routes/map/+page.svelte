@@ -449,22 +449,50 @@
     justify-content: space-between;
     gap: 12px;
     border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 8px 10px;
-    background: var(--surface-2);
+    border-radius: var(--radius-sm);
+    padding: 10px 14px;
+    background: white;
+    font-size: 14px;
+    transition: all 0.25s ease;
+    box-shadow: var(--shadow-sm);
   }
 
-  .retry {
-    margin-top: 8px;
+  .mini li:hover {
+    border-color: var(--border-hover);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow);
+  }
+
+  .country-name {
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  .mini li strong {
+    color: var(--gc-green);
+    font-weight: 700;
+  }
+
+  .refresh-btn {
     border: 1px solid var(--border);
-    border-radius: 10px;
-    background: var(--surface);
-    padding: 6px 10px;
+    border-radius: 999px;
+    background: white;
+    padding: 8px 16px;
     cursor: pointer;
+    color: var(--text-secondary);
+    font-weight: 600;
+    font-size: 13px;
+    transition: all 0.25s ease;
+    box-shadow: var(--shadow-sm);
   }
 
-  .retry:disabled {
-    opacity: 0.72;
+  .refresh-btn:hover {
+    border-color: var(--border-hover);
+    color: var(--gc-green);
+  }
+
+  .refresh-btn:disabled {
+    opacity: 0.6;
     cursor: wait;
   }
 </style>
