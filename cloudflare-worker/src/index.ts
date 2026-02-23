@@ -382,6 +382,17 @@ function getDownloadsStub(env: WorkerEnv): DurableObjectStub {
 // --- CORS helpers -----------------------------------------------------------
 
 const parsedAllowedOriginsCache = new Map<string, Set<string>>();
+const ORACLE_PUBLIC_WEBSITE_PATHS = new Set<string>([
+  "/api/public/website/overview",
+  "/api/public/website/map",
+  "/api/public/website/status",
+  "/api/public/website/changelog",
+  "/api/public/website/uninstall",
+]);
+
+function isOraclePublicWebsiteRoute(pathname: string): boolean {
+  return ORACLE_PUBLIC_WEBSITE_PATHS.has(pathname);
+}
 
 function parseAllowedOrigins(raw: string | undefined): Set<string> {
   if (!raw) return new Set<string>();
