@@ -918,10 +918,6 @@ function App() {
                           <li className="cqd-muted-text">No downloads yet</li>
                         )}
                       </ul>
-                      <div className="cqd-temp-cancelled-counter" role="status" aria-live="polite">
-                        <span className="cqd-temp-cancelled-label">Temporary cancelled counter</span>
-                        <span className="cqd-temp-cancelled-value">{cancelledDownloads}</span>
-                      </div>
                     </div>
                   </div>
                 </div>
