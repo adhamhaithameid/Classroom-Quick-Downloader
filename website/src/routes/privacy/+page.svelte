@@ -15,147 +15,225 @@
       timeZone: 'UTC'
     });
   }
-
-  async function load(force = false): Promise<void> {
-    if (force) refreshing = true;
-    if (!force) state = 'loading';
-    error = '';
-    try {
-      privacy = await fetchUserPrivacy();
-      state = 'ready';
-    } catch (err) {
-      state = 'error';
-      error = err instanceof Error ? err.message : 'Failed to load user privacy content.';
-    } finally {
-      refreshing = false;
-    }
-  }
-
-  onMount(async () => {
-    await load();
-  });
 </script>
 
-<section class="card user-page">
-  <header class="intro">
-    <div>
-      <h1>{privacy?.headline || 'Privacy at a glance'}</h1>
-      <p>{privacy?.description || 'Simple language for users. Full privacy details are on GitHub.'}</p>
-      <small>Last updated (UTC): {formatDate(privacy?.lastUpdatedAtUtc ?? null)}</small>
+<div class="privacy-page">
+  <header class="privacy-header">
+    <div class="header-content">
+      <div class="header-icon-row">
+        <div class="shield-icon">
+          <svg
+            width="28"
+            height="28"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="var(--gc-green)"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+          </svg>
+        </div>
+        <h1>{privacy.headline}</h1>
+      </div>
+      <p class="privacy-desc"><AnimatedNumericText text={privacy.description} /></p>
+      <small class="privacy-updated">Last updated (UTC): <AnimatedNumericText text={formatDate(privacy.lastUpdatedAtUtc)} /></small>
     </div>
     <div class="actions">
-      <button type="button" class="refresh" on:click={() => load(true)} disabled={refreshing}>
-        {refreshing ? 'Refreshing…' : 'Refresh'}
-      </button>
-      <a href={privacy?.fullPrivacyUrl || 'https://github.com/adhamhaithameid/Classroom-Quick-Downloader/blob/main/PRIVACY.md'} target="_blank" rel="noopener noreferrer">
-        Full privacy document on GitHub
+      <a class="action-btn" href={privacy.fullPrivacyUrl} target="_blank" rel="noopener noreferrer">
+        Full privacy document →
       </a>
     </div>
   </header>
 
-  {#if state === 'loading'}
-    <div class="state-loading">Loading privacy details…</div>
-  {:else if state === 'error'}
-    <div class="state-error">
-      <strong>Could not load privacy details.</strong>
-      <p>{error}</p>
-      <button type="button" class="refresh" on:click={() => load(true)} disabled={refreshing}>Retry</button>
-    </div>
-  {:else}
-    <div class="section-list">
-      {#each privacy?.sections ?? [] as section}
-        <article class="section card">
-          <h2>{section.title}</h2>
-          <p>{section.summary}</p>
-          {#if section.bullets.length > 0}
-            <ul>
-              {#each section.bullets as bullet}
-                <li>{bullet}</li>
-              {/each}
-            </ul>
-          {/if}
-        </article>
-      {/each}
-    </div>
-  {/if}
-</section>
+  <div class="section-grid">
+    {#each privacy.sections as section, i}
+      <article class="privacy-section card" style="animation-delay: {i * 0.07}s">
+        <div class="section-icon">{sectionIcons[i % sectionIcons.length]}</div>
+        <h2>{section.title}</h2>
+        <p class="section-summary"><AnimatedNumericText text={section.summary} /></p>
+        {#if section.bullets.length > 0}
+          <ul>
+            {#each section.bullets as bullet}
+              <li><AnimatedNumericText text={bullet} /></li>
+            {/each}
+          </ul>
+        {/if}
+      </article>
+    {/each}
+  </div>
+</div>
 
 <style>
-  .user-page {
-    padding: 22px;
-    display: grid;
-    gap: 14px;
+  .privacy-page {
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
   }
 
-  .intro {
+  .privacy-header {
     display: flex;
     justify-content: space-between;
-    gap: 12px;
+    gap: 24px;
     flex-wrap: wrap;
     align-items: flex-start;
+    animation: riseIn 0.5s ease both;
+  }
+
+  .header-content {
+    max-width: 640px;
+  }
+
+  .header-icon-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 4px;
+  }
+
+  .shield-icon {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--gc-green-bg);
+    border-radius: 14px;
+    border: 1px solid rgba(26, 139, 85, 0.12);
   }
 
   h1 {
     margin: 0;
-    font-size: clamp(30px, 5vw, 50px);
-    letter-spacing: -0.03em;
+    font-size: clamp(30px, 5vw, 46px);
+    letter-spacing: -0.04em;
+    font-weight: 800;
   }
 
-  p {
+  .privacy-desc {
     margin: 10px 0 0;
-    color: var(--muted);
-    line-height: 1.65;
+    color: var(--text-secondary);
+    line-height: 1.75;
+    font-size: 15px;
   }
 
-  small {
+  .privacy-updated {
     display: block;
-    margin-top: 10px;
+    margin-top: 6px;
     color: var(--muted);
+    font-size: 12px;
   }
 
   .actions {
-    display: grid;
+    display: flex;
+    flex-direction: column;
     gap: 8px;
-    min-width: 220px;
+    min-width: 200px;
   }
 
-  .actions a,
-  .refresh {
+  .action-btn {
     border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 9px 12px;
+    border-radius: 999px;
+    padding: 9px 16px;
     text-decoration: none;
-    background: var(--surface-2);
-    color: var(--text);
-    font-weight: 700;
+    background: white;
+    color: var(--text-secondary);
+    font-weight: 600;
     text-align: center;
     cursor: pointer;
+    font-size: 13px;
+    transition: all 0.25s ease;
+    box-shadow: var(--shadow-sm);
   }
 
-  .refresh:disabled {
-    opacity: 0.75;
-    cursor: wait;
+  .action-btn:hover {
+    border-color: var(--border-hover);
+    color: var(--gc-green);
   }
 
-  .section-list {
+  .section-grid {
     display: grid;
-    gap: 10px;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: 16px;
   }
 
-  .section {
-    padding: 14px;
-    border-radius: 16px;
+  .privacy-section {
+    padding: 28px;
+    animation: slideUp 0.5s ease both;
+    opacity: 0;
+    transition: all 0.3s ease;
   }
 
-  .section h2 {
+  .privacy-section:hover {
+    transform: translateY(-3px);
+    border-color: var(--border-hover);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .section-icon {
+    font-size: 28px;
+    margin-bottom: 10px;
+  }
+
+  .privacy-section h2 {
     margin: 0;
-    font-size: 22px;
+    font-size: 19px;
+    font-weight: 700;
     letter-spacing: -0.02em;
   }
 
-  .section ul {
+  .section-summary {
     margin: 10px 0 0;
+    color: var(--text-secondary);
+    line-height: 1.75;
+    font-size: 14px;
+  }
+
+  .privacy-section ul {
+    margin: 14px 0 0;
+    padding-left: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .privacy-section li {
+    position: relative;
     padding-left: 18px;
-    line-height: 1.6;
+    color: var(--text-secondary);
+    line-height: 1.65;
+    font-size: 14px;
+  }
+
+  .privacy-section li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 9px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--gc-green-light);
+  }
+
+  @media (max-width: 780px) {
+    .section-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .privacy-section {
+      padding: 20px;
+    }
+
+    .actions {
+      width: 100%;
+      min-width: 0;
+      flex-direction: row;
+    }
+
+    .action-btn {
+      width: 100%;
+    }
   }
 </style>
