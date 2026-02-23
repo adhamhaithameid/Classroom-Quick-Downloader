@@ -299,7 +299,7 @@
       <div class="l2-text-col">
         <span class="l2-label">THE PROBLEM</span>
         <h2>Downloading files from Classroom shouldn't take this long.</h2>
-        <p>Your professor uploads <AnimatedNumber value={30} format={{ useGrouping: false }} /> files for one assignment. You're stuck clicking each file, waiting for the dialog, choosing the folder — <strong>one by one</strong>. That's <AnimatedNumber value={10} format={{ useGrouping: false }} />&nbsp;minutes of your life you'll never get back.</p>
+        <p>Your professor uploads <AnimatedNumber value={30} format={{ useGrouping: false }} animated /> files for one assignment. You're stuck clicking each file, waiting for the dialog, choosing the folder — <strong>one by one</strong>. That's <AnimatedNumber value={10} format={{ useGrouping: false }} animated />&nbsp;minutes of your life you'll never get back.</p>
         <p>Google Classroom was built for education, not file management. Classroom Quick Downloader fills the gap.</p>
       </div>
       <div class="l2-visual-col">
