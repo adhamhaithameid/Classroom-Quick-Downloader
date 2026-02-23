@@ -32,7 +32,7 @@ function buildAuthEnv(overrides: Partial<Env> = {}) {
     DASHBOARD_PASSWORD: "password123",
     DANGER_PASSWORD: "danger123",
     DOWNLOADS_DO: namespace as unknown as DurableObjectNamespace,
-    ORACLE_ENDPOINT: "http://oracle.local/ingest-batch",
+    ORACLE_ENDPOINT: "https://oracle.local/ingest-batch",
     MAX_BATCH_EVENTS: "10000",
     ...overrides,
   };
