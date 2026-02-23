@@ -415,7 +415,6 @@ function App() {
         if (!browserApi || !browserApi.storage || !browserApi.storage.local) {
             if (isStale()) return;
             setTotalDownloads(0);
-            setCancelledDownloads(0);
             setStats([]); // Empty stats in dev
             return;
         }
