@@ -71,6 +71,5 @@ Required GitHub repository configuration:
 ## Runtime Environment Variables
 
 - `PUBLIC_ORACLE_API_BASE_URL`: Oracle public API base URL
-- `PUBLIC_WORKER_BASE_URL`: Cloudflare Worker base URL
 - `PUBLIC_SITE_URL`: canonical public website URL
 - `PUBLIC_BASE_PATH`: keep empty for Cloudflare Pages root deployment
