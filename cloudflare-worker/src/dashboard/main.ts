@@ -4315,7 +4315,9 @@ export function renderDashboard(stats: StatsResponse): string {
           .map(function ([k, v]) {
             const numeric = Number(v);
             const safeValue = Number.isFinite(numeric) ? numeric.toString() : "0";
-            return "<tr><td>" + escapeHtmlJS(k) + "</td><td>" + safeValue + "</td></tr>";
+            const countryName = dimension === "country" ? countryNameFromCodeJS(k) : "";
+            const tooltipAttr = countryName ? ' data-tooltip="' + escapeHtmlJS(countryName) + '"' : "";
+            return "<tr><td" + tooltipAttr + ">" + escapeHtmlJS(k) + "</td><td>" + safeValue + "</td></tr>";
           })
           .join("");
       }
