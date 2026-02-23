@@ -12,6 +12,7 @@ import {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  resetWebsiteSnapshotCacheForTests();
 });
 
 describe('coerceOverviewPayload', () => {
