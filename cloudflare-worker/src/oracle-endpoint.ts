@@ -1,0 +1,105 @@
+const INGEST_BATCH_PATH = "/ingest-batch";
+
+export type OracleEndpointResolveError =
+  | "oracle_endpoint_missing"
+  | "oracle_endpoint_invalid"
+  | "oracle_endpoint_invalid_scheme"
+  | "oracle_endpoint_insecure";
+
+export type OracleEndpointResolution =
+  | {
+      ok: true;
+      baseUrl: string;
+      ingestUrl: string;
+      protocol: "https:" | "http:";
+      insecureHttp: boolean;
+    }
+  | {
+      ok: false;
+      error: OracleEndpointResolveError;
+      message: string;
+    };
+
+type ResolveOracleEndpointOptions = {
+  allowInsecureHttp?: boolean;
+};
+
+function isLoopbackHostname(hostname: string): boolean {
+  const h = hostname.toLowerCase();
+  if (h === "localhost" || h === "127.0.0.1" || h === "0.0.0.0") return true;
+  if (h === "::1" || h === "[::1]") return true;
+  return h.startsWith("127.");
+}
+
+function trimTrailingSlashes(value: string): string {
+  return value.replace(/\/+$/, "");
+}
+
+function normalizeBasePath(pathname: string): string {
+  if (!pathname || pathname === "/") return "";
+  let normalized = trimTrailingSlashes(pathname);
+  if (!normalized || normalized === "/") return "";
+  if (normalized.toLowerCase().endsWith(INGEST_BATCH_PATH)) {
+    normalized = trimTrailingSlashes(
+      normalized.slice(0, normalized.length - INGEST_BATCH_PATH.length),
+    );
+  }
+  if (!normalized || normalized === "/") return "";
+  return normalized;
+}
+
+export function resolveOracleEndpoint(
+  rawEndpoint: string | undefined,
+  options: ResolveOracleEndpointOptions = {},
+): OracleEndpointResolution {
+  const raw = (rawEndpoint || "").trim();
+  if (!raw) {
+    return {
+      ok: false,
+      error: "oracle_endpoint_missing",
+      message: "ORACLE_ENDPOINT is not configured.",
+    };
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    return {
+      ok: false,
+      error: "oracle_endpoint_invalid",
+      message: "ORACLE_ENDPOINT is not a valid absolute URL.",
+    };
+  }
+
+  const protocol = parsed.protocol.toLowerCase();
+  if (protocol !== "https:" && protocol !== "http:") {
+    return {
+      ok: false,
+      error: "oracle_endpoint_invalid_scheme",
+      message: "ORACLE_ENDPOINT must use http:// or https://",
+    };
+  }
+
+  const allowInsecureHttp = options.allowInsecureHttp === true;
+  const insecureHttp = protocol === "http:";
+  if (insecureHttp && !allowInsecureHttp && !isLoopbackHostname(parsed.hostname)) {
+    return {
+      ok: false,
+      error: "oracle_endpoint_insecure",
+      message:
+        "ORACLE_ENDPOINT must use HTTPS for non-loopback hosts. Set ALLOW_INSECURE_ORACLE_ENDPOINT=true only for temporary/local migration.",
+    };
+  }
+
+  const basePath = normalizeBasePath(parsed.pathname);
+  const baseUrl = `${parsed.origin}${basePath}`;
+
+  return {
+    ok: true,
+    baseUrl,
+    ingestUrl: `${baseUrl}${INGEST_BATCH_PATH}`,
+    protocol: insecureHttp ? "http:" : "https:",
+    insecureHttp,
+  };
+}
