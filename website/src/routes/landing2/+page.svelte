@@ -1151,6 +1151,33 @@
     .l2-steps { flex-direction: column; align-items: center; }
     .l2-step-line { display: none; }
     .l2-nav-links { display: none; }
+    .l2-map-frame { width: 100%; }
+    .l2-map-state-card { border-radius: 18px; padding: 18px 14px; }
+    .l2-map-expand-btn {
+      top: 10px;
+      right: 10px;
+      width: 34px;
+      height: 34px;
+    }
+    .l2-map-modal-backdrop {
+      padding: 8px;
+    }
+    .l2-map-modal {
+      width: 100%;
+      max-height: calc(100vh - 16px);
+      border-radius: 14px;
+      padding: 8px;
+    }
+    .l2-map-modal-close {
+      width: 34px;
+      height: 34px;
+      top: 10px;
+      right: 10px;
+    }
+    :global(.l2-main-heatmap-modal) {
+      min-height: min(86vh, 720px);
+      padding: 8px;
+    }
   }
   @media (max-width: 600px) {
     .l2-feature-grid { grid-template-columns: 1fr; }
