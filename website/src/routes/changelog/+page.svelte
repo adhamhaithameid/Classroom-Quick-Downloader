@@ -21,6 +21,16 @@
     });
   }
 
+  function formatDateShort(value: number | null): string {
+    if (!value) return '';
+    return new Date(value).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      timeZone: 'UTC'
+    });
+  }
+
   async function load(force = false): Promise<void> {
     if (force) refreshing = true;
     if (!force) state = 'loading';
