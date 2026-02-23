@@ -297,22 +297,24 @@
 
 <style>
   .map-page {
-    padding: 18px;
+    padding: 24px;
     display: grid;
-    gap: 14px;
+    gap: 16px;
   }
 
   .intro h1 {
-    margin: 12px 0 8px;
-    font-size: clamp(30px, 4vw, 44px);
+    margin: 0 0 8px;
+    font-size: clamp(28px, 4vw, 42px);
     letter-spacing: -0.03em;
+    font-weight: 800;
   }
 
   .intro p {
     margin: 0;
-    line-height: 1.6;
-    color: var(--muted);
-    max-width: 70ch;
+    line-height: 1.65;
+    color: var(--text-secondary);
+    max-width: 60ch;
+    font-size: 15px;
   }
 
   .intro-actions {
