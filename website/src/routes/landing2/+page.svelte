@@ -745,22 +745,30 @@
   }
   .l2-cta-current:hover { transform: translateY(-2px); box-shadow: 0 6px 28px rgba(26, 139, 85, 0.45), 0 0 60px rgba(26, 139, 85, 0.2); }
   .l2-cta-other {
-    background: var(--card); color: var(--text);
-    border: 1.5px solid var(--border);
+    background: rgba(255, 255, 255, 0.55); color: var(--text);
+    border: 1.5px solid var(--border-subtle);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
   }
-  .l2-cta-other:hover { border-color: var(--green); color: var(--green); transform: translateY(-2px); }
+  .l2-cta-other:hover { border-color: var(--green-border); color: var(--green); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.05); }
 
   /* ── Scrolling Marquee ─────────────── */
   .l2-marquee {
-    overflow-x: scroll; overflow-y: hidden; padding: 24px 0;
-    border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
-    background: var(--card);
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
+    overflow: hidden; padding: 24px 0;
+    background: #ffffff;
+    border-top: 1px solid var(--border-subtle);
+    border-bottom: 1px solid var(--border-subtle);
+    position: relative; z-index: 2;
   }
-  .l2-marquee::-webkit-scrollbar { display: none; }
   .l2-marquee-track {
     display: flex; width: max-content;
+    animation: marquee-scroll 60s linear infinite;
+  }
+  .l2-marquee-track:hover {
+    animation-play-state: paused;
+  }
+  @keyframes marquee-scroll {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
   }
   .l2-marquee-set {
     display: flex; align-items: center; gap: 32px;
