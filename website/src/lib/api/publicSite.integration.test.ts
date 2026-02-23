@@ -123,86 +123,38 @@ describe('public website API integration', () => {
           }),
           { status: 200 }
         )
-      )
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            ok: true,
-            generatedAt: 2,
-            headline: 'h',
-            description: 'd',
-            sections: [
-              {
-                id: 'what-we-collect',
-                title: 'What we collect',
-                summary: 'Only aggregate metrics.',
-                bullets: ['No raw IP lists'],
-                priority: 1
-              }
-            ],
-            fullPrivacyUrl: 'https://github.com/adhamhaithameid/Classroom-Quick-Downloader/blob/main/PRIVACY.md',
-            lastUpdatedAtUtc: 2
-          }),
-          { status: 200 }
-        )
       );
     vi.stubGlobal('fetch', fetchMock);
 
     const changelog = await fetchUserChangelog();
-    const privacy = await fetchUserPrivacy();
 
     expect(changelog.entries[0]?.version).toBe('1.3.6');
-    expect(privacy.sections[0]?.id).toBe('what-we-collect');
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('uses worker public metrics outside Oracle window and falls back to Oracle installs', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-02-21T09:00:00.000Z'));
-
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            ok: true,
-            source: 'cloudflare-worker',
-            generatedAt: 1771700000000,
-            snapshotAtUtc: 1771699200000,
-            totals: { downloads: 300, countries: 2 },
-            countries: [
-              { countryCode: 'US', count: 200 },
-              { countryCode: 'GB', count: 100 }
-            ],
-            schedule: {
-              refreshHoursUtc: [3, 6, 9, 12, 15, 18, 21],
-              activeHourUtc: 9,
-              isRefreshWindow: true,
-              lastRefreshAtUtc: 1771699200000,
-              nextRefreshAtUtc: 1771702800000
-            }
-          }),
-          { status: 200 }
-        )
-      )
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            ok: true,
-            generatedAt: 1771700000000,
-            totals: { downloads: 10, success: 9, fail: 1 },
-            installs: { usersTotal: 99, lastSyncedAtUtc: 1700000, browsers: [] },
-            versions: { github: '1.3.6', chrome: '1.3.6', firefox: '1.3.6', edge: '1.3.6' },
-            status: { systemLive: true, liveSinceUtc: 1700000, workerHealth: 'up' },
-            links: { chrome: 'https://c', firefox: 'https://f', edge: 'https://e', github: 'https://g' }
-          }),
-          { status: 200 }
-        )
+  it('requests overview from Oracle API endpoint only', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      expect(url).toContain('/api/public/website/overview');
+      expect(url).not.toContain('/public/site-metrics');
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          generatedAt: 1771700000000,
+          totals: { downloads: 10, success: 9, fail: 1 },
+          installs: { usersTotal: 99, lastSyncedAtUtc: 1700000, browsers: [] },
+          versions: { github: '1.3.6', chrome: '1.3.6', firefox: '1.3.6', edge: '1.3.6' },
+          status: { systemLive: true, liveSinceUtc: 1700000, workerHealth: 'up' },
+          links: { chrome: 'https://c', firefox: 'https://f', edge: 'https://e', github: 'https://g' }
+        }),
+        { status: 200 }
       );
+    });
 
     vi.stubGlobal('fetch', fetchMock);
     const payload = await fetchOverview();
-    expect(payload.totals.downloads).toBe(300);
+    expect(payload.totals.downloads).toBe(10);
     expect(payload.installs.usersTotal).toBe(99);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
