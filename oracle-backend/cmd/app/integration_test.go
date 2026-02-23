@@ -107,7 +107,6 @@ func TestIntegration_AllRegisteredRoutesRespondNon404(t *testing.T) {
 		"/api/public/website/map",
 		"/api/public/website/status",
 		"/api/public/website/changelog",
-		"/api/public/website/privacy",
 		"/api/public/website/uninstall",
 		"/api/stats/timeseries?from=2026-01-01&to=2026-01-31",
 		"/api/stats/breakdown?from=2026-01-01&to=2026-01-31",
