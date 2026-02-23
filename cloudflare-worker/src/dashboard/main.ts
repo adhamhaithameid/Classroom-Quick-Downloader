@@ -4582,8 +4582,6 @@ export function renderDashboard(stats: StatsResponse): string {
           map.batchSize = stats.quota.batchSizeSuggestion || 0;
         }
         const requestsToday = Number(map.requestsToday ?? stats.requestsToday ?? 0);
-        map.weeklyEvents = stats.weeklyRequests ?? requestsToday;
-        map.monthlyEvents = stats.monthlyRequests ?? map.weeklyEvents;
         
         const uniqueCountriesAllTime = Number.isFinite(stats.uniqueCountriesAllTime)
           ? Number(stats.uniqueCountriesAllTime)
