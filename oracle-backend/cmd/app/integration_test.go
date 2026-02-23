@@ -65,7 +65,6 @@ func newIntegrationMux(t *testing.T) (*http.ServeMux, *sql.DB) {
 		"newsletter_subscriber":        {},
 		"newsletter_campaign":          {},
 		"website_user_changelog_entry": {},
-		"website_user_privacy_section": {},
 	}
 	mux.Handle("/api/admin/flags", handlers.FeatureFlagsHandler(sqlDB))
 	mux.Handle("/api/admin/alerts", handlers.AlertsHandler(sqlDB))
