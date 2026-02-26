@@ -496,6 +496,20 @@ function corsHeaders(request: Request, env: WorkerEnv): Headers {
   return h;
 }
 
+function addSecurityHeaders(headers: Headers): void {
+  headers.set(
+    "Content-Security-Policy",
+    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests;"
+  );
+  headers.set("X-Content-Type-Options", "nosniff");
+  headers.set("X-Frame-Options", "DENY");
+  headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  headers.set(
+    "Permissions-Policy",
+    "accelerator=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()"
+  );
+}
+
 function withCors(request: Request, res: Response, env: WorkerEnv): Response {
   const headers = new Headers(res.headers);
   const ch = corsHeaders(request, env);
@@ -542,9 +556,11 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
       // Valid session - redirect to dashboard
       return Response.redirect(new URL("/dashboard", request.url).toString(), 302);
     }
+    const headers = new Headers({ "content-type": "text/html; charset=utf-8" });
+    addSecurityHeaders(headers);
     return new Response(renderLoginPage(), {
       status: 200,
-      headers: { "content-type": "text/html; charset=utf-8" },
+      headers,
     });
   }
 
@@ -559,15 +575,19 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
     }
 
     if (!dashboardSecret) {
+      const headers = new Headers({ "content-type": "text/html; charset=utf-8" });
+      addSecurityHeaders(headers);
       return new Response(
         renderLoginPage("Server misconfigured: DASHBOARD_PASSWORD missing."),
-        { status: 500, headers: { "content-type": "text/html; charset=utf-8" } },
+        { status: 500, headers },
       );
     }
     if (!env.DO_SHARED_SECRET) {
+      const headers = new Headers({ "content-type": "text/html; charset=utf-8" });
+      addSecurityHeaders(headers);
       return new Response(
         renderLoginPage("Server misconfigured: DO_SHARED_SECRET missing."),
-        { status: 500, headers: { "content-type": "text/html; charset=utf-8" } },
+        { status: 500, headers },
       );
     }
 
@@ -576,24 +596,28 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
     
     // Handle service degradation: return 503 instead of hard lockout
     if (ipCheckResult.serviceDown) {
+      const headers = new Headers({
+        "content-type": "text/html; charset=utf-8",
+        "Retry-After": "30",
+        "X-Dependency-Error": "durable-object-unavailable"
+      });
+      addSecurityHeaders(headers);
       return new Response(
         renderLoginPage(ipCheckResult.error || "Service temporarily unavailable. Please try again."),
         { 
           status: 503, 
-          headers: { 
-            "content-type": "text/html; charset=utf-8",
-            "Retry-After": "30",
-            "X-Dependency-Error": "durable-object-unavailable"
-          } 
+          headers
         }
       );
     }
     
     // Handle explicit deny (allowlist enabled and IP not in list)
     if (!ipCheckResult.allowed) {
+      const headers = new Headers({ "content-type": "text/html; charset=utf-8" });
+      addSecurityHeaders(headers);
       return new Response(
         renderLoginPage("Access denied: your IP is not in the allowlist."),
-        { status: 403, headers: { "content-type": "text/html; charset=utf-8" } }
+        { status: 403, headers }
       );
     }
 
@@ -630,31 +654,37 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
           throw new Error("login-attempt payload missing allowed boolean");
         }
       } catch {
+        const headers = new Headers({
+          "content-type": "text/html; charset=utf-8",
+          "Retry-After": "30",
+          "X-Dependency-Error": "durable-object-unavailable",
+        });
+        addSecurityHeaders(headers);
         return new Response(
           renderLoginPage("Login service temporarily unavailable. Please try again shortly."),
           {
             status: 503,
-            headers: {
-              "content-type": "text/html; charset=utf-8",
-              "Retry-After": "30",
-              "X-Dependency-Error": "durable-object-unavailable",
-            },
+            headers,
           },
         );
       }
 
       if (!rateLimitData.allowed) {
         const mins = Math.ceil((rateLimitData.blockedForSeconds || 900) / 60);
+        const headers = new Headers({ "content-type": "text/html; charset=utf-8" });
+        addSecurityHeaders(headers);
         return new Response(
           renderLoginPage(`Too many failed attempts. Please try again in ${mins} minutes.`),
-          { status: 429, headers: { "content-type": "text/html; charset=utf-8" } }
+          { status: 429, headers }
         );
       }
 
       const remaining = rateLimitData.attemptsRemaining ?? 4;
+      const headers = new Headers({ "content-type": "text/html; charset=utf-8" });
+      addSecurityHeaders(headers);
       return new Response(
         renderLoginPage(`Invalid password. ${remaining} attempts remaining.`),
-        { status: 401, headers: { "content-type": "text/html; charset=utf-8" } }
+        { status: 401, headers }
       );
     }
 
@@ -736,9 +766,11 @@ async function handleDashboard(request: Request, env: WorkerEnv): Promise<Respon
   const stats = (await statsRes.json()) as StatsResponse;
   const html = renderDashboard(stats);
 
+  const headers = new Headers({ "content-type": "text/html; charset=utf-8" });
+  addSecurityHeaders(headers);
   return new Response(html, {
     status: 200,
-    headers: { "content-type": "text/html; charset=utf-8" },
+    headers,
   });
 }
 
