@@ -17,30 +17,26 @@
   }
 </script>
 
+<svelte:head>
+  <title>Privacy — Classroom Quick Downloader</title>
+  <meta name="description" content="Privacy policy summary for Classroom Quick Downloader. No tracking, no cookies, no personal data collection." />
+</svelte:head>
+
 <div class="privacy-page">
   <header class="privacy-header">
-    <div class="header-content">
-      <div class="header-icon-row">
-        <div class="shield-icon">
-          <svg
-            width="28"
-            height="28"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="var(--gc-green)"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-          </svg>
-        </div>
-        <h1>{privacy.headline}</h1>
+    <div class="header-left">
+      <div class="icon-box">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+        </svg>
       </div>
-      <p class="privacy-desc"><AnimatedNumericText text={privacy.description} animated /></p>
-      <small class="privacy-updated">Last updated (UTC): <AnimatedNumericText text={formatDate(privacy.lastUpdatedAtUtc)} animated /></small>
+      <div>
+        <h1>{privacy.headline}</h1>
+        <p class="privacy-desc"><AnimatedNumericText text={privacy.description} animated /></p>
+        <small class="privacy-updated">Last updated (UTC): <AnimatedNumericText text={formatDate(privacy.lastUpdatedAtUtc)} animated /></small>
+      </div>
     </div>
-    <div class="actions">
+    <div class="header-actions">
       <a class="action-btn" href={privacy.fullPrivacyUrl} target="_blank" rel="noopener noreferrer">
         Full privacy document →
       </a>
@@ -49,7 +45,7 @@
 
   <div class="section-grid">
     {#each privacy.sections as section, i}
-      <article class="privacy-section card" style="animation-delay: {i * 0.07}s">
+      <article class="privacy-section" style="animation-delay: {i * 0.06}s">
         <div class="section-icon">{sectionIcons[i % sectionIcons.length]}</div>
         <h2>{section.title}</h2>
         <p class="section-summary"><AnimatedNumericText text={section.summary} animated /></p>
@@ -69,9 +65,10 @@
   .privacy-page {
     display: flex;
     flex-direction: column;
-    gap: 28px;
+    gap: 24px;
   }
 
+  /* ── Header ──────────────────────── */
   .privacy-header {
     display: flex;
     justify-content: space-between;
@@ -81,37 +78,36 @@
     animation: riseIn 0.5s ease both;
   }
 
-  .header-content {
-    max-width: 640px;
-  }
-
-  .header-icon-row {
+  .header-left {
     display: flex;
-    align-items: center;
-    gap: 14px;
-    margin-bottom: 4px;
+    align-items: flex-start;
+    gap: 16px;
+    max-width: 700px;
   }
 
-  .shield-icon {
-    width: 48px;
-    height: 48px;
+  .icon-box {
+    width: 52px;
+    height: 52px;
+    border-radius: 16px;
+    background: var(--gc-green-bg);
+    border: 1px solid rgba(26, 139, 85, 0.12);
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--gc-green-bg);
-    border-radius: 14px;
-    border: 1px solid rgba(26, 139, 85, 0.12);
+    flex-shrink: 0;
+    color: var(--gc-green);
+    margin-top: 2px;
   }
 
   h1 {
     margin: 0;
-    font-size: clamp(30px, 5vw, 46px);
-    letter-spacing: -0.04em;
+    font-size: clamp(28px, 4vw, 40px);
     font-weight: 800;
+    letter-spacing: -0.03em;
   }
 
   .privacy-desc {
-    margin: 10px 0 0;
+    margin: 6px 0 0;
     color: var(--text-secondary);
     line-height: 1.75;
     font-size: 15px;
@@ -124,7 +120,7 @@
     font-size: 12px;
   }
 
-  .actions {
+  .header-actions {
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -132,11 +128,12 @@
   }
 
   .action-btn {
-    border: 1px solid var(--border);
+    border: 1px solid var(--border-subtle, rgba(226, 232, 240, 0.35));
     border-radius: 999px;
     padding: 9px 16px;
     text-decoration: none;
-    background: white;
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(6px);
     color: var(--text-secondary);
     font-weight: 600;
     text-align: center;
@@ -147,10 +144,11 @@
   }
 
   .action-btn:hover {
-    border-color: var(--border-hover);
+    border-color: rgba(26, 139, 85, 0.25);
     color: var(--gc-green);
   }
 
+  /* ── Section Grid ────────────────── */
   .section-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
@@ -158,6 +156,11 @@
   }
 
   .privacy-section {
+    border: 1px solid var(--border-subtle, rgba(226, 232, 240, 0.35));
+    border-radius: var(--radius);
+    background: rgba(255, 255, 255, 0.55);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     padding: 28px;
     animation: slideUp 0.5s ease both;
     opacity: 0;
@@ -166,7 +169,7 @@
 
   .privacy-section:hover {
     transform: translateY(-3px);
-    border-color: var(--border-hover);
+    border-color: rgba(26, 139, 85, 0.2);
     box-shadow: var(--shadow-lg);
   }
 
@@ -178,7 +181,7 @@
   .privacy-section h2 {
     margin: 0;
     font-size: 19px;
-    font-weight: 700;
+    font-weight: 800;
     letter-spacing: -0.02em;
   }
 
@@ -226,7 +229,7 @@
       padding: 20px;
     }
 
-    .actions {
+    .header-actions {
       width: 100%;
       min-width: 0;
       flex-direction: row;
