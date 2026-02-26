@@ -2,6 +2,7 @@
 import { describe, it, expect } from "vitest";
 import worker from "../src/index";
 import { Env } from "../src/types";
+import { DurableObjectNamespace, DurableObjectStub, ExecutionContext } from "@cloudflare/workers-types";
 
 // Mock environment
 const env: Env = {
@@ -13,15 +14,15 @@ const env: Env = {
     idFromName: () => ({ name: "test" }),
     get: () => ({
       fetch: async () => new Response(JSON.stringify({ ok: true })),
-    }),
-  } as any,
-};
+    } as unknown as DurableObjectStub),
+  } as unknown as DurableObjectNamespace,
+} as Env;
 
 // Mock ExecutionContext
 const ctx = {
   waitUntil: () => {},
   passThroughOnException: () => {},
-} as any;
+} as unknown as ExecutionContext;
 
 describe("Security Headers", () => {
   it("should have security headers on root login page", async () => {
