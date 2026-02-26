@@ -11,6 +11,7 @@ overrides:
   '@isaacs/brace-expansion': '>=5.0.1'
   minimatch: ^10.2.1
   web-ext-run>multimatch: 8.0.0
+  rollup: ^4.34.8
 
 packageExtensionsChecksum: sha256-rBo5apIvbDPHJ4I3tFABQ148jIpvJA5sIUOlsQlcVxM=
 
@@ -133,7 +134,7 @@ packages:
     engines: {node: '>=14'}
     hasBin: true
     peerDependencies:
-      rollup: 2.x || 3.x || 4.x
+      rollup: ^4.34.8
     peerDependenciesMeta:
       rollup:
         optional: true
