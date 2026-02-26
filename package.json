@@ -19,9 +19,9 @@
       "eslint>ajv": "8.18.0",
       "undici": ">=7.18.2",
       "@isaacs/brace-expansion": ">=5.0.1",
-      "minimatch": "^10.2.1",
+      "minimatch": "^10.2.3",
       "web-ext-run>multimatch": "8.0.0",
-      "rollup": "^4.34.8"
+      "rollup": "^4.59.0"
     },
     "packageExtensions": {
       "eslint@10.0.1": {
