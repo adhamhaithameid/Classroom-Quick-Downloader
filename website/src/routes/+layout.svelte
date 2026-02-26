@@ -1,23 +1,25 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { fade } from 'svelte/transition';
   import { base } from '$app/paths';
   import { page } from '$app/stores';
   import logo from '$lib/assets/cqd-logo.svg';
   import AnimatedNumber from '$lib/components/AnimatedNumber.svelte';
-  import AnimatedNumericText from '$lib/components/AnimatedNumericText.svelte';
   import { STORE_LINKS } from '$lib/config';
   import '../app.css';
 
   const nav = [
-    { href: '/', label: 'Home' },
-    { href: '/faq', label: 'FAQ' },
+    { href: '/overview', label: 'Overview' },
     { href: '/privacy', label: 'Privacy' },
-    { href: '/changelog', label: 'Changelog' },
-    { href: '/map', label: 'Map' }
+    { href: '/faq', label: 'FAQ' },
+    { href: '/changelog', label: 'Changelog' }
   ];
 
   let detectedBrowser: 'chrome' | 'firefox' | 'edge' = 'chrome';
+  let mobileNavOpen = false;
   const currentYear = new Date().getFullYear();
+  let routeKey = '/';
+  let isLanding2 = false;
 
   function detectBrowser(): 'chrome' | 'firefox' | 'edge' {
     const ua = navigator.userAgent.toLowerCase();
@@ -35,98 +37,171 @@
     return STORE_LINKS[key];
   }
 
+  function normalizePath(path: string): string {
+    const [pathOnly] = path.split('#');
+    return pathOnly.replace(/\/$/, '') || '/';
+  }
+
   function isActive(navHref: string, currentPath: string): boolean {
-    const normalizedCurrent = currentPath.replace(/\/$/, '') || '/';
-    const normalizedNav = navHref.replace(/\/$/, '') || '/';
+    const normalizedCurrent = normalizePath(currentPath);
+    const normalizedNav = normalizePath(navHref);
     return normalizedCurrent === normalizedNav;
   }
 
-  $: isLanding2 = $page.url.pathname.replace(/\/$/, '') === '/landing2';
+  function toggleMobileMenu(): void {
+    mobileNavOpen = !mobileNavOpen;
+  }
+
+  function closeMobileMenu(): void {
+    mobileNavOpen = false;
+  }
+
+  function handleSiteLinkClick(event: MouseEvent, href: string): void {
+    closeMobileMenu();
+
+    const [hrefPath, hash] = href.split('#');
+    if (!hash) return;
+
+    const currentPath = normalizePath($page.url.pathname);
+    const targetPath = normalizePath(hrefPath || currentPath);
+    if (targetPath !== currentPath) return;
+
+    const target = document.getElementById(hash);
+    if (!target) return;
+
+    event.preventDefault();
+    const headerOffset = 88;
+    const top = target.getBoundingClientRect().top + window.scrollY - headerOffset;
+    window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+    history.replaceState(
+      history.state,
+      '',
+      `${base}${targetPath === '/' ? '' : targetPath}#${hash}`
+    );
+  }
+
+  function handleWindowKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Escape' && mobileNavOpen) {
+      closeMobileMenu();
+    }
+  }
+
+  $: {
+    const route = $page.url.pathname.replace(/\/$/, '') || '/';
+    isLanding2 = route === '/overview' || route === '/landing2';
+  }
+  $: routeKey = $page.url.pathname;
+  $: if ($page.url.pathname) {
+    mobileNavOpen = false;
+  }
 
   onMount(() => {
     detectedBrowser = detectBrowser();
+    window.addEventListener('keydown', handleWindowKeydown);
+    return () => {
+      window.removeEventListener('keydown', handleWindowKeydown);
+    };
   });
 </script>
 
 <div class="site-shell">
-  {#if !isLanding2}
-    <header class="l2-nav-shell">
-      <div class="l2-wrap l2-nav-inner">
-        <a href="{base}/" class="l2-nav-brand">
-          <img src={logo} alt="Classroom Quick Downloader" class="l2-nav-logo" />
-          <span>Classroom Quick Downloader</span>
-        </a>
+  <header class="l2-nav-shell">
+    <div class="l2-nav-inner l2-nav-fullwidth">
+      <a href="{base}/overview" class="l2-nav-brand">
+        <img src={logo} alt="Classroom Quick Downloader" class="l2-nav-logo" />
+        <span class="l2-nav-brand-text">Classroom Quick Downloader</span>
+      </a>
 
-        <nav class="l2-nav-links" aria-label="Primary">
+      <nav class="l2-nav-links l2-nav-links-desktop" aria-label="Primary">
+        {#each nav as item}
+          <a
+            href="{base}{item.href}"
+            class:active={isActive(item.href, $page.url.pathname)}
+            aria-current={isActive(item.href, $page.url.pathname) ? 'page' : undefined}
+            on:click={(event) => handleSiteLinkClick(event, item.href)}
+          >
+            {item.label}
+          </a>
+        {/each}
+        <a href={STORE_LINKS.github} target="_blank" rel="noopener noreferrer">GitHub</a>
+      </nav>
+
+      <div class="l2-nav-actions">
+        <a class="l2-nav-cta l2-nav-cta-desktop" href={browserLink(detectedBrowser)} target="_blank" rel="noopener noreferrer">
+          Install for {browserDisplayName(detectedBrowser)}
+        </a>
+        <button
+          type="button"
+          class="l2-nav-menu-btn"
+          on:click={toggleMobileMenu}
+          aria-expanded={mobileNavOpen}
+          aria-controls="site-mobile-nav"
+          aria-label={mobileNavOpen ? 'Close site navigation' : 'Open site navigation'}
+        >
+          {#if mobileNavOpen}
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M6 6l12 12M18 6 6 18" />
+            </svg>
+          {:else}
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M4 7h16M4 12h16M4 17h16" />
+            </svg>
+          {/if}
+        </button>
+      </div>
+    </div>
+    {#if mobileNavOpen}
+      <div class="l2-nav-mobile-panel" id="site-mobile-nav">
+        <nav class="l2-nav-mobile-links" aria-label="Mobile Primary">
           {#each nav as item}
             <a
               href="{base}{item.href}"
               class:active={isActive(item.href, $page.url.pathname)}
               aria-current={isActive(item.href, $page.url.pathname) ? 'page' : undefined}
+              on:click={(event) => handleSiteLinkClick(event, item.href)}
             >
               {item.label}
             </a>
           {/each}
-          <a href={STORE_LINKS.github} target="_blank" rel="noopener noreferrer">GitHub</a>
+          <a href={STORE_LINKS.github} target="_blank" rel="noopener noreferrer" on:click={closeMobileMenu}>
+            GitHub
+          </a>
         </nav>
-
-        <a class="l2-nav-cta" href={browserLink(detectedBrowser)} target="_blank" rel="noopener noreferrer">
+        <a class="l2-nav-cta l2-nav-cta-mobile" href={browserLink(detectedBrowser)} target="_blank" rel="noopener noreferrer" on:click={closeMobileMenu}>
           Install for {browserDisplayName(detectedBrowser)}
         </a>
       </div>
-    </header>
-  {/if}
+    {/if}
+  </header>
 
   <main class:site-main={!isLanding2} class:l2-wrap={!isLanding2}>
-    <slot />
+    {#key routeKey}
+      <div class="site-route-shell" in:fade={{ duration: 220 }} out:fade={{ duration: 160 }}>
+        <slot />
+      </div>
+    {/key}
   </main>
 
-  {#if !isLanding2}
-    <footer class="l2-footer">
-      <div class="l2-wrap l2-footer-inner">
-        <a href="{base}/" class="l2-footer-brand">
-          <img src={logo} alt="Classroom Quick Downloader" class="l2-footer-logo" />
-          <strong>Classroom Quick Downloader</strong>
+  <footer class="l2-footer">
+    <div class="l2-wrap l2-footer-inner">
+      <div class="l2-footer-left">
+        <a href="https://github.com/adhamhaithameid" target="_blank" rel="noopener noreferrer" class="l2-footer-credit-link">
+          <img src="https://github.com/adhamhaithameid.png?size=22" alt="Adham Haitham" class="l2-footer-avatar" />
+          Built by <strong>Adham Haitham</strong>
         </a>
-        <div class="l2-footer-links">
-          <a href="{base}/">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-            Home
-          </a>
-          <a href="{base}/faq">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-            FAQ
-          </a>
-          <a href="{base}/privacy">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-            Privacy
-          </a>
-          <a href="{base}/changelog">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-            Changelog
-          </a>
-          <a href="{base}/map">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-            Map
-          </a>
-          <a href={STORE_LINKS.github} target="_blank" rel="noopener noreferrer">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
-            GitHub
-          </a>
-        </div>
-        <div class="l2-footer-right">
-          <a href="https://github.com/adhamhaithameid" target="_blank" rel="noopener noreferrer" class="l2-footer-credit-link">
-            <img src="https://github.com/adhamhaithameid.png?size=22" alt="Adham Haitham" class="l2-footer-avatar" />
-            Built by <strong>Adham Haitham</strong>
-          </a>
-          <span class="l2-footer-sep">•</span>
-          <span class="l2-footer-version"><a href="{base}/changelog"><AnimatedNumericText text="v1.3.7" animated /></a></span>
-          <span class="l2-footer-sep">•</span>
-          <span class="l2-footer-copy">© <AnimatedNumber value={currentYear} format={{ useGrouping: false }} /> Classroom Quick Downloader</span>
-        </div>
+        <span class="l2-footer-sep">•</span>
+        <span class="l2-footer-copy">© <AnimatedNumber value={currentYear} format={{ useGrouping: false }} /> Classroom Quick Downloader</span>
       </div>
-    </footer>
-  {/if}
+      <div class="l2-footer-links l2-footer-links-primary">
+        <a href={browserLink(detectedBrowser)} target="_blank" rel="noopener noreferrer">Download</a>
+        <a href="{base}/privacy">Privacy</a>
+        <a href="{base}/faq">FAQ</a>
+        <a href="{base}/changelog">Changelog</a>
+        <a href={STORE_LINKS.github} target="_blank" rel="noopener noreferrer">GitHub</a>
+        <a href="mailto:adhamhaithameid@gmail.com">Contact</a>
+      </div>
+    </div>
+  </footer>
 </div>
 
 <style>
@@ -144,6 +219,11 @@
     padding-bottom: 56px;
   }
 
+  .site-route-shell {
+    min-height: 100%;
+    will-change: opacity;
+  }
+
   .l2-wrap {
     max-width: 1280px;
     margin: 0 auto;
@@ -159,12 +239,32 @@
     -webkit-backdrop-filter: blur(14px);
     border-bottom: 1px solid var(--border);
     padding: 12px 0;
+    transition: transform 0.24s ease, opacity 0.24s ease;
+  }
+
+  :global(body.l2-media-modal-open) .l2-nav-shell,
+  :global(body.l2-map-modal-open) .l2-nav-shell {
+    opacity: 0;
+    transform: translateY(-100%);
+    pointer-events: none;
+  }
+
+  .l2-nav-fullwidth {
+    max-width: 100%;
+    padding: 0 24px;
   }
 
   .l2-nav-inner {
     display: flex;
     align-items: center;
     gap: 24px;
+  }
+
+  .l2-nav-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: auto;
   }
 
   .l2-nav-brand {
@@ -178,10 +278,22 @@
     white-space: nowrap;
   }
 
+  .l2-nav-brand-text {
+    opacity: 0;
+    max-width: 0;
+    overflow: hidden;
+    transition: opacity 0.25s, max-width 0.3s;
+  }
+
+  .l2-nav-brand:hover .l2-nav-brand-text {
+    opacity: 1;
+    max-width: 300px;
+  }
+
   .l2-nav-logo {
     width: auto;
-    height: 26px;
-    border-radius: 6px;
+    height: 36px;
+    border-radius: 8px;
     object-fit: contain;
   }
 
@@ -198,18 +310,83 @@
     font-weight: 500;
     padding: 6px 10px;
     border-radius: 8px;
-    transition: all 0.2s ease;
+    transition: color 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
   }
 
   .l2-nav-links a:hover {
     color: var(--gc-green);
     background: var(--gc-green-bg);
+    transform: translateY(-1px);
   }
 
   .l2-nav-links a.active {
     color: var(--gc-green);
     background: var(--gc-green-bg);
     font-weight: 700;
+  }
+
+  .l2-nav-menu-btn {
+    display: none;
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: #fff;
+    color: var(--text-secondary);
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: border-color 0.2s ease, color 0.2s ease, background-color 0.2s ease;
+  }
+
+  .l2-nav-menu-btn:hover {
+    border-color: var(--border-hover);
+    color: var(--gc-green);
+  }
+
+  .l2-nav-menu-btn svg {
+    width: 18px;
+    height: 18px;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .l2-nav-mobile-panel {
+    display: none;
+    background: rgba(248, 250, 251, 0.98);
+    box-shadow: 0 10px 24px rgba(15, 20, 25, 0.08);
+    border-radius: 0 0 14px 14px;
+  }
+
+  .l2-nav-mobile-links {
+    display: grid;
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+
+  .l2-nav-mobile-links a {
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: #fff;
+    padding: 10px 12px;
+    text-decoration: none;
+    color: var(--text-secondary);
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .l2-nav-mobile-links a.active {
+    color: var(--gc-green);
+    border-color: rgba(26, 139, 85, 0.35);
+    background: var(--gc-green-bg);
+  }
+
+  .l2-nav-cta-mobile {
+    display: block;
+    width: 100%;
+    text-align: center;
   }
 
   .l2-nav-cta {
@@ -246,31 +423,14 @@
     max-width: 100%;
   }
 
-  .l2-footer-brand {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    text-decoration: none;
-    color: var(--text);
-    font-size: 13px;
-    flex-shrink: 0;
-  }
-
-  .l2-footer-logo {
-    width: auto;
-    height: 20px;
-    border-radius: 5px;
-    object-fit: contain;
-  }
-
-  .l2-footer-brand strong {
-    font-weight: 800;
-  }
-
   .l2-footer-links {
     display: flex;
     gap: 4px;
     flex: 1;
+  }
+
+  .l2-footer-links-primary {
+    justify-content: flex-end;
   }
 
   .l2-footer-links a {
@@ -283,15 +443,16 @@
     font-weight: 500;
     padding: 4px 8px;
     border-radius: 6px;
-    transition: all 0.2s ease;
+    transition: color 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
   }
 
   .l2-footer-links a:hover {
     color: var(--gc-green);
     background: var(--gc-green-bg);
+    transform: translateY(-1px);
   }
 
-  .l2-footer-right {
+  .l2-footer-left {
     display: flex;
     align-items: center;
     gap: 10px;
@@ -329,49 +490,19 @@
     font-size: 10px;
   }
 
-  .l2-footer-version a {
-    color: var(--gc-green);
-    font-size: 11px;
-    font-weight: 600;
-    text-decoration: none;
-    background: var(--gc-green-bg);
-    border: 1px solid rgba(26, 139, 85, 0.12);
-    border-radius: 999px;
-    padding: 2px 8px;
-    transition: all 0.2s ease;
-  }
-
-  .l2-footer-version a:hover {
-    border-color: rgba(26, 139, 85, 0.25);
-  }
-
   .l2-footer-copy {
     color: var(--muted);
     font-size: 11px;
   }
 
-  @media (max-width: 1100px) {
-    .l2-nav-inner {
-      flex-wrap: wrap;
-      gap: 12px;
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-6px);
     }
-
-    .l2-nav-links {
-      order: 3;
-      width: 100%;
-      overflow-x: auto;
-      scrollbar-width: none;
-      -webkit-overflow-scrolling: touch;
-      padding-bottom: 4px;
-    }
-
-    .l2-nav-links::-webkit-scrollbar {
-      display: none;
-    }
-
-    .l2-nav-links a {
-      white-space: nowrap;
-      flex-shrink: 0;
+    to {
+      opacity: 1;
+      transform: translateY(0);
     }
   }
 
@@ -385,8 +516,25 @@
       padding: 0 16px;
     }
 
-    .l2-nav-brand span {
+    .l2-nav-brand-text {
       display: none;
+    }
+
+    .l2-nav-links-desktop,
+    .l2-nav-cta-desktop {
+      display: none;
+    }
+
+    .l2-nav-menu-btn {
+      display: inline-flex;
+    }
+
+    .l2-nav-mobile-panel {
+      display: block;
+      padding-top: 10px;
+      padding-bottom: 10px;
+      border-top: 1px solid var(--border);
+      animation: slideDown 0.2s ease;
     }
 
     .l2-footer-inner {
@@ -402,7 +550,7 @@
       flex-wrap: wrap;
     }
 
-    .l2-footer-right {
+    .l2-footer-left {
       width: 100%;
       justify-content: center;
       flex-wrap: wrap;
