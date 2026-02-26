@@ -13,12 +13,57 @@ import type {
 
 const REQUEST_TIMEOUT_MS = 8000;
 export const ORACLE_SNAPSHOT_REFRESH_MS = 3 * 60 * 60 * 1000;
+const SNAPSHOT_STORAGE_KEY = 'cqd.website.snapshot.v1';
 
 let cachedSnapshot: WebsiteSnapshot | null = null;
 let snapshotInFlight: Promise<WebsiteSnapshot> | null = null;
+let snapshotStorageHydrated = false;
 
 function isSnapshotFresh(snapshot: WebsiteSnapshot): boolean {
   return Date.now() < snapshot.nextRefreshAtUtc;
+}
+
+function canUseBrowserStorage(): boolean {
+  return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
+}
+
+function readSnapshotFromStorage(): WebsiteSnapshot | null {
+  if (!canUseBrowserStorage()) return null;
+  try {
+    const raw = window.localStorage.getItem(SNAPSHOT_STORAGE_KEY);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw) as Partial<WebsiteSnapshot> & { overview?: unknown; map?: unknown };
+    const fetchedAtUtc = asNumber(parsed.fetchedAtUtc);
+    const nextRefreshAtUtc = asNumber(parsed.nextRefreshAtUtc);
+    if (fetchedAtUtc <= 0 || nextRefreshAtUtc <= 0) return null;
+
+    return {
+      source: 'oracle',
+      fetchedAtUtc,
+      nextRefreshAtUtc,
+      overview: coerceOverviewPayload(parsed.overview),
+      map: coerceMapPayload(parsed.map)
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeSnapshotToStorage(snapshot: WebsiteSnapshot): void {
+  if (!canUseBrowserStorage()) return;
+  try {
+    window.localStorage.setItem(SNAPSHOT_STORAGE_KEY, JSON.stringify(snapshot));
+  } catch {
+    // Ignore quota/privacy mode failures.
+  }
+}
+
+function hydrateSnapshotCacheFromStorage(): void {
+  if (snapshotStorageHydrated) return;
+  snapshotStorageHydrated = true;
+  const persisted = readSnapshotFromStorage();
+  if (persisted) cachedSnapshot = persisted;
 }
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
@@ -269,6 +314,8 @@ function buildSnapshot(overview: OverviewResponse, map: MapResponse): WebsiteSna
 }
 
 export async function fetchWebsiteSnapshot(options: { force?: boolean } = {}): Promise<WebsiteSnapshot> {
+  hydrateSnapshotCacheFromStorage();
+
   if (!options.force && cachedSnapshot && isSnapshotFresh(cachedSnapshot)) {
     return cachedSnapshot;
   }
@@ -280,6 +327,7 @@ export async function fetchWebsiteSnapshot(options: { force?: boolean } = {}): P
     const [overview, map] = await Promise.all([fetchOracleOverview(), fetchOracleMap()]);
     const snapshot = buildSnapshot(overview, map);
     cachedSnapshot = snapshot;
+    writeSnapshotToStorage(snapshot);
     return snapshot;
   })()
     .catch((error) => {
@@ -305,6 +353,14 @@ export async function fetchMapData(): Promise<MapResponse> {
 export function resetWebsiteSnapshotCacheForTests(): void {
   cachedSnapshot = null;
   snapshotInFlight = null;
+  snapshotStorageHydrated = false;
+  if (canUseBrowserStorage()) {
+    try {
+      window.localStorage.removeItem(SNAPSHOT_STORAGE_KEY);
+    } catch {
+      // Ignore.
+    }
+  }
 }
 
 export async function fetchUserChangelog(): Promise<UserChangelogResponse> {
