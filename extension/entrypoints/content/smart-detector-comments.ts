@@ -440,39 +440,48 @@ function executeLayer3_GoldenSelectors(post: HTMLElement, keywords: CommentKeywo
 // ============================================================================
 
 function executeLayer4_NuclearScan(post: HTMLElement, keywords: CommentKeywords): LayerResult {
-  // Create a clone to avoid modifying the original
-  const clone = post.cloneNode(true) as HTMLElement;
-  
-  // Remove user content areas that might have false positives
-  for (const selector of GOLDEN_SELECTORS.userContentExclusions) {
-    clone.querySelectorAll(selector).forEach(el => el.remove());
-  }
-  
-  // TreeWalker for text nodes
+  // TreeWalker for text nodes with intelligent filtering
+  // Replaces cloneNode() with direct traversal for performance (O(N) -> O(1) memory)
   const walker = document.createTreeWalker(
-    clone,
-    NodeFilter.SHOW_TEXT,
+    post,
+    NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT,
     {
       acceptNode: (node) => {
-        const parent = node.parentElement;
-        if (!parent) return NodeFilter.FILTER_REJECT;
-        
-        const tagName = parent.tagName.toLowerCase();
-        if (tagName === 'script' || tagName === 'style' || tagName === 'noscript') {
-          return NodeFilter.FILTER_REJECT;
-        }
-        
-        // Skip hidden elements
-        try {
-          const style = window.getComputedStyle(parent);
-          if (style.display === 'none' || style.visibility === 'hidden') {
+        // 1. Element Filtering (Exclusions)
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          const el = node as HTMLElement;
+          const tagName = el.tagName.toLowerCase();
+
+          // Reject excluded tags
+          if (tagName === 'script' || tagName === 'style' || tagName === 'noscript') {
             return NodeFilter.FILTER_REJECT;
           }
-        } catch {
-          // Ignore
+
+          // Reject user content areas (false positives)
+          if (GOLDEN_SELECTORS.userContentExclusions.some(sel => el.matches(sel))) {
+            return NodeFilter.FILTER_REJECT;
+          }
+
+          // Reject hidden elements
+          try {
+            const style = window.getComputedStyle(el);
+            if (style.display === 'none' || style.visibility === 'hidden') {
+              return NodeFilter.FILTER_REJECT;
+            }
+          } catch {
+            // Ignore style errors
+          }
+
+          // Skip element itself but visit children
+          return NodeFilter.FILTER_SKIP;
         }
-        
-        return NodeFilter.FILTER_ACCEPT;
+
+        // 2. Text Node Acceptance
+        if (node.nodeType === Node.TEXT_NODE) {
+          return NodeFilter.FILTER_ACCEPT;
+        }
+
+        return NodeFilter.FILTER_SKIP;
       },
     }
   );

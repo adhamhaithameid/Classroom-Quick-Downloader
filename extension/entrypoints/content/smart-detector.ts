@@ -66,23 +66,6 @@ export interface PostStateResult {
 // UTILITY FUNCTIONS
 // ============================================================================
 
-function createSanitizedClone(element: HTMLElement): HTMLElement {
-  const clone = element.cloneNode(true) as HTMLElement;
-  
-  for (const selector of GOLDEN_SELECTORS.userContentExclusions) {
-    clone.querySelectorAll(selector).forEach(el => el.remove());
-  }
-  
-  clone.querySelectorAll('[role="button"]').forEach(btn => {
-    const text = normalizeText(btn.textContent || '').toLowerCase();
-    if (/more|less|show|hide|voir|mehr|menos/i.test(text)) {
-      btn.remove();
-    }
-  });
-  
-  return clone;
-}
-
 function extractAriaLabels(element: HTMLElement): string[] {
   const labels: string[] = [];
   
@@ -231,31 +214,55 @@ function executeEditedLayer2(post: HTMLElement, keywords: string[]): LayerResult
 // ============================================================================
 
 function executeEditedLayer3(post: HTMLElement, keywords: string[]): LayerResult {
-  const sanitizedPost = createSanitizedClone(post);
-  
+  // Direct TreeWalker traversal without cloning
+  // Replaces createSanitizedClone() logic with real-time filtering
   const walker = document.createTreeWalker(
-    sanitizedPost,
-    NodeFilter.SHOW_TEXT,
+    post,
+    NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT,
     {
       acceptNode: (node) => {
-        const parent = node.parentElement;
-        if (!parent) return NodeFilter.FILTER_REJECT;
-        
-        try {
-          const style = window.getComputedStyle(parent);
-          if (style.display === 'none' || style.visibility === 'hidden') {
+        // 1. Element Filtering
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          const el = node as HTMLElement;
+          const tagName = el.tagName.toLowerCase();
+
+          // Reject excluded tags
+          if (tagName === 'script' || tagName === 'style' || tagName === 'noscript') {
             return NodeFilter.FILTER_REJECT;
           }
-        } catch {
-          // Ignore
+
+          // Reject excluded content areas
+          if (GOLDEN_SELECTORS.userContentExclusions.some(sel => el.matches(sel))) {
+            return NodeFilter.FILTER_REJECT;
+          }
+
+          // Reject hidden elements
+          try {
+            const style = window.getComputedStyle(el);
+            if (style.display === 'none' || style.visibility === 'hidden') {
+              return NodeFilter.FILTER_REJECT;
+            }
+          } catch {
+            // Ignore
+          }
+
+          // Reject "show more/less" buttons (previously handled by createSanitizedClone)
+          if (tagName === 'button' || el.getAttribute('role') === 'button') {
+            const text = normalizeText(el.textContent || '').toLowerCase();
+            if (/more|less|show|hide|voir|mehr|menos/i.test(text)) {
+              return NodeFilter.FILTER_REJECT;
+            }
+          }
+
+          return NodeFilter.FILTER_SKIP;
         }
-        
-        const tagName = parent.tagName.toLowerCase();
-        if (tagName === 'script' || tagName === 'style' || tagName === 'noscript') {
-          return NodeFilter.FILTER_REJECT;
+
+        // 2. Text Node Acceptance
+        if (node.nodeType === Node.TEXT_NODE) {
+          return NodeFilter.FILTER_ACCEPT;
         }
-        
-        return NodeFilter.FILTER_ACCEPT;
+
+        return NodeFilter.FILTER_SKIP;
       },
     }
   );
