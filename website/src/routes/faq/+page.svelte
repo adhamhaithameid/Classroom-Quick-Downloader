@@ -599,17 +599,11 @@
     background-size: 60px 60px;
   }
 
-  .faq-hero-icon {
-    width: 52px;
-    height: 52px;
-    border-radius: 16px;
-    background: var(--gc-green-bg);
-    border: 1px solid rgba(26, 139, 85, 0.12);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    color: var(--gc-green);
+  /* ── Hero ───────────────────────── */
+  .fq-hero {
+    position: relative; z-index: 2;
+    text-align: center;
+    padding: 36px 24px 32px;
   }
 
   h1 {
