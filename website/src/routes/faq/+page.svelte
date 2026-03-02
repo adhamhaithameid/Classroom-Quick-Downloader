@@ -880,9 +880,9 @@
       font-size: 16px;
       padding-right: 44px;
     }
-
-    h1 {
-      font-size: 24px;
+    .fq-section {
+      border-radius: 16px;
+      padding: 16px 14px;
     }
 
     .faq-section {
