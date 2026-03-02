@@ -240,7 +240,7 @@ function sanitizeCachedData(value: unknown): ChangelogData | null {
 export async function fetchChangelog(force = false): Promise<ChangelogData | null> {
   // 1. Check cache
   const cached = await chrome.storage.local.get(STORAGE_KEY);
-  const data = cached[STORAGE_KEY] as ChangelogData | undefined;
+  const data = sanitizeCachedData(cached[STORAGE_KEY]);
 
   if (!force && data && (Date.now() - data.lastFetched < CACHE_duration_MS)) {
     return data;
