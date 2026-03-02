@@ -408,7 +408,7 @@
     const autoSpeed = 45; // px/s
     let isDragging = false;
     let isCoasting = false;
-    let autoDirection = 1; // 1 = left-to-right scroll, -1 = right-to-left
+    let autoDirection = 1; // 1 = content moves left (standard marquee), -1 = right
     let startX = 0;
     let scrollStart = 0;
     let lastX = 0;
