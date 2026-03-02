@@ -3419,17 +3419,9 @@
     pointer-events: none;
     z-index: 0;
   }
-
-  .l2-cta-3d-center {
-    display: flex;
-    justify-content: center;
-    margin: 0 auto 12px;
-    opacity: 0.75;
-  }
-
-  .l2-cta-3d-icon {
-    width: 140px;
-    height: 120px;
+  .l2-cta-content > * {
+    position: relative;
+    z-index: 1;
   }
 
   @keyframes cta-3d-float {
