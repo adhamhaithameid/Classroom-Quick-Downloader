@@ -6279,6 +6279,41 @@ export class DownloadsDurable {
       };
 
       let updated = false;
+      const now = Date.now();
+      const previewOnly = body.previewOnly === true;
+      const actor = trimAndLimitString(request.headers.get("CF-Connecting-IP") || "admin", 120) || "admin";
+      let parsedErrors: string[] = [];
+      let markdownSource: "manual" | "github" | "import" | null = null;
+      let markdownUrl: string | undefined;
+      let changelogFromMarkdown: ChangelogEntry[] | null = null;
+      let markdownLength = 0;
+
+      if (body.markdown || body.markdownUrl) {
+        const parsed = await this.parseMarkdownToEntries({
+          markdown: body.markdown,
+          markdownUrl: body.markdownUrl,
+          now,
+        });
+        if (!parsed.ok) {
+          return json({ ok: false, error: parsed.error }, { status: parsed.status });
+        }
+        parsedErrors = parsed.errors;
+        markdownSource = parsed.source;
+        markdownUrl = parsed.markdownUrl;
+        markdownLength = parsed.markdown.length;
+        changelogFromMarkdown = parsed.entries;
+        if (!previewOnly) {
+          this.d.changelogDraft = {
+            markdown: parsed.markdown,
+            markdownUrl: parsed.markdownUrl,
+            entries: parsed.entries,
+            errors: parsed.errors.slice(0, 20),
+            valid: parsed.valid,
+            updatedAt: now,
+            source: parsed.source,
+          };
+        }
+      }
 
       if (Array.isArray(body.changelog)) {
         this.d.changelog = body.changelog;
