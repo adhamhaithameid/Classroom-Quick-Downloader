@@ -68,6 +68,31 @@ function sanitizeChangelogMeta(input: unknown): ChangelogMeta | undefined {
 
 function coerceChangelogPayload(input: unknown): ChangelogResponse {
   const source = input as Partial<ChangelogResponse>;
+  const normalizeList = (value: unknown, maxItems = 24): string[] =>
+    Array.isArray(value)
+      ? value
+          .filter((line): line is string => typeof line === 'string' && line.trim().length > 0)
+          .map((line) => line.trim())
+          .slice(0, maxItems)
+      : [];
+
+  const buildLegacyChanges = (entry: {
+    summary?: string;
+    added?: string[];
+    changed?: string[];
+    fixed?: string[];
+    changes?: string[];
+  }): string[] => {
+    const direct = normalizeList(entry.changes, 40);
+    if (direct.length > 0) return direct;
+    const out: string[] = [];
+    if (entry.summary && entry.summary.trim().length > 0) out.push(`Summary: ${entry.summary.trim()}`);
+    for (const value of normalizeList(entry.added, 20)) out.push(`Added: ${value}`);
+    for (const value of normalizeList(entry.changed, 20)) out.push(`Changed: ${value}`);
+    for (const value of normalizeList(entry.fixed, 20)) out.push(`Fixed: ${value}`);
+    return out;
+  };
+
   const entries = Array.isArray(source?.entries)
     ? source.entries
         .map((entry) => {
