@@ -4895,6 +4895,14 @@ export class DownloadsDurable {
     }
 
     const ok = this.d.buffer.length === 0 && this.d.pendingBatches.length === 0 && !lastError;
+    this.appendDangerAudit(
+      request,
+      "full_sync",
+      "/admin/full-sync",
+      ok ? "ok" : "error",
+      lastError || `iterations=${iterations}`,
+    );
+    await this.persist();
 
     return json({
       ok,
