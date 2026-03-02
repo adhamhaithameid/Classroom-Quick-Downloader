@@ -366,7 +366,7 @@ func PublicWebsiteMapHandler(sqliteDB, postgresDB *sql.DB) http.HandlerFunc {
 			return
 		}
 		if r.Method != http.MethodGet {
-			w.WriteHeader(http.StatusMethodNotAllowed)
+			writePublicWebsiteError(w, http.StatusMethodNotAllowed, "method_not_allowed", "Only GET is allowed for this endpoint.", false)
 			return
 		}
 
