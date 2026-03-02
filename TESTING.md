@@ -114,7 +114,7 @@ Classroom-Quick-Downloader/
 │   ├── vitest.config.ts        # Vitest config with 3 coverage profiles
 │   └── package.json            # Test scripts
 ├── cloudflare-worker/          # Edge analytics & dashboard (TypeScript)
-│   ├── tests/                  # 2 Vitest test files
+│   ├── tests/                  # 13 Vitest test files
 │   ├── vitest.config.ts        # Vitest config (Node env)
 │   └── package.json            # Test scripts
 ├── oracle-backend/             # Analytics API (Go / Docker)
