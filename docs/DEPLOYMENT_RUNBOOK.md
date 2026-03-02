@@ -22,9 +22,11 @@ Related operator documents:
 - Oracle VM runs Docker container `cqd-oracle-backend` on port `8080`.
 - Cloudflare Worker (`cqd-analytics`) receives extension traffic and serves worker dashboard.
 - Website is static Svelte build deployed to Cloudflare Pages.
-- Website reads data through Worker HTTPS public routes:
-  - `/public/site-metrics`
-  - `/api/public/website/*` (Worker proxy -> Oracle)
+- Website reads canonical data directly from Oracle public routes:
+  - `/api/public/website/snapshot` (primary)
+  - compatibility endpoints `/api/public/website/*`
+- Website writes telemetry to:
+  - `/api/public/website/events` (Worker edge ingest -> DO queue -> Oracle internal batch flush)
 
 ## 2) Required Accounts and Access
 
