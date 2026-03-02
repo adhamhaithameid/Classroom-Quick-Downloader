@@ -3597,6 +3597,7 @@
           if (overrideCountriesInput && document.activeElement !== overrideCountriesInput) {
             overrideCountriesInput.value = JSON.stringify(overrideCountries, null, 2);
           }
+          renderWebsiteSyncAnomaly(data.anomaly || null);
         } catch (e) {
           setWebsiteSyncOutput({ ok: false, error: String(e) });
         }
