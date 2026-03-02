@@ -3549,6 +3549,38 @@
           setWebsiteSyncText('website-sync-last-batch-cloudflare', formatWebsiteSyncBatch(data.lastBatches && data.lastBatches.cloudflareToWebsite));
           setWebsiteSyncText('website-sync-last-batch-website', formatWebsiteSyncBatch(data.lastBatches && data.lastBatches.websiteToOracle));
 
+          if (snapshot && snapshot.overview && snapshot.map) {
+            var overview = snapshot.overview || {};
+            var map = snapshot.map || {};
+            var totals = overview.totals || {};
+            var installs = overview.installs || {};
+            var versions = overview.versions || {};
+            var status = overview.status || {};
+            var changelog = snapshot.changelog || {};
+            setWebsiteSyncText('website-sync-published-success', fmtNumber(Number(totals.success || 0)));
+            setWebsiteSyncText('website-sync-published-fail', fmtNumber(Number(totals.fail || 0)));
+            setWebsiteSyncText('website-sync-map-countries', fmtNumber(Number((map.totals && map.totals.countries) || 0)));
+            setWebsiteSyncText('website-sync-installs-users', fmtNumber(Number(installs.usersTotal || 0)));
+            setWebsiteSyncText('website-sync-snapshot-id', String(snapshot.snapshotId || '--'));
+            setWebsiteSyncText('website-sync-snapshot-generated', formatWebsiteSyncTimestamp(Number(snapshot.generatedAt || 0)));
+            setWebsiteSyncText('website-sync-worker-health', String(status.workerHealth || '--').toUpperCase());
+            setWebsiteSyncText('website-sync-changelog-source', String(changelog.source || 'oracle').toUpperCase());
+            setWebsiteSyncText(
+              'website-sync-versions',
+              'GH ' + String(versions.github || '--') + ' · CH ' + String(versions.chrome || '--') + ' · FF ' + String(versions.firefox || '--') + ' · ED ' + String(versions.edge || '--')
+            );
+          } else {
+            setWebsiteSyncText('website-sync-published-success', '--');
+            setWebsiteSyncText('website-sync-published-fail', '--');
+            setWebsiteSyncText('website-sync-map-countries', '--');
+            setWebsiteSyncText('website-sync-installs-users', '--');
+            setWebsiteSyncText('website-sync-snapshot-id', '--');
+            setWebsiteSyncText('website-sync-snapshot-generated', '--');
+            setWebsiteSyncText('website-sync-worker-health', '--');
+            setWebsiteSyncText('website-sync-changelog-source', '--');
+            setWebsiteSyncText('website-sync-versions', '--');
+          }
+
           var oneAmCheckbox = document.getElementById('website-sync-oneam-checkbox');
           if (oneAmCheckbox) {
             oneAmCheckbox.checked = oneAmEnabled;
