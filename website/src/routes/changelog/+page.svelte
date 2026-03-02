@@ -303,9 +303,56 @@
                 {/each}
               </nav>
             </div>
-          </article>
-        {/each}
-      </div>
+          </aside>
+
+          <!-- Timeline -->
+          <div class="cl-timeline">
+            {#each changelogEntries as entry, i}
+              <article class="cl-entry cl-reveal" id="v{entry.version}" style="transition-delay: {i * 0.05}s">
+                <div class="cl-marker-col">
+                  <div class="cl-dot"></div>
+                  {#if i < changelogEntries.length - 1}
+                    <div class="cl-line"></div>
+                  {/if}
+                </div>
+                <div class="cl-entry-card">
+                  <div class="cl-entry-header">
+                    <h2>v{entry.version}</h2>
+                  </div>
+                  <p class="cl-entry-summary"><strong>Summary:</strong> {entry.summary}</p>
+
+                  {#if entry.added.length > 0}
+                    <h3 class="cl-section-title">Added</h3>
+                    <ul class="cl-highlights">
+                      {#each entry.added as point}
+                        <li>{point}</li>
+                      {/each}
+                    </ul>
+                  {/if}
+
+                  {#if entry.changed.length > 0}
+                    <h3 class="cl-section-title">Changed</h3>
+                    <ul class="cl-highlights">
+                      {#each entry.changed as point}
+                        <li>{point}</li>
+                      {/each}
+                    </ul>
+                  {/if}
+
+                  {#if entry.fixed.length > 0}
+                    <h3 class="cl-section-title">Fixed</h3>
+                    <ul class="cl-highlights">
+                      {#each entry.fixed as point}
+                        <li>{point}</li>
+                      {/each}
+                    </ul>
+                  {/if}
+                </div>
+              </article>
+            {/each}
+          </div>
+        </div>
+      {/if}
     </div>
   {/if}
 </div>
