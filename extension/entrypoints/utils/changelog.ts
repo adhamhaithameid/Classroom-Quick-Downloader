@@ -1,5 +1,4 @@
 import { CHANGELOG_URL } from './analytics/constants';
-import { getExtensionVersion } from './analytics/detection';
 
 export interface ChangelogEntry {
   id: string;
