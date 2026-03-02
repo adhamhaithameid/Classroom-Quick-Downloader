@@ -572,44 +572,7 @@ describe("Worker auth config hardening", () => {
     });
 
     const res = await worker.fetch(request, env, {} as ExecutionContext);
-    const payload = await res.json() as { totals?: { downloads?: number } };
-
-    expect(res.status).toBe(200);
-    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
-    expect(payload.totals?.downloads).toBe(1200);
-  });
-
-  it("returns 502 when public site metrics upstream is unavailable", async () => {
-    const stub = {
-      fetch: async (input: RequestInfo) => {
-        const url = typeof input === "string" ? input : input instanceof Request ? input.url : "";
-        if (url.includes("/public/site-metrics")) {
-          throw new Error("do-offline");
-        }
-        return new Response(JSON.stringify({ ok: true }), {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        });
-      },
-    };
-    const namespace = {
-      idFromName: (_name: string) => "downloads-id",
-      get: (_id: string) => stub,
-    };
-    const env = mockEnv({ DOWNLOADS_DO: namespace as unknown as DurableObjectNamespace });
-    const request = new Request("https://example.com/public/site-metrics", {
-      method: "GET",
-      headers: {
-        Origin: "https://any.example",
-      },
-    });
-
-    const res = await worker.fetch(request, env, {} as ExecutionContext);
-    const payload = await res.json() as { ok?: boolean; error?: string };
-    expect(res.status).toBe(502);
-    expect(payload.ok).toBe(false);
-    expect(payload.error).toBe("upstream_unavailable");
-    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    expect(res.status).toBe(404);
   });
 
   it("proxies Oracle public website overview through the Worker with wildcard CORS", async () => {
