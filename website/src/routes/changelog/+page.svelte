@@ -196,6 +196,9 @@
       const parsed = await fetchFromGitHub(force);
       changelogEntries = parsed;
       state = 'ready';
+      degraded = false;
+      dataSource = 'github';
+      lastLoadedAtUtc = Date.now();
     } catch (err) {
       state = 'error';
       error = err instanceof Error ? err.message : 'Failed to load user changelog.';
