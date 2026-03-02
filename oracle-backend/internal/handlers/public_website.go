@@ -2154,14 +2154,16 @@ func resolveLatestExtensionVersion(ctx context.Context, store *controlPlaneStore
 			continue
 		}
 
-	res, err := http.DefaultClient.Do(req) // #nosec G107,G704 -- fixed GitHub API host with bounded timeout and static path pattern.
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
-	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return nil, errors.New("github api returned non-2xx status")
-	}
+		rank := int64FromAny(data["releasedAtUtc"])
+		if rank <= 0 {
+			rank = int64FromAny(data["createdAtUtc"])
+		}
+		if rank <= 0 {
+			rank = row.UpdatedAt
+		}
+		if rank <= 0 {
+			rank = row.CreatedAt
+		}
 
 	var payload gitHubReleaseInfo
 	if err := json.NewDecoder(res.Body).Decode(&payload); err != nil {
