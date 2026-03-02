@@ -6717,6 +6717,7 @@ export function renderDashboard(stats: StatsResponse): string {
         .then(data => {
           if (data.ok) {
             ipAllowlistData.allowlist = data.allowlist || [];
+            ipAllowlistData.stepUpBypassEnabled = data.stepUpBypassEnabled !== false;
             renderIpList();
             showToast('IP added: ' + ip, 'success');
             const input = document.getElementById('add-ip-input');
