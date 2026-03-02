@@ -18,7 +18,7 @@ export const privacyContent: ManualPrivacyContent = {
   headline: 'Privacy at a glance',
   description:
     'Classroom Quick Downloader uses aggregated operational analytics to keep downloads reliable across browsers. We do not collect private classroom file contents.',
-  lastUpdatedAtUtc: Date.UTC(2026, 1, 22, 0, 0, 0),
+  lastUpdatedAtUtc: Date.UTC(2026, 1, 27, 0, 0, 0),
   fullPrivacyUrl:
     'https://github.com/adhamhaithameid/Classroom-Quick-Downloader/blob/main/PRIVACY.md',
   sections: [
