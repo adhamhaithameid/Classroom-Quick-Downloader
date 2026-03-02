@@ -1,6 +1,6 @@
 # Oracle Dashboard — Security Audit Report
 
-> Update (2026-02-15): Latest changes include CI coverage-gate hardening for extension analytics storage migration fallback, popup stats race-condition guards, structured step-up auth error handling in Oracle dashboard, and backend/worker auth-security hardening. See /CHANGELOG.md for details.
+> Update (2026-02-28): This document is a historical deep-audit snapshot. Current repository-wide security/reliability status is tracked in `/docs/MAJOR_SCAN_2026-02-28.md` (latest full scan baseline).
 
 > **Date:** 2026-02-12
 > **Scope:** Full-stack audit — Go backend (30+ source files) and HTML/JS frontend (5021-line `index.html`)
