@@ -288,17 +288,20 @@
               <strong>Showing cached changelog data.</strong>
               <p>{error}</p>
             </div>
-            <div class="entry-body">
-              <span class="entry-date">{formatDate(entry.releasedAtUtc)}</span>
-              <h2><AnimatedNumericText text='v{entry.version}' animated /> — <AnimatedNumericText text={entry.title} animated /></h2>
-              <p>{entry.summary}</p>
-              {#if entry.highlights.length > 0}
-                <ul>
-                  {#each entry.highlights as point}
-                    <li>{point}</li>
-                  {/each}
-                </ul>
-              {/if}
+          </div>
+        {/if}
+        <div class="cl-layout">
+          <!-- Sidebar -->
+          <aside class="cl-sidebar">
+            <div class="cl-sidebar-card cl-reveal">
+              <h3 class="cl-sidebar-label">Versions</h3>
+              <nav class="cl-sidebar-links">
+                {#each changelogEntries as entry}
+                  <a href="#v{entry.version}" class="cl-sidebar-link" aria-label={'Version ' + entry.version}>
+                    <span class="cl-sv">{entry.version}</span>
+                  </a>
+                {/each}
+              </nav>
             </div>
           </article>
         {/each}
