@@ -602,8 +602,8 @@
     display: flex; flex-direction: column; gap: 6px;
   }
 
-  .entry-body p {
-    margin: 10px 0 0;
+  .cl-highlights li {
+    position: relative; padding-left: 20px;
     color: var(--text-secondary);
     line-height: 1.75;
     font-size: 14px;
