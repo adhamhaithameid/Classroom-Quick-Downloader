@@ -723,6 +723,7 @@ func PublicWebsiteUninstallHandler(sqliteDB *sql.DB) http.HandlerFunc {
 				writePublicWebsiteError(w, http.StatusBadRequest, "missing_required_header", "X-Requested-With header is required.", false)
 				return
 			}
+			r.Body = http.MaxBytesReader(w, r.Body, publicWebsiteEventsBodyLimitBytes)
 
 			var req publicWebsiteUninstallRequest
 			if err := decodeJSONBodyStrict(r, &req); err != nil {
