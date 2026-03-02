@@ -104,6 +104,7 @@
   let detectedBrowser: BrowserKey = 'chrome';
   let mapState: 'loading' | 'ready' | 'error' = 'loading';
   let mapError = '';
+  let isDataDegraded = false;
   let mapExpanded = false;
   let mediaExpanded: string | null = null;
   const browserCtas: Array<'chrome' | 'firefox' | 'edge'> = ['chrome', 'firefox', 'edge'];
