@@ -489,6 +489,10 @@ func HARuntimeStatusHandler(sqliteDB, postgresDB *sql.DB, guard *StorageGuard, p
 				}
 			}
 		}
+		websiteChainPayload := buildWebsiteChainHealthPayload(r.Context(), sqliteDB, time.Now().UTC())
+		if sqliteDB != nil {
+			_ = upsertWebsiteChainHealthAlerts(r.Context(), sqliteDB, websiteChainPayload)
+		}
 
 		postgresStatus := map[string]any{
 			"configured": postgresConfigured,
