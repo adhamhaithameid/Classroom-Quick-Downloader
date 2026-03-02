@@ -132,7 +132,9 @@ describe('fetchChangelog', () => {
     const data = await fetchChangelog();
     expect(data.ok).toBe(true);
     expect(data.entries).toHaveLength(0);
-  });
+    },
+    TEST_TIMEOUT_MS
+  );
 
   it('handles completely empty payload', async () => {
     vi.stubGlobal(
