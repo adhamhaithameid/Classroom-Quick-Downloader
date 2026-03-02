@@ -16,16 +16,67 @@
 
   let hostEl: HTMLSpanElement | null = null;
   let displayValue = 0;
-  const noHorizontalTransform: EffectTiming = { duration: 0 };
-  const defaultSpinTiming: EffectTiming = NumberFlowElement.defaultProps.transformTiming;
+  let formattedValue = '0';
+  let hasAnimatedInView = false;
+  let rafId: number | null = null;
 
-  function kickstart(): void {
-    priming = true;
-    displayValue = 0;
-    requestAnimationFrame(() => {
-      displayValue = value;
-      priming = false;
-    });
+  function safeNumber(input: number): number {
+    return Number.isFinite(input) ? input : 0;
+  }
+
+  function inferPrecision(input: number): number {
+    const fromFormat = typeof format.maximumFractionDigits === 'number'
+      ? format.maximumFractionDigits
+      : typeof format.minimumFractionDigits === 'number'
+        ? format.minimumFractionDigits
+        : null;
+    if (fromFormat !== null) return Math.max(0, Math.min(6, Math.round(fromFormat)));
+    if (Number.isInteger(input)) return 0;
+    const digits = String(input).split('.')[1]?.length ?? 0;
+    return Math.max(0, Math.min(6, digits));
+  }
+
+  function normalizeForDisplay(input: number): number {
+    const precision = inferPrecision(value);
+    const safe = safeNumber(input);
+    if (precision <= 0) return Math.round(safe);
+    return Number(safe.toFixed(precision));
+  }
+
+  function stopAnimation(): void {
+    if (rafId !== null) {
+      cancelAnimationFrame(rafId);
+      rafId = null;
+    }
+  }
+
+  function animateTo(next: number): void {
+    const target = safeNumber(next);
+    stopAnimation();
+
+    const from = displayValue;
+    const delta = target - from;
+    if (Math.abs(delta) < 0.0001) {
+      displayValue = target;
+      return;
+    }
+
+    const durationMs = 760;
+    const startTime = performance.now();
+
+    const tick = (now: number): void => {
+      const progress = Math.min(1, (now - startTime) / durationMs);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      displayValue = from + delta * eased;
+      if (progress < 1) {
+        rafId = requestAnimationFrame(tick);
+      } else {
+        rafId = null;
+        displayValue = target;
+      }
+    };
+
+    rafId = requestAnimationFrame(tick);
   }
 
   onMount(() => {
