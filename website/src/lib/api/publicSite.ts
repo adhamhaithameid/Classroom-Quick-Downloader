@@ -98,7 +98,36 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   });
 }
 
-async function fetchJSONFromBase(baseUrl: string, pathname: string, sourceLabel: string): Promise<unknown> {
+function buildRequestErrorMessage(status: number, requestLabel: string): string {
+  if (status === 401 || status === 403) {
+    return `Access denied (${status}).`;
+  }
+  if (status === 404) {
+    return `Requested content was not found (${status}).`;
+  }
+  if (status === 429) {
+    return `Too many requests (${status}). Please try again soon.`;
+  }
+  if (status >= 500) {
+    return `Service temporarily unavailable (${status}). Please try again.`;
+  }
+  return `${requestLabel} request failed (${status}).`;
+}
+
+async function extractResponseErrorMessage(response: Response, fallback: string): Promise<string> {
+  try {
+    const payload = await response.json();
+    const message =
+      (typeof payload?.error?.message === 'string' && payload.error.message) ||
+      (typeof payload?.message === 'string' && payload.message) ||
+      '';
+    return message.trim() || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+async function fetchJSONFromBase(baseUrl: string, pathname: string, requestLabel: string): Promise<unknown> {
   const normalizedBase = baseUrl.trim();
   if (!normalizedBase) {
     throw new Error(`Missing ${sourceLabel} base URL`);
