@@ -801,11 +801,47 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
       );
     }
 
-    const form = await request.formData();
-    const password = (form.get("password") || "").toString();
-
-    // Validate password
-    if (!timingSafeStringEqual(password, dashboardSecret)) {
+    if (!allowlistDecision.allowed) {
+      if (!allowlistDecision.stepUpBypassEnabled) {
+        return new Response(
+          renderLoginPage("This device is not allowlisted. Ask an admin to add your IP before trying again."),
+          { status: 403, headers: { "content-type": "text/html; charset=utf-8" } },
+        );
+      }
+      if (!env.DANGER_PASSWORD) {
+        return new Response(
+          renderLoginPage("Server misconfigured: DANGER_PASSWORD missing."),
+          { status: 500, headers: { "content-type": "text/html; charset=utf-8" } },
+        );
+      }
+      const stepUpResult = await verifyDangerStepUpPassword(stub, env, clientIp, password);
+      if (!stepUpResult.ok) {
+        if (stepUpResult.status === 429) {
+          const mins = Math.ceil((stepUpResult.blockedForSeconds || 900) / 60);
+          return new Response(
+            renderLoginPage(`Too many failed step-up attempts. Please try again in ${mins} minutes.`),
+            { status: 429, headers: { "content-type": "text/html; charset=utf-8" } },
+          );
+        }
+        if (stepUpResult.status === 503) {
+          return new Response(
+            renderLoginPage("Step-up verification service is temporarily unavailable. Please try again."),
+            {
+              status: 503,
+              headers: {
+                "content-type": "text/html; charset=utf-8",
+                "Retry-After": "30",
+                "X-Dependency-Error": "durable-object-unavailable",
+              },
+            },
+          );
+        }
+        return new Response(
+          renderLoginPage("This device is not allowlisted. Enter the admin danger password to continue."),
+          { status: 401, headers: { "content-type": "text/html; charset=utf-8" } },
+        );
+      }
+    } else if (!timingSafeStringEqual(password, dashboardSecret)) {
       // Rate limit: record failed attempt
       const rateLimitReq = new Request(new URL("/auth/login-attempt", request.url).toString(), {
         method: "POST",
