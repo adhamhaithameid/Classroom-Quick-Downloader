@@ -8,7 +8,9 @@ afterEach(() => {
 });
 
 describe('fetchChangelog', () => {
-  it('fetches and normalizes a valid changelog payload', async () => {
+  it(
+    'fetches and normalizes a valid changelog payload',
+    async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () =>
