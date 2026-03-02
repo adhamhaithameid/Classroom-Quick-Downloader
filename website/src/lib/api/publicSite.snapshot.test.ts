@@ -76,8 +76,8 @@ describe('fetchWebsiteSnapshot', () => {
           }
         }),
         { status: 200 }
-      );
-    });
+      )
+    );
 
     vi.stubGlobal('fetch', fetchMock);
 
