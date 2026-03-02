@@ -116,6 +116,11 @@ async function buildIntegrationContext() {
         method: 'GET',
       }));
     }
+    if (url.pathname === '/changelog') {
+      return durable.fetch(new Request('https://do/changelog', {
+        method: 'GET',
+      }));
+    }
     throw new Error(`Unexpected integration fetch URL: ${requestUrl}`);
   });
   vi.stubGlobal('fetch', fetchSpy);
