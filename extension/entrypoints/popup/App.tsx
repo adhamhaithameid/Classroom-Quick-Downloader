@@ -760,7 +760,7 @@ function App() {
                 </span>
                 {version && (
                   <button
-                    className={`cqd-brand-version ${getRuleClasses(getMatchingRule(changelogData?.config, version), seen)}`}
+                    className={`cqd-brand-version ${getRuleClasses(effectiveRule, seen)}`}
                     aria-label={`Version ${version} - View changelog`}
                     title={getLatestChange(changelogData) ? `Latest: ${getLatestChange(changelogData)}` : "View changelog"}
                     onClick={async () => {
