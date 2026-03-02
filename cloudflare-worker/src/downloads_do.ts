@@ -251,6 +251,30 @@ type PublicSiteMetricsSnapshot = {
   countries: PublicSiteCountryCount[];
 };
 
+type WebsiteTelemetryQueuedBatch = {
+  schemaVersion: typeof WEBSITE_EVENTS_SCHEMA_VERSION;
+  batchId: string;
+  correlationId: string;
+  generatedAtUtc: number;
+  sessionId: string;
+  pagePath: string;
+  events: WebsiteEventPayload[];
+  attempt: number;
+  nextRetryAtUtc: number | null;
+  lastError: string | null;
+};
+
+type DangerActionAuditRecord = {
+  id: string;
+  tsUtc: number;
+  actorIp: string;
+  action: string;
+  path: string;
+  result: "ok" | "error";
+  correlationId: string;
+  detail: string | null;
+};
+
 const DEFAULT_RETRY_STATE: RetryState = {
   consecutiveFailures: 0,
 };
