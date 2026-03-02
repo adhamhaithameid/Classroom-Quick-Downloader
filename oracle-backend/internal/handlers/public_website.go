@@ -2133,13 +2133,9 @@ func stringPtrOrNil(value string) *string {
 	return &value
 }
 
-func fetchGitHubVersionCached(ctx context.Context) *string {
-	cache := &githubVersionCache
-	cache.mu.Lock()
-	defer cache.mu.Unlock()
-
-	if cache.version != nil && time.Since(cache.fetched) < cache.ttl {
-		return cache.version
+func resolveLatestExtensionVersion(ctx context.Context, store *controlPlaneStore) *string {
+	if store == nil {
+		return nil
 	}
 
 	version, err := githubVersionFetcher(ctx)
