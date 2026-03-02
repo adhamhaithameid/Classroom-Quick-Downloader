@@ -88,6 +88,7 @@ describe('changelog utils', () => {
     expect(mod.getLatestChange({
       entries: [{ id: 'x', version: '1.0.0', date: '2026-01-01', changes: ['First change'] }],
       config: { rules: [] },
+      revisionToken: 'rev-a',
       lastFetched: Date.now(),
     })).toBe('First change');
 
