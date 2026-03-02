@@ -621,6 +621,47 @@ func publishWebsiteDataset(
 	return row, nil
 }
 
+func detectWebsiteDatasetMonotonicViolations(
+	prevDownloads int64,
+	prevCountries []publicWebsiteCountryCell,
+	nextDownloads int64,
+	nextCountries []publicWebsiteCountryCell,
+) []string {
+	violations := make([]string, 0, 32)
+	if prevDownloads > 0 && nextDownloads < prevDownloads {
+		violations = append(violations, fmt.Sprintf("downloads decreased (%d -> %d)", prevDownloads, nextDownloads))
+	}
+
+	prevMap := make(map[string]int64, len(prevCountries))
+	for _, row := range prevCountries {
+		code := strings.ToUpper(strings.TrimSpace(row.CountryCode))
+		if code == "" || row.Count <= 0 {
+			continue
+		}
+		prevMap[code] = row.Count
+	}
+	nextMap := make(map[string]int64, len(nextCountries))
+	for _, row := range nextCountries {
+		code := strings.ToUpper(strings.TrimSpace(row.CountryCode))
+		if code == "" || row.Count <= 0 {
+			continue
+		}
+		nextMap[code] = row.Count
+	}
+
+	for code, prev := range prevMap {
+		next := nextMap[code]
+		if next < prev {
+			violations = append(violations, fmt.Sprintf("country %s decreased (%d -> %d)", code, prev, next))
+		}
+	}
+
+	if len(violations) > 25 {
+		return violations[:25]
+	}
+	return violations
+}
+
 func PublishWebsiteDatasetFromOracle(
 	ctx context.Context,
 	db *sql.DB,
