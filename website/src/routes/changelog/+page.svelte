@@ -515,7 +515,7 @@
     display: flex; flex-direction: column; gap: 2px;
   }
 
-  .sidebar-links a {
+  .cl-sidebar-link {
     text-decoration: none;
     padding: 8px 12px;
     border-radius: var(--radius-sm);
