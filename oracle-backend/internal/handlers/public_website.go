@@ -152,6 +152,19 @@ type publicWebsiteUserChangelogEntry struct {
 	ReleasedAtUTC *int64   `json:"releasedAtUtc"`
 }
 
+type userFriendlyMarkdownRelease struct {
+	Version string
+	Summary string
+	Added   []string
+	Changed []string
+	Fixed   []string
+}
+
+type publicWebsiteUserChangelogConfig struct {
+	Source      string
+	MarkdownURL string
+}
+
 type publicWebsiteUninstallRequest struct {
 	Reason  string `json:"reason"`
 	Browser string `json:"browser"`
