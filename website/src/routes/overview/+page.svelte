@@ -1554,6 +1554,16 @@
         <span class="l2-label">TRUSTED WORLDWIDE</span>
         <h2>Used in <AnimatedNumber value={countryCount} suffix="+" animated /> countries.</h2>
         <p>Students, teachers, and universities around the world trust Classroom Quick Downloader.</p>
+        <div class="l2-data-actions">
+          <button
+            type="button"
+            class="l2-refresh-btn"
+            on:click={() => loadSiteData(true)}
+            disabled={$websiteSnapshotStore.isRefreshing}
+          >
+            {$websiteSnapshotStore.isRefreshing ? 'Refreshing…' : 'Refresh live data'}
+          </button>
+        </div>
       </div>
       <div class="l2-proof-grid">
         <div class="l2-proof-card"><div class="l2-proof-num"><AnimatedNumber value={downloadCount} animated /></div><div class="l2-proof-label">Total Downloads</div></div>
