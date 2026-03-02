@@ -1,6 +1,5 @@
 <script lang="ts">
   import { privacyContent as privacy } from '$lib/content/privacy';
-  import AnimatedNumericText from '$lib/components/AnimatedNumericText.svelte';
 
   const sectionIcons = ['🔒', '📊', '🛡️', '🌍', '🔑', '📱', '⚙️', '📋', '✅', '💡'];
 
