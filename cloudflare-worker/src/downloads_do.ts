@@ -6270,8 +6270,8 @@ export class DownloadsDurable {
     }
 
     try {
-      const body = await request.json() as { 
-        changelog?: ChangelogEntry[]; 
+      const body = await request.json() as {
+        changelog?: unknown;
         config?: ChangelogConfig;
       };
 
