@@ -33,9 +33,45 @@ describe('public website acceptance contracts', () => {
               status: { systemLive: true, liveSinceUtc: 1771600000000, workerHealth: 'up' },
               links: { chrome: 'https://c', firefox: 'https://f', edge: 'https://e', github: 'https://g' }
             },
-            versions: { github: '1.3.6', chrome: '1.3.6', firefox: null, edge: null },
-            status: { systemLive: true, liveSinceUtc: 1771600000000, workerHealth: 'up' },
-            links: { chrome: 'https://c', firefox: 'https://f', edge: 'https://e', github: 'https://g' }
+            map: {
+              ok: true,
+              generatedAt: 1771700000000,
+              granularity: 'country',
+              countries: [{ countryCode: 'US', count: 1200 }],
+              totals: { countries: 1, downloads: 1200 },
+              privacyNote: 'country only'
+            },
+            changelog: {
+              ok: true,
+              generatedAt: 1771700000000,
+              headline: "What's new for students",
+              description: 'Simple release notes',
+              entries: [
+                {
+                  id: 'release-136',
+                  version: '1.3.6',
+                  title: 'Stability improvements',
+                  summary: 'Security and reliability improvements.',
+                  highlights: ['Fewer errors'],
+                  releasedAtUtc: 1771600000000
+                }
+              ],
+              fullChangelogUrl: 'https://github.com/adhamhaithameid/Classroom-Quick-Downloader/blob/main/CHANGELOG.md',
+              lastUpdatedAtUtc: 1771600000000
+            },
+            userChangelogSummary: {
+              headline: "What's new for students",
+              description: 'Simple release notes',
+              entriesCount: 1,
+              lastUpdatedAtUtc: 1771600000000,
+              fullChangelogUrl: 'https://github.com/adhamhaithameid/Classroom-Quick-Downloader/blob/main/CHANGELOG.md'
+            },
+            privacy: {
+              headline: 'Privacy',
+              description: 'No raw IP storage',
+              userPrivacyUrl: 'https://classroom-quick-downloader-website.pages.dev/privacy',
+              fullPrivacyUrl: 'https://github.com/adhamhaithameid/Classroom-Quick-Downloader/blob/main/PRIVACY.md'
+            }
           }),
           { status: 200 }
         )
