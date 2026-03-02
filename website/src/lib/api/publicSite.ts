@@ -337,6 +337,7 @@ function coerceUserChangelogPayload(input: unknown): UserChangelogResponse {
   entries.sort((a, b) => (b.releasedAtUtc ?? 0) - (a.releasedAtUtc ?? 0));
 
   return {
+    schemaVersion: asSchemaVersion(source?.schemaVersion),
     ok: source?.ok === true,
     generatedAt: asNumber(source?.generatedAt),
     headline: asString(source?.headline),
