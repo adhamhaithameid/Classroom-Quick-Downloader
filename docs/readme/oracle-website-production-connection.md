@@ -18,6 +18,7 @@ export ORACLE_AUDIT_CHECKPOINT_SECRET='replace-with-strong-audit-secret'
 export SESSION_COOKIE_SECURE=true
 export PUBLIC_WEBSITE_ALLOWED_ORIGINS='https://<your-root-domain>,https://classroom-quick-downloader-website.pages.dev,http://localhost:5173'
 export CLOUDFLARE_PUBLIC_SITE_METRICS_URL='https://<worker-domain>/public/site-metrics'
+export CLOUDFLARE_ANALYTICS_HOSTNAME='<your-root-domain>'
 
 go run ./cmd/app
 ```
