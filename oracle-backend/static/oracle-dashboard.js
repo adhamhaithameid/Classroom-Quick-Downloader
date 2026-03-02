@@ -2305,6 +2305,19 @@
         window.open(url, '_blank');
       }
 
+      function onChartsControlsChange() {
+        updateChartFiltersFromUI();
+        loadCharts();
+      }
+
+      function exportActiveChartCSV() {
+        if (!Array.isArray(chartsLastExportRows) || chartsLastExportRows.length === 0) {
+          window.alert('No chart dataset is ready for export yet.');
+          return;
+        }
+        exportRowsAsCSV(chartsLastExportName, chartsLastExportRows);
+      }
+
       // Load deployment status
       async function loadDeployStatus() {
         var iconNodes = Array.from(document.querySelectorAll('[data-role="deploy-icon"]'));
