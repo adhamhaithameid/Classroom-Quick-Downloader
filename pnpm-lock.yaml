@@ -5938,7 +5938,7 @@ snapshots:
 
   rfdc@1.4.1: {}
 
-  rollup@4.58.0:
+  rollup@4.59.0:
     dependencies:
       '@types/estree': 1.0.8
     optionalDependencies:
