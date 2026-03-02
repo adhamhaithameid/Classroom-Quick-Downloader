@@ -76,6 +76,7 @@ Environment overrides:
   ORACLE_SSH_DEST        SSH destination (required, e.g. ubuntu@<oracle-host>)
   ORACLE_SSH_KEY         SSH key path (default: ~/.ssh/oracle_key)
   ORACLE_REMOTE_REPO_DIR Repo path on server (default: $HOME/Classroom-Quick-Downloader)
+  ORACLE_TARGET_REF      Git ref to deploy on Oracle (default: origin/main)
 EOF
     ;;
   *)
