@@ -388,6 +388,413 @@ const REQUEST_HISTORY_DAYS = 400;
 const PUBLIC_SITE_METRICS_REFRESH_HOURS_UTC = [3, 6, 9, 12, 15, 18, 21] as const;
 const MAX_PUBLIC_SITE_COUNTRIES = 300;
 const ISO_ALPHA2_PATTERN = /^[A-Z]{2}$/;
+const USER_FRIENDLY_CHANGELOG_GITHUB_URL =
+  "https://raw.githubusercontent.com/adhamhaithameid/Classroom-Quick-Downloader/main/user-friendly-changelog.md";
+const CHANGELOG_DEFAULT_APPLY_MODE: ChangelogApplyMode = "manual";
+const CHANGELOG_DEFAULT_AUTO_SYNC_ENABLED = false;
+const CHANGELOG_DEFAULT_AUTO_SYNC_INTERVAL_MINUTES = 60;
+const CHANGELOG_MIN_AUTO_SYNC_INTERVAL_MINUTES = 5;
+const CHANGELOG_MAX_AUTO_SYNC_INTERVAL_MINUTES = 1440;
+
+function defaultExtensionChangelogEntries(): ChangelogEntry[] {
+  return [
+    {
+      id: "release-138",
+      version: "1.3.8",
+      date: "2026-03-02T00:00:00.000Z",
+      isImportant: true,
+      changes: [
+        "Changelog delivery is now revision-aware so users receive same-version updates.",
+        "Version-pill state now refreshes against latest Cloudflare changelog data.",
+        "Improved sync reliability between published release data and extension UI."
+      ]
+    },
+    {
+      id: "release-137",
+      version: "1.3.7",
+      date: "2026-02-28T00:00:00.000Z",
+      isImportant: true,
+      changes: [
+        "New cleaner release notes experience so updates are easier to read.",
+        "Better download flow stability in large classes with many files.",
+        "Polished install and version messaging for non-technical users."
+      ]
+    },
+    {
+      id: "release-136",
+      version: "1.3.6",
+      date: "2026-02-20T00:00:00.000Z",
+      changes: [
+        "Improved reliability when batch downloads include mixed file types.",
+        "Reduced stuck-progress cases after tab wake or network hiccups.",
+        "Small security hardening updates across extension internals."
+      ]
+    },
+    {
+      id: "release-135",
+      version: "1.3.5",
+      date: "2026-02-19T00:00:00.000Z",
+      changes: [
+        "Smoother keyboard and popup interactions for faster navigation.",
+        "More consistent status updates while downloads are running.",
+        "General bug fixes focused on everyday classroom workflows."
+      ]
+    },
+    {
+      id: "release-134",
+      version: "1.3.4",
+      date: "2026-02-18T00:00:00.000Z",
+      changes: [
+        "Safer handling around internal requests and validation checks.",
+        "Improved compatibility with current Chromium and Firefox builds.",
+        "UI polish for clearer feedback in the extension popup."
+      ]
+    },
+    {
+      id: "release-133",
+      version: "1.3.3",
+      date: "2026-02-12T00:00:00.000Z",
+      changes: [
+        "Faster response when starting multi-file downloads.",
+        "Better recovery when a tab refreshes mid-download.",
+        "Reduced noisy errors in normal successful runs."
+      ]
+    },
+    {
+      id: "release-132",
+      version: "1.3.2",
+      date: "2026-02-08T00:00:00.000Z",
+      changes: [
+        "Improved analytics reliability without collecting personal data.",
+        "More accurate completion tracking for partial/cancelled actions.",
+        "Refined background logic for steadier long sessions."
+      ]
+    },
+    {
+      id: "release-131",
+      version: "1.3.1",
+      date: "2026-02-04T00:00:00.000Z",
+      changes: [
+        "First stability wave for the 1.3 series with faster queue handling.",
+        "Improved extension behavior on heavy Google Classroom pages.",
+        "General fixes and cleanup for a smoother daily experience."
+      ]
+    }
+  ];
+}
+
+type UserFriendlyRelease = {
+  version: string;
+  summary: string;
+  added: string[];
+  changed: string[];
+  fixed: string[];
+};
+
+type ParsedUserFriendlyChangelog = {
+  releases: UserFriendlyRelease[];
+  errors: string[];
+};
+
+function normalizeReleaseVersion(raw: string): string {
+  const value = raw.trim().replace(/^v/i, "");
+  if (!value) return "";
+  return value.replace(/\s+/g, "");
+}
+
+function parseUserFriendlyChangelogMarkdown(markdown: string): ParsedUserFriendlyChangelog {
+  const lines = markdown.replace(/\r\n/g, "\n").split("\n");
+  const errors: string[] = [];
+  const releases: UserFriendlyRelease[] = [];
+
+  let current: UserFriendlyRelease | null = null;
+  let activeSection: "summary" | "added" | "changed" | "fixed" | null = null;
+
+  const pushCurrent = () => {
+    if (!current) return;
+    current.summary = current.summary.trim();
+    if (!current.version) {
+      errors.push("Found a release block without a version heading.");
+      current = null;
+      return;
+    }
+    if (!current.summary) {
+      const fallback = current.added[0] || current.changed[0] || current.fixed[0] || "";
+      current.summary = fallback.trim();
+    }
+    if (!current.summary) {
+      errors.push(`Release v${current.version} is missing a Summary section.`);
+      current = null;
+      return;
+    }
+    releases.push({
+      version: current.version,
+      summary: current.summary,
+      added: [...current.added],
+      changed: [...current.changed],
+      fixed: [...current.fixed],
+    });
+    current = null;
+  };
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) continue;
+
+    const releaseMatch = line.match(/^##\s+v?([A-Za-z0-9._-]+)\s*$/i);
+    if (releaseMatch) {
+      pushCurrent();
+      const version = normalizeReleaseVersion(releaseMatch[1] || "");
+      current = {
+        version,
+        summary: "",
+        added: [],
+        changed: [],
+        fixed: [],
+      };
+      activeSection = null;
+      continue;
+    }
+
+    if (!current) {
+      // Ignore preamble text outside release blocks.
+      continue;
+    }
+
+    if (/^###\s+summary\s*$/i.test(line)) {
+      activeSection = "summary";
+      continue;
+    }
+    if (/^###\s+added\s*$/i.test(line)) {
+      activeSection = "added";
+      continue;
+    }
+    if (/^###\s+changed\s*$/i.test(line)) {
+      activeSection = "changed";
+      continue;
+    }
+    if (/^###\s+fixed\s*$/i.test(line)) {
+      activeSection = "fixed";
+      continue;
+    }
+
+    const bullet = line.match(/^-\s+(.+)$/);
+    const value = trimAndLimitString((bullet ? bullet[1] : line), 400);
+    if (!value) continue;
+
+    if (activeSection === "summary") {
+      current.summary = current.summary ? `${current.summary} ${value}` : value;
+      continue;
+    }
+    if (activeSection === "added") {
+      current.added.push(value);
+      continue;
+    }
+    if (activeSection === "changed") {
+      current.changed.push(value);
+      continue;
+    }
+    if (activeSection === "fixed") {
+      current.fixed.push(value);
+      continue;
+    }
+
+    // If no section heading was set, treat as summary continuation.
+    current.summary = current.summary ? `${current.summary} ${value}` : value;
+  }
+
+  pushCurrent();
+  return { releases, errors };
+}
+
+function buildReleaseMarkdown(entry: UserFriendlyRelease): string {
+  const lines: string[] = [];
+  lines.push(`## v${entry.version}`);
+  lines.push("### Summary");
+  lines.push(entry.summary);
+  lines.push("### Added");
+  for (const point of entry.added) lines.push(`- ${point}`);
+  lines.push("### Changed");
+  for (const point of entry.changed) lines.push(`- ${point}`);
+  lines.push("### Fixed");
+  for (const point of entry.fixed) lines.push(`- ${point}`);
+  return lines.join("\n");
+}
+
+function buildLegacyChanges(entry: UserFriendlyRelease): string[] {
+  const out: string[] = [];
+  out.push(`Summary: ${entry.summary}`);
+  for (const point of entry.added) out.push(`Added: ${point}`);
+  for (const point of entry.changed) out.push(`Changed: ${point}`);
+  for (const point of entry.fixed) out.push(`Fixed: ${point}`);
+  return out.slice(0, 24);
+}
+
+function toStructuredChangelogEntries(
+  parsed: ParsedUserFriendlyChangelog,
+  source: "manual" | "github" | "import",
+  nowMs: number,
+): ChangelogEntry[] {
+  return parsed.releases.map((release, idx) => ({
+    id: `release-${release.version.replace(/[^A-Za-z0-9]+/g, "-").replace(/^-+|-+$/g, "").toLowerCase() || String(nowMs + idx)}`,
+    version: release.version,
+    date: new Date(nowMs - idx * 1000).toISOString(),
+    summary: release.summary,
+    added: [...release.added],
+    changed: [...release.changed],
+    fixed: [...release.fixed],
+    markdown: buildReleaseMarkdown(release),
+    source,
+    changes: buildLegacyChanges(release),
+    isImportant: idx === 0,
+  }));
+}
+
+function sanitizeIncomingChangelogEntries(input: unknown): ChangelogEntry[] {
+  if (!Array.isArray(input)) return [];
+  return input
+    .map((row) => {
+      if (!isPlainObject(row)) return null;
+      const source = row as Record<string, unknown>;
+      const id = trimAndLimitString(source.id, 160);
+      const version = normalizeReleaseVersion(trimAndLimitString(source.version, 64));
+      const dateRaw = trimAndLimitString(source.date, 64);
+      const parsedDate = dateRaw ? Date.parse(dateRaw) : NaN;
+      const date = Number.isFinite(parsedDate) ? new Date(parsedDate).toISOString() : new Date().toISOString();
+      if (!id || !version) return null;
+      const summary = trimAndLimitString(source.summary, 600);
+      const added = Array.isArray(source.added)
+        ? source.added.map((item) => trimAndLimitString(item, 300)).filter((item) => item.length > 0).slice(0, 20)
+        : [];
+      const changed = Array.isArray(source.changed)
+        ? source.changed.map((item) => trimAndLimitString(item, 300)).filter((item) => item.length > 0).slice(0, 20)
+        : [];
+      const fixed = Array.isArray(source.fixed)
+        ? source.fixed.map((item) => trimAndLimitString(item, 300)).filter((item) => item.length > 0).slice(0, 20)
+        : [];
+      const markdown = trimAndLimitString(source.markdown, 12000);
+      const changes = Array.isArray(source.changes)
+        ? source.changes.map((item) => trimAndLimitString(item, 300)).filter((item) => item.length > 0).slice(0, 40)
+        : [];
+      const release: UserFriendlyRelease = {
+        version,
+        summary: summary || "",
+        added,
+        changed,
+        fixed,
+      };
+      const derivedChanges = changes.length > 0 ? changes : buildLegacyChanges(release);
+      return {
+        id,
+        version,
+        date,
+        summary: summary || undefined,
+        added,
+        changed,
+        fixed,
+        markdown: markdown || (summary ? buildReleaseMarkdown(release) : undefined),
+        source:
+          source.source === "github" || source.source === "import" || source.source === "manual"
+            ? source.source
+            : "manual",
+        changes: derivedChanges,
+        isImportant: source.isImportant === true,
+      } as ChangelogEntry;
+    })
+    .filter((entry): entry is ChangelogEntry => entry !== null);
+}
+
+function normalizeChangelogApplyMode(value: unknown): ChangelogApplyMode {
+  return value === "auto_github" ? "auto_github" : CHANGELOG_DEFAULT_APPLY_MODE;
+}
+
+function normalizeChangelogSyncStatus(value: unknown): ChangelogSyncStatus {
+  if (value === "ok" || value === "error") return value;
+  return "idle";
+}
+
+function normalizeRuleTarget(value: unknown): string {
+  const raw = trimAndLimitString(value, 64).toLowerCase();
+  if (!raw) return "";
+  if (raw === "all") return "all";
+  return normalizeReleaseVersion(raw);
+}
+
+function sanitizeNotificationRules(input: unknown): ChangelogConfig["rules"] {
+  if (!Array.isArray(input)) return [];
+  const byTarget = new Map<string, ChangelogConfig["rules"][number]>();
+  for (const row of input) {
+    if (!isPlainObject(row)) continue;
+    const source = row as Record<string, unknown>;
+    const target = normalizeRuleTarget(source.target);
+    if (!target) continue;
+    const priority =
+      source.priority === "major" || source.priority === "minor" || source.priority === "normal"
+        ? source.priority
+        : "normal";
+    const effect = source.effect === "glow" || source.effect === "pulse" || source.effect === "none"
+      ? source.effect
+      : "none";
+    const id = trimAndLimitString(source.id, 80) || `rule-${target.replace(/[^a-z0-9]+/g, "-")}`;
+    byTarget.set(target, { id, target, priority, effect });
+  }
+  return [...byTarget.values()].slice(0, 200);
+}
+
+function normalizeAutoSyncIntervalMinutes(value: unknown): number {
+  return clampInt(
+    value,
+    CHANGELOG_MIN_AUTO_SYNC_INTERVAL_MINUTES,
+    CHANGELOG_MAX_AUTO_SYNC_INTERVAL_MINUTES,
+    CHANGELOG_DEFAULT_AUTO_SYNC_INTERVAL_MINUTES,
+  );
+}
+
+function computeChangelogLiveHash(entries: ChangelogEntry[]): string {
+  const stable = entries
+    .map((entry) => ({
+      version: normalizeReleaseVersion(entry.version),
+      summary: trimAndLimitString(entry.summary, 2000),
+      added: Array.isArray(entry.added) ? entry.added.map((row) => trimAndLimitString(row, 400)) : [],
+      changed: Array.isArray(entry.changed) ? entry.changed.map((row) => trimAndLimitString(row, 400)) : [],
+      fixed: Array.isArray(entry.fixed) ? entry.fixed.map((row) => trimAndLimitString(row, 400)) : [],
+      changes: Array.isArray(entry.changes) ? entry.changes.map((row) => trimAndLimitString(row, 400)) : [],
+    }))
+    .filter((entry) => entry.version.length > 0)
+    .sort((a, b) => a.version.localeCompare(b.version));
+  return JSON.stringify(stable);
+}
+
+function sanitizeLoadedChangelogDraft(raw: unknown): ChangelogDraftState | null {
+  if (!isPlainObject(raw)) return null;
+  const source = raw as Record<string, unknown>;
+  const markdown = trimAndLimitString(source.markdown, 750_000);
+  const markdownUrl = trimAndLimitString(source.markdownUrl, 600);
+  const entries = sanitizeIncomingChangelogEntries(source.entries);
+  const errors = Array.isArray(source.errors)
+    ? source.errors
+        .filter((item): item is string => typeof item === "string")
+        .map((item) => trimAndLimitString(item, 240))
+        .filter((item) => item.length > 0)
+        .slice(0, 20)
+    : [];
+  const valid = source.valid === true;
+  const updatedAt = clampInt(source.updatedAt, 0, Number.MAX_SAFE_INTEGER, 0);
+  const draftSource =
+    source.source === "github" || source.source === "import" || source.source === "manual"
+      ? source.source
+      : "manual";
+  if (!markdown && entries.length === 0) return null;
+  return {
+    markdown,
+    markdownUrl: markdownUrl || undefined,
+    entries,
+    errors,
+    valid,
+    updatedAt: updatedAt > 0 ? updatedAt : Date.now(),
+    source: draftSource,
+  };
+}
 
 // Storage key inside DO storage
 const STORAGE_KEY = "analytics_state";
