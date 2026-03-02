@@ -325,7 +325,61 @@
               </div>
             </div>
 
-            <h3 class="section-heading">Top Today (UTC 00:00-24:00)</h3>
+            <div class="stats-grid" id="website-overview-stats-grid">
+              <div class="stat-card" data-tooltip="Website visits ingested into Oracle analytics" data-tooltip-position="bottom">
+                <div class="stat-header">
+                  <span class="stat-label">Website Visits</span>
+                  <div class="stat-icon cyan">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"></path>
+                      <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                  </div>
+                </div>
+                <div class="stat-value" id="stat-website-visits">--</div>
+                <div class="stat-subtext">Website traffic</div>
+              </div>
+              <div class="stat-card" data-tooltip="Feedback submissions from uninstall page" data-tooltip-position="bottom">
+                <div class="stat-header">
+                  <span class="stat-label">Website Feedback</span>
+                  <div class="stat-icon yellow">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                  </div>
+                </div>
+                <div class="stat-value" id="stat-website-feedback">--</div>
+                <div class="stat-subtext">Uninstall feedback</div>
+              </div>
+              <div class="stat-card" data-tooltip="Install/download CTA clicks tracked across website surfaces" data-tooltip-position="bottom">
+                <div class="stat-header">
+                  <span class="stat-label">Website CTA Clicks</span>
+                  <div class="stat-icon blue">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M12 19V5"></path>
+                      <path d="m5 12 7-7 7 7"></path>
+                    </svg>
+                  </div>
+                </div>
+                <div class="stat-value" id="stat-website-cta-clicks">--</div>
+                <div class="stat-subtext">Install + Download</div>
+              </div>
+              <div class="stat-card" data-tooltip="Map prompt responses from website users" data-tooltip-position="bottom">
+                <div class="stat-header">
+                  <span class="stat-label">Map Yes/No Ratio</span>
+                  <div class="stat-icon green">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="22 6 12 16 8 12"></polyline>
+                      <polyline points="2 6 8 12"></polyline>
+                    </svg>
+                  </div>
+                </div>
+                <div class="stat-value" id="stat-website-map-ratio">--</div>
+                <div class="stat-subtext" id="stat-website-map-total">--</div>
+              </div>
+            </div>
+
+            <h3 class="section-heading">Top Today</h3>
             <div class="top-today-grid" id="top-today-grid">
               <div class="top-card" data-tooltip="Most used browser today">
                 <div class="top-icon" id="top-browser-icon">🌐</div>
