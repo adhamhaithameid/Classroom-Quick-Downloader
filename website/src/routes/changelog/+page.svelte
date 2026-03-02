@@ -259,30 +259,26 @@
         </a>
       </div>
     </div>
-  </header>
+  </section>
 
-  {#if state === 'loading'}
-    <div class="state-loading">Loading changelog…</div>
-  {:else if state === 'error'}
-    <div class="state-error">
-      <strong>Could not load changelog.</strong>
-      <p>{error}</p>
-      <button type="button" class="action-btn" on:click={() => load(true)} disabled={refreshing}>Retry</button>
-    </div>
-  {:else}
-    <div class="changelog-body">
-      <!-- Sidebar -->
-      <aside class="sidebar">
-        <div class="sidebar-card">
-          <h3 class="sidebar-label">On this page</h3>
-          <nav class="sidebar-links">
-            {#each changelog?.entries ?? [] as entry}
-              <a href="#v{entry.version}">
-                <span class="sv"><AnimatedNumericText text={entry.version} animated /></span>
-                <span class="sd"><AnimatedNumericText text={formatDateShort(entry.releasedAtUtc)} animated /></span>
-              </a>
-            {/each}
-          </nav>
+  <!-- Body -->
+  <section class="cl-body-section">
+    <div class="cl-wrap">
+      {#if state === 'loading'}
+        <div class="cl-state-card cl-reveal">
+          <div class="cl-state-inner">
+            <span class="cl-state-icon">⏳</span>
+            <p>Loading changelog from the servers…</p>
+          </div>
+        </div>
+      {:else if state === 'error'}
+        <div class="cl-state-card cl-state-error cl-reveal">
+          <div class="cl-state-inner">
+            <span class="cl-state-icon">⚠️</span>
+            <strong>Could not load changelog.</strong>
+            <p>{error}</p>
+            <button type="button" class="cl-action-pill" on:click={() => load(true)} disabled={refreshing}>Retry</button>
+          </div>
         </div>
       </aside>
 
