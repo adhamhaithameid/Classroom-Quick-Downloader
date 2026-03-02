@@ -93,6 +93,8 @@ type DurableStateShape = {
   // IP Allowlist configuration
   ipAllowlistEnabled: boolean;
   ipAllowlist: string[];
+  ipAllowlistStepUpBypassEnabled: boolean;
+  dangerActionAuditLogs: DangerActionAuditRecord[];
 
   // Track endpoint rate limiting (per-IP, per-minute)
   trackRates: Record<string, { count: number; minute: number }>;
