@@ -80,20 +80,7 @@ describe('public website API integration', () => {
     vi.setSystemTime(new Date('2026-02-21T22:00:00.000Z'));
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () =>
-        new Response(
-          JSON.stringify({
-            ok: true,
-            generatedAt: 1700000,
-            totals: { downloads: 10, success: 9, fail: 1 },
-            installs: { usersTotal: 99, lastSyncedAtUtc: 1700000, browsers: [] },
-            versions: { github: '1.3.6', chrome: '1.3.6', firefox: '1.3.6', edge: '1.3.6' },
-            status: { systemLive: true, liveSinceUtc: 1700000, workerHealth: 'up' },
-            links: { chrome: 'https://c', firefox: 'https://f', edge: 'https://e', github: 'https://g' }
-          }),
-          { status: 200 }
-        )
-      )
+      vi.fn(async () => new Response(JSON.stringify(buildSnapshotPayload(10)), { status: 200 }))
     );
 
     const payload = await fetchOverview();
