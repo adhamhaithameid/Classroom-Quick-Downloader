@@ -264,6 +264,11 @@
 </div>
 
 <style>
+  main {
+    flex: 1;
+    min-height: 0;
+  }
+
   .site-shell {
     min-height: 100vh;
     display: flex;
