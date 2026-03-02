@@ -3403,7 +3403,8 @@
     z-index: 2;
     width: 100%;
     background: rgba(255, 255, 255, 0.55);
-    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
     border: 1px solid var(--border-subtle);
     border-radius: 24px;
     padding: 64px 48px;
