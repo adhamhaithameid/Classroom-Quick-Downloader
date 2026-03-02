@@ -316,7 +316,7 @@ function cloneCounterMap(input: Record<string, number> | undefined): Record<stri
 }
 
 const CONFIG_VERSION = 2;
-const DEFAULT_DAILY_FLUSH_WINDOW_START_UTC = 1;
+const DEFAULT_DAILY_FLUSH_WINDOW_START_UTC = 23;
 const DEFAULT_DAILY_FLUSH_WINDOW_MINUTES = 120;
 
 // Quota thresholds (approx. Cloudflare daily request quotas)
