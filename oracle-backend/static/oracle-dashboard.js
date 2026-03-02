@@ -2085,12 +2085,44 @@
         var visitorsContainer = document.getElementById('chart-visitors-timeseries');
         var uniqueContainer = document.getElementById('chart-unique-returning');
         try {
-          var range14 = getDateRange(14);
-          var data = await fetchJSON('/api/stats/timeseries?granularity=day&from=' + range14.from + '&to=' + range14.to);
-          if (!data.points || !data.points.length) {
-            dailyContainer.innerHTML = '<div class="empty-state">No data</div>';
-          } else {
-            renderBarChart(dailyContainer, data.points, 'day');
+          var visitorsData = await fetchJSON('/api/stats/visitors-timeseries' + rangeQuery + '&granularity=' + encodeURIComponent(rangeParams.granularity));
+          setChartsWindowMeta(visitorsData.meta || {
+            windowStartUtc: visitorsData.windowStartUtc,
+            windowEndUtc: visitorsData.windowEndUtc,
+            generatedAtUtc: visitorsData.generatedAtUtc
+          });
+          var points = Array.isArray(visitorsData.points) ? visitorsData.points : [];
+          renderMetricBars(visitorsContainer, points, { valueKey: 'visits', granularity: rangeParams.granularity, metricLabel: 'Visits' });
+          renderUniqueReturning(uniqueContainer, points);
+
+          var exportRows = points.map(function(row) {
+            return {
+              timestamp: row.timestamp || '',
+              visits: Number(row.visits || 0),
+              requests: Number(row.requests || 0),
+              uniqueSessions: Number(row.uniqueSessions || 0),
+              returningSessions: Number(row.returningSessions || 0)
+            };
+          });
+          setChartsExportDataset('visitors_timeseries', exportRows);
+
+          if (chartsComparePrevious && points.length) {
+            var prevWindow = previousDateWindow(visitorsData.from, visitorsData.to);
+            if (prevWindow) {
+              var prevData = await fetchJSON(
+                '/api/stats/visitors-timeseries?from=' + encodeURIComponent(prevWindow.from) +
+                '&to=' + encodeURIComponent(prevWindow.to) +
+                '&granularity=' + encodeURIComponent(rangeParams.granularity)
+              );
+              var currTotal = points.reduce(function(sum, row) { return sum + Number(row.visits || 0); }, 0);
+              var prevPoints = Array.isArray(prevData.points) ? prevData.points : [];
+              var prevTotal = prevPoints.reduce(function(sum, row) { return sum + Number(row.visits || 0); }, 0);
+              var delta = calcPctDelta(prevTotal, currTotal);
+              var compareNode = document.getElementById('charts-window-meta');
+              if (compareNode) {
+                compareNode.textContent += ' · Visits delta vs previous: ' + delta;
+              }
+            }
           }
         } catch (e) {
           dailyContainer.innerHTML = '<div class="empty-state empty-state-danger">Failed</div>';
