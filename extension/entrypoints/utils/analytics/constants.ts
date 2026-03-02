@@ -77,7 +77,17 @@ export const WORKER_BASE_URL = WORKER_URL.replace(/\/+track$/, '');
 export const CONFIG_URL = WORKER_BASE_URL ? `${WORKER_BASE_URL}/config` : '';
 export const CHANGELOG_URL = WORKER_BASE_URL ? `${WORKER_BASE_URL}/changelog` : '';
 const DEFAULT_WEBSITE_BASE_URL = 'https://classroom-quick-downloader-website.pages.dev';
-const WEBSITE_URL = (import.meta.env.VITE_PUBLIC_SITE_URL as string) || DEFAULT_WEBSITE_BASE_URL;
+const WEBSITE_URL = (import.meta.env.VITE_PUBLIC_SITE_URL as string) || resolveManifestHomepageUrl() || DEFAULT_WEBSITE_BASE_URL;
+
+function resolveManifestHomepageUrl(): string {
+  try {
+    const runtime = globalThis.chrome?.runtime;
+    const manifest = runtime?.getManifest?.();
+    return typeof manifest?.homepage_url === 'string' ? manifest.homepage_url : '';
+  } catch {
+    return '';
+  }
+}
 
 function normalizeBaseUrl(value: string): string {
   const trimmed = value.trim().replace(/\/+$/, '');
