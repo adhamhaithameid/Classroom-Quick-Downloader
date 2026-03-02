@@ -44,6 +44,7 @@ export type OverviewResponse = {
 };
 
 export type MapResponse = {
+  schemaVersion: PublicSchemaVersion;
   ok: boolean;
   generatedAt: number;
   granularity: 'country';
