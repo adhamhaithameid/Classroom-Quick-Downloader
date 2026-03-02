@@ -96,8 +96,9 @@
         source: querySource,
         notes: buildUninstallNotesPayload({
           reason: selectedReason,
-          confidence: confidenceToReinstall,
-          features: selectedFeatures,
+          confidenceToReinstall: confidenceToReinstall || 'not_provided',
+          selectedFeatures,
+          urgency: 'not_provided',
           notes
         })
       });
