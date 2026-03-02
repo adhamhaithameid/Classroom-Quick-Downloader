@@ -850,6 +850,47 @@ func TestLoggingMiddleware_PersistsOracleOperationLogs(t *testing.T) {
 	}
 }
 
+func TestIsDangerAuditedPath(t *testing.T) {
+	if !isDangerAuditedPath("/api/admin/website/force-push") {
+		t.Fatal("expected force-push to be treated as danger-audited path")
+	}
+	if isDangerAuditedPath("/api/admin/website/state") {
+		t.Fatal("did not expect website/state to be treated as danger-audited path")
+	}
+}
+
+func TestLoggingMiddleware_AppendsDangerAuditForCriticalPath(t *testing.T) {
+	sqlDB, err := db.Init(filepath.Join(t.TempDir(), "oracle-danger-audit.db"))
+	if err != nil {
+		t.Fatalf("db init failed: %v", err)
+	}
+	defer sqlDB.Close()
+
+	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		setActorContextOnWriter(w, "super-admin", "tok-123", "super_admin")
+		w.WriteHeader(http.StatusAccepted)
+	})
+	handler := observability.RequestContextMiddleware(loggingMiddleware(sqlDB, inner))
+
+	req := httptest.NewRequest(http.MethodPost, "/api/admin/website/force-push", nil).
+		WithContext(observability.WithActorContext(context.Background(), "super-admin", "tok-123", "super_admin"))
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+	if rr.Code != http.StatusAccepted {
+		t.Fatalf("unexpected status code: %d", rr.Code)
+	}
+
+	var count int64
+	if err := sqlDB.QueryRow(
+		`SELECT COUNT(*) FROM admin_audit_log WHERE action_type = 'danger_action_request' AND resource_id = '/api/admin/website/force-push'`,
+	).Scan(&count); err != nil {
+		t.Fatalf("query admin_audit_log failed: %v", err)
+	}
+	if count < 1 {
+		t.Fatalf("expected at least one danger_action_request audit row, got %d", count)
+	}
+}
+
 func TestLoggingMiddleware_SkipsStaticAssetPaths(t *testing.T) {
 	sqlDB, err := db.Init(filepath.Join(t.TempDir(), "oracle-no-log.db"))
 	if err != nil {
