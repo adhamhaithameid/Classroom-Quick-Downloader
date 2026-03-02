@@ -428,6 +428,17 @@ function isAdminCorsRoute(pathname: string): boolean {
   return pathname.startsWith("/admin/") || pathname.startsWith("/debug/");
 }
 
+function isDashboardRoute(pathname: string): boolean {
+  return (
+    pathname === "/" ||
+    pathname === "/dashboard" ||
+    pathname === "/logout" ||
+    pathname === "/stats" ||
+    pathname === "/auth/verify-danger" ||
+    isAdminCorsRoute(pathname)
+  );
+}
+
 function isProtectedCorsRoute(pathname: string): boolean {
   return pathname === "/stats" || pathname === "/auth/verify-danger" || isAdminCorsRoute(pathname);
 }
