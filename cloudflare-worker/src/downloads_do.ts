@@ -6706,6 +6706,7 @@ export class DownloadsDurable {
       updated,
       enabled: this.d.ipAllowlistEnabled,
       allowlist: this.d.ipAllowlist,
+      stepUpBypassEnabled: this.d.ipAllowlistStepUpBypassEnabled,
     });
   }
 }
