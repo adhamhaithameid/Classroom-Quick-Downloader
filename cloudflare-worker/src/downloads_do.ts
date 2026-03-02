@@ -6315,8 +6315,24 @@ export class DownloadsDurable {
         }
       }
 
-      if (Array.isArray(body.changelog)) {
-        this.d.changelog = body.changelog;
+      if (changelogFromMarkdown) {
+        this.d.changelog = changelogFromMarkdown;
+        this.d.changelogConfig = {
+          ...this.d.changelogConfig,
+          liveHash: computeChangelogLiveHash(changelogFromMarkdown),
+          markdownSourceUrl: markdownUrl || this.d.changelogConfig.markdownSourceUrl || USER_FRIENDLY_CHANGELOG_GITHUB_URL,
+          markdownHelpUrl: this.d.changelogConfig.markdownHelpUrl || USER_FRIENDLY_CHANGELOG_GITHUB_URL,
+          lastParsedAt: now,
+          lastUpdated: now,
+        };
+        updated = true;
+      } else if (Array.isArray(body.changelog)) {
+        this.d.changelog = sanitizeIncomingChangelogEntries(body.changelog);
+        this.d.changelogConfig = {
+          ...this.d.changelogConfig,
+          liveHash: computeChangelogLiveHash(this.d.changelog),
+          lastUpdated: now,
+        };
         updated = true;
       }
 
