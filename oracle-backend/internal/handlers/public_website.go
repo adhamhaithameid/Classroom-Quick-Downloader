@@ -1588,6 +1588,22 @@ func githubMarkdownURL(filename string) string {
 	return "https://github.com/" + repoSlug + "/blob/main/" + filename
 }
 
+func githubRawMarkdownURL(filename string) string {
+	repoSlug := strings.TrimSpace(os.Getenv("GITHUB_REPO_SLUG"))
+	if repoSlug == "" {
+		repoSlug = defaultGitHubRepoSlug
+	}
+	filename = strings.TrimSpace(filename)
+	if filename == "" {
+		filename = "user-friendly-changelog.md"
+	}
+	parts := strings.SplitN(repoSlug, "/", 2)
+	if len(parts) != 2 {
+		return ""
+	}
+	return "https://raw.githubusercontent.com/" + parts[0] + "/" + parts[1] + "/main/" + filename
+}
+
 func decodeRecordDataMap(raw json.RawMessage) map[string]any {
 	out := make(map[string]any)
 	if len(raw) == 0 {
