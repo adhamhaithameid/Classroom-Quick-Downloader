@@ -308,8 +308,6 @@
     margin: 0 0 14px;
     font-size: 14px; line-height: 1.75;
     color: var(--text-secondary);
-    line-height: 1.75;
-    font-size: 14px;
   }
 
   .privacy-section ul {
