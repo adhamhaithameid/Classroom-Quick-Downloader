@@ -128,8 +128,8 @@ jobs:
         working-directory: oracle-backend
         env:
           BASE_URL: http://127.0.0.1:18080
-          DASHBOARD_PASSWORD: DashAuth#2026!Oracle
-          SUPER_ADMIN_PASSWORD: SuperAdmin#2026!Oracle
+          DASHBOARD_PASSWORD: ${{ env.ORACLE_SMOKE_DASHBOARD_PASSWORD }}
+          SUPER_ADMIN_PASSWORD: ${{ env.ORACLE_SMOKE_SUPER_ADMIN_PASSWORD }}
           ORACLE_ALLOW_HTTP_STORE_URLS: "true"
         run: ./scripts/api-matrix-smoke.sh
 
