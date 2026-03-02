@@ -1334,11 +1334,16 @@
 ### Fixed
 - ...</pre>
                   <form class="form-grid" id="user-changelog-form">
-                    <div class="creative-grid">
-                      <input id="user-changelog-key" class="auth-input" placeholder="Record key (e.g., v1-3-6)" required />
-                      <input id="user-changelog-version" class="auth-input" placeholder="Version (e.g., 1.3.6)" required />
-                      <input id="user-changelog-title" class="auth-input" placeholder="Title (e.g., Stability improvements)" required />
-                      <input id="user-changelog-released-at" class="auth-input" placeholder="Released at UTC (ms, optional)" />
+                    <div class="section-caption" style="margin-top:8px; display:flex; align-items:center; gap:8px;">
+                      User-Friendly Markdown
+                      <button class="btn btn-secondary" id="user-changelog-format-info" type="button" title="Show required markdown format">i</button>
+                    </div>
+                    <input id="user-changelog-markdown-url" class="auth-input" placeholder="GitHub raw markdown URL (optional)" />
+                    <textarea id="user-changelog-markdown" class="auth-input auth-input-lg" placeholder="## v1.3.8&#10;### Summary&#10;...&#10;### Added&#10;- ...&#10;### Changed&#10;- ...&#10;### Fixed&#10;- ..."></textarea>
+                    <div class="action-buttons-grid action-buttons-grid-three">
+                      <button class="btn btn-secondary" type="button" id="user-changelog-preview-btn">Preview Draft</button>
+                      <button class="btn btn-secondary" type="button" id="user-changelog-import-url-btn">Import from URL</button>
+                      <a class="btn btn-secondary" href="https://github.com/adhamhaithameid/Classroom-Quick-Downloader/blob/main/user-friendly-changelog.md" target="_blank" rel="noopener noreferrer">Open GitHub Source</a>
                     </div>
                     <textarea id="user-changelog-summary" class="auth-input auth-input-lg" placeholder="Short summary for users" required></textarea>
                     <textarea id="user-changelog-highlights" class="auth-input auth-input-lg" placeholder="Highlights (one line per item)"></textarea>
