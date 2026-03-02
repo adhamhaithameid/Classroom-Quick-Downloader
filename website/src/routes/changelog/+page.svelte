@@ -576,12 +576,11 @@
     box-shadow: 0 8px 28px rgba(0,0,0,0.06);
   }
 
-  .line {
-    width: 2px;
-    flex: 1;
-    background: linear-gradient(180deg, var(--gc-green-light), rgba(87, 187, 138, 0.15));
-    margin-top: 8px;
-    border-radius: 1px;
+  .cl-entry-header { margin-bottom: 10px; }
+
+  .cl-entry-card h2 {
+    margin: 0; font-size: 20px; font-weight: 800;
+    letter-spacing: -0.02em; color: var(--text);
   }
 
   .entry-body {
