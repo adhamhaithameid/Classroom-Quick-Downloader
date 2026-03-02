@@ -174,10 +174,11 @@ type publicWebsiteUninstallRequest struct {
 }
 
 type publicWebsiteUninstallResponse struct {
-	OK           bool   `json:"ok"`
-	GeneratedAt  int64  `json:"generatedAt"`
-	SubmissionID int64  `json:"submissionId"`
-	Message      string `json:"message"`
+	SchemaVersion string `json:"schemaVersion"`
+	OK            bool   `json:"ok"`
+	GeneratedAt   int64  `json:"generatedAt"`
+	SubmissionID  int64  `json:"submissionId"`
+	Message       string `json:"message"`
 }
 
 type publicWebsiteUninstallStatsResponse struct {
