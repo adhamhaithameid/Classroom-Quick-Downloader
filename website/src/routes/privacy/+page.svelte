@@ -266,9 +266,10 @@
     max-width: 560px; margin: 0 auto;
   }
 
-  .action-btn:hover {
-    border-color: rgba(26, 139, 85, 0.25);
-    color: var(--gc-green);
+  /* ── Card Grid ─────────────────── */
+  .prv-sections-section {
+    position: relative; z-index: 2;
+    padding: 40px 0 60px;
   }
 
   /* ── Section Grid ────────────────── */
