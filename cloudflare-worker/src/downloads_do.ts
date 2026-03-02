@@ -2841,7 +2841,16 @@ export class DownloadsDurable {
       await this.flushToOracle(true);
     }
 
-    // Schedule next midnight alarm
+    // Flush website telemetry queue once daily at 23:00 UTC.
+    if (this.d.websiteTelemetryQueue.length > 0 && currentHour === 23) {
+      await this.flushWebsiteTelemetryQueue({
+        force: true,
+        trigger: "daily_alarm",
+        maxBatches: 300,
+      });
+    }
+
+    // Schedule next daily alarm
     await this.scheduleNextMidnightAlarm();
 
     // Retry failed Oracle flushes
