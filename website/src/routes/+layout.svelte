@@ -159,7 +159,13 @@
       </nav>
 
       <div class="l2-nav-actions">
-        <a class="l2-nav-cta l2-nav-cta-desktop" href={browserLink(detectedBrowser)} target="_blank" rel="noopener noreferrer">
+        <a
+          class="l2-nav-cta l2-nav-cta-desktop"
+          href={browserLink(detectedBrowser)}
+          target="_blank"
+          rel="noopener noreferrer"
+          on:click={() => trackInstallClick('nav_install')}
+        >
           Install for {browserDisplayName(detectedBrowser)}
         </a>
         <button
