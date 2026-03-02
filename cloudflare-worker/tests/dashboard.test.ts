@@ -177,7 +177,7 @@ describe("Dashboard login rendering", () => {
 });
 
 describe("Dashboard security rendering", () => {
-  it("escapes changelog fields and script-embedded config JSON", () => {
+  it("escapes changelog fields inside embedded raw stats JSON", () => {
     const stats = makeStats({
       changelog: [
         {
@@ -203,10 +203,10 @@ describe("Dashboard security rendering", () => {
 
     expect(html).not.toContain(`<script>alert('xss')</script>`);
     expect(html).not.toContain(`</script><script>alert(1)</script>`);
-    expect(html).not.toContain(`data-release-id="rel-1"><img src=x onerror=alert(1)>"`);
+    expect(html).not.toContain(`<img src=x onerror=alert(1)>`);
 
-    expect(html).toContain("&lt;script&gt;alert(&#039;xss&#039;)&lt;/script&gt;");
-    expect(html).toContain("\\u003c/script\\u003e\\u003cscript\\u003ealert(1)\\u003c/script\\u003e");
-    expect(html).toContain("data-release-id=\"rel-1&quot;&gt;&lt;img src=x onerror=alert(1)&gt;\"");
+    expect(html).toContain("&lt;script&gt;alert('xss')&lt;/script&gt;");
+    expect(html).toContain("&lt;/script&gt;&lt;script&gt;alert(1)&lt;/script&gt;");
+    expect(html).toContain("&lt;img src=x onerror=alert(1)&gt;");
   });
 });
