@@ -404,6 +404,12 @@ export interface ChangelogEntry {
   version: string;
   date: string; // ISO date string
   changes: string[]; // List of changes
+  summary?: string;
+  added?: string[];
+  changed?: string[];
+  fixed?: string[];
+  markdown?: string;
+  source?: "manual" | "github" | "import";
   isImportant?: boolean; // Highlight in UI?
 }
 
