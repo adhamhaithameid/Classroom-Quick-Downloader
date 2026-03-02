@@ -489,3 +489,172 @@ func TestTimeSeriesHandler_MethodNotAllowed(t *testing.T) {
 		t.Fatalf("expected 405, got %d", rr.Code)
 	}
 }
+
+func TestBreakdownHandler_IncludesUTCWindowMeta(t *testing.T) {
+	sqlDB := newStatsTestDB(t)
+	defer sqlDB.Close()
+
+	seedHourly(t, sqlDB, time.Now().UTC().Format("2006-01-02T15:04:05Z07:00"), 5, 4, 1, `{"1.0.0":5}`)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/stats/breakdown?dimension=browser&range=today", nil)
+	rr := httptest.NewRecorder()
+	BreakdownHandler(sqlDB).ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var resp map[string]any
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+	if _, ok := resp["windowStartUtc"].(string); !ok {
+		t.Fatalf("expected windowStartUtc string, got %T", resp["windowStartUtc"])
+	}
+	if _, ok := resp["windowEndUtc"].(string); !ok {
+		t.Fatalf("expected windowEndUtc string, got %T", resp["windowEndUtc"])
+	}
+}
+
+func TestVisitorsTimeseriesHandler_ReturnsTrafficAndSessionSeries(t *testing.T) {
+	sqlDB := newStatsTestDB(t)
+	defer sqlDB.Close()
+
+	_, err := sqlDB.Exec(`
+		INSERT INTO website_traffic_hourly (hour_utc, visits, requests, fetched_at, source)
+		VALUES
+		('2026-02-01T00:00:00Z', 40, 100, 1770000000000, 'cloudflare_graphql'),
+		('2026-02-02T00:00:00Z', 60, 140, 1770003600000, 'cloudflare_graphql')
+	`)
+	if err != nil {
+		t.Fatalf("seed website_traffic_hourly failed: %v", err)
+	}
+	_, err = sqlDB.Exec(`
+		INSERT INTO website_events_raw (
+			event_id, source, batch_id, session_id, page_path, event_type, action, placement,
+			event_ts_utc, generated_at_utc, attempt, correlation_id, meta_json, raw_event_json, ingested_at
+		) VALUES
+		('evt-1', 'web', 'b1', 's-1', '/overview', 'cta', 'install_click', 'hero', 1770000000000, 1770000000000, 1, '', '{}', '{}', 1770000000000),
+		('evt-2', 'web', 'b1', 's-1', '/overview', 'cta', 'download_click', 'hero', 1770086400000, 1770086400000, 1, '', '{}', '{}', 1770086400000),
+		('evt-3', 'web', 'b1', 's-2', '/overview', 'cta', 'install_click', 'hero', 1770086400000, 1770086400000, 1, '', '{}', '{}', 1770086400000)
+	`)
+	if err != nil {
+		t.Fatalf("seed website_events_raw failed: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/stats/visitors-timeseries?from=2026-02-01&to=2026-02-03&granularity=day", nil)
+	rr := httptest.NewRecorder()
+	VisitorsTimeseriesHandler(sqlDB).ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp struct {
+		OK     bool `json:"ok"`
+		Points []struct {
+			Visits            int64 `json:"visits"`
+			Requests          int64 `json:"requests"`
+			UniqueSessions    int64 `json:"uniqueSessions"`
+			ReturningSessions int64 `json:"returningSessions"`
+		} `json:"points"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+	if !resp.OK || len(resp.Points) == 0 {
+		t.Fatalf("unexpected response: %+v", resp)
+	}
+}
+
+func TestFunnelHandler_ReturnsExpectedStages(t *testing.T) {
+	sqlDB := newStatsTestDB(t)
+	defer sqlDB.Close()
+
+	_, err := sqlDB.Exec(`
+		INSERT INTO website_traffic_hourly (hour_utc, visits, requests, fetched_at, source)
+		VALUES ('2026-02-01T00:00:00Z', 100, 200, 1770000000000, 'cloudflare_graphql')
+	`)
+	if err != nil {
+		t.Fatalf("seed website_traffic_hourly failed: %v", err)
+	}
+	_, err = sqlDB.Exec(`
+		INSERT INTO website_event_daily (day_utc, event_type, action, placement, count, last_seen_at)
+		VALUES
+		('2026-02-01', 'cta', 'install_click', 'hero', 50, 1770000000000),
+		('2026-02-01', 'cta', 'download_click', 'hero', 45, 1770000000000),
+		('2026-02-01', 'map', 'map_yes', 'map_prompt_yes', 30, 1770000000000)
+	`)
+	if err != nil {
+		t.Fatalf("seed website_event_daily failed: %v", err)
+	}
+	seedHourly(t, sqlDB, "2026-02-01T00:00:00Z", 35, 30, 5, `{"1.0.0":35}`)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/stats/funnel?from=2026-02-01&to=2026-02-01", nil)
+	rr := httptest.NewRecorder()
+	FunnelHandler(sqlDB).ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	var resp struct {
+		Stages []struct {
+			Key   string `json:"key"`
+			Count int64  `json:"count"`
+		} `json:"stages"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+	if len(resp.Stages) < 4 {
+		t.Fatalf("expected at least 4 stages, got %d", len(resp.Stages))
+	}
+}
+
+func TestSegmentsAndHeatmapHandlers(t *testing.T) {
+	sqlDB := newStatsTestDB(t)
+	defer sqlDB.Close()
+
+	seedHourly(t, sqlDB, "2026-02-01T09:00:00Z", 10, 8, 2, `{"1.0.0":10}`)
+	_, err := sqlDB.Exec(`
+		UPDATE downloads_hourly
+		SET by_browser_json = '{"chrome":8,"firefox":2}', by_country_json = '{"US":7,"EG":3}'
+		WHERE bucket_start = '2026-02-01T09:00:00Z'
+	`)
+	if err != nil {
+		t.Fatalf("seed breakdown json failed: %v", err)
+	}
+	_, err = sqlDB.Exec(`
+		INSERT INTO website_events_raw (
+			event_id, source, batch_id, session_id, page_path, event_type, action, placement,
+			event_ts_utc, generated_at_utc, attempt, correlation_id, meta_json, raw_event_json, ingested_at
+		) VALUES
+		('evt-path-1', 'web', 'b1', 's-path-1', '/faq', 'cta', 'install_click', 'faq_cta', 1770000000000, 1770000000000, 1, '', '{"device":"desktop","referrer":"google"}', '{}', 1770000000000)
+	`)
+	if err != nil {
+		t.Fatalf("seed website_events_raw failed: %v", err)
+	}
+
+	segmentsReq := httptest.NewRequest(http.MethodGet, "/api/stats/segments?dimension=path&from=2026-02-01&to=2026-02-02", nil)
+	segmentsRR := httptest.NewRecorder()
+	SegmentsHandler(sqlDB).ServeHTTP(segmentsRR, segmentsReq)
+	if segmentsRR.Code != http.StatusOK {
+		t.Fatalf("expected 200 from segments, got %d: %s", segmentsRR.Code, segmentsRR.Body.String())
+	}
+
+	heatmapReq := httptest.NewRequest(http.MethodGet, "/api/stats/heatmap?from=2026-02-01&to=2026-02-02", nil)
+	heatmapRR := httptest.NewRecorder()
+	HeatmapHandler(sqlDB).ServeHTTP(heatmapRR, heatmapReq)
+	if heatmapRR.Code != http.StatusOK {
+		t.Fatalf("expected 200 from heatmap, got %d: %s", heatmapRR.Code, heatmapRR.Body.String())
+	}
+	var heatmapResp struct {
+		Cells []struct {
+			DayOfWeek int   `json:"dayOfWeek"`
+			HourUTC   int   `json:"hourUtc"`
+			Count     int64 `json:"count"`
+		} `json:"cells"`
+	}
+	if err := json.Unmarshal(heatmapRR.Body.Bytes(), &heatmapResp); err != nil {
+		t.Fatalf("unmarshal heatmap failed: %v", err)
+	}
+	if len(heatmapResp.Cells) != 168 {
+		t.Fatalf("expected 168 heatmap cells, got %d", len(heatmapResp.Cells))
+	}
+}
