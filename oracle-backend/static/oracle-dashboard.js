@@ -2395,11 +2395,12 @@
           applyInfraLink('infra-link-edge-dev', links.edgeDevDashboard || DEFAULT_INFRA_LINKS.edgeDevDashboard);
           applyInfraLink('infra-link-chrome-store', links.chromeStoreListing || DEFAULT_INFRA_LINKS.chromeStoreListing);
           applyInfraLink('infra-link-firefox-store', links.firefoxStoreListing || DEFAULT_INFRA_LINKS.firefoxStoreListing);
-          applyInfraLink('infra-link-edge-store', links.edgeStoreListing || DEFAULT_INFRA_LINKS.edgeStoreListing);
-          applyInfraLink('user-changelog-open-website', joinInfraUrl(links.website || DEFAULT_INFRA_LINKS.website, '/changelog'));        } catch (_) {
-          applyInfraLink('infra-link-cloudflare', DEFAULT_INFRA_LINKS.cloudflare);
-          applyInfraLink('infra-link-website', DEFAULT_INFRA_LINKS.website);
-          applyInfraLink('infra-link-uptime', DEFAULT_INFRA_LINKS.uptimeKuma);
+	          applyInfraLink('infra-link-edge-store', links.edgeStoreListing || DEFAULT_INFRA_LINKS.edgeStoreListing);
+	          applyInfraLink('user-changelog-open-website', joinInfraUrl(links.website || DEFAULT_INFRA_LINKS.website, '/changelog'));
+	        } catch (_) {
+	          applyInfraLink('infra-link-cloudflare', DEFAULT_INFRA_LINKS.cloudflare);
+	          applyInfraLink('infra-link-website', DEFAULT_INFRA_LINKS.website);
+	          applyInfraLink('infra-link-uptime', DEFAULT_INFRA_LINKS.uptimeKuma);
           applyInfraLink('infra-link-github', DEFAULT_INFRA_LINKS.githubRepo);
           applyInfraLink('infra-link-sheets', DEFAULT_INFRA_LINKS.googleSheets);
           applyInfraLink('infra-link-figma', DEFAULT_INFRA_LINKS.figmaDesign);
