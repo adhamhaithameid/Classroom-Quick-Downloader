@@ -25,6 +25,7 @@ const PUBLIC_SCHEMA_VERSION: PublicSchemaVersion = '1';
 let cachedSnapshot: WebsiteSnapshot | null = null;
 let cachedSnapshotSource: WebsiteSnapshotFetchSource = 'memory-cache';
 let snapshotInFlight: Promise<WebsiteSnapshot> | null = null;
+let snapshotResultInFlight: Promise<WebsiteSnapshotFetchResult> | null = null;
 let snapshotStorageHydrated = false;
 
 function isSnapshotFresh(snapshot: WebsiteSnapshot): boolean {
