@@ -379,12 +379,9 @@
     -webkit-text-fill-color: transparent;
   }
 
-  .hero p {
-    margin: 10px auto 0;
-    color: var(--text-secondary);
-    font-size: 15px;
-    line-height: 1.7;
-    max-width: 45ch;
+  .un-sub {
+    font-size: 16px; line-height: 1.75; color: var(--text-secondary);
+    max-width: 480px; margin: 0 auto;
   }
 
   /* ── Steps ─────────────────────────── */
