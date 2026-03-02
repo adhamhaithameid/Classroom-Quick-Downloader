@@ -770,7 +770,7 @@ function App() {
                          setChangelogData(latestData);
                        }
                        if (version) {
-                         await markAsSeen(version);
+                         await markAsSeen(version, latestData ?? changelogData);
                          setSeen(true);
                        }
                     }}
