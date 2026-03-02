@@ -135,10 +135,6 @@
     } catch { return code; }
   }
 
-  /* Parallax offset for 3D SVG */
-  let solutionParallaxY = 0;
-  let solutionSectionEl: HTMLElement | null = null;
-
   /* Silly map interaction — one-time question */
   let mapInteractionState: 'idle' | 'yes' | 'no' = 'idle';
   let sillyAnswered = false;
