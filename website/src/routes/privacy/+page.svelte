@@ -324,13 +324,9 @@
 
   .prv-bullets li::before {
     content: '';
-    position: absolute;
-    left: 0;
-    top: 9px;
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--gc-green-light);
+    position: absolute; left: 0; top: 9px;
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--green-light);
   }
 
   @media (max-width: 780px) {
