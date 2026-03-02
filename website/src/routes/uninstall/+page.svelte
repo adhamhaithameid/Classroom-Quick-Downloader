@@ -707,11 +707,11 @@
     font-size: 14px;
     font-weight: 600;
     color: var(--text-secondary);
-    border: 1px solid var(--border-subtle, rgba(226, 232, 240, 0.35));
-    border-radius: 999px;
-    padding: 7px 14px;
-    transition: all 0.2s ease;
-    background: rgba(255, 255, 255, 0.6);
+    border: 1.5px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    padding: 12px 22px;
+    transition: all 0.25s ease;
+    background: rgba(255, 255, 255, 0.65);
   }
 
   .reinstall-row a:hover {
