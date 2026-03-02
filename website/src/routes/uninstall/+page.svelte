@@ -638,7 +638,7 @@
     gap: 10px;
     padding: 16px 20px;
     border-radius: var(--radius-sm);
-    border: 1px solid var(--border-subtle, rgba(226, 232, 240, 0.35));
+    border: 1px solid var(--border-subtle);
     font-weight: 600;
     font-size: 14px;
     text-align: center;
