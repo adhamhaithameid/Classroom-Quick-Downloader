@@ -1130,19 +1130,6 @@
         stopMapPromptDelay = setupMapPromptDelay();
       });
     });
-    const timer = window.setInterval(() => {
-      void loadSiteData();
-    }, ORACLE_SNAPSHOT_REFRESH_MS);
-
-    /* Parallax scroll for solution 3D SVG */
-    const onScroll = () => {
-      if (!solutionSectionEl) return;
-      const rect = solutionSectionEl.getBoundingClientRect();
-      const vh = window.innerHeight;
-      const progress = 1 - (rect.top / vh);
-      solutionParallaxY = progress * 40;
-    };
-    window.addEventListener('scroll', onScroll, { passive: true });
 
     return () => {
       celebrationActive = false;
