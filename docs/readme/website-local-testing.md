@@ -20,7 +20,7 @@ export ARCHIVER_SHARED_SECRET='dev-archiver-strong'
 export ORACLE_AUDIT_CHECKPOINT_SECRET='dev-audit-strong'
 export ALLOW_LOOPBACK_BYPASS=true
 export SESSION_COOKIE_SECURE=false
-go run ./oracle-backend/cmd/app
+pnpm run dev:oracle
 ```
 
 ## 3) Start Cloudflare Worker (Terminal B)
