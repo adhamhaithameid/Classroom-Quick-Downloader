@@ -115,7 +115,9 @@ describe('fetchChangelog', () => {
 
     const data = await fetchChangelog();
     expect(data.entries[0]?.changes).toEqual(['Valid', 'Also valid']);
-  });
+    },
+    TEST_TIMEOUT_MS
+  );
 
   it('handles empty entries array', async () => {
     vi.stubGlobal(
