@@ -756,9 +756,10 @@
     transition: transform 0.2s ease;
   }
 
-  .faq-answer {
-    margin: 0;
-    padding: 0 16px 14px;
+  .fq-chevron svg { width: 100%; height: 100%; }
+
+  .fq-answer {
+    margin: 0; padding: 0 18px 16px;
     color: var(--text-secondary);
     font-size: 14px;
     line-height: 1.75;
