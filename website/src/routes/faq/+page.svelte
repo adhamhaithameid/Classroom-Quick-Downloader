@@ -333,7 +333,7 @@
     {
       title: 'For Developers',
       icon: '💻',
-      summary: 'Transparency, reporting, and contribution.',
+      summary: 'Architecture, contributing, and technical details.',
       items: [
         {
           id: 'oss-code',
