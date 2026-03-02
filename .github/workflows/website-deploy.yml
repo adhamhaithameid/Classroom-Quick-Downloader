@@ -89,6 +89,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Website typecheck
+        run: pnpm -C website check
+
+      - name: Website smoke tests
+        run: pnpm -C website test:smoke
+
       - name: Build website
         env:
           PUBLIC_BASE_PATH: ""
