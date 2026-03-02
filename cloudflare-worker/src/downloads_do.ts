@@ -1833,6 +1833,7 @@ export class DownloadsDurable {
         markdownHelpUrl: USER_FRIENDLY_CHANGELOG_GITHUB_URL,
         lastUpdated: Date.now(),
       },
+      changelogDraft: null,
       publicSiteMetricsSnapshot: null,
       websitePublicSyncEnabled: true,
       websiteManualFlushAt: null,
