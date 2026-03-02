@@ -950,19 +950,6 @@
       var tooltip = document.getElementById('chart-tooltip');
       var currentTooltipEvent = null;
       var currentTooltipPayload = null;
-      var CMD_DELAY = 1000;
-
-      document.addEventListener('keydown', function(e) {
-        if ((e.key === 'Meta' || e.key === 'Control') && !cmdHeld) {
-          cmdHeld = true;
-          cmdTimer = setTimeout(function() {
-            canShowTooltip = true;
-            if (currentTooltipEvent && currentTooltipPayload) {
-              renderTooltip(currentTooltipEvent, currentTooltipPayload);
-            }
-          }, CMD_DELAY);
-        }
-      });
 
       document.addEventListener('keyup', function(e) {
         if (e.key === 'Meta' || e.key === 'Control') {
