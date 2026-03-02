@@ -4861,6 +4861,7 @@ export class DownloadsDurable {
     }
 
     this.d.hardRemoteOff = false;
+    this.appendDangerAudit(request, "restore_power", "/admin/restore-power", "ok", "remote_on");
     await this.persist();
 
     const quota = computeQuotaDescriptor(
