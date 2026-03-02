@@ -1214,26 +1214,52 @@
   </div>
   <div class="l2-page-grid" aria-hidden="true"></div>
   <div class="l2-page-floats" aria-hidden="true">
-    <!-- 1. Download arrow into tray — near Hero -->
-    <svg class="l2-float-svg fs-1" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M32 8v32"/><path d="M20 30l12 12 12-12"/><rect x="12" y="48" width="40" height="6" rx="2"/></svg>
-    <!-- 2. Browser window with puzzle piece — near Hero -->
-    <svg class="l2-float-svg fs-2" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="10" width="52" height="44" rx="4"/><line x1="6" y1="22" x2="58" y2="22"/><circle cx="14" cy="16" r="2"/><circle cx="22" cy="16" r="2"/><circle cx="30" cy="16" r="2"/><path d="M40 34h6v-4a3 3 0 0 1 6 0v4h6v6h-4a3 3 0 0 0 0 6h4v6H40V34z"/></svg>
-    <!-- 3. Clock with fast-forward — near Students -->
-    <svg class="l2-float-svg fs-3" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="28" cy="32" r="20"/><path d="M28 18v14l10 6"/><path d="M52 22l6 4-6 4"/><path d="M56 26l6 4-6 4"/></svg>
-    <!-- 4. Stacked files with checkmark — near Students -->
-    <svg class="l2-float-svg fs-4" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="10" y="8" width="32" height="40" rx="3"/><rect x="16" y="14" width="32" height="40" rx="3"/><line x1="22" y1="26" x2="42" y2="26"/><line x1="22" y1="34" x2="38" y2="34"/><line x1="22" y1="42" x2="34" y2="42"/><circle cx="50" cy="16" r="8"/><path d="M46 16l3 3 6-6"/></svg>
-    <!-- 5. Split screen (X vs ✓) — near Problem/Solution -->
-    <svg class="l2-float-svg fs-5" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="24" height="48" rx="3"/><rect x="36" y="8" width="24" height="48" rx="3"/><path d="M10 28l12 12M22 28L10 40"/><path d="M42 30l5 5 10-10"/></svg>
-    <!-- 6. Shield with lock — near Features -->
-    <svg class="l2-float-svg fs-6" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M32 6L10 16v16c0 16 22 24 22 24s22-8 22-24V16L32 6z"/><rect x="25" y="28" width="14" height="12" rx="2"/><path d="M28 28v-4a4 4 0 0 1 8 0v4"/><circle cx="32" cy="34" r="1.5"/></svg>
-    <!-- 7. Code brackets </> — near Features -->
-    <svg class="l2-float-svg fs-7" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 14L6 32l16 18"/><path d="M42 14l16 18-16 18"/><line x1="36" y1="10" x2="28" y2="54"/></svg>
-    <!-- 8. Globe with pin markers — near Map -->
-    <svg class="l2-float-svg fs-8" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="32" cy="32" r="24"/><ellipse cx="32" cy="32" rx="10" ry="24"/><path d="M8 32h48"/><path d="M12 18h40"/><path d="M12 46h40"/><circle cx="42" cy="18" r="4" fill="currentColor" opacity="0.15"/><circle cx="22" cy="40" r="3" fill="currentColor" opacity="0.15"/></svg>
-    <!-- 9. Graduation cap — near Social Proof -->
-    <svg class="l2-float-svg fs-9" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M32 10L4 26l28 16 28-16L32 10z"/><path d="M16 34v14c0 4 16 8 16 8s16-4 16-8V34"/><line x1="56" y1="26" x2="56" y2="48"/><circle cx="56" cy="50" r="2"/></svg>
-    <!-- 10. Rocket launching — near CTA -->
-    <svg class="l2-float-svg fs-10" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M32 4c-6 12-10 28-10 40h20c0-12-4-28-10-40z"/><path d="M22 44l-6 14h6z"/><path d="M42 44l6 14h-6z"/><circle cx="32" cy="28" r="4"/><path d="M28 58q4 4 8 0"/><circle cx="32" cy="62" r="1"/></svg>
+    {#each visiblePlacements as p (p.id)}
+      {@const resolved = resolveSvg(p)}
+      <div
+        class="l2-placement-el"
+        class:edit-selected={editMode && selectedElementId === p.id}
+        class:edit-mode={editMode}
+        class:edit-locked={editMode && !!p.locked}
+        role="button"
+        tabindex={editMode ? 0 : -1}
+        aria-disabled={!editMode}
+        style="
+          left: {placementRenderLeftCss(p)};
+          top: {placementRenderTopCss(p)};
+          width: {p.renderSize}px;
+          height: {p.renderSize}px;
+          opacity: {placementRenderOpacity(p)};
+          color: {p.renderColor};
+          --placement-rotate: {p.renderRotate}deg;
+          animation-duration: {p.renderAnimDuration}s;
+          animation-play-state: {placementAnimationPlayState(p)};
+          z-index: {10000 + p.renderZIndex};
+        "
+        on:pointerdown={(e) => { if (editMode) startEditDrag(e, p); }}
+        on:click|stopPropagation={() => { if (editMode) { selectedElementId = p.id; } }}
+        on:keydown={(e) => {
+          if (!editMode) return;
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            selectedElementId = p.id;
+          }
+        }}
+      >
+        <svg
+          viewBox={resolved.viewBox}
+          fill="none" stroke="currentColor" stroke-width="1.5"
+          stroke-linecap="round" stroke-linejoin="round"
+          style="width:100%;height:100%;"
+        >
+          {@html resolved.svg}
+        </svg>
+        {#if editMode}
+          <button class="el-delete-btn" on:pointerdown|stopPropagation on:click|stopPropagation={() => deleteElement(p.id)} title="Delete">✕</button>
+          <span class="el-id-label">{p.id}</span>
+        {/if}
+      </div>
+    {/each}
   </div>
 
   <!-- ━━━━ Hero ━━━━ -->
