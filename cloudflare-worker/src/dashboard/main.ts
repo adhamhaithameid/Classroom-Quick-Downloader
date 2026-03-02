@@ -546,6 +546,20 @@ function renderReleaseManagementSection(entries: ChangelogEntry[], config: Chang
                    <span id="char-counter" class="char-counter">0 / 500</span>
                  </div>
               </div>
+
+              <div style="margin-bottom: 14px;">
+                 <label style="font-size: 0.75em; color: var(--text-soft); display: flex; align-items:center; gap:8px; margin-bottom: 6px;">
+                   User-Friendly Markdown
+                   <button type="button" id="cl-format-help" class="cl-help-btn" title="Show markdown format help">i</button>
+                 </label>
+                 <input id="new-cl-markdown-url" class="input-field" placeholder="GitHub raw URL (optional)" style="width:100%; padding:10px 12px; background: var(--bg-surface); border: 1px solid var(--border-subtle); color:white; border-radius:8px; font-size:0.88em; margin-bottom:8px;">
+                 <textarea id="new-cl-markdown" rows="10" class="input-field" placeholder="## v1.3.8&#10;### Summary&#10;Improved changelog reliability and release delivery for normal users.&#10;### Added&#10;- ...&#10;### Changed&#10;- ...&#10;### Fixed&#10;- ..." style="width:100%; padding:10px 12px; background: var(--bg-surface); border: 1px solid var(--border-subtle); color:white; border-radius:8px; font-size:0.88em; line-height:1.5; resize:vertical;"></textarea>
+                 <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">
+                   <button type="button" id="btn-preview-markdown" class="btn btn-secondary" style="padding:8px 12px;">Preview Draft</button>
+                   <button type="button" id="btn-import-markdown-url" class="btn btn-secondary" style="padding:8px 12px;">Import From URL</button>
+                   <a href="https://github.com/adhamhaithameid/Classroom-Quick-Downloader/blob/main/user-friendly-changelog.md" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="padding:8px 12px; text-decoration:none;">Open GitHub Source</a>
+                 </div>
+              </div>
               
               <button id="btn-save-all" class="btn btn-primary" style="width: 100%; padding: 14px 24px; background: var(--success); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s;">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
