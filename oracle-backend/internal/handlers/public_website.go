@@ -412,7 +412,7 @@ func PublicWebsiteStatusHandler(sqliteDB, postgresDB *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		status, err := buildPublicWebsiteStatus(r.Context(), sqliteDB)
+		snapshot, err := loadOrRefreshPublicWebsiteSnapshot(r.Context(), sqliteDB, postgresDB, false)
 		if err != nil {
 			http.Error(w, "failed to load status", http.StatusInternalServerError)
 			return
