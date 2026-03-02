@@ -280,17 +280,13 @@
             <button type="button" class="cl-action-pill" on:click={() => load(true)} disabled={refreshing}>Retry</button>
           </div>
         </div>
-      </aside>
-
-      <!-- Timeline -->
-      <div class="timeline">
-        {#each changelog?.entries ?? [] as entry, i}
-          <article class="entry" id="v{entry.version}" style="animation-delay: {i * 0.06}s">
-            <div class="marker-col">
-              <div class="dot"></div>
-              {#if i < (changelog?.entries.length ?? 0) - 1}
-                <div class="line"></div>
-              {/if}
+      {:else}
+        {#if degraded}
+          <div class="cl-state-card cl-state-warn cl-reveal">
+            <div class="cl-state-inner">
+              <span class="cl-state-icon">⚠️</span>
+              <strong>Showing cached changelog data.</strong>
+              <p>{error}</p>
             </div>
             <div class="entry-body">
               <span class="entry-date">{formatDate(entry.releasedAtUtc)}</span>
