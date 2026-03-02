@@ -5785,8 +5785,25 @@ export class DownloadsDurable {
    * Returns sorted entries and current config.
    */
   private async handleGetChangelog(): Promise<Response> {
-    const sorted = [...this.d.changelog].sort((a, b) => 
-      new Date(b.date).getTime() - new Date(a.date).getTime()
+    const sorted = this.getSortedChangelogEntries();
+    const sync = this.getChangelogSyncState();
+    return json(
+      {
+        ok: true,
+        entries: sorted,
+        config: this.d.changelogConfig,
+        meta: {
+          liveUpdatedAt: this.d.changelogConfig.lastUpdated ?? null,
+          applyMode: sync.applyMode,
+          lastAutoSyncAt: sync.lastAutoSyncAt,
+          lastAutoSyncStatus: sync.lastAutoSyncStatus,
+        },
+      },
+      {
+        headers: {
+          "cache-control": "no-store, max-age=0, must-revalidate",
+        },
+      },
     );
 
     return json({
