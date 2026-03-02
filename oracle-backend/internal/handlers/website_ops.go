@@ -826,6 +826,271 @@ func RecordWebsiteToOracleBatch(
 	)
 }
 
+func RecordWebsiteEventsIngestBatch(
+	ctx context.Context,
+	db *sql.DB,
+	acceptedCount int,
+	rejectedCount int,
+	sessionID string,
+	pagePath string,
+) error {
+	if db == nil {
+		return errors.New("database not available")
+	}
+	now := time.Now().UTC().UnixMilli()
+	if err := markWebsiteIngestTimestamp(ctx, db, now); err != nil {
+		return err
+	}
+
+	details := map[string]any{
+		"acceptedCount": acceptedCount,
+		"rejectedCount": rejectedCount,
+		"sessionId":     trimAndLimit(sessionID, 96),
+		"pagePath":      trimAndLimit(pagePath, 200),
+	}
+	return insertWebsiteSyncBatch(
+		ctx,
+		db,
+		websiteSyncDirectionWebsiteToOracle,
+		newWebsiteBatchID(websiteSyncDirectionWebsiteToOracle),
+		"website_events_ingest",
+		"ok",
+		details,
+	)
+}
+
+func RecordWebsiteEventsBatchIngest(
+	ctx context.Context,
+	db *sql.DB,
+	batchID string,
+	acceptedCount int,
+	rejectedCount int,
+	attempt int,
+	sessionID string,
+	pagePath string,
+	generatedAtUTC int64,
+) error {
+	if db == nil {
+		return errors.New("database not available")
+	}
+	now := time.Now().UTC().UnixMilli()
+	if err := markWebsiteIngestTimestamp(ctx, db, now); err != nil {
+		return err
+	}
+
+	details := map[string]any{
+		"acceptedCount":  acceptedCount,
+		"rejectedCount":  rejectedCount,
+		"attempt":        attempt,
+		"sessionId":      trimAndLimit(sessionID, 96),
+		"pagePath":       trimAndLimit(pagePath, 200),
+		"generatedAtUtc": generatedAtUTC,
+	}
+	return insertWebsiteSyncBatch(
+		ctx,
+		db,
+		websiteSyncDirectionWebsiteToOracle,
+		trimAndLimit(batchID, 160),
+		"worker_website_events_batch",
+		"ok",
+		details,
+	)
+}
+
+func markWebsiteIngestTimestamp(ctx context.Context, db *sql.DB, now int64) error {
+	row, err := loadWebsiteSyncControl(ctx, db)
+	if err != nil {
+		return err
+	}
+	row.LastWebsiteIngestAt = &now
+	row.UpdatedAt = now
+	if err := updateWebsiteSyncControlRow(ctx, db, row); err != nil {
+		return err
+	}
+	return nil
+}
+
+func markWebsiteIngestTimestampTx(ctx context.Context, tx *sql.Tx, now int64) error {
+	if tx == nil {
+		return errors.New("transaction not available")
+	}
+	_, err := tx.ExecContext(
+		ctx,
+		`UPDATE website_sync_control
+		 SET last_website_ingest_at = ?, updated_at = ?
+		 WHERE id = 1`,
+		now,
+		now,
+	) // #nosec G701 -- static SQL with bound values only.
+	return err
+}
+
+func loadLatestWebsiteMonotonicAnomaly(ctx context.Context, db *sql.DB) (*websiteSyncAnomaly, error) {
+	var tsUTC sql.NullInt64
+	var resourceID sql.NullString
+	var payloadRaw sql.NullString
+	err := db.QueryRowContext(
+		ctx,
+		`SELECT ts_utc, resource_id, payload_json
+		 FROM admin_audit_log
+		 WHERE action_type = 'website_dataset_monotonic_violation'
+		 ORDER BY ts_utc DESC
+		 LIMIT 1`,
+	).Scan(&tsUTC, &resourceID, &payloadRaw) // #nosec G701 -- static SQL with no dynamic fragments.
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if !tsUTC.Valid || tsUTC.Int64 <= 0 {
+		return nil, nil
+	}
+	var latestResolvedAt sql.NullInt64
+	if err := db.QueryRowContext(
+		ctx,
+		`SELECT MAX(created_at)
+		 FROM website_sync_batches
+		 WHERE status = 'ok'`,
+	).Scan(&latestResolvedAt); err == nil {
+		if latestResolvedAt.Valid && latestResolvedAt.Int64 >= tsUTC.Int64 {
+			return nil, nil
+		}
+	}
+	payload := map[string]any{}
+	if payloadRaw.Valid {
+		_ = json.Unmarshal([]byte(payloadRaw.String), &payload)
+	}
+	details := normalizeWebsiteAnomalyDetails(payload["violations"], 8, 200)
+	msg := "Published totals decrease guard blocked a dataset update."
+	if len(details) > 0 {
+		msg = details[0]
+	}
+	return &websiteSyncAnomaly{
+		Active:     true,
+		Source:     trimAndLimit(resourceID.String, 48),
+		Message:    msg,
+		Details:    details,
+		DetectedAt: tsUTC.Int64,
+	}, nil
+}
+
+func normalizeWebsiteAnomalyDetails(value any, maxItems int, maxLen int) []string {
+	out := make([]string, 0, maxItems)
+	switch typed := value.(type) {
+	case []string:
+		for _, row := range typed {
+			item := trimAndLimit(row, maxLen)
+			if item == "" {
+				continue
+			}
+			out = append(out, item)
+			if len(out) >= maxItems {
+				break
+			}
+		}
+	case []any:
+		for _, raw := range typed {
+			item := trimAndLimit(stringFromAny(raw), maxLen)
+			if item == "" {
+				continue
+			}
+			out = append(out, item)
+			if len(out) >= maxItems {
+				break
+			}
+		}
+	}
+	return out
+}
+
+func mergeWebsiteCountryByMax(
+	base []publicWebsiteCountryCell,
+	additional []publicWebsiteCountryCell,
+	maxItems int,
+) []publicWebsiteCountryCell {
+	agg := make(map[string]int64, len(base)+len(additional))
+	for _, row := range base {
+		code := strings.ToUpper(strings.TrimSpace(row.CountryCode))
+		if !isoCountryCodePattern.MatchString(code) || row.Count <= 0 {
+			continue
+		}
+		agg[code] = maxInt64(agg[code], row.Count)
+	}
+	for _, row := range additional {
+		code := strings.ToUpper(strings.TrimSpace(row.CountryCode))
+		if !isoCountryCodePattern.MatchString(code) || row.Count <= 0 {
+			continue
+		}
+		agg[code] = maxInt64(agg[code], row.Count)
+	}
+	merged := make([]publicWebsiteCountryCell, 0, len(agg))
+	for code, count := range agg {
+		merged = append(merged, publicWebsiteCountryCell{
+			CountryCode: code,
+			Count:       maxInt64(count, 0),
+		})
+	}
+	return normalizeWebsiteCountryCells(merged, maxItems)
+}
+
+func rebuildWebsiteDatasetFromTrustedHistory(
+	ctx context.Context,
+	db *sql.DB,
+) (int64, []publicWebsiteCountryCell, error) {
+	if db == nil {
+		return 0, nil, errors.New("database not available")
+	}
+
+	var downloads sql.NullInt64
+	if err := db.QueryRowContext(
+		ctx,
+		`SELECT COALESCE(SUM(total_downloads), 0) FROM downloads_hourly`,
+	).Scan(&downloads); err != nil {
+		return 0, nil, err
+	}
+
+	rows, err := db.QueryContext(
+		ctx,
+		`SELECT by_country_json FROM downloads_hourly`,
+	)
+	if err != nil {
+		return 0, nil, err
+	}
+	defer rows.Close()
+
+	agg := make(map[string]int64, 256)
+	for rows.Next() {
+		var raw sql.NullString
+		if scanErr := rows.Scan(&raw); scanErr != nil {
+			return 0, nil, scanErr
+		}
+		for code, count := range decodeCounterMap(raw.String) {
+			normalized := strings.ToUpper(strings.TrimSpace(code))
+			if !isoCountryCodePattern.MatchString(normalized) || normalized == "XX" || normalized == "ZZ" || normalized == "UN" || normalized == "EU" {
+				continue
+			}
+			if count <= 0 {
+				continue
+			}
+			agg[normalized] += count
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return 0, nil, err
+	}
+
+	countries := make([]publicWebsiteCountryCell, 0, len(agg))
+	for code, count := range agg {
+		countries = append(countries, publicWebsiteCountryCell{
+			CountryCode: code,
+			Count:       maxInt64(count, 0),
+		})
+	}
+	countries = normalizeWebsiteCountryCells(countries, 300)
+	return maxInt64(downloads.Int64, 0), countries, nil
+}
+
 func WebsiteOpsStateHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
