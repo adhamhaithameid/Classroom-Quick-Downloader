@@ -5995,11 +5995,11 @@ export function renderDashboard(stats: StatsResponse): string {
         };
       }
 
-          // 2. Gather New/Edit Release (if ANY text entered)
-          let ver = document.getElementById("new-cl-version").value.trim();
-          // Normalize version: strip leading 'v' or 'V' to prevent double-v display (e.g., "vv1.2.3")
-          if (ver.toLowerCase().startsWith('v')) {
-            ver = ver.substring(1);
+      if (btnSaveAll) {
+        btnSaveAll.onclick = async () => {
+          if (btnSaveAll) {
+            btnSaveAll.classList.add("btn-loading");
+            btnSaveAll.style.pointerEvents = "none";
           }
           const text = document.getElementById("new-cl-changes").value.trim();
           const editId = document.getElementById("edit-cl-id").value;
