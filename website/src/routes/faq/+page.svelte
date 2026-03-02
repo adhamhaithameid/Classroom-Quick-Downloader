@@ -625,6 +625,7 @@
     color: var(--green); font-weight: 600; text-decoration: underline;
     text-underline-offset: 3px; transition: color 0.2s;
   }
+  .fq-contact-link:hover { color: var(--green-light); }
 
   .faq-section-icon {
     font-size: 24px;
