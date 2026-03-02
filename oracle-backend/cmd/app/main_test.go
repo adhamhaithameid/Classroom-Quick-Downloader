@@ -1093,6 +1093,7 @@ func TestValidateProductionSecurityConfig(t *testing.T) {
 	tests := []struct {
 		name                        string
 		appEnv                      string
+		sessionCookieMode           string
 		allowLoopbackBypass         bool
 		allowEmptyDashboardPassword bool
 		allowHTTPStoreURLs          bool
