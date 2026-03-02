@@ -666,8 +666,7 @@
 
     .cl-entry {
       grid-template-columns: 20px 1fr;
-      gap: 14px;
-      padding-bottom: 28px;
+      gap: 14px; padding-bottom: 20px;
     }
   }
 </style>
