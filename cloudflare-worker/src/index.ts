@@ -1018,18 +1018,18 @@ async function handleVerifyDangerPassword(request: Request, env: WorkerEnv): Pro
 
   try {
     const { password } = await request.json() as { password: string };
-
-    if (!password || !env.DANGER_PASSWORD || !timingSafeStringEqual(password, env.DANGER_PASSWORD)) {
-      // Record failed attempt
-      await stub.fetch(new Request("https://do/auth/login-attempt", {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "X-Admin-Secret": env.DO_SHARED_SECRET,
-        },
-        body: JSON.stringify({ ip: `danger:${clientIp}`, success: false }),
-      }));
-      
+    const result = await verifyDangerStepUpPassword(stub, env, clientIp, password || "");
+    if (!result.ok) {
+      if (result.status === 429) {
+        return withCors(request, new Response(
+          JSON.stringify({
+            ok: false,
+            error: "Too many failed attempts. Try again later.",
+            blockedForSeconds: result.blockedForSeconds,
+          }),
+          { status: 429, headers: { "content-type": "application/json" } },
+        ), env);
+      }
       return withCors(request, new Response(
         JSON.stringify({ ok: false, error: "Invalid danger password" }),
         { status: 401, headers: { "content-type": "application/json" } }
