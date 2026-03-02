@@ -501,6 +501,7 @@
           if (Math.abs(v) < 0.5) { isCoasting = false; lastTime = 0; return; }
           offset += v;
           normalize();
+          applyTransform();
           v *= 0.92;
           requestAnimationFrame(coast);
         };
