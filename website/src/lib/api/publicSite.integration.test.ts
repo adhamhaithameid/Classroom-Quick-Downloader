@@ -75,7 +75,7 @@ function buildSnapshotPayload(downloads: number): Record<string, unknown> {
 }
 
 describe('public website API integration', () => {
-  it('fetches overview from Oracle endpoint contract', async () => {
+  it('fetches overview from canonical snapshot contract', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-02-21T22:00:00.000Z'));
     vi.stubGlobal(
