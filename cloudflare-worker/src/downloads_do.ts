@@ -6639,7 +6639,8 @@ export class DownloadsDurable {
       enabled?: boolean; 
       allowlist?: string[]; 
       add?: string; 
-      remove?: string 
+      remove?: string;
+      stepUpBypassEnabled?: boolean;
     };
     try {
       body = await request.json();
