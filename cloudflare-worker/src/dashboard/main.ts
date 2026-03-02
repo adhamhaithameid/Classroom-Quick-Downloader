@@ -3877,7 +3877,11 @@ export function renderDashboard(stats: StatsResponse): string {
           </div>
           <div style="flex: 1; min-width: 200px; padding: 14px 18px; background: var(--bg-surface); border-radius: var(--radius-sm); border: 1px solid var(--border);">
             <div style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-disabled); margin-bottom: 6px;">Status</div>
-            <div id="ip-status" style="font-size: 0.95rem; font-weight: 600; color: var(--success);">Allowed</div>
+            <div id="ip-status" style="font-size: 0.95rem; font-weight: 600; color: var(--success); margin-bottom: 8px;">Allowed</div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <span id="ip-allowlist-badge" style="font-size:0.7rem; font-weight:700; letter-spacing:0.04em; text-transform:uppercase; color:var(--text-primary); background:rgba(34,197,94,0.12); border:1px solid rgba(34,197,94,0.3); padding:3px 8px; border-radius:999px;">Allowlist: OFF</span>
+              <span id="ip-stepup-badge" style="font-size:0.7rem; font-weight:700; letter-spacing:0.04em; text-transform:uppercase; color:#93c5fd; background:rgba(59,130,246,0.12); border:1px solid rgba(59,130,246,0.3); padding:3px 8px; border-radius:999px;">Blocked IP Login: Step-Up ON</span>
+            </div>
           </div>
         </div>
         
