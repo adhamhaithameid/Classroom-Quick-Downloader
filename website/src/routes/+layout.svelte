@@ -56,6 +56,24 @@
     mobileNavOpen = false;
   }
 
+  function trackInstallClick(placement: string): void {
+    trackWebsiteEvent({
+      eventType: 'cta',
+      action: 'install_click',
+      placement,
+      pagePath: $page.url.pathname
+    });
+  }
+
+  function trackDownloadClick(placement: string): void {
+    trackWebsiteEvent({
+      eventType: 'cta',
+      action: 'download_click',
+      placement,
+      pagePath: $page.url.pathname
+    });
+  }
+
   function handleSiteLinkClick(event: MouseEvent, href: string): void {
     closeMobileMenu();
 
