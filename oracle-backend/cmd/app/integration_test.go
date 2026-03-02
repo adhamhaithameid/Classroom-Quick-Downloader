@@ -40,8 +40,8 @@ func newIntegrationMux(t *testing.T) (*http.ServeMux, *sql.DB) {
 	mux.Handle("/ingest-batch", handlers.IngestBatchHandler(sqlDB, "test-secret"))
 	mux.Handle("/storeBatch", handlers.IngestBatchHandler(sqlDB, "test-secret"))
 	mux.Handle("/api/public/website/overview", handlers.PublicWebsiteOverviewHandler(sqlDB, nil))
-	mux.Handle("/api/public/website/map", handlers.PublicWebsiteMapHandler(sqlDB))
-	mux.Handle("/api/public/website/status", handlers.PublicWebsiteStatusHandler(sqlDB))
+	mux.Handle("/api/public/website/map", handlers.PublicWebsiteMapHandler(sqlDB, nil))
+	mux.Handle("/api/public/website/status", handlers.PublicWebsiteStatusHandler(sqlDB, nil))
 	mux.Handle("/api/public/website/changelog", handlers.PublicWebsiteUserChangelogHandler(sqlDB, nil))
 	mux.Handle("/api/public/website/uninstall", handlers.PublicWebsiteUninstallHandler(sqlDB))
 
