@@ -37,7 +37,8 @@
   }
 
   function normalizePath(path: string): string {
-    const [pathOnly] = path.split('#');
+    const [pathWithoutHash] = path.split('#');
+    const [pathOnly] = pathWithoutHash.split('?');
     return pathOnly.replace(/\/$/, '') || '/';
   }
 
