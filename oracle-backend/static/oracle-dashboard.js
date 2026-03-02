@@ -1275,7 +1275,7 @@
           loadCharts();
           loadComparison();
         }
-        if (page === 'dashboards' || page === 'content-changelog') {
+        if (page === 'dashboards' || page === 'content-changelog' || page === 'website-analysis') {
           loadDashboardLinks();
         }
         if (page === 'dashboards') {
