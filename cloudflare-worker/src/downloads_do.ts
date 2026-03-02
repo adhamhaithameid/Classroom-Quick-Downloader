@@ -4486,6 +4486,7 @@ export class DownloadsDurable {
     };
     await this.state.storage.delete(STORAGE_KEY);
     await this.state.storage.deleteAlarm();
+    this.appendDangerAudit(request, "full_reset", "/debug/reset", "ok", "full_state_reset");
     await this.persist();
     return json({ ok: true, message: "state reset" });
   }
