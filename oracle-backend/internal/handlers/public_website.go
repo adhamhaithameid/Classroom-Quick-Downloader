@@ -2171,15 +2171,7 @@ func resolveLatestExtensionVersion(ctx context.Context, store *controlPlaneStore
 		}
 	}
 
-	version := strings.TrimSpace(payload.TagName)
-	if version == "" {
-		version = strings.TrimSpace(payload.Name)
-	}
-	version = strings.TrimPrefix(version, "v")
-	if version == "" {
-		return nil, errors.New("github release payload missing version")
-	}
-	return &version, nil
+	return stringPtrOrNil(bestVersion)
 }
 
 func writePublicWebsiteJSON(w http.ResponseWriter, statusCode int, payload any) {
