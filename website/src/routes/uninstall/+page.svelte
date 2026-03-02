@@ -35,7 +35,7 @@
 
   let selectedReason = '';
   let selectedFeatures: string[] = [];
-  let confidenceToReinstall = 'Maybe';
+  let confidenceToReinstall = '';
   let notes = '';
   let queryBrowser = 'unknown';
   let queryVersion = 'unknown';
