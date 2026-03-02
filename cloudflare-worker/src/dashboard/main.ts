@@ -5562,10 +5562,17 @@ export function renderDashboard(stats: StatsResponse): string {
       }
 
       async function sendChangelogUpdate(payload) {
-        // Show loading state
-        if (btnSaveAll) {
-          btnSaveAll.classList.add("btn-loading");
-          btnSaveAll.style.pointerEvents = "none";
+        try {
+          setChangelogActionStatus("Saving…", "info");
+          const data = await callChangelogAdmin("/admin/changelog", payload || {});
+          syncChangelogUiFromState(data);
+          await loadChangelogHistory();
+          setChangelogActionStatus("Saved", "ok");
+          return data;
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : "save_failed";
+          setChangelogActionStatus("Error: " + msg, "err");
+          throw error;
         }
         if (btnSaveText) btnSaveText.textContent = "Saving...";
         
