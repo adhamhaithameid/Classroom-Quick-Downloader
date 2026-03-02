@@ -3423,10 +3423,9 @@
     position: relative;
     z-index: 1;
   }
-
-  @keyframes cta-3d-float {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-10px); }
+  .l2-cta-content h2 {
+    font-size: clamp(32px, 4vw, 48px); font-weight: 900;
+    letter-spacing: -0.03em; margin: 0 0 16px;
   }
 
   /* ── Reveal Animations ─────────────── */
