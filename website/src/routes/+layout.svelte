@@ -205,7 +205,16 @@
             GitHub
           </a>
         </nav>
-        <a class="l2-nav-cta l2-nav-cta-mobile" href={browserLink(detectedBrowser)} target="_blank" rel="noopener noreferrer" on:click={closeMobileMenu}>
+        <a
+          class="l2-nav-cta l2-nav-cta-mobile"
+          href={browserLink(detectedBrowser)}
+          target="_blank"
+          rel="noopener noreferrer"
+          on:click={() => {
+            closeMobileMenu();
+            trackInstallClick('nav_mobile_install');
+          }}
+        >
           Install for {browserDisplayName(detectedBrowser)}
         </a>
       </div>
