@@ -1262,6 +1262,7 @@
           activity: { icon: '📊', label: 'Activity & Charts' },
           dashboards: { icon: '🛰️', label: 'Ops Hub' },
           'website-sync': { icon: '🌐', label: 'Website Sync' },
+          'website-analysis': { icon: '📈', label: 'Website Analysis' },
           creative: { icon: '🎨', label: 'Creative Hub' },
           'content-changelog': { icon: '🗞️', label: 'User Changelog' },
           logs: { icon: '🧾', label: 'Oracle Logs' },
