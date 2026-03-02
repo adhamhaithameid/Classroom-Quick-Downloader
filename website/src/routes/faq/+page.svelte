@@ -551,9 +551,9 @@
             ✉️ Email us
           </a>
         </div>
-      </section>
-    {/each}
-  </div>
+      </div>
+    </div>
+  </section>
 </div>
 
 <style>
