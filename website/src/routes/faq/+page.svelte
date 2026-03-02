@@ -331,7 +331,7 @@
       ]
     },
     {
-      title: 'Open Source and Support',
+      title: 'For Developers',
       icon: '💻',
       summary: 'Transparency, reporting, and contribution.',
       items: [
