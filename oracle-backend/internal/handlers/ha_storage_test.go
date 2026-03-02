@@ -547,8 +547,8 @@ func TestRetentionRunHandler_RawSnapshotsPolicyIsIgnored(t *testing.T) {
 	if dryRR.Code != http.StatusOK {
 		t.Fatalf("expected 200 from dry run, got %d: %s", dryRR.Code, dryRR.Body.String())
 	}
-	if !bytes.Contains(dryRR.Body.Bytes(), []byte(`"name":"cf_snapshots_raw"`)) {
-		t.Fatalf("expected dry run response to include cf_snapshots_raw action, got %s", dryRR.Body.String())
+	if bytes.Contains(dryRR.Body.Bytes(), []byte(`"name":"cf_snapshots_raw"`)) {
+		t.Fatalf("did not expect cf_snapshots_raw retention action, got %s", dryRR.Body.String())
 	}
 
 	var afterDryRun int64
