@@ -322,7 +322,7 @@
     color: var(--text-secondary);
   }
 
-  .privacy-section li::before {
+  .prv-bullets li::before {
     content: '';
     position: absolute;
     left: 0;
