@@ -2165,9 +2165,10 @@ func resolveLatestExtensionVersion(ctx context.Context, store *controlPlaneStore
 			rank = row.CreatedAt
 		}
 
-	var payload gitHubReleaseInfo
-	if err := json.NewDecoder(res.Body).Decode(&payload); err != nil {
-		return nil, err
+		if rank > bestRank {
+			bestRank = rank
+			bestVersion = version
+		}
 	}
 
 	version := strings.TrimSpace(payload.TagName)
