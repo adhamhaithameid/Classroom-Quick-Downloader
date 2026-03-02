@@ -583,8 +583,13 @@
     letter-spacing: -0.02em; color: var(--text);
   }
 
-  .entry-body {
-    min-width: 0;
+  .cl-section-title {
+    margin: 14px 0 8px;
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--green);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
   }
 
   .entry-date {
