@@ -23,6 +23,11 @@ export SESSION_COOKIE_SECURE=false
 pnpm run dev:oracle
 ```
 
+Open Oracle dashboard dev mode in browser:
+
+- `http://127.0.0.1:8080`
+- Login with `DASHBOARD_PASSWORD`.
+
 ## 3) Start Cloudflare Worker (Terminal B)
 
 ```bash
