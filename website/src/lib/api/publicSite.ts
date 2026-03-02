@@ -49,6 +49,8 @@ function readSnapshotFromStorage(): WebsiteSnapshot | null {
 
     return {
       source: 'oracle',
+      snapshotId: asString(parsed.snapshotId),
+      generatedAt: asNumber(parsed.generatedAt),
       fetchedAtUtc,
       nextRefreshAtUtc,
       overview: coerceOverviewPayload(parsed.overview),
