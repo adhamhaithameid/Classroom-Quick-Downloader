@@ -87,6 +87,7 @@
       hasAnimatedInView = true;
       return;
     }
+
     if (!animateOnView) {
       hasAnimatedInView = true;
       isInView = true;
