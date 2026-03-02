@@ -4090,6 +4090,7 @@ export class DownloadsDurable {
       
       // NEW: Changelog data
       changelog: this.d.changelog,
+      changelogRevisions: this.d.changelogRevisions,
       changelogConfig: this.d.changelogConfig,
 
       // Delivery observability chain
