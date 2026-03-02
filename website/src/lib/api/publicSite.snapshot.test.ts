@@ -148,8 +148,8 @@ describe('fetchWebsiteSnapshot', () => {
           }
         }),
         { status: 200 }
-      );
-    });
+      )
+    );
     vi.stubGlobal('fetch', fetchMock);
 
     const first = await fetchWebsiteSnapshot();
