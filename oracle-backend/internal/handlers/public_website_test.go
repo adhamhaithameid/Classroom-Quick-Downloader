@@ -56,7 +56,8 @@ func seedPublicWebsiteFixture(t *testing.T, sqlDB *sql.DB) {
 		(record_type, record_key, data_json, created_at, updated_at) VALUES
 		('deployment_target', 'chrome', '{"name":"Chrome","usersCount":1000,"rating":"4.9","ratingCount":100,"version":"1.3.6","syncedAt":1700000200000}', 1700000200000, 1700000200000),
 		('deployment_target', 'firefox', '{"name":"Firefox","usersCount":200,"rating":"4.7","ratingCount":20,"version":"1.3.5","syncedAt":1700000300000}', 1700000300000, 1700000300000),
-		('deployment_target', 'edge', '{"name":"Edge","usersCount":300,"rating":"4.8","ratingCount":30,"version":"1.3.6","syncedAt":1700000400000}', 1700000400000, 1700000400000)
+		('deployment_target', 'edge', '{"name":"Edge","usersCount":300,"rating":"4.8","ratingCount":30,"version":"1.3.6","syncedAt":1700000400000}', 1700000400000, 1700000400000),
+		('extension_version_note', 'v1.3.6', '{"version":"1.3.6","summary":"baseline"}', 1700000500000, 1700000500000)
 	`); err != nil {
 		t.Fatalf("seed admin_records failed: %v", err)
 	}
