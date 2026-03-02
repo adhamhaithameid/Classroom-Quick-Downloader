@@ -450,7 +450,7 @@ func TestPublicWebsiteHandlers_PreflightForAllowedOrigin(t *testing.T) {
 	req.Header.Set("Origin", "https://adhamhaithameid.github.io")
 	req.Header.Set("Access-Control-Request-Method", "GET")
 	rr := httptest.NewRecorder()
-	PublicWebsiteStatusHandler(sqlDB).ServeHTTP(rr, req)
+	PublicWebsiteStatusHandler(sqlDB, nil).ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusNoContent {
 		t.Fatalf("expected 204, got %d", rr.Code)
