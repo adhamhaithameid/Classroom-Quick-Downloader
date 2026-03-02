@@ -400,6 +400,9 @@ func BreakdownHandler(db *sql.DB) http.HandlerFunc {
 			To:             toTime.Format("2006-01-02"),
 			Values:         values,
 		}
+		meta := buildWindowMeta(now, fromTime, toTime)
+		resp.WindowStartUTC = meta.WindowStartUTC
+		resp.WindowEndUTC = meta.WindowEndUTC
 
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(resp)
