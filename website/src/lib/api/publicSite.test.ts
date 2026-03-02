@@ -7,7 +7,8 @@ import {
   resetWebsiteSnapshotCacheForTests,
   fetchUserChangelog,
   fetchUninstallStats,
-  submitUninstallFeedback
+  submitUninstallFeedback,
+  submitWebsiteEvents
 } from './publicSite';
 
 afterEach(() => {
