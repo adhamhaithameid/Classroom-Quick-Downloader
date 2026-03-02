@@ -6906,7 +6906,35 @@ export function renderDashboard(stats: StatsResponse): string {
           .then((data) => {
             setWebsiteAdminOutput(data);
             if (data && data.ok) {
-              showToast('Website data flushed.', 'success');
+              const sentEvents = Number(data?.telemetry?.sentEvents || 0);
+              const deadLettered = Number(data?.telemetry?.deadLetteredBatches || 0);
+              showToast(
+                'Website telemetry flushed. Sent ' + sentEvents + ' events' + (deadLettered ? (', DLQ +' + deadLettered) : '') + '.',
+                'success'
+              );
+              fetchWebsiteStatus();
+            } else {
+              showToast('Flush failed: ' + (data?.telemetry?.error || data?.error || 'unknown_error'), 'error');
+            }
+          })
+          .catch(() => showToast('Network error', 'error'))
+          .finally(() => { if (btn) btn.disabled = false; });
+      });
+
+      bind('btn-website-replay-dlq', () => {
+        const btn = document.getElementById('btn-website-replay-dlq');
+        if (btn) btn.disabled = true;
+        fetch('/admin/website/replay-dlq', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        })
+          .then(r => r.json())
+          .then((data) => {
+            setWebsiteAdminOutput(data);
+            if (data && data.ok) {
+              showToast('Replayed ' + Number(data.replayed || 0) + ' dead-letter batches.', 'success');
               fetchWebsiteStatus();
             } else {
               showToast('Flush failed.', 'error');
