@@ -135,6 +135,109 @@ func TestPublicWebsiteOverviewHandler_ReturnsSanitizedPayload(t *testing.T) {
 	}
 }
 
+func TestPublicWebsiteSnapshotHandler_ReturnsVersionedPayload(t *testing.T) {
+	sqlDB := openPublicWebsiteDB(t)
+	seedPublicWebsiteFixture(t, sqlDB)
+	t.Setenv("PUBLIC_WEBSITE_ALLOWED_ORIGINS", "https://adhamhaithameid.github.io")
+
+	req := httptest.NewRequest(http.MethodGet, "/api/public/website/snapshot", nil)
+	req.Header.Set("Origin", "https://adhamhaithameid.github.io")
+	rr := httptest.NewRecorder()
+	PublicWebsiteSnapshotHandler(sqlDB, nil).ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var payload struct {
+		SchemaVersion string `json:"schemaVersion"`
+		OK            bool   `json:"ok"`
+		SnapshotID    string `json:"snapshotId"`
+		Overview      struct {
+			SchemaVersion string `json:"schemaVersion"`
+			Totals        struct {
+				Downloads int64 `json:"downloads"`
+			} `json:"totals"`
+		} `json:"overview"`
+		Map struct {
+			SchemaVersion string `json:"schemaVersion"`
+			Totals        struct {
+				Downloads int64 `json:"downloads"`
+			} `json:"totals"`
+		} `json:"map"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("unmarshal payload failed: %v", err)
+	}
+	if !payload.OK {
+		t.Fatal("expected ok=true")
+	}
+	if payload.SchemaVersion != publicWebsiteSchemaVersion {
+		t.Fatalf("expected schemaVersion=%s, got %s", publicWebsiteSchemaVersion, payload.SchemaVersion)
+	}
+	if payload.Overview.SchemaVersion != publicWebsiteSchemaVersion {
+		t.Fatalf("expected nested overview schemaVersion=%s, got %s", publicWebsiteSchemaVersion, payload.Overview.SchemaVersion)
+	}
+	if payload.Map.SchemaVersion != publicWebsiteSchemaVersion {
+		t.Fatalf("expected nested map schemaVersion=%s, got %s", publicWebsiteSchemaVersion, payload.Map.SchemaVersion)
+	}
+	if payload.Overview.Totals.Downloads != 1200 || payload.Map.Totals.Downloads != 1200 {
+		t.Fatalf("expected snapshot downloads=1200, got overview=%d map=%d", payload.Overview.Totals.Downloads, payload.Map.Totals.Downloads)
+	}
+	if !strings.HasPrefix(payload.SnapshotID, "ws-public-website-snapshot-") {
+		t.Fatalf("unexpected snapshotId: %q", payload.SnapshotID)
+	}
+}
+
+func TestPublicWebsiteSnapshotHandler_ReusesStoredSnapshotUntilRefreshWindow(t *testing.T) {
+	sqlDB := openPublicWebsiteDB(t)
+	seedPublicWebsiteFixture(t, sqlDB)
+	t.Setenv("PUBLIC_WEBSITE_ALLOWED_ORIGINS", "https://adhamhaithameid.github.io")
+
+	firstReq := httptest.NewRequest(http.MethodGet, "/api/public/website/snapshot", nil)
+	firstReq.Header.Set("Origin", "https://adhamhaithameid.github.io")
+	firstRR := httptest.NewRecorder()
+	PublicWebsiteSnapshotHandler(sqlDB, nil).ServeHTTP(firstRR, firstReq)
+	if firstRR.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", firstRR.Code, firstRR.Body.String())
+	}
+
+	secondReq := httptest.NewRequest(http.MethodGet, "/api/public/website/snapshot", nil)
+	secondReq.Header.Set("Origin", "https://adhamhaithameid.github.io")
+	secondRR := httptest.NewRecorder()
+	PublicWebsiteSnapshotHandler(sqlDB, nil).ServeHTTP(secondRR, secondReq)
+	if secondRR.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", secondRR.Code, secondRR.Body.String())
+	}
+
+	var firstPayload struct {
+		SnapshotID string `json:"snapshotId"`
+	}
+	if err := json.Unmarshal(firstRR.Body.Bytes(), &firstPayload); err != nil {
+		t.Fatalf("failed to decode first snapshot payload: %v", err)
+	}
+	var secondPayload struct {
+		SnapshotID string `json:"snapshotId"`
+	}
+	if err := json.Unmarshal(secondRR.Body.Bytes(), &secondPayload); err != nil {
+		t.Fatalf("failed to decode second snapshot payload: %v", err)
+	}
+	if firstPayload.SnapshotID == "" || secondPayload.SnapshotID == "" {
+		t.Fatalf("expected non-empty snapshot IDs, got first=%q second=%q", firstPayload.SnapshotID, secondPayload.SnapshotID)
+	}
+	if firstPayload.SnapshotID != secondPayload.SnapshotID {
+		t.Fatalf("expected snapshot to be reused, got first=%q second=%q", firstPayload.SnapshotID, secondPayload.SnapshotID)
+	}
+
+	var storedSnapshots int
+	if err := sqlDB.QueryRow(`SELECT COUNT(*) FROM website_public_snapshots`).Scan(&storedSnapshots); err != nil {
+		t.Fatalf("failed to count website_public_snapshots rows: %v", err)
+	}
+	if storedSnapshots != 1 {
+		t.Fatalf("expected exactly 1 stored snapshot row, got %d", storedSnapshots)
+	}
+}
+
 func TestPublicWebsiteMapHandler_ReturnsIsoCountryBreakdown(t *testing.T) {
 	sqlDB := openPublicWebsiteDB(t)
 	seedPublicWebsiteFixture(t, sqlDB)
