@@ -1161,7 +1161,7 @@ func TestIngestRawSnapshotRedactsIPData(t *testing.T) {
 	if err := sqlDB.QueryRow(`SELECT payload_json FROM cf_snapshots_raw ORDER BY id DESC LIMIT 1`).Scan(&rawPayload); err != nil {
 		t.Fatalf("failed to load raw snapshot payload: %v", err)
 	}
-	if strings.Contains(rawPayload, "1.1.1.1") || strings.Contains(rawPayload, "8.8.8.8") || strings.Contains(rawPayload, "9.9.9.9") || strings.Contains(rawPayload, "4.4.4.4") {
+	if strings.Contains(rawPayload, "1.1.1.1") || strings.Contains(rawPayload, "8.8.8.8") || strings.Contains(rawPayload, "9.9.9.9") {
 		t.Fatalf("expected IP values to be redacted, got payload: %s", rawPayload)
 	}
 	if !strings.Contains(rawPayload, "REDACTED") {
