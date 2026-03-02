@@ -2905,9 +2905,11 @@ export class DownloadsDurable {
    */
   private async scheduleNextMidnightAlarm(): Promise<void> {
     const now = new Date();
-    const tomorrow = new Date(now);
-    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
-    tomorrow.setUTCHours(0, 0, 0, 0); // Midnight UTC tomorrow
+    const next = new Date(now);
+    next.setUTCHours(23, 0, 0, 0);
+    if (next.getTime() <= now.getTime()) {
+      next.setUTCDate(next.getUTCDate() + 1);
+    }
 
     const alarmTime = tomorrow.getTime();
     
