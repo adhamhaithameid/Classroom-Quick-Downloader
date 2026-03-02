@@ -378,7 +378,7 @@ func TestPublicWebsiteHandlers_UsePublishedOracleWebsiteDataset(t *testing.T) {
 
 	mapReq := httptest.NewRequest(http.MethodGet, "/api/public/website/map", nil)
 	mapRR := httptest.NewRecorder()
-	PublicWebsiteMapHandler(sqlDB).ServeHTTP(mapRR, mapReq)
+	PublicWebsiteMapHandler(sqlDB, nil).ServeHTTP(mapRR, mapReq)
 	if mapRR.Code != http.StatusOK {
 		t.Fatalf("expected 200 from map, got %d: %s", mapRR.Code, mapRR.Body.String())
 	}
