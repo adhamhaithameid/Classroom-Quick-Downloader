@@ -101,7 +101,7 @@
   let downloadCount = 0;
   let userCount = 0;
   let countryCount = 0;
-  let detectedBrowser: 'chrome' | 'firefox' | 'edge' = 'chrome';
+  let detectedBrowser: BrowserKey = 'chrome';
   let mapState: 'loading' | 'ready' | 'error' = 'loading';
   let mapError = '';
   let mapExpanded = false;
