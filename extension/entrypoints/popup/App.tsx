@@ -1,6 +1,6 @@
 // filepath: entrypoints/popup/App.tsx
 
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
 import './App.css';
 import logoSrc from '../../assets/CQD.png';
 import logoGraySrc from '../../assets/CQD-gray.png';
