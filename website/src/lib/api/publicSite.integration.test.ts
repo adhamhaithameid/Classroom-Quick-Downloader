@@ -146,7 +146,7 @@ describe('public website API integration', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('requests overview from Oracle API endpoint only', async () => {
+  it('requests snapshot from Oracle API endpoint only', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString();
       expect(url).toContain('/api/public/website/overview');
