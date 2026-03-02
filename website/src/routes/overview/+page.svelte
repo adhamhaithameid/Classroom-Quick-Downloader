@@ -309,6 +309,12 @@
 
   function onMapYes() {
     if (sillyAnswered) return;
+    trackWebsiteEvent({
+      eventType: 'map',
+      action: 'map_yes',
+      placement: 'map_prompt_yes',
+      pagePath: '/overview'
+    });
     sillyAnswered = true;
     mapInteractionState = 'yes';
     void triggerCelebration();
