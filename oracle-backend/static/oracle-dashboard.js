@@ -2438,6 +2438,8 @@
             var usersCountText = fmtNumberOrNA(v.usersCount, hasUsersCount);
             var ratingCountText = fmtNumberOrNA(v.ratingCount, hasRatingCount);
             var latencyText = hasLatency ? fmtNumber(parseMaybeNumber(v.syncLatencyMs)) + 'ms' : 'N/A';
+            var usersMetricText = String(v.usersMetric || 'n/a');
+            var syncSourceText = String(v.syncSource || 'n/a');
             var sourceText = item.updatedAt > 0 ? 'Database' : 'Template';
             var updatedAtText = item.updatedAt > 0 ? fmtUtcDateTimeFromMs(item.updatedAt) : 'never';
             var statusBadge = '';
