@@ -318,7 +318,8 @@
     min-height: 100%;
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    flex: 1 0 auto;
+    padding-bottom: 0;
   }
 
   /* ── Hero ──────────────────────────── */
