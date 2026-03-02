@@ -455,6 +455,40 @@ pnpm -C cloudflare-worker run deploy
 2. Rebuild locally with same env values.
 3. Deploy manually from section 6.3.
 
+### 9.4 Failure triage tree (fast path)
+
+1. Preflight failure:
+   fix missing secret/variable, rerun.
+2. Deploy failure:
+   inspect workflow logs, run manual deploy, verify health.
+3. Smoke failure:
+   if health fails -> rollback immediately.
+   if auth gate fails -> treat as security incident and contain.
+   if ingest/snapshot fails -> run replay + flush checks, inspect upstream logs.
+4. Persistent lag:
+   inspect queue depth, replay DLQ, verify Oracle batch acceptance.
+
+### 9.5 Rollback command and script references
+
+Use these rollback references per system.
+
+- Cloudflare Worker:
+  - Fast redeploy helper: `tools/deploy_manual.sh cloudflare`
+  - Roll back to a known-good git commit and redeploy:
+    - `git checkout <known-good-sha>`
+    - `pnpm -C cloudflare-worker run deploy`
+
+- Oracle backend/dashboard:
+  - Primary deploy/rollback-capable script: `oracle-backend/scripts/deploy_main_inplace.sh`
+  - SSH helper wrapper: `tools/deploy_manual.sh oracle`
+  - `deploy_main_inplace.sh` preserves the previous running image under a rollback tag, which can be used with Docker image re-tag/recreate if needed.
+
+- Website (Cloudflare Pages):
+  - Rebuild and redeploy a known-good commit:
+    - `git checkout <known-good-sha>`
+    - `pnpm -C website build`
+    - `CI=1 pnpm -C cloudflare-worker exec wrangler pages deploy ../website/build --project-name classroom-quick-downloader-website --branch main --commit-dirty=true`
+
 ## 10) Recommended Operations Rule
 
 - Keep production passwords and API tokens in GitHub Secrets / server `.env.production`.
