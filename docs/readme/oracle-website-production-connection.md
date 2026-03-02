@@ -60,10 +60,17 @@ Set repository vars/secrets once:
 - `CLOUDFLARE_API_TOKEN` (secret)
 - `CLOUDFLARE_ACCOUNT_ID` (secret)
 
-### Option A: GitHub Actions Manual Deploy
-- Open GitHub Actions.
-- Run `.github/workflows/website-deploy.yml` with `workflow_dispatch`.
-- This workflow is manual-only.
+Cloudflare Pages domain strategy:
+- attach your root custom domain as primary production domain
+- keep `classroom-quick-downloader-website.pages.dev` enabled and redirect it to the root domain
+
+### Option A: GitHub Actions Deploy
+- Auto deploy runs on pushes to `main` that touch:
+  - `website/**`
+  - `CHANGELOG.md`
+  - `PRIVACY.md`
+  - `.github/workflows/website-deploy.yml`
+- You can also trigger the same workflow manually with `workflow_dispatch` from GitHub Actions.
 
 ### Option B: Local Manual Deploy
 
