@@ -4388,7 +4388,7 @@ export class DownloadsDurable {
     });
   }
 
-  private async handleDebugReset(): Promise<Response> {
+  private async handleDebugReset(request: Request): Promise<Response> {
     const today = todayUtcDate();
     // Preserve config settings during reset
     const preservedConfig = {
