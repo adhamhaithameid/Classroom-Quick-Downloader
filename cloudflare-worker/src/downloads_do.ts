@@ -6337,7 +6337,7 @@ export class DownloadsDurable {
       }
 
       if (body.config) {
-        this.d.changelogConfig = {
+        const nextConfig: ChangelogConfig = {
           ...this.d.changelogConfig,
           ...body.config,
           lastUpdated: Date.now(),
