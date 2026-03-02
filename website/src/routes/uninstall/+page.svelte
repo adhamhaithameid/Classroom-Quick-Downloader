@@ -618,7 +618,7 @@
   .un-submit:hover {
     background: var(--green-light);
     transform: translateY(-2px);
-    box-shadow: 0 6px 28px rgba(26, 139, 85, 0.2);
+    box-shadow: 0 6px 28px rgba(26, 139, 85, 0.35);
   }
 
   .submit-btn:disabled {
