@@ -19,11 +19,19 @@ describe('public website acceptance contracts', () => {
             schemaVersion: '1',
             ok: true,
             generatedAt: 1771700000000,
-            totals: { downloads: 1200, success: 1100, fail: 100 },
-            installs: {
-              usersTotal: 400,
-              lastSyncedAtUtc: 1771699000000,
-              browsers: [{ key: 'chrome', name: 'Chrome', usersCount: 300, version: '1.3.6', rating: '5', ratingCount: 10 }]
+            snapshotId: 'snapshot-overview',
+            overview: {
+              ok: true,
+              generatedAt: 1771700000000,
+              totals: { downloads: 1200, success: 1100, fail: 100 },
+              installs: {
+                usersTotal: 400,
+                lastSyncedAtUtc: 1771699000000,
+                browsers: [{ key: 'chrome', name: 'Chrome', usersCount: 300, version: '1.3.6', rating: '5', ratingCount: 10 }]
+              },
+              versions: { github: '1.3.6', chrome: '1.3.6', firefox: null, edge: null },
+              status: { systemLive: true, liveSinceUtc: 1771600000000, workerHealth: 'up' },
+              links: { chrome: 'https://c', firefox: 'https://f', edge: 'https://e', github: 'https://g' }
             },
             versions: { github: '1.3.6', chrome: '1.3.6', firefox: null, edge: null },
             status: { systemLive: true, liveSinceUtc: 1771600000000, workerHealth: 'up' },
