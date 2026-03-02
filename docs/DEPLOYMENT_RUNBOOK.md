@@ -314,6 +314,11 @@ CI=1 pnpm -C cloudflare-worker exec wrangler pages deploy ../website/build --pro
 CI=1 pnpm -C cloudflare-worker exec wrangler pages deploy ../website/build --project-name classroom-quick-downloader-website --branch main --commit-dirty=true
 ```
 
+Notes:
+
+- `PUBLIC_BASE_PATH` must be either empty (`''`) or a root-relative path (`/repo-name`).
+- `PUBLIC_BASE_PATH='/'` is invalid in SvelteKit.
+
 ## 7) Password Rotation Commands
 
 ### 7.1 Cloudflare Worker passwords
