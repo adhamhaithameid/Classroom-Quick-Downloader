@@ -68,6 +68,10 @@ type StoredState = {
   websiteOverrideEnabled?: boolean;
   websiteOverrideDownloads?: number;
   websiteOverrideCountries?: Array<{ countryCode?: string; count?: number }>;
+  websiteTelemetryQueue?: Array<Record<string, unknown>>;
+  websiteTelemetryDeadLetter?: Array<Record<string, unknown>>;
+  websiteTelemetrySeenEventIds?: string[];
+  dangerActionAuditLogs?: Array<Record<string, unknown>>;
 };
 
 type TestEvent = {
