@@ -1313,46 +1313,6 @@ async function handleReleaseNotes(request: Request, env: WorkerEnv): Promise<Res
   });
 }
 
-async function handlePublicSiteMetrics(request: Request, env: WorkerEnv): Promise<Response> {
-  const stub = getDownloadsStub(env);
-  try {
-    const upstream = await stub.fetch(new Request("https://do/public/site-metrics", { method: "GET" }));
-
-    if (!upstream.ok) {
-      return withCors(
-        request,
-        new Response(JSON.stringify({ ok: false, error: "upstream_unavailable" }), {
-          status: 502,
-          headers: { "content-type": "application/json; charset=utf-8" },
-        }),
-        env,
-      );
-    }
-
-    const body = await upstream.text();
-    return withCors(
-      request,
-      new Response(body, {
-        status: 200,
-        headers: {
-          "content-type": "application/json; charset=utf-8",
-          "cache-control": "public, max-age=300, stale-while-revalidate=180",
-        },
-      }),
-      env,
-    );
-  } catch {
-    return withCors(
-      request,
-      new Response(JSON.stringify({ ok: false, error: "upstream_unavailable" }), {
-        status: 502,
-        headers: { "content-type": "application/json; charset=utf-8" },
-      }),
-      env,
-    );
-  }
-}
-
 async function handleOraclePublicWebsiteProxy(request: Request, env: WorkerEnv): Promise<Response> {
   const pathname = new URL(request.url).pathname;
   const isUninstallPath = pathname === "/api/public/website/uninstall";
