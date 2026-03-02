@@ -20,13 +20,56 @@
   <meta name="description" content="Privacy policy summary for Classroom Quick Downloader. No tracking, no cookies, no personal data collection." />
 </svelte:head>
 
-<div class="privacy-page">
-  <header class="privacy-header">
-    <div class="header-left">
-      <div class="icon-box">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-        </svg>
+<div class="prv">
+  <!-- Decorative orbs -->
+  <div class="prv-orbs" aria-hidden="true">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+    <div class="orb orb-4"></div>
+    <div class="orb orb-5"></div>
+    <div class="orb orb-6"></div>
+  </div>
+  <div class="prv-grid-bg" aria-hidden="true"></div>
+
+  <!-- Hero -->
+  <section class="prv-hero">
+    <div class="prv-wrap">
+      <span class="prv-label">PRIVACY POLICY</span>
+      <h1 class="prv-mega">{privacy.headline}</h1>
+      <p class="prv-sub">{privacy.description}</p>
+    </div>
+  </section>
+
+  <!-- Highlight Banner -->
+  <section class="prv-banner-section">
+    <div class="prv-wrap">
+      <div class="prv-banner prv-reveal">
+        <div class="prv-banner-items">
+          <div class="prv-banner-item">
+            <span class="prv-banner-icon">🍪</span>
+            <div>
+              <strong>Zero cookies</strong>
+              <p>No tracking cookies or session identifiers</p>
+            </div>
+          </div>
+          <span class="prv-banner-sep" aria-hidden="true"></span>
+          <div class="prv-banner-item">
+            <span class="prv-banner-icon">📊</span>
+            <div>
+              <strong>Zero tracking</strong>
+              <p>No analytics libraries or tracking pixels</p>
+            </div>
+          </div>
+          <span class="prv-banner-sep" aria-hidden="true"></span>
+          <div class="prv-banner-item">
+            <span class="prv-banner-icon">👤</span>
+            <div>
+              <strong>Zero personal data</strong>
+              <p>No names, emails, or identifiable information</p>
+            </div>
+          </div>
+        </div>
       </div>
       <div>
         <h1>{privacy.headline}</h1>
