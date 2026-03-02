@@ -491,10 +491,9 @@
     align-items: start;
   }
 
-  /* ── Sidebar ─────────────────────── */
-  .sidebar {
-    position: sticky;
-    top: 80px;
+  /* ── Sidebar ────────────────────── */
+  .cl-sidebar {
+    position: sticky; top: 90px;
   }
 
   .sidebar-card {
