@@ -33,6 +33,10 @@ deploy_cloudflare() {
 
 deploy_oracle() {
   require_cmd ssh
+  if [[ -z "${ORACLE_SSH_DEST:-}" ]]; then
+    echo "ORACLE_SSH_DEST is required (example: ubuntu@<oracle-host>)" >&2
+    exit 1
+  fi
   if [[ ! -f "$ORACLE_SSH_KEY" ]]; then
     echo "Oracle SSH key not found: $ORACLE_SSH_KEY" >&2
     exit 1
