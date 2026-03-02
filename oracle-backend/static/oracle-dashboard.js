@@ -31,7 +31,7 @@
             chromeStoreListing: 'https://chromewebstore.google.com/detail/classroom-quick-downloade/oemoongiefmpmomjikcjmkkkhffcbdid',
             firefoxStoreListing: 'https://addons.mozilla.org/en-US/firefox/addon/classroom-quick-downloader/',
             edgeStoreListing: 'https://microsoftedge.microsoft.com/addons/detail/classroom-quick-downloade/ecojbijjkcjdolpeoiemnccgmaeomcmn'
-          };
+      };
       const USER_CHANGELOG_RECORD_TYPE = 'website_user_changelog_entry';
 
       // Helpers
