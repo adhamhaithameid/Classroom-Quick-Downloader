@@ -4429,6 +4429,7 @@ export class DownloadsDurable {
         markdownHelpUrl: USER_FRIENDLY_CHANGELOG_GITHUB_URL,
         lastUpdated: Date.now(),
       },
+      changelogDraft: this.d.changelogDraft ?? null,
       publicSiteMetricsSnapshot: this.d.publicSiteMetricsSnapshot ?? null,
       websitePublicSyncEnabled:
         typeof this.d.websitePublicSyncEnabled === "boolean" ? this.d.websitePublicSyncEnabled : true,
