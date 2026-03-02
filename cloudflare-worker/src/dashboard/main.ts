@@ -6847,6 +6847,11 @@ export function renderDashboard(stats: StatsResponse): string {
         };
 
         setText('website-last-batch-slot', snapshot.snapshotAtUtc ? new Date(snapshot.snapshotAtUtc).toISOString().slice(0, 13) + ':00 UTC' : '—');
+        setText('website-telemetry-queue', String(Number(telemetry.pendingBatches || 0)));
+        setText('website-telemetry-retry-count', String(Number(telemetry.retryCount || 0)));
+        setText('website-last-telemetry-created', telemetry.lastBatchCreatedAtUtc ? formatTs(telemetry.lastBatchCreatedAtUtc) : '—');
+        setText('website-last-telemetry-sent', telemetry.lastBatchSentAtUtc ? formatTs(telemetry.lastBatchSentAtUtc) : '—');
+        setText('website-telemetry-dlq', String(Number(telemetry.deadLetterBatches || 0)));
         setText('website-last-refresh-at', snapshot.snapshotAtUtc ? formatTs(snapshot.snapshotAtUtc) : '—');
         setText('website-refresh-mode', website.refreshEnabled ? ('AUTO (' + refreshHours + ')') : 'MANUAL ONLY');
         setText('website-last-manual-flush', website.lastManualFlushAtUtc ? formatTs(website.lastManualFlushAtUtc) : '—');
