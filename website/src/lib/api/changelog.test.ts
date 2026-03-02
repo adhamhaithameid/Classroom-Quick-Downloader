@@ -136,7 +136,9 @@ describe('fetchChangelog', () => {
     TEST_TIMEOUT_MS
   );
 
-  it('handles completely empty payload', async () => {
+  it(
+    'handles completely empty payload',
+    async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => new Response(JSON.stringify({}), { status: 200 }))
