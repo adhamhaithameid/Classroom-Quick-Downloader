@@ -2143,15 +2143,16 @@ func resolveLatestExtensionVersion(ctx context.Context, store *controlPlaneStore
 		return nil
 	}
 
-	reqCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
-	defer cancel()
-
-	endpoint := "https://api.github.com/repos/" + repoSlug + "/releases/latest"
-	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, endpoint, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Accept", "application/vnd.github+json")
+	bestVersion := ""
+	bestRank := int64(-1)
+	for _, row := range records {
+		data := decodeRecordDataMap(row.Data)
+		version := strings.TrimSpace(stringFromAny(data["version"]))
+		version = strings.TrimPrefix(version, "v")
+		version = trimAndLimit(version, 64)
+		if version == "" {
+			continue
+		}
 
 	res, err := http.DefaultClient.Do(req) // #nosec G107,G704 -- fixed GitHub API host with bounded timeout and static path pattern.
 	if err != nil {
