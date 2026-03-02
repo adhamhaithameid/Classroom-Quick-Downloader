@@ -869,6 +869,53 @@ func TestPublicWebsiteUserChangelogHandler_ReturnsSanitizedEntries(t *testing.T)
 	}
 }
 
+func TestPublicWebsiteSnapshotHandler_UsesPrivacyPointersFromControlPlane(t *testing.T) {
+	sqlDB := openPublicWebsiteDB(t)
+	seedPublicWebsiteFixture(t, sqlDB)
+	t.Setenv("PUBLIC_WEBSITE_ALLOWED_ORIGINS", "https://adhamhaithameid.github.io")
+
+	if _, err := sqlDB.Exec(`INSERT INTO admin_records
+		(record_type, record_key, data_json, created_at, updated_at)
+		VALUES
+		('website_user_privacy', 'public', '{"headline":"Privacy for students","description":"Only aggregated public metrics.","userPrivacyUrl":"https://classroom-quick-downloader-website.pages.dev/privacy","fullPrivacyUrl":"https://github.com/adhamhaithameid/Classroom-Quick-Downloader/blob/main/PRIVACY.md"}', 1771600000000, 1771600000000)
+	`); err != nil {
+		t.Fatalf("seed privacy record failed: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/public/website/snapshot", nil)
+	req.Header.Set("Origin", "https://adhamhaithameid.github.io")
+	rr := httptest.NewRecorder()
+	PublicWebsiteSnapshotHandler(sqlDB, nil).ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var payload struct {
+		Privacy struct {
+			Headline       string `json:"headline"`
+			Description    string `json:"description"`
+			UserPrivacyURL string `json:"userPrivacyUrl"`
+			FullPrivacyURL string `json:"fullPrivacyUrl"`
+		} `json:"privacy"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode snapshot payload failed: %v", err)
+	}
+	if payload.Privacy.Headline != "Privacy for students" {
+		t.Fatalf("expected privacy headline override, got %q", payload.Privacy.Headline)
+	}
+	if payload.Privacy.Description != "Only aggregated public metrics." {
+		t.Fatalf("expected privacy description override, got %q", payload.Privacy.Description)
+	}
+	if payload.Privacy.UserPrivacyURL != "https://classroom-quick-downloader-website.pages.dev/privacy" {
+		t.Fatalf("unexpected userPrivacyUrl: %q", payload.Privacy.UserPrivacyURL)
+	}
+	if payload.Privacy.FullPrivacyURL != "https://github.com/adhamhaithameid/Classroom-Quick-Downloader/blob/main/PRIVACY.md" {
+		t.Fatalf("unexpected fullPrivacyUrl: %q", payload.Privacy.FullPrivacyURL)
+	}
+}
+
 func TestPublicWebsiteContentHandlers_RejectDisallowedOrigin(t *testing.T) {
 	sqlDB := openPublicWebsiteDB(t)
 	t.Setenv("PUBLIC_WEBSITE_ALLOWED_ORIGINS", "https://adhamhaithameid.github.io")
