@@ -414,7 +414,10 @@ function buildSnapshot(snapshotPayload: SnapshotResponse): WebsiteSnapshot {
     fetchedAtUtc: now,
     nextRefreshAtUtc: now + ORACLE_SNAPSHOT_REFRESH_MS,
     overview: normalizedOverview,
-    map
+    map,
+    changelog: snapshotPayload.changelog,
+    userChangelogSummary: snapshotPayload.userChangelogSummary,
+    privacy: snapshotPayload.privacy
   };
 }
 
