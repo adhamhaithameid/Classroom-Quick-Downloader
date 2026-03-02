@@ -6102,6 +6102,7 @@ export function renderDashboard(stats: StatsResponse): string {
           changesTextarea.value = "";
           updateCharCounter();
         }
+        if (markdownInputEl) markdownInputEl.value = "";
         if (editIdInput) editIdInput.value = "";
         
         // Hide edit mode banner
