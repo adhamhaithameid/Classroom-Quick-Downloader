@@ -370,14 +370,13 @@ function migrateSeenState(raw: unknown): SeenState {
 /**
  * Mark a version as seen.
  */
-export async function markAsSeen(version: string): Promise<void> {
-  if (!version) return;
-  const data = await chrome.storage.local.get(SEEN_KEY);
-  const seen = (data[SEEN_KEY] as string[]) || [];
-  if (!seen.includes(version)) {
-    const newSeen = [...seen, version];
-    await chrome.storage.local.set({ [SEEN_KEY]: newSeen });
-  }
+export async function markAsSeen(version: string, data?: ChangelogData | null): Promise<void> {
+  const normalizedVersion = normalizeVersion(version);
+  if (!normalizedVersion) return;
+  const storage = await chrome.storage.local.get(SEEN_KEY);
+  const seen = migrateSeenState(storage[SEEN_KEY]);
+  seen[normalizedVersion] = getSeenToken(normalizedVersion, data);
+  await chrome.storage.local.set({ [SEEN_KEY]: seen });
 }
 
 /**
