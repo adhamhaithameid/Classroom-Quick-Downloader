@@ -517,11 +517,8 @@
 
   .cl-sidebar-link {
     text-decoration: none;
-    padding: 8px 12px;
-    border-radius: var(--radius-sm);
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
+    padding: 8px 12px; border-radius: var(--radius-sm);
+    display: flex; flex-direction: column;
     transition: all 0.2s ease;
     color: var(--text-secondary);
   }
