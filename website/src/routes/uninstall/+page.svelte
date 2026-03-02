@@ -698,7 +698,11 @@
     flex-wrap: wrap;
   }
 
-  .reinstall-row a {
+  .un-reinstall-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
     text-decoration: none;
     font-size: 13px;
     font-weight: 600;
