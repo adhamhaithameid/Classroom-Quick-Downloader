@@ -1,4 +1,4 @@
-import { ORACLE_API_BASE_URL, STORE_LINKS } from '$lib/config';
+import { ORACLE_API_BASE_URL, STORE_LINKS, WORKER_BASE_URL } from '$lib/config';
 import type {
   InstallBrowser,
   MapResponse,
