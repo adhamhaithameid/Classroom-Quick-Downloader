@@ -594,6 +594,19 @@
   }
 
   @media (max-width: 860px) {
+    .l2-nav-shell {
+      padding: 10px 0;
+    }
+
+    .l2-nav-fullwidth {
+      padding: 0 14px;
+    }
+
+    .l2-nav-inner {
+      gap: 12px;
+      min-height: 44px;
+    }
+
     .site-main {
       padding-top: 22px;
       padding-bottom: 34px;
