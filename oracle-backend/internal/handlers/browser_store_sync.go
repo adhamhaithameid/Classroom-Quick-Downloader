@@ -814,7 +814,9 @@ func fetchEdgeStoreStatsByDetailsAPI(ctx context.Context, client *http.Client, l
 	}
 
 	stats := storeStats{
-		version: strings.TrimSpace(payload.Version),
+		version:     strings.TrimSpace(payload.Version),
+		source:      "edge_addons_details_api",
+		usersMetric: "active_install_count",
 	}
 	if payload.ActiveInstallCount >= 0 {
 		stats.usersCount = int64(payload.ActiveInstallCount)
