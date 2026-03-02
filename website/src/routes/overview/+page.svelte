@@ -1086,6 +1086,29 @@
     let stopPlacementViewportWatcher: (() => void) | undefined;
     detectedBrowser = detectBrowserFromNavigator();
     reducedMotionPreferred = shouldReduceMotion();
+    const searchParams = new URLSearchParams(window.location.search);
+    const isEmbed = searchParams.has('embed');
+    editMode = searchParams.has('edit');
+    editIsolation = editMode && !searchParams.has('interactive');
+    const placementViewportMedia = window.matchMedia(`(max-width: ${MOBILE_PLACEMENT_BREAKPOINT}px)`);
+    const onPlacementViewportChange = () => {
+      isMobilePlacementsViewport = placementViewportMedia.matches;
+    };
+    onPlacementViewportChange();
+    if (typeof placementViewportMedia.addEventListener === 'function') {
+      placementViewportMedia.addEventListener('change', onPlacementViewportChange);
+      stopPlacementViewportWatcher = () => placementViewportMedia.removeEventListener('change', onPlacementViewportChange);
+    } else if (typeof placementViewportMedia.addListener === 'function') {
+      placementViewportMedia.addListener(onPlacementViewportChange);
+      stopPlacementViewportWatcher = () => placementViewportMedia.removeListener(onPlacementViewportChange);
+    }
+    if (editMode && ENABLE_SILLY_QUESTION) {
+      mapPromptVisible = true;
+    }
+    publishedPlacements = loadPublishedPlacements();
+    placements = editMode
+      ? loadDraftPlacements(publishedPlacements)
+      : clonePlacements(publishedPlacements);
     initSillyState();
     void loadSiteData().then(() => {
       requestAnimationFrame(() => {
