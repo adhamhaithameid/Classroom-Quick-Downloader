@@ -573,8 +573,10 @@
     width: 100%;
     min-height: 110px;
     resize: vertical;
-    background: rgba(255, 255, 255, 0.6);
-    backdrop-filter: blur(6px);
+    border: 1.5px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    padding: 14px 16px;
+    background: rgba(255, 255, 255, 0.7);
     color: var(--text);
     font-size: 14px;
     line-height: 1.6;
