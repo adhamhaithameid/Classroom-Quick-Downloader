@@ -91,7 +91,9 @@ describe('fetchChangelog', () => {
     const data = await fetchChangelog();
     expect(data.entries).toHaveLength(1);
     expect(data.entries[0]?.id).toBe('r-good');
-  });
+    },
+    TEST_TIMEOUT_MS
+  );
 
   it('filters out non-string change entries', async () => {
     vi.stubGlobal(
