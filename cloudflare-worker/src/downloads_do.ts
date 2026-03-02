@@ -2583,6 +2583,57 @@ export class DownloadsDurable {
     return request.headers.get("CF-Connecting-IP") || "unknown";
   }
 
+  private buildDangerAuditID(now: number): string {
+    try {
+      if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+        return `wdaudit-${now}-${crypto.randomUUID()}`;
+      }
+    } catch {
+      // Fallback handled below.
+    }
+    return `wdaudit-${now}-${Math.random().toString(36).slice(2, 12)}`;
+  }
+
+  private buildDangerAuditCorrelationID(now: number): string {
+    try {
+      if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+        return `wdcorr-${now}-${crypto.randomUUID()}`;
+      }
+    } catch {
+      // Fallback handled below.
+    }
+    return `wdcorr-${now}-${Math.random().toString(36).slice(2, 12)}`;
+  }
+
+  private appendDangerAudit(
+    request: Request,
+    action: string,
+    path: string,
+    result: "ok" | "error",
+    detail?: string,
+  ): void {
+    const now = Date.now();
+    const entry: DangerActionAuditRecord = {
+      id: this.buildDangerAuditID(now),
+      tsUtc: now,
+      actorIp: trimAndLimitString(this.getClientIp(request), 120) || "unknown",
+      action: trimAndLimitString(action, 80) || "unknown",
+      path: trimAndLimitString(path, 120) || "",
+      result,
+      correlationId: this.buildDangerAuditCorrelationID(now),
+      detail: (() => {
+        const value = trimAndLimitString(detail, 280);
+        return value || null;
+      })(),
+    };
+    this.d.dangerActionAuditLogs.push(entry);
+    if (this.d.dangerActionAuditLogs.length > MAX_DANGER_AUDIT_LOGS) {
+      this.d.dangerActionAuditLogs = this.d.dangerActionAuditLogs.slice(
+        this.d.dangerActionAuditLogs.length - MAX_DANGER_AUDIT_LOGS,
+      );
+    }
+  }
+
   private checkTrackRateLimit(ip: string, nowMs: number): { allowed: boolean; retryAfterSec?: number } {
     const minute = Math.floor(nowMs / 60000);
     const entry = this.d.trackRates[ip];
