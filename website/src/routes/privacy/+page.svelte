@@ -397,8 +397,38 @@
       gap: 10px;
     }
 
-    .action-btn {
-      width: 100%;
+    .prv-banner {
+      padding: 24px 20px;
+    }
+
+    .prv-banner-items {
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .prv-banner-sep {
+      width: 48px; height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(26,139,85,0.2), transparent);
+    }
+
+    .prv-cta-card {
+      padding: 40px 24px;
+    }
+  }
+
+  @media (max-width: 600px) {
+    .prv-hero {
+      padding: 40px 16px 32px;
+    }
+
+    .prv-card h3 {
+      font-size: 18px;
+    }
+
+    .prv-card-summary,
+    .prv-bullets li {
+      font-size: 14px;
+      line-height: 1.7;
     }
   }
 </style>
