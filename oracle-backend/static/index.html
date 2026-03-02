@@ -172,14 +172,23 @@
         <div class="mobile-toolbar" data-shortcuts-capture="true">
           <div class="mobile-toolbar-grid">
             <select id="mobile-page-select" class="mobile-page-select" aria-label="Select dashboard section">
-              <option value="overview">Overview</option>
-              <option value="activity">Activity &amp; Charts</option>
-              <option value="dashboards">Ops Hub</option>
-              <option value="website-sync">Website Sync</option>
-              <option value="creative">Creative Hub</option>
-              <option value="content-changelog">User Changelog</option>
-              <option value="logs">Oracle Logs</option>
-              <option value="danger">Danger Zone</option>
+              <optgroup label="Cockpit">
+                <option value="overview">Overview</option>
+                <option value="dashboards">Ops Hub</option>
+              </optgroup>
+              <optgroup label="Website">
+                <option value="website-sync">Website Sync</option>
+                <option value="website-analysis">Website Analysis</option>
+                <option value="content-changelog">User Changelog</option>
+              </optgroup>
+              <optgroup label="Analysis">
+                <option value="activity">Activity &amp; Charts</option>
+                <option value="creative">Creative Hub</option>
+                <option value="logs">Oracle Logs</option>
+              </optgroup>
+              <optgroup label="Danger">
+                <option value="danger">Danger Zone</option>
+              </optgroup>
             </select>
             <button class="btn btn-secondary" id="shortcuts-btn-mobile" data-shortcut="Cmd+/" data-tooltip="Keyboard shortcuts">
               Shortcuts
