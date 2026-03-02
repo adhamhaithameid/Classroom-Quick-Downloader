@@ -102,6 +102,7 @@ function normalizeBaseUrl(value: string): string {
 
 export const WEBSITE_BASE_URL = normalizeBaseUrl(WEBSITE_URL) || DEFAULT_WEBSITE_BASE_URL;
 export const CHANGELOG_SITE_URL = `${WEBSITE_BASE_URL}/changelog`;
+export const UNINSTALL_SITE_URL = `${WEBSITE_BASE_URL}/uninstall`;
 export const TRACK_URL = WORKER_URL;
 
 // --- Rate Limits ---
