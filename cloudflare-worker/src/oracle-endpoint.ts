@@ -103,7 +103,9 @@ export function resolveOracleEndpoint(
   return {
     ok: true,
     baseUrl,
-    ingestUrl: `${baseUrl}${INGEST_BATCH_PATH}`,
+    ingestUrl: `${baseUrl}${EXTENSION_INGEST_BATCH_PATH}`,
+    ingestBatchUrl: `${baseUrl}${EXTENSION_INGEST_BATCH_PATH}`,
+    websiteEventsBatchUrl: `${baseUrl}${WEBSITE_INTERNAL_BATCH_PATH}`,
     protocol: insecureHttp ? "http:" : "https:",
     insecureHttp,
   };
