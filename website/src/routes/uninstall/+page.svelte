@@ -556,10 +556,12 @@
     transform: translateY(-1px);
   }
 
-  .notes-wrap span {
-    color: var(--text);
-    font-size: 14px;
-    font-weight: 700;
+  .un-mini-pill.active {
+    background: var(--green);
+    border-color: transparent;
+    color: #fff;
+    box-shadow: 0 3px 14px rgba(26, 139, 85, 0.22);
+    transform: translateY(-1px);
   }
 
   .notes-wrap em {
