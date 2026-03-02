@@ -2823,7 +2823,7 @@ export class DownloadsDurable {
   }
 
   // ---------------------------------------------------------------------------
-  // Alarms for retry / backoff AND scheduled midnight flush
+  // Alarms for retry / backoff AND scheduled daily flush
   // ---------------------------------------------------------------------------
 
   async alarm(): Promise<void> {
