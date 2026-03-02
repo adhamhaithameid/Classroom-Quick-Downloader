@@ -605,6 +605,43 @@ func Migrate(db *sql.DB) error {
 
 		`CREATE INDEX IF NOT EXISTS idx_auth_rate_limits_scope_updated
 			ON auth_rate_limits(scope, updated_at DESC);`,
+
+		// Extension changelog entries (CRUD-managed via Oracle dashboard).
+		`CREATE TABLE IF NOT EXISTS extension_changelog_entries (
+			id           TEXT PRIMARY KEY,
+			version      TEXT NOT NULL,
+			date         TEXT NOT NULL,
+			summary      TEXT NOT NULL DEFAULT '',
+			added_json   TEXT NOT NULL DEFAULT '[]',
+			changed_json TEXT NOT NULL DEFAULT '[]',
+			fixed_json   TEXT NOT NULL DEFAULT '[]',
+			is_important INTEGER NOT NULL DEFAULT 0,
+			created_at   INTEGER NOT NULL,
+			updated_at   INTEGER NOT NULL
+		);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_ext_changelog_entries_version
+			ON extension_changelog_entries(version);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_ext_changelog_entries_date
+			ON extension_changelog_entries(date DESC);`,
+
+		// Extension notification rules for changelog pill styling.
+		`CREATE TABLE IF NOT EXISTS extension_notification_rules (
+			id         TEXT PRIMARY KEY,
+			target     TEXT NOT NULL DEFAULT 'all',
+			priority   TEXT NOT NULL DEFAULT 'normal',
+			effect     TEXT NOT NULL DEFAULT 'none',
+			created_at INTEGER NOT NULL,
+			updated_at INTEGER NOT NULL
+		);`,
+
+		// Extension changelog configuration (source mode, GitHub import state).
+		`CREATE TABLE IF NOT EXISTS extension_changelog_config (
+			key        TEXT PRIMARY KEY,
+			value      TEXT NOT NULL DEFAULT '',
+			updated_at INTEGER NOT NULL
+		);`,
 	}
 
 	for _, stmt := range stmts {
