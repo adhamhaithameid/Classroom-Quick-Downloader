@@ -646,7 +646,9 @@
     margin-top: 16px;
   }
 
-  .result-msg.ok {
+  .un-toast-icon { font-size: 18px; flex-shrink: 0; }
+
+  .un-toast.ok {
     border-color: rgba(26, 139, 85, 0.3);
     color: var(--gc-green);
     background: rgba(26, 139, 85, 0.05);
