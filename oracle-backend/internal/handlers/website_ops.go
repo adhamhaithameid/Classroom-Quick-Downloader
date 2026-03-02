@@ -2090,6 +2090,30 @@ func WebsiteOpsOverrideHandler(db *sql.DB) http.HandlerFunc {
 				})
 			}
 			overrideCountries = normalizeWebsiteCountryCells(overrideCountries, 300)
+			violations := detectWebsiteDatasetMonotonicViolations(
+				maxInt64(row.PublishedDownloads, 0),
+				decodeWebsiteCountryCounts(row.PublishedCountries),
+				row.OverrideDownloads,
+				overrideCountries,
+			)
+			if len(violations) > 0 {
+				_ = AppendAuditLog(
+					r.Context(),
+					db,
+					"website_dataset_monotonic_violation",
+					"website_sync",
+					"override",
+					"blocked",
+					map[string]any{
+						"source":        "override",
+						"prevDownloads": maxInt64(row.PublishedDownloads, 0),
+						"nextDownloads": row.OverrideDownloads,
+						"violations":    violations,
+					},
+				)
+				writeJSONError(w, "monotonic_guard_blocked", "Override blocked: incoming totals would decrease existing published values.", http.StatusConflict)
+				return
+			}
 			row.OverrideCountriesRaw = encodeWebsiteCountryCells(overrideCountries)
 			row.PublishedSource = "override"
 			row.PublishedDownloads = row.OverrideDownloads
