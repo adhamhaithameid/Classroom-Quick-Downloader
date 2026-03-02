@@ -858,9 +858,14 @@
       border-radius: 14px;
       box-shadow: 0 2px 10px rgba(15, 20, 25, 0.045);
     }
-    to {
-      opacity: 1;
-      transform: translateY(0);
+    .fq-question {
+      padding: 15px 16px;
+      gap: 12px;
+    }
+    .fq-answer {
+      padding: 0 16px 15px;
+      font-size: 14px;
+      line-height: 1.72;
     }
   }
 
