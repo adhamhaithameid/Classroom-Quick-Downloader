@@ -480,6 +480,11 @@ export async function fetchWebsiteSnapshotResult(options: { force?: boolean } = 
   return runner;
 }
 
+export async function fetchWebsiteSnapshot(options: { force?: boolean } = {}): Promise<WebsiteSnapshot> {
+  const result = await fetchWebsiteSnapshotResult(options);
+  return result.snapshot;
+}
+
 export async function fetchOverview(): Promise<OverviewResponse> {
   return fetchOracleOverview();
 }
