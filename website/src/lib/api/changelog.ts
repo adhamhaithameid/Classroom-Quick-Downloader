@@ -1,4 +1,4 @@
-import { WORKER_BASE_URL } from '$lib/config';
+import { ORACLE_API_BASE_URL, WORKER_BASE_URL } from '$lib/config';
 import type { ChangelogResponse, ChangelogConfig, ChangelogMeta, ChangelogNotificationRule } from '$lib/types/public';
 
 const REQUEST_TIMEOUT_MS = 8000;
@@ -144,12 +144,27 @@ function coerceChangelogPayload(input: unknown): ChangelogResponse {
   };
 }
 
-export async function fetchChangelog(): Promise<ChangelogResponse> {
-  const response = await withTimeout(fetch(`${WORKER_BASE_URL}/changelog`), REQUEST_TIMEOUT_MS);
+async function tryFetchFrom(url: string): Promise<ChangelogResponse> {
+  const response = await withTimeout(fetch(url), REQUEST_TIMEOUT_MS);
   if (!response.ok) {
     throw new Error(`Changelog request failed (${response.status})`);
   }
   const payload = await response.json();
   return coerceChangelogPayload(payload);
+}
+
+/**
+ * Fetch changelog data. Oracle is the primary source; Worker is the fallback.
+ */
+export async function fetchChangelog(): Promise<ChangelogResponse> {
+  // 1. Try Oracle (primary)
+  try {
+    return await tryFetchFrom(`${ORACLE_API_BASE_URL}/api/public/extension/changelog`);
+  } catch (oracleErr) {
+    console.warn('[Changelog] Oracle fetch failed, trying Worker fallback:', oracleErr);
+  }
+
+  // 2. Try Worker (fallback)
+  return await tryFetchFrom(`${WORKER_BASE_URL}/changelog`);
 }
 
