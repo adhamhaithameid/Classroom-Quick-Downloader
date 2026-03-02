@@ -522,10 +522,9 @@
     transition: all 0.2s ease;
     color: var(--text-secondary);
   }
-
-  .sidebar-links a:hover {
-    background: rgba(26, 139, 85, 0.05);
-    color: var(--gc-green);
+  .cl-sidebar-link:hover {
+    background: var(--green-bg);
+    color: var(--green);
   }
 
   .sv {
