@@ -109,6 +109,68 @@ describe('changelog utils', () => {
     expect(await mod.isVersionSeen('')).toBe(false);
   });
 
+  it('accepts entries without id and creates stable fallback id', async () => {
+    const mod = await loadChangelogModule();
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({
+      ok: true,
+      entries: [{ version: 'v1.3.7', date: '2026-02-28T00:00:00.000Z', changes: ['New'] }],
+      config: { rules: [] },
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    const result = await mod.fetchChangelog(true);
+    expect(result?.entries[0]?.id.startsWith('cl-1.3.7-')).toBe(true);
+    expect(result?.entries[0]?.version).toBe('1.3.7');
+  });
+
+  it('treats same-version cloud updates as unseen when changelog content changes', async () => {
+    const mod = await loadChangelogModule();
+    const inMemoryStorage: Record<string, unknown> = {};
+    chrome.storage.local.get = vi.fn(async (key?: string | string[] | Record<string, unknown>) => {
+      if (typeof key === 'string') {
+        return { [key]: inMemoryStorage[key] };
+      }
+      if (Array.isArray(key)) {
+        return key.reduce<Record<string, unknown>>((acc, item) => {
+          acc[item] = inMemoryStorage[item];
+          return acc;
+        }, {});
+      }
+      if (key && typeof key === 'object') {
+        return Object.entries(key).reduce<Record<string, unknown>>((acc, [storageKey, fallback]) => {
+          acc[storageKey] = storageKey in inMemoryStorage ? inMemoryStorage[storageKey] : fallback;
+          return acc;
+        }, {});
+      }
+      return { ...inMemoryStorage };
+    }) as never;
+    chrome.storage.local.set = vi.fn(async (next: Record<string, unknown>) => {
+      Object.assign(inMemoryStorage, next);
+    }) as never;
+
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        ok: true,
+        entries: [{ id: 'r1', version: '1.3.7', date: '2026-02-28T00:00:00.000Z', changes: ['Initial note'] }],
+        config: { rules: [{ id: 'rule', target: '1.3.7', priority: 'major', effect: 'pulse' }] },
+        meta: { liveUpdatedAt: 10 },
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        ok: true,
+        entries: [{ id: 'r1', version: '1.3.7', date: '2026-02-28T00:00:00.000Z', changes: ['Updated note'] }],
+        config: { rules: [{ id: 'rule', target: '1.3.7', priority: 'major', effect: 'pulse' }] },
+        meta: { liveUpdatedAt: 20 },
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+
+    const first = await mod.fetchChangelog(true);
+    expect(first?.revisionToken).toBeTruthy();
+    await mod.markAsSeen('1.3.7', first);
+    expect(await mod.isVersionSeen('1.3.7', first)).toBe(true);
+
+    const second = await mod.fetchChangelog(true);
+    expect(second?.revisionToken).toBeTruthy();
+    expect(second?.revisionToken).not.toBe(first?.revisionToken);
+    expect(await mod.isVersionSeen('1.3.7', second)).toBe(false);
+  });
+
   it('matches notification rules', async () => {
     const mod = await loadChangelogModule();
     const cfg: ChangelogConfig = {
