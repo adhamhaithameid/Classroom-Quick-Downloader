@@ -504,10 +504,9 @@
     margin-left: 2px;
   }
 
-  .field span {
-    color: var(--text);
-    font-size: 14px;
-    font-weight: 700;
+  /* ── Field groups ─────────────── */
+  .un-field-group {
+    margin-bottom: 20px;
   }
 
   .field select {
