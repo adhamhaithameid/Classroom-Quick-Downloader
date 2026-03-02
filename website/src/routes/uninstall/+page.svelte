@@ -660,8 +660,37 @@
     background: rgba(220, 38, 38, 0.04);
   }
 
-  /* ── Reinstall ──────────────────────── */
-  .reinstall-row {
+  /* ── CTA Section ───────────────── */
+  .un-cta-section {
+    position: relative; z-index: 2;
+    padding: 8px 0 20px;
+  }
+
+  .un-cta-card {
+    text-align: center;
+    background: var(--surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: 24px;
+    padding: 44px 36px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.04);
+  }
+
+  .un-cta-heading {
+    font-size: clamp(22px, 3vw, 30px);
+    font-weight: 900;
+    letter-spacing: -0.03em;
+    margin: 0 0 10px;
+  }
+
+  .un-cta-text {
+    font-size: 15px;
+    color: var(--text-secondary);
+    max-width: 400px;
+    margin: 0 auto 24px;
+    line-height: 1.7;
+  }
+
+  .un-reinstall-row {
     display: flex;
     align-items: center;
     justify-content: center;
