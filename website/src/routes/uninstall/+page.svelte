@@ -137,30 +137,14 @@
   <div class="un-grid-bg" aria-hidden="true"></div>
 
   <!-- Hero -->
-  <header class="hero">
-    <div class="hero-icon">
-      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.42 19.42 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91" />
-      </svg>
-    </div>
-    <h1>Sorry to see you go.</h1>
-    <p>
-      Your feedback helps shape future versions. This form takes about 30 seconds and everything is optional.
-    </p>
-  </header>
-
-  <!-- Step 1: Reason -->
-  <section class="step">
-    <h2>Why did you uninstall?</h2>
-    <div class="option-grid">
-      {#each reasons as reason}
-        <button
-          type="button"
-          class="option"
-          class:selected={selectedReason === reason}
-          on:click={() => { selectedReason = reason; }}
-        >{reason}</button>
-      {/each}
+  <section class="un-hero un-appear" style="animation-delay: 0s">
+    <div class="un-wrap">
+      <span class="un-label">FEEDBACK CENTER</span>
+      <h1 class="un-mega">We'd love to hear why.</h1>
+      <p class="un-sub">
+        Your feedback directly shapes what we build next.<br />
+        Pick a reason below — everything else is optional.
+      </p>
     </div>
   </section>
 
