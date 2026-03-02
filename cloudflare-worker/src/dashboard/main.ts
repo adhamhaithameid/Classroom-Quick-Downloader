@@ -6719,6 +6719,7 @@ export function renderDashboard(stats: StatsResponse): string {
             ipAllowlistData.allowlist = data.allowlist || [];
             ipAllowlistData.stepUpBypassEnabled = data.stepUpBypassEnabled !== false;
             renderIpList();
+            refreshIpSecurityBadges();
             showToast('IP added: ' + ip, 'success');
             const input = document.getElementById('add-ip-input');
             if (input) input.value = '';
