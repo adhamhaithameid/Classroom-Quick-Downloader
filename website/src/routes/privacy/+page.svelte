@@ -288,10 +288,10 @@
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  .privacy-section:hover {
-    transform: translateY(-3px);
-    border-color: rgba(26, 139, 85, 0.2);
-    box-shadow: var(--shadow-lg);
+  .prv-card:hover {
+    transform: translateY(-4px);
+    border-color: var(--green-border);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.08);
   }
 
   .section-icon {
