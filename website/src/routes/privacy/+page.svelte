@@ -219,9 +219,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    flex-shrink: 0;
-    color: var(--gc-green);
-    margin-top: 2px;
+    gap: 32px;
+    flex-wrap: wrap;
   }
 
   h1 {
