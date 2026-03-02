@@ -93,19 +93,7 @@ describe('public website API integration', () => {
     vi.setSystemTime(new Date('2026-02-21T22:30:00.000Z'));
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () =>
-        new Response(
-          JSON.stringify({
-            ok: true,
-            generatedAt: 1700000,
-            granularity: 'country',
-            countries: [{ countryCode: 'us', count: 10 }, { countryCode: 'xx', count: 0 }],
-            totals: { countries: 1, downloads: 10 },
-            privacyNote: 'note'
-          }),
-          { status: 200 }
-        )
-      )
+      vi.fn(async () => new Response(JSON.stringify(buildSnapshotPayload(10)), { status: 200 }))
     );
 
     const payload = await fetchMapData();
