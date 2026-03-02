@@ -113,7 +113,10 @@
 
   onMount(() => {
     const params = new URLSearchParams(window.location.search);
-    queryBrowser = params.get('browser') || detectBrowserFromUserAgent(navigator.userAgent);
+    const browserFromQuery = normalizeBrowser(params.get('browser') || '');
+    const browserFromUA = detectBrowserFromUserAgent(navigator.userAgent);
+    detectedBrowser = browserFromQuery || browserFromUA;
+    queryBrowser = detectedBrowser;
     queryVersion = params.get('version') || 'unknown';
     querySource = params.get('source') || 'website';
   });
