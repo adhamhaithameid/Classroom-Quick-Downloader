@@ -421,7 +421,27 @@ function buildSnapshot(snapshotPayload: SnapshotResponse): WebsiteSnapshot {
   };
 }
 
-export async function fetchWebsiteSnapshot(options: { force?: boolean } = {}): Promise<WebsiteSnapshot> {
+function toErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) return error.message.trim();
+  return 'Failed to fetch live Oracle snapshot.';
+}
+
+function buildSnapshotFetchResult(
+  snapshot: WebsiteSnapshot,
+  source: WebsiteSnapshotFetchSource,
+  degraded: boolean,
+  errorMessage: string | null
+): WebsiteSnapshotFetchResult {
+  return {
+    snapshot,
+    source,
+    degraded,
+    stale: degraded || Date.now() >= snapshot.nextRefreshAtUtc,
+    errorMessage
+  };
+}
+
+export async function fetchWebsiteSnapshotResult(options: { force?: boolean } = {}): Promise<WebsiteSnapshotFetchResult> {
   hydrateSnapshotCacheFromStorage();
 
   if (!options.force && cachedSnapshot && isSnapshotFresh(cachedSnapshot)) {
