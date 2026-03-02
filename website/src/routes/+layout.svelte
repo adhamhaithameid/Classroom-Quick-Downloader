@@ -21,6 +21,7 @@
     // { href: '/samples', label: 'Samples' },
     // { href: '/overview2', label: 'Overview2' }
   ];
+  let nav = [...baseNav];
 
   let detectedBrowser: 'chrome' | 'firefox' | 'edge' = 'chrome';
   let mobileNavOpen = false;
