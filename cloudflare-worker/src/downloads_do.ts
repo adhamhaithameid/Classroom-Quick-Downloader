@@ -1860,6 +1860,26 @@ export class DownloadsDurable {
     }
 
     // Merge stored with defaults to be robust to schema changes.
+    const stepUpBypassNeedsMigration =
+      typeof stored.ipAllowlistStepUpBypassEnabled !== "boolean";
+    const changelogRevisionNeedsMigration = !Array.isArray(
+      (stored as unknown as Record<string, unknown>).changelogRevisions,
+    );
+    const changelogConfigNeedsMigration = (() => {
+      if (!isPlainObject(stored.changelogConfig)) return true;
+      const cfg = stored.changelogConfig as Record<string, unknown>;
+      if (cfg.applyMode !== "manual" && cfg.applyMode !== "auto_github") return true;
+      if (typeof cfg.autoSyncEnabled !== "boolean") return true;
+      if (typeof cfg.autoSyncIntervalMinutes !== "number") return true;
+      if (cfg.lastAutoSyncStatus !== "idle" && cfg.lastAutoSyncStatus !== "ok" && cfg.lastAutoSyncStatus !== "error") return true;
+      if (typeof cfg.liveHash !== "string" || cfg.liveHash.trim() === "") return true;
+      return false;
+    })();
+    const changelogDraftNeedsMigration = (() => {
+      const draftRaw = (stored as unknown as Record<string, unknown>).changelogDraft;
+      if (typeof draftRaw === "undefined" || draftRaw === null) return false;
+      return !isPlainObject(draftRaw);
+    })();
     this.data = {
       totalEvents: stored.totalEvents ?? base.totalEvents,
       totalDownloads: stored.totalDownloads ?? base.totalDownloads,
