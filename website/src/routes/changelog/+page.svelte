@@ -432,11 +432,17 @@
     display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;
   }
 
-  .header-meta {
-    display: block;
-    margin-top: 4px;
-    color: var(--muted);
-    font-size: 12px;
+  .cl-action-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    border: 1px solid var(--border-subtle);
+    border-radius: 999px; padding: 9px 18px;
+    text-decoration: none;
+    background: rgba(255,255,255,0.6);
+    backdrop-filter: blur(6px);
+    color: var(--text-secondary);
+    font-weight: 600; font-size: 13px;
+    cursor: pointer; transition: all 0.25s ease;
+    box-shadow: 0 1px 3px rgba(15,20,25,0.04);
   }
 
   .header-actions {
