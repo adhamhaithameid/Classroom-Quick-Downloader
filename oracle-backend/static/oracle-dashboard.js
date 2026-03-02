@@ -3525,6 +3525,12 @@
         if (!stateNode) return;
         try {
           var data = await fetchJSON('/api/admin/website/state');
+          var snapshot = null;
+          try {
+            snapshot = await fetchJSON('/api/public/website/snapshot');
+          } catch (_) {
+            snapshot = null;
+          }
           var control = data.control || {};
           var overrideCountries = Array.isArray(control.overrideCountries) ? control.overrideCountries : [];
           var publishedCountries = Array.isArray(control.publishedCountries) ? control.publishedCountries : [];
