@@ -1576,7 +1576,7 @@
 
   <!-- ━━━━ Global Map ━━━━ -->
   <section id="global-map" class="l2-block l2-snap l2-map-section" bind:this={mapSectionEl}>
-    <div class="l2-wrap l2-reveal l2-map-wrap">
+    <div class="l2-wrap l2-reveal l2-map-wrap" data-placement-section="map">
       <div class="l2-map-layout">
         {#if mapState === 'loading'}
           <div class="l2-map-state-card">
