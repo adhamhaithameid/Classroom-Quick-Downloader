@@ -300,6 +300,7 @@ function coerceUninstallStatsPayload(input: unknown): UninstallStatsResponse {
 function coerceUninstallSubmitPayload(input: unknown): UninstallFeedbackResponse {
   const source = input as Partial<UninstallFeedbackResponse>;
   return {
+    schemaVersion: asSchemaVersion(source?.schemaVersion),
     ok: source?.ok === true,
     generatedAt: asNumber(source?.generatedAt),
     submissionId: asNumber(source?.submissionId),
