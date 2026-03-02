@@ -6619,6 +6619,7 @@ export class DownloadsDurable {
       ok: true,
       enabled: this.d.ipAllowlistEnabled,
       allowlist: this.d.ipAllowlist,
+      stepUpBypassEnabled: this.d.ipAllowlistStepUpBypassEnabled,
       yourIp: clientIp,
     });
   }
