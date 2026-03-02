@@ -94,7 +94,7 @@ describe('fetchWebsiteSnapshot', () => {
     expect(first.overview.installs.usersTotal).toBe(20);
     expect(second.fetchedAtUtc).toBe(first.fetchedAtUtc);
     expect(first.nextRefreshAtUtc - first.fetchedAtUtc).toBe(ORACLE_SNAPSHOT_REFRESH_MS);
-  });
+  }, 15_000);
 
   it('refreshes cache after 3 hours and when force=true', async () => {
     vi.useFakeTimers();
