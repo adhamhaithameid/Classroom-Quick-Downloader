@@ -68,6 +68,11 @@
                   <span class="nav-item-emoji" aria-hidden="true">🗞️</span>
                   <span class="nav-item-label">User Changelog</span>
                 </button>
+                <button class="nav-item" data-page="ext-changelog" data-shortcut="Cmd+9"
+                  data-tooltip="Manage extension changelog entries, notification rules, and pill styling" data-tooltip-position="bottom" aria-label="Extension Changelog manager">
+                  <span class="nav-item-emoji" aria-hidden="true">🧩</span>
+                  <span class="nav-item-label">Ext Changelog</span>
+                </button>
               </div>
             </div>
 
@@ -180,6 +185,7 @@
                 <option value="website-sync">Website Sync</option>
                 <option value="website-analysis">Website Analysis</option>
                 <option value="content-changelog">User Changelog</option>
+                <option value="ext-changelog">Ext Changelog</option>
               </optgroup>
               <optgroup label="Analysis">
                 <option value="activity">Activity &amp; Charts</option>
@@ -1366,6 +1372,121 @@
                     <span class="pill">Tap: <strong>/changelog</strong></span>
                   </div>
                   <pre id="user-changelog-output" class="json-viewer json-viewer-compact hidden"></pre>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- EXTENSION CHANGELOG PAGE -->
+          <div class="page website-page" id="page-ext-changelog">
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <div class="card-title">Extension Changelog & Notifications</div>
+                  <div class="card-subtitle">Manage changelog entries and notification pill rules for the browser extension</div>
+                </div>
+                <div class="action-buttons-grid action-buttons-grid-three">
+                  <button class="btn btn-secondary" id="ext-cl-refresh-btn">Refresh</button>
+                  <button class="btn btn-secondary" id="ext-cl-import-github-btn">Import from GitHub</button>
+                  <button class="btn btn-secondary" id="ext-cl-preview-public-btn">Preview Public API</button>
+                </div>
+              </div>
+              <div class="card-body">
+                <!-- Stats -->
+                <div class="section-block">
+                  <div class="section-caption">Status</div>
+                  <div class="stats-grid">
+                    <div class="stat-card2">
+                      <div class="stat-label">Entries</div>
+                      <div class="stat-value" id="ext-cl-entry-count">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Rules</div>
+                      <div class="stat-value" id="ext-cl-rule-count">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Public Endpoint</div>
+                      <div class="stat-value" style="font-size:0.75rem">/api/public/extension/changelog</div>
+                    </div>
+                  </div>
+                </div>
+                <!-- Entries Table -->
+                <div class="section-block">
+                  <div class="section-caption">📋 Changelog Entries</div>
+                  <div id="ext-cl-entries-table" class="table-container">
+                    <div class="loading"><div class="spinner"></div>Loading...</div>
+                  </div>
+                </div>
+                <!-- Add/Edit Entry -->
+                <div class="section-block">
+                  <div class="section-caption">Add / Edit Entry</div>
+                  <form class="form-grid" id="ext-cl-entry-form">
+                    <div class="action-buttons-grid action-buttons-grid-three">
+                      <input id="ext-cl-entry-id" class="auth-input" placeholder="ID (e.g. v1.3.8-release)" />
+                      <input id="ext-cl-entry-version" class="auth-input" placeholder="Version (e.g. 1.3.8)" />
+                      <input id="ext-cl-entry-date" class="auth-input" type="date" />
+                    </div>
+                    <textarea id="ext-cl-entry-summary" class="auth-input" placeholder="Summary" rows="2"></textarea>
+                    <textarea id="ext-cl-entry-added" class="auth-input" placeholder="Added (one per line)" rows="3"></textarea>
+                    <textarea id="ext-cl-entry-changed" class="auth-input" placeholder="Changed (one per line)" rows="3"></textarea>
+                    <textarea id="ext-cl-entry-fixed" class="auth-input" placeholder="Fixed (one per line)" rows="3"></textarea>
+                    <label class="auth-field-inline">
+                      <input type="checkbox" id="ext-cl-entry-important" />
+                      <span>Mark as Important</span>
+                    </label>
+                    <div class="action-buttons-grid action-buttons-grid-two">
+                      <button class="btn btn-start" type="submit">Save Entry</button>
+                      <button class="btn btn-secondary" type="button" id="ext-cl-entry-clear">Clear Form</button>
+                    </div>
+                  </form>
+                </div>
+                <!-- Notification Rules -->
+                <div class="section-block">
+                  <div class="section-caption">🔔 Notification Rules (Pill Styling)</div>
+                  <div class="card-subtitle">Rules control the changelog pill color and animation in the extension. Target: "all" or specific version. Priority: normal/minor/major. Effect: none/glow/pulse.</div>
+                  <div id="ext-cl-rules-table" class="table-container" style="margin-top:8px">
+                    <div class="loading"><div class="spinner"></div>Loading...</div>
+                  </div>
+                </div>
+                <!-- Add/Edit Rule -->
+                <div class="section-block">
+                  <div class="section-caption">Add / Edit Rule</div>
+                  <form class="form-grid" id="ext-cl-rule-form">
+                    <div class="action-buttons-grid action-buttons-grid-four">
+                      <input id="ext-cl-rule-id" class="auth-input" placeholder="Rule ID" />
+                      <input id="ext-cl-rule-target" class="auth-input" placeholder="Target (all or version)" value="all" />
+                      <select id="ext-cl-rule-priority" class="auth-input">
+                        <option value="normal">Normal</option>
+                        <option value="minor">Minor</option>
+                        <option value="major">Major</option>
+                      </select>
+                      <select id="ext-cl-rule-effect" class="auth-input">
+                        <option value="none">None</option>
+                        <option value="glow">Glow</option>
+                        <option value="pulse">Pulse</option>
+                      </select>
+                    </div>
+                    <div class="action-buttons-grid action-buttons-grid-two">
+                      <button class="btn btn-start" type="submit">Save Rule</button>
+                      <button class="btn btn-secondary" type="button" id="ext-cl-rule-clear">Clear Form</button>
+                    </div>
+                  </form>
+                </div>
+                <!-- Bulk Markdown Import -->
+                <div class="section-block">
+                  <div class="section-caption">📋 Bulk Markdown Import</div>
+                  <div class="section-note" style="margin-bottom:10px;font-size:0.82em;color:var(--text-soft,#aaa)">
+                    Paste changelog markdown below. Format: <code>## vX.Y.Z</code> → <code>### Summary</code> / <code>### Added</code> / <code>### Changed</code> / <code>### Fixed</code>
+                  </div>
+                  <textarea id="ext-cl-bulk-markdown" rows="12" class="form-control" placeholder="## v1.3.8&#10;### Summary&#10;Improved changelog reliability…&#10;### Added&#10;- Revision-aware changelog tracking&#10;### Changed&#10;- Seen-state behavior now compares version plus revision&#10;### Fixed&#10;- Fixed same-version publish cases" style="width:100%;font-family:monospace;font-size:0.85em;resize:vertical;background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.1);color:#e2e8f0;border-radius:8px;padding:12px"></textarea>
+                  <div style="display:flex;gap:8px;margin-top:10px">
+                    <button class="btn btn-start" type="button" id="ext-cl-bulk-import-btn">📥 Bulk Import All</button>
+                  </div>
+                </div>
+                <!-- Public API preview -->
+                <div class="section-block">
+                  <div class="section-caption">Public API Preview</div>
+                  <pre id="ext-cl-public-preview" class="json-viewer json-viewer-compact hidden"></pre>
                 </div>
               </div>
             </div>
