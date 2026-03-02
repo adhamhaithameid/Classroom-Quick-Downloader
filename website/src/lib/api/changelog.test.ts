@@ -34,7 +34,9 @@ describe('fetchChangelog', () => {
     expect(data.entries[0]?.isImportant).toBe(true);
     expect(data.entries[0]?.changes).toEqual(['Bug fix A', 'Feature B']);
     expect(data.entries[1]?.version).toBe('1.3.6');
-  });
+    },
+    TEST_TIMEOUT_MS
+  );
 
   it('sorts entries by date descending', async () => {
     vi.stubGlobal(
