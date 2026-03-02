@@ -935,8 +935,8 @@
       /* Floating tooltip */
       .floating-tooltip {
         position: fixed;
-        right: 16px;
-        bottom: 16px;
+        left: 12px;
+        top: 12px;
         background: rgba(9, 9, 11, 0.85);
         backdrop-filter: blur(8px);
         -webkit-backdrop-filter: blur(8px);
