@@ -2164,6 +2164,18 @@
         }
       }
 
+      function calcPctDelta(base, next) {
+        var b = Number(base || 0);
+        var n = Number(next || 0);
+        if (b <= 0) {
+          if (n <= 0) return '0%';
+          return '+∞';
+        }
+        var pct = ((n - b) / b) * 100;
+        var sign = pct >= 0 ? '+' : '';
+        return sign + pct.toFixed(1) + '%';
+      }
+
       // Comparison feature
       var currentComparisonMode = 'week';
 
