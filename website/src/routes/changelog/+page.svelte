@@ -511,10 +511,8 @@
     color: var(--green);
   }
 
-  .sidebar-links {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
+  .cl-sidebar-links {
+    display: flex; flex-direction: column; gap: 2px;
   }
 
   .sidebar-links a {
