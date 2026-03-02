@@ -748,7 +748,16 @@
               <div class="card-header">
                 <div>
                   <div class="card-title">Daily Downloads</div>
-                  <div class="card-subtitle">Last 14 days - Hover for details</div>
+                  <div class="card-subtitle">Selectable download window with daily totals</div>
+                </div>
+                <div>
+                  <select id="daily-downloads-range-select" class="auth-input">
+                    <option value="7">Last 7 Days</option>
+                    <option value="14" selected>Last 14 Days</option>
+                    <option value="30">Last 30 Days</option>
+                    <option value="60">Last 60 Days</option>
+                    <option value="all">All Time</option>
+                  </select>
                 </div>
               </div>
               <div class="card-body">
