@@ -444,6 +444,11 @@
     cursor: pointer; transition: all 0.25s ease;
     box-shadow: 0 1px 3px rgba(15,20,25,0.04);
   }
+  .cl-action-pill:hover {
+    border-color: rgba(26,139,85,0.25);
+    color: var(--green);
+  }
+  .cl-action-pill:disabled { opacity: 0.6; cursor: wait; }
 
   .header-actions {
     display: flex;
