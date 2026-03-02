@@ -220,13 +220,16 @@
       </div>
     {/if}
   </header>
+  {/if}
 
-  <main class:site-main={!isLanding2} class:l2-wrap={!isLanding2}>
-    {#key routeKey}
-      <div class="site-route-shell" in:fade={{ duration: 220 }} out:fade={{ duration: 160 }}>
-        <slot />
-      </div>
-    {/key}
+  <main
+    class:site-main={!isOverviewStyleRoute && !hideChrome}
+    class:site-main-overview-style={isOverviewStyleRoute && !hideChrome}
+    class:l2-wrap={!isOverviewStyleRoute && !hideChrome}
+  >
+    <div class="site-route-shell">
+      <slot />
+    </div>
   </main>
 
   <footer class="l2-footer">
