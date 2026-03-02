@@ -788,8 +788,9 @@
       font-size: 13px;
     }
 
-    .step {
-      padding: 18px;
+    .un-cta-card {
+      padding: 36px 20px;
+      border-radius: 18px;
     }
 
     .two-col {
