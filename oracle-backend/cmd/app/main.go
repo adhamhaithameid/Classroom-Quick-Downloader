@@ -91,6 +91,9 @@ func validateProductionSecurityConfig(
 	if allowUntrustedStoreURLs {
 		return errors.New("ORACLE_ALLOW_UNTRUSTED_STORE_URLS must be false in production")
 	}
+	if !strings.EqualFold(strings.TrimSpace(sessionCookieMode), "true") {
+		return errors.New("SESSION_COOKIE_SECURE must be true in production")
+	}
 	for _, network := range trustedProxyNets {
 		if network == nil {
 			continue
