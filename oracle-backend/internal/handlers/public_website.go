@@ -2247,6 +2247,9 @@ func resolvePublicWebsiteAllowedOrigins() map[string]struct{} {
 			allowed[normalized] = struct{}{}
 		}
 	}
+	if normalized := normalizeRequestOriginHeader(os.Getenv("PUBLIC_SITE_URL")); normalized != "" {
+		allowed[normalized] = struct{}{}
+	}
 
 	raw := strings.TrimSpace(os.Getenv("PUBLIC_WEBSITE_ALLOWED_ORIGINS"))
 	if raw == "" {
