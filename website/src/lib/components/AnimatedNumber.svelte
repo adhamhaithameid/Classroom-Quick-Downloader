@@ -4,7 +4,6 @@
    * Keeps numeric glyph spacing natural (no per-digit layout engine).
    */
   import { onMount } from 'svelte';
-  import NumberFlow, { NumberFlowElement, continuous } from '@number-flow/svelte';
 
   export let value: number = 0;
   export let suffix: string = '';
