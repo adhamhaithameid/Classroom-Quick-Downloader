@@ -397,6 +397,22 @@ function parseAllowedOrigins(raw: string | undefined): Set<string> {
   return allowed;
 }
 
+function parseAllowedEmails(raw: string | undefined): Set<string> {
+  if (!raw) return new Set<string>();
+  const cacheKey = raw.trim().toLowerCase();
+  if (!cacheKey) return new Set<string>();
+  const cached = parsedAllowedEmailsCache.get(cacheKey);
+  if (cached) return cached;
+  const emails = new Set<string>();
+  for (const item of cacheKey.split(",")) {
+    const value = item.trim().toLowerCase();
+    if (!value) continue;
+    emails.add(value);
+  }
+  parsedAllowedEmailsCache.set(cacheKey, emails);
+  return emails;
+}
+
 function isPublicCorsRoute(pathname: string): boolean {
   return (
     pathname === "/config" ||
