@@ -798,8 +798,9 @@
       gap: 10px;
     }
 
-    .option {
-      white-space: normal;
+    .un-reinstall-btn {
+      width: 100%;
+      justify-content: center;
     }
   }
 </style>
