@@ -95,6 +95,14 @@ type websiteOpsStateResponse struct {
 	} `json:"lastBatches"`
 }
 
+type websiteSyncAnomaly struct {
+	Active     bool     `json:"active"`
+	Source     string   `json:"source"`
+	Message    string   `json:"message"`
+	Details    []string `json:"details"`
+	DetectedAt int64    `json:"detectedAt"`
+}
+
 type websiteOpsOverrideRequest struct {
 	Enabled   bool                     `json:"enabled"`
 	Downloads int64                    `json:"downloads"`
