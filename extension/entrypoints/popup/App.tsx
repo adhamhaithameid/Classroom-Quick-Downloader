@@ -19,6 +19,7 @@ const GITHUB_PROFILE_URL = 'https://github.com/adhamhaithameid';
 const GITHUB_STAR_URL = `${GITHUB_REPO_URL}/stargazers`;
 const GITHUB_AVATAR_URL = 'https://github.com/adhamhaithameid.png?size=80';
 const BUY_ME_COFFEE_URL = 'https://buymeacoffee.com/adhamhaithameid';
+const CHANGELOG_POLL_MS = 15_000;
 
 // Extension Store URLs for each browser
 const EXTENSION_STORE_URLS = {
