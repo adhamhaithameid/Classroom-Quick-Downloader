@@ -1179,6 +1179,7 @@ func TestValidateProductionSecurityConfig(t *testing.T) {
 
 			err := validateProductionSecurityConfig(
 				tc.appEnv,
+				tc.sessionCookieMode,
 				tc.allowLoopbackBypass,
 				tc.allowEmptyDashboardPassword,
 				tc.allowHTTPStoreURLs,
