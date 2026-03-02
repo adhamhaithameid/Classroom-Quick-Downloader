@@ -90,3 +90,50 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: cloudflare-worker
           command: deploy
+
+      - name: Post-deploy smoke checks
+        env:
+          PUBLIC_WORKER_BASE_URL: ${{ vars.PUBLIC_WORKER_BASE_URL }}
+          PUBLIC_SITE_URL: ${{ vars.PUBLIC_SITE_URL }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          worker_base="${PUBLIC_WORKER_BASE_URL%/}"
+          site_origin="$(printf '%s' "${PUBLIC_SITE_URL}" | sed -E 's#(https?://[^/]+).*#\1#')"
+
+          health_code="000"
+          for _ in $(seq 1 20); do
+            health_code="$(curl -sS -o /tmp/worker-health.json -w "%{http_code}" "${worker_base}/health" || true)"
+            if [ "${health_code}" = "200" ]; then
+              break
+            fi
+            sleep 3
+          done
+          if [ "${health_code}" != "200" ]; then
+            echo "::error::Worker /health smoke check failed (HTTP ${health_code})"
+            cat /tmp/worker-health.json || true
+            exit 1
+          fi
+
+          auth_code="$(curl -sS -o /tmp/worker-auth.txt -w "%{http_code}" "${worker_base}/admin/website/status" || true)"
+          if [ "${auth_code}" != "401" ] && [ "${auth_code}" != "403" ]; then
+            echo "::error::Worker auth smoke check expected 401/403, got ${auth_code}"
+            cat /tmp/worker-auth.txt || true
+            exit 1
+          fi
+
+          snapshot_payload="$(curl -fsS "${worker_base}/api/public/website/snapshot")"
+          echo "${snapshot_payload}" | grep -Eq '"schemaVersion"[[:space:]]*:[[:space:]]*"1"'
+
+          event_id="gha-worker-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          ingest_payload="$(cat <<JSON
+          {"schemaVersion":"1","sessionId":"gha-worker-smoke","pagePath":"/ci/smoke","events":[{"eventId":"${event_id}","eventType":"cta","action":"install_click","placement":"hero_install"}]}
+          JSON
+          )"
+          ingest_response="$(curl -fsS -X POST "${worker_base}/api/public/website/events" \
+            -H "Origin: ${site_origin}" \
+            -H "Content-Type: application/json" \
+            -H "X-Requested-With: XMLHttpRequest" \
+            --data "${ingest_payload}")"
+          echo "${ingest_response}" | grep -Eq '"ok"[[:space:]]*:[[:space:]]*true'
