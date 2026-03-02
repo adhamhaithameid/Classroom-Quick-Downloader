@@ -12,6 +12,8 @@ export type OracleEndpointResolution =
       ok: true;
       baseUrl: string;
       ingestUrl: string;
+      ingestBatchUrl: string;
+      websiteEventsBatchUrl: string;
       protocol: "https:" | "http:";
       insecureHttp: boolean;
     }
