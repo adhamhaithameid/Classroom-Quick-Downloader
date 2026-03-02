@@ -2811,7 +2811,15 @@
           await fetchJSONWithInit('/api/admin/records/upsert', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ recordType: USER_CHANGELOG_RECORD_TYPE, recordKey: key, data: data })
+            body: JSON.stringify({
+              recordType: USER_CHANGELOG_CONFIG_RECORD_TYPE,
+              recordKey: 'active',
+              data: {
+                source: source,
+                markdownUrl: markdownUrl,
+                updatedAtUtc: Date.now()
+              }
+            })
           });
           var form = document.getElementById('user-changelog-form');
           if (form) form.reset();
