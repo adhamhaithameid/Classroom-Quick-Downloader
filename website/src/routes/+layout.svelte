@@ -3,7 +3,6 @@
   import { base } from '$app/paths';
   import { page } from '$app/stores';
   import logo from '$lib/assets/cqd-logo.svg';
-  import AnimatedNumber from '$lib/components/AnimatedNumber.svelte';
   import { STORE_LINKS } from '$lib/config';
   import '../app.css';
 
