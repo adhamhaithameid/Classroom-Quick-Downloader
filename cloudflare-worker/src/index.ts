@@ -1246,7 +1246,6 @@ async function proxyToDO(request: Request, env: WorkerEnv): Promise<Response> {
   const requestInit: RequestInit & { duplex?: "half" } = {
     method: request.method,
     headers: headers,
-    body: request.body,
     redirect: request.redirect,
   });
 
