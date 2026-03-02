@@ -1147,6 +1147,38 @@
   $: if (typeof document !== 'undefined') {
     document.body.classList.toggle('l2-map-modal-open', mapExpanded);
   }
+  $: {
+    const snapshot = $websiteSnapshotStore.snapshot;
+    if (snapshot) {
+      overview = snapshot.overview;
+      mapData = snapshot.map;
+      downloadCount = snapshot.overview.totals.downloads || 0;
+      userCount = computeUsersTotal(snapshot.overview);
+      countryCount = snapshot.map.totals.countries || 0;
+    } else {
+      overview = null;
+      mapData = null;
+      downloadCount = 0;
+      userCount = 0;
+      countryCount = 0;
+    }
+
+    mapError = $websiteSnapshotStore.errorMessage || '';
+    isDataDegraded = $websiteSnapshotStore.status === 'degraded';
+
+    if ($websiteSnapshotStore.status === 'error' && !$websiteSnapshotStore.snapshot) {
+      mapState = 'error';
+    } else if (
+      ($websiteSnapshotStore.status === 'idle' ||
+        $websiteSnapshotStore.status === 'loading' ||
+        $websiteSnapshotStore.status === 'refreshing') &&
+      !$websiteSnapshotStore.snapshot
+    ) {
+      mapState = 'loading';
+    } else {
+      mapState = 'ready';
+    }
+  }
 </script>
 
 <svelte:window on:keydown={handleGlobalKeydown} />
