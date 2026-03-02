@@ -789,10 +789,10 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
       allowlistDecision = await checkLoginAllowlist(stub, request.url, env.DO_SHARED_SECRET, clientIp);
     } catch {
       return new Response(
-        renderLoginPage(ipCheckResult.error || "Service temporarily unavailable. Please try again."),
-        { 
-          status: 503, 
-          headers: { 
+        renderLoginPage("Access policy service temporarily unavailable. Please try again shortly."),
+        {
+          status: 503,
+          headers: {
             "content-type": "text/html; charset=utf-8",
             "Retry-After": "30",
             "X-Dependency-Error": "durable-object-unavailable"
