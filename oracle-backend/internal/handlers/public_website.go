@@ -511,6 +511,183 @@ func loadOrRefreshPublicWebsiteSnapshot(
 	if latestErr != nil && !errors.Is(latestErr, sql.ErrNoRows) {
 		return publicWebsiteSnapshotResponse{}, latestErr
 	}
+	if latestErr == nil && !forceRefresh && !shouldRefreshPublicWebsiteSnapshot(latest, time.Now().UTC()) {
+		return latest, nil
+	}
+
+	built, err := buildPublicWebsiteSnapshot(ctx, sqliteDB, postgresDB)
+	if err != nil {
+		if latestErr == nil {
+			return latest, nil
+		}
+		return publicWebsiteSnapshotResponse{}, err
+	}
+	if err := savePublicWebsiteSnapshot(ctx, sqliteDB, built); err != nil {
+		logEvent("error", "public_website_snapshot_store_failed", map[string]interface{}{
+			"error":      trimAndLimit(err.Error(), 240),
+			"snapshotId": built.SnapshotID,
+		})
+	}
+	return built, nil
+}
+
+func shouldRefreshPublicWebsiteSnapshot(snapshot publicWebsiteSnapshotResponse, nowUTC time.Time) bool {
+	if snapshot.GeneratedAt <= 0 {
+		return true
+	}
+	if strings.TrimSpace(snapshot.SnapshotID) == "" {
+		return true
+	}
+	if snapshot.SchemaVersion != publicWebsiteSchemaVersion {
+		return true
+	}
+	age := nowUTC.Sub(time.UnixMilli(snapshot.GeneratedAt))
+	return age >= publicWebsiteSnapshotRefreshInterval
+}
+
+func buildPublicWebsiteSnapshot(
+	ctx context.Context,
+	sqliteDB, postgresDB *sql.DB,
+) (publicWebsiteSnapshotResponse, error) {
+	store := newControlPlaneStore(sqliteDB, postgresDB)
+	overview, err := buildPublicWebsiteOverview(ctx, sqliteDB, store)
+	if err != nil {
+		return publicWebsiteSnapshotResponse{}, err
+	}
+	worldMap, err := buildPublicWebsiteMap(ctx, sqliteDB)
+	if err != nil {
+		return publicWebsiteSnapshotResponse{}, err
+	}
+	changelog, err := buildPublicWebsiteUserChangelog(ctx, store)
+	if err != nil {
+		return publicWebsiteSnapshotResponse{}, err
+	}
+
+	generatedAt := time.Now().UTC().UnixMilli()
+	overview.GeneratedAt = generatedAt
+	worldMap.GeneratedAt = generatedAt
+	changelog.GeneratedAt = generatedAt
+
+	return publicWebsiteSnapshotResponse{
+		SchemaVersion:        publicWebsiteSchemaVersion,
+		OK:                   overview.OK && worldMap.OK && changelog.OK,
+		GeneratedAt:          generatedAt,
+		SnapshotID:           newWebsiteBatchID("public_website_snapshot"),
+		Overview:             overview,
+		Map:                  worldMap,
+		Changelog:            changelog,
+		UserChangelogSummary: buildPublicWebsiteChangelogSummary(changelog),
+		Privacy:              buildPublicWebsitePrivacyPointers(ctx, store),
+	}, nil
+}
+
+func buildPublicWebsiteChangelogSummary(changelog publicWebsiteUserChangelogResponse) publicWebsiteChangelogSummary {
+	return publicWebsiteChangelogSummary{
+		Headline:         changelog.Headline,
+		Description:      changelog.Description,
+		EntriesCount:     len(changelog.Entries),
+		LastUpdatedAtUTC: changelog.LastUpdatedAtUTC,
+		FullChangelogURL: changelog.FullChangelogURL,
+	}
+}
+
+func buildPublicWebsitePrivacyPointers(ctx context.Context, store *controlPlaneStore) publicWebsitePrivacyPointers {
+	userPrivacyURL := "https://classroom-quick-downloader-website.pages.dev/privacy"
+	if publicSiteURL := strings.TrimSpace(os.Getenv("PUBLIC_SITE_URL")); publicSiteURL != "" {
+		userPrivacyURL = strings.TrimRight(publicSiteURL, "/") + "/privacy"
+	}
+
+	pointers := publicWebsitePrivacyPointers{
+		Headline:       "Privacy, simplified",
+		Description:    "We only expose aggregated, public-safe metrics and never publish raw IP data.",
+		UserPrivacyURL: userPrivacyURL,
+		FullPrivacyURL: githubMarkdownURL("PRIVACY.md"),
+	}
+	if store == nil {
+		return pointers
+	}
+
+	records, err := store.listRecords(ctx, publicWebsitePrivacyRecordType)
+	if err != nil || len(records) == 0 {
+		return pointers
+	}
+	data := decodeRecordDataMap(records[0].Data)
+	if normalized := trimAndLimit(stringFromAny(data["headline"]), 120); normalized != "" {
+		pointers.Headline = normalized
+	}
+	if normalized := trimAndLimit(stringFromAny(data["description"]), 300); normalized != "" {
+		pointers.Description = normalized
+	}
+	if normalized := normalizeExternalURL(stringFromAny(data["userPrivacyUrl"])); normalized != "" {
+		pointers.UserPrivacyURL = normalized
+	}
+	if normalized := normalizeExternalURL(stringFromAny(data["fullPrivacyUrl"])); normalized != "" {
+		pointers.FullPrivacyURL = normalized
+	}
+	return pointers
+}
+
+func loadLatestPublicWebsiteSnapshot(ctx context.Context, sqliteDB *sql.DB) (publicWebsiteSnapshotResponse, error) {
+	var payloadJSON string
+	if err := sqliteDB.QueryRowContext(
+		ctx,
+		`SELECT payload_json
+		 FROM website_public_snapshots
+		 ORDER BY generated_at DESC, id DESC
+		 LIMIT 1`,
+	).Scan(&payloadJSON); err != nil { // #nosec G701 -- static query without user input.
+		return publicWebsiteSnapshotResponse{}, err
+	}
+
+	var payload publicWebsiteSnapshotResponse
+	if err := json.Unmarshal([]byte(payloadJSON), &payload); err != nil {
+		return publicWebsiteSnapshotResponse{}, err
+	}
+	payload.SchemaVersion = publicWebsiteSchemaVersion
+	payload.Overview.SchemaVersion = publicWebsiteSchemaVersion
+	payload.Map.SchemaVersion = publicWebsiteSchemaVersion
+	payload.Changelog.SchemaVersion = publicWebsiteSchemaVersion
+	if payload.UserChangelogSummary.FullChangelogURL == "" {
+		payload.UserChangelogSummary = buildPublicWebsiteChangelogSummary(payload.Changelog)
+	}
+	if payload.Privacy.FullPrivacyURL == "" || payload.Privacy.UserPrivacyURL == "" {
+		payload.Privacy = buildPublicWebsitePrivacyPointers(ctx, newControlPlaneStore(sqliteDB, nil))
+	}
+	return payload, nil
+}
+
+func savePublicWebsiteSnapshot(
+	ctx context.Context,
+	sqliteDB *sql.DB,
+	snapshot publicWebsiteSnapshotResponse,
+) error {
+	if sqliteDB == nil {
+		return errors.New("database not available")
+	}
+	payloadBytes, err := json.Marshal(snapshot)
+	if err != nil {
+		return err
+	}
+	if len(payloadBytes) > publicWebsiteSnapshotPayloadMaxBytes {
+		return errors.New("snapshot payload exceeds size limit")
+	}
+
+	_, err = sqliteDB.ExecContext(
+		ctx,
+		`INSERT INTO website_public_snapshots (
+			snapshot_id,
+			schema_version,
+			generated_at,
+			payload_json,
+			created_at
+		) VALUES (?, ?, ?, ?, ?)`,
+		trimAndLimit(snapshot.SnapshotID, 120),
+		publicWebsiteSchemaVersion,
+		snapshot.GeneratedAt,
+		string(payloadBytes),
+		time.Now().UTC().UnixMilli(),
+	) // #nosec G701 -- static insert statement with bound params only.
+	return err
 }
 
 func PublicWebsiteUninstallHandler(sqliteDB *sql.DB) http.HandlerFunc {
