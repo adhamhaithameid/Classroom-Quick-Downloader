@@ -101,7 +101,7 @@ func TestIngestWritesOutboxAndSchemaRegistry(t *testing.T) {
 	}
 
 	var schemaPathCount int64
-	if err := sqlDB.QueryRow(`SELECT COUNT(*) FROM cf_schema_registry WHERE json_path = 'extra.newThing.enabled'`).Scan(&schemaPathCount); err != nil {
+	if err := sqlDB.QueryRow(`SELECT COUNT(*) FROM cf_schema_registry WHERE json_path = 'summary.totals.totalEvents'`).Scan(&schemaPathCount); err != nil {
 		t.Fatalf("failed querying schema registry: %v", err)
 	}
 	if schemaPathCount == 0 {
