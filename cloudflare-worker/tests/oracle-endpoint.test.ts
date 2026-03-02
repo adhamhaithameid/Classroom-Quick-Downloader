@@ -24,6 +24,8 @@ describe("resolveOracleEndpoint", () => {
     if (result.ok) {
       expect(result.baseUrl).toBe("https://oracle.example.com");
       expect(result.ingestUrl).toBe("https://oracle.example.com/ingest-batch");
+      expect(result.ingestBatchUrl).toBe("https://oracle.example.com/ingest-batch");
+      expect(result.websiteEventsBatchUrl).toBe("https://oracle.example.com/api/internal/website/events/batch");
       expect(result.insecureHttp).toBe(false);
     }
   });
