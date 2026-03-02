@@ -479,9 +479,9 @@
     box-shadow: 0 1px 4px rgba(15, 20, 25, 0.03);
   }
 
-  .option:hover {
-    border-color: rgba(26, 139, 85, 0.2);
-    color: var(--gc-green);
+  .un-pill-icon {
+    font-size: 15px;
+    line-height: 1;
   }
 
   .option.selected {
