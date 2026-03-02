@@ -396,9 +396,11 @@
     margin-bottom: 14px;
   }
 
-  .step h2 {
-    margin: 0 0 14px;
-    font-size: 17px;
+  .un-step-badge {
+    width: 30px; height: 30px;
+    background: var(--green);
+    color: #fff;
+    font-size: 14px;
     font-weight: 800;
     letter-spacing: -0.015em;
   }
