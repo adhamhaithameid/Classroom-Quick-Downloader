@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { base } from '$app/paths';
   import { submitUninstallFeedback } from '$lib/api/publicSite';
   import { STORE_LINKS } from '$lib/config';
   import { buildUninstallNotesPayload, detectBrowserFromUserAgent } from '$lib/uninstall/feedback';
