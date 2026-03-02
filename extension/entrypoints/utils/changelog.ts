@@ -25,6 +25,13 @@ export interface ChangelogConfig {
   lastUpdated?: number;
 }
 
+export interface ChangelogMeta {
+  liveUpdatedAt?: number;
+  applyMode?: string;
+  lastAutoSyncAt?: number | null;
+  lastAutoSyncStatus?: string;
+}
+
 export interface ChangelogData {
   entries: ChangelogEntry[];
   config: ChangelogConfig;
