@@ -401,7 +401,7 @@ export function getMatchingRule(config: ChangelogConfig | undefined, currentVers
   if (!version) return null;
 
   // 1. Exact Match
-  const exact = config.rules.find(r => r.target === currentVersion);
+  const exact = config.rules.find(r => normalizeRuleTarget(r.target) === version);
   if (exact) return exact;
 
   // 2. Wildcard "all"
