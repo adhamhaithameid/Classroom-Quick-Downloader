@@ -72,6 +72,27 @@ jobs:
               exit 1
             fi
 
+            required_env_keys=(
+              APP_ENV
+              ADDR
+              DB_PATH
+              STATIC_DIR
+              DO_SHARED_SECRET
+              DASHBOARD_PASSWORD
+              SUPER_ADMIN_PASSWORD
+              DANGER_PASSWORD
+              ARCHIVER_SHARED_SECRET
+              ORACLE_AUDIT_CHECKPOINT_SECRET
+              PUBLIC_WEBSITE_ALLOWED_ORIGINS
+            )
+            for key in "${required_env_keys[@]}"; do
+              value="$(grep -E "^${key}=" .env.production | head -n1 | cut -d= -f2- || true)"
+              if [ -z "${value}" ]; then
+                echo "Missing required key in .env.production: ${key}"
+                exit 1
+              fi
+            done
+
             if [ ! -f docker-compose.runtime.override.yml ]; then
               cat > docker-compose.runtime.override.yml <<'EOF'
             services:
