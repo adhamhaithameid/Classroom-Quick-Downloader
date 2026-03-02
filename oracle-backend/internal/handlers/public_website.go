@@ -24,6 +24,14 @@ const (
 	publicWebsiteSchemaVersion           = "1"
 	defaultGitHubRepoSlug                = "adhamhaithameid/Classroom-Quick-Downloader"
 	publicWebsiteUserChangelogRecordType = "website_user_changelog_entry"
+	publicWebsiteUserChangelogConfigType = "website_user_changelog_config"
+	publicWebsitePrivacyRecordType       = "website_user_privacy"
+	publicWebsiteEventsBodyLimitBytes    = 128 << 10 // 128 KiB
+	publicWebsiteEventsMaxPerRequest     = 64
+	publicWebsiteMetaJSONMaxBytes        = 4 << 10 // 4 KiB
+	publicWebsiteRawEventJSONMaxBytes    = 8 << 10 // 8 KiB
+	publicWebsiteSnapshotRefreshInterval = 3 * time.Hour
+	publicWebsiteSnapshotPayloadMaxBytes = 2 << 20 // 2 MiB
 )
 
 var (
