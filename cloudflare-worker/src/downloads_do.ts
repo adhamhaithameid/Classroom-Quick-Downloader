@@ -6574,7 +6574,11 @@ export class DownloadsDurable {
     try {
       body = await request.json();
     } catch {
-      return json({ allowed: true }); // Allow on parse error to prevent lockout
+      return json({
+        allowed: true,
+        enabled: this.d.ipAllowlistEnabled,
+        stepUpBypassEnabled: this.d.ipAllowlistStepUpBypassEnabled,
+      }); // Allow on parse error to prevent lockout
     }
 
     const ip = normalizeIp(body.ip || "");
