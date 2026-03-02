@@ -49,7 +49,7 @@ describe('route render smoke coverage', () => {
     const html = squish(body);
 
     expect(head).toContain('Changelog — Classroom Quick Downloader');
-    expect(html).toContain('Loading changelog from GitHub');
+    expect(html).toContain('Loading changelog from the servers');
     expect(html).toContain('Open changelog on GitHub');
   });
 
