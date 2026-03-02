@@ -260,6 +260,13 @@ Configured workflows:
   - runs website typecheck + smoke test before build
   - builds website
   - deploys to Cloudflare Pages
+  - runs post-deploy smoke checks:
+    - website URL availability
+    - worker `/health`
+    - worker admin auth gate (expects `401/403`)
+    - worker website ingest path (`POST /api/public/website/events`)
+    - worker website snapshot compatibility route (`GET /api/public/website/snapshot`) when exposed
+    - oracle website snapshot path (`GET /api/public/website/snapshot`) as canonical source of truth
 
 ## 6) Manual Deploy Commands
 
