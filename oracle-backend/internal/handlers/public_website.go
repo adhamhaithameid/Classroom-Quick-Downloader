@@ -1224,8 +1224,9 @@ func buildPublicWebsiteOverview(ctx context.Context, sqliteDB *sql.DB, store *co
 	edgeVersion := stringPtrOrNil(lookupBrowserVersion(installs.Browsers, "edge"))
 
 	return publicWebsiteOverviewResponse{
-		OK:          true,
-		GeneratedAt: time.Now().UTC().UnixMilli(),
+		SchemaVersion: publicWebsiteSchemaVersion,
+		OK:            true,
+		GeneratedAt:   time.Now().UTC().UnixMilli(),
 		Totals: publicWebsiteTotals{
 			Downloads: downloads,
 			Success:   rawTotals["totalSuccess"],
