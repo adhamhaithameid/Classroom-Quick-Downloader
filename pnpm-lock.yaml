@@ -3441,7 +3441,7 @@ snapshots:
 
   '@acemir/cssom@0.9.31': {}
 
-  '@aklinker1/rollup-plugin-visualizer@5.12.0(rollup@4.58.0)':
+  '@aklinker1/rollup-plugin-visualizer@5.12.0(rollup@4.59.0)':
     dependencies:
       open: 8.4.2
       picomatch: 2.3.1
