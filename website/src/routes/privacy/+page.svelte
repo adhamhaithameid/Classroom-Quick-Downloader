@@ -245,20 +245,25 @@
     line-height: 1.5;
   }
 
-  .action-btn {
-    border: 1px solid var(--border-subtle, rgba(226, 232, 240, 0.35));
-    border-radius: 999px;
-    padding: 9px 16px;
-    text-decoration: none;
-    background: rgba(255, 255, 255, 0.6);
-    backdrop-filter: blur(6px);
-    color: var(--text-secondary);
-    font-weight: 600;
-    text-align: center;
-    cursor: pointer;
-    font-size: 13px;
-    transition: all 0.25s ease;
-    box-shadow: var(--shadow-sm);
+  .prv-banner-sep {
+    width: 1px; height: 48px;
+    background: linear-gradient(180deg, transparent, rgba(26,139,85,0.2), transparent);
+    flex-shrink: 0;
+  }
+
+  /* ── Section Head ──────────────── */
+  .prv-section-head {
+    text-align: center; margin-bottom: 48px;
+  }
+
+  .prv-section-head h2 {
+    font-size: clamp(28px, 3.5vw, 42px); font-weight: 800;
+    letter-spacing: -0.02em; margin: 0 0 12px;
+  }
+
+  .prv-section-head p {
+    font-size: 16px; color: var(--text-secondary);
+    max-width: 560px; margin: 0 auto;
   }
 
   .action-btn:hover {
