@@ -161,6 +161,12 @@ func SummaryHandler(db *sql.DB) http.HandlerFunc {
 		resp.Flags = flags
 		resp.OK = true
 		resp.GeneratedAt = now.UnixMilli()
+		resp.GeneratedAtUTC = now.Format(time.RFC3339)
+		if useWindow {
+			meta := buildWindowMeta(now, fromTime, toTime)
+			resp.WindowStartUTC = meta.WindowStartUTC
+			resp.WindowEndUTC = meta.WindowEndUTC
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(resp)
