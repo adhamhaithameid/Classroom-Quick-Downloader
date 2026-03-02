@@ -260,6 +260,7 @@
       </div>
     </div>
   </footer>
+  {/if}
 </div>
 
 <style>
