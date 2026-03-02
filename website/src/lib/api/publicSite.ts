@@ -511,6 +511,10 @@ export function resetWebsiteSnapshotCacheForTests(): void {
 }
 
 export async function fetchUserChangelog(): Promise<UserChangelogResponse> {
+  const snapshot = await fetchWebsiteSnapshot();
+  if (snapshot.changelog.entries.length > 0 || snapshot.changelog.headline || snapshot.changelog.description) {
+    return snapshot.changelog;
+  }
   const payload = await fetchOracleJSON('/api/public/website/changelog');
   return coerceUserChangelogPayload(payload);
 }
