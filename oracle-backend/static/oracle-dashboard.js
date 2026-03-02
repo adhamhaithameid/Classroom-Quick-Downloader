@@ -2730,6 +2730,24 @@
           var lastUpdatedText = fmtUtcDateTimeFromMs(payload.lastUpdatedAtUtc || payload.generatedAt || 0);
           setContentSyncStatus('user-changelog-sync-status', entries + ' entries · ' + lastUpdatedText, false);
           setContentSyncOutput('user-changelog-output', payload);
+          setTextOrPlaceholder('user-changelog-current-source', String(payload.source || 'oracle').toUpperCase());
+          setTextOrPlaceholder('user-changelog-current-entry-count', fmtNumber(entries));
+          setTextOrPlaceholder('user-changelog-current-updated', lastUpdatedText);
+          var currentPreviewNode = document.getElementById('user-changelog-current-preview');
+          if (currentPreviewNode) {
+            if (entries > 0) {
+              var top = payload.entries[0] || {};
+              currentPreviewNode.innerHTML = renderReleasePreviewHTML({
+                version: top.version || '',
+                summary: top.summary || '',
+                added: [],
+                changed: [],
+                fixed: [],
+              });
+            } else {
+              currentPreviewNode.innerHTML = '<div class="empty-state">No live changelog entries yet.</div>';
+            }
+          }
         } catch (e) {
           setContentSyncStatus('user-changelog-sync-status', 'Failed to read /api/public/website/changelog', true);
           setContentSyncOutput('user-changelog-output', { ok: false, error: String((e && e.message) || e || 'unknown') });
