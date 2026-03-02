@@ -375,6 +375,9 @@ func PublicWebsiteMapHandler(sqliteDB, postgresDB *sql.DB) http.HandlerFunc {
 			writePublicWebsiteError(w, http.StatusInternalServerError, "snapshot_build_failed", "Failed to load map data.", true)
 			return
 		}
+		writePublicWebsiteJSON(w, http.StatusOK, snapshot.Map)
+	}
+}
 
 		downloads := rawTotals["totalDownloads"]
 		countries := make([]publicWebsiteCountryCell, 0, len(rawTotals))
