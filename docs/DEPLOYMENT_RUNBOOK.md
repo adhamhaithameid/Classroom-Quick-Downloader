@@ -210,6 +210,16 @@ pnpm dlx wrangler whoami
 
 Save that as GitHub secret `CLOUDFLARE_ACCOUNT_ID`.
 
+### 4.3 Worker CORS origins for website writes
+
+In Cloudflare Worker settings (`cqd-analytics`), ensure `CORS_ALLOWED_ORIGINS` includes:
+
+- `https://<your-root-domain>`
+- `https://classroom-quick-downloader-website.pages.dev`
+- local dev origins you still use
+
+This is required so `POST /api/public/website/events` accepts your website origins at the Worker ingress layer.
+
 ## 5) Automatic Deploys on `main`
 
 Configured workflows:
