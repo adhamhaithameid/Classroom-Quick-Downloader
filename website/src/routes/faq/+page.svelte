@@ -379,6 +379,16 @@
           id: 'dev-license',
           q: 'What license does CQD use?',
           a: 'CQD is released under an open-source license. Check the LICENSE file in the GitHub repository for the exact terms and conditions.'
+        },
+        {
+          id: 'dev-build',
+          q: 'How do I build the extension from source?',
+          a: 'Clone the repository, install dependencies with npm/pnpm, and run the build script. Detailed build instructions are in the README. You can then load the built extension as an unpacked extension in developer mode.'
+        },
+        {
+          id: 'dev-testing',
+          q: 'How is the extension tested?',
+          a: 'CQD uses Vitest for unit and integration tests, with CI pipelines running on every pull request. The website and backend have their own comprehensive test suites as well.'
         }
       ]
     }
