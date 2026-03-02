@@ -90,8 +90,8 @@
 
     if (!animateOnView) {
       hasAnimatedInView = true;
-      isInView = true;
-      kickstart();
+      displayValue = 0;
+      animateTo(initial);
       return;
     }
     if (!hostEl || typeof IntersectionObserver === 'undefined') {
