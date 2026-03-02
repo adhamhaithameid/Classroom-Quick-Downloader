@@ -1224,7 +1224,7 @@ func recordSheetsFlushRunResult(
 		APIURL:       apiURL,
 		RowJSON:      rowJSON,
 		SummaryJSON:  summaryJSON,
-		MetaJSON:     metaJSON,
+		MetaJSON:     verifiedMetaJSON,
 		ErrorMessage: errorMessage,
 	}); err != nil {
 		log.Printf("[Scheduler] Failed to persist sheets flush run: %v", err)
