@@ -452,7 +452,7 @@
           if (lastTime === 0) lastTime = ts;
           const dt = (ts - lastTime) / 1000;
           lastTime = ts;
-          viewport.scrollLeft += autoSpeed * autoDirection * dt;
+          offset -= autoSpeed * autoDirection * dt;
           normalize();
         }
       }
