@@ -38,7 +38,9 @@ describe('fetchChangelog', () => {
     TEST_TIMEOUT_MS
   );
 
-  it('sorts entries by date descending', async () => {
+  it(
+    'sorts entries by date descending',
+    async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () =>
