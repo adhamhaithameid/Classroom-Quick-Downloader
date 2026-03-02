@@ -6,6 +6,17 @@
   "scripts": {
     "preinstall": "node ../tools/enforce-pnpm.cjs",
     "test": "go test ./...",
+    "test:smoke": "go test ./cmd/app ./internal/handlers ./internal/db -run 'Smoke|Health|APIHealthHandler|DBHealthHandler|InitPostgres_Smoke' -count=1",
+    "test:functional": "go test ./cmd/app -run 'Functional|Acceptance_Given' -count=1",
+    "test:integration": "go test ./cmd/app ./internal/handlers -run 'Integration|IngestE2E|E2E' -count=1",
+    "test:regression": "go test ./cmd/app ./internal/handlers -run 'Regression|Snapshot|Idempotent|MethodEnforcement' -count=1",
+    "test:load": "go test ./internal/handlers ./tests/performance -run 'TestLoad_' -bench 'Benchmark(HealthHandler|SummaryHandler_EmptyDB|IngestBatchHandler|TimeSeriesHandler|BreakdownHandler)' -benchmem -count=1",
+    "test:stress": "go test ./internal/handlers -run 'TestStress_' -count=1",
+    "test:security": "go test ./cmd/app ./internal/handlers -run 'Security|XSS|PathTraversal|SQLInjection|AuthHeaderValidation|RequiresAuth|RequiresStepUp|CSP|CSRF' -count=1",
+    "test:ui": "go test ./cmd/app -run 'Dashboard|StaticAssets|Template|CreativeHub|OpsHub' -count=1",
+    "test:fuzz": "go test ./internal/handlers -run '^$' -fuzz '^FuzzSanitizeWebsiteEventForAggregate$' -fuzztime=2s -count=1 && go test ./internal/handlers -run '^$' -fuzz '^FuzzSanitizeWebsiteEventPlacement$' -fuzztime=2s -count=1",
+    "test:reliability": "go test ./cmd/app ./internal/handlers ./internal/relay ./internal/observability -run 'Reliability|SessionPersistence|RunOnce|Retry|RequestContext|Metrics|PublicWebsiteEventsHandler_DeduplicatesRetryBatch|PublicWebsiteEventsHandler_PartialAcceptDoesNotAbortBatch' -count=1",
+    "test:strict": "pnpm run test:smoke && pnpm run test:functional && pnpm run test:integration && pnpm run test:regression && pnpm run test:load && pnpm run test:stress && pnpm run test:security && pnpm run test:ui && pnpm run test:fuzz && pnpm run test:reliability && pnpm run test",
     "vet": "go vet ./...",
     "validate": "pnpm run test && pnpm run vet",
     "gosec": "\"$(go env GOPATH)/bin/gosec\" -track-suppressions ./..."
