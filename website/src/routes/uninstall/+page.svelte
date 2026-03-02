@@ -45,6 +45,23 @@
   let submitState: 'idle' | 'sending' | 'done' | 'error' = 'idle';
   let submitMessage = '';
 
+  function normalizeBrowser(value: string): BrowserKey | null {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (normalized === 'chrome' || normalized === 'firefox' || normalized === 'edge') return normalized;
+    return null;
+  }
+
+  function isDetectedBrowser(browser: BrowserKey): boolean {
+    return detectedBrowser === browser;
+  }
+
+  /** Put the detected browser in the centre of the row */
+  $: orderedBrowsers = (() => {
+    const all: BrowserKey[] = ['chrome', 'firefox', 'edge'];
+    const others = all.filter(b => b !== detectedBrowser);
+    return others.length === 2 ? [others[0], detectedBrowser, others[1]] : all;
+  })();
+
   function toggleFeature(value: string): void {
     if (selectedFeatures.includes(value)) {
       selectedFeatures = selectedFeatures.filter((item) => item !== value);
