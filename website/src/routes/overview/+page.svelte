@@ -1407,12 +1407,11 @@
           <div class="l2-ps-media-card l2-ps-problem">
             <div class="l2-ps-media-badge">Without Classroom Quick Downloader</div>
             <div class="l2-ps-media-wrap">
-              <video class="l2-ps-video" autoplay loop muted playsinline preload="metadata" aria-label="Tedious manual download process">
-                <source src="{base}/videos/problem.mp4" type="video/mp4" />
-              </video>
-              <button type="button" class="l2-ps-expand-btn" on:click={() => toggleMediaExpanded('problem-video')} aria-label="Expand video">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg>
-              </button>
+              <MediaLoader type="video" src="{base}/videos/problem.mp4" class="l2-ps-video" autoplay loop muted playsinline preload="metadata" ariaLabel="Tedious manual download process">
+                <button type="button" class="l2-ps-expand-btn" on:click={() => toggleMediaExpanded('problem-video')} aria-label="Expand video">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg>
+                </button>
+              </MediaLoader>
             </div>
           </div>
           <div class="l2-ps-flow-arrow" aria-hidden="true">
