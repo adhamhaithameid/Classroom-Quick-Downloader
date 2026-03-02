@@ -239,6 +239,9 @@ Configured workflows:
 
 - `/.github/workflows/oracle-dashboard-deploy.yml`
   - triggers on every push to `main`
+  - runs preflight guardrails:
+    - required GitHub secrets presence
+    - schema compatibility check (`tools/check_schema_compat.sh`)
   - SSH into Oracle VM
   - hard-syncs repo to `origin/main`
   - rebuilds/recreates Oracle container
