@@ -1618,7 +1618,7 @@
         <div class="l2-map-copy">
           <span class="l2-label">TRUSTED WORLDWIDE</span>
           <h2>See where Classroom Quick Downloader is used around the world.</h2>
-          <p>Country-level usage rendered as a rotating globe based on live Oracle metrics.</p>
+          <p>Country-level usage rendered as a rotating globe based on live service metrics.</p>
           <div class="l2-map-top-countries">
             {#each topCountries as country, i}
               <div class="l2-top-country-card l2-rank-{i}" style="--rank-color:{i === 0 ? '#ca8a04' : i === 1 ? '#64748b' : '#92400e'};--rank-bg:{i === 0 ? 'rgba(234,179,8,0.08)' : i === 1 ? 'rgba(148,163,184,0.06)' : 'rgba(180,83,9,0.06)'};--rank-border:{i === 0 ? 'rgba(234,179,8,0.3)' : i === 1 ? 'rgba(148,163,184,0.25)' : 'rgba(180,83,9,0.25)'}">
