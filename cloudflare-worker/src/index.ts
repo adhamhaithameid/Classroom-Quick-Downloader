@@ -360,6 +360,18 @@ function isOraclePublicWebsiteRoute(pathname: string): boolean {
   return ORACLE_PUBLIC_WEBSITE_PATHS.has(pathname);
 }
 
+function websiteEventsErrorBody(code: string, message: string, retryable: boolean): Record<string, unknown> {
+  return {
+    ok: false,
+    schemaVersion: WEBSITE_EVENTS_SCHEMA_VERSION,
+    error: {
+      code,
+      message,
+      retryable,
+    },
+  };
+}
+
 function parseAllowedOrigins(raw: string | undefined): Set<string> {
   if (!raw) return new Set<string>();
   const cacheKey = raw.trim();
