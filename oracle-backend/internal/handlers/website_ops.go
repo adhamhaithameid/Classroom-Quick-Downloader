@@ -87,6 +87,7 @@ type websiteOpsStateResponse struct {
 	OK          bool                   `json:"ok"`
 	GeneratedAt int64                  `json:"generatedAt"`
 	Control     websiteOpsControlState `json:"control"`
+	Anomaly     *websiteSyncAnomaly    `json:"anomaly,omitempty"`
 	LastBatches struct {
 		OracleToWebsite     *websiteOpsBatch `json:"oracleToWebsite,omitempty"`
 		CloudflareToWebsite *websiteOpsBatch `json:"cloudflareToWebsite,omitempty"`
