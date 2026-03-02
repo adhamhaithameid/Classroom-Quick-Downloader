@@ -232,6 +232,7 @@
     </div>
   </main>
 
+  {#if !hideChrome}
   <footer class="l2-footer">
     <div class="l2-wrap l2-footer-inner">
       <div class="l2-footer-left">
