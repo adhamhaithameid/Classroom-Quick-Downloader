@@ -544,6 +544,10 @@ function isCorsOriginAllowedForPath(request: Request, env: WorkerEnv, pathname: 
     const protectedAllowlist = parseAllowedOrigins(env.CORS_ALLOWED_ORIGINS);
     return protectedAllowlist.has(headerOrigin);
   }
+  if (pathname === "/api/public/website/events") {
+    const websiteIngestAllowlist = parseAllowedOrigins(env.CORS_ALLOWED_ORIGINS);
+    return websiteIngestAllowlist.has(headerOrigin);
+  }
   return false;
 }
 
