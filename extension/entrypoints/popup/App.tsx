@@ -765,6 +765,10 @@ function App() {
                     title={getLatestChange(changelogData) ? `Latest: ${getLatestChange(changelogData)}` : "View changelog"}
                     onClick={async () => {
                        setShowChangelog(true);
+                       const latestData = await fetchChangelog(true);
+                       if (latestData) {
+                         setChangelogData(latestData);
+                       }
                        if (version) {
                          await markAsSeen(version);
                          setSeen(true);
