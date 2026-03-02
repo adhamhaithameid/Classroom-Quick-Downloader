@@ -372,7 +372,7 @@ func PublicWebsiteMapHandler(sqliteDB, postgresDB *sql.DB) http.HandlerFunc {
 
 		snapshot, err := loadOrRefreshPublicWebsiteSnapshot(r.Context(), sqliteDB, postgresDB, false)
 		if err != nil {
-			http.Error(w, "failed to load totals", http.StatusInternalServerError)
+			writePublicWebsiteError(w, http.StatusInternalServerError, "snapshot_build_failed", "Failed to load map data.", true)
 			return
 		}
 
