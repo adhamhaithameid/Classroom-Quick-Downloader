@@ -160,7 +160,9 @@ describe('fetchChangelog', () => {
     );
 
     await expect(fetchChangelog()).rejects.toThrow('Changelog request failed (500)');
-  });
+    },
+    TEST_TIMEOUT_MS
+  );
 
   it('defaults isImportant to false when not provided', async () => {
     vi.stubGlobal(
