@@ -298,10 +298,9 @@
     font-size: 32px; margin-bottom: 14px;
   }
 
-  .privacy-section h2 {
-    margin: 0;
-    font-size: 19px;
-    font-weight: 800;
+  .prv-card h3 {
+    margin: 0 0 10px;
+    font-size: 19px; font-weight: 800;
     letter-spacing: -0.02em;
   }
 
