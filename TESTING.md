@@ -389,7 +389,13 @@ Results appear in the **Security** tab of the GitHub repository.
 
 ### Deployment Model
 
-Production deployments are manual (no auto-deploy workflow in this repo):
+Production deploys are automated through GitHub Actions on `main`:
+
+- `/.github/workflows/deploy-cloudflare-worker.yml` deploys the Worker on every `main` push (and supports manual dispatch).
+- `/.github/workflows/oracle-dashboard-deploy.yml` deploys Oracle backend/dashboard to the VM on every `main` push (and supports manual dispatch).
+- `/.github/workflows/website-deploy.yml` deploys Website on `main` pushes affecting website/docs paths (and supports manual dispatch).
+
+Manual deploy scripts remain available for emergency/ops use:
 
 ```bash
 # Cloudflare Worker deploy (from your local machine)
