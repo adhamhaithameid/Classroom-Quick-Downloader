@@ -3,16 +3,18 @@
   import { base } from '$app/paths';
   import { submitUninstallFeedback } from '$lib/api/publicSite';
   import { STORE_LINKS } from '$lib/config';
-  import { buildUninstallNotesPayload, detectBrowserFromUserAgent } from '$lib/uninstall/feedback';
+  import { trackWebsiteEvent } from '$lib/analytics/websiteEvents';
+  import { buildUninstallNotesPayload } from '$lib/uninstall/feedback';
+  import { browserDisplayName, detectBrowserFromUserAgent, type BrowserKey } from '$lib/browser/detect';
 
-  const reasons = [
-    "Didn't work as expected",
-    "Too many permissions",
-    "Slowed my browser",
-    "Found an alternative",
-    "Privacy concerns",
-    "Temporary install",
-    "Other"
+  const reasons: { label: string; icon: string }[] = [
+    { label: "Didn't work as expected", icon: '⚙️' },
+    { label: 'Too many permissions', icon: '🔒' },
+    { label: 'Slowed my browser', icon: '🐢' },
+    { label: 'Found an alternative', icon: '🔄' },
+    { label: 'Privacy concerns', icon: '🛡️' },
+    { label: 'Temporary install', icon: '⏱️' },
+    { label: 'Other', icon: '💬' }
   ];
 
   const featureOptions = [
