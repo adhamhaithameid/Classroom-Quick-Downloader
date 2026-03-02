@@ -722,8 +722,8 @@
 
   .fq-item {
     text-align: left;
-    background: rgba(255, 255, 255, 0.7);
-    border: 1px solid var(--border-subtle, rgba(226, 232, 240, 0.35));
+    background: rgba(255,255,255,0.75);
+    border: 1px solid var(--border-subtle);
     border-radius: var(--radius-sm);
     padding: 0;
     cursor: pointer;
