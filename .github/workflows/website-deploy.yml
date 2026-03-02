@@ -30,8 +30,32 @@ jobs:
           PUBLIC_WORKER_BASE_URL: ${{ vars.PUBLIC_WORKER_BASE_URL }}
           PUBLIC_SITE_URL: ${{ vars.PUBLIC_SITE_URL }}
         run: |
-          if [ -z "${{ vars.CLOUDFLARE_PAGES_PROJECT_NAME }}" ]; then
-            echo "CLOUDFLARE_PAGES_PROJECT_NAME GitHub variable is required."
+          set -euo pipefail
+          required=(
+            CLOUDFLARE_API_TOKEN
+            CLOUDFLARE_ACCOUNT_ID
+            CLOUDFLARE_PAGES_PROJECT_NAME
+            PUBLIC_ORACLE_API_BASE_URL
+            PUBLIC_WORKER_BASE_URL
+            PUBLIC_SITE_URL
+          )
+          for key in "${required[@]}"; do
+            if [ -z "${!key:-}" ]; then
+              echo "::error::Missing required Actions secret/variable: ${key}"
+              exit 1
+            fi
+          done
+          for url_key in PUBLIC_ORACLE_API_BASE_URL PUBLIC_WORKER_BASE_URL PUBLIC_SITE_URL; do
+            case "${!url_key}" in
+              https://*) ;;
+              *)
+                echo "::error::${url_key} must start with https://"
+                exit 1
+                ;;
+            esac
+          done
+          if [ "${PUBLIC_ORACLE_API_BASE_URL%/}" = "${PUBLIC_WORKER_BASE_URL%/}" ]; then
+            echo "::error::PUBLIC_ORACLE_API_BASE_URL must be different from PUBLIC_WORKER_BASE_URL (Website reads must target Oracle; writes must target Worker)."
             exit 1
           fi
 
