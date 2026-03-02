@@ -32,20 +32,8 @@
   let snapshotLinks: { chrome: string; firefox: string; edge: string; github: string } | null = null;
   $: snapshotLinks = $websiteSnapshotStore.snapshot?.overview.links ?? null;
 
-  function detectBrowser(): 'chrome' | 'firefox' | 'edge' {
-    const ua = navigator.userAgent.toLowerCase();
-    if (ua.includes('edg/') || ua.includes('edge')) return 'edge';
-    if (ua.includes('firefox')) return 'firefox';
-    return 'chrome';
-  }
-
-  function browserDisplayName(key: string): string {
-    const map: Record<string, string> = { chrome: 'Chrome', firefox: 'Firefox', edge: 'Edge' };
-    return map[key] || key;
-  }
-
-  function browserLink(key: 'chrome' | 'firefox' | 'edge'): string {
-    return STORE_LINKS[key];
+  function browserLink(key: BrowserKey): string {
+    return snapshotLinks?.[key] || STORE_LINKS[key];
   }
 
   function normalizePath(path: string): string {
