@@ -1077,6 +1077,68 @@ function unauthorizedResponse(request: Request, env: WorkerEnv): Response {
   ), env);
 }
 
+function isMutatingMethod(method: string): boolean {
+  const upper = method.toUpperCase();
+  return upper !== "GET" && upper !== "HEAD" && upper !== "OPTIONS";
+}
+
+function isAdminMutationCsrfAllowed(request: Request, env: WorkerEnv): {
+  ok: boolean;
+  code?: string;
+  message?: string;
+} {
+  const pathname = new URL(request.url).pathname;
+  if (!isAdminCorsRoute(pathname) || !isMutatingMethod(request.method)) {
+    return { ok: true };
+  }
+
+  const requestedWith = (request.headers.get("X-Requested-With") || "").trim();
+  if (requestedWith !== "XMLHttpRequest") {
+    return {
+      ok: false,
+      code: "csrf_missing_x_requested_with",
+      message: "Mutating admin requests require X-Requested-With: XMLHttpRequest.",
+    };
+  }
+
+  const origin = normalizeHeaderOrigin(request.headers.get("Origin"));
+  if (origin) {
+    if (isCorsOriginAllowedForPath(request, env, pathname)) {
+      return { ok: true };
+    }
+    return {
+      ok: false,
+      code: "invalid_origin",
+      message: "Origin is not allowed for mutating admin requests.",
+    };
+  }
+
+  const refererOrigin = normalizeRefererOrigin(request.headers.get("Referer"));
+  if (!refererOrigin) {
+    return {
+      ok: false,
+      code: "origin_required",
+      message: "Origin or Referer is required for mutating admin requests.",
+    };
+  }
+
+  const requestOrigin = normalizeRequestOrigin(request);
+  if (requestOrigin && refererOrigin === requestOrigin) {
+    return { ok: true };
+  }
+
+  const adminAllowlist = parseAllowedOrigins(env.ADMIN_CORS_ALLOWED_ORIGINS);
+  if (adminAllowlist.has(refererOrigin)) {
+    return { ok: true };
+  }
+
+  return {
+    ok: false,
+    code: "invalid_origin",
+    message: "Referer origin is not allowed for mutating admin requests.",
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Protected Stats Endpoint (requires session or X-Admin-Secret)
 // ---------------------------------------------------------------------------
