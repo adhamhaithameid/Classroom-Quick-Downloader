@@ -692,6 +692,10 @@ func savePublicWebsiteSnapshot(
 
 func PublicWebsiteUninstallHandler(sqliteDB *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if sqliteDB == nil {
+			writePublicWebsiteError(w, http.StatusServiceUnavailable, "database_unavailable", "Database is unavailable.", true)
+			return
+		}
 		if !preparePublicWebsiteCORSWithOptions(w, r, publicWebsiteCORSOptions{
 			AllowedMethods:        "GET, POST, OPTIONS",
 			RequireOriginForWrite: true,
