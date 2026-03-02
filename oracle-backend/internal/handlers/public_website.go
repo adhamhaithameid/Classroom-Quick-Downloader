@@ -131,6 +131,7 @@ type publicWebsitePrivacyPointers struct {
 }
 
 type publicWebsiteUserChangelogResponse struct {
+	SchemaVersion    string                            `json:"schemaVersion"`
 	OK               bool                              `json:"ok"`
 	GeneratedAt      int64                             `json:"generatedAt"`
 	Headline         string                            `json:"headline"`
