@@ -53,6 +53,29 @@ export type MapResponse = {
   privacyNote: string;
 };
 
+export type SnapshotResponse = {
+  schemaVersion: PublicSchemaVersion;
+  ok: boolean;
+  generatedAt: number;
+  snapshotId: string;
+  overview: OverviewResponse;
+  map: MapResponse;
+  changelog: UserChangelogResponse;
+  userChangelogSummary: {
+    headline: string;
+    description: string;
+    entriesCount: number;
+    lastUpdatedAtUtc: number | null;
+    fullChangelogUrl: string;
+  };
+  privacy: {
+    headline: string;
+    description: string;
+    userPrivacyUrl: string;
+    fullPrivacyUrl: string;
+  };
+};
+
 export type WebsiteSnapshot = {
   source: 'oracle';
   fetchedAtUtc: number;
