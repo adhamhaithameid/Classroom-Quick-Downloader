@@ -73,7 +73,7 @@ Usage:
   ./tools/deploy_manual.sh all
 
 Environment overrides:
-  ORACLE_SSH_DEST        SSH destination (default: ubuntu@129.151.233.229)
+  ORACLE_SSH_DEST        SSH destination (required, e.g. ubuntu@<oracle-host>)
   ORACLE_SSH_KEY         SSH key path (default: ~/.ssh/oracle_key)
   ORACLE_REMOTE_REPO_DIR Repo path on server (default: $HOME/Classroom-Quick-Downloader)
 EOF
