@@ -1501,7 +1501,7 @@
           </svg>
         </button>
         {#if mediaExpanded === 'problem-video'}
-          <video class="l2-media-modal-content" autoplay loop muted playsinline><source src="{base}/videos/problem.mp4" type="video/mp4" /></video>
+          <MediaLoader type="video" src="{base}/videos/problem.mp4" class="l2-media-modal-content" autoplay loop muted playsinline />
         {:else if mediaExpanded === 'solution-video'}
           <video class="l2-media-modal-content" autoplay loop muted playsinline><source src="{base}/videos/solution.mp4" type="video/mp4" /></video>
         {:else if mediaExpanded === 'problem-flags'}
