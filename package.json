@@ -7,6 +7,7 @@
     "preinstall": "node tools/enforce-pnpm.cjs",
     "dev": "node tools/dev-browser.cjs",
     "dev:ext": "pnpm --filter extension dev",
+    "dev:oracle": "cd oracle-backend && go run ./cmd/app",
     "dev:website": "pnpm -C website dev",
     "build:ext": "pnpm --filter extension build",
     "build:website": "pnpm -C website build",
