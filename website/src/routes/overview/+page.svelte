@@ -1111,8 +1111,20 @@
       : clonePlacements(publishedPlacements);
     initSillyState();
     void loadSiteData().then(() => {
-      requestAnimationFrame(() => {
-        setupReveal();
+      requestAnimationFrame(async () => {
+        await waitForStableLayoutBeforePlacementLock();
+        syncPlacementCanvasHeight(true);
+        if (!editMode) {
+          placementCanvasLocked = true;
+          freezePlacementCoordinates();
+        }
+        if (isEmbed || editMode) {
+          resetPlacementSectionVisibility(true);
+          document.querySelectorAll('.l2-reveal').forEach((el) => el.classList.add('in-view'));
+        } else {
+          resetPlacementSectionVisibility(false);
+          setupReveal();
+        }
         stopMarquee = initMarquee();
         stopHeavierScroll = initHeavierScroll();
         stopMapPromptDelay = setupMapPromptDelay();
