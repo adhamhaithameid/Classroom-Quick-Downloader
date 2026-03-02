@@ -1,6 +1,6 @@
 # Testing Guide
 
-> Update (2026-02-15): Latest changes include CI coverage-gate hardening for extension analytics storage migration fallback, popup stats race-condition guards, structured step-up auth error handling in Oracle dashboard, and backend/worker auth-security hardening. See /CHANGELOG.md for details.
+> Update (2026-02-28): Major full-repo scan completed. Security scans are clean; known residual issue is intermittent timeout flakiness during heavy combined test runs (not deterministic functional regressions). See `/docs/MAJOR_SCAN_2026-02-28.md` for full evidence.
 
 > Comprehensive reference for every test suite, integration test, CI workflow, and manual verification script in the **Classroom Quick Downloader** monorepo.
 
