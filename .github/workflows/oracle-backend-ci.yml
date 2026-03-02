@@ -84,6 +84,14 @@ jobs:
         with:
           go-version: "1.24.13"
 
+      - name: Generate runtime smoke secrets
+        run: |
+          echo "ORACLE_SMOKE_DO_SHARED_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          echo "ORACLE_SMOKE_DASHBOARD_PASSWORD=$(openssl rand -hex 24)" >> "$GITHUB_ENV"
+          echo "ORACLE_SMOKE_SUPER_ADMIN_PASSWORD=$(openssl rand -hex 24)" >> "$GITHUB_ENV"
+          echo "ORACLE_SMOKE_ARCHIVER_SHARED_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          echo "ORACLE_SMOKE_AUDIT_CHECKPOINT_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+
       - name: Start backend
         working-directory: oracle-backend
         env:
