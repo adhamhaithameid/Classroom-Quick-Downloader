@@ -72,6 +72,7 @@ describe('oracle-only website data source routing', () => {
       expect(url).not.toContain('/public/site-metrics');
       return new Response(
         JSON.stringify({
+          schemaVersion: '1',
           ok: true,
           generatedAt: 1771700000000,
           totals: { downloads: 77, success: 75, fail: 2 },
