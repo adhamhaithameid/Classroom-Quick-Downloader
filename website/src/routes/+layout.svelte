@@ -1,6 +1,5 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { fade } from 'svelte/transition';
   import { base } from '$app/paths';
   import { page } from '$app/stores';
   import logo from '$lib/assets/cqd-logo.svg';
