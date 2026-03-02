@@ -2900,7 +2900,7 @@ export class DownloadsDurable {
   }
 
   /**
-   * Schedule an alarm for the next midnight (00:00 UTC).
+   * Schedule an alarm for the next 23:00 UTC daily flush.
    * Called after each alarm to ensure continuous scheduling.
    */
   private async scheduleNextMidnightAlarm(): Promise<void> {
