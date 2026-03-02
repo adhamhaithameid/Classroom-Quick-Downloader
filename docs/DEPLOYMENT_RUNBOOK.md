@@ -69,8 +69,9 @@ In GitHub repo:
 Create:
 
 - `CLOUDFLARE_PAGES_PROJECT_NAME=classroom-quick-downloader-website`
-- `PUBLIC_SITE_URL=https://classroom-quick-downloader-website.pages.dev`
-- `PUBLIC_ORACLE_API_BASE_URL=https://cqd-analytics.adhamhaithameid.workers.dev`
+- `PUBLIC_SITE_URL=https://<your-root-domain>`
+- `PUBLIC_ORACLE_API_BASE_URL=https://<your-oracle-public-https-domain>`
+- `PUBLIC_WORKER_BASE_URL=https://cqd-analytics.adhamhaithameid.workers.dev`
 
 Important:
 - `PUBLIC_ORACLE_API_BASE_URL` must point to Worker HTTPS proxy, not raw `http://...:8080`.
