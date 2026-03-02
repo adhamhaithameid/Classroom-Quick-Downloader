@@ -534,8 +534,11 @@
     display: flex; flex-direction: column;
   }
 
-  .sidebar-links a:hover .sv {
-    color: var(--gc-green);
+  .cl-entry {
+    display: grid;
+    grid-template-columns: 28px 1fr;
+    gap: 20px;
+    padding-bottom: 24px;
   }
 
   .sd {
