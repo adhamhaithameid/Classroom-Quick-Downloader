@@ -635,8 +635,11 @@
       gap: 20px;
     }
 
-    .sidebar {
-      position: static;
+    .cl-sidebar { position: static; }
+
+    .cl-sidebar-card {
+      padding: 12px;
+      border-radius: 14px;
     }
 
     .sidebar-links {
