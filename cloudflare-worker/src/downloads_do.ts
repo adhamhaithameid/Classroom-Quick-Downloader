@@ -2921,6 +2921,375 @@ export class DownloadsDurable {
     }
   }
 
+  private buildWebsiteTelemetryBatchID(now: number): string {
+    try {
+      if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+        return `ws-${now}-${crypto.randomUUID()}`;
+      }
+    } catch {
+      // Fallback handled below.
+    }
+    return `ws-${now}-${Math.random().toString(36).slice(2, 12)}`;
+  }
+
+  private buildWebsiteTelemetryCorrelationID(now: number): string {
+    try {
+      if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+        return `wscorr-${now}-${crypto.randomUUID()}`;
+      }
+    } catch {
+      // Fallback handled below.
+    }
+    return `wscorr-${now}-${Math.random().toString(36).slice(2, 12)}`;
+  }
+
+  private appendWebsiteTelemetrySeenEventIDs(eventIDs: string[]): void {
+    if (!Array.isArray(eventIDs) || eventIDs.length === 0) return;
+    this.d.websiteTelemetrySeenEventIds.push(...eventIDs);
+    if (this.d.websiteTelemetrySeenEventIds.length > WEBSITE_TELEMETRY_MAX_DEDUPE_IDS) {
+      this.d.websiteTelemetrySeenEventIds = this.d.websiteTelemetrySeenEventIds.slice(
+        this.d.websiteTelemetrySeenEventIds.length - WEBSITE_TELEMETRY_MAX_DEDUPE_IDS,
+      );
+    }
+  }
+
+  private nextWebsiteTelemetryRetryAt(attempt: number): number {
+    const safeAttempt = Math.max(1, Math.floor(attempt));
+    const base = Math.min(
+      WEBSITE_TELEMETRY_RETRY_MAX_MS,
+      WEBSITE_TELEMETRY_RETRY_BASE_MS * Math.pow(2, safeAttempt - 1),
+    );
+    const jitter = Math.floor(base * (Math.random() * 0.35));
+    return Date.now() + base + jitter;
+  }
+
+  private async scheduleAlarmAtEarliest(targetAt: number): Promise<void> {
+    const safeTarget = clampInt(targetAt, 1, Number.MAX_SAFE_INTEGER, 0);
+    if (safeTarget <= 0) return;
+    const currentAlarm = await this.state.storage.getAlarm();
+    if (!currentAlarm || currentAlarm > safeTarget) {
+      await this.state.storage.setAlarm(safeTarget);
+    }
+  }
+
+  private moveWebsiteTelemetryBatchToDeadLetter(
+    batch: WebsiteTelemetryQueuedBatch,
+    errorMessage: string,
+  ): void {
+    const normalizedError = trimAndLimitString(errorMessage, 280) || "unknown_error";
+    const deadLetterBatch: WebsiteTelemetryQueuedBatch = {
+      ...batch,
+      lastError: normalizedError,
+      nextRetryAtUtc: null,
+    };
+    this.d.websiteTelemetryDeadLetter.push(deadLetterBatch);
+    if (this.d.websiteTelemetryDeadLetter.length > WEBSITE_TELEMETRY_MAX_DLQ_BATCHES) {
+      this.d.websiteTelemetryDeadLetter = this.d.websiteTelemetryDeadLetter.slice(
+        this.d.websiteTelemetryDeadLetter.length - WEBSITE_TELEMETRY_MAX_DLQ_BATCHES,
+      );
+    }
+  }
+
+  private async flushWebsiteTelemetryQueue(options: {
+    force: boolean;
+    trigger: string;
+    maxBatches?: number;
+  }): Promise<{
+    ok: boolean;
+    processedBatches: number;
+    sentEvents: number;
+    deadLetteredBatches: number;
+    remainingQueue: number;
+    remainingDeadLetter: number;
+    error?: string;
+  }> {
+    const maxBatches = clampInt(options.maxBatches, 1, 1000, 100);
+    const now = Date.now();
+    let processedBatches = 0;
+    let sentEvents = 0;
+    let deadLetteredBatches = 0;
+    let lastError: string | undefined;
+
+    if (this.d.websiteTelemetryQueue.length === 0) {
+      return {
+        ok: true,
+        processedBatches,
+        sentEvents,
+        deadLetteredBatches,
+        remainingQueue: 0,
+        remainingDeadLetter: this.d.websiteTelemetryDeadLetter.length,
+      };
+    }
+
+    const resolvedOracleEndpoint = resolveOracleEndpoint(this.env.ORACLE_ENDPOINT, {
+      allowInsecureHttp: this.env.ALLOW_INSECURE_ORACLE_ENDPOINT === "true",
+    });
+    if (!resolvedOracleEndpoint.ok || !this.env.DO_SHARED_SECRET) {
+      const msg = !resolvedOracleEndpoint.ok
+        ? resolvedOracleEndpoint.message
+        : "DO_SHARED_SECRET is not configured";
+      this.d.websiteTelemetryLastError = msg;
+      const head = this.d.websiteTelemetryQueue[0];
+      if (head) {
+        head.attempt = Math.max(1, head.attempt + 1);
+        if (head.attempt >= WEBSITE_TELEMETRY_MAX_RETRY_ATTEMPTS) {
+          this.moveWebsiteTelemetryBatchToDeadLetter(head, msg);
+          this.d.websiteTelemetryQueue.shift();
+          deadLetteredBatches += 1;
+        } else {
+          head.lastError = msg;
+          head.nextRetryAtUtc = this.nextWebsiteTelemetryRetryAt(head.attempt);
+          await this.scheduleAlarmAtEarliest(head.nextRetryAtUtc);
+        }
+      }
+      await this.scheduleNextMidnightAlarm();
+      await this.persist();
+      return {
+        ok: false,
+        processedBatches,
+        sentEvents,
+        deadLetteredBatches,
+        remainingQueue: this.d.websiteTelemetryQueue.length,
+        remainingDeadLetter: this.d.websiteTelemetryDeadLetter.length,
+        error: msg,
+      };
+    }
+
+    while (this.d.websiteTelemetryQueue.length > 0 && processedBatches < maxBatches) {
+      const batch = this.d.websiteTelemetryQueue[0];
+      if (!batch) break;
+
+      if (!options.force && batch.nextRetryAtUtc && now < batch.nextRetryAtUtc) {
+        break;
+      }
+
+      const attempt = Math.max(1, batch.attempt + 1);
+      const payloadBase: WebsiteEventsBatchRequest = {
+        schemaVersion: WEBSITE_EVENTS_SCHEMA_VERSION,
+        batchId: batch.batchId,
+        generatedAtUtc: batch.generatedAtUtc,
+        attempt,
+        sessionId: batch.sessionId,
+        pagePath: batch.pagePath,
+        events: batch.events,
+        expectedEventCount: batch.events.length,
+      };
+      const checksum = await computeWebsiteEventsBatchChecksum({
+        batchId: payloadBase.batchId,
+        generatedAtUtc: payloadBase.generatedAtUtc,
+        sessionId: payloadBase.sessionId,
+        pagePath: payloadBase.pagePath,
+        events: payloadBase.events,
+      });
+      const payload: WebsiteEventsBatchRequest = checksum
+        ? { ...payloadBase, batchChecksum: checksum }
+        : payloadBase;
+
+      this.d.websiteTelemetryLastBatchSentAt = Date.now();
+      this.d.websiteTelemetryLastBatchID = batch.batchId;
+      this.d.websiteTelemetryLastCorrelationID = batch.correlationId;
+
+      logEvent("info", "website_telemetry_flush_attempt", {
+        trigger: options.trigger,
+        batchId: batch.batchId,
+        correlationId: batch.correlationId,
+        attempt,
+        eventCount: batch.events.length,
+      });
+
+      try {
+        const response = await fetch(resolvedOracleEndpoint.websiteEventsBatchUrl, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json; charset=utf-8",
+            "x-do-secret": this.env.DO_SHARED_SECRET,
+            "x-correlation-id": batch.correlationId,
+            "x-requested-with": "XMLHttpRequest",
+          },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          const body = await response.text().catch(() => "");
+          throw new Error(
+            trimAndLimitString(
+              `oracle_http_${response.status}: ${body || response.statusText || "upstream_rejected"}`,
+              280,
+            ),
+          );
+        }
+
+        const ack = (await response.json().catch(() => null)) as
+          | { ok?: boolean; batchId?: string }
+          | null;
+        if (!ack || ack.ok !== true || ack.batchId !== batch.batchId) {
+          throw new Error("oracle_ack_invalid");
+        }
+
+        this.d.websiteTelemetryQueue.shift();
+        this.d.websiteTelemetryLastBatchAckAt = Date.now();
+        this.d.websiteTelemetryLastError = null;
+        sentEvents += batch.events.length;
+        processedBatches += 1;
+        continue;
+      } catch (error) {
+        const message = trimAndLimitString(String(error), 280) || "website_telemetry_flush_failed";
+        batch.attempt = attempt;
+        batch.lastError = message;
+        this.d.websiteTelemetryLastError = message;
+        lastError = message;
+
+        if (batch.attempt >= WEBSITE_TELEMETRY_MAX_RETRY_ATTEMPTS) {
+          this.moveWebsiteTelemetryBatchToDeadLetter(batch, message);
+          this.d.websiteTelemetryQueue.shift();
+          deadLetteredBatches += 1;
+          processedBatches += 1;
+          logEvent("warn", "website_telemetry_batch_dead_lettered", {
+            trigger: options.trigger,
+            batchId: batch.batchId,
+            correlationId: batch.correlationId,
+            attempt: batch.attempt,
+          });
+          continue;
+        }
+
+        batch.nextRetryAtUtc = this.nextWebsiteTelemetryRetryAt(batch.attempt);
+        await this.scheduleAlarmAtEarliest(batch.nextRetryAtUtc);
+        logEvent("warn", "website_telemetry_flush_retry_scheduled", {
+          trigger: options.trigger,
+          batchId: batch.batchId,
+          correlationId: batch.correlationId,
+          attempt: batch.attempt,
+          nextRetryAtUtc: batch.nextRetryAtUtc,
+        });
+        break;
+      }
+    }
+
+    const head = this.d.websiteTelemetryQueue[0];
+    if (head?.nextRetryAtUtc) {
+      await this.scheduleAlarmAtEarliest(head.nextRetryAtUtc);
+    }
+    await this.scheduleNextMidnightAlarm();
+    await this.persist();
+
+    return {
+      ok: !lastError,
+      processedBatches,
+      sentEvents,
+      deadLetteredBatches,
+      remainingQueue: this.d.websiteTelemetryQueue.length,
+      remainingDeadLetter: this.d.websiteTelemetryDeadLetter.length,
+      ...(lastError ? { error: lastError } : {}),
+    };
+  }
+
+  private async handlePublicWebsiteEvents(request: Request): Promise<Response> {
+    const contentType = request.headers.get("content-type") || "";
+    if (!contentType.toLowerCase().includes("application/json")) {
+      return websiteEventsError(
+        "invalid_content_type",
+        "Content-Type must be application/json.",
+        400,
+        false,
+      );
+    }
+
+    const bodyText = await request.text();
+    if (!bodyText || bodyText.length > WEBSITE_EVENTS_BODY_LIMIT_BYTES) {
+      return websiteEventsError(
+        "payload_too_large",
+        `Request body must be <= ${WEBSITE_EVENTS_BODY_LIMIT_BYTES} bytes.`,
+        413,
+        false,
+      );
+    }
+
+    let parsedBody: unknown;
+    try {
+      parsedBody = JSON.parse(bodyText) as unknown;
+    } catch {
+      return websiteEventsError("invalid_json", "Request body must be valid JSON.", 400, false);
+    }
+
+    const validation = parseWebsiteEventsRequest(parsedBody);
+    if (!validation.ok) {
+      return validation.response;
+    }
+    const payload = validation.value;
+    if (this.d.websiteTelemetryQueue.length >= WEBSITE_TELEMETRY_MAX_QUEUE_BATCHES) {
+      return websiteEventsError(
+        "upstream_unavailable",
+        "Telemetry queue is full. Please retry shortly.",
+        503,
+        true,
+      );
+    }
+
+    const knownIDs = new Set(this.d.websiteTelemetrySeenEventIds);
+    const payloadSeenIDs = new Set<string>();
+    const acceptedEvents: WebsiteEventPayload[] = [];
+    let rejectedCount = 0;
+    for (const event of payload.events) {
+      if (payloadSeenIDs.has(event.eventId) || knownIDs.has(event.eventId)) {
+        rejectedCount += 1;
+        continue;
+      }
+      payloadSeenIDs.add(event.eventId);
+      acceptedEvents.push({
+        ...event,
+        tsUtc: event.tsUtc && event.tsUtc > 0 ? Math.floor(event.tsUtc) : Date.now(),
+      });
+    }
+
+    if (acceptedEvents.length === 0) {
+      return json(
+        {
+          ok: true,
+          schemaVersion: WEBSITE_EVENTS_SCHEMA_VERSION,
+          generatedAt: Date.now(),
+          acceptedCount: 0,
+          rejectedCount,
+        },
+        { status: 200 },
+      );
+    }
+
+    const now = Date.now();
+    const batchId = this.buildWebsiteTelemetryBatchID(now);
+    const correlationId = this.buildWebsiteTelemetryCorrelationID(now);
+    const queuedBatch: WebsiteTelemetryQueuedBatch = {
+      schemaVersion: WEBSITE_EVENTS_SCHEMA_VERSION,
+      batchId,
+      correlationId,
+      generatedAtUtc: now,
+      sessionId: sanitizeWebsiteTelemetrySessionID(payload.sessionId),
+      pagePath: sanitizeWebsiteTelemetryPagePath(payload.pagePath),
+      events: acceptedEvents,
+      attempt: 0,
+      nextRetryAtUtc: null,
+      lastError: null,
+    };
+    this.d.websiteTelemetryQueue.push(queuedBatch);
+    this.appendWebsiteTelemetrySeenEventIDs(acceptedEvents.map((event) => event.eventId));
+    this.d.websiteTelemetryLastBatchCreatedAt = now;
+    this.d.websiteTelemetryLastBatchID = batchId;
+    this.d.websiteTelemetryLastCorrelationID = correlationId;
+    await this.scheduleNextMidnightAlarm();
+    await this.persist();
+
+    return json(
+      {
+        ok: true,
+        schemaVersion: WEBSITE_EVENTS_SCHEMA_VERSION,
+        generatedAt: now,
+        acceptedCount: acceptedEvents.length,
+        rejectedCount,
+      },
+      { status: 200 },
+    );
+  }
+
   // ---------------------------------------------------------------------------
   // Handlers
   // ---------------------------------------------------------------------------
