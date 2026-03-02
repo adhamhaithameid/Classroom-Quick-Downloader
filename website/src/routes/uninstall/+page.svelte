@@ -94,8 +94,6 @@
         browser: queryBrowser,
         version: queryVersion,
         source: querySource,
-        confidence: confidenceToReinstall,
-        features: selectedFeatures,
         notes: buildUninstallNotesPayload({
           reason: selectedReason,
           confidence: confidenceToReinstall,
