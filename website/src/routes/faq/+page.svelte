@@ -884,9 +884,16 @@
       border-radius: 16px;
       padding: 16px 14px;
     }
-
-    .faq-section {
-      padding: 16px;
+    .fq-section-icon { font-size: 24px; }
+    .fq-section-head h2 { font-size: 19px; }
+    .fq-section-head p { font-size: 12px; }
+    .fq-q-text {
+      font-size: 15px;
+      line-height: 1.45;
+    }
+    .fq-chevron {
+      width: 24px;
+      height: 24px;
     }
   }
 </style>
