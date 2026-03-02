@@ -994,6 +994,54 @@ func scheduleSheetsArchiver() {
 	}
 }
 
+func resolveSheetsIDFromEnv() string {
+	candidates := []string{
+		strings.TrimSpace(os.Getenv("SHEETS_ID")),
+		strings.TrimSpace(os.Getenv("GOOGLE_SHEETS_ID")),
+	}
+	for _, candidate := range candidates {
+		if candidate != "" {
+			return candidate
+		}
+	}
+	for _, key := range []string{"GOOGLE_SHEETS_URL", "SHEETS_URL"} {
+		if parsed := extractGoogleSheetID(strings.TrimSpace(os.Getenv(key))); parsed != "" {
+			return parsed
+		}
+	}
+	return ""
+}
+
+func extractGoogleSheetID(raw string) string {
+	if raw == "" {
+		return ""
+	}
+	if !strings.Contains(raw, "/") {
+		if len(raw) >= 20 && len(raw) <= 120 {
+			return raw
+		}
+		return ""
+	}
+	marker := "/d/"
+	idx := strings.Index(raw, marker)
+	if idx < 0 {
+		return ""
+	}
+	rest := raw[idx+len(marker):]
+	if rest == "" {
+		return ""
+	}
+	end := strings.IndexAny(rest, "/?#&")
+	if end >= 0 {
+		rest = rest[:end]
+	}
+	rest = strings.TrimSpace(rest)
+	if len(rest) < 20 || len(rest) > 120 {
+		return ""
+	}
+	return rest
+}
+
 // runArchiver executes the archiver binary with the given parameters.
 // This calls the archiver as a subprocess to maintain separation of concerns.
 func runArchiver(sheetsID, credsPath, kumaPushURL, archiverSecret, apiURL string) {
