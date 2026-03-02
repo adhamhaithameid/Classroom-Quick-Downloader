@@ -396,8 +396,25 @@ func TestWebsiteOpsForcePushAndOverrideHandlers(t *testing.T) {
 	overrideReq.Header.Set("Content-Type", "application/json")
 	overrideRR := httptest.NewRecorder()
 	WebsiteOpsOverrideHandler(sqlDB).ServeHTTP(overrideRR, overrideReq)
-	if overrideRR.Code != http.StatusOK {
-		t.Fatalf("expected 200 from override, got %d: %s", overrideRR.Code, overrideRR.Body.String())
+	if overrideRR.Code != http.StatusConflict {
+		t.Fatalf("expected 409 from monotonic guard override, got %d: %s", overrideRR.Code, overrideRR.Body.String())
+	}
+
+	validOverrideBody := `{
+		"enabled": true,
+		"downloads": 1777,
+		"countries": [
+			{"countryCode": "US", "count": 900},
+			{"countryCode": "GB", "count": 500},
+			{"countryCode": "CA", "count": 377}
+		]
+	}`
+	validReq := httptest.NewRequest(http.MethodPost, "/api/admin/website/override", strings.NewReader(validOverrideBody))
+	validReq.Header.Set("Content-Type", "application/json")
+	validRR := httptest.NewRecorder()
+	WebsiteOpsOverrideHandler(sqlDB).ServeHTTP(validRR, validReq)
+	if validRR.Code != http.StatusOK {
+		t.Fatalf("expected 200 from valid override, got %d: %s", validRR.Code, validRR.Body.String())
 	}
 
 	stateReq := httptest.NewRequest(http.MethodGet, "/api/admin/website/state", nil)
