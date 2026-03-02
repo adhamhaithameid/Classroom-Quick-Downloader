@@ -67,6 +67,7 @@ func validateAuditCheckpointSecret(secret string) error {
 
 func validateProductionSecurityConfig(
 	appEnv string,
+	sessionCookieMode string,
 	allowLoopbackBypass bool,
 	allowEmptyDashboardPassword bool,
 	allowHTTPStoreURLs bool,
