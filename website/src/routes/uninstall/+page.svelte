@@ -585,7 +585,7 @@
     box-sizing: border-box;
   }
 
-  .notes-wrap textarea::placeholder {
+  .un-field-group textarea::placeholder {
     color: var(--muted);
   }
 
