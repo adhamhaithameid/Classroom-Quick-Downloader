@@ -3391,7 +3391,11 @@
 
   /* ── Final CTA ─────────────────────── */
   .l2-cta-section {
-    position: relative; z-index: 2; padding: 80px 0; text-align: center;
+    position: relative;
+    z-index: 2;
+    isolation: isolate;
+    padding: 80px 0;
+    text-align: center;
     background: transparent;
   }
   .l2-cta-content {
