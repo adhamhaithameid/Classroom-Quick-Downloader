@@ -654,6 +654,14 @@
     .cl-sidebar-link {
       white-space: nowrap;
       flex-shrink: 0;
+      min-width: 114px;
+      border: 1px solid var(--border-subtle);
+      background: rgba(255, 255, 255, 0.76);
+      border-radius: 12px;
+      padding: 10px 12px;
+    }
+    .cl-sidebar-link:hover {
+      border-color: rgba(26, 139, 85, 0.22);
     }
 
     .entry {
