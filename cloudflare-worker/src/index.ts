@@ -1015,43 +1015,6 @@ async function handleVerifyDangerPassword(request: Request, env: WorkerEnv): Pro
   const clientIp = request.headers.get("CF-Connecting-IP") || "unknown";
 
   const stub = getDownloadsStub(env);
-  
-  // First check if this IP is rate limited for danger password attempts
-  const rateLimitReq = new Request("https://do/auth/login-attempt", {
-    method: "POST",
-    headers: { 
-      "Content-Type": "application/json",
-      "X-Admin-Secret": env.DO_SHARED_SECRET,
-    },
-    body: JSON.stringify({ ip: `danger:${clientIp}`, success: false, checkOnly: true }),
-  });
-  const rateLimitRes = await stub.fetch(rateLimitReq);
-  if (!rateLimitRes.ok) {
-    return withCors(request, new Response(
-      JSON.stringify({ ok: false, error: "Rate limit service unavailable. Try again later." }),
-      { status: 503, headers: { "content-type": "application/json" } }
-    ), env);
-  }
-  let rateLimitData: { ok: boolean; allowed: boolean; blockedForSeconds?: number };
-  try {
-    rateLimitData = await rateLimitRes.json();
-  } catch {
-    return withCors(request, new Response(
-      JSON.stringify({ ok: false, error: "Rate limit service unavailable. Try again later." }),
-      { status: 503, headers: { "content-type": "application/json" } }
-    ), env);
-  }
-  
-  if (!rateLimitData.allowed) {
-    return withCors(request, new Response(
-      JSON.stringify({ 
-        ok: false, 
-        error: "Too many failed attempts. Try again later.",
-        blockedForSeconds: rateLimitData.blockedForSeconds 
-      }),
-      { status: 429, headers: { "content-type": "application/json" } }
-    ), env);
-  }
 
   try {
     const { password } = await request.json() as { password: string };
