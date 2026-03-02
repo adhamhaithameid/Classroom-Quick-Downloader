@@ -424,6 +424,16 @@ function renderNotificationSection(entries: ChangelogEntry[], config: ChangelogC
 
 function renderReleaseManagementSection(entries: ChangelogEntry[], config: ChangelogConfig): string {
   const sorted = [...entries].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const applyMode = config.applyMode === "auto_github" ? "auto_github" : "manual";
+  const autoSyncEnabled = config.autoSyncEnabled === true;
+  const autoSyncIntervalMinutes = Number.isFinite(Number(config.autoSyncIntervalMinutes))
+    ? Math.max(5, Math.min(1440, Number(config.autoSyncIntervalMinutes)))
+    : 60;
+  const syncStatus = config.lastAutoSyncStatus || "idle";
+  const syncStatusText =
+    syncStatus === "ok" ? "Auto sync healthy" : syncStatus === "error" ? "Auto sync error" : "Auto sync idle";
+  const syncStatusColor =
+    syncStatus === "ok" ? "#86efac" : syncStatus === "error" ? "#fca5a5" : "var(--text-soft)";
   
   // Versions for DataList
   const knownVersions = Array.from(new Set(sorted.map(e => e.version)));
