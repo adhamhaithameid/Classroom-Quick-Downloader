@@ -1833,8 +1833,218 @@
         });
       }
 
-        for (var i = 0; i < dimensions.length; i++) {
-          var dim = dimensions[i];
+      function renderMetricBars(container, points, config) {
+        if (!container) return;
+        if (!Array.isArray(points) || !points.length) {
+          container.innerHTML = '<div class="empty-state">No data</div>';
+          return;
+        }
+        var valueKey = String(config && config.valueKey ? config.valueKey : 'value');
+        var granularity = String(config && config.granularity ? config.granularity : 'day');
+        var metricLabel = String(config && config.metricLabel ? config.metricLabel : 'Value');
+        var maxVal = Math.max.apply(null, points.map(function(row) {
+          return Number(row && row[valueKey] || 0);
+        })) || 1;
+
+        var html = '<div class="chart-wrapper"><div class="chart-y-axis">';
+        [maxVal, Math.round(maxVal * 0.66), Math.round(maxVal * 0.33), 0].forEach(function(v) {
+          html += '<span class="chart-y-label">' + fmtNumber(v) + '</span>';
+        });
+        html += '</div><div class="chart-grid"><div class="chart-grid-line"></div><div class="chart-grid-line"></div><div class="chart-grid-line"></div><div class="chart-grid-line"></div></div><div class="chart-bars">';
+
+        points.forEach(function(row) {
+          var rawVal = Number(row && row[valueKey] || 0);
+          var height = (rawVal / maxVal) * 100;
+          var y = Math.max(0, 100 - height);
+          var barHeight = Math.max(2, height);
+          var packed = JSON.stringify(row || {}).replace(/"/g, '&quot;');
+          html += '<div class="chart-bar-wrapper">';
+          html += '<svg class="chart-bar-svg" viewBox="0 0 10 100" preserveAspectRatio="none" data-point="' + packed + '">';
+          html += '<rect class="chart-bar-rect" x="0" y="' + y + '" width="10" height="' + barHeight + '"></rect>';
+          html += '</svg></div>';
+        });
+        html += '</div><div class="chart-x-axis">';
+        var step = Math.ceil(points.length / 8);
+        points.forEach(function(row, idx) {
+          var ts = String((row && row.timestamp) || '');
+          var label = idx % step === 0 ? fmtShortTime(ts) : '';
+          html += '<span class="chart-x-label">' + escapeHtml(label) + '</span>';
+        });
+        html += '</div></div>';
+        container.innerHTML = html;
+
+        bindMetricBarHover(container, function(row) {
+          var ts = String(row.timestamp || '');
+          return {
+            title: fmtTimestamp(ts, granularity),
+            rows: [
+              { label: metricLabel, value: fmtNumber(Number(row[valueKey] || 0)) },
+              { label: 'Requests', value: fmtNumber(Number(row.requests || 0)) },
+              { label: 'Unique Sessions', value: fmtNumber(Number(row.uniqueSessions || 0)) },
+              { label: 'Returning', value: fmtNumber(Number(row.returningSessions || 0)) }
+            ]
+          };
+        });
+      }
+
+      function renderBreakdownBars(container, dim, rows, colorClass, options) {
+        if (!container) return;
+        if (!Array.isArray(rows) || !rows.length) {
+          container.innerHTML = '<div class="empty-state">No data</div>';
+          return;
+        }
+        var maxCount = Math.max.apply(null, rows.map(function(v) { return Number(v.count || 0); })) || 1;
+        var leadText = options && typeof options.leadText === 'string' ? options.leadText.trim() : '';
+        var html = '';
+        if (leadText) {
+          html += '<div class="card-subtitle" style="margin-bottom:8px;">' + escapeHtml(leadText) + '</div>';
+        }
+        html += '<div class="breakdown-bars">';
+        rows.slice(0, 8).forEach(function(v) {
+          var count = Number(v.count || 0);
+          var pct = (count / maxCount) * 100;
+          var labelRaw = String(v.value || 'Unknown');
+          var labelTooltip = dim === 'country' ? resolveCountryName(labelRaw) : '';
+          var labelAttr = labelTooltip ? (' data-tooltip="' + escapeHtml(labelTooltip) + '"') : '';
+          var packed = JSON.stringify({
+            dimension: dim,
+            label: labelRaw,
+            count: count,
+            pct: pct
+          }).replace(/"/g, '&quot;');
+          html += '<div class="breakdown-bar-item" data-point="' + packed + '"><span class="breakdown-bar-label"' + labelAttr + '>' + escapeHtml(labelRaw) + '</span>';
+          html += '<div class="breakdown-bar-track"><progress class="breakdown-progress ' + colorClass + '" max="100" value="' + Math.round(pct) + '"></progress><span class="breakdown-progress-value">' + Math.round(pct) + '%</span></div>';
+          html += '<span class="breakdown-bar-count">' + fmtNumber(count) + '</span></div>';
+        });
+        html += '</div>';
+        container.innerHTML = html;
+        bindMetricBarHover(container, function(row) {
+          return {
+            title: String(row.label || 'Segment'),
+            rows: [
+              { label: 'Dimension', value: String(row.dimension || '') },
+              { label: 'Count', value: fmtNumber(Number(row.count || 0)) },
+              { label: 'Relative', value: Number(row.pct || 0).toFixed(1) + '%' }
+            ]
+          };
+        });
+      }
+
+      function renderFunnel(container, stages) {
+        if (!container) return;
+        if (!Array.isArray(stages) || !stages.length) {
+          container.innerHTML = '<div class="empty-state">No funnel data</div>';
+          return;
+        }
+        var start = Number(stages[0].count || 0);
+        var html = '<div class="card-subtitle" style="margin-bottom:8px;">Conversion funnel explains how many users moved from one step to the next.</div><div class="funnel-list">';
+        stages.forEach(function(stage) {
+          var count = Number(stage.count || 0);
+          var fromStart = start > 0 ? (count / start) * 100 : 0;
+          var fromPrevPct = Number(stage.fromPrev || 0) * 100;
+          var packed = JSON.stringify({
+            label: stage.label || stage.key || 'Stage',
+            count: count,
+            fromPrev: fromPrevPct,
+            fromStart: Number(stage.fromStart || 0) * 100
+          }).replace(/"/g, '&quot;');
+          html += '<div class="funnel-row" data-point="' + packed + '">';
+          html += '<div class="funnel-row-head"><strong>' + escapeHtml(String(stage.label || stage.key || 'Stage')) + '</strong><span>' + fmtNumber(count) + '</span></div>';
+          html += '<div class="funnel-track"><div class="funnel-fill" style="width:' + Math.max(1, Math.min(100, fromStart)) + '%"></div></div>';
+          html += '<div class="card-subtitle">From previous: ' + fromPrevPct.toFixed(1) + '% · From start: ' + fromStart.toFixed(1) + '%</div>';
+          html += '</div>';
+        });
+        html += '</div>';
+        container.innerHTML = html;
+        bindMetricBarHover(container, function(row) {
+          return {
+            title: String(row.label || 'Stage'),
+            rows: [
+              { label: 'Count', value: fmtNumber(Number(row.count || 0)) },
+              { label: 'From previous', value: Number(row.fromPrev || 0).toFixed(1) + '%' },
+              { label: 'From start', value: Number(row.fromStart || 0).toFixed(1) + '%' }
+            ]
+          };
+        });
+      }
+
+      function renderHeatmap(container, cells) {
+        if (!container) return;
+        if (!Array.isArray(cells) || !cells.length) {
+          container.innerHTML = '<div class="empty-state">No heatmap data</div>';
+          return;
+        }
+        var maxCount = Math.max.apply(null, cells.map(function(cell) {
+          return Number(cell.count || 0);
+        })) || 1;
+        var dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        var html = '<div class="heatmap-wrap"><div class="heatmap-grid">';
+        html += '<div class="heatmap-corner"></div>';
+        for (var h = 0; h < 24; h += 1) {
+          html += '<div class="heatmap-hour-label">' + String(h).padStart(2, '0') + '</div>';
+        }
+        for (var d = 0; d < 7; d += 1) {
+          html += '<div class="heatmap-day-label">' + dayLabels[d] + '</div>';
+          for (var hour = 0; hour < 24; hour += 1) {
+            var match = cells.find(function(cell) { return Number(cell.dayOfWeek) === d && Number(cell.hourUtc) === hour; }) || { count: 0 };
+            var count = Number(match.count || 0);
+            var intensity = maxCount > 0 ? (count / maxCount) : 0;
+            var packed = JSON.stringify({ day: dayLabels[d], hour: hour, count: count, intensity: intensity }).replace(/"/g, '&quot;');
+            html += '<div class="heatmap-cell" data-point="' + packed + '" style="opacity:' + (0.15 + intensity * 0.85).toFixed(3) + '"></div>';
+          }
+        }
+        html += '</div></div>';
+        container.innerHTML = html;
+        bindMetricBarHover(container, function(row) {
+          return {
+            title: String(row.day || '') + ' ' + String(row.hour || '').padStart(2, '0') + ':00 UTC',
+            rows: [
+              { label: 'Downloads', value: fmtNumber(Number(row.count || 0)) },
+              { label: 'Intensity', value: (Number(row.intensity || 0) * 100).toFixed(1) + '%' }
+            ]
+          };
+        });
+      }
+
+      function renderUniqueReturning(container, points) {
+        if (!container) return;
+        if (!Array.isArray(points) || !points.length) {
+          container.innerHTML = '<div class="empty-state">No session data</div>';
+          return;
+        }
+        var totals = points.reduce(function(acc, row) {
+          acc.unique += Number(row.uniqueSessions || 0);
+          acc.returning += Number(row.returningSessions || 0);
+          return acc;
+        }, { unique: 0, returning: 0 });
+        renderDonutChart(container.id, {
+          centerLabel: 'Sessions',
+          centerValue: fmtNumber(totals.unique),
+          segments: [
+            { name: 'Unique', value: totals.unique, color: '#22c55e', dotClass: 'success' },
+            { name: 'Returning', value: totals.returning, color: '#3b82f6', dotClass: 'downloads' }
+          ]
+        });
+      }
+
+      function updateChartFiltersFromUI() {
+        var rangeNode = document.getElementById('charts-range-select');
+        var dimNode = document.getElementById('charts-dimension-select');
+        var compareNode = document.getElementById('charts-compare-previous');
+        chartsRange = rangeNode ? String(rangeNode.value || 'week') : chartsRange;
+        chartsDimension = dimNode ? String(dimNode.value || 'browser') : chartsDimension;
+        chartsComparePrevious = !!(compareNode && compareNode.checked);
+      }
+
+      async function loadCharts() {
+        updateChartFiltersFromUI();
+        var rangeParams = chartsRangeParams(chartsRange);
+        var rangeQuery = '?range=' + encodeURIComponent(rangeParams.range);
+        var dims = ['browser', 'os', 'type', 'country'];
+        var colors = { browser: 'purple', os: 'blue', type: 'cyan', country: 'green' };
+
+        // Baseline breakdown cards
+        await Promise.all(dims.map(async function(dim) {
           var container = document.getElementById('chart-' + dim);
           try {
             var data = await fetchJSON('/api/stats/breakdown?dimension=' + dim + '&from=' + range.from + '&to=' + range.to);
