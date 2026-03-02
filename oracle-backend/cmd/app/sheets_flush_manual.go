@@ -109,7 +109,7 @@ func ManualSheetsFlushHandler(sqlDB *sql.DB) http.HandlerFunc {
 		}
 		w.Header().Set("Content-Type", "application/json")
 
-		sheetsID := strings.TrimSpace(os.Getenv("SHEETS_ID"))
+		sheetsID := resolveSheetsIDFromEnv()
 		if sheetsID == "" {
 			w.WriteHeader(http.StatusServiceUnavailable)
 			_ = json.NewEncoder(w).Encode(map[string]any{
