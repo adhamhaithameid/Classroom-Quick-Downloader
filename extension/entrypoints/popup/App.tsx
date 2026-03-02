@@ -559,7 +559,7 @@ function App() {
   const [seen, setSeen] = useState(false);
   useEffect(() => {
     if (version) {
-       isVersionSeen(version).then(setSeen);
+       isVersionSeen(version, changelogData).then(setSeen);
     }
   }, [version]);
 
