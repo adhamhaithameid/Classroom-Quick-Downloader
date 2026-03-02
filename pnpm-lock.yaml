@@ -6520,7 +6520,7 @@ snapshots:
       is-wsl: 3.1.1
       powershell-utils: 0.1.0
 
-  wxt@0.20.17(@types/node@25.3.0)(jiti@2.6.1)(rollup@4.58.0):
+  wxt@0.20.17(@types/node@25.3.0)(jiti@2.6.1)(rollup@4.59.0):
     dependencies:
       '@1natsu/wait-element': 4.1.2
       '@aklinker1/rollup-plugin-visualizer': 5.12.0(rollup@4.58.0)
