@@ -80,6 +80,8 @@
   }
 
   onMount(() => {
+    const initial = safeNumber(value);
+
     if (!animated) {
       hasAnimatedInView = true;
       isInView = true;
