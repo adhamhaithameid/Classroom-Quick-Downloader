@@ -654,7 +654,7 @@
     background: rgba(26, 139, 85, 0.05);
   }
 
-  .result-msg.fail {
+  .un-toast.fail {
     border-color: rgba(220, 38, 38, 0.3);
     color: #b91c1c;
     background: rgba(220, 38, 38, 0.04);
