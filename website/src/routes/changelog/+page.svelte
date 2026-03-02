@@ -608,13 +608,11 @@
     line-height: 1.65; font-size: 14px;
   }
 
-  .entry-body ul {
-    margin: 12px 0 0;
-    padding-left: 0;
-    list-style: none;
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
+  .cl-highlights li::before {
+    content: '';
+    position: absolute; left: 0; top: 9px;
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--green-light);
   }
 
   .entry-body li {
