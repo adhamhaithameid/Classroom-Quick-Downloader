@@ -6632,6 +6632,7 @@ export function renderDashboard(stats: StatsResponse): string {
                 if (ipEl) ipEl.textContent = data.yourIp;
               }
               renderIpList();
+              refreshIpSecurityBadges();
             }
           })
           .catch(() => {
