@@ -645,8 +645,10 @@
     .cl-sidebar-links {
       flex-direction: row;
       flex-wrap: nowrap;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
+      gap: 8px;
+      overflow-x: auto; -webkit-overflow-scrolling: touch;
+      scrollbar-width: none; -ms-overflow-style: none;
+      padding-bottom: 2px;
     }
 
     .sidebar-links::-webkit-scrollbar { display: none; }
