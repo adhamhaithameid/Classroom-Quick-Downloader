@@ -6656,6 +6656,11 @@ export class DownloadsDurable {
       updated = true;
     }
 
+    if (typeof body.stepUpBypassEnabled === "boolean") {
+      this.d.ipAllowlistStepUpBypassEnabled = body.stepUpBypassEnabled;
+      updated = true;
+    }
+
     // Replace entire allowlist
     if (Array.isArray(body.allowlist)) {
       const normalized = body.allowlist
