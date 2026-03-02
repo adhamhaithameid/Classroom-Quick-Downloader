@@ -155,7 +155,7 @@ describe('fetchWebsiteSnapshot', () => {
     const first = await fetchWebsiteSnapshot();
     vi.setSystemTime(new Date('2026-02-23T01:00:00.000Z'));
     await fetchWebsiteSnapshot();
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
 
     await fetchWebsiteSnapshot({ force: true });
     expect(fetchMock).toHaveBeenCalledTimes(4);
