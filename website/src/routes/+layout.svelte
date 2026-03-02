@@ -631,6 +631,9 @@
 
     .l2-nav-menu-btn {
       display: inline-flex;
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
     }
 
     .l2-nav-mobile-panel {
