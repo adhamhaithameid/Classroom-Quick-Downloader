@@ -28,8 +28,9 @@ const (
 var websiteCloudflarePullHoursUTC = []int{3, 6, 9, 12, 15, 18, 21}
 
 var (
-	errCloudflareWebsiteFetch   = errors.New("cloudflare_website_fetch_failed")
-	errCloudflareWebsitePublish = errors.New("cloudflare_website_publish_failed")
+	errCloudflareWebsiteFetch    = errors.New("cloudflare_website_fetch_failed")
+	errCloudflareWebsitePublish  = errors.New("cloudflare_website_publish_failed")
+	errWebsiteMonotonicViolation = errors.New("website_dataset_monotonic_violation")
 )
 
 type websiteOpsCountryCount struct {
