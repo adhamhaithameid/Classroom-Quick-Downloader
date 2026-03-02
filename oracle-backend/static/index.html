@@ -572,6 +572,45 @@
 
           <!-- CHARTS PAGE -->
           <div class="page" id="page-charts">
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <div class="card-title">📐 Analytics Controls</div>
+                  <div class="card-subtitle">Range presets, compare mode, and segment dimensions</div>
+                </div>
+                <div class="action-buttons-grid action-buttons-grid-four">
+                  <select id="charts-range-select" class="auth-input">
+                    <option value="today">Today (UTC)</option>
+                    <option value="week" selected>Last 7 Days</option>
+                    <option value="month">This Month</option>
+                    <option value="year">This Year</option>
+                    <option value="all">All Time</option>
+                  </select>
+                  <select id="charts-dimension-select" class="auth-input">
+                    <option value="browser" selected>Browser</option>
+                    <option value="os">OS</option>
+                    <option value="country">Country</option>
+                    <option value="type">File Type</option>
+                    <option value="action">Website Action</option>
+                    <option value="placement">Placement</option>
+                    <option value="path">Page Path</option>
+                    <option value="device">Device</option>
+                    <option value="referrer">Referrer</option>
+                  </select>
+                  <label class="auth-field-inline">
+                    <input type="checkbox" id="charts-compare-previous" />
+                    <span>Compare with previous window</span>
+                  </label>
+                  <button class="btn btn-secondary" id="charts-export-active-btn">Export Active Chart CSV</button>
+                </div>
+              </div>
+              <div class="card-body card-body-top">
+                <div class="pill-row">
+                  <span class="pill">UTC Window: <strong id="charts-window-meta">--</strong></span>
+                </div>
+              </div>
+            </div>
+
             <!-- Comparison Section -->
             <div class="card">
               <div class="card-header">
