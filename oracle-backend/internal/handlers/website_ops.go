@@ -1968,6 +1968,9 @@ func PullWebsiteDatasetFromCloudflare(
 		true,
 	)
 	if err != nil {
+		if errors.Is(err, errWebsiteMonotonicViolation) {
+			return websiteSyncControlRow{}, cloudflareSiteMetricsPayload{}, err
+		}
 		return websiteSyncControlRow{}, cloudflareSiteMetricsPayload{}, fmt.Errorf("%w: %v", errCloudflareWebsitePublish, err)
 	}
 
