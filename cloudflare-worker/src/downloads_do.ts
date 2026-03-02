@@ -1791,6 +1791,8 @@ export class DownloadsDurable {
       loginAttempts: {},
       ipAllowlistEnabled: false,
       ipAllowlist: [],
+      ipAllowlistStepUpBypassEnabled: true,
+      dangerActionAuditLogs: [],
       trackRates: {},
 
       // Remote config defaults
