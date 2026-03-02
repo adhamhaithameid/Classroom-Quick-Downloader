@@ -345,6 +345,17 @@ docker compose --env-file .env.production -f docker-compose.yml -f docker-compos
 
 ## 8) Post-Deploy Verification Checklist
 
+Fast path with phase scripts:
+
+```bash
+bash tools/phase12_verify.sh
+
+WORKER_BASE_URL='https://cqd-analytics.adhamhaithameid.workers.dev' \
+ORACLE_BASE_URL='https://<your-oracle-public-https-domain>' \
+WEBSITE_URL='https://classroom-quick-downloader-website.pages.dev' \
+bash tools/phase13_rollout.sh
+```
+
 Run all:
 
 ```bash
