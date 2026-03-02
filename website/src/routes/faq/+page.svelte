@@ -765,6 +765,85 @@
     animation: slideDown 0.2s ease;
   }
 
+  /* ── Empty State ───────────────── */
+  .fq-empty {
+    text-align: center;
+    padding: 48px 24px;
+    background: rgba(255,255,255,0.55);
+    border: 1px dashed var(--border-subtle);
+    border-radius: 20px;
+  }
+
+  .fq-empty-icon { font-size: 48px; display: block; margin-bottom: 12px; }
+  .fq-empty h3 { margin: 0 0 8px; font-size: 20px; font-weight: 800; }
+  .fq-empty p { color: var(--text-secondary); font-size: 15px; }
+
+  .fq-clear-link {
+    background: none; border: none; color: var(--green);
+    font-weight: 700; cursor: pointer; text-decoration: underline;
+    text-underline-offset: 3px; font-size: inherit; padding: 0;
+  }
+
+  /* ── CTA Section ───────────────── */
+  .fq-cta-section {
+    position: relative; z-index: 2;
+    padding: 0 0 16px;
+  }
+
+  .fq-cta-card {
+    text-align: center;
+    background: rgba(255,255,255,0.55);
+    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--border-subtle);
+    border-radius: 24px;
+    padding: 56px 48px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.04);
+  }
+
+  .fq-cta-card h2 {
+    font-size: clamp(28px, 3.5vw, 40px); font-weight: 900;
+    letter-spacing: -0.03em; margin: 0 0 12px;
+  }
+
+  .fq-cta-card p {
+    font-size: 16px; color: var(--text-secondary);
+    margin: 0 0 28px; line-height: 1.7;
+  }
+
+  .fq-cta-actions {
+    display: flex; gap: 14px; justify-content: center; flex-wrap: wrap;
+  }
+
+  .fq-cta-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 14px 28px; font-size: 15px; font-weight: 700;
+    border-radius: 14px; text-decoration: none;
+    transition: all 0.25s ease;
+  }
+
+  .fq-cta-primary {
+    background: linear-gradient(135deg, var(--green), var(--green-light));
+    color: #fff;
+    box-shadow: 0 4px 20px rgba(26,139,85,0.35), 0 0 40px rgba(26,139,85,0.15);
+  }
+  .fq-cta-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 28px rgba(26,139,85,0.45), 0 0 60px rgba(26,139,85,0.2);
+  }
+
+
+
+  .fq-reveal {
+    opacity: 1;
+    transform: none;
+  }
+
+  .fq-search-input,
+  .fq-section,
+  .fq-cta-card {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
   @keyframes slideDown {
     from {
       opacity: 0;
