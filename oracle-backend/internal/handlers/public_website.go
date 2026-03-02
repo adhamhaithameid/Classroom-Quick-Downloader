@@ -1536,9 +1536,11 @@ func buildPublicWebsiteUserChangelog(ctx context.Context, store *controlPlaneSto
 	})
 
 	if len(entries) == 0 {
-		latestVersion := "latest"
-		if gitHubVersion := fetchGitHubVersionCached(ctx); gitHubVersion != nil && strings.TrimSpace(*gitHubVersion) != "" {
-			latestVersion = strings.TrimSpace(*gitHubVersion)
+		entries = defaultPublicWebsiteUserChangelogEntries()
+		if len(entries) > 0 && entries[0].ReleasedAtUTC != nil {
+			lastUpdated = entries[0].ReleasedAtUTC
+		} else {
+			lastUpdated = &now
 		}
 		entries = append(entries, publicWebsiteUserChangelogEntry{
 			ID:      "default-latest",
