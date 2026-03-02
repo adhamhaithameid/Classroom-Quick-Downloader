@@ -462,9 +462,11 @@
     gap: 10px;
   }
 
-  .option {
-    text-align: left;
-    border: 1px solid var(--border-subtle, rgba(226, 232, 240, 0.35));
+  .un-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    border: 1.5px solid var(--border-subtle);
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.6);
     padding: 10px 18px;
