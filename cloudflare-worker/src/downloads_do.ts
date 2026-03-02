@@ -114,6 +114,15 @@ type DurableStateShape = {
   websiteOverrideEnabled: boolean;
   websiteOverrideDownloads: number;
   websiteOverrideCountries: PublicSiteCountryCount[];
+  websiteTelemetryQueue: WebsiteTelemetryQueuedBatch[];
+  websiteTelemetryDeadLetter: WebsiteTelemetryQueuedBatch[];
+  websiteTelemetrySeenEventIds: string[];
+  websiteTelemetryLastBatchCreatedAt: number | null;
+  websiteTelemetryLastBatchSentAt: number | null;
+  websiteTelemetryLastBatchAckAt: number | null;
+  websiteTelemetryLastBatchID: string | null;
+  websiteTelemetryLastCorrelationID: string | null;
+  websiteTelemetryLastError: string | null;
 
   // =========================================================================
   // REMOTE CONFIG - Controllable from Cloudflare Dashboard
