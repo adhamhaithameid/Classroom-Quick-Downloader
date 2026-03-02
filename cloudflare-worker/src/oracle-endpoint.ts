@@ -1,4 +1,5 @@
-const INGEST_BATCH_PATH = "/ingest-batch";
+const EXTENSION_INGEST_BATCH_PATH = "/ingest-batch";
+const WEBSITE_INTERNAL_BATCH_PATH = "/api/internal/website/events/batch";
 
 export type OracleEndpointResolveError =
   | "oracle_endpoint_missing"
