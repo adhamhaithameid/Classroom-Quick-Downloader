@@ -2795,25 +2795,16 @@
         }
       }
 
-      async function saveUserChangelogRecord(e) {
-        e.preventDefault();
-        var key = normalizeKey(document.getElementById('user-changelog-key').value, 'release');
-        var version = (document.getElementById('user-changelog-version').value || '').trim();
-        var title = (document.getElementById('user-changelog-title').value || '').trim();
-        var summary = (document.getElementById('user-changelog-summary').value || '').trim();
-        var releasedAtRaw = (document.getElementById('user-changelog-released-at').value || '').trim();
-        var highlightsRaw = (document.getElementById('user-changelog-highlights').value || '').trim();
-        if (!version || !title || !summary) return;
-        var releasedAtUtc = Number(releasedAtRaw || Date.now());
-        if (!Number.isFinite(releasedAtUtc) || releasedAtUtc <= 0) releasedAtUtc = Date.now();
-        var data = {
-          version: version.slice(0, 64),
-          title: title.slice(0, 120),
-          summary: summary.slice(0, 500),
-          releasedAtUtc: releasedAtUtc,
-          highlights: parseMultilineList(highlightsRaw, 6, 180),
-          updatedAtUtc: Date.now()
-        };
+      async function saveUserChangelogSourceConfig() {
+        var sourceNode = document.getElementById('user-changelog-source-select');
+        var urlNode = document.getElementById('user-changelog-source-url');
+        var source = sourceNode ? String(sourceNode.value || 'oracle').trim().toLowerCase() : 'oracle';
+        if (source !== 'github') source = 'oracle';
+        var markdownUrl = urlNode ? String(urlNode.value || '').trim() : '';
+        if (source === 'github' && (!/^https:\/\//i.test(markdownUrl) || markdownUrl.length < 20)) {
+          setContentSyncStatus('user-changelog-source-status', 'invalid GitHub raw markdown URL', true);
+          return;
+        }
         var ok = await ensureStepUp();
         if (!ok) return;
         try {
