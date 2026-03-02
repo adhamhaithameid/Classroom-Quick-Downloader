@@ -4028,7 +4028,7 @@ snapshots:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.20.1
 
-  '@number-flow/svelte@0.3.13(svelte@5.53.1)':
+  '@number-flow/svelte@0.3.13(svelte@5.53.5)':
     dependencies:
       esm-env: 1.2.2
       number-flow: 0.5.12
