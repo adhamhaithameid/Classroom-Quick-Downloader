@@ -4100,6 +4100,7 @@ export function renderDashboard(stats: StatsResponse): string {
               <button id="btn-website-flush-now" class="btn" style="justify-content:center; padding: 8px 10px; font-size:0.78rem;">Flush Data Now</button>
               <button id="btn-website-refresh-toggle" class="btn" style="justify-content:center; padding: 8px 10px; font-size:0.78rem;">Save Refresh Toggle</button>
               <button id="btn-website-override-save" class="btn" style="justify-content:center; padding: 8px 10px; font-size:0.78rem;">Save Override</button>
+              <button id="btn-website-replay-dlq" class="btn" style="justify-content:center; padding: 8px 10px; font-size:0.78rem;">Replay Dead-Letter</button>
             </div>
             <pre id="website-admin-output" class="code-block code-block-large" style="margin-top:10px; max-height:180px; overflow:auto;">{"status":"idle"}</pre>
           </div>
