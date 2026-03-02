@@ -6671,7 +6671,36 @@ export function renderDashboard(stats: StatsResponse): string {
           });
         });
       }
-      
+
+      const stepUpToggle = document.getElementById('blocked-ip-stepup-toggle');
+      if (stepUpToggle) {
+        stepUpToggle.addEventListener('change', function() {
+          const enabled = this.checked;
+          fetch('/admin/ip-allowlist', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ stepUpBypassEnabled: enabled })
+          })
+          .then(r => r.json())
+          .then(data => {
+            if (data.ok) {
+              ipAllowlistData.stepUpBypassEnabled = data.stepUpBypassEnabled !== false;
+              this.checked = ipAllowlistData.stepUpBypassEnabled;
+              refreshIpSecurityBadges();
+              showToast('Blocked-IP step-up ' + (ipAllowlistData.stepUpBypassEnabled ? 'enabled' : 'disabled'), 'success');
+            } else {
+              this.checked = !enabled;
+              showToast('Failed to update: ' + (data.error || 'Unknown'), 'error');
+            }
+          })
+          .catch(() => {
+            this.checked = !enabled;
+            showToast('Network error', 'error');
+          });
+        });
+      }
+
       // Add IP
       function addIp(ip) {
         if (!ip || !isValidIpAddress(ip)) {
