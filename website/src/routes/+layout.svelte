@@ -620,6 +620,10 @@
       display: none;
     }
 
+    .l2-nav-logo {
+      height: 34px;
+    }
+
     .l2-nav-links-desktop,
     .l2-nav-cta-desktop {
       display: none;
