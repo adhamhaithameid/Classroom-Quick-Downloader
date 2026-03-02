@@ -212,6 +212,19 @@
     }
   }
 
+  function formatUtcTime(value: number | null): string {
+    if (!value) return 'Unknown';
+    return new Date(value).toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZone: 'UTC'
+    }) + ' UTC';
+  }
+
   onMount(async () => {
     await load();
   });
