@@ -84,6 +84,59 @@ export type WebsiteSnapshot = {
   nextRefreshAtUtc: number;
   overview: OverviewResponse;
   map: MapResponse;
+  changelog: UserChangelogResponse;
+  userChangelogSummary: SnapshotResponse['userChangelogSummary'];
+  privacy: SnapshotResponse['privacy'];
+};
+
+export type WebsiteSnapshotFetchSource = 'oracle' | 'memory-cache' | 'storage-cache';
+
+export type WebsiteSnapshotFetchResult = {
+  snapshot: WebsiteSnapshot;
+  source: WebsiteSnapshotFetchSource;
+  degraded: boolean;
+  stale: boolean;
+  errorMessage: string | null;
+};
+
+export type WebsiteSnapshotStoreStatus =
+  | 'idle'
+  | 'loading'
+  | 'ready'
+  | 'refreshing'
+  | 'degraded'
+  | 'error';
+
+export type WebsiteSnapshotStoreState = {
+  status: WebsiteSnapshotStoreStatus;
+  snapshot: WebsiteSnapshot | null;
+  source: WebsiteSnapshotFetchSource | null;
+  degraded: boolean;
+  stale: boolean;
+  isRefreshing: boolean;
+  errorMessage: string | null;
+  lastUpdatedAtUtc: number | null;
+  lastFailureAtUtc: number | null;
+  lastUserRefreshAtUtc: number | null;
+};
+
+export type ChangelogNotificationRule = {
+  id: string;
+  target: string;
+  priority: 'normal' | 'minor' | 'major';
+  effect: 'none' | 'glow' | 'pulse';
+};
+
+export type ChangelogConfig = {
+  rules: ChangelogNotificationRule[];
+  lastUpdated?: number;
+};
+
+export type ChangelogMeta = {
+  liveUpdatedAt?: number;
+  applyMode?: string;
+  lastAutoSyncAt?: number | null;
+  lastAutoSyncStatus?: string;
 };
 
 export type ChangelogResponse = {
