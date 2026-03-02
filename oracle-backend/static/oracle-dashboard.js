@@ -1283,6 +1283,7 @@
           loadNotifications();
         }
         if (page === 'website-sync') loadWebsiteSyncState();
+        if (page === 'website-analysis') loadWebsiteAnalytics();
         if (page === 'creative') loadCreativeHub();
         if (page === 'content-changelog') loadUserChangelogRecords();
         if (page === 'logs') loadOracleLogs();
