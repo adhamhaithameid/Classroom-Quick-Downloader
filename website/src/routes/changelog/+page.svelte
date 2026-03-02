@@ -172,7 +172,29 @@
     if (force) refreshing = true;
     error = '';
     try {
-      changelog = await fetchUserChangelog({ force });
+      // PRIMARY: fetch from the Worker API (serves dashboard-managed data)
+      try {
+        const workerData = await fetchWorkerChangelog();
+        if (workerData.ok && workerData.entries.length > 0) {
+          const converted = workerEntriesToMdEntries(workerData.entries);
+          if (converted.length > 0) {
+            converted.sort((a, b) => semverCompareDesc(a.version, b.version));
+            changelogEntries = converted;
+            state = 'ready';
+            degraded = false;
+            dataSource = 'worker';
+            lastLoadedAtUtc = Date.now();
+            return;
+          }
+        }
+        // Worker returned ok but no entries — fall through to GitHub
+      } catch {
+        // Worker unavailable — fall through to GitHub
+      }
+
+      // FALLBACK: fetch directly from GitHub raw markdown
+      const parsed = await fetchFromGitHub(force);
+      changelogEntries = parsed;
       state = 'ready';
     } catch (err) {
       state = 'error';
