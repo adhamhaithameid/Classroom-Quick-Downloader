@@ -2462,6 +2462,7 @@
             html += '<input class="auth-input" id="' + escapeHtml(ratingCountId) + '" placeholder="Rating count" value="' + escapeHtml(v.ratingCount || '') + '"/>';
             html += '<input class="auth-input" id="' + escapeHtml(urlId) + '" placeholder="Store dashboard URL" value="' + escapeHtml(v.url || '') + '"/>';
             html += '<div class="pill-row"><span class="pill">UsersCount: ' + escapeHtml(usersCountText) + '</span><span class="pill">RatingCount: ' + escapeHtml(ratingCountText) + '</span><span class="pill">Latency: ' + escapeHtml(latencyText) + '</span></div>';
+            html += '<div class="pill-row"><span class="pill">Users Metric: ' + escapeHtml(usersMetricText) + '</span><span class="pill">Sync Source: ' + escapeHtml(syncSourceText) + '</span></div>';
             html += '<div class="pill-row"><span class="pill">Source: ' + escapeHtml(sourceText) + '</span><span class="pill">Updated (UTC): ' + escapeHtml(updatedAtText) + '</span></div>';
             html += '<button class="btn btn-secondary" data-action="save-deployment-card" data-record-key="' + escapeHtml(key) + '">Save</button>';
             html += '</div></div>';
