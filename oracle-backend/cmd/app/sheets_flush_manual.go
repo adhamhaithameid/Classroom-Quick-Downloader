@@ -115,7 +115,7 @@ func ManualSheetsFlushHandler(sqlDB *sql.DB) http.HandlerFunc {
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"ok":      false,
 				"error":   "sheets_not_configured",
-				"message": "SHEETS_ID is not configured on the server",
+				"message": "Google Sheets ID is not configured (set SHEETS_ID or GOOGLE_SHEETS_ID or GOOGLE_SHEETS_URL)",
 			})
 			return
 		}
