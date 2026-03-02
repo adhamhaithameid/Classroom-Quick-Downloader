@@ -6072,6 +6072,9 @@ export function renderDashboard(stats: StatsResponse): string {
           changesTextarea.value = entry.changes.join("\\n");
           updateCharCounter();
         }
+        if (markdownInputEl) {
+          markdownInputEl.value = entry.markdown || "";
+        }
         if (editIdInput) editIdInput.value = entry.id;
         
         // Show edit mode banner
