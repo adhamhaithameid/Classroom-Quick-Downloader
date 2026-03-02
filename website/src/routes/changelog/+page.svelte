@@ -1,14 +1,13 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { STORE_LINKS } from '$lib/config';
-  import { fetchChangelog as fetchWorkerChangelog } from '$lib/api/changelog';
+  import { fetchUserChangelog } from '$lib/api/publicSite';
 
   type ChangelogMdEntry = {
     version: string;
+    title: string;
     summary: string;
-    added: string[];
-    changed: string[];
-    fixed: string[];
+    highlights: string[];
   };
 
   const USER_FRIENDLY_CHANGELOG_RAW_URL =
@@ -20,8 +19,8 @@
   let refreshing = false;
   let degraded = false;
   let lastLoadedAtUtc: number | null = null;
-  /** Tracks whether the current data came from the Worker API or the GitHub fallback. */
-  let dataSource: 'worker' | 'github' | null = null;
+  /** Tracks whether the current data came from Oracle API or the GitHub fallback. */
+  let dataSource: 'oracle' | 'github' | null = null;
 
   function semverCompareDesc(a: string, b: string): number {
     const aParts = a.split('.').map((part) => Number.parseInt(part, 10) || 0);
@@ -34,37 +33,30 @@
     return 0;
   }
 
-  /**
-   * Convert Worker API response entries into the ChangelogMdEntry format used by the template.
-   */
-  function workerEntriesToMdEntries(
+  function oracleEntriesToMdEntries(
     entries: Array<{
       version: string;
+      title?: string;
       summary?: string;
-      added?: string[];
-      changed?: string[];
-      fixed?: string[];
-      changes?: string[];
+      highlights?: string[];
     }>
   ): ChangelogMdEntry[] {
     return entries
       .map((entry) => {
         const version = (entry.version || '').replace(/^v/i, '').trim();
         if (!version) return null;
-
-        // Build summary from explicit summary field, or first change entry
         let summary = (entry.summary || '').trim();
-        if (!summary && Array.isArray(entry.changes) && entry.changes.length > 0) {
-          const first = entry.changes[0] || '';
-          summary = first.replace(/^Summary:\s*/i, '').trim();
-        }
+        const title = (entry.title || '').trim();
+        const highlights = Array.isArray(entry.highlights)
+          ? entry.highlights.filter((item) => typeof item === 'string' && item.trim())
+          : [];
+        if (!summary && highlights.length > 0) summary = highlights[0];
 
         return {
           version,
+          title,
           summary: summary || 'No summary available.',
-          added: Array.isArray(entry.added) ? entry.added.filter((s) => typeof s === 'string' && s.trim()) : [],
-          changed: Array.isArray(entry.changed) ? entry.changed.filter((s) => typeof s === 'string' && s.trim()) : [],
-          fixed: Array.isArray(entry.fixed) ? entry.fixed.filter((s) => typeof s === 'string' && s.trim()) : []
+          highlights
         };
       })
       .filter((entry): entry is ChangelogMdEntry => entry !== null);
@@ -72,7 +64,7 @@
 
   /**
    * Parse raw GitHub markdown into ChangelogMdEntry[].
-   * Used as a fallback when the Worker API is unavailable.
+   * Used as a fallback when Oracle API is unavailable.
    */
   function parseChangelogMarkdown(markdown: string): ChangelogMdEntry[] {
     const lines = markdown.replace(/\r\n/g, '\n').split('\n');
@@ -87,10 +79,9 @@
       if (!current.summary.trim()) return;
       entries.push({
         version: current.version,
+        title: current.title,
         summary: current.summary.trim(),
-        added: current.added,
-        changed: current.changed,
-        fixed: current.fixed
+        highlights: current.highlights
       });
     };
 
@@ -103,10 +94,9 @@
         pushCurrent();
         current = {
           version: versionMatch[1],
+          title: '',
           summary: '',
-          added: [],
-          changed: [],
-          fixed: []
+          highlights: []
         };
         section = null;
         continue;
@@ -139,9 +129,9 @@
       if (line.startsWith('- ')) {
         const value = line.slice(2).trim();
         if (!value) continue;
-        if (section === 'added') current.added.push(value);
-        if (section === 'changed') current.changed.push(value);
-        if (section === 'fixed') current.fixed.push(value);
+        if (section === 'added') current.highlights.push(`Added: ${value}`);
+        if (section === 'changed') current.highlights.push(`Changed: ${value}`);
+        if (section === 'fixed') current.highlights.push(`Fixed: ${value}`);
       }
     }
 
@@ -172,24 +162,24 @@
     if (force) refreshing = true;
     error = '';
     try {
-      // PRIMARY: fetch from the Worker API (serves dashboard-managed data)
+      // PRIMARY: fetch from Oracle public website changelog (dashboard-managed data)
       try {
-        const workerData = await fetchWorkerChangelog();
-        if (workerData.ok && workerData.entries.length > 0) {
-          const converted = workerEntriesToMdEntries(workerData.entries);
+        const oracleData = await fetchUserChangelog();
+        if (oracleData.ok && oracleData.entries.length > 0) {
+          const converted = oracleEntriesToMdEntries(oracleData.entries);
           if (converted.length > 0) {
             converted.sort((a, b) => semverCompareDesc(a.version, b.version));
             changelogEntries = converted;
             state = 'ready';
             degraded = false;
-            dataSource = 'worker';
+            dataSource = 'oracle';
             lastLoadedAtUtc = Date.now();
             return;
           }
         }
-        // Worker returned ok but no entries — fall through to GitHub
+        // Oracle returned ok but no entries — fall through to GitHub
       } catch {
-        // Worker unavailable — fall through to GitHub
+        // Oracle unavailable — fall through to GitHub
       }
 
       // FALLBACK: fetch directly from GitHub raw markdown
@@ -319,30 +309,15 @@
                   <div class="cl-entry-header">
                     <h2>v{entry.version}</h2>
                   </div>
+                  {#if entry.title}
+                    <p class="cl-entry-summary"><strong>{entry.title}</strong></p>
+                  {/if}
                   <p class="cl-entry-summary"><strong>Summary:</strong> {entry.summary}</p>
 
-                  {#if entry.added.length > 0}
-                    <h3 class="cl-section-title">Added</h3>
+                  {#if entry.highlights.length > 0}
+                    <h3 class="cl-section-title">Highlights</h3>
                     <ul class="cl-highlights">
-                      {#each entry.added as point}
-                        <li>{point}</li>
-                      {/each}
-                    </ul>
-                  {/if}
-
-                  {#if entry.changed.length > 0}
-                    <h3 class="cl-section-title">Changed</h3>
-                    <ul class="cl-highlights">
-                      {#each entry.changed as point}
-                        <li>{point}</li>
-                      {/each}
-                    </ul>
-                  {/if}
-
-                  {#if entry.fixed.length > 0}
-                    <h3 class="cl-section-title">Fixed</h3>
-                    <ul class="cl-highlights">
-                      {#each entry.fixed as point}
+                      {#each entry.highlights as point}
                         <li>{point}</li>
                       {/each}
                     </ul>
