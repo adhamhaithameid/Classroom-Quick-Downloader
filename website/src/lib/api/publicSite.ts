@@ -455,6 +455,7 @@ export async function fetchWebsiteSnapshotResult(options: { force?: boolean } = 
     const canonicalPayload = await fetchOracleSnapshot();
     const snapshot = buildSnapshot(canonicalPayload);
     cachedSnapshot = snapshot;
+    cachedSnapshotSource = 'memory-cache';
     writeSnapshotToStorage(snapshot);
     return snapshot;
   })()
