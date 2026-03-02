@@ -6937,7 +6937,7 @@ export function renderDashboard(stats: StatsResponse): string {
               showToast('Replayed ' + Number(data.replayed || 0) + ' dead-letter batches.', 'success');
               fetchWebsiteStatus();
             } else {
-              showToast('Flush failed.', 'error');
+              showToast('Replay failed.', 'error');
             }
           })
           .catch(() => showToast('Network error', 'error'))
