@@ -252,8 +252,6 @@
           </button>
         </div>
       </div>
-    </div>
-  </section>
 
   <!-- Step 3: Notes -->
   <section class="step">
