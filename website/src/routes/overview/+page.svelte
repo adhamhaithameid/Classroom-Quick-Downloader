@@ -465,7 +465,7 @@
       isDragging = true;
       isCoasting = false;
       startX = e.clientX;
-      scrollStart = viewport.scrollLeft;
+      dragOffset = offset;
       lastX = e.clientX;
       velocity = 0;
       viewport.setPointerCapture(e.pointerId);
