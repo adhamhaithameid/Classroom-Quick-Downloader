@@ -82,8 +82,9 @@ CLI alternative:
 
 ```bash
 gh variable set CLOUDFLARE_PAGES_PROJECT_NAME --repo adhamhaithameid/Classroom-Quick-Downloader --body 'classroom-quick-downloader-website'
-gh variable set PUBLIC_SITE_URL --repo adhamhaithameid/Classroom-Quick-Downloader --body 'https://classroom-quick-downloader-website.pages.dev'
-gh variable set PUBLIC_ORACLE_API_BASE_URL --repo adhamhaithameid/Classroom-Quick-Downloader --body 'https://cqd-analytics.adhamhaithameid.workers.dev'
+gh variable set PUBLIC_SITE_URL --repo adhamhaithameid/Classroom-Quick-Downloader --body 'https://<your-root-domain>'
+gh variable set PUBLIC_ORACLE_API_BASE_URL --repo adhamhaithameid/Classroom-Quick-Downloader --body 'https://<your-oracle-public-https-domain>'
+gh variable set PUBLIC_WORKER_BASE_URL --repo adhamhaithameid/Classroom-Quick-Downloader --body 'https://cqd-analytics.adhamhaithameid.workers.dev'
 ```
 
 ### 3.3 Oracle server `.env.production`
