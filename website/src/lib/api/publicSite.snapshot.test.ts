@@ -37,24 +37,43 @@ describe('fetchWebsiteSnapshot', () => {
             versions: { github: '1.0.0', chrome: '1.0.0', firefox: null, edge: null },
             status: { systemLive: true, liveSinceUtc: 1, workerHealth: 'up' },
             links: { chrome: 'https://c', firefox: 'https://f', edge: 'https://e', github: 'https://g' }
-          }),
-          { status: 200 }
-        );
-      }
-      return new Response(
-        JSON.stringify({
-          ok: true,
-          generatedAt: 1,
-          granularity: 'country',
-          countries: [
-            { countryCode: 'us', count: 4 },
-            { countryCode: 'US', count: 6 },
-            { countryCode: 'de', count: 2 },
-            { countryCode: 'de', count: 3 },
-            { countryCode: 'gb', count: 0 }
-          ],
-          totals: { countries: 999, downloads: 999 },
-          privacyNote: 'country-only'
+          },
+          map: {
+            ok: true,
+            generatedAt: 1,
+            granularity: 'country',
+            countries: [
+              { countryCode: 'us', count: 4 },
+              { countryCode: 'US', count: 6 },
+              { countryCode: 'de', count: 2 },
+              { countryCode: 'de', count: 3 },
+              { countryCode: 'gb', count: 0 }
+            ],
+            totals: { countries: 999, downloads: 999 },
+            privacyNote: 'country-only'
+          },
+          changelog: {
+            ok: true,
+            generatedAt: 1,
+            headline: 'h',
+            description: 'd',
+            entries: [],
+            fullChangelogUrl: 'https://example.com/changelog',
+            lastUpdatedAtUtc: null
+          },
+          userChangelogSummary: {
+            headline: 'h',
+            description: 'd',
+            entriesCount: 0,
+            lastUpdatedAtUtc: null,
+            fullChangelogUrl: 'https://example.com/changelog'
+          },
+          privacy: {
+            headline: 'p',
+            description: 'pd',
+            userPrivacyUrl: 'https://example.com/privacy',
+            fullPrivacyUrl: 'https://example.com/full-privacy'
+          }
         }),
         { status: 200 }
       );
