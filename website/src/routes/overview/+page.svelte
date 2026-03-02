@@ -476,7 +476,7 @@
       if (!isDragging) return;
       velocity = e.clientX - lastX;
       lastX = e.clientX;
-      viewport.scrollLeft = scrollStart - (e.clientX - startX);
+      offset = dragOffset + (e.clientX - startX);
       normalize();
     };
 
