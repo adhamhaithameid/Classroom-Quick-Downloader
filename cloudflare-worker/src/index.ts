@@ -531,7 +531,7 @@ function cloudflareAccessDeniedResponse(request: Request, env: WorkerEnv, pathna
 
 function isCorsOriginAllowedForPath(request: Request, env: WorkerEnv, pathname: string): boolean {
   const headerOrigin = normalizeHeaderOrigin(request.headers.get("Origin"));
-  if (!headerOrigin) return true;
+  if (!headerOrigin) return !isOriginRequiredForPath(pathname);
   const requestOrigin = normalizeRequestOrigin(request);
   if (requestOrigin && headerOrigin === requestOrigin) {
     return true;
