@@ -244,7 +244,14 @@
         <span class="l2-footer-copy">© {currentYear} Classroom Quick Downloader</span>
       </div>
       <div class="l2-footer-links l2-footer-links-primary">
-        <a href={browserLink(detectedBrowser)} target="_blank" rel="noopener noreferrer">Download</a>
+        <a
+          href={browserLink(detectedBrowser)}
+          target="_blank"
+          rel="noopener noreferrer"
+          on:click={() => trackDownloadClick('footer_download')}
+        >
+          Download
+        </a>
         <a href="{base}/privacy">Privacy</a>
         <a href="{base}/faq">FAQ</a>
         <a href="{base}/changelog">Changelog</a>
