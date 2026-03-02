@@ -1205,7 +1205,13 @@ async function handleProtectedAdminEndpoint(request: Request, env: WorkerEnv): P
     method: request.method,
     headers: headers,
     redirect: request.redirect,
-  });
+  };
+  if (hasBody) {
+    requestInit.body = request.body;
+    // Node fetch in tests requires duplex for streamed request bodies.
+    requestInit.duplex = "half";
+  }
+  const newReq = new Request(request.url, requestInit);
 
   const res = await stub.fetch(newReq);
   return withCors(request, res, env);
