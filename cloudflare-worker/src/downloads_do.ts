@@ -4438,6 +4438,16 @@ export class DownloadsDurable {
         typeof this.d.websiteOverrideEnabled === "boolean" ? this.d.websiteOverrideEnabled : false,
       websiteOverrideDownloads: clampInt(this.d.websiteOverrideDownloads, 0, Number.MAX_SAFE_INTEGER, 0),
       websiteOverrideCountries: normalizePublicSiteCountryList(this.d.websiteOverrideCountries),
+      websiteTelemetryQueue: [],
+      websiteTelemetryDeadLetter: [],
+      websiteTelemetrySeenEventIds: [],
+      websiteTelemetryLastBatchCreatedAt: null,
+      websiteTelemetryLastBatchSentAt: null,
+      websiteTelemetryLastBatchAckAt: null,
+      websiteTelemetryLastBatchID: null,
+      websiteTelemetryLastCorrelationID: null,
+      websiteTelemetryLastError: null,
+      dangerActionAuditLogs: this.d.dangerActionAuditLogs ?? [],
     };
     
     this.data = {
