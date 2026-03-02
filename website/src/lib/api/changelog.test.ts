@@ -151,7 +151,9 @@ describe('fetchChangelog', () => {
     TEST_TIMEOUT_MS
   );
 
-  it('throws on HTTP error responses', async () => {
+  it(
+    'throws on HTTP error responses',
+    async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => new Response('Server Error', { status: 500 }))
