@@ -127,7 +127,15 @@
   <meta name="description" content="Help us improve Classroom Quick Downloader. Share why you uninstalled so we can make it better." />
 </svelte:head>
 
-<div class="uninstall-page">
+<div class="un">
+  <!-- Decorative background -->
+  <div class="un-orbs" aria-hidden="true">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+  </div>
+  <div class="un-grid-bg" aria-hidden="true"></div>
+
   <!-- Hero -->
   <header class="hero">
     <div class="hero-icon">
