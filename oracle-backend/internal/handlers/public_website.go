@@ -2184,6 +2184,7 @@ func writePublicWebsiteJSON(w http.ResponseWriter, statusCode int, payload any) 
 type publicWebsiteCORSOptions struct {
 	AllowedMethods        string
 	RequireOriginForWrite bool
+	StructuredErrors      bool
 }
 
 func preparePublicWebsiteCORS(w http.ResponseWriter, r *http.Request) bool {
