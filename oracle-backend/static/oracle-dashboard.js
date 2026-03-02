@@ -2355,7 +2355,7 @@
             setStatusUI('❓', 'Unknown', '', 'Status unknown: backend could not resolve deployment metadata.', false);
           }
         } catch (e) {
-          setStatusUI('❌', 'Error', '', 'Failed to load deployment status', false);
+          setStatusUI('❌', 'Error', '', 'Deployment status request failed. Check /api/deploy-status and auth state.', false);
         }
       }
 
