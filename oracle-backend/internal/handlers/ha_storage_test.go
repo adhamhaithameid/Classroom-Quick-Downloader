@@ -164,6 +164,297 @@ func TestHARuntimeStatusHandler_ReturnsFlagsAndBacklog(t *testing.T) {
 	}
 }
 
+func TestHARuntimeStatusHandler_IncludesWebsiteChainHealth(t *testing.T) {
+	sqlDB := newHAStorageTestDB(t)
+	defer sqlDB.Close()
+
+	now := time.Now().UTC().UnixMilli()
+	if _, err := sqlDB.Exec(
+		`INSERT INTO website_sync_batches (direction, batch_id, triggered_by, status, details_json, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?)`,
+		websiteSyncDirectionWebsiteToOracle,
+		"website-batch-123",
+		"worker_flush",
+		"ok",
+		`{"acceptedCount":12,"correlationId":"corr-abc"}`,
+		now-2*int64(time.Minute/time.Millisecond),
+	); err != nil {
+		t.Fatalf("seed website_sync_batches failed: %v", err)
+	}
+	if _, err := sqlDB.Exec(
+		`INSERT INTO website_public_snapshots (snapshot_id, schema_version, generated_at, payload_json, created_at)
+		 VALUES (?, ?, ?, ?, ?)`,
+		"ws-public-website-snapshot-test",
+		"1",
+		now-3*int64(time.Minute/time.Millisecond),
+		`{"ok":true}`,
+		now-3*int64(time.Minute/time.Millisecond),
+	); err != nil {
+		t.Fatalf("seed website_public_snapshots failed: %v", err)
+	}
+	if _, err := sqlDB.Exec(
+		`INSERT INTO backup_runs (backup_path, status, error_message, started_at, finished_at)
+		 VALUES (?, ?, ?, ?, ?)`,
+		"/tmp/cqd-backup.db",
+		"success",
+		"",
+		now-10*int64(time.Minute/time.Millisecond),
+		now-8*int64(time.Minute/time.Millisecond),
+	); err != nil {
+		t.Fatalf("seed backup_runs failed: %v", err)
+	}
+	if _, err := sqlDB.Exec(
+		`INSERT INTO sheets_flush_runs (flushed_at_utc, archived_day, status, sheet_id, api_url, row_json, summary_json, meta_json, error_message, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		now-6*int64(time.Minute/time.Millisecond),
+		"2026-03-01",
+		"ok",
+		"sheet-id",
+		"https://example.invalid",
+		`{"downloads":1}`,
+		`{"rows":1}`,
+		`{"verify":"ok"}`,
+		"",
+		now-6*int64(time.Minute/time.Millisecond),
+	); err != nil {
+		t.Fatalf("seed sheets_flush_runs failed: %v", err)
+	}
+
+	guard := NewStorageGuard(filepath.Join(t.TempDir(), "analytics.db"), StorageWatermarks{Warn: 99, Critical: 99.5, Emergency: 99.9})
+	postgresErr := ""
+	req := httptest.NewRequest(http.MethodGet, "/api/admin/ha/status", nil)
+	rr := httptest.NewRecorder()
+	HARuntimeStatusHandler(sqlDB, nil, guard, false, &postgresErr).ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(rr.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode payload failed: %v", err)
+	}
+	websiteChain, ok := payload["websiteChain"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected websiteChain object in response")
+	}
+	if _, ok := websiteChain["lastBatchAccepted"].(map[string]any); !ok {
+		t.Fatalf("expected websiteChain.lastBatchAccepted object")
+	}
+	if _, ok := websiteChain["lastSnapshotGenerated"].(map[string]any); !ok {
+		t.Fatalf("expected websiteChain.lastSnapshotGenerated object")
+	}
+	batchIntegrity, ok := websiteChain["batchIntegrity"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected websiteChain.batchIntegrity object")
+	}
+	if _, ok := batchIntegrity["checksumStatus"]; !ok {
+		t.Fatalf("expected batchIntegrity.checksumStatus field")
+	}
+	if _, ok := batchIntegrity["rowCountStatus"]; !ok {
+		t.Fatalf("expected batchIntegrity.rowCountStatus field")
+	}
+	if _, ok := websiteChain["lagMinutes"]; !ok {
+		t.Fatalf("expected websiteChain.lagMinutes field")
+	}
+	backupDrift, ok := websiteChain["backupDrift"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected websiteChain.backupDrift object")
+	}
+	if backupDrift["status"] == nil {
+		t.Fatalf("expected backup drift status")
+	}
+	sheetsVerification, ok := websiteChain["sheetsFlushVerification"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected websiteChain.sheetsFlushVerification object")
+	}
+	if sheetsVerification["verified"] != true {
+		t.Fatalf("expected sheets verification to be true")
+	}
+	if _, ok := sheetsVerification["checksumStatus"]; !ok {
+		t.Fatalf("expected sheets verification checksumStatus field")
+	}
+	if _, ok := sheetsVerification["rowCountStatus"]; !ok {
+		t.Fatalf("expected sheets verification rowCountStatus field")
+	}
+}
+
+func TestHARuntimeStatusHandler_RaisesWebsiteBackupDriftAlertOnMissedWindow(t *testing.T) {
+	sqlDB := newHAStorageTestDB(t)
+	defer sqlDB.Close()
+
+	t.Setenv("ORACLE_BACKUP_EXPECTED_INTERVAL_MINUTES", "10")
+	t.Setenv("ORACLE_SHEETS_FLUSH_EXPECTED_INTERVAL_MINUTES", "10")
+
+	now := time.Now().UTC().UnixMilli()
+	if _, err := sqlDB.Exec(
+		`INSERT INTO backup_runs (backup_path, status, error_message, started_at, finished_at)
+		 VALUES (?, ?, ?, ?, ?)`,
+		"/tmp/cqd-backup.db",
+		"success",
+		"",
+		now-45*int64(time.Minute/time.Millisecond),
+		now-35*int64(time.Minute/time.Millisecond),
+	); err != nil {
+		t.Fatalf("seed backup_runs failed: %v", err)
+	}
+	if _, err := sqlDB.Exec(
+		`INSERT INTO sheets_flush_runs (flushed_at_utc, archived_day, status, sheet_id, api_url, row_json, summary_json, meta_json, error_message, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		now-5*int64(time.Minute/time.Millisecond),
+		"2026-03-01",
+		"ok",
+		"sheet-id",
+		"https://example.invalid",
+		`{"downloads":1}`,
+		`{"rows":1}`,
+		`{"verification":{"verified":true,"checksumStatus":"match","rowCountStatus":"match","expectedRows":1,"actualRows":1}}`,
+		"",
+		now-5*int64(time.Minute/time.Millisecond),
+	); err != nil {
+		t.Fatalf("seed sheets_flush_runs failed: %v", err)
+	}
+
+	guard := NewStorageGuard(filepath.Join(t.TempDir(), "analytics.db"), StorageWatermarks{Warn: 99, Critical: 99.5, Emergency: 99.9})
+	postgresErr := ""
+	req := httptest.NewRequest(http.MethodGet, "/api/admin/ha/status", nil)
+	rr := httptest.NewRecorder()
+	HARuntimeStatusHandler(sqlDB, nil, guard, false, &postgresErr).ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var severity string
+	var payloadJSON string
+	if err := sqlDB.QueryRow(
+		`SELECT severity, payload_json
+		 FROM system_alerts
+		 WHERE alert_type = ? AND status = 'open'
+		 ORDER BY updated_at DESC, id DESC
+		 LIMIT 1`,
+		"website_backup_drift",
+	).Scan(&severity, &payloadJSON); err != nil {
+		t.Fatalf("expected website_backup_drift alert, query failed: %v", err)
+	}
+	if severity != "critical" {
+		t.Fatalf("expected critical severity, got %q", severity)
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(payloadJSON), &payload); err != nil {
+		t.Fatalf("decode alert payload failed: %v", err)
+	}
+	reasons, _ := payload["reasons"].([]any)
+	found := false
+	for _, item := range reasons {
+		if item == "backup_drift_critical" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected reasons to include backup_drift_critical, payload=%v", payload)
+	}
+}
+
+func TestHARuntimeStatusHandler_RaisesWebsiteBackupDriftAlertOnBatchIntegrityMismatch(t *testing.T) {
+	sqlDB := newHAStorageTestDB(t)
+	defer sqlDB.Close()
+
+	now := time.Now().UTC().UnixMilli()
+	if _, err := sqlDB.Exec(
+		`INSERT INTO website_sync_batches (direction, batch_id, triggered_by, status, details_json, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?)`,
+		websiteSyncDirectionWebsiteToOracle,
+		"website-batch-integrity-mismatch",
+		"worker_website_events_batch",
+		"ok",
+		`{
+			"acceptedCount":4,
+			"rejectedCount":0,
+			"receivedCount":4,
+			"accountedCount":4,
+			"batchChecksum":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			"expectedBatchChecksum":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+			"checksumStatus":"mismatch",
+			"rowCountStatus":"match",
+			"integrity":"critical",
+			"integrityNotes":["batch checksum mismatch"],
+			"correlationId":"corr-mismatch"
+		}`,
+		now-2*int64(time.Minute/time.Millisecond),
+	); err != nil {
+		t.Fatalf("seed website_sync_batches failed: %v", err)
+	}
+	if _, err := sqlDB.Exec(
+		`INSERT INTO backup_runs (backup_path, status, error_message, started_at, finished_at)
+		 VALUES (?, ?, ?, ?, ?)`,
+		"/tmp/cqd-backup.db",
+		"success",
+		"",
+		now-10*int64(time.Minute/time.Millisecond),
+		now-8*int64(time.Minute/time.Millisecond),
+	); err != nil {
+		t.Fatalf("seed backup_runs failed: %v", err)
+	}
+	if _, err := sqlDB.Exec(
+		`INSERT INTO sheets_flush_runs (flushed_at_utc, archived_day, status, sheet_id, api_url, row_json, summary_json, meta_json, error_message, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		now-6*int64(time.Minute/time.Millisecond),
+		"2026-03-01",
+		"ok",
+		"sheet-id",
+		"https://example.invalid",
+		`{"downloads":1}`,
+		`{"rows":1}`,
+		`{"verification":{"verified":true,"checksumStatus":"match","rowCountStatus":"match","expectedRows":1,"actualRows":1}}`,
+		"",
+		now-6*int64(time.Minute/time.Millisecond),
+	); err != nil {
+		t.Fatalf("seed sheets_flush_runs failed: %v", err)
+	}
+
+	guard := NewStorageGuard(filepath.Join(t.TempDir(), "analytics.db"), StorageWatermarks{Warn: 99, Critical: 99.5, Emergency: 99.9})
+	postgresErr := ""
+	req := httptest.NewRequest(http.MethodGet, "/api/admin/ha/status", nil)
+	rr := httptest.NewRecorder()
+	HARuntimeStatusHandler(sqlDB, nil, guard, false, &postgresErr).ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var severity string
+	var payloadJSON string
+	if err := sqlDB.QueryRow(
+		`SELECT severity, payload_json
+		 FROM system_alerts
+		 WHERE alert_type = ? AND status = 'open'
+		 ORDER BY updated_at DESC, id DESC
+		 LIMIT 1`,
+		"website_backup_drift",
+	).Scan(&severity, &payloadJSON); err != nil {
+		t.Fatalf("expected website_backup_drift alert, query failed: %v", err)
+	}
+	if severity != "critical" {
+		t.Fatalf("expected critical severity, got %q", severity)
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(payloadJSON), &payload); err != nil {
+		t.Fatalf("decode alert payload failed: %v", err)
+	}
+	reasons, _ := payload["reasons"].([]any)
+	found := false
+	for _, item := range reasons {
+		if item == "worker_to_oracle_batch_integrity_mismatch" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected reasons to include worker_to_oracle_batch_integrity_mismatch, payload=%v", payload)
+	}
+}
+
 func TestDRDrillAndStatusHandlers_SQLite(t *testing.T) {
 	sqlDB := newHAStorageTestDB(t)
 	defer sqlDB.Close()
