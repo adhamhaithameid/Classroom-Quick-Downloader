@@ -3,7 +3,18 @@
   import { STORE_LINKS } from '$lib/config';
   import { fetchChangelog as fetchWorkerChangelog } from '$lib/api/changelog';
 
-  let changelog: UserChangelogResponse | null = null;
+  type ChangelogMdEntry = {
+    version: string;
+    summary: string;
+    added: string[];
+    changed: string[];
+    fixed: string[];
+  };
+
+  const USER_FRIENDLY_CHANGELOG_RAW_URL =
+    'https://raw.githubusercontent.com/adhamhaithameid/Classroom-Quick-Downloader/main/user-friendly-changelog.md';
+
+  let changelogEntries: ChangelogMdEntry[] = [];
   let state: 'loading' | 'ready' | 'error' = 'loading';
   let error = '';
   let refreshing = false;
