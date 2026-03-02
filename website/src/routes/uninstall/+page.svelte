@@ -148,22 +148,94 @@
     </div>
   </section>
 
-  <!-- Step 2: Quick selects -->
-  <section class="step two-col">
-    <label class="field">
-      <span>Likely to reinstall?</span>
-      <select bind:value={confidenceToReinstall}>
-        <option>Very likely</option>
-        <option>Maybe</option>
-        <option>Unlikely</option>
-        <option>Never</option>
-      </select>
-    </label>
+  <!-- Form -->
+  <section class="un-form-section">
+    <div class="un-wrap">
+      <!-- Step 1: Reason -->
+      <div class="un-step un-appear" style="animation-delay: 0.1s">
+        <div class="un-step-badge" aria-hidden="true">1</div>
+        <div class="un-card">
+          <h2 class="un-card-title">What made you uninstall?</h2>
+          <p class="un-card-hint">Pick the closest reason — it helps us prioritize fixes.</p>
+          <div class="un-pills">
+            {#each reasons as { label, icon }}
+              <button
+                type="button"
+                class="un-pill"
+                class:active={selectedReason === label}
+                on:click={() => { selectedReason = label; }}
+              >
+                <span class="un-pill-icon">{icon}</span>
+                {label}
+                {#if selectedReason === label}
+                  <svg class="un-pill-check" viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                {/if}
+              </button>
+            {/each}
+          </div>
+        </div>
+      </div>
 
-    <div class="field">
-      <span>Which features did you use?</span>
-      <div class="option-grid compact">
-        {#each featureOptions as feat}
+      <!-- Step 2: Details -->
+      <div class="un-step un-appear" style="animation-delay: 0.2s">
+        <div class="un-step-badge" aria-hidden="true">2</div>
+        <div class="un-card">
+          <div class="un-card-title-row">
+            <h2 class="un-card-title">Tell us more</h2>
+            <span class="un-optional-tag">Optional</span>
+          </div>
+
+          <!-- Reinstall likelihood -->
+          <div class="un-field-group">
+            <span class="un-field-label">Would you reinstall?</span>
+            <div class="un-inline-pills">
+              {#each confidenceOptions as { label, icon }}
+                <button
+                  type="button"
+                  class="un-mini-pill"
+                  class:active={confidenceToReinstall === label}
+                  on:click={() => { confidenceToReinstall = label; }}
+                >
+                  <span class="un-mini-icon">{icon}</span>
+                  {label}
+                </button>
+              {/each}
+            </div>
+          </div>
+
+          <!-- Feature usage -->
+          <div class="un-field-group">
+            <span class="un-field-label">Which features did you use?</span>
+            <div class="un-inline-pills">
+              {#each featureOptions as { label, icon }}
+                <button
+                  type="button"
+                  class="un-mini-pill"
+                  class:active={selectedFeatures.includes(label)}
+                  on:click={() => toggleFeature(label)}
+                >
+                  <span class="un-mini-icon">{icon}</span>
+                  {label}
+                  {#if selectedFeatures.includes(label)}
+                    <svg class="un-mini-check" viewBox="0 0 20 20" fill="currentColor" width="12" height="12"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                  {/if}
+                </button>
+              {/each}
+            </div>
+          </div>
+
+          <!-- Notes -->
+          <div class="un-field-group">
+            <label class="un-field-label" for="un-notes">Anything else on your mind?</label>
+            <textarea
+              id="un-notes"
+              bind:value={notes}
+              maxlength="1200"
+              placeholder="What happened, when, and what you wish was different…"
+            ></textarea>
+          </div>
+
+          <!-- Submit -->
           <button
             type="button"
             class="option small"
