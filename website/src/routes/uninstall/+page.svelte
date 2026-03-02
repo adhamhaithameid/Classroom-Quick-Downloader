@@ -384,16 +384,10 @@
     max-width: 480px; margin: 0 auto;
   }
 
-  /* ── Steps ─────────────────────────── */
-  .step {
-    border: 1px solid var(--border-subtle, rgba(226, 232, 240, 0.35));
-    border-radius: var(--radius);
-    background: rgba(255, 255, 255, 0.55);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    padding: 24px;
-    animation: slideUp 0.5s ease both;
-    opacity: 0;
+  /* ── Form Section ──────────────── */
+  .un-form-section {
+    position: relative; z-index: 2;
+    padding: 8px 0 24px;
   }
 
   .step:nth-child(2) { animation-delay: 0.06s; }
