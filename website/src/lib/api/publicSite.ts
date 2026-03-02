@@ -279,6 +279,7 @@ export function coerceMapPayload(input: unknown): MapResponse {
 function coerceUninstallStatsPayload(input: unknown): UninstallStatsResponse {
   const source = input as Partial<UninstallStatsResponse>;
   return {
+    schemaVersion: asSchemaVersion(source?.schemaVersion),
     ok: source?.ok === true,
     generatedAt: asNumber(source?.generatedAt),
     stats: {
