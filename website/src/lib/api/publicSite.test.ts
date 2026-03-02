@@ -278,20 +278,55 @@ describe('user-facing content APIs', () => {
             schemaVersion: '1',
             ok: true,
             generatedAt: 1700000000000,
-            headline: "What's new for students",
-            description: 'Simple updates',
-            entries: [
-              {
-                id: 'release-136',
-                version: '1.3.6',
-                title: 'Stability improvements',
-                summary: 'This release includes stability and security improvements.',
-                highlights: ['Fewer errors', 'More reliable downloads'],
-                releasedAtUtc: 1700000000001
-              }
-            ],
-            fullChangelogUrl: 'https://github.com/adhamhaithameid/Classroom-Quick-Downloader/blob/main/CHANGELOG.md',
-            lastUpdatedAtUtc: 1700000000001
+            snapshotId: 'snapshot-1',
+            overview: {
+              ok: true,
+              generatedAt: 1700000000000,
+              totals: { downloads: 1, success: 1, fail: 0 },
+              installs: { usersTotal: 1, lastSyncedAtUtc: 1700000000000, browsers: [] },
+              versions: { github: '1.3.6', chrome: '1.3.6', firefox: null, edge: null },
+              status: { systemLive: true, liveSinceUtc: 1700000000000, workerHealth: 'up' },
+              links: { chrome: 'https://c', firefox: 'https://f', edge: 'https://e', github: 'https://g' }
+            },
+            map: {
+              ok: true,
+              generatedAt: 1700000000000,
+              granularity: 'country',
+              countries: [{ countryCode: 'US', count: 1 }],
+              totals: { countries: 1, downloads: 1 },
+              privacyNote: 'country only'
+            },
+            changelog: {
+              ok: true,
+              generatedAt: 1700000000000,
+              headline: "What's new for students",
+              description: 'Simple updates',
+              entries: [
+                {
+                  id: 'release-136',
+                  version: '1.3.6',
+                  title: 'Stability improvements',
+                  summary: 'This release includes stability and security improvements.',
+                  highlights: ['Fewer errors', 'More reliable downloads'],
+                  releasedAtUtc: 1700000000001
+                }
+              ],
+              fullChangelogUrl: 'https://github.com/adhamhaithameid/Classroom-Quick-Downloader/blob/main/CHANGELOG.md',
+              lastUpdatedAtUtc: 1700000000001
+            },
+            userChangelogSummary: {
+              headline: "What's new for students",
+              description: 'Simple updates',
+              entriesCount: 1,
+              lastUpdatedAtUtc: 1700000000001,
+              fullChangelogUrl: 'https://github.com/adhamhaithameid/Classroom-Quick-Downloader/blob/main/CHANGELOG.md'
+            },
+            privacy: {
+              headline: 'Privacy',
+              description: 'No raw IP storage.',
+              userPrivacyUrl: 'https://classroom-quick-downloader-website.pages.dev/privacy',
+              fullPrivacyUrl: 'https://github.com/adhamhaithameid/Classroom-Quick-Downloader/blob/main/PRIVACY.md'
+            }
           }),
           { status: 200 }
         )
