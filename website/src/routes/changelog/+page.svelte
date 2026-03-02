@@ -428,10 +428,8 @@
     display: block; margin-bottom: 12px;
   }
 
-  .header-sub {
-    margin: 4px 0 0;
-    color: var(--text-secondary);
-    font-size: 15px;
+  .cl-hero-actions {
+    display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;
   }
 
   .header-meta {
