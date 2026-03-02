@@ -92,7 +92,8 @@ gh variable set PUBLIC_WORKER_BASE_URL --repo adhamhaithameid/Classroom-Quick-Do
 On Oracle VM:
 
 ```bash
-ssh -i ~/.ssh/oracle_key ubuntu@129.151.233.229
+ORACLE_HOST="<oracle-host>"
+ssh -i ~/.ssh/oracle_key "ubuntu@${ORACLE_HOST}"
 cd ~/Classroom-Quick-Downloader/oracle-backend
 ```
 
