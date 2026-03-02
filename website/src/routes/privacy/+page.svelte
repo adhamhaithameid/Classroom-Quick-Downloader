@@ -310,13 +310,9 @@
     color: var(--text-secondary);
   }
 
-  .privacy-section ul {
-    margin: 14px 0 0;
-    padding-left: 0;
-    list-style: none;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
+  .prv-bullets {
+    margin: 0; padding: 0; list-style: none;
+    display: flex; flex-direction: column; gap: 8px;
   }
 
   .privacy-section li {
