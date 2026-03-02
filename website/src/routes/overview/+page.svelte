@@ -8,6 +8,7 @@
   import type { MapResponse, OverviewResponse } from '$lib/types/public';
   import { trackWebsiteEvent } from '$lib/analytics/websiteEvents';
   import AnimatedNumber from '$lib/components/AnimatedNumber.svelte';
+  import MediaLoader from '$lib/components/MediaLoader.svelte';
   import AnimatedNumericText from '$lib/components/AnimatedNumericText.svelte';
   import CountryHeatmap from '$lib/components/CountryHeatmap.svelte';
   import RotatingGlobe from '$lib/components/RotatingGlobe.svelte';
