@@ -595,8 +595,15 @@
     box-shadow: 0 0 0 3px rgba(26, 139, 85, 0.1);
   }
 
-  .submit-btn {
-    background: var(--gc-green);
+  /* ── Submit ────────────────────── */
+  .un-submit {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    width: 100%;
+    padding: 16px 28px;
+    background: var(--green);
     color: #fff;
     border: none;
     border-radius: 999px;
