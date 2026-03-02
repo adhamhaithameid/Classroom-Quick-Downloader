@@ -858,6 +858,17 @@
                 </div>
               </div>
               <div class="card-body">
+                <div class="pill-row">
+                  <span class="pill">Refresh: reloads state and batch snapshots</span>
+                  <span class="pill">Force Push: publish current Oracle state immediately</span>
+                  <span class="pill">Pull Cloudflare: fetch latest website metrics snapshot</span>
+                  <span class="pill">Reconcile: repairs totals using trusted hourly history</span>
+                </div>
+                <div id="website-sync-anomaly-banner" class="website-sync-anomaly hidden" role="status" aria-live="polite">
+                  <div class="website-sync-anomaly-title">Monotonic Guard Alert</div>
+                  <div id="website-sync-anomaly-message" class="website-sync-anomaly-message">--</div>
+                  <ul id="website-sync-anomaly-details" class="website-sync-anomaly-details"></ul>
+                </div>
                 <div class="section-block">
                   <div class="section-caption">Current State</div>
                   <div class="stats-grid">
