@@ -521,7 +521,7 @@ func insertWebsiteSyncBatchWithRunner(
 		trimAndLimit(triggeredBy, 120),
 		trimAndLimit(status, 32),
 		string(payload),
-		time.Now().UTC().UnixMilli(),
+		createdAt,
 	) // #nosec G701 -- static SQL with bound values only.
 	return err
 }
