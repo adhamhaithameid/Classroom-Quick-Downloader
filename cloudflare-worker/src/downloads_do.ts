@@ -6340,7 +6340,32 @@ export class DownloadsDurable {
         const nextConfig: ChangelogConfig = {
           ...this.d.changelogConfig,
           ...body.config,
-          lastUpdated: Date.now(),
+        };
+        if (typeof body.config.markdownSourceUrl === "string") {
+          nextConfig.markdownSourceUrl =
+            trimAndLimitString(body.config.markdownSourceUrl, 600) || USER_FRIENDLY_CHANGELOG_GITHUB_URL;
+        }
+        if (typeof body.config.markdownHelpUrl === "string") {
+          nextConfig.markdownHelpUrl =
+            trimAndLimitString(body.config.markdownHelpUrl, 600) || USER_FRIENDLY_CHANGELOG_GITHUB_URL;
+        }
+        nextConfig.rules = sanitizeNotificationRules(nextConfig.rules);
+        nextConfig.applyMode = normalizeChangelogApplyMode(nextConfig.applyMode);
+        nextConfig.autoSyncEnabled =
+          typeof nextConfig.autoSyncEnabled === "boolean"
+            ? nextConfig.autoSyncEnabled
+            : CHANGELOG_DEFAULT_AUTO_SYNC_ENABLED;
+        nextConfig.autoSyncIntervalMinutes = normalizeAutoSyncIntervalMinutes(nextConfig.autoSyncIntervalMinutes);
+        nextConfig.lastAutoSyncStatus = normalizeChangelogSyncStatus(nextConfig.lastAutoSyncStatus);
+        nextConfig.lastAutoSyncError = trimAndLimitString(nextConfig.lastAutoSyncError, 320) || undefined;
+        nextConfig.nextAutoSyncAt = clampInt(nextConfig.nextAutoSyncAt, 0, Number.MAX_SAFE_INTEGER, 0) || undefined;
+        nextConfig.liveHash =
+          trimAndLimitString(nextConfig.liveHash, 2_000_000) ||
+          trimAndLimitString(this.d.changelogConfig.liveHash, 2_000_000) ||
+          computeChangelogLiveHash(this.d.changelog);
+        this.d.changelogConfig = {
+          ...nextConfig,
+          lastUpdated: now,
         };
         updated = true;
       }
