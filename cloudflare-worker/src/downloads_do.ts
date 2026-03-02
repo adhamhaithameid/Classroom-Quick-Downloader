@@ -2747,6 +2747,10 @@ export class DownloadsDurable {
       return this.handleAdminWebsiteFlushNow(request);
     }
 
+    if (pathname === "/admin/website/replay-dlq" && request.method === "POST") {
+      return this.handleAdminWebsiteReplayDLQ(request);
+    }
+
     if (pathname === "/admin/website/override" && request.method === "POST") {
       return this.handleAdminWebsiteOverride(request);
     }
