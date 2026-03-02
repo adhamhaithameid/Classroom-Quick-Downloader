@@ -28,6 +28,7 @@ Built for students who want speed, fewer clicks, and less friction during busy w
 - [🖼️ In Action](#in-action)
 - [⚡ How to Use](#how-to-use)
 - [🎯 Benefits](#benefits)
+- [🛠️ Ops Status](#ops-status)
 - [📖 Backstory](#backstory)
 - [📦 Installation](#installation)
 - [🔒 Privacy at a Glance](#privacy-at-a-glance)
