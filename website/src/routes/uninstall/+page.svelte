@@ -295,9 +295,27 @@
 </div>
 
 <style>
-  .uninstall-page {
-    max-width: 680px;
-    margin: 0 auto;
+  /* ── Design tokens ───────────────── */
+  .un {
+    --green: #1a8b55;
+    --green-light: #22c55e;
+    --green-bg: rgba(26, 139, 85, 0.06);
+    --green-border: rgba(26, 139, 85, 0.15);
+    --text: #1a1a2e;
+    --text-secondary: #64748b;
+    --muted: #94a3b8;
+    --surface: rgba(255, 255, 255, 0.65);
+    --border-subtle: rgba(226, 232, 240, 0.4);
+    --radius: 20px;
+    --radius-sm: 14px;
+    --wrap: 780px;
+
+    font-family: var(--font-ui), sans-serif;
+    color: var(--text);
+    overflow: clip;
+    position: relative;
+    width: 100%;
+    min-height: 100%;
     display: flex;
     flex-direction: column;
     gap: 16px;
