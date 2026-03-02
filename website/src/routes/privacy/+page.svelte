@@ -186,12 +186,36 @@
     -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
   }
 
-  .icon-box {
-    width: 52px;
-    height: 52px;
-    border-radius: 16px;
-    background: var(--gc-green-bg);
-    border: 1px solid rgba(26, 139, 85, 0.12);
+  .prv-sub {
+    font-size: 17px; line-height: 1.7; color: var(--text);
+    opacity: 0.7;
+    max-width: 640px; margin: 0 auto 20px;
+  }
+
+
+
+  .prv-label {
+    font-size: 12px; font-weight: 700; color: var(--green);
+    letter-spacing: 0.08em; text-transform: uppercase;
+    display: block; margin-bottom: 12px;
+  }
+
+  /* ── Highlight Banner ──────────── */
+  .prv-banner-section {
+    position: relative; z-index: 2;
+    padding: 0 0 48px;
+  }
+
+  .prv-banner {
+    background: rgba(255,255,255,0.6);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--border-subtle);
+    border-radius: 20px;
+    padding: 32px 40px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.04);
+  }
+
+  .prv-banner-items {
     display: flex;
     align-items: center;
     justify-content: center;
