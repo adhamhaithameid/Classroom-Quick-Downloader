@@ -383,7 +383,7 @@ func TestWebsiteOpsForcePushAndOverrideHandlers(t *testing.T) {
 		t.Fatalf("expected 200 from force push, got %d: %s", forceRR.Code, forceRR.Body.String())
 	}
 
-	overrideBody := `{
+	invalidOverrideBody := `{
 		"enabled": true,
 		"downloads": 777,
 		"countries": [
