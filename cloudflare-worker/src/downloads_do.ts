@@ -3834,6 +3834,7 @@ export class DownloadsDurable {
       ok: telemetryFlush.ok,
       flushedAtUtc: now,
       source: this.d.websiteOverrideEnabled ? "override" : "snapshot",
+      telemetry: telemetryFlush,
       snapshotAtUtc: effectiveSnapshot.snapshotAtUtc,
       totals: {
         downloads: effectiveSnapshot.downloads,
