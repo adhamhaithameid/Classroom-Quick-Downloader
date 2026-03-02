@@ -899,6 +899,444 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
 
+type WebsiteEventType = (typeof WEBSITE_EVENT_TYPE_VALUES)[number];
+type WebsiteEventAction = (typeof WEBSITE_EVENT_ACTION_VALUES)[number];
+type WebsiteEventMetaValue = string | number | boolean | null;
+
+type WebsiteEventPayload = {
+  eventId: string;
+  eventType: WebsiteEventType;
+  action: WebsiteEventAction;
+  placement: string;
+  tsUtc?: number;
+  meta?: Record<string, WebsiteEventMetaValue>;
+};
+
+type WebsiteEventsRequest = {
+  schemaVersion: typeof WEBSITE_EVENTS_SCHEMA_VERSION;
+  sessionId: string;
+  pagePath: string;
+  events: WebsiteEventPayload[];
+};
+
+type WebsiteEventsBatchRequest = {
+  schemaVersion: typeof WEBSITE_EVENTS_SCHEMA_VERSION;
+  batchId: string;
+  batchChecksum?: string;
+  expectedEventCount?: number;
+  generatedAtUtc: number;
+  attempt: number;
+  sessionId: string;
+  pagePath: string;
+  events: WebsiteEventPayload[];
+};
+
+type WebsiteEventsErrorCode =
+  | "invalid_content_type"
+  | "payload_too_large"
+  | "invalid_json"
+  | "invalid_payload"
+  | "schema_version_required"
+  | "unknown_field"
+  | "event_unknown_field"
+  | "events_required"
+  | "events_batch_too_large"
+  | "invalid_event_id"
+  | "invalid_event_type"
+  | "invalid_event_action"
+  | "event_action_type_mismatch"
+  | "invalid_placement"
+  | "invalid_ts_utc"
+  | "invalid_meta"
+  | "internal_misconfigured"
+  | "upstream_unavailable"
+  | "upstream_rejected"
+  | "upstream_invalid_response";
+
+type WebsiteEventsErrorResponse = {
+  ok: false;
+  schemaVersion: typeof WEBSITE_EVENTS_SCHEMA_VERSION;
+  error: {
+    code: WebsiteEventsErrorCode;
+    message: string;
+    retryable: boolean;
+  };
+};
+
+async function computeWebsiteEventsBatchChecksum(input: {
+  batchId: string;
+  generatedAtUtc: number;
+  sessionId: string;
+  pagePath: string;
+  events: WebsiteEventPayload[];
+}): Promise<string> {
+  if (
+    typeof crypto === "undefined" ||
+    !crypto.subtle ||
+    typeof crypto.subtle.digest !== "function"
+  ) {
+    return "";
+  }
+
+  const lines: string[] = [];
+  lines.push(WEBSITE_EVENTS_SCHEMA_VERSION);
+  lines.push(input.batchId || "");
+  lines.push(String(Math.max(0, Math.trunc(input.generatedAtUtc || 0))));
+  lines.push(input.sessionId || "");
+  lines.push(input.pagePath || "/");
+  lines.push(String(Array.isArray(input.events) ? input.events.length : 0));
+
+  for (const event of input.events || []) {
+    lines.push(event.eventId || "");
+    lines.push(event.eventType || "");
+    lines.push(event.action || "");
+    lines.push(event.placement || "");
+    lines.push(String(typeof event.tsUtc === "number" ? Math.max(0, Math.trunc(event.tsUtc)) : 0));
+  }
+
+  const payload = lines.join("\n");
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(payload));
+  const bytes = new Uint8Array(digest);
+  let out = "";
+  for (const b of bytes) out += b.toString(16).padStart(2, "0");
+  return out;
+}
+
+function isWebsiteEventType(value: string): value is WebsiteEventType {
+  return (WEBSITE_EVENT_TYPE_VALUES as readonly string[]).includes(value);
+}
+
+function isWebsiteEventAction(value: string): value is WebsiteEventAction {
+  return (WEBSITE_EVENT_ACTION_VALUES as readonly string[]).includes(value);
+}
+
+function websiteEventsError(
+  code: WebsiteEventsErrorCode,
+  message: string,
+  status: number,
+  retryable = false,
+): Response {
+  const payload: WebsiteEventsErrorResponse = {
+    ok: false,
+    schemaVersion: WEBSITE_EVENTS_SCHEMA_VERSION,
+    error: {
+      code,
+      message,
+      retryable,
+    },
+  };
+  return json(payload, { status });
+}
+
+function hasOnlyAllowedKeys(value: Record<string, unknown>, allowed: Set<string>): boolean {
+  for (const key of Object.keys(value)) {
+    if (!allowed.has(key)) return false;
+  }
+  return true;
+}
+
+function normalizeWebsiteEventsPagePath(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return "/";
+  const normalized = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+  return normalized.length <= WEBSITE_EVENTS_MAX_PAGE_PATH_LEN
+    ? normalized
+    : normalized.slice(0, WEBSITE_EVENTS_MAX_PAGE_PATH_LEN);
+}
+
+function sanitizeWebsiteEventMeta(raw: unknown): Record<string, WebsiteEventMetaValue> | null | undefined {
+  if (raw == null) return undefined;
+  if (!isPlainObject(raw)) return null;
+  const out: Record<string, WebsiteEventMetaValue> = {};
+  const entries = Object.entries(raw);
+  if (entries.length > WEBSITE_EVENTS_MAX_META_KEYS) {
+    return null;
+  }
+  for (const [key, value] of entries) {
+    const cleanKey = key.trim();
+    if (!cleanKey || cleanKey.length > WEBSITE_EVENTS_MAX_META_KEY_LEN) {
+      return null;
+    }
+    if (typeof value === "string") {
+      out[cleanKey] = value.slice(0, WEBSITE_EVENTS_MAX_META_VALUE_STRING_LEN);
+      continue;
+    }
+    if (typeof value === "number" || typeof value === "boolean" || value === null) {
+      out[cleanKey] = value;
+      continue;
+    }
+    return null;
+  }
+  return out;
+}
+
+function parseWebsiteEventsRequest(raw: unknown): { ok: true; value: WebsiteEventsRequest } | { ok: false; response: Response } {
+  if (!isPlainObject(raw)) {
+    return {
+      ok: false,
+      response: websiteEventsError("invalid_payload", "Request body must be a JSON object.", 400, false),
+    };
+  }
+  if (!hasOnlyAllowedKeys(raw, WEBSITE_EVENT_ROOT_KEYS)) {
+    return {
+      ok: false,
+      response: websiteEventsError("unknown_field", "Request body contains unsupported fields.", 400, false),
+    };
+  }
+
+  if (raw.schemaVersion !== WEBSITE_EVENTS_SCHEMA_VERSION) {
+    return {
+      ok: false,
+      response: websiteEventsError("schema_version_required", "schemaVersion must be \"1\".", 400, false),
+    };
+  }
+
+  const sessionId = typeof raw.sessionId === "string" ? raw.sessionId.trim() : "";
+  if (!sessionId || sessionId.length > WEBSITE_EVENTS_MAX_SESSION_ID_LEN) {
+    return {
+      ok: false,
+      response: websiteEventsError("invalid_payload", "sessionId is required and must be <= 96 characters.", 400, false),
+    };
+  }
+
+  const pagePathRaw = typeof raw.pagePath === "string" ? raw.pagePath : "/";
+  const pagePath = normalizeWebsiteEventsPagePath(pagePathRaw);
+
+  if (!Array.isArray(raw.events) || raw.events.length === 0) {
+    return {
+      ok: false,
+      response: websiteEventsError("events_required", "events must be a non-empty array.", 400, false),
+    };
+  }
+
+  if (raw.events.length > WEBSITE_EVENTS_MAX_BATCH) {
+    return {
+      ok: false,
+      response: websiteEventsError(
+        "events_batch_too_large",
+        `events length must be <= ${WEBSITE_EVENTS_MAX_BATCH}.`,
+        413,
+        false,
+      ),
+    };
+  }
+
+  const events: WebsiteEventPayload[] = [];
+  for (const entry of raw.events) {
+    if (!isPlainObject(entry)) {
+      return {
+        ok: false,
+        response: websiteEventsError("invalid_payload", "Each event must be an object.", 400, false),
+      };
+    }
+    if (!hasOnlyAllowedKeys(entry, WEBSITE_EVENT_KEYS)) {
+      return {
+        ok: false,
+        response: websiteEventsError("event_unknown_field", "Event contains unsupported fields.", 400, false),
+      };
+    }
+
+    const eventId = typeof entry.eventId === "string" ? entry.eventId.trim() : "";
+    if (!WEBSITE_EVENT_ID_PATTERN.test(eventId)) {
+      return {
+        ok: false,
+        response: websiteEventsError("invalid_event_id", "eventId must match the expected format.", 400, false),
+      };
+    }
+
+    const rawEventType = typeof entry.eventType === "string" ? entry.eventType.trim().toLowerCase() : "";
+    if (!isWebsiteEventType(rawEventType)) {
+      return {
+        ok: false,
+        response: websiteEventsError("invalid_event_type", "eventType must be one of: cta, map.", 400, false),
+      };
+    }
+    const eventType: WebsiteEventType = rawEventType;
+
+    const rawAction = typeof entry.action === "string" ? entry.action.trim().toLowerCase() : "";
+    if (!isWebsiteEventAction(rawAction)) {
+      return {
+        ok: false,
+        response: websiteEventsError(
+          "invalid_event_action",
+          "action must be one of: install_click, download_click, map_yes, map_no.",
+          400,
+          false,
+        ),
+      };
+    }
+    const action: WebsiteEventAction = rawAction;
+    if (WEBSITE_EVENT_ACTION_TO_TYPE[action] !== eventType) {
+      return {
+        ok: false,
+        response: websiteEventsError("event_action_type_mismatch", "action does not match eventType.", 400, false),
+      };
+    }
+
+    const placement = typeof entry.placement === "string" ? entry.placement.trim().toLowerCase() : "";
+    if (!placement || placement.length > WEBSITE_EVENTS_MAX_PLACEMENT_LEN) {
+      return {
+        ok: false,
+        response: websiteEventsError("invalid_placement", "placement is required and must be <= 64 characters.", 400, false),
+      };
+    }
+
+    let tsUtc: number | undefined;
+    if (entry.tsUtc !== undefined) {
+      if (typeof entry.tsUtc !== "number" || !Number.isFinite(entry.tsUtc) || entry.tsUtc <= 0) {
+        return {
+          ok: false,
+          response: websiteEventsError("invalid_ts_utc", "tsUtc must be a positive Unix ms timestamp.", 400, false),
+        };
+      }
+      tsUtc = Math.floor(entry.tsUtc);
+    }
+
+    const meta = sanitizeWebsiteEventMeta(entry.meta);
+    if (meta === null) {
+      return {
+        ok: false,
+        response: websiteEventsError("invalid_meta", "meta must be a small object of primitive values.", 400, false),
+      };
+    }
+
+    events.push({
+      eventId,
+      eventType,
+      action,
+      placement,
+      ...(tsUtc ? { tsUtc } : {}),
+      ...(meta ? { meta } : {}),
+    });
+  }
+
+  return {
+    ok: true,
+    value: {
+      schemaVersion: WEBSITE_EVENTS_SCHEMA_VERSION,
+      sessionId,
+      pagePath,
+      events,
+    },
+  };
+}
+
+function trimAndLimitString(value: unknown, maxLen: number): string {
+  if (typeof value !== "string") return "";
+  return value.trim().slice(0, Math.max(0, maxLen));
+}
+
+function sanitizeWebsiteTelemetrySessionID(value: unknown): string {
+  return trimAndLimitString(value, WEBSITE_EVENTS_MAX_SESSION_ID_LEN);
+}
+
+function sanitizeWebsiteTelemetryPagePath(value: unknown): string {
+  if (typeof value !== "string") return "/";
+  return normalizeWebsiteEventsPagePath(value);
+}
+
+function sanitizeLoadedChangelogRevision(raw: unknown): ChangelogRevision | null {
+  if (!isPlainObject(raw)) return null;
+  const source = raw as Record<string, unknown>;
+  const id = trimAndLimitString(source.id, 160);
+  const createdAt = clampInt(source.createdAt, 1, Number.MAX_SAFE_INTEGER, 0);
+  const actor = trimAndLimitString(source.actor, 120);
+  const sourceTypeRaw = trimAndLimitString(source.source, 24).toLowerCase();
+  const sourceType: "manual" | "github" | "github_auto" | "api" =
+    sourceTypeRaw === "github" || sourceTypeRaw === "github_auto" || sourceTypeRaw === "api"
+      ? sourceTypeRaw
+      : "manual";
+  const markdownUrl = trimAndLimitString(source.markdownUrl, 600);
+  const markdownLength = clampInt(source.markdownLength, 0, 2_000_000, 0);
+  const releases = clampInt(source.releases, 0, 2000, 0);
+  const valid = source.valid === true;
+  const errors = Array.isArray(source.errors)
+    ? source.errors
+        .filter((item): item is string => typeof item === "string")
+        .map((item) => trimAndLimitString(item, 240))
+        .filter((item) => item.length > 0)
+        .slice(0, 8)
+    : [];
+  if (!id || createdAt <= 0) return null;
+  return {
+    id,
+    source: sourceType,
+    createdAt,
+    actor: actor || "unknown",
+    markdownUrl: markdownUrl || undefined,
+    markdownLength,
+    releases,
+    valid,
+    errors: errors.length > 0 ? errors : undefined,
+  };
+}
+
+function sanitizeLoadedWebsiteTelemetryBatch(raw: unknown): WebsiteTelemetryQueuedBatch | null {
+  if (!isPlainObject(raw)) return null;
+  const source = raw as Record<string, unknown>;
+  if (source.schemaVersion !== WEBSITE_EVENTS_SCHEMA_VERSION) return null;
+  const batchId = trimAndLimitString(source.batchId, 160);
+  const correlationId =
+    trimAndLimitString(source.correlationId, 160);
+  const generatedAtUtc = clampInt(source.generatedAtUtc, 1, Number.MAX_SAFE_INTEGER, 0);
+  const sessionId = sanitizeWebsiteTelemetrySessionID(source.sessionId);
+  const pagePath = sanitizeWebsiteTelemetryPagePath(source.pagePath);
+  const attempt = clampInt(source.attempt, 0, 100, 0);
+  const nextRetryAtUtc = (() => {
+    const value = clampInt(source.nextRetryAtUtc, 0, Number.MAX_SAFE_INTEGER, 0);
+    return value > 0 ? value : null;
+  })();
+  const lastError = (() => {
+    if (typeof source.lastError !== "string") return null;
+    const normalized = trimAndLimitString(source.lastError, 280);
+    return normalized || null;
+  })();
+  if (!batchId || !correlationId || generatedAtUtc <= 0 || sessionId === "" || pagePath === "") {
+    return null;
+  }
+  if (!Array.isArray(source.events) || source.events.length === 0 || source.events.length > WEBSITE_EVENTS_MAX_BATCH) {
+    return null;
+  }
+  const normalizedEvents: WebsiteEventPayload[] = [];
+  for (const eventRaw of source.events) {
+    if (!isPlainObject(eventRaw)) continue;
+    const eventSource = eventRaw as Record<string, unknown>;
+    const eventId = typeof eventSource.eventId === "string" ? eventSource.eventId.trim() : "";
+    const eventType = typeof eventSource.eventType === "string" ? eventSource.eventType.trim().toLowerCase() : "";
+    const action = typeof eventSource.action === "string" ? eventSource.action.trim().toLowerCase() : "";
+    const placement = typeof eventSource.placement === "string" ? eventSource.placement.trim().toLowerCase() : "";
+    if (!WEBSITE_EVENT_ID_PATTERN.test(eventId)) continue;
+    if (!isWebsiteEventType(eventType)) continue;
+    if (!isWebsiteEventAction(action)) continue;
+    if (WEBSITE_EVENT_ACTION_TO_TYPE[action] !== eventType) continue;
+    if (!placement || placement.length > WEBSITE_EVENTS_MAX_PLACEMENT_LEN) continue;
+    const tsUtc = clampInt(eventSource.tsUtc, 1, Number.MAX_SAFE_INTEGER, generatedAtUtc);
+    const meta = sanitizeWebsiteEventMeta(eventSource.meta);
+    if (meta === null) continue;
+    normalizedEvents.push({
+      eventId,
+      eventType,
+      action,
+      placement,
+      tsUtc,
+      ...(meta ? { meta } : {}),
+    });
+  }
+  if (normalizedEvents.length === 0) return null;
+  return {
+    schemaVersion: WEBSITE_EVENTS_SCHEMA_VERSION,
+    batchId,
+    correlationId,
+    generatedAtUtc,
+    sessionId,
+    pagePath,
+    events: normalizedEvents,
+    attempt,
+    nextRetryAtUtc,
+    lastError,
+  };
+}
+
 function sanitizeString(
   value: unknown,
   maxLen: number,
