@@ -727,7 +727,7 @@ func PublicWebsiteUninstallHandler(sqliteDB *sql.DB) http.HandlerFunc {
 
 			var req publicWebsiteUninstallRequest
 			if err := decodeJSONBodyStrict(r, &req); err != nil {
-				http.Error(w, "invalid request body", http.StatusBadRequest)
+				writePublicWebsiteError(w, http.StatusBadRequest, "invalid_request_body", "Request body must be valid JSON and match the expected schema.", false)
 				return
 			}
 
