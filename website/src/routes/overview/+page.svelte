@@ -1466,10 +1466,11 @@
           <div class="l2-ps-media-card l2-ps-solution">
             <div class="l2-ps-media-badge l2-ps-badge-green">With Classroom Quick Downloader</div>
             <div class="l2-ps-media-wrap">
-              <img class="l2-ps-img" src="{base}/images/solution-flags.png" alt="CQD flags showing edited and commented posts" loading="lazy" decoding="async" />
-              <button type="button" class="l2-ps-expand-btn" on:click={() => toggleMediaExpanded('solution-flags')} aria-label="Expand image">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg>
-              </button>
+              <MediaLoader type="image" src="{base}/images/solution-flags.webp" class="l2-ps-img" alt="CQD flags showing edited and commented posts" loading="lazy">
+                <button type="button" class="l2-ps-expand-btn" on:click={() => toggleMediaExpanded('solution-flags')} aria-label="Expand image">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg>
+                </button>
+              </MediaLoader>
             </div>
           </div>
         </div>
