@@ -439,27 +439,26 @@
   />
 </svelte:head>
 
-<div class="faq-page">
-  <header class="faq-hero">
-    <div class="faq-hero-icon">
-      <svg
-        width="24"
-        height="24"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      >
-        <circle cx="12" cy="12" r="10" />
-        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-        <line x1="12" y1="17" x2="12.01" y2="17" />
-      </svg>
-    </div>
-    <div>
-      <h1>Frequently Asked Questions</h1>
-      <p>Comprehensive answers for setup, usage, privacy, and troubleshooting.</p>
+<div class="fq">
+  <!-- Decorative orbs -->
+  <div class="fq-orbs" aria-hidden="true">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+    <div class="orb orb-4"></div>
+    <div class="orb orb-5"></div>
+  </div>
+  <div class="fq-grid-bg" aria-hidden="true"></div>
+
+  <!-- Hero -->
+  <section class="fq-hero">
+    <div class="fq-wrap">
+      <span class="fq-label">HELP CENTER</span>
+      <h1 class="fq-mega">Frequently Asked Questions</h1>
+      <p class="fq-sub">
+        Answers for students, developers, and everyone in between.
+        Can't find what you need? <a href="mailto:adhamhaithameid@gmail.com" class="fq-contact-link">Get in touch</a>.
+      </p>
     </div>
   </header>
 
