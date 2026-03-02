@@ -667,10 +667,42 @@
     box-shadow: 0 4px 24px rgba(26,139,85,0.08);
   }
 
-  .faq-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
+  .fq-search-input::placeholder { color: var(--muted); }
+
+  .fq-search-clear {
+    position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+    width: 28px; height: 28px; border-radius: 8px;
+    border: none; background: rgba(0,0,0,0.06);
+    color: var(--text-secondary); font-size: 12px; font-weight: 700;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .fq-search-clear:hover { background: rgba(0,0,0,0.1); }
+
+
+
+
+
+  /* ── FAQ Body ──────────────────── */
+  .fq-body-section {
+    position: relative; z-index: 2;
+    padding: 16px 0 40px;
+  }
+
+  .fq-sections { display: grid; gap: 24px; }
+
+  .fq-section {
+    background: rgba(255,255,255,0.6);
+    border: 1px solid var(--border-subtle);
+    border-radius: 20px;
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    padding: 28px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+  }
+
+  .fq-section-head {
+    display: flex; align-items: center; gap: 14px;
+    margin-bottom: 20px;
   }
 
   .faq-item {
