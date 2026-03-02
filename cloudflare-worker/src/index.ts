@@ -781,11 +781,13 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
       );
     }
 
-    // IP Allowlist check (Fail-Safe with Graceful Degradation)
-    const ipCheckResult = await isIpAllowed(stub, clientIp, env);
-    
-    // Handle service degradation: return 503 instead of hard lockout
-    if (ipCheckResult.serviceDown) {
+    const form = await request.formData();
+    const password = (form.get("password") || "").toString();
+
+    let allowlistDecision: LoginAllowlistCheck;
+    try {
+      allowlistDecision = await checkLoginAllowlist(stub, request.url, env.DO_SHARED_SECRET, clientIp);
+    } catch {
       return new Response(
         renderLoginPage(ipCheckResult.error || "Service temporarily unavailable. Please try again."),
         { 
