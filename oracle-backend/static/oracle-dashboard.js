@@ -3945,6 +3945,13 @@
           showFlushModal();
         } catch (e) {
           if (e && e.payload && typeof e.payload === 'object') {
+            if (e.payload.error === 'sheets_not_configured') {
+              e.payload.troubleshooting = [
+                'Set one of: SHEETS_ID, GOOGLE_SHEETS_ID, or GOOGLE_SHEETS_URL.',
+                'Ensure GOOGLE_CREDS_PATH points to the service-account JSON file.',
+                'Run the flush again after environment reload/restart.'
+              ];
+            }
             setDangerOutput(e.payload);
           } else {
             setDangerOutput({ ok: false, error: String(e) });
