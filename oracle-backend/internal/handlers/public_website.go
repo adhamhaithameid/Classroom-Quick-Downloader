@@ -199,6 +199,92 @@ type publicWebsiteReasonCount struct {
 	Count  int64  `json:"count"`
 }
 
+type publicWebsiteEventsIngestRequest struct {
+	SchemaVersion string                          `json:"schemaVersion"`
+	SessionID     string                          `json:"sessionId"`
+	PagePath      string                          `json:"pagePath"`
+	Events        []publicWebsiteEventIngestEvent `json:"events"`
+}
+
+type publicWebsiteEventIngestEvent struct {
+	EventID   string         `json:"eventId"`
+	EventType string         `json:"eventType"`
+	Action    string         `json:"action"`
+	Placement string         `json:"placement"`
+	TSUTC     *int64         `json:"tsUtc,omitempty"`
+	Meta      map[string]any `json:"meta,omitempty"`
+}
+
+type publicWebsiteEventsIngestResponse struct {
+	SchemaVersion string `json:"schemaVersion"`
+	OK            bool   `json:"ok"`
+	GeneratedAt   int64  `json:"generatedAt"`
+	AcceptedCount int    `json:"acceptedCount"`
+	RejectedCount int    `json:"rejectedCount"`
+}
+
+type publicWebsiteEventsBatchIngestRequest struct {
+	SchemaVersion  string                          `json:"schemaVersion"`
+	BatchID        string                          `json:"batchId"`
+	BatchChecksum  string                          `json:"batchChecksum,omitempty"`
+	ExpectedEvents *int                            `json:"expectedEventCount,omitempty"`
+	GeneratedAtUTC int64                           `json:"generatedAtUtc"`
+	Attempt        int                             `json:"attempt"`
+	SessionID      string                          `json:"sessionId"`
+	PagePath       string                          `json:"pagePath"`
+	Events         []publicWebsiteEventIngestEvent `json:"events"`
+}
+
+type publicWebsiteEventsBatchIngestResponse struct {
+	SchemaVersion string `json:"schemaVersion"`
+	OK            bool   `json:"ok"`
+	BatchID       string `json:"batchId"`
+	GeneratedAt   int64  `json:"generatedAt"`
+	AcceptedCount int    `json:"acceptedCount"`
+	RejectedCount int    `json:"rejectedCount"`
+	Checksum      string `json:"checksum,omitempty"`
+	ChecksumState string `json:"checksumStatus,omitempty"`
+	RowCountState string `json:"rowCountStatus,omitempty"`
+	Integrity     string `json:"integrityStatus,omitempty"`
+}
+
+type publicWebsiteErrorEnvelope struct {
+	SchemaVersion string                  `json:"schemaVersion"`
+	OK            bool                    `json:"ok"`
+	Error         publicWebsiteErrorShape `json:"error"`
+}
+
+type publicWebsiteErrorShape struct {
+	Code      string `json:"code"`
+	Message   string `json:"message"`
+	Retryable bool   `json:"retryable"`
+}
+
+type websiteEventsIngestMetadata struct {
+	Source         string
+	BatchID        string
+	TriggeredBy    string
+	Attempt        int
+	SessionID      string
+	PagePath       string
+	GeneratedAtUTC int64
+	CorrelationID  string
+	BatchChecksum  string
+	ExpectedEvents *int
+}
+
+type websiteEventsIngestResult struct {
+	Accepted       int
+	Rejected       int
+	Received       int
+	Accounted      int
+	BatchChecksum  string
+	ChecksumStatus string
+	RowCountStatus string
+	Integrity      string
+	IntegrityNotes []string
+}
+
 type publicWebsiteTotals struct {
 	Downloads int64 `json:"downloads"`
 	Success   int64 `json:"success"`
