@@ -5805,6 +5805,7 @@ export class DownloadsDurable {
         },
       },
     );
+  }
 
     return json({
       ok: true,
