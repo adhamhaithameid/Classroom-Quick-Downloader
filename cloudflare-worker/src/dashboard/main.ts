@@ -6474,6 +6474,56 @@ export function renderDashboard(stats: StatsResponse): string {
         document.body.appendChild(toast);
         setTimeout(() => toast.remove(), 3000);
       }
+
+      function setBadgeState(node, enabled, onLabel, offLabel, onColors, offColors) {
+        if (!node) return;
+        node.textContent = enabled ? onLabel : offLabel;
+        const colors = enabled ? onColors : offColors;
+        node.style.background = colors.bg;
+        node.style.borderColor = colors.border;
+        node.style.color = colors.text;
+      }
+
+      function refreshIpSecurityBadges() {
+        const allowlistBadge = document.getElementById('ip-allowlist-badge');
+        const statusEl = document.getElementById('ip-status');
+        const stepUpBadge = document.getElementById('ip-stepup-badge');
+
+        setBadgeState(
+          allowlistBadge,
+          ipAllowlistData.enabled === true,
+          'Allowlist: ON',
+          'Allowlist: OFF',
+          { bg: 'rgba(34,197,94,0.16)', border: 'rgba(34,197,94,0.45)', text: '#86efac' },
+          { bg: 'rgba(148,163,184,0.14)', border: 'rgba(148,163,184,0.35)', text: '#cbd5e1' }
+        );
+        setBadgeState(
+          stepUpBadge,
+          ipAllowlistData.stepUpBypassEnabled === true,
+          'Blocked IP Login: Step-Up ON',
+          'Blocked IP Login: Step-Up OFF',
+          { bg: 'rgba(59,130,246,0.12)', border: 'rgba(59,130,246,0.3)', text: '#93c5fd' },
+          { bg: 'rgba(251,146,60,0.15)', border: 'rgba(251,146,60,0.4)', text: '#fdba74' }
+        );
+        if (!statusEl) return;
+        if (!ipAllowlistData.enabled) {
+          statusEl.textContent = 'Open (Allowlist Off)';
+          statusEl.style.color = 'var(--warning)';
+          return;
+        }
+        if (ipAllowlistData.allowlist.includes(currentUserIp)) {
+          statusEl.textContent = 'Allowlisted';
+          statusEl.style.color = 'var(--success)';
+          return;
+        }
+        if (ipAllowlistData.stepUpBypassEnabled) {
+          statusEl.textContent = 'Blocked IP (Use Admin Password)';
+          statusEl.style.color = 'var(--warning)';
+          return;
+        }
+        statusEl.textContent = 'Blocked IP (Step-Up Disabled)';
+        statusEl.style.color = 'var(--danger)';
+      }
       
       // Utility: Validate IP address or CIDR (IPv4/IPv6)
       function isValidIpAddress(ip) {
