@@ -5926,6 +5926,338 @@ export class DownloadsDurable {
       markdownUrl,
       now: options.now,
     });
+
+    if (!parsed.ok) {
+      this.d.changelogConfig = {
+        ...this.d.changelogConfig,
+        applyMode: mode,
+        autoSyncEnabled,
+        autoSyncIntervalMinutes: intervalMinutes,
+        lastAutoSyncStatus: "error",
+        lastAutoSyncError: parsed.error,
+        nextAutoSyncAt,
+      };
+      return { ok: false, updated: false, error: parsed.error };
+    }
+
+    const nextHash = computeChangelogLiveHash(parsed.entries);
+    const prevHash = trimAndLimitString(this.d.changelogConfig.liveHash, 2_000_000);
+    const changed = nextHash !== prevHash;
+    if (changed) {
+      this.d.changelog = parsed.entries;
+      this.appendChangelogRevision({
+        id: `rev-${options.now}-${Math.floor(Math.random() * 1000000)}`,
+        source: "github_auto",
+        createdAt: options.now,
+        actor: options.actor || options.source,
+        markdownUrl,
+        markdownLength: parsed.markdown.length,
+        releases: parsed.entries.length,
+        valid: parsed.valid,
+        errors: parsed.errors.length > 0 ? parsed.errors.slice(0, 8) : undefined,
+      });
+    }
+
+    this.d.changelogDraft = {
+      markdown: parsed.markdown,
+      markdownUrl,
+      entries: parsed.entries,
+      errors: parsed.errors.slice(0, 20),
+      valid: parsed.valid,
+      updatedAt: options.now,
+      source: "github",
+    };
+
+    this.d.changelogConfig = {
+      ...this.d.changelogConfig,
+      applyMode: mode,
+      autoSyncEnabled,
+      autoSyncIntervalMinutes: intervalMinutes,
+      markdownSourceUrl: markdownUrl,
+      markdownHelpUrl: this.d.changelogConfig.markdownHelpUrl || USER_FRIENDLY_CHANGELOG_GITHUB_URL,
+      lastParsedAt: options.now,
+      lastUpdated: changed ? options.now : this.d.changelogConfig.lastUpdated,
+      lastAutoSyncAt: options.now,
+      lastAutoSyncStatus: "ok",
+      lastAutoSyncError: undefined,
+      nextAutoSyncAt,
+      liveHash: nextHash,
+    };
+
+    return { ok: true, updated: changed };
+  }
+
+  private async ensureChangelogAutoSyncAlarm(now: number): Promise<boolean> {
+    const mode = normalizeChangelogApplyMode(this.d.changelogConfig.applyMode);
+    const autoSyncEnabled = this.d.changelogConfig.autoSyncEnabled === true;
+    if (mode !== "auto_github" || !autoSyncEnabled) {
+      return false;
+    }
+    const intervalMinutes = normalizeAutoSyncIntervalMinutes(this.d.changelogConfig.autoSyncIntervalMinutes);
+    const existingNext = clampInt(this.d.changelogConfig.nextAutoSyncAt, 0, Number.MAX_SAFE_INTEGER, 0);
+    const nextAt = existingNext > now ? existingNext : now + intervalMinutes * 60_000;
+    const changed = nextAt !== existingNext;
+    this.d.changelogConfig.nextAutoSyncAt = nextAt;
+    this.d.changelogConfig.autoSyncIntervalMinutes = intervalMinutes;
+    await this.scheduleAlarmAtEarliest(nextAt);
+    return changed;
+  }
+
+  private async fetchMarkdownFromUrl(url: string): Promise<{ ok: true; markdown: string } | { ok: false; error: string }> {
+    const target = trimAndLimitString(url, 600);
+    if (!target) return { ok: false, error: "markdown_url_required" };
+    let parsed: URL;
+    try {
+      parsed = new URL(target);
+    } catch {
+      return { ok: false, error: "invalid_markdown_url" };
+    }
+    if (parsed.protocol !== "https:") {
+      return { ok: false, error: "markdown_url_must_be_https" };
+    }
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8_000);
+    try {
+      const res = await fetch(parsed.toString(), { method: "GET", signal: controller.signal });
+      if (!res.ok) {
+        return { ok: false, error: `markdown_fetch_failed_${res.status}` };
+      }
+      const markdown = trimAndLimitString(await res.text(), 750_000);
+      if (!markdown) return { ok: false, error: "markdown_empty" };
+      return { ok: true, markdown };
+    } catch {
+      return { ok: false, error: "markdown_fetch_failed" };
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  private appendChangelogRevision(revision: ChangelogRevision): void {
+    const next = [revision, ...(this.d.changelogRevisions || [])];
+    this.d.changelogRevisions = next.slice(0, 100);
+  }
+
+  private async handleAdminGetChangelogState(request: Request): Promise<Response> {
+    if (!this.isAuthorizedAdmin(request)) {
+      return json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+    return json(this.getAdminChangelogStatePayload());
+  }
+
+  private async handleAdminParseChangelog(request: Request): Promise<Response> {
+    if (!this.isAuthorizedAdmin(request)) {
+      return json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+    let body: { markdown?: string; markdownUrl?: string };
+    try {
+      body = await request.json();
+    } catch {
+      return json({ ok: false, error: "invalid_payload" }, { status: 400 });
+    }
+
+    let markdown = trimAndLimitString(body.markdown, 750_000);
+    let source: "manual" | "github" | "import" = "manual";
+    let markdownUrl: string | undefined;
+    if (!markdown && body.markdownUrl) {
+      markdownUrl = trimAndLimitString(body.markdownUrl, 600);
+      const fetched = await this.fetchMarkdownFromUrl(markdownUrl);
+      if (!fetched.ok) {
+        return json({ ok: false, error: fetched.error }, { status: 400 });
+      }
+      markdown = fetched.markdown;
+      source = "github";
+    }
+    if (!markdown) {
+      return json({ ok: false, error: "markdown_required" }, { status: 400 });
+    }
+
+    const parsed = parseUserFriendlyChangelogMarkdown(markdown);
+    const entries = toStructuredChangelogEntries(parsed, source, Date.now());
+    return json({
+      ok: true,
+      valid: parsed.errors.length === 0 && entries.length > 0,
+      errors: parsed.errors,
+      entries,
+      source,
+      markdownUrl: markdownUrl || null,
+    });
+  }
+
+  private async handleAdminChangelogHistory(request: Request): Promise<Response> {
+    if (!this.isAuthorizedAdmin(request)) {
+      return json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+    const revisions = [...(this.d.changelogRevisions || [])].sort((a, b) => b.createdAt - a.createdAt);
+    return json({
+      ok: true,
+      history: revisions,
+    });
+  }
+
+  private async handleAdminSaveChangelogRules(request: Request): Promise<Response> {
+    if (!this.isAuthorizedAdmin(request)) {
+      return json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+    let body: { rules?: unknown };
+    try {
+      body = await request.json();
+    } catch {
+      return json({ ok: false, error: "invalid_payload" }, { status: 400 });
+    }
+    const now = Date.now();
+    this.d.changelogConfig = {
+      ...this.d.changelogConfig,
+      rules: sanitizeNotificationRules(body.rules),
+      lastUpdated: now,
+    };
+    await this.persist();
+    return json(this.getAdminChangelogStatePayload());
+  }
+
+  private async handleAdminSaveChangelogDraft(request: Request): Promise<Response> {
+    if (!this.isAuthorizedAdmin(request)) {
+      return json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+    let body: { markdown?: unknown; markdownUrl?: unknown };
+    try {
+      body = await request.json();
+    } catch {
+      return json({ ok: false, error: "invalid_payload" }, { status: 400 });
+    }
+    const now = Date.now();
+    const parsed = await this.parseMarkdownToEntries({
+      markdown: body.markdown,
+      markdownUrl: body.markdownUrl,
+      now,
+    });
+    if (!parsed.ok) {
+      return json({ ok: false, error: parsed.error }, { status: parsed.status });
+    }
+
+    this.d.changelogDraft = {
+      markdown: parsed.markdown,
+      markdownUrl: parsed.markdownUrl,
+      entries: parsed.entries,
+      errors: parsed.errors.slice(0, 20),
+      valid: parsed.valid,
+      updatedAt: now,
+      source: parsed.source,
+    };
+    this.d.changelogConfig = {
+      ...this.d.changelogConfig,
+      markdownSourceUrl:
+        parsed.markdownUrl || this.d.changelogConfig.markdownSourceUrl || USER_FRIENDLY_CHANGELOG_GITHUB_URL,
+      markdownHelpUrl: this.d.changelogConfig.markdownHelpUrl || USER_FRIENDLY_CHANGELOG_GITHUB_URL,
+      lastParsedAt: now,
+      lastUpdated: now,
+    };
+    await this.persist();
+    return json(this.getAdminChangelogStatePayload());
+  }
+
+  private async handleAdminPublishChangelogDraft(request: Request): Promise<Response> {
+    if (!this.isAuthorizedAdmin(request)) {
+      return json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+    const mode = normalizeChangelogApplyMode(this.d.changelogConfig.applyMode);
+    if (mode !== "manual") {
+      return json({ ok: false, error: "manual_mode_required" }, { status: 409 });
+    }
+    if (!this.d.changelogDraft || this.d.changelogDraft.entries.length === 0) {
+      return json({ ok: false, error: "draft_missing" }, { status: 400 });
+    }
+    const now = Date.now();
+    const actor = trimAndLimitString(request.headers.get("CF-Connecting-IP") || "admin", 120) || "admin";
+    this.d.changelog = this.d.changelogDraft.entries;
+    const nextHash = computeChangelogLiveHash(this.d.changelog);
+    this.d.changelogConfig = {
+      ...this.d.changelogConfig,
+      applyMode: mode,
+      lastUpdated: now,
+      lastParsedAt: now,
+      liveHash: nextHash,
+    };
+    this.appendChangelogRevision({
+      id: `rev-${now}-${Math.floor(Math.random() * 1000000)}`,
+      source: this.d.changelogDraft.source === "github" ? "github" : "manual",
+      createdAt: now,
+      actor,
+      markdownUrl: this.d.changelogDraft.markdownUrl,
+      markdownLength: this.d.changelogDraft.markdown.length,
+      releases: this.d.changelog.length,
+      valid: this.d.changelogDraft.valid,
+      errors: this.d.changelogDraft.errors.length > 0 ? this.d.changelogDraft.errors.slice(0, 8) : undefined,
+    });
+    await this.persist();
+    return json(this.getAdminChangelogStatePayload());
+  }
+
+  private async handleAdminSetChangelogMode(request: Request): Promise<Response> {
+    if (!this.isAuthorizedAdmin(request)) {
+      return json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+    let body: {
+      applyMode?: unknown;
+      autoSyncEnabled?: unknown;
+      autoSyncIntervalMinutes?: unknown;
+      markdownSourceUrl?: unknown;
+    };
+    try {
+      body = await request.json();
+    } catch {
+      return json({ ok: false, error: "invalid_payload" }, { status: 400 });
+    }
+
+    const now = Date.now();
+    const applyMode = normalizeChangelogApplyMode(body.applyMode ?? this.d.changelogConfig.applyMode);
+    const explicitAutoSync = typeof body.autoSyncEnabled === "boolean" ? body.autoSyncEnabled : null;
+    const nextAutoSyncEnabled = applyMode === "auto_github"
+      ? explicitAutoSync ?? true
+      : false;
+    const autoSyncIntervalMinutes = normalizeAutoSyncIntervalMinutes(
+      body.autoSyncIntervalMinutes ?? this.d.changelogConfig.autoSyncIntervalMinutes,
+    );
+    const markdownSourceUrl =
+      trimAndLimitString(body.markdownSourceUrl, 600) ||
+      trimAndLimitString(this.d.changelogConfig.markdownSourceUrl, 600) ||
+      USER_FRIENDLY_CHANGELOG_GITHUB_URL;
+
+    this.d.changelogConfig = {
+      ...this.d.changelogConfig,
+      applyMode,
+      autoSyncEnabled: nextAutoSyncEnabled,
+      autoSyncIntervalMinutes,
+      markdownSourceUrl,
+      markdownHelpUrl: this.d.changelogConfig.markdownHelpUrl || USER_FRIENDLY_CHANGELOG_GITHUB_URL,
+      nextAutoSyncAt:
+        applyMode === "auto_github" && nextAutoSyncEnabled
+          ? now + autoSyncIntervalMinutes * 60_000
+          : undefined,
+      lastUpdated: now,
+    };
+    const changed = await this.ensureChangelogAutoSyncAlarm(now);
+    if (!changed && (applyMode !== "auto_github" || !nextAutoSyncEnabled)) {
+      this.d.changelogConfig.nextAutoSyncAt = undefined;
+    }
+    await this.persist();
+    return json(this.getAdminChangelogStatePayload());
+  }
+
+  private async handleAdminSyncChangelogNow(request: Request): Promise<Response> {
+    if (!this.isAuthorizedAdmin(request)) {
+      return json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+    const now = Date.now();
+    const actor = trimAndLimitString(request.headers.get("CF-Connecting-IP") || "admin", 120) || "admin";
+    const result = await this.applyAutoGithubSync({ now, actor, source: "manual" });
+    await this.ensureChangelogAutoSyncAlarm(now);
+    await this.persist();
+    if (!result.ok) {
+      const payload = this.getAdminChangelogStatePayload();
+      return json({ ...payload, ok: false, error: result.error || "sync_failed" }, { status: 400 });
+    }
+    const payload = this.getAdminChangelogStatePayload();
+    return json({ ...payload, ok: true, updated: result.updated });
   }
 
   /**
