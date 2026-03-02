@@ -168,8 +168,8 @@ importers:
         specifier: ^3.1.5
         version: 3.1.5
       svelte:
-        specifier: ^5.51.0
-        version: 5.53.1
+        specifier: ^5.53.5
+        version: 5.53.5
       svelte-check:
         specifier: ^4.3.6
         version: 4.4.3(picomatch@4.0.3)(svelte@5.53.1)(typescript@5.9.3)
