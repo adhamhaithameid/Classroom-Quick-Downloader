@@ -239,11 +239,10 @@
     color: var(--text);
   }
 
-  .header-actions {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    min-width: 200px;
+  .prv-banner-item p {
+    margin: 2px 0 0;
+    font-size: 13px; color: var(--text-secondary);
+    line-height: 1.5;
   }
 
   .action-btn {
