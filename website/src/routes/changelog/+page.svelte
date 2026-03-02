@@ -546,10 +546,12 @@
     align-items: center; flex-shrink: 0;
   }
 
-  /* ── Timeline ────────────────────── */
-  .timeline {
-    display: flex;
-    flex-direction: column;
+  .cl-dot {
+    width: 14px; height: 14px; border-radius: 50%;
+    border: 2.5px solid var(--green);
+    background: var(--green-bg);
+    flex-shrink: 0;
+    box-shadow: 0 0 0 4px rgba(26,139,85,0.06);
   }
 
   .entry {
