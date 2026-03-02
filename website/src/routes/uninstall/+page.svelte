@@ -714,9 +714,10 @@
     background: rgba(255, 255, 255, 0.65);
   }
 
-  .reinstall-row a:hover {
-    border-color: rgba(26, 139, 85, 0.25);
-    color: var(--gc-green);
+  .un-browser-icon {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
   }
 
   .reinstall-or {
