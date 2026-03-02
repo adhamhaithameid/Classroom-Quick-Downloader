@@ -40,9 +40,11 @@ export const privacyContent: ManualPrivacyContent = {
       summary:
         'We avoid collecting sensitive personal content and keep public data privacy-safe.',
       bullets: [
-        'No classroom document content is collected.',
-        'No account passwords are collected.',
-        'No raw IP lists are published in public website data.'
+        'No classroom document content, file names, or assignment text is collected.',
+        'No account passwords, emails, or Google credentials are accessed.',
+        'No raw IP lists are published in public website data.',
+        'No browsing history, search queries, or tab contents are tracked.',
+        'No personally identifiable information (PII) is ever stored.'
       ]
     },
     {
