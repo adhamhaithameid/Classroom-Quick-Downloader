@@ -1244,6 +1244,161 @@ func buildPublicWebsiteOverview(ctx context.Context, sqliteDB *sql.DB, store *co
 	}, nil
 }
 
+func buildPublicWebsiteMap(ctx context.Context, sqliteDB *sql.DB) (publicWebsiteMapResponse, error) {
+	rawTotals, err := loadTotals(ctx, sqliteDB)
+	if err != nil {
+		return publicWebsiteMapResponse{}, err
+	}
+
+	downloads := rawTotals["totalDownloads"]
+	countries := make([]publicWebsiteCountryCell, 0, len(rawTotals))
+
+	published, publishedErr := loadWebsitePublishedDataset(ctx, sqliteDB)
+	if publishedErr == nil && published.Active {
+		downloads = maxInt64(published.Downloads, 0)
+		countries = normalizeWebsiteCountryCells(published.Countries, 300)
+	} else {
+		for key, value := range rawTotals {
+			if !strings.HasPrefix(key, "country:") || value <= 0 {
+				continue
+			}
+			code := strings.ToUpper(strings.TrimSpace(strings.TrimPrefix(key, "country:")))
+			if code == "XX" || code == "UNKNOWN" || !isoCountryCodePattern.MatchString(code) {
+				continue
+			}
+			countries = append(countries, publicWebsiteCountryCell{
+				CountryCode: code,
+				Count:       value,
+			})
+		}
+		sort.Slice(countries, func(i, j int) bool {
+			if countries[i].Count == countries[j].Count {
+				return countries[i].CountryCode < countries[j].CountryCode
+			}
+			return countries[i].Count > countries[j].Count
+		})
+	}
+
+	return publicWebsiteMapResponse{
+		SchemaVersion: publicWebsiteSchemaVersion,
+		OK:            true,
+		GeneratedAt:   time.Now().UTC().UnixMilli(),
+		Granularity:   "country",
+		Countries:     countries,
+		Totals: publicWebsiteMapTotals{
+			Countries: len(countries),
+			Downloads: downloads,
+		},
+		PrivacyNote: "Country-level usage is aggregated without storing raw IP addresses. VPN/proxy users may appear at exit-node locations.",
+	}, nil
+}
+
+func defaultPublicWebsiteUserChangelogEntries() []publicWebsiteUserChangelogEntry {
+	mkTS := func(ms int64) *int64 {
+		v := ms
+		return &v
+	}
+
+	return []publicWebsiteUserChangelogEntry{
+		{
+			ID:      "release-138",
+			Version: "1.3.8",
+			Title:   "Reliable changelog delivery for all users",
+			Summary: "Changelog updates now re-open correctly even when the version number stays the same, so release communication remains accurate.",
+			Highlights: []string{
+				"Revision-aware changelog updates from Cloudflare to extension clients.",
+				"Improved version-pill behavior after same-version republish events.",
+				"Stronger sync consistency between dashboard publish and user-visible release notes.",
+			},
+			ReleasedAtUTC: mkTS(1772409600000), // 2026-03-02
+		},
+		{
+			ID:      "release-137",
+			Version: "1.3.7",
+			Title:   "Cleaner updates and smoother daily use",
+			Summary: "We improved release messaging and polished the core flow so classroom downloads feel simpler and more predictable.",
+			Highlights: []string{
+				"Clearer changelog wording focused on normal users.",
+				"Better stability when running large download batches.",
+				"UI polish across key website and extension touchpoints.",
+			},
+			ReleasedAtUTC: mkTS(1772236800000), // 2026-02-28
+		},
+		{
+			ID:      "release-136",
+			Version: "1.3.6",
+			Title:   "Stability and security improvements",
+			Summary: "This release improves reliability in real classroom usage and adds additional hardening under the hood.",
+			Highlights: []string{
+				"Fewer stuck-progress cases during heavy downloads.",
+				"Improved behavior after tab wakeups and network hiccups.",
+				"Extra hardening for safer extension operation.",
+			},
+			ReleasedAtUTC: mkTS(1771545600000), // 2026-02-20
+		},
+		{
+			ID:      "release-135",
+			Version: "1.3.5",
+			Title:   "Popup quality and interaction fixes",
+			Summary: "We refined popup behavior and tightened the user flow so actions feel faster and more consistent.",
+			Highlights: []string{
+				"Better keyboard interaction in popup controls.",
+				"Clearer live status while downloads run.",
+				"General bug fixes for day-to-day usage.",
+			},
+			ReleasedAtUTC: mkTS(1771459200000), // 2026-02-19
+		},
+		{
+			ID:      "release-134",
+			Version: "1.3.4",
+			Title:   "Compatibility and reliability pass",
+			Summary: "This update focuses on better compatibility with current browsers and steadier behavior across different classroom page types.",
+			Highlights: []string{
+				"Improved cross-browser consistency.",
+				"Safer request validation paths.",
+				"UI feedback polish in extension flows.",
+			},
+			ReleasedAtUTC: mkTS(1771372800000), // 2026-02-18
+		},
+		{
+			ID:      "release-133",
+			Version: "1.3.3",
+			Title:   "Performance and recovery updates",
+			Summary: "We reduced friction in high-volume sessions with faster queue handling and better recovery from interruptions.",
+			Highlights: []string{
+				"Faster start for multi-file downloads.",
+				"Better recovery after refreshes mid-run.",
+				"Reduced noisy errors in successful paths.",
+			},
+			ReleasedAtUTC: mkTS(1770854400000), // 2026-02-12
+		},
+		{
+			ID:      "release-132",
+			Version: "1.3.2",
+			Title:   "Tracking accuracy and backend polish",
+			Summary: "We improved internal tracking quality while keeping the same privacy-first model and no personal data collection.",
+			Highlights: []string{
+				"More accurate handling for partial/cancelled actions.",
+				"Smoother background sync behavior.",
+				"Better resilience in long-running sessions.",
+			},
+			ReleasedAtUTC: mkTS(1770508800000), // 2026-02-08
+		},
+		{
+			ID:      "release-131",
+			Version: "1.3.1",
+			Title:   "Foundation stability for the 1.3 line",
+			Summary: "The first wave of 1.3 improvements focused on reliability and responsiveness for classrooms with many attachments.",
+			Highlights: []string{
+				"Faster queue behavior in heavy courses.",
+				"Improved consistency on complex classroom pages.",
+				"General reliability and cleanup fixes.",
+			},
+			ReleasedAtUTC: mkTS(1770163200000), // 2026-02-04
+		},
+	}
+}
+
 func buildPublicWebsiteUserChangelog(ctx context.Context, store *controlPlaneStore) (publicWebsiteUserChangelogResponse, error) {
 	now := time.Now().UTC().UnixMilli()
 	fullURL := githubMarkdownURL("CHANGELOG.md")
