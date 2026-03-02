@@ -428,7 +428,6 @@ func PublicWebsiteStatusHandler(sqliteDB, postgresDB *sql.DB) http.HandlerFunc {
 }
 
 func PublicWebsiteUserChangelogHandler(sqliteDB, postgresDB *sql.DB) http.HandlerFunc {
-	store := newControlPlaneStore(sqliteDB, postgresDB)
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !preparePublicWebsiteCORSWithOptions(w, r, publicWebsiteCORSOptions{
 			AllowedMethods: "GET, OPTIONS",
