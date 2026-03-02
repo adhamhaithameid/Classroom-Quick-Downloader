@@ -105,16 +105,12 @@
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
-          if (entry.isIntersecting) {
-            if (!isInView) {
-              isInView = true;
-              hasAnimatedInView = true;
-              kickstart();
-            } else if (!priming) {
-              displayValue = value;
-            }
-          } else {
-            isInView = false;
+          if (!entry.isIntersecting) continue;
+          if (!hasAnimatedInView) {
+            hasAnimatedInView = true;
+            displayValue = 0;
+            animateTo(value);
+            observer.disconnect();
           }
         }
       },
