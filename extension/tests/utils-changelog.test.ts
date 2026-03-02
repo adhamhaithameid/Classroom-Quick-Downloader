@@ -84,7 +84,7 @@ describe('changelog utils', () => {
   it('handles latest change extraction and seen version tracking', async () => {
     const mod = await loadChangelogModule();
     expect(mod.getLatestChange(null)).toBeNull();
-    expect(mod.getLatestChange({ entries: [], config: { rules: [] }, lastFetched: Date.now() })).toBeNull();
+    expect(mod.getLatestChange({ entries: [], config: { rules: [] }, revisionToken: 'rev-empty', lastFetched: Date.now() })).toBeNull();
     expect(mod.getLatestChange({
       entries: [{ id: 'x', version: '1.0.0', date: '2026-01-01', changes: ['First change'] }],
       config: { rules: [] },
