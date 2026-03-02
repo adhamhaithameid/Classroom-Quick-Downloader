@@ -145,14 +145,9 @@
       }
     }
 
-  function formatDate(value: number | null): string {
-    if (!value) return 'Unknown';
-    return new Date(value).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      timeZone: 'UTC'
-    });
+    pushCurrent();
+    entries.sort((a, b) => semverCompareDesc(a.version, b.version));
+    return entries;
   }
 
   function formatDateShort(value: number | null): string {
