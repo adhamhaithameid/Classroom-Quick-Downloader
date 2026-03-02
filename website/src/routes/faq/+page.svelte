@@ -503,11 +503,53 @@
                 <h2>{section.title}</h2>
                 <p>{section.summary}</p>
               </div>
-              {#if openId === item.id}
-                <p class="faq-answer">{item.a}</p>
-              {/if}
-            </button>
-          {/each}
+
+            </header>
+
+            <div class="fq-list">
+              {#each section.items as item}
+                <button
+                  class="fq-item"
+                  class:open={openIds.has(item.id)}
+                  type="button"
+                  on:click={() => toggle(item.id)}
+                  aria-expanded={openIds.has(item.id)}
+                >
+                  <div class="fq-question">
+                    <span class="fq-q-text">{item.q}</span>
+                    <span class="fq-chevron" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        {#if openIds.has(item.id)}
+                          <line x1="5" y1="12" x2="19" y2="12" />
+                        {:else}
+                          <line x1="12" y1="5" x2="12" y2="19" />
+                          <line x1="5" y1="12" x2="19" y2="12" />
+                        {/if}
+                      </svg>
+                    </span>
+                  </div>
+                  {#if openIds.has(item.id)}
+                    <p class="fq-answer">{item.a}</p>
+                  {/if}
+                </button>
+              {/each}
+            </div>
+          </div>
+        {/each}
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="fq-cta-section">
+    <div class="fq-wrap">
+      <div class="fq-cta-card fq-reveal">
+        <h2>Still have questions?</h2>
+        <p>Reach out by email and we'll get back to you.</p>
+        <div class="fq-cta-actions">
+          <a class="fq-cta-btn fq-cta-primary" href="mailto:adhamhaithameid@gmail.com">
+            ✉️ Email us
+          </a>
         </div>
       </section>
     {/each}
