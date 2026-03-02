@@ -1515,7 +1515,14 @@ export default {
 
     // Admin endpoints (require session OR X-Admin-Secret - session injects secret for DO)
     if (
-      (pathname === "/admin/changelog" && request.method === "POST") ||
+      (pathname === "/admin/changelog" && (request.method === "POST" || request.method === "GET")) ||
+      (pathname === "/admin/changelog/parse" && request.method === "POST") ||
+      (pathname === "/admin/changelog/history" && request.method === "GET") ||
+      (pathname === "/admin/changelog/rules" && request.method === "POST") ||
+      (pathname === "/admin/changelog/draft" && request.method === "POST") ||
+      (pathname === "/admin/changelog/publish" && request.method === "POST") ||
+      (pathname === "/admin/changelog/mode" && request.method === "POST") ||
+      (pathname === "/admin/changelog/sync-now" && request.method === "POST") ||
       (pathname === "/debug/flush" && request.method === "POST") ||
       (pathname === "/debug/reset" && request.method === "POST") ||
       pathname === "/admin/force-flush" ||
