@@ -4377,7 +4377,7 @@ export class DownloadsDurable {
     await this.persist();
   }
 
-  private async handleDebugFlush(): Promise<Response> {
+  private async handleDebugFlush(request: Request): Promise<Response> {
     const before = this.d.buffer.length;
     return json({
       ok: true,
