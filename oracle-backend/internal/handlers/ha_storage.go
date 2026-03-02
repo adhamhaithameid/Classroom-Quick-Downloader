@@ -22,16 +22,19 @@ import (
 )
 
 const (
-	defaultStorageSampleInterval     = 10 * time.Second
-	defaultRetentionFailureDays      = 30
-	defaultRetentionOutboxDays       = 30
-	defaultRetentionLogsDays         = 90
-	defaultRetentionRawSnapshotsDays = 30
-	defaultRetentionBackupDays       = 180
-	defaultRetentionStorageDays      = 90
-	defaultRetentionAuthStaleDays    = 7
-	defaultDRPromotionLagSeconds     = 300
-	defaultBackpressureRetrySec      = 30
+	defaultStorageSampleInterval  = 10 * time.Second
+	defaultRetentionFailureDays   = 30
+	defaultRetentionOutboxDays    = 30
+	defaultRetentionLogsDays      = 90
+	defaultRetentionBackupDays    = 180
+	defaultRetentionStorageDays   = 90
+	defaultRetentionAuthStaleDays = 7
+	defaultDRPromotionLagSeconds  = 300
+	defaultBackpressureRetrySec   = 30
+	defaultSnapshotLagWarnMinutes = 195
+	defaultSnapshotLagCritMinutes = 390
+	defaultBackupExpectedMinutes  = 24 * 60
+	defaultSheetsExpectedMinutes  = 24 * 60
 )
 
 type StorageWatermarks struct {
