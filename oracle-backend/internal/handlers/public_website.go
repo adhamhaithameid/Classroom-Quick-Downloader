@@ -772,10 +772,11 @@ func PublicWebsiteUninstallHandler(sqliteDB *sql.DB) http.HandlerFunc {
 				})
 			}
 			writePublicWebsiteJSON(w, http.StatusCreated, publicWebsiteUninstallResponse{
-				OK:           true,
-				GeneratedAt:  now,
-				SubmissionID: submissionID,
-				Message:      "Thanks. Your feedback was submitted successfully.",
+				SchemaVersion: publicWebsiteSchemaVersion,
+				OK:            true,
+				GeneratedAt:   now,
+				SubmissionID:  submissionID,
+				Message:       "Thanks. Your feedback was submitted successfully.",
 			})
 			return
 		default:
