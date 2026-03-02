@@ -42,6 +42,196 @@ export interface ChangelogData {
 
 const STORAGE_KEY = 'cqd_changelog_v1';
 const CACHE_duration_MS = 0; // Always fetch on reload
+const SEEN_KEY = 'cqd_changelog_seen_v1';
+const FORCE_REFRESH_QUERY_KEY = '_';
+
+function normalizeStringList(value: unknown, maxItems = 24): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item): item is string => typeof item === 'string')
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, maxItems);
+}
+
+function toLegacyChanges(entry: {
+  summary?: string;
+  added?: string[];
+  changed?: string[];
+  fixed?: string[];
+  changes?: unknown;
+}): string[] {
+  const fallback = normalizeStringList(entry.changes, 40);
+  if (fallback.length > 0) return fallback;
+  const out: string[] = [];
+  const summary = (entry.summary || '').trim();
+  if (summary) out.push(`Summary: ${summary}`);
+  for (const row of normalizeStringList(entry.added, 20)) out.push(`Added: ${row}`);
+  for (const row of normalizeStringList(entry.changed, 20)) out.push(`Changed: ${row}`);
+  for (const row of normalizeStringList(entry.fixed, 20)) out.push(`Fixed: ${row}`);
+  return out;
+}
+
+function normalizeVersion(value: string): string {
+  return value.trim().replace(/^v/i, '');
+}
+
+function toFiniteInt(value: unknown): number | undefined {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return undefined;
+  return Math.floor(num);
+}
+
+function hashText(value: string): string {
+  let hash = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = ((hash << 5) - hash) + value.charCodeAt(i);
+    hash |= 0;
+  }
+  return (hash >>> 0).toString(16);
+}
+
+function normalizeRulePriority(value: unknown): NotificationRule['priority'] {
+  return value === 'minor' || value === 'major' ? value : 'normal';
+}
+
+function normalizeRuleEffect(value: unknown): NotificationRule['effect'] {
+  return value === 'glow' || value === 'pulse' ? value : 'none';
+}
+
+function normalizeRuleTarget(value: unknown): string {
+  if (typeof value !== 'string') return 'all';
+  const trimmed = value.trim();
+  if (!trimmed) return 'all';
+  if (trimmed.toLowerCase() === 'all') return 'all';
+  return normalizeVersion(trimmed);
+}
+
+function sanitizeRules(value: unknown): NotificationRule[] {
+  if (!Array.isArray(value)) return [];
+  const out: NotificationRule[] = [];
+  for (let i = 0; i < value.length; i += 1) {
+    const row = value[i] as Record<string, unknown> | null | undefined;
+    const idRaw = typeof row?.id === 'string' && row.id.trim()
+      ? row.id.trim()
+      : `rule-${i + 1}`;
+    out.push({
+      id: idRaw,
+      target: normalizeRuleTarget(row?.target),
+      priority: normalizeRulePriority(row?.priority),
+      effect: normalizeRuleEffect(row?.effect),
+    });
+  }
+  return out;
+}
+
+function sanitizeMeta(value: unknown): ChangelogMeta | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const row = value as Record<string, unknown>;
+  const liveUpdatedAt = toFiniteInt(row.liveUpdatedAt);
+  const lastAutoSyncAtRaw = row.lastAutoSyncAt;
+  const lastAutoSyncAt = lastAutoSyncAtRaw == null ? null : toFiniteInt(lastAutoSyncAtRaw) ?? null;
+  const applyMode = typeof row.applyMode === 'string' ? row.applyMode : undefined;
+  const lastAutoSyncStatus = typeof row.lastAutoSyncStatus === 'string' ? row.lastAutoSyncStatus : undefined;
+  if (
+    liveUpdatedAt === undefined &&
+    applyMode === undefined &&
+    lastAutoSyncStatus === undefined &&
+    lastAutoSyncAt === null
+  ) {
+    return undefined;
+  }
+  return {
+    liveUpdatedAt,
+    applyMode,
+    lastAutoSyncAt,
+    lastAutoSyncStatus,
+  };
+}
+
+function computeRevisionToken(entries: ChangelogEntry[], config: ChangelogConfig, meta?: ChangelogMeta): string {
+  const basis = {
+    configLastUpdated: toFiniteInt(config.lastUpdated) ?? null,
+    liveUpdatedAt: toFiniteInt(meta?.liveUpdatedAt) ?? null,
+    rules: config.rules.map((rule) => ({
+      target: normalizeRuleTarget(rule.target),
+      priority: normalizeRulePriority(rule.priority),
+      effect: normalizeRuleEffect(rule.effect),
+    })),
+    entries: entries.map((entry) => ({
+      id: entry.id,
+      version: normalizeVersion(entry.version),
+      date: entry.date,
+      summary: entry.summary || '',
+      changes: entry.changes,
+      added: entry.added || [],
+      changed: entry.changed || [],
+      fixed: entry.fixed || [],
+      markdown: entry.markdown || '',
+      isImportant: entry.isImportant === true,
+    })),
+  };
+  return `rev-${hashText(JSON.stringify(basis))}`;
+}
+
+function sanitizeCachedData(value: unknown): ChangelogData | null {
+  if (!value || typeof value !== 'object') return null;
+  const row = value as Record<string, unknown>;
+  const entriesRaw = Array.isArray(row.entries) ? row.entries : [];
+  const entries: ChangelogEntry[] = entriesRaw
+    .map((entryRaw, index): ChangelogEntry | null => {
+      const entry = entryRaw as Record<string, unknown> | null | undefined;
+      const versionRaw = typeof entry?.version === 'string' ? entry.version.trim() : '';
+      if (!versionRaw) return null;
+      const version = normalizeVersion(versionRaw);
+      const date = typeof entry?.date === 'string' ? entry.date : new Date().toISOString();
+      const id = typeof entry?.id === 'string' && entry.id.trim()
+        ? entry.id.trim()
+        : `cl-${version}-${Date.parse(date) || 0}-${index}`;
+      const added = normalizeStringList(entry?.added, 20);
+      const changed = normalizeStringList(entry?.changed, 20);
+      const fixed = normalizeStringList(entry?.fixed, 20);
+      const summary = typeof entry?.summary === 'string' ? entry.summary.trim() : '';
+      const markdown = typeof entry?.markdown === 'string' ? entry.markdown : '';
+      const parsedEntry: ChangelogEntry = {
+        id,
+        version,
+        date,
+        changes: toLegacyChanges({
+          summary,
+          added,
+          changed,
+          fixed,
+          changes: entry?.changes,
+        }),
+        added,
+        changed,
+        fixed,
+        isImportant: entry?.isImportant === true,
+      };
+      if (summary) parsedEntry.summary = summary;
+      if (markdown) parsedEntry.markdown = markdown;
+      return parsedEntry;
+    })
+    .filter((entry): entry is ChangelogEntry => entry !== null);
+  const configRaw = (row.config && typeof row.config === 'object') ? (row.config as Record<string, unknown>) : {};
+  const config: ChangelogConfig = {
+    rules: sanitizeRules(configRaw.rules),
+    lastUpdated: toFiniteInt(configRaw.lastUpdated),
+  };
+  const meta = sanitizeMeta(row.meta);
+  const lastFetched = toFiniteInt(row.lastFetched) ?? Date.now();
+  const revisionToken = typeof row.revisionToken === 'string' && row.revisionToken.trim()
+    ? row.revisionToken.trim()
+    : computeRevisionToken(entries, config, meta);
+  return {
+    entries,
+    config,
+    meta,
+    revisionToken,
+    lastFetched,
+  };
+}
 
 /**
  * Fetch changelog from storage or network.
