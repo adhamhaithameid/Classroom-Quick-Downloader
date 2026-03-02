@@ -499,7 +499,7 @@
         isCoasting = true;
         const coast = () => {
           if (Math.abs(v) < 0.5) { isCoasting = false; lastTime = 0; return; }
-          viewport.scrollLeft -= v;
+          offset += v;
           normalize();
           v *= 0.92;
           requestAnimationFrame(coast);
