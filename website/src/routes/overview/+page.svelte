@@ -1515,25 +1515,7 @@
 
   <!-- ━━━━ Features ━━━━ -->
   <section class="l2-block l2-block-alt l2-features-section l2-snap">
-    <div class="l2-wrap l2-reveal" style="position:relative">
-      <!-- Features doodles — shield (privacy) and code brackets (open source) -->
-      <!-- Features doodles — privacy shield with eye-crossed + code branch -->
-      <svg class="l2-doodle l2-doodle-features-1" viewBox="0 0 70 70" fill="none" aria-hidden="true">
-        <path d="M35 6L12 18v18c0 16 23 24 23 24s23-8 23-24V18L35 6z" stroke="var(--green)" stroke-width="1.5" opacity="0.15"/>
-        <ellipse cx="35" cy="34" rx="10" ry="6" stroke="var(--green)" stroke-width="1.2" opacity="0.15"/>
-        <circle cx="35" cy="34" r="3" stroke="var(--green)" stroke-width="1.2" opacity="0.12"/>
-        <line x1="24" y1="42" x2="46" y2="26" stroke="var(--green)" stroke-width="1.5" opacity="0.18" stroke-linecap="round"/>
-      </svg>
-      <svg class="l2-doodle l2-doodle-features-2" viewBox="0 0 60 60" fill="none" aria-hidden="true">
-        <circle cx="30" cy="10" r="4" stroke="var(--green)" stroke-width="1.5" opacity="0.15"/>
-        <line x1="30" y1="14" x2="30" y2="30" stroke="var(--green)" stroke-width="1.5" opacity="0.12"/>
-        <circle cx="18" cy="40" r="4" stroke="var(--green)" stroke-width="1.5" opacity="0.15"/>
-        <circle cx="42" cy="40" r="4" stroke="var(--green)" stroke-width="1.5" opacity="0.15"/>
-        <path d="M30 30l-12 10" stroke="var(--green)" stroke-width="1.5" opacity="0.12" stroke-linecap="round"/>
-        <path d="M30 30l12 10" stroke="var(--green)" stroke-width="1.5" opacity="0.12" stroke-linecap="round"/>
-        <circle cx="18" cy="54" r="4" stroke="var(--green)" stroke-width="1.5" opacity="0.10"/>
-        <line x1="18" y1="44" x2="18" y2="50" stroke="var(--green)" stroke-width="1.5" opacity="0.10"/>
-      </svg>
+    <div class="l2-wrap l2-reveal" data-placement-section="features" style="position:relative">
       <div class="l2-section-head">
         <span class="l2-label">WHY CLASSROOM QUICK DOWNLOADER</span>
         <h2>Built different.</h2>
