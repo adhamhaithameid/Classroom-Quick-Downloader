@@ -42,6 +42,11 @@ func csrfHeaderMiddleware(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
+		// Internal service endpoints use shared-secret auth and are non-browser.
+		if strings.HasPrefix(r.URL.Path, "/api/internal/") {
+			next.ServeHTTP(w, r)
+			return
+		}
 
 		if strings.HasPrefix(r.URL.Path, "/api/") {
 			switch r.Method {
