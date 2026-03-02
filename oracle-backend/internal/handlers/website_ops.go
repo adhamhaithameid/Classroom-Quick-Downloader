@@ -481,6 +481,26 @@ func insertWebsiteSyncBatch(
 	if db == nil {
 		return errors.New("database not available")
 	}
+	return insertWebsiteSyncBatchWithRunner(ctx, db, direction, batchID, triggeredBy, status, details, time.Now().UTC().UnixMilli())
+}
+
+type websiteSyncExecRunner interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+}
+
+func insertWebsiteSyncBatchWithRunner(
+	ctx context.Context,
+	runner websiteSyncExecRunner,
+	direction string,
+	batchID string,
+	triggeredBy string,
+	status string,
+	details any,
+	createdAt int64,
+) error {
+	if runner == nil {
+		return errors.New("exec runner not available")
+	}
 	if strings.TrimSpace(batchID) == "" {
 		batchID = newWebsiteBatchID(direction)
 	}
