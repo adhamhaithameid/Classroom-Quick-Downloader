@@ -382,11 +382,13 @@ export async function markAsSeen(version: string, data?: ChangelogData | null): 
 /**
  * Check if a version has been seen.
  */
-export async function isVersionSeen(version: string): Promise<boolean> {
-  if (!version) return false;
-  const data = await chrome.storage.local.get(SEEN_KEY);
-  const seen = (data[SEEN_KEY] as string[]) || [];
-  return seen.includes(version);
+export async function isVersionSeen(version: string, data?: ChangelogData | null): Promise<boolean> {
+  const normalizedVersion = normalizeVersion(version);
+  if (!normalizedVersion) return false;
+  const storage = await chrome.storage.local.get(SEEN_KEY);
+  const seen = migrateSeenState(storage[SEEN_KEY]);
+  if (!seen[normalizedVersion]) return false;
+  return seen[normalizedVersion] === getSeenToken(normalizedVersion, data);
 }
 
 /**
