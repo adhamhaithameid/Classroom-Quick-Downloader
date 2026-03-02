@@ -3411,14 +3411,11 @@
     overflow: visible;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.04);
   }
-  .l2-cta-content h2 {
-    font-size: clamp(32px, 4vw, 48px); font-weight: 900;
-    letter-spacing: -0.03em; margin: 0 0 16px;
-  }
-  .l2-cta-content p { font-size: 18px; color: var(--text-secondary); margin: 0 0 36px; }
-
-  /* Large decorative 3D SVG — centered clock above CTA heading */
-  .l2-cta-3d {
+  .l2-cta-content::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.08));
     pointer-events: none;
     z-index: 0;
     animation: cta-3d-float 8s ease-in-out infinite;
