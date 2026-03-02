@@ -333,7 +333,36 @@ export function getLatestChange(data: ChangelogData | null): string | null {
 
 type SeenState = Record<string, string>;
 
-const SEEN_KEY = 'cqd_changelog_seen_v1';
+function getSeenToken(version: string, data?: ChangelogData | null): string {
+  const normalizedVersion = normalizeVersion(version);
+  if (!normalizedVersion) return 'legacy';
+  if (!data) return 'legacy';
+  return `${normalizedVersion}::${data.revisionToken}`;
+}
+
+function migrateSeenState(raw: unknown): SeenState {
+  if (!raw) return {};
+  if (Array.isArray(raw)) {
+    const state: SeenState = {};
+    for (const item of raw) {
+      if (typeof item !== 'string') continue;
+      const version = normalizeVersion(item);
+      if (!version) continue;
+      state[version] = 'legacy';
+    }
+    return state;
+  }
+  if (typeof raw !== 'object') return {};
+  const row = raw as Record<string, unknown>;
+  const state: SeenState = {};
+  for (const [key, value] of Object.entries(row)) {
+    const version = normalizeVersion(key);
+    if (!version) continue;
+    if (typeof value !== 'string') continue;
+    state[version] = value.trim() || 'legacy';
+  }
+  return state;
+}
 
 /**
  * Mark the current version as seen.
