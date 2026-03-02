@@ -2556,7 +2556,6 @@
   .l2-mq-item { display: flex; align-items: baseline; gap: 8px; white-space: nowrap; }
   .l2-mq-num {
     font-size: 22px; font-weight: 800; color: var(--green);
-    font-variant-numeric: tabular-nums;
   }
   .l2-mq-label { font-size: 13px; font-weight: 500; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em; }
   .l2-mq-dot { color: var(--text-secondary); opacity: 0.72; font-size: 20px; }
