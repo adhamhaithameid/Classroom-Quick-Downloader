@@ -1313,17 +1313,7 @@
 
   <!-- ━━━━ Why Keep It ━━━━ -->
   <section class="l2-block l2-block-alt l2-students-section l2-snap">
-    <div class="l2-wrap l2-reveal" style="position:relative">
-      <!-- Students doodle — pencil -->
-      <!-- Students doodle — open notebook with pencil -->
-      <svg class="l2-doodle l2-doodle-students-1" viewBox="0 0 80 80" fill="none" aria-hidden="true">
-        <rect x="8" y="12" width="30" height="56" rx="2" stroke="var(--green)" stroke-width="1.5" opacity="0.15"/>
-        <rect x="38" y="12" width="30" height="56" rx="2" stroke="var(--green)" stroke-width="1.5" opacity="0.15"/>
-        <line x1="14" y1="24" x2="32" y2="24" stroke="var(--green)" stroke-width="1" opacity="0.12"/>
-        <line x1="14" y1="32" x2="30" y2="32" stroke="var(--green)" stroke-width="1" opacity="0.10"/>
-        <line x1="14" y1="40" x2="28" y2="40" stroke="var(--green)" stroke-width="1" opacity="0.08"/>
-        <path d="M60 8l-16 16-2 8 8-2 16-16z" stroke="var(--green)" stroke-width="1.5" opacity="0.18" stroke-linecap="round" stroke-linejoin="round" fill="var(--green)" fill-opacity="0.03"/>
-      </svg>
+    <div class="l2-wrap l2-reveal" data-placement-section="students" style="position:relative">
       <div class="l2-section-head l2-students-head">
         <span class="l2-label">WHY STUDENTS KEEP IT INSTALLED</span>
         <h2>It removes friction from real coursework.</h2>
