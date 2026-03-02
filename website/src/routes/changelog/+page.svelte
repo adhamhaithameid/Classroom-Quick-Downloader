@@ -382,14 +382,29 @@
     padding-bottom: 0;
   }
 
-  /* ── Header ──────────────────────── */
-  .changelog-header {
-    display: flex;
-    justify-content: space-between;
-    gap: 24px;
-    flex-wrap: wrap;
-    align-items: flex-start;
-    animation: riseIn 0.5s ease both;
+  .cl-wrap { max-width: var(--wrap); margin: 0 auto; padding: 0 24px; }
+
+  /* ── Decorative ────────────────── */
+  .cl-orbs { position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; z-index: 0; }
+  .orb { position: absolute; border-radius: 50%; filter: blur(120px); }
+  .orb-1 { width: 460px; height: 460px; background: #bbf7d0; top: -5%; right: -3%; opacity: 0.28; }
+  .orb-2 { width: 380px; height: 380px; background: #a5f3fc; top: 15%; left: -5%; opacity: 0.2; }
+  .orb-3 { width: 340px; height: 340px; background: #e0e7ff; top: 40%; right: 10%; opacity: 0.18; }
+  .orb-4 { width: 400px; height: 400px; background: #bbf7d0; top: 65%; left: 5%; opacity: 0.2; }
+  .orb-5 { width: 360px; height: 360px; background: #a5f3fc; top: 85%; right: 3%; opacity: 0.16; }
+
+  .cl-grid-bg {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none; z-index: 0; opacity: 0.03;
+    background-image: linear-gradient(var(--text) 1px, transparent 1px), linear-gradient(90deg, var(--text) 1px, transparent 1px);
+    background-size: 60px 60px;
+  }
+
+  /* ── Hero ───────────────────────── */
+  .cl-hero {
+    position: relative; z-index: 2;
+    text-align: center;
+    padding: 36px 24px 40px;
   }
 
   .header-left {
