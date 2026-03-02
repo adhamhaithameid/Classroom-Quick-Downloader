@@ -379,33 +379,12 @@ func PublicWebsiteMapHandler(sqliteDB, postgresDB *sql.DB) http.HandlerFunc {
 	}
 }
 
-		downloads := rawTotals["totalDownloads"]
-		countries := make([]publicWebsiteCountryCell, 0, len(rawTotals))
-
-		published, publishedErr := loadWebsitePublishedDataset(r.Context(), sqliteDB)
-		if publishedErr == nil && published.Active {
-			downloads = maxInt64(published.Downloads, 0)
-			countries = normalizeWebsiteCountryCells(published.Countries, 300)
-		} else {
-			for key, value := range rawTotals {
-				if !strings.HasPrefix(key, "country:") || value <= 0 {
-					continue
-				}
-				code := strings.ToUpper(strings.TrimSpace(strings.TrimPrefix(key, "country:")))
-				if code == "XX" || code == "UNKNOWN" || !isoCountryCodePattern.MatchString(code) {
-					continue
-				}
-				countries = append(countries, publicWebsiteCountryCell{
-					CountryCode: code,
-					Count:       value,
-				})
-			}
-			sort.Slice(countries, func(i, j int) bool {
-				if countries[i].Count == countries[j].Count {
-					return countries[i].CountryCode < countries[j].CountryCode
-				}
-				return countries[i].Count > countries[j].Count
-			})
+func PublicWebsiteSnapshotHandler(sqliteDB, postgresDB *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !preparePublicWebsiteCORSWithOptions(w, r, publicWebsiteCORSOptions{
+			AllowedMethods: "GET, OPTIONS",
+		}) {
+			return
 		}
 
 		payload := publicWebsiteMapResponse{
