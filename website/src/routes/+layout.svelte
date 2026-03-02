@@ -638,9 +638,12 @@
 
     .l2-nav-mobile-panel {
       display: block;
-      padding-top: 10px;
-      padding-bottom: 10px;
-      border-top: 1px solid var(--border);
+      margin: 10px 12px 0;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.96);
+      box-shadow: 0 12px 28px rgba(15, 20, 25, 0.08);
       animation: slideDown 0.2s ease;
     }
 
