@@ -837,6 +837,7 @@ function App() {
                   href={CHANGELOG_SITE_URL}
                   target="_blank"
                   rel="noopener noreferrer"
+                  onClick={handleChangelogWebsiteClick}
                   aria-label="Open changelog website"
                   className="cqd-cl-footer-link cqd-cl-footer-link-secondary"
                 >
