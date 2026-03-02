@@ -6001,30 +6001,13 @@ export function renderDashboard(stats: StatsResponse): string {
             btnSaveAll.classList.add("btn-loading");
             btnSaveAll.style.pointerEvents = "none";
           }
-          const text = document.getElementById("new-cl-changes").value.trim();
-          const editId = document.getElementById("edit-cl-id").value;
-          
-          if (ver && text) {
-            const changes = text.split("\\n").map(l => l.trim()).filter(Boolean);
-            
-            // Access raw stats to append/update
-            const statsEl = document.getElementById("raw-stats-json");
-            const currentEntries = statsEl ? (JSON.parse(statsEl.textContent).changelog || []) : [];
-            
-            if (editId) {
-               // UPDATE existing
-               const updated = currentEntries.map(e => e.id === editId ? { ...e, version: ver, changes } : e);
-               payload.changelog = updated;
-            } else {
-               // CREATE new
-               const newEntry = {
-                 id: crypto.randomUUID(),
-                 version: ver,
-                 date: new Date().toISOString(),
-                 changes: changes,
-                 isImportant: false
-               };
-               payload.changelog = [newEntry, ...currentEntries];
+          if (btnSaveText) btnSaveText.textContent = "Saving Draft...";
+          try {
+            let markdownText = markdownInputEl ? String(markdownInputEl.value || "").trim() : "";
+            const markdownUrl = markdownUrlInputEl ? String(markdownUrlInputEl.value || "").trim() : "";
+            if (!markdownText) {
+              markdownText = buildLegacyEditorMarkdown();
+              if (markdownInputEl && markdownText) markdownInputEl.value = markdownText;
             }
 
           } else if (ver || text) {
