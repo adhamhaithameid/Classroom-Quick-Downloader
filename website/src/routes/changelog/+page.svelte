@@ -592,20 +592,14 @@
     text-transform: uppercase;
   }
 
-  .entry-date {
-    display: block;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--muted);
-    margin-bottom: 2px;
+  .cl-entry-summary {
+    margin: 0 0 12px; color: var(--text-secondary);
+    line-height: 1.75; font-size: 14px;
   }
 
-  .entry-body h2 {
-    margin: 0;
-    font-size: 20px;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-    color: var(--text);
+  .cl-highlights {
+    margin: 0; padding: 0; list-style: none;
+    display: flex; flex-direction: column; gap: 6px;
   }
 
   .entry-body p {
