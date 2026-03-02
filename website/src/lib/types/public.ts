@@ -147,6 +147,11 @@ export type ChangelogResponse = {
     version: string;
     date: string;
     changes: string[];
+    summary?: string;
+    added?: string[];
+    changed?: string[];
+    fixed?: string[];
+    markdown?: string;
     isImportant?: boolean;
   }>;
 };
