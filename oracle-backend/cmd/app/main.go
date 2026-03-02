@@ -244,6 +244,8 @@ func main() {
 	mux.Handle("/api/public/website/status", handlers.PublicWebsiteStatusHandler(sqlDB, postgresDB))
 	mux.Handle("/api/public/website/changelog", handlers.PublicWebsiteUserChangelogHandler(sqlDB, postgresDB))
 	mux.Handle("/api/public/website/uninstall", handlers.PublicWebsiteUninstallHandler(sqlDB))
+	mux.Handle("/api/public/website/events", handlers.PublicWebsiteEventsHandler(sqlDB))
+	mux.Handle("/api/internal/website/events/batch", handlers.InternalWebsiteEventsBatchHandler(sqlDB, doSecret))
 
 	// Analytics API endpoints (protected by auth when DASHBOARD_PASSWORD is set).
 	setAuthStateDB(sqlDB)
