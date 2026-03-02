@@ -443,8 +443,79 @@ func TestWebsiteOpsForcePushAndOverrideHandlers(t *testing.T) {
 	if statePayload.Control.OverrideDownloads != 1777 {
 		t.Fatalf("expected override downloads=1777, got %d", statePayload.Control.OverrideDownloads)
 	}
-	if len(statePayload.Control.OverrideCountries) != 2 {
-		t.Fatalf("expected 2 override countries, got %+v", statePayload.Control.OverrideCountries)
+	if len(statePayload.Control.OverrideCountries) != 3 {
+		t.Fatalf("expected 3 override countries, got %+v", statePayload.Control.OverrideCountries)
+	}
+}
+
+func TestWebsiteOpsReconcileTotalsHandler(t *testing.T) {
+	sqlDB := openPublicWebsiteDB(t)
+
+	if _, err := sqlDB.Exec(`
+		INSERT INTO batches (batch_id, generated_at, ingested_at, time_zone, events_count, downloads_count, success_count, fail_count)
+		VALUES ('batch-reconcile', 1770000000000, 1770000001000, 'UTC', 40, 35, 30, 5)
+	`); err != nil {
+		t.Fatalf("seed batches failed: %v", err)
+	}
+	if _, err := sqlDB.Exec(`
+		INSERT INTO downloads_hourly (
+			bucket_start, bucket_end, total_events, total_downloads, total_success, total_fail,
+			by_status_json, by_type_json, by_browser_json, by_os_json, by_ext_ver_json, by_lang_json, by_country_json, by_error_type_json, batch_id
+		) VALUES (
+			'2026-02-27T00:00:00Z', '2026-02-27T01:00:00Z', 40, 35, 30, 5,
+			'{}', '{}', '{}', '{}', '{}', '{}', '{"US":20,"EG":15}', '{}', 'batch-reconcile'
+		)
+	`); err != nil {
+		t.Fatalf("seed downloads_hourly failed: %v", err)
+	}
+	if _, err := sqlDB.Exec(`
+		UPDATE website_sync_control
+		SET published_downloads = 10, published_countries_json = '[{"countryCode":"US","count":5}]', published_source = 'oracle', updated_at = ?
+		WHERE id = 1
+	`, time.Now().UTC().UnixMilli()); err != nil {
+		t.Fatalf("seed website_sync_control failed: %v", err)
+	}
+	_ = AppendAuditLog(
+		context.Background(),
+		sqlDB,
+		"website_dataset_monotonic_violation",
+		"website_sync",
+		"cloudflare",
+		"blocked",
+		map[string]any{"violations": []string{"downloads decreased (100 -> 90)"}},
+	)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/admin/website/reconcile-totals", nil)
+	rr := httptest.NewRecorder()
+	WebsiteOpsReconcileTotalsHandler(sqlDB).ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200 from reconcile totals, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	stateReq := httptest.NewRequest(http.MethodGet, "/api/admin/website/state", nil)
+	stateRR := httptest.NewRecorder()
+	WebsiteOpsStateHandler(sqlDB).ServeHTTP(stateRR, stateReq)
+	if stateRR.Code != http.StatusOK {
+		t.Fatalf("expected 200 from state, got %d: %s", stateRR.Code, stateRR.Body.String())
+	}
+	var payload struct {
+		Control struct {
+			PublishedSource    string `json:"publishedSource"`
+			PublishedDownloads int64  `json:"publishedDownloads"`
+		} `json:"control"`
+		Anomaly any `json:"anomaly"`
+	}
+	if err := json.Unmarshal(stateRR.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode state payload failed: %v", err)
+	}
+	if payload.Control.PublishedSource != "reconcile" {
+		t.Fatalf("expected published source 'reconcile', got %q", payload.Control.PublishedSource)
+	}
+	if payload.Control.PublishedDownloads < 35 {
+		t.Fatalf("expected published downloads >= 35, got %d", payload.Control.PublishedDownloads)
+	}
+	if payload.Anomaly != nil {
+		t.Fatalf("expected anomaly to be cleared after reconcile, got %+v", payload.Anomaly)
 	}
 }
 
