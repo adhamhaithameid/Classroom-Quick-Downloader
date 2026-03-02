@@ -1267,7 +1267,25 @@
     <div class="l2-wrap l2-hero-content">
       <h1 class="l2-mega">
         The free extension that<br/>
-        <span class="l2-em">supercharges</span><br/>Google Classroom.
+        <span class="l2-em l2-em-supercharge">supercharges{#if pinnedSuperchargeStar}{@const pinnedResolved = resolveSvg(pinnedSuperchargeStar)}{@const pinnedSize = Math.max(18, Math.min(54, pinnedSuperchargeStar.renderSize))}<span
+            class="l2-supercharge-star"
+            aria-hidden="true"
+            style="
+              width: {pinnedSize}px;
+              height: {pinnedSize}px;
+              opacity: {pinnedSuperchargeStar.renderOpacity};
+              color: {pinnedSuperchargeStar.renderColor};
+              transform: rotate({pinnedSuperchargeStar.renderRotate}deg);
+            "
+          ><svg
+              viewBox={pinnedResolved.viewBox}
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              style="width:100%;height:100%;"
+            >{@html pinnedResolved.svg}</svg></span>{/if}</span><br/>Google Classroom.
       </h1>
 
       <p class="l2-sub">
