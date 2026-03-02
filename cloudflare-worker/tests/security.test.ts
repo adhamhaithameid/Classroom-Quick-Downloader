@@ -1037,6 +1037,43 @@ describe("Durable Object security behaviors", () => {
     expect(deniedPayload.allowed).toBe(false);
   });
 
+  it("persists and exposes step-up bypass setting in allowlist endpoints", async () => {
+    const { obj } = makeDO();
+    const update = await callDO(obj, "/admin/ip-allowlist", {
+      enabled: true,
+      allowlist: ["10.0.0.0/8"],
+      stepUpBypassEnabled: false,
+    }, { "X-Admin-Secret": "secret" });
+    expect(update.status).toBe(200);
+    const updatePayload = await update.json() as { stepUpBypassEnabled?: boolean };
+    expect(updatePayload.stepUpBypassEnabled).toBe(false);
+
+    const read = await callDOGetWithAdmin(obj, "/admin/ip-allowlist");
+    expect(read.status).toBe(200);
+    const readPayload = await read.json() as { stepUpBypassEnabled?: boolean };
+    expect(readPayload.stepUpBypassEnabled).toBe(false);
+
+    const check = await callDO(obj, "/auth/check-ip-allowlist", { ip: "192.168.1.10" });
+    expect(check.status).toBe(200);
+    const checkPayload = await check.json() as { allowed?: boolean; stepUpBypassEnabled?: boolean };
+    expect(checkPayload.allowed).toBe(false);
+    expect(checkPayload.stepUpBypassEnabled).toBe(false);
+  });
+
+  it("records danger action audit entries for destructive admin actions", async () => {
+    const { obj, state } = makeDO();
+    const resetRes = await callDO(obj, "/debug/reset", {}, { "X-Admin-Secret": "secret" });
+    expect(resetRes.status).toBe(200);
+
+    const stored = await state.storage.get<StoredState>(STORAGE_KEY);
+    const entries = Array.isArray(stored?.dangerActionAuditLogs) ? stored?.dangerActionAuditLogs : [];
+    expect(entries.length).toBeGreaterThan(0);
+    const latest = entries[entries.length - 1] as Record<string, unknown>;
+    expect(typeof latest.action).toBe("string");
+    expect(typeof latest.correlationId).toBe("string");
+    expect(latest.path).toBe("/debug/reset");
+  });
+
   it("returns pipeline health status", async () => {
     const { obj } = makeDO();
     const res = await callDOGet(obj, "/pipeline-health");
