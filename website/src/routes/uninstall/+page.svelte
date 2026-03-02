@@ -720,11 +720,31 @@
     flex-shrink: 0;
   }
 
-  .reinstall-or {
-    color: var(--muted);
-    font-size: 12px;
-    font-weight: 500;
-    font-style: italic;
+  .un-reinstall-btn:hover {
+    border-color: var(--green-border);
+    color: var(--green);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.05);
+  }
+
+  .un-reinstall-btn.detected {
+    border-color: transparent;
+    background: var(--green);
+    color: #fff;
+    box-shadow: 0 4px 20px rgba(26, 139, 85, 0.25);
+  }
+
+  .un-reinstall-btn.detected:hover {
+    background: var(--green-light);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 28px rgba(26, 139, 85, 0.35);
+  }
+
+  .un-cta-divider {
+    width: 50px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(26, 139, 85, 0.18), transparent);
+    margin: 22px auto;
   }
 
   @media (max-width: 600px) {
