@@ -28,7 +28,7 @@ export const privacyContent: ManualPrivacyContent = {
       summary:
         'We collect aggregate usage signals to measure reliability and improve the extension over time.',
       bullets: [
-        'Download outcomes (success, fail, cancel) as counts.',
+        'Download outcomes (success, fail, cancel) as counts — never individual file details.',
         'Browser and extension version for compatibility tracking.',
         'Country-level activity trends for service quality monitoring.'
       ]
