@@ -187,6 +187,16 @@ type DurableStateShape = {
   lastHealthNotifyAt?: number | null;
 };
 
+type ChangelogDraftState = {
+  markdown: string;
+  markdownUrl?: string;
+  entries: ChangelogEntry[];
+  errors: string[];
+  valid: boolean;
+  updatedAt: number;
+  source: "manual" | "github" | "import";
+};
+
 type PendingOracleBatch = {
   batch: OracleBatch;
   weightedCount: number;
