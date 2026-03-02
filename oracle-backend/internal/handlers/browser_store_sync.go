@@ -521,6 +521,18 @@ func fetchAndParseStoreStats(ctx context.Context, client *http.Client, key, url 
 	if err := validateStoreURL(key, url); err != nil {
 		return storeStats{}, err
 	}
+	if key == "chrome" {
+		stats, err := fetchChromeStoreStatsByListingPage(ctx, client, url)
+		if err == nil {
+			return stats, nil
+		}
+	}
+	if key == "firefox" {
+		stats, err := fetchFirefoxStoreStatsByAPI(ctx, client, url)
+		if err == nil {
+			return stats, nil
+		}
+	}
 	if key == "edge" {
 		stats, err := fetchEdgeStoreStatsByDetailsAPI(ctx, client, url)
 		if err == nil {
