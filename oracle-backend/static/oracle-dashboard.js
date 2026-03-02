@@ -2788,39 +2788,10 @@
           } else if (!urlNode.value) {
             urlNode.value = 'https://raw.githubusercontent.com/adhamhaithameid/Classroom-Quick-Downloader/main/user-friendly-changelog.md';
           }
-          records.forEach(function(item) {
-            var d = item.data || {};
-            var highlights = Array.isArray(d.highlights) ? d.highlights : [];
-            var releasedAt = fmtUtcDateTimeFromMs(d.releasedAtUtc || 0);
-            var updatedAt = fmtUtcDateTimeFromMs(item.updatedAt || d.updatedAtUtc || 0);
-            html += '<div class="content-record-card">';
-            html += '<div class="content-record-head">';
-            html += '<div class="content-record-title">' + escapeHtml(d.version || item.recordKey || 'Untitled') + ' — ' + escapeHtml(d.title || 'Update') + '</div>';
-            html += '<span class="pill' + (item.isDefault ? '' : ' status-ok') + '">' + (item.isDefault ? 'starter' : 'saved') + '</span>';
-            html += '</div>';
-            html += '<div class="content-record-meta">Record key: ' + escapeHtml(item.recordKey || '') + '</div>';
-            html += '<div class="content-record-meta">Released (UTC): ' + escapeHtml(releasedAt) + '</div>';
-            html += '<div class="content-record-meta">Updated (UTC): ' + escapeHtml(updatedAt) + '</div>';
-            html += '<div class="content-record-summary">' + escapeHtml(String(d.summary || '').slice(0, 500)) + '</div>';
-            if (highlights.length) {
-              html += '<div class="pill-row">';
-              highlights.slice(0, 4).forEach(function(point) {
-                html += '<span class="pill">' + escapeHtml(String(point)) + '</span>';
-              });
-              html += '</div>';
-            }
-            html += '<div class="content-record-actions">';
-            if (!item.isDefault) {
-              html += '<button class="btn btn-danger" data-action="delete-user-changelog-record" data-record-key="' + escapeHtml(item.recordKey || '') + '">Delete</button>';
-            }
-            html += '</div>';
-            html += '</div>';
-          });
-          container.innerHTML = html;
-          await refreshUserChangelogPublicPreview();
-        } catch (e) {
-          container.innerHTML = '<div class="empty-state empty-state-danger">Failed to load user changelog entries.</div>';
-          await refreshUserChangelogPublicPreview();
+          setContentSyncStatus('user-changelog-source-status', 'loaded', false);
+        } catch (_) {
+          sourceNode.value = 'oracle';
+          setContentSyncStatus('user-changelog-source-status', 'failed to load source config', true);
         }
       }
 
