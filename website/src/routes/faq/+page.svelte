@@ -633,11 +633,28 @@
     display: block; margin-bottom: 12px;
   }
 
-  .faq-section-head h2 {
-    margin: 0;
-    font-size: 18px;
-    font-weight: 800;
-    letter-spacing: -0.015em;
+  /* ── Search + Controls ─────────── */
+  .fq-controls-section {
+    position: relative; z-index: 2;
+    padding: 16px 0 32px;
+  }
+
+  .fq-search-bar {
+    position: relative;
+    max-width: 640px; margin: 0 auto 20px;
+  }
+
+  .fq-search-icon {
+    position: absolute; left: 18px; top: 50%; transform: translateY(-50%);
+    width: 20px; height: 20px; color: var(--muted); pointer-events: none;
+  }
+
+  .fq-search-input {
+    width: 100%; padding: 16px 48px 16px 50px;
+    border-radius: 16px; font-size: 15px; font-weight: 500;
+    border: 1.5px solid var(--border-subtle);
+    background: rgba(255,255,255,0.7);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
     color: var(--text);
   }
 
