@@ -401,6 +401,9 @@
     if (!marqueeViewport) return undefined;
 
     const viewport = marqueeViewport;
+    const track = viewport.querySelector('.l2-marquee-track') as HTMLElement;
+    if (!track) return undefined;
+
     const duplicateSets = 8;
     const autoSpeed = 45; // px/s
     let isDragging = false;
