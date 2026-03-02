@@ -545,10 +545,9 @@
     font-family: var(--font-ui), sans-serif;
   }
 
-  .field select:focus {
-    outline: none;
-    border-color: var(--gc-green);
-    box-shadow: 0 0 0 3px rgba(26, 139, 85, 0.1);
+  .un-mini-icon {
+    font-size: 13px;
+    line-height: 1;
   }
 
   /* ── Notes ──────────────────────────── */
