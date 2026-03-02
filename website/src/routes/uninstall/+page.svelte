@@ -704,7 +704,7 @@
     justify-content: center;
     gap: 8px;
     text-decoration: none;
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 600;
     color: var(--text-secondary);
     border: 1px solid var(--border-subtle, rgba(226, 232, 240, 0.35));
