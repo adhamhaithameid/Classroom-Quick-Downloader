@@ -2348,8 +2348,8 @@
                 true
               );
             } else {
-              var tip = 'Commit: ' + data.message + ' - Deployed: ' + new Date(data.deployed_at).toLocaleString('en-US', { timeZone: 'UTC' });
-              setStatusUI('✅', data.commit, commitHref, tip, false);
+              var tip = 'Status: healthy deploy.\nCommit: ' + data.message + '\nDeployed (UTC): ' + new Date(data.deployed_at).toLocaleString('en-US', { timeZone: 'UTC' });
+              setStatusUI('✅', 'Live · ' + data.commit, commitHref, tip, false);
             }
           } else {
             setStatusUI('❓', 'Unknown', '', 'Deployment status unknown', false);
