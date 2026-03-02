@@ -4253,6 +4253,13 @@
           ['website-sync-reconcile-btn', websiteSyncReconcileTotals],
           ['website-sync-oneam-save-btn', websiteSyncSaveOneAM],
           ['website-sync-override-save-btn', websiteSyncSaveOverride],
+          ['website-analysis-refresh-btn', loadWebsiteAnalytics],
+          ['website-analysis-sync-traffic-btn', websiteTrafficSyncNow],
+          ['website-analysis-export-json-btn', function() {
+            var out = document.getElementById('website-analysis-output');
+            if (!out || !out.textContent) return;
+            copyText(out.textContent);
+          }],
           ['user-changelog-refresh-btn', loadUserChangelogRecords],
           ['logs-refresh-btn', loadOracleLogs],
           ['logs-dry-run-delete-btn', function() { oracleLogsDeleteOlder(true); }],
