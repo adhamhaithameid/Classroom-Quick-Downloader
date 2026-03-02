@@ -11,6 +11,12 @@ Use this document for both:
 1. one-time setup
 2. daily/manual deployments
 
+Related operator documents:
+
+- `/Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/docs/RUNBOOK_DEPLOYMENT.md`
+- `/Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/docs/RUNBOOK_INCIDENT_RESPONSE.md`
+- `/Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/docs/DATA_FLOW_WORKER_ORACLE_WEBSITE.md`
+
 ## 1) Production Architecture
 
 - Oracle VM runs Docker container `cqd-oracle-backend` on port `8080`.
