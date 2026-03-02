@@ -4292,6 +4292,15 @@
           });
         });
 
+        var websiteAnalysisBtn = document.getElementById('infra-link-website-analysis');
+        if (websiteAnalysisBtn && websiteAnalysisBtn.dataset.boundClick !== '1') {
+          websiteAnalysisBtn.dataset.boundClick = '1';
+          websiteAnalysisBtn.addEventListener('click', function(ev) {
+            ev.preventDefault();
+            showPage('website-analysis');
+          });
+        }
+
         [
           ['creative-email-template-form', saveCreativeEmailTemplate],
           ['newsletter-subscriber-form', saveNewsletterSubscriber],
