@@ -302,8 +302,9 @@ pnpm -C cloudflare-worker run deploy
 ```bash
 cd /Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader
 PUBLIC_BASE_PATH='' \
-PUBLIC_ORACLE_API_BASE_URL='https://cqd-analytics.adhamhaithameid.workers.dev' \
-PUBLIC_SITE_URL='https://classroom-quick-downloader-website.pages.dev' \
+PUBLIC_ORACLE_API_BASE_URL='https://<your-oracle-public-https-domain>' \
+PUBLIC_WORKER_BASE_URL='https://cqd-analytics.adhamhaithameid.workers.dev' \
+PUBLIC_SITE_URL='https://<your-root-domain>' \
 pnpm -C website build
 
 # Preview branch deploy:
