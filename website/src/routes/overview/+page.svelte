@@ -1503,7 +1503,7 @@
         {#if mediaExpanded === 'problem-video'}
           <MediaLoader type="video" src="{base}/videos/problem.mp4" class="l2-media-modal-content" autoplay loop muted playsinline />
         {:else if mediaExpanded === 'solution-video'}
-          <video class="l2-media-modal-content" autoplay loop muted playsinline><source src="{base}/videos/solution.mp4" type="video/mp4" /></video>
+          <MediaLoader type="video" src="{base}/videos/solution.mp4" class="l2-media-modal-content" autoplay loop muted playsinline />
         {:else if mediaExpanded === 'problem-flags'}
           <img class="l2-media-modal-content" src="{base}/images/problem-flags.png" alt="Expanded view" />
         {:else if mediaExpanded === 'solution-flags'}
