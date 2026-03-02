@@ -282,13 +282,10 @@
     background: rgba(255, 255, 255, 0.65);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius);
-    background: rgba(255, 255, 255, 0.55);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    padding: 28px;
-    animation: slideUp 0.5s ease both;
-    opacity: 0;
-    transition: all 0.3s ease;
+    padding: 28px 24px;
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .privacy-section:hover {
