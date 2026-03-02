@@ -578,3 +578,81 @@ pnpm --filter cloudflare-worker test && \
 | `verify_oracle.sh` | Go vet + tests + Docker build |
 | `oracle-backend/scripts/deploy_main_inplace.sh` | In-place Oracle production deploy with rollback image tag |
 | `deploy_manual.sh` | One-command manual deploy wrapper (`cloudflare`, `oracle`, `all`) |
+
+---
+
+## Runbook Validation Suite (Phase 11)
+
+Use this section to validate that deployment/incident/data-flow runbooks are still accurate.
+
+Related docs:
+
+- `/Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/docs/RUNBOOK_DEPLOYMENT.md`
+- `/Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/docs/RUNBOOK_INCIDENT_RESPONSE.md`
+- `/Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/docs/DATA_FLOW_WORKER_ORACLE_WEBSITE.md`
+- `/Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/docs/DEPLOYMENT_RUNBOOK.md`
+
+### A. Command Accuracy Check
+
+```bash
+cd /Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader
+bash tools/check_schema_compat.sh
+pnpm -C cloudflare-worker test:smoke
+pnpm -C website test:smoke
+cd oracle-backend && go test ./... && cd ..
+```
+
+Expected output:
+
+- schema check prints `Schema compatibility check passed (version=1)`
+- test suites complete with pass counts and no failures
+
+### B. Data-Flow Smoke Check
+
+```bash
+WORKER_BASE=\"https://cqd-analytics.adhamhaithameid.workers.dev\"
+SITE_ORIGIN=\"https://<your-root-domain>\"
+
+curl -fsS \"${WORKER_BASE}/health\"
+curl -fsS \"${WORKER_BASE}/api/public/website/snapshot\"
+curl -fsS -X POST \"${WORKER_BASE}/api/public/website/events\" \
+  -H \"Origin: ${SITE_ORIGIN}\" \
+  -H 'Content-Type: application/json' \
+  -H 'X-Requested-With: XMLHttpRequest' \
+  -d '{\"schemaVersion\":\"1\",\"sessionId\":\"testing-smoke\",\"pagePath\":\"/testing\",\"events\":[{\"eventId\":\"testing-smoke-1\",\"eventType\":\"cta\",\"action\":\"install_click\",\"placement\":\"hero_install\"}]}'
+```
+
+Expected output:
+
+- `/health` returns `200`
+- snapshot response includes `schemaVersion: \"1\"`
+- ingest response includes `ok: true`
+
+### C. Replay/Recovery Procedure Check
+
+```bash
+curl -fsS https://cqd-analytics.adhamhaithameid.workers.dev/admin/website/status \
+  -H 'X-Admin-Secret: <DO_SHARED_SECRET>'
+curl -fsS -X POST https://cqd-analytics.adhamhaithameid.workers.dev/admin/website/replay-dlq \
+  -H 'Content-Type: application/json' \
+  -H 'X-Admin-Secret: <DO_SHARED_SECRET>' \
+  -d '{\"limit\":25}'
+curl -fsS -X POST https://cqd-analytics.adhamhaithameid.workers.dev/admin/website/flush-now \
+  -H 'X-Admin-Secret: <DO_SHARED_SECRET>'
+```
+
+Expected output:
+
+- status payload includes queue and dead-letter fields
+- replay/flush endpoints return `ok: true`
+
+### D. Security Containment Drill (Procedure Validation)
+
+This is a procedural test. Do not run in production without change control.
+
+Checklist:
+
+1. Verify runbook paths resolve and are current.
+2. Verify secret rotation commands execute in staging.
+3. Verify rollback commands are executable and known-good SHA is available.
+4. Verify post-rollback smoke checks pass.
