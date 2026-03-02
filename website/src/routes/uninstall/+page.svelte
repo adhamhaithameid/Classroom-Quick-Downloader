@@ -518,7 +518,26 @@
     font-size: 13px;
     font-weight: 700;
     color: var(--text);
-    font-size: 14px;
+    margin-bottom: 10px;
+    letter-spacing: -0.01em;
+  }
+
+  /* ── Inline mini pills ─────────── */
+  .un-inline-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .un-mini-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    border: 1.5px solid var(--border-subtle);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.8);
+    padding: 8px 16px;
+    color: var(--text-secondary);
     cursor: pointer;
     transition: all 0.2s ease;
     -webkit-appearance: none;
