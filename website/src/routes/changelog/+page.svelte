@@ -570,13 +570,10 @@
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  .dot {
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    border: 2.5px solid var(--gc-green);
-    background: var(--gc-green-bg);
-    flex-shrink: 0;
+  .cl-entry-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--green-border);
+    box-shadow: 0 8px 28px rgba(0,0,0,0.06);
   }
 
   .line {
