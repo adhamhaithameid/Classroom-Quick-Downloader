@@ -155,6 +155,24 @@ func TestSanitizeLogValue_ReplacesNewLines(t *testing.T) {
 	}
 }
 
+func TestResolveSheetsIDFromEnv_Fallbacks(t *testing.T) {
+	t.Setenv("SHEETS_ID", "")
+	t.Setenv("GOOGLE_SHEETS_ID", "")
+	t.Setenv("GOOGLE_SHEETS_URL", "https://docs.google.com/spreadsheets/d/1ptzLKUVnAkyXnT635Zgb1C6Img9aeAZ1se3nRz_QZmI/edit#gid=0")
+	t.Setenv("SHEETS_URL", "")
+	got := resolveSheetsIDFromEnv()
+	if got != "1ptzLKUVnAkyXnT635Zgb1C6Img9aeAZ1se3nRz_QZmI" {
+		t.Fatalf("expected sheet id to be parsed from URL, got %q", got)
+	}
+
+	t.Setenv("GOOGLE_SHEETS_URL", "")
+	t.Setenv("GOOGLE_SHEETS_ID", "sheet-direct-id-1234567890123456")
+	got = resolveSheetsIDFromEnv()
+	if got != "sheet-direct-id-1234567890123456" {
+		t.Fatalf("expected sheet id from GOOGLE_SHEETS_ID, got %q", got)
+	}
+}
+
 func TestStartInMemoryStoreCleanupLoop_StopsOnCancel(t *testing.T) {
 	now := time.Now()
 	sessionStore.Lock()
