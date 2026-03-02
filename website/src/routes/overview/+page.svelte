@@ -3427,6 +3427,7 @@
     font-size: clamp(32px, 4vw, 48px); font-weight: 900;
     letter-spacing: -0.03em; margin: 0 0 16px;
   }
+  .l2-cta-content p { font-size: 18px; color: var(--text-secondary); margin: 0 0 36px; }
 
   /* ── Reveal Animations ─────────────── */
   .l2-reveal {
