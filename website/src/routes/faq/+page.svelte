@@ -479,29 +479,29 @@
         {/if}
       </div>
 
-  <div class="faq-sections">
-    {#each sections as section}
-      <section class="faq-section">
-        <header class="faq-section-head">
-          <span class="faq-section-icon">{section.icon}</span>
-          <div>
-            <h2>{section.title}</h2>
-            <p>{section.summary}</p>
-          </div>
-        </header>
 
-        <div class="faq-list">
-          {#each section.items as item}
-            <button
-              class="faq-item"
-              class:open={openId === item.id}
-              type="button"
-              on:click={() => toggle(item.id)}
-              aria-expanded={openId === item.id}
-            >
-              <div class="faq-question">
-                <span class="faq-q-text">{item.q}</span>
-                <span class="faq-chevron" aria-hidden="true">{openId === item.id ? '−' : '+'}</span>
+    </div>
+  </section>
+
+  <!-- FAQ Sections -->
+  <section class="fq-body-section">
+    <div class="fq-wrap">
+      {#if filteredSections.length === 0}
+        <div class="fq-empty fq-reveal">
+          <span class="fq-empty-icon">🔍</span>
+          <h3>No results for "{searchQuery}"</h3>
+          <p>Try different keywords or <button type="button" class="fq-clear-link" on:click={clearSearch}>clear your search</button>.</p>
+        </div>
+      {/if}
+
+      <div class="fq-sections">
+        {#each filteredSections as section, sIdx}
+          <div class="fq-section fq-reveal" style="animation-delay: {sIdx * 0.05}s">
+            <header class="fq-section-head">
+              <span class="fq-section-icon">{section.icon}</span>
+              <div>
+                <h2>{section.title}</h2>
+                <p>{section.summary}</p>
               </div>
               {#if openId === item.id}
                 <p class="faq-answer">{item.a}</p>
