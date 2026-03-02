@@ -268,4 +268,92 @@ describe('extension <-> cloudflare integration', () => {
     expect(fetchSpy).toHaveBeenCalled();
     expect(String(fetchSpy.mock.calls[0]?.[0])).toContain('/config');
   });
+
+  it('pulls /changelog from cloudflare DO, applies notification rules, and re-opens on same-version updates', async () => {
+    const { durable, changelog, fetchSpy } = await buildIntegrationContext();
+
+    const adminRes = await durable.fetch(new Request('https://do/admin/changelog', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Admin-Secret': 'secret',
+      },
+      body: JSON.stringify({
+        changelog: [
+          {
+            id: 'release-138',
+            version: '1.3.8',
+            date: '2026-03-02T00:00:00.000Z',
+            changes: [
+              'Live changelog payload from DO',
+            ],
+          },
+        ],
+        config: {
+          rules: [
+            {
+              id: 'rule-138',
+              target: '1.3.8',
+              priority: 'major',
+              effect: 'pulse',
+            },
+          ],
+        },
+      }),
+    }));
+    expect(adminRes.status).toBe(200);
+
+    const data = await changelog.fetchChangelog(true);
+    expect(data?.entries.length).toBeGreaterThan(0);
+    expect(data?.entries[0]?.version).toBe('1.3.8');
+    expect(data?.entries[0]?.changes[0]).toContain('Live changelog payload');
+    expect(data?.revisionToken).toBeTruthy();
+
+    const rule = changelog.getMatchingRule(data?.config, '1.3.8');
+    expect(rule?.priority).toBe('major');
+    expect(rule?.effect).toBe('pulse');
+    expect(changelog.getRuleClasses(rule, false)).toContain('cqd-pill-major');
+    await changelog.markAsSeen('1.3.8', data);
+    expect(await changelog.isVersionSeen('1.3.8', data)).toBe(true);
+
+    const republishRes = await durable.fetch(new Request('https://do/admin/changelog', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Admin-Secret': 'secret',
+      },
+      body: JSON.stringify({
+        changelog: [
+          {
+            id: 'release-138',
+            version: '1.3.8',
+            date: '2026-03-02T00:00:00.000Z',
+            changes: [
+              'Updated payload for same version',
+            ],
+          },
+        ],
+        config: {
+          rules: [
+            {
+              id: 'rule-138',
+              target: '1.3.8',
+              priority: 'major',
+              effect: 'pulse',
+            },
+          ],
+        },
+      }),
+    }));
+    expect(republishRes.status).toBe(200);
+
+    const updated = await changelog.fetchChangelog(true);
+    expect(updated?.revisionToken).toBeTruthy();
+    expect(updated?.revisionToken).not.toBe(data?.revisionToken);
+    expect(updated?.entries[0]?.changes[0]).toContain('Updated payload for same version');
+    expect(await changelog.isVersionSeen('1.3.8', updated)).toBe(false);
+
+    expect(fetchSpy).toHaveBeenCalled();
+    expect(fetchSpy.mock.calls.some((call) => String(call[0]).includes('/changelog'))).toBe(true);
+  });
 });
