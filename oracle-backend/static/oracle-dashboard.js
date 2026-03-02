@@ -4064,6 +4064,7 @@
         { combo: 'Cmd/Ctrl+2', desc: 'Go to Activity & Charts', run: function () { showPage('activity'); } },
         { combo: 'Cmd/Ctrl+3', desc: 'Go to Ops Hub', run: function() { showPage('dashboards'); } },
         { combo: 'Cmd/Ctrl+8', desc: 'Go to Website Sync', run: function() { showPage('website-sync'); } },
+        { combo: 'Cmd/Ctrl+6', desc: 'Go to Website Analysis', run: function() { showPage('website-analysis'); } },
         { combo: 'Cmd/Ctrl+4', desc: 'Go to Creative Hub', run: function () { showPage('creative'); } },
         { combo: 'Cmd/Ctrl+5', desc: 'Go to User Changelog', run: function () { showPage('content-changelog'); } },
         { combo: 'Cmd/Ctrl+7', desc: 'Go to Logs', run: function () { showPage('logs'); } },
