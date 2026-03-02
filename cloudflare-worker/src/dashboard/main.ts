@@ -6009,11 +6009,26 @@ export function renderDashboard(stats: StatsResponse): string {
               markdownText = buildLegacyEditorMarkdown();
               if (markdownInputEl && markdownText) markdownInputEl.value = markdownText;
             }
-
-          } else if (ver || text) {
-             if (!confirm("Release fields are partially filled but will NOT be saved. Proceed with saving ONLY config?")) {
-               return;
-             }
+            if (!markdownText && !markdownUrl) {
+              setChangelogActionStatus("Provide markdown or markdown URL first.", "err");
+              return;
+            }
+            const payload = {};
+            if (markdownText) payload.markdown = markdownText;
+            if (markdownUrl) payload.markdownUrl = markdownUrl;
+            const data = await callChangelogAdmin("/admin/changelog/draft", payload);
+            syncChangelogUiFromState(data);
+            await loadChangelogHistory();
+            setChangelogActionStatus("Draft saved", "ok");
+          } catch (error) {
+            const msg = error instanceof Error ? error.message : "draft_save_failed";
+            setChangelogActionStatus("Draft save failed: " + msg, "err");
+          } finally {
+            if (btnSaveAll) {
+              btnSaveAll.classList.remove("btn-loading");
+              btnSaveAll.style.pointerEvents = "";
+            }
+            if (btnSaveText) btnSaveText.textContent = "Save Draft";
           }
 
           sendChangelogUpdate(payload);
