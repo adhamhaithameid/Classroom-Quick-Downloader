@@ -110,7 +110,7 @@ Known caveat:
 ```
 Classroom-Quick-Downloader/
 ├── extension/                  # Browser extension (TypeScript / WXT)
-│   ├── tests/                  # 43 Vitest test files
+│   ├── tests/                  # 47 Vitest test files
 │   ├── vitest.config.ts        # Vitest config with 3 coverage profiles
 │   └── package.json            # Test scripts
 ├── cloudflare-worker/          # Edge analytics & dashboard (TypeScript)
