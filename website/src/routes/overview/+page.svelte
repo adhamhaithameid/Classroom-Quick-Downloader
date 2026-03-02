@@ -435,7 +435,7 @@
     };
 
     const normalize = () => {
-      const setW = viewport.scrollWidth / duplicateSets;
+      const setW = getSetWidth();
       if (setW <= 0) return;
       if (viewport.scrollLeft >= setW * 6) viewport.scrollLeft -= setW;
       if (viewport.scrollLeft <= setW) viewport.scrollLeft += setW;
