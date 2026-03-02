@@ -457,7 +457,7 @@ export async function fetchWebsiteSnapshotResult(options: { force?: boolean } = 
     cachedSnapshot = snapshot;
     cachedSnapshotSource = 'memory-cache';
     writeSnapshotToStorage(snapshot);
-    return snapshot;
+    return buildSnapshotFetchResult(snapshot, 'oracle', false, null);
   })()
     .catch((error) => {
       if (cachedSnapshot) return cachedSnapshot;
