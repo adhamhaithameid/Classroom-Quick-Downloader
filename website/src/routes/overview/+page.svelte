@@ -1549,14 +1549,7 @@
 
   <!-- ━━━━ Social Proof ━━━━ -->
   <section class="l2-block l2-block-alt l2-snap">
-    <div class="l2-wrap l2-reveal" style="position:relative">
-      <!-- Proof doodle — trophy -->
-      <!-- Proof doodle — star trophy badge -->
-      <svg class="l2-doodle l2-doodle-proof-1" viewBox="0 0 80 80" fill="none" aria-hidden="true">
-        <path d="M40 8l6 14h15l-12 10 5 14-14-8-14 8 5-14-12-10h15z" stroke="var(--green)" stroke-width="1.5" opacity="0.15" fill="var(--green)" fill-opacity="0.03" stroke-linejoin="round"/>
-        <circle cx="40" cy="28" r="20" stroke="var(--green)" stroke-width="1" opacity="0.06" stroke-dasharray="4 3"/>
-        <path d="M30 56h20M35 56v10M45 56v10M32 66h16" stroke="var(--green)" stroke-width="1.2" opacity="0.12" stroke-linecap="round"/>
-      </svg>
+    <div class="l2-wrap l2-reveal" data-placement-section="proof" style="position:relative">
       <div class="l2-section-head">
         <span class="l2-label">TRUSTED WORLDWIDE</span>
         <h2>Used in <AnimatedNumber value={countryCount} suffix="+" animated /> countries.</h2>
