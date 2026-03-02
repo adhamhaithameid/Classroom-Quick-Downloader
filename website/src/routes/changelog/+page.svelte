@@ -18,6 +18,132 @@
   let state: 'loading' | 'ready' | 'error' = 'loading';
   let error = '';
   let refreshing = false;
+  let degraded = false;
+  let lastLoadedAtUtc: number | null = null;
+  /** Tracks whether the current data came from the Worker API or the GitHub fallback. */
+  let dataSource: 'worker' | 'github' | null = null;
+
+  function semverCompareDesc(a: string, b: string): number {
+    const aParts = a.split('.').map((part) => Number.parseInt(part, 10) || 0);
+    const bParts = b.split('.').map((part) => Number.parseInt(part, 10) || 0);
+    const maxLength = Math.max(aParts.length, bParts.length);
+    for (let i = 0; i < maxLength; i += 1) {
+      const diff = (bParts[i] ?? 0) - (aParts[i] ?? 0);
+      if (diff !== 0) return diff;
+    }
+    return 0;
+  }
+
+  /**
+   * Convert Worker API response entries into the ChangelogMdEntry format used by the template.
+   */
+  function workerEntriesToMdEntries(
+    entries: Array<{
+      version: string;
+      summary?: string;
+      added?: string[];
+      changed?: string[];
+      fixed?: string[];
+      changes?: string[];
+    }>
+  ): ChangelogMdEntry[] {
+    return entries
+      .map((entry) => {
+        const version = (entry.version || '').replace(/^v/i, '').trim();
+        if (!version) return null;
+
+        // Build summary from explicit summary field, or first change entry
+        let summary = (entry.summary || '').trim();
+        if (!summary && Array.isArray(entry.changes) && entry.changes.length > 0) {
+          const first = entry.changes[0] || '';
+          summary = first.replace(/^Summary:\s*/i, '').trim();
+        }
+
+        return {
+          version,
+          summary: summary || 'No summary available.',
+          added: Array.isArray(entry.added) ? entry.added.filter((s) => typeof s === 'string' && s.trim()) : [],
+          changed: Array.isArray(entry.changed) ? entry.changed.filter((s) => typeof s === 'string' && s.trim()) : [],
+          fixed: Array.isArray(entry.fixed) ? entry.fixed.filter((s) => typeof s === 'string' && s.trim()) : []
+        };
+      })
+      .filter((entry): entry is ChangelogMdEntry => entry !== null);
+  }
+
+  /**
+   * Parse raw GitHub markdown into ChangelogMdEntry[].
+   * Used as a fallback when the Worker API is unavailable.
+   */
+  function parseChangelogMarkdown(markdown: string): ChangelogMdEntry[] {
+    const lines = markdown.replace(/\r\n/g, '\n').split('\n');
+    const entries: ChangelogMdEntry[] = [];
+
+    let current: ChangelogMdEntry | null = null;
+    let section: 'summary' | 'added' | 'changed' | 'fixed' | null = null;
+
+    const pushCurrent = () => {
+      if (!current) return;
+      if (!current.version) return;
+      if (!current.summary.trim()) return;
+      entries.push({
+        version: current.version,
+        summary: current.summary.trim(),
+        added: current.added,
+        changed: current.changed,
+        fixed: current.fixed
+      });
+    };
+
+    for (const rawLine of lines) {
+      const line = rawLine.trim();
+      if (!line) continue;
+
+      const versionMatch = line.match(/^##\s+v?(\d+\.\d+\.\d+)\s*$/i);
+      if (versionMatch) {
+        pushCurrent();
+        current = {
+          version: versionMatch[1],
+          summary: '',
+          added: [],
+          changed: [],
+          fixed: []
+        };
+        section = null;
+        continue;
+      }
+
+      if (!current) continue;
+
+      if (/^###\s+summary\s*$/i.test(line)) {
+        section = 'summary';
+        continue;
+      }
+      if (/^###\s+added\s*$/i.test(line)) {
+        section = 'added';
+        continue;
+      }
+      if (/^###\s+changed\s*$/i.test(line)) {
+        section = 'changed';
+        continue;
+      }
+      if (/^###\s+fixed\s*$/i.test(line)) {
+        section = 'fixed';
+        continue;
+      }
+
+      if (section === 'summary') {
+        current.summary = current.summary ? `${current.summary} ${line}` : line;
+        continue;
+      }
+
+      if (line.startsWith('- ')) {
+        const value = line.slice(2).trim();
+        if (!value) continue;
+        if (section === 'added') current.added.push(value);
+        if (section === 'changed') current.changed.push(value);
+        if (section === 'fixed') current.fixed.push(value);
+      }
+    }
 
   function formatDate(value: number | null): string {
     if (!value) return 'Unknown';
