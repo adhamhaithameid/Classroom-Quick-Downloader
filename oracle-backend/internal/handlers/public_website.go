@@ -1542,19 +1542,6 @@ func buildPublicWebsiteUserChangelog(ctx context.Context, store *controlPlaneSto
 		} else {
 			lastUpdated = &now
 		}
-		entries = append(entries, publicWebsiteUserChangelogEntry{
-			ID:      "default-latest",
-			Version: latestVersion,
-			Title:   "Stability and security improvements",
-			Summary: "This release focuses on faster downloads, better reliability, and safer handling across supported browsers.",
-			Highlights: []string{
-				"More stable download handling for large coursework files.",
-				"Improved compatibility with recent browser updates.",
-				"Security and reliability hardening.",
-			},
-			ReleasedAtUTC: &now,
-		})
-		lastUpdated = &now
 	}
 
 	return publicWebsiteUserChangelogResponse{
