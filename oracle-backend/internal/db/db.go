@@ -222,6 +222,19 @@ func Migrate(db *sql.DB) error {
 		`CREATE INDEX IF NOT EXISTS idx_website_sync_batches_direction_created
 			ON website_sync_batches(direction, created_at DESC);`,
 
+		// Canonical public website snapshots consumed by the static site.
+		`CREATE TABLE IF NOT EXISTS website_public_snapshots (
+			id             INTEGER PRIMARY KEY AUTOINCREMENT,
+			snapshot_id    TEXT NOT NULL UNIQUE,
+			schema_version TEXT NOT NULL,
+			generated_at   INTEGER NOT NULL,
+			payload_json   TEXT NOT NULL,
+			created_at     INTEGER NOT NULL
+		);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_website_public_snapshots_generated_at
+			ON website_public_snapshots(generated_at DESC);`,
+
 		// DO state history (health + backlog + quota).
 		`CREATE TABLE IF NOT EXISTS do_state_snapshots (
 			snapshot_id           INTEGER PRIMARY KEY AUTOINCREMENT,
