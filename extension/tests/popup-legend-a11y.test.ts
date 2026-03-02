@@ -145,6 +145,14 @@ describe('popup legend keyboard accessibility', () => {
     expect(/\/changelog|CHANGELOG\.md/.test(releaseHref)).toBe(true);
 
     await act(async () => {
+      releaseNotesLink?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      await tick();
+    });
+    expect((globalThis as any).chrome.tabs.create).toHaveBeenCalledWith({
+      url: releaseHref,
+    });
+
+    await act(async () => {
       legendItem?.focus();
       await tick();
     });
