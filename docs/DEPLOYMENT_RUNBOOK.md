@@ -244,6 +244,7 @@ Configured workflows:
     - schema compatibility check (`tools/check_schema_compat.sh`)
   - SSH into Oracle VM
   - hard-syncs repo to `origin/main`
+  - validates required `.env.production` keys on the server before deployment
   - rebuilds/recreates Oracle container
   - health-checks `/health`
 
