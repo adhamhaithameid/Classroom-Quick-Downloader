@@ -10,7 +10,7 @@
   import LoadingScreen from '$lib/components/LoadingScreen.svelte';
   import '../app.css';
 
-  const nav = [
+  const baseNav = [
     { href: '/overview', label: 'Overview' },
     { href: '/privacy', label: 'Privacy' },
     { href: '/faq', label: 'FAQ' },
