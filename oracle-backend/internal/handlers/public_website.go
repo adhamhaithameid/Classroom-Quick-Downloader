@@ -36,6 +36,7 @@ const (
 
 var (
 	isoCountryCodePattern = regexp.MustCompile(`^[A-Z]{2}$`)
+	websiteEventIDPattern = regexp.MustCompile(`^[A-Za-z0-9._:-]{6,120}$`)
 
 	defaultPublicWebsiteAllowedOrigins = []string{
 		"https://adhamhaithameid.github.io",
