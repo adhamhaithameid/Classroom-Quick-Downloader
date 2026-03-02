@@ -1448,7 +1448,8 @@ func buildPublicWebsiteUserChangelog(ctx context.Context, store *controlPlaneSto
 	var lastUpdated *int64
 	for _, row := range records {
 		data := decodeRecordDataMap(row.Data)
-		version := trimAndLimit(stringFromAny(data["version"]), 64)
+		markdown := trimAndLimit(stringFromAny(data["markdown"]), 24000)
+		releasedAt := int64PtrFromAny(data["releasedAtUtc"])
 		title := trimAndLimit(stringFromAny(data["title"]), 120)
 		summary := trimAndLimit(stringFromAny(data["summary"]), 500)
 		if version == "" || summary == "" {
