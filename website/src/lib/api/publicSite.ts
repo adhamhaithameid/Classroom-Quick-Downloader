@@ -209,6 +209,7 @@ function normalizeBrowser(input: unknown): InstallBrowser {
 export function coerceOverviewPayload(input: unknown): OverviewResponse {
   const source = input as Partial<OverviewResponse>;
   return {
+    schemaVersion: asSchemaVersion(source?.schemaVersion),
     ok: source?.ok === true,
     generatedAt: asNumber(source?.generatedAt),
     totals: {
