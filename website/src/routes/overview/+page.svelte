@@ -3399,7 +3399,9 @@
     background: transparent;
   }
   .l2-cta-content {
-    position: relative; z-index: 2;
+    position: relative;
+    z-index: 2;
+    width: 100%;
     background: rgba(255, 255, 255, 0.55);
     backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
     border: 1px solid var(--border-subtle);
