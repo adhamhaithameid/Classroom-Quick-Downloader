@@ -380,6 +380,7 @@ curl -fsS -X POST "${ORACLE_BASE_URL}/api/admin/website/traffic/refresh" # requi
 
 # Oracle install-sync scheduler checks (15-minute automatic sync)
 docker logs --tail 300 cqd-oracle-backend | rg "deployment auto-sync enabled|deployment auto-sync completed"
+docker logs --tail 300 cqd-oracle-backend | rg "website_traffic_sync"
 
 # Website live checks
 curl -I https://classroom-quick-downloader-website.pages.dev
