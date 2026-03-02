@@ -238,6 +238,34 @@ describe('uninstall feedback API', () => {
     const [, init] = call;
     expect(init?.method).toBe('POST');
   });
+
+  it('submits website events payload', async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify({ ok: true, generatedAt: 1700002, acceptedCount: 2, rejectedCount: 0 }), {
+        status: 200
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await submitWebsiteEvents({
+      schemaVersion: '1',
+      sessionId: 'session-1',
+      pagePath: '/overview',
+      events: [
+        { eventId: 'evt-1', eventType: 'cta', action: 'install_click', placement: 'hero_install' },
+        { eventId: 'evt-2', eventType: 'map', action: 'map_yes', placement: 'map_prompt_yes' }
+      ]
+    });
+
+    expect(response.ok).toBe(true);
+    expect(response.acceptedCount).toBe(2);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const call = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    const [, init] = call;
+    expect(init?.method).toBe('POST');
+    const requestBody = JSON.parse(String(init?.body || '{}')) as { schemaVersion?: string };
+    expect(requestBody.schemaVersion).toBe('1');
+  });
 });
 
 describe('user-facing content APIs', () => {
