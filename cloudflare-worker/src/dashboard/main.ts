@@ -5978,12 +5978,22 @@ export function renderDashboard(stats: StatsResponse): string {
          };
       }
 
-      if (btnSaveAll) {
-        btnSaveAll.onclick = () => {
-          // 1. Gather Config (Active Rules)
-          const payload = {
-            config: { rules: activeRules }
-          };
+      if (btnSaveRules) {
+        btnSaveRules.onclick = async () => {
+          try {
+            setRuleStatus("Saving…", "info");
+            const data = await callChangelogAdmin("/admin/changelog/rules", { rules: activeRules });
+            const nextRules = data && data.config && Array.isArray(data.config.rules) ? data.config.rules : activeRules;
+            activeRules = nextRules;
+            renderRulesList();
+            setRuleStatus("Saved", "ok");
+            syncChangelogUiFromState(data);
+          } catch (error) {
+            const msg = error instanceof Error ? error.message : "rules_save_failed";
+            setRuleStatus("Error: " + msg, "err");
+          }
+        };
+      }
 
           // 2. Gather New/Edit Release (if ANY text entered)
           let ver = document.getElementById("new-cl-version").value.trim();
