@@ -2944,6 +2944,64 @@ export function renderDashboard(stats: StatsResponse): string {
     .char-counter.warning { color: #f59e0b; }
     .char-counter.error { color: #ef4444; }
 
+    .cl-help-btn {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 1px solid var(--border-subtle);
+      background: rgba(255,255,255,0.08);
+      color: var(--text-muted);
+      font-size: 11px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      padding: 0;
+      line-height: 1;
+    }
+    .cl-help-btn:hover {
+      color: var(--text-primary);
+      border-color: rgba(59, 130, 246, 0.5);
+      background: rgba(59,130,246,0.12);
+    }
+    .cl-render-preview h4 {
+      margin: 0 0 4px;
+      font-size: 0.86em;
+      color: #cbd5e1;
+    }
+    .cl-render-preview .cl-preview-summary {
+      margin: 0 0 8px;
+      font-size: 0.82em;
+      color: #d1d5db;
+      line-height: 1.55;
+    }
+    .cl-render-preview ul {
+      margin: 0 0 8px 16px;
+      padding: 0;
+      color: #9ca3af;
+      font-size: 0.8em;
+      line-height: 1.5;
+    }
+    .cl-revision-item {
+      padding: 8px 10px;
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      background: rgba(255,255,255,0.02);
+      font-size: 0.77em;
+      color: #9ca3af;
+      line-height: 1.45;
+    }
+    .cl-revision-item strong {
+      color: #e5e7eb;
+      font-size: 0.95em;
+    }
+    .cl-preview-empty {
+      color: #94a3b8;
+      font-size: 0.82em;
+      font-style: italic;
+    }
+
     /* Loading State */
     .btn-loading {
       position: relative;
