@@ -704,6 +704,17 @@ function App() {
     };
   });
 
+  const matchedRule = version ? getMatchingRule(changelogData?.config, version) : null;
+  const fallbackRule = !matchedRule && changelogData?.entries?.length
+    ? {
+        id: 'fallback-unseen',
+        target: 'all',
+        priority: 'minor' as const,
+        effect: 'glow' as const,
+      }
+    : null;
+  const effectiveRule = matchedRule ?? fallbackRule;
+
   const isLoadingSettings = loadingState || settings == null;
   const isEnabled = settings?.extensionEnabled ?? true;
 
