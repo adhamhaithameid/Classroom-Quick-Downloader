@@ -136,6 +136,7 @@ function coerceChangelogPayload(input: unknown): ChangelogResponse {
   const meta = sanitizeChangelogMeta(rawSource?.meta);
 
   return {
+    schemaVersion: '1',
     ok: source?.ok === true,
     entries
   };
