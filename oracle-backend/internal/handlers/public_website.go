@@ -2209,7 +2209,7 @@ func preparePublicWebsiteCORSWithOptions(w http.ResponseWriter, r *http.Request,
 			return false
 		}
 		if origin != "" && !isOriginAllowed(origin, allowed) {
-			http.Error(w, "origin not allowed", http.StatusForbidden)
+			writePublicWebsiteCORSFailure(w, options.StructuredErrors, http.StatusForbidden, "origin_not_allowed", "Origin is not allowed for this endpoint.")
 			return false
 		}
 		if origin != "" {
