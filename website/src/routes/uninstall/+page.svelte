@@ -367,11 +367,16 @@
     display: block; margin-bottom: 14px;
   }
 
-  .hero h1 {
-    margin: 0;
-    font-size: 28px;
-    font-weight: 800;
-    letter-spacing: -0.03em;
+  .un-mega {
+    font-size: clamp(32px, 5.5vw, 52px);
+    font-weight: 900;
+    line-height: 1.12;
+    letter-spacing: -0.035em;
+    margin: 0 0 18px;
+    background: linear-gradient(135deg, var(--green), var(--green-light), #10b981);
+    background-size: 200% 200%;
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
   }
 
   .hero p {
