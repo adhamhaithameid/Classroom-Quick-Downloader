@@ -87,6 +87,7 @@ type deploymentSyncResult struct {
 	Version     string `json:"version"`
 	Rating      string `json:"rating"`
 	RatingCount int64  `json:"ratingCount"`
+	SyncSource  string `json:"syncSource,omitempty"`
 	Status      string `json:"status"`
 	Error       string `json:"error,omitempty"`
 	LatencyMS   int64  `json:"latencyMs"`
