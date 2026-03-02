@@ -43,6 +43,66 @@ cd oracle-backend && go test ./...            # Oracle Backend Go tests
 pnpm -C extension test:coverage:all           # Critical + runtime 100 % gates
 ```
 
+## Phase 12 + 13 Execution
+
+Strict phase-12 closure:
+
+```bash
+bash tools/phase12_verify.sh
+```
+
+Phase-12 matrix reference:
+
+- `/Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/docs/PHASE12_TEST_MATRIX.md`
+
+Phase-13 rollout sequence (dry-run style validation + smoke):
+
+```bash
+WORKER_BASE_URL='https://cqd-analytics.adhamhaithameid.workers.dev' \
+ORACLE_BASE_URL='https://<your-oracle-public-https-domain>' \
+WEBSITE_URL='https://classroom-quick-downloader-website.pages.dev' \
+bash tools/phase13_rollout.sh
+```
+
+Phase-13 rollout including deployments:
+
+```bash
+ORACLE_SSH_DEST='ubuntu@<oracle-host>' \
+CLOUDFLARE_ACCOUNT_ID='<account-id>' \
+CLOUDFLARE_API_TOKEN='<token>' \
+CLOUDFLARE_PAGES_PROJECT_NAME='classroom-quick-downloader-website' \
+PUBLIC_BASE_PATH='' \
+PUBLIC_ORACLE_API_BASE_URL='https://<your-oracle-public-https-domain>' \
+PUBLIC_WORKER_BASE_URL='https://cqd-analytics.adhamhaithameid.workers.dev' \
+PUBLIC_SITE_URL='https://<your-root-domain>' \
+WORKER_BASE_URL='https://cqd-analytics.adhamhaithameid.workers.dev' \
+ORACLE_BASE_URL='https://<your-oracle-public-https-domain>' \
+WEBSITE_URL='https://<your-root-domain>' \
+bash tools/phase13_rollout.sh --deploy
+```
+
+24h monitoring window (lag/retry/DLQ guardrails):
+
+```bash
+WORKER_BASE_URL='https://cqd-analytics.adhamhaithameid.workers.dev' \
+ORACLE_BASE_URL='https://<your-oracle-public-https-domain>' \
+DURATION_HOURS=24 \
+INTERVAL_SECONDS=300 \
+bash tools/phase13_monitor.sh
+```
+
+## Latest Major Scan Snapshot (2026-02-28)
+
+- `pnpm run scan:security` -> PASS
+- `pnpm -C website run test:strict` -> PASS (isolated)
+- `pnpm -C cloudflare-worker run test:strict` -> PASS (isolated)
+- `pnpm -C oracle-backend run test:strict` -> PASS
+- `pnpm -C extension run test -- --maxWorkers=1` -> PASS
+
+Known caveat:
+- Vitest timeout/hook budgets were raised to `30s` for `website`, `cloudflare-worker`, and `extension` to reduce false negatives in heavy runs.
+- If a shared host is under heavy contention, rerun affected suites in isolation for deterministic signal.
+
 ---
 
 ## Project Structure
