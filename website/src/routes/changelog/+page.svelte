@@ -150,13 +150,21 @@
     return entries;
   }
 
-  function formatDateShort(value: number | null): string {
-    if (!value) return '';
-    return new Date(value).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      timeZone: 'UTC'
-    });
+  /**
+   * Fetch from GitHub raw markdown (fallback).
+   */
+  async function fetchFromGitHub(force: boolean): Promise<ChangelogMdEntry[]> {
+    const url = force ? `${USER_FRIENDLY_CHANGELOG_RAW_URL}?t=${Date.now()}` : USER_FRIENDLY_CHANGELOG_RAW_URL;
+    const response = await fetch(url, { cache: force ? 'no-store' : 'default' });
+    if (!response.ok) {
+      throw new Error(`GitHub changelog request failed (${response.status})`);
+    }
+    const markdown = await response.text();
+    const parsed = parseChangelogMarkdown(markdown);
+    if (parsed.length === 0) {
+      throw new Error('GitHub changelog format is invalid or empty.');
+    }
+    return parsed;
   }
 
   async function load(force = false): Promise<void> {
