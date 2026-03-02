@@ -5837,7 +5837,8 @@ export class DownloadsDurable {
     const sync = this.getChangelogSyncState();
     return {
       ok: true,
-      entries: sorted,
+      // Backward compatibility
+      entries,
       config: this.d.changelogConfig,
     });
   }
