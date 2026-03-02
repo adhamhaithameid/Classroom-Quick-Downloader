@@ -2205,7 +2205,7 @@ func preparePublicWebsiteCORSWithOptions(w http.ResponseWriter, r *http.Request,
 
 	if r.Method == http.MethodOptions {
 		if origin == "" && requireOrigin {
-			http.Error(w, "origin required", http.StatusForbidden)
+			writePublicWebsiteCORSFailure(w, options.StructuredErrors, http.StatusForbidden, "origin_required", "Origin header is required for write requests.")
 			return false
 		}
 		if origin != "" && !isOriginAllowed(origin, allowed) {
