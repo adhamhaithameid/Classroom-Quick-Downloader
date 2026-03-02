@@ -148,7 +148,7 @@ async function fetchJSONFromBase(baseUrl: string, pathname: string, requestLabel
 }
 
 async function fetchOracleJSON(pathname: string): Promise<unknown> {
-  return fetchJSONFromBase(ORACLE_API_BASE_URL, pathname, 'Oracle public API');
+  return fetchJSONFromBase(ORACLE_API_BASE_URL, pathname, 'Public data');
 }
 
 function asString(value: unknown): string {
