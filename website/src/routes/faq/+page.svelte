@@ -746,11 +746,8 @@
     padding: 16px 18px; gap: 14px;
   }
 
-  .faq-q-text {
-    font-weight: 700;
-    font-size: 14px;
-    color: var(--text);
-    line-height: 1.5;
+  .fq-q-text {
+    font-weight: 700; font-size: 14px; color: var(--text); line-height: 1.5;
   }
 
   .faq-chevron {
