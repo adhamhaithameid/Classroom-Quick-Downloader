@@ -834,6 +834,20 @@ Reliability behavior:
 - Each cycle retries transient full-failure runs automatically before waiting for the next schedule.
 - Archiver runs persist latest Sheets flush metadata (`status`, archived day, row payload JSON) for dashboard visibility.
 
+### Website Traffic Sync
+
+- `GET /api/admin/website/analytics` now includes additive traffic fields:
+  - `traffic` (`visits`, `requests`, `lastSyncedAtUtc`, `source`, `status`)
+  - `trafficDaily[]` (daily Cloudflare aggregates)
+- `POST /api/admin/website/traffic/refresh` triggers an immediate Cloudflare traffic sync (step-up required).
+
+Traffic sync behavior:
+- Pull source: Cloudflare GraphQL (`requestSource=eyeball`) filtered by `CLOUDFLARE_ANALYTICS_HOSTNAME`.
+- Automatic fallback: if `httpRequestsAdaptiveGroups` is unavailable for the account/token, Oracle falls back to `rumPageloadEventsAdaptiveGroups`.
+- Storage grain: hourly rows in `website_traffic_hourly`.
+- Scheduler: runs once at startup, then by `ORACLE_WEBSITE_TRAFFIC_SYNC_INTERVAL_SECONDS`.
+- Each run refreshes the last `ORACLE_WEBSITE_TRAFFIC_SYNC_LOOKBACK_HOURS` for idempotent backfill.
+
 ### Creative Hub
 
 - `GET /api/admin/creative/designs`
