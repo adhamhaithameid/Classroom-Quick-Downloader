@@ -3645,6 +3645,24 @@
         }
       }
 
+      async function websiteSyncReconcileTotals() {
+        var ok = await ensureStepUp();
+        if (!ok) return;
+        if (!window.confirm('Rebuild website totals from trusted hourly history and publish monotonic-safe values?')) return;
+        try {
+          var payload = await fetchJSONWithInit('/api/admin/website/reconcile-totals', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+          });
+          setWebsiteSyncOutput(payload);
+          await loadWebsiteSyncState();
+        } catch (e) {
+          setWebsiteSyncOutput({ ok: false, error: String(e) });
+          await loadWebsiteSyncState();
+        }
+      }
+
       async function websiteSyncSaveOneAM() {
         var checkbox = document.getElementById('website-sync-oneam-checkbox');
         var enabled = !!(checkbox && checkbox.checked);
