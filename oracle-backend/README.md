@@ -51,6 +51,12 @@ export DASHBOARD_PASSWORD='your-dashboard-password'
 export SUPER_ADMIN_PASSWORD='your-super-admin-password'
 go run ./cmd/app
 ```
+
+From repo root, equivalent shortcut:
+```bash
+cd /Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader
+pnpm run dev:oracle
+```
 2. Desktop test URL:
 ```text
 http://localhost:8080
