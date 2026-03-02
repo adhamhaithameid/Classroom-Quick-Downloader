@@ -642,7 +642,7 @@
       border-radius: 14px;
     }
 
-    .sidebar-links {
+    .cl-sidebar-links {
       flex-direction: row;
       flex-wrap: nowrap;
       overflow-x: auto;
