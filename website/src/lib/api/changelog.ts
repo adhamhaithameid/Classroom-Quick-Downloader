@@ -152,3 +152,4 @@ export async function fetchChangelog(): Promise<ChangelogResponse> {
   const payload = await response.json();
   return coerceChangelogPayload(payload);
 }
+
