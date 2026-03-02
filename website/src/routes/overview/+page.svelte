@@ -1299,6 +1299,7 @@
             href={browserLink(b)}
             target="_blank"
             rel="noopener noreferrer"
+            on:click={() => trackInstallClick('hero_install')}
           >
             <img src="{base}/images/{b}.svg" alt="" class="l2-cta-icon" />
             {#if b === detectedBrowser}Install for {browserDisplayName(b)}{:else}{browserDisplayName(b)}{/if}
