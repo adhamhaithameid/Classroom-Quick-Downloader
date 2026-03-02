@@ -2759,6 +2759,10 @@
         }
       }
 
+      async function loadUserChangelogRevisionHistory() {
+        return;
+      }
+
       async function loadUserChangelogRecords() {
         var container = document.getElementById('user-changelog-list');
         if (!container) return;
