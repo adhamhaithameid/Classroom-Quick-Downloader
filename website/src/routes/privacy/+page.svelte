@@ -223,11 +223,9 @@
     flex-wrap: wrap;
   }
 
-  h1 {
-    margin: 0;
-    font-size: clamp(28px, 4vw, 40px);
-    font-weight: 800;
-    letter-spacing: -0.03em;
+  .prv-banner-item {
+    display: flex; align-items: center; gap: 14px;
+    flex: 1; min-width: 200px;
   }
 
   .privacy-desc {
