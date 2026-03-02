@@ -144,6 +144,11 @@
           id: 'privacy-full',
           q: 'Where can I read the full privacy policy?',
           a: 'Use the Privacy page on this website for the user summary, then open the full policy document from that page for complete details.'
+        },
+        {
+          id: 'privacy-network',
+          q: 'Does CQD make network requests?',
+          a: 'CQD sends minimal aggregate analytics (download counts, browser version) to the CQD backend for reliability monitoring. No personal data, file content, or classroom details are transmitted.'
         }
       ]
     },
