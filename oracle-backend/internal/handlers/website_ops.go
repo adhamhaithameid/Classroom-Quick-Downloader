@@ -1800,6 +1800,10 @@ func WebsiteOpsPullCloudflareHandler(db *sql.DB, cloudflareMetricsURL string) ht
 			"oracle_admin_pull_cloudflare",
 		)
 		if err != nil {
+			if errors.Is(err, errWebsiteMonotonicViolation) {
+				writeJSONError(w, "monotonic_guard_blocked", "Cloudflare pull blocked: incoming totals would decrease existing published values.", http.StatusConflict)
+				return
+			}
 			statusCode := http.StatusBadGateway
 			message := "Failed to fetch Cloudflare website metrics"
 			if errors.Is(err, errCloudflareWebsitePublish) {
