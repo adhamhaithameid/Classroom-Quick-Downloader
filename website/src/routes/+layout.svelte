@@ -4,6 +4,10 @@
   import { page } from '$app/stores';
   import logo from '$lib/assets/cqd-logo.svg';
   import { STORE_LINKS } from '$lib/config';
+  import { browserDisplayName, detectBrowserFromNavigator, type BrowserKey } from '$lib/browser/detect';
+  import { flushWebsiteEvents, initWebsiteEventsClient, trackWebsiteEvent } from '$lib/analytics/websiteEvents';
+  import { initializeWebsiteSnapshotStore, websiteSnapshotStore } from '$lib/stores/websiteSnapshot';
+  import LoadingScreen from '$lib/components/LoadingScreen.svelte';
   import '../app.css';
 
   const nav = [
