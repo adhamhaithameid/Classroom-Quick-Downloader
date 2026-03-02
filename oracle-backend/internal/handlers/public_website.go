@@ -733,7 +733,7 @@ func PublicWebsiteUninstallHandler(sqliteDB *sql.DB) http.HandlerFunc {
 
 			clean := sanitizePublicWebsiteUninstallRequest(req)
 			if clean.Reason == "" {
-				http.Error(w, "reason is required", http.StatusBadRequest)
+				writePublicWebsiteError(w, http.StatusBadRequest, "reason_required", "reason is required.", false)
 				return
 			}
 
