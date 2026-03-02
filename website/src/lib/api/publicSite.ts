@@ -445,7 +445,7 @@ export async function fetchWebsiteSnapshotResult(options: { force?: boolean } = 
   hydrateSnapshotCacheFromStorage();
 
   if (!options.force && cachedSnapshot && isSnapshotFresh(cachedSnapshot)) {
-    return cachedSnapshot;
+    return buildSnapshotFetchResult(cachedSnapshot, cachedSnapshotSource, false, null);
   }
   if (!options.force && snapshotInFlight) {
     return snapshotInFlight;
