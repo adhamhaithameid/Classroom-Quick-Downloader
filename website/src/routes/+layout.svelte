@@ -26,8 +26,11 @@
   let detectedBrowser: BrowserKey = 'chrome';
   let mobileNavOpen = false;
   const currentYear = new Date().getFullYear();
-  let routeKey = '/';
-  let isLanding2 = false;
+  let route = '/';
+  let isOverviewStyleRoute = false;
+  let hideChrome = false;
+  let snapshotLinks: { chrome: string; firefox: string; edge: string; github: string } | null = null;
+  $: snapshotLinks = $websiteSnapshotStore.snapshot?.overview.links ?? null;
 
   function detectBrowser(): 'chrome' | 'firefox' | 'edge' {
     const ua = navigator.userAgent.toLowerCase();
