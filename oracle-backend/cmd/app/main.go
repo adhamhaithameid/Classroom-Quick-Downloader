@@ -238,6 +238,7 @@ func main() {
 	mux.HandleFunc("/storeBatch", ingestHandler)
 
 	// Public website endpoints (unauthenticated, sanitized, CORS restricted).
+	mux.Handle("/api/public/website/snapshot", handlers.PublicWebsiteSnapshotHandler(sqlDB, postgresDB))
 	mux.Handle("/api/public/website/overview", handlers.PublicWebsiteOverviewHandler(sqlDB, postgresDB))
 	mux.Handle("/api/public/website/map", handlers.PublicWebsiteMapHandler(sqlDB))
 	mux.Handle("/api/public/website/status", handlers.PublicWebsiteStatusHandler(sqlDB))
