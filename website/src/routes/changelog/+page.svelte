@@ -358,7 +358,24 @@
 </div>
 
 <style>
-  .changelog-page {
+  /* ── Base ──────────────────────────── */
+  .cl {
+    --green: #1a8b55;
+    --green-light: #22c55e;
+    --green-bg: rgba(26, 139, 85, 0.06);
+    --green-border: rgba(26, 139, 85, 0.12);
+    --text: #1a1a2e;
+    --text-secondary: #64748b;
+    --muted: #94a3b8;
+    --border-subtle: rgba(226, 232, 240, 0.35);
+    --radius: 16px;
+    --radius-sm: 12px;
+    --wrap: 1280px;
+    font-family: var(--font-ui), sans-serif;
+    color: var(--text);
+    overflow: clip;
+    position: relative;
+    min-height: 100%;
     display: flex;
     flex-direction: column;
     gap: 24px;
