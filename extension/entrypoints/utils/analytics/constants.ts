@@ -71,7 +71,8 @@ export const BACKOFF_STEPS_SECONDS = [
 
 // --- Worker URLs ---
 
-const WORKER_URL = import.meta.env.VITE_WORKER_URL as string || '';
+const DEFAULT_WORKER_TRACK_URL = 'https://cqd-analytics.adhamhaithameid.workers.dev/track';
+const WORKER_URL = (import.meta.env.VITE_WORKER_URL as string) || DEFAULT_WORKER_TRACK_URL;
 export const WORKER_BASE_URL = WORKER_URL.replace(/\/+track$/, '');
 export const CONFIG_URL = WORKER_BASE_URL ? `${WORKER_BASE_URL}/config` : '';
 export const CHANGELOG_URL = WORKER_BASE_URL ? `${WORKER_BASE_URL}/changelog` : '';
