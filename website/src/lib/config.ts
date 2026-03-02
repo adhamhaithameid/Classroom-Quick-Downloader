@@ -17,7 +17,7 @@ function ensureUrl(value: string, fallback: string): string {
     return cleanBaseUrl(parsed.origin + parsed.pathname);
   } catch {
     return fallback;
-  }
+	}
 }
 
 export const SITE_URL = ensureUrl(env.PUBLIC_SITE_URL ?? '', DEFAULT_SITE_URL);
