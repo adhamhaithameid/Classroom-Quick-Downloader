@@ -1997,7 +1997,7 @@
     --border-subtle: rgba(226, 232, 240, 0.35);
     --radius: 16px;
     --wrap: 1280px;
-    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    font-family: var(--font-ui), sans-serif;
     background: var(--bg);
     color: var(--text);
     overflow-x: hidden;
