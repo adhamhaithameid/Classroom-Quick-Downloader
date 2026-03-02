@@ -491,7 +491,8 @@ export async function fetchOverview(): Promise<OverviewResponse> {
 }
 
 export async function fetchMapData(): Promise<MapResponse> {
-  return fetchOracleMap();
+  const snapshot = await fetchWebsiteSnapshot();
+  return snapshot.map;
 }
 
 export function resetWebsiteSnapshotCacheForTests(): void {
