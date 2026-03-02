@@ -805,10 +805,6 @@ func RecordWebsiteToOracleBatch(
 	if db == nil {
 		return errors.New("database not available")
 	}
-	row, err := loadWebsiteSyncControl(ctx, db)
-	if err != nil {
-		return err
-	}
 	now := time.Now().UTC().UnixMilli()
 	row.LastWebsiteIngestAt = &now
 	row.UpdatedAt = now
