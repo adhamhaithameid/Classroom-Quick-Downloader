@@ -228,11 +228,8 @@
     flex: 1; min-width: 200px;
   }
 
-  .privacy-desc {
-    margin: 6px 0 0;
-    color: var(--text-secondary);
-    line-height: 1.75;
-    font-size: 15px;
+  .prv-banner-icon {
+    font-size: 32px; flex-shrink: 0;
   }
 
   .privacy-updated {
