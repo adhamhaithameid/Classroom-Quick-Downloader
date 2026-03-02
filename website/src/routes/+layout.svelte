@@ -119,7 +119,10 @@
   }
 
   onMount(() => {
-    detectedBrowser = detectBrowser();
+    detectedBrowser = detectBrowserFromNavigator();
+    hideChrome = new URLSearchParams(window.location.search).has('embed');
+    const disposeWebsiteEvents = initWebsiteEventsClient();
+    const disposeSnapshotStore = initializeWebsiteSnapshotStore();
     window.addEventListener('keydown', handleWindowKeydown);
     return () => {
       window.removeEventListener('keydown', handleWindowKeydown);
