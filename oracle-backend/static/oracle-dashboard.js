@@ -4439,6 +4439,7 @@
       window.addEventListener("load", async function() {
         initOracleUtcClock();
         renderShortcutsList();
+        initNavGroupToggles();
         bindButtonActions();
         document.addEventListener('keydown', function(e) {
           if ((e.metaKey || e.ctrlKey) && !shouldIgnoreGlobalShortcut(e) && runKeyboardShortcut(e)) {
