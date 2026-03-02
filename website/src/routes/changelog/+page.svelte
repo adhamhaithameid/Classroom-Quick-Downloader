@@ -258,21 +258,6 @@
           Open changelog on GitHub →
         </a>
       </div>
-      <div>
-        <h1>Changelog</h1>
-        <p class="header-sub">What's new in every release of Classroom Quick Downloader.</p>
-        {#if changelog}
-          <small class="header-meta">{changelog.entries.length} releases documented</small>
-        {/if}
-      </div>
-    </div>
-    <div class="header-actions">
-      <a class="action-btn" href={STORE_LINKS.github + '/blob/main/CHANGELOG.md'} target="_blank" rel="noopener noreferrer">
-        Full changelog →
-      </a>
-      <button class="action-btn" type="button" on:click={() => load(true)} disabled={refreshing}>
-        {refreshing ? 'Refreshing…' : '↻ Refresh'}
-      </button>
     </div>
   </header>
 
