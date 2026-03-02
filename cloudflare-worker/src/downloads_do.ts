@@ -3812,6 +3812,21 @@ export class DownloadsDurable {
     const slotKey = makeSlotKey(now);
     this.d.publicSiteMetricsSnapshot = this.buildPublicSiteMetricsSnapshot(now, slotKey);
     this.d.websiteManualFlushAt = now;
+    const telemetryFlush = await this.flushWebsiteTelemetryQueue({
+      force: true,
+      trigger: "admin_flush_now",
+      maxBatches: 600,
+    });
+    if (!telemetryFlush.ok && telemetryFlush.error) {
+      this.d.websiteTelemetryLastError = telemetryFlush.error;
+    }
+    this.appendDangerAudit(
+      request,
+      "website_flush_now",
+      "/admin/website/flush-now",
+      telemetryFlush.ok ? "ok" : "error",
+      telemetryFlush.error || `processed=${telemetryFlush.processedBatches}`,
+    );
     await this.persist();
 
     const effectiveSnapshot = this.resolveEffectivePublicSiteSnapshot(this.d.publicSiteMetricsSnapshot);
