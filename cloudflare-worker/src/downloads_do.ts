@@ -3751,6 +3751,10 @@ export class DownloadsDurable {
     const slotKey = makeSlotKey(now);
     const snapshot = this.d.publicSiteMetricsSnapshot ?? this.buildPublicSiteMetricsSnapshot(now, slotKey);
     const effectiveSnapshot = this.resolveEffectivePublicSiteSnapshot(snapshot);
+    const telemetryRetryCount = this.d.websiteTelemetryQueue.reduce(
+      (max, batch) => Math.max(max, Math.max(0, Math.floor(batch.attempt || 0))),
+      0,
+    );
     const activeHour = currentUtcHour(now);
     const isRefreshWindow = PUBLIC_SITE_METRICS_REFRESH_HOURS_UTC.includes(activeHour as (typeof PUBLIC_SITE_METRICS_REFRESH_HOURS_UTC)[number]);
     return json({
