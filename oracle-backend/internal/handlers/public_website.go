@@ -708,7 +708,7 @@ func PublicWebsiteUninstallHandler(sqliteDB *sql.DB) http.HandlerFunc {
 		case http.MethodGet:
 			stats, err := loadPublicWebsiteUninstallStats(r.Context(), sqliteDB)
 			if err != nil {
-				http.Error(w, "failed to load uninstall stats", http.StatusInternalServerError)
+				writePublicWebsiteError(w, http.StatusInternalServerError, "uninstall_stats_load_failed", "Failed to load uninstall stats.", true)
 				return
 			}
 			writePublicWebsiteJSON(w, http.StatusOK, publicWebsiteUninstallStatsResponse{
