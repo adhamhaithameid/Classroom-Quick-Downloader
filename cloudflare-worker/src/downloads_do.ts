@@ -4379,6 +4379,8 @@ export class DownloadsDurable {
 
   private async handleDebugFlush(request: Request): Promise<Response> {
     const before = this.d.buffer.length;
+    this.appendDangerAudit(request, "clear_buffer", "/debug/flush", "ok", `buffer=${before}`);
+    await this.persist();
     return json({
       ok: true,
       message: "debug flush not implemented in this step",
