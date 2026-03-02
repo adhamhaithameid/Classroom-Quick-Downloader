@@ -561,7 +561,7 @@ function App() {
     if (version) {
        isVersionSeen(version, changelogData).then(setSeen);
     }
-  }, [version]);
+  }, [version, changelogData?.revisionToken]);
 
   // --- GLOBAL SETTINGS LOGIC ---
   useEffect(() => {
