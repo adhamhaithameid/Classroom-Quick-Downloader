@@ -67,16 +67,6 @@ func TestPublicWebsiteOverviewHandler_ReturnsSanitizedPayload(t *testing.T) {
 	sqlDB := openPublicWebsiteDB(t)
 	seedPublicWebsiteFixture(t, sqlDB)
 
-	originalFetcher := githubVersionFetcher
-	t.Cleanup(func() {
-		githubVersionFetcher = originalFetcher
-		resetPublicWebsiteVersionCacheForTest()
-	})
-	githubVersionFetcher = func(context.Context) (*string, error) {
-		v := "1.3.6"
-		return &v, nil
-	}
-	resetPublicWebsiteVersionCacheForTest()
 	t.Setenv("PUBLIC_WEBSITE_ALLOWED_ORIGINS", "https://adhamhaithameid.github.io")
 
 	req := httptest.NewRequest(http.MethodGet, "/api/public/website/overview", nil)
