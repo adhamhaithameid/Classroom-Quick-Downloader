@@ -392,7 +392,7 @@ func TestWebsiteOpsForcePushAndOverrideHandlers(t *testing.T) {
 			{"countryCode": "xx", "count": 1}
 		]
 	}`
-	overrideReq := httptest.NewRequest(http.MethodPost, "/api/admin/website/override", strings.NewReader(overrideBody))
+	overrideReq := httptest.NewRequest(http.MethodPost, "/api/admin/website/override", strings.NewReader(invalidOverrideBody))
 	overrideReq.Header.Set("Content-Type", "application/json")
 	overrideRR := httptest.NewRecorder()
 	WebsiteOpsOverrideHandler(sqlDB).ServeHTTP(overrideRR, overrideReq)
