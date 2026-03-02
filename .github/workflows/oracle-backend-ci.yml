@@ -98,11 +98,11 @@ jobs:
           ADDR: 127.0.0.1:18080
           DB_PATH: ${{ runner.temp }}/oracle-runtime-smoke.db
           STATIC_DIR: ./static
-          DO_SHARED_SECRET: do-shared-2026-02-14-strong
-          DASHBOARD_PASSWORD: DashAuth#2026!Oracle
-          SUPER_ADMIN_PASSWORD: SuperAdmin#2026!Oracle
-          ARCHIVER_SHARED_SECRET: Archiver#2026!Oracle
-          ORACLE_AUDIT_CHECKPOINT_SECRET: AuditAnchor2026OracleStrong
+          DO_SHARED_SECRET: ${{ env.ORACLE_SMOKE_DO_SHARED_SECRET }}
+          DASHBOARD_PASSWORD: ${{ env.ORACLE_SMOKE_DASHBOARD_PASSWORD }}
+          SUPER_ADMIN_PASSWORD: ${{ env.ORACLE_SMOKE_SUPER_ADMIN_PASSWORD }}
+          ARCHIVER_SHARED_SECRET: ${{ env.ORACLE_SMOKE_ARCHIVER_SHARED_SECRET }}
+          ORACLE_AUDIT_CHECKPOINT_SECRET: ${{ env.ORACLE_SMOKE_AUDIT_CHECKPOINT_SECRET }}
           SESSION_COOKIE_SECURE: "false"
           ALLOW_INSECURE_COOKIES: "true"
           ORACLE_ALLOW_HTTP_STORE_URLS: "true"
