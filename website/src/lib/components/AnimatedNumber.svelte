@@ -85,8 +85,6 @@
     if (!animated) {
       displayValue = initial;
       hasAnimatedInView = true;
-      isInView = true;
-      displayValue = value;
       return;
     }
     if (!animateOnView) {
