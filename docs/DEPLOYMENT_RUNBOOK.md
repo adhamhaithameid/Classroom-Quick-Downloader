@@ -364,6 +364,11 @@ curl -fsS https://cqd-analytics.adhamhaithameid.workers.dev/health
 curl -fsS https://cqd-analytics.adhamhaithameid.workers.dev/public/site-metrics
 curl -fsS https://cqd-analytics.adhamhaithameid.workers.dev/api/public/website/overview
 curl -fsS https://cqd-analytics.adhamhaithameid.workers.dev/api/public/website/uninstall
+curl -fsS -X POST https://cqd-analytics.adhamhaithameid.workers.dev/api/public/website/events \
+  -H 'Origin: https://<your-root-domain>' \
+  -H 'Content-Type: application/json' \
+  -H 'X-Requested-With: XMLHttpRequest' \
+  -d '{"schemaVersion":"1","sessionId":"smoke","pagePath":"/overview","events":[{"eventId":"smoke-evt-1","eventType":"cta","action":"install_click","placement":"hero_install"}]}'
 
 # Oracle live checks
 ORACLE_BASE_URL="http://<your-oracle-host>:8080"
