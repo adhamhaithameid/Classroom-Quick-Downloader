@@ -186,14 +186,17 @@ type timeSeriesPoint struct {
 }
 
 type timeSeriesResponse struct {
-	OK          bool              `json:"ok"`
-	Granularity string            `json:"granularity"`
-	Range       string            `json:"range,omitempty"`
-	ExtVersion  string            `json:"extVersion,omitempty"`
-	From        string            `json:"from"`
-	To          string            `json:"to"`
-	Points      []timeSeriesPoint `json:"points"`
-	Buckets     []timeSeriesPoint `json:"buckets"` // Backward-compatible alias for older clients/tests.
+	OK             bool              `json:"ok"`
+	Granularity    string            `json:"granularity"`
+	Range          string            `json:"range,omitempty"`
+	ExtVersion     string            `json:"extVersion,omitempty"`
+	GeneratedAtUTC string            `json:"generatedAtUtc,omitempty"`
+	WindowStartUTC string            `json:"windowStartUtc,omitempty"`
+	WindowEndUTC   string            `json:"windowEndUtc,omitempty"`
+	From           string            `json:"from"`
+	To             string            `json:"to"`
+	Points         []timeSeriesPoint `json:"points"`
+	Buckets        []timeSeriesPoint `json:"buckets"` // Backward-compatible alias for older clients/tests.
 }
 
 func TimeSeriesHandler(db *sql.DB) http.HandlerFunc {
