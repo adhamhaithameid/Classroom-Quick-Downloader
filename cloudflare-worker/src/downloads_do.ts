@@ -1518,6 +1518,18 @@ type PipelineHealthResponse = {
     warnBufferUtil: number;
     criticalBufferUtil: number;
   };
+  websiteTelemetry?: {
+    pendingBatches: number;
+    deadLetterBatches: number;
+    retryCount: number;
+    lastBatchCreatedAtUtc: number | null;
+    lastBatchSentAtUtc: number | null;
+    lastBatchAckAtUtc: number | null;
+    lastBatchId: string | null;
+    lastCorrelationId: string | null;
+    lastError: string | null;
+    nextRetryAtUtc: number | null;
+  };
 };
 
 type PipelineHealthNotification = PipelineHealthResponse & {
