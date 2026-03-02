@@ -6551,7 +6551,7 @@ snapshots:
       jszip: 3.10.1
       linkedom: 0.18.12
       magicast: 0.5.2
-      minimatch: 10.2.2
+      minimatch: 10.2.4
       nano-spawn: 2.0.0
       normalize-path: 3.0.0
       nypm: 0.6.5
