@@ -286,6 +286,15 @@
     padding-bottom: 56px;
   }
 
+  .site-main-overview-style {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+
   .site-route-shell {
     min-height: 100%;
     will-change: opacity;
