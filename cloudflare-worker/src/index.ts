@@ -1165,6 +1165,26 @@ async function handleProtectedAdminEndpoint(request: Request, env: WorkerEnv): P
     return unauthorizedResponse(request, env);
   }
 
+  // Session-authenticated mutating admin routes must pass CSRF/origin checks.
+  if (!auth.hasValidSecret) {
+    const csrf = isAdminMutationCsrfAllowed(request, env);
+    if (!csrf.ok) {
+      return withCors(
+        request,
+        new Response(
+          JSON.stringify({
+            ok: false,
+            error: "csrf_validation_failed",
+            code: csrf.code || "csrf_invalid",
+            message: csrf.message || "Mutating admin request failed CSRF validation.",
+          }),
+          { status: 403, headers: { "content-type": "application/json; charset=utf-8" } },
+        ),
+        env,
+      );
+    }
+  }
+
   // If session-based auth but no secret header, inject the secret for DO
   const stub = getDownloadsStub(env);
   const country = (request.cf as unknown as { country?: string })?.country;
