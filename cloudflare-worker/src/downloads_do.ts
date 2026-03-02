@@ -2833,8 +2833,11 @@ export class DownloadsDurable {
 
     // Flush extension buffered events once daily at 23:00 UTC.
     const currentHour = new Date().getUTCHours();
-    if (this.d.buffer.length > 0 && currentHour === 0) {
-      logEvent("info", "alarm_midnight_flush", { bufferedEvents: this.d.buffer.length });
+    if ((this.d.buffer.length > 0 || this.d.pendingBatches.length > 0) && currentHour === 23) {
+      logEvent("info", "alarm_daily_flush", {
+        bufferedEvents: this.d.buffer.length,
+        pendingBatches: this.d.pendingBatches.length,
+      });
       await this.flushToOracle(true);
     }
 
