@@ -696,7 +696,6 @@
     justify-content: center;
     gap: 10px;
     flex-wrap: wrap;
-    padding: 12px 0;
   }
 
   .reinstall-row a {
