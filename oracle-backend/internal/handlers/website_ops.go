@@ -1142,6 +1142,10 @@ func WebsiteOpsStateHandler(db *sql.DB) http.HandlerFunc {
 		response.LastBatches.OracleToWebsite = oracleBatch
 		response.LastBatches.CloudflareToWebsite = cloudflareBatch
 		response.LastBatches.WebsiteToOracle = websiteBatch
+		anomaly, anomalyErr := loadLatestWebsiteMonotonicAnomaly(r.Context(), db)
+		if anomalyErr == nil {
+			response.Anomaly = anomaly
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(response)
