@@ -2048,25 +2048,9 @@
           var container = document.getElementById('chart-' + dim);
           if (!container) return;
           try {
-            var data = await fetchJSON('/api/stats/breakdown?dimension=' + dim + '&from=' + range.from + '&to=' + range.to);
-            if (!data.values || !data.values.length) {
-              container.innerHTML = '<div class="empty-state">No data</div>';
-              continue;
-            }
-            var maxCount = Math.max.apply(null, data.values.map(function(v) { return v.count; }));
-            var html = '<div class="breakdown-bars">';
-            data.values.slice(0, 5).forEach(function(v) {
-              var pct = (v.count / maxCount) * 100;
-              var labelRaw = String(v.value || 'Unknown');
-              var labelTooltip = dim === 'country' ? resolveCountryName(labelRaw) : '';
-              var labelAttr = labelTooltip ? (' data-tooltip="' + escapeHtml(labelTooltip) + '"') : '';
-              html += '<div class="breakdown-bar-item"><span class="breakdown-bar-label"' + labelAttr + '>' + escapeHtml(labelRaw) + '</span>';
-              html += '<div class="breakdown-bar-track"><progress class="breakdown-progress ' + colors[i] + '" max="100" value="' + Math.round(pct) + '"></progress><span class="breakdown-progress-value">' + Math.round(pct) + '%</span></div>';
-              html += '<span class="breakdown-bar-count">' + fmtNumber(v.count) + '</span></div>';
-            });
-            html += '</div>';
-            container.innerHTML = html;
-          } catch (e) {
+            var data = await fetchJSON('/api/stats/breakdown?dimension=' + encodeURIComponent(dim) + '&range=' + encodeURIComponent(rangeParams.range));
+            renderBreakdownBars(container, dim, Array.isArray(data.values) ? data.values : [], colors[dim] || 'blue');
+          } catch (_) {
             container.innerHTML = '<div class="empty-state empty-state-danger">Failed</div>';
           }
         }
