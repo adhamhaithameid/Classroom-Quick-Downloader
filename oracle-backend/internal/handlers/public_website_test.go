@@ -433,6 +433,15 @@ func TestPublicWebsiteHandlers_AllowsCloudflarePagesDefaultOrigin(t *testing.T) 
 	}
 }
 
+func TestResolvePublicWebsiteAllowedOrigins_IncludesPublicSiteURL(t *testing.T) {
+	t.Setenv("PUBLIC_SITE_URL", "https://example-root-domain.com/path")
+	t.Setenv("PUBLIC_WEBSITE_ALLOWED_ORIGINS", "")
+	allowed := resolvePublicWebsiteAllowedOrigins()
+	if _, ok := allowed["https://example-root-domain.com"]; !ok {
+		t.Fatalf("expected PUBLIC_SITE_URL origin to be auto-allowed, got map: %+v", allowed)
+	}
+}
+
 func TestPublicWebsiteHandlers_PreflightForAllowedOrigin(t *testing.T) {
 	sqlDB := openPublicWebsiteDB(t)
 	t.Setenv("PUBLIC_WEBSITE_ALLOWED_ORIGINS", "https://adhamhaithameid.github.io")
