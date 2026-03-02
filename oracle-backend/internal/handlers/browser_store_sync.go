@@ -459,6 +459,9 @@ func syncDeploymentTargets(
 			if strings.TrimSpace(stats.users) != "" {
 				data["users"] = strings.TrimSpace(stats.users)
 				data["usersCount"] = stats.usersCount
+				if stats.usersMetric != "" {
+					data["usersMetric"] = stats.usersMetric
+				}
 			}
 			if strings.TrimSpace(stats.version) != "" {
 				data["version"] = strings.TrimSpace(stats.version)
