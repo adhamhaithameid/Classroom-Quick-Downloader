@@ -2821,10 +2821,128 @@
               }
             })
           });
-          var form = document.getElementById('user-changelog-form');
-          if (form) form.reset();
-          await loadUserChangelogRecords();
-        } catch (_) {}
+          setContentSyncStatus('user-changelog-source-status', 'saved', false);
+          await refreshUserChangelogPublicPreview();
+        } catch (_) {
+          setContentSyncStatus('user-changelog-source-status', 'failed to save source config', true);
+        }
+      }
+
+      async function previewUserChangelogDraft(fromUrlOnly) {
+        var markdownNode = document.getElementById('user-changelog-markdown');
+        var urlNode = document.getElementById('user-changelog-markdown-url');
+        var previewNode = document.getElementById('user-changelog-draft-preview');
+        if (!previewNode) return;
+        var markdown = markdownNode ? String(markdownNode.value || '').trim() : '';
+        var markdownUrl = urlNode ? String(urlNode.value || '').trim() : '';
+        if (fromUrlOnly) markdown = '';
+
+        if (!markdown && markdownUrl) {
+          try {
+            var res = await fetch(markdownUrl, { credentials: 'omit' });
+            if (res.ok) {
+              markdown = String(await res.text());
+              if (markdownNode) markdownNode.value = markdown;
+            }
+          } catch (_) {}
+        }
+        if (!markdown) {
+          previewNode.innerHTML = '<div class="empty-state">Paste markdown or provide a valid markdown URL first.</div>';
+          return;
+        }
+        var parsed = parseUserFriendlyChangelogMarkdown(markdown);
+        if (!parsed.releases.length) {
+          previewNode.innerHTML = '<div class="empty-state empty-state-danger">No valid releases found in markdown.</div>';
+          return;
+        }
+        var release = parsed.releases[0];
+        var html = renderReleasePreviewHTML(release);
+        if (parsed.errors.length) {
+          html = '<div class="content-record-meta status-error">Warnings: ' + escapeHtml(parsed.errors.slice(0, 3).join(' | ')) + '</div>' + html;
+        }
+        previewNode.innerHTML = html;
+      }
+
+      function showUserChangelogFormatInfo() {
+        window.alert(
+          'Supported format:\\n\\n## v1.3.8\\n### Summary\\nOne summary line\\n### Added\\n- bullet\\n### Changed\\n- bullet\\n### Fixed\\n- bullet\\n\\nSource file: user-friendly-changelog.md on GitHub.'
+        );
+      }
+
+      async function saveUserChangelogRecord(e) {
+        e.preventDefault();
+        var markdown = (document.getElementById('user-changelog-markdown').value || '').trim();
+        var markdownUrl = (document.getElementById('user-changelog-markdown-url').value || '').trim();
+        var now = Date.now();
+
+        if (!markdown && markdownUrl) {
+          try {
+            var fetched = await fetch(markdownUrl, { credentials: 'omit' });
+            if (fetched.ok) {
+              markdown = String(await fetched.text());
+              var mdNode = document.getElementById('user-changelog-markdown');
+              if (mdNode) mdNode.value = markdown;
+            }
+          } catch (_) {}
+        }
+
+        if (markdown) {
+          var parsedMarkdown = parseUserFriendlyChangelogMarkdown(markdown);
+          if (!parsedMarkdown.releases.length) {
+            setContentSyncStatus('user-changelog-sync-status', 'Markdown parse failed: no valid releases', true);
+            return;
+          }
+          var okStepUp = await ensureStepUp();
+          if (!okStepUp) return;
+          try {
+            for (var idx = 0; idx < parsedMarkdown.releases.length; idx += 1) {
+              var release = parsedMarkdown.releases[idx];
+              var version = normalizeVersionToken(release.version || '');
+              var keyFromVersion = normalizeKey('release-' + version.replace(/\./g, '-'), 'release');
+              var data = {
+                version: version,
+                title: 'Release update',
+                summary: String(release.summary || '').slice(0, 500),
+                releasedAtUtc: now - (idx * 1000),
+                highlights: releaseToHighlights(release),
+                added: (release.added || []).slice(0, 6),
+                changed: (release.changed || []).slice(0, 6),
+                fixed: (release.fixed || []).slice(0, 6),
+                markdown: buildReleaseMarkdown(release),
+                updatedAtUtc: now
+              };
+              await fetchJSONWithInit('/api/admin/records/upsert', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ recordType: USER_CHANGELOG_RECORD_TYPE, recordKey: keyFromVersion, data: data })
+              });
+            }
+            await fetchJSONWithInit('/api/admin/records/upsert', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                recordType: USER_CHANGELOG_REVISION_RECORD_TYPE,
+                recordKey: normalizeKey('rev-' + now, 'rev'),
+                data: {
+                  source: markdownUrl ? 'github' : 'manual',
+                  markdownUrl: markdownUrl || '',
+                  createdAtUtc: now,
+                  releases: parsedMarkdown.releases.length,
+                  valid: parsedMarkdown.errors.length === 0,
+                  errors: parsedMarkdown.errors.slice(0, 8)
+                }
+              })
+            });
+            var formMd = document.getElementById('user-changelog-form');
+            if (formMd) formMd.reset();
+            await loadUserChangelogRecords();
+          } catch (errMd) {
+            setContentSyncStatus('user-changelog-sync-status', 'Failed to save markdown changelog.', true);
+          }
+          return;
+        }
+
+        setContentSyncStatus('user-changelog-sync-status', 'Paste markdown or import URL using the required format.', true);
       }
 
       async function deleteUserChangelogRecord(key) {
