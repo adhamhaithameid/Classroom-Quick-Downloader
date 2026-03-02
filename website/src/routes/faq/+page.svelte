@@ -371,12 +371,7 @@
           a: 'Follow the repository\'s security policy (SECURITY.md) and report privately through the documented security contact path instead of posting sensitive details publicly.'
         },
         {
-          id: 'oss-changelog',
-          q: 'Where can I see release history?',
-          a: 'The website changelog provides user-facing release notes. The GitHub repository contains the full technical commit history and detailed release notes.'
-        },
-        {
-          id: 'oss-contribute',
+          id: 'dev-contribute',
           q: 'Can I contribute to the project?',
           a: 'Absolutely. Pull requests, bug reports, feature suggestions, and even documentation improvements are welcome. Check the CONTRIBUTING guidelines in the repository.'
         },
