@@ -474,6 +474,61 @@ function normalizeHeaderOrigin(rawOrigin: string | null): string | null {
   }
 }
 
+function normalizeRefererOrigin(rawReferer: string | null): string | null {
+  if (!rawReferer) return null;
+  try {
+    const refererOrigin = new URL(rawReferer).origin;
+    return refererOrigin === "null" ? null : refererOrigin;
+  } catch {
+    return null;
+  }
+}
+
+function isCloudflareAccessRequired(env: WorkerEnv): boolean {
+  if ((env.CLOUDFLARE_ACCESS_REQUIRED || "").trim().toLowerCase() === "true") {
+    return true;
+  }
+  return parseAllowedEmails(env.CLOUDFLARE_ACCESS_EMAIL_ALLOWLIST).size > 0;
+}
+
+function hasCloudflareAccessIdentity(request: Request): boolean {
+  const email = (request.headers.get("CF-Access-Authenticated-User-Email") || "").trim();
+  const jwt = (request.headers.get("CF-Access-Jwt-Assertion") || "").trim();
+  return email !== "" || jwt !== "";
+}
+
+function isCloudflareAccessIdentityAllowed(request: Request, env: WorkerEnv): boolean {
+  if (!isCloudflareAccessRequired(env)) return true;
+  if (!hasCloudflareAccessIdentity(request)) return false;
+  const allowedEmails = parseAllowedEmails(env.CLOUDFLARE_ACCESS_EMAIL_ALLOWLIST);
+  if (allowedEmails.size === 0) {
+    return true;
+  }
+  const email = (request.headers.get("CF-Access-Authenticated-User-Email") || "").trim().toLowerCase();
+  if (!email) return false;
+  return allowedEmails.has(email);
+}
+
+function cloudflareAccessDeniedResponse(request: Request, env: WorkerEnv, pathname: string): Response {
+  if (pathname === "/" || pathname === "/dashboard" || pathname === "/logout") {
+    return new Response("Access denied: Cloudflare Access identity required.", {
+      status: 403,
+      headers: { "content-type": "text/plain; charset=utf-8" },
+    });
+  }
+  return withCors(
+    request,
+    new Response(
+      JSON.stringify({
+        ok: false,
+        error: "access_identity_required",
+      }),
+      { status: 403, headers: { "content-type": "application/json; charset=utf-8" } },
+    ),
+    env,
+  );
+}
+
 function isCorsOriginAllowedForPath(request: Request, env: WorkerEnv, pathname: string): boolean {
   const headerOrigin = normalizeHeaderOrigin(request.headers.get("Origin"));
   if (!headerOrigin) return true;
