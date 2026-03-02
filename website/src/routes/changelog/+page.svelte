@@ -529,10 +529,9 @@
   .cl-sidebar-link:hover .cl-sv { color: var(--green); }
   .cl-sv { font-weight: 700; font-size: 14px; color: var(--text); }
 
-  .sv {
-    font-weight: 700;
-    font-size: 14px;
-    color: var(--text);
+  /* ── Timeline ───────────────────── */
+  .cl-timeline {
+    display: flex; flex-direction: column;
   }
 
   .sidebar-links a:hover .sv {
