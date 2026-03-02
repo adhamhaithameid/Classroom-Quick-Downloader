@@ -124,8 +124,10 @@
     };
   });
 
-  $: if (!animated && displayValue !== value) {
-    displayValue = value;
+  $: if (!animated) {
+    stopAnimation();
+    displayValue = safeNumber(value);
+    hasAnimatedInView = true;
   }
 
   $: if (animated && hasAnimatedInView && !priming && displayValue !== value) {
