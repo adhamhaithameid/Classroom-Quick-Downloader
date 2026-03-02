@@ -322,7 +322,9 @@
   }
 
   function stopRotationLoop(): void {
-    cancelAnimationFrame(animationFrameId);
+    if (typeof window !== 'undefined' && typeof window.cancelAnimationFrame === 'function' && animationFrameId) {
+      window.cancelAnimationFrame(animationFrameId);
+    }
     animationFrameId = 0;
     lastAnimationTs = 0;
   }
