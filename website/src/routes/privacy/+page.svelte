@@ -232,7 +232,7 @@
     font-size: 32px; flex-shrink: 0;
   }
 
-  .privacy-updated {
+  .prv-banner-item strong {
     display: block;
     margin-top: 6px;
     color: var(--muted);
