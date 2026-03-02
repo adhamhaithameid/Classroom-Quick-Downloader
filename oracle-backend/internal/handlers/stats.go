@@ -393,11 +393,12 @@ func BreakdownHandler(db *sql.DB) http.HandlerFunc {
 		})
 
 		resp := breakdownResponse{
-			OK:        true,
-			Dimension: dim,
-			From:      fromTime.Format("2006-01-02"),
-			To:        toTime.Format("2006-01-02"),
-			Values:    values,
+			OK:             true,
+			Dimension:      dim,
+			GeneratedAtUTC: now.Format(time.RFC3339),
+			From:           fromTime.Format("2006-01-02"),
+			To:             toTime.Format("2006-01-02"),
+			Values:         values,
 		}
 
 		w.Header().Set("Content-Type", "application/json")
