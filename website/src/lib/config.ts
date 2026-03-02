@@ -2,8 +2,8 @@ import { env } from '$env/dynamic/public';
 
 const DEFAULT_SITE_URL = 'https://classroom-quick-downloader-website.pages.dev';
 const DEFAULT_WORKER_URL = 'https://cqd-analytics.adhamhaithameid.workers.dev';
-const DEFAULT_ORACLE_URL = DEFAULT_WORKER_URL;
-const DEFAULT_APP_VERSION = 'v1.3.7';
+const DEFAULT_ORACLE_URL = 'https://oracle.classroom-quick-downloader.com';
+const DEFAULT_APP_VERSION = 'v1.3.8';
 
 function cleanBaseUrl(value: string): string {
   return value.trim().replace(/\/+$/, '');
