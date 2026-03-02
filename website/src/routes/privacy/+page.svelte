@@ -114,24 +114,7 @@
         </a>
       </div>
     </div>
-  </header>
-
-  <div class="section-grid">
-    {#each privacy.sections as section, i}
-      <article class="privacy-section" style="animation-delay: {i * 0.06}s">
-        <div class="section-icon">{sectionIcons[i % sectionIcons.length]}</div>
-        <h2>{section.title}</h2>
-        <p class="section-summary"><AnimatedNumericText text={section.summary} animated /></p>
-        {#if section.bullets.length > 0}
-          <ul>
-            {#each section.bullets as bullet}
-              <li><AnimatedNumericText text={bullet} animated /></li>
-            {/each}
-          </ul>
-        {/if}
-      </article>
-    {/each}
-  </div>
+  </section>
 </div>
 
 <style>
