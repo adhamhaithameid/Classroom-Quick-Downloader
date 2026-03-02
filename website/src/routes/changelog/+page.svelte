@@ -479,8 +479,12 @@
     max-width: 400px; margin: 0 auto;
   }
 
-  /* ── Body ────────────────────────── */
-  .changelog-body {
+  .cl-state-icon { font-size: 36px; display: block; margin-bottom: 12px; }
+  .cl-state-inner p { color: var(--text-secondary); font-size: 15px; margin: 8px 0 16px; }
+  .cl-state-inner strong { font-size: 17px; }
+
+  /* ── Layout ─────────────────────── */
+  .cl-layout {
     display: grid;
     grid-template-columns: 200px 1fr;
     gap: 32px;
