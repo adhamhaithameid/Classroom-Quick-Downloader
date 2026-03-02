@@ -460,6 +460,12 @@ const (
 	defaultDeploymentsAutoSyncInterval = 15 * time.Minute
 	minDeploymentsAutoSyncInterval     = 1 * time.Minute
 	maxDeploymentsAutoSyncInterval     = 24 * time.Hour
+	defaultWebsiteTrafficSyncInterval  = 1 * time.Hour
+	minWebsiteTrafficSyncInterval      = 1 * time.Minute
+	maxWebsiteTrafficSyncInterval      = 24 * time.Hour
+	defaultWebsiteTrafficSyncLookback  = 48 * time.Hour
+	minWebsiteTrafficSyncLookback      = 1 * time.Hour
+	maxWebsiteTrafficSyncLookback      = 30 * 24 * time.Hour
 )
 
 func deploymentsAutoSyncEnabled() bool {
