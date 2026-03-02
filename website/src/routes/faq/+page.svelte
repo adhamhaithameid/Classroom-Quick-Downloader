@@ -399,7 +399,35 @@
   let activeSection: string | null = null;
 
   function toggle(id: string): void {
-    openId = openId === id ? null : id;
+    if (openIds.has(id)) {
+      openIds.delete(id);
+    } else {
+      openIds.add(id);
+    }
+    openIds = new Set(openIds);
+  }
+
+  $: filteredSections = (() => {
+    if (!searchQuery.trim()) return activeSection ? sections.filter(s => s.title === activeSection) : sections;
+    const q = searchQuery.toLowerCase();
+    return sections
+      .map(s => ({
+        ...s,
+        items: s.items.filter(i => i.q.toLowerCase().includes(q) || i.a.toLowerCase().includes(q))
+      }))
+      .filter(s => s.items.length > 0);
+  })();
+
+
+
+  function clearSearch(): void {
+    searchQuery = '';
+    activeSection = null;
+  }
+
+  function selectSection(title: string): void {
+    activeSection = activeSection === title ? null : title;
+    searchQuery = '';
   }
 </script>
 
