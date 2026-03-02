@@ -3844,6 +3844,56 @@ export class DownloadsDurable {
     });
   }
 
+  private async handleAdminWebsiteReplayDLQ(request: Request): Promise<Response> {
+    if (!this.isAuthorizedAdmin(request)) {
+      return json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+
+    let limit = this.d.websiteTelemetryDeadLetter.length;
+    if (request.headers.get("content-type")?.toLowerCase().includes("application/json")) {
+      try {
+        const body = await request.json() as { limit?: number };
+        if (body && typeof body.limit === "number" && Number.isFinite(body.limit)) {
+          limit = clampInt(body.limit, 1, 1000, limit);
+        }
+      } catch {
+        // Ignore malformed body and replay all by default.
+      }
+    }
+
+    const replayCount = Math.min(limit, this.d.websiteTelemetryDeadLetter.length);
+    const replaying = this.d.websiteTelemetryDeadLetter.splice(0, replayCount);
+    for (const batch of replaying.reverse()) {
+      this.d.websiteTelemetryQueue.unshift({
+        ...batch,
+        attempt: 0,
+        nextRetryAtUtc: null,
+        lastError: null,
+      });
+    }
+    if (this.d.websiteTelemetryQueue.length > WEBSITE_TELEMETRY_MAX_QUEUE_BATCHES) {
+      this.d.websiteTelemetryQueue = this.d.websiteTelemetryQueue.slice(0, WEBSITE_TELEMETRY_MAX_QUEUE_BATCHES);
+    }
+    this.d.websiteTelemetryLastError = null;
+    this.appendDangerAudit(
+      request,
+      "website_replay_dlq",
+      "/admin/website/replay-dlq",
+      "ok",
+      `replayed=${replayCount}`,
+    );
+    await this.scheduleAlarmAtEarliest(Date.now() + 500);
+    await this.persist();
+
+    return json({
+      ok: true,
+      replayed: replayCount,
+      pendingBatches: this.d.websiteTelemetryQueue.length,
+      deadLetterBatches: this.d.websiteTelemetryDeadLetter.length,
+      nextRetryAtUtc: this.d.websiteTelemetryQueue[0]?.nextRetryAtUtc ?? null,
+    });
+  }
+
   private async handleAdminWebsiteRefreshToggle(request: Request): Promise<Response> {
     if (!this.isAuthorizedAdmin(request)) {
       return json({ ok: false, error: "unauthorized" }, { status: 401 });
