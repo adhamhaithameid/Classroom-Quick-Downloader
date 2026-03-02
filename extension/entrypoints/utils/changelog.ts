@@ -250,7 +250,10 @@ export async function fetchChangelog(force = false): Promise<ChangelogData | nul
   if (!CHANGELOG_URL) return data || null;
 
   try {
-    const res = await fetch(CHANGELOG_URL);
+    const requestUrl = force
+      ? `${CHANGELOG_URL}${CHANGELOG_URL.includes('?') ? '&' : '?'}${FORCE_REFRESH_QUERY_KEY}=${Date.now()}`
+      : CHANGELOG_URL;
+    const res = await fetch(requestUrl, { cache: 'no-store' });
     if (!res.ok) throw new Error('Network error');
     
     const json = await res.json();
