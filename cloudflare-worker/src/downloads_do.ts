@@ -2776,6 +2776,30 @@ export class DownloadsDurable {
     if (pathname === "/admin/changelog" && request.method === "POST") {
       return this.handleAdminUpdateChangelog(request);
     }
+    if (pathname === "/admin/changelog" && request.method === "GET") {
+      return this.handleAdminGetChangelogState(request);
+    }
+    if (pathname === "/admin/changelog/parse" && request.method === "POST") {
+      return this.handleAdminParseChangelog(request);
+    }
+    if (pathname === "/admin/changelog/history" && request.method === "GET") {
+      return this.handleAdminChangelogHistory(request);
+    }
+    if (pathname === "/admin/changelog/rules" && request.method === "POST") {
+      return this.handleAdminSaveChangelogRules(request);
+    }
+    if (pathname === "/admin/changelog/draft" && request.method === "POST") {
+      return this.handleAdminSaveChangelogDraft(request);
+    }
+    if (pathname === "/admin/changelog/publish" && request.method === "POST") {
+      return this.handleAdminPublishChangelogDraft(request);
+    }
+    if (pathname === "/admin/changelog/mode" && request.method === "POST") {
+      return this.handleAdminSetChangelogMode(request);
+    }
+    if (pathname === "/admin/changelog/sync-now" && request.method === "POST") {
+      return this.handleAdminSyncChangelogNow(request);
+    }
 
     // Login rate limiting - used by worker to check/record attempts
     if (pathname === "/auth/login-attempt" && request.method === "POST") {
