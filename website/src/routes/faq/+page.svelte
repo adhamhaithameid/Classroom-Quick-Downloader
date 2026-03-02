@@ -460,7 +460,7 @@
         Can't find what you need? <a href="mailto:adhamhaithameid@gmail.com" class="fq-contact-link">Get in touch</a>.
       </p>
     </div>
-  </header>
+  </section>
 
   <div class="faq-quick-links">
     <a href="{base}/privacy" class="faq-quick-link">Privacy Summary</a>
