@@ -4516,6 +4516,15 @@ export class DownloadsDurable {
       );
     }
 
+    this.appendDangerAudit(
+      request,
+      "force_flush",
+      "/admin/force-flush",
+      "ok",
+      `sent=${result.sent}`,
+    );
+    await this.persist();
+
     return json({
       ok: true,
       sent: result.sent,
