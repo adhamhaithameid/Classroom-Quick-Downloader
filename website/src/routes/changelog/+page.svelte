@@ -668,5 +668,18 @@
       grid-template-columns: 20px 1fr;
       gap: 14px; padding-bottom: 20px;
     }
+
+    .cl-entry-card { padding: 20px; }
+  }
+
+  @media (max-width: 600px) {
+    .cl-hero { padding: 40px 16px 32px; }
+    .cl-hero-actions { flex-direction: column; align-items: center; }
+    .cl-state-card { padding: 32px 20px; }
+    .cl-sidebar-link {
+      min-width: 102px;
+      padding: 9px 10px;
+    }
+    .cl-sv { font-size: 13px; }
   }
 </style>
