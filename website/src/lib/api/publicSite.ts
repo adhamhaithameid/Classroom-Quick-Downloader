@@ -526,7 +526,7 @@ export async function fetchUninstallStats(): Promise<UninstallStatsResponse> {
 
 export async function submitUninstallFeedback(body: UninstallFeedbackRequest): Promise<UninstallFeedbackResponse> {
   const response = await withTimeout(
-    fetch(`${ORACLE_API_BASE_URL}/api/public/website/uninstall`, {
+    fetch(`${WORKER_BASE_URL}/api/public/website/uninstall`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
