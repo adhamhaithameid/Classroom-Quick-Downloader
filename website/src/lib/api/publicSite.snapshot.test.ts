@@ -12,7 +12,7 @@ afterEach(() => {
 });
 
 describe('fetchWebsiteSnapshot', () => {
-  it('loads overview + map from Oracle and caches for 3 hours', async () => {
+  it('loads canonical snapshot from Oracle and caches for 3 hours', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-02-23T00:00:00.000Z'));
 
