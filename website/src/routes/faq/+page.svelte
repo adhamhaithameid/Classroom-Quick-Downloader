@@ -432,7 +432,7 @@
 </script>
 
 <svelte:head>
-  <title>FAQ - Classroom Quick Downloader</title>
+  <title>FAQ — Classroom Quick Downloader</title>
   <meta
     name="description"
     content="Comprehensive FAQ for Classroom Quick Downloader: setup, browser support, privacy, troubleshooting, security, and release information."
