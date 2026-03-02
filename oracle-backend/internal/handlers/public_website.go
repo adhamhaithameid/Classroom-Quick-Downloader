@@ -370,7 +370,7 @@ func PublicWebsiteMapHandler(sqliteDB, postgresDB *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		rawTotals, err := loadTotals(r.Context(), sqliteDB)
+		snapshot, err := loadOrRefreshPublicWebsiteSnapshot(r.Context(), sqliteDB, postgresDB, false)
 		if err != nil {
 			http.Error(w, "failed to load totals", http.StatusInternalServerError)
 			return
