@@ -4127,6 +4127,7 @@
         if (!withShift && key === '2') { showPage('activity'); return true; }
         if (!withShift && key === '3') { showPage('dashboards'); return true; }
         if (!withShift && key === '8') { showPage('website-sync'); return true; }
+        if (!withShift && key === '6') { showPage('website-analysis'); return true; }
         if (!withShift && key === '4') { showPage('creative'); return true; }
         if (!withShift && key === '5') { showPage('content-changelog'); return true; }
         if (!withShift && key === '7') { showPage('logs'); return true; }
