@@ -130,6 +130,11 @@ function coerceChangelogPayload(input: unknown): ChangelogResponse {
     : [];
 
   entries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  const rawSource = input as Record<string, unknown> | null;
+  const config = sanitizeChangelogConfig(rawSource?.config);
+  const meta = sanitizeChangelogMeta(rawSource?.meta);
+
   return {
     ok: source?.ok === true,
     entries
