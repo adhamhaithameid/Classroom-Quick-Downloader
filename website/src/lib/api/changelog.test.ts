@@ -164,7 +164,9 @@ describe('fetchChangelog', () => {
     TEST_TIMEOUT_MS
   );
 
-  it('defaults isImportant to false when not provided', async () => {
+  it(
+    'defaults isImportant to false when not provided',
+    async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () =>
