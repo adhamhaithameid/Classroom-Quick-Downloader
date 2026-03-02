@@ -106,7 +106,8 @@
       submitMessage = response?.message || 'Thank you — your feedback helps us build better software.';
     } catch (error) {
       submitState = 'error';
-      submitMessage = 'Could not submit feedback. Please try again later.';
+      submitMessage =
+        error instanceof Error && error.message ? error.message : 'Could not submit feedback. Please try again later.';
     }
   }
 
