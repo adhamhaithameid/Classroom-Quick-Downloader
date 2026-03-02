@@ -83,6 +83,7 @@ type deploymentSyncResult struct {
 	URL         string `json:"url"`
 	Users       string `json:"users"`
 	UsersCount  int64  `json:"usersCount"`
+	UsersMetric string `json:"usersMetric,omitempty"`
 	Version     string `json:"version"`
 	Rating      string `json:"rating"`
 	RatingCount int64  `json:"ratingCount"`
