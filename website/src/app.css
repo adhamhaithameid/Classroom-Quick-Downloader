@@ -33,6 +33,8 @@
   --radius: 18px;
   --radius-sm: 12px;
   --radius-lg: 24px;
+  --font-ui: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui;
+  --emoji-font-stack: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', 'Twemoji Mozilla';
 }
 
 * {
