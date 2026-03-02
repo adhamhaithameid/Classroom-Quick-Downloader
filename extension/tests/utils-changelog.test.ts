@@ -175,7 +175,7 @@ describe('changelog utils', () => {
     const mod = await loadChangelogModule();
     const cfg: ChangelogConfig = {
       rules: [
-        { id: 'r1', target: '1.3.0', priority: 'major', effect: 'pulse' as const },
+        { id: 'r1', target: 'v1.3.0', priority: 'major', effect: 'pulse' as const },
         { id: 'r2', target: 'all', priority: 'minor', effect: 'glow' as const },
       ],
     };
