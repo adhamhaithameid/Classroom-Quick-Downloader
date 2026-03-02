@@ -241,7 +241,7 @@
           Built by <strong>Adham Haitham</strong>
         </a>
         <span class="l2-footer-sep">•</span>
-        <span class="l2-footer-copy">© <AnimatedNumber value={currentYear} format={{ useGrouping: false }} /> Classroom Quick Downloader</span>
+        <span class="l2-footer-copy">© {currentYear} Classroom Quick Downloader</span>
       </div>
       <div class="l2-footer-links l2-footer-links-primary">
         <a href={browserLink(detectedBrowser)} target="_blank" rel="noopener noreferrer">Download</a>
