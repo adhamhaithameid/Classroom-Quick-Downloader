@@ -450,11 +450,10 @@
   }
   .cl-action-pill:disabled { opacity: 0.6; cursor: wait; }
 
-  .header-actions {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    min-width: 180px;
+  /* ── Body ──────────────────────── */
+  .cl-body-section {
+    position: relative; z-index: 2;
+    padding: 16px 0 16px;
   }
 
   .action-btn {
