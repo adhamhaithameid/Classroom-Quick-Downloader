@@ -2775,12 +2775,18 @@
         try {
           var payload = await fetchJSON('/api/admin/records/list?type=' + encodeURIComponent(USER_CHANGELOG_CONFIG_RECORD_TYPE));
           var records = Array.isArray(payload.records) ? payload.records : [];
-          var usingDefaults = records.length === 0;
-          if (usingDefaults) records = defaultUserChangelogRecordsForDashboard();
-
-          var html = '';
-          if (usingDefaults) {
-            html += '<div class="empty-state">No saved changelog entries yet. Showing starter content preview.</div>';
+          var selected = records.find(function(item) {
+            return String((item && item.recordKey) || '').trim().toLowerCase() === 'active';
+          }) || records[0] || null;
+          var data = selected && selected.data ? selected.data : {};
+          var source = String(data.source || 'oracle').trim().toLowerCase();
+          if (source !== 'github') source = 'oracle';
+          sourceNode.value = source;
+          var urlValue = String(data.markdownUrl || '').trim();
+          if (urlValue) {
+            urlNode.value = urlValue;
+          } else if (!urlNode.value) {
+            urlNode.value = 'https://raw.githubusercontent.com/adhamhaithameid/Classroom-Quick-Downloader/main/user-friendly-changelog.md';
           }
           records.forEach(function(item) {
             var d = item.data || {};
