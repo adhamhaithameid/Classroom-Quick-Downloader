@@ -187,6 +187,7 @@ export type UninstallFeedbackRequest = {
 };
 
 export type UninstallFeedbackResponse = {
+  schemaVersion: PublicSchemaVersion;
   ok: boolean;
   generatedAt: number;
   submissionId: number;
