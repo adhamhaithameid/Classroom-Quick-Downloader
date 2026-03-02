@@ -564,9 +564,8 @@
     transform: translateY(-1px);
   }
 
-  .notes-wrap em {
-    font-weight: 400;
-    color: var(--muted);
+  .un-mini-check {
+    flex-shrink: 0;
   }
 
   .notes-wrap textarea {
