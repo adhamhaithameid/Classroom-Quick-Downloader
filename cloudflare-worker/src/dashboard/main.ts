@@ -5670,22 +5670,10 @@ export function renderDashboard(stats: StatsResponse): string {
             body: JSON.stringify(payload)
           });
           const data = await res.json();
-          if (data.ok) {
-            // Reload the page to show updated changelog/releases
-            window.location.reload();
-          } else {
-            // Check for unauthorized/IP block
-            if (res.status === 403 || res.status === 401) {
-              window.location.reload(); // Likely session expired
-              return;
-            }
-            alert("Error: " + (data.error || "Unknown"));
-            // Reset button state
-            if (btnSaveAll) {
-              btnSaveAll.classList.remove("btn-loading");
-              btnSaveAll.style.pointerEvents = "";
-            }
-            if (btnSaveText) btnSaveText.textContent = "Save Configuration & Publish";
+          if (!data.ok) {
+            const msg = data.error || 'parse_failed';
+            if (draftPreviewEl) draftPreviewEl.innerHTML = '<div class="cl-preview-empty">Parse failed: ' + escapeHtmlUnsafe(msg) + '</div>';
+            return;
           }
         } catch(e) {
           alert("Network error");
