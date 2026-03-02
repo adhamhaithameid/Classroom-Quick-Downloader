@@ -447,8 +447,8 @@ export async function fetchWebsiteSnapshotResult(options: { force?: boolean } = 
   if (!options.force && cachedSnapshot && isSnapshotFresh(cachedSnapshot)) {
     return buildSnapshotFetchResult(cachedSnapshot, cachedSnapshotSource, false, null);
   }
-  if (!options.force && snapshotInFlight) {
-    return snapshotInFlight;
+  if (!options.force && snapshotResultInFlight) {
+    return snapshotResultInFlight;
   }
 
   const runner = (async () => {
