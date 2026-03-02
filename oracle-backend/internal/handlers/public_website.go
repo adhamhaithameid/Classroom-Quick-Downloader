@@ -400,7 +400,7 @@ func PublicWebsiteSnapshotHandler(sqliteDB, postgresDB *sql.DB) http.HandlerFunc
 	}
 }
 
-func PublicWebsiteStatusHandler(sqliteDB *sql.DB) http.HandlerFunc {
+func PublicWebsiteStatusHandler(sqliteDB, postgresDB *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !preparePublicWebsiteCORSWithOptions(w, r, publicWebsiteCORSOptions{
 			AllowedMethods: "GET, OPTIONS",
