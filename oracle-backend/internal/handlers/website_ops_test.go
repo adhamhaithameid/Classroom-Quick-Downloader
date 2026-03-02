@@ -440,8 +440,8 @@ func TestWebsiteOpsForcePushAndOverrideHandlers(t *testing.T) {
 	if !statePayload.Control.OverrideEnabled {
 		t.Fatal("expected override to be enabled")
 	}
-	if statePayload.Control.OverrideDownloads != 777 {
-		t.Fatalf("expected override downloads=777, got %d", statePayload.Control.OverrideDownloads)
+	if statePayload.Control.OverrideDownloads != 1777 {
+		t.Fatalf("expected override downloads=1777, got %d", statePayload.Control.OverrideDownloads)
 	}
 	if len(statePayload.Control.OverrideCountries) != 2 {
 		t.Fatalf("expected 2 override countries, got %+v", statePayload.Control.OverrideCountries)
