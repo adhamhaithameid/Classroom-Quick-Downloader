@@ -4417,6 +4417,7 @@ export class DownloadsDurable {
       
       // Preserve Changelog
       changelog: this.d.changelog ?? [],
+      changelogRevisions: this.d.changelogRevisions ?? [],
       changelogConfig: this.d.changelogConfig ?? {
         customPill: false,
         showNotification: false,
