@@ -4047,6 +4047,26 @@ export function renderDashboard(stats: StatsResponse): string {
                 <strong id="website-last-batch-slot" style="color:var(--text-primary);">—</strong>
               </div>
               <div style="display:flex; justify-content:space-between; gap:10px; font-size:0.78rem;">
+                <span style="color: var(--text-muted);">Telemetry Queue</span>
+                <strong id="website-telemetry-queue" style="color:var(--text-primary);">—</strong>
+              </div>
+              <div style="display:flex; justify-content:space-between; gap:10px; font-size:0.78rem;">
+                <span style="color: var(--text-muted);">Telemetry Retry Count</span>
+                <strong id="website-telemetry-retry-count" style="color:var(--text-primary);">—</strong>
+              </div>
+              <div style="display:flex; justify-content:space-between; gap:10px; font-size:0.78rem;">
+                <span style="color: var(--text-muted);">Last Telemetry Created (UTC)</span>
+                <strong id="website-last-telemetry-created" style="color:var(--text-primary);">—</strong>
+              </div>
+              <div style="display:flex; justify-content:space-between; gap:10px; font-size:0.78rem;">
+                <span style="color: var(--text-muted);">Last Telemetry Sent (UTC)</span>
+                <strong id="website-last-telemetry-sent" style="color:var(--text-primary);">—</strong>
+              </div>
+              <div style="display:flex; justify-content:space-between; gap:10px; font-size:0.78rem;">
+                <span style="color: var(--text-muted);">Telemetry Dead-Letter</span>
+                <strong id="website-telemetry-dlq" style="color:var(--text-primary);">—</strong>
+              </div>
+              <div style="display:flex; justify-content:space-between; gap:10px; font-size:0.78rem;">
                 <span style="color: var(--text-muted);">Last Refresh (UTC)</span>
                 <strong id="website-last-refresh-at" style="color:var(--text-primary);">—</strong>
               </div>
