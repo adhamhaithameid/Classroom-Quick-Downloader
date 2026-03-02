@@ -50,7 +50,7 @@ function initializeUninstallUrl(): void {
   if (typeof setUninstallURL !== 'function') return;
 
   const extensionVersion = chrome.runtime?.getManifest?.().version || 'unknown';
-  const uninstallUrl = new URL(`${WEBSITE_BASE_URL}/uninstall`);
+  const uninstallUrl = new URL(UNINSTALL_SITE_URL);
   uninstallUrl.searchParams.set('source', 'extension');
   uninstallUrl.searchParams.set('browser', detectRuntimeBrowser());
   uninstallUrl.searchParams.set('version', extensionVersion);
