@@ -3,6 +3,8 @@ import type {
   InstallBrowser,
   MapResponse,
   OverviewResponse,
+  PublicSchemaVersion,
+  SnapshotResponse,
   UserChangelogResponse,
   UninstallFeedbackRequest,
   UninstallFeedbackResponse,
