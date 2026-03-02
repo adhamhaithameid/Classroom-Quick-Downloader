@@ -6836,6 +6836,7 @@ export function renderDashboard(stats: StatsResponse): string {
 
       function applyWebsiteStatus(payload) {
         const website = payload && payload.website ? payload.website : {};
+        const telemetry = payload && payload.telemetry ? payload.telemetry : {};
         const snapshot = payload && payload.publicSnapshot ? payload.publicSnapshot : {};
         const totals = snapshot && snapshot.totals ? snapshot.totals : {};
         const refreshHours = Array.isArray(website.refreshHoursUtc) ? website.refreshHoursUtc.join(', ') : '3,6,9,12,15,18,21';
