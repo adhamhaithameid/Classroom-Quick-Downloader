@@ -375,6 +375,8 @@ ORACLE_BASE_URL="http://<your-oracle-host>:8080"
 curl -fsS "${ORACLE_BASE_URL}/health"
 curl -fsS "${ORACLE_BASE_URL}/api/public/website/overview"
 curl -fsS "${ORACLE_BASE_URL}/api/admin/website/state" # requires auth cookie/session
+curl -fsS "${ORACLE_BASE_URL}/api/admin/website/analytics?range=7d" # requires auth cookie/session
+curl -fsS -X POST "${ORACLE_BASE_URL}/api/admin/website/traffic/refresh" # requires auth + step-up
 
 # Oracle install-sync scheduler checks (15-minute automatic sync)
 docker logs --tail 300 cqd-oracle-backend | rg "deployment auto-sync enabled|deployment auto-sync completed"
