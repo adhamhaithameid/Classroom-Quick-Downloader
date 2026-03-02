@@ -42,6 +42,12 @@ function mockEnv(overrides: Partial<Env> = {}): Env {
   };
 }
 
+function extractCookie(setCookie: string | null): string {
+  if (!setCookie) return "";
+  const idx = setCookie.indexOf(";");
+  return idx === -1 ? setCookie : setCookie.slice(0, idx);
+}
+
 describe("Worker auth config hardening", () => {
   it("requires DASHBOARD_PASSWORD and does not fall back to DO_SHARED_SECRET", async () => {
     const env = mockEnv({ DASHBOARD_PASSWORD: undefined });
