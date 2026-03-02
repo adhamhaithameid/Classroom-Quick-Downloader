@@ -80,8 +80,7 @@ func TestIngestWritesOutboxAndSchemaRegistry(t *testing.T) {
 				}
 			}
 		],
-		"doState":{"ok":true},
-		"extra":{"newThing":{"enabled":true}}
+		"doState":{"ok":true}
 	}`
 
 	req := httptest.NewRequest(http.MethodPost, "/ingest-batch", strings.NewReader(payload))
