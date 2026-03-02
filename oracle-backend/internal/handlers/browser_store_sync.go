@@ -428,6 +428,7 @@ func syncDeploymentTargets(
 			URL:         targetURL,
 			Users:       stats.users,
 			UsersCount:  stats.usersCount,
+			UsersMetric: stats.usersMetric,
 			Version:     stats.version,
 			Rating:      stats.rating,
 			RatingCount: stats.ratingCount,
