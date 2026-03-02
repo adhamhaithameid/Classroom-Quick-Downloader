@@ -1031,8 +1031,8 @@ async function handleVerifyDangerPassword(request: Request, env: WorkerEnv): Pro
         ), env);
       }
       return withCors(request, new Response(
-        JSON.stringify({ ok: false, error: "Invalid danger password" }),
-        { status: 401, headers: { "content-type": "application/json" } }
+        JSON.stringify({ ok: false, error: result.error || "Invalid danger password" }),
+        { status: result.status, headers: { "content-type": "application/json" } },
       ), env);
     }
 
