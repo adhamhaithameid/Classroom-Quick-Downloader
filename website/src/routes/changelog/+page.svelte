@@ -605,8 +605,7 @@
   .cl-highlights li {
     position: relative; padding-left: 20px;
     color: var(--text-secondary);
-    line-height: 1.75;
-    font-size: 14px;
+    line-height: 1.65; font-size: 14px;
   }
 
   .entry-body ul {
