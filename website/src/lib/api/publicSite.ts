@@ -9,6 +9,10 @@ import type {
   UninstallFeedbackRequest,
   UninstallFeedbackResponse,
   UninstallStatsResponse,
+  WebsiteEventIngestResponse,
+  WebsiteEventRequest,
+  WebsiteSnapshotFetchResult,
+  WebsiteSnapshotFetchSource,
   WebsiteSnapshot,
   WorkerHealth
 } from '$lib/types/public';
