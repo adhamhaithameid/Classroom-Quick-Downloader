@@ -709,6 +709,42 @@ func resourceIDFromRequest(r *http.Request) string {
 	return "-"
 }
 
+var dangerAuditPaths = map[string]struct{}{
+	"/api/admin/flags/update":                  {},
+	"/api/admin/outbox/retry":                  {},
+	"/api/admin/outbox/replay-dead-letter":     {},
+	"/api/admin/dr/drill":                      {},
+	"/api/admin/retention/run":                 {},
+	"/api/admin/sql/query":                     {},
+	"/api/admin/sql/exec":                      {},
+	"/api/admin/danger/clear-data":             {},
+	"/api/admin/backup/run":                    {},
+	"/api/admin/records/upsert":                {},
+	"/api/admin/records/delete":                {},
+	"/api/admin/creative/designs/upsert":       {},
+	"/api/admin/creative/designs/delete":       {},
+	"/api/admin/creative/emails/upsert":        {},
+	"/api/admin/creative/emails/delete":        {},
+	"/api/admin/newsletter/subscribers/upsert": {},
+	"/api/admin/newsletter/subscribers/delete": {},
+	"/api/admin/newsletter/campaigns/upsert":   {},
+	"/api/admin/newsletter/campaigns/delete":   {},
+	"/api/admin/oracle-logs/delete-older":      {},
+	"/api/admin/oracle-logs/clear-all":         {},
+	"/api/admin/sheets/flush-now":              {},
+	"/api/admin/website/traffic/refresh":       {},
+	"/api/admin/website/force-push":            {},
+	"/api/admin/website/pull-cloudflare":       {},
+	"/api/admin/website/reconcile-totals":      {},
+	"/api/admin/website/override":              {},
+	"/api/admin/website/one-am-toggle":         {},
+}
+
+func isDangerAuditedPath(requestPath string) bool {
+	_, ok := dangerAuditPaths[strings.TrimSpace(requestPath)]
+	return ok
+}
+
 // loggingMiddleware emits structured request logs with correlation context.
 func loggingMiddleware(db *sql.DB, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
