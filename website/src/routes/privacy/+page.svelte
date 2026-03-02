@@ -1,7 +1,7 @@
 <script lang="ts">
   import { privacyContent as privacy } from '$lib/content/privacy';
 
-  const sectionIcons = ['🔒', '📊', '🛡️', '🌍', '🔑', '📱', '⚙️', '📋', '✅', '💡'];
+  const sectionIcons = ['🔒', '🚫', '💡', '⚡', '🗓️', '🧩', '⚖️', '👶', '🔑', '📬'];
 
   function formatDate(value: number | null): string {
     if (!value) return 'N/A';
