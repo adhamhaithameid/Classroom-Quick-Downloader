@@ -118,7 +118,10 @@
     );
 
     observer.observe(hostEl);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      stopAnimation();
+    };
   });
 
   $: if (!animated && displayValue !== value) {
