@@ -239,11 +239,18 @@
           <button
             class="un-submit"
             type="button"
-            class="option small"
-            class:selected={selectedFeatures.includes(feat)}
-            on:click={() => toggleFeature(feat)}
-          >{feat}</button>
-        {/each}
+            disabled={submitState === 'sending'}
+            on:click={submitFeedback}
+          >
+            {#if submitState === 'sending'}
+              <svg class="un-spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="18" height="18"><circle cx="12" cy="12" r="10" stroke-dasharray="60" stroke-dashoffset="20"/></svg>
+              Sending…
+            {:else}
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/></svg>
+              Submit feedback
+            {/if}
+          </button>
+        </div>
       </div>
     </div>
   </section>
