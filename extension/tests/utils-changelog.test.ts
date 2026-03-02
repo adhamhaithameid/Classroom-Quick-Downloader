@@ -93,10 +93,19 @@ describe('changelog utils', () => {
     })).toBe('First change');
 
     chrome.storage.local.get = vi.fn(async () => ({ cqd_changelog_seen_v1: ['1.0.0'] })) as never;
-    await mod.markAsSeen('1.1.0');
-    expect(chrome.storage.local.set).toHaveBeenCalledWith({ cqd_changelog_seen_v1: ['1.0.0', '1.1.0'] });
-    expect(await mod.isVersionSeen('1.0.0')).toBe(true);
-    expect(await mod.isVersionSeen('2.0.0')).toBe(false);
+    const firstData = {
+      entries: [{ id: 'x', version: '1.0.0', date: '2026-01-01', changes: ['First change'] }],
+      config: { rules: [] },
+      revisionToken: 'rev-a',
+      lastFetched: Date.now(),
+    };
+    await mod.markAsSeen('1.0.0', firstData);
+    expect(chrome.storage.local.set).toHaveBeenCalledWith({ cqd_changelog_seen_v1: { '1.0.0': '1.0.0::rev-a' } });
+    chrome.storage.local.get = vi.fn(async () => ({ cqd_changelog_seen_v1: { '1.0.0': '1.0.0::rev-a' } })) as never;
+    expect(await mod.isVersionSeen('1.0.0', firstData)).toBe(true);
+    const updatedData = { ...firstData, revisionToken: 'rev-b' };
+    expect(await mod.isVersionSeen('1.0.0', updatedData)).toBe(false);
+    expect(await mod.isVersionSeen('2.0.0', updatedData)).toBe(false);
     expect(await mod.isVersionSeen('')).toBe(false);
   });
 
