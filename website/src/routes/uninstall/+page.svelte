@@ -550,10 +550,10 @@
     line-height: 1;
   }
 
-  /* ── Notes ──────────────────────────── */
-  .notes-wrap {
-    display: grid;
-    gap: 8px;
+  .un-mini-pill:hover {
+    border-color: var(--green-border);
+    color: var(--green);
+    transform: translateY(-1px);
   }
 
   .notes-wrap span {
