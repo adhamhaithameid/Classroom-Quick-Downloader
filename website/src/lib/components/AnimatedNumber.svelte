@@ -1,8 +1,7 @@
 <script lang="ts">
   /**
-   * AnimatedNumber — global wrapper around @number-flow/svelte.
-   * Uses NumberFlow defaults + continuous plugin for slot-wheel digit motion.
-   * Numbers animate from 0 -> target when they enter the viewport.
+   * AnimatedNumber — lightweight animated number text renderer.
+   * Keeps numeric glyph spacing natural (no per-digit layout engine).
    */
   import { onMount } from 'svelte';
   import NumberFlow, { NumberFlowElement, continuous } from '@number-flow/svelte';
