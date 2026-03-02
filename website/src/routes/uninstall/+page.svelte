@@ -650,7 +650,7 @@
 
   .un-toast.ok {
     border-color: rgba(26, 139, 85, 0.3);
-    color: var(--gc-green);
+    color: var(--green);
     background: rgba(26, 139, 85, 0.05);
   }
 
