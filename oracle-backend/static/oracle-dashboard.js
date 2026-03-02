@@ -4250,6 +4250,7 @@
           ['website-sync-refresh-btn', loadWebsiteSyncState],
           ['website-sync-force-push-btn', websiteSyncForcePush],
           ['website-sync-pull-cloudflare-btn', websiteSyncPullCloudflare],
+          ['website-sync-reconcile-btn', websiteSyncReconcileTotals],
           ['website-sync-oneam-save-btn', websiteSyncSaveOneAM],
           ['website-sync-override-save-btn', websiteSyncSaveOverride],
           ['user-changelog-refresh-btn', loadUserChangelogRecords],
