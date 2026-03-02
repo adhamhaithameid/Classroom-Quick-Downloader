@@ -6370,6 +6370,32 @@ export class DownloadsDurable {
         updated = true;
       }
 
+      if (previewOnly) {
+        return json({
+          ok: true,
+          updated: false,
+          previewOnly: true,
+          entries: changelogFromMarkdown ?? this.d.changelog,
+          config: this.d.changelogConfig,
+          errors: parsedErrors,
+        });
+      }
+
+      if (updated && (changelogFromMarkdown || Array.isArray(body.changelog))) {
+        const revision: ChangelogRevision = {
+          id: `rev-${now}-${Math.floor(Math.random() * 1000000)}`,
+          source: changelogFromMarkdown ? (markdownSource === "github" ? "github" : "manual") : "api",
+          createdAt: now,
+          actor,
+          markdownUrl,
+          markdownLength,
+          releases: this.d.changelog.length,
+          valid: parsedErrors.length === 0,
+          errors: parsedErrors.length > 0 ? parsedErrors.slice(0, 8) : undefined,
+        };
+        this.appendChangelogRevision(revision);
+      }
+
       if (updated) {
         await this.persist();
       }
