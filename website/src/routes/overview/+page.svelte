@@ -3298,6 +3298,12 @@
     padding: 30px;
   }
 
+  .l2.edit-mode .l2-map-state-card {
+    aspect-ratio: 1 / 1;
+    display: grid;
+    align-content: center;
+  }
+
   .l2-map-frame {
     position: relative;
     width: min(100%, 760px);
