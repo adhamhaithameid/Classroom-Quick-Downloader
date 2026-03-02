@@ -66,7 +66,9 @@ describe('fetchChangelog', () => {
     TEST_TIMEOUT_MS
   );
 
-  it('filters out entries with missing required fields', async () => {
+  it(
+    'filters out entries with missing required fields',
+    async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () =>
