@@ -55,7 +55,7 @@ Website control APIs exposed by worker:
 Set repository vars/secrets once:
 - `PUBLIC_ORACLE_API_BASE_URL=https://<oracle-domain>`
 - `PUBLIC_WORKER_BASE_URL=https://<worker-domain>`
-- `PUBLIC_SITE_URL=https://<your-cloudflare-pages-domain>`
+- `PUBLIC_SITE_URL=https://<your-root-domain>`
 - `CLOUDFLARE_PAGES_PROJECT_NAME=<cloudflare-pages-project-name>`
 - `CLOUDFLARE_API_TOKEN` (secret)
 - `CLOUDFLARE_ACCOUNT_ID` (secret)
