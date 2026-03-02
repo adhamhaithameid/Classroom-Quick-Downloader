@@ -94,6 +94,7 @@
       animateTo(initial);
       return;
     }
+
     if (!hostEl || typeof IntersectionObserver === 'undefined') {
       hasAnimatedInView = true;
       kickstart();
