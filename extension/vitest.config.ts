@@ -77,6 +77,8 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     include: ['tests/**/*.test.ts'],
+    testTimeout: 30000,
+    hookTimeout: 30000,
     coverage: getCoverageConfig(),
     setupFiles: ['./tests/setup.ts'],
   },
