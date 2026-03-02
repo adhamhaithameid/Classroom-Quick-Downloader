@@ -588,6 +588,18 @@ function renderReleaseManagementSection(entries: ChangelogEntry[], config: Chang
            <div class="cl-history-list" style="overflow-y: auto; max-height: 400px; padding-right: 8px;">
              ${historyHtml}
            </div>
+           <div style="margin-top:14px; padding:12px; border:1px solid var(--border-subtle); border-radius:10px; background:rgba(255,255,255,0.03);">
+             <div class="section-header" style="margin-bottom:8px;">Live Preview (Users See This)</div>
+             <div id="cl-current-preview" class="cl-render-preview" style="max-height:180px; overflow:auto;"></div>
+           </div>
+           <div style="margin-top:10px; padding:12px; border:1px solid var(--border-subtle); border-radius:10px; background:rgba(255,255,255,0.03);">
+             <div class="section-header" style="margin-bottom:8px;">Draft Preview (Unpublished)</div>
+             <div id="cl-draft-preview" class="cl-render-preview" style="max-height:220px; overflow:auto;"></div>
+           </div>
+           <div style="margin-top:10px; padding:12px; border:1px solid var(--border-subtle); border-radius:10px; background:rgba(255,255,255,0.03);">
+             <div class="section-header" style="margin-bottom:8px;">Revision History</div>
+             <div id="cl-revision-history" style="max-height:180px; overflow:auto; display:flex; flex-direction:column; gap:8px;"></div>
+           </div>
          </div>
        </div>
     </section>
