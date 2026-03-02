@@ -136,10 +136,46 @@ describe('oracle-only website data source routing', () => {
           schemaVersion: '1',
           ok: true,
           generatedAt: 1771700000000,
-          granularity: 'country',
-          countries: [{ countryCode: 'us', count: 88 }],
-          totals: { downloads: 88, countries: 1 },
-          privacyNote: 'country only'
+          snapshotId: 'snapshot-88',
+          overview: {
+            ok: true,
+            generatedAt: 1771700000000,
+            totals: { downloads: 88, success: 88, fail: 0 },
+            installs: { usersTotal: 1, lastSyncedAtUtc: 1771700000000, browsers: [] },
+            versions: { github: null, chrome: null, firefox: null, edge: null },
+            status: { systemLive: true, liveSinceUtc: 1771600000000, workerHealth: 'up' },
+            links: { chrome: 'https://c', firefox: 'https://f', edge: 'https://e', github: 'https://g' }
+          },
+          map: {
+            ok: true,
+            generatedAt: 1771700000000,
+            granularity: 'country',
+            countries: [{ countryCode: 'us', count: 88 }],
+            totals: { downloads: 88, countries: 1 },
+            privacyNote: 'country only'
+          },
+          changelog: {
+            ok: true,
+            generatedAt: 1771700000000,
+            headline: '',
+            description: '',
+            entries: [],
+            fullChangelogUrl: '',
+            lastUpdatedAtUtc: null
+          },
+          userChangelogSummary: {
+            headline: '',
+            description: '',
+            entriesCount: 0,
+            lastUpdatedAtUtc: null,
+            fullChangelogUrl: ''
+          },
+          privacy: {
+            headline: '',
+            description: '',
+            userPrivacyUrl: '',
+            fullPrivacyUrl: ''
+          }
         }),
         { status: 200 }
       );
