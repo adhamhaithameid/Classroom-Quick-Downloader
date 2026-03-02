@@ -6459,7 +6459,7 @@ export function renderDashboard(stats: StatsResponse): string {
 
       // ===== SECURITY SETTINGS HANDLERS =====
       let currentUserIp = '';
-      let ipAllowlistData = { enabled: false, allowlist: [] };
+      let ipAllowlistData = { enabled: false, allowlist: [], stepUpBypassEnabled: true };
       
       // Utility: Show toast notification
       function showToast(message, type) {
