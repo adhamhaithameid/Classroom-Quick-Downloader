@@ -579,14 +579,10 @@
     background: rgba(255, 255, 255, 0.7);
     color: var(--text);
     font-size: 14px;
-    line-height: 1.6;
-    transition: all 0.2s ease;
-  }
-
-  .notes-wrap textarea:focus {
-    outline: none;
-    border-color: var(--gc-green);
-    box-shadow: 0 0 0 3px rgba(26, 139, 85, 0.1);
+    font-family: var(--font-ui), sans-serif;
+    line-height: 1.65;
+    transition: all 0.25s ease;
+    box-sizing: border-box;
   }
 
   .notes-wrap textarea::placeholder {
