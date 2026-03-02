@@ -57,6 +57,10 @@ curl http://127.0.0.1:8080/api/public/website/overview
 curl http://127.0.0.1:8080/api/public/website/map
 curl http://127.0.0.1:8080/api/public/website/changelog
 curl http://127.0.0.1:8080/api/public/website/uninstall
+curl -X POST http://127.0.0.1:8080/api/public/website/events \
+  -H 'Origin: http://localhost:5173' \
+  -H 'Content-Type: application/json' \
+  -d '{"sessionId":"local-dev","pagePath":"/overview","events":[{"eventId":"evt-1","eventType":"cta","action":"install_click","placement":"hero_install"}]}'
 # Optional (for Oracle cloudflare-pull scheduler/manual admin pull validation):
 curl http://127.0.0.1:8787/public/site-metrics
 ```
