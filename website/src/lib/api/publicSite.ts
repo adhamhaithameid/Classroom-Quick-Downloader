@@ -472,6 +472,7 @@ export async function fetchWebsiteSnapshotResult(options: { force?: boolean } = 
     })
     .finally(() => {
       snapshotInFlight = null;
+      snapshotResultInFlight = null;
     });
 
   snapshotInFlight = runner;
