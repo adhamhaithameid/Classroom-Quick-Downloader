@@ -2911,7 +2911,7 @@ export class DownloadsDurable {
       next.setUTCDate(next.getUTCDate() + 1);
     }
 
-    const alarmTime = tomorrow.getTime();
+    const alarmTime = next.getTime();
     
     // Only set if no alarm is scheduled or if this is earlier
     const currentAlarm = await this.state.storage.getAlarm();
