@@ -452,8 +452,8 @@ export async function fetchWebsiteSnapshotResult(options: { force?: boolean } = 
   }
 
   const runner = (async () => {
-    const [overview, map] = await Promise.all([fetchOracleOverview(), fetchOracleMap()]);
-    const snapshot = buildSnapshot(overview, map);
+    const canonicalPayload = await fetchOracleSnapshot();
+    const snapshot = buildSnapshot(canonicalPayload);
     cachedSnapshot = snapshot;
     writeSnapshotToStorage(snapshot);
     return snapshot;
