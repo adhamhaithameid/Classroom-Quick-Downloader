@@ -421,8 +421,9 @@
 
   .un-card-title-row {
     display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
   }
 
   .option-grid.compact {
