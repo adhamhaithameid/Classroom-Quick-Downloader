@@ -615,8 +615,8 @@
     box-shadow: 0 4px 20px rgba(26, 139, 85, 0.25);
   }
 
-  .submit-btn:hover {
-    background: var(--gc-green-dark);
+  .un-submit:hover {
+    background: var(--green-light);
     transform: translateY(-2px);
     box-shadow: 0 6px 28px rgba(26, 139, 85, 0.2);
   }
