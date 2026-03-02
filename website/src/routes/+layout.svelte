@@ -133,7 +133,10 @@
   });
 </script>
 
-<div class="site-shell">
+<LoadingScreen />
+
+<div class="site-shell" class:o2-fullscreen={hideChrome}>
+  {#if !hideChrome}
   <header class="l2-nav-shell">
     <div class="l2-nav-inner l2-nav-fullwidth">
       <a href="{base}/overview" class="l2-nav-brand">
