@@ -3815,8 +3815,9 @@ export function renderDashboard(stats: StatsResponse): string {
         </div>
       </section>
 
-      ${renderNotificationSection(stats.changelog || [], stats.changelogConfig || {})}
-      ${renderReleaseManagementSection(stats.changelog || [], stats.changelogConfig || {})}
+      ${"" /* DEPRECATED: Notification Styling and Release Publishing are now managed in Oracle Dashboard → Extension Changelog page */}
+      ${"" /* renderNotificationSection(stats.changelog || [], stats.changelogConfig || {}) */}
+      ${"" /* renderReleaseManagementSection(stats.changelog || [], stats.changelogConfig || {}) */}
 
       <!-- Raw /stats payload -->
       <section class="card" id="raw">
