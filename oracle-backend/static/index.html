@@ -1288,7 +1288,51 @@
               </div>
               <div class="card-body">
                 <div class="section-block">
-                  <div class="section-caption">Create / Update Entry</div>
+                  <div class="section-caption">Display Source Control</div>
+                  <div class="card-subtitle">Choose whether website users see changelog content from Oracle records or directly from GitHub <code>user-friendly-changelog.md</code>.</div>
+                  <div class="action-buttons-grid action-buttons-grid-three">
+                    <select id="user-changelog-source-select" class="auth-input">
+                      <option value="oracle">Oracle-managed user changelog</option>
+                      <option value="github">GitHub user-friendly-changelog.md</option>
+                    </select>
+                    <input id="user-changelog-source-url" class="auth-input" placeholder="GitHub RAW markdown URL (https://raw.githubusercontent.com/.../user-friendly-changelog.md)" />
+                    <button class="btn btn-secondary" id="user-changelog-source-save-btn" type="button">Save Source</button>
+                  </div>
+                  <div class="pill-row">
+                    <span class="pill">Source status: <strong id="user-changelog-source-status">--</strong></span>
+                    <span class="pill">Website reads: <strong>/api/public/website/changelog</strong></span>
+                  </div>
+                </div>
+                <div class="section-block">
+                  <div class="section-caption">Currently Displayed Changelog</div>
+                  <div class="stats-grid">
+                    <div class="stat-card2">
+                      <div class="stat-label">Current Source</div>
+                      <div class="stat-value" id="user-changelog-current-source">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Entry Count</div>
+                      <div class="stat-value" id="user-changelog-current-entry-count">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Last Updated (UTC)</div>
+                      <div class="stat-value" id="user-changelog-current-updated">--</div>
+                    </div>
+                  </div>
+                  <div id="user-changelog-current-preview" class="content-record-summary">--</div>
+                </div>
+                <div class="section-block">
+                  <div class="section-caption">Create / Update Entry (Required Format)</div>
+                  <div class="card-subtitle">Use this exact format only:</div>
+                  <pre class="json-viewer json-viewer-compact">## v1.3.7
+### Summary
+...
+### Added
+- ...
+### Changed
+- ...
+### Fixed
+- ...</pre>
                   <form class="form-grid" id="user-changelog-form">
                     <div class="creative-grid">
                       <input id="user-changelog-key" class="auth-input" placeholder="Record key (e.g., v1-3-6)" required />
