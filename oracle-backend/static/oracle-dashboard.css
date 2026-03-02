@@ -144,6 +144,60 @@
 
       .sidebar-nav { flex: 1; padding: 8px; overflow-y: auto; overflow-x: hidden; scrollbar-gutter: stable both-edges; }
       .nav-section { margin-bottom: 16px; }
+      .nav-section-groups { display: grid; gap: 10px; }
+
+      .nav-group {
+        border: 1px solid var(--border-primary);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.02);
+      }
+
+      .nav-group-toggle {
+        width: 100%;
+        border: none;
+        background: transparent;
+        color: var(--text-secondary);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 10px 12px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .nav-group-toggle:hover {
+        color: var(--text-primary);
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      .nav-group-items {
+        padding: 4px 6px 8px;
+      }
+
+      .nav-group .nav-item {
+        margin-top: 4px;
+      }
+
+      .nav-group-chevron {
+        transition: transform 0.2s ease;
+      }
+
+      .nav-group.collapsed .nav-group-items {
+        display: none;
+      }
+
+      .nav-group.collapsed .nav-group-chevron {
+        transform: rotate(-90deg);
+      }
+
+      .nav-group-danger {
+        border-color: rgba(239, 68, 68, 0.35);
+        background: rgba(239, 68, 68, 0.04);
+      }
 
       .nav-label {
         font-size: 12px;
