@@ -460,7 +460,14 @@ export async function fetchWebsiteSnapshotResult(options: { force?: boolean } = 
     return buildSnapshotFetchResult(snapshot, 'oracle', false, null);
   })()
     .catch((error) => {
-      if (cachedSnapshot) return cachedSnapshot;
+      if (cachedSnapshot) {
+        return buildSnapshotFetchResult(
+          cachedSnapshot,
+          cachedSnapshotSource,
+          true,
+          toErrorMessage(error)
+        );
+      }
       throw error;
     })
     .finally(() => {
