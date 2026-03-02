@@ -140,6 +140,7 @@ export type ChangelogMeta = {
 };
 
 export type ChangelogResponse = {
+  schemaVersion: PublicSchemaVersion;
   ok: boolean;
   entries: Array<{
     id: string;
