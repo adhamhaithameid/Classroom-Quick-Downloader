@@ -1812,10 +1812,26 @@
       }
 
       // Charts Page
-      async function loadCharts() {
-        var dimensions = ['browser', 'os', 'type', 'country'];
-        var colors = ['purple', 'blue', 'cyan', 'green'];
-        var range = getDateRange(7);
+      function bindMetricBarHover(container, formatPayload) {
+        if (!container) return;
+        container.querySelectorAll('[data-point]').forEach(function(node) {
+          if (node.dataset.hoverBound === '1') return;
+          node.dataset.hoverBound = '1';
+          var move = function(e) {
+            var parsed;
+            try {
+              parsed = JSON.parse(node.getAttribute('data-point') || '{}');
+            } catch (_) {
+              parsed = {};
+            }
+            var payload = formatPayload(parsed);
+            showTooltip(e, payload);
+          };
+          node.addEventListener('mouseenter', move);
+          node.addEventListener('mousemove', move);
+          node.addEventListener('mouseleave', hideTooltip);
+        });
+      }
 
         for (var i = 0; i < dimensions.length; i++) {
           var dim = dimensions[i];
