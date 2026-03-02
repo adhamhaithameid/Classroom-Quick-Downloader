@@ -499,6 +499,7 @@ export function resetWebsiteSnapshotCacheForTests(): void {
   cachedSnapshot = null;
   cachedSnapshotSource = 'memory-cache';
   snapshotInFlight = null;
+  snapshotResultInFlight = null;
   snapshotStorageHydrated = false;
   if (canUseBrowserStorage()) {
     try {
