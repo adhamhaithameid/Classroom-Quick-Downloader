@@ -845,9 +845,18 @@
     -webkit-backdrop-filter: none;
   }
   @keyframes slideDown {
-    from {
-      opacity: 0;
-      transform: translateY(-5px);
+    from { opacity: 0; transform: translateY(-5px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── Responsive ────────────────── */
+  @media (max-width: 900px) {
+    .fq-section { padding: 20px; }
+    .fq-cta-card { padding: 40px 24px; }
+    .fq-list { gap: 10px; }
+    .fq-item {
+      border-radius: 14px;
+      box-shadow: 0 2px 10px rgba(15, 20, 25, 0.045);
     }
     to {
       opacity: 1;
