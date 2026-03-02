@@ -393,7 +393,9 @@ async function fetchOracleSnapshot(): Promise<SnapshotResponse> {
   return coerceSnapshotPayload(payload);
 }
 
-function buildSnapshot(overview: OverviewResponse, map: MapResponse): WebsiteSnapshot {
+function buildSnapshot(snapshotPayload: SnapshotResponse): WebsiteSnapshot {
+  const overview = snapshotPayload.overview;
+  const map = snapshotPayload.map;
   const browsersTotal = overview.installs.browsers.reduce((sum, item) => sum + (item.usersCount || 0), 0);
   const normalizedUsersTotal = Math.max(overview.installs.usersTotal, browsersTotal);
   const normalizedOverview: OverviewResponse = {
