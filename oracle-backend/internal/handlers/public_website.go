@@ -753,7 +753,7 @@ func PublicWebsiteUninstallHandler(sqliteDB *sql.DB) http.HandlerFunc {
 				now,
 			) // #nosec G701 -- static INSERT with placeholders and bound parameters.
 			if err != nil {
-				http.Error(w, "failed to save feedback", http.StatusInternalServerError)
+				writePublicWebsiteError(w, http.StatusInternalServerError, "feedback_save_failed", "Failed to save feedback.", true)
 				return
 			}
 
