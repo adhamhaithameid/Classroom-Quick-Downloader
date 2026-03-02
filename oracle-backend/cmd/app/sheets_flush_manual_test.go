@@ -33,6 +33,9 @@ func TestManualSheetsFlushHandler_RequiresSheetsConfig(t *testing.T) {
 	defer sqlDB.Close()
 
 	t.Setenv("SHEETS_ID", "")
+	t.Setenv("GOOGLE_SHEETS_ID", "")
+	t.Setenv("GOOGLE_SHEETS_URL", "")
+	t.Setenv("SHEETS_URL", "")
 
 	req := httptest.NewRequest(http.MethodPost, "/api/admin/sheets/flush-now", nil)
 	rr := httptest.NewRecorder()
