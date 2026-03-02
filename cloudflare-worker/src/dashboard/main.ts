@@ -5725,6 +5725,91 @@ export function renderDashboard(stats: StatsResponse): string {
         if (version.toLowerCase().startsWith("v")) {
           version = version.slice(1);
         }
+        const rows = String(changesEl.value || "")
+          .split("\\n")
+          .map((row) => row.trim())
+          .filter(Boolean);
+        if (!version || rows.length === 0) return "";
+        const summary = rows[0].replace(/^[-*][ \t]+/, "");
+        const bullets = rows.map((row) => row.replace(/^[-*][ \t]+/, ""));
+        return [
+          "## v" + version,
+          "### Summary",
+          summary,
+          "### Added",
+          ...bullets.map((row) => "- " + row),
+          "### Changed",
+          "- No structural changes documented.",
+          "### Fixed",
+          "- No fixes documented.",
+        ].join("\\n");
+      }
+
+      function readModePayload() {
+        return {
+          applyMode: modeInputEl ? modeInputEl.value : "manual",
+          autoSyncEnabled: autoSyncEnabledInputEl ? autoSyncEnabledInputEl.checked : false,
+          autoSyncIntervalMinutes: autoSyncIntervalInputEl ? Number(autoSyncIntervalInputEl.value || "60") : 60,
+          markdownSourceUrl: markdownUrlInputEl ? String(markdownUrlInputEl.value || "").trim() : "",
+        };
+      }
+
+      function updateModeDependentControls() {
+        const mode = modeInputEl ? modeInputEl.value : "manual";
+        const isAuto = mode === "auto_github";
+        if (autoSyncEnabledInputEl) autoSyncEnabledInputEl.disabled = !isAuto;
+        if (autoSyncIntervalInputEl) autoSyncIntervalInputEl.disabled = !isAuto;
+        if (btnPublishDraft) btnPublishDraft.disabled = isAuto;
+        if (btnSyncNow) btnSyncNow.disabled = !isAuto;
+      }
+      if (modeInputEl) {
+        modeInputEl.addEventListener("change", updateModeDependentControls);
+      }
+      updateModeDependentControls();
+
+      if (btnSaveMode) {
+        btnSaveMode.onclick = async () => {
+          try {
+            setChangelogActionStatus("Saving mode…", "info");
+            const data = await callChangelogAdmin("/admin/changelog/mode", readModePayload());
+            syncChangelogUiFromState(data);
+            await loadChangelogHistory();
+            setChangelogActionStatus("Mode saved", "ok");
+          } catch (error) {
+            const msg = error instanceof Error ? error.message : "mode_save_failed";
+            setChangelogActionStatus("Mode save failed: " + msg, "err");
+          }
+        };
+      }
+
+      if (btnSyncNow) {
+        btnSyncNow.onclick = async () => {
+          try {
+            setChangelogActionStatus("Running sync…", "info");
+            const data = await callChangelogAdmin("/admin/changelog/sync-now", {});
+            syncChangelogUiFromState(data);
+            await loadChangelogHistory();
+            setChangelogActionStatus("Auto sync completed", "ok");
+          } catch (error) {
+            const msg = error instanceof Error ? error.message : "sync_now_failed";
+            setChangelogActionStatus("Sync failed: " + msg, "err");
+          }
+        };
+      }
+
+      if (btnPublishDraft) {
+        btnPublishDraft.onclick = async () => {
+          try {
+            setChangelogActionStatus("Publishing draft…", "info");
+            const data = await callChangelogAdmin("/admin/changelog/publish", {});
+            syncChangelogUiFromState(data);
+            await loadChangelogHistory();
+            setChangelogActionStatus("Draft published", "ok");
+          } catch (error) {
+            const msg = error instanceof Error ? error.message : "publish_failed";
+            setChangelogActionStatus("Publish failed: " + msg, "err");
+          }
+        };
       }
 
       // --- NEW RULES ENGINE LOGIC ---
