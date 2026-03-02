@@ -259,6 +259,49 @@ export async function fetchChangelog(force = false): Promise<ChangelogData | nul
     const json = await res.json();
     if (!json.ok) throw new Error('API error');
 
+    const rawEntries = Array.isArray(json.entries) ? json.entries : [];
+    const parsedEntries: ChangelogEntry[] = rawEntries
+      .map((entry: any, index: number) => {
+        const versionRaw = typeof entry?.version === 'string' ? entry.version.trim() : '';
+        const version = normalizeVersion(versionRaw);
+        const date = typeof entry?.date === 'string' ? entry.date : new Date().toISOString();
+        if (!version) return null;
+        const id = typeof entry?.id === 'string' && entry.id.trim()
+          ? entry.id.trim()
+          : `cl-${version}-${Date.parse(date) || 0}-${index}`;
+        const added = normalizeStringList(entry?.added, 20);
+        const changed = normalizeStringList(entry?.changed, 20);
+        const fixed = normalizeStringList(entry?.fixed, 20);
+        const summary = typeof entry?.summary === 'string' ? entry.summary.trim() : '';
+        const markdown = typeof entry?.markdown === 'string' ? entry.markdown : '';
+        const changes = toLegacyChanges({
+          summary,
+          added,
+          changed,
+          fixed,
+          changes: entry?.changes
+        });
+        return {
+          id,
+          version,
+          date,
+          changes,
+          summary: summary || undefined,
+          added,
+          changed,
+          fixed,
+          markdown: markdown || undefined,
+          isImportant: entry?.isImportant === true
+        };
+      })
+      .filter((entry: ChangelogEntry | null): entry is ChangelogEntry => entry !== null);
+
+    const configRaw = (json.config && typeof json.config === 'object') ? json.config : {};
+    const config: ChangelogConfig = {
+      rules: sanitizeRules(configRaw.rules),
+      lastUpdated: toFiniteInt(configRaw.lastUpdated),
+    };
+    const meta = sanitizeMeta(json.meta);
     const newData: ChangelogData = {
       entries: json.entries || [],
       config: json.config || { customPill: false, showNotification: false },
