@@ -589,10 +589,10 @@
     color: var(--muted);
   }
 
-  /* ── Submit ─────────────────────────── */
-  .bottom-actions {
-    display: flex;
-    justify-content: flex-end;
+  .un-field-group textarea:focus {
+    outline: none;
+    border-color: var(--green);
+    box-shadow: 0 0 0 3px rgba(26, 139, 85, 0.1);
   }
 
   .submit-btn {
