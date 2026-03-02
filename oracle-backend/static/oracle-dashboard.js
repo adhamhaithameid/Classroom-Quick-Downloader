@@ -2046,6 +2046,7 @@
         // Baseline breakdown cards
         await Promise.all(dims.map(async function(dim) {
           var container = document.getElementById('chart-' + dim);
+          if (!container) return;
           try {
             var data = await fetchJSON('/api/stats/breakdown?dimension=' + dim + '&from=' + range.from + '&to=' + range.to);
             if (!data.values || !data.values.length) {
