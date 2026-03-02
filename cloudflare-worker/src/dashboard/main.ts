@@ -6107,7 +6107,7 @@ export function renderDashboard(stats: StatsResponse): string {
         
         // Hide edit mode banner
         if (editModeBanner) editModeBanner.classList.remove("active");
-        if (btnSaveText) btnSaveText.textContent = "Save Configuration & Publish";
+        if (btnSaveText) btnSaveText.textContent = "Save Draft";
         
         // Remove editing highlight
         document.querySelectorAll(".cl-history-item.editing").forEach(item => {
