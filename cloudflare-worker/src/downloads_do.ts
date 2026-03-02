@@ -5840,6 +5840,91 @@ export class DownloadsDurable {
       // Backward compatibility
       entries,
       config: this.d.changelogConfig,
+      history: revisions,
+      // New explicit lifecycle payload
+      live: {
+        entries,
+        config: this.d.changelogConfig,
+        meta: {
+          lastUpdatedAt: this.d.changelogConfig.lastUpdated ?? null,
+          liveHash: this.d.changelogConfig.liveHash || computeChangelogLiveHash(entries),
+        },
+      },
+      draft: this.d.changelogDraft,
+      sync,
+    };
+  }
+
+  private async parseMarkdownToEntries(params: {
+    markdown?: unknown;
+    markdownUrl?: unknown;
+    now: number;
+  }): Promise<
+    | { ok: false; error: string; status: number }
+    | {
+        ok: true;
+        markdown: string;
+        markdownUrl?: string;
+        source: "manual" | "github";
+        errors: string[];
+        entries: ChangelogEntry[];
+        valid: boolean;
+      }
+  > {
+    const markdownInput = trimAndLimitString(params.markdown, 750_000);
+    const markdownUrl = trimAndLimitString(params.markdownUrl, 600);
+    let markdown = markdownInput;
+    let source: "manual" | "github" = "manual";
+
+    if (!markdown && markdownUrl) {
+      const fetched = await this.fetchMarkdownFromUrl(markdownUrl);
+      if (!fetched.ok) {
+        return { ok: false, error: fetched.error, status: 400 };
+      }
+      markdown = fetched.markdown;
+      source = "github";
+    }
+
+    if (!markdown) {
+      return { ok: false, error: "markdown_required", status: 400 };
+    }
+
+    const parsed = parseUserFriendlyChangelogMarkdown(markdown);
+    const entries = toStructuredChangelogEntries(parsed, source, params.now);
+    if (entries.length === 0) {
+      return { ok: false, error: "markdown_parse_failed", status: 400 };
+    }
+
+    return {
+      ok: true,
+      markdown,
+      markdownUrl: markdownUrl || undefined,
+      source,
+      errors: parsed.errors,
+      entries,
+      valid: parsed.errors.length === 0,
+    };
+  }
+
+  private async applyAutoGithubSync(options: {
+    now: number;
+    actor: string;
+    source: "alarm" | "manual";
+  }): Promise<{ ok: boolean; updated: boolean; error?: string }> {
+    const mode = normalizeChangelogApplyMode(this.d.changelogConfig.applyMode);
+    const autoSyncEnabled = this.d.changelogConfig.autoSyncEnabled === true;
+    const intervalMinutes = normalizeAutoSyncIntervalMinutes(this.d.changelogConfig.autoSyncIntervalMinutes);
+    const nextAutoSyncAt = options.now + intervalMinutes * 60_000;
+
+    if (mode !== "auto_github" || !autoSyncEnabled) {
+      return { ok: false, updated: false, error: "auto_mode_disabled" };
+    }
+
+    const markdownUrl =
+      trimAndLimitString(this.d.changelogConfig.markdownSourceUrl, 600) || USER_FRIENDLY_CHANGELOG_GITHUB_URL;
+    const parsed = await this.parseMarkdownToEntries({
+      markdownUrl,
+      now: options.now,
     });
   }
 
