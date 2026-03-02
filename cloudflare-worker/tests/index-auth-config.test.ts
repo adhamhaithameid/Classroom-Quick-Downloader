@@ -320,6 +320,88 @@ describe("Worker auth config hardening", () => {
     expect(body.error).toBe("cors_origin_not_allowed");
   });
 
+  it("returns structured CORS error envelope for website events route", async () => {
+    const env = mockEnv();
+    const request = new Request("https://example.com/api/public/website/events", {
+      method: "POST",
+      headers: {
+        Origin: "https://evil.example",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        schemaVersion: "1",
+        sessionId: "session-123",
+        pagePath: "/overview",
+        events: [
+          {
+            eventId: "evt-200001",
+            eventType: "cta",
+            action: "install_click",
+            placement: "hero_install",
+          },
+        ],
+      }),
+    });
+
+    const res = await worker.fetch(request, env, {} as ExecutionContext);
+    const body = await res.json() as {
+      ok?: boolean;
+      schemaVersion?: string;
+      error?: {
+        code?: string;
+        retryable?: boolean;
+      };
+    };
+
+    expect(res.status).toBe(403);
+    expect(body.ok).toBe(false);
+    expect(body.schemaVersion).toBe("1");
+    expect(body.error?.code).toBe("cors_origin_not_allowed");
+    expect(body.error?.retryable).toBe(false);
+  });
+
+  it("requires Origin header for website events route", async () => {
+    const env = mockEnv({
+      CORS_ALLOWED_ORIGINS: "https://website.example",
+    });
+    const request = new Request("https://example.com/api/public/website/events", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        schemaVersion: "1",
+        sessionId: "session-123",
+        pagePath: "/overview",
+        events: [
+          {
+            eventId: "evt-200002",
+            eventType: "cta",
+            action: "install_click",
+            placement: "hero_install",
+          },
+        ],
+      }),
+    });
+
+    const res = await worker.fetch(request, env, {} as ExecutionContext);
+    const body = await res.json() as {
+      ok?: boolean;
+      schemaVersion?: string;
+      error?: {
+        code?: string;
+        retryable?: boolean;
+      };
+    };
+
+    expect(res.status).toBe(403);
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
+    expect(body.ok).toBe(false);
+    expect(body.schemaVersion).toBe("1");
+    expect(body.error?.code).toBe("origin_required");
+    expect(body.error?.retryable).toBe(false);
+  });
+
   it("enforces strict admin CORS allowlist", async () => {
     const env = mockEnv({
       CORS_ALLOWED_ORIGINS: "https://stats.example.com",
