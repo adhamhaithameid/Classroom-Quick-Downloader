@@ -3910,6 +3910,13 @@ export class DownloadsDurable {
     }
 
     this.d.websitePublicSyncEnabled = body.enabled;
+    this.appendDangerAudit(
+      request,
+      "website_refresh_toggle",
+      "/admin/website/refresh-toggle",
+      "ok",
+      `enabled=${String(this.d.websitePublicSyncEnabled)}`,
+    );
     await this.persist();
     return json({
       ok: true,
