@@ -491,9 +491,12 @@
     box-shadow: 0 4px 14px rgba(26, 139, 85, 0.08);
   }
 
-  .option.small {
-    padding: 7px 14px;
-    font-size: 13px;
+  .un-pill.active {
+    background: var(--green);
+    border-color: transparent;
+    color: #fff;
+    box-shadow: 0 4px 18px rgba(26, 139, 85, 0.28);
+    transform: translateY(-1px);
   }
 
   /* ── Fields ─────────────────────────── */
