@@ -499,10 +499,9 @@
     transform: translateY(-1px);
   }
 
-  /* ── Fields ─────────────────────────── */
-  .field {
-    display: grid;
-    gap: 8px;
+  .un-pill-check {
+    flex-shrink: 0;
+    margin-left: 2px;
   }
 
   .field span {
