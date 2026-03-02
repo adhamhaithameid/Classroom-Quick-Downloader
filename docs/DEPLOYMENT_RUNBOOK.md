@@ -74,7 +74,9 @@ Create:
 - `PUBLIC_WORKER_BASE_URL=https://cqd-analytics.adhamhaithameid.workers.dev`
 
 Important:
-- `PUBLIC_ORACLE_API_BASE_URL` must point to Worker HTTPS proxy, not raw `http://...:8080`.
+- `PUBLIC_ORACLE_API_BASE_URL` must point to Oracle public HTTPS endpoint (not Worker).
+- `PUBLIC_WORKER_BASE_URL` must point to Worker HTTPS endpoint.
+- `PUBLIC_ORACLE_API_BASE_URL` and `PUBLIC_WORKER_BASE_URL` must be different.
 
 CLI alternative:
 
