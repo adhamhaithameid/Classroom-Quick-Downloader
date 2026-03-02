@@ -142,7 +142,7 @@ async function fetchJSONFromBase(baseUrl: string, pathname: string, requestLabel
     REQUEST_TIMEOUT_MS
   );
   if (!response.ok) {
-    throw new Error(`${sourceLabel} request failed (${response.status})`);
+    throw new Error(buildRequestErrorMessage(response.status, requestLabel));
   }
   return response.json();
 }
