@@ -71,10 +71,33 @@
           </div>
         </div>
       </div>
-      <div>
-        <h1>{privacy.headline}</h1>
-        <p class="privacy-desc"><AnimatedNumericText text={privacy.description} animated /></p>
-        <small class="privacy-updated">Last updated (UTC): <AnimatedNumericText text={formatDate(privacy.lastUpdatedAtUtc)} animated /></small>
+    </div>
+  </section>
+
+  <!-- Privacy Sections Grid -->
+  <section class="prv-sections-section">
+    <div class="prv-wrap">
+      <div class="prv-section-head prv-reveal">
+        <span class="prv-label">IN DETAIL</span>
+        <h2>Everything you need to know about your data.</h2>
+        <p>Each card below explains a specific aspect of how we handle privacy. Click through for complete transparency.</p>
+      </div>
+
+      <div class="prv-card-grid">
+        {#each privacy.sections as section, i}
+          <article class="prv-card prv-reveal" style="animation-delay: {i * 0.06}s">
+            <div class="prv-card-icon">{sectionIcons[i % sectionIcons.length]}</div>
+            <h3>{section.title}</h3>
+            <p class="prv-card-summary">{section.summary}</p>
+            {#if section.bullets.length > 0}
+              <ul class="prv-bullets">
+                {#each section.bullets as bullet}
+                  <li>{bullet}</li>
+                {/each}
+              </ul>
+            {/if}
+          </article>
+        {/each}
       </div>
     </div>
     <div class="header-actions">
