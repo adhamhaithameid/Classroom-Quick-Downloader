@@ -572,7 +572,7 @@ function renderReleaseManagementSection(entries: ChangelogEntry[], config: Chang
               </div>
               <div id="cl-action-status" style="margin-top:8px; font-size:0.75em; color: var(--text-soft);">Idle</div>
               
-              <div style="margin-top: 10px; font-size: 0.75em; color: var(--text-soft); text-align: center;">
+           <div style="margin-top: 10px; font-size: 0.75em; color: var(--text-soft); text-align: center;">
                  💡 Tip: Press <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Ctrl+Enter</kbd> to save quickly
               </div>
            </div>
