@@ -1824,6 +1824,13 @@ export class DownloadsDurable {
       changelogRevisions: [],
       changelogConfig: {
         rules: [],
+        applyMode: CHANGELOG_DEFAULT_APPLY_MODE,
+        autoSyncEnabled: CHANGELOG_DEFAULT_AUTO_SYNC_ENABLED,
+        autoSyncIntervalMinutes: CHANGELOG_DEFAULT_AUTO_SYNC_INTERVAL_MINUTES,
+        lastAutoSyncStatus: "idle",
+        liveHash: computeChangelogLiveHash(defaultExtensionChangelogEntries()),
+        markdownSourceUrl: USER_FRIENDLY_CHANGELOG_GITHUB_URL,
+        markdownHelpUrl: USER_FRIENDLY_CHANGELOG_GITHUB_URL,
         lastUpdated: Date.now(),
       },
       publicSiteMetricsSnapshot: null,
