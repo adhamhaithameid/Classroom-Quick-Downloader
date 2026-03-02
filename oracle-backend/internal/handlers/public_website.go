@@ -336,11 +336,6 @@ type publicWebsiteMapTotals struct {
 	Downloads int64 `json:"downloads"`
 }
 
-type gitHubReleaseInfo struct {
-	TagName string `json:"tag_name"`
-	Name    string `json:"name"`
-}
-
 func PublicWebsiteOverviewHandler(sqliteDB, postgresDB *sql.DB) http.HandlerFunc {
 	store := newControlPlaneStore(sqliteDB, postgresDB)
 	return func(w http.ResponseWriter, r *http.Request) {
