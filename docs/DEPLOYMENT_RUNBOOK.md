@@ -226,6 +226,9 @@ Configured workflows:
 
 - `/.github/workflows/deploy-cloudflare-worker.yml`
   - triggers on every push to `main`
+  - runs preflight guardrails:
+    - required secrets/variables presence
+    - schema compatibility check (`tools/check_schema_compat.sh`)
   - tests + validates worker
   - deploys worker
 
