@@ -2146,6 +2146,80 @@ export class DownloadsDurable {
       websiteOverrideCountries: normalizePublicSiteCountryList(
         (stored as unknown as Record<string, unknown>).websiteOverrideCountries,
       ),
+      websiteTelemetryQueue: (() => {
+        const raw = (stored as unknown as Record<string, unknown>).websiteTelemetryQueue;
+        if (!Array.isArray(raw)) return [];
+        return raw
+          .map((row) => sanitizeLoadedWebsiteTelemetryBatch(row))
+          .filter((row): row is WebsiteTelemetryQueuedBatch => row !== null)
+          .slice(0, WEBSITE_TELEMETRY_MAX_QUEUE_BATCHES);
+      })(),
+      websiteTelemetryDeadLetter: (() => {
+        const raw = (stored as unknown as Record<string, unknown>).websiteTelemetryDeadLetter;
+        if (!Array.isArray(raw)) return [];
+        return raw
+          .map((row) => sanitizeLoadedWebsiteTelemetryBatch(row))
+          .filter((row): row is WebsiteTelemetryQueuedBatch => row !== null)
+          .slice(0, WEBSITE_TELEMETRY_MAX_DLQ_BATCHES);
+      })(),
+      websiteTelemetrySeenEventIds: (() => {
+        const raw = (stored as unknown as Record<string, unknown>).websiteTelemetrySeenEventIds;
+        if (!Array.isArray(raw)) return [];
+        const normalized = raw
+          .filter((value) => typeof value === "string")
+          .map((value) => value.trim())
+          .filter((value) => WEBSITE_EVENT_ID_PATTERN.test(value));
+        if (normalized.length <= WEBSITE_TELEMETRY_MAX_DEDUPE_IDS) return normalized;
+        return normalized.slice(normalized.length - WEBSITE_TELEMETRY_MAX_DEDUPE_IDS);
+      })(),
+      websiteTelemetryLastBatchCreatedAt: (() => {
+        const value = clampInt(
+          (stored as unknown as Record<string, unknown>).websiteTelemetryLastBatchCreatedAt,
+          0,
+          Number.MAX_SAFE_INTEGER,
+          0,
+        );
+        return value > 0 ? value : null;
+      })(),
+      websiteTelemetryLastBatchSentAt: (() => {
+        const value = clampInt(
+          (stored as unknown as Record<string, unknown>).websiteTelemetryLastBatchSentAt,
+          0,
+          Number.MAX_SAFE_INTEGER,
+          0,
+        );
+        return value > 0 ? value : null;
+      })(),
+      websiteTelemetryLastBatchAckAt: (() => {
+        const value = clampInt(
+          (stored as unknown as Record<string, unknown>).websiteTelemetryLastBatchAckAt,
+          0,
+          Number.MAX_SAFE_INTEGER,
+          0,
+        );
+        return value > 0 ? value : null;
+      })(),
+      websiteTelemetryLastBatchID: (() => {
+        const value = trimAndLimitString(
+          (stored as unknown as Record<string, unknown>).websiteTelemetryLastBatchID,
+          160,
+        );
+        return value || null;
+      })(),
+      websiteTelemetryLastCorrelationID: (() => {
+        const value = trimAndLimitString(
+          (stored as unknown as Record<string, unknown>).websiteTelemetryLastCorrelationID,
+          160,
+        );
+        return value || null;
+      })(),
+      websiteTelemetryLastError: (() => {
+        const value = trimAndLimitString(
+          (stored as unknown as Record<string, unknown>).websiteTelemetryLastError,
+          280,
+        );
+        return value || null;
+      })(),
 
       lastHealthStatus: stored.lastHealthStatus ?? base.lastHealthStatus,
       lastHealthNotifyAt: stored.lastHealthNotifyAt ?? base.lastHealthNotifyAt,
