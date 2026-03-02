@@ -2481,7 +2481,17 @@ export class DownloadsDurable {
       }
     }
 
-    if (hadLegacyIps || strippedEventIps || configDirty || pendingCompacted || failurePruned) {
+    if (
+      hadLegacyIps ||
+      strippedEventIps ||
+      configDirty ||
+      pendingCompacted ||
+      failurePruned ||
+      stepUpBypassNeedsMigration ||
+      changelogRevisionNeedsMigration ||
+      changelogConfigNeedsMigration ||
+      changelogDraftNeedsMigration
+    ) {
       await this.persist();
     }
 
