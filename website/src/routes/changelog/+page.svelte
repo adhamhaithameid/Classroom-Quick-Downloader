@@ -378,7 +378,8 @@
     min-height: 100%;
     display: flex;
     flex-direction: column;
-    gap: 24px;
+    flex: 1 0 auto;
+    padding-bottom: 0;
   }
 
   /* ── Header ──────────────────────── */
