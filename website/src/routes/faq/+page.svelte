@@ -64,7 +64,7 @@
       ]
     },
     {
-      title: 'Installation and Browser Support',
+      title: 'Installation & Browser Support',
       icon: '🌐',
       summary: 'Where it runs and how to install it.',
       items: [
