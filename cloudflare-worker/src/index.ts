@@ -615,6 +615,120 @@ function handleOptions(request: Request, env: WorkerEnv): Response {
   return new Response(null, { status: 204, headers: corsHeaders(request, env) });
 }
 
+type LoginAllowlistCheck = {
+  ok: boolean;
+  allowed: boolean;
+  enabled: boolean;
+  stepUpBypassEnabled: boolean;
+};
+
+type DangerStepUpResult = {
+  ok: boolean;
+  status: number;
+  error?: string;
+  blockedForSeconds?: number;
+};
+
+async function checkLoginAllowlist(
+  stub: DurableObjectStub,
+  requestUrl: string,
+  doSecret: string,
+  clientIp: string,
+): Promise<LoginAllowlistCheck> {
+  const checkReq = new Request(new URL("/auth/check-ip-allowlist", requestUrl).toString(), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Admin-Secret": doSecret,
+    },
+    body: JSON.stringify({ ip: clientIp }),
+  });
+  const checkRes = await stub.fetch(checkReq);
+  if (!checkRes.ok) {
+    throw new Error(`ip-allowlist endpoint returned ${checkRes.status}`);
+  }
+  const checkData = await checkRes.json() as {
+    allowed?: unknown;
+    enabled?: unknown;
+    stepUpBypassEnabled?: unknown;
+  };
+  if (typeof checkData.allowed !== "boolean") {
+    throw new Error("ip-allowlist payload missing allowed boolean");
+  }
+  return {
+    ok: true,
+    allowed: checkData.allowed,
+    enabled: checkData.enabled === true,
+    stepUpBypassEnabled: checkData.stepUpBypassEnabled === true,
+  };
+}
+
+async function verifyDangerStepUpPassword(
+  stub: DurableObjectStub,
+  env: WorkerEnv,
+  clientIp: string,
+  password: string,
+): Promise<DangerStepUpResult> {
+  const rateLimitReq = new Request("https://do/auth/login-attempt", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Admin-Secret": env.DO_SHARED_SECRET,
+    },
+    body: JSON.stringify({ ip: `danger:${clientIp}`, success: false, checkOnly: true }),
+  });
+  const rateLimitRes = await stub.fetch(rateLimitReq);
+  if (!rateLimitRes.ok) {
+    return {
+      ok: false,
+      status: 503,
+      error: "Rate limit service unavailable. Try again later.",
+    };
+  }
+
+  let rateLimitData: { allowed?: unknown; blockedForSeconds?: unknown };
+  try {
+    rateLimitData = await rateLimitRes.json() as { allowed?: unknown; blockedForSeconds?: unknown };
+  } catch {
+    return {
+      ok: false,
+      status: 503,
+      error: "Rate limit service unavailable. Try again later.",
+    };
+  }
+  if (rateLimitData.allowed !== true) {
+    return {
+      ok: false,
+      status: 429,
+      error: "Too many failed step-up attempts. Try again later.",
+      blockedForSeconds:
+        typeof rateLimitData.blockedForSeconds === "number" ? rateLimitData.blockedForSeconds : undefined,
+    };
+  }
+
+  if (!password || !env.DANGER_PASSWORD || !timingSafeStringEqual(password, env.DANGER_PASSWORD)) {
+    await stub.fetch(new Request("https://do/auth/login-attempt", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Admin-Secret": env.DO_SHARED_SECRET,
+      },
+      body: JSON.stringify({ ip: `danger:${clientIp}`, success: false }),
+    }));
+    return { ok: false, status: 401, error: "Invalid danger password" };
+  }
+
+  await stub.fetch(new Request("https://do/auth/login-attempt", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Admin-Secret": env.DO_SHARED_SECRET,
+    },
+    body: JSON.stringify({ ip: `danger:${clientIp}`, success: true }),
+  }));
+  return { ok: true, status: 200 };
+}
+
 // ---------------------------------------------------------------------------
 // Dashboard Login (POST / validates password, sets session cookie)
 // ---------------------------------------------------------------------------
