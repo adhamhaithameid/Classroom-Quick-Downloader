@@ -145,6 +145,8 @@
   .animated-number {
     display: inline-flex;
     align-items: baseline;
-    font-variant-numeric: tabular-nums;
+    letter-spacing: normal;
+    word-spacing: normal;
+    font-kerning: normal;
   }
 </style>
