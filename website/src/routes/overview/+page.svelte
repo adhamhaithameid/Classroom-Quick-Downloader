@@ -447,7 +447,7 @@
     /* Auto-scroll tick */
     const tick = (ts: number) => {
       if (!isDragging && !isCoasting) {
-        const setW = viewport.scrollWidth / duplicateSets;
+        const setW = getSetWidth();
         if (setW > 0) {
           if (lastTime === 0) lastTime = ts;
           const dt = (ts - lastTime) / 1000;
