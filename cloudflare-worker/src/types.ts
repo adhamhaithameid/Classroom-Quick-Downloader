@@ -432,6 +432,9 @@ export interface NotificationRule {
   effect: 'none' | 'glow' | 'pulse';
 }
 
+export type ChangelogApplyMode = "manual" | "auto_github";
+export type ChangelogSyncStatus = "idle" | "ok" | "error";
+
 /**
  * Configuration for the "Version Pill" in the extension.
  */
