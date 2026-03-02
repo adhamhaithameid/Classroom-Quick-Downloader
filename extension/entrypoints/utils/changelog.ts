@@ -331,6 +331,7 @@ export function getLatestChange(data: ChangelogData | null): string | null {
   return null;
 }
 
+type SeenState = Record<string, string>;
 
 const SEEN_KEY = 'cqd_changelog_seen_v1';
 
