@@ -280,6 +280,53 @@
           id: 'trouble-csp',
           q: 'I see CSP errors in the console. Is this a problem?',
           a: 'Content Security Policy errors can appear in some institutional environments. CQD is designed to work within CSP constraints, but some strict school policies may need adjustment by IT administrators.'
+        },
+        {
+          id: 'trouble-slow-download',
+          q: 'Downloads are starting but seem slow.',
+          a: 'Download speed depends on your internet connection and Google\'s servers, not CQD. If many files are queued, your browser may serialize some downloads. Try downloading fewer files at a time on slower connections.'
+        },
+        {
+          id: 'trouble-blocked-school',
+          q: 'My school\'s network blocks the extension. What can I do?',
+          a: 'Some school networks or managed Chromebooks restrict extension installation. Contact your IT administrator and reference the extension\'s store listing and open-source repository for review.'
+        }
+      ]
+    },
+    {
+      title: 'Updates & Versioning',
+      icon: '🔄',
+      summary: 'How updates work and what each version means.',
+      items: [
+        {
+          id: 'updates-auto',
+          q: 'Does CQD update automatically?',
+          a: 'Yes. Browser extension stores handle automatic updates. When a new version is published, your browser will download and apply it within a few hours to a couple of days.'
+        },
+        {
+          id: 'updates-force',
+          q: 'How can I force an update?',
+          a: 'Go to your browser\'s extensions page (chrome://extensions), enable "Developer mode", and click "Update". This will check for and install the latest version immediately.'
+        },
+        {
+          id: 'updates-version-check',
+          q: 'How do I check which version I have?',
+          a: 'Open your browser\'s extensions page and find Classroom Quick Downloader in the list. The version number is displayed there. You can also see the latest version on the Changelog page.'
+        },
+        {
+          id: 'updates-rollback',
+          q: 'Can I go back to a previous version?',
+          a: 'Browser stores don\'t support rollback natively. If you need an older version, you can download the source code from GitHub, check out a specific tag, and load it as an unpacked extension in developer mode.'
+        },
+        {
+          id: 'updates-changelog',
+          q: 'Where can I see what changed in each version?',
+          a: 'The Changelog page on this website shows user-facing release notes. The GitHub repository has the full technical commit history for every change.'
+        },
+        {
+          id: 'updates-beta',
+          q: 'Is there a beta or preview channel?',
+          a: 'Not currently. All releases go through the standard store review process. You can follow the GitHub repository for early visibility into upcoming changes.'
         }
       ]
     },
