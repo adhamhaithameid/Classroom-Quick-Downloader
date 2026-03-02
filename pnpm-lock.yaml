@@ -5635,7 +5635,7 @@ snapshots:
     dependencies:
       array-differ: 4.0.0
       array-union: 3.0.1
-      minimatch: 10.2.2
+      minimatch: 10.2.4
 
   nano-spawn@2.0.0: {}
 
