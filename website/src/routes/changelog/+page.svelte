@@ -486,7 +486,7 @@
   /* ── Layout ─────────────────────── */
   .cl-layout {
     display: grid;
-    grid-template-columns: 200px 1fr;
+    grid-template-columns: 210px 1fr;
     gap: 32px;
     align-items: start;
   }
