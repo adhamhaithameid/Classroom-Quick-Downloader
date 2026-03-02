@@ -75,11 +75,46 @@ describe('oracle-only website data source routing', () => {
           schemaVersion: '1',
           ok: true,
           generatedAt: 1771700000000,
-          totals: { downloads: 77, success: 75, fail: 2 },
-          installs: { usersTotal: 20, lastSyncedAtUtc: 1771699200000, browsers: [] },
-          versions: { github: '1.3.6', chrome: '1.3.6', firefox: null, edge: null },
-          status: { systemLive: true, liveSinceUtc: 1771600000000, workerHealth: 'up' },
-          links: { chrome: 'https://c', firefox: 'https://f', edge: 'https://e', github: 'https://g' }
+          snapshotId: 'snapshot-77',
+          overview: {
+            ok: true,
+            generatedAt: 1771700000000,
+            totals: { downloads: 77, success: 75, fail: 2 },
+            installs: { usersTotal: 20, lastSyncedAtUtc: 1771699200000, browsers: [] },
+            versions: { github: '1.3.6', chrome: '1.3.6', firefox: null, edge: null },
+            status: { systemLive: true, liveSinceUtc: 1771600000000, workerHealth: 'up' },
+            links: { chrome: 'https://c', firefox: 'https://f', edge: 'https://e', github: 'https://g' }
+          },
+          map: {
+            ok: true,
+            generatedAt: 1771700000000,
+            granularity: 'country',
+            countries: [{ countryCode: 'US', count: 77 }],
+            totals: { downloads: 77, countries: 1 },
+            privacyNote: 'country only'
+          },
+          changelog: {
+            ok: true,
+            generatedAt: 1771700000000,
+            headline: '',
+            description: '',
+            entries: [],
+            fullChangelogUrl: 'https://github.com/adhamhaithameid/Classroom-Quick-Downloader/blob/main/CHANGELOG.md',
+            lastUpdatedAtUtc: null
+          },
+          userChangelogSummary: {
+            headline: '',
+            description: '',
+            entriesCount: 0,
+            lastUpdatedAtUtc: null,
+            fullChangelogUrl: 'https://github.com/adhamhaithameid/Classroom-Quick-Downloader/blob/main/CHANGELOG.md'
+          },
+          privacy: {
+            headline: '',
+            description: '',
+            userPrivacyUrl: 'https://classroom-quick-downloader-website.pages.dev/privacy',
+            fullPrivacyUrl: 'https://github.com/adhamhaithameid/Classroom-Quick-Downloader/blob/main/PRIVACY.md'
+          }
         }),
         { status: 200 }
       );
