@@ -2831,11 +2831,7 @@ export class DownloadsDurable {
     const now = Date.now();
     this.ensureRequestDay();
 
-    // =========================================================================
-    // SCHEDULED MIDNIGHT FLUSH TO ORACLE
-    // At 00:00-00:15, flush all buffered events to Oracle
-    // This happens before extensions wake up at 1:00 AM
-    // =========================================================================
+    // Flush extension buffered events once daily at 23:00 UTC.
     const currentHour = new Date().getUTCHours();
     if (this.d.buffer.length > 0 && currentHour === 0) {
       logEvent("info", "alarm_midnight_flush", { bufferedEvents: this.d.buffer.length });
