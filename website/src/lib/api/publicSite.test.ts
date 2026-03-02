@@ -126,7 +126,7 @@ describe('oracle-only website data source routing', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('reads map from Oracle public endpoint', async () => {
+  it('reads map from Oracle canonical snapshot endpoint', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString();
       expect(url).toContain('/api/public/website/map');
