@@ -6624,6 +6624,8 @@ export function renderDashboard(stats: StatsResponse): string {
               };
               const toggle = document.getElementById('ip-protection-toggle');
               if (toggle) toggle.checked = data.enabled;
+              const stepUpToggle = document.getElementById('blocked-ip-stepup-toggle');
+              if (stepUpToggle) stepUpToggle.checked = ipAllowlistData.stepUpBypassEnabled;
               if (data.yourIp) {
                 currentUserIp = data.yourIp;
                 const ipEl = document.getElementById('current-ip');
