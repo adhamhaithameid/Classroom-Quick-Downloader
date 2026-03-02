@@ -6617,7 +6617,11 @@ export function renderDashboard(stats: StatsResponse): string {
           .then(r => r.json())
           .then(data => {
             if (data.ok) {
-              ipAllowlistData = { enabled: data.enabled, allowlist: data.allowlist || [] };
+              ipAllowlistData = {
+                enabled: data.enabled,
+                allowlist: data.allowlist || [],
+                stepUpBypassEnabled: data.stepUpBypassEnabled !== false
+              };
               const toggle = document.getElementById('ip-protection-toggle');
               if (toggle) toggle.checked = data.enabled;
               if (data.yourIp) {
