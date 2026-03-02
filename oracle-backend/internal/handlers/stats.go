@@ -1007,6 +1007,7 @@ func HeatmapHandler(db *sql.DB) http.HandlerFunc {
 		fromIso := fromTime.UTC().Format(time.RFC3339)
 		toIso := toTime.AddDate(0, 0, 1).UTC().Format(time.RFC3339)
 
+		// #nosec G701 -- static SQL statement with bound date parameters.
 		rows, err := db.QueryContext(
 			ctx,
 			`SELECT
@@ -2090,6 +2091,7 @@ func queryWebsiteTrafficWindowTotal(ctx context.Context, db *sql.DB, fromIso, to
 
 func queryWebsiteEventDailyTotal(ctx context.Context, db *sql.DB, fromDay, toDay, eventType, action string) (int64, error) {
 	var total int64
+	// #nosec G701 -- static SQL statement with bound range/action filters.
 	if err := db.QueryRowContext(
 		ctx,
 		`SELECT COALESCE(SUM(count), 0)
@@ -2107,6 +2109,7 @@ func queryWebsiteEventDailyTotal(ctx context.Context, db *sql.DB, fromDay, toDay
 
 func queryDownloadsWindowTotal(ctx context.Context, db *sql.DB, fromIso, toIso string) (int64, error) {
 	var total int64
+	// #nosec G701 -- static SQL statement with bound range parameters.
 	if err := db.QueryRowContext(
 		ctx,
 		`SELECT COALESCE(SUM(total_downloads), 0)

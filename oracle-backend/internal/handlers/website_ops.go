@@ -947,12 +947,13 @@ func loadLatestWebsiteMonotonicAnomaly(ctx context.Context, db *sql.DB) (*websit
 		return nil, nil
 	}
 	var latestResolvedAt sql.NullInt64
+	// #nosec G701 -- static SQL with no user-controlled fragments.
 	if err := db.QueryRowContext(
 		ctx,
 		`SELECT MAX(created_at)
 		 FROM website_sync_batches
 		 WHERE status = 'ok'`,
-	).Scan(&latestResolvedAt); err == nil {
+	).Scan(&latestResolvedAt); err == nil { // #nosec G701 -- static query with no user-controlled SQL fragments.
 		if latestResolvedAt.Valid && latestResolvedAt.Int64 >= tsUTC.Int64 {
 			return nil, nil
 		}
@@ -1043,17 +1044,18 @@ func rebuildWebsiteDatasetFromTrustedHistory(
 	}
 
 	var downloads sql.NullInt64
+	// #nosec G701 -- static SQL with no user-controlled fragments.
 	if err := db.QueryRowContext(
 		ctx,
 		`SELECT COALESCE(SUM(total_downloads), 0) FROM downloads_hourly`,
-	).Scan(&downloads); err != nil {
+	).Scan(&downloads); err != nil { // #nosec G701 -- static query with no user-controlled SQL fragments.
 		return 0, nil, err
 	}
 
 	rows, err := db.QueryContext(
 		ctx,
 		`SELECT by_country_json FROM downloads_hourly`,
-	)
+	) // #nosec G701 -- static query with no user-controlled SQL fragments.
 	if err != nil {
 		return 0, nil, err
 	}
@@ -1181,7 +1183,7 @@ func WebsiteAnalyticsHandler(db *sql.DB, trafficCfg WebsiteTrafficSyncConfig) ht
 			actionArgs = append(actionArgs, rng.StartDay)
 		}
 		actionQuery += ` GROUP BY action`
-		actionRows, err := db.QueryContext(ctx, actionQuery, actionArgs...)
+		actionRows, err := db.QueryContext(ctx, actionQuery, actionArgs...) // #nosec G701 -- query is assembled from fixed clauses only; values stay parameterized.
 		if err != nil {
 			writeJSONError(w, "analytics_load_failed", "Failed to load website analytics", http.StatusInternalServerError)
 			return
@@ -1225,7 +1227,7 @@ func WebsiteAnalyticsHandler(db *sql.DB, trafficCfg WebsiteTrafficSyncConfig) ht
 		}
 		dailyQuery += ` GROUP BY day_utc ORDER BY day_utc DESC LIMIT ?`
 		dailyArgs = append(dailyArgs, rng.DayLimit)
-		dailyRows, err := db.QueryContext(ctx, dailyQuery, dailyArgs...)
+		dailyRows, err := db.QueryContext(ctx, dailyQuery, dailyArgs...) // #nosec G701 -- query is assembled from fixed clauses only; values stay parameterized.
 		if err != nil {
 			writeJSONError(w, "analytics_load_failed", "Failed to load website analytics", http.StatusInternalServerError)
 			return
@@ -1266,7 +1268,7 @@ func WebsiteAnalyticsHandler(db *sql.DB, trafficCfg WebsiteTrafficSyncConfig) ht
 		}
 		placementsQuery += ` GROUP BY placement, action ORDER BY total DESC, placement ASC LIMIT ?`
 		placementsArgs = append(placementsArgs, websiteAnalyticsMaxPlacements)
-		placementsRows, err := db.QueryContext(ctx, placementsQuery, placementsArgs...)
+		placementsRows, err := db.QueryContext(ctx, placementsQuery, placementsArgs...) // #nosec G701 -- query is assembled from fixed clauses only; values stay parameterized.
 		if err != nil {
 			writeJSONError(w, "analytics_load_failed", "Failed to load website analytics", http.StatusInternalServerError)
 			return
@@ -1299,7 +1301,7 @@ func WebsiteAnalyticsHandler(db *sql.DB, trafficCfg WebsiteTrafficSyncConfig) ht
 
 		var feedbackTotal int64
 		var feedbackLast sql.NullInt64
-		if err := db.QueryRowContext(ctx, feedbackQuery, feedbackArgs...).Scan(&feedbackTotal, &feedbackLast); err != nil {
+		if err := db.QueryRowContext(ctx, feedbackQuery, feedbackArgs...).Scan(&feedbackTotal, &feedbackLast); err != nil { // #nosec G701 -- query is assembled from fixed clauses only; values stay parameterized.
 			writeJSONError(w, "analytics_load_failed", "Failed to load website analytics", http.StatusInternalServerError)
 			return
 		}
@@ -1312,7 +1314,7 @@ func WebsiteAnalyticsHandler(db *sql.DB, trafficCfg WebsiteTrafficSyncConfig) ht
 			reasonsArgs = append(reasonsArgs, rng.StartMS)
 		}
 		reasonsQuery += ` GROUP BY reason ORDER BY c DESC, reason ASC LIMIT 8`
-		reasonRows, err := db.QueryContext(ctx, reasonsQuery, reasonsArgs...)
+		reasonRows, err := db.QueryContext(ctx, reasonsQuery, reasonsArgs...) // #nosec G701 -- query is assembled from fixed clauses only; values stay parameterized.
 		if err != nil {
 			writeJSONError(w, "analytics_load_failed", "Failed to load website analytics", http.StatusInternalServerError)
 			return
@@ -1347,7 +1349,7 @@ func WebsiteAnalyticsHandler(db *sql.DB, trafficCfg WebsiteTrafficSyncConfig) ht
 		}
 		feedbackDailyQuery += ` GROUP BY day_utc ORDER BY day_utc DESC LIMIT ?`
 		feedbackDailyArgs = append(feedbackDailyArgs, dailyCap)
-		feedbackDailyRows, err := db.QueryContext(ctx, feedbackDailyQuery, feedbackDailyArgs...)
+		feedbackDailyRows, err := db.QueryContext(ctx, feedbackDailyQuery, feedbackDailyArgs...) // #nosec G701 -- query is assembled from fixed clauses only; values stay parameterized.
 		if err != nil {
 			writeJSONError(w, "analytics_load_failed", "Failed to load website analytics", http.StatusInternalServerError)
 			return
@@ -1398,7 +1400,7 @@ func WebsiteAnalyticsHandler(db *sql.DB, trafficCfg WebsiteTrafficSyncConfig) ht
 			feedbackBrowsersArgs = append(feedbackBrowsersArgs, rng.StartMS)
 		}
 		feedbackBrowsersQuery += ` GROUP BY browser ORDER BY c DESC, browser ASC LIMIT 8`
-		feedbackBrowsersRows, err := db.QueryContext(ctx, feedbackBrowsersQuery, feedbackBrowsersArgs...)
+		feedbackBrowsersRows, err := db.QueryContext(ctx, feedbackBrowsersQuery, feedbackBrowsersArgs...) // #nosec G701 -- query is assembled from fixed clauses only; values stay parameterized.
 		if err != nil {
 			writeJSONError(w, "analytics_load_failed", "Failed to load website analytics", http.StatusInternalServerError)
 			return
@@ -1541,7 +1543,7 @@ func loadWebsiteTrafficAnalytics(
 		totalQuery += ` WHERE hour_utc >= ?`
 		totalArgs = append(totalArgs, startHour)
 	}
-	if err := db.QueryRowContext(ctx, totalQuery, totalArgs...).Scan(&summary.Visits, &summary.Requests); err != nil {
+	if err := db.QueryRowContext(ctx, totalQuery, totalArgs...).Scan(&summary.Visits, &summary.Requests); err != nil { // #nosec G701 -- query is assembled from fixed clauses only; values stay parameterized.
 		return websiteAnalyticsTrafficSummary{}, nil, err
 	}
 	summary.Visits = maxInt64(summary.Visits, 0)
@@ -1561,7 +1563,7 @@ func loadWebsiteTrafficAnalytics(
 	}
 	dailyQuery += ` GROUP BY day_utc ORDER BY day_utc DESC LIMIT ?`
 	dailyArgs = append(dailyArgs, dailyLimit)
-	dailyRows, err := db.QueryContext(ctx, dailyQuery, dailyArgs...)
+	dailyRows, err := db.QueryContext(ctx, dailyQuery, dailyArgs...) // #nosec G701 -- query is assembled from fixed clauses only; values stay parameterized.
 	if err != nil {
 		return websiteAnalyticsTrafficSummary{}, nil, err
 	}
@@ -1584,13 +1586,14 @@ func loadWebsiteTrafficAnalytics(
 
 	var latestFetched sql.NullInt64
 	var latestSource sql.NullString
+	// #nosec G701 -- static SQL with no user-controlled fragments.
 	if err := db.QueryRowContext(
 		ctx,
 		`SELECT fetched_at, source
 		 FROM website_traffic_hourly
 		 ORDER BY fetched_at DESC, hour_utc DESC
 		 LIMIT 1`,
-	).Scan(&latestFetched, &latestSource); err != nil && !errors.Is(err, sql.ErrNoRows) {
+	).Scan(&latestFetched, &latestSource); err != nil && !errors.Is(err, sql.ErrNoRows) { // #nosec G701 -- static query with no user-controlled SQL fragments.
 		return websiteAnalyticsTrafficSummary{}, nil, err
 	}
 	if latestFetched.Valid && latestFetched.Int64 > 0 {

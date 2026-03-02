@@ -38,7 +38,8 @@ var (
 )
 
 type WebsiteTrafficSyncConfig struct {
-	Enabled    bool
+	Enabled bool
+	// #nosec G117 -- configuration secret field by design; loaded from environment and never exposed in responses.
 	APIToken   string
 	AccountTag string
 	Hostname   string

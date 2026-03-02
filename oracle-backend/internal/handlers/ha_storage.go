@@ -1072,6 +1072,7 @@ func buildWebsiteChainHealthPayload(ctx context.Context, sqliteDB *sql.DB, nowUT
 			createdAt  sql.NullInt64
 			detailsRaw sql.NullString
 		)
+		// #nosec G701 -- static SQL with bound parameters and fixed ordering.
 		err := sqliteDB.QueryRowContext(
 			ctx,
 			`SELECT batch_id, triggered_by, created_at, details_json
@@ -1083,6 +1084,7 @@ func buildWebsiteChainHealthPayload(ctx context.Context, sqliteDB *sql.DB, nowUT
 			"worker_website_events_batch",
 		).Scan(&batchID, &triggered, &createdAt, &detailsRaw)
 		if err == sql.ErrNoRows {
+			// #nosec G701 -- static SQL with bound parameters and fixed ordering.
 			err = sqliteDB.QueryRowContext(
 				ctx,
 				`SELECT batch_id, triggered_by, created_at, details_json
@@ -1175,6 +1177,7 @@ func buildWebsiteChainHealthPayload(ctx context.Context, sqliteDB *sql.DB, nowUT
 			snapshotID sql.NullString
 			generated  sql.NullInt64
 		)
+		// #nosec G701 -- static SQL with no user-controlled fragments.
 		err := sqliteDB.QueryRowContext(
 			ctx,
 			`SELECT snapshot_id, generated_at
@@ -1206,6 +1209,7 @@ func buildWebsiteChainHealthPayload(ctx context.Context, sqliteDB *sql.DB, nowUT
 			statusRaw  sql.NullString
 			finishedAt sql.NullInt64
 		)
+		// #nosec G701 -- static SQL with no user-controlled fragments.
 		err := sqliteDB.QueryRowContext(
 			ctx,
 			`SELECT status, finished_at
@@ -1235,6 +1239,7 @@ func buildWebsiteChainHealthPayload(ctx context.Context, sqliteDB *sql.DB, nowUT
 			metaRaw     sql.NullString
 			errorReason sql.NullString
 		)
+		// #nosec G701 -- static SQL with no user-controlled fragments.
 		err := sqliteDB.QueryRowContext(
 			ctx,
 			`SELECT status, flushed_at_utc, COALESCE(meta_json, ''), COALESCE(error_message, '')

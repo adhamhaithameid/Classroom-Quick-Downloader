@@ -574,13 +574,19 @@ func websiteTrafficSyncHostname() string {
 	}
 	if parsed, err := url.Parse(siteURL); err == nil {
 		if host := strings.TrimSpace(parsed.Hostname()); host != "" {
-			log.Printf("[Scheduler] CLOUDFLARE_ANALYTICS_HOSTNAME not set; using host from PUBLIC_SITE_URL (%s)", host)
+			log.Printf( // #nosec G706 -- host is sanitized before it is written to logs.
+				"[Scheduler] CLOUDFLARE_ANALYTICS_HOSTNAME not set; using host from PUBLIC_SITE_URL (%s)",
+				sanitizeLogValue(host),
+			)
 			return host
 		}
 	}
 	candidate := strings.TrimSpace(strings.TrimSuffix(strings.Split(siteURL, "/")[0], "."))
 	if candidate != "" && !strings.Contains(candidate, " ") {
-		log.Printf("[Scheduler] CLOUDFLARE_ANALYTICS_HOSTNAME not set; using PUBLIC_SITE_URL fallback value (%s)", candidate)
+		log.Printf( // #nosec G706 -- candidate value is sanitized before it is written to logs.
+			"[Scheduler] CLOUDFLARE_ANALYTICS_HOSTNAME not set; using PUBLIC_SITE_URL fallback value (%s)",
+			sanitizeLogValue(candidate),
+		)
 		return candidate
 	}
 	return ""

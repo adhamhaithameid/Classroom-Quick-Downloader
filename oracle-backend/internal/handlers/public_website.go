@@ -629,6 +629,7 @@ func buildPublicWebsitePrivacyPointers(ctx context.Context, store *controlPlaneS
 
 func loadLatestPublicWebsiteSnapshot(ctx context.Context, sqliteDB *sql.DB) (publicWebsiteSnapshotResponse, error) {
 	var payloadJSON string
+	// #nosec G701 -- static query without user-controlled SQL fragments.
 	if err := sqliteDB.QueryRowContext(
 		ctx,
 		`SELECT payload_json
@@ -892,6 +893,7 @@ func ingestWebsiteEvents(
 			continue
 		}
 
+		// #nosec G701 -- static insert with bound values in a transaction.
 		insertRes, execErr := tx.ExecContext(
 			ctx,
 			`INSERT INTO website_event_idempotency (event_id, created_at)
@@ -920,6 +922,7 @@ func ingestWebsiteEvents(
 			eventTSUTC = *rawEvent.TSUTC
 		}
 
+		// #nosec G701 -- static insert with bound values in a transaction.
 		if _, execErr = tx.ExecContext(
 			ctx,
 			`INSERT INTO website_events_raw (
@@ -946,6 +949,7 @@ func ingestWebsiteEvents(
 			return websiteEventsIngestResult{}, execErr
 		}
 
+		// #nosec G701 -- static upsert with bound values in a transaction.
 		if _, execErr = tx.ExecContext(
 			ctx,
 			`INSERT INTO website_event_daily (day_utc, event_type, action, placement, count, last_seen_at)
@@ -1655,7 +1659,7 @@ func loadPublicWebsiteUserChangelogConfig(ctx context.Context, store *controlPla
 	rawURL := strings.TrimSpace(stringFromAny(data["markdownUrl"]))
 	if rawURL != "" {
 		parsed, parseErr := url.Parse(rawURL)
-		if parseErr == nil && strings.EqualFold(parsed.Scheme, "https") {
+		if parseErr == nil && strings.EqualFold(parsed.Scheme, "https") && isAllowedUserChangelogHost(parsed.Hostname()) {
 			config.MarkdownURL = rawURL
 		}
 	}
@@ -1671,6 +1675,9 @@ func fetchRemoteUserFriendlyChangelogMarkdown(ctx context.Context, rawURL string
 	if err != nil || !strings.EqualFold(parsed.Scheme, "https") {
 		return "", errors.New("github raw changelog url is invalid")
 	}
+	if !isAllowedUserChangelogHost(parsed.Hostname()) {
+		return "", errors.New("github raw changelog host is not allowlisted")
+	}
 	reqCtx, cancel := context.WithTimeout(ctx, 6*time.Second)
 	defer cancel()
 	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, rawURL, nil)
@@ -1678,7 +1685,19 @@ func fetchRemoteUserFriendlyChangelogMarkdown(ctx context.Context, rawURL string
 		return "", err
 	}
 	req.Header.Set("User-Agent", "ClassroomQuickDownloader-Oracle/4.1")
-	resp, err := http.DefaultClient.Do(req)
+	httpClient := &http.Client{
+		Timeout: 6 * time.Second,
+		CheckRedirect: func(nextReq *http.Request, via []*http.Request) error {
+			if len(via) >= 4 {
+				return errors.New("too many redirects")
+			}
+			if !isAllowedUserChangelogHost(nextReq.URL.Hostname()) {
+				return errors.New("redirect host is not allowlisted")
+			}
+			return nil
+		},
+	}
+	resp, err := httpClient.Do(req) // #nosec G704 -- target URL is HTTPS and strictly host-allowlisted before dispatch.
 	if err != nil {
 		return "", err
 	}
@@ -1695,6 +1714,16 @@ func fetchRemoteUserFriendlyChangelogMarkdown(ctx context.Context, rawURL string
 		return "", errors.New("github changelog markdown is empty")
 	}
 	return markdown, nil
+}
+
+func isAllowedUserChangelogHost(host string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(host))
+	switch normalized {
+	case "raw.githubusercontent.com", "gist.githubusercontent.com":
+		return true
+	default:
+		return false
+	}
 }
 
 func normalizeStringList(value any, maxItems, maxLen int) []string {
