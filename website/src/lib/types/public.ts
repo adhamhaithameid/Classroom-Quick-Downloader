@@ -154,6 +154,8 @@ export type ChangelogResponse = {
     markdown?: string;
     isImportant?: boolean;
   }>;
+  config?: ChangelogConfig;
+  meta?: ChangelogMeta;
 };
 
 export type UserChangelogEntry = {
