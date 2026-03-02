@@ -263,6 +263,7 @@ export function coerceMapPayload(input: unknown): MapResponse {
   const totalDownloads = countries.reduce((sum, item) => sum + item.count, 0);
 
   return {
+    schemaVersion: asSchemaVersion(source?.schemaVersion),
     ok: source?.ok === true,
     generatedAt: asNumber(source?.generatedAt),
     granularity: 'country',
