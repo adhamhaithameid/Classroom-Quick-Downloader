@@ -621,60 +621,9 @@
     max-width: 600px; margin: 0 auto;
   }
 
-  .faq-quick-links {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-  }
-
-  .faq-quick-link {
-    text-decoration: none;
-    color: var(--gc-green);
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
-    border: 1px solid rgba(26, 139, 85, 0.18);
-    background: rgba(26, 139, 85, 0.04);
-    border-radius: 999px;
-    padding: 7px 14px;
-    transition: all 0.2s ease;
-    backdrop-filter: blur(6px);
-  }
-
-  .faq-quick-link:hover {
-    border-color: rgba(26, 139, 85, 0.35);
-    background: rgba(26, 139, 85, 0.08);
-  }
-
-  .faq-sections {
-    display: grid;
-    gap: 20px;
-  }
-
-  .faq-section {
-    border: 1px solid var(--border-subtle, rgba(226, 232, 240, 0.35));
-    border-radius: var(--radius);
-    background: rgba(255, 255, 255, 0.55);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    padding: 22px;
-    animation: slideUp 0.5s ease both;
-    opacity: 0;
-  }
-
-  .faq-section:nth-child(1) { animation-delay: 0s; }
-  .faq-section:nth-child(2) { animation-delay: 0.06s; }
-  .faq-section:nth-child(3) { animation-delay: 0.12s; }
-  .faq-section:nth-child(4) { animation-delay: 0.18s; }
-  .faq-section:nth-child(5) { animation-delay: 0.24s; }
-  .faq-section:nth-child(6) { animation-delay: 0.3s; }
-
-  .faq-section-head {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 14px;
+  .fq-contact-link {
+    color: var(--green); font-weight: 600; text-decoration: underline;
+    text-underline-offset: 3px; transition: color 0.2s;
   }
 
   .faq-section-icon {
