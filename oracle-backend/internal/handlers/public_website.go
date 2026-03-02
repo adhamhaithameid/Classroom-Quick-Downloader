@@ -87,9 +87,10 @@ type publicWebsiteOverviewResponse struct {
 }
 
 type publicWebsiteStatusResponse struct {
-	OK          bool                `json:"ok"`
-	GeneratedAt int64               `json:"generatedAt"`
-	Status      publicWebsiteStatus `json:"status"`
+	SchemaVersion string              `json:"schemaVersion"`
+	OK            bool                `json:"ok"`
+	GeneratedAt   int64               `json:"generatedAt"`
+	Status        publicWebsiteStatus `json:"status"`
 }
 
 type publicWebsiteMapResponse struct {
