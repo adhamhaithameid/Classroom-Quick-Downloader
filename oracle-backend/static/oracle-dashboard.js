@@ -992,6 +992,10 @@
       function hideTooltip() { 
         currentTooltipEvent = null;
         currentTooltipPayload = null;
+        if (tooltip) {
+          tooltip.style.left = '';
+          tooltip.style.top = '';
+        }
         tooltip.classList.remove('visible'); 
       }
 
