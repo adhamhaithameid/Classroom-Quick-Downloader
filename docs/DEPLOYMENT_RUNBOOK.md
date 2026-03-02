@@ -308,7 +308,7 @@ PUBLIC_SITE_URL='https://<your-root-domain>' \
 pnpm -C website build
 
 # Preview branch deploy:
-pnpm dlx wrangler pages deploy website/build --project-name classroom-quick-downloader-website --branch Not_Stable
+CI=1 pnpm -C cloudflare-worker exec wrangler pages deploy ../website/build --project-name classroom-quick-downloader-website --branch Not_Stable --commit-dirty=true
 
 # Production deploy:
 pnpm dlx wrangler pages deploy website/build --project-name classroom-quick-downloader-website --branch main
