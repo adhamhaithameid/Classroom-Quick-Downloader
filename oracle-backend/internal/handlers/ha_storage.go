@@ -529,6 +529,59 @@ func HARuntimeStatusHandler(sqliteDB, postgresDB *sql.DB, guard *StorageGuard, p
 	}
 }
 
+func upsertWebsiteChainHealthAlerts(ctx context.Context, db *sql.DB, chain map[string]any) error {
+	if db == nil || chain == nil {
+		return nil
+	}
+	backupDrift, _ := chain["backupDrift"].(map[string]any)
+	sheets, _ := chain["sheetsFlushVerification"].(map[string]any)
+	integrity, _ := chain["batchIntegrity"].(map[string]any)
+	thresholds, _ := chain["thresholds"].(map[string]any)
+
+	backupIndicator := normalizeHealthStatus(stringFromAny(backupDrift["indicator"]))
+	sheetsIndicator := normalizeHealthStatus(stringFromAny(sheets["indicator"]))
+	integrityStatus := normalizeHealthStatus(stringFromAny(integrity["status"]))
+	checksumStatus := normalizeHealthStatus(stringFromAny(integrity["checksumStatus"]))
+	rowCountStatus := normalizeHealthStatus(stringFromAny(integrity["rowCountStatus"]))
+
+	if backupIndicator != "critical" &&
+		sheetsIndicator != "critical" &&
+		integrityStatus != "critical" &&
+		checksumStatus != "mismatch" &&
+		rowCountStatus != "mismatch" {
+		return nil
+	}
+
+	reasons := make([]string, 0, 6)
+	if backupIndicator == "critical" {
+		reasons = append(reasons, "backup_drift_critical")
+	}
+	if sheetsIndicator == "critical" {
+		reasons = append(reasons, "sheets_flush_drift_or_verification_failed")
+	}
+	if integrityStatus == "critical" || checksumStatus == "mismatch" || rowCountStatus == "mismatch" {
+		reasons = append(reasons, "worker_to_oracle_batch_integrity_mismatch")
+	}
+	severity := "warning"
+	if backupIndicator == "critical" || sheetsIndicator == "critical" || integrityStatus == "critical" {
+		severity = "critical"
+	}
+	return upsertOpenAlert(
+		ctx,
+		db,
+		"website_backup_drift",
+		severity,
+		"Website backup/integrity drift detected in telemetry chain.",
+		map[string]any{
+			"reasons":        reasons,
+			"thresholds":     thresholds,
+			"backupDrift":    backupDrift,
+			"sheets":         sheets,
+			"batchIntegrity": integrity,
+		},
+	)
+}
+
 func DRStatusHandler(sqliteDB, postgresDB *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
