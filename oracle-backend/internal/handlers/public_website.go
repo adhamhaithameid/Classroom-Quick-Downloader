@@ -1491,8 +1491,21 @@ func buildPublicWebsiteUserChangelog(ctx context.Context, store *controlPlaneSto
 		if version == "" || summary == "" {
 			continue
 		}
-		highlights := normalizeStringList(data["highlights"], 6, 180)
-		releasedAt := int64PtrFromAny(data["releasedAtUtc"])
+		highlights := normalizeStringList(data["highlights"], 9, 180)
+		if len(highlights) == 0 {
+			added := normalizeStringList(data["added"], 3, 180)
+			changed := normalizeStringList(data["changed"], 3, 180)
+			fixed := normalizeStringList(data["fixed"], 3, 180)
+			for _, item := range added {
+				highlights = append(highlights, "Added: "+item)
+			}
+			for _, item := range changed {
+				highlights = append(highlights, "Changed: "+item)
+			}
+			for _, item := range fixed {
+				highlights = append(highlights, "Fixed: "+item)
+			}
+		}
 		entries = append(entries, publicWebsiteUserChangelogEntry{
 			ID:            trimAndLimit(row.RecordKey, 120),
 			Version:       version,
