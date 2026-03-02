@@ -1475,6 +1475,63 @@ func resolveRange(ctx context.Context, db *sql.DB, rangeName string, now time.Ti
 	}
 }
 
+func buildWindowMeta(now, fromTime, toTime time.Time) topTodayWindowMeta {
+	return topTodayWindowMeta{
+		GeneratedAtUTC: now.UTC().Format(time.RFC3339),
+		WindowStartUTC: fromTime.UTC().Format(time.RFC3339),
+		WindowEndUTC:   toTime.AddDate(0, 0, 1).UTC().Format(time.RFC3339),
+	}
+}
+
+func resolveRangeWindow(
+	ctx context.Context,
+	db *sql.DB,
+	q map[string][]string,
+	now time.Time,
+	defaultDays int,
+) (fromTime time.Time, toTime time.Time, rangeName string, err error) {
+	getFirst := func(key string) string {
+		values := q[key]
+		if len(values) == 0 {
+			return ""
+		}
+		return strings.TrimSpace(values[0])
+	}
+
+	rangeName = strings.ToLower(getFirst("range"))
+	fromStr := getFirst("from")
+	toStr := getFirst("to")
+
+	if rangeName != "" {
+		fromTime, toTime, err = resolveRange(ctx, db, rangeName, now)
+		return
+	}
+
+	if fromStr == "" {
+		fromTime = now.AddDate(0, 0, -defaultDays)
+	} else {
+		fromTime, err = time.Parse("2006-01-02", fromStr)
+		if err != nil {
+			err = errors.New("invalid from (expected YYYY-MM-DD)")
+			return
+		}
+	}
+	if toStr == "" {
+		toTime = now
+	} else {
+		toTime, err = time.Parse("2006-01-02", toStr)
+		if err != nil {
+			err = errors.New("invalid to (expected YYYY-MM-DD)")
+			return
+		}
+	}
+	if toTime.Before(fromTime) {
+		err = errors.New("to must be >= from")
+		return
+	}
+	return
+}
+
 func queryTimeSeriesHour(ctx context.Context, db *sql.DB, fromIso, toIso, extVersion string) ([]timeSeriesPoint, error) {
 	if strings.TrimSpace(extVersion) != "" {
 		return queryTimeSeriesHourByVersion(ctx, db, fromIso, toIso, extVersion)
