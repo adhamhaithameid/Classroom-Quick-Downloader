@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { STORE_LINKS } from '$lib/config';
+  import { fetchChangelog as fetchWorkerChangelog } from '$lib/api/changelog';
 
   let changelog: UserChangelogResponse | null = null;
   let state: 'loading' | 'ready' | 'error' = 'loading';
