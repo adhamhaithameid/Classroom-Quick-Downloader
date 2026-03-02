@@ -869,9 +869,16 @@
     }
   }
 
-  @media (max-width: 700px) {
-    .faq-hero {
-      align-items: flex-start;
+  @media (max-width: 600px) {
+    .fq-hero { padding: 40px 16px 24px; }
+    .fq-cta-actions { flex-direction: column; align-items: center; }
+    .fq-section-head { flex-wrap: wrap; }
+    .fq-controls-section { padding: 12px 0 22px; }
+    .fq-search-bar { margin-bottom: 14px; }
+    .fq-search-input {
+      min-height: 52px;
+      font-size: 16px;
+      padding-right: 44px;
     }
 
     h1 {
