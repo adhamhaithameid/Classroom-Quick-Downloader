@@ -119,7 +119,9 @@ describe('fetchChangelog', () => {
     TEST_TIMEOUT_MS
   );
 
-  it('handles empty entries array', async () => {
+  it(
+    'handles empty entries array',
+    async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () =>
