@@ -322,14 +322,41 @@
     padding-bottom: 0;
   }
 
-  /* ── Hero ──────────────────────────── */
-  .hero {
-    border: 1px solid var(--border-subtle, rgba(226, 232, 240, 0.35));
-    border-radius: var(--radius);
-    background: rgba(255, 255, 255, 0.55);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    padding: 36px 28px 28px;
+  .un-wrap {
+    max-width: var(--wrap);
+    margin: 0 auto;
+    padding: 0 24px;
+    width: 100%;
+  }
+
+  /* ── Entrance animation ──────────── */
+  .un-appear {
+    animation: un-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  /* ── Decorative ────────────────── */
+  .un-orbs {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none; z-index: 0;
+  }
+
+  .orb { position: absolute; border-radius: 50%; filter: blur(130px); }
+  .orb-1 { width: 520px; height: 520px; background: #bbf7d0; top: -6%; right: -8%; opacity: 0.22; }
+  .orb-2 { width: 420px; height: 420px; background: #e0e7ff; top: 35%; left: -10%; opacity: 0.18; }
+  .orb-3 { width: 380px; height: 380px; background: #a5f3fc; top: 75%; right: -4%; opacity: 0.14; }
+
+  .un-grid-bg {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none; z-index: 0; opacity: 0.025;
+    background-image:
+      linear-gradient(var(--text) 1px, transparent 1px),
+      linear-gradient(90deg, var(--text) 1px, transparent 1px);
+    background-size: 60px 60px;
+  }
+
+  /* ── Hero ───────────────────────── */
+  .un-hero {
+    position: relative; z-index: 2;
     text-align: center;
     animation: riseIn 0.5s ease both;
   }
