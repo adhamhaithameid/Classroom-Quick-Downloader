@@ -440,7 +440,12 @@ function isDashboardRoute(pathname: string): boolean {
 }
 
 function isProtectedCorsRoute(pathname: string): boolean {
-  return pathname === "/stats" || pathname === "/auth/verify-danger" || isAdminCorsRoute(pathname);
+  return (
+    pathname === "/stats" ||
+    pathname === "/auth/verify-danger" ||
+    pathname === "/api/public/website/events" ||
+    isAdminCorsRoute(pathname)
+  );
 }
 
 function isKnownCorsRoute(pathname: string): boolean {
