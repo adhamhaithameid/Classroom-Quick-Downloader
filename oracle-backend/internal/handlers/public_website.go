@@ -182,9 +182,10 @@ type publicWebsiteUninstallResponse struct {
 }
 
 type publicWebsiteUninstallStatsResponse struct {
-	OK          bool                        `json:"ok"`
-	GeneratedAt int64                       `json:"generatedAt"`
-	Stats       publicWebsiteUninstallStats `json:"stats"`
+	SchemaVersion string                      `json:"schemaVersion"`
+	OK            bool                        `json:"ok"`
+	GeneratedAt   int64                       `json:"generatedAt"`
+	Stats         publicWebsiteUninstallStats `json:"stats"`
 }
 
 type publicWebsiteUninstallStats struct {
