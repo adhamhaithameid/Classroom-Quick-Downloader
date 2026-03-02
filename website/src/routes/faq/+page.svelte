@@ -376,7 +376,7 @@
           a: 'Absolutely. Pull requests, bug reports, feature suggestions, and even documentation improvements are welcome. Check the CONTRIBUTING guidelines in the repository.'
         },
         {
-          id: 'oss-license',
+          id: 'dev-license',
           q: 'What license does CQD use?',
           a: 'CQD is released under an open-source license. Check the LICENSE file in the GitHub repository for the exact terms and conditions.'
         }
