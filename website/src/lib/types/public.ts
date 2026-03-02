@@ -168,6 +168,7 @@ export type UserChangelogEntry = {
 };
 
 export type UserChangelogResponse = {
+  schemaVersion: PublicSchemaVersion;
   ok: boolean;
   generatedAt: number;
   headline: string;
