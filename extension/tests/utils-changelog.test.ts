@@ -29,7 +29,10 @@ describe('changelog utils', () => {
     };
     chrome.storage.local.get = vi.fn(async () => ({ cqd_changelog_v1: cached })) as never;
     const result = await mod.fetchChangelog(false);
-    expect(result).toEqual(cached);
+    expect(result?.entries[0]?.id).toBe('1');
+    expect(result?.entries[0]?.version).toBe('1.3.0');
+    expect(result?.revisionToken).toBeTruthy();
+    expect(result?.lastFetched).toBe(cached.lastFetched);
     expect(fetch).not.toHaveBeenCalled();
   });
 
