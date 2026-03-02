@@ -279,6 +279,63 @@ func TestPublicWebsiteMapHandler_ReturnsIsoCountryBreakdown(t *testing.T) {
 	}
 }
 
+func TestPublicWebsiteEndpoints_IncludeSchemaVersionForCompatibility(t *testing.T) {
+	sqlDB := openPublicWebsiteDB(t)
+	seedPublicWebsiteFixture(t, sqlDB)
+
+	cases := []struct {
+		name    string
+		request *http.Request
+		handler http.HandlerFunc
+	}{
+		{
+			name:    "overview",
+			request: httptest.NewRequest(http.MethodGet, "/api/public/website/overview", nil),
+			handler: PublicWebsiteOverviewHandler(sqlDB, nil),
+		},
+		{
+			name:    "map",
+			request: httptest.NewRequest(http.MethodGet, "/api/public/website/map", nil),
+			handler: PublicWebsiteMapHandler(sqlDB, nil),
+		},
+		{
+			name:    "status",
+			request: httptest.NewRequest(http.MethodGet, "/api/public/website/status", nil),
+			handler: PublicWebsiteStatusHandler(sqlDB, nil),
+		},
+		{
+			name:    "changelog",
+			request: httptest.NewRequest(http.MethodGet, "/api/public/website/changelog", nil),
+			handler: PublicWebsiteUserChangelogHandler(sqlDB, nil),
+		},
+		{
+			name:    "uninstall-stats",
+			request: httptest.NewRequest(http.MethodGet, "/api/public/website/uninstall", nil),
+			handler: PublicWebsiteUninstallHandler(sqlDB),
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			rr := httptest.NewRecorder()
+			tc.handler.ServeHTTP(rr, tc.request)
+			if rr.Code != http.StatusOK {
+				t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+			}
+
+			var payload struct {
+				SchemaVersion string `json:"schemaVersion"`
+			}
+			if err := json.Unmarshal(rr.Body.Bytes(), &payload); err != nil {
+				t.Fatalf("decode payload failed: %v", err)
+			}
+			if payload.SchemaVersion != publicWebsiteSchemaVersion {
+				t.Fatalf("expected schemaVersion=%s, got %q", publicWebsiteSchemaVersion, payload.SchemaVersion)
+			}
+		})
+	}
+}
+
 func TestPublicWebsiteHandlers_UsePublishedOracleWebsiteDataset(t *testing.T) {
 	sqlDB := openPublicWebsiteDB(t)
 	seedPublicWebsiteFixture(t, sqlDB)
