@@ -388,8 +388,9 @@
       grid-template-columns: 1fr;
     }
 
-    .privacy-section {
-      padding: 20px;
+    .prv-card {
+      padding: 22px 18px;
+      border-radius: 14px;
     }
 
     .header-actions {
