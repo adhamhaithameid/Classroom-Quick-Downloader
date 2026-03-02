@@ -606,12 +606,14 @@
     padding: 36px 24px 32px;
   }
 
-  h1 {
-    margin: 0;
-    font-size: clamp(28px, 4vw, 40px);
-    font-weight: 800;
-    letter-spacing: -0.03em;
-    color: var(--text);
+  .fq-mega {
+    font-size: clamp(36px, 5vw, 60px);
+    font-weight: 900; line-height: 1.15;
+    letter-spacing: -0.03em; margin: 0 0 20px;
+    padding-bottom: 0.1em;
+    background: linear-gradient(135deg, var(--green), var(--green-light), #10b981);
+    background-size: 200% 200%;
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
   }
 
   .faq-hero p {
