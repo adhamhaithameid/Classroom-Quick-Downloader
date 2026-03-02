@@ -1231,6 +1231,151 @@ func recordSheetsFlushRunResult(
 	}
 }
 
+func buildSheetsFlushVerificationMeta(
+	status string,
+	rowJSON []byte,
+	summaryJSON []byte,
+	metaJSON []byte,
+	errorMessage string,
+) []byte {
+	meta := map[string]any{}
+	if trimmed := strings.TrimSpace(string(metaJSON)); trimmed != "" {
+		var parsed map[string]any
+		if err := json.Unmarshal([]byte(trimmed), &parsed); err == nil && parsed != nil {
+			meta = parsed
+		}
+	}
+
+	rowSHA := sha256Hex(rowJSON)
+	summarySHA := sha256Hex(summaryJSON)
+	previousMetaSHA := sha256Hex(metaJSON)
+	expectedRows := extractExpectedRowsFromSummary(summaryJSON)
+	actualRows := inferArchivedRowCount(rowJSON)
+	rowCountStatus := "unknown"
+	if expectedRows >= 0 {
+		if actualRows == expectedRows {
+			rowCountStatus = "match"
+		} else {
+			rowCountStatus = "mismatch"
+		}
+	}
+	checksumStatus := "unknown"
+	if rowSHA != "" && summarySHA != "" {
+		checksumStatus = "match"
+	}
+
+	notes := make([]string, 0, 4)
+	if rowCountStatus == "mismatch" {
+		notes = append(notes, "row_count_mismatch")
+	}
+	if strings.TrimSpace(errorMessage) != "" {
+		notes = append(notes, "flush_error_present")
+	}
+
+	verified := strings.EqualFold(strings.TrimSpace(status), "ok") &&
+		checksumStatus == "match" &&
+		(rowCountStatus == "match" || rowCountStatus == "unknown")
+
+	verification := map[string]any{
+		"schemaVersion":  "1",
+		"checkedAtUtc":   time.Now().UTC().UnixMilli(),
+		"rowSha256":      rowSHA,
+		"summarySha256":  summarySHA,
+		"metaSha256":     previousMetaSHA,
+		"checksumStatus": checksumStatus,
+		"rowCountStatus": rowCountStatus,
+		"expectedRows":   expectedRows,
+		"actualRows":     actualRows,
+		"verified":       verified,
+		"notes":          notes,
+	}
+	meta["verification"] = verification
+
+	encoded, err := json.Marshal(meta)
+	if err != nil {
+		return metaJSON
+	}
+	return encoded
+}
+
+func extractExpectedRowsFromSummary(summaryJSON []byte) int64 {
+	trimmed := strings.TrimSpace(string(summaryJSON))
+	if trimmed == "" {
+		return -1
+	}
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(trimmed), &payload); err != nil {
+		return -1
+	}
+	if value, ok := payload["rows"]; ok {
+		return int64FromInterface(value, -1)
+	}
+	if value, ok := payload["rowCount"]; ok {
+		return int64FromInterface(value, -1)
+	}
+	if totals, ok := payload["totals"].(map[string]any); ok {
+		if value, exists := totals["rows"]; exists {
+			return int64FromInterface(value, -1)
+		}
+		if value, exists := totals["rowCount"]; exists {
+			return int64FromInterface(value, -1)
+		}
+	}
+	return -1
+}
+
+func inferArchivedRowCount(rowJSON []byte) int64 {
+	trimmed := strings.TrimSpace(string(rowJSON))
+	if trimmed == "" {
+		return 0
+	}
+	var payload any
+	if err := json.Unmarshal([]byte(trimmed), &payload); err != nil {
+		return 0
+	}
+	switch value := payload.(type) {
+	case []any:
+		return int64(len(value))
+	case map[string]any:
+		return 1
+	default:
+		return 1
+	}
+}
+
+func int64FromInterface(value any, fallback int64) int64 {
+	switch n := value.(type) {
+	case int:
+		return int64(n)
+	case int64:
+		return n
+	case int32:
+		return int64(n)
+	case float64:
+		return int64(n)
+	case float32:
+		return int64(n)
+	case json.Number:
+		if parsed, err := n.Int64(); err == nil {
+			return parsed
+		}
+	case string:
+		parsed, err := strconv.ParseInt(strings.TrimSpace(n), 10, 64)
+		if err == nil {
+			return parsed
+		}
+	}
+	return fallback
+}
+
+func sha256Hex(input []byte) string {
+	if len(input) == 0 {
+		return ""
+	}
+	sum := sha256.Sum256(input)
+	return hex.EncodeToString(sum[:])
+}
+
 const (
 	defaultArchiverRunTimeout = 2 * time.Minute
 	minArchiverRunTimeout     = 1 * time.Second
