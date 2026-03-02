@@ -333,7 +333,8 @@ pnpm -C cloudflare-worker run deploy
 ### 7.2 Oracle dashboard passwords
 
 ```bash
-ssh -i ~/.ssh/oracle_key ubuntu@129.151.233.229
+ORACLE_HOST="<oracle-host>"
+ssh -i ~/.ssh/oracle_key "ubuntu@${ORACLE_HOST}"
 cd ~/Classroom-Quick-Downloader/oracle-backend
 sed -i 's#^DASHBOARD_PASSWORD=.*#DASHBOARD_PASSWORD=<new-dashboard-password>#' .env.production
 sed -i 's#^SUPER_ADMIN_PASSWORD=.*#SUPER_ADMIN_PASSWORD=<new-danger-password>#' .env.production
