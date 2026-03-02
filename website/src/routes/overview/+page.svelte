@@ -374,6 +374,15 @@
     return map[key] || key;
   }
 
+  function trackInstallClick(placement: string): void {
+    trackWebsiteEvent({
+      eventType: 'cta',
+      action: 'install_click',
+      placement,
+      pagePath: '/overview'
+    });
+  }
+
   function computeTimeSaved(downloads: number) {
     const SECONDS_PER_DOWNLOAD = 13;
     const CLICKS_PER_DOWNLOAD = 5;
