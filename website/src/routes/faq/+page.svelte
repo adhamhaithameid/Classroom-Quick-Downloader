@@ -750,13 +750,10 @@
     font-weight: 700; font-size: 14px; color: var(--text); line-height: 1.5;
   }
 
-  .faq-chevron {
-    font-size: 20px;
-    color: var(--gc-green);
-    font-weight: 700;
-    flex-shrink: 0;
-    width: 20px;
-    text-align: center;
+  .fq-chevron {
+    flex-shrink: 0; width: 22px; height: 22px;
+    color: var(--green);
+    transition: transform 0.2s ease;
   }
 
   .faq-answer {
