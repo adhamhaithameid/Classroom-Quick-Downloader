@@ -234,9 +234,9 @@
 
   .prv-banner-item strong {
     display: block;
-    margin-top: 6px;
-    color: var(--muted);
-    font-size: 12px;
+    font-size: 16px; font-weight: 800;
+    letter-spacing: -0.01em;
+    color: var(--text);
   }
 
   .header-actions {
