@@ -111,7 +111,7 @@
       ]
     },
     {
-      title: 'Privacy and Data',
+      title: 'Privacy & Data',
       icon: '🔒',
       summary: 'What is collected and why.',
       items: [
