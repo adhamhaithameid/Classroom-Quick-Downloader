@@ -308,11 +308,14 @@ type breakdownValue struct {
 }
 
 type breakdownResponse struct {
-	OK        bool             `json:"ok"`
-	Dimension string           `json:"dimension"`
-	From      string           `json:"from"`
-	To        string           `json:"to"`
-	Values    []breakdownValue `json:"values"`
+	OK             bool             `json:"ok"`
+	Dimension      string           `json:"dimension"`
+	GeneratedAtUTC string           `json:"generatedAtUtc,omitempty"`
+	WindowStartUTC string           `json:"windowStartUtc,omitempty"`
+	WindowEndUTC   string           `json:"windowEndUtc,omitempty"`
+	From           string           `json:"from"`
+	To             string           `json:"to"`
+	Values         []breakdownValue `json:"values"`
 }
 
 func BreakdownHandler(db *sql.DB) http.HandlerFunc {
