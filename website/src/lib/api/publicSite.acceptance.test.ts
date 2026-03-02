@@ -16,6 +16,7 @@ describe('public website acceptance contracts', () => {
       vi.fn(async () =>
         new Response(
           JSON.stringify({
+            schemaVersion: '1',
             ok: true,
             generatedAt: 1771700000000,
             totals: { downloads: 1200, success: 1100, fail: 100 },
