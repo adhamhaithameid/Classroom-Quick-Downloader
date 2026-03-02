@@ -423,7 +423,7 @@ func TestPublicWebsiteHandlers_AllowsCloudflarePagesDefaultOrigin(t *testing.T) 
 	req := httptest.NewRequest(http.MethodGet, "/api/public/website/map", nil)
 	req.Header.Set("Origin", "https://classroom-quick-downloader.pages.dev")
 	rr := httptest.NewRecorder()
-	PublicWebsiteMapHandler(sqlDB).ServeHTTP(rr, req)
+	PublicWebsiteMapHandler(sqlDB, nil).ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rr.Code)
