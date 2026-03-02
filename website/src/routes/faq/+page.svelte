@@ -627,9 +627,10 @@
   }
   .fq-contact-link:hover { color: var(--green-light); }
 
-  .faq-section-icon {
-    font-size: 24px;
-    flex-shrink: 0;
+  .fq-label {
+    font-size: 12px; font-weight: 700; color: var(--green);
+    letter-spacing: 0.08em; text-transform: uppercase;
+    display: block; margin-bottom: 12px;
   }
 
   .faq-section-head h2 {
