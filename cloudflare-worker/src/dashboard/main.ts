@@ -5451,6 +5451,22 @@ export function renderDashboard(stats: StatsResponse): string {
        */
       const btnSaveAll = document.getElementById("btn-save-all");
       const btnSaveText = document.getElementById("btn-save-text");
+      const btnSaveRules = document.getElementById("btn-save-rules");
+      const btnPublishDraft = document.getElementById("btn-publish-draft");
+      const btnSyncNow = document.getElementById("btn-sync-now");
+      const btnSaveMode = document.getElementById("btn-save-mode");
+      const rulesSaveStatusEl = document.getElementById("rules-save-status");
+      const changelogActionStatusEl = document.getElementById("cl-action-status");
+      const markdownInputEl = document.getElementById("new-cl-markdown");
+      const markdownUrlInputEl = document.getElementById("new-cl-markdown-url");
+      const modeInputEl = document.getElementById("cl-apply-mode");
+      const autoSyncEnabledInputEl = document.getElementById("cl-auto-sync-enabled");
+      const autoSyncIntervalInputEl = document.getElementById("cl-auto-sync-interval");
+      const syncStatusEl = document.getElementById("cl-sync-status");
+      const syncErrorEl = document.getElementById("cl-sync-error");
+      const draftPreviewEl = document.getElementById("cl-draft-preview");
+      const currentPreviewEl = document.getElementById("cl-current-preview");
+      const revisionHistoryEl = document.getElementById("cl-revision-history");
       
       async function sendChangelogUpdate(payload) {
         // Show loading state
