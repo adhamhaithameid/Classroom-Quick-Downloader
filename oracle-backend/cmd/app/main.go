@@ -124,6 +124,7 @@ func main() {
 
 	if err := validateProductionSecurityConfig(
 		os.Getenv("APP_ENV"),
+		sessionCookieSecureMode,
 		allowLoopbackBypass,
 		allowEmptyDashboardPassword,
 		os.Getenv("ORACLE_ALLOW_HTTP_STORE_URLS") == "true",
