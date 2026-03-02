@@ -3599,6 +3599,16 @@
           }
           renderWebsiteSyncAnomaly(data.anomaly || null);
         } catch (e) {
+          renderWebsiteSyncAnomaly(null);
+          setWebsiteSyncText('website-sync-published-success', '--');
+          setWebsiteSyncText('website-sync-published-fail', '--');
+          setWebsiteSyncText('website-sync-map-countries', '--');
+          setWebsiteSyncText('website-sync-installs-users', '--');
+          setWebsiteSyncText('website-sync-snapshot-id', '--');
+          setWebsiteSyncText('website-sync-snapshot-generated', '--');
+          setWebsiteSyncText('website-sync-worker-health', '--');
+          setWebsiteSyncText('website-sync-changelog-source', '--');
+          setWebsiteSyncText('website-sync-versions', '--');
           setWebsiteSyncOutput({ ok: false, error: String(e) });
         }
       }
