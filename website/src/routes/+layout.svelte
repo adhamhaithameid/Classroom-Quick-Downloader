@@ -689,4 +689,10 @@
       flex-wrap: wrap;
     }
   }
+
+  @media (max-width: 520px) {
+    .l2-nav-mobile-links {
+      grid-template-columns: 1fr;
+    }
+  }
 </style>
