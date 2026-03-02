@@ -2530,7 +2530,7 @@
     overflow: hidden;
     scrollbar-width: none;
     -ms-overflow-style: none;
-    touch-action: pan-y;
+    touch-action: none;
     cursor: grab;
     user-select: none;
     -webkit-user-select: none;
