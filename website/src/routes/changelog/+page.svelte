@@ -456,15 +456,12 @@
     padding: 16px 0 16px;
   }
 
-  .action-btn {
-    border: 1px solid var(--border-subtle, rgba(226, 232, 240, 0.35));
-    border-radius: 999px;
-    padding: 9px 16px;
-    text-decoration: none;
-    background: rgba(255, 255, 255, 0.6);
-    backdrop-filter: blur(6px);
-    color: var(--text-secondary);
-    font-weight: 600;
+  .cl-state-card {
+    background: rgba(255,255,255,0.6);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border: 1px solid var(--border-subtle);
+    border-radius: 20px;
+    padding: 48px;
     text-align: center;
     cursor: pointer;
     font-size: 13px;
