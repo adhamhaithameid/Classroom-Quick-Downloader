@@ -6691,6 +6691,13 @@ export class DownloadsDurable {
     }
 
     if (updated) {
+      this.appendDangerAudit(
+        request,
+        "ip_allowlist_update",
+        "/admin/ip-allowlist",
+        "ok",
+        `enabled=${String(this.d.ipAllowlistEnabled)};bypass=${String(this.d.ipAllowlistStepUpBypassEnabled)};entries=${this.d.ipAllowlist.length}`,
+      );
       await this.persist();
     }
 
