@@ -1545,6 +1545,7 @@ func buildPublicWebsiteUserChangelog(ctx context.Context, store *controlPlaneSto
 	}
 
 	return publicWebsiteUserChangelogResponse{
+		SchemaVersion:    publicWebsiteSchemaVersion,
 		OK:               true,
 		GeneratedAt:      now,
 		Headline:         "What's new for students",
