@@ -130,8 +130,8 @@
     hasAnimatedInView = true;
   }
 
-  $: if (animated && hasAnimatedInView && !priming && displayValue !== value) {
-    displayValue = value;
+  $: if (animated && hasAnimatedInView) {
+    animateTo(value);
   }
 </script>
 
