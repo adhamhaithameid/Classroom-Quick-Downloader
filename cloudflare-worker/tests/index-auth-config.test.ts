@@ -452,6 +452,97 @@ describe("Worker auth config hardening", () => {
     expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
   });
 
+  it("rejects session-auth mutating admin requests without CSRF header", async () => {
+    const env = mockEnv();
+    const loginRes = await worker.fetch(new Request("https://example.com/", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: "password=dashboard-secret",
+    }), env, {} as ExecutionContext);
+    expect(loginRes.status).toBe(302);
+    const cookie = extractCookie(loginRes.headers.get("Set-Cookie"));
+    expect(cookie).toContain("cqd_session=");
+
+    const adminRes = await worker.fetch(new Request("https://example.com/admin/force-flush", {
+      method: "POST",
+      headers: {
+        Cookie: cookie,
+        Origin: "https://example.com",
+      },
+    }), env, {} as ExecutionContext);
+    const body = await adminRes.json() as { error?: string; code?: string };
+    expect(adminRes.status).toBe(403);
+    expect(body.error).toBe("csrf_validation_failed");
+    expect(body.code).toBe("csrf_missing_x_requested_with");
+  });
+
+  it("accepts session-auth mutating admin requests with CSRF header and same-origin", async () => {
+    const env = mockEnv();
+    const loginRes = await worker.fetch(new Request("https://example.com/", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: "password=dashboard-secret",
+    }), env, {} as ExecutionContext);
+    expect(loginRes.status).toBe(302);
+    const cookie = extractCookie(loginRes.headers.get("Set-Cookie"));
+
+    const adminRes = await worker.fetch(new Request("https://example.com/admin/force-flush", {
+      method: "POST",
+      headers: {
+        Cookie: cookie,
+        Origin: "https://example.com",
+        "X-Requested-With": "XMLHttpRequest",
+      },
+    }), env, {} as ExecutionContext);
+    expect(adminRes.status).toBe(200);
+  });
+
+  it("enforces Cloudflare Access identity for dashboard routes when enabled", async () => {
+    const env = mockEnv({ CLOUDFLARE_ACCESS_REQUIRED: "true" });
+    const denied = await worker.fetch(
+      new Request("https://example.com/", { method: "GET" }),
+      env,
+      {} as ExecutionContext,
+    );
+    expect(denied.status).toBe(403);
+
+    const allowed = await worker.fetch(
+      new Request("https://example.com/", {
+        method: "GET",
+        headers: { "CF-Access-Authenticated-User-Email": "admin@example.com" },
+      }),
+      env,
+      {} as ExecutionContext,
+    );
+    expect(allowed.status).toBe(200);
+  });
+
+  it("enforces Cloudflare Access email allowlist when configured", async () => {
+    const env = mockEnv({
+      CLOUDFLARE_ACCESS_REQUIRED: "true",
+      CLOUDFLARE_ACCESS_EMAIL_ALLOWLIST: "owner@example.com,admin@example.com",
+    });
+    const denied = await worker.fetch(
+      new Request("https://example.com/", {
+        method: "GET",
+        headers: { "CF-Access-Authenticated-User-Email": "random@example.com" },
+      }),
+      env,
+      {} as ExecutionContext,
+    );
+    expect(denied.status).toBe(403);
+
+    const allowed = await worker.fetch(
+      new Request("https://example.com/", {
+        method: "GET",
+        headers: { "CF-Access-Authenticated-User-Email": "owner@example.com" },
+      }),
+      env,
+      {} as ExecutionContext,
+    );
+    expect(allowed.status).toBe(200);
+  });
+
   it("allows wildcard CORS for public track preflight", async () => {
     const env = mockEnv();
     const request = new Request("https://example.com/track", {
