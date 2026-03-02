@@ -1733,6 +1733,239 @@
     </div>
   </section>
 
+  <!-- ━━━━ Edit Mode Toolbar & Picker ━━━━ -->
+  {#if editMode}
+    <div class="edit-toolbar" transition:fade={{ duration: 200 }}>
+      <div class="edit-tb-left">
+        <span class="edit-tb-title">✏️ Element Editor</span>
+        <button class="edit-tb-btn edit-tb-add-float" on:click={() => addElement('float')}>+ Float</button>
+        <button class="edit-tb-btn edit-tb-add-doodle" on:click={() => addElement('doodle')}>+ Doodle</button>
+        <button class="edit-tb-btn edit-tb-add-3d" on:click={() => addElement('3d')}>+ 3D</button>
+        <span class="edit-tb-count">{placements.length} element{placements.length !== 1 ? 's' : ''}</span>
+        {#if editorStatus}
+          <span class="edit-tb-status tone-{editorStatusTone}">{editorStatus}</span>
+        {/if}
+      </div>
+      <div class="edit-tb-right">
+        <button class="edit-tb-btn" on:click={toggleEditIsolation}>{editIsolation ? '🧊 Editing Locked' : '🌐 Page Interactive'}</button>
+        <button class="edit-tb-btn" on:click={handleEditExport}>📋 Export</button>
+        <button
+          class="edit-tb-btn"
+          on:click={() => {
+            const next = !showImportPanel;
+            showImportPanel = next;
+            if (next) {
+              importErrors = [];
+              importWarnings = [];
+            }
+          }}
+        >📥 Import</button>
+        <button class="edit-tb-btn" on:click={handleEditDiscard}>↩️ Discard Draft</button>
+        <button class="edit-tb-btn edit-tb-publish" on:click={handleEditPublish}>✅ Apply Draft</button>
+        <button class="edit-tb-btn edit-tb-reset" on:click={handleEditResetDraft}>🔄 Reset Draft</button>
+      </div>
+    </div>
+
+    {#if selectedPlacement}
+      <div class="edit-inspector" transition:fade={{ duration: 120 }}>
+        <div class="edit-inspector-top">
+          <span class="edit-inspector-id">{selectedPlacement.id}</span>
+          <span class="edit-inspector-type">{selectedPlacement.type}</span>
+          <button class="edit-tb-btn edit-tb-swap" on:click={() => { pickerOpen = true; pickerSearch = ''; }}>🎨 Swap</button>
+          <button class="edit-tb-btn" on:click={duplicateSelectedElement}>⧉ Duplicate</button>
+          <button class="edit-tb-btn" on:click={toggleSelectedVisibility}>{selectedPlacement.hidden ? '👁️ Show' : '🙈 Hide'}</button>
+          <button class="edit-tb-btn" on:click={toggleSelectedLock}>{selectedPlacement.locked ? '🔓 Unlock' : '🔒 Lock'}</button>
+          <button class="edit-tb-btn edit-tb-reset" on:click={() => deleteElement(selectedPlacement.id)}>✕ Delete</button>
+        </div>
+        <div class="edit-inspector-grid">
+          <label class="edit-tb-slider">
+            X: {selectedPlacement.x.toFixed(1)}%
+            <input
+              type="range"
+              min="-25"
+              max="125"
+              step="0.1"
+              value={selectedPlacement.x}
+              on:input={(e) => updatePlacement(selectedPlacement.id, { x: Number(e.currentTarget.value) })}
+            />
+          </label>
+          <label class="edit-tb-slider">
+            Y: {selectedPlacement.y.toFixed(1)}%
+            <input
+              type="range"
+              min="-25"
+              max="125"
+              step="0.1"
+              value={selectedPlacement.y}
+              on:input={(e) => updatePlacement(selectedPlacement.id, { y: Number(e.currentTarget.value) })}
+            />
+          </label>
+          <label class="edit-tb-slider">
+            Size: {selectedPlacement.size}px
+            <input
+              type="range"
+              min="16"
+              max="640"
+              value={selectedPlacement.size}
+              on:input={(e) => updatePlacement(selectedPlacement.id, { size: Number(e.currentTarget.value) })}
+            />
+          </label>
+          <label class="edit-tb-slider">
+            Opacity: {(selectedPlacement.opacity * 100).toFixed(0)}%
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={selectedPlacement.opacity * 100}
+              on:input={(e) => updatePlacement(selectedPlacement.id, { opacity: Number(e.currentTarget.value) / 100 })}
+            />
+          </label>
+          <label class="edit-tb-slider">
+            Rotate: {selectedPlacement.rotate.toFixed(1)}°
+            <input
+              type="range"
+              min="-360"
+              max="360"
+              step="0.1"
+              value={selectedPlacement.rotate}
+              on:input={(e) => updatePlacement(selectedPlacement.id, { rotate: Number(e.currentTarget.value) })}
+            />
+          </label>
+          <label class="edit-tb-slider">
+            Speed: {selectedPlacement.animDuration.toFixed(1)}s
+            <input
+              type="range"
+              min="0"
+              max="120"
+              step="0.1"
+              value={selectedPlacement.animDuration}
+              on:input={(e) => updatePlacement(selectedPlacement.id, { animDuration: Number(e.currentTarget.value) })}
+            />
+          </label>
+          <label class="edit-tb-slider">
+            Layer: {selectedPlacement.zIndex ?? 0}
+            <input
+              type="range"
+              min="0"
+              max="500"
+              value={selectedPlacement.zIndex ?? 0}
+              on:input={(e) => updatePlacement(selectedPlacement.id, { zIndex: Number(e.currentTarget.value) })}
+            />
+          </label>
+          <label class="edit-tb-slider edit-color-input">
+            Color:
+            <input
+              type="color"
+              value={selectedPlacement.color?.startsWith('#') ? selectedPlacement.color : '#1a8b55'}
+              on:input={(e) => updatePlacement(selectedPlacement.id, { color: e.currentTarget.value })}
+            />
+            <button class="edit-tb-btn" on:click={() => updatePlacement(selectedPlacement.id, { color: 'var(--green)' })}>Theme</button>
+          </label>
+          <label class="edit-tb-slider">
+            Section:
+            <select
+              value={selectedPlacement.section}
+              on:change={(e) => updatePlacement(selectedPlacement.id, { section: e.currentTarget.value as ElementPlacement['section'] })}
+            >
+              <option value="hero">Hero</option>
+              <option value="students">Students</option>
+              <option value="problem">Problem</option>
+              <option value="features">Features</option>
+              <option value="steps">Steps</option>
+              <option value="proof">Proof</option>
+              <option value="map">Map</option>
+              <option value="cta">CTA</option>
+              <option value="general">General</option>
+            </select>
+          </label>
+          <div class="edit-layer-controls">
+            <button class="edit-tb-btn" on:click={() => bumpSelectedLayer('down')}>Layer -1</button>
+            <button class="edit-tb-btn" on:click={() => bumpSelectedLayer('up')}>Layer +1</button>
+          </div>
+        </div>
+      </div>
+    {/if}
+
+    {#if showImportPanel}
+      <div class="edit-import-panel" transition:fade={{ duration: 150 }}>
+        <h4>Import Placements JSON</h4>
+        <textarea class="edit-import-textarea" bind:value={importJsonText} placeholder="Paste JSON here..."></textarea>
+        {#if importWarnings.length > 0}
+          <div class="edit-import-log warn">
+            <strong>Warnings</strong>
+            {#each importWarnings as warning}
+              <div>{warning}</div>
+            {/each}
+          </div>
+        {/if}
+        {#if importErrors.length > 0}
+          <div class="edit-import-log error">
+            <strong>Errors</strong>
+            {#each importErrors as error}
+              <div>{error}</div>
+            {/each}
+          </div>
+        {/if}
+        <div class="edit-import-actions">
+          <button class="edit-tb-btn edit-tb-publish" on:click={handleEditImport}>Apply To Draft</button>
+          <button class="edit-tb-btn" on:click={() => showImportPanel = false}>Cancel</button>
+        </div>
+      </div>
+    {/if}
+
+    {#if pickerOpen}
+      <div
+        class="edit-picker-overlay"
+        role="button"
+        tabindex="0"
+        aria-label="Close sample picker"
+        on:click|self={() => pickerOpen = false}
+        on:keydown={(e) => {
+          if (e.currentTarget !== e.target) return;
+          if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            pickerOpen = false;
+          }
+        }}
+        transition:fade={{ duration: 150 }}
+      >
+        <div class="edit-picker-panel">
+          <div class="edit-picker-header">
+            <h3>Pick a Sample</h3>
+            <button class="edit-picker-close" on:click={() => pickerOpen = false}>✕</button>
+          </div>
+          <div class="edit-picker-tabs">
+            <button class:active={pickerTab === 'float'} on:click={() => pickerTab = 'float'}>🎈 Floats</button>
+            <button class:active={pickerTab === 'doodle'} on:click={() => pickerTab = 'doodle'}>✏️ Doodles</button>
+            <button class:active={pickerTab === '3d'} on:click={() => pickerTab = '3d'}>🧊 3D</button>
+          </div>
+          <input class="edit-picker-search" type="text" placeholder="Search..." bind:value={pickerSearch} />
+          <div class="edit-picker-grid">
+            {#each pickerItems as item (item.id)}
+              <button
+                class="edit-picker-item"
+                class:active={selectedPlacement?.sampleId === item.id}
+                on:click={() => assignSample(item.id)}
+                title={item.label}
+              >
+                <svg
+                  viewBox={pickerTab === '3d' ? '0 0 120 110' : pickerTab === 'doodle' ? '0 0 60 60' : '0 0 64 64'}
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round" stroke-linejoin="round"
+                  style="width:36px;height:36px;color:var(--green);">
+                  {@html item.svg}
+                </svg>
+                <span class="edit-picker-id">{item.id}</span>
+              </button>
+            {/each}
+          </div>
+        </div>
+      </div>
+    {/if}
+  {/if}
+
 </div>
 
 <style>
