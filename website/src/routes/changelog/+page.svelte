@@ -620,20 +620,17 @@
     transform: none;
   }
 
-  .entry-body li::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 9px;
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--gc-green-light);
+  .cl-action-pill,
+  .cl-state-card,
+  .cl-sidebar-card,
+  .cl-entry-card {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
 
-  /* ── Responsive ──────────────────── */
-  @media (max-width: 820px) {
-    .changelog-body {
+  /* ── Responsive ────────────────── */
+  @media (max-width: 900px) {
+    .cl-layout {
       grid-template-columns: 1fr;
       gap: 20px;
     }
