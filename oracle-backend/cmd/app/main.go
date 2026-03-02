@@ -1213,6 +1213,7 @@ func recordSheetsFlushRunResult(
 	if db == nil {
 		return
 	}
+	verifiedMetaJSON := buildSheetsFlushVerificationMeta(status, rowJSON, summaryJSON, metaJSON, errorMessage)
 	recordCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	if err := handlers.RecordSheetsFlushRun(recordCtx, db, handlers.SheetsFlushRunRecordInput{
