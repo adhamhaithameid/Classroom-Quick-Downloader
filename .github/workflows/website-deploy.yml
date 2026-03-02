@@ -21,7 +21,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Validate Cloudflare Pages project variable
+      - name: Validate required GitHub secrets and variables
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_PAGES_PROJECT_NAME: ${{ vars.CLOUDFLARE_PAGES_PROJECT_NAME }}
+          PUBLIC_ORACLE_API_BASE_URL: ${{ vars.PUBLIC_ORACLE_API_BASE_URL }}
+          PUBLIC_WORKER_BASE_URL: ${{ vars.PUBLIC_WORKER_BASE_URL }}
+          PUBLIC_SITE_URL: ${{ vars.PUBLIC_SITE_URL }}
         run: |
           if [ -z "${{ vars.CLOUDFLARE_PAGES_PROJECT_NAME }}" ]; then
             echo "CLOUDFLARE_PAGES_PROJECT_NAME GitHub variable is required."
