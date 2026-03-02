@@ -358,7 +358,7 @@ func PublicWebsiteOverviewHandler(sqliteDB, postgresDB *sql.DB) http.HandlerFunc
 	}
 }
 
-func PublicWebsiteMapHandler(sqliteDB *sql.DB) http.HandlerFunc {
+func PublicWebsiteMapHandler(sqliteDB, postgresDB *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !preparePublicWebsiteCORSWithOptions(w, r, publicWebsiteCORSOptions{
 			AllowedMethods: "GET, OPTIONS",
