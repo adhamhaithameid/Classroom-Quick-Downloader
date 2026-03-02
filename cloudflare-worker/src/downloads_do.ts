@@ -5807,7 +5807,35 @@ export class DownloadsDurable {
     );
   }
 
-    return json({
+  private getSortedChangelogEntries(): ChangelogEntry[] {
+    return [...this.d.changelog].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }
+
+  private getChangelogSyncState(): {
+    applyMode: ChangelogApplyMode;
+    autoSyncEnabled: boolean;
+    autoSyncIntervalMinutes: number;
+    lastAutoSyncAt: number | null;
+    lastAutoSyncStatus: ChangelogSyncStatus;
+    lastAutoSyncError: string | null;
+    nextAutoSyncAt: number | null;
+  } {
+    return {
+      applyMode: normalizeChangelogApplyMode(this.d.changelogConfig.applyMode),
+      autoSyncEnabled: this.d.changelogConfig.autoSyncEnabled === true,
+      autoSyncIntervalMinutes: normalizeAutoSyncIntervalMinutes(this.d.changelogConfig.autoSyncIntervalMinutes),
+      lastAutoSyncAt: this.d.changelogConfig.lastAutoSyncAt ?? null,
+      lastAutoSyncStatus: normalizeChangelogSyncStatus(this.d.changelogConfig.lastAutoSyncStatus),
+      lastAutoSyncError: trimAndLimitString(this.d.changelogConfig.lastAutoSyncError, 320) || null,
+      nextAutoSyncAt: this.d.changelogConfig.nextAutoSyncAt ?? null,
+    };
+  }
+
+  private getAdminChangelogStatePayload(): Record<string, unknown> {
+    const entries = this.getSortedChangelogEntries();
+    const revisions = [...(this.d.changelogRevisions || [])].sort((a, b) => b.createdAt - a.createdAt);
+    const sync = this.getChangelogSyncState();
+    return {
       ok: true,
       entries: sorted,
       config: this.d.changelogConfig,
