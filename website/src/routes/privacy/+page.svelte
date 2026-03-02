@@ -317,7 +317,8 @@
 
   .prv-bullets li {
     position: relative;
-    padding-left: 18px;
+    padding-left: 20px;
+    font-size: 14px; line-height: 1.65;
     color: var(--text-secondary);
     line-height: 1.65;
     font-size: 14px;
