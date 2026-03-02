@@ -1265,24 +1265,6 @@
   <!-- ━━━━ Hero ━━━━ -->
   <section id="top" class="l2-hero l2-snap">
     <div class="l2-wrap l2-hero-content">
-      <!-- Hero doodles — download arrow, folder, graduation cap -->
-      <!-- Hero doodles — files cascading + browser icons -->
-      <svg class="l2-doodle l2-doodle-hero-1" viewBox="0 0 80 80" fill="none" aria-hidden="true">
-        <rect x="10" y="20" width="24" height="30" rx="2" stroke="var(--green)" stroke-width="1.5" opacity="0.18"/>
-        <rect x="18" y="12" width="24" height="30" rx="2" stroke="var(--green)" stroke-width="1.5" opacity="0.14"/>
-        <rect x="26" y="4" width="24" height="30" rx="2" stroke="var(--green)" stroke-width="1.5" opacity="0.10"/>
-        <path d="M20 58v12h40V58" stroke="var(--green)" stroke-width="1.5" opacity="0.15" stroke-linecap="round"/>
-        <path d="M40 42v16" stroke="var(--green)" stroke-width="1.5" opacity="0.15" stroke-linecap="round"/>
-        <path d="M34 52l6 6 6-6" stroke="var(--green)" stroke-width="1.5" opacity="0.15" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-      <svg class="l2-doodle l2-doodle-hero-2" viewBox="0 0 70 70" fill="none" aria-hidden="true">
-        <rect x="8" y="14" width="54" height="38" rx="4" stroke="var(--green)" stroke-width="1.5" opacity="0.15"/>
-        <line x1="8" y1="24" x2="62" y2="24" stroke="var(--green)" stroke-width="1" opacity="0.12"/>
-        <circle cx="16" cy="19" r="2" stroke="var(--green)" stroke-width="1" opacity="0.12"/>
-        <circle cx="23" cy="19" r="2" stroke="var(--green)" stroke-width="1" opacity="0.12"/>
-        <circle cx="30" cy="19" r="2" stroke="var(--green)" stroke-width="1" opacity="0.12"/>
-        <path d="M24 36h22M24 42h14" stroke="var(--green)" stroke-width="1" opacity="0.10" stroke-linecap="round"/>
-      </svg>
       <h1 class="l2-mega">
         The free extension that<br/>
         <span class="l2-em">supercharges</span><br/>Google Classroom.
