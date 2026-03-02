@@ -6595,7 +6595,11 @@ export class DownloadsDurable {
     // Check CIDR/IP match
     const isAllowed = ip ? isIpAllowed(ip, this.d.ipAllowlist) : false;
     
-    return json({ allowed: isAllowed });
+    return json({
+      allowed: isAllowed,
+      enabled: this.d.ipAllowlistEnabled,
+      stepUpBypassEnabled: this.d.ipAllowlistStepUpBypassEnabled,
+    });
   }
 
   /**
