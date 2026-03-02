@@ -693,19 +693,389 @@
   }
 
   async function loadSiteData(force = false): Promise<void> {
-    mapState = force ? mapState : 'loading';
-    mapError = '';
-    try {
-      const snapshot = await fetchWebsiteSnapshot({ force });
-      overview = snapshot.overview;
-      mapData = snapshot.map;
-      downloadCount = snapshot.overview.totals.downloads || 0;
-      userCount = computeUsersTotal(snapshot.overview);
-      countryCount = snapshot.map.totals.countries || 0;
-      mapState = 'ready';
-    } catch (error) {
-      mapError = error instanceof Error ? error.message : 'Failed to load map data.';
-      mapState = 'error';
+    await refreshWebsiteSnapshotStore({ force, userInitiated: force });
+  }
+
+  /* ━━━ Edit-mode helpers ━━━ */
+  /** Resolve SVG content for a placement — from catalog or builtins */
+  function resolveSvg(p: ElementPlacement): { svg: string; viewBox: string } {
+    const builtin = getBuiltinSvg(p.sampleId);
+    if (builtin) return builtin;
+
+    if (p.customSvg) {
+      return { svg: p.customSvg, viewBox: p.viewBox || '0 0 64 64' };
+    }
+
+    for (const cat of svgCategories) {
+      const item = cat.items.find((i: SvgItem) => i.id === p.sampleId);
+      if (item) {
+        return { svg: item.svg, viewBox: '0 0 64 64' };
+      }
+    }
+    for (const d of doodleItems) {
+      if (d.id === p.sampleId) {
+        return { svg: d.svg, viewBox: '0 0 60 60' };
+      }
+    }
+    for (const t of threeDElements) {
+      if (t.id === p.sampleId) {
+        return { svg: t.svg, viewBox: '0 0 120 110' };
+      }
+    }
+
+    return { svg: '<text x="32" y="40" text-anchor="middle" font-size="24" fill="currentColor">?</text>', viewBox: '0 0 64 64' };
+  }
+
+  function setEditorStatus(message: string, tone: 'ok' | 'warn' | 'error' = 'ok') {
+    editorStatus = message;
+    editorStatusTone = tone;
+    if (statusTimer) clearTimeout(statusTimer);
+    statusTimer = setTimeout(() => {
+      editorStatus = '';
+      statusTimer = null;
+    }, 3500);
+  }
+
+  function toggleEditIsolation() {
+    editIsolation = !editIsolation;
+    setEditorStatus(editIsolation ? 'Page interactions frozen for placement editing.' : 'Page interactions restored.');
+  }
+
+  function persistEditingState() {
+    if (!editMode) return;
+    saveDraftPlacements(placements);
+  }
+
+  function nudgeSelected(dx: number, dy: number): void {
+    if (!selectedPlacement || selectedPlacement.locked) return;
+    updatePlacement(selectedPlacement.id, {
+      x: Math.round(Math.max(-25, Math.min(125, selectedPlacement.x + dx)) * 10) / 10,
+      y: Math.round(Math.max(-25, Math.min(125, selectedPlacement.y + dy)) * 10) / 10
+    });
+  }
+
+  function addElement(type: 'float' | 'doodle' | '3d') {
+    const id = genPlacementId(type);
+    const defaultSamples: Record<'float' | 'doodle' | '3d', string> = {
+      float: 'F-1-1',
+      doodle: doodleItems[0]?.id || 'D-1',
+      '3d': threeDElements[0]?.id || '3D-1'
+    };
+
+    let spawnY = 30;
+    const canvasHeight = placementCanvasHeight > 0 ? placementCanvasHeight : pageEl?.scrollHeight || 0;
+    if (canvasHeight > 0) {
+      const vh = window.innerHeight;
+      const sy = window.scrollY;
+      spawnY = ((sy + vh / 2) / canvasHeight) * 100;
+      spawnY = Math.round(spawnY * 10) / 10;
+    }
+
+    placements = [
+      ...placements,
+      {
+        id,
+        sampleId: defaultSamples[type],
+        type,
+        section: 'general',
+        x: 50,
+        y: spawnY,
+        size: type === '3d' ? 120 : type === 'float' ? 90 : 60,
+        opacity: type === 'float' ? 0.06 : type === '3d' ? 0.72 : 0.7,
+        rotate: 0,
+        animDuration: type === '3d' ? 14 : 20,
+        color: 'var(--green)',
+        zIndex: maxPlacementZIndex(placements) + 1,
+        hidden: false,
+        locked: false
+      }
+    ];
+    persistEditingState();
+    selectedElementId = id;
+    setEditorStatus(`Added ${type} element '${id}'.`);
+  }
+
+  function duplicateSelectedElement() {
+    if (!selectedPlacement) return;
+    const duplicated: ElementPlacement = {
+      ...selectedPlacement,
+      id: genPlacementId(selectedPlacement.type),
+      x: Math.round(Math.max(-25, Math.min(125, selectedPlacement.x + 2)) * 10) / 10,
+      y: Math.round(Math.max(-25, Math.min(125, selectedPlacement.y + 2)) * 10) / 10,
+      zIndex: maxPlacementZIndex(placements) + 1,
+      locked: false,
+      hidden: false
+    };
+    placements = [...placements, duplicated];
+    persistEditingState();
+    selectedElementId = duplicated.id;
+    setEditorStatus(`Duplicated '${selectedPlacement.id}' -> '${duplicated.id}'.`);
+  }
+
+  function deleteElement(id: string) {
+    placements = placements.filter(p => p.id !== id);
+    persistEditingState();
+    if (selectedElementId === id) selectedElementId = null;
+    setEditorStatus(`Deleted '${id}'.`, 'warn');
+  }
+
+  function assignSample(sampleId: string) {
+    if (!selectedElementId) return;
+    placements = placements.map(p => p.id === selectedElementId ? { ...p, sampleId } : p);
+    persistEditingState();
+    pickerOpen = false;
+    setEditorStatus(`Applied sample '${sampleId}'.`);
+  }
+
+  function updatePlacement(id: string, updates: Partial<ElementPlacement>) {
+    placements = placements.map(p => p.id === id ? { ...p, ...updates } : p);
+    persistEditingState();
+  }
+
+  function bumpSelectedLayer(direction: 'up' | 'down') {
+    if (!selectedPlacement) return;
+    const next = Math.max(0, (selectedPlacement.zIndex ?? 0) + (direction === 'up' ? 1 : -1));
+    updatePlacement(selectedPlacement.id, { zIndex: next });
+  }
+
+  function toggleSelectedLock() {
+    if (!selectedPlacement) return;
+    updatePlacement(selectedPlacement.id, { locked: !selectedPlacement.locked });
+  }
+
+  function toggleSelectedVisibility() {
+    if (!selectedPlacement) return;
+    updatePlacement(selectedPlacement.id, { hidden: !selectedPlacement.hidden });
+  }
+
+  function startEditDrag(e: PointerEvent, p: ElementPlacement) {
+    if (!editMode || p.locked) return;
+    e.preventDefault();
+    e.stopPropagation();
+    selectedElementId = p.id;
+    editDrag = { id: p.id, pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, origX: p.x, origY: p.y };
+  }
+
+  function onEditPointerMove(e: PointerEvent) {
+    if (!editDrag || !pageEl) return;
+    if (e.pointerId !== editDrag.pointerId) return;
+    const rect = pageEl.getBoundingClientRect();
+    const pageW = rect.width;
+    const pageH = placementCanvasHeight > 0 ? placementCanvasHeight : pageEl.scrollHeight;
+    const dx = e.clientX - editDrag.startX;
+    const dy = e.clientY - editDrag.startY;
+    const newX = Math.max(-25, Math.min(125, editDrag.origX + (dx / pageW) * 100));
+    const newY = Math.max(-25, Math.min(125, editDrag.origY + (dy / pageH) * 100));
+    const dragId = editDrag.id;
+    placements = placements.map(p =>
+      p.id === dragId ? { ...p, x: Math.round(newX * 10) / 10, y: Math.round(newY * 10) / 10 } : p
+    );
+  }
+
+  function onEditPointerUp(e: PointerEvent) {
+    if (!editDrag) return;
+    if (e.pointerId !== editDrag.pointerId) return;
+    persistEditingState();
+    editDrag = null;
+  }
+
+  function handleEditExport() {
+    const json = exportPlacementsJSON(placements);
+    navigator.clipboard.writeText(json)
+      .then(() => setEditorStatus('Placements JSON copied to clipboard.'))
+      .catch(() => setEditorStatus('Could not copy JSON to clipboard.', 'error'));
+  }
+
+  function handleEditImport() {
+    const result = importPlacementsJSON(importJsonText);
+    importErrors = result.errors;
+    importWarnings = result.warnings;
+    if (!result.ok) {
+      setEditorStatus('Import failed. Fix JSON and try again.', 'error');
+      return;
+    }
+
+    placements = result.placements;
+    persistEditingState();
+    showImportPanel = false;
+    importJsonText = '';
+    selectedElementId = null;
+    setEditorStatus(
+      result.warnings.length > 0
+        ? `Imported with ${result.warnings.length} warning(s).`
+        : `Imported ${placements.length} placement(s).`,
+      result.warnings.length > 0 ? 'warn' : 'ok'
+    );
+  }
+
+  function handleEditPublish() {
+    publishedPlacements = publishPlacements(placements);
+    placements = clonePlacements(publishedPlacements);
+    setEditorStatus('Draft applied to live overview.', 'ok');
+  }
+
+  function handleEditDiscard() {
+    placements = discardDraftPlacements(publishedPlacements);
+    selectedElementId = null;
+    setEditorStatus('Draft reverted to published version.', 'warn');
+  }
+
+  function handleEditResetDraft() {
+    placements = clonePlacements(defaultPlacements);
+    persistEditingState();
+    selectedElementId = null;
+    setEditorStatus('Draft reset to defaults (not published yet).', 'warn');
+  }
+
+  /** Get all catalog items for the picker */
+  function getPickerItems(tab: 'float' | 'doodle' | '3d', search: string): SvgItem[] {
+    let items: SvgItem[] = [];
+    if (tab === 'float') {
+      items = svgCategories.flatMap(c => c.items);
+    } else if (tab === 'doodle') {
+      items = doodleItems;
+    } else {
+      items = threeDElements;
+    }
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      items = items.filter(i => i.id.toLowerCase().includes(q) || i.label.toLowerCase().includes(q));
+    }
+    return items;
+  }
+
+  function isPinnedSuperchargeStarPlacement(placement: ElementPlacement): boolean {
+    if (placement.id === PINNED_SUPERCHARGE_STAR_ID) return true;
+    return placement.sampleId === PINNED_SUPERCHARGE_STAR_SAMPLE_ID && placement.section === 'general';
+  }
+
+  function clampForRender(value: number, min: number, max: number): number {
+    if (!Number.isFinite(value)) return min;
+    return Math.min(max, Math.max(min, value));
+  }
+
+  function syncPlacementCanvasHeight(force = false): void {
+    if (!pageEl) return;
+    if (placementCanvasLocked && !force) return;
+    const measuredHeight = Math.max(
+      window.innerHeight || 0,
+      pageEl.scrollHeight || 0,
+      document.documentElement?.scrollHeight || 0,
+      document.body?.scrollHeight || 0
+    );
+    if (!Number.isFinite(measuredHeight) || measuredHeight <= 0) return;
+    placementCanvasHeight = Math.round(measuredHeight);
+  }
+
+  function freezePlacementCoordinates(): void {
+    if (!pageEl) return;
+    const viewportHeight = typeof window !== 'undefined' ? window.innerHeight || 0 : 0;
+    const canvasHeight = placementCanvasHeight > 0 ? placementCanvasHeight : pageEl.scrollHeight || viewportHeight;
+    const canvasWidth = pageEl.clientWidth || (typeof window !== 'undefined' ? window.innerWidth || 0 : 0);
+    if (!Number.isFinite(canvasHeight) || canvasHeight <= 0) return;
+    if (!Number.isFinite(canvasWidth) || canvasWidth <= 0) return;
+
+    const next: Record<string, { leftPx: number; topPx: number }> = {};
+    for (const placement of visiblePlacements) {
+      next[placement.id] = {
+        leftPx: Number(((canvasWidth * placement.renderX) / 100).toFixed(2)),
+        topPx: Number(((canvasHeight * placement.renderY) / 100).toFixed(2))
+      };
+    }
+    frozenPlacementCoords = next;
+  }
+
+  async function waitForStableLayoutBeforePlacementLock(): Promise<void> {
+    if (typeof document === 'undefined' || typeof window === 'undefined') return;
+
+    const fontsReady = (
+      document as Document & {
+        fonts?: { ready?: Promise<unknown> };
+      }
+    ).fonts?.ready;
+
+    if (fontsReady) {
+      await Promise.race([
+        fontsReady,
+        new Promise((resolve) => window.setTimeout(resolve, 1200))
+      ]);
+    }
+
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => resolve());
+      });
+    });
+  }
+
+  function resolvePlacementForViewport(placement: ElementPlacement): RenderPlacement {
+    const onMobile = isMobilePlacementsViewport;
+    return {
+      ...placement,
+      renderX: Number(clampForRender(onMobile && placement.mobileX !== undefined ? placement.mobileX : placement.x, -25, 125).toFixed(2)),
+      renderY: Number(clampForRender(onMobile && placement.mobileY !== undefined ? placement.mobileY : placement.y, -25, 125).toFixed(2)),
+      renderSize: Math.round(clampForRender(onMobile && placement.mobileSize !== undefined ? placement.mobileSize : placement.size, 16, 640)),
+      renderOpacity: Number(clampForRender(onMobile && placement.mobileOpacity !== undefined ? placement.mobileOpacity : placement.opacity, 0, 1).toFixed(3)),
+      renderRotate: Number(clampForRender(onMobile && placement.mobileRotate !== undefined ? placement.mobileRotate : placement.rotate, -360, 360).toFixed(2)),
+      renderAnimDuration: Number(
+        clampForRender(onMobile && placement.mobileAnimDuration !== undefined ? placement.mobileAnimDuration : placement.animDuration, 0, 120).toFixed(2)
+      ),
+      renderColor: onMobile && placement.mobileColor ? placement.mobileColor : placement.color || 'var(--green)',
+      renderZIndex: Math.round(clampForRender(onMobile && placement.mobileZIndex !== undefined ? placement.mobileZIndex : placement.zIndex ?? 0, 0, 30000)),
+      renderHidden: Boolean(placement.hidden || (onMobile && placement.mobileHidden === true))
+    };
+  }
+
+  function placementRenderOpacity(placement: RenderPlacement): number {
+    if (editMode) return placement.renderOpacity;
+    if (placementSectionVisible[placement.section]) return placement.renderOpacity;
+    return 0;
+  }
+
+  function placementRenderLeftCss(placement: RenderPlacement): string {
+    if (!editMode && placementCanvasLocked) {
+      const frozen = frozenPlacementCoords[placement.id];
+      if (frozen) return `${frozen.leftPx}px`;
+    }
+    return `${placement.renderX}%`;
+  }
+
+  function placementRenderTopCss(placement: RenderPlacement): string {
+    if (!editMode && placementCanvasLocked) {
+      const frozen = frozenPlacementCoords[placement.id];
+      if (frozen) return `${frozen.topPx}px`;
+    }
+    return `${placement.renderY}%`;
+  }
+
+  function placementAnimationPlayState(placement: RenderPlacement): 'running' | 'paused' {
+    if (placement.renderAnimDuration <= 0) return 'paused';
+    if (editMode) return 'running';
+    if (!placementSectionVisible[placement.section]) return 'paused';
+    return 'running';
+  }
+
+  $: selectedPlacement = placements.find(p => p.id === selectedElementId) || null;
+  $: pinnedSuperchargeStar = isMobilePlacementsViewport
+    ? null
+    : placements
+        .map((placement) => resolvePlacementForViewport(placement))
+        .find((placement) => isPinnedSuperchargeStarPlacement(placement) && !placement.renderHidden) || null;
+  $: visiblePlacements = isMobilePlacementsViewport
+    ? []
+    : placements
+        .map((placement) => resolvePlacementForViewport(placement))
+        .filter((placement) => !placement.renderHidden && !isPinnedSuperchargeStarPlacement(placement))
+        .slice()
+        .sort((a, b) => a.renderZIndex - b.renderZIndex);
+  $: pickerItems = editMode ? getPickerItems(pickerTab, pickerSearch) : [];
+  $: if (!editMode && placementCanvasLocked) {
+    const frozenCount = Object.keys(frozenPlacementCoords).length;
+    const needsFreeze =
+      frozenCount !== visiblePlacements.length ||
+      visiblePlacements.some((placement) => !(placement.id in frozenPlacementCoords));
+    if (needsFreeze) {
+      freezePlacementCoordinates();
     }
   }
 
