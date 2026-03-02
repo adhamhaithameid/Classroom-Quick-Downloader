@@ -334,43 +334,6 @@ export function clearSessionCookieHeader(url?: URL, env?: WorkerEnv): string {
 }
 
 // ---------------------------------------------------------------------------
-// IP Allowlist Check (Fail-Safe with Graceful Degradation)
-// Returns: { allowed: boolean, error?: string } for proper 503 handling
-// ---------------------------------------------------------------------------
-
-type IpAllowResult = { allowed: boolean; error?: string; serviceDown?: boolean };
-
-async function isIpAllowed(stub: DurableObjectStub, ip: string, env: WorkerEnv): Promise<IpAllowResult> {
-  try {
-    const res = await stub.fetch(new Request("http://internal/auth/check-ip-allowlist", {
-      method: "POST",
-      headers: { 
-        "Content-Type": "application/json",
-        "X-Admin-Secret": env.DO_SHARED_SECRET,
-      },
-      body: JSON.stringify({ ip }),
-    }));
-    const data = await res.json() as { allowed: boolean; enabled?: boolean };
-    
-    // If allowlist is not enabled, allow all IPs
-    if (data.enabled === false) {
-      return { allowed: true };
-    }
-    
-    return { allowed: data.allowed !== false };
-  } catch (err) {
-    // Graceful Degradation: Signal service unavailable instead of hard lockout
-    // This prevents admins from being locked out during transient DO failures
-    console.error("[isIpAllowed] DO check failed:", err);
-    return { 
-      allowed: false, 
-      serviceDown: true,
-      error: "IP allowlist service temporarily unavailable. Please try again shortly."
-    };
-  }
-}
-
-// ---------------------------------------------------------------------------
 // Core Helpers
 // ---------------------------------------------------------------------------
 
