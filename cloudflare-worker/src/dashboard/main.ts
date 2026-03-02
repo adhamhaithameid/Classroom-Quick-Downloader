@@ -6855,6 +6855,7 @@ export function renderDashboard(stats: StatsResponse): string {
         setText('website-last-refresh-at', snapshot.snapshotAtUtc ? formatTs(snapshot.snapshotAtUtc) : '—');
         setText('website-refresh-mode', website.refreshEnabled ? ('AUTO (' + refreshHours + ')') : 'MANUAL ONLY');
         setText('website-last-manual-flush', website.lastManualFlushAtUtc ? formatTs(website.lastManualFlushAtUtc) : '—');
+        setText('website-last-telemetry-ack', telemetry.lastBatchAckAtUtc ? formatTs(telemetry.lastBatchAckAtUtc) : '—');
 
         const refreshEnabled = document.getElementById('website-refresh-enabled');
         if (refreshEnabled) {
