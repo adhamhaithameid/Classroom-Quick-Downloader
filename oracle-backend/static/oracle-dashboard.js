@@ -948,11 +948,6 @@
 
       // Floating tooltip
       var tooltip = document.getElementById('chart-tooltip');
-      
-      // Command-key-based tooltip logic
-      var cmdHeld = false;
-      var canShowTooltip = false;
-      var cmdTimer = null;
       var currentTooltipEvent = null;
       var currentTooltipPayload = null;
       var CMD_DELAY = 1000;
