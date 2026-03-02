@@ -462,11 +462,22 @@
     </div>
   </section>
 
-  <div class="faq-quick-links">
-    <a href="{base}/privacy" class="faq-quick-link">Privacy Summary</a>
-    <a href="{base}/changelog" class="faq-quick-link">User Changelog</a>
-    <a href={STORE_LINKS.github} target="_blank" rel="noopener noreferrer" class="faq-quick-link">GitHub Repository</a>
-  </div>
+  <!-- Search + Quick Links -->
+  <section class="fq-controls-section">
+    <div class="fq-wrap">
+      <div class="fq-search-bar fq-reveal">
+        <svg class="fq-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input
+          type="text"
+          class="fq-search-input"
+          placeholder="Search questions..."
+          bind:value={searchQuery}
+          aria-label="Search FAQ"
+        />
+        {#if searchQuery}
+          <button type="button" class="fq-search-clear" on:click={clearSearch} aria-label="Clear search">✕</button>
+        {/if}
+      </div>
 
   <div class="faq-sections">
     {#each sections as section}
