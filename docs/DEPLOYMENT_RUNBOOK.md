@@ -231,6 +231,11 @@ Configured workflows:
     - schema compatibility check (`tools/check_schema_compat.sh`)
   - tests + validates worker
   - deploys worker
+  - runs post-deploy smoke checks:
+    - `/health`
+    - admin auth gate (expects `401/403`)
+    - website ingest path (`POST /api/public/website/events`)
+    - website snapshot compatibility route (`GET /api/public/website/snapshot`) when exposed
 
 - `/.github/workflows/oracle-dashboard-deploy.yml`
   - triggers on every push to `main`
