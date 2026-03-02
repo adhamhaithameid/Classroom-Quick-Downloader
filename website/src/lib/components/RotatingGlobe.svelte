@@ -307,7 +307,7 @@
       }
 
       if (changed) applyProjection();
-      animationFrameId = requestAnimationFrame(animate);
+      animationFrameId = scheduleAnimationFrame(animate);
     };
 
     applyProjection();
