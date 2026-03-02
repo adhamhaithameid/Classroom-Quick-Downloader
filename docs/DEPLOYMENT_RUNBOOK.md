@@ -246,7 +246,11 @@ Configured workflows:
   - hard-syncs repo to `origin/main`
   - validates required `.env.production` keys on the server before deployment
   - rebuilds/recreates Oracle container
-  - health-checks `/health`
+  - runs post-deploy smoke checks on Oracle:
+    - `/health`
+    - admin auth gate (expects `401/403`)
+    - public website ingest path (`POST /api/public/website/events`)
+    - public website snapshot path (`GET /api/public/website/snapshot`)
 
 - `/.github/workflows/website-deploy.yml`
   - triggers on `main` for `website/**`, `CHANGELOG.md`, `PRIVACY.md`
