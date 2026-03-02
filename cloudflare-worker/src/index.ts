@@ -1254,8 +1254,32 @@ async function proxyToDO(request: Request, env: WorkerEnv): Promise<Response> {
   }
   const newReq = new Request(request.url, requestInit);
 
-  const res = await stub.fetch(newReq);
-  return withCors(request, res, env);
+  try {
+    const res = await stub.fetch(newReq);
+    return withCors(request, res, env);
+  } catch {
+    const pathname = new URL(request.url).pathname;
+    if (pathname === "/api/public/website/events") {
+      return withCors(
+        request,
+        new Response(
+          JSON.stringify(
+            websiteEventsErrorBody(
+              "upstream_unavailable",
+              "Telemetry gateway is temporarily unavailable.",
+              true,
+            ),
+          ),
+          { status: 502, headers: { "content-type": "application/json; charset=utf-8" } },
+        ),
+        env,
+      );
+    }
+    return withCors(request, new Response(
+      JSON.stringify({ ok: false, error: "upstream_unavailable" }),
+      { status: 502, headers: { "content-type": "application/json; charset=utf-8" } }
+    ), env);
+  }
 }
 
 async function handleReleaseNotes(request: Request, env: WorkerEnv): Promise<Response> {
