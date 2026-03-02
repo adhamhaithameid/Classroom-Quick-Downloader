@@ -37,7 +37,7 @@
   let selectedFeatures: string[] = [];
   let confidenceToReinstall = '';
   let notes = '';
-  let queryBrowser = 'unknown';
+  let queryBrowser: BrowserKey = 'chrome';
   let queryVersion = 'unknown';
   let querySource = 'website';
 
