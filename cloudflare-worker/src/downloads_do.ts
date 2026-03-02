@@ -6273,6 +6273,9 @@ export class DownloadsDurable {
       const body = await request.json() as {
         changelog?: unknown;
         config?: ChangelogConfig;
+        markdown?: string;
+        markdownUrl?: string;
+        previewOnly?: boolean;
       };
 
       let updated = false;
