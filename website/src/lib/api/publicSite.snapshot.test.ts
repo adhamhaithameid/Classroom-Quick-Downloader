@@ -16,11 +16,14 @@ describe('fetchWebsiteSnapshot', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-02-23T00:00:00.000Z'));
 
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url.includes('/api/public/website/overview')) {
-        return new Response(
-          JSON.stringify({
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          schemaVersion: '1',
+          ok: true,
+          generatedAt: 1,
+          snapshotId: 'snapshot-1',
+          overview: {
             ok: true,
             generatedAt: 1,
             totals: { downloads: 100, success: 90, fail: 10 },
