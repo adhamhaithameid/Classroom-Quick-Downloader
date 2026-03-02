@@ -609,6 +609,7 @@
     border-radius: var(--radius-sm);
     font-size: 15px;
     font-weight: 700;
+    font-family: var(--font-ui), sans-serif;
     cursor: pointer;
     transition: all 0.25s ease;
     box-shadow: var(--shadow-green);
