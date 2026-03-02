@@ -263,16 +263,33 @@
     </div>
   </section>
 
-  <!-- Actions -->
-  <div class="bottom-actions">
-    <button class="submit-btn" type="button" disabled={submitState === 'sending'} on:click={submitFeedback}>
-      {submitState === 'sending' ? 'Submitting…' : 'Submit feedback'}
-    </button>
-  </div>
-
-  {#if submitMessage}
-    <div class="result-msg" class:ok={submitState === 'done'} class:fail={submitState === 'error'}>
-      {submitMessage}
+  <!-- Reinstall CTA -->
+  <section class="un-cta-section un-appear" style="animation-delay: 0.3s">
+    <div class="un-wrap">
+      <div class="un-cta-card">
+        <h2 class="un-cta-heading">Come back anytime</h2>
+        <p class="un-cta-text">Changed your mind? Reinstall instantly from your browser's store.</p>
+        <div class="un-reinstall-row">
+          {#each orderedBrowsers as browser}
+            {@const isDetected = isDetectedBrowser(browser)}
+            <a
+              href={STORE_LINKS[browser]}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="un-reinstall-btn"
+              class:detected={isDetected}
+              on:click={() => trackReinstallClick(browser)}
+            >
+              <img src="{base}/images/{browser}.svg" alt="" class="un-browser-icon" />
+              {#if isDetected}Reinstall for {browserDisplayName(browser)}{:else}{browserDisplayName(browser)}{/if}
+            </a>
+          {/each}
+        </div>
+        <div class="un-cta-divider"></div>
+        <a class="un-bug-link" href={STORE_LINKS.github + '/issues'} target="_blank" rel="noopener noreferrer">
+          🐛 Report a bug instead
+        </a>
+      </div>
     </div>
   {/if}
 
