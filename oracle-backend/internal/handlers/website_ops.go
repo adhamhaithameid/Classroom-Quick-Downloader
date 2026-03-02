@@ -605,8 +605,8 @@ func publishWebsiteDataset(
 	if row.PublishedSource == "" {
 		row.PublishedSource = "oracle"
 	}
-	row.PublishedDownloads = maxInt64(downloads, 0)
-	row.PublishedCountries = encodeWebsiteCountryCells(countries)
+	row.PublishedDownloads = nextDownloads
+	row.PublishedCountries = encodeWebsiteCountryCells(nextCountries)
 	row.UpdatedAt = now
 	if setOraclePush {
 		row.LastOraclePushAt = &now
