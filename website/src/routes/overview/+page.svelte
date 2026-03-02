@@ -6,6 +6,7 @@
   import { detectBrowserFromNavigator, type BrowserKey } from '$lib/browser/detect';
   import { refreshWebsiteSnapshotStore, websiteSnapshotStore } from '$lib/stores/websiteSnapshot';
   import type { MapResponse, OverviewResponse } from '$lib/types/public';
+  import { trackWebsiteEvent } from '$lib/analytics/websiteEvents';
   import AnimatedNumber from '$lib/components/AnimatedNumber.svelte';
   import AnimatedNumericText from '$lib/components/AnimatedNumericText.svelte';
   import CountryHeatmap from '$lib/components/CountryHeatmap.svelte';
