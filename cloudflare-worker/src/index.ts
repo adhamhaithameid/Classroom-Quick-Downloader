@@ -1440,6 +1440,11 @@ export default {
       );
     }
 
+    // Optional Cloudflare Access enforcement for dashboard/admin routes.
+    if (isDashboardRoute(pathname) && !isCloudflareAccessIdentityAllowed(request, env)) {
+      return cloudflareAccessDeniedResponse(request, env, pathname);
+    }
+
     // Login page
     if (pathname === "/") {
       return handleRoot(request, env);
