@@ -805,7 +805,7 @@ describe("Durable Object security behaviors", () => {
     expect(res.status).toBe(200);
     const payload = await res.json() as { serverTimeUtc?: number; dailyFlushWindowStartUtc?: number; dailyFlushWindowMinutes?: number; committedSeq?: number; healthNotifyIntervalsMs?: { warn?: number; critical?: number } };
     expect(typeof payload.serverTimeUtc).toBe("number");
-    expect(payload.dailyFlushWindowStartUtc).toBe(1);
+    expect(payload.dailyFlushWindowStartUtc).toBe(23);
     expect(payload.dailyFlushWindowMinutes).toBe(120);
     expect(typeof payload.committedSeq).toBe("number");
     expect(typeof payload.healthNotifyIntervalsMs?.warn).toBe("number");
