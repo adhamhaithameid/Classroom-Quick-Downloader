@@ -177,6 +177,10 @@ function asWorkerHealth(value: unknown): WorkerHealth {
   return 'down';
 }
 
+function asSchemaVersion(value: unknown): PublicSchemaVersion {
+  return value === '1' ? '1' : PUBLIC_SCHEMA_VERSION;
+}
+
 function asStringArray(value: unknown, maxItems = 8): string[] {
   if (!Array.isArray(value)) return [];
   const out: string[] = [];
