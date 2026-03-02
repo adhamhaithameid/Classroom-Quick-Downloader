@@ -444,7 +444,8 @@ func normalizeJSONListText(raw string) string {
 
 func newWebsiteBatchID(direction string) string {
 	short := strings.ReplaceAll(direction, "_", "-")
-	return fmt.Sprintf("ws-%s-%d", short, time.Now().UTC().UnixMilli())
+	now := time.Now().UTC()
+	return fmt.Sprintf("ws-%s-%d-%d", short, now.UnixMilli(), now.UnixNano()%1_000_000)
 }
 
 func isWebsiteCloudflarePullHour(hourUTC int) bool {
