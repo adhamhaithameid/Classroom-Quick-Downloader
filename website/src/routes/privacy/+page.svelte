@@ -294,9 +294,8 @@
     box-shadow: 0 16px 40px rgba(0, 0, 0, 0.08);
   }
 
-  .section-icon {
-    font-size: 28px;
-    margin-bottom: 10px;
+  .prv-card-icon {
+    font-size: 32px; margin-bottom: 14px;
   }
 
   .privacy-section h2 {
