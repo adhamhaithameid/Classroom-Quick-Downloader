@@ -2053,7 +2053,7 @@
           } catch (_) {
             container.innerHTML = '<div class="empty-state empty-state-danger">Failed</div>';
           }
-        }
+        }));
 
         // Daily chart
         var dailyContainer = document.getElementById('daily-chart');
