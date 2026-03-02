@@ -747,9 +747,40 @@
     margin: 22px auto;
   }
 
-  @media (max-width: 600px) {
-    .uninstall-page {
-      gap: 12px;
+  .un-bug-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-decoration: none;
+    transition: color 0.2s ease;
+  }
+
+  .un-bug-link:hover {
+    color: var(--green);
+  }
+
+  /* ── Animations ────────────────── */
+  @keyframes un-rise {
+    from { opacity: 0; transform: translateY(18px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes un-spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
+
+  /* ── Responsive ────────────────── */
+  @media (max-width: 680px) {
+    .un-hero { padding: 32px 16px 24px; }
+    .un-mega { font-size: 30px; }
+
+    .un-card {
+      padding: 28px 20px;
+      border-radius: 16px;
     }
 
     .hero {
