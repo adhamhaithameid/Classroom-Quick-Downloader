@@ -6655,6 +6655,10 @@ export function renderDashboard(stats: StatsResponse): string {
           .then(data => {
             if (data.ok) {
               ipAllowlistData.enabled = data.enabled;
+              if (typeof data.stepUpBypassEnabled === 'boolean') {
+                ipAllowlistData.stepUpBypassEnabled = data.stepUpBypassEnabled;
+              }
+              refreshIpSecurityBadges();
               showToast('IP Protection ' + (data.enabled ? 'enabled' : 'disabled'), 'success');
             } else {
               this.checked = !enabled; // Revert
