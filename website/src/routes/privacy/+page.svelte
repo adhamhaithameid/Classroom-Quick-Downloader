@@ -304,8 +304,9 @@
     letter-spacing: -0.02em;
   }
 
-  .section-summary {
-    margin: 10px 0 0;
+  .prv-card-summary {
+    margin: 0 0 14px;
+    font-size: 14px; line-height: 1.75;
     color: var(--text-secondary);
     line-height: 1.75;
     font-size: 14px;
