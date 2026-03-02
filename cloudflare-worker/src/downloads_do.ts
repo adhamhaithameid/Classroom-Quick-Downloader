@@ -2853,7 +2853,30 @@ export class DownloadsDurable {
     // Schedule next daily alarm
     await this.scheduleNextMidnightAlarm();
 
-    // Retry failed Oracle flushes
+    const changelogSync = this.getChangelogSyncState();
+    if (changelogSync.applyMode === "auto_github" && changelogSync.autoSyncEnabled) {
+      let syncTouchedState = false;
+      const syncDueAt = changelogSync.nextAutoSyncAt || 0;
+      if (syncDueAt <= 0 || now >= syncDueAt) {
+        const syncResult = await this.applyAutoGithubSync({
+          now,
+          actor: "alarm",
+          source: "alarm",
+        });
+        syncTouchedState = true;
+        if (!syncResult.ok) {
+          logEvent("warn", "changelog_auto_sync_failed", {
+            error: syncResult.error || "sync_failed",
+          });
+        }
+      }
+      const alarmDirty = await this.ensureChangelogAutoSyncAlarm(now);
+      if (syncTouchedState || alarmDirty) {
+        await this.persist();
+      }
+    }
+
+    // Retry failed extension Oracle flushes.
     if (this.d.retryState && this.d.retryState.nextRetryAt && now >= this.d.retryState.nextRetryAt) {
       await this.flushToOracle(false);
     }
