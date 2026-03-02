@@ -2549,6 +2549,118 @@
         return out;
       }
 
+      function normalizeVersionToken(value) {
+        var v = String(value || '').trim();
+        if (v.toLowerCase().startsWith('v')) v = v.slice(1);
+        return v.replace(/\s+/g, '');
+      }
+
+      function parseUserFriendlyChangelogMarkdown(markdown) {
+        var lines = String(markdown || '').replace(/\r\n/g, '\n').split('\n');
+        var releases = [];
+        var errors = [];
+        var current = null;
+        var section = null;
+
+        function pushCurrent() {
+          if (!current) return;
+          current.version = normalizeVersionToken(current.version || '');
+          current.summary = String(current.summary || '').trim();
+          if (!current.summary) {
+            current.summary = (current.added[0] || current.changed[0] || current.fixed[0] || '').trim();
+          }
+          if (!current.version || !current.summary) {
+            errors.push('Release block missing version or summary.');
+            current = null;
+            return;
+          }
+          releases.push({
+            version: current.version,
+            summary: current.summary,
+            added: current.added.slice(0, 12),
+            changed: current.changed.slice(0, 12),
+            fixed: current.fixed.slice(0, 12)
+          });
+          current = null;
+        }
+
+        lines.forEach(function(rawLine) {
+          var line = String(rawLine || '').trim();
+          if (!line) return;
+          var releaseMatch = line.match(/^##\s+v?([A-Za-z0-9._-]+)\s*$/i);
+          if (releaseMatch) {
+            pushCurrent();
+            current = { version: releaseMatch[1], summary: '', added: [], changed: [], fixed: [] };
+            section = null;
+            return;
+          }
+          if (!current) return;
+          if (/^###\s+summary\s*$/i.test(line)) { section = 'summary'; return; }
+          if (/^###\s+added\s*$/i.test(line)) { section = 'added'; return; }
+          if (/^###\s+changed\s*$/i.test(line)) { section = 'changed'; return; }
+          if (/^###\s+fixed\s*$/i.test(line)) { section = 'fixed'; return; }
+
+          var bulletMatch = line.match(/^-\s+(.+)$/);
+          var value = String(bulletMatch ? bulletMatch[1] : line).trim();
+          if (!value) return;
+          if (section === 'summary') {
+            current.summary = current.summary ? (current.summary + ' ' + value) : value;
+            return;
+          }
+          if (section === 'added') { current.added.push(value); return; }
+          if (section === 'changed') { current.changed.push(value); return; }
+          if (section === 'fixed') { current.fixed.push(value); return; }
+          current.summary = current.summary ? (current.summary + ' ' + value) : value;
+        });
+
+        pushCurrent();
+        return { releases: releases, errors: errors };
+      }
+
+      function buildReleaseMarkdown(release) {
+        var lines = [];
+        lines.push('## v' + normalizeVersionToken(release.version || ''));
+        lines.push('### Summary');
+        lines.push(String(release.summary || ''));
+        lines.push('### Added');
+        (release.added || []).forEach(function(item) { lines.push('- ' + item); });
+        lines.push('### Changed');
+        (release.changed || []).forEach(function(item) { lines.push('- ' + item); });
+        lines.push('### Fixed');
+        (release.fixed || []).forEach(function(item) { lines.push('- ' + item); });
+        return lines.join('\n');
+      }
+
+      function renderReleasePreviewHTML(release) {
+        if (!release) return '<div class="empty-state">No release preview.</div>';
+        var html = '';
+        html += '<div class="content-record-meta">Version: v' + escapeHtml(normalizeVersionToken(release.version || '')) + '</div>';
+        html += '<div class="content-record-summary"><strong>Summary:</strong> ' + escapeHtml(release.summary || '') + '</div>';
+        var sections = [
+          { label: 'Added', items: release.added || [] },
+          { label: 'Changed', items: release.changed || [] },
+          { label: 'Fixed', items: release.fixed || [] }
+        ];
+        sections.forEach(function(section) {
+          if (!section.items.length) return;
+          html += '<div class="content-record-meta" style="margin-top:6px;"><strong>' + escapeHtml(section.label) + '</strong></div>';
+          html += '<ul class="cl-changes-list">';
+          section.items.slice(0, 5).forEach(function(item) {
+            html += '<li>' + escapeHtml(item) + '</li>';
+          });
+          html += '</ul>';
+        });
+        return html;
+      }
+
+      function releaseToHighlights(release) {
+        var highlights = [];
+        (release.added || []).forEach(function(item) { highlights.push('Added: ' + item); });
+        (release.changed || []).forEach(function(item) { highlights.push('Changed: ' + item); });
+        (release.fixed || []).forEach(function(item) { highlights.push('Fixed: ' + item); });
+        return highlights.slice(0, 9);
+      }
+
       async function loadCreativeHub() {
         await loadCreativeEmails();
         await loadNewsletterSubscribers();
