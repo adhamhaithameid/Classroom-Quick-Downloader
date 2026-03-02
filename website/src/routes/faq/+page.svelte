@@ -661,10 +661,10 @@
     box-sizing: border-box;
   }
 
-  .faq-section-head p {
-    margin: 3px 0 0;
-    font-size: 13px;
-    color: var(--text-secondary);
+  .fq-search-input:focus {
+    outline: none;
+    border-color: rgba(26,139,85,0.4);
+    box-shadow: 0 4px 24px rgba(26,139,85,0.08);
   }
 
   .faq-list {
