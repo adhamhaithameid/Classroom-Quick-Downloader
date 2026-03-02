@@ -103,6 +103,7 @@ type DurableStateShape = {
   // CHANGELOG & CONFIG
   // =========================================================================
   changelog: ChangelogEntry[];
+  changelogRevisions: ChangelogRevision[];
   changelogConfig: ChangelogConfig;
 
   // Public website metrics snapshot refreshed on a fixed UTC schedule.
