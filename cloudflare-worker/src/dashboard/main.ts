@@ -4319,6 +4319,39 @@ export function renderDashboard(stats: StatsResponse): string {
       let lastRefreshAt = 0;
       let configDirty = false;
 
+      // Enforce CSRF header for same-origin mutating requests made from dashboard UI.
+      const nativeFetch = window.fetch.bind(window);
+      window.fetch = function patchedFetch(input, init) {
+        try {
+          const requestUrl = (() => {
+            if (typeof input === "string" || input instanceof URL) {
+              return new URL(String(input), window.location.href);
+            }
+            if (input && typeof input.url === "string") {
+              return new URL(input.url, window.location.href);
+            }
+            return null;
+          })();
+          const method = (
+            (init && init.method) ||
+            (input && typeof input === "object" && "method" in input ? input.method : "GET") ||
+            "GET"
+          ).toUpperCase();
+          const isMutating = method !== "GET" && method !== "HEAD" && method !== "OPTIONS";
+          const isSameOrigin = requestUrl && requestUrl.origin === window.location.origin;
+          if (isMutating && isSameOrigin) {
+            const headers = new Headers(init && init.headers ? init.headers : (input && "headers" in input ? input.headers : undefined));
+            if (!headers.has("X-Requested-With")) {
+              headers.set("X-Requested-With", "XMLHttpRequest");
+            }
+            return nativeFetch(input, { ...(init || {}), headers });
+          }
+        } catch (err) {
+          console.warn("fetch patch fallback", err);
+        }
+        return nativeFetch(input, init);
+      };
+
       function formatTs(ts) {
         if (!ts) return "—";
         const d = new Date(ts);
