@@ -17,12 +17,20 @@
     { label: 'Other', icon: '💬' }
   ];
 
-  const featureOptions = [
-    'Batch download',
-    'Single-file buttons',
-    'Classwork tab support',
-    'Stream tab support',
-    'Google Workspace support'
+  const featureOptions: { label: string; icon: string }[] = [
+    { label: 'Download all button', icon: '📥' },
+    { label: 'Single file download buttons', icon: '📄' },
+    { label: 'Edited flag', icon: '✏️' },
+    { label: 'Commented flag', icon: '💬' },
+    { label: 'Both flag', icon: '🔀' },
+    { label: 'Extension popup', icon: '🧩' }
+  ];
+
+  const confidenceOptions: { label: string; icon: string }[] = [
+    { label: 'Very likely', icon: '💚' },
+    { label: 'Maybe', icon: '🤔' },
+    { label: 'Unlikely', icon: '😕' },
+    { label: 'Never', icon: '👋' }
   ];
 
   let selectedReason = '';
