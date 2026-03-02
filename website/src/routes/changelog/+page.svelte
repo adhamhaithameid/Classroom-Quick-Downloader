@@ -650,10 +650,8 @@
       scrollbar-width: none; -ms-overflow-style: none;
       padding-bottom: 2px;
     }
-
-    .sidebar-links::-webkit-scrollbar { display: none; }
-
-    .sidebar-links a {
+    .cl-sidebar-links::-webkit-scrollbar { display: none; }
+    .cl-sidebar-link {
       white-space: nowrap;
       flex-shrink: 0;
     }
