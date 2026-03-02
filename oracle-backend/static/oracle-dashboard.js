@@ -2764,8 +2764,14 @@
       }
 
       async function loadUserChangelogRecords() {
-        var container = document.getElementById('user-changelog-list');
-        if (!container) return;
+        await loadUserChangelogSourceConfig();
+        await refreshUserChangelogPublicPreview();
+      }
+
+      async function loadUserChangelogSourceConfig() {
+        var sourceNode = document.getElementById('user-changelog-source-select');
+        var urlNode = document.getElementById('user-changelog-source-url');
+        if (!sourceNode || !urlNode) return;
         try {
           var payload = await fetchJSON('/api/admin/records/list?type=' + encodeURIComponent(USER_CHANGELOG_RECORD_TYPE));
           var records = Array.isArray(payload.records) ? payload.records : [];
