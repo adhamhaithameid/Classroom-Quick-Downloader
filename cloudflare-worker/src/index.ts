@@ -1247,7 +1247,12 @@ async function proxyToDO(request: Request, env: WorkerEnv): Promise<Response> {
     method: request.method,
     headers: headers,
     redirect: request.redirect,
-  });
+  };
+  if (hasBody) {
+    requestInit.body = request.body;
+    requestInit.duplex = "half";
+  }
+  const newReq = new Request(request.url, requestInit);
 
   const res = await stub.fetch(newReq);
   return withCors(request, res, env);
