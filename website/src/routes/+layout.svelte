@@ -255,7 +255,7 @@
         <a href="{base}/privacy">Privacy</a>
         <a href="{base}/faq">FAQ</a>
         <a href="{base}/changelog">Changelog</a>
-        <a href={STORE_LINKS.github} target="_blank" rel="noopener noreferrer">GitHub</a>
+        <a href={snapshotLinks?.github || STORE_LINKS.github} target="_blank" rel="noopener noreferrer">GitHub</a>
         <a href="mailto:adhamhaithameid@gmail.com">Contact</a>
       </div>
     </div>
