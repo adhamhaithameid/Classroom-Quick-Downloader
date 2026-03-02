@@ -133,6 +133,8 @@
   $: if (animated && hasAnimatedInView) {
     animateTo(value);
   }
+
+  $: formattedValue = new Intl.NumberFormat(undefined, format).format(normalizeForDisplay(displayValue));
 </script>
 
 <span bind:this={hostEl} class="animated-number">
