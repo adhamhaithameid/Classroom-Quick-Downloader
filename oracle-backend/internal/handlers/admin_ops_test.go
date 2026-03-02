@@ -105,7 +105,7 @@ func TestIngestWritesOutboxAndSchemaRegistry(t *testing.T) {
 		t.Fatalf("failed querying schema registry: %v", err)
 	}
 	if schemaPathCount == 0 {
-		t.Fatalf("expected schema drift path to be registered")
+		t.Fatalf("expected schema path to be registered")
 	}
 }
 
