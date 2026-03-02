@@ -278,8 +278,9 @@
     gap: 20px;
   }
 
-  .privacy-section {
-    border: 1px solid var(--border-subtle, rgba(226, 232, 240, 0.35));
+  .prv-card {
+    background: rgba(255, 255, 255, 0.65);
+    border: 1px solid var(--border-subtle);
     border-radius: var(--radius);
     background: rgba(255, 255, 255, 0.55);
     backdrop-filter: blur(10px);
