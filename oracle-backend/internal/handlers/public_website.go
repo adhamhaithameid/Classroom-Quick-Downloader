@@ -348,7 +348,7 @@ func PublicWebsiteOverviewHandler(sqliteDB, postgresDB *sql.DB) http.HandlerFunc
 			return
 		}
 
-		payload, err := buildPublicWebsiteOverview(r.Context(), sqliteDB, store)
+		snapshot, err := loadOrRefreshPublicWebsiteSnapshot(r.Context(), sqliteDB, postgresDB, false)
 		if err != nil {
 			http.Error(w, "failed to build public website overview", http.StatusInternalServerError)
 			return
