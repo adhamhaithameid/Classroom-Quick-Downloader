@@ -391,6 +391,11 @@ func PublicWebsiteSnapshotHandler(sqliteDB, postgresDB *sql.DB) http.HandlerFunc
 			return
 		}
 
+		payload, err := loadOrRefreshPublicWebsiteSnapshot(r.Context(), sqliteDB, postgresDB, false)
+		if err != nil {
+			writePublicWebsiteError(w, http.StatusInternalServerError, "snapshot_build_failed", "Failed to build website snapshot.", true)
+			return
+		}
 		writePublicWebsiteJSON(w, http.StatusOK, payload)
 	}
 }
