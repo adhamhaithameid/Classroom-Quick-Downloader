@@ -130,7 +130,7 @@ async function buildIntegrationContext() {
   const analytics = await import('../entrypoints/utils/analytics/index');
   const changelog = await import('../entrypoints/utils/changelog');
 
-  return { durable, state, fetchSpy, storage, flush, analytics };
+  return { durable, state, fetchSpy, storage, flush, analytics, changelog };
 }
 
 describe('extension <-> cloudflare integration', () => {
