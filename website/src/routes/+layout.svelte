@@ -99,7 +99,8 @@
   }
 
   function handleWindowKeydown(event: KeyboardEvent): void {
-    if (event.key === 'Escape' && mobileNavOpen) {
+    if (event.key !== 'Escape') return;
+    if (mobileNavOpen) {
       closeMobileMenu();
     }
   }
