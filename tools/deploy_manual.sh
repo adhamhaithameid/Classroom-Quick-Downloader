@@ -11,7 +11,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MODE="${1:-help}"
-ORACLE_SSH_DEST="${ORACLE_SSH_DEST:-ubuntu@129.151.233.229}"
+ORACLE_SSH_DEST="${ORACLE_SSH_DEST:-}"
 ORACLE_SSH_KEY="${ORACLE_SSH_KEY:-$HOME/.ssh/oracle_key}"
 ORACLE_REMOTE_REPO_DIR="${ORACLE_REMOTE_REPO_DIR:-\$HOME/Classroom-Quick-Downloader}"
 
