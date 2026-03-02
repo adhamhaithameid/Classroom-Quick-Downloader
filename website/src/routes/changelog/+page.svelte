@@ -541,9 +541,9 @@
     padding-bottom: 24px;
   }
 
-  .sd {
-    font-size: 12px;
-    color: var(--muted);
+  .cl-marker-col {
+    display: flex; flex-direction: column;
+    align-items: center; flex-shrink: 0;
   }
 
   /* ── Timeline ────────────────────── */
