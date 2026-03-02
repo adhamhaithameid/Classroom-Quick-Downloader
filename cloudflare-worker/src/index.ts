@@ -452,6 +452,10 @@ function isKnownCorsRoute(pathname: string): boolean {
   return isPublicCorsRoute(pathname) || isProtectedCorsRoute(pathname);
 }
 
+function isOriginRequiredForPath(pathname: string): boolean {
+  return pathname === "/api/public/website/events";
+}
+
 function normalizeRequestOrigin(request: Request): string | null {
   try {
     return new URL(request.url).origin;
