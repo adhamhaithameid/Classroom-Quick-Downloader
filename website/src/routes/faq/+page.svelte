@@ -366,7 +366,7 @@
           a: 'Use the in-product feedback links or open an issue on GitHub with clear reproduction steps, browser name/version, and what you expected to happen.'
         },
         {
-          id: 'oss-security-report',
+          id: 'dev-security-report',
           q: 'How can I report a security issue responsibly?',
           a: 'Follow the repository\'s security policy (SECURITY.md) and report privately through the documented security contact path instead of posting sensitive details publicly.'
         },
