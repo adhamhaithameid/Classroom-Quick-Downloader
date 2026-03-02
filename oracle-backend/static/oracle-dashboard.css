@@ -2452,4 +2452,5 @@
         font-size: 11px;
       }
       .status-ok { color: var(--success); }
+      .status-warning { color: var(--warning); }
       .status-error { color: var(--danger); }
