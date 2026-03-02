@@ -726,6 +726,348 @@ func ExportHandler(db *sql.DB) http.HandlerFunc {
 }
 
 // ---------------------------------------------------------------------------
+// 6. Visitors Time Series Handler
+// ---------------------------------------------------------------------------
+
+func VisitorsTimeseriesHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		ctx := r.Context()
+		now := time.Now().UTC()
+		q := r.URL.Query()
+
+		fromTime, toTime, rangeName, err := resolveRangeWindow(ctx, db, map[string][]string(q), now, 30)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		gran := strings.ToLower(strings.TrimSpace(q.Get("granularity")))
+		if gran == "" {
+			if rangeName == "today" {
+				gran = "hour"
+			} else {
+				gran = "day"
+			}
+		}
+		if gran != "hour" && gran != "day" {
+			http.Error(w, "invalid granularity (use hour|day)", http.StatusBadRequest)
+			return
+		}
+
+		fromIso := fromTime.UTC().Format(time.RFC3339)
+		toIso := toTime.AddDate(0, 0, 1).UTC().Format(time.RFC3339)
+		points, err := queryWebsiteTrafficTimeseries(ctx, db, fromIso, toIso, gran)
+		if err != nil {
+			http.Error(w, "failed to load visitors timeseries: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if gran == "day" {
+			uniqueByDay, returningByDay, err := queryWebsiteSessionDayStats(ctx, db, fromTime, toTime)
+			if err == nil {
+				for idx := range points {
+					dayKey := points[idx].Timestamp
+					points[idx].UniqueSessions = uniqueByDay[dayKey]
+					points[idx].ReturningSessions = returningByDay[dayKey]
+				}
+			}
+		}
+
+		resp := visitorsTimeseriesResponse{
+			OK:          true,
+			Range:       rangeName,
+			Granularity: gran,
+			From:        fromTime.Format("2006-01-02"),
+			To:          toTime.Format("2006-01-02"),
+			Points:      points,
+			Meta:        buildWindowMeta(now, fromTime, toTime),
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// 7. Funnel Handler
+// ---------------------------------------------------------------------------
+
+func FunnelHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		ctx := r.Context()
+		now := time.Now().UTC()
+		q := r.URL.Query()
+
+		fromTime, toTime, rangeName, err := resolveRangeWindow(ctx, db, map[string][]string(q), now, 30)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		fromIso := fromTime.UTC().Format(time.RFC3339)
+		toIso := toTime.AddDate(0, 0, 1).UTC().Format(time.RFC3339)
+		fromDay := fromTime.UTC().Format("2006-01-02")
+		toDay := toTime.UTC().Format("2006-01-02")
+
+		visits, err := queryWebsiteTrafficWindowTotal(ctx, db, fromIso, toIso, "visits")
+		if err != nil {
+			http.Error(w, "failed to load funnel visits: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		installClicks, err := queryWebsiteEventDailyTotal(ctx, db, fromDay, toDay, "cta", "install_click")
+		if err != nil {
+			http.Error(w, "failed to load funnel install clicks: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		downloadClicks, err := queryWebsiteEventDailyTotal(ctx, db, fromDay, toDay, "cta", "download_click")
+		if err != nil {
+			http.Error(w, "failed to load funnel download clicks: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		actualDownloads, err := queryDownloadsWindowTotal(ctx, db, fromIso, toIso)
+		if err != nil {
+			http.Error(w, "failed to load funnel download totals: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		mapYes, err := queryWebsiteEventDailyTotal(ctx, db, fromDay, toDay, "map", "map_yes")
+		if err != nil {
+			http.Error(w, "failed to load funnel map yes totals: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		stages := []funnelStage{
+			{Key: "visits", Label: "Website Visits", Count: visits},
+			{Key: "install_clicks", Label: "Install Clicks", Count: installClicks},
+			{Key: "download_clicks", Label: "Download Clicks", Count: downloadClicks},
+			{Key: "downloads", Label: "Actual Downloads", Count: actualDownloads},
+			{Key: "map_yes", Label: "Map Prompt Yes", Count: mapYes},
+		}
+		startCount := stages[0].Count
+		prevCount := int64(0)
+		for i := range stages {
+			if i == 0 {
+				stages[i].FromPrev = 1
+				if startCount > 0 {
+					stages[i].FromStart = 1
+				}
+				prevCount = stages[i].Count
+				continue
+			}
+			if prevCount > 0 {
+				stages[i].FromPrev = float64(stages[i].Count) / float64(prevCount)
+			}
+			if startCount > 0 {
+				stages[i].FromStart = float64(stages[i].Count) / float64(startCount)
+			}
+			prevCount = stages[i].Count
+		}
+
+		resp := funnelResponse{
+			OK:     true,
+			Range:  rangeName,
+			From:   fromTime.Format("2006-01-02"),
+			To:     toTime.Format("2006-01-02"),
+			Stages: stages,
+			Meta:   buildWindowMeta(now, fromTime, toTime),
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// 8. Segments Handler
+// ---------------------------------------------------------------------------
+
+func SegmentsHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		ctx := r.Context()
+		now := time.Now().UTC()
+		q := r.URL.Query()
+
+		fromTime, toTime, rangeName, err := resolveRangeWindow(ctx, db, map[string][]string(q), now, 30)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		dim := strings.ToLower(strings.TrimSpace(q.Get("dimension")))
+		if dim == "" {
+			dim = "browser"
+		}
+
+		values := make([]segmentValue, 0, 24)
+		fromIso := fromTime.UTC().Format(time.RFC3339)
+		toIso := toTime.AddDate(0, 0, 1).UTC().Format(time.RFC3339)
+		fromDay := fromTime.UTC().Format("2006-01-02")
+		toDay := toTime.UTC().Format("2006-01-02")
+
+		switch dim {
+		case "browser", "os", "type", "country", "status", "lang", "language", "version", "extversion", "error":
+			column, colErr := columnForDimension(dim)
+			if colErr != nil {
+				http.Error(w, colErr.Error(), http.StatusBadRequest)
+				return
+			}
+			rows, queryErr := queryBreakdown(ctx, db, column, fromIso, toIso)
+			if queryErr != nil {
+				http.Error(w, "failed to load segments: "+queryErr.Error(), http.StatusInternalServerError)
+				return
+			}
+			sort.Slice(rows, func(i, j int) bool { return rows[i].Count > rows[j].Count })
+			for _, row := range rows {
+				values = append(values, segmentValue{Value: row.Value, Count: row.Count})
+				if len(values) >= 30 {
+					break
+				}
+			}
+		case "action":
+			rows, queryErr := queryWebsiteEventGroupBy(ctx, db, "action", fromDay, toDay)
+			if queryErr != nil {
+				http.Error(w, "failed to load action segments: "+queryErr.Error(), http.StatusInternalServerError)
+				return
+			}
+			values = rows
+		case "placement":
+			rows, queryErr := queryWebsiteEventGroupBy(ctx, db, "placement", fromDay, toDay)
+			if queryErr != nil {
+				http.Error(w, "failed to load placement segments: "+queryErr.Error(), http.StatusInternalServerError)
+				return
+			}
+			values = rows
+		case "path", "page_path":
+			rows, queryErr := queryWebsiteRawGroupBy(ctx, db, "page_path", fromTime, toTime)
+			if queryErr != nil {
+				http.Error(w, "failed to load path segments: "+queryErr.Error(), http.StatusInternalServerError)
+				return
+			}
+			values = rows
+		case "device":
+			rows, queryErr := queryWebsiteRawJSONGroupBy(ctx, db, "$.device", fromTime, toTime)
+			if queryErr != nil {
+				http.Error(w, "failed to load device segments: "+queryErr.Error(), http.StatusInternalServerError)
+				return
+			}
+			values = rows
+		case "referrer":
+			rows, queryErr := queryWebsiteRawJSONGroupBy(ctx, db, "$.referrer", fromTime, toTime)
+			if queryErr != nil {
+				http.Error(w, "failed to load referrer segments: "+queryErr.Error(), http.StatusInternalServerError)
+				return
+			}
+			values = rows
+		default:
+			http.Error(w, "invalid dimension", http.StatusBadRequest)
+			return
+		}
+
+		resp := segmentsResponse{
+			OK:        true,
+			Dimension: dim,
+			Range:     rangeName,
+			From:      fromTime.Format("2006-01-02"),
+			To:        toTime.Format("2006-01-02"),
+			Values:    values,
+			Meta:      buildWindowMeta(now, fromTime, toTime),
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// 9. Heatmap Handler
+// ---------------------------------------------------------------------------
+
+func HeatmapHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		ctx := r.Context()
+		now := time.Now().UTC()
+		q := r.URL.Query()
+
+		fromTime, toTime, rangeName, err := resolveRangeWindow(ctx, db, map[string][]string(q), now, 30)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		fromIso := fromTime.UTC().Format(time.RFC3339)
+		toIso := toTime.AddDate(0, 0, 1).UTC().Format(time.RFC3339)
+
+		rows, err := db.QueryContext(
+			ctx,
+			`SELECT
+				CAST(strftime('%w', bucket_start) AS INTEGER) AS dow,
+				CAST(strftime('%H', bucket_start) AS INTEGER) AS hour_utc,
+				COALESCE(SUM(total_downloads), 0) AS total
+			 FROM downloads_hourly
+			 WHERE bucket_start >= ? AND bucket_start < ?
+			 GROUP BY dow, hour_utc`,
+			fromIso,
+			toIso,
+		)
+		if err != nil {
+			http.Error(w, "failed to load heatmap data: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		matrix := make(map[int64]int64, 7*24)
+		for rows.Next() {
+			var dayOfWeek int
+			var hourUTC int
+			var count int64
+			if scanErr := rows.Scan(&dayOfWeek, &hourUTC, &count); scanErr != nil {
+				http.Error(w, "failed to decode heatmap data", http.StatusInternalServerError)
+				return
+			}
+			key := int64(dayOfWeek*100 + hourUTC)
+			matrix[key] = maxInt64(count, 0)
+		}
+		if err := rows.Err(); err != nil {
+			http.Error(w, "failed to read heatmap rows", http.StatusInternalServerError)
+			return
+		}
+
+		cells := make([]heatmapCell, 0, 7*24)
+		for day := 0; day < 7; day += 1 {
+			for hour := 0; hour < 24; hour += 1 {
+				key := int64(day*100 + hour)
+				cells = append(cells, heatmapCell{
+					DayOfWeek: day,
+					HourUTC:   hour,
+					Count:     matrix[key],
+				})
+			}
+		}
+
+		resp := heatmapResponse{
+			OK:    true,
+			Range: rangeName,
+			From:  fromTime.Format("2006-01-02"),
+			To:    toTime.Format("2006-01-02"),
+			Cells: cells,
+			Meta:  buildWindowMeta(now, fromTime, toTime),
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
