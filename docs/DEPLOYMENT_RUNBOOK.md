@@ -383,7 +383,8 @@ docker logs --tail 300 cqd-oracle-backend | rg "deployment auto-sync enabled|dep
 docker logs --tail 300 cqd-oracle-backend | rg "website_traffic_sync"
 
 # Website live checks
-curl -I https://classroom-quick-downloader-website.pages.dev
+curl -I https://<your-root-domain>
+curl -I https://classroom-quick-downloader-website.pages.dev # should redirect to root domain
 curl -I https://not-stable.classroom-quick-downloader-website.pages.dev
 ```
 
