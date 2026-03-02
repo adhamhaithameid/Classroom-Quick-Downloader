@@ -478,6 +478,7 @@
       lastX = e.clientX;
       offset = dragOffset + (e.clientX - startX);
       normalize();
+      applyTransform();
     };
 
     const onUp = (e: PointerEvent) => {
