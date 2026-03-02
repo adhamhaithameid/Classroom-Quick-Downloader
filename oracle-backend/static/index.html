@@ -27,48 +27,87 @@
         </div>
 
         <nav class="sidebar-nav">
-          <div class="nav-section">
-            <div class="nav-label">Sections</div>
-            <button class="nav-item active" data-page="overview" data-shortcut="Cmd+1"
-              data-tooltip="View summary statistics" data-tooltip-position="bottom" aria-label="Overview — summary statistics">
-              <span class="nav-item-emoji" aria-hidden="true">🏠</span>
-              <span class="nav-item-label">Overview</span>
-            </button>
-            <button class="nav-item" data-page="activity" data-shortcut="Cmd+2"
-              data-tooltip="View activity timeline and analytics charts" data-tooltip-position="bottom" aria-label="Activity and Charts — timeline and analytics">
-              <span class="nav-item-emoji" aria-hidden="true">📊</span>
-              <span class="nav-item-label">Activity &amp; Charts</span>
-            </button>
-            <button class="nav-item" data-page="dashboards" data-shortcut="Cmd+3"
-              data-tooltip="Dashboards, deployments, and notifications" data-tooltip-position="bottom" aria-label="Ops Hub — dashboards and deployments">
-              <span class="nav-item-emoji" aria-hidden="true">🛰️</span>
-              <span class="nav-item-label">Ops Hub</span>
-            </button>
-            <button class="nav-item" data-page="website-sync" data-shortcut="Cmd+8"
-              data-tooltip="Website sync batches and public website controls" data-tooltip-position="bottom" aria-label="Website Sync controls">
-              <span class="nav-item-emoji" aria-hidden="true">🌐</span>
-              <span class="nav-item-label">Website Sync</span>
-            </button>
-            <button class="nav-item" data-page="creative" data-shortcut="Cmd+4"
-              data-tooltip="Design, email templates, and newsletter management" data-tooltip-position="bottom" aria-label="Creative Hub — email templates and newsletters">
-              <span class="nav-item-emoji" aria-hidden="true">🎨</span>
-              <span class="nav-item-label">Creative Hub</span>
-            </button>
-            <button class="nav-item" data-page="content-changelog" data-shortcut="Cmd+5"
-              data-tooltip="Manage user-facing changelog content for the public website" data-tooltip-position="bottom" aria-label="User Changelog content manager">
-              <span class="nav-item-emoji" aria-hidden="true">🗞️</span>
-              <span class="nav-item-label">User Changelog</span>
-            </button>
-            <button class="nav-item" data-page="logs" data-shortcut="Cmd+7"
-              data-tooltip="Oracle backend request and admin operation logs" data-tooltip-position="bottom" aria-label="Oracle Logs — backend request and admin logs">
-              <span class="nav-item-emoji" aria-hidden="true">🧾</span>
-              <span class="nav-item-label">Oracle Logs</span>
-            </button>
-            <button class="nav-item" data-page="danger" data-shortcut="Cmd+0"
-              data-tooltip="Critical administrative operations" data-tooltip-position="bottom" aria-label="Danger Zone — critical administrative operations">
-              <span class="nav-item-emoji" aria-hidden="true">☢️</span>
-              <span class="nav-item-label">Danger Zone</span>
-            </button>
+          <div class="nav-section nav-section-groups">
+            <div class="nav-group" data-nav-group="cockpit">
+              <button class="nav-group-toggle" type="button" data-nav-group-toggle="cockpit" aria-expanded="true" aria-controls="nav-group-cockpit">
+                <span class="nav-group-label">Cockpit</span>
+                <span class="nav-group-chevron" aria-hidden="true">▾</span>
+              </button>
+              <div class="nav-group-items" id="nav-group-cockpit">
+                <button class="nav-item active" data-page="overview" data-shortcut="Cmd+1"
+                  data-tooltip="View summary statistics" data-tooltip-position="bottom" aria-label="Overview — summary statistics">
+                  <span class="nav-item-emoji" aria-hidden="true">🏠</span>
+                  <span class="nav-item-label">Overview</span>
+                </button>
+                <button class="nav-item" data-page="dashboards" data-shortcut="Cmd+3"
+                  data-tooltip="Dashboards, deployments, and notifications" data-tooltip-position="bottom" aria-label="Ops Hub — dashboards and deployments">
+                  <span class="nav-item-emoji" aria-hidden="true">🛰️</span>
+                  <span class="nav-item-label">Ops Hub</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="nav-group" data-nav-group="website">
+              <button class="nav-group-toggle" type="button" data-nav-group-toggle="website" aria-expanded="true" aria-controls="nav-group-website">
+                <span class="nav-group-label">Website</span>
+                <span class="nav-group-chevron" aria-hidden="true">▾</span>
+              </button>
+              <div class="nav-group-items" id="nav-group-website">
+                <button class="nav-item" data-page="website-sync" data-shortcut="Cmd+8"
+                  data-tooltip="Website sync batches and public website controls" data-tooltip-position="bottom" aria-label="Website Sync controls">
+                  <span class="nav-item-emoji" aria-hidden="true">🌐</span>
+                  <span class="nav-item-label">Website Sync</span>
+                </button>
+                <button class="nav-item" data-page="website-analysis" data-shortcut="Cmd+6"
+                  data-tooltip="Website click telemetry and feedback analytics" data-tooltip-position="bottom" aria-label="Website Analysis — telemetry analytics">
+                  <span class="nav-item-emoji" aria-hidden="true">📈</span>
+                  <span class="nav-item-label">Website Analysis</span>
+                </button>
+                <button class="nav-item" data-page="content-changelog" data-shortcut="Cmd+5"
+                  data-tooltip="Manage user-facing changelog content for the public website" data-tooltip-position="bottom" aria-label="User Changelog content manager">
+                  <span class="nav-item-emoji" aria-hidden="true">🗞️</span>
+                  <span class="nav-item-label">User Changelog</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="nav-group" data-nav-group="analysis">
+              <button class="nav-group-toggle" type="button" data-nav-group-toggle="analysis" aria-expanded="true" aria-controls="nav-group-analysis">
+                <span class="nav-group-label">Analysis</span>
+                <span class="nav-group-chevron" aria-hidden="true">▾</span>
+              </button>
+              <div class="nav-group-items" id="nav-group-analysis">
+                <button class="nav-item" data-page="activity" data-shortcut="Cmd+2"
+                  data-tooltip="View activity timeline and analytics charts" data-tooltip-position="bottom" aria-label="Activity and Charts — timeline and analytics">
+                  <span class="nav-item-emoji" aria-hidden="true">📊</span>
+                  <span class="nav-item-label">Activity &amp; Charts</span>
+                </button>
+                <button class="nav-item" data-page="creative" data-shortcut="Cmd+4"
+                  data-tooltip="Design, email templates, and newsletter management" data-tooltip-position="bottom" aria-label="Creative Hub — email templates and newsletters">
+                  <span class="nav-item-emoji" aria-hidden="true">🎨</span>
+                  <span class="nav-item-label">Creative Hub</span>
+                </button>
+                <button class="nav-item" data-page="logs" data-shortcut="Cmd+7"
+                  data-tooltip="Oracle backend request and admin operation logs" data-tooltip-position="bottom" aria-label="Oracle Logs — backend request and admin logs">
+                  <span class="nav-item-emoji" aria-hidden="true">🧾</span>
+                  <span class="nav-item-label">Oracle Logs</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="nav-group nav-group-danger" data-nav-group="danger">
+              <button class="nav-group-toggle" type="button" data-nav-group-toggle="danger" aria-expanded="true" aria-controls="nav-group-danger">
+                <span class="nav-group-label">Danger</span>
+                <span class="nav-group-chevron" aria-hidden="true">▾</span>
+              </button>
+              <div class="nav-group-items" id="nav-group-danger">
+                <button class="nav-item" data-page="danger" data-shortcut="Cmd+0"
+                  data-tooltip="Critical administrative operations" data-tooltip-position="bottom" aria-label="Danger Zone — critical administrative operations">
+                  <span class="nav-item-emoji" aria-hidden="true">☢️</span>
+                  <span class="nav-item-label">Danger Zone</span>
+                </button>
+              </div>
+            </div>
           </div>
 
           <!-- <div class="nav-section">
