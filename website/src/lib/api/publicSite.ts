@@ -486,7 +486,8 @@ export async function fetchWebsiteSnapshot(options: { force?: boolean } = {}): P
 }
 
 export async function fetchOverview(): Promise<OverviewResponse> {
-  return fetchOracleOverview();
+  const snapshot = await fetchWebsiteSnapshot();
+  return snapshot.overview;
 }
 
 export async function fetchMapData(): Promise<MapResponse> {
