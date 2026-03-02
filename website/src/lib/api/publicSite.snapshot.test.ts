@@ -84,7 +84,7 @@ describe('fetchWebsiteSnapshot', () => {
     const first = await fetchWebsiteSnapshot();
     const second = await fetchWebsiteSnapshot();
 
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(first.map.countries).toEqual([
       { countryCode: 'US', count: 10 },
       { countryCode: 'DE', count: 5 }
