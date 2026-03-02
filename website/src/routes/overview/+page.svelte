@@ -3134,6 +3134,48 @@
     letter-spacing: -0.02em; margin: 0 0 12px;
   }
   .l2-section-head p { font-size: 16px; color: var(--text-secondary); max-width: 560px; margin: 0 auto; }
+  .l2-data-actions {
+    margin-top: 16px;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .l2-refresh-btn {
+    border: 1px solid rgba(26, 139, 85, 0.24);
+    background: rgba(26, 139, 85, 0.08);
+    color: var(--green);
+    border-radius: 999px;
+    padding: 8px 14px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    transition: all 0.2s ease;
+    cursor: pointer;
+  }
+  .l2-refresh-btn:hover:not(:disabled) {
+    background: rgba(26, 139, 85, 0.14);
+    border-color: rgba(26, 139, 85, 0.36);
+    transform: translateY(-1px);
+  }
+  .l2-refresh-btn:disabled {
+    opacity: 0.55;
+    cursor: wait;
+  }
+  .l2-degraded-pill {
+    border: 1px solid rgba(217, 119, 6, 0.32);
+    background: rgba(217, 119, 6, 0.1);
+    color: #92400e;
+    border-radius: 999px;
+    padding: 7px 12px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
 
   /* ── Feature grid ──────────────────── */
   .l2-feature-grid {
