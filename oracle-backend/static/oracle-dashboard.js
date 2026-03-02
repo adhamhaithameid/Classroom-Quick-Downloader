@@ -1232,6 +1232,7 @@
           activity: ['activity', 'charts'],
           dashboards: ['dashboards', 'deployments', 'notifications'],
           'website-sync': ['website-sync'],
+          'website-analysis': ['website-analysis'],
           creative: ['creative'],
           'content-changelog': ['content-changelog'],
           logs: ['logs'],
