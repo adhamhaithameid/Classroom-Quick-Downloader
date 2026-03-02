@@ -419,8 +419,7 @@
     box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04);
   }
 
-  /* ── Option grid ───────────────────── */
-  .option-grid {
+  .un-card-title-row {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
