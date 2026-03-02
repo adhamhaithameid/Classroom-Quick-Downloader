@@ -53,6 +53,9 @@ type summaryResponse struct {
 	// --- Dashboard Fields ---
 	OK             bool                `json:"ok"`
 	GeneratedAt    int64               `json:"generatedAt"`
+	GeneratedAtUTC string              `json:"generatedAtUtc,omitempty"`
+	WindowStartUTC string              `json:"windowStartUtc,omitempty"`
+	WindowEndUTC   string              `json:"windowEndUtc,omitempty"`
 	Status         string              `json:"status"`
 	Flags          []string            `json:"flags"`
 	TotalDownloads int64               `json:"totalDownloads"`
