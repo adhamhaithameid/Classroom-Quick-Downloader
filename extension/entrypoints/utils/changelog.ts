@@ -397,6 +397,8 @@ export async function isVersionSeen(version: string, data?: ChangelogData | null
  */
 export function getMatchingRule(config: ChangelogConfig | undefined, currentVersion: string): NotificationRule | null {
   if (!config || !config.rules || !config.rules.length) return null;
+  const version = normalizeVersion(currentVersion);
+  if (!version) return null;
 
   // 1. Exact Match
   const exact = config.rules.find(r => r.target === currentVersion);
