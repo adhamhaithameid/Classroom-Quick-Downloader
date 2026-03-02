@@ -83,11 +83,32 @@ describe('public website acceptance contracts', () => {
     expect(payload.status.workerHealth).toBe('up');
   });
 
-  it('accepts user changelog contract from Oracle', async () => {
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
+  it('accepts user changelog contract from Oracle snapshot', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          schemaVersion: '1',
+          ok: true,
+          generatedAt: 1771700000000,
+          snapshotId: 'snapshot-changelog',
+          overview: {
+            ok: true,
+            generatedAt: 1771700000000,
+            totals: { downloads: 1, success: 1, fail: 0 },
+            installs: { usersTotal: 1, lastSyncedAtUtc: 1771700000000, browsers: [] },
+            versions: { github: '1.3.6', chrome: '1.3.6', firefox: null, edge: null },
+            status: { systemLive: true, liveSinceUtc: 1771600000000, workerHealth: 'up' },
+            links: { chrome: 'https://c', firefox: 'https://f', edge: 'https://e', github: 'https://g' }
+          },
+          map: {
+            ok: true,
+            generatedAt: 1771700000000,
+            granularity: 'country',
+            countries: [{ countryCode: 'US', count: 1 }],
+            totals: { countries: 1, downloads: 1 },
+            privacyNote: 'country only'
+          },
+          changelog: {
             ok: true,
             generatedAt: 1771700000000,
             headline: "What's new for students",
