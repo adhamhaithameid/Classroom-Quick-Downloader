@@ -3933,6 +3933,13 @@
             headers: { 'Content-Type': 'application/json' },
             body: '{}'
           });
+          if (data && data.ok === false && data.error === 'sheets_not_configured') {
+            data.troubleshooting = [
+              'Set one of: SHEETS_ID, GOOGLE_SHEETS_ID, or GOOGLE_SHEETS_URL.',
+              'Ensure GOOGLE_CREDS_PATH points to the service-account JSON file.',
+              'Ensure ARCHIVER_SHARED_SECRET and ARCHIVER_API_URL are valid for Oracle archiver calls.'
+            ];
+          }
           setDangerOutput(data);
           await loadFlushInfo();
           showFlushModal();
