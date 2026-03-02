@@ -3448,6 +3448,36 @@
         node.textContent = value;
       }
 
+      function renderWebsiteSyncAnomaly(anomaly) {
+        var banner = document.getElementById('website-sync-anomaly-banner');
+        var messageNode = document.getElementById('website-sync-anomaly-message');
+        var detailsNode = document.getElementById('website-sync-anomaly-details');
+        if (!banner || !messageNode || !detailsNode) return;
+        if (!anomaly || anomaly.active !== true) {
+          banner.classList.add('hidden');
+          messageNode.textContent = '';
+          detailsNode.innerHTML = '';
+          return;
+        }
+        banner.classList.remove('hidden');
+        var source = String(anomaly.source || 'unknown').trim();
+        var detectedAt = Number(anomaly.detectedAt || 0);
+        var prefix = source ? ('Source: ' + source + ' · ') : '';
+        var msg = String(anomaly.message || 'A totals decrease was blocked by monotonic guard.').trim();
+        messageNode.textContent = prefix + msg + (detectedAt > 0 ? (' · ' + fmtUtcDateTimeFromMs(detectedAt)) : '');
+        var details = Array.isArray(anomaly.details) ? anomaly.details : [];
+        if (!details.length) {
+          detailsNode.innerHTML = '';
+          return;
+        }
+        detailsNode.innerHTML = details
+          .slice(0, 8)
+          .map(function(item) {
+            return '<li>' + escapeHtml(String(item || '')) + '</li>';
+          })
+          .join('');
+      }
+
       function formatWebsiteSyncTimestamp(ts) {
         if (!Number.isFinite(Number(ts)) || Number(ts) <= 0) {
           return '--';
