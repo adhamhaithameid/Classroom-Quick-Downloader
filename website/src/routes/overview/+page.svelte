@@ -583,6 +583,56 @@
   function handleGlobalKeydown(event: KeyboardEvent): void {
     if (event.key === 'Escape' && mapExpanded) closeMapExpanded();
     if (event.key === 'Escape' && mediaExpanded) closeMediaExpanded();
+    if (event.key === 'Escape' && pickerOpen) pickerOpen = false;
+
+    if (!editMode || !selectedPlacement) return;
+
+    const target = event.target as HTMLElement | null;
+    if (
+      target &&
+      (target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT' ||
+        target.isContentEditable)
+    ) {
+      return;
+    }
+
+    if (selectedPlacement.locked) return;
+
+    const step = event.shiftKey ? 2 : 0.5;
+
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      event.preventDefault();
+      deleteElement(selectedPlacement.id);
+      return;
+    }
+
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'd') {
+      event.preventDefault();
+      duplicateSelectedElement();
+      return;
+    }
+
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault();
+      nudgeSelected(-step, 0);
+      return;
+    }
+    if (event.key === 'ArrowRight') {
+      event.preventDefault();
+      nudgeSelected(step, 0);
+      return;
+    }
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      nudgeSelected(0, -step);
+      return;
+    }
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      nudgeSelected(0, step);
+    }
   }
 
   function setupReveal(): void {
