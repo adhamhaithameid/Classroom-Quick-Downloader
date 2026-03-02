@@ -460,7 +460,16 @@ function renderReleaseManagementSection(entries: ChangelogEntry[], config: Chang
         </div>
       </div>
       <ul class="cl-changes-list">
-        ${e.changes.map(c => `<li>${escapeHtml(c)}</li>`).join('')}
+        ${
+          (e.summary || (Array.isArray(e.added) && e.added.length) || (Array.isArray(e.changed) && e.changed.length) || (Array.isArray(e.fixed) && e.fixed.length))
+            ? `
+              ${e.summary ? `<li><strong>Summary:</strong> ${escapeHtml(e.summary)}</li>` : ""}
+              ${Array.isArray(e.added) ? e.added.map((c) => `<li><strong>Added:</strong> ${escapeHtml(c)}</li>`).join("") : ""}
+              ${Array.isArray(e.changed) ? e.changed.map((c) => `<li><strong>Changed:</strong> ${escapeHtml(c)}</li>`).join("") : ""}
+              ${Array.isArray(e.fixed) ? e.fixed.map((c) => `<li><strong>Fixed:</strong> ${escapeHtml(c)}</li>`).join("") : ""}
+            `
+            : e.changes.map(c => `<li>${escapeHtml(c)}</li>`).join('')
+        }
       </ul>
     </div>
   `).join('') || `
