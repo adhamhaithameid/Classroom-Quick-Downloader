@@ -21,6 +21,8 @@ const (
 
 	defaultCloudflarePublicSiteMetricsURL = "https://cqd-analytics.adhamhaithameid.workers.dev/public/site-metrics"
 	websiteOpsBodyLimitBytes              = 256 << 10 // 256 KiB
+	websiteAnalyticsMaxPlacements         = 24
+	websiteAnalyticsMaxSeriesDays         = 366
 )
 
 var websiteCloudflarePullHoursUTC = []int{3, 6, 9, 12, 15, 18, 21}
