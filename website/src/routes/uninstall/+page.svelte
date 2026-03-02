@@ -606,9 +606,8 @@
     background: var(--green);
     color: #fff;
     border: none;
-    border-radius: 999px;
-    padding: 12px 28px;
-    font-size: 14px;
+    border-radius: var(--radius-sm);
+    font-size: 15px;
     font-weight: 700;
     cursor: pointer;
     transition: all 0.25s ease;
