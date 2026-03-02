@@ -138,17 +138,7 @@
 </script>
 
 <span bind:this={hostEl} class="animated-number">
-  <NumberFlow
-    value={displayValue}
-    {format}
-    {prefix}
-    {suffix}
-    {animated}
-    transformTiming={noHorizontalTransform}
-    spinTiming={animated ? defaultSpinTiming : undefined}
-    plugins={[continuous]}
-    willChange
-  />
+  {prefix}{formattedValue}{suffix}
 </span>
 
 <style>
