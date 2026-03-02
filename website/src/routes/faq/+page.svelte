@@ -341,7 +341,27 @@
           a: 'The full repository is public on GitHub, including extension, backend, and website code. Anyone can review, fork, or contribute.'
         },
         {
-          id: 'oss-report-bug',
+          id: 'dev-architecture',
+          q: 'What is the extension built with?',
+          a: 'CQD uses the WebExtensions API (Manifest V3 for Chrome/Edge, V2 for Firefox). The content script runs on Google Classroom pages, and a background service worker handles download orchestration.'
+        },
+        {
+          id: 'dev-mv3',
+          q: 'Is CQD Manifest V3 compatible?',
+          a: 'Yes. The Chrome and Edge versions use Manifest V3 with a service worker. The Firefox version uses V2 due to Firefox\'s MV3 adoption timeline. Both share the same core logic.'
+        },
+        {
+          id: 'dev-content-script',
+          q: 'How does the content script work?',
+          a: 'The content script runs on Google Classroom pages, scans the DOM for downloadable attachments, and injects download buttons. It communicates with the background script via message passing for actual download triggering.'
+        },
+        {
+          id: 'dev-backend',
+          q: 'What powers the backend?',
+          a: 'CQD uses a Cloudflare Worker + Durable Object as the ingestion gateway, with a private managed data service for durable telemetry and public snapshots. The website is a SvelteKit static site deployed on Cloudflare Pages.'
+        },
+        {
+          id: 'dev-report-bug',
           q: 'How do I report a bug or request a feature?',
           a: 'Use the in-product feedback links or open an issue on GitHub with clear reproduction steps, browser name/version, and what you expected to happen.'
         },
