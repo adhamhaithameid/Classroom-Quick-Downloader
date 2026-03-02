@@ -315,7 +315,7 @@
     display: flex; flex-direction: column; gap: 8px;
   }
 
-  .privacy-section li {
+  .prv-bullets li {
     position: relative;
     padding-left: 18px;
     color: var(--text-secondary);
