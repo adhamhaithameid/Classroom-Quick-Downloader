@@ -466,9 +466,13 @@
     box-shadow: 0 4px 20px rgba(0,0,0,0.04);
   }
 
-  .action-btn:hover {
-    border-color: rgba(26, 139, 85, 0.25);
-    color: var(--gc-green);
+  .cl-state-error {
+    border-color: rgba(239,68,68,0.2);
+  }
+  .cl-state-warn {
+    border-color: rgba(217,119,6,0.28);
+    background: rgba(255,244,214,0.55);
+    margin-bottom: 18px;
   }
 
   .action-btn:disabled {
