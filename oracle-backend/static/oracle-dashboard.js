@@ -2751,6 +2751,11 @@
         } catch (e) {
           setContentSyncStatus('user-changelog-sync-status', 'Failed to read /api/public/website/changelog', true);
           setContentSyncOutput('user-changelog-output', { ok: false, error: String((e && e.message) || e || 'unknown') });
+          setTextOrPlaceholder('user-changelog-current-source', '--');
+          setTextOrPlaceholder('user-changelog-current-entry-count', '--');
+          setTextOrPlaceholder('user-changelog-current-updated', '--');
+          var currentPreviewFail = document.getElementById('user-changelog-current-preview');
+          if (currentPreviewFail) currentPreviewFail.innerHTML = '<div class="empty-state empty-state-danger">Failed to load live preview.</div>';
         }
       }
 
