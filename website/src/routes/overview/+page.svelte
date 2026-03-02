@@ -1534,14 +1534,7 @@
 
   <!-- ━━━━ How It Works ━━━━ -->
   <section class="l2-block l2-snap">
-    <div class="l2-wrap l2-reveal" style="position:relative">
-      <!-- Steps doodle — cursor click -->
-      <!-- Steps doodle — cursor with click ripple -->
-      <svg class="l2-doodle l2-doodle-steps-1" viewBox="0 0 70 70" fill="none" aria-hidden="true">
-        <path d="M18 10v28l8-6 5 14 6-2-5-14 9 1L18 10z" stroke="var(--green)" stroke-width="1.5" opacity="0.18" fill="var(--green)" fill-opacity="0.04" stroke-linejoin="round"/>
-        <circle cx="18" cy="10" r="8" stroke="var(--green)" stroke-width="1" opacity="0.08"/>
-        <circle cx="18" cy="10" r="14" stroke="var(--green)" stroke-width="0.8" opacity="0.05" stroke-dasharray="3 3"/>
-      </svg>
+    <div class="l2-wrap l2-reveal" data-placement-section="steps" style="position:relative">
       <div class="l2-section-head">
         <span class="l2-label">HOW IT WORKS</span>
         <h2>Three steps. Ten seconds.</h2>
