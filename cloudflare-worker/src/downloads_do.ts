@@ -6401,7 +6401,14 @@ export class DownloadsDurable {
         await this.persist();
       }
 
-      return json({ ok: true, updated });
+      return json({
+        ok: true,
+        updated,
+        entries: [...this.d.changelog].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+        config: this.d.changelogConfig,
+        history: [...(this.d.changelogRevisions || [])].sort((a, b) => b.createdAt - a.createdAt).slice(0, 30),
+        errors: parsedErrors,
+      });
     } catch {
       return json({ ok: false, error: "invalid_payload" }, { status: 400 });
     }
