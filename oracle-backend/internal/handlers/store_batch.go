@@ -225,6 +225,22 @@ func IngestBatchHandlerV4(sqliteDB, postgresDB *sql.DB, sharedSecret string) htt
 	}
 }
 
+func decodeOracleBatchStrict(body []byte, dst *model.OracleBatch) error {
+	dec := json.NewDecoder(bytes.NewReader(body))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(dst); err != nil {
+		return err
+	}
+	var extra any
+	if err := dec.Decode(&extra); err != io.EOF {
+		if err == nil {
+			return errTrailingJSON
+		}
+		return err
+	}
+	return nil
+}
+
 func shouldUsePostgresPrimaryIngest(ctx context.Context, sqliteDB, postgresDB *sql.DB) (bool, error) {
 	if postgresDB == nil {
 		return false, nil
