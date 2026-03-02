@@ -1083,7 +1083,8 @@
     let stopMarquee: (() => void) | undefined;
     let stopHeavierScroll: (() => void) | undefined;
     let stopMapPromptDelay: (() => void) | undefined;
-    detectedBrowser = detectBrowser();
+    let stopPlacementViewportWatcher: (() => void) | undefined;
+    detectedBrowser = detectBrowserFromNavigator();
     reducedMotionPreferred = shouldReduceMotion();
     initSillyState();
     void loadSiteData().then(() => {
