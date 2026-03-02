@@ -1505,7 +1505,7 @@
         {:else if mediaExpanded === 'solution-video'}
           <MediaLoader type="video" src="{base}/videos/solution.mp4" class="l2-media-modal-content" autoplay loop muted playsinline />
         {:else if mediaExpanded === 'problem-flags'}
-          <img class="l2-media-modal-content" src="{base}/images/problem-flags.png" alt="Expanded view" />
+          <MediaLoader type="image" src="{base}/images/problem-flags.webp" class="l2-media-modal-content" alt="Expanded view" />
         {:else if mediaExpanded === 'solution-flags'}
           <img class="l2-media-modal-content" src="{base}/images/solution-flags.png" alt="Expanded view" />
         {/if}
