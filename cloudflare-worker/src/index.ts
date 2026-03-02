@@ -795,17 +795,9 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
           headers: {
             "content-type": "text/html; charset=utf-8",
             "Retry-After": "30",
-            "X-Dependency-Error": "durable-object-unavailable"
-          } 
-        }
-      );
-    }
-    
-    // Handle explicit deny (allowlist enabled and IP not in list)
-    if (!ipCheckResult.allowed) {
-      return new Response(
-        renderLoginPage("Access denied: your IP is not in the allowlist."),
-        { status: 403, headers: { "content-type": "text/html; charset=utf-8" } }
+            "X-Dependency-Error": "durable-object-unavailable",
+          },
+        },
       );
     }
 
