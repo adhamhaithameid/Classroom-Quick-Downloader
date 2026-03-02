@@ -571,8 +571,8 @@ func TestRetentionRunHandler_RawSnapshotsPolicyIsIgnored(t *testing.T) {
 	if err := sqlDB.QueryRow(`SELECT COUNT(*) FROM cf_snapshots_raw`).Scan(&remaining); err != nil {
 		t.Fatalf("failed to query retained raw snapshots: %v", err)
 	}
-	if remaining != 1 {
-		t.Fatalf("expected only recent snapshot to remain, remaining=%d", remaining)
+	if remaining != 2 {
+		t.Fatalf("expected retention run to keep all cf_snapshots_raw rows, remaining=%d", remaining)
 	}
 }
 
