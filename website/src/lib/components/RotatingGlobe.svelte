@@ -311,7 +311,14 @@
     };
 
     applyProjection();
-    animationFrameId = requestAnimationFrame(animate);
+    animationFrameId = scheduleAnimationFrame(animate);
+  }
+
+  function scheduleAnimationFrame(callback: FrameRequestCallback): number {
+    if (typeof window === 'undefined' || typeof window.requestAnimationFrame !== 'function') {
+      return 0;
+    }
+    return window.requestAnimationFrame(callback);
   }
 
   function stopRotationLoop(): void {
