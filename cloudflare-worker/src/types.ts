@@ -440,6 +440,17 @@ export type ChangelogSyncStatus = "idle" | "ok" | "error";
  */
 export interface ChangelogConfig {
   rules: NotificationRule[];
+  applyMode?: ChangelogApplyMode;
+  autoSyncEnabled?: boolean;
+  autoSyncIntervalMinutes?: number;
+  lastAutoSyncAt?: number;
+  lastAutoSyncStatus?: ChangelogSyncStatus;
+  lastAutoSyncError?: string;
+  nextAutoSyncAt?: number;
+  liveHash?: string;
+  markdownSourceUrl?: string;
+  markdownHelpUrl?: string;
+  lastParsedAt?: number;
   lastUpdated?: number;
 }
 
