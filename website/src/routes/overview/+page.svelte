@@ -2078,6 +2078,18 @@
     -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
     animation: gradient-shift 5s ease-in-out infinite;
   }
+  .l2-em-supercharge {
+    position: relative;
+  }
+  .l2-supercharge-star {
+    position: absolute;
+    left: calc(100% + clamp(2px, 0.25vw, 8px));
+    top: 0.08em;
+    pointer-events: none;
+    z-index: 2;
+    animation: none !important;
+    transform-origin: center;
+  }
   .l2-sub {
     font-size: 18px; line-height: 1.7; color: var(--text);
     opacity: 0.7;
