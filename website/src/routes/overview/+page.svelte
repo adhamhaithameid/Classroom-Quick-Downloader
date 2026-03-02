@@ -1477,23 +1477,7 @@
       </div>
 
       <!-- Solution summary -->
-      <div class="l2-ps-solution-summary" bind:this={solutionSectionEl}>
-        <div class="l2-ps-solution-3d" aria-hidden="true" style="transform: translateY({solutionParallaxY}px) rotate(12deg)">
-          <svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" class="l2-solution-3d-icon">
-            <path d="M16 40l44-16 44 16v48l-44 16-44-16V40z" fill="url(#sol-g1)" opacity="0.12"/>
-            <path d="M60 24l44 16v48l-44 16V24z" fill="url(#sol-g2)" opacity="0.18"/>
-            <path d="M16 40l44 16v48L16 88V40z" fill="url(#sol-g3)" opacity="0.08"/>
-            <path d="M60 42v30" stroke="#1a8b55" stroke-width="3.5" stroke-linecap="round"/>
-            <path d="M48 62l12 12 12-12" stroke="#1a8b55" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-            <circle cx="88" cy="36" r="14" fill="#ecfdf5" stroke="#1a8b55" stroke-width="2"/>
-            <path d="M82 36l4 4 8-8" stroke="#1a8b55" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-            <defs>
-              <linearGradient id="sol-g1" x1="60" y1="24" x2="60" y2="104" gradientUnits="userSpaceOnUse"><stop stop-color="#1a8b55"/><stop offset="1" stop-color="#22c55e"/></linearGradient>
-              <linearGradient id="sol-g2" x1="82" y1="24" x2="82" y2="104" gradientUnits="userSpaceOnUse"><stop stop-color="#1a8b55"/><stop offset="1" stop-color="#16a34a"/></linearGradient>
-              <linearGradient id="sol-g3" x1="38" y1="40" x2="38" y2="104" gradientUnits="userSpaceOnUse"><stop stop-color="#22c55e"/><stop offset="1" stop-color="#86efac"/></linearGradient>
-            </defs>
-          </svg>
-        </div>
+      <div class="l2-ps-solution-summary">
         <span class="l2-label">THE SOLUTION</span>
         <h3>One click. Every file. Clear flags. Done.</h3>
         <ul class="l2-check-list">
