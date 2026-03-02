@@ -394,7 +394,9 @@
     }
   ];
 
-  let openId: string | null = sections[0]?.items[0]?.id ?? null;
+  let openIds = new Set<string>([sections[0]?.items[0]?.id ?? '']);
+  let searchQuery = '';
+  let activeSection: string | null = null;
 
   function toggle(id: string): void {
     openId = openId === id ? null : id;
