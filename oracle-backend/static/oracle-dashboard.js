@@ -2352,7 +2352,7 @@
               setStatusUI('✅', 'Live · ' + data.commit, commitHref, tip, false);
             }
           } else {
-            setStatusUI('❓', 'Unknown', '', 'Deployment status unknown', false);
+            setStatusUI('❓', 'Unknown', '', 'Status unknown: backend could not resolve deployment metadata.', false);
           }
         } catch (e) {
           setStatusUI('❌', 'Error', '', 'Failed to load deployment status', false);
