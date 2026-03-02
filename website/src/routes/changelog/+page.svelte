@@ -499,10 +499,10 @@
   .cl-sidebar-card {
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius);
-    background: rgba(255, 255, 255, 0.55);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    padding: 16px;
+    background: rgba(255,255,255,0.6);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    padding: 18px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.04);
   }
 
   .sidebar-label {
