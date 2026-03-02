@@ -4245,6 +4245,7 @@
           ['stepup-btn', openStepUpModal],
           ['log-sort-btn', toggleLogSort],
           ['log-export-btn', exportLogCSV],
+          ['charts-export-active-btn', exportActiveChartCSV],
           ['notifications-refresh-btn', loadNotifications],
           ['website-sync-refresh-btn', loadWebsiteSyncState],
           ['website-sync-force-push-btn', websiteSyncForcePush],
