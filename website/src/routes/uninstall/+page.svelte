@@ -484,11 +484,11 @@
     line-height: 1;
   }
 
-  .option.selected {
-    background: var(--gc-green-bg);
-    border-color: rgba(26, 139, 85, 0.35);
-    color: var(--gc-green);
-    font-weight: 600;
+  .un-pill:hover {
+    border-color: var(--green-border);
+    color: var(--green);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(26, 139, 85, 0.08);
   }
 
   .option.small {
