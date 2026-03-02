@@ -554,13 +554,10 @@
     box-shadow: 0 0 0 4px rgba(26,139,85,0.06);
   }
 
-  .entry {
-    display: grid;
-    grid-template-columns: 28px 1fr;
-    gap: 20px;
-    animation: slideUp 0.5s ease both;
-    opacity: 0;
-    padding-bottom: 32px;
+  .cl-line {
+    width: 2px; flex: 1;
+    background: linear-gradient(180deg, var(--green-light), rgba(87,187,138,0.15));
+    margin-top: 8px; border-radius: 1px;
   }
 
   .marker-col {
