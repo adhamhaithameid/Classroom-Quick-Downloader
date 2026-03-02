@@ -804,13 +804,6 @@ func RetentionRunHandler(sqliteDB, postgresDB *sql.DB) http.HandlerFunc {
 				return
 			}
 		}
-		if isSelected("cf_snapshots_raw") {
-			cutoff := time.Now().UTC().AddDate(0, 0, -getenvIntWithDefault("ORACLE_RETENTION_RAW_SNAPSHOTS_DAYS", defaultRetentionRawSnapshotsDays)).UnixMilli()
-			if err := runSQLite("cf_snapshots_raw", `SELECT COUNT(*) FROM cf_snapshots_raw WHERE received_at < ?`, `DELETE FROM cf_snapshots_raw WHERE received_at < ?`, cutoff); err != nil {
-				http.Error(w, "retention failed", http.StatusInternalServerError)
-				return
-			}
-		}
 		if isSelected("ingest_outbox_sent") {
 			cutoff := time.Now().UTC().AddDate(0, 0, -getenvIntWithDefault("ORACLE_RETENTION_OUTBOX_SENT_DAYS", defaultRetentionOutboxDays)).UnixMilli()
 			if err := runSQLite("ingest_outbox_sent", `SELECT COUNT(*) FROM ingest_outbox WHERE status = 'sent' AND created_at < ?`, `DELETE FROM ingest_outbox WHERE status = 'sent' AND created_at < ?`, cutoff); err != nil {
