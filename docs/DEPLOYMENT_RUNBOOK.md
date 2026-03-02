@@ -195,6 +195,7 @@ In Cloudflare Dashboard:
    - `Account -> Workers Scripts:Edit`
    - `Account -> Workers Tail:Read` (optional but useful)
    - `Account -> Pages:Edit`
+   - `Account -> Analytics:Read`
 4. Scope token to your account (`fc9538cb362e6266eea89037f6347225`).
 5. Create token and copy value once.
 6. Save value to GitHub secret `CLOUDFLARE_API_TOKEN`.
