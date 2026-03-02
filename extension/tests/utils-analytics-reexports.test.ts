@@ -22,4 +22,34 @@ describe('utils/analytics re-exports', () => {
     expect(constants.UNINSTALL_SITE_URL).toBe('https://example.com/cqd/uninstall');
     vi.unstubAllEnvs();
   });
+
+  it('falls back to production worker URL when VITE_WORKER_URL is missing', async () => {
+    vi.resetModules();
+    vi.stubEnv('VITE_WORKER_URL', '');
+    const constants = await import('../entrypoints/utils/analytics/constants');
+    expect(constants.WORKER_BASE_URL).toBe('https://cqd-analytics.adhamhaithameid.workers.dev');
+    expect(constants.CONFIG_URL).toBe('https://cqd-analytics.adhamhaithameid.workers.dev/config');
+    expect(constants.CHANGELOG_URL).toBe('https://cqd-analytics.adhamhaithameid.workers.dev/changelog');
+    expect(constants.TRACK_URL).toBe('https://cqd-analytics.adhamhaithameid.workers.dev/track');
+    vi.unstubAllEnvs();
+  });
+
+  it('falls back to manifest homepage url when site env is missing', async () => {
+    vi.resetModules();
+    vi.unstubAllEnvs();
+
+    const runtimeRecord = chrome.runtime as unknown as Record<string, unknown>;
+    const originalGetManifest = runtimeRecord.getManifest;
+    runtimeRecord.getManifest = vi.fn(() => ({
+      version: '1.3.0-test',
+      homepage_url: 'https://manifest.example/site/',
+    }));
+
+    const constants = await import('../entrypoints/utils/analytics/constants');
+    expect(constants.WEBSITE_BASE_URL).toBe('https://manifest.example/site');
+    expect(constants.CHANGELOG_SITE_URL).toBe('https://manifest.example/site/changelog');
+    expect(constants.UNINSTALL_SITE_URL).toBe('https://manifest.example/site/uninstall');
+
+    runtimeRecord.getManifest = originalGetManifest;
+  });
 });
