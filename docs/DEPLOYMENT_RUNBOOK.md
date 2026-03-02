@@ -388,6 +388,44 @@ curl -I https://classroom-quick-downloader-website.pages.dev # should redirect t
 curl -I https://not-stable.classroom-quick-downloader-website.pages.dev
 ```
 
+### 8.1 Worker telemetry queue operations (admin)
+
+Use these endpoints to inspect and recover website telemetry ingestion state.
+
+```bash
+# Queue and pipeline status
+curl -fsS https://cqd-analytics.adhamhaithameid.workers.dev/admin/website/status \
+  -H 'X-Admin-Secret: <DO_SHARED_SECRET>'
+
+# Force immediate queue flush attempt to Oracle internal endpoint
+curl -fsS -X POST https://cqd-analytics.adhamhaithameid.workers.dev/admin/website/flush-now \
+  -H 'X-Admin-Secret: <DO_SHARED_SECRET>'
+
+# Replay failed batches from DLQ back into the retry queue
+curl -fsS -X POST https://cqd-analytics.adhamhaithameid.workers.dev/admin/website/replay-dlq \
+  -H 'Content-Type: application/json' \
+  -H 'X-Admin-Secret: <DO_SHARED_SECRET>' \
+  -d '{"limit":25}'
+```
+
+Expected checks:
+- `pendingBatches` should decrease after successful flushes.
+- `deadLetterBatches` should move down after replay + successful retries.
+- `lastBatchSentAtUtc` and `lastBatchAckAtUtc` should update after successful Oracle delivery.
+
+### 8.2 Expected output quick reference
+
+Use this table when validating smoke checks.
+
+| Check | Command Pattern | Expected Result |
+|------|------------------|-----------------|
+| Worker health | `curl -fsS $WORKER_BASE/health` | HTTP `200`, JSON `ok=true` |
+| Oracle health | `curl -fsS $ORACLE_BASE/health` | HTTP `200`, JSON `ok=true` |
+| Worker auth gate | `curl -i $WORKER_BASE/admin/website/status` | HTTP `401` or `403` |
+| Oracle auth gate | `curl -i $ORACLE_BASE/api/admin/website/state` | HTTP `401` or `403` |
+| Public snapshot | `curl -fsS $WORKER_BASE/api/public/website/snapshot` | includes `schemaVersion: \"1\"` |
+| Public ingest | `POST /api/public/website/events` | JSON `ok=true` |
+
 ## 9) CI/CD Failure Recovery
 
 ### 9.1 Oracle deploy workflow fails
