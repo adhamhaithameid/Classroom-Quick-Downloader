@@ -518,9 +518,10 @@ func HARuntimeStatusHandler(sqliteDB, postgresDB *sql.DB, guard *StorageGuard, p
 					"error": errorString(sqliteBacklogErr),
 				},
 			},
-			"postgres": postgresStatus,
-			"storage":  storagePayload,
-			"backup":   backupPayload,
+			"postgres":     postgresStatus,
+			"storage":      storagePayload,
+			"backup":       backupPayload,
+			"websiteChain": websiteChainPayload,
 		}
 
 		w.Header().Set("Content-Type", "application/json")
