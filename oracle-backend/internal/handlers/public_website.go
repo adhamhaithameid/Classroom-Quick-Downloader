@@ -354,7 +354,7 @@ func PublicWebsiteOverviewHandler(sqliteDB, postgresDB *sql.DB) http.HandlerFunc
 			return
 		}
 
-		writePublicWebsiteJSON(w, http.StatusOK, payload)
+		writePublicWebsiteJSON(w, http.StatusOK, snapshot.Overview)
 	}
 }
 
