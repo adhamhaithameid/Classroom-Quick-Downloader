@@ -40,6 +40,7 @@
   let queryBrowser: BrowserKey = 'chrome';
   let queryVersion = 'unknown';
   let querySource = 'website';
+  let detectedBrowser: BrowserKey = 'chrome';
 
   let submitState: 'idle' | 'sending' | 'done' | 'error' = 'idle';
   let submitMessage = '';
