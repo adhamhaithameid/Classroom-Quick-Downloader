@@ -1402,6 +1402,43 @@ func defaultPublicWebsiteUserChangelogEntries() []publicWebsiteUserChangelogEntr
 func buildPublicWebsiteUserChangelog(ctx context.Context, store *controlPlaneStore) (publicWebsiteUserChangelogResponse, error) {
 	now := time.Now().UTC().UnixMilli()
 	fullURL := githubMarkdownURL("CHANGELOG.md")
+	config, err := loadPublicWebsiteUserChangelogConfig(ctx, store)
+	if err != nil {
+		return publicWebsiteUserChangelogResponse{}, err
+	}
+
+	if strings.EqualFold(config.Source, "github") {
+		markdownURL := config.MarkdownURL
+		if markdownURL == "" {
+			markdownURL = githubRawMarkdownURL("user-friendly-changelog.md")
+		}
+		markdown, fetchErr := fetchRemoteUserFriendlyChangelogMarkdown(ctx, markdownURL)
+		if fetchErr != nil {
+			logEvent("warn", "public_user_changelog_github_fetch_failed", map[string]interface{}{
+				"error": trimAndLimit(fetchErr.Error(), 240),
+				"url":   trimAndLimit(markdownURL, 240),
+			})
+		} else {
+			releases := parseUserFriendlyChangelogMarkdown(markdown)
+			entries := mapParsedReleasesToChangelogEntries(releases)
+			if len(entries) > 0 {
+				lastUpdated := now
+				return publicWebsiteUserChangelogResponse{
+					SchemaVersion:    publicWebsiteSchemaVersion,
+					OK:               true,
+					GeneratedAt:      now,
+					Source:           "github",
+					SourceURL:        markdownURL,
+					Headline:         "Arc-style release notes for normal users",
+					Description:      "Simple updates focused on what changed and how it helps your day-to-day classroom workflow.",
+					Entries:          entries,
+					FullChangelogURL: fullURL,
+					LastUpdatedAtUTC: &lastUpdated,
+				}, nil
+			}
+		}
+	}
+
 	records, err := store.listRecords(ctx, publicWebsiteUserChangelogRecordType)
 	if err != nil {
 		return publicWebsiteUserChangelogResponse{}, err
