@@ -690,6 +690,112 @@ describe("Worker auth config hardening", () => {
     vi.unstubAllGlobals();
   });
 
+  it("routes website events POST through the DO gateway", async () => {
+    const doFetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const req = input as Request;
+      if (new URL(req.url).pathname === "/api/public/website/events") {
+        expect(req.method).toBe("POST");
+        expect(req.headers.get("content-type")).toContain("application/json");
+        expect(req.headers.get("origin")).toBe("https://website.example");
+        const payload = await req.json() as { events?: unknown[] };
+        expect(Array.isArray(payload.events)).toBe(true);
+        return new Response(
+          JSON.stringify({ ok: true, generatedAt: 1771700000000, acceptedCount: 2, rejectedCount: 0 }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json; charset=utf-8" },
+          },
+        );
+      }
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "content-type": "application/json; charset=utf-8" },
+      });
+    });
+    const namespace = {
+      idFromName: (_name: string) => "downloads-id",
+      get: (_id: string) => ({ fetch: doFetchMock }),
+    };
+    const env = mockEnv({
+      ORACLE_ENDPOINT: "https://oracle.local",
+      DOWNLOADS_DO: namespace as unknown as DurableObjectNamespace,
+      CORS_ALLOWED_ORIGINS: "https://website.example",
+    });
+    const request = new Request("https://example.com/api/public/website/events", {
+      method: "POST",
+      headers: {
+        Origin: "https://website.example",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        schemaVersion: "1",
+        sessionId: "session-1",
+        pagePath: "/overview",
+        events: [
+          { eventId: "evt-1", eventType: "cta", action: "install_click", placement: "hero_install" },
+          { eventId: "evt-2", eventType: "map", action: "map_yes", placement: "map_prompt_yes" },
+        ],
+      }),
+    });
+
+    const res = await worker.fetch(request, env, {} as ExecutionContext);
+    const payload = await res.json() as { ok?: boolean; acceptedCount?: number };
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("https://website.example");
+    expect(payload.ok).toBe(true);
+    expect(payload.acceptedCount).toBe(2);
+    expect(doFetchMock).toHaveBeenCalledTimes(1);
+
+    const methodRejected = await worker.fetch(
+      new Request("https://example.com/api/public/website/events", {
+        method: "GET",
+      }),
+      env,
+      {} as ExecutionContext,
+    );
+    expect(methodRejected.status).toBe(405);
+
+  });
+
+  it("routes /admin/website/replay-dlq through protected admin proxy", async () => {
+    const doFetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const req = input as Request;
+      expect(new URL(req.url).pathname).toBe("/admin/website/replay-dlq");
+      expect(req.method).toBe("POST");
+      expect(req.headers.get("x-admin-secret")).toBe("do-shared-secret");
+      expect(req.headers.get("content-type")).toContain("application/json");
+      const payload = await req.json() as { limit?: number };
+      expect(payload.limit).toBe(3);
+      return new Response(JSON.stringify({ ok: true, replayed: 3, pendingBatches: 5, deadLetterBatches: 0 }), {
+        status: 200,
+        headers: { "content-type": "application/json; charset=utf-8" },
+      });
+    });
+    const namespace = {
+      idFromName: (_name: string) => "downloads-id",
+      get: (_id: string) => ({ fetch: doFetchMock }),
+    };
+    const env = mockEnv({
+      DOWNLOADS_DO: namespace as unknown as DurableObjectNamespace,
+    });
+    const request = new Request("https://example.com/admin/website/replay-dlq", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "X-Admin-Secret": "do-shared-secret",
+      },
+      body: JSON.stringify({ limit: 3 }),
+    });
+
+    const res = await worker.fetch(request, env, {} as ExecutionContext);
+    const payload = await res.json() as { ok?: boolean; replayed?: number };
+
+    expect(res.status).toBe(200);
+    expect(payload.ok).toBe(true);
+    expect(payload.replayed).toBe(3);
+    expect(doFetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("returns 503 for proxied Oracle public routes when ORACLE_ENDPOINT is missing", async () => {
     const env = mockEnv({ ORACLE_ENDPOINT: "" });
     const request = new Request("https://example.com/api/public/website/changelog", {
