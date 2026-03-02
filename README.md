@@ -95,6 +95,16 @@ Downloading class files one-by-one wastes time and focus. CQD makes the common s
 
 ---
 
+<a id="ops-status"></a>
+## 🛠️ Ops Status
+
+- Latest full scan date: `2026-02-28` (security and dependency scans clean).
+- Cloudflare website traffic sync is implemented in Oracle dashboard APIs/UI.
+- Remaining rollout blocker is operational only: attach root custom domain to Cloudflare Pages, then apply redirect/env cutover.
+- Detailed status: [docs/MAJOR_SCAN_2026-02-28.md](docs/MAJOR_SCAN_2026-02-28.md) and [docs/DEPLOYMENT_RUNBOOK.md](docs/DEPLOYMENT_RUNBOOK.md).
+
+---
+
 <a id="backstory"></a>
 ## 📖 Backstory: From Lecture Notes to Real Tool
 
