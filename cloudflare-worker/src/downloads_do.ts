@@ -318,6 +318,38 @@ function cloneCounterMap(input: Record<string, number> | undefined): Record<stri
 const CONFIG_VERSION = 2;
 const DEFAULT_DAILY_FLUSH_WINDOW_START_UTC = 23;
 const DEFAULT_DAILY_FLUSH_WINDOW_MINUTES = 120;
+const WEBSITE_EVENTS_BODY_LIMIT_BYTES = 128 * 1024;
+const WEBSITE_EVENTS_MAX_BATCH = 64;
+const WEBSITE_EVENTS_SCHEMA_VERSION = "1" as const;
+const WEBSITE_EVENTS_MAX_SESSION_ID_LEN = 96;
+const WEBSITE_EVENTS_MAX_PAGE_PATH_LEN = 200;
+const WEBSITE_EVENTS_MAX_PLACEMENT_LEN = 64;
+const WEBSITE_EVENTS_MAX_META_KEYS = 8;
+const WEBSITE_EVENTS_MAX_META_KEY_LEN = 40;
+const WEBSITE_EVENTS_MAX_META_VALUE_STRING_LEN = 120;
+const WEBSITE_EVENT_ID_PATTERN = /^[A-Za-z0-9._:-]{6,120}$/;
+const WEBSITE_EVENT_TYPE_VALUES = ["cta", "map"] as const;
+const WEBSITE_EVENT_ACTION_VALUES = [
+  "install_click",
+  "download_click",
+  "map_yes",
+  "map_no",
+] as const;
+const WEBSITE_EVENT_ACTION_TO_TYPE: Record<(typeof WEBSITE_EVENT_ACTION_VALUES)[number], (typeof WEBSITE_EVENT_TYPE_VALUES)[number]> = {
+  install_click: "cta",
+  download_click: "cta",
+  map_yes: "map",
+  map_no: "map",
+};
+const WEBSITE_EVENT_ROOT_KEYS = new Set(["schemaVersion", "sessionId", "pagePath", "events"]);
+const WEBSITE_EVENT_KEYS = new Set(["eventId", "eventType", "action", "placement", "tsUtc", "meta"]);
+const MAX_DANGER_AUDIT_LOGS = 500;
+const WEBSITE_TELEMETRY_MAX_QUEUE_BATCHES = 4000;
+const WEBSITE_TELEMETRY_MAX_DLQ_BATCHES = 1000;
+const WEBSITE_TELEMETRY_MAX_DEDUPE_IDS = 50_000;
+const WEBSITE_TELEMETRY_MAX_RETRY_ATTEMPTS = 5;
+const WEBSITE_TELEMETRY_RETRY_BASE_MS = 60_000;
+const WEBSITE_TELEMETRY_RETRY_MAX_MS = 6 * 60 * 60 * 1000;
 
 // Quota thresholds (approx. Cloudflare daily request quotas)
 const QUOTA_VERY_SOFT_LIMIT = 30_000;
