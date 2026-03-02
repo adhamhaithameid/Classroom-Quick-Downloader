@@ -253,16 +253,14 @@
         </div>
       </div>
 
-  <!-- Step 3: Notes -->
-  <section class="step">
-    <label class="notes-wrap">
-      <span>Anything else? <em>(optional)</em></span>
-      <textarea
-        bind:value={notes}
-        maxlength="1200"
-        placeholder="What happened, when, and what should change?"
-      ></textarea>
-    </label>
+      <!-- Result Message -->
+      {#if submitMessage}
+        <div class="un-toast" class:ok={submitState === 'done'} class:fail={submitState === 'error'}>
+          <span class="un-toast-icon">{submitState === 'done' ? '✅' : '⚠️'}</span>
+          <span>{submitMessage}</span>
+        </div>
+      {/if}
+    </div>
   </section>
 
   <!-- Actions -->
