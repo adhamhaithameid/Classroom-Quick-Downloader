@@ -103,6 +103,9 @@ func TestHealthDBHandler(t *testing.T) {
 
 func TestScheduleSheetsArchiver_NoSheetConfiguredReturnsImmediately(t *testing.T) {
 	t.Setenv("SHEETS_ID", "")
+	t.Setenv("GOOGLE_SHEETS_ID", "")
+	t.Setenv("GOOGLE_SHEETS_URL", "")
+	t.Setenv("SHEETS_URL", "")
 	done := make(chan struct{})
 	go func() {
 		scheduleSheetsArchiver()
