@@ -15,9 +15,6 @@
   export let rootMargin = '0px 0px -8% 0px';
 
   let hostEl: HTMLSpanElement | null = null;
-  let hasAnimatedInView = false;
-  let isInView = false;
-  let priming = false;
   let displayValue = 0;
   const noHorizontalTransform: EffectTiming = { duration: 0 };
   const defaultSpinTiming: EffectTiming = NumberFlowElement.defaultProps.transformTiming;
