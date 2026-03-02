@@ -384,6 +384,16 @@ export interface Env {
    * No fallback to CORS_ALLOWED_ORIGINS; admin/debug origins must be explicitly set.
    */
   ADMIN_CORS_ALLOWED_ORIGINS?: string;
+  /**
+   * Optional Cloudflare Access enforcement for dashboard/admin routes.
+   * When true, dashboard routes require Access identity headers.
+   */
+  CLOUDFLARE_ACCESS_REQUIRED?: string;
+  /**
+   * Optional comma-separated Access email allowlist.
+   * If configured, access identity email must match one of these entries.
+   */
+  CLOUDFLARE_ACCESS_EMAIL_ALLOWLIST?: string;
 }
 
 /**
