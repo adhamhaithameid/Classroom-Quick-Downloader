@@ -3418,7 +3418,6 @@
     background: linear-gradient(145deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.08));
     pointer-events: none;
     z-index: 0;
-    animation: cta-3d-float 8s ease-in-out infinite;
   }
 
   .l2-cta-3d-center {
