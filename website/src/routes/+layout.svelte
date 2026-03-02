@@ -105,11 +105,15 @@
     }
   }
 
-  $: {
-    const route = $page.url.pathname.replace(/\/$/, '') || '/';
-    isLanding2 = route === '/overview' || route === '/landing2';
-  }
-  $: routeKey = $page.url.pathname;
+  $: route = $page.url.pathname.replace(/\/$/, '') || '/';
+  $: isOverviewStyleRoute =
+    route === '/overview' ||
+    route === '/landing2' ||
+    route === '/404' ||
+    route === '/uninstall' ||
+    route === '/privacy' ||
+    route === '/faq' ||
+    route === '/changelog';
   $: if ($page.url.pathname) {
     mobileNavOpen = false;
   }
