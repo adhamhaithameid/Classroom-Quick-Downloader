@@ -415,6 +415,17 @@
     let velocity = 0;
     let rafId = 0;
     let lastTime = 0;
+    let offset = 0; // current translateX offset (negative = content shifted left)
+
+    const getSetWidth = () => {
+      const sets = track.querySelectorAll('.l2-marquee-set');
+      if (sets.length === 0) return 0;
+      return (sets[0] as HTMLElement).offsetWidth;
+    };
+
+    const applyTransform = () => {
+      track.style.transform = `translateX(${offset}px)`;
+    };
 
     const setInitialOffset = () => {
       const setW = viewport.scrollWidth / duplicateSets;
