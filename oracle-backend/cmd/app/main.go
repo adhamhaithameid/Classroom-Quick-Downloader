@@ -312,7 +312,7 @@ func main() {
 	mux.Handle("/api/admin/deployments/sync", authMiddleware(handlers.DeploymentsSyncHandler(sqlDB, postgresDB, appMetrics)))
 	mux.Handle("/api/admin/dashboard-links", authMiddleware(handlers.DashboardLinksHandler(
 		getenv("CLOUDFLARE_DASHBOARD_URL", "https://cqd-analytics.adhamhaithameid.workers.dev/"),
-		getenv("PUBLIC_SITE_URL", "https://classroom-quick-downloader-website.pages.dev"),
+		getenv("PUBLIC_SITE_URL", ""),
 		getenv("UPTIME_KUMA_URL", "https://cqd-analytics.adhamhaithameid.workers.dev/pipeline-health"),
 		getenv("GITHUB_REPO_URL", "https://github.com/adhamhaithameid/Classroom-Quick-Downloader"),
 		getenv("GOOGLE_SHEETS_URL", "https://docs.google.com/spreadsheets/d/1ptzLKUVnAkyXnT635Zgb1C6Img9aeAZ1se3nRz_QZmI/edit?gid=0#gid=0"),
