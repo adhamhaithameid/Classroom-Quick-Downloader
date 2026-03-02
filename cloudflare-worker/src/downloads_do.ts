@@ -2715,7 +2715,7 @@ export class DownloadsDurable {
       if (!this.isAuthorizedAdmin(request)) {
         return json({ ok: false, error: "unauthorized" }, { status: 401 });
       }
-      return this.handleDebugReset();
+      return this.handleDebugReset(request);
     }
 
     if (pathname === "/admin/force-flush" && request.method === "POST") {
