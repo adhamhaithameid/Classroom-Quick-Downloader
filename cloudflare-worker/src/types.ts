@@ -197,6 +197,7 @@ export interface StatsResponse {
   
   // Changelog data for dashboard
   changelog: ChangelogEntry[];
+  changelogRevisions?: ChangelogRevision[];
   changelogConfig: ChangelogConfig;
 
   // End-to-end delivery metrics chain
