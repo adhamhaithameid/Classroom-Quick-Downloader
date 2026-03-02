@@ -1979,6 +1979,36 @@ export class DownloadsDurable {
       loginAttempts: stored.loginAttempts ?? base.loginAttempts,
       ipAllowlistEnabled: stored.ipAllowlistEnabled ?? base.ipAllowlistEnabled,
       ipAllowlist: Array.isArray(stored.ipAllowlist) ? stored.ipAllowlist : base.ipAllowlist,
+      ipAllowlistStepUpBypassEnabled:
+        typeof stored.ipAllowlistStepUpBypassEnabled === "boolean"
+          ? stored.ipAllowlistStepUpBypassEnabled
+          : base.ipAllowlistStepUpBypassEnabled,
+      dangerActionAuditLogs: (() => {
+        const source = (stored as unknown as Record<string, unknown>).dangerActionAuditLogs;
+        if (!Array.isArray(source)) return [];
+        return source
+          .filter((entry) => isPlainObject(entry))
+          .map((entry) => {
+            const row = entry as Record<string, unknown>;
+            const resultRaw = typeof row.result === "string" ? row.result : "ok";
+            const result: "ok" | "error" = resultRaw === "error" ? "error" : "ok";
+            return {
+              id: trimAndLimitString(row.id, 120) || "",
+              tsUtc: clampInt(row.tsUtc, 0, Number.MAX_SAFE_INTEGER, 0),
+              actorIp: trimAndLimitString(row.actorIp, 120) || "unknown",
+              action: trimAndLimitString(row.action, 80) || "unknown",
+              path: trimAndLimitString(row.path, 120) || "",
+              result,
+              correlationId: trimAndLimitString(row.correlationId, 160) || "",
+              detail: (() => {
+                const value = trimAndLimitString(row.detail, 280);
+                return value || null;
+              })(),
+            };
+          })
+          .filter((entry) => entry.id !== "" && entry.tsUtc > 0)
+          .slice(0, MAX_DANGER_AUDIT_LOGS);
+      })(),
       trackRates: stored.trackRates && typeof stored.trackRates === "object" ? stored.trackRates : base.trackRates,
 
       // Remote config - preserve stored values or use defaults
