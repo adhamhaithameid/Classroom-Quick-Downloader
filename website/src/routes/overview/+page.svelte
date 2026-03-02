@@ -2863,20 +2863,6 @@
     overflow: visible;
   }
 
-  .l2-ps-solution-3d {
-    position: absolute;
-    right: -40px;
-    top: -20px;
-    pointer-events: none;
-    opacity: 0.7;
-    transition: transform 0.1s ease-out;
-  }
-
-  .l2-solution-3d-icon {
-    width: 120px;
-    height: 120px;
-  }
-
   /* ── Top Countries in Map Section ── */
   .l2-map-top-countries {
     display: flex;
