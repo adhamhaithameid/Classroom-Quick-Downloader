@@ -463,10 +463,7 @@
     border-radius: 20px;
     padding: 48px;
     text-align: center;
-    cursor: pointer;
-    font-size: 13px;
-    transition: all 0.25s ease;
-    box-shadow: var(--shadow-sm);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.04);
   }
 
   .action-btn:hover {
