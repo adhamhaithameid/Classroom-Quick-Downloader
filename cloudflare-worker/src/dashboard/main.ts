@@ -6030,8 +6030,6 @@ export function renderDashboard(stats: StatsResponse): string {
             }
             if (btnSaveText) btnSaveText.textContent = "Save Draft";
           }
-
-          sendChangelogUpdate(payload);
         };
       }
 
