@@ -654,6 +654,44 @@
     document.querySelectorAll('.l2-reveal').forEach((el) => observer.observe(el));
   }
 
+  function resetPlacementSectionVisibility(showAll = false): void {
+    if (showAll) {
+      placementSectionVisible = {
+        hero: true,
+        students: true,
+        problem: true,
+        features: true,
+        steps: true,
+        proof: true,
+        map: true,
+        cta: true,
+        general: true
+      };
+      return;
+    }
+    placementSectionVisible = { ...INITIAL_PLACEMENT_SECTION_VISIBILITY };
+  }
+
+  function setPlacementSectionVisible(section: string): void {
+    const normalized = section.trim().toLowerCase();
+    if (
+      normalized !== 'hero' &&
+      normalized !== 'students' &&
+      normalized !== 'problem' &&
+      normalized !== 'features' &&
+      normalized !== 'steps' &&
+      normalized !== 'proof' &&
+      normalized !== 'map' &&
+      normalized !== 'cta' &&
+      normalized !== 'general'
+    ) {
+      return;
+    }
+    const sectionKey = normalized as PlacementSection;
+    if (placementSectionVisible[sectionKey]) return;
+    placementSectionVisible = { ...placementSectionVisible, [sectionKey]: true };
+  }
+
   async function loadSiteData(force = false): Promise<void> {
     mapState = force ? mapState : 'loading';
     mapError = '';
