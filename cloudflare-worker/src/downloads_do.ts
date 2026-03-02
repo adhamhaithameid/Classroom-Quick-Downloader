@@ -4301,6 +4301,21 @@ export class DownloadsDurable {
         warnBufferUtil,
         criticalBufferUtil: critBufferUtil,
       },
+      websiteTelemetry: {
+        pendingBatches: this.d.websiteTelemetryQueue.length,
+        deadLetterBatches: this.d.websiteTelemetryDeadLetter.length,
+        retryCount: this.d.websiteTelemetryQueue.reduce(
+          (max, batch) => Math.max(max, Math.max(0, Math.floor(batch.attempt || 0))),
+          0,
+        ),
+        lastBatchCreatedAtUtc: this.d.websiteTelemetryLastBatchCreatedAt,
+        lastBatchSentAtUtc: this.d.websiteTelemetryLastBatchSentAt,
+        lastBatchAckAtUtc: this.d.websiteTelemetryLastBatchAckAt,
+        lastBatchId: this.d.websiteTelemetryLastBatchID,
+        lastCorrelationId: this.d.websiteTelemetryLastCorrelationID,
+        lastError: this.d.websiteTelemetryLastError,
+        nextRetryAtUtc: this.d.websiteTelemetryQueue[0]?.nextRetryAtUtc ?? null,
+      },
     };
   }
 
