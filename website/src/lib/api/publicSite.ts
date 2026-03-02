@@ -77,7 +77,10 @@ function hydrateSnapshotCacheFromStorage(): void {
   if (snapshotStorageHydrated) return;
   snapshotStorageHydrated = true;
   const persisted = readSnapshotFromStorage();
-  if (persisted) cachedSnapshot = persisted;
+  if (persisted) {
+    cachedSnapshot = persisted;
+    cachedSnapshotSource = 'storage-cache';
+  }
 }
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
