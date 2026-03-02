@@ -1200,7 +1200,8 @@ async function handleProtectedAdminEndpoint(request: Request, env: WorkerEnv): P
     headers.set("X-Geo-Country", country);
   }
 
-  const newReq = new Request(request.url, {
+  const hasBody = request.method !== "GET" && request.method !== "HEAD";
+  const requestInit: RequestInit & { duplex?: "half" } = {
     method: request.method,
     headers: headers,
     body: request.body,
