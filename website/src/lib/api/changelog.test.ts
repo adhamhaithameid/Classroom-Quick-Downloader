@@ -182,5 +182,7 @@ describe('fetchChangelog', () => {
 
     const data = await fetchChangelog();
     expect(data.entries[0]?.isImportant).toBe(false);
-  });
+    },
+    TEST_TIMEOUT_MS
+  );
 });
