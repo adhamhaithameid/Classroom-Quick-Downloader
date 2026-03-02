@@ -18,7 +18,7 @@ describe("resolveOracleEndpoint", () => {
     }
   });
 
-  it("normalizes HTTPS endpoint and strips ingest suffix from base", () => {
+  it("normalizes HTTPS endpoint and strips legacy ingest suffix from base", () => {
     const result = resolveOracleEndpoint("https://oracle.example.com/ingest-batch");
     expect(result.ok).toBe(true);
     if (result.ok) {
