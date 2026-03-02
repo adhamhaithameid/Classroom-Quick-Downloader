@@ -125,10 +125,24 @@ describe('public website acceptance contracts', () => {
             ],
             fullChangelogUrl: 'https://github.com/adhamhaithameid/Classroom-Quick-Downloader/blob/main/CHANGELOG.md',
             lastUpdatedAtUtc: 1771600000000
-          }),
-          { status: 200 }
-        )
-      );
+          },
+          userChangelogSummary: {
+            headline: "What's new for students",
+            description: 'Simple release notes',
+            entriesCount: 1,
+            lastUpdatedAtUtc: 1771600000000,
+            fullChangelogUrl: 'https://github.com/adhamhaithameid/Classroom-Quick-Downloader/blob/main/CHANGELOG.md'
+          },
+          privacy: {
+            headline: 'Privacy',
+            description: 'No raw IP storage',
+            userPrivacyUrl: 'https://classroom-quick-downloader-website.pages.dev/privacy',
+            fullPrivacyUrl: 'https://github.com/adhamhaithameid/Classroom-Quick-Downloader/blob/main/PRIVACY.md'
+          }
+        }),
+        { status: 200 }
+      )
+    );
     vi.stubGlobal('fetch', fetchMock);
 
     const changelog = await fetchUserChangelog();
