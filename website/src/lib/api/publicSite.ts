@@ -537,7 +537,8 @@ export async function submitUninstallFeedback(body: UninstallFeedbackRequest): P
     REQUEST_TIMEOUT_MS
   );
   if (!response.ok) {
-    throw new Error(`Uninstall feedback request failed (${response.status})`);
+    const fallbackMessage = buildRequestErrorMessage(response.status, 'Uninstall feedback');
+    throw new Error(await extractResponseErrorMessage(response, fallbackMessage));
   }
   const payload = await response.json();
   return coerceUninstallSubmitPayload(payload);
