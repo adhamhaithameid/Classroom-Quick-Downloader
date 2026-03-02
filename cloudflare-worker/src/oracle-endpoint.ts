@@ -42,10 +42,12 @@ function normalizeBasePath(pathname: string): string {
   if (!pathname || pathname === "/") return "";
   let normalized = trimTrailingSlashes(pathname);
   if (!normalized || normalized === "/") return "";
-  if (normalized.toLowerCase().endsWith(INGEST_BATCH_PATH)) {
-    normalized = trimTrailingSlashes(
-      normalized.slice(0, normalized.length - INGEST_BATCH_PATH.length),
-    );
+  const normalizedLower = normalized.toLowerCase();
+  for (const suffix of [WEBSITE_INTERNAL_BATCH_PATH, EXTENSION_INGEST_BATCH_PATH]) {
+    if (normalizedLower.endsWith(suffix)) {
+      normalized = trimTrailingSlashes(normalized.slice(0, normalized.length - suffix.length));
+      break;
+    }
   }
   if (!normalized || normalized === "/") return "";
   return normalized;
