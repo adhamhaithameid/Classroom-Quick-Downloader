@@ -468,8 +468,8 @@
     gap: 7px;
     border: 1.5px solid var(--border-subtle);
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.6);
-    padding: 10px 18px;
+    background: rgba(255, 255, 255, 0.8);
+    padding: 11px 20px;
     color: var(--text-secondary);
     cursor: pointer;
     transition: all 0.2s ease;
