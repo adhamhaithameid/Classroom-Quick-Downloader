@@ -720,7 +720,7 @@ func PublicWebsiteUninstallHandler(sqliteDB *sql.DB) http.HandlerFunc {
 			return
 		case http.MethodPost:
 			if strings.TrimSpace(r.Header.Get("X-Requested-With")) != "XMLHttpRequest" {
-				http.Error(w, "missing required header", http.StatusBadRequest)
+				writePublicWebsiteError(w, http.StatusBadRequest, "missing_required_header", "X-Requested-With header is required.", false)
 				return
 			}
 
