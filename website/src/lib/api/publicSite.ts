@@ -497,6 +497,7 @@ export async function fetchMapData(): Promise<MapResponse> {
 
 export function resetWebsiteSnapshotCacheForTests(): void {
   cachedSnapshot = null;
+  cachedSnapshotSource = 'memory-cache';
   snapshotInFlight = null;
   snapshotStorageHydrated = false;
   if (canUseBrowserStorage()) {
