@@ -13,6 +13,7 @@ import {
   DOStateBatch,
   BatchSummary,
   ChangelogEntry,
+  ChangelogRevision,
   ChangelogConfig,
 } from "./types";
 import { resolveOracleEndpoint } from "./oracle-endpoint";
