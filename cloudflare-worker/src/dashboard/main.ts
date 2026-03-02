@@ -422,7 +422,7 @@ function renderNotificationSection(entries: ChangelogEntry[], config: ChangelogC
   `;
 }
 
-function renderReleaseManagementSection(entries: ChangelogEntry[], _config: ChangelogConfig): string {
+function renderReleaseManagementSection(entries: ChangelogEntry[], config: ChangelogConfig): string {
   const sorted = [...entries].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   
   // Versions for DataList
