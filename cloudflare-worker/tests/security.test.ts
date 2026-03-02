@@ -407,6 +407,213 @@ describe("public site metrics snapshot endpoint", () => {
     expect(typeof statusPayload.website?.lastManualFlushAtUtc).toBe("number");
     expect(statusPayload.publicSnapshot?.totals?.downloads).toBe(90);
   });
+
+  it("queues website telemetry at ingress without immediate Oracle dependency", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { obj, state } = makeDOWithEnv({ ORACLE_ENDPOINT: "" });
+    const ingestRes = await callDOWithoutAdmin(
+      obj,
+      "/api/public/website/events",
+      {
+        schemaVersion: "1",
+        sessionId: "session-queue-test",
+        pagePath: "/overview",
+        events: [
+          {
+            eventId: "evt-phase3-queue-1",
+            eventType: "cta",
+            action: "install_click",
+            placement: "hero_install",
+          },
+        ],
+      },
+      {
+        "X-Requested-With": "XMLHttpRequest",
+      },
+    );
+    expect(ingestRes.status).toBe(200);
+    const ingestPayload = await ingestRes.json() as { ok?: boolean; acceptedCount?: number; rejectedCount?: number };
+    expect(ingestPayload.ok).toBe(true);
+    expect(ingestPayload.acceptedCount).toBe(1);
+    expect(ingestPayload.rejectedCount).toBe(0);
+    expect(fetchMock).toHaveBeenCalledTimes(0);
+
+    const stored = await state.storage.get<StoredState>(STORAGE_KEY);
+    expect(Array.isArray(stored?.websiteTelemetryQueue)).toBe(true);
+    expect(stored?.websiteTelemetryQueue?.length).toBe(1);
+    expect(stored?.websiteTelemetryDeadLetter?.length ?? 0).toBe(0);
+
+    vi.unstubAllGlobals();
+  });
+
+  it("flushes queued website telemetry to Oracle internal endpoint and carries correlation id", async () => {
+    const { obj } = makeDOWithEnv({ ORACLE_ENDPOINT: "https://oracle.example.com/ingest-batch" });
+
+    const ingestRes = await callDOWithoutAdmin(
+      obj,
+      "/api/public/website/events",
+      {
+        schemaVersion: "1",
+        sessionId: "session-flush-test",
+        pagePath: "/overview",
+        events: [
+          {
+            eventId: "evt-phase3-flush-1",
+            eventType: "map",
+            action: "map_yes",
+            placement: "map_prompt_yes",
+          },
+        ],
+      },
+      {
+        "X-Requested-With": "XMLHttpRequest",
+      },
+    );
+    expect(ingestRes.status).toBe(200);
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const requestUrl = String(input);
+      expect(requestUrl).toContain("/api/internal/website/events/batch");
+      const headerSource = new Headers(init?.headers);
+      const corr = headerSource.get("x-correlation-id");
+      expect(typeof corr).toBe("string");
+      expect((corr || "").startsWith("wscorr-")).toBe(true);
+      const payload = JSON.parse(String(init?.body || "{}")) as { batchId?: string };
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          batchId: payload.batchId,
+          generatedAt: Date.now(),
+          acceptedCount: 1,
+          rejectedCount: 0,
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        },
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const flushRes = await callDO(obj, "/admin/website/flush-now", {}, { "X-Admin-Secret": "secret" });
+    expect(flushRes.status).toBe(200);
+    const flushPayload = await flushRes.json() as {
+      telemetry?: { ok?: boolean; sentEvents?: number; deadLetteredBatches?: number };
+    };
+    expect(flushPayload.telemetry?.ok).toBe(true);
+    expect(flushPayload.telemetry?.sentEvents).toBe(1);
+    expect(flushPayload.telemetry?.deadLetteredBatches).toBe(0);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    const statusRes = await callDOGetWithAdmin(obj, "/admin/website/status");
+    expect(statusRes.status).toBe(200);
+    const statusPayload = await statusRes.json() as {
+      telemetry?: {
+        pendingBatches?: number;
+        deadLetterBatches?: number;
+        retryCount?: number;
+        lastBatchCreatedAtUtc?: number | null;
+        lastBatchSentAtUtc?: number | null;
+        lastBatchAckAtUtc?: number | null;
+      };
+    };
+    expect(statusPayload.telemetry?.pendingBatches).toBe(0);
+    expect(statusPayload.telemetry?.deadLetterBatches).toBe(0);
+    expect(statusPayload.telemetry?.retryCount).toBe(0);
+    expect(typeof statusPayload.telemetry?.lastBatchCreatedAtUtc).toBe("number");
+    expect(typeof statusPayload.telemetry?.lastBatchSentAtUtc).toBe("number");
+    expect(typeof statusPayload.telemetry?.lastBatchAckAtUtc).toBe("number");
+
+    vi.unstubAllGlobals();
+  });
+
+  it("replays website DLQ batches and flushes them successfully", async () => {
+    const now = Date.now();
+    const { obj } = makeDOWithEnv(
+      { ORACLE_ENDPOINT: "https://oracle.example.com/ingest-batch" },
+      {
+        websiteTelemetryQueue: [],
+        websiteTelemetryDeadLetter: [
+          {
+            schemaVersion: "1",
+            batchId: "ws-dead-letter-1",
+            correlationId: "wscorr-dead-letter-1",
+            generatedAtUtc: now,
+            sessionId: "session-dlq-replay",
+            pagePath: "/overview",
+            events: [
+              {
+                eventId: "evt-dlq-replay-1",
+                eventType: "cta",
+                action: "download_click",
+                placement: "hero_download",
+                tsUtc: now,
+              },
+            ],
+            attempt: 6,
+            nextRetryAtUtc: now + 60_000,
+            lastError: "upstream timeout",
+          },
+        ],
+      },
+    );
+
+    const replayRes = await callDO(obj, "/admin/website/replay-dlq", { limit: 5 }, { "X-Admin-Secret": "secret" });
+    expect(replayRes.status).toBe(200);
+    const replayPayload = await replayRes.json() as {
+      ok?: boolean;
+      replayed?: number;
+      pendingBatches?: number;
+      deadLetterBatches?: number;
+    };
+    expect(replayPayload.ok).toBe(true);
+    expect(replayPayload.replayed).toBe(1);
+    expect(replayPayload.pendingBatches).toBe(1);
+    expect(replayPayload.deadLetterBatches).toBe(0);
+
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const payload = JSON.parse(String(init?.body || "{}")) as { batchId?: string; expectedEventCount?: number };
+      expect(payload.batchId).toBe("ws-dead-letter-1");
+      expect(payload.expectedEventCount).toBe(1);
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          batchId: payload.batchId,
+          generatedAt: Date.now(),
+          acceptedCount: 1,
+          rejectedCount: 0,
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        },
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const flushRes = await callDO(obj, "/admin/website/flush-now", {}, { "X-Admin-Secret": "secret" });
+    expect(flushRes.status).toBe(200);
+    const flushPayload = await flushRes.json() as {
+      telemetry?: {
+        ok?: boolean;
+        sentEvents?: number;
+        deadLetteredBatches?: number;
+      };
+    };
+    expect(flushPayload.telemetry?.ok).toBe(true);
+    expect(flushPayload.telemetry?.sentEvents).toBe(1);
+    expect(flushPayload.telemetry?.deadLetteredBatches).toBe(0);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    vi.unstubAllGlobals();
+  });
 });
 
 describe("Durable Object security behaviors", () => {
