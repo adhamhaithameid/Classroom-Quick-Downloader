@@ -540,8 +540,9 @@
     color: var(--text-secondary);
     cursor: pointer;
     transition: all 0.2s ease;
-    -webkit-appearance: none;
-    appearance: none;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: var(--font-ui), sans-serif;
   }
 
   .field select:focus {
