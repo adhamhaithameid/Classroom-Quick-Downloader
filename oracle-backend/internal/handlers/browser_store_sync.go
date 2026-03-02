@@ -97,6 +97,7 @@ type deploymentSyncResult struct {
 type storeStats struct {
 	users       string
 	usersCount  int64
+	usersMetric string
 	version     string
 	rating      string
 	ratingCount int64
