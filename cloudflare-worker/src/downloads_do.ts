@@ -3957,6 +3957,13 @@ export class DownloadsDurable {
       this.d.websiteOverrideCountries = normalizePublicSiteCountryList(body.countries);
     }
 
+    this.appendDangerAudit(
+      request,
+      "website_override",
+      "/admin/website/override",
+      "ok",
+      `enabled=${String(this.d.websiteOverrideEnabled)}`,
+    );
     await this.persist();
     const now = Date.now();
     const slotKey = makeSlotKey(now);
