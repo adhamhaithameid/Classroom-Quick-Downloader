@@ -201,7 +201,7 @@
               {item.label}
             </a>
           {/each}
-          <a href={STORE_LINKS.github} target="_blank" rel="noopener noreferrer" on:click={closeMobileMenu}>
+          <a href={snapshotLinks?.github || STORE_LINKS.github} target="_blank" rel="noopener noreferrer" on:click={closeMobileMenu}>
             GitHub
           </a>
         </nav>
