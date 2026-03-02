@@ -472,6 +472,9 @@ func syncDeploymentTargets(
 			}
 			data["syncStatus"] = "ok"
 			data["syncError"] = ""
+			if stats.source != "" {
+				data["syncSource"] = stats.source
+			}
 			data["syncLatencyMs"] = latencyMs
 			data["syncedAt"] = nowMs
 
