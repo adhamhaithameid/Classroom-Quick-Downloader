@@ -422,11 +422,10 @@
     max-width: 520px; margin: 0 auto 20px;
   }
 
-  h1 {
-    margin: 0;
-    font-size: clamp(28px, 4vw, 40px);
-    font-weight: 800;
-    letter-spacing: -0.03em;
+  .cl-label {
+    font-size: 12px; font-weight: 700; color: var(--green);
+    letter-spacing: 0.08em; text-transform: uppercase;
+    display: block; margin-bottom: 12px;
   }
 
   .header-sub {
