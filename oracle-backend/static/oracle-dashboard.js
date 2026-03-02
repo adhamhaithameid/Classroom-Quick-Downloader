@@ -3161,6 +3161,280 @@
         }
       }
 
+      function setWebsiteAnalysisText(id, value) {
+        var node = document.getElementById(id);
+        if (!node) return;
+        node.textContent = value;
+      }
+
+      function setWebsiteAnalysisTableState(tableBodyId, html, emptyLabel, colSpan) {
+        var body = document.getElementById(tableBodyId);
+        if (!body) return;
+        if (html) {
+          body.innerHTML = html;
+          return;
+        }
+        body.innerHTML = '<tr><td colspan="' + String(colSpan || 1) + '" class="td-primary">' + escapeHtml(emptyLabel || 'No data') + '</td></tr>';
+      }
+
+      function setWebsiteAnalysisOutput(payload) {
+        var out = document.getElementById('website-analysis-output');
+        if (!out) return;
+        out.textContent = JSON.stringify(payload || {}, null, 2);
+        out.classList.remove('hidden');
+      }
+
+      function setWebsiteChainStatus(id, label, status) {
+        var node = document.getElementById(id);
+        if (!node) return;
+        node.textContent = label;
+        node.classList.remove('status-ok', 'status-warning', 'status-error');
+        if (status === 'ok') node.classList.add('status-ok');
+        else if (status === 'warn') node.classList.add('status-warning');
+        else if (status === 'critical') node.classList.add('status-error');
+      }
+
+      function resetWebsiteChainHealth(reason) {
+        setWebsiteAnalysisText('website-chain-last-batch-accepted', '--');
+        setWebsiteAnalysisText('website-chain-last-snapshot', '--');
+        setWebsiteAnalysisText('website-chain-lag-minutes', '--');
+        setWebsiteAnalysisText('website-chain-thresholds-lag', '--');
+        setWebsiteAnalysisText('website-chain-thresholds-backup', '--');
+        setWebsiteAnalysisText('website-chain-thresholds-sheets', '--');
+        setWebsiteAnalysisText('website-chain-thresholds-integrity', '--');
+        setWebsiteChainStatus('website-chain-lag-status', '--', 'critical');
+        setWebsiteChainStatus('website-chain-backup-status', '--', 'critical');
+        setWebsiteChainStatus('website-chain-sheets-status', '--', 'critical');
+        setWebsiteChainStatus('website-chain-batch-integrity-status', '--', 'critical');
+        if (reason) {
+          setWebsiteAnalysisOutput({ ok: false, source: 'website_chain', error: reason });
+        }
+      }
+
+      async function loadWebsiteChainHealth() {
+        var data = await fetchJSON('/api/admin/ha/status');
+        var chain = data && data.websiteChain ? data.websiteChain : {};
+        var thresholds = chain && chain.thresholds ? chain.thresholds : {};
+        var lastBatch = chain && chain.lastBatchAccepted ? chain.lastBatchAccepted : null;
+        var lastSnapshot = chain && chain.lastSnapshotGenerated ? chain.lastSnapshotGenerated : null;
+        var lagMinutes = Number(chain && chain.lagMinutes);
+        var lagStatus = String(chain && chain.lagStatus || 'unknown').trim().toLowerCase();
+
+        var backup = chain && chain.backupDrift ? chain.backupDrift : {};
+        var backupIndicator = String(backup.indicator || 'unknown').trim().toLowerCase();
+        var backupDrift = Number(backup.driftMinutes);
+        var backupStatus = String(backup.status || 'unknown').trim();
+
+        var sheets = chain && chain.sheetsFlushVerification ? chain.sheetsFlushVerification : {};
+        var sheetsIndicator = String(sheets.indicator || 'unknown').trim().toLowerCase();
+        var sheetsDrift = Number(sheets.driftMinutes);
+        var sheetsStatus = String(sheets.status || 'unknown').trim();
+        var sheetsVerified = sheets.verified === true;
+        var sheetsChecksumStatus = String(sheets.checksumStatus || 'unknown').trim().toLowerCase();
+        var sheetsRowCountStatus = String(sheets.rowCountStatus || 'unknown').trim().toLowerCase();
+
+        var integrity = chain && chain.batchIntegrity ? chain.batchIntegrity : {};
+        var integrityStatus = String(integrity.status || 'unknown').trim().toLowerCase();
+        var integrityVerified = integrity.verified === true;
+        var integrityChecksumStatus = String(integrity.checksumStatus || 'unknown').trim().toLowerCase();
+        var integrityRowCountStatus = String(integrity.rowCountStatus || 'unknown').trim().toLowerCase();
+
+        setWebsiteAnalysisText(
+          'website-chain-last-batch-accepted',
+          lastBatch && Number(lastBatch.acceptedAtUtc || 0) > 0 ? formatWebsiteSyncTimestamp(Number(lastBatch.acceptedAtUtc || 0)) : '--'
+        );
+        setWebsiteAnalysisText(
+          'website-chain-last-snapshot',
+          lastSnapshot && Number(lastSnapshot.generatedAtUtc || 0) > 0 ? formatWebsiteSyncTimestamp(Number(lastSnapshot.generatedAtUtc || 0)) : '--'
+        );
+        setWebsiteAnalysisText(
+          'website-chain-lag-minutes',
+          Number.isFinite(lagMinutes) ? (fmtNumber(lagMinutes) + ' min') : '--'
+        );
+        setWebsiteAnalysisText(
+          'website-chain-thresholds-lag',
+          'Warn ≥ ' + fmtNumber(Number(thresholds.lagWarnMinutes || 0)) + 'm · Critical ≥ ' + fmtNumber(Number(thresholds.lagCriticalMinutes || 0)) + 'm'
+        );
+        setWebsiteAnalysisText(
+          'website-chain-thresholds-backup',
+          'Expected ≤ ' + fmtNumber(Number(thresholds.backupExpectedMinutes || 0)) + 'm · Critical ≥ ' + fmtNumber(Number(thresholds.backupCriticalMinutes || 0)) + 'm'
+        );
+        setWebsiteAnalysisText(
+          'website-chain-thresholds-sheets',
+          'Expected ≤ ' + fmtNumber(Number(thresholds.sheetsExpectedMinutes || 0)) + 'm · Critical ≥ ' + fmtNumber(Number(thresholds.sheetsCriticalMinutes || 0)) + 'm'
+        );
+        setWebsiteAnalysisText(
+          'website-chain-thresholds-integrity',
+          'Checksum: ' + (integrityChecksumStatus || 'unknown').toUpperCase() + ' · Row count: ' + (integrityRowCountStatus || 'unknown').toUpperCase()
+        );
+
+        setWebsiteChainStatus('website-chain-lag-status', (lagStatus || 'unknown').toUpperCase(), lagStatus);
+        setWebsiteChainStatus(
+          'website-chain-backup-status',
+          backupStatus + (Number.isFinite(backupDrift) ? (' · drift ' + fmtNumber(backupDrift) + 'm') : ''),
+          backupIndicator
+        );
+        setWebsiteChainStatus(
+          'website-chain-sheets-status',
+          (sheetsVerified ? 'VERIFIED' : (sheetsStatus || 'unknown').toUpperCase()) +
+            ' · checksum ' + (sheetsChecksumStatus || 'unknown').toUpperCase() +
+            ' · rows ' + (sheetsRowCountStatus || 'unknown').toUpperCase() +
+            (Number.isFinite(sheetsDrift) ? (' · drift ' + fmtNumber(sheetsDrift) + 'm') : ''),
+          sheetsVerified ? 'ok' : sheetsIndicator
+        );
+        setWebsiteChainStatus(
+          'website-chain-batch-integrity-status',
+          (integrityVerified ? 'VERIFIED' : (integrityStatus || 'unknown').toUpperCase()) +
+            ' · checksum ' + (integrityChecksumStatus || 'unknown').toUpperCase() +
+            ' · rows ' + (integrityRowCountStatus || 'unknown').toUpperCase(),
+          integrityVerified ? 'ok' : (integrityStatus === 'critical' ? 'critical' : integrityStatus)
+        );
+      }
+
+      async function loadWebsiteAnalytics(rangeOverride) {
+        if (typeof rangeOverride !== 'string') {
+          rangeOverride = '';
+        }
+        var rangeEl = document.getElementById('website-analysis-range');
+        var range = String(rangeOverride || (rangeEl && rangeEl.value) || websiteAnalyticsRange || '7d').trim() || '7d';
+        websiteAnalyticsRange = range;
+        if (rangeEl && rangeEl.value !== range) {
+          rangeEl.value = range;
+        }
+
+        try {
+          var data = await fetchJSON('/api/admin/website/analytics?range=' + encodeURIComponent(range));
+          var buttons = data.buttons || {};
+          var map = data.map || {};
+          var feedback = data.feedback || {};
+          var traffic = data.traffic || {};
+
+          var installClicks = Number(buttons.installClicks || 0);
+          var downloadClicks = Number(buttons.downloadClicks || 0);
+          var mapYes = Number(map.yes || 0);
+          var mapNo = Number(map.no || 0);
+          var yesRatio = Number(map.yesRatio || 0);
+          var feedbackTotal = Number(feedback.totalSubmissions || 0);
+          var feedbackLast = Number(feedback.lastSubmissionAtUtc || 0);
+          var trafficVisits = Number(traffic.visits || 0);
+          var trafficRequests = Number(traffic.requests || 0);
+          var trafficLastSync = Number(traffic.lastSyncedAtUtc || 0);
+          var trafficStatus = String(traffic.status || 'no_data').replace(/_/g, ' ');
+
+          setWebsiteAnalysisText('website-analysis-install-clicks', fmtNumber(installClicks));
+          setWebsiteAnalysisText('website-analysis-download-clicks', fmtNumber(downloadClicks));
+          setWebsiteAnalysisText('website-analysis-map-yes', fmtNumber(mapYes));
+          setWebsiteAnalysisText('website-analysis-map-no', fmtNumber(mapNo));
+          setWebsiteAnalysisText('website-analysis-map-yes-ratio', fmtPct(Math.max(0, Math.min(yesRatio, 1))));
+          setWebsiteAnalysisText('website-analysis-feedback-total', fmtNumber(feedbackTotal));
+          setWebsiteAnalysisText('website-analysis-feedback-last', feedbackLast > 0 ? formatWebsiteSyncTimestamp(feedbackLast) : '--');
+          setWebsiteAnalysisText('website-analysis-traffic-visits', fmtNumber(trafficVisits));
+          setWebsiteAnalysisText('website-analysis-traffic-requests', fmtNumber(trafficRequests));
+          setWebsiteAnalysisText('website-analysis-traffic-status', trafficStatus);
+          setWebsiteAnalysisText('website-analysis-traffic-last-sync', trafficLastSync > 0 ? formatWebsiteSyncTimestamp(trafficLastSync) : '--');
+
+          var daily = Array.isArray(data.daily) ? data.daily : [];
+          var dailyHtml = '';
+          daily.forEach(function(row) {
+            dailyHtml += '<tr>';
+            dailyHtml += '<td class="td-primary">' + escapeHtml(String(row.dayUtc || '--')) + '</td>';
+            dailyHtml += '<td>' + escapeHtml(fmtNumber(Number(row.installClicks || 0))) + '</td>';
+            dailyHtml += '<td>' + escapeHtml(fmtNumber(Number(row.downloadClicks || 0))) + '</td>';
+            dailyHtml += '<td>' + escapeHtml(fmtNumber(Number(row.mapYes || 0))) + '</td>';
+            dailyHtml += '<td>' + escapeHtml(fmtNumber(Number(row.mapNo || 0))) + '</td>';
+            dailyHtml += '<td>' + escapeHtml(fmtNumber(Number(row.feedbackSubmissions || 0))) + '</td>';
+            dailyHtml += '</tr>';
+          });
+          setWebsiteAnalysisTableState('website-analysis-daily-body', dailyHtml, 'No daily website telemetry yet.', 6);
+
+          var trafficDaily = Array.isArray(data.trafficDaily) ? data.trafficDaily : [];
+          var trafficDailyHtml = '';
+          trafficDaily.forEach(function(row) {
+            trafficDailyHtml += '<tr>';
+            trafficDailyHtml += '<td class="td-primary">' + escapeHtml(String(row.dayUtc || '--')) + '</td>';
+            trafficDailyHtml += '<td>' + escapeHtml(fmtNumber(Number(row.visits || 0))) + '</td>';
+            trafficDailyHtml += '<td>' + escapeHtml(fmtNumber(Number(row.requests || 0))) + '</td>';
+            trafficDailyHtml += '</tr>';
+          });
+          setWebsiteAnalysisTableState('website-analysis-traffic-daily-body', trafficDailyHtml, 'No daily Cloudflare traffic yet.', 3);
+
+          var placements = Array.isArray(data.placements) ? data.placements : [];
+          var placementsHtml = '';
+          placements.forEach(function(row) {
+            placementsHtml += '<tr>';
+            placementsHtml += '<td class="td-primary">' + escapeHtml(String(row.placement || 'unknown')) + '</td>';
+            placementsHtml += '<td>' + escapeHtml(String(row.action || 'unknown')) + '</td>';
+            placementsHtml += '<td>' + escapeHtml(fmtNumber(Number(row.count || 0))) + '</td>';
+            placementsHtml += '</tr>';
+          });
+          setWebsiteAnalysisTableState('website-analysis-placements-body', placementsHtml, 'No placement telemetry yet.', 3);
+
+          var reasons = Array.isArray(feedback.topReasons) ? feedback.topReasons : [];
+          var reasonsHtml = '';
+          reasons.forEach(function(row) {
+            reasonsHtml += '<tr>';
+            reasonsHtml += '<td class="td-primary">' + escapeHtml(String(row.reason || 'Unknown')) + '</td>';
+            reasonsHtml += '<td>' + escapeHtml(fmtNumber(Number(row.count || 0))) + '</td>';
+            reasonsHtml += '</tr>';
+          });
+          setWebsiteAnalysisTableState('website-analysis-feedback-reasons-body', reasonsHtml, 'No feedback reasons yet.', 2);
+
+          var feedbackDaily = Array.isArray(feedback.dailySubmissions) ? feedback.dailySubmissions : [];
+          var feedbackDailyHtml = '';
+          var feedbackPeak = 0;
+          feedbackDaily.forEach(function(row) {
+            var submissions = Number(row.submissions || 0);
+            if (submissions > feedbackPeak) feedbackPeak = submissions;
+            feedbackDailyHtml += '<tr>';
+            feedbackDailyHtml += '<td class="td-primary">' + escapeHtml(String(row.dayUtc || '--')) + '</td>';
+            feedbackDailyHtml += '<td>' + escapeHtml(fmtNumber(submissions)) + '</td>';
+            feedbackDailyHtml += '</tr>';
+          });
+          setWebsiteAnalysisTableState('website-analysis-feedback-daily-body', feedbackDailyHtml, 'No daily feedback yet.', 2);
+
+          var feedbackBrowsers = Array.isArray(feedback.byBrowser) ? feedback.byBrowser : [];
+          var topBrowser = feedbackBrowsers.length ? String(feedbackBrowsers[0].reason || '--') : '--';
+          var topReason = reasons.length ? String(reasons[0].reason || '--') : '--';
+          setWebsiteAnalysisText('website-analysis-feedback-top-browser', topBrowser);
+          setWebsiteAnalysisText('website-analysis-feedback-top-reason', topReason);
+          setWebsiteAnalysisText('website-analysis-feedback-daily-peak', feedbackDaily.length ? fmtNumber(feedbackPeak) : '--');
+
+          setWebsiteAnalysisOutput(data);
+          await loadWebsiteChainHealth();
+        } catch (e) {
+          setWebsiteAnalysisOutput({ ok: false, error: String((e && e.message) || e || 'unknown') });
+          setWebsiteAnalysisTableState('website-analysis-daily-body', '', 'Failed to load daily telemetry.', 6);
+          setWebsiteAnalysisTableState('website-analysis-traffic-daily-body', '', 'Failed to load Cloudflare traffic.', 3);
+          setWebsiteAnalysisTableState('website-analysis-placements-body', '', 'Failed to load placement telemetry.', 3);
+          setWebsiteAnalysisTableState('website-analysis-feedback-reasons-body', '', 'Failed to load feedback summary.', 2);
+          setWebsiteAnalysisTableState('website-analysis-feedback-daily-body', '', 'Failed to load feedback timeline.', 2);
+          setWebsiteAnalysisText('website-analysis-traffic-visits', '--');
+          setWebsiteAnalysisText('website-analysis-traffic-requests', '--');
+          setWebsiteAnalysisText('website-analysis-traffic-status', '--');
+          setWebsiteAnalysisText('website-analysis-traffic-last-sync', '--');
+          setWebsiteAnalysisText('website-analysis-feedback-top-browser', '--');
+          setWebsiteAnalysisText('website-analysis-feedback-top-reason', '--');
+          setWebsiteAnalysisText('website-analysis-feedback-daily-peak', '--');
+          resetWebsiteChainHealth();
+        }
+      }
+
+      async function websiteTrafficSyncNow() {
+        var ok = await ensureStepUp();
+        if (!ok) return;
+        try {
+          var payload = await fetchJSONWithInit('/api/admin/website/traffic/refresh', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+          });
+          setWebsiteAnalysisOutput(payload);
+          await loadWebsiteAnalytics();
+        } catch (e) {
+          setWebsiteAnalysisOutput({ ok: false, error: String(e) });
+        }
+      }
+
       function setWebsiteSyncOutput(payload) {
         var out = document.getElementById('website-sync-output');
         if (!out) return;
