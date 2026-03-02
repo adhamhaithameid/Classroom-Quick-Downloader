@@ -3794,6 +3794,13 @@ export class DownloadsDurable {
         },
         countries: effectiveSnapshot.countries,
       },
+      security: {
+        ipAllowlistEnabled: this.d.ipAllowlistEnabled,
+        stepUpBypassEnabled: this.d.ipAllowlistStepUpBypassEnabled,
+        dangerAuditRecent: [...this.d.dangerActionAuditLogs]
+          .sort((a, b) => b.tsUtc - a.tsUtc)
+          .slice(0, 25),
+      },
     });
   }
 
