@@ -97,6 +97,16 @@
           id: 'install-size',
           q: 'How large is the extension?',
           a: 'The extension is very lightweight — under 200KB. It has no external dependencies and does not load any third-party scripts.'
+        },
+        {
+          id: 'install-brave',
+          q: 'Does it work on Brave with Shields enabled?',
+          a: 'Yes. CQD works normally with Brave Shields enabled since it operates entirely within Google Classroom\'s existing page context and doesn\'t inject cross-site resources.'
+        },
+        {
+          id: 'install-chromebook',
+          q: 'Can I use it on a Chromebook?',
+          a: 'Absolutely. Chromebooks support Chrome extensions natively. Install CQD from the Chrome Web Store and it will work the same as on any desktop Chrome browser.'
         }
       ]
     },
