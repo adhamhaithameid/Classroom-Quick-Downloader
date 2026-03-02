@@ -354,7 +354,7 @@
         </div>
       {/if}
     </div>
-  {/if}
+  </section>
 </div>
 
 <style>
