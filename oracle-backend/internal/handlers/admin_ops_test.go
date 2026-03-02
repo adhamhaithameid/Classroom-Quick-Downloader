@@ -1141,10 +1141,11 @@ func TestIngestRawSnapshotRedactsIPData(t *testing.T) {
 		"timeZone":"UTC",
 		"summary":{"totals":{"totalEvents":1,"totalDownloads":1,"totalSuccess":1,"totalFail":0}},
 		"timeBuckets":[],
-		"doState":{"ok":true},
-		"uniqueIps":["1.1.1.1","8.8.8.8"],
-		"clientIp":"9.9.9.9",
-		"nested":{"ip_address":"4.4.4.4"}
+		"doState":{
+			"ok":true,
+			"retryState":{"consecutiveFailures":1,"lastError":"9.9.9.9"}
+		},
+		"uniqueIps":["1.1.1.1","8.8.8.8"]
 	}`
 
 	req := httptest.NewRequest(http.MethodPost, "/ingest-batch", bytes.NewBufferString(payload))
