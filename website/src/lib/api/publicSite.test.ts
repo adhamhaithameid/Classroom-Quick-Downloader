@@ -129,7 +129,7 @@ describe('oracle-only website data source routing', () => {
   it('reads map from Oracle canonical snapshot endpoint', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString();
-      expect(url).toContain('/api/public/website/map');
+      expect(url).toContain('/api/public/website/snapshot');
       expect(url).not.toContain('/public/site-metrics');
       return new Response(
         JSON.stringify({
