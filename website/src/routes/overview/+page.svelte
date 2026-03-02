@@ -641,6 +641,10 @@
         for (const entry of entries) {
           if (entry.isIntersecting) {
             entry.target.classList.add('in-view');
+            const revealSection = (entry.target as HTMLElement).dataset.placementSection;
+            if (revealSection) {
+              setPlacementSectionVisible(revealSection);
+            }
             observer.unobserve(entry.target);
           }
         }
