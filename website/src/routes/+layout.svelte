@@ -155,7 +155,7 @@
             {item.label}
           </a>
         {/each}
-        <a href={STORE_LINKS.github} target="_blank" rel="noopener noreferrer">GitHub</a>
+        <a href={snapshotLinks?.github || STORE_LINKS.github} target="_blank" rel="noopener noreferrer">GitHub</a>
       </nav>
 
       <div class="l2-nav-actions">
