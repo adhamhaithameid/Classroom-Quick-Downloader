@@ -280,6 +280,8 @@ git fetch --prune origin main
 git checkout main
 git reset --hard origin/main
 cd oracle-backend
+# Optional branch override for not-stable testing:
+# TARGET_REF=origin/Not_Stable bash scripts/deploy_main_inplace.sh
 cp .env.production .env
 export COMPOSE_PROJECT_NAME=oracle-backend
 docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.runtime.override.yml up -d --build --no-deps --force-recreate oracle-backend
