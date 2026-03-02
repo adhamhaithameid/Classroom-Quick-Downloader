@@ -615,12 +615,9 @@
     background: var(--green-light);
   }
 
-  .entry-body li {
-    position: relative;
-    padding-left: 18px;
-    color: var(--text-secondary);
-    line-height: 1.65;
-    font-size: 14px;
+  .cl-reveal {
+    opacity: 1;
+    transform: none;
   }
 
   .entry-body li::before {
