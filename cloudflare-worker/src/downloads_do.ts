@@ -2917,7 +2917,7 @@ export class DownloadsDurable {
     const currentAlarm = await this.state.storage.getAlarm();
     if (!currentAlarm || currentAlarm > alarmTime) {
       await this.state.storage.setAlarm(alarmTime);
-      logEvent("info", "alarm_scheduled_next_midnight_flush", { at: tomorrow.toISOString() });
+      logEvent("info", "alarm_scheduled_next_daily_flush", { at: next.toISOString() });
     }
   }
 
