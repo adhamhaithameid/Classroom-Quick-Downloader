@@ -1152,6 +1152,585 @@ func WebsiteOpsStateHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
+func WebsiteAnalyticsHandler(db *sql.DB, trafficCfg WebsiteTrafficSyncConfig) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		if db == nil {
+			writeJSONError(w, "database_unavailable", "Database not configured", http.StatusServiceUnavailable)
+			return
+		}
+
+		rng := resolveWebsiteAnalyticsRange(r.URL.Query().Get("range"), time.Now().UTC())
+		ctx := r.Context()
+
+		actions := map[string]int64{
+			"install_click":  0,
+			"download_click": 0,
+			"map_yes":        0,
+			"map_no":         0,
+		}
+
+		actionQuery := `SELECT action, SUM(count) AS total
+			FROM website_event_daily`
+		actionArgs := []any{}
+		if rng.StartDay != "" {
+			actionQuery += ` WHERE day_utc >= ?`
+			actionArgs = append(actionArgs, rng.StartDay)
+		}
+		actionQuery += ` GROUP BY action`
+		actionRows, err := db.QueryContext(ctx, actionQuery, actionArgs...)
+		if err != nil {
+			writeJSONError(w, "analytics_load_failed", "Failed to load website analytics", http.StatusInternalServerError)
+			return
+		}
+		for actionRows.Next() {
+			var action string
+			var total int64
+			if scanErr := actionRows.Scan(&action, &total); scanErr != nil {
+				_ = actionRows.Close()
+				writeJSONError(w, "analytics_load_failed", "Failed to load website analytics", http.StatusInternalServerError)
+				return
+			}
+			if _, ok := actions[action]; ok {
+				actions[action] = maxInt64(total, 0)
+			}
+		}
+		if err := actionRows.Err(); err != nil {
+			_ = actionRows.Close()
+			writeJSONError(w, "analytics_load_failed", "Failed to load website analytics", http.StatusInternalServerError)
+			return
+		}
+		_ = actionRows.Close()
+
+		dailyCap := rng.DayLimit
+		if dailyCap < 1 {
+			dailyCap = 1
+		}
+		dailyByDay := make(map[string]*websiteAnalyticsDailyPoint, dailyCap)
+		daily := make([]websiteAnalyticsDailyPoint, 0, dailyCap)
+		dailyQuery := `SELECT
+				day_utc,
+				SUM(CASE WHEN action = 'install_click' THEN count ELSE 0 END) AS install_clicks,
+				SUM(CASE WHEN action = 'download_click' THEN count ELSE 0 END) AS download_clicks,
+				SUM(CASE WHEN action = 'map_yes' THEN count ELSE 0 END) AS map_yes,
+				SUM(CASE WHEN action = 'map_no' THEN count ELSE 0 END) AS map_no
+			FROM website_event_daily`
+		dailyArgs := []any{}
+		if rng.StartDay != "" {
+			dailyQuery += ` WHERE day_utc >= ?`
+			dailyArgs = append(dailyArgs, rng.StartDay)
+		}
+		dailyQuery += ` GROUP BY day_utc ORDER BY day_utc DESC LIMIT ?`
+		dailyArgs = append(dailyArgs, rng.DayLimit)
+		dailyRows, err := db.QueryContext(ctx, dailyQuery, dailyArgs...)
+		if err != nil {
+			writeJSONError(w, "analytics_load_failed", "Failed to load website analytics", http.StatusInternalServerError)
+			return
+		}
+		for dailyRows.Next() {
+			var row websiteAnalyticsDailyPoint
+			if scanErr := dailyRows.Scan(&row.DayUTC, &row.InstallClicks, &row.DownloadClicks, &row.MapYes, &row.MapNo); scanErr != nil {
+				_ = dailyRows.Close()
+				writeJSONError(w, "analytics_load_failed", "Failed to load website analytics", http.StatusInternalServerError)
+				return
+			}
+			row.DayUTC = trimAndLimit(strings.TrimSpace(row.DayUTC), 16)
+			if row.DayUTC == "" {
+				continue
+			}
+			row.InstallClicks = maxInt64(row.InstallClicks, 0)
+			row.DownloadClicks = maxInt64(row.DownloadClicks, 0)
+			row.MapYes = maxInt64(row.MapYes, 0)
+			row.MapNo = maxInt64(row.MapNo, 0)
+			row.Feedback = 0
+			copyRow := row
+			dailyByDay[row.DayUTC] = &copyRow
+		}
+		if err := dailyRows.Err(); err != nil {
+			_ = dailyRows.Close()
+			writeJSONError(w, "analytics_load_failed", "Failed to load website analytics", http.StatusInternalServerError)
+			return
+		}
+		_ = dailyRows.Close()
+
+		placements := make([]websiteAnalyticsPlacementBreakdown, 0, websiteAnalyticsMaxPlacements)
+		placementsQuery := `SELECT placement, action, SUM(count) AS total
+			FROM website_event_daily`
+		placementsArgs := []any{}
+		if rng.StartDay != "" {
+			placementsQuery += ` WHERE day_utc >= ?`
+			placementsArgs = append(placementsArgs, rng.StartDay)
+		}
+		placementsQuery += ` GROUP BY placement, action ORDER BY total DESC, placement ASC LIMIT ?`
+		placementsArgs = append(placementsArgs, websiteAnalyticsMaxPlacements)
+		placementsRows, err := db.QueryContext(ctx, placementsQuery, placementsArgs...)
+		if err != nil {
+			writeJSONError(w, "analytics_load_failed", "Failed to load website analytics", http.StatusInternalServerError)
+			return
+		}
+		for placementsRows.Next() {
+			var row websiteAnalyticsPlacementBreakdown
+			if scanErr := placementsRows.Scan(&row.Placement, &row.Action, &row.Count); scanErr != nil {
+				_ = placementsRows.Close()
+				writeJSONError(w, "analytics_load_failed", "Failed to load website analytics", http.StatusInternalServerError)
+				return
+			}
+			row.Placement = trimAndLimit(row.Placement, 80)
+			row.Action = trimAndLimit(row.Action, 40)
+			row.Count = maxInt64(row.Count, 0)
+			placements = append(placements, row)
+		}
+		if err := placementsRows.Err(); err != nil {
+			_ = placementsRows.Close()
+			writeJSONError(w, "analytics_load_failed", "Failed to load website analytics", http.StatusInternalServerError)
+			return
+		}
+		_ = placementsRows.Close()
+
+		feedbackQuery := `SELECT COUNT(*), MAX(created_at) FROM website_uninstall_feedback`
+		feedbackArgs := []any{}
+		if rng.StartMS > 0 {
+			feedbackQuery += ` WHERE created_at >= ?`
+			feedbackArgs = append(feedbackArgs, rng.StartMS)
+		}
+
+		var feedbackTotal int64
+		var feedbackLast sql.NullInt64
+		if err := db.QueryRowContext(ctx, feedbackQuery, feedbackArgs...).Scan(&feedbackTotal, &feedbackLast); err != nil {
+			writeJSONError(w, "analytics_load_failed", "Failed to load website analytics", http.StatusInternalServerError)
+			return
+		}
+
+		reasonsQuery := `SELECT reason, COUNT(*) AS c
+			FROM website_uninstall_feedback`
+		reasonsArgs := []any{}
+		if rng.StartMS > 0 {
+			reasonsQuery += ` WHERE created_at >= ?`
+			reasonsArgs = append(reasonsArgs, rng.StartMS)
+		}
+		reasonsQuery += ` GROUP BY reason ORDER BY c DESC, reason ASC LIMIT 8`
+		reasonRows, err := db.QueryContext(ctx, reasonsQuery, reasonsArgs...)
+		if err != nil {
+			writeJSONError(w, "analytics_load_failed", "Failed to load website analytics", http.StatusInternalServerError)
+			return
+		}
+		topReasons := make([]publicWebsiteReasonCount, 0, 8)
+		for reasonRows.Next() {
+			var row publicWebsiteReasonCount
+			if scanErr := reasonRows.Scan(&row.Reason, &row.Count); scanErr != nil {
+				_ = reasonRows.Close()
+				writeJSONError(w, "analytics_load_failed", "Failed to load website analytics", http.StatusInternalServerError)
+				return
+			}
+			row.Reason = trimAndLimit(row.Reason, 120)
+			row.Count = maxInt64(row.Count, 0)
+			topReasons = append(topReasons, row)
+		}
+		if err := reasonRows.Err(); err != nil {
+			_ = reasonRows.Close()
+			writeJSONError(w, "analytics_load_failed", "Failed to load website analytics", http.StatusInternalServerError)
+			return
+		}
+		_ = reasonRows.Close()
+
+		feedbackDailyQuery := `SELECT
+				strftime('%Y-%m-%d', created_at / 1000, 'unixepoch') AS day_utc,
+				COUNT(*) AS total
+			FROM website_uninstall_feedback`
+		feedbackDailyArgs := []any{}
+		if rng.StartMS > 0 {
+			feedbackDailyQuery += ` WHERE created_at >= ?`
+			feedbackDailyArgs = append(feedbackDailyArgs, rng.StartMS)
+		}
+		feedbackDailyQuery += ` GROUP BY day_utc ORDER BY day_utc DESC LIMIT ?`
+		feedbackDailyArgs = append(feedbackDailyArgs, dailyCap)
+		feedbackDailyRows, err := db.QueryContext(ctx, feedbackDailyQuery, feedbackDailyArgs...)
+		if err != nil {
+			writeJSONError(w, "analytics_load_failed", "Failed to load website analytics", http.StatusInternalServerError)
+			return
+		}
+		feedbackDaily := make([]map[string]any, 0, dailyCap)
+		for feedbackDailyRows.Next() {
+			var dayUTC string
+			var total int64
+			if scanErr := feedbackDailyRows.Scan(&dayUTC, &total); scanErr != nil {
+				_ = feedbackDailyRows.Close()
+				writeJSONError(w, "analytics_load_failed", "Failed to load website analytics", http.StatusInternalServerError)
+				return
+			}
+			dayUTC = trimAndLimit(strings.TrimSpace(dayUTC), 16)
+			if dayUTC == "" {
+				continue
+			}
+			total = maxInt64(total, 0)
+			feedbackDaily = append(feedbackDaily, map[string]any{
+				"dayUtc":      dayUTC,
+				"submissions": total,
+			})
+			if current, ok := dailyByDay[dayUTC]; ok {
+				current.Feedback = total
+			} else {
+				dailyByDay[dayUTC] = &websiteAnalyticsDailyPoint{
+					DayUTC:         dayUTC,
+					InstallClicks:  0,
+					DownloadClicks: 0,
+					MapYes:         0,
+					MapNo:          0,
+					Feedback:       total,
+				}
+			}
+		}
+		if err := feedbackDailyRows.Err(); err != nil {
+			_ = feedbackDailyRows.Close()
+			writeJSONError(w, "analytics_load_failed", "Failed to load website analytics", http.StatusInternalServerError)
+			return
+		}
+		_ = feedbackDailyRows.Close()
+
+		feedbackBrowsersQuery := `SELECT browser, COUNT(*) AS c
+			FROM website_uninstall_feedback`
+		feedbackBrowsersArgs := []any{}
+		if rng.StartMS > 0 {
+			feedbackBrowsersQuery += ` WHERE created_at >= ?`
+			feedbackBrowsersArgs = append(feedbackBrowsersArgs, rng.StartMS)
+		}
+		feedbackBrowsersQuery += ` GROUP BY browser ORDER BY c DESC, browser ASC LIMIT 8`
+		feedbackBrowsersRows, err := db.QueryContext(ctx, feedbackBrowsersQuery, feedbackBrowsersArgs...)
+		if err != nil {
+			writeJSONError(w, "analytics_load_failed", "Failed to load website analytics", http.StatusInternalServerError)
+			return
+		}
+		feedbackByBrowser := make([]publicWebsiteReasonCount, 0, 8)
+		for feedbackBrowsersRows.Next() {
+			var browser string
+			var count int64
+			if scanErr := feedbackBrowsersRows.Scan(&browser, &count); scanErr != nil {
+				_ = feedbackBrowsersRows.Close()
+				writeJSONError(w, "analytics_load_failed", "Failed to load website analytics", http.StatusInternalServerError)
+				return
+			}
+			browser = trimAndLimit(strings.TrimSpace(browser), 40)
+			if browser == "" {
+				browser = "unknown"
+			}
+			feedbackByBrowser = append(feedbackByBrowser, publicWebsiteReasonCount{
+				Reason: browser,
+				Count:  maxInt64(count, 0),
+			})
+		}
+		if err := feedbackBrowsersRows.Err(); err != nil {
+			_ = feedbackBrowsersRows.Close()
+			writeJSONError(w, "analytics_load_failed", "Failed to load website analytics", http.StatusInternalServerError)
+			return
+		}
+		_ = feedbackBrowsersRows.Close()
+
+		for _, row := range dailyByDay {
+			if row == nil {
+				continue
+			}
+			daily = append(daily, *row)
+		}
+		sort.Slice(daily, func(i, j int) bool {
+			if daily[i].DayUTC == daily[j].DayUTC {
+				if daily[i].InstallClicks == daily[j].InstallClicks {
+					return daily[i].DownloadClicks > daily[j].DownloadClicks
+				}
+				return daily[i].InstallClicks > daily[j].InstallClicks
+			}
+			return daily[i].DayUTC > daily[j].DayUTC
+		})
+		if len(daily) > dailyCap {
+			daily = daily[:dailyCap]
+		}
+
+		trafficSummary, trafficDaily, err := loadWebsiteTrafficAnalytics(ctx, db, rng, trafficCfg)
+		if err != nil {
+			logEvent("warn", "website_traffic_analytics_load_failed", map[string]interface{}{
+				"error": trimAndLimit(err.Error(), 240),
+				"range": rng.Name,
+			})
+			trafficSummary = websiteAnalyticsTrafficSummary{
+				Visits:          0,
+				Requests:        0,
+				LastSyncedAtUTC: nil,
+				Source:          websiteTrafficSourceHTTPAdaptive,
+				Status:          "error",
+			}
+			if !trafficCfg.normalized().Enabled {
+				trafficSummary.Status = "disabled"
+			}
+			trafficDaily = []websiteAnalyticsTrafficDailyPoint{}
+		}
+
+		mapYes := actions["map_yes"]
+		mapNo := actions["map_no"]
+		mapResponses := mapYes + mapNo
+		yesRatio := 0.0
+		if mapResponses > 0 {
+			yesRatio = float64(mapYes) / float64(mapResponses)
+		}
+
+		var feedbackLastPtr *int64
+		if feedbackLast.Valid && feedbackLast.Int64 > 0 {
+			value := feedbackLast.Int64
+			feedbackLastPtr = &value
+		}
+
+		payload := websiteAnalyticsResponse{
+			OK:          true,
+			GeneratedAt: time.Now().UTC().UnixMilli(),
+			Range:       rng.Name,
+			Buttons: map[string]int64{
+				"installClicks":  actions["install_click"],
+				"downloadClicks": actions["download_click"],
+			},
+			Map: map[string]any{
+				"yes":          mapYes,
+				"no":           mapNo,
+				"responses":    mapResponses,
+				"yesRatio":     yesRatio,
+				"yesPercent":   yesRatio * 100,
+				"responseRate": mapResponses,
+			},
+			Feedback: map[string]any{
+				"totalSubmissions":    maxInt64(feedbackTotal, 0),
+				"lastSubmissionAtUtc": feedbackLastPtr,
+				"topReasons":          topReasons,
+				"dailySubmissions":    feedbackDaily,
+				"byBrowser":           feedbackByBrowser,
+			},
+			Daily:        daily,
+			Placements:   placements,
+			Traffic:      trafficSummary,
+			TrafficDaily: trafficDaily,
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(payload)
+	}
+}
+
+func loadWebsiteTrafficAnalytics(
+	ctx context.Context,
+	db *sql.DB,
+	rng websiteAnalyticsRange,
+	trafficCfg WebsiteTrafficSyncConfig,
+) (websiteAnalyticsTrafficSummary, []websiteAnalyticsTrafficDailyPoint, error) {
+	cfg := trafficCfg.normalized()
+	summary := websiteAnalyticsTrafficSummary{
+		Visits:          0,
+		Requests:        0,
+		LastSyncedAtUTC: nil,
+		Source:          websiteTrafficSourceHTTPAdaptive,
+		Status:          "no_data",
+	}
+
+	startHour := ""
+	if rng.StartDay != "" {
+		startHour = rng.StartDay + "T00:00:00Z"
+	}
+
+	totalQuery := `SELECT COALESCE(SUM(visits), 0), COALESCE(SUM(requests), 0)
+		FROM website_traffic_hourly`
+	totalArgs := []any{}
+	if startHour != "" {
+		totalQuery += ` WHERE hour_utc >= ?`
+		totalArgs = append(totalArgs, startHour)
+	}
+	if err := db.QueryRowContext(ctx, totalQuery, totalArgs...).Scan(&summary.Visits, &summary.Requests); err != nil {
+		return websiteAnalyticsTrafficSummary{}, nil, err
+	}
+	summary.Visits = maxInt64(summary.Visits, 0)
+	summary.Requests = maxInt64(summary.Requests, 0)
+
+	dailyLimit := int(maxInt64(int64(rng.DayLimit), 1))
+	daily := make([]websiteAnalyticsTrafficDailyPoint, 0, dailyLimit)
+	dailyQuery := `SELECT
+			substr(hour_utc, 1, 10) AS day_utc,
+			COALESCE(SUM(visits), 0) AS visits,
+			COALESCE(SUM(requests), 0) AS requests
+		FROM website_traffic_hourly`
+	dailyArgs := []any{}
+	if startHour != "" {
+		dailyQuery += ` WHERE hour_utc >= ?`
+		dailyArgs = append(dailyArgs, startHour)
+	}
+	dailyQuery += ` GROUP BY day_utc ORDER BY day_utc DESC LIMIT ?`
+	dailyArgs = append(dailyArgs, dailyLimit)
+	dailyRows, err := db.QueryContext(ctx, dailyQuery, dailyArgs...)
+	if err != nil {
+		return websiteAnalyticsTrafficSummary{}, nil, err
+	}
+	for dailyRows.Next() {
+		var row websiteAnalyticsTrafficDailyPoint
+		if scanErr := dailyRows.Scan(&row.DayUTC, &row.Visits, &row.Requests); scanErr != nil {
+			_ = dailyRows.Close()
+			return websiteAnalyticsTrafficSummary{}, nil, scanErr
+		}
+		row.DayUTC = trimAndLimit(strings.TrimSpace(row.DayUTC), 16)
+		row.Visits = maxInt64(row.Visits, 0)
+		row.Requests = maxInt64(row.Requests, 0)
+		daily = append(daily, row)
+	}
+	if err := dailyRows.Err(); err != nil {
+		_ = dailyRows.Close()
+		return websiteAnalyticsTrafficSummary{}, nil, err
+	}
+	_ = dailyRows.Close()
+
+	var latestFetched sql.NullInt64
+	var latestSource sql.NullString
+	if err := db.QueryRowContext(
+		ctx,
+		`SELECT fetched_at, source
+		 FROM website_traffic_hourly
+		 ORDER BY fetched_at DESC, hour_utc DESC
+		 LIMIT 1`,
+	).Scan(&latestFetched, &latestSource); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return websiteAnalyticsTrafficSummary{}, nil, err
+	}
+	if latestFetched.Valid && latestFetched.Int64 > 0 {
+		value := latestFetched.Int64
+		summary.LastSyncedAtUTC = &value
+	}
+	if latestSource.Valid {
+		source := trimAndLimit(strings.TrimSpace(latestSource.String), 64)
+		if source != "" {
+			summary.Source = source
+		}
+	}
+
+	latestBatch, err := loadLatestWebsiteSyncBatch(ctx, db, websiteSyncDirectionCloudflareTrafficToOracle)
+	if err != nil {
+		return websiteAnalyticsTrafficSummary{}, nil, err
+	}
+
+	switch {
+	case !cfg.Enabled:
+		summary.Status = "disabled"
+	case summary.LastSyncedAtUTC == nil && latestBatch != nil && strings.EqualFold(latestBatch.Status, "error"):
+		summary.Status = "error"
+	case summary.LastSyncedAtUTC == nil:
+		summary.Status = "no_data"
+	default:
+		staleAfter := 2 * cfg.Interval
+		if staleAfter < 2*time.Hour {
+			staleAfter = 2 * time.Hour
+		}
+		if staleAfter > 24*time.Hour {
+			staleAfter = 24 * time.Hour
+		}
+		lagMs := time.Now().UTC().UnixMilli() - *summary.LastSyncedAtUTC
+		if lagMs > staleAfter.Milliseconds() {
+			summary.Status = "stale"
+		} else {
+			summary.Status = "ok"
+		}
+		if latestBatch != nil && strings.EqualFold(latestBatch.Status, "error") && summary.Status == "ok" {
+			summary.Status = "degraded"
+		}
+	}
+
+	return summary, daily, nil
+}
+
+func resolveWebsiteAnalyticsRange(raw string, nowUTC time.Time) websiteAnalyticsRange {
+	todayStart := time.Date(nowUTC.Year(), nowUTC.Month(), nowUTC.Day(), 0, 0, 0, 0, time.UTC)
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "today":
+		return websiteAnalyticsRange{
+			Name:     "today",
+			StartDay: todayStart.Format("2006-01-02"),
+			StartMS:  todayStart.UnixMilli(),
+			DayLimit: 1,
+		}
+	case "30d":
+		start := todayStart.AddDate(0, 0, -29)
+		return websiteAnalyticsRange{
+			Name:     "30d",
+			StartDay: start.Format("2006-01-02"),
+			StartMS:  start.UnixMilli(),
+			DayLimit: 30,
+		}
+	case "all":
+		return websiteAnalyticsRange{
+			Name:     "all",
+			StartDay: "",
+			StartMS:  0,
+			DayLimit: websiteAnalyticsMaxSeriesDays,
+		}
+	default:
+		start := todayStart.AddDate(0, 0, -6)
+		return websiteAnalyticsRange{
+			Name:     "7d",
+			StartDay: start.Format("2006-01-02"),
+			StartMS:  start.UnixMilli(),
+			DayLimit: 7,
+		}
+	}
+}
+
+func WebsiteTrafficRefreshHandler(db *sql.DB, trafficCfg WebsiteTrafficSyncConfig) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		if db == nil {
+			writeJSONError(w, "database_unavailable", "Database not configured", http.StatusServiceUnavailable)
+			return
+		}
+
+		result, err := SyncWebsiteTrafficFromCloudflare(r.Context(), db, trafficCfg, "oracle_admin_traffic_refresh")
+		if err != nil {
+			statusCode := http.StatusBadGateway
+			code := "traffic_refresh_failed"
+			message := "Failed to refresh Cloudflare traffic analytics"
+			switch {
+			case errors.Is(err, errWebsiteTrafficSyncDisabled):
+				statusCode = http.StatusConflict
+				code = "traffic_sync_disabled"
+				message = "Website traffic sync is disabled"
+			case errors.Is(err, errWebsiteTrafficSyncConfig):
+				statusCode = http.StatusBadRequest
+				code = "traffic_sync_invalid_config"
+				message = "Website traffic sync is misconfigured"
+			case errors.Is(err, errWebsiteTrafficSyncPersist):
+				statusCode = http.StatusInternalServerError
+				code = "traffic_refresh_store_failed"
+				message = "Failed to store Cloudflare traffic analytics"
+			}
+			writeJSONError(w, code, message, statusCode)
+			return
+		}
+
+		_ = AppendAuditLog(
+			r.Context(),
+			db,
+			"website_traffic_refresh",
+			"website_sync",
+			"cloudflare_traffic_to_oracle",
+			"ok",
+			map[string]any{
+				"hoursUpserted": result.HoursUpserted,
+				"visits":        result.Visits,
+				"requests":      result.Requests,
+				"lastHourUtc":   result.LastHourUTC,
+			},
+		)
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"ok":   true,
+			"sync": result,
+		})
+	}
+}
+
 func WebsiteOpsForcePushHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
