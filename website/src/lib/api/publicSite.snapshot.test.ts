@@ -100,11 +100,14 @@ describe('fetchWebsiteSnapshot', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-02-23T00:00:00.000Z'));
 
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url.includes('/overview')) {
-        return new Response(
-          JSON.stringify({
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          schemaVersion: '1',
+          ok: true,
+          generatedAt: Date.now(),
+          snapshotId: `snapshot-${Date.now()}`,
+          overview: {
             ok: true,
             generatedAt: Date.now(),
             totals: { downloads: fetchMock.mock.calls.length, success: 1, fail: 0 },
