@@ -8,7 +8,7 @@ afterEach(() => {
 });
 
 describe('public website acceptance contracts', () => {
-  it('accepts a full overview payload from Oracle', async () => {
+  it('accepts a full overview payload from Oracle snapshot', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-02-21T22:10:00.000Z'));
     vi.stubGlobal(
