@@ -641,10 +641,9 @@
     border: 1px solid var(--border-subtle);
     font-weight: 600;
     font-size: 14px;
-    text-align: center;
-    animation: riseIn 0.3s ease both;
-    background: rgba(255, 255, 255, 0.6);
-    backdrop-filter: blur(6px);
+    animation: un-rise 0.3s ease both;
+    background: var(--surface);
+    margin-top: 16px;
   }
 
   .result-msg.ok {
