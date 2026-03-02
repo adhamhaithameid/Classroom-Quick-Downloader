@@ -2124,8 +2124,43 @@
               }
             }
           }
-        } catch (e) {
-          dailyContainer.innerHTML = '<div class="empty-state empty-state-danger">Failed</div>';
+        } catch (_) {
+          if (visitorsContainer) visitorsContainer.innerHTML = '<div class="empty-state empty-state-danger">Failed</div>';
+          if (uniqueContainer) uniqueContainer.innerHTML = '<div class="empty-state empty-state-danger">Failed</div>';
+        }
+
+        // Funnel
+        var funnelContainer = document.getElementById('chart-funnel');
+        try {
+          var funnelData = await fetchJSON('/api/stats/funnel' + rangeQuery);
+          var stages = Array.isArray(funnelData.stages) ? funnelData.stages : [];
+          renderFunnel(funnelContainer, stages);
+        } catch (_) {
+          if (funnelContainer) funnelContainer.innerHTML = '<div class="empty-state empty-state-danger">Failed</div>';
+        }
+
+        // Dynamic segments
+        var segmentsContainer = document.getElementById('chart-segments');
+        try {
+          var segmentsData = await fetchJSON('/api/stats/segments?dimension=' + encodeURIComponent(chartsDimension) + '&range=' + encodeURIComponent(rangeParams.range));
+          var segmentRows = Array.isArray(segmentsData.values) ? segmentsData.values : [];
+          renderBreakdownBars(segmentsContainer, chartsDimension, segmentRows, 'blue', {
+            leadText: 'Dynamic segments explain where activity concentrated inside the selected dimension.'
+          });
+          setChartsExportDataset('segments_' + chartsDimension, segmentRows.map(function(row) {
+            return { dimension: chartsDimension, value: row.value, count: Number(row.count || 0) };
+          }));
+        } catch (_) {
+          if (segmentsContainer) segmentsContainer.innerHTML = '<div class="empty-state empty-state-danger">Failed</div>';
+        }
+
+        // Heatmap
+        var heatmapContainer = document.getElementById('chart-heatmap');
+        try {
+          var heatmapData = await fetchJSON('/api/stats/heatmap' + rangeQuery);
+          renderHeatmap(heatmapContainer, Array.isArray(heatmapData.cells) ? heatmapData.cells : []);
+        } catch (_) {
+          if (heatmapContainer) heatmapContainer.innerHTML = '<div class="empty-state empty-state-danger">Failed</div>';
         }
       }
 
