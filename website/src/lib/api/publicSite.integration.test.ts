@@ -14,6 +14,66 @@ afterEach(() => {
   resetWebsiteSnapshotCacheForTests();
 });
 
+function buildSnapshotPayload(downloads: number): Record<string, unknown> {
+  return {
+    schemaVersion: '1',
+    ok: true,
+    generatedAt: 1771700000000,
+    snapshotId: `snapshot-${downloads}`,
+    overview: {
+      schemaVersion: '1',
+      ok: true,
+      generatedAt: 1771700000000,
+      totals: { downloads, success: Math.max(downloads - 2, 0), fail: 2 },
+      installs: { usersTotal: 99, lastSyncedAtUtc: 1771699200000, browsers: [] },
+      versions: { github: '1.3.6', chrome: '1.3.6', firefox: '1.3.6', edge: '1.3.6' },
+      status: { systemLive: true, liveSinceUtc: 1700000, workerHealth: 'up' },
+      links: { chrome: 'https://c', firefox: 'https://f', edge: 'https://e', github: 'https://g' }
+    },
+    map: {
+      schemaVersion: '1',
+      ok: true,
+      generatedAt: 1771700000000,
+      granularity: 'country',
+      countries: [{ countryCode: 'us', count: downloads }, { countryCode: 'xx', count: 0 }],
+      totals: { downloads, countries: 1 },
+      privacyNote: 'note'
+    },
+    changelog: {
+      schemaVersion: '1',
+      ok: true,
+      generatedAt: 1771700000000,
+      headline: 'h',
+      description: 'd',
+      entries: [
+        {
+          id: 'release-136',
+          version: '1.3.6',
+          title: 'Stability',
+          summary: 'Security and stability improvements.',
+          highlights: ['A'],
+          releasedAtUtc: 1
+        }
+      ],
+      fullChangelogUrl: 'https://github.com/adhamhaithameid/Classroom-Quick-Downloader/blob/main/CHANGELOG.md',
+      lastUpdatedAtUtc: 1
+    },
+    userChangelogSummary: {
+      headline: 'h',
+      description: 'd',
+      entriesCount: 1,
+      lastUpdatedAtUtc: 1,
+      fullChangelogUrl: 'https://github.com/adhamhaithameid/Classroom-Quick-Downloader/blob/main/CHANGELOG.md'
+    },
+    privacy: {
+      headline: 'Privacy',
+      description: 'No raw IP storage',
+      userPrivacyUrl: 'https://classroom-quick-downloader-website.pages.dev/privacy',
+      fullPrivacyUrl: 'https://github.com/adhamhaithameid/Classroom-Quick-Downloader/blob/main/PRIVACY.md'
+    }
+  };
+}
+
 describe('public website API integration', () => {
   it('fetches overview from Oracle endpoint contract', async () => {
     vi.useFakeTimers();
