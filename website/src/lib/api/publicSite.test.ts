@@ -275,6 +275,7 @@ describe('user-facing content APIs', () => {
       vi.fn(async () =>
         new Response(
           JSON.stringify({
+            schemaVersion: '1',
             ok: true,
             generatedAt: 1700000000000,
             headline: "What's new for students",
