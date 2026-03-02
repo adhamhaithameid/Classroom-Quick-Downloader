@@ -980,6 +980,227 @@
             </div>
           </div>
 
+          <div class="page website-page" id="page-website-analysis">
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <div class="card-title">Website Analysis</div>
+                  <div class="card-subtitle">Website actions, map responses, feedback analytics, and Cloudflare traffic health</div>
+                </div>
+                <div class="action-buttons-grid action-buttons-grid-four">
+                  <select id="website-analysis-range" class="auth-input">
+                    <option value="today">Today</option>
+                    <option value="7d" selected>Last 7 days</option>
+                    <option value="30d">Last 30 days</option>
+                    <option value="all">All time</option>
+                  </select>
+                  <button class="btn btn-secondary" id="website-analysis-refresh-btn">Refresh</button>
+                  <button class="btn btn-secondary" id="website-analysis-sync-traffic-btn">Sync Cloudflare Now</button>
+                  <button class="btn btn-secondary" id="website-analysis-export-json-btn">Export JSON</button>
+                </div>
+              </div>
+              <div class="card-body">
+                <div class="pill-row">
+                  <span class="pill">Range controls all website action + feedback aggregates.</span>
+                  <span class="pill">Cloudflare sync updates traffic cards/tables only.</span>
+                  <span class="pill">Use Export JSON for full payload diagnostics.</span>
+                </div>
+                <div class="section-block">
+                  <div class="section-caption">Headline Metrics</div>
+                  <div class="stats-grid">
+                    <div class="stat-card2">
+                      <div class="stat-label">Install Button Clicks</div>
+                      <div class="stat-value" id="website-analysis-install-clicks">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Download Button Clicks</div>
+                      <div class="stat-value" id="website-analysis-download-clicks">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Map Yes</div>
+                      <div class="stat-value" id="website-analysis-map-yes">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Map No</div>
+                      <div class="stat-value" id="website-analysis-map-no">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Map Yes Ratio</div>
+                      <div class="stat-value" id="website-analysis-map-yes-ratio">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Feedback Submissions</div>
+                      <div class="stat-value" id="website-analysis-feedback-total">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Cloudflare Visits</div>
+                      <div class="stat-value" id="website-analysis-traffic-visits">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Cloudflare Requests</div>
+                      <div class="stat-value" id="website-analysis-traffic-requests">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Cloudflare Sync Status</div>
+                      <div class="stat-value" id="website-analysis-traffic-status">--</div>
+                    </div>
+                  </div>
+                  <div class="pill-row">
+                    <span class="pill">Last Feedback Submission: <strong id="website-analysis-feedback-last">--</strong></span>
+                    <span class="pill">Last Cloudflare Sync: <strong id="website-analysis-traffic-last-sync">--</strong></span>
+                  </div>
+                </div>
+
+                <div class="section-block">
+                  <div class="section-caption">Website Data Chain Health</div>
+                  <div class="stats-grid">
+                    <div class="stat-card2">
+                      <div class="stat-label">Last Batch Accepted (UTC)</div>
+                      <div class="stat-value" id="website-chain-last-batch-accepted">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Last Snapshot Generated (UTC)</div>
+                      <div class="stat-value" id="website-chain-last-snapshot">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Lag Minutes</div>
+                      <div class="stat-value" id="website-chain-lag-minutes">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Lag Status</div>
+                      <div class="stat-value" id="website-chain-lag-status">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Backup Drift</div>
+                      <div class="stat-value" id="website-chain-backup-status">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Sheets Flush Verification</div>
+                      <div class="stat-value" id="website-chain-sheets-status">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Worker Batch Integrity</div>
+                      <div class="stat-value" id="website-chain-batch-integrity-status">--</div>
+                    </div>
+                  </div>
+                  <div class="pill-row">
+                    <span class="pill">Lag thresholds: <strong id="website-chain-thresholds-lag">--</strong></span>
+                    <span class="pill">Backup drift: <strong id="website-chain-thresholds-backup">--</strong></span>
+                    <span class="pill">Sheets drift: <strong id="website-chain-thresholds-sheets">--</strong></span>
+                    <span class="pill">Integrity checks: <strong id="website-chain-thresholds-integrity">--</strong></span>
+                  </div>
+                </div>
+
+                <div class="section-block">
+                  <div class="section-caption">Daily Events</div>
+                  <div class="table-container">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Day (UTC)</th>
+                          <th>Install</th>
+                          <th>Download</th>
+                          <th>Map Yes</th>
+                          <th>Map No</th>
+                          <th>Feedback</th>
+                        </tr>
+                      </thead>
+                      <tbody id="website-analysis-daily-body">
+                        <tr><td colspan="6" class="td-primary">Loading…</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div class="section-block">
+                  <div class="section-caption">Daily Traffic (Cloudflare)</div>
+                  <div class="table-container">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Day (UTC)</th>
+                          <th>Visits</th>
+                          <th>Requests</th>
+                        </tr>
+                      </thead>
+                      <tbody id="website-analysis-traffic-daily-body">
+                        <tr><td colspan="3" class="td-primary">Loading…</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div class="section-block">
+                  <div class="section-caption">Top CTA Placements</div>
+                  <div class="table-container">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Placement</th>
+                          <th>Action</th>
+                          <th>Count</th>
+                        </tr>
+                      </thead>
+                      <tbody id="website-analysis-placements-body">
+                        <tr><td colspan="3" class="td-primary">Loading…</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div class="section-block">
+                  <div class="section-caption">Top Feedback Reasons</div>
+                  <div class="table-container">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Reason</th>
+                          <th>Count</th>
+                        </tr>
+                      </thead>
+                      <tbody id="website-analysis-feedback-reasons-body">
+                        <tr><td colspan="2" class="td-primary">Loading…</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div class="section-block" id="website-analysis-feedback-panel">
+                  <div class="section-caption">Feedback Insights</div>
+                  <div class="stats-grid">
+                    <div class="stat-card2">
+                      <div class="stat-label">Top Browser in Feedback</div>
+                      <div class="stat-value" id="website-analysis-feedback-top-browser">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Top Reason</div>
+                      <div class="stat-value" id="website-analysis-feedback-top-reason">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Recent Daily Peak</div>
+                      <div class="stat-value" id="website-analysis-feedback-daily-peak">--</div>
+                    </div>
+                  </div>
+                  <div class="table-container">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Day (UTC)</th>
+                          <th>Feedback Submissions</th>
+                        </tr>
+                      </thead>
+                      <tbody id="website-analysis-feedback-daily-body">
+                        <tr><td colspan="2" class="td-primary">Loading…</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <pre id="website-analysis-output" class="json-viewer json-viewer-compact hidden"></pre>
+              </div>
+            </div>
+          </div>
+
           <!-- CREATIVE PAGE -->
           <div class="page" id="page-creative">
             <div class="card">
