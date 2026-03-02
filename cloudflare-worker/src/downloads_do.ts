@@ -5676,8 +5676,7 @@ export class DownloadsDurable {
     }
 
     try {
-      // Send to /ingest-batch endpoint (aggregated format)
-      // We append "/ingest-batch" here to correct the base URL if needed
+      // Send to Oracle internal website events batch endpoint.
       const res = await fetch(targetUrl, {
         method: "POST",
         headers: {
