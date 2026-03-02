@@ -320,8 +320,6 @@
     padding-left: 20px;
     font-size: 14px; line-height: 1.65;
     color: var(--text-secondary);
-    line-height: 1.65;
-    font-size: 14px;
   }
 
   .privacy-section li::before {
