@@ -47,16 +47,32 @@ var (
 		"http://127.0.0.1:5173",
 	}
 
-	githubVersionFetcher = fetchLatestGitHubVersion
-	githubVersionCache   = struct {
-		mu      sync.Mutex
-		version *string
-		fetched time.Time
-		lastErr error
-		ttl     time.Duration
-	}{
-		ttl: 10 * time.Minute,
+	publicWebsiteEventActionToType = map[string]string{
+		"install_click":  "cta",
+		"download_click": "cta",
+		"map_yes":        "map",
+		"map_no":         "map",
 	}
+
+	publicWebsiteEventAllowedPlacements = map[string]struct{}{
+		"nav_install":                 {},
+		"nav_mobile_install":          {},
+		"footer_download":             {},
+		"hero_install":                {},
+		"hero_download":               {},
+		"final_install":               {},
+		"final_download":              {},
+		"map_prompt_yes":              {},
+		"map_prompt_no":               {},
+		"map_prompt_install":          {},
+		"uninstall_reinstall_chrome":  {},
+		"uninstall_reinstall_firefox": {},
+		"uninstall_reinstall_edge":    {},
+		"website_link_header":         {},
+		"website_link_footer":         {},
+	}
+
+	publicWebsiteSnapshotBuildMu sync.Mutex
 )
 
 type publicWebsiteOverviewResponse struct {
