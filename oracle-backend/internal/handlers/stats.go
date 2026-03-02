@@ -1961,3 +1961,301 @@ func calcChange(old, new int64) string {
 	}
 	return strconv.FormatFloat(pct, 'f', 1, 64) + "%"
 }
+
+func queryWebsiteTrafficTimeseries(
+	ctx context.Context,
+	db *sql.DB,
+	fromIso string,
+	toIso string,
+	granularity string,
+) ([]visitorsTimeseriesPoint, error) {
+	var (
+		query string
+		rows  *sql.Rows
+		err   error
+	)
+	if granularity == "hour" {
+		query = `
+			SELECT hour_utc, COALESCE(SUM(visits), 0), COALESCE(SUM(requests), 0)
+			FROM website_traffic_hourly
+			WHERE hour_utc >= ? AND hour_utc < ?
+			GROUP BY hour_utc
+			ORDER BY hour_utc ASC`
+		rows, err = db.QueryContext(ctx, query, fromIso, toIso) // #nosec G701 -- static SQL with bound parameters only.
+	} else {
+		query = `
+			SELECT substr(hour_utc, 1, 10) AS day_utc, COALESCE(SUM(visits), 0), COALESCE(SUM(requests), 0)
+			FROM website_traffic_hourly
+			WHERE hour_utc >= ? AND hour_utc < ?
+			GROUP BY day_utc
+			ORDER BY day_utc ASC`
+		rows, err = db.QueryContext(ctx, query, fromIso, toIso) // #nosec G701 -- static SQL with bound parameters only.
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]visitorsTimeseriesPoint, 0, 120)
+	for rows.Next() {
+		var (
+			ts       string
+			visits   int64
+			requests int64
+		)
+		if scanErr := rows.Scan(&ts, &visits, &requests); scanErr != nil {
+			return nil, scanErr
+		}
+		out = append(out, visitorsTimeseriesPoint{
+			Timestamp: ts,
+			Visits:    maxInt64(visits, 0),
+			Requests:  maxInt64(requests, 0),
+		})
+	}
+	return out, rows.Err()
+}
+
+func queryWebsiteSessionDayStats(
+	ctx context.Context,
+	db *sql.DB,
+	fromTime time.Time,
+	toTime time.Time,
+) (map[string]int64, map[string]int64, error) {
+	fromMS := fromTime.UTC().UnixMilli()
+	toMS := toTime.AddDate(0, 0, 1).UTC().UnixMilli()
+
+	rows, err := db.QueryContext(
+		ctx,
+		`WITH daily_sessions AS (
+			SELECT
+				strftime('%Y-%m-%d', ingested_at / 1000, 'unixepoch') AS day_utc,
+				session_id
+			FROM website_events_raw
+			WHERE ingested_at >= ? AND ingested_at < ? AND session_id <> ''
+			GROUP BY day_utc, session_id
+		),
+		first_seen AS (
+			SELECT session_id, MIN(day_utc) AS first_day
+			FROM daily_sessions
+			GROUP BY session_id
+		)
+		SELECT
+			d.day_utc,
+			COUNT(*) AS unique_sessions,
+			SUM(CASE WHEN f.first_day < d.day_utc THEN 1 ELSE 0 END) AS returning_sessions
+		FROM daily_sessions d
+		INNER JOIN first_seen f ON f.session_id = d.session_id
+		GROUP BY d.day_utc
+		ORDER BY d.day_utc ASC`,
+		fromMS,
+		toMS,
+	) // #nosec G701 -- static SQL with bound parameters only.
+	if err != nil {
+		return nil, nil, err
+	}
+	defer rows.Close()
+
+	uniqueByDay := make(map[string]int64, 64)
+	returningByDay := make(map[string]int64, 64)
+	for rows.Next() {
+		var (
+			day       string
+			unique    int64
+			returning int64
+		)
+		if scanErr := rows.Scan(&day, &unique, &returning); scanErr != nil {
+			return nil, nil, scanErr
+		}
+		day = strings.TrimSpace(day)
+		if day == "" {
+			continue
+		}
+		uniqueByDay[day] = maxInt64(unique, 0)
+		returningByDay[day] = maxInt64(returning, 0)
+	}
+	return uniqueByDay, returningByDay, rows.Err()
+}
+
+func queryWebsiteTrafficWindowTotal(ctx context.Context, db *sql.DB, fromIso, toIso string, field string) (int64, error) {
+	query := `SELECT COALESCE(SUM(visits), 0) FROM website_traffic_hourly WHERE hour_utc >= ? AND hour_utc < ?`
+	if field == "requests" {
+		query = `SELECT COALESCE(SUM(requests), 0) FROM website_traffic_hourly WHERE hour_utc >= ? AND hour_utc < ?`
+	}
+	var total int64
+	if err := db.QueryRowContext(ctx, query, fromIso, toIso).Scan(&total); err != nil { // #nosec G701 -- SQL text is static and bounds are parameterized.
+		return 0, err
+	}
+	return maxInt64(total, 0), nil
+}
+
+func queryWebsiteEventDailyTotal(ctx context.Context, db *sql.DB, fromDay, toDay, eventType, action string) (int64, error) {
+	var total int64
+	if err := db.QueryRowContext(
+		ctx,
+		`SELECT COALESCE(SUM(count), 0)
+		 FROM website_event_daily
+		 WHERE day_utc >= ? AND day_utc <= ? AND event_type = ? AND action = ?`,
+		fromDay,
+		toDay,
+		eventType,
+		action,
+	).Scan(&total); err != nil { // #nosec G701 -- static SQL with bound params only.
+		return 0, err
+	}
+	return maxInt64(total, 0), nil
+}
+
+func queryDownloadsWindowTotal(ctx context.Context, db *sql.DB, fromIso, toIso string) (int64, error) {
+	var total int64
+	if err := db.QueryRowContext(
+		ctx,
+		`SELECT COALESCE(SUM(total_downloads), 0)
+		 FROM downloads_hourly
+		 WHERE bucket_start >= ? AND bucket_start < ?`,
+		fromIso,
+		toIso,
+	).Scan(&total); err != nil { // #nosec G701 -- static SQL with bound params only.
+		return 0, err
+	}
+	return maxInt64(total, 0), nil
+}
+
+func queryWebsiteEventGroupBy(
+	ctx context.Context,
+	db *sql.DB,
+	groupBy string,
+	fromDay string,
+	toDay string,
+) ([]segmentValue, error) {
+	query := `SELECT action, COALESCE(SUM(count), 0) AS total
+		FROM website_event_daily
+		WHERE day_utc >= ? AND day_utc <= ?
+		GROUP BY action
+		ORDER BY total DESC, action ASC
+		LIMIT 30`
+	if groupBy == "placement" {
+		query = `SELECT placement, COALESCE(SUM(count), 0) AS total
+			FROM website_event_daily
+			WHERE day_utc >= ? AND day_utc <= ?
+			GROUP BY placement
+			ORDER BY total DESC, placement ASC
+			LIMIT 30`
+	}
+	rows, err := db.QueryContext(ctx, query, fromDay, toDay) // #nosec G701 -- SQL text is static and date values are bound.
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	values := make([]segmentValue, 0, 30)
+	for rows.Next() {
+		var value sql.NullString
+		var count int64
+		if scanErr := rows.Scan(&value, &count); scanErr != nil {
+			return nil, scanErr
+		}
+		label := strings.TrimSpace(value.String)
+		if label == "" {
+			label = "unknown"
+		}
+		values = append(values, segmentValue{
+			Value: label,
+			Count: maxInt64(count, 0),
+		})
+	}
+	return values, rows.Err()
+}
+
+func queryWebsiteRawGroupBy(
+	ctx context.Context,
+	db *sql.DB,
+	column string,
+	fromTime time.Time,
+	toTime time.Time,
+) ([]segmentValue, error) {
+	if strings.ToLower(strings.TrimSpace(column)) != "page_path" {
+		return nil, errors.New("invalid raw group-by column")
+	}
+	fromMS := fromTime.UTC().UnixMilli()
+	toMS := toTime.AddDate(0, 0, 1).UTC().UnixMilli()
+	query := `SELECT page_path, COUNT(*) AS total
+		FROM website_events_raw
+		WHERE ingested_at >= ? AND ingested_at < ?
+		GROUP BY page_path
+		ORDER BY total DESC, page_path ASC
+		LIMIT 30`
+	rows, err := db.QueryContext(ctx, query, fromMS, toMS) // #nosec G701 -- SQL text is static and bounds are parameterized.
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	values := make([]segmentValue, 0, 30)
+	for rows.Next() {
+		var value sql.NullString
+		var count int64
+		if scanErr := rows.Scan(&value, &count); scanErr != nil {
+			return nil, scanErr
+		}
+		label := strings.TrimSpace(value.String)
+		if label == "" {
+			label = "/"
+		}
+		values = append(values, segmentValue{
+			Value: label,
+			Count: maxInt64(count, 0),
+		})
+	}
+	return values, rows.Err()
+}
+
+func queryWebsiteRawJSONGroupBy(
+	ctx context.Context,
+	db *sql.DB,
+	jsonPath string,
+	fromTime time.Time,
+	toTime time.Time,
+) ([]segmentValue, error) {
+	path := strings.TrimSpace(jsonPath)
+	if path != "$.device" && path != "$.referrer" {
+		return nil, errors.New("invalid json path")
+	}
+	fromMS := fromTime.UTC().UnixMilli()
+	toMS := toTime.AddDate(0, 0, 1).UTC().UnixMilli()
+	rows, err := db.QueryContext(
+		ctx,
+		`SELECT
+			COALESCE(NULLIF(TRIM(CAST(json_extract(meta_json, ?) AS TEXT)), ''), 'unknown') AS value,
+			COUNT(*) AS total
+		 FROM website_events_raw
+		 WHERE ingested_at >= ? AND ingested_at < ?
+		 GROUP BY value
+		 ORDER BY total DESC, value ASC
+		 LIMIT 30`,
+		path,
+		fromMS,
+		toMS,
+	) // #nosec G701 -- SQL text is static and path/time args are bound parameters.
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	values := make([]segmentValue, 0, 30)
+	for rows.Next() {
+		var value sql.NullString
+		var count int64
+		if scanErr := rows.Scan(&value, &count); scanErr != nil {
+			return nil, scanErr
+		}
+		label := strings.TrimSpace(value.String)
+		if label == "" {
+			label = "unknown"
+		}
+		values = append(values, segmentValue{
+			Value: label,
+			Count: maxInt64(count, 0),
+		})
+	}
+	return values, rows.Err()
+}
