@@ -30,7 +30,7 @@ import {
   openDriveBypassTab,
 } from './download-handler';
 import { refreshRemoteAnalyticsConfig, recordDownloadEvent } from '../utils/analytics';
-import { WEBSITE_BASE_URL } from '../utils/analytics/constants';
+import { UNINSTALL_SITE_URL } from '../utils/analytics/constants';
 import { t } from '../content/i18n';
 
 // =====================================================
