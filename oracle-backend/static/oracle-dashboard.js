@@ -1320,6 +1320,7 @@
           renderOverviewMiniCharts(data);
           updateVersionFilterOptions(data.versions || {});
           await loadDeploymentStoreMetrics();
+          await loadOverviewWebsiteStats(!!forceRefresh);
         } catch (e) {
           document.getElementById("sidebar-status").className = "status-dot error";
           document.getElementById("sidebar-status-text").textContent = "Error";
