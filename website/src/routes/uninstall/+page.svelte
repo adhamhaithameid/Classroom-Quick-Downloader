@@ -474,8 +474,9 @@
     cursor: pointer;
     transition: all 0.2s ease;
     font-size: 14px;
-    font-weight: 500;
-    box-shadow: 0 1px 3px rgba(15, 20, 25, 0.03);
+    font-weight: 600;
+    font-family: var(--font-ui), sans-serif;
+    box-shadow: 0 1px 4px rgba(15, 20, 25, 0.03);
   }
 
   .option:hover {
