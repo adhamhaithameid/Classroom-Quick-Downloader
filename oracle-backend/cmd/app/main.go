@@ -844,6 +844,30 @@ func loggingMiddleware(db *sql.DB, next http.Handler) http.Handler {
 		); err != nil {
 			log.Printf("[WARN] failed to write oracle operation log: %v", err)
 		}
+		if isDangerAuditedPath(r.URL.Path) {
+			auditResult := "ok"
+			if sw.statusCode >= 400 {
+				auditResult = "error"
+			}
+			if err := handlers.AppendAuditLog(
+				r.Context(),
+				db,
+				"danger_action_request",
+				resourceTypeFromRequest(r),
+				r.URL.Path,
+				auditResult,
+				map[string]any{
+					"method":      r.Method,
+					"path":        r.URL.Path,
+					"statusCode":  sw.statusCode,
+					"latencyMs":   duration.Milliseconds(),
+					"requestID":   requestID,
+					"correlation": correlationID,
+				},
+			); err != nil {
+				log.Printf("[WARN] failed to append danger action audit entry: %v", err)
+			}
+		}
 	})
 }
 
