@@ -793,8 +793,9 @@
       border-radius: 18px;
     }
 
-    .two-col {
-      grid-template-columns: 1fr;
+    .un-reinstall-row {
+      flex-direction: column;
+      gap: 10px;
     }
 
     .option {
