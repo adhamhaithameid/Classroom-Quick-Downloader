@@ -114,7 +114,7 @@ ORACLE_AUDIT_CHECKPOINT_SECRET=<set>
 
 SESSION_COOKIE_SECURE=false
 
-PUBLIC_WEBSITE_ALLOWED_ORIGINS=https://classroom-quick-downloader-website.pages.dev,https://not-stable.classroom-quick-downloader-website.pages.dev,https://classroom-quick-downloader.pages.dev,https://adhamhaithameid.github.io,http://localhost:5173,http://127.0.0.1:5173
+PUBLIC_WEBSITE_ALLOWED_ORIGINS=https://<your-root-domain>,https://classroom-quick-downloader-website.pages.dev,https://not-stable.classroom-quick-downloader-website.pages.dev,https://classroom-quick-downloader.pages.dev,https://adhamhaithameid.github.io,http://localhost:5173,http://127.0.0.1:5173
 CLOUDFLARE_PUBLIC_SITE_METRICS_URL=https://cqd-analytics.adhamhaithameid.workers.dev/public/site-metrics
 ORACLE_DEPLOYMENTS_AUTO_SYNC_ENABLED=true
 ORACLE_DEPLOYMENTS_AUTO_SYNC_INTERVAL_SECONDS=900
