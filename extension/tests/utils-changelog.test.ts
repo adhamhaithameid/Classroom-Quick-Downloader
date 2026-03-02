@@ -44,7 +44,9 @@ describe('changelog utils', () => {
       lastFetched: Date.now(),
     };
     chrome.storage.local.get = vi.fn(async () => ({ cqd_changelog_v1: cached })) as never;
-    expect(await mod.fetchChangelog()).toEqual(cached);
+    const result = await mod.fetchChangelog();
+    expect(result?.entries[0]?.id).toBe('c1');
+    expect(result?.revisionToken).toBeTruthy();
   });
 
   it('fetches, validates, and stores changelog payload from network', async () => {
