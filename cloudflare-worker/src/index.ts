@@ -1402,7 +1402,34 @@ export default {
       return handleOptions(request, env);
     }
 
-    if (isProtectedCorsRoute(pathname) && !isCorsOriginAllowedForPath(request, env, pathname)) {
+    const enforceProtectedCors =
+      !(pathname === "/api/public/website/events" && request.method !== "POST");
+    if (
+      isProtectedCorsRoute(pathname) &&
+      enforceProtectedCors &&
+      !isCorsOriginAllowedForPath(request, env, pathname)
+    ) {
+      if (pathname === "/api/public/website/events") {
+        const hasOrigin = normalizeHeaderOrigin(request.headers.get("Origin")) !== null;
+        const errorCode = hasOrigin ? "cors_origin_not_allowed" : "origin_required";
+        const errorMessage = hasOrigin
+          ? "Origin is not allowed for this endpoint."
+          : "Origin header is required for this endpoint.";
+        return withCors(
+          request,
+          new Response(
+            JSON.stringify(
+              websiteEventsErrorBody(
+                errorCode,
+                errorMessage,
+                false,
+              ),
+            ),
+            { status: 403, headers: { "content-type": "application/json" } },
+          ),
+          env,
+        );
+      }
       return withCors(
         request,
         new Response(
