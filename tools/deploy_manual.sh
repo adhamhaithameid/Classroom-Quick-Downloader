@@ -14,6 +14,7 @@ MODE="${1:-help}"
 ORACLE_SSH_DEST="${ORACLE_SSH_DEST:-}"
 ORACLE_SSH_KEY="${ORACLE_SSH_KEY:-$HOME/.ssh/oracle_key}"
 ORACLE_REMOTE_REPO_DIR="${ORACLE_REMOTE_REPO_DIR:-\$HOME/Classroom-Quick-Downloader}"
+ORACLE_TARGET_REF="${ORACLE_TARGET_REF:-origin/main}"
 
 require_cmd() {
   if ! command -v "$1" >/dev/null 2>&1; then
