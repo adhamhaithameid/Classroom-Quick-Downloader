@@ -279,15 +279,19 @@ func TimeSeriesHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		resp := timeSeriesResponse{
-			OK:          true,
-			Granularity: gran,
-			Range:       rangeName,
-			ExtVersion:  extVersion,
-			From:        fromTime.Format("2006-01-02"),
-			To:          toTime.Format("2006-01-02"),
-			Points:      points,
-			Buckets:     points,
+			OK:             true,
+			Granularity:    gran,
+			Range:          rangeName,
+			ExtVersion:     extVersion,
+			GeneratedAtUTC: now.Format(time.RFC3339),
+			From:           fromTime.Format("2006-01-02"),
+			To:             toTime.Format("2006-01-02"),
+			Points:         points,
+			Buckets:        points,
 		}
+		meta := buildWindowMeta(now, fromTime, toTime)
+		resp.WindowStartUTC = meta.WindowStartUTC
+		resp.WindowEndUTC = meta.WindowEndUTC
 
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(resp)
