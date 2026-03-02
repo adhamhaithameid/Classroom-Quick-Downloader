@@ -103,8 +103,8 @@
         })
       });
       submitState = 'done';
-      submitMessage = response?.message || 'Thank you for your feedback!';
-    } catch {
+      submitMessage = response?.message || 'Thank you — your feedback helps us build better software.';
+    } catch (error) {
       submitState = 'error';
       submitMessage = 'Could not submit feedback. Please try again later.';
     }
