@@ -705,7 +705,22 @@
     margin-bottom: 20px;
   }
 
-  .faq-item {
+  .fq-section-icon { font-size: 28px; flex-shrink: 0; }
+
+  .fq-section-head h2 {
+    margin: 0; font-size: 20px; font-weight: 800;
+    letter-spacing: -0.015em;
+  }
+
+  .fq-section-head p {
+    margin: 3px 0 0; font-size: 13px; color: var(--text-secondary);
+  }
+
+
+
+  .fq-list { display: flex; flex-direction: column; gap: 8px; }
+
+  .fq-item {
     text-align: left;
     background: rgba(255, 255, 255, 0.7);
     border: 1px solid var(--border-subtle, rgba(226, 232, 240, 0.35));
