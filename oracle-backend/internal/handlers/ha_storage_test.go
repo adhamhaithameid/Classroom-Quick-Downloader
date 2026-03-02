@@ -511,7 +511,7 @@ func TestRetentionRunHandler_DryRunAndExecute(t *testing.T) {
 	}
 }
 
-func TestRetentionRunHandler_RawSnapshotsPolicyDryRunAndExecute(t *testing.T) {
+func TestRetentionRunHandler_RawSnapshotsPolicyIsIgnored(t *testing.T) {
 	sqlDB := newHAStorageTestDB(t)
 	defer sqlDB.Close()
 
