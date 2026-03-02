@@ -412,6 +412,10 @@ function renderNotificationSection(entries: ChangelogEntry[], config: ChangelogC
           <div id="rules-list-container" style="display: flex; flex-direction: column; gap: 8px; max-height: 400px; overflow-y: auto; padding-right: 4px;">
              <!-- Renders via JS -->
           </div>
+          <div style="display:flex; align-items:center; gap:10px; margin-top:12px;">
+            <button id="btn-save-rules" class="btn btn-primary" style="padding:8px 12px;">Save Notification Rules</button>
+            <span id="rules-save-status" style="font-size:0.75em; color: var(--text-soft);">Idle</span>
+          </div>
         </div>
       </div>
     </section>
