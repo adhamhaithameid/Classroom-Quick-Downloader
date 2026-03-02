@@ -1215,7 +1215,10 @@ func buildPublicWebsiteOverview(ctx context.Context, sqliteDB *sql.DB, store *co
 		return publicWebsiteOverviewResponse{}, err
 	}
 
-	gitHubVersion := fetchGitHubVersionCached(ctx)
+	gitHubVersion := resolveLatestExtensionVersion(ctx, store)
+	if gitHubVersion == nil {
+		gitHubVersion = stringPtrOrNil(lookupBrowserVersion(installs.Browsers, "chrome"))
+	}
 	chromeVersion := stringPtrOrNil(lookupBrowserVersion(installs.Browsers, "chrome"))
 	firefoxVersion := stringPtrOrNil(lookupBrowserVersion(installs.Browsers, "firefox"))
 	edgeVersion := stringPtrOrNil(lookupBrowserVersion(installs.Browsers, "edge"))
