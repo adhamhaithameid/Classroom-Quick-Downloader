@@ -1507,7 +1507,7 @@
         {:else if mediaExpanded === 'problem-flags'}
           <MediaLoader type="image" src="{base}/images/problem-flags.webp" class="l2-media-modal-content" alt="Expanded view" />
         {:else if mediaExpanded === 'solution-flags'}
-          <img class="l2-media-modal-content" src="{base}/images/solution-flags.png" alt="Expanded view" />
+          <MediaLoader type="image" src="{base}/images/solution-flags.webp" class="l2-media-modal-content" alt="Expanded view" />
         {/if}
       </div>
     </div>
