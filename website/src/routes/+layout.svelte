@@ -647,6 +647,29 @@
       animation: slideDown 0.2s ease;
     }
 
+    .l2-nav-mobile-links {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .l2-nav-mobile-links a {
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 8px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .l2-nav-cta-mobile {
+      margin-top: 2px;
+      padding: 11px 16px;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
     .l2-footer-inner {
       flex-wrap: wrap;
       white-space: normal;
