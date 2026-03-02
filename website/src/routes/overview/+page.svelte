@@ -323,6 +323,12 @@
 
   function onMapNo() {
     if (sillyAnswered) return;
+    trackWebsiteEvent({
+      eventType: 'map',
+      action: 'map_no',
+      placement: 'map_prompt_no',
+      pagePath: '/overview'
+    });
     sillyAnswered = true;
     mapInteractionState = 'no';
     try { localStorage.setItem('cqd-silly-answer', 'no'); } catch {}
