@@ -48,6 +48,24 @@ It includes every commit from project inception and groups release windows by ex
 - `2326373` | 2026-02-20 | AdhamHaithamEid | chore(deps): update npm deps and carry eslint 10.0.1 compatibility patch | category: Chore | components: Cloudflare Worker, Dependencies | files: `cloudflare-worker/package.json`, `package.json`, `patches/eslint@10.0.1.patch`, `pnpm-lock.yaml`
 - `ff9075d` | 2026-02-20 | AdhamHaithamEid | chore(deps): upgrade Oracle Go modules to latest Go 1.24-compatible versions | category: Chore | components: Dependencies, Oracle Backend | files: `oracle-backend/go.mod`, `oracle-backend/go.sum`
 
+## [1.3.8] - 2026-03-02
+
+### Summary
+- Reliability release for changelog propagation from Cloudflare to extension clients.
+- Scope: version-pill state, seen-state persistence, and same-version republish behavior.
+
+### Added
+- Revision-token awareness in extension changelog handling tests.
+- Integration coverage for same-version republish and re-open behavior.
+
+### Changed
+- Seen-state comparison now uses version + revision data contract.
+- Release metadata defaults updated to 1.3.8 across extension/worker/website surfaces.
+
+### Fixed
+- Fixed missed user updates when changelog content changed without version bump.
+- Fixed stale changelog visibility after Cloudflare publish/update/delete cycles.
+
 ## [1.3.6] - 2026-02-20
 
 ### Summary
