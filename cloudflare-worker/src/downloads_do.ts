@@ -5653,7 +5653,7 @@ export class DownloadsDurable {
       }
     })();
     logEvent("info", "oracle_flush_attempt", {
-      target: "/ingest-batch",
+      target: targetPath,
       fromPendingBatch: !!pendingMeta,
       eventCount: eventsToFlush.length,
     });
