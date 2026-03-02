@@ -3831,7 +3831,7 @@ export class DownloadsDurable {
 
     const effectiveSnapshot = this.resolveEffectivePublicSiteSnapshot(this.d.publicSiteMetricsSnapshot);
     return json({
-      ok: true,
+      ok: telemetryFlush.ok,
       flushedAtUtc: now,
       source: this.d.websiteOverrideEnabled ? "override" : "snapshot",
       snapshotAtUtc: effectiveSnapshot.snapshotAtUtc,
