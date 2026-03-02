@@ -1967,6 +1967,76 @@ func sanitizePublicWebsiteUninstallRequest(input publicWebsiteUninstallRequest) 
 	}
 }
 
+func sanitizeWebsiteEventSessionID(raw string) string {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return "anonymous"
+	}
+	if len(value) > 96 {
+		value = value[:96]
+	}
+	return value
+}
+
+func sanitizeWebsiteEventPagePath(raw string) string {
+	path := strings.TrimSpace(raw)
+	if path == "" {
+		return "/"
+	}
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+	if len(path) > 200 {
+		path = path[:200]
+	}
+	return path
+}
+
+func sanitizeWebsiteEventPlacement(raw string) string {
+	placement := strings.ToLower(strings.TrimSpace(raw))
+	if placement == "" {
+		return "unknown"
+	}
+	if _, ok := publicWebsiteEventAllowedPlacements[placement]; ok {
+		return placement
+	}
+	return "unknown"
+}
+
+func sanitizeWebsiteEventForAggregate(
+	input publicWebsiteEventIngestEvent,
+	nowUTC time.Time,
+) (eventID, eventType, action, placement, dayUTC string, ok bool) {
+	eventID = strings.TrimSpace(input.EventID)
+	if !websiteEventIDPattern.MatchString(eventID) {
+		return "", "", "", "", "", false
+	}
+
+	eventType = strings.ToLower(strings.TrimSpace(input.EventType))
+	action = strings.ToLower(strings.TrimSpace(input.Action))
+	expectedType, actionAllowed := publicWebsiteEventActionToType[action]
+	if !actionAllowed {
+		return "", "", "", "", "", false
+	}
+	if eventType == "" {
+		eventType = expectedType
+	}
+	if eventType != expectedType {
+		return "", "", "", "", "", false
+	}
+
+	placement = sanitizeWebsiteEventPlacement(input.Placement)
+	eventTime := nowUTC
+	if input.TSUTC != nil && *input.TSUTC > 0 {
+		ts := time.UnixMilli(*input.TSUTC).UTC()
+		if ts.Year() >= 2015 && ts.Year() <= 2200 {
+			eventTime = ts
+		}
+	}
+	dayUTC = eventTime.Format("2006-01-02")
+	return eventID, eventType, action, placement, dayUTC, true
+}
+
 func trimAndLimit(input string, maxLen int) string {
 	input = strings.TrimSpace(input)
 	if input == "" || maxLen <= 0 {
