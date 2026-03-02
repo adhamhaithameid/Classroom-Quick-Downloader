@@ -272,8 +272,7 @@
     padding: 40px 0 60px;
   }
 
-  /* ── Section Grid ────────────────── */
-  .section-grid {
+  .prv-card-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
     gap: 16px;
