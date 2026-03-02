@@ -11,6 +11,7 @@ export type InstallBrowser = {
 };
 
 export type OverviewResponse = {
+  schemaVersion: PublicSchemaVersion;
   ok: boolean;
   generatedAt: number;
   totals: {
