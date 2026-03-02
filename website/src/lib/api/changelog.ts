@@ -118,6 +118,11 @@ function coerceChangelogPayload(input: unknown): ChangelogResponse {
             version,
             date,
             changes,
+            summary: summary || undefined,
+            added,
+            changed,
+            fixed,
+            markdown: markdown || undefined,
             isImportant: raw.isImportant === true
           };
         })
