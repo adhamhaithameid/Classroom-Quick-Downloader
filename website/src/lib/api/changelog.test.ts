@@ -95,7 +95,9 @@ describe('fetchChangelog', () => {
     TEST_TIMEOUT_MS
   );
 
-  it('filters out non-string change entries', async () => {
+  it(
+    'filters out non-string change entries',
+    async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () =>
