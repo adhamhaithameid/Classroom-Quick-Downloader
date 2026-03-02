@@ -980,6 +980,7 @@
         });
         tooltip.innerHTML = html;
         tooltip.classList.add('visible');
+        positionTooltip(e);
       }
 
       function showTooltip(e, payload) {
