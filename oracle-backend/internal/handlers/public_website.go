@@ -386,17 +386,9 @@ func PublicWebsiteSnapshotHandler(sqliteDB, postgresDB *sql.DB) http.HandlerFunc
 		}) {
 			return
 		}
-
-		payload := publicWebsiteMapResponse{
-			OK:          true,
-			GeneratedAt: time.Now().UTC().UnixMilli(),
-			Granularity: "country",
-			Countries:   countries,
-			Totals: publicWebsiteMapTotals{
-				Countries: len(countries),
-				Downloads: downloads,
-			},
-			PrivacyNote: "Country-level usage is aggregated without storing raw IP addresses. VPN/proxy users may appear at exit-node locations.",
+		if r.Method != http.MethodGet {
+			writePublicWebsiteError(w, http.StatusMethodNotAllowed, "method_not_allowed", "Only GET is allowed for this endpoint.", false)
+			return
 		}
 
 		writePublicWebsiteJSON(w, http.StatusOK, payload)
