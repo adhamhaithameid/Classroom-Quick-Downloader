@@ -282,7 +282,6 @@
   }
 
   .site-main {
-    flex: 1;
     padding-top: 32px;
     padding-bottom: 56px;
   }
