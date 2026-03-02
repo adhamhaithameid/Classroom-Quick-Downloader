@@ -14,9 +14,10 @@ import (
 )
 
 const (
-	websiteSyncDirectionOracleToWebsite     = "oracle_to_website"
-	websiteSyncDirectionCloudflareToWebsite = "cloudflare_to_website"
-	websiteSyncDirectionWebsiteToOracle     = "website_to_oracle"
+	websiteSyncDirectionOracleToWebsite           = "oracle_to_website"
+	websiteSyncDirectionCloudflareToWebsite       = "cloudflare_to_website"
+	websiteSyncDirectionWebsiteToOracle           = "website_to_oracle"
+	websiteSyncDirectionCloudflareTrafficToOracle = "cloudflare_traffic_to_oracle"
 
 	defaultCloudflarePublicSiteMetricsURL = "https://cqd-analytics.adhamhaithameid.workers.dev/public/site-metrics"
 	websiteOpsBodyLimitBytes              = 256 << 10 // 256 KiB
