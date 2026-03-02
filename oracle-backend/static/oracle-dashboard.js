@@ -823,6 +823,85 @@
         }
       }
 
+      function chartsRangeParams(range) {
+        switch (String(range || '').toLowerCase()) {
+          case 'today': return { range: 'today', granularity: 'hour' };
+          case 'week': return { range: 'week', granularity: 'day' };
+          case 'month': return { range: 'month', granularity: 'day' };
+          case 'year': return { range: 'year', granularity: 'day' };
+          case 'all': return { range: 'all', granularity: 'day' };
+          default: return { range: 'week', granularity: 'day' };
+        }
+      }
+
+      function parseIsoDate(iso) {
+        var value = String(iso || '').trim();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+        var date = new Date(value + 'T00:00:00Z');
+        if (Number.isNaN(date.getTime())) return null;
+        return date;
+      }
+
+      function previousDateWindow(fromIso, toIso) {
+        var fromDate = parseIsoDate(fromIso);
+        var toDate = parseIsoDate(toIso);
+        if (!fromDate || !toDate) return null;
+        var dayMs = 24 * 60 * 60 * 1000;
+        var spanDays = Math.max(1, Math.round((toDate.getTime() - fromDate.getTime()) / dayMs) + 1);
+        var prevTo = new Date(fromDate.getTime() - dayMs);
+        var prevFrom = new Date(prevTo.getTime() - (spanDays - 1) * dayMs);
+        return {
+          from: prevFrom.toISOString().slice(0, 10),
+          to: prevTo.toISOString().slice(0, 10)
+        };
+      }
+
+      function setChartsWindowMeta(meta) {
+        var node = document.getElementById('charts-window-meta');
+        if (!node) return;
+        if (!meta) {
+          node.textContent = '--';
+          return;
+        }
+        var start = String(meta.windowStartUtc || '').trim();
+        var end = String(meta.windowEndUtc || '').trim();
+        var generatedAt = String(meta.generatedAtUtc || '').trim();
+        var text = (start || '--') + ' → ' + (end || '--');
+        if (generatedAt) text += ' · generated ' + generatedAt;
+        node.textContent = text;
+      }
+
+      function setChartsExportDataset(name, rows) {
+        chartsLastExportName = String(name || 'chart_data').trim() || 'chart_data';
+        chartsLastExportRows = Array.isArray(rows) ? rows : [];
+      }
+
+      function exportRowsAsCSV(name, rows) {
+        if (!Array.isArray(rows) || !rows.length) return;
+        var columns = Object.keys(rows[0] || {});
+        if (!columns.length) return;
+        var csv = columns.join(',') + '\n';
+        rows.forEach(function(row) {
+          var values = columns.map(function(col) {
+            var raw = row[col];
+            var text = String(raw == null ? '' : raw);
+            if (text.includes('"') || text.includes(',') || text.includes('\n')) {
+              return '"' + text.replace(/"/g, '""') + '"';
+            }
+            return text;
+          });
+          csv += values.join(',') + '\n';
+        });
+        var blob = new Blob([csv], { type: 'text/csv' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        var dateToken = new Date().toISOString().slice(0, 10);
+        a.href = url;
+        a.download = chartsLastExportName + '_' + dateToken + '.csv';
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+
       function getBrowserIcon(b) {
         var icons = {
           chrome: '🌐',
