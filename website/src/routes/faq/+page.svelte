@@ -761,9 +761,8 @@
   .fq-answer {
     margin: 0; padding: 0 18px 16px;
     color: var(--text-secondary);
-    font-size: 14px;
-    line-height: 1.75;
-    animation: slideDown 0.18s ease;
+    font-size: 14px; line-height: 1.75;
+    animation: slideDown 0.2s ease;
   }
 
   @keyframes slideDown {
