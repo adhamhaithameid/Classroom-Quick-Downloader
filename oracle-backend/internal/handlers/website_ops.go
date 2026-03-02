@@ -511,7 +511,7 @@ func insertWebsiteSyncBatchWithRunner(
 	if strings.TrimSpace(status) == "" {
 		status = "ok"
 	}
-	_, err = db.ExecContext(
+	_, err = runner.ExecContext(
 		ctx,
 		`INSERT INTO website_sync_batches (
 			direction, batch_id, triggered_by, status, details_json, created_at
