@@ -361,17 +361,10 @@
     padding: 44px 24px 32px;
   }
 
-  .hero-icon {
-    width: 56px;
-    height: 56px;
-    border-radius: 16px;
-    background: var(--gc-green-bg);
-    border: 1px solid rgba(26, 139, 85, 0.12);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--gc-green);
-    margin-bottom: 16px;
+  .un-label {
+    font-size: 11px; font-weight: 700; color: var(--green);
+    letter-spacing: 0.1em; text-transform: uppercase;
+    display: block; margin-bottom: 14px;
   }
 
   .hero h1 {
