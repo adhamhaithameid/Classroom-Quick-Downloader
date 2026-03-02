@@ -2768,6 +2768,10 @@ export class DownloadsDurable {
       return this.handlePublicSiteMetrics();
     }
 
+    if (pathname === "/api/public/website/events" && request.method === "POST") {
+      return this.handlePublicWebsiteEvents(request);
+    }
+
     // Admin Changelog Update
     if (pathname === "/admin/changelog" && request.method === "POST") {
       return this.handleAdminUpdateChangelog(request);
