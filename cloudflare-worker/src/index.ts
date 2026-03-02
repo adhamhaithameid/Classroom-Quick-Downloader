@@ -420,7 +420,6 @@ function isPublicCorsRoute(pathname: string): boolean {
     pathname === "/pipeline-health" ||
     pathname === "/changelog" ||
     pathname === "/track" ||
-    pathname === "/public/site-metrics" ||
     isOraclePublicWebsiteRoute(pathname)
   );
 }
