@@ -37,6 +37,7 @@ function mockEnv(overrides: Partial<Env> = {}): Env {
     ORACLE_ENDPOINT: "https://oracle.local/ingest-batch",
     MAX_BATCH_EVENTS: "10000",
     DASHBOARD_PASSWORD: "dashboard-secret",
+    CORS_ALLOWED_ORIGINS: "https://classroom-quick-downloader-website.pages.dev,https://stats.example.com",
     ...overrides,
   };
 }
