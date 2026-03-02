@@ -273,7 +273,8 @@ Configured workflows:
 ### 6.1 Deploy Oracle manually
 
 ```bash
-ssh -i ~/.ssh/oracle_key ubuntu@129.151.233.229
+ORACLE_HOST="<oracle-host>"
+ssh -i ~/.ssh/oracle_key "ubuntu@${ORACLE_HOST}"
 cd ~/Classroom-Quick-Downloader
 git fetch --prune origin main
 git checkout main
