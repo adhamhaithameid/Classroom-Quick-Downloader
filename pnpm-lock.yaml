@@ -6161,7 +6161,7 @@ snapshots:
     transitivePeerDependencies:
       - picomatch
 
-  svelte@5.53.1:
+  svelte@5.53.5:
     dependencies:
       '@jridgewell/remapping': 2.3.5
       '@jridgewell/sourcemap-codec': 1.5.5
