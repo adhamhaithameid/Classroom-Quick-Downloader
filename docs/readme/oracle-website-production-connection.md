@@ -16,7 +16,7 @@ export SUPER_ADMIN_PASSWORD='replace-with-strong-super-admin-password'
 export ARCHIVER_SHARED_SECRET='replace-with-strong-archiver-secret'
 export ORACLE_AUDIT_CHECKPOINT_SECRET='replace-with-strong-audit-secret'
 export SESSION_COOKIE_SECURE=true
-export PUBLIC_WEBSITE_ALLOWED_ORIGINS='https://<your-cloudflare-pages-domain>,http://localhost:5173'
+export PUBLIC_WEBSITE_ALLOWED_ORIGINS='https://<your-root-domain>,https://classroom-quick-downloader-website.pages.dev,http://localhost:5173'
 export CLOUDFLARE_PUBLIC_SITE_METRICS_URL='https://<worker-domain>/public/site-metrics'
 
 go run ./cmd/app
