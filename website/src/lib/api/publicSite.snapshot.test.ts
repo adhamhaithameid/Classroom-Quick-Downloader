@@ -115,18 +115,37 @@ describe('fetchWebsiteSnapshot', () => {
             versions: { github: null, chrome: null, firefox: null, edge: null },
             status: { systemLive: true, liveSinceUtc: 1, workerHealth: 'up' },
             links: { chrome: 'https://c', firefox: 'https://f', edge: 'https://e', github: 'https://g' }
-          }),
-          { status: 200 }
-        );
-      }
-      return new Response(
-        JSON.stringify({
-          ok: true,
-          generatedAt: Date.now(),
-          granularity: 'country',
-          countries: [{ countryCode: 'US', count: 1 }],
-          totals: { countries: 1, downloads: 1 },
-          privacyNote: 'country-only'
+          },
+          map: {
+            ok: true,
+            generatedAt: Date.now(),
+            granularity: 'country',
+            countries: [{ countryCode: 'US', count: 1 }],
+            totals: { countries: 1, downloads: 1 },
+            privacyNote: 'country-only'
+          },
+          changelog: {
+            ok: true,
+            generatedAt: Date.now(),
+            headline: '',
+            description: '',
+            entries: [],
+            fullChangelogUrl: '',
+            lastUpdatedAtUtc: null
+          },
+          userChangelogSummary: {
+            headline: '',
+            description: '',
+            entriesCount: 0,
+            lastUpdatedAtUtc: null,
+            fullChangelogUrl: ''
+          },
+          privacy: {
+            headline: '',
+            description: '',
+            userPrivacyUrl: '',
+            fullPrivacyUrl: ''
+          }
         }),
         { status: 200 }
       );
