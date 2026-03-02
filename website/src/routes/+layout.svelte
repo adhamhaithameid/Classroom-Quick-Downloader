@@ -23,7 +23,7 @@
   ];
   let nav = [...baseNav];
 
-  let detectedBrowser: 'chrome' | 'firefox' | 'edge' = 'chrome';
+  let detectedBrowser: BrowserKey = 'chrome';
   let mobileNavOpen = false;
   const currentYear = new Date().getFullYear();
   let routeKey = '/';
