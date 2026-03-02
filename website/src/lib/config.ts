@@ -20,7 +20,28 @@ function ensureUrl(value: string, fallback: string): string {
 	}
 }
 
-export const SITE_URL = ensureUrl(env.PUBLIC_SITE_URL ?? '', DEFAULT_SITE_URL);
+function resolveDefaultSiteUrl(): string {
+	if (typeof window !== 'undefined') {
+		try {
+			const origin = cleanBaseUrl(window.location.origin);
+			if (origin.startsWith('https://') || origin.startsWith('http://')) {
+				return origin;
+			}
+		} catch {
+			// fall through to static fallback
+		}
+	}
+	return DEFAULT_SITE_URL;
+}
+
+function envBool(value: string | undefined, fallback = false): boolean {
+  if (typeof value !== 'string') return fallback;
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) return fallback;
+  return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
+}
+
+export const SITE_URL = ensureUrl(env.PUBLIC_SITE_URL ?? '', resolveDefaultSiteUrl());
 export const ORACLE_API_BASE_URL = ensureUrl(env.PUBLIC_ORACLE_API_BASE_URL ?? '', DEFAULT_ORACLE_URL);
 export const WORKER_BASE_URL = ensureUrl(env.PUBLIC_WORKER_BASE_URL ?? '', DEFAULT_WORKER_URL);
 export const APP_VERSION = (() => {
