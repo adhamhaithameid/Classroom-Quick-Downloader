@@ -4032,7 +4032,7 @@ snapshots:
     dependencies:
       esm-env: 1.2.2
       number-flow: 0.5.12
-      svelte: 5.53.1
+      svelte: 5.53.5
 
   '@pnpm/config.env-replace@1.1.0': {}
 
