@@ -951,15 +951,21 @@
       var currentTooltipEvent = null;
       var currentTooltipPayload = null;
 
-      document.addEventListener('keyup', function(e) {
-        if (e.key === 'Meta' || e.key === 'Control') {
-          cmdHeld = false;
-          canShowTooltip = false;
-          if (cmdTimer) clearTimeout(cmdTimer);
-          cmdTimer = null;
-          hideTooltip();
-        }
-      });
+      function positionTooltip(e) {
+        if (!tooltip || !e) return;
+        var x = Number(e.clientX || 0) + 16;
+        var y = Number(e.clientY || 0) + 16;
+        var viewportW = Math.max(320, window.innerWidth || 0);
+        var viewportH = Math.max(240, window.innerHeight || 0);
+        var tipW = Math.max(120, tooltip.offsetWidth || 220);
+        var tipH = Math.max(60, tooltip.offsetHeight || 90);
+        if (x + tipW > viewportW - 10) x = viewportW - tipW - 10;
+        if (y + tipH > viewportH - 10) y = viewportH - tipH - 10;
+        if (x < 10) x = 10;
+        if (y < 10) y = 10;
+        tooltip.style.left = String(x) + 'px';
+        tooltip.style.top = String(y) + 'px';
+      }
       
       function renderTooltip(e, payload) {
         var model = payload || {};
