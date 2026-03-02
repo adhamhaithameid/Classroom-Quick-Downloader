@@ -162,7 +162,7 @@ describe('fetchWebsiteSnapshot', () => {
 
     vi.setSystemTime(new Date('2026-02-23T04:10:00.000Z'));
     const refreshed = await fetchWebsiteSnapshot();
-    expect(fetchMock).toHaveBeenCalledTimes(6);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(refreshed.fetchedAtUtc).toBeGreaterThan(first.fetchedAtUtc);
   });
 });
