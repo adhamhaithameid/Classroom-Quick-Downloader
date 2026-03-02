@@ -1820,7 +1820,8 @@ export class DownloadsDurable {
       configHealthNotifyCritIntervalMs: HEALTH_NOTIFY_CRIT_INTERVAL_MS,
 
       // Changelog defaults
-      changelog: [],
+      changelog: defaultExtensionChangelogEntries(),
+      changelogRevisions: [],
       changelogConfig: {
         rules: [],
         lastUpdated: Date.now(),
