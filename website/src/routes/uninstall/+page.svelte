@@ -237,6 +237,7 @@
 
           <!-- Submit -->
           <button
+            class="un-submit"
             type="button"
             class="option small"
             class:selected={selectedFeatures.includes(feat)}
