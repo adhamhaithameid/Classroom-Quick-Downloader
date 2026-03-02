@@ -437,8 +437,11 @@
     const normalize = () => {
       const setW = getSetWidth();
       if (setW <= 0) return;
-      if (viewport.scrollLeft >= setW * 6) viewport.scrollLeft -= setW;
-      if (viewport.scrollLeft <= setW) viewport.scrollLeft += setW;
+      // Keep offset in the middle band so the illusion of infinite scroll holds
+      const minBound = -(setW * 6);
+      const maxBound = -(setW);
+      if (offset < minBound) offset += setW;
+      if (offset > maxBound) offset -= setW;
     };
 
     /* Auto-scroll tick */
