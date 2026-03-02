@@ -348,6 +348,7 @@ const parsedAllowedOriginsCache = new Map<string, Set<string>>();
 const parsedAllowedEmailsCache = new Map<string, Set<string>>();
 const WEBSITE_EVENTS_SCHEMA_VERSION = "1" as const;
 const ORACLE_PUBLIC_WEBSITE_PATHS = new Set<string>([
+  "/api/public/website/snapshot",
   "/api/public/website/overview",
   "/api/public/website/map",
   "/api/public/website/status",
