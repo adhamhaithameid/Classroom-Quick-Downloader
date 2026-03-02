@@ -664,7 +664,7 @@
       border-color: rgba(26, 139, 85, 0.22);
     }
 
-    .entry {
+    .cl-entry {
       grid-template-columns: 20px 1fr;
       gap: 14px;
       padding-bottom: 28px;
