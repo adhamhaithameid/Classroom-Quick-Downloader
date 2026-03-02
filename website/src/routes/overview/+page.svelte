@@ -1653,7 +1653,13 @@
                 <p class="l2-silly-typed">{noTypedText}<span class="l2-typing-cursor">|</span></p>
                 {#if noShowCta}
                   <div class="l2-silly-cta-reveal" transition:scale={{ duration: 300, start: 0.7 }}>
-                    <a class="l2-cta l2-cta-current l2-silly-install" href={browserLink(detectedBrowser)} target="_blank" rel="noopener noreferrer">
+                    <a
+                      class="l2-cta l2-cta-current l2-silly-install"
+                      href={browserLink(detectedBrowser)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      on:click={() => trackInstallClick('map_prompt_install')}
+                    >
                       <img src="{base}/images/{detectedBrowser}.svg" alt="" class="l2-cta-icon" />
                       Install for {browserDisplayName(detectedBrowser)}
                     </a>
