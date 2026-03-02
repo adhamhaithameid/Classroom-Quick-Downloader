@@ -4078,6 +4078,10 @@ export function renderDashboard(stats: StatsResponse): string {
                 <span style="color: var(--text-muted);">Last Manual Flush (UTC)</span>
                 <strong id="website-last-manual-flush" style="color:var(--text-primary);">—</strong>
               </div>
+              <div style="display:flex; justify-content:space-between; gap:10px; font-size:0.78rem;">
+                <span style="color: var(--text-muted);">Last Telemetry ACK (UTC)</span>
+                <strong id="website-last-telemetry-ack" style="color:var(--text-primary);">—</strong>
+              </div>
             </div>
             <div style="display:flex; flex-direction:column; gap:8px; margin-bottom: 10px;">
               <label style="display:flex; align-items:center; gap:8px; font-size:0.78rem; color:var(--text-secondary);">
