@@ -4498,6 +4498,14 @@ export class DownloadsDurable {
 
     const result = await this.flushToOracle(true);
     if (!result.ok) {
+      this.appendDangerAudit(
+        request,
+        "force_flush",
+        "/admin/force-flush",
+        "error",
+        result.error || "flush_failed",
+      );
+      await this.persist();
       return json(
         {
           ok: false,
