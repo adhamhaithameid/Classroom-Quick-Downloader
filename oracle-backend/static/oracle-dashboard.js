@@ -4196,6 +4196,42 @@
           });
         });
 
+        var chartsRangeSelect = document.getElementById('charts-range-select');
+        if (chartsRangeSelect && chartsRangeSelect.dataset.boundChange !== '1') {
+          chartsRangeSelect.dataset.boundChange = '1';
+          chartsRangeSelect.addEventListener('change', onChartsControlsChange);
+        }
+        if (chartsRangeSelect && document.activeElement !== chartsRangeSelect) {
+          chartsRangeSelect.value = chartsRange;
+        }
+        var chartsDimensionSelect = document.getElementById('charts-dimension-select');
+        if (chartsDimensionSelect && chartsDimensionSelect.dataset.boundChange !== '1') {
+          chartsDimensionSelect.dataset.boundChange = '1';
+          chartsDimensionSelect.addEventListener('change', onChartsControlsChange);
+        }
+        if (chartsDimensionSelect && document.activeElement !== chartsDimensionSelect) {
+          chartsDimensionSelect.value = chartsDimension;
+        }
+        var chartsCompareCheckbox = document.getElementById('charts-compare-previous');
+        if (chartsCompareCheckbox && chartsCompareCheckbox.dataset.boundChange !== '1') {
+          chartsCompareCheckbox.dataset.boundChange = '1';
+          chartsCompareCheckbox.addEventListener('change', onChartsControlsChange);
+        }
+        if (chartsCompareCheckbox) {
+          chartsCompareCheckbox.checked = chartsComparePrevious;
+        }
+        var dailyDownloadsRangeSelect = document.getElementById('daily-downloads-range-select');
+        if (dailyDownloadsRangeSelect && dailyDownloadsRangeSelect.dataset.boundChange !== '1') {
+          dailyDownloadsRangeSelect.dataset.boundChange = '1';
+          dailyDownloadsRangeSelect.addEventListener('change', function() {
+            dailyDownloadsRange = String(dailyDownloadsRangeSelect.value || '14');
+            loadCharts();
+          });
+        }
+        if (dailyDownloadsRangeSelect && document.activeElement !== dailyDownloadsRangeSelect) {
+          dailyDownloadsRangeSelect.value = dailyDownloadsRange;
+        }
+
         [
           ['shortcuts-btn', openShortcutsModal],
           ['shortcuts-btn-mobile', openShortcutsModal],
