@@ -3482,6 +3482,16 @@
       border-radius: 14px;
       padding: 8px;
     }
+    .l2-cta-content {
+      border-radius: 20px;
+      padding: 30px 20px;
+    }
+    .l2-cta-content p {
+      margin-bottom: 26px;
+      font-size: 16px;
+    }
+    .l2-data-actions { width: 100%; }
+    .l2-degraded-pill { white-space: normal; text-align: center; }
     .l2-ps-expand-btn-modal {
       width: 34px;
       height: 34px;
