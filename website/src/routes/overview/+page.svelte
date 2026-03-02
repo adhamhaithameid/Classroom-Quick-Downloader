@@ -3457,7 +3457,6 @@
     .l2-ps-pair { grid-template-columns: 1fr; gap: 20px; }
     .l2-ps-flow-arrow { transform: rotate(90deg); justify-self: center; }
     .l2-ps-expand-btn { opacity: 1; transform: scale(1); }
-    .l2-cta-3d { display: none; }
     .l2-media-modal-backdrop { padding: 8px; }
     .l2-map-layout { grid-template-columns: 1fr; gap: 20px; }
     .l2-map-copy { max-width: none; }
