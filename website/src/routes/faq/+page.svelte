@@ -735,10 +735,10 @@
     box-shadow: 0 2px 8px rgba(15,20,25,0.05);
   }
 
-  .faq-item.open {
-    border-color: rgba(26, 139, 85, 0.28);
-    box-shadow: 0 4px 16px rgba(15, 20, 25, 0.06);
-    background: rgba(255, 255, 255, 0.85);
+  .fq-item.open {
+    border-color: rgba(26,139,85,0.28);
+    box-shadow: 0 4px 16px rgba(15,20,25,0.06);
+    background: rgba(255,255,255,0.9);
   }
 
   .faq-question {
