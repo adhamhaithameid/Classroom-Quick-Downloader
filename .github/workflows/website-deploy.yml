@@ -3,11 +3,6 @@ name: Deploy Website (Cloudflare Pages)
 on:
   push:
     branches: [main]
-    paths:
-      - "website/**"
-      - "CHANGELOG.md"
-      - "PRIVACY.md"
-      - ".github/workflows/website-deploy.yml"
   workflow_dispatch:
 
 permissions:
