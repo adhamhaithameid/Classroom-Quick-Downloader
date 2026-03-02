@@ -494,3 +494,43 @@ Use these rollback references per system.
 - Keep production passwords and API tokens in GitHub Secrets / server `.env.production`.
 - Never commit credentials to repo.
 - Always verify `/health` and one public website endpoint after each deploy.
+
+## 11) Security Incident Containment (Deployment Context)
+
+If deployment reveals security regression:
+
+1. Freeze deployments and admin mutations.
+2. Roll back affected component to known-good SHA.
+3. Rotate impacted secrets.
+4. Invalidate sessions.
+5. Preserve evidence (logs, run IDs, request IDs).
+6. Follow `/Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/docs/RUNBOOK_INCIDENT_RESPONSE.md`.
+
+## 11) Rollout Status and Remaining Steps (2026-02-28)
+
+### Completed in code
+- Oracle now supports Cloudflare traffic sync storage + scheduler + manual refresh endpoint.
+- Oracle dashboard now renders Cloudflare traffic cards and daily traffic table.
+- Config surfaces for traffic sync/env toggles are documented and wired into runtime config.
+
+### Still required manually in platform dashboards
+- Attach production root custom domain to Cloudflare Pages project.
+- Enable redirect from `https://classroom-quick-downloader-website.pages.dev` to root custom domain.
+- When root domain is attached, set/verify these runtime values:
+  - `PUBLIC_SITE_URL=https://<root-domain>`
+  - `PUBLIC_WEBSITE_ALLOWED_ORIGINS` includes root domain + required pages.dev domains
+  - Worker `CORS_ALLOWED_ORIGINS` includes root domain
+  - Oracle `CLOUDFLARE_ANALYTICS_HOSTNAME=<root-domain>`
+  - Oracle `CLOUDFLARE_ANALYTICS_API_TOKEN`, `CLOUDFLARE_ANALYTICS_ACCOUNT_TAG`
+
+### Post-enable checks
+- Trigger `POST /api/admin/website/traffic/refresh` once from Oracle dashboard.
+- Confirm dashboard `traffic.status="ok"` and `lastSyncedAtUtc` updates.
+- Validate public site event write from root domain origin (`/api/public/website/events`) returns success.
+
+### Current runtime status (verified 2026-02-28)
+- `ORACLE_WEBSITE_TRAFFIC_SYNC_ENABLED=true` is active in production Oracle runtime.
+- Manual refresh was executed successfully and persisted traffic rows in `website_traffic_hourly`.
+- Cloudflare Pages API currently reports only `classroom-quick-downloader-website.pages.dev` attached to the Pages project.
+- Cloudflare Pages custom-domain list is currently empty for this project, so root-domain redirect cutover is still blocked on domain attach.
+- Worker `cqd-analytics` runtime currently has `CORS_ALLOWED_ORIGINS` set to pages.dev + local origins (root domain not yet present).
