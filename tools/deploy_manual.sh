@@ -44,7 +44,8 @@ deploy_oracle() {
   echo "[oracle] deploying remotely via SSH"
   echo "  target: $ORACLE_SSH_DEST"
   echo "  key: $ORACLE_SSH_KEY"
-  ssh -i "$ORACLE_SSH_KEY" "$ORACLE_SSH_DEST" "REPO_DIR=$ORACLE_REMOTE_REPO_DIR bash -s" <<'EOF'
+  echo "  git ref: $ORACLE_TARGET_REF"
+  ssh -i "$ORACLE_SSH_KEY" "$ORACLE_SSH_DEST" "REPO_DIR=$ORACLE_REMOTE_REPO_DIR TARGET_REF=$ORACLE_TARGET_REF bash -s" <<'EOF'
 set -euo pipefail
 if [[ ! -d "$REPO_DIR/.git" ]]; then
   git clone https://github.com/adhamhaithameid/Classroom-Quick-Downloader.git "$REPO_DIR"
