@@ -5625,12 +5625,48 @@ export function renderDashboard(stats: StatsResponse): string {
         if (!revisionHistoryEl) return;
         revisionHistoryEl.innerHTML = '<div class="cl-preview-empty">Loading revisions…</div>';
         try {
-          const res = await fetch("/admin/changelog", {
-            method: "POST",
-            headers: { 
-              "Content-Type": "application/json"
-            },
-            credentials: "same-origin",
+          const data = await fetchAdminChangelogState();
+          syncChangelogUiFromState(data);
+          await refreshLivePreviewFromPublicEndpoint();
+          const history = Array.isArray(data.history) ? data.history : [];
+          if (!history.length) {
+            revisionHistoryEl.innerHTML = '<div class="cl-preview-empty">No revisions saved yet.</div>';
+            return;
+          }
+          revisionHistoryEl.innerHTML = history.slice(0, 15).map((row) => {
+            const when = new Date(Number(row.createdAt || 0)).toLocaleString('en-US', { timeZone: 'UTC' });
+            const source = String(row.source || 'manual');
+            const valid = row.valid === true ? 'valid' : 'needs check';
+            const releases = Number(row.releases || 0);
+            return '<div class="cl-revision-item"><strong>' + escapeHtmlUnsafe(source) + '</strong> · ' +
+              escapeHtmlUnsafe(valid) + ' · ' + releases + ' releases<br>' +
+              '<span>' + escapeHtmlUnsafe(when) + ' UTC</span></div>';
+          }).join('');
+        } catch (_) {
+          revisionHistoryEl.innerHTML = '<div class="cl-preview-empty">Failed to load revision history.</div>';
+        }
+      }
+
+      async function previewMarkdownDraft(fromUrlOnly) {
+        const markdown = markdownInputEl ? markdownInputEl.value.trim() : '';
+        const markdownUrl = markdownUrlInputEl ? markdownUrlInputEl.value.trim() : '';
+        if (!markdown && !markdownUrl) {
+          if (draftPreviewEl) draftPreviewEl.innerHTML = '<div class="cl-preview-empty">Paste markdown or provide a URL first.</div>';
+          return;
+        }
+        const payload = {};
+        if (!fromUrlOnly && markdown) payload.markdown = markdown;
+        if (markdownUrl) payload.markdownUrl = markdownUrl;
+        if (fromUrlOnly && !markdownUrl) {
+          if (draftPreviewEl) draftPreviewEl.innerHTML = '<div class="cl-preview-empty">Provide a markdown URL to import.</div>';
+          return;
+        }
+        if (draftPreviewEl) draftPreviewEl.innerHTML = '<div class="cl-preview-empty">Parsing markdown…</div>';
+        try {
+          const res = await fetch('/admin/changelog/parse', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
             body: JSON.stringify(payload)
           });
           const data = await res.json();
