@@ -612,7 +612,7 @@
     font-family: var(--font-ui), sans-serif;
     cursor: pointer;
     transition: all 0.25s ease;
-    box-shadow: var(--shadow-green);
+    box-shadow: 0 4px 20px rgba(26, 139, 85, 0.25);
   }
 
   .submit-btn:hover {
