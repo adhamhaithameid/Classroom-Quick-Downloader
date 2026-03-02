@@ -953,7 +953,7 @@ func serveIndexWithNonce(w http.ResponseWriter, r *http.Request, staticRoot stri
 // - GOOGLE_CREDS_PATH: Path to service account JSON (default: /run/secrets/google-credentials.json)
 // - KUMA_PUSH_URL: Optional Uptime Kuma push URL
 func scheduleSheetsArchiver() {
-	sheetsID := os.Getenv("SHEETS_ID")
+	sheetsID := resolveSheetsIDFromEnv()
 	if sheetsID == "" {
 		log.Println("[Scheduler] SHEETS_ID not set, skipping automated Sheets export")
 		return
