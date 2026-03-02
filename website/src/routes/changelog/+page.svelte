@@ -1,8 +1,5 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { fetchUserChangelog } from '$lib/api/publicSite';
-  import type { UserChangelogResponse } from '$lib/types/public';
-  import AnimatedNumericText from '$lib/components/AnimatedNumericText.svelte';
   import { STORE_LINKS } from '$lib/config';
 
   let changelog: UserChangelogResponse | null = null;
