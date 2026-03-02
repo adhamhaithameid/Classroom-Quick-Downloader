@@ -1,6 +1,6 @@
 # 🏛️ Oracle Backend & Analytics Engine
 
-> Update (2026-02-15): Latest changes include CI coverage-gate hardening for extension analytics storage migration fallback, popup stats race-condition guards, structured step-up auth error handling in Oracle dashboard, and backend/worker auth-security hardening. See /CHANGELOG.md for details.
+> Update (2026-02-28): Cloudflare website traffic sync is now integrated into Oracle analytics (`traffic` + `trafficDaily`, scheduler + manual refresh endpoint). Full scan status and remaining rollout steps are in `/docs/MAJOR_SCAN_2026-02-28.md` and `/docs/DEPLOYMENT_RUNBOOK.md`.
 
 ![Go](https://img.shields.io/badge/Go-1.24-00ADD8?logo=go&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-Pure_Go-003B57?logo=sqlite&logoColor=white)
