@@ -6585,7 +6585,11 @@ export class DownloadsDurable {
 
     // If allowlist is disabled, allow all
     if (!this.d.ipAllowlistEnabled || this.d.ipAllowlist.length === 0) {
-      return json({ allowed: true });
+      return json({
+        allowed: true,
+        enabled: this.d.ipAllowlistEnabled,
+        stepUpBypassEnabled: this.d.ipAllowlistStepUpBypassEnabled,
+      });
     }
 
     // Check CIDR/IP match
