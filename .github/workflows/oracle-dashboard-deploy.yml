@@ -13,6 +13,31 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  preflight:
+    name: Pre-deploy Guardrails
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate required GitHub secrets
+        env:
+          ORACLE_HOST: ${{ secrets.ORACLE_HOST }}
+          ORACLE_SSH_KEY: ${{ secrets.ORACLE_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          required=(ORACLE_HOST ORACLE_SSH_KEY)
+          for key in "${required[@]}"; do
+            if [ -z "${!key:-}" ]; then
+              echo "::error::Missing required Actions secret: ${key}"
+              exit 1
+            fi
+          done
+
+      - name: Schema compatibility checks
+        run: bash tools/check_schema_compat.sh
+
   deploy:
     name: Deploy Oracle Backend on VM
     runs-on: ubuntu-latest
