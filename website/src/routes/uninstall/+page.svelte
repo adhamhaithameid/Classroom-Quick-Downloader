@@ -783,8 +783,9 @@
       border-radius: 16px;
     }
 
-    .hero {
-      padding: 28px 16px 16px;
+    .un-pill {
+      padding: 10px 16px;
+      font-size: 13px;
     }
 
     .step {
