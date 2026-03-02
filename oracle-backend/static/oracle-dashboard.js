@@ -1328,6 +1328,45 @@
           if (statusIndicatorError) {
             statusIndicatorError.setAttribute("data-tooltip", "Backend status: Error. Last overview request failed.");
           }
+          renderOverviewWebsiteStatsFallback();
+        }
+      }
+
+      function renderOverviewWebsiteStatsFallback() {
+        setTextOrPlaceholder('stat-website-visits', '--');
+        setTextOrPlaceholder('stat-website-feedback', '--');
+        setTextOrPlaceholder('stat-website-cta-clicks', '--');
+        setTextOrPlaceholder('stat-website-map-ratio', '--');
+        setTextOrPlaceholder('stat-website-map-total', '--');
+      }
+
+      function setTextOrPlaceholder(id, value) {
+        var node = document.getElementById(id);
+        if (!node) return;
+        node.textContent = String(value == null ? '--' : value);
+      }
+
+      async function loadOverviewWebsiteStats(forceRefresh) {
+        try {
+          var analytics = await cachedFetchJSON('/api/admin/website/analytics?range=all', 45000, { forceRefresh: !!forceRefresh });
+          var traffic = analytics && analytics.traffic ? analytics.traffic : {};
+          var feedback = analytics && analytics.feedback ? analytics.feedback : {};
+          var buttons = analytics && analytics.buttons ? analytics.buttons : {};
+          var map = analytics && analytics.map ? analytics.map : {};
+          var installClicks = Number(buttons.installClicks || 0);
+          var downloadClicks = Number(buttons.downloadClicks || 0);
+          var mapYes = Number(map.yes || 0);
+          var mapNo = Number(map.no || 0);
+          var mapResponses = mapYes + mapNo;
+          var ratioPct = mapResponses > 0 ? (mapYes / mapResponses) * 100 : 0;
+
+          setTextOrPlaceholder('stat-website-visits', fmtNumber(Number(traffic.visits || 0)));
+          setTextOrPlaceholder('stat-website-feedback', fmtNumber(Number(feedback.totalSubmissions || 0)));
+          setTextOrPlaceholder('stat-website-cta-clicks', fmtNumber(installClicks + downloadClicks));
+          setTextOrPlaceholder('stat-website-map-ratio', mapResponses > 0 ? (ratioPct.toFixed(1) + '%') : '--');
+          setTextOrPlaceholder('stat-website-map-total', 'Yes ' + fmtNumber(mapYes) + ' / No ' + fmtNumber(mapNo));
+        } catch (_) {
+          renderOverviewWebsiteStatsFallback();
         }
       }
 
