@@ -126,6 +126,9 @@
     window.addEventListener('keydown', handleWindowKeydown);
     return () => {
       window.removeEventListener('keydown', handleWindowKeydown);
+      void flushWebsiteEvents({ beaconPreferred: true });
+      disposeWebsiteEvents();
+      disposeSnapshotStore();
     };
   });
 </script>
