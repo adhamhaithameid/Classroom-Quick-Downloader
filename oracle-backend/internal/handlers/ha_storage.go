@@ -992,6 +992,418 @@ func persistDRDrill(ctx context.Context, sqliteDB, postgresDB *sql.DB, rec drDri
 	return err
 }
 
+func buildWebsiteChainHealthPayload(ctx context.Context, sqliteDB *sql.DB, nowUTC time.Time) map[string]any {
+	nowMillis := nowUTC.UnixMilli()
+	warnLag := normalizePositiveInt(getenvIntWithDefault("ORACLE_WEBSITE_SNAPSHOT_WARN_LAG_MINUTES", defaultSnapshotLagWarnMinutes), defaultSnapshotLagWarnMinutes)
+	critLag := normalizePositiveInt(getenvIntWithDefault("ORACLE_WEBSITE_SNAPSHOT_CRIT_LAG_MINUTES", defaultSnapshotLagCritMinutes), defaultSnapshotLagCritMinutes)
+	if critLag <= warnLag {
+		critLag = warnLag + 60
+	}
+	backupExpected := normalizePositiveInt(getenvIntWithDefault("ORACLE_BACKUP_EXPECTED_INTERVAL_MINUTES", defaultBackupExpectedMinutes), defaultBackupExpectedMinutes)
+	sheetsExpected := normalizePositiveInt(getenvIntWithDefault("ORACLE_SHEETS_FLUSH_EXPECTED_INTERVAL_MINUTES", defaultSheetsExpectedMinutes), defaultSheetsExpectedMinutes)
+
+	payload := map[string]any{
+		"configured":            sqliteDB != nil,
+		"generatedAt":           nowMillis,
+		"lagMinutes":            nil,
+		"lagStatus":             "unknown",
+		"lagSource":             "",
+		"lastBatchAccepted":     nil,
+		"lastSnapshotGenerated": nil,
+		"batchIntegrity": map[string]any{
+			"status":             "unknown",
+			"verified":           false,
+			"checksumStatus":     "unknown",
+			"rowCountStatus":     "unknown",
+			"batchId":            "",
+			"correlationId":      "",
+			"computedChecksum":   "",
+			"expectedChecksum":   "",
+			"receivedCount":      nil,
+			"acceptedCount":      nil,
+			"rejectedCount":      nil,
+			"accountedCount":     nil,
+			"expectedEventCount": nil,
+			"integrityNotes":     []string{},
+		},
+		"thresholds": map[string]any{
+			"lagWarnMinutes":        warnLag,
+			"lagCriticalMinutes":    critLag,
+			"backupExpectedMinutes": backupExpected,
+			"backupCriticalMinutes": backupExpected * 2,
+			"sheetsExpectedMinutes": sheetsExpected,
+			"sheetsCriticalMinutes": sheetsExpected * 2,
+		},
+		"backupDrift": map[string]any{
+			"status":                  "unknown",
+			"indicator":               "unknown",
+			"expectedIntervalMinutes": backupExpected,
+			"criticalAfterMinutes":    backupExpected * 2,
+			"lastFinishedAtUtc":       nil,
+			"driftMinutes":            nil,
+		},
+		"sheetsFlushVerification": map[string]any{
+			"status":                  "unknown",
+			"verified":                false,
+			"indicator":               "unknown",
+			"expectedIntervalMinutes": sheetsExpected,
+			"criticalAfterMinutes":    sheetsExpected * 2,
+			"lastFlushedAtUtc":        nil,
+			"driftMinutes":            nil,
+			"checksumStatus":          "unknown",
+			"rowCountStatus":          "unknown",
+			"expectedRows":            nil,
+			"actualRows":              nil,
+			"verificationAtUtc":       nil,
+			"verificationNotes":       []string{},
+		},
+	}
+	if sqliteDB == nil {
+		return payload
+	}
+
+	var (
+		lastBatchCreatedAt int64
+	)
+	{
+		var (
+			batchID    sql.NullString
+			triggered  sql.NullString
+			createdAt  sql.NullInt64
+			detailsRaw sql.NullString
+		)
+		err := sqliteDB.QueryRowContext(
+			ctx,
+			`SELECT batch_id, triggered_by, created_at, details_json
+			 FROM website_sync_batches
+			 WHERE direction = ? AND status = 'ok' AND triggered_by = ?
+			 ORDER BY created_at DESC, id DESC
+			 LIMIT 1`,
+			websiteSyncDirectionWebsiteToOracle,
+			"worker_website_events_batch",
+		).Scan(&batchID, &triggered, &createdAt, &detailsRaw)
+		if err == sql.ErrNoRows {
+			err = sqliteDB.QueryRowContext(
+				ctx,
+				`SELECT batch_id, triggered_by, created_at, details_json
+			 FROM website_sync_batches
+			 WHERE direction = ? AND status = 'ok'
+			 ORDER BY created_at DESC, id DESC
+			 LIMIT 1`,
+				websiteSyncDirectionWebsiteToOracle,
+			).Scan(&batchID, &triggered, &createdAt, &detailsRaw)
+		}
+		if err == nil {
+			lastBatchCreatedAt = createdAt.Int64
+			correlationID := ""
+			acceptedCount := int64(0)
+			rejectedCount := int64(0)
+			receivedCount := int64(0)
+			accountedCount := int64(0)
+			expectedEventCount := int64(0)
+			computedChecksum := ""
+			expectedChecksum := ""
+			checksumStatus := "unknown"
+			rowCountStatus := "unknown"
+			integrityStatus := "unknown"
+			notes := make([]string, 0, 8)
+			if strings.TrimSpace(detailsRaw.String) != "" {
+				var details map[string]any
+				if jsonErr := json.Unmarshal([]byte(detailsRaw.String), &details); jsonErr == nil {
+					if v, ok := details["correlationId"].(string); ok {
+						correlationID = trimAndLimit(strings.TrimSpace(v), 120)
+					}
+					acceptedCount = toInt64FromAny(details["acceptedCount"])
+					rejectedCount = toInt64FromAny(details["rejectedCount"])
+					receivedCount = toInt64FromAny(details["receivedCount"])
+					accountedCount = toInt64FromAny(details["accountedCount"])
+					expectedEventCount = toInt64FromAny(details["expectedEventCount"])
+					computedChecksum = trimAndLimit(strings.ToLower(stringFromAny(details["batchChecksum"])), 80)
+					expectedChecksum = trimAndLimit(strings.ToLower(stringFromAny(details["expectedBatchChecksum"])), 80)
+					checksumStatus = strings.ToLower(trimAndLimit(stringFromAny(details["checksumStatus"]), 24))
+					rowCountStatus = strings.ToLower(trimAndLimit(stringFromAny(details["rowCountStatus"]), 24))
+					integrityStatus = strings.ToLower(trimAndLimit(stringFromAny(details["integrity"]), 24))
+					if rawNotes, ok := details["integrityNotes"].([]any); ok {
+						for _, item := range rawNotes {
+							if note := trimAndLimit(stringFromAny(item), 160); note != "" {
+								notes = append(notes, note)
+							}
+						}
+					}
+				}
+			}
+			payload["lastBatchAccepted"] = map[string]any{
+				"batchId":       trimAndLimit(strings.TrimSpace(batchID.String), 120),
+				"acceptedAtUtc": createdAt.Int64,
+				"correlationId": correlationID,
+				"acceptedCount": maxInt64(acceptedCount, 0),
+				"triggeredBy":   trimAndLimit(strings.TrimSpace(triggered.String), 80),
+			}
+			integrity := payload["batchIntegrity"].(map[string]any)
+			integrity["status"] = normalizeHealthStatus(integrityStatus)
+			integrity["checksumStatus"] = normalizeHealthStatus(checksumStatus)
+			integrity["rowCountStatus"] = normalizeHealthStatus(rowCountStatus)
+			integrity["batchId"] = trimAndLimit(strings.TrimSpace(batchID.String), 120)
+			integrity["correlationId"] = correlationID
+			integrity["computedChecksum"] = computedChecksum
+			integrity["expectedChecksum"] = expectedChecksum
+			integrity["receivedCount"] = maxInt64(receivedCount, 0)
+			integrity["acceptedCount"] = maxInt64(acceptedCount, 0)
+			integrity["rejectedCount"] = maxInt64(rejectedCount, 0)
+			integrity["accountedCount"] = maxInt64(accountedCount, 0)
+			integrity["expectedEventCount"] = maxInt64(expectedEventCount, 0)
+			if len(notes) > 0 {
+				integrity["integrityNotes"] = notes
+			}
+			verified := integrity["status"] == "ok" &&
+				integrity["checksumStatus"] != "mismatch" &&
+				integrity["rowCountStatus"] != "mismatch"
+			integrity["verified"] = verified
+			if integrity["status"] == "unknown" {
+				if verified {
+					integrity["status"] = "ok"
+				} else if integrity["checksumStatus"] == "mismatch" || integrity["rowCountStatus"] == "mismatch" {
+					integrity["status"] = "critical"
+				}
+			}
+		}
+	}
+
+	var lagAnchorAt int64
+	{
+		var (
+			snapshotID sql.NullString
+			generated  sql.NullInt64
+		)
+		err := sqliteDB.QueryRowContext(
+			ctx,
+			`SELECT snapshot_id, generated_at
+			 FROM website_public_snapshots
+			 ORDER BY generated_at DESC, id DESC
+			 LIMIT 1`,
+		).Scan(&snapshotID, &generated)
+		if err == nil {
+			lagAnchorAt = generated.Int64
+			payload["lastSnapshotGenerated"] = map[string]any{
+				"snapshotId":     trimAndLimit(strings.TrimSpace(snapshotID.String), 160),
+				"generatedAtUtc": generated.Int64,
+			}
+			payload["lagSource"] = "snapshot_generated_at"
+		}
+	}
+	if lagAnchorAt <= 0 && lastBatchCreatedAt > 0 {
+		lagAnchorAt = lastBatchCreatedAt
+		payload["lagSource"] = "batch_accepted_at"
+	}
+	if lagMinutes, ok := calculateLagMinutes(nowMillis, lagAnchorAt); ok {
+		payload["lagMinutes"] = lagMinutes
+		payload["lagStatus"] = lagSeverity(lagMinutes, warnLag, critLag)
+	}
+
+	{
+		backup := payload["backupDrift"].(map[string]any)
+		var (
+			statusRaw  sql.NullString
+			finishedAt sql.NullInt64
+		)
+		err := sqliteDB.QueryRowContext(
+			ctx,
+			`SELECT status, finished_at
+			 FROM backup_runs
+			 ORDER BY finished_at DESC, id DESC
+			 LIMIT 1`,
+		).Scan(&statusRaw, &finishedAt)
+		if err == nil {
+			status := normalizeHealthStatus(statusRaw.String)
+			backup["status"] = status
+			backup["lastFinishedAtUtc"] = finishedAt.Int64
+			if driftMinutes, ok := calculateLagMinutes(nowMillis, finishedAt.Int64); ok {
+				backup["driftMinutes"] = driftMinutes
+				backup["indicator"] = lagSeverity(driftMinutes, backupExpected, backupExpected*2)
+			}
+			if status != "unknown" && !isSuccessHealthStatus(status) {
+				backup["indicator"] = "critical"
+			}
+		}
+	}
+
+	{
+		sheets := payload["sheetsFlushVerification"].(map[string]any)
+		var (
+			statusRaw   sql.NullString
+			flushedAt   sql.NullInt64
+			metaRaw     sql.NullString
+			errorReason sql.NullString
+		)
+		err := sqliteDB.QueryRowContext(
+			ctx,
+			`SELECT status, flushed_at_utc, COALESCE(meta_json, ''), COALESCE(error_message, '')
+			 FROM sheets_flush_runs
+			 ORDER BY flushed_at_utc DESC, id DESC
+			 LIMIT 1`,
+		).Scan(&statusRaw, &flushedAt, &metaRaw, &errorReason)
+		if err == nil {
+			status := normalizeHealthStatus(statusRaw.String)
+			verified := isSuccessHealthStatus(status)
+			sheets["status"] = status
+			sheets["verified"] = verified
+			sheets["lastFlushedAtUtc"] = flushedAt.Int64
+			if msg := trimAndLimit(strings.TrimSpace(errorReason.String), 240); msg != "" {
+				sheets["error"] = msg
+			}
+			if driftMinutes, ok := calculateLagMinutes(nowMillis, flushedAt.Int64); ok {
+				sheets["driftMinutes"] = driftMinutes
+				sheets["indicator"] = lagSeverity(driftMinutes, sheetsExpected, sheetsExpected*2)
+			}
+			if strings.TrimSpace(metaRaw.String) != "" {
+				var parsedMeta map[string]any
+				if jsonErr := json.Unmarshal([]byte(metaRaw.String), &parsedMeta); jsonErr == nil {
+					if verification, ok := parsedMeta["verification"].(map[string]any); ok {
+						checksumStatus := normalizeHealthStatus(stringFromAny(verification["checksumStatus"]))
+						rowCountStatus := normalizeHealthStatus(stringFromAny(verification["rowCountStatus"]))
+						if checksumStatus != "unknown" {
+							sheets["checksumStatus"] = checksumStatus
+						}
+						if rowCountStatus != "unknown" {
+							sheets["rowCountStatus"] = rowCountStatus
+						}
+						sheets["expectedRows"] = maxInt64(int64FromAny(verification["expectedRows"]), 0)
+						sheets["actualRows"] = maxInt64(int64FromAny(verification["actualRows"]), 0)
+						sheets["verificationAtUtc"] = maxInt64(int64FromAny(verification["checkedAtUtc"]), 0)
+						if notesRaw, ok := verification["notes"].([]any); ok {
+							notes := make([]string, 0, len(notesRaw))
+							for _, item := range notesRaw {
+								if note := trimAndLimit(stringFromAny(item), 180); note != "" {
+									notes = append(notes, note)
+								}
+							}
+							if len(notes) > 0 {
+								sheets["verificationNotes"] = notes
+							}
+						}
+						if boolFromAny(verification["verified"]) {
+							sheets["verified"] = true
+						}
+					}
+				}
+			}
+			verifiedNow := boolFromAny(sheets["verified"])
+			if !verifiedNow {
+				sheets["indicator"] = "critical"
+			}
+			if sheets["checksumStatus"] == "mismatch" || sheets["rowCountStatus"] == "mismatch" {
+				sheets["verified"] = false
+				sheets["indicator"] = "critical"
+			}
+		}
+	}
+
+	{
+		backup := payload["backupDrift"].(map[string]any)
+		sheets := payload["sheetsFlushVerification"].(map[string]any)
+		integrity := payload["batchIntegrity"].(map[string]any)
+		checksumMismatch := normalizeHealthStatus(stringFromAny(integrity["checksumStatus"])) == "mismatch"
+		rowMismatch := normalizeHealthStatus(stringFromAny(integrity["rowCountStatus"])) == "mismatch"
+		sheetsMismatch := normalizeHealthStatus(stringFromAny(sheets["checksumStatus"])) == "mismatch" ||
+			normalizeHealthStatus(stringFromAny(sheets["rowCountStatus"])) == "mismatch"
+		if checksumMismatch || rowMismatch || sheetsMismatch {
+			backup["indicator"] = "critical"
+			backup["status"] = "integrity_mismatch"
+			backup["integrityMismatch"] = true
+		}
+	}
+
+	return payload
+}
+
+func boolFromAny(v any) bool {
+	switch raw := v.(type) {
+	case bool:
+		return raw
+	case string:
+		switch strings.ToLower(strings.TrimSpace(raw)) {
+		case "1", "true", "yes", "ok":
+			return true
+		}
+	case int:
+		return raw != 0
+	case int64:
+		return raw != 0
+	case float64:
+		return raw != 0
+	}
+	return false
+}
+
+func normalizePositiveInt(v, fallback int) int {
+	if v <= 0 {
+		return fallback
+	}
+	return v
+}
+
+func toInt64FromAny(v any) int64 {
+	switch n := v.(type) {
+	case int:
+		return int64(n)
+	case int64:
+		return n
+	case int32:
+		return int64(n)
+	case float64:
+		return int64(n)
+	case float32:
+		return int64(n)
+	case json.Number:
+		if parsed, err := n.Int64(); err == nil {
+			return parsed
+		}
+		return 0
+	default:
+		return 0
+	}
+}
+
+func calculateLagMinutes(nowMillis, anchorMillis int64) (int64, bool) {
+	if anchorMillis <= 0 {
+		return 0, false
+	}
+	if nowMillis <= anchorMillis {
+		return 0, true
+	}
+	return (nowMillis - anchorMillis) / int64(time.Minute/time.Millisecond), true
+}
+
+func lagSeverity(lagMinutes int64, warnMinutes, criticalMinutes int) string {
+	if lagMinutes < 0 {
+		return "unknown"
+	}
+	if criticalMinutes > 0 && lagMinutes >= int64(criticalMinutes) {
+		return "critical"
+	}
+	if warnMinutes > 0 && lagMinutes >= int64(warnMinutes) {
+		return "warn"
+	}
+	return "ok"
+}
+
+func normalizeHealthStatus(raw string) string {
+	v := strings.ToLower(strings.TrimSpace(raw))
+	if v == "" {
+		return "unknown"
+	}
+	return trimAndLimit(v, 48)
+}
+
+func isSuccessHealthStatus(status string) bool {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "ok", "success", "completed":
+		return true
+	default:
+		return false
+	}
+}
+
 func errorString(err error) string {
 	if err == nil {
 		return ""
