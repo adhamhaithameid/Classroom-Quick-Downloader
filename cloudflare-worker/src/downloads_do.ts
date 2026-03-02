@@ -4112,6 +4112,13 @@ export class DownloadsDurable {
           .sort((a, b) => b.lastTs - a.lastTs)
           .slice(0, 20),
       },
+      security: {
+        ipAllowlistEnabled: this.d.ipAllowlistEnabled,
+        stepUpBypassEnabled: this.d.ipAllowlistStepUpBypassEnabled,
+        dangerAuditRecent: [...this.d.dangerActionAuditLogs]
+          .sort((a, b) => b.tsUtc - a.tsUtc)
+          .slice(0, 50),
+      },
     };
 
     return json(payload);
