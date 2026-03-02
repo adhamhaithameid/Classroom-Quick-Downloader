@@ -454,6 +454,7 @@
           lastTime = ts;
           offset -= autoSpeed * autoDirection * dt;
           normalize();
+          applyTransform();
         }
       }
       rafId = requestAnimationFrame(tick);
