@@ -1235,6 +1235,7 @@
           'website-analysis': ['website-analysis'],
           creative: ['creative'],
           'content-changelog': ['content-changelog'],
+          'ext-changelog': ['ext-changelog'],
           logs: ['logs'],
           danger: ['danger']
         };
@@ -1265,6 +1266,7 @@
           'website-analysis': { icon: '📈', label: 'Website Analysis' },
           creative: { icon: '🎨', label: 'Creative Hub' },
           'content-changelog': { icon: '🗞️', label: 'User Changelog' },
+          'ext-changelog': { icon: '🧩', label: 'Extension Changelog' },
           logs: { icon: '🧾', label: 'Oracle Logs' },
           danger: { icon: '☢️', label: 'Danger Zone' }
         };
@@ -1286,6 +1288,7 @@
         if (page === 'website-analysis') loadWebsiteAnalytics();
         if (page === 'creative') loadCreativeHub();
         if (page === 'content-changelog') loadUserChangelogRecords();
+        if (page === 'ext-changelog') loadExtChangelog();
         if (page === 'logs') loadOracleLogs();
       }
 
@@ -4435,12 +4438,327 @@
         });
       }
 
+      // ========== Extension Changelog Page ==========
+      var _extClEntriesCache = null;
+      var _extClRulesCache = null;
+
+      function extClToast(message, type) {
+        type = type || 'success';
+        var toast = document.createElement('div');
+        toast.textContent = message;
+        toast.style.cssText = 'position:fixed;top:20px;right:20px;z-index:99999;padding:12px 20px;border-radius:10px;font-size:0.9em;font-weight:600;color:#fff;pointer-events:none;max-width:420px;box-shadow:0 4px 24px rgba(0,0,0,0.3);opacity:0;transition:opacity 0.3s ease;';
+        if (type === 'success') toast.style.background = 'linear-gradient(135deg,#22c55e,#16a34a)';
+        else if (type === 'error') toast.style.background = 'linear-gradient(135deg,#ef4444,#dc2626)';
+        else toast.style.background = 'linear-gradient(135deg,#3b82f6,#2563eb)';
+        document.body.appendChild(toast);
+        requestAnimationFrame(function() { toast.style.opacity = '1'; });
+        setTimeout(function() {
+          toast.style.opacity = '0';
+          setTimeout(function() { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 400);
+        }, 2800);
+      }
+
+      function postJSON(url, payload) {
+        return fetchJSONWithInit(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      }
+
+      async function loadExtChangelog() {
+        await Promise.all([loadExtChangelogEntries(), loadExtChangelogRules()]);
+      }
+
+      async function loadExtChangelogEntries() {
+        var container = document.getElementById('ext-cl-entries-table');
+        container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading entries…</div>';
+        try {
+          var data = await fetchJSON('/api/admin/extension-changelog/entries');
+          _extClEntriesCache = data.entries || [];
+          var countEl = document.getElementById('ext-cl-entry-count');
+          if (countEl) countEl.textContent = String(_extClEntriesCache.length);
+          renderExtChangelogEntriesTable(_extClEntriesCache, container);
+        } catch (e) {
+          container.innerHTML = '<div class="empty-state empty-state-danger">Failed to load entries: ' + escapeHtml(e.message) + '</div>';
+        }
+      }
+
+      function renderExtChangelogEntriesTable(entries, container) {
+        if (!entries.length) {
+          container.innerHTML = '<div class="empty-state">No entries yet. Use the form above, bulk import, or import from GitHub.</div>';
+          return;
+        }
+        var html = '<div class="table-responsive"><table><thead><tr>';
+        html += '<th>Version</th><th>Date</th><th>Summary</th><th style="text-align:center">+</th><th style="text-align:center">~</th><th style="text-align:center">!</th><th style="text-align:center">⭐</th><th>Actions</th>';
+        html += '</tr></thead><tbody>';
+        entries.forEach(function(entry) {
+          var addedCount = Array.isArray(entry.added) ? entry.added.length : 0;
+          var changedCount = Array.isArray(entry.changed) ? entry.changed.length : 0;
+          var fixedCount = Array.isArray(entry.fixed) ? entry.fixed.length : 0;
+          html += '<tr>';
+          html += '<td><strong>v' + escapeHtml(entry.version || '') + '</strong></td>';
+          html += '<td style="white-space:nowrap;font-size:0.85em;color:var(--text-soft,#aaa)">' + escapeHtml(entry.date || '') + '</td>';
+          html += '<td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml((entry.summary || '').slice(0, 100)) + '</td>';
+          html += '<td style="text-align:center;color:#22c55e;font-weight:600">' + (addedCount || '—') + '</td>';
+          html += '<td style="text-align:center;color:#f59e0b;font-weight:600">' + (changedCount || '—') + '</td>';
+          html += '<td style="text-align:center;color:#ef4444;font-weight:600">' + (fixedCount || '—') + '</td>';
+          html += '<td style="text-align:center">' + (entry.isImportant ? '⭐' : '') + '</td>';
+          html += '<td style="white-space:nowrap">';
+          html += '<button class="btn btn-secondary btn-xs" onclick="editExtClEntry(\'' + escapeHtml(entry.id || '') + '\')">✏️</button> ';
+          html += '<button class="btn btn-danger btn-xs" onclick="deleteExtClEntry(\'' + escapeHtml(entry.id || '') + '\')">🗑️</button>';
+          html += '</td>';
+          html += '</tr>';
+        });
+        html += '</tbody></table></div>';
+        container.innerHTML = html;
+      }
+
+      window.editExtClEntry = function(id) {
+        var entry = (_extClEntriesCache || []).find(function(e) { return e.id === id; });
+        if (!entry) return;
+        document.getElementById('ext-cl-entry-id').value = entry.id || '';
+        document.getElementById('ext-cl-entry-version').value = entry.version || '';
+        document.getElementById('ext-cl-entry-date').value = entry.date || '';
+        document.getElementById('ext-cl-entry-summary').value = entry.summary || '';
+        document.getElementById('ext-cl-entry-added').value = (entry.added || []).join('\n');
+        document.getElementById('ext-cl-entry-changed').value = (entry.changed || []).join('\n');
+        document.getElementById('ext-cl-entry-fixed').value = (entry.fixed || []).join('\n');
+        document.getElementById('ext-cl-entry-important').checked = !!entry.isImportant;
+        var formEl = document.getElementById('ext-cl-entry-form');
+        if (formEl) formEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        extClToast('Editing v' + (entry.version || id), 'info');
+      };
+
+      window.deleteExtClEntry = async function(id) {
+        if (!confirm('Delete entry "' + id + '"?')) return;
+        try {
+          await postJSON('/api/admin/extension-changelog/entries/delete', { id: id });
+          extClToast('Entry deleted ✓', 'success');
+          await loadExtChangelogEntries();
+        } catch (e) {
+          extClToast('Delete failed: ' + e.message, 'error');
+        }
+      };
+
+      async function loadExtChangelogRules() {
+        var container = document.getElementById('ext-cl-rules-table');
+        container.innerHTML = '<div class="loading"><div class="spinner"></div>Loading rules…</div>';
+        try {
+          var data = await fetchJSON('/api/admin/extension-changelog/rules');
+          _extClRulesCache = data.rules || [];
+          var countEl = document.getElementById('ext-cl-rule-count');
+          if (countEl) countEl.textContent = String(_extClRulesCache.length);
+          renderExtChangelogRulesTable(_extClRulesCache, container);
+        } catch (e) {
+          container.innerHTML = '<div class="empty-state empty-state-danger">Failed to load rules: ' + escapeHtml(e.message) + '</div>';
+        }
+      }
+
+      function renderExtChangelogRulesTable(rules, container) {
+        if (!rules.length) {
+          container.innerHTML = '<div class="empty-state">No notification rules. The extension pill will use default styling.</div>';
+          return;
+        }
+        var html = '<div class="table-responsive"><table><thead><tr>';
+        html += '<th>ID</th><th>Target</th><th>Priority</th><th>Effect</th><th>Preview</th><th>Actions</th>';
+        html += '</tr></thead><tbody>';
+        rules.forEach(function(rule) {
+          var pillStyle = '';
+          var pillBg = 'rgba(255,255,255,0.08)';
+          if (rule.priority === 'minor') { pillStyle = 'color:#60a5fa;'; pillBg = 'rgba(59,130,246,0.15)'; }
+          if (rule.priority === 'major') { pillStyle = 'color:#f87171;font-weight:700;'; pillBg = 'rgba(239,68,68,0.15)'; }
+          var effectIcon = rule.effect === 'glow' ? '✨' : rule.effect === 'pulse' ? '📡' : '—';
+          html += '<tr>';
+          html += '<td><code style="font-size:0.82em">' + escapeHtml(rule.id || '') + '</code></td>';
+          html += '<td>' + escapeHtml(rule.target || 'all') + '</td>';
+          html += '<td><span style="' + pillStyle + '">' + escapeHtml(rule.priority || 'normal') + '</span></td>';
+          html += '<td>' + effectIcon + ' ' + escapeHtml(rule.effect || 'none') + '</td>';
+          html += '<td><span style="display:inline-block;padding:3px 10px;border-radius:12px;font-size:0.82em;background:' + pillBg + ';' + pillStyle + '">' + escapeHtml(rule.priority || 'normal') + '</span></td>';
+          html += '<td style="white-space:nowrap">';
+          html += '<button class="btn btn-secondary btn-xs" onclick="editExtClRule(\'' + escapeHtml(rule.id || '') + '\')">✏️</button> ';
+          html += '<button class="btn btn-danger btn-xs" onclick="deleteExtClRule(\'' + escapeHtml(rule.id || '') + '\')">🗑️</button>';
+          html += '</td>';
+          html += '</tr>';
+        });
+        html += '</tbody></table></div>';
+        container.innerHTML = html;
+      }
+
+      window.editExtClRule = function(id) {
+        var rule = (_extClRulesCache || []).find(function(r) { return r.id === id; });
+        if (!rule) return;
+        document.getElementById('ext-cl-rule-id').value = rule.id || '';
+        document.getElementById('ext-cl-rule-target').value = rule.target || 'all';
+        document.getElementById('ext-cl-rule-priority').value = rule.priority || 'normal';
+        document.getElementById('ext-cl-rule-effect').value = rule.effect || 'none';
+        extClToast('Editing rule: ' + (rule.id || id), 'info');
+      };
+
+      window.deleteExtClRule = async function(id) {
+        if (!confirm('Delete rule "' + id + '"?')) return;
+        try {
+          await postJSON('/api/admin/extension-changelog/rules/delete', { id: id });
+          extClToast('Rule deleted ✓', 'success');
+          await loadExtChangelogRules();
+        } catch (e) {
+          extClToast('Delete failed: ' + e.message, 'error');
+        }
+      };
+
+      function splitLines(text) {
+        return String(text || '').split('\n').map(function(l) { return l.trim(); }).filter(function(l) { return l.length > 0; });
+      }
+
+      function bindExtChangelogEvents() {
+        // Entry form submit
+        var entryForm = document.getElementById('ext-cl-entry-form');
+        if (entryForm) {
+          entryForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            var id = document.getElementById('ext-cl-entry-id').value.trim();
+            var version = document.getElementById('ext-cl-entry-version').value.trim();
+            var date = document.getElementById('ext-cl-entry-date').value.trim();
+            var summary = document.getElementById('ext-cl-entry-summary').value.trim();
+            var added = splitLines(document.getElementById('ext-cl-entry-added').value);
+            var changed = splitLines(document.getElementById('ext-cl-entry-changed').value);
+            var fixed = splitLines(document.getElementById('ext-cl-entry-fixed').value);
+            var isImportant = document.getElementById('ext-cl-entry-important').checked;
+            if (!id || !version) { extClToast('ID and Version are required.', 'error'); return; }
+            if (!date) date = new Date().toISOString().slice(0, 10);
+            try {
+              await postJSON('/api/admin/extension-changelog/entries/upsert', {
+                id: id, version: version, date: date, summary: summary,
+                added: added, changed: changed, fixed: fixed, isImportant: isImportant
+              });
+              extClToast('Entry saved ✓ (v' + version + ')', 'success');
+              clearExtClEntryForm();
+              await loadExtChangelogEntries();
+            } catch (e) {
+              extClToast('Save failed: ' + e.message, 'error');
+            }
+          });
+        }
+
+        // Entry clear
+        var entryClear = document.getElementById('ext-cl-entry-clear');
+        if (entryClear) entryClear.addEventListener('click', clearExtClEntryForm);
+
+        // Rule form submit
+        var ruleForm = document.getElementById('ext-cl-rule-form');
+        if (ruleForm) {
+          ruleForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            var id = document.getElementById('ext-cl-rule-id').value.trim();
+            var target = document.getElementById('ext-cl-rule-target').value.trim() || 'all';
+            var priority = document.getElementById('ext-cl-rule-priority').value;
+            var effect = document.getElementById('ext-cl-rule-effect').value;
+            if (!id) { extClToast('Rule ID is required.', 'error'); return; }
+            try {
+              await postJSON('/api/admin/extension-changelog/rules/upsert', {
+                id: id, target: target, priority: priority, effect: effect
+              });
+              extClToast('Rule saved ✓', 'success');
+              clearExtClRuleForm();
+              await loadExtChangelogRules();
+            } catch (e) {
+              extClToast('Save failed: ' + e.message, 'error');
+            }
+          });
+        }
+
+        // Rule clear
+        var ruleClear = document.getElementById('ext-cl-rule-clear');
+        if (ruleClear) ruleClear.addEventListener('click', clearExtClRuleForm);
+
+        // Refresh
+        var refreshBtn = document.getElementById('ext-cl-refresh-btn');
+        if (refreshBtn) refreshBtn.addEventListener('click', async function() {
+          extClToast('Refreshing…', 'info');
+          await loadExtChangelog();
+          extClToast('Data refreshed ✓', 'success');
+        });
+
+        // Import GitHub
+        var importBtn = document.getElementById('ext-cl-import-github-btn');
+        if (importBtn) {
+          importBtn.addEventListener('click', async function() {
+            if (!confirm('Import entries from GitHub user-friendly-changelog.md?\nThis will merge/update existing entries.')) return;
+            try {
+              var result = await postJSON('/api/admin/extension-changelog/import-github', {});
+              extClToast('Imported ' + (result.imported || 0) + ' entries from GitHub ✓', 'success');
+              await loadExtChangelogEntries();
+            } catch (e) {
+              extClToast('Import failed: ' + e.message, 'error');
+            }
+          });
+        }
+
+        // Bulk import
+        var bulkBtn = document.getElementById('ext-cl-bulk-import-btn');
+        if (bulkBtn) {
+          bulkBtn.addEventListener('click', async function() {
+            var textarea = document.getElementById('ext-cl-bulk-markdown');
+            var md = (textarea && textarea.value || '').trim();
+            if (!md) { extClToast('Paste changelog markdown first.', 'error'); return; }
+            if (!confirm('Bulk import all parsed releases from the pasted markdown?')) return;
+            try {
+              var result = await postJSON('/api/admin/extension-changelog/bulk-import', { markdown: md });
+              extClToast('Bulk imported ' + (result.imported || 0) + ' entries ✓', 'success');
+              textarea.value = '';
+              await loadExtChangelogEntries();
+            } catch (e) {
+              extClToast('Bulk import failed: ' + e.message, 'error');
+            }
+          });
+        }
+
+        // Preview public API
+        var previewBtn = document.getElementById('ext-cl-preview-public-btn');
+        if (previewBtn) {
+          previewBtn.addEventListener('click', async function() {
+            var previewEl = document.getElementById('ext-cl-public-preview');
+            previewEl.classList.remove('hidden');
+            previewEl.textContent = 'Loading…';
+            try {
+              var res = await fetch('/api/public/extension/changelog');
+              var data = await res.json();
+              previewEl.innerHTML = syntaxHighlight(JSON.stringify(data, null, 2));
+              extClToast('Public API preview loaded ✓', 'info');
+            } catch (e) {
+              previewEl.textContent = 'Error: ' + e.message;
+              extClToast('Preview failed: ' + e.message, 'error');
+            }
+          });
+        }
+      }
+
+      function clearExtClEntryForm() {
+        document.getElementById('ext-cl-entry-id').value = '';
+        document.getElementById('ext-cl-entry-version').value = '';
+        document.getElementById('ext-cl-entry-date').value = '';
+        document.getElementById('ext-cl-entry-summary').value = '';
+        document.getElementById('ext-cl-entry-added').value = '';
+        document.getElementById('ext-cl-entry-changed').value = '';
+        document.getElementById('ext-cl-entry-fixed').value = '';
+        document.getElementById('ext-cl-entry-important').checked = false;
+      }
+
+      function clearExtClRuleForm() {
+        document.getElementById('ext-cl-rule-id').value = '';
+        document.getElementById('ext-cl-rule-target').value = 'all';
+        document.getElementById('ext-cl-rule-priority').value = 'normal';
+        document.getElementById('ext-cl-rule-effect').value = 'none';
+      }
+
+
       // Init
       window.addEventListener("load", async function() {
         initOracleUtcClock();
         renderShortcutsList();
         initNavGroupToggles();
         bindButtonActions();
+        bindExtChangelogEvents();
         document.addEventListener('keydown', function(e) {
           if ((e.metaKey || e.ctrlKey) && !shouldIgnoreGlobalShortcut(e) && runKeyboardShortcut(e)) {
             e.preventDefault();
