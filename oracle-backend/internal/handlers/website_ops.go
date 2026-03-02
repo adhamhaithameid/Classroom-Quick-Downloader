@@ -113,6 +113,55 @@ type websiteOpsOneAMRequest struct {
 	Enabled bool `json:"enabled"`
 }
 
+type websiteAnalyticsRange struct {
+	Name     string
+	StartDay string
+	StartMS  int64
+	DayLimit int
+}
+
+type websiteAnalyticsDailyPoint struct {
+	DayUTC         string `json:"dayUtc"`
+	InstallClicks  int64  `json:"installClicks"`
+	DownloadClicks int64  `json:"downloadClicks"`
+	MapYes         int64  `json:"mapYes"`
+	MapNo          int64  `json:"mapNo"`
+	Feedback       int64  `json:"feedbackSubmissions"`
+}
+
+type websiteAnalyticsPlacementBreakdown struct {
+	Placement string `json:"placement"`
+	Action    string `json:"action"`
+	Count     int64  `json:"count"`
+}
+
+type websiteAnalyticsTrafficSummary struct {
+	Visits          int64  `json:"visits"`
+	Requests        int64  `json:"requests"`
+	LastSyncedAtUTC *int64 `json:"lastSyncedAtUtc"`
+	Source          string `json:"source"`
+	Status          string `json:"status"`
+}
+
+type websiteAnalyticsTrafficDailyPoint struct {
+	DayUTC   string `json:"dayUtc"`
+	Visits   int64  `json:"visits"`
+	Requests int64  `json:"requests"`
+}
+
+type websiteAnalyticsResponse struct {
+	OK           bool                                 `json:"ok"`
+	GeneratedAt  int64                                `json:"generatedAt"`
+	Range        string                               `json:"range"`
+	Buttons      map[string]int64                     `json:"buttons"`
+	Map          map[string]any                       `json:"map"`
+	Feedback     map[string]any                       `json:"feedback"`
+	Daily        []websiteAnalyticsDailyPoint         `json:"daily"`
+	Placements   []websiteAnalyticsPlacementBreakdown `json:"placements"`
+	Traffic      websiteAnalyticsTrafficSummary       `json:"traffic"`
+	TrafficDaily []websiteAnalyticsTrafficDailyPoint  `json:"trafficDaily"`
+}
+
 type cloudflareSiteMetricsPayload struct {
 	OK     bool `json:"ok"`
 	Totals struct {
