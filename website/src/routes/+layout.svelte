@@ -276,6 +276,10 @@
     background: var(--bg);
     color: var(--text);
   }
+  .site-shell.o2-fullscreen {
+    overflow: hidden;
+    height: 100vh;
+  }
 
   .site-main {
     flex: 1;
