@@ -1744,6 +1744,10 @@ func WebsiteOpsForcePushHandler(db *sql.DB) http.HandlerFunc {
 
 		row, err := PublishWebsiteDatasetFromOracle(r.Context(), db, "oracle_admin_force_push")
 		if err != nil {
+			if errors.Is(err, errWebsiteMonotonicViolation) {
+				writeJSONError(w, "monotonic_guard_blocked", "Publish blocked: incoming totals would decrease existing published values.", http.StatusConflict)
+				return
+			}
 			writeJSONError(w, "force_push_failed", "Failed to force publish website data", http.StatusInternalServerError)
 			return
 		}
