@@ -54,7 +54,10 @@ function readSnapshotFromStorage(): WebsiteSnapshot | null {
       fetchedAtUtc,
       nextRefreshAtUtc,
       overview: coerceOverviewPayload(parsed.overview),
-      map: coerceMapPayload(parsed.map)
+      map: coerceMapPayload(parsed.map),
+      changelog: coerceUserChangelogPayload(parsed.changelog),
+      userChangelogSummary: normalizeUserChangelogSummary((parsed as Partial<SnapshotResponse>)?.userChangelogSummary),
+      privacy: normalizePrivacyPointers((parsed as Partial<SnapshotResponse>)?.privacy)
     };
   } catch {
     return null;
