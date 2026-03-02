@@ -279,7 +279,7 @@
   }
 
   function setupMapPromptDelay(): (() => void) | undefined {
-    if (!ENABLE_SILLY_QUESTION || !mapSectionEl || typeof window === 'undefined') return undefined;
+    if (!ENABLE_SILLY_QUESTION || editMode || !mapSectionEl || typeof window === 'undefined') return undefined;
 
     const observer = new IntersectionObserver(
       ([entry]) => {
