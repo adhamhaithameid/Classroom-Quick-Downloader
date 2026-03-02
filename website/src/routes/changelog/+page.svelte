@@ -505,13 +505,10 @@
     box-shadow: 0 2px 12px rgba(0,0,0,0.04);
   }
 
-  .sidebar-label {
-    margin: 0 0 12px;
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--gc-green);
+  .cl-sidebar-label {
+    margin: 0 0 14px; font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--green);
   }
 
   .sidebar-links {
