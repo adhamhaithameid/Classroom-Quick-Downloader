@@ -42,6 +42,19 @@ describe("resolveOracleEndpoint", () => {
     }
   });
 
+  it("normalizes canonical internal ingest endpoint when full path is provided", () => {
+    const result = resolveOracleEndpoint(
+      "https://oracle.example.com/api/internal/website/events/batch",
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.baseUrl).toBe("https://oracle.example.com");
+      expect(result.ingestUrl).toBe("https://oracle.example.com/ingest-batch");
+      expect(result.ingestBatchUrl).toBe("https://oracle.example.com/ingest-batch");
+      expect(result.websiteEventsBatchUrl).toBe("https://oracle.example.com/api/internal/website/events/batch");
+    }
+  });
+
   it("rejects non-loopback HTTP endpoint without override", () => {
     const result = resolveOracleEndpoint("http://oracle.example.com:8080");
     expect(result.ok).toBe(false);
