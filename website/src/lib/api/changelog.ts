@@ -1,5 +1,5 @@
 import { WORKER_BASE_URL } from '$lib/config';
-import type { ChangelogResponse } from '$lib/types/public';
+import type { ChangelogResponse, ChangelogConfig, ChangelogMeta, ChangelogNotificationRule } from '$lib/types/public';
 
 const REQUEST_TIMEOUT_MS = 8000;
 
