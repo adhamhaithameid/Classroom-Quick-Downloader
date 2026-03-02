@@ -2138,21 +2138,9 @@ func resolveLatestExtensionVersion(ctx context.Context, store *controlPlaneStore
 		return nil
 	}
 
-	version, err := githubVersionFetcher(ctx)
-	cache.fetched = time.Now()
-	if err != nil {
-		cache.lastErr = err
-		return cache.version
-	}
-	cache.lastErr = nil
-	cache.version = version
-	return cache.version
-}
-
-func fetchLatestGitHubVersion(ctx context.Context) (*string, error) {
-	repoSlug := strings.TrimSpace(os.Getenv("GITHUB_REPO_SLUG"))
-	if repoSlug == "" {
-		repoSlug = defaultGitHubRepoSlug
+	records, err := store.listRecords(ctx, "extension_version_note")
+	if err != nil || len(records) == 0 {
+		return nil
 	}
 
 	reqCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
