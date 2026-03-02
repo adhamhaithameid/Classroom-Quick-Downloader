@@ -495,6 +495,27 @@ function renderReleaseManagementSection(entries: ChangelogEntry[], config: Chang
        <div class="section-subtitle">
          Publish a new changelog entry. This text appears when users click the version pill.
        </div>
+       <div style="display:grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap:10px; margin: 10px 0 16px;">
+         <label style="display:flex; flex-direction:column; gap:6px; font-size:0.78em; color: var(--text-soft);">
+           Apply Mode
+           <select id="cl-apply-mode" class="input-field" style="padding:8px 10px; background: var(--bg-surface); border: 1px solid var(--border-subtle); color: white; border-radius: 8px;">
+             <option value="manual" ${applyMode === "manual" ? "selected" : ""}>Manual</option>
+             <option value="auto_github" ${applyMode === "auto_github" ? "selected" : ""}>Auto GitHub</option>
+           </select>
+         </label>
+         <label style="display:flex; flex-direction:column; gap:6px; font-size:0.78em; color: var(--text-soft);">
+           Auto Sync Interval (minutes)
+           <input id="cl-auto-sync-interval" type="number" min="5" max="1440" value="${autoSyncIntervalMinutes}" class="input-field" style="padding:8px 10px; background: var(--bg-surface); border: 1px solid var(--border-subtle); color: white; border-radius: 8px;" />
+         </label>
+         <label style="display:flex; align-items:center; gap:8px; font-size:0.78em; color: var(--text-soft); margin-top: 20px;">
+           <input id="cl-auto-sync-enabled" type="checkbox" ${autoSyncEnabled ? "checked" : ""} />
+           Auto Sync Enabled
+         </label>
+         <div style="display:flex; flex-direction:column; justify-content:center; gap:4px; font-size:0.78em;">
+           <span id="cl-sync-status" style="color:${syncStatusColor}; font-weight:600;">${syncStatusText}</span>
+           <span id="cl-sync-error" style="color:#fca5a5;">${escapeHtml(config.lastAutoSyncError || "")}</span>
+         </div>
+       </div>
 
        <!-- Edit Mode Banner -->
        <div id="edit-mode-banner" class="edit-mode-banner">
