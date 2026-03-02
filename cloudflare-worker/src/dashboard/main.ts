@@ -5682,7 +5682,48 @@ export function renderDashboard(stats: StatsResponse): string {
             const errList = data.errors.slice(0, 4).map((e) => '<li>' + escapeHtmlUnsafe(e) + '</li>').join('');
             draftPreviewEl.innerHTML = '<div style="font-size:0.82em; color:#fca5a5; margin-bottom:6px;">Parser warnings:</div><ul>' + errList + '</ul>';
           }
-          if (btnSaveText) btnSaveText.textContent = "Save Configuration & Publish";
+          renderReleasePreview(draftPreviewEl, data.entries || []);
+        } catch (_) {
+          if (draftPreviewEl) draftPreviewEl.innerHTML = '<div class="cl-preview-empty">Preview request failed.</div>';
+        }
+      }
+
+      (function initChangelogPreviewState() {
+        const raw = document.getElementById('raw-stats-json');
+        if (!raw) return;
+        try {
+          const parsed = JSON.parse(raw.textContent || '{}');
+          const entries = Array.isArray(parsed.changelog) ? parsed.changelog : [];
+          renderReleasePreview(currentPreviewEl, entries);
+        } catch (_) {
+          renderReleasePreview(currentPreviewEl, []);
+        }
+      })();
+
+      const previewBtn = document.getElementById('btn-preview-markdown');
+      if (previewBtn) previewBtn.onclick = () => previewMarkdownDraft(false);
+
+      const importBtn = document.getElementById('btn-import-markdown-url');
+      if (importBtn) importBtn.onclick = () => previewMarkdownDraft(true);
+
+      const helpBtn = document.getElementById('cl-format-help');
+      if (helpBtn) {
+        helpBtn.onclick = () => {
+          alert(
+            "Format:\\n\\n## v1.3.8\\n### Summary\\nOne summary line.\\n### Added\\n- Bullet\\n### Changed\\n- Bullet\\n### Fixed\\n- Bullet\\n\\nSource file: user-friendly-changelog.md on GitHub."
+          );
+        };
+      }
+
+      loadChangelogHistory();
+
+      function buildLegacyEditorMarkdown() {
+        const versionEl = document.getElementById("new-cl-version");
+        const changesEl = document.getElementById("new-cl-changes");
+        if (!versionEl || !changesEl) return "";
+        let version = String(versionEl.value || "").trim();
+        if (version.toLowerCase().startsWith("v")) {
+          version = version.slice(1);
         }
       }
 
