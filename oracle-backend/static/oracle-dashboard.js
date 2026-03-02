@@ -2057,6 +2057,33 @@
 
         // Daily downloads chart uses dedicated day-window selector.
         var dailyContainer = document.getElementById('daily-chart');
+        if (dailyContainer) {
+          try {
+            var dailyQuery = '/api/stats/timeseries?granularity=day';
+            if (dailyDownloadsRange === 'all') {
+              dailyQuery += '&range=all';
+            } else {
+              var days = Number(dailyDownloadsRange || 14);
+              if (!Number.isFinite(days) || days < 1) days = 14;
+              var endDate = new Date();
+              var startDate = new Date();
+              startDate.setUTCDate(endDate.getUTCDate() - (days - 1));
+              dailyQuery += '&from=' + encodeURIComponent(fmtDate(startDate)) + '&to=' + encodeURIComponent(fmtDate(endDate));
+            }
+            var tsData = await fetchJSON(dailyQuery);
+            if (Array.isArray(tsData.points) && tsData.points.length) {
+              renderBarChart(dailyContainer, tsData.points, 'day');
+            } else {
+              dailyContainer.innerHTML = '<div class="empty-state">No data</div>';
+            }
+          } catch (_) {
+            dailyContainer.innerHTML = '<div class="empty-state empty-state-danger">Failed</div>';
+          }
+        }
+
+        // Visitors series + compare previous
+        var visitorsContainer = document.getElementById('chart-visitors-timeseries');
+        var uniqueContainer = document.getElementById('chart-unique-returning');
         try {
           var range14 = getDateRange(14);
           var data = await fetchJSON('/api/stats/timeseries?granularity=day&from=' + range14.from + '&to=' + range14.to);
