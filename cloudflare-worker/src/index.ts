@@ -1204,7 +1204,6 @@ async function handleProtectedAdminEndpoint(request: Request, env: WorkerEnv): P
   const requestInit: RequestInit & { duplex?: "half" } = {
     method: request.method,
     headers: headers,
-    body: request.body,
     redirect: request.redirect,
   });
 
