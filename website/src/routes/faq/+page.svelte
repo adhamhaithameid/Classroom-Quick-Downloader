@@ -336,7 +336,7 @@
       summary: 'Architecture, contributing, and technical details.',
       items: [
         {
-          id: 'oss-code',
+          id: 'dev-code',
           q: 'Where is the source code?',
           a: 'The full repository is public on GitHub, including extension, backend, and website code. Anyone can review, fork, or contribute.'
         },
