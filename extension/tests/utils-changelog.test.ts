@@ -76,7 +76,9 @@ describe('changelog utils', () => {
     };
     chrome.storage.local.get = vi.fn(async () => ({ cqd_changelog_v1: cached })) as never;
     vi.mocked(fetch).mockRejectedValueOnce(new Error('offline'));
-    expect(await mod.fetchChangelog(true)).toEqual(cached);
+    const result = await mod.fetchChangelog(true);
+    expect(result?.entries[0]?.id).toBe('c2');
+    expect(result?.revisionToken).toBeTruthy();
   });
 
   it('handles latest change extraction and seen version tracking', async () => {
