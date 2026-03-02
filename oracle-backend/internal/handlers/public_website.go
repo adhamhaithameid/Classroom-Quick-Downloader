@@ -445,7 +445,71 @@ func PublicWebsiteUserChangelogHandler(sqliteDB, postgresDB *sql.DB) http.Handle
 			return
 		}
 
-		writePublicWebsiteJSON(w, http.StatusOK, payload)
+		writePublicWebsiteJSON(w, http.StatusOK, snapshot.Changelog)
+	}
+}
+
+func StartPublicWebsiteSnapshotRefreshLoop(ctx context.Context, sqliteDB, postgresDB *sql.DB) {
+	if sqliteDB == nil {
+		return
+	}
+
+	refresh := func(triggeredBy string) {
+		runCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
+
+		snapshot, err := loadOrRefreshPublicWebsiteSnapshot(runCtx, sqliteDB, postgresDB, true)
+		if err != nil {
+			logEvent("error", "public_website_snapshot_refresh_failed", map[string]interface{}{
+				"error":       trimAndLimit(err.Error(), 240),
+				"triggeredBy": triggeredBy,
+			})
+			return
+		}
+		logEvent("info", "public_website_snapshot_refreshed", map[string]interface{}{
+			"snapshotId":  snapshot.SnapshotID,
+			"generatedAt": snapshot.GeneratedAt,
+			"triggeredBy": triggeredBy,
+		})
+	}
+
+	refresh("oracle_scheduler_snapshot_startup")
+	ticker := time.NewTicker(publicWebsiteSnapshotRefreshInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			refresh("oracle_scheduler_snapshot_interval")
+		}
+	}
+}
+
+func loadOrRefreshPublicWebsiteSnapshot(
+	ctx context.Context,
+	sqliteDB, postgresDB *sql.DB,
+	forceRefresh bool,
+) (publicWebsiteSnapshotResponse, error) {
+	if sqliteDB == nil {
+		return publicWebsiteSnapshotResponse{}, errors.New("database not available")
+	}
+
+	latest, latestErr := loadLatestPublicWebsiteSnapshot(ctx, sqliteDB)
+	if latestErr != nil && !errors.Is(latestErr, sql.ErrNoRows) {
+		return publicWebsiteSnapshotResponse{}, latestErr
+	}
+	if latestErr == nil && !forceRefresh && !shouldRefreshPublicWebsiteSnapshot(latest, time.Now().UTC()) {
+		return latest, nil
+	}
+
+	publicWebsiteSnapshotBuildMu.Lock()
+	defer publicWebsiteSnapshotBuildMu.Unlock()
+
+	latest, latestErr = loadLatestPublicWebsiteSnapshot(ctx, sqliteDB)
+	if latestErr != nil && !errors.Is(latestErr, sql.ErrNoRows) {
+		return publicWebsiteSnapshotResponse{}, latestErr
 	}
 }
 
