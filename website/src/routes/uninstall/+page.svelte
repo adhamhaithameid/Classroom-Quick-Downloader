@@ -70,6 +70,15 @@
     selectedFeatures = [...selectedFeatures, value];
   }
 
+  function trackReinstallClick(browser: BrowserKey): void {
+    trackWebsiteEvent({
+      eventType: 'cta',
+      action: 'install_click',
+      placement: `uninstall_reinstall_${browser}`,
+      pagePath: '/uninstall'
+    });
+  }
+
   async function submitFeedback(): Promise<void> {
     submitState = 'sending';
     submitMessage = '';
