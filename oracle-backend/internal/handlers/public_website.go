@@ -1451,6 +1451,42 @@ func buildPublicWebsiteUserChangelog(ctx context.Context, store *controlPlaneSto
 		markdown := trimAndLimit(stringFromAny(data["markdown"]), 24000)
 		releasedAt := int64PtrFromAny(data["releasedAtUtc"])
 		title := trimAndLimit(stringFromAny(data["title"]), 120)
+
+		if markdown != "" {
+			parsedReleases := parseUserFriendlyChangelogMarkdown(markdown)
+			for idx, release := range parsedReleases {
+				if release.Version == "" || release.Summary == "" {
+					continue
+				}
+				entryID := trimAndLimit(row.RecordKey, 120)
+				if len(parsedReleases) > 1 {
+					entryID = trimAndLimit(entryID+"-"+strings.ReplaceAll(strings.ToLower(release.Version), ".", "-"), 120)
+				}
+				entryTitle := title
+				if entryTitle == "" {
+					if idx == 0 {
+						entryTitle = "Release highlights"
+					} else {
+						entryTitle = "Release update"
+					}
+				}
+				entries = append(entries, publicWebsiteUserChangelogEntry{
+					ID:            entryID,
+					Version:       release.Version,
+					Title:         entryTitle,
+					Summary:       release.Summary,
+					Highlights:    flattenReleaseHighlights(release, 9),
+					ReleasedAtUTC: releasedAt,
+				})
+			}
+			if row.UpdatedAt > 0 && (lastUpdated == nil || row.UpdatedAt > *lastUpdated) {
+				updated := row.UpdatedAt
+				lastUpdated = &updated
+			}
+			continue
+		}
+
+		version := trimAndLimit(stringFromAny(data["version"]), 64)
 		summary := trimAndLimit(stringFromAny(data["summary"]), 500)
 		if version == "" || summary == "" {
 			continue
