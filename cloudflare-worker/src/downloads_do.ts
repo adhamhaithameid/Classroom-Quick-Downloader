@@ -15,6 +15,8 @@ import {
   ChangelogEntry,
   ChangelogRevision,
   ChangelogConfig,
+  ChangelogApplyMode,
+  ChangelogSyncStatus,
 } from "./types";
 import { resolveOracleEndpoint } from "./oracle-endpoint";
 
