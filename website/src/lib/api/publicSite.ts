@@ -388,9 +388,9 @@ function coerceSnapshotPayload(input: unknown): SnapshotResponse {
   };
 }
 
-async function fetchOracleMap(): Promise<MapResponse> {
-  const payload = await fetchOracleJSON('/api/public/website/map');
-  return coerceMapPayload(payload);
+async function fetchOracleSnapshot(): Promise<SnapshotResponse> {
+  const payload = await fetchOracleJSON('/api/public/website/snapshot');
+  return coerceSnapshotPayload(payload);
 }
 
 function buildSnapshot(overview: OverviewResponse, map: MapResponse): WebsiteSnapshot {
