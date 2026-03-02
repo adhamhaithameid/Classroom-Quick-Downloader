@@ -2495,7 +2495,7 @@ export class DownloadsDurable {
       await this.persist();
     }
 
-    // Ensure midnight alarm is scheduled
+    // Ensure daily Oracle flush alarm is scheduled.
     await this.scheduleNextMidnightAlarm();
   }
 
