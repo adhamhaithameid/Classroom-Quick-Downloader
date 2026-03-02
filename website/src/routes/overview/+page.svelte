@@ -2527,8 +2527,7 @@
   }
 
   .l2-marquee-viewport {
-    overflow-x: scroll;
-    overflow-y: hidden;
+    overflow: hidden;
     scrollbar-width: none;
     -ms-overflow-style: none;
     touch-action: pan-y;
