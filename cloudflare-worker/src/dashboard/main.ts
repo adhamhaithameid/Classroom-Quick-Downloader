@@ -565,6 +565,12 @@ function renderReleaseManagementSection(entries: ChangelogEntry[], config: Chang
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
                 <span id="btn-save-text">Save Draft</span>
               </button>
+              <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">
+                <button id="btn-publish-draft" class="btn btn-secondary" style="padding:8px 12px;">Publish Draft</button>
+                <button id="btn-sync-now" class="btn btn-secondary" style="padding:8px 12px;">Sync Now (Auto)</button>
+                <button id="btn-save-mode" class="btn btn-secondary" style="padding:8px 12px;">Save Mode</button>
+              </div>
+              <div id="cl-action-status" style="margin-top:8px; font-size:0.75em; color: var(--text-soft);">Idle</div>
               
               <div style="margin-top: 10px; font-size: 0.75em; color: var(--text-soft); text-align: center;">
                  💡 Tip: Press <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Ctrl+Enter</kbd> to save quickly
