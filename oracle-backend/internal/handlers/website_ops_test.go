@@ -47,6 +47,322 @@ func TestWebsiteOpsStateHandler_DefaultState(t *testing.T) {
 	}
 }
 
+func TestWebsiteAnalyticsHandler_ReturnsAggregates(t *testing.T) {
+	sqlDB := openPublicWebsiteDB(t)
+
+	if _, err := sqlDB.Exec(`INSERT INTO website_event_daily
+		(day_utc, event_type, action, placement, count, last_seen_at)
+		VALUES
+		('2026-02-20', 'cta', 'install_click', 'hero_install', 11, 1771600000000),
+		('2026-02-20', 'cta', 'download_click', 'footer_download', 9, 1771600000000),
+		('2026-02-20', 'map', 'map_yes', 'map_prompt_yes', 7, 1771600000000),
+		('2026-02-20', 'map', 'map_no', 'map_prompt_no', 3, 1771600000000),
+		('2026-02-19', 'cta', 'install_click', 'nav_install', 4, 1771510000000)
+	`); err != nil {
+		t.Fatalf("seed website_event_daily failed: %v", err)
+	}
+
+	if _, err := sqlDB.Exec(`INSERT INTO website_uninstall_feedback
+		(reason, browser, extension_version, source, notes, origin, created_at)
+		VALUES
+		('Temporary install', 'chrome', '1.3.7', 'website', 'note', 'https://example.com', 1771600000000),
+		('Found alternative', 'firefox', '1.3.7', 'website', 'note', 'https://example.com', 1771600000100)
+	`); err != nil {
+		t.Fatalf("seed website_uninstall_feedback failed: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/admin/website/analytics?range=all", nil)
+	rr := httptest.NewRecorder()
+	WebsiteAnalyticsHandler(sqlDB, WebsiteTrafficSyncConfig{}).ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var payload struct {
+		OK      bool   `json:"ok"`
+		Range   string `json:"range"`
+		Buttons struct {
+			InstallClicks  int64 `json:"installClicks"`
+			DownloadClicks int64 `json:"downloadClicks"`
+		} `json:"buttons"`
+		Map struct {
+			Yes       int64   `json:"yes"`
+			No        int64   `json:"no"`
+			Responses int64   `json:"responses"`
+			YesRatio  float64 `json:"yesRatio"`
+		} `json:"map"`
+		Feedback struct {
+			TotalSubmissions int64 `json:"totalSubmissions"`
+			TopReasons       []struct {
+				Reason string `json:"reason"`
+				Count  int64  `json:"count"`
+			} `json:"topReasons"`
+		} `json:"feedback"`
+		Daily []struct {
+			DayUTC string `json:"dayUtc"`
+		} `json:"daily"`
+		Placements []struct {
+			Placement string `json:"placement"`
+			Action    string `json:"action"`
+			Count     int64  `json:"count"`
+		} `json:"placements"`
+		Traffic struct {
+			Visits   int64  `json:"visits"`
+			Requests int64  `json:"requests"`
+			Status   string `json:"status"`
+		} `json:"traffic"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode analytics payload failed: %v", err)
+	}
+	if !payload.OK {
+		t.Fatal("expected ok=true")
+	}
+	if payload.Range != "all" {
+		t.Fatalf("expected range=all, got %q", payload.Range)
+	}
+	if payload.Buttons.InstallClicks != 15 {
+		t.Fatalf("expected installClicks=15, got %d", payload.Buttons.InstallClicks)
+	}
+	if payload.Buttons.DownloadClicks != 9 {
+		t.Fatalf("expected downloadClicks=9, got %d", payload.Buttons.DownloadClicks)
+	}
+	if payload.Map.Yes != 7 || payload.Map.No != 3 || payload.Map.Responses != 10 {
+		t.Fatalf("unexpected map payload: %+v", payload.Map)
+	}
+	if payload.Map.YesRatio <= 0.69 || payload.Map.YesRatio >= 0.71 {
+		t.Fatalf("unexpected yesRatio: %f", payload.Map.YesRatio)
+	}
+	if payload.Feedback.TotalSubmissions != 2 {
+		t.Fatalf("expected feedback total=2, got %d", payload.Feedback.TotalSubmissions)
+	}
+	if len(payload.Daily) == 0 {
+		t.Fatal("expected non-empty daily series")
+	}
+	if len(payload.Placements) == 0 {
+		t.Fatal("expected non-empty placements breakdown")
+	}
+	if payload.Traffic.Visits != 0 || payload.Traffic.Requests != 0 {
+		t.Fatalf("expected zero traffic defaults, got %+v", payload.Traffic)
+	}
+	if payload.Traffic.Status != "disabled" {
+		t.Fatalf("expected traffic status disabled when sync config is disabled, got %q", payload.Traffic.Status)
+	}
+}
+
+func TestWebsiteAnalyticsHandler_IncludesTrafficAggregates(t *testing.T) {
+	sqlDB := openPublicWebsiteDB(t)
+	nowMs := time.Now().UTC().UnixMilli()
+
+	if _, err := sqlDB.Exec(`INSERT INTO website_traffic_hourly
+		(hour_utc, visits, requests, fetched_at, source)
+		VALUES
+		('2026-02-20T01:00:00Z', 100, 500, ?, 'cloudflare_graphql'),
+		('2026-02-20T02:00:00Z', 120, 520, ?, 'cloudflare_graphql'),
+		('2026-02-19T23:00:00Z', 90, 410, ?, 'cloudflare_graphql')
+	`, nowMs, nowMs, nowMs); err != nil {
+		t.Fatalf("seed website_traffic_hourly failed: %v", err)
+	}
+	if err := insertWebsiteSyncBatch(
+		t.Context(),
+		sqlDB,
+		websiteSyncDirectionCloudflareTrafficToOracle,
+		"traffic-sync-ok",
+		"test",
+		"ok",
+		map[string]any{"hoursUpserted": 3},
+	); err != nil {
+		t.Fatalf("seed website traffic sync batch failed: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/admin/website/analytics?range=all", nil)
+	rr := httptest.NewRecorder()
+	cfg := WebsiteTrafficSyncConfig{
+		Enabled:  true,
+		Interval: time.Hour,
+		Lookback: 48 * time.Hour,
+	}
+	WebsiteAnalyticsHandler(sqlDB, cfg).ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var payload struct {
+		OK      bool `json:"ok"`
+		Traffic struct {
+			Visits          int64  `json:"visits"`
+			Requests        int64  `json:"requests"`
+			LastSyncedAtUTC *int64 `json:"lastSyncedAtUtc"`
+			Source          string `json:"source"`
+			Status          string `json:"status"`
+		} `json:"traffic"`
+		TrafficDaily []struct {
+			DayUTC   string `json:"dayUtc"`
+			Visits   int64  `json:"visits"`
+			Requests int64  `json:"requests"`
+		} `json:"trafficDaily"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode analytics payload failed: %v", err)
+	}
+	if !payload.OK {
+		t.Fatal("expected ok=true")
+	}
+	if payload.Traffic.Visits != 310 {
+		t.Fatalf("expected traffic visits=310, got %d", payload.Traffic.Visits)
+	}
+	if payload.Traffic.Requests != 1430 {
+		t.Fatalf("expected traffic requests=1430, got %d", payload.Traffic.Requests)
+	}
+	if payload.Traffic.Source != "cloudflare_graphql" {
+		t.Fatalf("expected traffic source cloudflare_graphql, got %q", payload.Traffic.Source)
+	}
+	switch payload.Traffic.Status {
+	case "ok", "degraded", "stale":
+		// Time-based traffic freshness and latest sync status can produce
+		// one of these states while aggregates remain valid.
+	default:
+		t.Fatalf("expected traffic status in [ok degraded stale], got %q", payload.Traffic.Status)
+	}
+	if payload.Traffic.LastSyncedAtUTC == nil || *payload.Traffic.LastSyncedAtUTC <= 0 {
+		t.Fatalf("expected lastSyncedAtUtc to be present, got %+v", payload.Traffic)
+	}
+	if len(payload.TrafficDaily) == 0 {
+		t.Fatal("expected trafficDaily to be non-empty")
+	}
+}
+
+func TestWebsiteAnalyticsHandler_DegradesWhenTrafficLoadFails(t *testing.T) {
+	sqlDB := openPublicWebsiteDB(t)
+	if _, err := sqlDB.Exec(`DROP TABLE IF EXISTS website_traffic_hourly`); err != nil {
+		t.Fatalf("drop website_traffic_hourly failed: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/admin/website/analytics?range=7d", nil)
+	rr := httptest.NewRecorder()
+	WebsiteAnalyticsHandler(sqlDB, WebsiteTrafficSyncConfig{
+		Enabled:  true,
+		Interval: time.Hour,
+		Lookback: 48 * time.Hour,
+	}).ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var payload struct {
+		OK      bool `json:"ok"`
+		Traffic struct {
+			Status   string `json:"status"`
+			Visits   int64  `json:"visits"`
+			Requests int64  `json:"requests"`
+		} `json:"traffic"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode analytics payload failed: %v", err)
+	}
+	if !payload.OK {
+		t.Fatal("expected ok=true")
+	}
+	if payload.Traffic.Status != "error" {
+		t.Fatalf("expected traffic status error, got %q", payload.Traffic.Status)
+	}
+	if payload.Traffic.Visits != 0 || payload.Traffic.Requests != 0 {
+		t.Fatalf("expected zero traffic payload on degrade, got %+v", payload.Traffic)
+	}
+}
+
+func TestWebsiteTrafficRefreshHandler_UpsertsGraphQLTraffic(t *testing.T) {
+	sqlDB := openPublicWebsiteDB(t)
+
+	mockCF := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Fatalf("expected POST to GraphQL endpoint, got %s", r.Method)
+		}
+		auth := r.Header.Get("Authorization")
+		if auth != "Bearer test-token" {
+			t.Fatalf("expected bearer token header, got %q", auth)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"data": {
+				"viewer": {
+					"accounts": [{
+						"httpRequestsAdaptiveGroups": [
+							{
+								"dimensions": { "datetimeHour": "2026-02-20T01:00:00Z" },
+								"sum": { "visits": 42, "requests": 210 }
+							},
+							{
+								"dimensions": { "datetimeHour": "2026-02-20T02:00:00Z" },
+								"sum": { "visits": 58, "requests": 240 }
+							}
+						]
+					}]
+				}
+			}
+		}`))
+	}))
+	defer mockCF.Close()
+
+	originalEndpoint := cloudflareAnalyticsGraphQLEndpoint
+	cloudflareAnalyticsGraphQLEndpoint = mockCF.URL
+	t.Cleanup(func() {
+		cloudflareAnalyticsGraphQLEndpoint = originalEndpoint
+	})
+
+	cfg := WebsiteTrafficSyncConfig{
+		Enabled:    true,
+		APIToken:   "test-token",
+		AccountTag: "account-123",
+		Hostname:   "example.com",
+		Interval:   time.Hour,
+		Lookback:   48 * time.Hour,
+	}
+	req := httptest.NewRequest(http.MethodPost, "/api/admin/website/traffic/refresh", nil)
+	rr := httptest.NewRecorder()
+	WebsiteTrafficRefreshHandler(sqlDB, cfg).ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var payload struct {
+		OK   bool `json:"ok"`
+		Sync struct {
+			HoursUpserted int   `json:"hoursUpserted"`
+			Visits        int64 `json:"visits"`
+			Requests      int64 `json:"requests"`
+		} `json:"sync"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode refresh payload failed: %v", err)
+	}
+	if !payload.OK {
+		t.Fatal("expected ok=true")
+	}
+	if payload.Sync.HoursUpserted != 2 || payload.Sync.Visits != 100 || payload.Sync.Requests != 450 {
+		t.Fatalf("unexpected sync payload: %+v", payload.Sync)
+	}
+
+	var rows int64
+	if err := sqlDB.QueryRow(`SELECT COUNT(*) FROM website_traffic_hourly`).Scan(&rows); err != nil {
+		t.Fatalf("query website_traffic_hourly failed: %v", err)
+	}
+	if rows != 2 {
+		t.Fatalf("expected 2 traffic rows, got %d", rows)
+	}
+
+	batch, err := loadLatestWebsiteSyncBatch(t.Context(), sqlDB, websiteSyncDirectionCloudflareTrafficToOracle)
+	if err != nil {
+		t.Fatalf("loadLatestWebsiteSyncBatch failed: %v", err)
+	}
+	if batch == nil {
+		t.Fatal("expected cloudflare_traffic_to_oracle sync batch")
+	}
+	if batch.Status != "ok" {
+		t.Fatalf("expected traffic batch status ok, got %q", batch.Status)
+	}
+}
+
 func TestWebsiteOpsForcePushAndOverrideHandlers(t *testing.T) {
 	sqlDB := openPublicWebsiteDB(t)
 
