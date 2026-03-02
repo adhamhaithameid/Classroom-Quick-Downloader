@@ -1213,8 +1213,15 @@ async function handleProtectedAdminEndpoint(request: Request, env: WorkerEnv): P
   }
   const newReq = new Request(request.url, requestInit);
 
-  const res = await stub.fetch(newReq);
-  return withCors(request, res, env);
+  try {
+    const res = await stub.fetch(newReq);
+    return withCors(request, res, env);
+  } catch {
+    return withCors(request, new Response(
+      JSON.stringify({ ok: false, error: "upstream_unavailable" }),
+      { status: 502, headers: { "content-type": "application/json; charset=utf-8" } }
+    ), env);
+  }
 }
 
 // ---------------------------------------------------------------------------
