@@ -432,6 +432,7 @@ func syncDeploymentTargets(
 			Version:     stats.version,
 			Rating:      stats.rating,
 			RatingCount: stats.ratingCount,
+			SyncSource:  stats.source,
 			LatencyMS:   latencyMs,
 			SyncedAtUTC: nowMs,
 		}
