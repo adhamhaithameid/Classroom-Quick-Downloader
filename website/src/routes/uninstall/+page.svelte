@@ -402,7 +402,12 @@
     color: #fff;
     font-size: 14px;
     font-weight: 800;
-    letter-spacing: -0.015em;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 14px;
+    box-shadow: 0 3px 12px rgba(26, 139, 85, 0.3);
   }
 
   .two-col {
