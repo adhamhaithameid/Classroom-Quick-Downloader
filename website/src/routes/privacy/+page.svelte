@@ -167,11 +167,23 @@
     background-size: 60px 60px;
   }
 
-  .header-left {
-    display: flex;
-    align-items: flex-start;
-    gap: 16px;
-    max-width: 700px;
+  /* ── Hero ───────────────────────── */
+  .prv-hero {
+    position: relative; z-index: 2;
+    text-align: center;
+    padding: 36px 24px 40px;
+  }
+
+  .prv-mega {
+    font-size: clamp(36px, 5vw, 60px);
+    font-weight: 900;
+    line-height: 1.15;
+    letter-spacing: -0.03em;
+    margin: 0 0 20px;
+    padding-bottom: 0.1em;
+    background: linear-gradient(135deg, var(--green), var(--green-light), #10b981);
+    background-size: 200% 200%;
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
   }
 
   .icon-box {
