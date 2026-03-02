@@ -417,17 +417,9 @@
     -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
   }
 
-  .icon-box {
-    width: 52px;
-    height: 52px;
-    border-radius: 16px;
-    background: var(--gc-green-bg);
-    border: 1px solid rgba(26, 139, 85, 0.12);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    color: var(--gc-green);
+  .cl-sub {
+    font-size: 17px; line-height: 1.7; color: var(--text); opacity: 0.7;
+    max-width: 520px; margin: 0 auto 20px;
   }
 
   h1 {
