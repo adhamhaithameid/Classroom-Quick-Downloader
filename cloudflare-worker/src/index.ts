@@ -1533,6 +1533,7 @@ export default {
       pathname === "/admin/ip-allowlist" ||
       pathname === "/admin/website/status" ||
       pathname === "/admin/website/flush-now" ||
+      pathname === "/admin/website/replay-dlq" ||
       pathname === "/admin/website/override" ||
       pathname === "/admin/website/refresh-toggle"
     ) {
