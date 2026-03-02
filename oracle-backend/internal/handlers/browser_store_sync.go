@@ -1103,8 +1103,9 @@ func StartDeploymentsAutoSyncLoop(
 			runCtx, cancel := context.WithTimeout(ctx, 40*time.Second)
 			results, okCount, err = syncDeploymentTargets(runCtx, store, sqliteDB, client, metrics, targetSet, false, true)
 			cancel()
-			// Any successful target means sync made progress; keep regular schedule.
-			if err == nil && (okCount > 0 || len(results) == 0) {
+			// Retry until the batch is fully successful so transient per-target
+			// failures do not leave partial stale state for an entire interval.
+			if err == nil && (len(results) == 0 || okCount == int64(len(results))) {
 				break
 			}
 			if attempt < maxAttempts {
