@@ -9,6 +9,7 @@
 ## Table of Contents
 
 - [Quick Start](#quick-start)
+- [Latest Major Scan Snapshot (2026-02-28)](#latest-major-scan-snapshot-2026-02-28)
 - [Project Structure](#project-structure)
 - [Extension Tests (Vitest)](#extension-tests-vitest)
   - [Unit Tests](#unit-tests)
