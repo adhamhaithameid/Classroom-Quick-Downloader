@@ -419,9 +419,10 @@ func PublicWebsiteStatusHandler(sqliteDB, postgresDB *sql.DB) http.HandlerFunc {
 		}
 
 		writePublicWebsiteJSON(w, http.StatusOK, publicWebsiteStatusResponse{
-			OK:          true,
-			GeneratedAt: time.Now().UTC().UnixMilli(),
-			Status:      status,
+			SchemaVersion: publicWebsiteSchemaVersion,
+			OK:            true,
+			GeneratedAt:   snapshot.GeneratedAt,
+			Status:        snapshot.Overview.Status,
 		})
 	}
 }
