@@ -1621,6 +1621,82 @@ func int64PtrFromAny(value any) *int64 {
 	return &v
 }
 
+func loadPublicWebsiteUserChangelogConfig(ctx context.Context, store *controlPlaneStore) (publicWebsiteUserChangelogConfig, error) {
+	config := publicWebsiteUserChangelogConfig{
+		Source:      "oracle",
+		MarkdownURL: githubRawMarkdownURL("user-friendly-changelog.md"),
+	}
+	records, err := store.listRecords(ctx, publicWebsiteUserChangelogConfigType)
+	if err != nil {
+		return config, err
+	}
+	if len(records) == 0 {
+		return config, nil
+	}
+	var selected *controlPlaneRecordRow
+	for i := range records {
+		row := records[i]
+		if strings.EqualFold(strings.TrimSpace(row.RecordKey), "active") {
+			selected = &row
+			break
+		}
+	}
+	if selected == nil {
+		selected = &records[0]
+	}
+	data := decodeRecordDataMap(selected.Data)
+	source := strings.ToLower(strings.TrimSpace(stringFromAny(data["source"])))
+	switch source {
+	case "github":
+		config.Source = "github"
+	default:
+		config.Source = "oracle"
+	}
+	rawURL := strings.TrimSpace(stringFromAny(data["markdownUrl"]))
+	if rawURL != "" {
+		parsed, parseErr := url.Parse(rawURL)
+		if parseErr == nil && strings.EqualFold(parsed.Scheme, "https") {
+			config.MarkdownURL = rawURL
+		}
+	}
+	return config, nil
+}
+
+func fetchRemoteUserFriendlyChangelogMarkdown(ctx context.Context, rawURL string) (string, error) {
+	rawURL = strings.TrimSpace(rawURL)
+	if rawURL == "" {
+		return "", errors.New("github raw changelog url is empty")
+	}
+	parsed, err := url.Parse(rawURL)
+	if err != nil || !strings.EqualFold(parsed.Scheme, "https") {
+		return "", errors.New("github raw changelog url is invalid")
+	}
+	reqCtx, cancel := context.WithTimeout(ctx, 6*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, rawURL, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("User-Agent", "ClassroomQuickDownloader-Oracle/4.1")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", errors.New("github changelog request failed with non-2xx status")
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 512*1024))
+	if err != nil {
+		return "", err
+	}
+	markdown := strings.TrimSpace(string(body))
+	if markdown == "" {
+		return "", errors.New("github changelog markdown is empty")
+	}
+	return markdown, nil
+}
+
 func normalizeStringList(value any, maxItems, maxLen int) []string {
 	items := make([]string, 0, maxItems)
 	switch typed := value.(type) {
