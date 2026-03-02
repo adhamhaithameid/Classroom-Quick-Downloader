@@ -78,6 +78,8 @@ export type SnapshotResponse = {
 
 export type WebsiteSnapshot = {
   source: 'oracle';
+  snapshotId: string;
+  generatedAt: number;
   fetchedAtUtc: number;
   nextRefreshAtUtc: number;
   overview: OverviewResponse;
