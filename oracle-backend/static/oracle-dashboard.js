@@ -4420,6 +4420,7 @@
           await loadNotifications();
         }
         if (currentPage === 'website-sync') await loadWebsiteSyncState();
+        if (currentPage === 'website-analysis') await loadWebsiteAnalytics();
         if (currentPage === 'creative') await loadCreativeHub();
         if (currentPage === 'content-changelog') await loadUserChangelogRecords();
         if (currentPage === 'logs') await loadOracleLogs();
