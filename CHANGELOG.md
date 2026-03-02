@@ -12,6 +12,7 @@ It includes every commit from project inception and groups release windows by ex
 
 ## Table of Contents
 - [Unreleased](#unreleased)
+- [1.3.8](#138-20260302)
 - [1.3.6](#136-20260220)
 - [1.3.0](#130-20260218)
 - [1.2.7](#127-20260204)
