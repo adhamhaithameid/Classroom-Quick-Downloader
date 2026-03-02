@@ -50,6 +50,16 @@
           id: 'basics-mobile',
           q: 'Does it work on mobile?',
           a: 'Not directly. Browser extensions are a desktop feature. On mobile, you would need to use a mobile browser that supports extensions (like Firefox for Android), but this is not officially tested.'
+        },
+        {
+          id: 'basics-how-many-files',
+          q: 'Is there a limit to how many files I can download at once?',
+          a: 'CQD itself doesn\'t impose a limit. However, your browser may throttle concurrent downloads — typically 6–10 at a time. CQD queues the rest and downloads them as slots free up.'
+        },
+        {
+          id: 'basics-file-format',
+          q: 'Does it change the file names or formats?',
+          a: 'No. Files are downloaded exactly as they are hosted on Google Classroom. The original file names and formats are preserved.'
         }
       ]
     },
