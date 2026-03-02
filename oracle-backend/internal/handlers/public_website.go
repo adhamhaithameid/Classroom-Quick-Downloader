@@ -712,9 +712,10 @@ func PublicWebsiteUninstallHandler(sqliteDB *sql.DB) http.HandlerFunc {
 				return
 			}
 			writePublicWebsiteJSON(w, http.StatusOK, publicWebsiteUninstallStatsResponse{
-				OK:          true,
-				GeneratedAt: time.Now().UTC().UnixMilli(),
-				Stats:       stats,
+				SchemaVersion: publicWebsiteSchemaVersion,
+				OK:            true,
+				GeneratedAt:   time.Now().UTC().UnixMilli(),
+				Stats:         stats,
 			})
 			return
 		case http.MethodPost:
