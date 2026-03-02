@@ -176,6 +176,8 @@ If project already exists, verify:
 1. `Workers & Pages -> classroom-quick-downloader-website`.
 2. Confirm default production domain is active.
 3. Confirm `Not_Stable` preview branch alias is available after preview deploys.
+4. Attach your root custom domain (`<your-root-domain>`) as production domain.
+5. Enable redirect from `classroom-quick-downloader-website.pages.dev` to your root custom domain.
 
 CLI equivalent:
 
