@@ -3459,6 +3459,7 @@
     .l2-ps-expand-btn { opacity: 1; transform: scale(1); }
     .l2-media-modal-backdrop { padding: 8px; }
     .l2-map-layout { grid-template-columns: 1fr; gap: 20px; }
+    .l2-map-degraded-note { font-size: 11px; }
     .l2-map-copy { max-width: none; }
     .l2-map-shell { justify-content: center; }
     .l2-map-frame { width: 100%; }
