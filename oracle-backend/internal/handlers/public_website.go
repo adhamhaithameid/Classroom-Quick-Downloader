@@ -94,12 +94,40 @@ type publicWebsiteStatusResponse struct {
 }
 
 type publicWebsiteMapResponse struct {
-	OK          bool                       `json:"ok"`
-	GeneratedAt int64                      `json:"generatedAt"`
-	Granularity string                     `json:"granularity"`
-	Countries   []publicWebsiteCountryCell `json:"countries"`
-	Totals      publicWebsiteMapTotals     `json:"totals"`
-	PrivacyNote string                     `json:"privacyNote"`
+	SchemaVersion string                     `json:"schemaVersion"`
+	OK            bool                       `json:"ok"`
+	GeneratedAt   int64                      `json:"generatedAt"`
+	Granularity   string                     `json:"granularity"`
+	Countries     []publicWebsiteCountryCell `json:"countries"`
+	Totals        publicWebsiteMapTotals     `json:"totals"`
+	PrivacyNote   string                     `json:"privacyNote"`
+}
+
+type publicWebsiteSnapshotResponse struct {
+	SchemaVersion        string                             `json:"schemaVersion"`
+	OK                   bool                               `json:"ok"`
+	GeneratedAt          int64                              `json:"generatedAt"`
+	SnapshotID           string                             `json:"snapshotId"`
+	Overview             publicWebsiteOverviewResponse      `json:"overview"`
+	Map                  publicWebsiteMapResponse           `json:"map"`
+	Changelog            publicWebsiteUserChangelogResponse `json:"changelog"`
+	UserChangelogSummary publicWebsiteChangelogSummary      `json:"userChangelogSummary"`
+	Privacy              publicWebsitePrivacyPointers       `json:"privacy"`
+}
+
+type publicWebsiteChangelogSummary struct {
+	Headline         string `json:"headline"`
+	Description      string `json:"description"`
+	EntriesCount     int    `json:"entriesCount"`
+	LastUpdatedAtUTC *int64 `json:"lastUpdatedAtUtc"`
+	FullChangelogURL string `json:"fullChangelogUrl"`
+}
+
+type publicWebsitePrivacyPointers struct {
+	Headline       string `json:"headline"`
+	Description    string `json:"description"`
+	UserPrivacyURL string `json:"userPrivacyUrl"`
+	FullPrivacyURL string `json:"fullPrivacyUrl"`
 }
 
 type publicWebsiteUserChangelogResponse struct {
