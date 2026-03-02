@@ -955,7 +955,7 @@ func serveIndexWithNonce(w http.ResponseWriter, r *http.Request, staticRoot stri
 func scheduleSheetsArchiver() {
 	sheetsID := resolveSheetsIDFromEnv()
 	if sheetsID == "" {
-		log.Println("[Scheduler] SHEETS_ID not set, skipping automated Sheets export")
+		log.Println("[Scheduler] Sheets ID not configured, skipping automated Sheets export")
 		return
 	}
 
