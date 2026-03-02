@@ -253,7 +253,11 @@ Configured workflows:
     - public website snapshot path (`GET /api/public/website/snapshot`)
 
 - `/.github/workflows/website-deploy.yml`
-  - triggers on `main` for `website/**`, `CHANGELOG.md`, `PRIVACY.md`
+  - triggers on every push to `main`
+  - runs preflight guardrails:
+    - required secrets/variables presence
+    - schema compatibility check (`tools/check_schema_compat.sh`)
+  - runs website typecheck + smoke test before build
   - builds website
   - deploys to Cloudflare Pages
 
