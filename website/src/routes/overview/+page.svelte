@@ -3407,7 +3407,8 @@
     -webkit-backdrop-filter: blur(16px);
     border: 1px solid var(--border-subtle);
     border-radius: 24px;
-    padding: 64px 48px;
+    padding: clamp(28px, 5vw, 64px) clamp(20px, 5vw, 48px);
+    overflow: visible;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.04);
   }
   .l2-cta-content h2 {
