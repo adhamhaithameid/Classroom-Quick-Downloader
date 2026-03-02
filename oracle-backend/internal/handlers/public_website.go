@@ -699,6 +699,7 @@ func PublicWebsiteUninstallHandler(sqliteDB *sql.DB) http.HandlerFunc {
 		if !preparePublicWebsiteCORSWithOptions(w, r, publicWebsiteCORSOptions{
 			AllowedMethods:        "GET, POST, OPTIONS",
 			RequireOriginForWrite: true,
+			StructuredErrors:      true,
 		}) {
 			return
 		}
