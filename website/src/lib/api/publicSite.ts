@@ -20,6 +20,7 @@ import type {
 const REQUEST_TIMEOUT_MS = 8000;
 export const ORACLE_SNAPSHOT_REFRESH_MS = 3 * 60 * 60 * 1000;
 const SNAPSHOT_STORAGE_KEY = 'cqd.website.snapshot.v1';
+const PUBLIC_SCHEMA_VERSION: PublicSchemaVersion = '1';
 
 let cachedSnapshot: WebsiteSnapshot | null = null;
 let snapshotInFlight: Promise<WebsiteSnapshot> | null = null;
