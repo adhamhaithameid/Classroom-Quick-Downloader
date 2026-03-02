@@ -526,6 +526,8 @@
     background: var(--green-bg);
     color: var(--green);
   }
+  .cl-sidebar-link:hover .cl-sv { color: var(--green); }
+  .cl-sv { font-weight: 700; font-size: 14px; color: var(--text); }
 
   .sv {
     font-weight: 700;
