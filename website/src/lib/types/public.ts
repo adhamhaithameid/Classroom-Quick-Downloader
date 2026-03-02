@@ -207,3 +207,30 @@ export type UninstallStatsResponse = {
     }>;
   };
 };
+
+export type WebsiteEventType = 'cta' | 'map';
+export type WebsiteEventAction = 'install_click' | 'download_click' | 'map_yes' | 'map_no';
+
+export type WebsiteEventPayload = {
+  eventId: string;
+  eventType: WebsiteEventType;
+  action: WebsiteEventAction;
+  placement: string;
+  tsUtc?: number;
+  meta?: Record<string, string | number | boolean | null>;
+};
+
+export type WebsiteEventRequest = {
+  schemaVersion: PublicSchemaVersion;
+  sessionId: string;
+  pagePath: string;
+  events: WebsiteEventPayload[];
+};
+
+export type WebsiteEventIngestResponse = {
+  schemaVersion: PublicSchemaVersion;
+  ok: boolean;
+  generatedAt: number;
+  acceptedCount: number;
+  rejectedCount: number;
+};
