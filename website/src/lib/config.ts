@@ -49,6 +49,7 @@ export const APP_VERSION = (() => {
   if (!raw) return DEFAULT_APP_VERSION;
   return raw.startsWith('v') ? raw : `v${raw}`;
 })();
+export const ENABLE_FEEDBACK_NAV = envBool(env.PUBLIC_ENABLE_FEEDBACK_NAV, false);
 
 export const STORE_LINKS = {
   chrome:
