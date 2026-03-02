@@ -577,6 +577,29 @@ func publishWebsiteDataset(
 		return websiteSyncControlRow{}, err
 	}
 
+	prevDownloads := maxInt64(row.PublishedDownloads, 0)
+	prevCountries := decodeWebsiteCountryCounts(row.PublishedCountries)
+	nextDownloads := maxInt64(downloads, 0)
+	nextCountries := normalizeWebsiteCountryCells(countries, 300)
+	violations := detectWebsiteDatasetMonotonicViolations(prevDownloads, prevCountries, nextDownloads, nextCountries)
+	if len(violations) > 0 {
+		_ = AppendAuditLog(
+			ctx,
+			db,
+			"website_dataset_monotonic_violation",
+			"website_sync",
+			trimAndLimit(source, 32),
+			"blocked",
+			map[string]any{
+				"source":        trimAndLimit(source, 32),
+				"prevDownloads": prevDownloads,
+				"nextDownloads": nextDownloads,
+				"violations":    violations,
+			},
+		)
+		return websiteSyncControlRow{}, fmt.Errorf("%w: %s", errWebsiteMonotonicViolation, strings.Join(violations, "; "))
+	}
+
 	now := time.Now().UTC().UnixMilli()
 	row.PublishedSource = trimAndLimit(source, 32)
 	if row.PublishedSource == "" {
