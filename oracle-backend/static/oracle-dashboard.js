@@ -4160,6 +4160,15 @@
           });
         }
 
+        var websiteAnalysisRange = document.getElementById('website-analysis-range');
+        if (websiteAnalysisRange && websiteAnalysisRange.dataset.boundChange !== '1') {
+          websiteAnalysisRange.dataset.boundChange = '1';
+          websiteAnalysisRange.addEventListener('change', function() {
+            websiteAnalyticsRange = websiteAnalysisRange.value || '7d';
+            loadWebsiteAnalytics(websiteAnalyticsRange);
+          });
+        }
+
         var activityVersionFilter = document.getElementById('activity-version-filter');
         if (activityVersionFilter && activityVersionFilter.dataset.boundChange !== '1') {
           activityVersionFilter.dataset.boundChange = '1';
