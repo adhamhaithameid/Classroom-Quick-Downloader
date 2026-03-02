@@ -589,6 +589,9 @@ func ComparisonHandler(db *sql.DB) http.HandlerFunc {
 		if to2.After(end) {
 			end = to2
 		}
+		meta := buildWindowMeta(time.Now().UTC(), start, end)
+		resp.WindowStartUTC = meta.WindowStartUTC
+		resp.WindowEndUTC = meta.WindowEndUTC
 
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(resp)
