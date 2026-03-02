@@ -986,9 +986,7 @@
       function showTooltip(e, payload) {
         currentTooltipEvent = e;
         currentTooltipPayload = payload;
-        if (canShowTooltip) {
-          renderTooltip(e, payload);
-        }
+        renderTooltip(e, payload);
       }
       
       function hideTooltip() { 
