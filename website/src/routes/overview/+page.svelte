@@ -3244,6 +3244,25 @@
     gap: 34px;
     align-items: center;
   }
+  .l2-map-degraded-note {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    border: 1px solid rgba(217, 119, 6, 0.28);
+    background: rgba(217, 119, 6, 0.09);
+    color: #78350f;
+    border-radius: 12px;
+    padding: 10px 12px;
+    font-size: 12px;
+    line-height: 1.55;
+  }
+  .l2-map-degraded-note strong {
+    font-size: 12px;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+  }
 
   .l2-map-copy {
     max-width: 560px;
