@@ -88,7 +88,7 @@ describe('public website API integration', () => {
     expect(payload.totals.downloads).toBe(10);
   });
 
-  it('fetches map data and strips invalid rows', async () => {
+  it('fetches map data and strips invalid rows from canonical snapshot', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-02-21T22:30:00.000Z'));
     vi.stubGlobal(
