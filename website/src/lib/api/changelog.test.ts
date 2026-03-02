@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fetchChangelog } from './changelog';
 
+const TEST_TIMEOUT_MS = 15_000;
+
 afterEach(() => {
   vi.restoreAllMocks();
 });
