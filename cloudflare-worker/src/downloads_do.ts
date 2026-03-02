@@ -2497,6 +2497,10 @@ export class DownloadsDurable {
 
     // Ensure daily Oracle flush alarm is scheduled.
     await this.scheduleNextMidnightAlarm();
+    const changelogAlarmDirty = await this.ensureChangelogAutoSyncAlarm(Date.now());
+    if (changelogAlarmDirty) {
+      await this.persist();
+    }
   }
 
   private async persist(): Promise<void> {
