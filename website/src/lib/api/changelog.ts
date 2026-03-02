@@ -100,9 +100,18 @@ function coerceChangelogPayload(input: unknown): ChangelogResponse {
           const id = typeof raw?.id === 'string' ? raw.id : '';
           const version = typeof raw?.version === 'string' ? raw.version : '';
           const date = typeof raw?.date === 'string' ? raw.date : '';
-          const changes = Array.isArray(raw?.changes)
-            ? raw.changes.filter((line): line is string => typeof line === 'string' && line.trim().length > 0)
-            : [];
+          const summary = typeof raw?.summary === 'string' ? raw.summary.trim() : '';
+          const added = normalizeList(raw?.added, 20);
+          const changed = normalizeList(raw?.changed, 20);
+          const fixed = normalizeList(raw?.fixed, 20);
+          const markdown = typeof raw?.markdown === 'string' ? raw.markdown : '';
+          const changes = buildLegacyChanges({
+            summary,
+            added,
+            changed,
+            fixed,
+            changes: raw?.changes
+          });
           if (!id || !version || !date) return null;
           return {
             id,
