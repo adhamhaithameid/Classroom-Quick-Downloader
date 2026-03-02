@@ -45,7 +45,7 @@ Create:
 
 - `CLOUDFLARE_API_TOKEN`
 - `CLOUDFLARE_ACCOUNT_ID`
-- `ORACLE_HOST` (example: `129.151.233.229`)
+- `ORACLE_HOST` (example: `<oracle-host>`)
 - `ORACLE_SSH_KEY` (full private key content)
 
 Note:
