@@ -5468,6 +5468,99 @@ export function renderDashboard(stats: StatsResponse): string {
       const currentPreviewEl = document.getElementById("cl-current-preview");
       const revisionHistoryEl = document.getElementById("cl-revision-history");
       
+      function setChangelogActionStatus(message, tone) {
+        if (!changelogActionStatusEl) return;
+        changelogActionStatusEl.textContent = message || "Idle";
+        changelogActionStatusEl.style.color = tone === "ok" ? "#86efac" : tone === "err" ? "#fca5a5" : "var(--text-soft)";
+      }
+
+      function setRuleStatus(message, tone) {
+        if (!rulesSaveStatusEl) return;
+        rulesSaveStatusEl.textContent = message || "Idle";
+        rulesSaveStatusEl.style.color = tone === "ok" ? "#86efac" : tone === "err" ? "#fca5a5" : "var(--text-soft)";
+      }
+
+      async function callChangelogAdmin(endpoint, payload) {
+        const res = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          credentials: "same-origin",
+          body: JSON.stringify(payload || {})
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.ok === false) {
+          const error = (data && data.error) ? data.error : "request_failed";
+          throw new Error(error);
+        }
+        return data;
+      }
+
+      async function fetchAdminChangelogState() {
+        const res = await fetch("/admin/changelog", { credentials: "same-origin" });
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          throw new Error(data.error || "state_load_failed");
+        }
+        return data;
+      }
+
+      async function refreshLivePreviewFromPublicEndpoint() {
+        if (!currentPreviewEl) return;
+        currentPreviewEl.innerHTML = '<div class="cl-preview-empty">Loading public /changelog…</div>';
+        try {
+          const res = await fetch("/changelog", { credentials: "same-origin", cache: "no-store" });
+          const data = await res.json();
+          renderReleasePreview(currentPreviewEl, Array.isArray(data.entries) ? data.entries : []);
+        } catch (_) {
+          currentPreviewEl.innerHTML = '<div class="cl-preview-empty">Failed to load public /changelog preview.</div>';
+        }
+      }
+
+      function renderSyncStatus(sync) {
+        if (!syncStatusEl || !syncErrorEl) return;
+        const status = String(sync && sync.lastAutoSyncStatus || "idle");
+        const text = status === "ok" ? "Auto sync healthy" : status === "error" ? "Auto sync error" : "Auto sync idle";
+        syncStatusEl.textContent = text;
+        syncStatusEl.style.color = status === "ok" ? "#86efac" : status === "error" ? "#fca5a5" : "var(--text-soft)";
+        syncErrorEl.textContent = String(sync && sync.lastAutoSyncError || "");
+      }
+
+      function syncChangelogUiFromState(state) {
+        if (!state || state.ok !== true) return;
+        const liveEntries = state.live && Array.isArray(state.live.entries)
+          ? state.live.entries
+          : (Array.isArray(state.entries) ? state.entries : []);
+        const draftEntries = state.draft && Array.isArray(state.draft.entries) ? state.draft.entries : [];
+        renderReleasePreview(draftPreviewEl, draftEntries);
+        renderReleasePreview(currentPreviewEl, liveEntries);
+        const cfg = state.config || {};
+        if (markdownInputEl && state.draft && typeof state.draft.markdown === "string") {
+          markdownInputEl.value = state.draft.markdown;
+        }
+        if (markdownUrlInputEl) {
+          const sourceUrl = (state.draft && state.draft.markdownUrl) || cfg.markdownSourceUrl || "";
+          markdownUrlInputEl.value = sourceUrl;
+        }
+        if (modeInputEl) modeInputEl.value = cfg.applyMode === "auto_github" ? "auto_github" : "manual";
+        if (autoSyncEnabledInputEl) autoSyncEnabledInputEl.checked = cfg.autoSyncEnabled === true;
+        if (autoSyncIntervalInputEl) autoSyncIntervalInputEl.value = String(cfg.autoSyncIntervalMinutes || 60);
+        renderSyncStatus(state.sync || cfg || {});
+        const rawStatsEl = document.getElementById("raw-stats-json");
+        if (rawStatsEl) {
+          try {
+            const parsedRaw = JSON.parse(rawStatsEl.textContent || "{}");
+            parsedRaw.changelog = liveEntries;
+            parsedRaw.changelogConfig = cfg;
+            rawStatsEl.textContent = JSON.stringify(parsedRaw, null, 2);
+          } catch (_) {
+            // ignore
+          }
+        }
+        updateModeDependentControls();
+      }
+
       async function sendChangelogUpdate(payload) {
         // Show loading state
         if (btnSaveAll) {
