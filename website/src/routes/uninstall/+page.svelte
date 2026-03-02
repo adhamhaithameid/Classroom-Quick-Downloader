@@ -80,6 +80,12 @@
   }
 
   async function submitFeedback(): Promise<void> {
+    if (!selectedReason.trim()) {
+      submitState = 'error';
+      submitMessage = 'Please pick a reason above before submitting.';
+      return;
+    }
+
     submitState = 'sending';
     submitMessage = '';
     try {
