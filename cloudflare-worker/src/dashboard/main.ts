@@ -5574,8 +5574,56 @@ export function renderDashboard(stats: StatsResponse): string {
           setChangelogActionStatus("Error: " + msg, "err");
           throw error;
         }
-        if (btnSaveText) btnSaveText.textContent = "Saving...";
-        
+      }
+
+      function escapeHtmlUnsafe(value) {
+        return String(value || '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      function renderReleasePreview(container, entries) {
+        if (!container) return;
+        const list = Array.isArray(entries) ? entries.slice(0, 3) : [];
+        if (list.length === 0) {
+          container.innerHTML = '<div class="cl-preview-empty">No entries to preview.</div>';
+          return;
+        }
+        let html = '';
+        list.forEach((entry) => {
+          const summary = entry.summary || '';
+          const added = Array.isArray(entry.added) ? entry.added : [];
+          const changed = Array.isArray(entry.changed) ? entry.changed : [];
+          const fixed = Array.isArray(entry.fixed) ? entry.fixed : [];
+          html += '<article style="margin-bottom:10px; border-bottom:1px dashed var(--border-subtle); padding-bottom:8px;">';
+          html += '<h4>v' + escapeHtmlUnsafe(entry.version || '') + '</h4>';
+          html += '<p class="cl-preview-summary">' + escapeHtmlUnsafe(summary || (entry.changes && entry.changes[0]) || '') + '</p>';
+          if (added.length) {
+            html += '<div style="font-size:0.75em; color:#86efac; margin-bottom:2px;">Added</div><ul>';
+            added.slice(0, 3).forEach((point) => { html += '<li>' + escapeHtmlUnsafe(point) + '</li>'; });
+            html += '</ul>';
+          }
+          if (changed.length) {
+            html += '<div style="font-size:0.75em; color:#93c5fd; margin-bottom:2px;">Changed</div><ul>';
+            changed.slice(0, 3).forEach((point) => { html += '<li>' + escapeHtmlUnsafe(point) + '</li>'; });
+            html += '</ul>';
+          }
+          if (fixed.length) {
+            html += '<div style="font-size:0.75em; color:#fca5a5; margin-bottom:2px;">Fixed</div><ul>';
+            fixed.slice(0, 3).forEach((point) => { html += '<li>' + escapeHtmlUnsafe(point) + '</li>'; });
+            html += '</ul>';
+          }
+          html += '</article>';
+        });
+        container.innerHTML = html;
+      }
+
+      async function loadChangelogHistory() {
+        if (!revisionHistoryEl) return;
+        revisionHistoryEl.innerHTML = '<div class="cl-preview-empty">Loading revisions…</div>';
         try {
           const res = await fetch("/admin/changelog", {
             method: "POST",
