@@ -515,9 +515,44 @@ function App() {
 
   // --- CHANGELOG LOADING ---
   useEffect(() => {
-    fetchChangelog().then((data) => {
-      setChangelogData(data);
-    });
+    let cancelled = false;
+    let inFlight = false;
+
+    const loadChangelog = async () => {
+      if (inFlight) return;
+      inFlight = true;
+      try {
+        const data = await fetchChangelog(true);
+        if (!cancelled && data) {
+          setChangelogData(data);
+        }
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    void loadChangelog();
+
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        void loadChangelog();
+      }
+    };
+
+    window.addEventListener('focus', handleVisibilityOrFocus);
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    const pollId = window.setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        void loadChangelog();
+      }
+    }, CHANGELOG_POLL_MS);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(pollId);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+    };
   }, []);
 
   // --- SEEN STATE ---
