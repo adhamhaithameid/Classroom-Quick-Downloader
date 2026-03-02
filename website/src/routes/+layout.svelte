@@ -296,8 +296,19 @@
   }
 
   .site-route-shell {
-    min-height: 100%;
-    will-change: opacity;
+    min-height: 0;
+  }
+
+  .site-main-overview-style .site-route-shell {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  :global(.site-main-overview-style .site-route-shell > *) {
+    flex: 1 0 auto;
+    min-height: 0;
   }
 
   .l2-wrap {
