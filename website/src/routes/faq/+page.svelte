@@ -186,6 +186,63 @@
           id: 'downloads-gdrive',
           q: 'Does it bypass Google Drive download limits?',
           a: 'No. CQD works within Google\'s normal download flow. If a file has exceeded its Drive download quota, CQD cannot override that restriction.'
+        },
+        {
+          id: 'downloads-where',
+          q: 'Where do downloaded files go?',
+          a: 'Files go to your browser\'s default download location. You can change this in your browser\'s settings under the Downloads section.'
+        },
+        {
+          id: 'downloads-zip',
+          q: 'Does CQD zip the files into one download?',
+          a: 'No. Each file is downloaded individually as a separate file. This preserves original file names and formats, and avoids the overhead of zipping and unzipping.'
+        }
+      ]
+    },
+    {
+      title: 'For Students',
+      icon: '🎓',
+      summary: 'Real classroom scenarios and student-specific questions.',
+      items: [
+        {
+          id: 'student-multi-class',
+          q: 'Can I download files from multiple classes at once?',
+          a: 'CQD works on one Classroom page at a time. To download from multiple classes, navigate to each class page and use the download controls there.'
+        },
+        {
+          id: 'student-exam-period',
+          q: 'Is it safe to use during exam periods?',
+          a: 'Yes. CQD only downloads files you already have access to. It doesn\'t bypass any access restrictions, viewing locks, or exam-specific protections set by your instructor.'
+        },
+        {
+          id: 'student-shared-account',
+          q: 'Does it work on shared school computers?',
+          a: 'Yes, as long as the browser has the extension installed. Since CQD stores no personal data, using it on shared computers doesn\'t create privacy concerns.'
+        },
+        {
+          id: 'student-offline',
+          q: 'Can I use CQD offline?',
+          a: 'CQD needs Google Classroom to be loaded (which requires internet). However, once files are downloaded, they are available offline on your device.'
+        },
+        {
+          id: 'student-old-posts',
+          q: 'Does it work on archived or old class posts?',
+          a: 'Yes. CQD detects downloadable attachments on any accessible Classroom page, including archived classes and older posts, as long as the files are still available.'
+        },
+        {
+          id: 'student-google-docs',
+          q: 'Can it download Google Docs, Sheets, and Slides?',
+          a: 'CQD downloads files that have a direct download link. Native Google Docs/Sheets/Slides are web documents — they can be exported manually from Google Drive but are not standard file attachments.'
+        },
+        {
+          id: 'student-teacher-notice',
+          q: 'Will my teacher know I\'m using CQD?',
+          a: 'No. CQD works entirely on the client side in your browser. It doesn\'t modify any server-side data or send notifications to your teacher. It simply adds download buttons to the page.'
+        },
+        {
+          id: 'student-study-notes',
+          q: 'Can I organize downloads by assignment or topic?',
+          a: 'CQD downloads files with their original names. For organization, you can create folders on your device and move files after downloading. CQD doesn\'t rename or reorganize files.'
         }
       ]
     },
