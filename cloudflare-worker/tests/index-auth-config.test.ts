@@ -147,6 +147,163 @@ describe("Worker auth config hardening", () => {
     expect(res.headers.get("Set-Cookie")).toContain("cqd_session=");
   });
 
+  it("rejects non-allowlisted login when normal dashboard password is used", async () => {
+    const stub = {
+      fetch: async (input: RequestInfo) => {
+        const url = typeof input === "string" ? input : input instanceof Request ? input.url : "";
+        if (url.includes("/auth/check-ip-allowlist")) {
+          return new Response(JSON.stringify({ allowed: false, enabled: true, stepUpBypassEnabled: true }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        if (url.includes("/auth/login-attempt")) {
+          return new Response(JSON.stringify({ ok: true, allowed: true }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      },
+    };
+    const namespace = {
+      idFromName: (_name: string) => "downloads-id",
+      get: (_id: string) => stub,
+    };
+    const env = mockEnv({ DOWNLOADS_DO: namespace as unknown as DurableObjectNamespace });
+    const request = new Request("https://example.com/", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+      },
+      body: "password=dashboard-secret",
+    });
+
+    const res = await worker.fetch(request, env, {} as ExecutionContext);
+    const text = await res.text();
+    expect(res.status).toBe(401);
+    expect(text).toContain("admin danger password");
+  });
+
+  it("denies non-allowlisted login when step-up bypass is disabled", async () => {
+    const stub = {
+      fetch: async (input: RequestInfo) => {
+        const url = typeof input === "string" ? input : input instanceof Request ? input.url : "";
+        if (url.includes("/auth/check-ip-allowlist")) {
+          return new Response(JSON.stringify({ allowed: false, enabled: true, stepUpBypassEnabled: false }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        return new Response(JSON.stringify({ ok: true, allowed: true }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      },
+    };
+    const namespace = {
+      idFromName: (_name: string) => "downloads-id",
+      get: (_id: string) => stub,
+    };
+    const env = mockEnv({ DOWNLOADS_DO: namespace as unknown as DurableObjectNamespace });
+    const request = new Request("https://example.com/", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+      },
+      body: "password=danger-secret",
+    });
+
+    const res = await worker.fetch(request, env, {} as ExecutionContext);
+    const text = await res.text();
+    expect(res.status).toBe(403);
+    expect(text).toContain("not allowlisted");
+  });
+
+  it("allows non-allowlisted login with admin danger password in the single field", async () => {
+    const stub = {
+      fetch: async (input: RequestInfo) => {
+        const url = typeof input === "string" ? input : input instanceof Request ? input.url : "";
+        if (url.includes("/auth/check-ip-allowlist")) {
+          return new Response(JSON.stringify({ allowed: false, enabled: true, stepUpBypassEnabled: true }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        if (url.includes("/auth/login-attempt")) {
+          return new Response(JSON.stringify({ ok: true, allowed: true }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      },
+    };
+    const namespace = {
+      idFromName: (_name: string) => "downloads-id",
+      get: (_id: string) => stub,
+    };
+    const env = mockEnv({ DOWNLOADS_DO: namespace as unknown as DurableObjectNamespace });
+    const request = new Request("https://example.com/", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+      },
+      body: "password=danger-secret",
+    });
+
+    const res = await worker.fetch(request, env, {} as ExecutionContext);
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Set-Cookie")).toContain("cqd_session=");
+  });
+
+  it("rejects non-allowlisted login with invalid admin danger password", async () => {
+    const stub = {
+      fetch: async (input: RequestInfo) => {
+        const url = typeof input === "string" ? input : input instanceof Request ? input.url : "";
+        if (url.includes("/auth/check-ip-allowlist")) {
+          return new Response(JSON.stringify({ allowed: false, enabled: true, stepUpBypassEnabled: true }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        if (url.includes("/auth/login-attempt")) {
+          return new Response(JSON.stringify({ ok: true, allowed: true }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      },
+    };
+    const namespace = {
+      idFromName: (_name: string) => "downloads-id",
+      get: (_id: string) => stub,
+    };
+    const env = mockEnv({ DOWNLOADS_DO: namespace as unknown as DurableObjectNamespace });
+    const request = new Request("https://example.com/", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+      },
+      body: "password=wrong-step-up",
+    });
+
+    const res = await worker.fetch(request, env, {} as ExecutionContext);
+    const text = await res.text();
+    expect(res.status).toBe(401);
+    expect(text).toContain("admin danger password");
+  });
+
   it("blocks protected CORS requests from disallowed origins", async () => {
     const env = mockEnv();
     const request = new Request("https://example.com/stats", {
