@@ -2340,7 +2340,13 @@
           if (data.commit && data.commit !== 'unknown') {
             var commitHref = 'https://github.com/adhamhaithameid/Classroom-Quick-Downloader/commit/' + data.commit_full;
             if (data.stale) {
-              setStatusUI('⚠️', data.commit, commitHref, 'Stale deployment (>24h) - ' + data.message, true);
+              setStatusUI(
+                '⚠️',
+                'Stale · ' + data.commit,
+                commitHref,
+                'Status: stale deployment (>24h). Means latest runtime deploy is older than expected.\nCommit: ' + data.message,
+                true
+              );
             } else {
               var tip = 'Commit: ' + data.message + ' - Deployed: ' + new Date(data.deployed_at).toLocaleString('en-US', { timeZone: 'UTC' });
               setStatusUI('✅', data.commit, commitHref, tip, false);
