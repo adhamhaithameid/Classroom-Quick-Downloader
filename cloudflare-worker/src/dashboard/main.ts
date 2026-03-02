@@ -3855,6 +3855,19 @@ export function renderDashboard(stats: StatsResponse): string {
             <span class="toggle-slider"></span>
           </label>
         </div>
+
+        <div class="security-row" style="padding: 16px 20px; background: var(--bg-surface); border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 16px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:16px;">
+            <div>
+              <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">Blocked-IP login policy</div>
+              <div style="font-size: 0.8rem; color: var(--text-muted);">Allow blocked IPs to step up using admin danger password.</div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="blocked-ip-stepup-toggle" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
         
         <!-- Current Session Info -->
         <div class="session-info" style="display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap;">
