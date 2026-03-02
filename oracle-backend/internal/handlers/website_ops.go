@@ -1840,6 +1840,100 @@ func WebsiteOpsPullCloudflareHandler(db *sql.DB, cloudflareMetricsURL string) ht
 	}
 }
 
+func WebsiteOpsReconcileTotalsHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		if db == nil {
+			writeJSONError(w, "database_unavailable", "Database not configured", http.StatusServiceUnavailable)
+			return
+		}
+
+		controlRow, err := loadWebsiteSyncControl(r.Context(), db)
+		if err != nil {
+			writeJSONError(w, "reconcile_failed", "Failed to load current website sync state", http.StatusInternalServerError)
+			return
+		}
+		trustedDownloads, trustedCountries, err := rebuildWebsiteDatasetFromTrustedHistory(r.Context(), db)
+		if err != nil {
+			writeJSONError(w, "reconcile_failed", "Failed to rebuild totals from trusted history", http.StatusInternalServerError)
+			return
+		}
+
+		currentDownloads := maxInt64(controlRow.PublishedDownloads, 0)
+		currentCountries := decodeWebsiteCountryCounts(controlRow.PublishedCountries)
+		reconciledDownloads := maxInt64(currentDownloads, trustedDownloads)
+		reconciledCountries := mergeWebsiteCountryByMax(currentCountries, trustedCountries, 300)
+
+		row, err := publishWebsiteDataset(
+			r.Context(),
+			db,
+			"reconcile",
+			reconciledDownloads,
+			reconciledCountries,
+			true,
+			false,
+		)
+		if err != nil {
+			if errors.Is(err, errWebsiteMonotonicViolation) {
+				writeJSONError(w, "monotonic_guard_blocked", "Reconcile blocked: incoming totals would decrease existing published values.", http.StatusConflict)
+				return
+			}
+			writeJSONError(w, "reconcile_failed", "Failed to publish reconciled totals", http.StatusInternalServerError)
+			return
+		}
+
+		_ = insertWebsiteSyncBatch(
+			r.Context(),
+			db,
+			websiteSyncDirectionOracleToWebsite,
+			newWebsiteBatchID(websiteSyncDirectionOracleToWebsite),
+			"oracle_admin_reconcile_totals",
+			"ok",
+			map[string]any{
+				"source":              "reconcile",
+				"trustedDownloads":    trustedDownloads,
+				"trustedCountries":    len(trustedCountries),
+				"previousDownloads":   currentDownloads,
+				"reconciledDownloads": reconciledDownloads,
+				"reconciledCountries": len(reconciledCountries),
+			},
+		)
+
+		_ = AppendAuditLog(
+			r.Context(),
+			db,
+			"website_reconcile_totals",
+			"website_sync",
+			"reconcile",
+			"ok",
+			map[string]any{
+				"trustedDownloads":    trustedDownloads,
+				"trustedCountries":    len(trustedCountries),
+				"previousDownloads":   currentDownloads,
+				"reconciledDownloads": reconciledDownloads,
+			},
+		)
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"ok": true,
+			"trusted": map[string]any{
+				"downloads": trustedDownloads,
+				"countries": trustedCountries,
+			},
+			"published": map[string]any{
+				"source":           row.PublishedSource,
+				"downloads":        row.PublishedDownloads,
+				"countries":        decodeWebsiteCountryCounts(row.PublishedCountries),
+				"lastOraclePushAt": row.LastOraclePushAt,
+			},
+		})
+	}
+}
+
 func PullWebsiteDatasetFromCloudflare(
 	ctx context.Context,
 	db *sql.DB,
