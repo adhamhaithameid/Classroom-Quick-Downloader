@@ -475,7 +475,8 @@ export async function fetchWebsiteSnapshotResult(options: { force?: boolean } = 
       snapshotResultInFlight = null;
     });
 
-  snapshotInFlight = runner;
+  snapshotResultInFlight = runner;
+  snapshotInFlight = runner.then((result) => result.snapshot);
   return runner;
 }
 
