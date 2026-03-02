@@ -1455,8 +1455,27 @@ export default {
       return handleReleaseNotes(request, env);
     }
 
-    if (pathname === "/public/site-metrics" && request.method === "GET") {
-      return handlePublicSiteMetrics(request, env);
+    if (pathname === "/api/public/website/events") {
+      if (request.method !== "POST") {
+        return withCors(
+          request,
+          new Response(
+            JSON.stringify(
+              websiteEventsErrorBody(
+                "method_not_allowed",
+                "Only POST is allowed for this endpoint.",
+                false,
+              ),
+            ),
+            {
+            status: 405,
+            headers: { "content-type": "application/json; charset=utf-8" },
+            },
+          ),
+          env,
+        );
+      }
+      return proxyToDO(request, env);
     }
 
     if (isOraclePublicWebsiteRoute(pathname)) {
