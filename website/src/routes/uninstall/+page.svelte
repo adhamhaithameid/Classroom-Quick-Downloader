@@ -568,11 +568,10 @@
     flex-shrink: 0;
   }
 
-  .notes-wrap textarea {
-    border: 1px solid var(--border-subtle, rgba(226, 232, 240, 0.35));
-    border-radius: var(--radius-sm);
-    padding: 12px;
-    min-height: 100px;
+  /* ── Textarea ──────────────────── */
+  .un-field-group textarea {
+    width: 100%;
+    min-height: 110px;
     resize: vertical;
     background: rgba(255, 255, 255, 0.6);
     backdrop-filter: blur(6px);
