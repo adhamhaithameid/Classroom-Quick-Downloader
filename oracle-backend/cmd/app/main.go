@@ -505,6 +505,87 @@ func deploymentsAutoSyncInterval() time.Duration {
 	return interval
 }
 
+func websiteTrafficSyncEnabled() bool {
+	raw := strings.ToLower(getenvWithAliases("ORACLE_WEBSITE_TRAFFIC_SYNC_ENABLED", "WEBSITE_TRAFFIC_SYNC_ENABLED"))
+	switch raw {
+	case "true", "1", "yes", "on":
+		return true
+	case "":
+		return false
+	case "false", "0", "no", "off":
+		return false
+	default:
+		log.Printf("[Scheduler] Invalid ORACLE_WEBSITE_TRAFFIC_SYNC_ENABLED value; defaulting to disabled")
+		return false
+	}
+}
+
+func websiteTrafficSyncInterval() time.Duration {
+	raw := getenvWithAliases("ORACLE_WEBSITE_TRAFFIC_SYNC_INTERVAL_SECONDS", "WEBSITE_TRAFFIC_SYNC_INTERVAL_SECONDS")
+	if raw == "" {
+		return defaultWebsiteTrafficSyncInterval
+	}
+	seconds, err := strconv.Atoi(raw)
+	if err != nil || seconds <= 0 {
+		log.Printf("[Scheduler] Invalid ORACLE_WEBSITE_TRAFFIC_SYNC_INTERVAL_SECONDS value; using default %s", defaultWebsiteTrafficSyncInterval)
+		return defaultWebsiteTrafficSyncInterval
+	}
+	interval := time.Duration(seconds) * time.Second
+	if interval < minWebsiteTrafficSyncInterval {
+		log.Printf("[Scheduler] ORACLE_WEBSITE_TRAFFIC_SYNC_INTERVAL_SECONDS below minimum; clamping to %s", minWebsiteTrafficSyncInterval)
+		return minWebsiteTrafficSyncInterval
+	}
+	if interval > maxWebsiteTrafficSyncInterval {
+		log.Printf("[Scheduler] ORACLE_WEBSITE_TRAFFIC_SYNC_INTERVAL_SECONDS above maximum; clamping to %s", maxWebsiteTrafficSyncInterval)
+		return maxWebsiteTrafficSyncInterval
+	}
+	return interval
+}
+
+func websiteTrafficSyncLookback() time.Duration {
+	raw := getenvWithAliases("ORACLE_WEBSITE_TRAFFIC_SYNC_LOOKBACK_HOURS", "WEBSITE_TRAFFIC_SYNC_LOOKBACK_HOURS")
+	if raw == "" {
+		return defaultWebsiteTrafficSyncLookback
+	}
+	hours, err := strconv.Atoi(raw)
+	if err != nil || hours <= 0 {
+		log.Printf("[Scheduler] Invalid ORACLE_WEBSITE_TRAFFIC_SYNC_LOOKBACK_HOURS value; using default %s", defaultWebsiteTrafficSyncLookback)
+		return defaultWebsiteTrafficSyncLookback
+	}
+	lookback := time.Duration(hours) * time.Hour
+	if lookback < minWebsiteTrafficSyncLookback {
+		log.Printf("[Scheduler] ORACLE_WEBSITE_TRAFFIC_SYNC_LOOKBACK_HOURS below minimum; clamping to %s", minWebsiteTrafficSyncLookback)
+		return minWebsiteTrafficSyncLookback
+	}
+	if lookback > maxWebsiteTrafficSyncLookback {
+		log.Printf("[Scheduler] ORACLE_WEBSITE_TRAFFIC_SYNC_LOOKBACK_HOURS above maximum; clamping to %s", maxWebsiteTrafficSyncLookback)
+		return maxWebsiteTrafficSyncLookback
+	}
+	return lookback
+}
+
+func websiteTrafficSyncHostname() string {
+	if explicit := strings.TrimSpace(os.Getenv("CLOUDFLARE_ANALYTICS_HOSTNAME")); explicit != "" {
+		return explicit
+	}
+	siteURL := strings.TrimSpace(os.Getenv("PUBLIC_SITE_URL"))
+	if siteURL == "" {
+		return ""
+	}
+	if parsed, err := url.Parse(siteURL); err == nil {
+		if host := strings.TrimSpace(parsed.Hostname()); host != "" {
+			log.Printf("[Scheduler] CLOUDFLARE_ANALYTICS_HOSTNAME not set; using host from PUBLIC_SITE_URL (%s)", host)
+			return host
+		}
+	}
+	candidate := strings.TrimSpace(strings.TrimSuffix(strings.Split(siteURL, "/")[0], "."))
+	if candidate != "" && !strings.Contains(candidate, " ") {
+		log.Printf("[Scheduler] CLOUDFLARE_ANALYTICS_HOSTNAME not set; using PUBLIC_SITE_URL fallback value (%s)", candidate)
+		return candidate
+	}
+	return ""
+}
+
 // HealthDBHandler returns a handler that checks the database connection
 // by executing a lightweight query.
 func HealthDBHandler(db *sql.DB) http.HandlerFunc {
