@@ -97,8 +97,9 @@
 
     if (!hostEl || typeof IntersectionObserver === 'undefined') {
       hasAnimatedInView = true;
-      kickstart();
-      return;
+      displayValue = 0;
+      animateTo(initial);
+      return () => stopAnimation();
     }
 
     const observer = new IntersectionObserver(
