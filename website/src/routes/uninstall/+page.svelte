@@ -426,8 +426,40 @@
     margin-bottom: 6px;
   }
 
-  .option-grid.compact {
-    gap: 8px;
+  .un-card-title {
+    margin: 0 0 6px;
+    font-size: 21px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
+  .un-card-title-row .un-card-title {
+    margin-bottom: 0;
+  }
+
+  .un-optional-tag {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    background: rgba(148, 163, 184, 0.1);
+    border-radius: 6px;
+    padding: 3px 8px;
+  }
+
+  .un-card-hint {
+    margin: 0 0 22px;
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+  }
+
+  /* ── Reason pills ─────────────── */
+  .un-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
   }
 
   .option {
