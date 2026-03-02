@@ -23,6 +23,7 @@ const SNAPSHOT_STORAGE_KEY = 'cqd.website.snapshot.v1';
 const PUBLIC_SCHEMA_VERSION: PublicSchemaVersion = '1';
 
 let cachedSnapshot: WebsiteSnapshot | null = null;
+let cachedSnapshotSource: WebsiteSnapshotFetchSource = 'memory-cache';
 let snapshotInFlight: Promise<WebsiteSnapshot> | null = null;
 let snapshotStorageHydrated = false;
 
