@@ -76,13 +76,14 @@ var (
 )
 
 type publicWebsiteOverviewResponse struct {
-	OK          bool                  `json:"ok"`
-	GeneratedAt int64                 `json:"generatedAt"`
-	Totals      publicWebsiteTotals   `json:"totals"`
-	Installs    publicWebsiteInstalls `json:"installs"`
-	Versions    publicWebsiteVersions `json:"versions"`
-	Status      publicWebsiteStatus   `json:"status"`
-	Links       publicWebsiteLinks    `json:"links"`
+	SchemaVersion string                `json:"schemaVersion"`
+	OK            bool                  `json:"ok"`
+	GeneratedAt   int64                 `json:"generatedAt"`
+	Totals        publicWebsiteTotals   `json:"totals"`
+	Installs      publicWebsiteInstalls `json:"installs"`
+	Versions      publicWebsiteVersions `json:"versions"`
+	Status        publicWebsiteStatus   `json:"status"`
+	Links         publicWebsiteLinks    `json:"links"`
 }
 
 type publicWebsiteStatusResponse struct {
