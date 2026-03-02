@@ -1110,48 +1110,67 @@ func TestValidateProductionSecurityConfig(t *testing.T) {
 			allowUntrustedStoreURLs:     true,
 			trustedProxyCIDRs:           "0.0.0.0/0,::/0",
 		},
-		{
-			name:                "prod rejects loopback bypass",
-			appEnv:              "production",
-			allowLoopbackBypass: true,
-			wantErrContains:     "ALLOW_LOOPBACK_BYPASS",
-		},
-		{
-			name:                        "prod rejects empty dashboard password",
-			appEnv:                      "production",
-			allowEmptyDashboardPassword: true,
-			wantErrContains:             "ALLOW_EMPTY_DASHBOARD_PASSWORD",
-		},
-		{
-			name:               "prod rejects http store urls",
-			appEnv:             "production",
-			allowHTTPStoreURLs: true,
-			wantErrContains:    "ORACLE_ALLOW_HTTP_STORE_URLS",
-		},
-		{
-			name:                    "prod rejects untrusted store urls",
-			appEnv:                  "production",
-			allowUntrustedStoreURLs: true,
-			wantErrContains:         "ORACLE_ALLOW_UNTRUSTED_STORE_URLS",
-		},
-		{
-			name:              "prod rejects ipv4 wildcard trusted proxy",
-			appEnv:            "production",
-			trustedProxyCIDRs: "0.0.0.0/0",
-			wantErrContains:   "TRUSTED_PROXY_CIDRS",
-		},
-		{
-			name:              "prod rejects ipv6 wildcard trusted proxy",
-			appEnv:            "production",
-			trustedProxyCIDRs: "::/0",
-			wantErrContains:   "TRUSTED_PROXY_CIDRS",
-		},
-		{
-			name:              "prod accepts strict trusted proxy cidrs",
-			appEnv:            "  PROD  ",
-			trustedProxyCIDRs: "10.0.0.0/8,2001:db8::/32",
-		},
-	}
+			{
+				name:                "prod rejects loopback bypass",
+				appEnv:              "production",
+				sessionCookieMode:   "true",
+				allowLoopbackBypass: true,
+				wantErrContains:     "ALLOW_LOOPBACK_BYPASS",
+			},
+			{
+				name:                        "prod rejects empty dashboard password",
+				appEnv:                      "production",
+				sessionCookieMode:           "true",
+				allowEmptyDashboardPassword: true,
+				wantErrContains:             "ALLOW_EMPTY_DASHBOARD_PASSWORD",
+			},
+			{
+				name:               "prod rejects http store urls",
+				appEnv:             "production",
+				sessionCookieMode:  "true",
+				allowHTTPStoreURLs: true,
+				wantErrContains:    "ORACLE_ALLOW_HTTP_STORE_URLS",
+			},
+			{
+				name:                    "prod rejects untrusted store urls",
+				appEnv:                  "production",
+				sessionCookieMode:       "true",
+				allowUntrustedStoreURLs: true,
+				wantErrContains:         "ORACLE_ALLOW_UNTRUSTED_STORE_URLS",
+			},
+			{
+				name:              "prod rejects ipv4 wildcard trusted proxy",
+				appEnv:            "production",
+				sessionCookieMode: "true",
+				trustedProxyCIDRs: "0.0.0.0/0",
+				wantErrContains:   "TRUSTED_PROXY_CIDRS",
+			},
+			{
+				name:              "prod rejects ipv6 wildcard trusted proxy",
+				appEnv:            "production",
+				sessionCookieMode: "true",
+				trustedProxyCIDRs: "::/0",
+				wantErrContains:   "TRUSTED_PROXY_CIDRS",
+			},
+			{
+				name:              "prod accepts strict trusted proxy cidrs",
+				appEnv:            "  PROD  ",
+				sessionCookieMode: "true",
+				trustedProxyCIDRs: "10.0.0.0/8,2001:db8::/32",
+			},
+			{
+				name:              "prod rejects insecure session cookie mode",
+				appEnv:            "production",
+			sessionCookieMode: "false",
+				wantErrContains:   "SESSION_COOKIE_SECURE",
+			},
+			{
+				name:              "prod rejects auto session cookie mode",
+				appEnv:            "production",
+				sessionCookieMode: "auto",
+				wantErrContains:   "SESSION_COOKIE_SECURE",
+			},
+		}
 
 	for _, tc := range tests {
 		tc := tc
