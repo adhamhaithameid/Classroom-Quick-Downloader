@@ -429,10 +429,84 @@ type comparisonChange struct {
 }
 
 type comparisonResponse struct {
-	OK      bool             `json:"ok"`
-	Period1 periodData       `json:"period1"`
-	Period2 periodData       `json:"period2"`
-	Change  comparisonChange `json:"change"`
+	OK             bool             `json:"ok"`
+	GeneratedAtUTC string           `json:"generatedAtUtc,omitempty"`
+	WindowStartUTC string           `json:"windowStartUtc,omitempty"`
+	WindowEndUTC   string           `json:"windowEndUtc,omitempty"`
+	Period1        periodData       `json:"period1"`
+	Period2        periodData       `json:"period2"`
+	Change         comparisonChange `json:"change"`
+}
+
+type topTodayWindowMeta struct {
+	GeneratedAtUTC string `json:"generatedAtUtc"`
+	WindowStartUTC string `json:"windowStartUtc"`
+	WindowEndUTC   string `json:"windowEndUtc"`
+}
+
+type visitorsTimeseriesPoint struct {
+	Timestamp         string `json:"timestamp"`
+	Visits            int64  `json:"visits"`
+	Requests          int64  `json:"requests"`
+	UniqueSessions    int64  `json:"uniqueSessions"`
+	ReturningSessions int64  `json:"returningSessions"`
+}
+
+type visitorsTimeseriesResponse struct {
+	OK          bool                      `json:"ok"`
+	Range       string                    `json:"range,omitempty"`
+	Granularity string                    `json:"granularity"`
+	From        string                    `json:"from"`
+	To          string                    `json:"to"`
+	Points      []visitorsTimeseriesPoint `json:"points"`
+	Meta        topTodayWindowMeta        `json:"meta"`
+}
+
+type funnelStage struct {
+	Key       string  `json:"key"`
+	Label     string  `json:"label"`
+	Count     int64   `json:"count"`
+	FromPrev  float64 `json:"fromPrev"`
+	FromStart float64 `json:"fromStart"`
+}
+
+type funnelResponse struct {
+	OK     bool               `json:"ok"`
+	Range  string             `json:"range,omitempty"`
+	From   string             `json:"from"`
+	To     string             `json:"to"`
+	Stages []funnelStage      `json:"stages"`
+	Meta   topTodayWindowMeta `json:"meta"`
+}
+
+type segmentValue struct {
+	Value string `json:"value"`
+	Count int64  `json:"count"`
+}
+
+type segmentsResponse struct {
+	OK        bool               `json:"ok"`
+	Dimension string             `json:"dimension"`
+	Range     string             `json:"range,omitempty"`
+	From      string             `json:"from"`
+	To        string             `json:"to"`
+	Values    []segmentValue     `json:"values"`
+	Meta      topTodayWindowMeta `json:"meta"`
+}
+
+type heatmapCell struct {
+	DayOfWeek int   `json:"dayOfWeek"`
+	HourUTC   int   `json:"hourUtc"`
+	Count     int64 `json:"count"`
+}
+
+type heatmapResponse struct {
+	OK    bool               `json:"ok"`
+	Range string             `json:"range,omitempty"`
+	From  string             `json:"from"`
+	To    string             `json:"to"`
+	Cells []heatmapCell      `json:"cells"`
+	Meta  topTodayWindowMeta `json:"meta"`
 }
 
 func ComparisonHandler(db *sql.DB) http.HandlerFunc {
