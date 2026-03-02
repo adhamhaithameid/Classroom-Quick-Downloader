@@ -413,6 +413,18 @@ export interface ChangelogEntry {
   isImportant?: boolean; // Highlight in UI?
 }
 
+export interface ChangelogRevision {
+  id: string;
+  source: "manual" | "github" | "github_auto" | "api";
+  createdAt: number;
+  actor: string;
+  markdownUrl?: string;
+  markdownLength: number;
+  releases: number;
+  valid: boolean;
+  errors?: string[];
+}
+
 export interface NotificationRule {
   id: string;
   target: string; // "all" or specific version "1.2.3"
