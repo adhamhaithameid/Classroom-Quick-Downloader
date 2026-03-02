@@ -291,17 +291,7 @@
         </a>
       </div>
     </div>
-  {/if}
-
-  <div class="reinstall-row">
-    <a href={STORE_LINKS.chrome} target="_blank" rel="noopener noreferrer">Reinstall on Chrome</a>
-    <span class="reinstall-or">or</span>
-    <a href={STORE_LINKS.firefox} target="_blank" rel="noopener noreferrer">Reinstall on Firefox</a>
-    <span class="reinstall-or">or</span>
-    <a href={STORE_LINKS.edge} target="_blank" rel="noopener noreferrer">Reinstall on Edge</a>
-    <span class="reinstall-or">or</span>
-    <a href={STORE_LINKS.github + '/issues'} target="_blank" rel="noopener noreferrer">Report a bug</a>
-  </div>
+  </section>
 </div>
 
 <style>
