@@ -1036,16 +1036,6 @@ async function handleVerifyDangerPassword(request: Request, env: WorkerEnv): Pro
       ), env);
     }
 
-    // Clear attempts on success
-    await stub.fetch(new Request("https://do/auth/login-attempt", {
-      method: "POST",
-      headers: { 
-        "Content-Type": "application/json",
-        "X-Admin-Secret": env.DO_SHARED_SECRET,
-      },
-      body: JSON.stringify({ ip: `danger:${clientIp}`, success: true }),
-    }));
-
     return withCors(request, new Response(
       JSON.stringify({ ok: true }),
       { status: 200, headers: { "content-type": "application/json" } }
