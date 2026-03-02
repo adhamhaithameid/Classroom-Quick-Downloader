@@ -76,6 +76,11 @@ const WORKER_URL = (import.meta.env.VITE_WORKER_URL as string) || DEFAULT_WORKER
 export const WORKER_BASE_URL = WORKER_URL.replace(/\/+track$/, '');
 export const CONFIG_URL = WORKER_BASE_URL ? `${WORKER_BASE_URL}/config` : '';
 export const CHANGELOG_URL = WORKER_BASE_URL ? `${WORKER_BASE_URL}/changelog` : '';
+
+const DEFAULT_ORACLE_BASE_URL = 'https://oracle.classroom-quick-downloader.com';
+const ORACLE_BASE_URL = normalizeBaseUrl((import.meta.env.VITE_ORACLE_URL as string) || DEFAULT_ORACLE_BASE_URL) || DEFAULT_ORACLE_BASE_URL;
+export const ORACLE_CHANGELOG_URL = `${ORACLE_BASE_URL}/api/public/extension/changelog`;
+
 const DEFAULT_WEBSITE_BASE_URL = 'https://classroom-quick-downloader-website.pages.dev';
 const WEBSITE_URL = (import.meta.env.VITE_PUBLIC_SITE_URL as string) || resolveManifestHomepageUrl() || DEFAULT_WEBSITE_BASE_URL;
 
