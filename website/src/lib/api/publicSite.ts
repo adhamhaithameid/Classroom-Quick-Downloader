@@ -409,6 +409,8 @@ function buildSnapshot(snapshotPayload: SnapshotResponse): WebsiteSnapshot {
   const now = Date.now();
   return {
     source: 'oracle',
+    snapshotId: snapshotPayload.snapshotId || `snapshot-${snapshotPayload.generatedAt || now}`,
+    generatedAt: snapshotPayload.generatedAt || now,
     fetchedAtUtc: now,
     nextRefreshAtUtc: now + ORACLE_SNAPSHOT_REFRESH_MS,
     overview: normalizedOverview,
