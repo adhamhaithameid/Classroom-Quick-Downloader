@@ -101,6 +101,7 @@ type storeStats struct {
 	version     string
 	rating      string
 	ratingCount int64
+	source      string
 }
 
 type deploymentTargetResponse struct {
