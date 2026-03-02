@@ -33,6 +33,8 @@
             edgeStoreListing: 'https://microsoftedge.microsoft.com/addons/detail/classroom-quick-downloade/ecojbijjkcjdolpeoiemnccgmaeomcmn'
       };
       const USER_CHANGELOG_RECORD_TYPE = 'website_user_changelog_entry';
+      const USER_CHANGELOG_REVISION_RECORD_TYPE = 'website_user_changelog_revision';
+      const USER_CHANGELOG_CONFIG_RECORD_TYPE = 'website_user_changelog_config';
 
       // Helpers
       let authInFlight = null;
