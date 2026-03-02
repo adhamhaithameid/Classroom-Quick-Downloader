@@ -636,6 +636,32 @@ function App() {
     }
   }
 
+  function openExternalUrl(url: string): void {
+    if (!url) return;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const browserApi = (globalThis as any).chrome as typeof chrome | undefined;
+    if (browserApi?.tabs?.create) {
+      try {
+        browserApi.tabs.create({ url });
+        return;
+      } catch {
+        // fallback below
+      }
+    }
+
+    try {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } catch {
+      // ignore
+    }
+  }
+
+  function handleChangelogWebsiteClick(event: MouseEvent<HTMLAnchorElement>): void {
+    event.preventDefault();
+    openExternalUrl(CHANGELOG_SITE_URL);
+  }
+
   const handleCopyLink = async (browser: BrowserType) => {
     try {
       await navigator.clipboard.writeText(EXTENSION_STORE_URLS[browser]);
