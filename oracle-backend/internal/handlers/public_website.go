@@ -21,6 +21,7 @@ import (
 
 const (
 	publicWebsiteCacheControl            = "public, max-age=120, stale-while-revalidate=60"
+	publicWebsiteSchemaVersion           = "1"
 	defaultGitHubRepoSlug                = "adhamhaithameid/Classroom-Quick-Downloader"
 	publicWebsiteUserChangelogRecordType = "website_user_changelog_entry"
 )
