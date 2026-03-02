@@ -730,9 +730,9 @@
     box-shadow: 0 1px 3px rgba(15,20,25,0.03);
   }
 
-  .faq-item:hover {
-    border-color: rgba(26, 139, 85, 0.18);
-    box-shadow: 0 2px 8px rgba(15, 20, 25, 0.05);
+  .fq-item:hover {
+    border-color: rgba(26,139,85,0.18);
+    box-shadow: 0 2px 8px rgba(15,20,25,0.05);
   }
 
   .faq-item.open {
