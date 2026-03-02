@@ -14,8 +14,11 @@ This package is static (`@sveltejs/adapter-static`) and deploys to Cloudflare Pa
 
 ## Data Source Schedule (UTC)
 
-- Oracle pulls website metrics from Cloudflare at: `03:00`, `06:00`, `09:00`, `12:00`, `15:00`, `18:00`, `21:00`
-- Oracle publishes Oracle-native website data at: `01:00`
+- Oracle traffic sync from Cloudflare is scheduler-driven and configurable:
+  - `ORACLE_WEBSITE_TRAFFIC_SYNC_ENABLED` (default `false`)
+  - `ORACLE_WEBSITE_TRAFFIC_SYNC_INTERVAL_SECONDS` (default `3600`)
+  - `ORACLE_WEBSITE_TRAFFIC_SYNC_LOOKBACK_HOURS` (default `48`)
+- An immediate manual sync can be triggered from Oracle dashboard via `POST /api/admin/website/traffic/refresh` (step-up required).
 - The website reads overview/map/changelog/uninstall data from Oracle public APIs.
 
 ## Requirements
