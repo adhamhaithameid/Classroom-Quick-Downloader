@@ -2055,7 +2055,7 @@
           }
         }));
 
-        // Daily chart
+        // Daily downloads chart uses dedicated day-window selector.
         var dailyContainer = document.getElementById('daily-chart');
         try {
           var range14 = getDateRange(14);
