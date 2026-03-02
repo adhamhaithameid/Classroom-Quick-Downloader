@@ -27,6 +27,8 @@
 		"test:reliability": "vitest run src/lib/analytics/websiteEvents.reliability.test.ts src/lib/analytics/websiteEvents.test.ts src/lib/api/publicSite.snapshot.test.ts",
 		"test:acceptance": "vitest run src/lib/api/publicSite.acceptance.test.ts",
 		"test:system": "pnpm run test:integration && pnpm run test:component && pnpm run test:acceptance",
+		"test:strict": "pnpm run test:smoke && pnpm run test:functional && pnpm run test:integration && pnpm run test:regression && pnpm run test:load && pnpm run test:stress && pnpm run test:security && pnpm run test:ui && pnpm run test:routes && pnpm run test:fuzz && pnpm run test:reliability && pnpm run test:unit && pnpm run test:acceptance && pnpm run test:system",
+		"test:massive": "pnpm run check && pnpm run test:strict && pnpm run test",
 		"test:watch": "vitest"
 	},
 	"dependencies": {
