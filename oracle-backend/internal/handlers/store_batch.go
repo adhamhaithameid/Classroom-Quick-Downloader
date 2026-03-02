@@ -157,7 +157,7 @@ func IngestBatchHandlerV4(sqliteDB, postgresDB *sql.DB, sharedSecret string) htt
 		}
 
 		var batch model.OracleBatch
-		if err := json.Unmarshal(bodyBytes, &batch); err != nil {
+		if err := decodeOracleBatchStrict(bodyBytes, &batch); err != nil {
 			logEvent("warn", "ingest_invalid_json", map[string]interface{}{
 				"error": err.Error(),
 			})
