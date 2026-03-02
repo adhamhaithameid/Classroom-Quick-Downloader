@@ -410,7 +410,7 @@
     let isCoasting = false;
     let autoDirection = 1; // 1 = content moves left (standard marquee), -1 = right
     let startX = 0;
-    let scrollStart = 0;
+    let dragOffset = 0;
     let lastX = 0;
     let velocity = 0;
     let rafId = 0;
