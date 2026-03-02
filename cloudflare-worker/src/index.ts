@@ -1315,8 +1315,10 @@ async function handleReleaseNotes(request: Request, env: WorkerEnv): Promise<Res
 
 async function handleOraclePublicWebsiteProxy(request: Request, env: WorkerEnv): Promise<Response> {
   const pathname = new URL(request.url).pathname;
-  const isUninstallPath = pathname === "/api/public/website/uninstall";
-  const allowedMethods = isUninstallPath ? new Set(["GET", "POST"]) : new Set(["GET"]);
+  let allowedMethods = new Set(["GET"]);
+  if (pathname === "/api/public/website/uninstall") {
+    allowedMethods = new Set(["GET", "POST"]);
+  }
 
   if (!allowedMethods.has(request.method)) {
     return withCors(
