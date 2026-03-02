@@ -2881,6 +2881,20 @@ export class DownloadsDurable {
       await this.flushToOracle(false);
     }
 
+    // Retry failed website telemetry batches.
+    const websiteHead = this.d.websiteTelemetryQueue[0];
+    if (
+      websiteHead &&
+      websiteHead.nextRetryAtUtc &&
+      now >= websiteHead.nextRetryAtUtc
+    ) {
+      await this.flushWebsiteTelemetryQueue({
+        force: false,
+        trigger: "retry_alarm",
+        maxBatches: 100,
+      });
+    }
+
     const health = this.buildPipelineHealthPayload(now);
     this.state.waitUntil(this.notifyHealthIfNeeded(health).catch(() => {}));
   }
