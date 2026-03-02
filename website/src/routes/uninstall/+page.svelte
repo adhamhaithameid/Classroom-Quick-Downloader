@@ -627,8 +627,16 @@
     transform: none;
   }
 
-  .result-msg {
-    padding: 14px 18px;
+  .un-spinner {
+    animation: un-spin 0.8s linear infinite;
+  }
+
+  /* ── Toast message ─────────────── */
+  .un-toast {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 16px 20px;
     border-radius: var(--radius-sm);
     border: 1px solid var(--border-subtle, rgba(226, 232, 240, 0.35));
     font-weight: 600;
