@@ -786,6 +786,418 @@ func PublicWebsiteUninstallHandler(sqliteDB *sql.DB) http.HandlerFunc {
 	}
 }
 
+func PublicWebsiteEventsHandler(sqliteDB *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if sqliteDB == nil {
+			writePublicWebsiteError(w, http.StatusServiceUnavailable, "database_unavailable", "Database is unavailable.", true)
+			return
+		}
+		if !preparePublicWebsiteCORSWithOptions(w, r, publicWebsiteCORSOptions{
+			AllowedMethods:        "POST, OPTIONS",
+			RequireOriginForWrite: true,
+			StructuredErrors:      true,
+		}) {
+			return
+		}
+		if r.Method != http.MethodPost {
+			writePublicWebsiteError(w, http.StatusMethodNotAllowed, "method_not_allowed", "Only POST is allowed for this endpoint.", false)
+			return
+		}
+
+		r.Body = http.MaxBytesReader(w, r.Body, publicWebsiteEventsBodyLimitBytes)
+		var req publicWebsiteEventsIngestRequest
+		if err := decodeJSONBodyStrict(r, &req); err != nil {
+			writePublicWebsiteError(w, http.StatusBadRequest, "invalid_request_body", "Request body must be valid JSON and match the expected schema.", false)
+			return
+		}
+		if req.SchemaVersion != publicWebsiteSchemaVersion {
+			writePublicWebsiteError(w, http.StatusBadRequest, "schema_version_required", "schemaVersion must be \"1\".", false)
+			return
+		}
+		if len(req.Events) == 0 {
+			writePublicWebsiteError(w, http.StatusBadRequest, "events_required", "events must be a non-empty array.", false)
+			return
+		}
+		if len(req.Events) > publicWebsiteEventsMaxPerRequest {
+			writePublicWebsiteError(w, http.StatusBadRequest, "events_batch_too_large", "events length exceeds the maximum allowed batch size.", false)
+			return
+		}
+
+		sanitizedSessionID := sanitizeWebsiteEventSessionID(req.SessionID)
+		sanitizedPagePath := sanitizeWebsiteEventPagePath(req.PagePath)
+		nowUTC := time.Now().UTC()
+		nowMillis := nowUTC.UnixMilli()
+		result, err := ingestWebsiteEvents(
+			r.Context(),
+			sqliteDB,
+			req.Events,
+			nowUTC,
+			websiteEventsIngestMetadata{
+				Source:         "website_public_events",
+				BatchID:        newWebsiteBatchID(websiteSyncDirectionWebsiteToOracle),
+				TriggeredBy:    "website_events_ingest",
+				Attempt:        1,
+				SessionID:      sanitizedSessionID,
+				PagePath:       sanitizedPagePath,
+				GeneratedAtUTC: nowMillis,
+				CorrelationID:  trimAndLimit(r.Header.Get("X-Correlation-ID"), 200),
+			},
+		)
+		if err != nil {
+			writePublicWebsiteError(w, http.StatusInternalServerError, "ingest_failed", "Failed to ingest website events.", true)
+			return
+		}
+
+		writePublicWebsiteJSON(w, http.StatusOK, publicWebsiteEventsIngestResponse{
+			SchemaVersion: publicWebsiteSchemaVersion,
+			OK:            true,
+			GeneratedAt:   nowMillis,
+			AcceptedCount: result.Accepted,
+			RejectedCount: result.Rejected,
+		})
+	}
+}
+
+func ingestWebsiteEvents(
+	ctx context.Context,
+	sqliteDB *sql.DB,
+	events []publicWebsiteEventIngestEvent,
+	nowUTC time.Time,
+	metadata websiteEventsIngestMetadata,
+) (websiteEventsIngestResult, error) {
+	if sqliteDB == nil {
+		return websiteEventsIngestResult{}, errors.New("database not available")
+	}
+	tx, err := sqliteDB.BeginTx(ctx, nil)
+	if err != nil {
+		return websiteEventsIngestResult{}, err
+	}
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	nowMillis := nowUTC.UnixMilli()
+	ingestMeta := normalizeWebsiteEventsIngestMetadata(metadata, nowMillis)
+	result := websiteEventsIngestResult{
+		Received:       len(events),
+		BatchChecksum:  computeWebsiteEventsBatchChecksum(ingestMeta.BatchID, ingestMeta.GeneratedAtUTC, ingestMeta.SessionID, ingestMeta.PagePath, events),
+		ChecksumStatus: "not_provided",
+		RowCountStatus: "not_provided",
+		Integrity:      "ok",
+	}
+	for _, rawEvent := range events {
+		eventID, eventType, action, placement, dayUTC, valid := sanitizeWebsiteEventForAggregate(rawEvent, nowUTC)
+		if !valid {
+			result.Rejected++
+			continue
+		}
+
+		insertRes, execErr := tx.ExecContext(
+			ctx,
+			`INSERT INTO website_event_idempotency (event_id, created_at)
+			 VALUES (?, ?)
+			 ON CONFLICT(event_id) DO NOTHING`,
+			eventID,
+			nowMillis,
+		)
+		if execErr != nil {
+			return websiteEventsIngestResult{}, execErr
+		}
+		insertedRows, rowsErr := insertRes.RowsAffected()
+		if rowsErr != nil {
+			return websiteEventsIngestResult{}, rowsErr
+		}
+		if insertedRows == 0 {
+			result.Rejected++
+			continue
+		}
+
+		metaPayload := normalizeWebsiteEventMeta(rawEvent.Meta)
+		metaJSON := encodeWebsiteEventMetaJSON(metaPayload)
+		rawEventJSON := encodeWebsiteRawEventJSON(rawEvent, eventID, eventType, action, placement, metaPayload)
+		var eventTSUTC any
+		if rawEvent.TSUTC != nil && *rawEvent.TSUTC > 0 {
+			eventTSUTC = *rawEvent.TSUTC
+		}
+
+		if _, execErr = tx.ExecContext(
+			ctx,
+			`INSERT INTO website_events_raw (
+				event_id, source, batch_id, session_id, page_path,
+				event_type, action, placement, event_ts_utc, generated_at_utc, attempt,
+				correlation_id, meta_json, raw_event_json, ingested_at
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			eventID,
+			ingestMeta.Source,
+			ingestMeta.BatchID,
+			ingestMeta.SessionID,
+			ingestMeta.PagePath,
+			eventType,
+			action,
+			placement,
+			eventTSUTC,
+			ingestMeta.GeneratedAtUTC,
+			ingestMeta.Attempt,
+			ingestMeta.CorrelationID,
+			metaJSON,
+			rawEventJSON,
+			nowMillis,
+		); execErr != nil {
+			return websiteEventsIngestResult{}, execErr
+		}
+
+		if _, execErr = tx.ExecContext(
+			ctx,
+			`INSERT INTO website_event_daily (day_utc, event_type, action, placement, count, last_seen_at)
+			 VALUES (?, ?, ?, ?, 1, ?)
+			 ON CONFLICT(day_utc, event_type, action, placement)
+			 DO UPDATE SET
+				count = website_event_daily.count + 1,
+				last_seen_at = excluded.last_seen_at`,
+			dayUTC,
+			eventType,
+			action,
+			placement,
+			nowMillis,
+		); execErr != nil {
+			return websiteEventsIngestResult{}, execErr
+		}
+		result.Accepted++
+	}
+
+	result.Accounted = result.Accepted + result.Rejected
+
+	expectedChecksum := strings.ToLower(strings.TrimSpace(ingestMeta.BatchChecksum))
+	computedChecksum := strings.ToLower(strings.TrimSpace(result.BatchChecksum))
+	if expectedChecksum != "" {
+		if expectedChecksum == computedChecksum {
+			result.ChecksumStatus = "match"
+		} else {
+			result.ChecksumStatus = "mismatch"
+			result.IntegrityNotes = append(result.IntegrityNotes, "batch checksum mismatch")
+		}
+	}
+
+	if ingestMeta.ExpectedEvents != nil {
+		expectedEvents := *ingestMeta.ExpectedEvents
+		if expectedEvents < 0 {
+			expectedEvents = 0
+		}
+		if expectedEvents == result.Received {
+			result.RowCountStatus = "match"
+		} else {
+			result.RowCountStatus = "mismatch"
+			result.IntegrityNotes = append(result.IntegrityNotes, "expected event count mismatch")
+		}
+	}
+
+	if result.Accounted != result.Received {
+		result.RowCountStatus = "mismatch"
+		result.IntegrityNotes = append(result.IntegrityNotes, "ingested event accounting mismatch")
+	}
+	if len(result.IntegrityNotes) > 0 {
+		result.Integrity = "critical"
+	} else {
+		result.Integrity = "ok"
+	}
+
+	details := map[string]any{
+		"acceptedCount":  result.Accepted,
+		"rejectedCount":  result.Rejected,
+		"receivedCount":  result.Received,
+		"accountedCount": result.Accounted,
+		"attempt":        ingestMeta.Attempt,
+		"sessionId":      ingestMeta.SessionID,
+		"pagePath":       ingestMeta.PagePath,
+		"generatedAtUtc": ingestMeta.GeneratedAtUTC,
+		"source":         ingestMeta.Source,
+		"batchChecksum":  result.BatchChecksum,
+		"checksumStatus": result.ChecksumStatus,
+		"rowCountStatus": result.RowCountStatus,
+		"integrity":      result.Integrity,
+	}
+	if ingestMeta.ExpectedEvents != nil {
+		details["expectedEventCount"] = maxInt64(int64(*ingestMeta.ExpectedEvents), 0)
+	}
+	if expectedChecksum != "" {
+		details["expectedBatchChecksum"] = expectedChecksum
+	}
+	if len(result.IntegrityNotes) > 0 {
+		details["integrityNotes"] = result.IntegrityNotes
+	}
+	if ingestMeta.CorrelationID != "" {
+		details["correlationId"] = ingestMeta.CorrelationID
+	}
+
+	if err := markWebsiteIngestTimestampTx(ctx, tx, nowMillis); err != nil {
+		return websiteEventsIngestResult{}, err
+	}
+	if err := insertWebsiteSyncBatchWithRunner(
+		ctx,
+		tx,
+		websiteSyncDirectionWebsiteToOracle,
+		ingestMeta.BatchID,
+		ingestMeta.TriggeredBy,
+		"ok",
+		details,
+		nowMillis,
+	); err != nil {
+		return websiteEventsIngestResult{}, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return websiteEventsIngestResult{}, err
+	}
+	return result, nil
+}
+
+func normalizeWebsiteEventsIngestMetadata(input websiteEventsIngestMetadata, nowMillis int64) websiteEventsIngestMetadata {
+	output := input
+	output.Source = trimAndLimit(output.Source, 64)
+	if output.Source == "" {
+		output.Source = "website_events_ingest"
+	}
+	output.BatchID = trimAndLimit(output.BatchID, 160)
+	if output.BatchID == "" {
+		output.BatchID = newWebsiteBatchID(websiteSyncDirectionWebsiteToOracle)
+	}
+	output.TriggeredBy = trimAndLimit(output.TriggeredBy, 120)
+	if output.TriggeredBy == "" {
+		output.TriggeredBy = "website_events_ingest"
+	}
+	if output.Attempt < 1 {
+		output.Attempt = 1
+	}
+	if output.Attempt > 20 {
+		output.Attempt = 20
+	}
+	output.SessionID = sanitizeWebsiteEventSessionID(output.SessionID)
+	output.PagePath = sanitizeWebsiteEventPagePath(output.PagePath)
+	if output.GeneratedAtUTC <= 0 {
+		output.GeneratedAtUTC = nowMillis
+	}
+	output.CorrelationID = trimAndLimit(output.CorrelationID, 200)
+	output.BatchChecksum = strings.ToLower(trimAndLimit(strings.TrimSpace(output.BatchChecksum), 80))
+	if output.ExpectedEvents != nil {
+		v := *output.ExpectedEvents
+		if v < 0 {
+			v = 0
+		}
+		output.ExpectedEvents = &v
+	}
+	return output
+}
+
+func computeWebsiteEventsBatchChecksum(
+	batchID string,
+	generatedAtUTC int64,
+	sessionID string,
+	pagePath string,
+	events []publicWebsiteEventIngestEvent,
+) string {
+	h := sha256.New()
+	writeLine := func(v string) {
+		_, _ = h.Write([]byte(v))
+		_, _ = h.Write([]byte{'\n'})
+	}
+
+	writeLine(publicWebsiteSchemaVersion)
+	writeLine(trimAndLimit(batchID, 160))
+	writeLine(strconv.FormatInt(generatedAtUTC, 10))
+	writeLine(sanitizeWebsiteEventSessionID(sessionID))
+	writeLine(sanitizeWebsiteEventPagePath(pagePath))
+	writeLine(strconv.Itoa(len(events)))
+
+	refUTC := time.Now().UTC()
+	if generatedAtUTC > 0 {
+		refUTC = time.UnixMilli(generatedAtUTC).UTC()
+	}
+	for _, event := range events {
+		eventID, eventType, action, placement, _, ok := sanitizeWebsiteEventForAggregate(event, refUTC)
+		if !ok {
+			eventID = strings.TrimSpace(event.EventID)
+			eventType = strings.ToLower(strings.TrimSpace(event.EventType))
+			action = strings.ToLower(strings.TrimSpace(event.Action))
+			placement = sanitizeWebsiteEventPlacement(event.Placement)
+		}
+		ts := int64(0)
+		if event.TSUTC != nil && *event.TSUTC > 0 {
+			ts = *event.TSUTC
+		}
+		writeLine(eventID)
+		writeLine(eventType)
+		writeLine(action)
+		writeLine(placement)
+		writeLine(strconv.FormatInt(ts, 10))
+	}
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+func normalizeWebsiteEventMeta(raw map[string]any) map[string]any {
+	if len(raw) == 0 {
+		return map[string]any{}
+	}
+	out := make(map[string]any, len(raw))
+	count := 0
+	for k, v := range raw {
+		if count >= 16 {
+			break
+		}
+		key := trimAndLimit(k, 64)
+		if key == "" {
+			continue
+		}
+		switch value := v.(type) {
+		case string:
+			out[key] = trimAndLimit(value, 256)
+		case float64, bool, nil:
+			out[key] = value
+		default:
+			continue
+		}
+		count++
+	}
+	return out
+}
+
+func encodeWebsiteEventMetaJSON(meta map[string]any) string {
+	if len(meta) == 0 {
+		return "{}"
+	}
+	bytes, err := json.Marshal(meta)
+	if err != nil || len(bytes) > publicWebsiteMetaJSONMaxBytes {
+		return "{}"
+	}
+	return string(bytes)
+}
+
+func encodeWebsiteRawEventJSON(
+	input publicWebsiteEventIngestEvent,
+	eventID string,
+	eventType string,
+	action string,
+	placement string,
+	meta map[string]any,
+) string {
+	payload := map[string]any{
+		"eventId":   eventID,
+		"eventType": eventType,
+		"action":    action,
+		"placement": placement,
+	}
+	if input.TSUTC != nil && *input.TSUTC > 0 {
+		payload["tsUtc"] = *input.TSUTC
+	}
+	if len(meta) > 0 {
+		payload["meta"] = meta
+	}
+	bytes, err := json.Marshal(payload)
+	if err != nil || len(bytes) > publicWebsiteRawEventJSONMaxBytes {
+		return "{}"
+	}
+	return string(bytes)
+}
+
 func buildPublicWebsiteOverview(ctx context.Context, sqliteDB *sql.DB, store *controlPlaneStore) (publicWebsiteOverviewResponse, error) {
 	rawTotals, err := loadTotals(ctx, sqliteDB)
 	if err != nil {
