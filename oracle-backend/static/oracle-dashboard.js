@@ -1170,6 +1170,60 @@
         });
       }
 
+      function readNavGroupState() {
+        try {
+          var raw = localStorage.getItem(NAV_GROUP_STATE_KEY);
+          if (!raw) return {};
+          var parsed = JSON.parse(raw);
+          if (!parsed || typeof parsed !== 'object') return {};
+          return parsed;
+        } catch (_) {
+          return {};
+        }
+      }
+
+      function persistNavGroupState(state) {
+        try {
+          localStorage.setItem(NAV_GROUP_STATE_KEY, JSON.stringify(state || {}));
+        } catch (_) {}
+      }
+
+      function setNavGroupCollapsed(groupKey, collapsed) {
+        var root = document.querySelector('.nav-group[data-nav-group="' + groupKey + '"]');
+        if (!root) return;
+        root.classList.toggle('collapsed', !!collapsed);
+        var toggle = root.querySelector('[data-nav-group-toggle]');
+        if (toggle) {
+          toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+        }
+      }
+
+      function initNavGroupToggles() {
+        var state = readNavGroupState();
+        document.querySelectorAll('.nav-group[data-nav-group]').forEach(function(groupNode) {
+          var groupKey = groupNode.getAttribute('data-nav-group') || '';
+          if (!groupKey) return;
+          setNavGroupCollapsed(groupKey, !!state[groupKey]);
+        });
+
+        document.querySelectorAll('[data-nav-group-toggle]').forEach(function(toggle) {
+          if (toggle.dataset.boundClick === '1') return;
+          toggle.dataset.boundClick = '1';
+          toggle.addEventListener('click', function(ev) {
+            ev.preventDefault();
+            var groupKey = toggle.getAttribute('data-nav-group-toggle') || '';
+            if (!groupKey) return;
+            var root = document.querySelector('.nav-group[data-nav-group="' + groupKey + '"]');
+            if (!root) return;
+            var isCollapsed = root.classList.contains('collapsed');
+            var nextState = readNavGroupState();
+            nextState[groupKey] = !isCollapsed;
+            persistNavGroupState(nextState);
+            setNavGroupCollapsed(groupKey, !isCollapsed);
+          });
+        });
+      }
+
       // Page Navigation
       function showPage(page) {
         currentPage = page;
