@@ -656,6 +656,9 @@
     background: rgba(255,255,255,0.7);
     backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
     color: var(--text);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.04);
+    transition: all 0.25s ease;
+    box-sizing: border-box;
   }
 
   .faq-section-head p {
