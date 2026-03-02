@@ -1242,7 +1242,8 @@ async function proxyToDO(request: Request, env: WorkerEnv): Promise<Response> {
   }
 
   // We need to create a new Request object to modify headers locally before fetching the Stub
-  const newReq = new Request(request.url, {
+  const hasBody = request.method !== "GET" && request.method !== "HEAD";
+  const requestInit: RequestInit & { duplex?: "half" } = {
     method: request.method,
     headers: headers,
     body: request.body,
