@@ -149,7 +149,7 @@ describe('public website API integration', () => {
   it('requests snapshot from Oracle API endpoint only', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString();
-      expect(url).toContain('/api/public/website/overview');
+      expect(url).toContain('/api/public/website/snapshot');
       expect(url).not.toContain('/public/site-metrics');
       return new Response(
         JSON.stringify({
