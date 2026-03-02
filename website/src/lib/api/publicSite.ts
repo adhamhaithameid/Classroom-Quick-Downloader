@@ -130,7 +130,7 @@ async function extractResponseErrorMessage(response: Response, fallback: string)
 async function fetchJSONFromBase(baseUrl: string, pathname: string, requestLabel: string): Promise<unknown> {
   const normalizedBase = baseUrl.trim();
   if (!normalizedBase) {
-    throw new Error(`Missing ${sourceLabel} base URL`);
+    throw new Error('Public API is not configured.');
   }
   const response = await withTimeout(
     fetch(`${normalizedBase}${pathname}`, {
