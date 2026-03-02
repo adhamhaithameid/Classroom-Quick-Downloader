@@ -410,10 +410,13 @@
     box-shadow: 0 3px 12px rgba(26, 139, 85, 0.3);
   }
 
-  .two-col {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 20px;
+  /* ── Card ──────────────────────── */
+  .un-card {
+    background: var(--surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius);
+    padding: 36px 32px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04);
   }
 
   /* ── Option grid ───────────────────── */
