@@ -6397,6 +6397,7 @@ export class DownloadsDurable {
       }
 
       if (updated) {
+        await this.ensureChangelogAutoSyncAlarm(now);
         await this.persist();
       }
 
