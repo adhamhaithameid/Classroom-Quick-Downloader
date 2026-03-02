@@ -10,12 +10,20 @@
       let allTimeActivityPoints = [];
           let oracleClockIs24 = localStorage.getItem('oracle_clock_24h') !== 'false';
       let refreshIntervalId = null;
-          const DEFAULT_INFRA_LINKS = {
-            cloudflare: 'https://cqd-analytics.adhamhaithameid.workers.dev/',
-            website: 'https://classroom-quick-downloader-website.pages.dev',
-            uptimeKuma: 'https://cqd-analytics.adhamhaithameid.workers.dev/pipeline-health',
-            githubRepo: 'https://github.com/adhamhaithameid/Classroom-Quick-Downloader',
-            googleSheets: 'https://docs.google.com/spreadsheets/d/1ptzLKUVnAkyXnT635Zgb1C6Img9aeAZ1se3nRz_QZmI/edit?gid=0#gid=0',
+      let websiteAnalyticsRange = '7d';
+      let chartsRange = 'week';
+      let chartsDimension = 'browser';
+      let chartsComparePrevious = false;
+      let dailyDownloadsRange = '14';
+      let chartsLastExportRows = [];
+      let chartsLastExportName = 'chart_data';
+	      const NAV_GROUP_STATE_KEY = 'oracle_nav_group_state_v1';
+	          const DEFAULT_INFRA_LINKS = {
+	            cloudflare: 'https://cqd-analytics.adhamhaithameid.workers.dev/',
+	            website: '',
+	            uptimeKuma: 'https://cqd-analytics.adhamhaithameid.workers.dev/pipeline-health',
+	            githubRepo: 'https://github.com/adhamhaithameid/Classroom-Quick-Downloader',
+	            googleSheets: 'https://docs.google.com/spreadsheets/d/1ptzLKUVnAkyXnT635Zgb1C6Img9aeAZ1se3nRz_QZmI/edit?gid=0#gid=0',
             figmaDesign: 'https://www.figma.com/design/hQLRpncinKnJQRG1lhCdQG/Google-Classroom-Downloade-Icon?node-id=0-1&t=5Eimhfrvp8RwFC19-1',
             chromeDevDashboard: 'https://chrome.google.com/webstore/devconsole/9fe14497-b35b-4542-9af0-dedfdf6a194c',
             firefoxDevDashboard: 'https://addons.mozilla.org/en-US/firefox/user/19632882/',
