@@ -1390,21 +1390,7 @@
 
   <!-- ━━━━ Problem → Solution (Dual Feature) ━━━━ -->
   <section class="l2-block l2-block-alt l2-ps-section l2-snap">
-    <div class="l2-wrap l2-reveal" style="position:relative">
-      <!-- Solution doodle — stacked documents -->
-      <!-- Solution doodles — messy papers (chaos) + organized folder (order) -->
-      <svg class="l2-doodle l2-doodle-solution-1" viewBox="0 0 80 80" fill="none" aria-hidden="true">
-        <rect x="8" y="10" width="26" height="34" rx="2" stroke="var(--green)" stroke-width="1.2" opacity="0.12" transform="rotate(-8 21 27)"/>
-        <rect x="16" y="6" width="26" height="34" rx="2" stroke="var(--green)" stroke-width="1.2" opacity="0.15" transform="rotate(5 29 23)"/>
-        <rect x="24" y="14" width="26" height="34" rx="2" stroke="var(--green)" stroke-width="1.2" opacity="0.18"/>
-        <line x1="30" y1="24" x2="44" y2="24" stroke="var(--green)" stroke-width="1" opacity="0.12"/>
-        <line x1="30" y1="30" x2="40" y2="30" stroke="var(--green)" stroke-width="1" opacity="0.10"/>
-      </svg>
-      <svg class="l2-doodle l2-doodle-solution-2" viewBox="0 0 70 70" fill="none" aria-hidden="true">
-        <path d="M10 24v32h40V32H30l-6-8H10z" stroke="var(--green)" stroke-width="1.5" opacity="0.15" fill="var(--green)" fill-opacity="0.03" stroke-linejoin="round"/>
-        <line x1="10" y1="32" x2="50" y2="32" stroke="var(--green)" stroke-width="1" opacity="0.10"/>
-        <path d="M28 42l5 5 10-10" stroke="var(--green)" stroke-width="1.5" opacity="0.18" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
+    <div class="l2-wrap l2-reveal" data-placement-section="problem" style="position:relative">
       <div class="l2-section-head">
         <span class="l2-label">THE PROBLEM</span>
         <h2>Downloading files from Classroom shouldn't take this long.</h2>
