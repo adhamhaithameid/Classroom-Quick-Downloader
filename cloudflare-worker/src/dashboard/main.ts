@@ -5675,12 +5675,12 @@ export function renderDashboard(stats: StatsResponse): string {
             if (draftPreviewEl) draftPreviewEl.innerHTML = '<div class="cl-preview-empty">Parse failed: ' + escapeHtmlUnsafe(msg) + '</div>';
             return;
           }
-        } catch(e) {
-          alert("Network error");
-          // Reset button state
-          if (btnSaveAll) {
-            btnSaveAll.classList.remove("btn-loading");
-            btnSaveAll.style.pointerEvents = "";
+          if (fromUrlOnly && markdownInputEl && Array.isArray(data.entries) && data.entries.length > 0) {
+            markdownInputEl.value = data.entries.map((entry) => entry.markdown || '').filter(Boolean).join('\\n\\n');
+          }
+          if (Array.isArray(data.errors) && data.errors.length > 0 && draftPreviewEl) {
+            const errList = data.errors.slice(0, 4).map((e) => '<li>' + escapeHtmlUnsafe(e) + '</li>').join('');
+            draftPreviewEl.innerHTML = '<div style="font-size:0.82em; color:#fca5a5; margin-bottom:6px;">Parser warnings:</div><ul>' + errList + '</ul>';
           }
           if (btnSaveText) btnSaveText.textContent = "Save Configuration & Publish";
         }
