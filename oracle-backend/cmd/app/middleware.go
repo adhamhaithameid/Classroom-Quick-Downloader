@@ -27,6 +27,8 @@ func requestBodyLimitMiddleware(next http.Handler) http.Handler {
 				r.Body = http.MaxBytesReader(w, r.Body, adminRequestBodyLimit)
 			case strings.HasPrefix(r.URL.Path, "/api/auth/"):
 				r.Body = http.MaxBytesReader(w, r.Body, authRequestBodyLimit)
+			case strings.HasPrefix(r.URL.Path, "/api/internal/"):
+				r.Body = http.MaxBytesReader(w, r.Body, internalRequestBodyLimit)
 			}
 		}
 		next.ServeHTTP(w, r)
