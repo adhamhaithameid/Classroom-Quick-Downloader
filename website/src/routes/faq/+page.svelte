@@ -741,12 +741,9 @@
     background: rgba(255,255,255,0.9);
   }
 
-  .faq-question {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 14px 16px;
-    gap: 14px;
+  .fq-question {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 16px 18px; gap: 14px;
   }
 
   .faq-q-text {
