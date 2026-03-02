@@ -1,4 +1,4 @@
-import { CHANGELOG_URL } from './analytics/constants';
+import { CHANGELOG_URL, ORACLE_CHANGELOG_URL } from './analytics/constants';
 
 export interface ChangelogEntry {
   id: string;
@@ -30,6 +30,7 @@ export interface ChangelogMeta {
   applyMode?: string;
   lastAutoSyncAt?: number | null;
   lastAutoSyncStatus?: string;
+  contentChecksum?: string;
 }
 
 export interface ChangelogData {
@@ -43,6 +44,7 @@ export interface ChangelogData {
 const STORAGE_KEY = 'cqd_changelog_v1';
 const CACHE_duration_MS = 0; // Always fetch on reload
 const SEEN_KEY = 'cqd_changelog_seen_v1';
+const ETAG_KEY = 'cqd_changelog_etag_v1';
 const FORCE_REFRESH_QUERY_KEY = '_';
 
 function normalizeStringList(value: unknown, maxItems = 24): string[] {
@@ -133,11 +135,13 @@ function sanitizeMeta(value: unknown): ChangelogMeta | undefined {
   const lastAutoSyncAt = lastAutoSyncAtRaw == null ? null : toFiniteInt(lastAutoSyncAtRaw) ?? null;
   const applyMode = typeof row.applyMode === 'string' ? row.applyMode : undefined;
   const lastAutoSyncStatus = typeof row.lastAutoSyncStatus === 'string' ? row.lastAutoSyncStatus : undefined;
+  const contentChecksum = typeof row.contentChecksum === 'string' ? row.contentChecksum : undefined;
   if (
     liveUpdatedAt === undefined &&
     applyMode === undefined &&
     lastAutoSyncStatus === undefined &&
-    lastAutoSyncAt === null
+    lastAutoSyncAt === null &&
+    contentChecksum === undefined
   ) {
     return undefined;
   }
@@ -146,6 +150,7 @@ function sanitizeMeta(value: unknown): ChangelogMeta | undefined {
     applyMode,
     lastAutoSyncAt,
     lastAutoSyncStatus,
+    contentChecksum,
   };
 }
 
@@ -234,89 +239,148 @@ function sanitizeCachedData(value: unknown): ChangelogData | null {
 }
 
 /**
- * Fetch changelog from storage or network.
- * Returns null if network fails and no cache.
+ * Parse a raw API JSON response into ChangelogData.
+ * Shared between Oracle and Worker responses (same format).
+ */
+function parseApiResponse(json: any): ChangelogData | null {
+  if (!json || !json.ok) return null;
+  const rawEntries = Array.isArray(json.entries) ? json.entries : [];
+  const parsedEntries: ChangelogEntry[] = rawEntries
+    .map((entry: any, index: number) => {
+      const versionRaw = typeof entry?.version === 'string' ? entry.version.trim() : '';
+      const version = normalizeVersion(versionRaw);
+      const date = typeof entry?.date === 'string' ? entry.date : new Date().toISOString();
+      if (!version) return null;
+      const id = typeof entry?.id === 'string' && entry.id.trim()
+        ? entry.id.trim()
+        : `cl-${version}-${Date.parse(date) || 0}-${index}`;
+      const added = normalizeStringList(entry?.added, 20);
+      const changed = normalizeStringList(entry?.changed, 20);
+      const fixed = normalizeStringList(entry?.fixed, 20);
+      const summary = typeof entry?.summary === 'string' ? entry.summary.trim() : '';
+      const markdown = typeof entry?.markdown === 'string' ? entry.markdown : '';
+      const changes = toLegacyChanges({
+        summary,
+        added,
+        changed,
+        fixed,
+        changes: entry?.changes
+      });
+      return {
+        id,
+        version,
+        date,
+        changes,
+        summary: summary || undefined,
+        added,
+        changed,
+        fixed,
+        markdown: markdown || undefined,
+        isImportant: entry?.isImportant === true
+      };
+    })
+    .filter((entry: ChangelogEntry | null): entry is ChangelogEntry => entry !== null);
+
+  const configRaw = (json.config && typeof json.config === 'object') ? json.config : {};
+  const config: ChangelogConfig = {
+    rules: sanitizeRules(configRaw.rules),
+    lastUpdated: toFiniteInt(configRaw.lastUpdated),
+  };
+  const meta = sanitizeMeta(json.meta);
+  return {
+    entries: parsedEntries,
+    config,
+    meta,
+    revisionToken: computeRevisionToken(parsedEntries, config, meta),
+    lastFetched: Date.now(),
+  };
+}
+
+/**
+ * Try fetching from a URL. Returns [ChangelogData | null, newEtag | null].
+ * Returns [null, storedEtag] on 304 Not Modified.
+ */
+async function tryFetchEndpoint(
+  url: string,
+  force: boolean,
+  storedEtag?: string
+): Promise<[ChangelogData | null, string | null]> {
+  const requestUrl = force
+    ? `${url}${url.includes('?') ? '&' : '?'}${FORCE_REFRESH_QUERY_KEY}=${Date.now()}`
+    : url;
+
+  const headers: Record<string, string> = {};
+  if (storedEtag && !force) {
+    headers['If-None-Match'] = storedEtag;
+  }
+
+  const res = await fetch(requestUrl, { cache: 'no-store', headers });
+
+  // 304 Not Modified — data hasn't changed
+  if (res.status === 304) {
+    return [null, storedEtag || null];
+  }
+
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+  const json = await res.json();
+  const parsed = parseApiResponse(json);
+  const newEtag = res.headers.get('ETag') || null;
+  return [parsed, newEtag];
+}
+
+/**
+ * Fetch changelog from Oracle (primary) or Worker (fallback).
+ * Returns cached data if both fail; null if no cache exists.
  */
 export async function fetchChangelog(force = false): Promise<ChangelogData | null> {
   // 1. Check cache
-  const cached = await chrome.storage.local.get(STORAGE_KEY);
+  const cached = await chrome.storage.local.get([STORAGE_KEY, ETAG_KEY]);
   const data = sanitizeCachedData(cached[STORAGE_KEY]);
+  const storedEtag = typeof cached[ETAG_KEY] === 'string' ? cached[ETAG_KEY] : undefined;
 
   if (!force && data && (Date.now() - data.lastFetched < CACHE_duration_MS)) {
     return data;
   }
 
-  // 2. Fetch network
-  if (!CHANGELOG_URL) return data || null;
-
+  // 2. Try Oracle (primary)
   try {
-    const requestUrl = force
-      ? `${CHANGELOG_URL}${CHANGELOG_URL.includes('?') ? '&' : '?'}${FORCE_REFRESH_QUERY_KEY}=${Date.now()}`
-      : CHANGELOG_URL;
-    const res = await fetch(requestUrl, { cache: 'no-store' });
-    if (!res.ok) throw new Error('Network error');
-    
-    const json = await res.json();
-    if (!json.ok) throw new Error('API error');
-
-    const rawEntries = Array.isArray(json.entries) ? json.entries : [];
-    const parsedEntries: ChangelogEntry[] = rawEntries
-      .map((entry: any, index: number) => {
-        const versionRaw = typeof entry?.version === 'string' ? entry.version.trim() : '';
-        const version = normalizeVersion(versionRaw);
-        const date = typeof entry?.date === 'string' ? entry.date : new Date().toISOString();
-        if (!version) return null;
-        const id = typeof entry?.id === 'string' && entry.id.trim()
-          ? entry.id.trim()
-          : `cl-${version}-${Date.parse(date) || 0}-${index}`;
-        const added = normalizeStringList(entry?.added, 20);
-        const changed = normalizeStringList(entry?.changed, 20);
-        const fixed = normalizeStringList(entry?.fixed, 20);
-        const summary = typeof entry?.summary === 'string' ? entry.summary.trim() : '';
-        const markdown = typeof entry?.markdown === 'string' ? entry.markdown : '';
-        const changes = toLegacyChanges({
-          summary,
-          added,
-          changed,
-          fixed,
-          changes: entry?.changes
+    if (ORACLE_CHANGELOG_URL) {
+      const [oracleData, newEtag] = await tryFetchEndpoint(ORACLE_CHANGELOG_URL, force, storedEtag);
+      if (oracleData) {
+        // Fresh data from Oracle
+        await chrome.storage.local.set({
+          [STORAGE_KEY]: oracleData,
+          [ETAG_KEY]: newEtag || '',
         });
-        return {
-          id,
-          version,
-          date,
-          changes,
-          summary: summary || undefined,
-          added,
-          changed,
-          fixed,
-          markdown: markdown || undefined,
-          isImportant: entry?.isImportant === true
-        };
-      })
-      .filter((entry: ChangelogEntry | null): entry is ChangelogEntry => entry !== null);
-
-    const configRaw = (json.config && typeof json.config === 'object') ? json.config : {};
-    const config: ChangelogConfig = {
-      rules: sanitizeRules(configRaw.rules),
-      lastUpdated: toFiniteInt(configRaw.lastUpdated),
-    };
-    const meta = sanitizeMeta(json.meta);
-    const newData: ChangelogData = {
-      entries: parsedEntries,
-      config,
-      meta,
-      revisionToken: computeRevisionToken(parsedEntries, config, meta),
-      lastFetched: Date.now(),
-    };
-
-    // 3. Update cache
-    await chrome.storage.local.set({ [STORAGE_KEY]: newData });
-    return newData;
-  } catch (e) {
-    console.warn('[CQD Changelog] Fetch failed:', e);
-    return data || null;
+        return oracleData;
+      }
+      // 304 response — data unchanged, update lastFetched
+      if (data) {
+        const refreshed = { ...data, lastFetched: Date.now() };
+        await chrome.storage.local.set({ [STORAGE_KEY]: refreshed });
+        return refreshed;
+      }
+    }
+  } catch (oracleErr) {
+    console.warn('[CQD Changelog] Oracle fetch failed, trying Worker fallback:', oracleErr);
   }
+
+  // 3. Try Worker (fallback)
+  try {
+    if (CHANGELOG_URL) {
+      const [workerData] = await tryFetchEndpoint(CHANGELOG_URL, force);
+      if (workerData) {
+        await chrome.storage.local.set({ [STORAGE_KEY]: workerData });
+        return workerData;
+      }
+    }
+  } catch (workerErr) {
+    console.warn('[CQD Changelog] Worker fallback also failed:', workerErr);
+  }
+
+  // 4. Return cached data (offline fallback)
+  return data || null;
 }
 
 /**
@@ -364,9 +428,6 @@ function migrateSeenState(raw: unknown): SeenState {
   return state;
 }
 
-/**
- * Mark the current version as seen.
- */
 /**
  * Mark a version as seen.
  */
