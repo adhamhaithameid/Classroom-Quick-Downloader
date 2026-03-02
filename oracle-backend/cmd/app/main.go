@@ -329,6 +329,14 @@ func main() {
 	mux.Handle("/api/admin/sheets/flush-now", authMiddleware(criticalMiddleware(ManualSheetsFlushHandler(sqlDB))))
 	mux.Handle("/api/admin/sheets/last-flush", authMiddleware(handlers.SheetsLastFlushHandler(sqlDB)))
 	cloudflarePublicSiteMetricsURL := getenv("CLOUDFLARE_PUBLIC_SITE_METRICS_URL", "")
+	websiteTrafficSyncConfig := handlers.WebsiteTrafficSyncConfig{
+		Enabled:    websiteTrafficSyncEnabled(),
+		APIToken:   strings.TrimSpace(os.Getenv("CLOUDFLARE_ANALYTICS_API_TOKEN")),
+		AccountTag: strings.TrimSpace(os.Getenv("CLOUDFLARE_ANALYTICS_ACCOUNT_TAG")),
+		Hostname:   websiteTrafficSyncHostname(),
+		Interval:   websiteTrafficSyncInterval(),
+		Lookback:   websiteTrafficSyncLookback(),
+	}
 	mux.Handle("/api/admin/website/state", authMiddleware(handlers.WebsiteOpsStateHandler(sqlDB)))
 	mux.Handle("/api/admin/website/force-push", authMiddleware(criticalMiddleware(handlers.WebsiteOpsForcePushHandler(sqlDB))))
 	mux.Handle("/api/admin/website/pull-cloudflare", authMiddleware(criticalMiddleware(handlers.WebsiteOpsPullCloudflareHandler(sqlDB, cloudflarePublicSiteMetricsURL))))
