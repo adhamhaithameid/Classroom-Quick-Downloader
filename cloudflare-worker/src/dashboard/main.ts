@@ -6744,6 +6744,7 @@ export function renderDashboard(stats: StatsResponse): string {
             ipAllowlistData.allowlist = data.allowlist || [];
             ipAllowlistData.stepUpBypassEnabled = data.stepUpBypassEnabled !== false;
             renderIpList();
+            refreshIpSecurityBadges();
             showToast('IP removed: ' + ip, 'success');
           } else {
             showToast('Failed: ' + (data.error || 'Unknown'), 'error');
