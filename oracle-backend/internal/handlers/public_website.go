@@ -1726,6 +1726,145 @@ func normalizeStringList(value any, maxItems, maxLen int) []string {
 	return items
 }
 
+func parseUserFriendlyChangelogMarkdown(markdown string) []userFriendlyMarkdownRelease {
+	lines := strings.Split(strings.ReplaceAll(markdown, "\r\n", "\n"), "\n")
+	releases := make([]userFriendlyMarkdownRelease, 0, 16)
+
+	var current *userFriendlyMarkdownRelease
+	section := ""
+	pushCurrent := func() {
+		if current == nil {
+			return
+		}
+		current.Version = trimAndLimit(strings.TrimPrefix(strings.TrimPrefix(current.Version, "v"), "V"), 64)
+		current.Summary = trimAndLimit(current.Summary, 600)
+		if current.Summary == "" {
+			if len(current.Added) > 0 {
+				current.Summary = trimAndLimit(current.Added[0], 600)
+			} else if len(current.Changed) > 0 {
+				current.Summary = trimAndLimit(current.Changed[0], 600)
+			} else if len(current.Fixed) > 0 {
+				current.Summary = trimAndLimit(current.Fixed[0], 600)
+			}
+		}
+		if current.Version != "" && current.Summary != "" {
+			releases = append(releases, *current)
+		}
+		current = nil
+	}
+
+	for _, raw := range lines {
+		line := strings.TrimSpace(raw)
+		if line == "" {
+			continue
+		}
+		if strings.HasPrefix(strings.ToLower(line), "## v") || strings.HasPrefix(strings.ToLower(line), "## ") {
+			pushCurrent()
+			version := strings.TrimSpace(strings.TrimPrefix(strings.TrimPrefix(line, "##"), "v"))
+			version = strings.TrimPrefix(version, "V")
+			current = &userFriendlyMarkdownRelease{
+				Version: version,
+				Added:   make([]string, 0, 8),
+				Changed: make([]string, 0, 8),
+				Fixed:   make([]string, 0, 8),
+			}
+			section = ""
+			continue
+		}
+		if current == nil {
+			continue
+		}
+		switch strings.ToLower(line) {
+		case "### summary":
+			section = "summary"
+			continue
+		case "### added":
+			section = "added"
+			continue
+		case "### changed":
+			section = "changed"
+			continue
+		case "### fixed":
+			section = "fixed"
+			continue
+		}
+
+		value := strings.TrimSpace(strings.TrimPrefix(line, "-"))
+		value = trimAndLimit(value, 240)
+		if value == "" {
+			continue
+		}
+		switch section {
+		case "summary":
+			if current.Summary == "" {
+				current.Summary = value
+			} else {
+				current.Summary = trimAndLimit(current.Summary+" "+value, 600)
+			}
+		case "added":
+			current.Added = append(current.Added, value)
+		case "changed":
+			current.Changed = append(current.Changed, value)
+		case "fixed":
+			current.Fixed = append(current.Fixed, value)
+		default:
+			if current.Summary == "" {
+				current.Summary = value
+			}
+		}
+	}
+
+	pushCurrent()
+	return releases
+}
+
+func flattenReleaseHighlights(release userFriendlyMarkdownRelease, maxItems int) []string {
+	out := make([]string, 0, maxItems)
+	for _, item := range release.Added {
+		out = append(out, "Added: "+trimAndLimit(item, 180))
+		if len(out) >= maxItems {
+			return out
+		}
+	}
+	for _, item := range release.Changed {
+		out = append(out, "Changed: "+trimAndLimit(item, 180))
+		if len(out) >= maxItems {
+			return out
+		}
+	}
+	for _, item := range release.Fixed {
+		out = append(out, "Fixed: "+trimAndLimit(item, 180))
+		if len(out) >= maxItems {
+			return out
+		}
+	}
+	return out
+}
+
+func mapParsedReleasesToChangelogEntries(releases []userFriendlyMarkdownRelease) []publicWebsiteUserChangelogEntry {
+	entries := make([]publicWebsiteUserChangelogEntry, 0, len(releases))
+	for i, release := range releases {
+		version := trimAndLimit(release.Version, 64)
+		summary := trimAndLimit(release.Summary, 500)
+		if version == "" || summary == "" {
+			continue
+		}
+		entryID := trimAndLimit("github-release-"+strings.ReplaceAll(strings.ToLower(version), ".", "-"), 120)
+		if entryID == "github-release-" {
+			entryID = "github-release-" + trimAndLimit(strconv.Itoa(i+1), 16)
+		}
+		entries = append(entries, publicWebsiteUserChangelogEntry{
+			ID:            entryID,
+			Version:       version,
+			Title:         "Release update",
+			Summary:       summary,
+			Highlights:    flattenReleaseHighlights(release, 9),
+			ReleasedAtUTC: nil,
+		})
+	}
+	return entries
+}
+
 func derivePublicWorkerHealth(snapshot *summaryDOStateInfo) string {
 	if snapshot == nil {
 		return "down"
