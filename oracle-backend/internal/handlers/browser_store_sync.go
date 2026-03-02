@@ -566,6 +566,7 @@ func fetchAndParseStoreStats(ctx context.Context, client *http.Client, key, url 
 	if stats.users != "" && stats.usersCount == 0 {
 		stats.usersCount = parseApproxUsersCount(stats.users)
 	}
+	stats.source = "store_listing_html_fallback"
 	return stats, nil
 }
 
