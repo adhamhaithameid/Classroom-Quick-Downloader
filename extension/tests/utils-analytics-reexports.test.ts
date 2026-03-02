@@ -19,6 +19,7 @@ describe('utils/analytics re-exports', () => {
     expect(constants.TRACK_URL).toBe('https://worker.example/track');
     expect(constants.WEBSITE_BASE_URL).toBe('https://example.com/cqd');
     expect(constants.CHANGELOG_SITE_URL).toBe('https://example.com/cqd/changelog');
+    expect(constants.UNINSTALL_SITE_URL).toBe('https://example.com/cqd/uninstall');
     vi.unstubAllEnvs();
   });
 });
