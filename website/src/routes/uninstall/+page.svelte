@@ -509,12 +509,14 @@
     margin-bottom: 20px;
   }
 
-  .field select {
-    border: 1px solid var(--border-subtle, rgba(226, 232, 240, 0.35));
-    border-radius: var(--radius-sm);
-    padding: 10px 12px;
-    background: rgba(255, 255, 255, 0.6);
-    backdrop-filter: blur(6px);
+  .un-field-group:last-of-type {
+    margin-bottom: 24px;
+  }
+
+  .un-field-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 700;
     color: var(--text);
     font-size: 14px;
     cursor: pointer;
