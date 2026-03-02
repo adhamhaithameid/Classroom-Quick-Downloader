@@ -24,6 +24,7 @@
 - [Manual Testing Scripts](#manual-testing-scripts)
 - [Git Hooks](#git-hooks)
 - [Running Everything at Once](#running-everything-at-once)
+- [Phase 12 + 13 Execution](#phase-12--13-execution)
 
 ---
 
