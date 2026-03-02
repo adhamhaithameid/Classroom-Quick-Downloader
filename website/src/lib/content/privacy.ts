@@ -30,7 +30,8 @@ export const privacyContent: ManualPrivacyContent = {
       bullets: [
         'Download outcomes (success, fail, cancel) as counts — never individual file details.',
         'Browser and extension version for compatibility tracking.',
-        'Country-level activity trends for service quality monitoring.'
+        'Country-level activity trends for service quality monitoring.',
+        'Page view counts on the CQD website (no personal identifiers attached).'
       ]
     },
     {
