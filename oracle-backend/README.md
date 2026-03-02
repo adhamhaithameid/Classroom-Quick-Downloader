@@ -243,6 +243,12 @@ All configuration is done via environment variables, defined in `docker-compose.
 | `ORACLE_DR_REPLICA_LAG_SECONDS` | `-1` | Optional external replica lag feed for DR visibility. |
 | `ORACLE_DR_PROMOTION_MAX_LAG_SECONDS` | `300` | Promotion guardrail for DR eligibility checks. |
 | `ORACLE_RETENTION_RAW_SNAPSHOTS_DAYS` | `30` | Retention window for `cf_snapshots_raw` rows based on `received_at`. |
+| `CLOUDFLARE_ANALYTICS_API_TOKEN` | *(optional)* | API token used to read Cloudflare traffic analytics via GraphQL (required when traffic sync is enabled). |
+| `CLOUDFLARE_ANALYTICS_ACCOUNT_TAG` | *(optional)* | Cloudflare account tag used by the analytics GraphQL query. |
+| `CLOUDFLARE_ANALYTICS_HOSTNAME` | *(optional)* | Hostname filter for analytics pulls (use your production root domain). |
+| `ORACLE_WEBSITE_TRAFFIC_SYNC_ENABLED` | `false` | Enables hourly Cloudflare traffic sync into Oracle (`website_traffic_hourly`). |
+| `ORACLE_WEBSITE_TRAFFIC_SYNC_INTERVAL_SECONDS` | `3600` | Scheduler interval for Cloudflare traffic sync loop (min `60`, max `86400`). |
+| `ORACLE_WEBSITE_TRAFFIC_SYNC_LOOKBACK_HOURS` | `48` | Rolling lookback window fetched each sync run (min `1`, max `720`). |
 
 Startup is **fail-closed** for auth secrets: the server exits if `SUPER_ADMIN_PASSWORD` is missing, and also exits if `DASHBOARD_PASSWORD` is missing while `ALLOW_EMPTY_DASHBOARD_PASSWORD=false`.
 Startup also exits if `ORACLE_AUDIT_CHECKPOINT_SECRET` is missing, and exits when `DO_SHARED_SECRET`, `DASHBOARD_PASSWORD`, `SUPER_ADMIN_PASSWORD`, `ARCHIVER_SHARED_SECRET`, or `ORACLE_AUDIT_CHECKPOINT_SECRET` are set to known weak placeholder values (for example `secret`, `password`, or `change-me-in-production`).
