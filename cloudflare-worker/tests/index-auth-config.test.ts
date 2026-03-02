@@ -7,6 +7,12 @@ function mockEnv(overrides: Partial<Env> = {}): Env {
     fetch: async (input: RequestInfo) => {
       // Return rate-limit-compatible response for login-attempt checks
       const url = typeof input === "string" ? input : input instanceof Request ? input.url : "";
+      if (url.includes("/auth/check-ip-allowlist")) {
+        return new Response(JSON.stringify({ allowed: true, enabled: true, stepUpBypassEnabled: false }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
       if (url.includes("/auth/login-attempt")) {
         return new Response(JSON.stringify({ ok: true, allowed: true }), {
           status: 200,
