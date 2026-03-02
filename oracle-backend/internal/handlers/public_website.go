@@ -780,7 +780,7 @@ func PublicWebsiteUninstallHandler(sqliteDB *sql.DB) http.HandlerFunc {
 			})
 			return
 		default:
-			w.WriteHeader(http.StatusMethodNotAllowed)
+			writePublicWebsiteError(w, http.StatusMethodNotAllowed, "method_not_allowed", "Only GET and POST are allowed for this endpoint.", false)
 			return
 		}
 	}
