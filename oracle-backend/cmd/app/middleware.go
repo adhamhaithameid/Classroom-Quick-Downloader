@@ -15,8 +15,9 @@ import (
 	"oracle-backend/internal/handlers"
 )
 
-const adminRequestBodyLimit = 1 << 20  // 1 MiB
-const authRequestBodyLimit = 256 << 10 // 256 KiB
+const adminRequestBodyLimit = 1 << 20      // 1 MiB
+const authRequestBodyLimit = 256 << 10     // 256 KiB
+const internalRequestBodyLimit = 256 << 10 // 256 KiB
 
 func requestBodyLimitMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
