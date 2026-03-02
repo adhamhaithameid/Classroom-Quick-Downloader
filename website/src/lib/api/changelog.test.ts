@@ -62,7 +62,9 @@ describe('fetchChangelog', () => {
     expect(data.entries[0]?.id).toBe('r-new');
     expect(data.entries[1]?.id).toBe('r-mid');
     expect(data.entries[2]?.id).toBe('r-old');
-  });
+    },
+    TEST_TIMEOUT_MS
+  );
 
   it('filters out entries with missing required fields', async () => {
     vi.stubGlobal(
