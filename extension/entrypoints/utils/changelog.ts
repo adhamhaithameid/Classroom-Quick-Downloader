@@ -35,6 +35,8 @@ export interface ChangelogMeta {
 export interface ChangelogData {
   entries: ChangelogEntry[];
   config: ChangelogConfig;
+  meta?: ChangelogMeta;
+  revisionToken: string;
   lastFetched: number;
 }
 
