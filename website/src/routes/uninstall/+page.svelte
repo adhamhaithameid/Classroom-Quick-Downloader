@@ -358,7 +358,7 @@
   .un-hero {
     position: relative; z-index: 2;
     text-align: center;
-    animation: riseIn 0.5s ease both;
+    padding: 44px 24px 32px;
   }
 
   .hero-icon {
