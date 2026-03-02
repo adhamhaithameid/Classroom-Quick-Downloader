@@ -572,6 +572,25 @@ func TestIngestBatchHandler_InvalidJSON(t *testing.T) {
 	}
 }
 
+func TestIngestBatchHandler_RejectsUnknownFields(t *testing.T) {
+	sqlDB := newTestDB(t)
+	defer sqlDB.Close()
+
+	handler := IngestBatchHandler(sqlDB, "secret")
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/ingest-batch",
+		strings.NewReader(`{"batchId":"strict-decode-test","unexpected":true}`),
+	)
+	req.Header.Set("X-DO-SECRET", "secret")
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for unknown JSON field, got %d", rr.Code)
+	}
+}
+
 func TestIngestBatchHandler_MissingBatchID(t *testing.T) {
 	sqlDB := newTestDB(t)
 	defer sqlDB.Close()
