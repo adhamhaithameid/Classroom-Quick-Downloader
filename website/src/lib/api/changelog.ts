@@ -138,7 +138,9 @@ function coerceChangelogPayload(input: unknown): ChangelogResponse {
   return {
     schemaVersion: '1',
     ok: source?.ok === true,
-    entries
+    entries,
+    config,
+    meta,
   };
 }
 
