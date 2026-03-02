@@ -40,6 +40,8 @@ var (
 
 	defaultPublicWebsiteAllowedOrigins = []string{
 		"https://adhamhaithameid.github.io",
+		"https://classroom-quick-downloader-website.pages.dev",
+		"https://not-stable.classroom-quick-downloader-website.pages.dev",
 		"https://classroom-quick-downloader.pages.dev",
 		"http://localhost:5173",
 		"http://127.0.0.1:5173",
