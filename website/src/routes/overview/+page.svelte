@@ -3,7 +3,8 @@
   import { fade, scale } from 'svelte/transition';
   import { base } from '$app/paths';
   import { APP_VERSION, STORE_LINKS } from '$lib/config';
-  import { fetchWebsiteSnapshot, ORACLE_SNAPSHOT_REFRESH_MS } from '$lib/api/publicSite';
+  import { detectBrowserFromNavigator, type BrowserKey } from '$lib/browser/detect';
+  import { refreshWebsiteSnapshotStore, websiteSnapshotStore } from '$lib/stores/websiteSnapshot';
   import type { MapResponse, OverviewResponse } from '$lib/types/public';
   import AnimatedNumber from '$lib/components/AnimatedNumber.svelte';
   import AnimatedNumericText from '$lib/components/AnimatedNumericText.svelte';
