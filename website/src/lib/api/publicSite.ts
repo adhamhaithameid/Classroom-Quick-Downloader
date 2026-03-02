@@ -543,3 +543,26 @@ export async function submitUninstallFeedback(body: UninstallFeedbackRequest): P
   const payload = await response.json();
   return coerceUninstallSubmitPayload(payload);
 }
+
+export async function submitWebsiteEvents(body: WebsiteEventRequest): Promise<WebsiteEventIngestResponse> {
+  const requestBody: WebsiteEventRequest = {
+    ...body,
+    schemaVersion: PUBLIC_SCHEMA_VERSION
+  };
+  const response = await withTimeout(
+    fetch(`${WORKER_BASE_URL}/api/public/website/events`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      body: JSON.stringify(requestBody)
+    }),
+    REQUEST_TIMEOUT_MS
+  );
+  if (!response.ok) {
+    throw new Error(buildRequestErrorMessage(response.status, 'Website events'));
+  }
+  const responsePayload = await response.json();
+  return coerceWebsiteEventIngestPayload(responsePayload);
+}
