@@ -348,9 +348,44 @@ function coerceUserChangelogPayload(input: unknown): UserChangelogResponse {
   };
 }
 
-async function fetchOracleOverview(): Promise<OverviewResponse> {
-  const payload = await fetchOracleJSON('/api/public/website/overview');
-  return coerceOverviewPayload(payload);
+function normalizeUserChangelogSummary(input: unknown): SnapshotResponse['userChangelogSummary'] {
+  const source = input as Partial<SnapshotResponse['userChangelogSummary']> | undefined;
+  return {
+    headline: asString(source?.headline),
+    description: asString(source?.description),
+    entriesCount: asNumber(source?.entriesCount),
+    lastUpdatedAtUtc: asNullableNumber(source?.lastUpdatedAtUtc),
+    fullChangelogUrl: asString(source?.fullChangelogUrl)
+  };
+}
+
+function normalizePrivacyPointers(input: unknown): SnapshotResponse['privacy'] {
+  const source = input as Partial<SnapshotResponse['privacy']> | undefined;
+  return {
+    headline: asString(source?.headline),
+    description: asString(source?.description),
+    userPrivacyUrl: asString(source?.userPrivacyUrl),
+    fullPrivacyUrl: asString(source?.fullPrivacyUrl)
+  };
+}
+
+function coerceSnapshotPayload(input: unknown): SnapshotResponse {
+  const source = input as Partial<SnapshotResponse>;
+  const overview = coerceOverviewPayload(source?.overview);
+  const map = coerceMapPayload(source?.map);
+  const changelog = coerceUserChangelogPayload(source?.changelog);
+
+  return {
+    schemaVersion: asSchemaVersion(source?.schemaVersion),
+    ok: source?.ok === true,
+    generatedAt: asNumber(source?.generatedAt),
+    snapshotId: asString(source?.snapshotId),
+    overview,
+    map,
+    changelog,
+    userChangelogSummary: normalizeUserChangelogSummary(source?.userChangelogSummary),
+    privacy: normalizePrivacyPointers(source?.privacy)
+  };
 }
 
 async function fetchOracleMap(): Promise<MapResponse> {
