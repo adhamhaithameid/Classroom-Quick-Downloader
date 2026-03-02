@@ -200,8 +200,13 @@
       dataSource = 'github';
       lastLoadedAtUtc = Date.now();
     } catch (err) {
-      state = 'error';
-      error = err instanceof Error ? err.message : 'Failed to load user changelog.';
+      error = err instanceof Error ? err.message : 'Failed to load changelog.';
+      if (changelogEntries.length > 0) {
+        degraded = true;
+        state = 'ready';
+      } else {
+        state = 'error';
+      }
     } finally {
       refreshing = false;
     }
