@@ -428,8 +428,9 @@
     };
 
     const setInitialOffset = () => {
-      const setW = viewport.scrollWidth / duplicateSets;
-      if (setW > 0) viewport.scrollLeft = setW * 3;
+      const setW = getSetWidth();
+      if (setW > 0) offset = -(setW * 3);
+      applyTransform();
       lastTime = 0;
     };
 
