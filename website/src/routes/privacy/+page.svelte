@@ -393,10 +393,8 @@
       border-radius: 14px;
     }
 
-    .header-actions {
-      width: 100%;
-      min-width: 0;
-      flex-direction: row;
+    .prv-bullets {
+      gap: 10px;
     }
 
     .action-btn {
