@@ -390,9 +390,11 @@
     padding: 8px 0 24px;
   }
 
-  .step:nth-child(2) { animation-delay: 0.06s; }
-  .step:nth-child(3) { animation-delay: 0.12s; }
-  .step:nth-child(4) { animation-delay: 0.18s; }
+  /* ── Step container ──────────────── */
+  .un-step {
+    position: relative;
+    margin-bottom: 14px;
+  }
 
   .step h2 {
     margin: 0 0 14px;
