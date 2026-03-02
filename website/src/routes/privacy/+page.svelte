@@ -12,6 +12,7 @@
       timeZone: 'UTC'
     });
   }
+
 </script>
 
 <svelte:head>
