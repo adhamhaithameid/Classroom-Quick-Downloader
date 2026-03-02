@@ -475,9 +475,8 @@
     margin-bottom: 18px;
   }
 
-  .action-btn:disabled {
-    opacity: 0.6;
-    cursor: wait;
+  .cl-state-inner {
+    max-width: 400px; margin: 0 auto;
   }
 
   /* ── Body ────────────────────────── */
