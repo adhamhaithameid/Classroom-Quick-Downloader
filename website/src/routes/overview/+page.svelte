@@ -1181,7 +1181,12 @@
   }
 </script>
 
-<svelte:window on:keydown={handleGlobalKeydown} />
+<svelte:window
+  on:keydown={handleGlobalKeydown}
+  on:pointermove={onEditPointerMove}
+  on:pointerup={onEditPointerUp}
+  on:pointercancel={onEditPointerUp}
+/>
 
 <svelte:head>
   <title>Classroom Quick Downloader — The Free Extension That Supercharges Google Classroom</title>
