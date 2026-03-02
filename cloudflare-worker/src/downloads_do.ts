@@ -4480,6 +4480,7 @@ export class DownloadsDurable {
       loginAttempts: {},
       ipAllowlistEnabled: false,
       ipAllowlist: [],
+      ipAllowlistStepUpBypassEnabled: true,
       trackRates: {},
       ...preservedConfig,
     };
