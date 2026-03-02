@@ -575,10 +575,19 @@ func ComparisonHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		resp := comparisonResponse{
-			OK:      true,
-			Period1: p1,
-			Period2: p2,
-			Change:  change,
+			OK:             true,
+			GeneratedAtUTC: time.Now().UTC().Format(time.RFC3339),
+			Period1:        p1,
+			Period2:        p2,
+			Change:         change,
+		}
+		start := from1
+		if from2.Before(start) {
+			start = from2
+		}
+		end := to1
+		if to2.After(end) {
+			end = to2
 		}
 
 		w.Header().Set("Content-Type", "application/json")
