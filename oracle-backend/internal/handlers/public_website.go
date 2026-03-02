@@ -2283,10 +2283,25 @@ func isOriginAllowed(origin string, allowed map[string]struct{}) bool {
 	return ok
 }
 
-func resetPublicWebsiteVersionCacheForTest() {
-	githubVersionCache.mu.Lock()
-	defer githubVersionCache.mu.Unlock()
-	githubVersionCache.version = nil
-	githubVersionCache.fetched = time.Time{}
-	githubVersionCache.lastErr = nil
+func writePublicWebsiteError(w http.ResponseWriter, statusCode int, code, message string, retryable bool) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(statusCode)
+	_ = json.NewEncoder(w).Encode(publicWebsiteErrorEnvelope{
+		SchemaVersion: publicWebsiteSchemaVersion,
+		OK:            false,
+		Error: publicWebsiteErrorShape{
+			Code:      code,
+			Message:   message,
+			Retryable: retryable,
+		},
+	})
+}
+
+func writePublicWebsiteCORSFailure(w http.ResponseWriter, structured bool, statusCode int, code, message string) {
+	if structured {
+		writePublicWebsiteError(w, statusCode, code, message, false)
+		return
+	}
+	http.Error(w, message, statusCode)
 }
