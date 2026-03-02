@@ -26,6 +26,9 @@ func TestMigrationBootstrapCleanDatabases(t *testing.T) {
 		"auth_sessions",
 		"auth_stepup_challenges",
 		"auth_rate_limits",
+		"website_traffic_hourly",
+		"website_events_raw",
+		"website_public_snapshots",
 	}
 	for _, table := range requiredSQLiteTables {
 		var count int
