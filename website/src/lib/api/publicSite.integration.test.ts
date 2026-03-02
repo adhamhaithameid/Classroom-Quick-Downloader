@@ -136,31 +136,8 @@ describe('public website API integration', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it('loads user changelog from Oracle public APIs', async () => {
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            ok: true,
-            generatedAt: 1,
-            headline: 'h',
-            description: 'd',
-            entries: [
-              {
-                id: 'release-136',
-                version: '1.3.6',
-                title: 'Stability',
-                summary: 'Security and stability improvements.',
-                highlights: ['A'],
-                releasedAtUtc: 1
-              }
-            ],
-            fullChangelogUrl: 'https://github.com/adhamhaithameid/Classroom-Quick-Downloader/blob/main/CHANGELOG.md',
-            lastUpdatedAtUtc: 1
-          }),
-          { status: 200 }
-        )
-      );
+  it('loads user changelog from canonical snapshot payload', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify(buildSnapshotPayload(5)), { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
 
     const changelog = await fetchUserChangelog();
