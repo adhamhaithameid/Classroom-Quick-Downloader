@@ -308,6 +308,17 @@ function coerceUninstallSubmitPayload(input: unknown): UninstallFeedbackResponse
   };
 }
 
+function coerceWebsiteEventIngestPayload(input: unknown): WebsiteEventIngestResponse {
+  const source = input as Partial<WebsiteEventIngestResponse>;
+  return {
+    schemaVersion: asSchemaVersion(source?.schemaVersion),
+    ok: source?.ok === true,
+    generatedAt: asNumber(source?.generatedAt),
+    acceptedCount: asNumber(source?.acceptedCount),
+    rejectedCount: asNumber(source?.rejectedCount)
+  };
+}
+
 function coerceUserChangelogPayload(input: unknown): UserChangelogResponse {
   const source = input as Partial<UserChangelogResponse>;
   const entries = Array.isArray(source?.entries)
