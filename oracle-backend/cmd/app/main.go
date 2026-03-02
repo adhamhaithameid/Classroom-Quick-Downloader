@@ -252,14 +252,17 @@ func main() {
 	authMiddleware := requireAuth(sqlDB, dashboardPassword, archiverSecret, allowLoopbackBypass)
 	criticalMiddleware := requireStepUp(sqlDB, superAdminPassword)
 	allowedRecordTypes := map[string]struct{}{
-		"deployment_target":            {},
-		"deployment_update_sentence":   {},
-		"extension_version_note":       {},
-		"creative_design":              {},
-		"creative_email_template":      {},
-		"newsletter_subscriber":        {},
-		"newsletter_campaign":          {},
-		"website_user_changelog_entry": {},
+		"deployment_target":               {},
+		"deployment_update_sentence":      {},
+		"extension_version_note":          {},
+		"creative_design":                 {},
+		"creative_email_template":         {},
+		"newsletter_subscriber":           {},
+		"newsletter_campaign":             {},
+		"website_user_changelog_entry":    {},
+		"website_user_changelog_revision": {},
+		"website_user_changelog_config":   {},
+		"website_user_privacy":            {},
 	}
 	mux.Handle("/api/stats/summary", authMiddleware(handlers.SummaryHandler(sqlDB)))
 	mux.Handle("/api/stats/timeseries", authMiddleware(handlers.TimeSeriesHandler(sqlDB)))
