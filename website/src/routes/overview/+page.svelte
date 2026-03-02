@@ -2488,9 +2488,9 @@
     75% { transform: translateY(-15px) rotate(calc(var(--placement-rotate, 0deg) + 4deg)); }
   }
   @keyframes float-b {
-    0%, 100% { transform: translateY(0) rotate(0deg); }
-    33% { transform: translateY(15px) rotate(-4deg); }
-    66% { transform: translateY(-25px) rotate(6deg); }
+    0%, 100% { transform: translateY(0) rotate(var(--placement-rotate, 0deg)); }
+    33% { transform: translateY(15px) rotate(calc(var(--placement-rotate, 0deg) - 4deg)); }
+    66% { transform: translateY(-25px) rotate(calc(var(--placement-rotate, 0deg) + 6deg)); }
   }
 
   /* ── CTA Buttons ───────────────────── */
