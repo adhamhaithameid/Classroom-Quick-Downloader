@@ -196,7 +196,7 @@ packages:
     engines: {node: '>=14'}
     hasBin: true
     peerDependencies:
-      rollup: 2.x || 3.x || 4.x
+      rollup: ^4.59.0
     peerDependenciesMeta:
       rollup:
         optional: true
