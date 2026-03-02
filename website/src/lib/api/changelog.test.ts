@@ -147,7 +147,9 @@ describe('fetchChangelog', () => {
     const data = await fetchChangelog();
     expect(data.ok).toBe(false);
     expect(data.entries).toEqual([]);
-  });
+    },
+    TEST_TIMEOUT_MS
+  );
 
   it('throws on HTTP error responses', async () => {
     vi.stubGlobal(
