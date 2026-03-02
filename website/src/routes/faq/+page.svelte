@@ -727,7 +727,7 @@
     border-radius: var(--radius-sm);
     padding: 0; cursor: pointer; width: 100%;
     transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 1px 3px rgba(15, 20, 25, 0.03);
+    box-shadow: 0 1px 3px rgba(15,20,25,0.03);
   }
 
   .faq-item:hover {
