@@ -338,6 +338,8 @@ func main() {
 		Lookback:   websiteTrafficSyncLookback(),
 	}
 	mux.Handle("/api/admin/website/state", authMiddleware(handlers.WebsiteOpsStateHandler(sqlDB)))
+	mux.Handle("/api/admin/website/analytics", authMiddleware(handlers.WebsiteAnalyticsHandler(sqlDB, websiteTrafficSyncConfig)))
+	mux.Handle("/api/admin/website/traffic/refresh", authMiddleware(criticalMiddleware(handlers.WebsiteTrafficRefreshHandler(sqlDB, websiteTrafficSyncConfig))))
 	mux.Handle("/api/admin/website/force-push", authMiddleware(criticalMiddleware(handlers.WebsiteOpsForcePushHandler(sqlDB))))
 	mux.Handle("/api/admin/website/pull-cloudflare", authMiddleware(criticalMiddleware(handlers.WebsiteOpsPullCloudflareHandler(sqlDB, cloudflarePublicSiteMetricsURL))))
 	mux.Handle("/api/admin/website/override", authMiddleware(criticalMiddleware(handlers.WebsiteOpsOverrideHandler(sqlDB))))
