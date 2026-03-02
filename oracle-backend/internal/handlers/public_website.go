@@ -134,6 +134,8 @@ type publicWebsiteUserChangelogResponse struct {
 	SchemaVersion    string                            `json:"schemaVersion"`
 	OK               bool                              `json:"ok"`
 	GeneratedAt      int64                             `json:"generatedAt"`
+	Source           string                            `json:"source"`
+	SourceURL        string                            `json:"sourceUrl,omitempty"`
 	Headline         string                            `json:"headline"`
 	Description      string                            `json:"description"`
 	Entries          []publicWebsiteUserChangelogEntry `json:"entries"`
