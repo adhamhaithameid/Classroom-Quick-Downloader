@@ -405,7 +405,7 @@ export function getMatchingRule(config: ChangelogConfig | undefined, currentVers
   if (exact) return exact;
 
   // 2. Wildcard "all"
-  const all = config.rules.find(r => r.target === 'all');
+  const all = config.rules.find(r => normalizeRuleTarget(r.target) === 'all');
   if (all) return all;
 
   return null;
