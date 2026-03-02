@@ -441,7 +441,7 @@ func PublicWebsiteUserChangelogHandler(sqliteDB, postgresDB *sql.DB) http.Handle
 
 		snapshot, err := loadOrRefreshPublicWebsiteSnapshot(r.Context(), sqliteDB, postgresDB, false)
 		if err != nil {
-			http.Error(w, "failed to load changelog", http.StatusInternalServerError)
+			writePublicWebsiteError(w, http.StatusInternalServerError, "snapshot_build_failed", "Failed to load changelog data.", true)
 			return
 		}
 
