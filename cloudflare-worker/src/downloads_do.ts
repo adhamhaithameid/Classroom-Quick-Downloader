@@ -105,6 +105,7 @@ type DurableStateShape = {
   changelog: ChangelogEntry[];
   changelogRevisions: ChangelogRevision[];
   changelogConfig: ChangelogConfig;
+  changelogDraft: ChangelogDraftState | null;
 
   // Public website metrics snapshot refreshed on a fixed UTC schedule.
   publicSiteMetricsSnapshot: PublicSiteMetricsSnapshot | null;
