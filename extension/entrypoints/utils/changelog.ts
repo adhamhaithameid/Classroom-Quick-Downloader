@@ -303,8 +303,10 @@ export async function fetchChangelog(force = false): Promise<ChangelogData | nul
     };
     const meta = sanitizeMeta(json.meta);
     const newData: ChangelogData = {
-      entries: json.entries || [],
-      config: json.config || { customPill: false, showNotification: false },
+      entries: parsedEntries,
+      config,
+      meta,
+      revisionToken: computeRevisionToken(parsedEntries, config, meta),
       lastFetched: Date.now(),
     };
 
