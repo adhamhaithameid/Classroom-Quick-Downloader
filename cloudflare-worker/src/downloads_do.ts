@@ -2048,8 +2048,53 @@ export class DownloadsDurable {
       configHealthNotifyCritIntervalMs:
         stored.configHealthNotifyCritIntervalMs ?? base.configHealthNotifyCritIntervalMs,
 
-      changelog: Array.isArray(stored.changelog) ? stored.changelog : base.changelog,
-      changelogConfig: stored.changelogConfig ?? base.changelogConfig,
+      changelog:
+        (() => {
+          if (!Array.isArray(stored.changelog) || stored.changelog.length === 0) return base.changelog;
+          const sanitized = sanitizeIncomingChangelogEntries(stored.changelog);
+          return sanitized.length > 0 ? sanitized : base.changelog;
+        })(),
+      changelogRevisions: Array.isArray((stored as unknown as Record<string, unknown>).changelogRevisions)
+        ? ((stored as unknown as Record<string, unknown>).changelogRevisions as unknown[])
+            .map((row) => sanitizeLoadedChangelogRevision(row))
+            .filter((row): row is ChangelogRevision => row !== null)
+            .slice(0, 100)
+        : [],
+      changelogConfig: (() => {
+        const config = isPlainObject(stored.changelogConfig)
+          ? (stored.changelogConfig as ChangelogConfig)
+          : base.changelogConfig;
+        return {
+          ...base.changelogConfig,
+          ...config,
+          rules: sanitizeNotificationRules(config.rules),
+          applyMode: normalizeChangelogApplyMode(config.applyMode),
+          autoSyncEnabled:
+            typeof config.autoSyncEnabled === "boolean"
+              ? config.autoSyncEnabled
+              : CHANGELOG_DEFAULT_AUTO_SYNC_ENABLED,
+          autoSyncIntervalMinutes: normalizeAutoSyncIntervalMinutes(config.autoSyncIntervalMinutes),
+          lastAutoSyncAt: clampInt(config.lastAutoSyncAt, 0, Number.MAX_SAFE_INTEGER, 0) || undefined,
+          lastAutoSyncStatus: normalizeChangelogSyncStatus(config.lastAutoSyncStatus),
+          lastAutoSyncError: trimAndLimitString(config.lastAutoSyncError, 320) || undefined,
+          nextAutoSyncAt: clampInt(config.nextAutoSyncAt, 0, Number.MAX_SAFE_INTEGER, 0) || undefined,
+          liveHash:
+            trimAndLimitString(config.liveHash, 2_000_000) ||
+            computeChangelogLiveHash(
+              Array.isArray(stored.changelog) && stored.changelog.length > 0
+                ? (() => {
+                    const sanitized = sanitizeIncomingChangelogEntries(stored.changelog);
+                    return sanitized.length > 0 ? sanitized : base.changelog;
+                  })()
+                : base.changelog,
+            ),
+          markdownSourceUrl: trimAndLimitString(config.markdownSourceUrl, 600) || USER_FRIENDLY_CHANGELOG_GITHUB_URL,
+          markdownHelpUrl: trimAndLimitString(config.markdownHelpUrl, 600) || USER_FRIENDLY_CHANGELOG_GITHUB_URL,
+        };
+      })(),
+      changelogDraft: sanitizeLoadedChangelogDraft(
+        (stored as unknown as Record<string, unknown>).changelogDraft,
+      ),
       publicSiteMetricsSnapshot: (() => {
         const snapshot = (stored as unknown as Record<string, unknown>).publicSiteMetricsSnapshot;
         if (!isPlainObject(snapshot)) return null;
