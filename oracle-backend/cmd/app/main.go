@@ -247,6 +247,9 @@ func main() {
 	mux.Handle("/api/public/website/events", handlers.PublicWebsiteEventsHandler(sqlDB))
 	mux.Handle("/api/internal/website/events/batch", handlers.InternalWebsiteEventsBatchHandler(sqlDB, doSecret))
 
+	// Extension changelog (public, CORS-enabled).
+	mux.Handle("/api/public/extension/changelog", handlers.ExtensionChangelogPublicHandler(sqlDB))
+
 	// Analytics API endpoints (protected by auth when DASHBOARD_PASSWORD is set).
 	setAuthStateDB(sqlDB)
 	authMiddleware := requireAuth(sqlDB, dashboardPassword, archiverSecret, allowLoopbackBypass)
@@ -345,6 +348,19 @@ func main() {
 	mux.Handle("/api/admin/website/reconcile-totals", authMiddleware(criticalMiddleware(handlers.WebsiteOpsReconcileTotalsHandler(sqlDB))))
 	mux.Handle("/api/admin/website/override", authMiddleware(criticalMiddleware(handlers.WebsiteOpsOverrideHandler(sqlDB))))
 	mux.Handle("/api/admin/website/one-am-toggle", authMiddleware(criticalMiddleware(handlers.WebsiteOpsOneAMToggleHandler(sqlDB))))
+
+	// Extension changelog admin endpoints.
+	mux.Handle("/api/admin/extension-changelog/entries", authMiddleware(handlers.ExtChangelogEntriesListHandler(sqlDB)))
+	mux.Handle("/api/admin/extension-changelog/entries/upsert", authMiddleware(criticalMiddleware(handlers.ExtChangelogEntriesUpsertHandler(sqlDB))))
+	mux.Handle("/api/admin/extension-changelog/entries/delete", authMiddleware(criticalMiddleware(handlers.ExtChangelogEntriesDeleteHandler(sqlDB))))
+	mux.Handle("/api/admin/extension-changelog/rules", authMiddleware(handlers.ExtChangelogRulesListHandler(sqlDB)))
+	mux.Handle("/api/admin/extension-changelog/rules/upsert", authMiddleware(criticalMiddleware(handlers.ExtChangelogRulesUpsertHandler(sqlDB))))
+	mux.Handle("/api/admin/extension-changelog/rules/delete", authMiddleware(criticalMiddleware(handlers.ExtChangelogRulesDeleteHandler(sqlDB))))
+	mux.Handle("/api/admin/extension-changelog/config", authMiddleware(handlers.ExtChangelogConfigHandler(sqlDB)))
+	mux.Handle("/api/admin/extension-changelog/config/save", authMiddleware(criticalMiddleware(handlers.ExtChangelogConfigSaveHandler(sqlDB))))
+	mux.Handle("/api/admin/extension-changelog/import-github", authMiddleware(criticalMiddleware(handlers.ExtChangelogImportGitHubHandler(sqlDB))))
+	mux.Handle("/api/admin/extension-changelog/bulk-import", authMiddleware(criticalMiddleware(handlers.ExtChangelogBulkImportHandler(sqlDB))))
+
 	mux.Handle("/metrics", authMiddleware(metricsHandler(appMetrics, sqlDB)))
 
 	// Auth endpoints
@@ -744,6 +760,13 @@ var dangerAuditPaths = map[string]struct{}{
 	"/api/admin/website/reconcile-totals":      {},
 	"/api/admin/website/override":              {},
 	"/api/admin/website/one-am-toggle":         {},
+	"/api/admin/extension-changelog/entries/upsert":  {},
+	"/api/admin/extension-changelog/entries/delete":  {},
+	"/api/admin/extension-changelog/rules/upsert":    {},
+	"/api/admin/extension-changelog/rules/delete":    {},
+	"/api/admin/extension-changelog/config/save":     {},
+	"/api/admin/extension-changelog/import-github":   {},
+	"/api/admin/extension-changelog/bulk-import":     {},
 }
 
 func isDangerAuditedPath(requestPath string) bool {
