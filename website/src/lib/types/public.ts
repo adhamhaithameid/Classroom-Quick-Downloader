@@ -1,4 +1,5 @@
 export type WorkerHealth = 'up' | 'degraded' | 'down';
+export type PublicSchemaVersion = '1';
 
 export type InstallBrowser = {
   key: 'chrome' | 'firefox' | 'edge' | string;
