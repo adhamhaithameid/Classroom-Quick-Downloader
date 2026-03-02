@@ -1713,52 +1713,7 @@
 
   <!-- ━━━━ Final CTA ━━━━ -->
   <section class="l2-cta-section l2-snap">
-    <div class="l2-wrap l2-cta-content l2-reveal" style="position:relative;overflow:visible">
-      <!-- Single centered 3D clock illustration — "save hours" theme -->
-      <div class="l2-cta-3d l2-cta-3d-center" aria-hidden="true">
-        <svg viewBox="0 0 160 140" fill="none" xmlns="http://www.w3.org/2000/svg" class="l2-cta-3d-icon">
-          <!-- 3D isometric base platform -->
-          <path d="M30 110l50-18 50 18v14l-50 18-50-18V110z" fill="url(#cta-c1)" opacity="0.10"/>
-          <path d="M80 92l50 18v14l-50 18V92z" fill="url(#cta-c2)" opacity="0.14"/>
-          <path d="M30 110l50 18v14L30 124V110z" fill="url(#cta-c3)" opacity="0.07"/>
-          <!-- Clock face -->
-          <circle cx="80" cy="52" r="38" fill="#ecfdf5" stroke="#1a8b55" stroke-width="2" opacity="0.9"/>
-          <circle cx="80" cy="52" r="34" fill="none" stroke="#1a8b55" stroke-width="0.5" opacity="0.2"/>
-          <!-- Hour tick marks (12 total) -->
-          <line x1="80" y1="18" x2="80" y2="24" stroke="#1a8b55" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
-          <line x1="97" y1="22" x2="94" y2="27" stroke="#1a8b55" stroke-width="1.5" stroke-linecap="round" opacity="0.3"/>
-          <line x1="110" y1="35" x2="105" y2="38" stroke="#1a8b55" stroke-width="1.5" stroke-linecap="round" opacity="0.3"/>
-          <line x1="114" y1="52" x2="108" y2="52" stroke="#1a8b55" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
-          <line x1="110" y1="69" x2="105" y2="66" stroke="#1a8b55" stroke-width="1.5" stroke-linecap="round" opacity="0.3"/>
-          <line x1="97" y1="82" x2="94" y2="77" stroke="#1a8b55" stroke-width="1.5" stroke-linecap="round" opacity="0.3"/>
-          <line x1="80" y1="86" x2="80" y2="80" stroke="#1a8b55" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
-          <line x1="63" y1="82" x2="66" y2="77" stroke="#1a8b55" stroke-width="1.5" stroke-linecap="round" opacity="0.3"/>
-          <line x1="50" y1="69" x2="55" y2="66" stroke="#1a8b55" stroke-width="1.5" stroke-linecap="round" opacity="0.3"/>
-          <line x1="46" y1="52" x2="52" y2="52" stroke="#1a8b55" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
-          <line x1="50" y1="35" x2="55" y2="38" stroke="#1a8b55" stroke-width="1.5" stroke-linecap="round" opacity="0.3"/>
-          <line x1="63" y1="22" x2="66" y2="27" stroke="#1a8b55" stroke-width="1.5" stroke-linecap="round" opacity="0.3"/>
-          <!-- Hour hand (pointing roughly 10 o'clock — "time saved") -->
-          <line x1="80" y1="52" x2="68" y2="34" stroke="#1a8b55" stroke-width="3" stroke-linecap="round" opacity="0.7"/>
-          <!-- Minute hand (pointing 2 o'clock) -->
-          <line x1="80" y1="52" x2="100" y2="36" stroke="#1a8b55" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
-          <!-- Center dot -->
-          <circle cx="80" cy="52" r="3" fill="#1a8b55" opacity="0.6"/>
-          <!-- Speed lines around clock — motion blur effect -->
-          <path d="M126 40a48 48 0 0 1 0 24" stroke="#22c55e" stroke-width="1.5" stroke-linecap="round" opacity="0.2"/>
-          <path d="M130 36a52 52 0 0 1 0 32" stroke="#22c55e" stroke-width="1" stroke-linecap="round" opacity="0.12"/>
-          <!-- Green checkmark badge -->
-          <circle cx="118" cy="24" r="14" fill="#ecfdf5" stroke="#1a8b55" stroke-width="2"/>
-          <path d="M112 24l4 4 8-8" stroke="#1a8b55" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-          <defs>
-            <linearGradient id="cta-c1" x1="80" y1="92" x2="80" y2="142" gradientUnits="userSpaceOnUse"><stop stop-color="#1a8b55"/><stop offset="1" stop-color="#22c55e"/></linearGradient>
-            <linearGradient id="cta-c2" x1="105" y1="92" x2="105" y2="142" gradientUnits="userSpaceOnUse"><stop stop-color="#1a8b55"/><stop offset="1" stop-color="#16a34a"/></linearGradient>
-            <linearGradient id="cta-c3" x1="55" y1="110" x2="55" y2="142" gradientUnits="userSpaceOnUse"><stop stop-color="#22c55e"/><stop offset="1" stop-color="#86efac"/></linearGradient>
-          </defs>
-        </svg>
-      </div>
-      <!-- CTA doodles — arrow + checkmark accents -->
-      <svg class="l2-doodle l2-doodle-cta-1" viewBox="0 0 60 60" fill="none" aria-hidden="true"><path d="M30 8v30M20 28l10 12 10-12" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.15"/><rect x="14" y="44" width="32" height="4" rx="2" fill="var(--green)" opacity="0.08"/></svg>
-      <svg class="l2-doodle l2-doodle-cta-2" viewBox="0 0 40 40" fill="none" aria-hidden="true"><circle cx="20" cy="20" r="16" stroke="var(--green)" stroke-width="1.5" opacity="0.12"/><path d="M12 20l6 6 12-14" stroke="var(--green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.15"/></svg>
+    <div class="l2-wrap l2-cta-content l2-reveal" data-placement-section="cta" style="position:relative;overflow:visible">
       <h2>Ready to save hours?</h2>
       <p>Install Classroom Quick Downloader in under 10 seconds. Free, forever. No account required.</p>
       <div class="l2-hero-actions">
