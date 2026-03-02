@@ -37,6 +37,25 @@ func TestGetenvAndGetenvFloat(t *testing.T) {
 	}
 }
 
+func TestWebsiteTrafficSyncHostname(t *testing.T) {
+	t.Setenv("CLOUDFLARE_ANALYTICS_HOSTNAME", "metrics.example.com")
+	t.Setenv("PUBLIC_SITE_URL", "https://fallback.example.com")
+	if got := websiteTrafficSyncHostname(); got != "metrics.example.com" {
+		t.Fatalf("expected explicit analytics hostname, got %q", got)
+	}
+
+	t.Setenv("CLOUDFLARE_ANALYTICS_HOSTNAME", "")
+	t.Setenv("PUBLIC_SITE_URL", "https://root.example.com/path")
+	if got := websiteTrafficSyncHostname(); got != "root.example.com" {
+		t.Fatalf("expected hostname derived from PUBLIC_SITE_URL, got %q", got)
+	}
+
+	t.Setenv("PUBLIC_SITE_URL", "")
+	if got := websiteTrafficSyncHostname(); got != "" {
+		t.Fatalf("expected empty hostname when envs are missing, got %q", got)
+	}
+}
+
 func TestHealthDBHandler(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "health.db")
 	sqlDB, err := db.Init(dbPath)
