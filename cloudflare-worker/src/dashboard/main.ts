@@ -6080,7 +6080,7 @@ export function renderDashboard(stats: StatsResponse): string {
         // Show edit mode banner
         if (editModeBanner) editModeBanner.classList.add("active");
         if (editModeVersion) editModeVersion.textContent = "v" + entry.version;
-        if (btnSaveText) btnSaveText.textContent = "Update Release & Save Config";
+        if (btnSaveText) btnSaveText.textContent = "Save Draft";
         
         // Highlight the item being edited
         document.querySelectorAll(".cl-history-item").forEach(item => {
