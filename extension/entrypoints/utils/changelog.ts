@@ -134,25 +134,9 @@ function normalizeManualData(): ChangelogData {
   };
 
   const basis = {
-    configLastUpdated: toFiniteInt(config.lastUpdated) ?? null,
-    liveUpdatedAt: toFiniteInt(meta?.liveUpdatedAt) ?? null,
-    rules: config.rules.map((rule) => ({
-      target: normalizeRuleTarget(rule.target),
-      priority: normalizeRulePriority(rule.priority),
-      effect: normalizeRuleEffect(rule.effect),
-    })),
-    entries: entries.map((entry) => ({
-      id: entry.id,
-      version: normalizeVersion(entry.version),
-      date: entry.date,
-      summary: entry.summary || '',
-      changes: entry.changes,
-      added: entry.added || [],
-      changed: entry.changed || [],
-      fixed: entry.fixed || [],
-      markdown: entry.markdown || '',
-      isImportant: entry.isImportant === true,
-    })),
+    entries: entries.map((entry) => ({ id: entry.id, version: entry.version, date: entry.date, changes: entry.changes })),
+    rules: rules.map((rule) => ({ target: rule.target, priority: rule.priority, effect: rule.effect })),
+    checksum: meta.contentChecksum,
   };
   return `rev-${hashText(JSON.stringify(basis))}`;
 }
