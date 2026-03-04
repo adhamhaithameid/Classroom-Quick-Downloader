@@ -223,3 +223,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Tuned defaults for safer prolonged usage.",
         "Fixed repeated-session regressions."
       ],
+      "added": [
