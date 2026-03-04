@@ -206,3 +206,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Core cancel-download capability."
       ],
       "changed": [
+        "Lifecycle handling updated for cancellation-aware flow."
