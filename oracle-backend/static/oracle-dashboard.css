@@ -2093,6 +2093,9 @@
       #page-content-changelog .form-grid {
         gap: 12px;
       }
+      #page-ext-changelog .form-grid {
+        gap: 12px;
+      }
       #page-content-changelog .creative-grid {
         grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
       }
