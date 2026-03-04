@@ -381,6 +381,26 @@ function redirectWithCookies(location: string, cookies: string[]): Response {
   return new Response(null, { status: 302, headers });
 }
 
+const HTML_SECURITY_HEADERS = {
+  "content-security-policy":
+    "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https:; font-src 'self' data:",
+  "x-content-type-options": "nosniff",
+  "x-frame-options": "DENY",
+  "referrer-policy": "strict-origin-when-cross-origin",
+  "permissions-policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+} as const;
+
+function withHtmlSecurityHeaders(init?: HeadersInit): Headers {
+  const headers = new Headers(init);
+  headers.set("content-type", headers.get("content-type") || "text/html; charset=utf-8");
+  for (const [key, value] of Object.entries(HTML_SECURITY_HEADERS)) {
+    if (!headers.has(key)) {
+      headers.set(key, value);
+    }
+  }
+  return headers;
+}
+
 // ---------------------------------------------------------------------------
 // Core Helpers
 // ---------------------------------------------------------------------------
@@ -833,7 +853,7 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
     }
     return new Response(renderLoginPage(), {
       status: 200,
-      headers: { "content-type": "text/html; charset=utf-8" },
+      headers: withHtmlSecurityHeaders(),
     });
   }
 
@@ -850,13 +870,13 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
     if (!dashboardSecret) {
       return new Response(
         renderLoginPage("Server misconfigured: DASHBOARD_PASSWORD missing."),
-        { status: 500, headers: { "content-type": "text/html; charset=utf-8" } },
+        { status: 500, headers: withHtmlSecurityHeaders() },
       );
     }
     if (!env.DO_SHARED_SECRET) {
       return new Response(
         renderLoginPage("Server misconfigured: DO_SHARED_SECRET missing."),
-        { status: 500, headers: { "content-type": "text/html; charset=utf-8" } },
+        { status: 500, headers: withHtmlSecurityHeaders() },
       );
     }
 
@@ -871,11 +891,10 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
         renderLoginPage("Access policy service temporarily unavailable. Please try again shortly."),
         {
           status: 503,
-          headers: {
-            "content-type": "text/html; charset=utf-8",
+          headers: withHtmlSecurityHeaders({
             "Retry-After": "30",
             "X-Dependency-Error": "durable-object-unavailable",
-          },
+          }),
         },
       );
     }
@@ -884,13 +903,13 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
       if (!allowlistDecision.stepUpBypassEnabled) {
         return new Response(
           renderLoginPage("This device is not allowlisted. Ask an admin to add your IP before trying again."),
-          { status: 403, headers: { "content-type": "text/html; charset=utf-8" } },
+          { status: 403, headers: withHtmlSecurityHeaders() },
         );
       }
       if (!env.DANGER_PASSWORD) {
         return new Response(
           renderLoginPage("Server misconfigured: DANGER_PASSWORD missing."),
-          { status: 500, headers: { "content-type": "text/html; charset=utf-8" } },
+          { status: 500, headers: withHtmlSecurityHeaders() },
         );
       }
       const stepUpResult = await verifyDangerStepUpPassword(stub, env, clientIp, password);
@@ -899,7 +918,7 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
           const mins = Math.ceil((stepUpResult.blockedForSeconds || 900) / 60);
           return new Response(
             renderLoginPage(`Too many failed step-up attempts. Please try again in ${mins} minutes.`),
-            { status: 429, headers: { "content-type": "text/html; charset=utf-8" } },
+            { status: 429, headers: withHtmlSecurityHeaders() },
           );
         }
         if (stepUpResult.status === 503) {
@@ -907,17 +926,16 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
             renderLoginPage("Step-up verification service is temporarily unavailable. Please try again."),
             {
               status: 503,
-              headers: {
-                "content-type": "text/html; charset=utf-8",
+              headers: withHtmlSecurityHeaders({
                 "Retry-After": "30",
                 "X-Dependency-Error": "durable-object-unavailable",
-              },
+              }),
             },
           );
         }
         return new Response(
           renderLoginPage("This device is not allowlisted. Enter the admin danger password to continue."),
-          { status: 401, headers: { "content-type": "text/html; charset=utf-8" } },
+          { status: 401, headers: withHtmlSecurityHeaders() },
         );
       }
     } else if (!timingSafeStringEqual(password, dashboardSecret)) {
@@ -953,11 +971,10 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
           renderLoginPage("Login service temporarily unavailable. Please try again shortly."),
           {
             status: 503,
-            headers: {
-              "content-type": "text/html; charset=utf-8",
+            headers: withHtmlSecurityHeaders({
               "Retry-After": "30",
               "X-Dependency-Error": "durable-object-unavailable",
-            },
+            }),
           },
         );
       }
@@ -966,14 +983,14 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
         const mins = Math.ceil((rateLimitData.blockedForSeconds || 900) / 60);
         return new Response(
           renderLoginPage(`Too many failed attempts. Please try again in ${mins} minutes.`),
-          { status: 429, headers: { "content-type": "text/html; charset=utf-8" } }
+          { status: 429, headers: withHtmlSecurityHeaders() }
         );
       }
 
       const remaining = rateLimitData.attemptsRemaining ?? 4;
       return new Response(
         renderLoginPage(`Invalid password. ${remaining} attempts remaining.`),
-        { status: 401, headers: { "content-type": "text/html; charset=utf-8" } }
+        { status: 401, headers: withHtmlSecurityHeaders() }
       );
     }
 
@@ -1054,7 +1071,7 @@ async function handleDashboard(request: Request, env: WorkerEnv): Promise<Respon
 
   return new Response(html, {
     status: 200,
-    headers: { "content-type": "text/html; charset=utf-8" },
+    headers: withHtmlSecurityHeaders(),
   });
 }
 
@@ -1079,7 +1096,7 @@ async function handleWebsiteConsoleDashboard(request: Request, env: WorkerEnv): 
 
   return new Response(renderWebsiteConsole(), {
     status: 200,
-    headers: { "content-type": "text/html; charset=utf-8" },
+    headers: withHtmlSecurityHeaders(),
   });
 }
 
@@ -1861,13 +1878,10 @@ async function handleReleaseNotes(request: Request, env: WorkerEnv): Promise<Res
 
   return new Response(html, {
     status: 200,
-    headers: {
-      "content-type": "text/html; charset=utf-8",
+    headers: withHtmlSecurityHeaders({
       "cache-control": "public, max-age=300",
-      "x-content-type-options": "nosniff",
-      "x-frame-options": "DENY",
       "referrer-policy": "no-referrer",
-    },
+    }),
   });
 }
 
