@@ -262,3 +262,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "summary": "Post-1.1 stabilization release.",
       "highlights": [
         "Additional diagnostics and background-flow coverage.",
+        "Better queue/error defaults.",
