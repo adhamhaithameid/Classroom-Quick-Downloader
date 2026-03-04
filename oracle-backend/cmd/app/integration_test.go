@@ -44,6 +44,9 @@ func newIntegrationMux(t *testing.T) (*http.ServeMux, *sql.DB) {
 	mux.Handle("/api/public/website/status", handlers.PublicWebsiteStatusHandler(sqlDB, nil))
 	mux.Handle("/api/public/website/changelog", handlers.PublicWebsiteUserChangelogHandler(sqlDB, nil))
 	mux.Handle("/api/public/website/uninstall", handlers.PublicWebsiteUninstallHandler(sqlDB))
+	// NEWSLETTER_CTA_DISABLED_ROLLBACK_START
+	// mux.Handle("/api/public/website/newsletter/subscribe", handlers.PublicWebsiteNewsletterSubscribeHandler(sqlDB, nil))
+	// NEWSLETTER_CTA_DISABLED_ROLLBACK_END
 
 	// Stats routes (no auth wrapper for integration test)
 	mux.Handle("/api/stats/summary", handlers.SummaryHandler(sqlDB))
