@@ -140,3 +140,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Fixed cross-service payload/shape mismatches."
       ],
       "added": [
+        "Better feedback and uninstall integration paths."
