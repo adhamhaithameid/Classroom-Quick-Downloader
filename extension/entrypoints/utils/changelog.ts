@@ -245,10 +245,6 @@ export async function isVersionSeen(version: string, data?: ChangelogData | null
   return seen[normalizedVersion] === getSeenToken(normalizedVersion, data);
 }
 
-/**
- * Get the matching rule for a given version.
- * Priority: Exact Match > "all" > null
- */
 export function getMatchingRule(config: ChangelogConfig | undefined, currentVersion: string): NotificationRule | null {
   if (!config || !config.rules || !config.rules.length) return null;
   const version = normalizeVersion(currentVersion);
