@@ -132,7 +132,6 @@ function normalizeManualData(): ChangelogData {
       ? EXTENSION_MANUAL_CHANGELOG.meta.contentChecksum
       : `manual-${now}`,
   };
-}
 
 function computeRevisionToken(entries: ChangelogEntry[], config: ChangelogConfig, meta?: ChangelogMeta): string {
   const basis = {
