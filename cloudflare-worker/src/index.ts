@@ -288,7 +288,7 @@ function getCookieValue(request: Request, name: string): string | null {
     if (eqIndex === -1) continue;
     const key = cookie.substring(0, eqIndex);
     const value = cookie.substring(eqIndex + 1);
-    if (name === COOKIE_NAME) return value;
+    if (key === name) return value;
   }
   return null;
 }
