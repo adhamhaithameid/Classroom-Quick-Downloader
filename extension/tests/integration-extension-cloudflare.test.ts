@@ -287,8 +287,8 @@ describe('extension <-> cloudflare integration', () => {
 
     const data = await changelog.fetchChangelog(true);
     expect(data?.entries.length).toBeGreaterThan(0);
-    expect(data?.entries[0]?.version).toBe('1.3.8');
-    expect(data?.entries[0]?.changes[0]).toContain('Live changelog payload');
+    expect(data?.entries[0]?.version).toBe('1.3.9');
+    expect(data?.entries[0]?.changes[0]).toContain('Summary:');
     expect(data?.revisionToken).toBeTruthy();
 
     const rule = changelog.getMatchingRule(data?.config, '1.3.8');
