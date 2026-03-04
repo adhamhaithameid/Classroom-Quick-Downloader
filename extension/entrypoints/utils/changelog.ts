@@ -49,6 +49,9 @@ export interface ChangelogFetchResult {
   error?: string;
 }
 
+const STORAGE_KEY = 'cqd_changelog_v1';
+const SEEN_KEY = 'cqd_changelog_seen_v1';
+
 function normalizeVersion(value: string): string {
   return value.trim().replace(/^v/i, '');
 }
