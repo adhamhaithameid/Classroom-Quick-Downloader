@@ -18,3 +18,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       ],
       "changed": [
         "Website snapshot/cache behavior now prioritizes fresh local snapshots on reload."
+      ],
