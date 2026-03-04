@@ -4472,7 +4472,9 @@
         if (currentPage === 'website-sync') await loadWebsiteSyncState();
         if (currentPage === 'website-analysis') await loadWebsiteAnalytics();
         if (currentPage === 'creative') await loadCreativeHub();
-        if (currentPage === 'content-changelog') await loadUserChangelogRecords();
+        if (currentPage === 'content-changelog' && LEGACY_CHANGELOG_CUSTOMIZATION_ENABLED) {
+          await loadUserChangelogRecords();
+        }
         if (currentPage === 'logs') await loadOracleLogs();
 
         refreshButtons.forEach(function(btn) {
