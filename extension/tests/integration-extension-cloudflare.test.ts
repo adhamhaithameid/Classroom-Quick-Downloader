@@ -122,10 +122,14 @@ async function buildIntegrationContext() {
         method: 'GET',
       }));
     }
-    if (url.pathname === '/changelog') {
-      return durable.fetch(new Request('https://do/changelog', {
-        method: 'GET',
-      }));
+    if (url.pathname === '/api/public/extension/changelog') {
+      return new Response(JSON.stringify(oracleChangelogPayload), {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          ETag: '"oracle-etag"',
+        },
+      });
     }
     throw new Error(`Unexpected integration fetch URL: ${requestUrl}`);
   });
