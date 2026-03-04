@@ -203,3 +203,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Fixed inability to interrupt active operations."
       ],
       "added": [
+        "Core cancel-download capability."
