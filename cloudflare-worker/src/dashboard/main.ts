@@ -3821,9 +3821,17 @@ export function renderDashboard(stats: StatsResponse): string {
         </div>
       </section>
 
-      ${"" /* DEPRECATED: Notification Styling and Release Publishing are now managed in Oracle Dashboard → Extension Changelog page */}
-      ${"" /* renderNotificationSection(stats.changelog || [], stats.changelogConfig || {}) */}
-      ${"" /* renderReleaseManagementSection(stats.changelog || [], stats.changelogConfig || {}) */}
+      <section class="card" id="legacy-changelog-disabled">
+        <h2>Extension Changelog Controls Moved</h2>
+        <div class="section-subtitle" style="margin-bottom: 12px;">
+          Legacy Cloudflare sections <strong>📢 Release Publishing</strong> and
+          <strong> 🔔 Notification Styling</strong> are disabled.
+        </div>
+        <div class="metric-sub">
+          Manage extension changelog entries and changelog pill rules in the
+          Oracle Dashboard under <code>Extension Changelog</code>.
+        </div>
+      </section>
 
       <!-- Raw /stats payload -->
       <section class="card" id="raw">
