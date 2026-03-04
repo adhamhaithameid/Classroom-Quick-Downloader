@@ -138,3 +138,4 @@
         "Improved user-facing messaging and data alignment.",
         "Fixed cross-service payload/shape mismatches."
       ],
+      "added": [
