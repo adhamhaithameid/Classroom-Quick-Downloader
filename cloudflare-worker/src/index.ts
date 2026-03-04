@@ -185,6 +185,7 @@ async function createSessionTokenWithBinding(
   ip: string,
   userAgent: string,
   bindingMode: SessionBindingMode,
+  ttlMs = SESSION_DURATION_MS,
 ): Promise<string> {
   const payload: SessionPayload = {
     ip,
