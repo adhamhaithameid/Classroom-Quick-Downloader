@@ -22,9 +22,11 @@
   export let loading: 'lazy' | 'eager' = 'eager';
   /** Aspect ratio hint for the skeleton (e.g. '16/9') */
   export let aspectRatio: string = '';
+  /** When true, skip skeleton and show content immediately */
+  export let eager: boolean = false;
 
   type MediaState = 'loading' | 'loaded' | 'error';
-  let state: MediaState = 'loading';
+  let state: MediaState = eager ? 'loaded' : 'loading';
   let imgEl: HTMLImageElement;
   let videoEl: HTMLVideoElement;
   let retryKey = 0;
@@ -74,8 +76,8 @@
 
 <div class="ml" class:ml-loaded={state === 'loaded'} style={aspectRatio ? `aspect-ratio: ${aspectRatio}` : ''}>
   <!-- Shimmer skeleton (absolutely positioned overlay, disappears when loaded) -->
-  {#if state === 'loading'}
-    <div class="ml-skeleton" aria-hidden="true">
+  {#if state !== 'error'}
+    <div class="ml-skeleton" class:ml-skeleton-out={state === 'loaded'} aria-hidden="true">
       <div class="ml-shimmer"></div>
       <div class="ml-skeleton-icon">
         {#if type === 'video'}
@@ -179,6 +181,13 @@
     justify-content: center;
     background: linear-gradient(135deg, #f1f5f9 0%, #e8eef3 50%, #f1f5f9 100%);
     z-index: 2;
+    opacity: 1;
+    transition: opacity 0.4s ease;
+    pointer-events: none;
+  }
+
+  .ml-skeleton-out {
+    opacity: 0;
   }
 
   .ml-shimmer {
