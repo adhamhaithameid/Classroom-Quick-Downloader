@@ -74,16 +74,8 @@ function normalizeRuleTarget(value: unknown): string {
 function hashText(value: string): string {
   let hash = 0;
   for (let i = 0; i < value.length; i += 1) {
-    const row = value[i] as Record<string, unknown> | null | undefined;
-    const idRaw = typeof row?.id === 'string' && row.id.trim()
-      ? row.id.trim()
-      : `rule-${i + 1}`;
-    out.push({
-      id: idRaw,
-      target: normalizeRuleTarget(row?.target),
-      priority: normalizeRulePriority(row?.priority),
-      effect: normalizeRuleEffect(row?.effect),
-    });
+    hash = ((hash << 5) - hash) + value.charCodeAt(i);
+    hash |= 0;
   }
   return out;
 }
