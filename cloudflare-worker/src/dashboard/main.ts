@@ -610,6 +610,7 @@ function renderReleaseManagementSection(entries: ChangelogEntry[], config: Chang
     </section>
   `;
 }
+// LEGACY_CHANGELOG_DISABLED_END
 
 export function renderDashboard(stats: StatsResponse): string {
   const quota = stats.quota;
