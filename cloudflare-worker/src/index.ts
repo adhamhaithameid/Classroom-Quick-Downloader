@@ -10,6 +10,8 @@ import type { Env as WorkerEnv, StatsResponse } from "./types";
 
 const SESSION_DURATION_MS = 60 * 60 * 1000; // 1 hour
 const COOKIE_NAME = "cqd_session";
+const DANGER_COOKIE_NAME = "cqd_danger_stepup";
+const DANGER_SESSION_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 
 interface SessionPayload {
   ip: string;
