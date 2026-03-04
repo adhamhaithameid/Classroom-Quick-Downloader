@@ -217,3 +217,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "id": "manual-1.1.10-11",
       "version": "1.1.10",
       "title": "Release 1.1.10",
+      "summary": "Late 1.1 stability update.",
