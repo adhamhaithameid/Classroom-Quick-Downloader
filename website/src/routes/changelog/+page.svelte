@@ -1,17 +1,17 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, afterUpdate } from 'svelte';
   import { STORE_LINKS } from '$lib/config';
-  import { fetchUserChangelog } from '$lib/api/publicSite';
+  import { fetchChangelog } from '$lib/api/changelog';
 
   type ChangelogMdEntry = {
     version: string;
     title: string;
     summary: string;
     highlights: string[];
+    added: string[];
+    changed: string[];
+    fixed: string[];
   };
-
-  const USER_FRIENDLY_CHANGELOG_RAW_URL =
-    'https://raw.githubusercontent.com/adhamhaithameid/Classroom-Quick-Downloader/main/user-friendly-changelog.md';
 
   let changelogEntries: ChangelogMdEntry[] = [];
   let state: 'loading' | 'ready' | 'error' = 'loading';
@@ -19,8 +19,9 @@
   let refreshing = false;
   let degraded = false;
   let lastLoadedAtUtc: number | null = null;
-  /** Tracks whether the current data came from Oracle API or the GitHub fallback. */
-  let dataSource: 'oracle' | 'github' | null = null;
+  let activeVersion = '';
+  /** Tracks whether the current data came from manual source. */
+  let dataSource: 'manual' | null = null;
 
   function semverCompareDesc(a: string, b: string): number {
     const aParts = a.split('.').map((part) => Number.parseInt(part, 10) || 0);
@@ -33,12 +34,15 @@
     return 0;
   }
 
-  function oracleEntriesToMdEntries(
+  function manualEntriesToMdEntries(
     entries: Array<{
       version: string;
       title?: string;
       summary?: string;
       highlights?: string[];
+      added?: string[];
+      changed?: string[];
+      fixed?: string[];
     }>
   ): ChangelogMdEntry[] {
     return entries
@@ -50,111 +54,28 @@
         const highlights = Array.isArray(entry.highlights)
           ? entry.highlights.filter((item) => typeof item === 'string' && item.trim())
           : [];
+        const added = Array.isArray(entry.added)
+          ? entry.added.filter((item) => typeof item === 'string' && item.trim())
+          : [];
+        const changed = Array.isArray(entry.changed)
+          ? entry.changed.filter((item) => typeof item === 'string' && item.trim())
+          : [];
+        const fixed = Array.isArray(entry.fixed)
+          ? entry.fixed.filter((item) => typeof item === 'string' && item.trim())
+          : [];
         if (!summary && highlights.length > 0) summary = highlights[0];
 
         return {
           version,
           title,
           summary: summary || 'No summary available.',
-          highlights
+          highlights,
+          added,
+          changed,
+          fixed
         };
       })
       .filter((entry): entry is ChangelogMdEntry => entry !== null);
-  }
-
-  /**
-   * Parse raw GitHub markdown into ChangelogMdEntry[].
-   * Used as a fallback when Oracle API is unavailable.
-   */
-  function parseChangelogMarkdown(markdown: string): ChangelogMdEntry[] {
-    const lines = markdown.replace(/\r\n/g, '\n').split('\n');
-    const entries: ChangelogMdEntry[] = [];
-
-    let current: ChangelogMdEntry | null = null;
-    let section: 'summary' | 'added' | 'changed' | 'fixed' | null = null;
-
-    const pushCurrent = () => {
-      if (!current) return;
-      if (!current.version) return;
-      if (!current.summary.trim()) return;
-      entries.push({
-        version: current.version,
-        title: current.title,
-        summary: current.summary.trim(),
-        highlights: current.highlights
-      });
-    };
-
-    for (const rawLine of lines) {
-      const line = rawLine.trim();
-      if (!line) continue;
-
-      const versionMatch = line.match(/^##\s+v?(\d+\.\d+\.\d+)\s*$/i);
-      if (versionMatch) {
-        pushCurrent();
-        current = {
-          version: versionMatch[1],
-          title: '',
-          summary: '',
-          highlights: []
-        };
-        section = null;
-        continue;
-      }
-
-      if (!current) continue;
-
-      if (/^###\s+summary\s*$/i.test(line)) {
-        section = 'summary';
-        continue;
-      }
-      if (/^###\s+added\s*$/i.test(line)) {
-        section = 'added';
-        continue;
-      }
-      if (/^###\s+changed\s*$/i.test(line)) {
-        section = 'changed';
-        continue;
-      }
-      if (/^###\s+fixed\s*$/i.test(line)) {
-        section = 'fixed';
-        continue;
-      }
-
-      if (section === 'summary') {
-        current.summary = current.summary ? `${current.summary} ${line}` : line;
-        continue;
-      }
-
-      if (line.startsWith('- ')) {
-        const value = line.slice(2).trim();
-        if (!value) continue;
-        if (section === 'added') current.highlights.push(`Added: ${value}`);
-        if (section === 'changed') current.highlights.push(`Changed: ${value}`);
-        if (section === 'fixed') current.highlights.push(`Fixed: ${value}`);
-      }
-    }
-
-    pushCurrent();
-    entries.sort((a, b) => semverCompareDesc(a.version, b.version));
-    return entries;
-  }
-
-  /**
-   * Fetch from GitHub raw markdown (fallback).
-   */
-  async function fetchFromGitHub(force: boolean): Promise<ChangelogMdEntry[]> {
-    const url = force ? `${USER_FRIENDLY_CHANGELOG_RAW_URL}?t=${Date.now()}` : USER_FRIENDLY_CHANGELOG_RAW_URL;
-    const response = await fetch(url, { cache: force ? 'no-store' : 'default' });
-    if (!response.ok) {
-      throw new Error(`GitHub changelog request failed (${response.status})`);
-    }
-    const markdown = await response.text();
-    const parsed = parseChangelogMarkdown(markdown);
-    if (parsed.length === 0) {
-      throw new Error('GitHub changelog format is invalid or empty.');
-    }
-    return parsed;
   }
 
   async function load(force = false): Promise<void> {
@@ -162,32 +83,26 @@
     if (force) refreshing = true;
     error = '';
     try {
-      // PRIMARY: fetch from Oracle public website changelog (dashboard-managed data)
-      try {
-        const oracleData = await fetchUserChangelog();
-        if (oracleData.ok && oracleData.entries.length > 0) {
-          const converted = oracleEntriesToMdEntries(oracleData.entries);
-          if (converted.length > 0) {
-            converted.sort((a, b) => semverCompareDesc(a.version, b.version));
-            changelogEntries = converted;
-            state = 'ready';
-            degraded = false;
-            dataSource = 'oracle';
-            lastLoadedAtUtc = Date.now();
-            return;
-          }
-        }
-        // Oracle returned ok but no entries — fall through to GitHub
-      } catch {
-        // Oracle unavailable — fall through to GitHub
+      const manualData = await fetchChangelog();
+      if (!manualData.ok) {
+        throw new Error('Manual changelog source returned an invalid response.');
       }
-
-      // FALLBACK: fetch directly from GitHub raw markdown
-      const parsed = await fetchFromGitHub(force);
-      changelogEntries = parsed;
+      const converted = manualEntriesToMdEntries(
+        manualData.entries.map((entry) => ({
+          version: entry.version,
+          title: '',
+          summary: entry.summary,
+          highlights: entry.changes,
+          added: entry.added,
+          changed: entry.changed,
+          fixed: entry.fixed,
+        }))
+      );
+      converted.sort((a, b) => semverCompareDesc(a.version, b.version));
+      changelogEntries = converted;
       state = 'ready';
       degraded = false;
-      dataSource = 'github';
+      dataSource = 'manual';
       lastLoadedAtUtc = Date.now();
     } catch (err) {
       error = err instanceof Error ? err.message : 'Failed to load changelog.';
@@ -215,8 +130,64 @@
     }) + ' UTC';
   }
 
-  onMount(async () => {
-    await load();
+  let scrollSpyRaf = 0;
+  let scrollSpyBound: (() => void) | null = null;
+
+  function updateActiveFromScroll() {
+    const entryEls = document.querySelectorAll('.cl-entry[id]');
+    if (entryEls.length === 0) return;
+    const threshold = window.innerHeight * 0.35;
+    let best = '';
+    let bestDist = Infinity;
+    entryEls.forEach((el) => {
+      const rect = el.getBoundingClientRect();
+      // Entry is "active" when its top is above the 35% viewport line
+      // and its bottom is still visible (not fully scrolled past).
+      if (rect.top <= threshold && rect.bottom > 0) {
+        const dist = Math.abs(rect.top - 60);
+        if (dist < bestDist) {
+          bestDist = dist;
+          best = el.id;
+        }
+      }
+    });
+    if (best) {
+      activeVersion = best.replace(/^v/i, '');
+    }
+  }
+
+  function onScroll() {
+    if (scrollSpyRaf) cancelAnimationFrame(scrollSpyRaf);
+    scrollSpyRaf = requestAnimationFrame(updateActiveFromScroll);
+  }
+
+  function attachScrollSpy() {
+    if (scrollSpyBound) return;
+    scrollSpyBound = onScroll;
+    window.addEventListener('scroll', scrollSpyBound, { passive: true });
+    updateActiveFromScroll();
+  }
+
+  function detachScrollSpy() {
+    if (scrollSpyBound) {
+      window.removeEventListener('scroll', scrollSpyBound);
+      scrollSpyBound = null;
+    }
+    if (scrollSpyRaf) {
+      cancelAnimationFrame(scrollSpyRaf);
+      scrollSpyRaf = 0;
+    }
+  }
+
+  afterUpdate(() => {
+    if (state === 'ready' && changelogEntries.length > 0) {
+      requestAnimationFrame(() => attachScrollSpy());
+    }
+  });
+
+  onMount(() => {
+    void load();
+    return () => detachScrollSpy();
   });
 </script>
 
@@ -287,7 +258,12 @@
               <h3 class="cl-sidebar-label">Versions</h3>
               <nav class="cl-sidebar-links">
                 {#each changelogEntries as entry}
-                  <a href="#v{entry.version}" class="cl-sidebar-link" aria-label={'Version ' + entry.version}>
+                  <a
+                    href="#v{entry.version}"
+                    class="cl-sidebar-link"
+                    class:active={activeVersion === entry.version}
+                    aria-label={'Version ' + entry.version}
+                  >
                     <span class="cl-sv">{entry.version}</span>
                   </a>
                 {/each}
@@ -300,21 +276,48 @@
             {#each changelogEntries as entry, i}
               <article class="cl-entry cl-reveal" id="v{entry.version}" style="transition-delay: {i * 0.05}s">
                 <div class="cl-marker-col">
-                  <div class="cl-dot"></div>
+                  <div class="cl-dot" class:active={activeVersion === entry.version} class:latest={i === 0}></div>
                   {#if i < changelogEntries.length - 1}
                     <div class="cl-line"></div>
                   {/if}
                 </div>
                 <div class="cl-entry-card">
                   <div class="cl-entry-header">
-                    <h2>v{entry.version}</h2>
+                    <h2>v{entry.version}{#if i === 0}<span class="cl-latest-tag">Latest</span>{/if}</h2>
                   </div>
                   {#if entry.title}
                     <p class="cl-entry-summary"><strong>{entry.title}</strong></p>
                   {/if}
                   <p class="cl-entry-summary"><strong>Summary:</strong> {entry.summary}</p>
 
-                  {#if entry.highlights.length > 0}
+                  {#if entry.added.length > 0}
+                    <h3 class="cl-section-title">Added</h3>
+                    <ul class="cl-highlights">
+                      {#each entry.added as point}
+                        <li>{point}</li>
+                      {/each}
+                    </ul>
+                  {/if}
+
+                  {#if entry.changed.length > 0}
+                    <h3 class="cl-section-title">Changed</h3>
+                    <ul class="cl-highlights">
+                      {#each entry.changed as point}
+                        <li>{point}</li>
+                      {/each}
+                    </ul>
+                  {/if}
+
+                  {#if entry.fixed.length > 0}
+                    <h3 class="cl-section-title">Fixed</h3>
+                    <ul class="cl-highlights">
+                      {#each entry.fixed as point}
+                        <li>{point}</li>
+                      {/each}
+                    </ul>
+                  {/if}
+
+                  {#if entry.added.length === 0 && entry.changed.length === 0 && entry.fixed.length === 0 && entry.highlights.length > 0}
                     <h3 class="cl-section-title">Highlights</h3>
                     <ul class="cl-highlights">
                       {#each entry.highlights as point}
@@ -497,12 +500,14 @@
     transition: all 0.2s ease;
     color: var(--text-secondary);
   }
-  .cl-sidebar-link:hover {
+  .cl-sidebar-link:hover,
+  .cl-sidebar-link.active {
     background: var(--green-bg);
     color: var(--green);
   }
-  .cl-sidebar-link:hover .cl-sv { color: var(--green); }
-  .cl-sv { font-weight: 700; font-size: 14px; color: var(--text); }
+  .cl-sidebar-link:hover .cl-sv,
+  .cl-sidebar-link.active .cl-sv { color: var(--green); }
+  .cl-sv { font-weight: 700; font-size: 14px; color: var(--text); transition: color 0.2s ease; }
 
   /* ── Timeline ───────────────────── */
   .cl-timeline {
@@ -527,6 +532,25 @@
     background: var(--green-bg);
     flex-shrink: 0;
     box-shadow: 0 0 0 4px rgba(26,139,85,0.06);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .cl-dot.active {
+    width: 18px; height: 18px;
+    background: var(--green);
+    border-color: var(--green);
+    box-shadow: 0 0 0 5px rgba(26,139,85,0.15), 0 0 12px rgba(34,197,94,0.3);
+  }
+
+  .cl-dot.latest {
+    background: var(--green);
+    border-color: var(--green);
+    animation: cl-dot-pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes cl-dot-pulse {
+    0%, 100% { box-shadow: 0 0 0 4px rgba(26,139,85,0.12), 0 0 8px rgba(34,197,94,0.2); }
+    50% { box-shadow: 0 0 0 7px rgba(26,139,85,0.2), 0 0 18px rgba(34,197,94,0.35); }
   }
 
   .cl-line {
@@ -556,6 +580,17 @@
   .cl-entry-card h2 {
     margin: 0; font-size: 20px; font-weight: 800;
     letter-spacing: -0.02em; color: var(--text);
+    display: flex; align-items: center; gap: 10px;
+  }
+
+  .cl-latest-tag {
+    display: inline-flex; align-items: center;
+    font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    color: #fff;
+    background: linear-gradient(135deg, var(--green), var(--green-light));
+    padding: 3px 10px; border-radius: 999px;
+    line-height: 1.4;
   }
 
   .cl-section-title {
@@ -635,7 +670,8 @@
       border-radius: 12px;
       padding: 10px 12px;
     }
-    .cl-sidebar-link:hover {
+    .cl-sidebar-link:hover,
+    .cl-sidebar-link.active {
       border-color: rgba(26, 139, 85, 0.22);
     }
 
