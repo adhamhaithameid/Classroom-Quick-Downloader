@@ -99,3 +99,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       ],
       "added": [
         "Expanded resilience/security checks across extension-worker-oracle flow."
+      ],
