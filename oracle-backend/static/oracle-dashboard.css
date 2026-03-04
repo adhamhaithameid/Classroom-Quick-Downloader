@@ -1,21 +1,21 @@
       :root {
-        --bg-primary: #09090b;
-        --bg-secondary: #18181b;
-        --bg-tertiary: #27272a;
-        --bg-hover: #3f3f46;
-        --border-primary: #27272a;
-        --border-secondary: #3f3f46;
-        --text-primary: #fafafa;
-        --text-secondary: #a1a1aa;
-        --text-muted: #71717a;
-        --accent: #3b82f6;
-        --accent-hover: #2563eb;
-        --success: #22c55e;
-        --danger: #ef4444;
-        --warning: #f59e0b;
-        --purple: #a855f7;
-        --cyan: #06b6d4;
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        --bg-primary: #0b1020;
+        --bg-secondary: #131a2e;
+        --bg-tertiary: #1a2440;
+        --bg-hover: #253252;
+        --border-primary: #223150;
+        --border-secondary: #33466f;
+        --text-primary: #f7f9ff;
+        --text-secondary: #bac6e0;
+        --text-muted: #8d9ab8;
+        --accent: #6ea8fe;
+        --accent-hover: #8ab8ff;
+        --success: #5ad29b;
+        --danger: #ff6b7f;
+        --warning: #ffbe5c;
+        --purple: #b18cff;
+        --cyan: #5ad7ff;
+        font-family: 'Inter', 'Google Sans', -apple-system, BlinkMacSystemFont, sans-serif;
       }
 
       * { box-sizing: border-box; margin: 0; padding: 0; }
