@@ -3103,13 +3103,7 @@
             html += '</div>';
           });
           container.innerHTML = html;
-          if (summary) {
-            summary.innerHTML =
-              '<span class="newsletter-tag">Total: ' + fmtNumber(counts.total) + '</span>' +
-              '<span class="newsletter-tag">Active: ' + fmtNumber(counts.active) + '</span>' +
-              '<span class="newsletter-tag">Paused: ' + fmtNumber(counts.paused) + '</span>' +
-              '<span class="newsletter-tag">Unsubscribed: ' + fmtNumber(counts.unsubscribed) + '</span>';
-          }
+          renderNewsletterSummary(summary, counts);
         } catch (e) {
           container.innerHTML = '<div class="empty-state empty-state-danger">Failed to load subscribers</div>';
           if (summary) summary.innerHTML = '';
