@@ -175,11 +175,8 @@ export async function fetchChangelogDetailed(force = false): Promise<ChangelogFe
   };
   await persistManualCache(data);
   return {
-    entries: parsedEntries,
-    config,
-    meta,
-    revisionToken: computeRevisionToken(parsedEntries, config, meta),
-    lastFetched: Date.now(),
+    data,
+    status: force ? 'fresh' : 'not-modified',
   };
 }
 
