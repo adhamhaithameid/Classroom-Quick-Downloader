@@ -1401,7 +1401,7 @@ func defaultPublicWebsiteUserChangelogEntries() []publicWebsiteUserChangelogEntr
 				"Edge-first snapshot retrieval with Oracle fallback.",
 				"Session-pinned numbers that update only on refresh/reopen.",
 			},
-			ReleasedAtUTC: mkTS(1772409600000), // 2026-03-02
+			ReleasedAtUTC: mkTS(1772496000000), // 2026-03-03
 		},
 		{
 			ID:      "release-137",
