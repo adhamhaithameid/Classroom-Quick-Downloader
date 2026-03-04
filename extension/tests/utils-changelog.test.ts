@@ -98,14 +98,14 @@ describe('changelog utils (manual mode)', () => {
 
   it('matches notification rules in manual configuration', async () => {
     const mod = await loadChangelogModule();
-    const cfg: ChangelogConfig = {
-      rules: [
-        { id: 'r1', target: 'v1.3.0', priority: 'major', effect: 'pulse' as const },
-        { id: 'r2', target: 'all', priority: 'minor', effect: 'glow' as const },
-      ],
-    };
-    expect(mod.getMatchingRule(cfg, '1.3.0')?.id).toBe('r1');
-    expect(mod.getMatchingRule(cfg, '9.9.9')?.id).toBe('r2');
+    const data = await mod.fetchChangelog(true);
+
+    const exact = mod.getMatchingRule(data?.config, '1.3.8');
+    expect(exact?.id).toBe('manual-pill-v138');
+
+    const fallback = mod.getMatchingRule(data?.config, '9.9.9');
+    expect(fallback?.id).toBe('manual-pill-default');
+
     expect(mod.getMatchingRule(undefined, '1.0.0')).toBeNull();
   });
 
