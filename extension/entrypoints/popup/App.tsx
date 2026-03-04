@@ -559,10 +559,8 @@ function App() {
         setChangelogStatus('loading');
       }
       try {
-        const data = await fetchChangelog(true);
-        if (!cancelled && data) {
-          setChangelogData(data);
-        }
+        const result = await fetchChangelogDetailed(true);
+        applyChangelogFetchResult(result);
       } finally {
         inFlight = false;
       }
