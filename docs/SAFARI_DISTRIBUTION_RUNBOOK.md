@@ -47,6 +47,20 @@ This generates a project under:
 
 - `extension/.output/safari-xcode/`
 
+## 3.5 One-command local flow (build + convert + compile + launch)
+
+```bash
+pnpm -C extension run safari:local
+```
+
+This command:
+
+1. builds the Safari extension artifact,
+2. converts it to an Xcode project,
+3. compiles the macOS container app,
+4. launches the app, and
+5. opens Safari extensions settings.
+
 ## 4. Local Manual Testing on Safari
 
 1. Open generated `.xcodeproj`.

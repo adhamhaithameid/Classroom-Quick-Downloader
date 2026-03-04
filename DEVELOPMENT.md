@@ -147,6 +147,9 @@ pnpm -C extension run safari
 
 # Convert to Xcode project (macOS only)
 pnpm -C extension run safari:xcode
+
+# Full local Safari flow (build + convert + compile + launch)
+pnpm -C extension run safari:local
 ```
 
 Full runbook:
