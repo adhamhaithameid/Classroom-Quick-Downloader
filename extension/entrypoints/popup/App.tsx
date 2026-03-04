@@ -529,6 +529,29 @@ function App() {
     let cancelled = false;
     let inFlight = false;
 
+    const applyChangelogFetchResult = (result: ChangelogFetchResult) => {
+      if (cancelled) return;
+      if (result.data) {
+        setChangelogData(result.data);
+      }
+      if (result.status === 'cache-fallback') {
+        setChangelogStatus('offline');
+        setChangelogStatusMessage(result.error || 'Oracle is unreachable. Showing cached changelog.');
+        return;
+      }
+      if (result.status === 'error') {
+        setChangelogStatus('error');
+        setChangelogStatusMessage(result.error || 'Unable to load changelog from Oracle.');
+        return;
+      }
+      setChangelogStatus('ready');
+      if (result.status === 'empty') {
+        setChangelogStatusMessage('No changelog entries are available yet.');
+      } else {
+        setChangelogStatusMessage(null);
+      }
+    };
+
     const loadChangelog = async () => {
       if (inFlight) return;
       inFlight = true;
