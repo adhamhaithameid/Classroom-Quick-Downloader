@@ -415,6 +415,89 @@ export interface Env {
    * If configured, access identity email must match one of these entries.
    */
   CLOUDFLARE_ACCESS_EMAIL_ALLOWLIST?: string;
+  /**
+   * Optional feature flag for queue-first website event pipeline on free plan.
+   * Default false.
+   */
+  ENABLE_SITE_QUEUE_PIPELINE?: string;
+}
+
+export interface WebsiteConsoleSummaryResponse {
+  ok: boolean;
+  code: string;
+  message: string;
+  generatedAtUtc: number;
+  runtime: {
+    kvConfigured: boolean;
+    d1Configured: boolean;
+    oracleReachable: boolean;
+  };
+  snapshot: {
+    snapshotId: string | null;
+    generatedAtUtc: number | null;
+    totals: {
+      downloads: number;
+      countries: number;
+    };
+    cacheState: "hit" | "miss";
+  };
+  telemetry: Record<string, unknown>;
+  doWebsite: Record<string, unknown>;
+}
+
+export interface WebsiteConsoleKVResponse {
+  ok: boolean;
+  code: string;
+  message: string;
+  generatedAtUtc: number;
+  key: string;
+  sizeBytes: number;
+  exists: boolean;
+  valueRaw: string | null;
+  valueJson: unknown;
+}
+
+export interface WebsiteConsoleD1TablesResponse {
+  ok: boolean;
+  code: string;
+  message: string;
+  generatedAtUtc: number;
+  tables: string[];
+}
+
+export interface WebsiteConsoleD1QueryRequest {
+  query: string;
+  maxRows?: number;
+}
+
+export interface WebsiteConsoleD1QueryResponse {
+  ok: boolean;
+  code: string;
+  message: string;
+  generatedAtUtc: number;
+  maxRows: number;
+  rowCount: number;
+  query: string;
+  rows: Record<string, unknown>[];
+}
+
+export interface WebsiteConsoleTelemetryResponse {
+  ok: boolean;
+  code: string;
+  message: string;
+  generatedAtUtc: number;
+  telemetry: Record<string, unknown>;
+  publicSnapshot: Record<string, unknown>;
+}
+
+export interface WebsiteConsoleSnapshotRawResponse {
+  ok: boolean;
+  code: string;
+  message: string;
+  generatedAtUtc: number;
+  kvSnapshotRaw: string | null;
+  kvSnapshotJson: Record<string, unknown> | null;
+  doPublicSnapshot: Record<string, unknown> | null;
 }
 
 /**
