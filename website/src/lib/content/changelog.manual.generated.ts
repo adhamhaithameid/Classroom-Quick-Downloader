@@ -92,3 +92,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "version": "1.3.0",
       "title": "Release 1.3.0",
       "summary": "Major reliability and security hardening release.",
+      "highlights": [
