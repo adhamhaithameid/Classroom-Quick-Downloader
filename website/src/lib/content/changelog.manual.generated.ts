@@ -81,3 +81,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       ],
       "changed": [
         "Updated dependency resolution paths."
+      ],
