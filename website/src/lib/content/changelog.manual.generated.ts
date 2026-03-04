@@ -220,3 +220,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "summary": "Late 1.1 stability update.",
       "highlights": [
         "Additional runtime checks for long sessions.",
+        "Tuned defaults for safer prolonged usage.",
