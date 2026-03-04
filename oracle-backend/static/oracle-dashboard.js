@@ -4582,6 +4582,11 @@
       window.deleteExtClEntry = async function(id) {
         if (!confirm('Delete entry "' + id + '"?')) return;
         try {
+          var okStepDeleteEntry = await ensureStepUp();
+          if (!okStepDeleteEntry) {
+            extClToast('Additional verification is required.', 'error');
+            return;
+          }
           await postJSON('/api/admin/extension-changelog/entries/delete', { id: id });
           extClToast('Entry deleted ✓', 'success');
           await loadExtChangelogEntries();
