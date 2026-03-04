@@ -297,3 +297,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       ],
       "releasedAtUtc": 1771482780434
     },
+    {
