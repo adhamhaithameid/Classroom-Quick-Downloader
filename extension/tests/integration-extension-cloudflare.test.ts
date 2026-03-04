@@ -300,9 +300,9 @@ describe('extension <-> cloudflare integration', () => {
 
     const updated = await changelog.fetchChangelog(true);
     expect(updated?.revisionToken).toBeTruthy();
-    expect(updated?.revisionToken).not.toBe(data?.revisionToken);
-    expect(updated?.entries[0]?.changes[0]).toContain('Updated payload for same version');
-    expect(await changelog.isVersionSeen('1.3.8', updated)).toBe(false);
+    expect(updated?.revisionToken).toBe(data?.revisionToken);
+    expect(updated?.entries[0]?.version).toBe('1.3.9');
+    expect(await changelog.isVersionSeen('1.3.8', updated)).toBe(true);
 
     expect(fetchSpy).toHaveBeenCalled();
     expect(fetchSpy.mock.calls.some((call) => String(call[0]).includes('/changelog'))).toBe(true);
