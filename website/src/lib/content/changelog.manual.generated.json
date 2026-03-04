@@ -145,3 +145,4 @@
         "Improved user-facing messaging and data alignment."
       ],
       "fixed": [
+        "Fixed cross-service payload/shape mismatches."
