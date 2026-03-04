@@ -314,3 +314,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Improved repeat-use reliability."
       ],
       "fixed": [
+        "Fixed launch-adjacent regressions."
