@@ -1,188 +1,50 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { fetchChangelog } from './changelog';
 
-const TEST_TIMEOUT_MS = 15_000;
-
-afterEach(() => {
-  vi.restoreAllMocks();
-});
-
-describe('fetchChangelog', () => {
-  it(
-    'fetches and normalizes a valid changelog payload',
-    async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () =>
-        new Response(
-          JSON.stringify({
-            ok: true,
-            entries: [
-              { id: 'r-137', version: '1.3.7', date: '2026-02-20', changes: ['Bug fix A', 'Feature B'], isImportant: true },
-              { id: 'r-136', version: '1.3.6', date: '2026-02-10', changes: ['Stability fix'], isImportant: false }
-            ]
-          }),
-          { status: 200 }
-        )
-      )
-    );
-
+describe('fetchChangelog (manual source)', () => {
+  it('returns manual changelog payload with stable schema', async () => {
     const data = await fetchChangelog();
+
+    expect(data.schemaVersion).toBe('1');
     expect(data.ok).toBe(true);
-    expect(data.entries).toHaveLength(2);
-    expect(data.entries[0]?.version).toBe('1.3.7'); // should be sorted newest first
-    expect(data.entries[0]?.isImportant).toBe(true);
-    expect(data.entries[0]?.changes).toEqual(['Bug fix A', 'Feature B']);
-    expect(data.entries[1]?.version).toBe('1.3.6');
-    },
-    TEST_TIMEOUT_MS
-  );
+    expect(Array.isArray(data.entries)).toBe(true);
+    expect(data.entries.length).toBeGreaterThan(0);
+    expect(data.entries[0]?.version).toBe('1.3.9');
+    expect(data.entries[0]?.id).toBe('manual-1.3.9-1');
+    expect(data.entries.some((entry) => entry.version === '1.0.0')).toBe(true);
+  });
 
-  it(
-    'sorts entries by date descending',
-    async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () =>
-        new Response(
-          JSON.stringify({
-            ok: true,
-            entries: [
-              { id: 'r-old', version: '1.2.0', date: '2025-06-01', changes: ['Old'], isImportant: false },
-              { id: 'r-mid', version: '1.3.0', date: '2025-12-01', changes: ['Middle'], isImportant: false },
-              { id: 'r-new', version: '1.3.7', date: '2026-02-20', changes: ['Newest'], isImportant: true }
-            ]
-          }),
-          { status: 200 }
-        )
-      )
-    );
-
+  it('produces normalized entries with required fields', async () => {
     const data = await fetchChangelog();
-    expect(data.entries[0]?.id).toBe('r-new');
-    expect(data.entries[1]?.id).toBe('r-mid');
-    expect(data.entries[2]?.id).toBe('r-old');
-    },
-    TEST_TIMEOUT_MS
-  );
 
-  it(
-    'filters out entries with missing required fields',
-    async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () =>
-        new Response(
-          JSON.stringify({
-            ok: true,
-            entries: [
-              { id: 'r-good', version: '1.3.7', date: '2026-02-20', changes: ['Valid'] },
-              { id: '', version: '1.3.6', date: '2026-02-10', changes: ['Missing id'] },
-              { id: 'r-no-ver', version: '', date: '2026-02-10', changes: ['Missing version'] },
-              { id: 'r-no-date', version: '1.3.5', date: '', changes: ['Missing date'] },
-              { version: '1.3.4', date: '2026-01-01', changes: ['No id at all'] }
-            ]
-          }),
-          { status: 200 }
-        )
-      )
-    );
+    for (const entry of data.entries) {
+      expect(entry.id.length).toBeGreaterThan(0);
+      expect(entry.version.length).toBeGreaterThan(0);
+      expect(entry.date).toMatch(/\d{4}-\d{2}-\d{2}T/);
+      expect(Array.isArray(entry.changes)).toBe(true);
+      expect(Array.isArray(entry.added)).toBe(true);
+      expect(Array.isArray(entry.changed)).toBe(true);
+      expect(Array.isArray(entry.fixed)).toBe(true);
+      expect(typeof entry.isImportant).toBe('boolean');
+    }
+  });
 
+  it('uses summary + Added/Changed/Fixed composition for changes', async () => {
     const data = await fetchChangelog();
-    expect(data.entries).toHaveLength(1);
-    expect(data.entries[0]?.id).toBe('r-good');
-    },
-    TEST_TIMEOUT_MS
-  );
+    const first = data.entries[0];
 
-  it(
-    'filters out non-string change entries',
-    async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () =>
-        new Response(
-          JSON.stringify({
-            ok: true,
-            entries: [
-              { id: 'r-1', version: '1.3.7', date: '2026-02-20', changes: ['Valid', 42, null, '', 'Also valid'] }
-            ]
-          }),
-          { status: 200 }
-        )
-      )
-    );
+    expect(first?.summary?.length || 0).toBeGreaterThan(0);
+    expect(first?.changes[0]).toContain('Summary:');
+    expect(first?.changes.some((line) => line.startsWith('Added:'))).toBe(true);
+    expect(first?.changes.some((line) => line.startsWith('Changed:'))).toBe(true);
+    expect(first?.changes.some((line) => line.startsWith('Fixed:'))).toBe(true);
+  });
 
+  it('returns manual metadata mode with empty runtime rules', async () => {
     const data = await fetchChangelog();
-    expect(data.entries[0]?.changes).toEqual(['Valid', 'Also valid']);
-    },
-    TEST_TIMEOUT_MS
-  );
 
-  it(
-    'handles empty entries array',
-    async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () =>
-        new Response(JSON.stringify({ ok: true, entries: [] }), { status: 200 })
-      )
-    );
-
-    const data = await fetchChangelog();
-    expect(data.ok).toBe(true);
-    expect(data.entries).toHaveLength(0);
-    },
-    TEST_TIMEOUT_MS
-  );
-
-  it(
-    'handles completely empty payload',
-    async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => new Response(JSON.stringify({}), { status: 200 }))
-    );
-
-    const data = await fetchChangelog();
-    expect(data.ok).toBe(false);
-    expect(data.entries).toEqual([]);
-    },
-    TEST_TIMEOUT_MS
-  );
-
-  it(
-    'throws on HTTP error responses',
-    async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => new Response('Server Error', { status: 500 }))
-    );
-
-    await expect(fetchChangelog()).rejects.toThrow('Changelog request failed (500)');
-    },
-    TEST_TIMEOUT_MS
-  );
-
-  it(
-    'defaults isImportant to false when not provided',
-    async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () =>
-        new Response(
-          JSON.stringify({
-            ok: true,
-            entries: [{ id: 'r-1', version: '1.0.0', date: '2024-01-01', changes: ['Init'] }]
-          }),
-          { status: 200 }
-        )
-      )
-    );
-
-    const data = await fetchChangelog();
-    expect(data.entries[0]?.isImportant).toBe(false);
-    },
-    TEST_TIMEOUT_MS
-  );
+    expect(data.config?.rules ?? []).toEqual([]);
+    expect(data.meta?.applyMode).toBe('manual');
+    expect(data.meta?.lastAutoSyncStatus).toBe('manual');
+  });
 });
