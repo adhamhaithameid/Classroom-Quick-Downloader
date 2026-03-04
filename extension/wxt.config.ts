@@ -34,6 +34,7 @@ export default defineConfig({
       'https://drive.usercontent.google.com/*',
       'https://accounts.google.com/*',
       'https://cqd-analytics.adhamhaithameid.workers.dev/*',
+      'https://oracle.classroom-quick-downloader.com/*',
     ],
     icons: {
       "16": "icon/16.png",
