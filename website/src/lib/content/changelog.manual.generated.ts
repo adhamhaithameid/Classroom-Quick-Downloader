@@ -208,3 +208,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "changed": [
         "Lifecycle handling updated for cancellation-aware flow."
       ],
+      "fixed": [
