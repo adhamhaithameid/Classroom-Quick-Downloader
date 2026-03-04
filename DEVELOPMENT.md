@@ -117,7 +117,7 @@ cd extension
 pnpm zip:all
 ```
 
-This creates production-ready `.zip` files for Chrome, Firefox, Edge, and Safari.
+This creates production-ready `.zip` files for Chrome, Firefox, and Edge.
 
 ### Build for a Specific Browser
 
@@ -133,28 +133,13 @@ pnpm zip -b firefox
 # Edge
 pnpm zip -b edge
 
-# Safari
-pnpm zip -b safari
+# Safari (temporarily disabled)
+# pnpm run safari
 ```
 
-### Safari: Local Testing and Distribution
-
-Safari requires an Xcode app container (you cannot install the extension zip directly in Safari like Chromium/Firefox).
-
-```bash
-# Build safari artifact
-pnpm -C extension run safari
-
-# Convert to Xcode project (macOS only)
-pnpm -C extension run safari:xcode
-
-# Full local Safari flow (build + convert + compile + launch)
-pnpm -C extension run safari:local
-```
-
-Full runbook:
-
-- `docs/SAFARI_DISTRIBUTION_RUNBOOK.md`
+<!-- Safari flow is intentionally disabled right now.
+Full archived runbook: docs/SAFARI_DISTRIBUTION_RUNBOOK.md
+-->
 
 ### Check for TypeScript Errors
 
