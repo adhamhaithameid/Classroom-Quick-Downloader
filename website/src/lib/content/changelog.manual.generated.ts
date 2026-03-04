@@ -35,3 +35,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Fixed stale changelog visibility in republish scenarios."
       ],
       "added": [
+        "Revision-aware changelog checks for same-version updates."
