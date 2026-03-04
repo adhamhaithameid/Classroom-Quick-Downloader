@@ -236,9 +236,6 @@ export async function markAsSeen(version: string, data?: ChangelogData | null): 
   await chrome.storage.local.set({ [SEEN_KEY]: seen });
 }
 
-/**
- * Check if a version has been seen.
- */
 export async function isVersionSeen(version: string, data?: ChangelogData | null): Promise<boolean> {
   const normalizedVersion = normalizeVersion(version);
   if (!normalizedVersion) return false;
