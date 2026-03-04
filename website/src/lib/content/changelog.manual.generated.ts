@@ -248,3 +248,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Extended compatibility hardening."
       ],
       "changed": [
+        "Improved consistency across frequent workflows."
