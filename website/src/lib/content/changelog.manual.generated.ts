@@ -131,3 +131,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
     },
     {
       "id": "manual-1.2.3-7",
+      "version": "1.2.3",
