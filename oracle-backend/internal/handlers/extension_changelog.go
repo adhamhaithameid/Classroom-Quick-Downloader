@@ -51,10 +51,12 @@ type extChangelogMeta struct {
 }
 
 type extChangelogResponse struct {
-	OK      bool                 `json:"ok"`
-	Entries []extChangelogEntry  `json:"entries"`
-	Config  extChangelogConfig   `json:"config"`
-	Meta    extChangelogMeta     `json:"meta"`
+	SchemaVersion string              `json:"schemaVersion"`
+	OK            bool                `json:"ok"`
+	Entries       []extChangelogEntry `json:"entries"`
+	Config        extChangelogConfig  `json:"config"`
+	Meta          extChangelogMeta    `json:"meta"`
+	UpdateState   string              `json:"updateState,omitempty"`
 }
 
 // ---------------------------------------------------------------------------
