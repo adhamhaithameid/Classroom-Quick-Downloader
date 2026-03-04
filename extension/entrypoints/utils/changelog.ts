@@ -261,7 +261,7 @@ export function getMatchingRule(config: ChangelogConfig | undefined, currentVers
 
 export function getRuleClasses(rule: NotificationRule | null, isSeen: boolean): string {
   if (!rule) return '';
-  if (isSeen) return ''; // Default / Normal style if seen
+  if (isSeen) return '';
 
   const classes = [];
   
