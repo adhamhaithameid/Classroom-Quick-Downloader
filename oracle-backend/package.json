@@ -5,6 +5,9 @@
   "packageManager": "pnpm@10.28.2",
   "scripts": {
     "preinstall": "node ../tools/enforce-pnpm.cjs",
+    "build:dashboard": "node ./scripts/build-dashboard.mjs",
+    "typecheck:dashboard": "tsc -p ./tsconfig.dashboard.json --noEmit",
+    "test:dashboard:unit": "pnpm run typecheck:dashboard",
     "test": "go test ./...",
     "test:smoke": "go test ./cmd/app ./internal/handlers ./internal/db -run 'Smoke|Health|APIHealthHandler|DBHealthHandler|InitPostgres_Smoke' -count=1",
     "test:functional": "go test ./cmd/app -run 'Functional|Acceptance_Given' -count=1",
