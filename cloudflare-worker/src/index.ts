@@ -395,6 +395,11 @@ function getDownloadsStub(env: WorkerEnv): DurableObjectStub {
 const parsedAllowedOriginsCache = new Map<string, Set<string>>();
 const parsedAllowedEmailsCache = new Map<string, Set<string>>();
 const WEBSITE_EVENTS_SCHEMA_VERSION = "1" as const;
+const SITE_SNAPSHOT_KV_KEY = "site:v1:snapshot";
+const SITE_CACHE_TTL_SECONDS = 3 * 60 * 60;
+const SITE_CACHE_REVALIDATE_AFTER_MS = 3 * 60 * 60 * 1000;
+const ORACLE_PULL_HOURS_UTC = new Set([0, 3, 6, 9, 12, 15, 18, 21]);
+const ORACLE_EXPORT_HOURS_UTC = new Set([1, 4, 7, 10, 13, 16, 19, 22]);
 const ORACLE_PUBLIC_WEBSITE_PATHS = new Set<string>([
   "/api/public/website/snapshot",
   "/api/public/website/overview",
