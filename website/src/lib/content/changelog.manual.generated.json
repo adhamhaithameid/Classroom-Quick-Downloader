@@ -229,3 +229,4 @@
         "Tuned defaults for safer prolonged usage."
       ],
       "fixed": [
+        "Fixed repeated-session regressions."
