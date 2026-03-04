@@ -165,3 +165,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       ],
       "changed": [
         "Improved cancel responsiveness and clarity."
+      ],
