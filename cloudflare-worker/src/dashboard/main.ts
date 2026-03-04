@@ -5664,7 +5664,6 @@ export function renderDashboard(stats: StatsResponse): string {
           appendCategory("Fixed", "#fca5a5", fixed);
           container.appendChild(article);
         });
-        container.innerHTML = html;
       }
 
       async function loadChangelogHistory() {
