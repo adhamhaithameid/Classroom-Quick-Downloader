@@ -269,3 +269,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Additional diagnostics and background-flow coverage."
       ],
       "changed": [
+        "Better queue/error defaults."
