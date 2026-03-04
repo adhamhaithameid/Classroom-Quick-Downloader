@@ -3106,7 +3106,9 @@
           renderNewsletterSummary(summary, counts);
         } catch (e) {
           container.innerHTML = '<div class="empty-state empty-state-danger">Failed to load subscribers</div>';
-          if (summary) summary.innerHTML = '';
+          if (summary) {
+            while (summary.firstChild) summary.removeChild(summary.firstChild);
+          }
         }
       }
 
