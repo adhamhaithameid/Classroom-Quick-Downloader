@@ -1958,7 +1958,7 @@
           }).replace(/"/g, '&quot;');
           html += '<div class="funnel-row" data-point="' + packed + '">';
           html += '<div class="funnel-row-head"><strong>' + escapeHtml(String(stage.label || stage.key || 'Stage')) + '</strong><span>' + fmtNumber(count) + '</span></div>';
-          html += '<div class="funnel-track"><div class="funnel-fill" style="width:' + Math.max(1, Math.min(100, fromStart)) + '%"></div></div>';
+          html += '<div class="funnel-track"><div class="funnel-fill" data-width="' + Math.max(1, Math.min(100, fromStart)).toFixed(2) + '"></div></div>';
           html += '<div class="card-subtitle">From previous: ' + fromPrevPct.toFixed(1) + '% · From start: ' + fromStart.toFixed(1) + '%</div>';
           html += '</div>';
         });
