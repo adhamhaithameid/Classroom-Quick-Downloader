@@ -293,6 +293,14 @@ function getCookieValue(request: Request, name: string): string | null {
   return null;
 }
 
+function getSessionCookie(request: Request): string | null {
+  return getCookieValue(request, COOKIE_NAME);
+}
+
+function getDangerStepUpCookie(request: Request): string | null {
+  return getCookieValue(request, DANGER_COOKIE_NAME);
+}
+
 /**
  * Checks if hostname represents a local development environment.
  * SECURITY: Only loopback addresses disable Secure cookie flag.
