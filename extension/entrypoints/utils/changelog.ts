@@ -67,8 +67,7 @@ function normalizeRuleEffect(value: unknown): NotificationRule['effect'] {
 function normalizeRuleTarget(value: unknown): string {
   if (typeof value !== 'string') return 'all';
   const trimmed = value.trim();
-  if (!trimmed) return 'all';
-  if (trimmed.toLowerCase() === 'all') return 'all';
+  if (!trimmed || trimmed.toLowerCase() === 'all') return 'all';
   return normalizeVersion(trimmed);
 }
 
