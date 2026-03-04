@@ -5621,7 +5621,7 @@ export function renderDashboard(stats: StatsResponse): string {
           setPreviewMessage(container, "No entries to preview.");
           return;
         }
-        let html = '';
+        clearChildren(container);
         list.forEach((entry) => {
           const summary = entry.summary || '';
           const added = Array.isArray(entry.added) ? entry.added : [];
