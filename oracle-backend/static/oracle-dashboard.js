@@ -4769,6 +4769,11 @@
             var priority = document.getElementById('ext-cl-rule-priority').value;
             var effect = document.getElementById('ext-cl-rule-effect').value;
             if (!id) { extClToast('Rule ID is required.', 'error'); return; }
+            var okStepRuleSave = await ensureStepUp();
+            if (!okStepRuleSave) {
+              extClToast('Additional verification is required.', 'error');
+              return;
+            }
             try {
               await postJSON('/api/admin/extension-changelog/rules/upsert', {
                 id: id, target: target, priority: priority, effect: effect
