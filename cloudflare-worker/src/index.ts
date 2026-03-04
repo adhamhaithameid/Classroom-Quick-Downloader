@@ -1192,9 +1192,9 @@ async function resolveAuthContext(request: Request, env: WorkerEnv): Promise<Aut
     );
 
   return {
-    hasValidSecret: !!adminSecret && timingSafeStringEqual(adminSecret, env.DO_SHARED_SECRET),
-    hasValidSession: !!dashboardSecret && !!sessionToken &&
-      await verifySessionToken(sessionToken, dashboardSecret, clientIp, userAgent, bindingMode),
+    hasValidSecret,
+    hasValidSession,
+    hasDangerStepUp,
   };
 }
 
