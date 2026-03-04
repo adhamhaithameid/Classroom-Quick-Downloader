@@ -138,8 +138,6 @@ function normalizeManualData(): ChangelogData {
     rules: rules.map((rule) => ({ target: rule.target, priority: rule.priority, effect: rule.effect })),
     checksum: meta.contentChecksum,
   };
-  return `rev-${hashText(JSON.stringify(basis))}`;
-}
 
 function sanitizeCachedData(value: unknown): ChangelogData | null {
   if (!value || typeof value !== 'object') return null;
