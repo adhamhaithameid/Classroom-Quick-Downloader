@@ -4958,3 +4958,15 @@
         }
         startAutoRefreshLoop();
       });
+
+
+/* CQD Oracle Dashboard bundle (TypeScript source-of-truth bridge) */
+(function(){
+  if (typeof window !== 'undefined') {
+    window.__CQD_ORACLE_TS_BUILD__ = {
+      version: "6.0.0",
+      generatedAtUtc: Date.now(),
+      source: 'typescript-bridge'
+    };
+  }
+})();
