@@ -346,3 +346,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "summary": "Project bootstrap baseline.",
       "highlights": [
         "Initial project foundations.",
+        "Initial structure and baseline workflows.",
