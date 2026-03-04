@@ -231,3 +231,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       ],
       "fixed": [
         "Fixed repeated-session regressions."
+      ],
