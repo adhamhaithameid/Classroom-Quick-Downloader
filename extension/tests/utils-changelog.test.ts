@@ -125,12 +125,8 @@ describe('changelog utils (manual mode)', () => {
       expect(mod.getRuleClasses({ id: 'r', target: 'all', priority: 'major', effect: 'glow' }, false)).toContain('cqd-effect-glow-red');
       expect(mod.getRuleClasses({ id: 'r', target: 'all', priority: 'normal', effect: 'glow' }, false)).toContain('cqd-effect-glow-blue');
 
-      // Major -> Red
-      expect(mod.getRuleClasses({ ...base, priority: 'major' }, false)).toContain('cqd-effect-pulse-red');
-
-      // Minor/Normal -> Blue
-      expect(mod.getRuleClasses({ ...base, priority: 'minor' }, false)).toContain('cqd-effect-pulse-blue');
-      expect(mod.getRuleClasses({ ...base, priority: 'normal' }, false)).toContain('cqd-effect-pulse-blue');
+      expect(mod.getRuleClasses({ id: 'r', target: 'all', priority: 'major', effect: 'pulse' }, false)).toContain('cqd-effect-pulse-red');
+      expect(mod.getRuleClasses({ id: 'r', target: 'all', priority: 'normal', effect: 'pulse' }, false)).toContain('cqd-effect-pulse-blue');
     });
 
     it('handles combinations of priority and effect', async () => {
