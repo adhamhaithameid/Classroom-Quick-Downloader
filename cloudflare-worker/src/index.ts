@@ -2420,7 +2420,13 @@ export default {
       pathname === "/admin/website/flush-now" ||
       pathname === "/admin/website/replay-dlq" ||
       pathname === "/admin/website/override" ||
-      pathname === "/admin/website/refresh-toggle"
+      pathname === "/admin/website/refresh-toggle" ||
+      pathname === "/admin/website/console/summary" ||
+      pathname === "/admin/website/console/kv" ||
+      pathname === "/admin/website/console/d1/tables" ||
+      pathname === "/admin/website/console/d1/query" ||
+      pathname === "/admin/website/console/telemetry" ||
+      pathname === "/admin/website/console/snapshot/raw"
     ) {
       return handleProtectedAdminEndpoint(request, env);
     }
