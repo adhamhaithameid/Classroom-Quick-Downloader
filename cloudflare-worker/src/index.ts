@@ -1,5 +1,5 @@
 // filepath: cloudflare-worker/src/index.ts
-import { renderDashboard, renderLoginPage } from "./dashboard";
+import { renderDashboard, renderLoginPage, renderWebsiteConsole } from "./dashboard";
 import { renderReleaseNotesPage, sanitizeReleaseEntries } from "./release-notes";
 import { resolveOracleEndpoint } from "./oracle-endpoint";
 import type { Env as WorkerEnv, StatsResponse } from "./types";
