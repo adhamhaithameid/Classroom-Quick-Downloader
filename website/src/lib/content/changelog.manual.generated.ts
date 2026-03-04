@@ -32,3 +32,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "highlights": [
         "Revision-aware changelog checks for same-version updates.",
         "Improved changelog update detection logic.",
+        "Fixed stale changelog visibility in republish scenarios."
