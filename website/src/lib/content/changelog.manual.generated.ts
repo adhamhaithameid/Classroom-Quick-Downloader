@@ -334,3 +334,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "changed": [
         "Established baseline architecture/contracts."
       ],
+      "fixed": [
