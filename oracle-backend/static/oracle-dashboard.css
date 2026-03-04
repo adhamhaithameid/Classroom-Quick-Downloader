@@ -1983,7 +1983,8 @@
       }
       #page-website-sync .section-caption,
       #page-website-analysis .section-caption,
-      #page-content-changelog .section-caption {
+      #page-content-changelog .section-caption,
+      #page-ext-changelog .section-caption {
         color: #cbd5e1;
         text-transform: uppercase;
         letter-spacing: 0.08em;
