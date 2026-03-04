@@ -77,7 +77,7 @@ export type SnapshotResponse = {
 };
 
 export type WebsiteSnapshot = {
-  source: 'oracle';
+  source: 'oracle' | 'edge-backend';
   snapshotId: string;
   generatedAt: number;
   fetchedAtUtc: number;
@@ -89,7 +89,13 @@ export type WebsiteSnapshot = {
   privacy: SnapshotResponse['privacy'];
 };
 
-export type WebsiteSnapshotFetchSource = 'oracle' | 'memory-cache' | 'storage-cache';
+export type WebsiteSnapshotFetchSource =
+  | 'edge-backend'
+  | 'oracle'
+  | 'memory-cache'
+  | 'storage-cache'
+  | 'session-cache'
+  | 'bootstrap-cache';
 
 export type WebsiteSnapshotFetchResult = {
   snapshot: WebsiteSnapshot;
@@ -234,3 +240,19 @@ export type WebsiteEventIngestResponse = {
   acceptedCount: number;
   rejectedCount: number;
 };
+
+/* NEWSLETTER_CTA_DISABLED_ROLLBACK_START
+export type NewsletterSubscribeRequest = {
+  email: string;
+  name?: string;
+  source?: string;
+};
+
+export type NewsletterSubscribeResponse = {
+  schemaVersion: PublicSchemaVersion;
+  ok: boolean;
+  generatedAt: number;
+  recordKey: string;
+  message: string;
+};
+NEWSLETTER_CTA_DISABLED_ROLLBACK_END */
