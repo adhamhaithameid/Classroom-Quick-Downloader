@@ -280,7 +280,7 @@ export async function verifySessionToken(
     return false;
   }
 }
-function getSessionCookie(request: Request): string | null {
+function getCookieValue(request: Request, name: string): string | null {
   const cookieHeader = request.headers.get("Cookie") || "";
   const cookies = cookieHeader.split(";").map(c => c.trim());
   for (const cookie of cookies) {
