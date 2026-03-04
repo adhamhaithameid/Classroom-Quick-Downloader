@@ -4273,7 +4273,7 @@
           dailyDownloadsRangeSelect.value = dailyDownloadsRange;
         }
 
-        [
+        var clickBindings = [
           ['shortcuts-btn', openShortcutsModal],
           ['shortcuts-btn-mobile', openShortcutsModal],
           ['batch-btn', showBatchModal],
