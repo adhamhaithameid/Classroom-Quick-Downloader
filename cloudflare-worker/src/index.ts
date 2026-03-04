@@ -526,7 +526,7 @@ function isKnownCorsRoute(pathname: string): boolean {
 }
 
 function isOriginRequiredForPath(pathname: string): boolean {
-  return pathname === "/api/public/website/events";
+  return pathname === "/api/public/website/events" || pathname === "/api/site/v1/events";
 }
 
 function normalizeRequestOrigin(request: Request): string | null {
