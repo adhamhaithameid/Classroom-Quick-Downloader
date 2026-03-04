@@ -1945,7 +1945,7 @@
           return;
         }
         var start = Number(stages[0].count || 0);
-        var html = '<div class="card-subtitle" style="margin-bottom:8px;">Conversion funnel explains how many users moved from one step to the next.</div><div class="funnel-list">';
+        var html = '<div class="card-subtitle card-subtitle-spaced">Conversion funnel explains how many users moved from one step to the next.</div><div class="funnel-list">';
         stages.forEach(function(stage) {
           var count = Number(stage.count || 0);
           var fromStart = start > 0 ? (count / start) * 100 : 0;
