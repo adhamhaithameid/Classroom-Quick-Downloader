@@ -354,3 +354,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       ],
       "changed": [
         "Initial structure and baseline workflows."
+      ],
