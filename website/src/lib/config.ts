@@ -2,8 +2,8 @@ import { env } from '$env/dynamic/public';
 
 const DEFAULT_SITE_URL = 'https://classroom-quick-downloader-website.pages.dev';
 const DEFAULT_WORKER_URL = 'https://cqd-analytics.adhamhaithameid.workers.dev';
-const DEFAULT_ORACLE_URL = 'https://oracle.classroom-quick-downloader.com';
-const DEFAULT_APP_VERSION = 'v1.3.8';
+const DEFAULT_ORACLE_URL = DEFAULT_WORKER_URL;
+const DEFAULT_APP_VERSION = 'v1.3.9';
 
 function cleanBaseUrl(value: string): string {
   return value.trim().replace(/\/+$/, '');
@@ -44,6 +44,7 @@ function envBool(value: string | undefined, fallback = false): boolean {
 export const SITE_URL = ensureUrl(env.PUBLIC_SITE_URL ?? '', resolveDefaultSiteUrl());
 export const ORACLE_API_BASE_URL = ensureUrl(env.PUBLIC_ORACLE_API_BASE_URL ?? '', DEFAULT_ORACLE_URL);
 export const WORKER_BASE_URL = ensureUrl(env.PUBLIC_WORKER_BASE_URL ?? '', DEFAULT_WORKER_URL);
+export const SITE_BACKEND_BASE_URL = ensureUrl(env.PUBLIC_SITE_BACKEND_BASE_URL ?? '', WORKER_BASE_URL);
 export const APP_VERSION = (() => {
   const raw = (env.PUBLIC_APP_VERSION ?? DEFAULT_APP_VERSION).trim();
   if (!raw) return DEFAULT_APP_VERSION;
