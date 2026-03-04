@@ -2102,6 +2102,116 @@
       #page-content-changelog .auth-input-lg {
         min-height: 150px;
       }
+      #page-ext-changelog .table-container table {
+        min-width: 700px;
+      }
+      #page-ext-changelog .table-container td code {
+        font-size: 11px;
+      }
+      #page-ext-changelog .ext-cl-cell-center {
+        text-align: center;
+      }
+      #page-ext-changelog .ext-cl-entry-date {
+        white-space: nowrap;
+        font-size: 0.85em;
+        color: var(--text-soft, #aaa);
+      }
+      #page-ext-changelog .ext-cl-entry-summary {
+        max-width: 260px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      #page-ext-changelog .ext-cl-actions-cell {
+        white-space: nowrap;
+      }
+      #page-ext-changelog .ext-cl-rule-id-code {
+        font-size: 0.82em;
+      }
+      #page-ext-changelog .ext-cl-count-added {
+        color: #22c55e;
+        font-weight: 600;
+      }
+      #page-ext-changelog .ext-cl-count-changed {
+        color: #f59e0b;
+        font-weight: 600;
+      }
+      #page-ext-changelog .ext-cl-count-fixed {
+        color: #ef4444;
+        font-weight: 600;
+      }
+      #page-ext-changelog .card-subtitle {
+        max-width: 86ch;
+      }
+      .ext-pill-preview-shell {
+        margin-top: 12px;
+        display: grid;
+        gap: 10px;
+      }
+      .ext-pill-preview-surface {
+        border: 1px solid rgba(148, 163, 184, 0.35);
+        border-radius: 12px;
+        background: radial-gradient(circle at 22% 20%, rgba(59,130,246,0.18), rgba(15,23,42,0.82));
+        padding: 16px;
+        text-align: center;
+      }
+      .ext-pill-preview-label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.09em;
+        color: #93c5fd;
+        margin-bottom: 10px;
+      }
+      .ext-pill-preview-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      /* Version pill preview (mirrors extension/cloudflare logic) */
+      .cqd-brand-version {
+        font-weight: 600;
+        color: #005dd7;
+        background: #e3edff;
+        padding: 3px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        border: 1px solid transparent;
+        display: inline-block;
+        transition: all 0.2s ease;
+      }
+      .cqd-pill-minor {
+        background: #005dd7 !important;
+        color: #fff !important;
+      }
+      .cqd-pill-major {
+        background: #ef4444 !important;
+        color: #fff !important;
+      }
+      .cqd-effect-glow-blue {
+        box-shadow: 0 0 10px #00d2ff, 0 0 5px #007bff !important;
+        border-color: #00d2ff !important;
+      }
+      .cqd-effect-glow-red {
+        box-shadow: 0 0 10px #f87171, 0 0 5px #ef4444 !important;
+        border-color: #f87171 !important;
+      }
+      @keyframes oracle-pill-pulse-blue {
+        0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.72); }
+        70% { box-shadow: 0 0 0 7px rgba(59, 130, 246, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+      }
+      @keyframes oracle-pill-pulse-red {
+        0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.72); }
+        70% { box-shadow: 0 0 0 7px rgba(239, 68, 68, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+      }
+      .cqd-effect-pulse-blue { animation: oracle-pill-pulse-blue 2s infinite; }
+      .cqd-effect-pulse-red { animation: oracle-pill-pulse-red 2s infinite; }
+      .rule-preview-mini {
+        font-size: 11px;
+        padding: 2px 8px;
+      }
       .infra-button-grid .btn {
         border: 1px solid rgba(148,163,184,0.32);
         background: rgba(30,41,59,0.42);
