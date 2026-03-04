@@ -199,3 +199,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "summary": "Cancel feature baseline release.",
       "highlights": [
         "Core cancel-download capability.",
+        "Lifecycle handling updated for cancellation-aware flow.",
