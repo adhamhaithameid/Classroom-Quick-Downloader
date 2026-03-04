@@ -55,8 +55,7 @@ jobs:
             esac
           done
           if [ "${PUBLIC_ORACLE_API_BASE_URL%/}" = "${PUBLIC_WORKER_BASE_URL%/}" ]; then
-            echo "::error::PUBLIC_ORACLE_API_BASE_URL must be different from PUBLIC_WORKER_BASE_URL (Website reads must target Oracle; writes must target Worker)."
-            exit 1
+            echo "::warning::PUBLIC_ORACLE_API_BASE_URL equals PUBLIC_WORKER_BASE_URL. This is allowed when routing reads/writes by endpoint path."
           fi
 
       - name: Schema compatibility checks
