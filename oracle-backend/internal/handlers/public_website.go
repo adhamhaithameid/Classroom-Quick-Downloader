@@ -1392,10 +1392,10 @@ func defaultPublicWebsiteUserChangelogEntries() []publicWebsiteUserChangelogEntr
 
 	return []publicWebsiteUserChangelogEntry{
 		{
-			ID:      "release-138",
-			Version: "1.3.8",
-			Title:   "Reliable changelog delivery for all users",
-			Summary: "Changelog updates now re-open correctly even when the version number stays the same, so release communication remains accurate.",
+			ID:      "release-139",
+			Version: "1.3.9",
+			Title:   "Manual changelog mode and session-pinned live metrics",
+			Summary: "Release notes are now sourced from manual versioned files, and website metrics stay stable during an open session for clearer UX.",
 			Highlights: []string{
 				"Revision-aware changelog updates from Cloudflare to extension clients.",
 				"Improved version-pill behavior after same-version republish events.",
