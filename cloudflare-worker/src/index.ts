@@ -407,6 +407,9 @@ const ORACLE_PUBLIC_WEBSITE_PATHS = new Set<string>([
   "/api/public/website/status",
   "/api/public/website/changelog",
   "/api/public/website/uninstall",
+  // NEWSLETTER_CTA_DISABLED_ROLLBACK_START
+  // "/api/public/website/newsletter/subscribe",
+  // NEWSLETTER_CTA_DISABLED_ROLLBACK_END
 ]);
 
 function isOraclePublicWebsiteRoute(pathname: string): boolean {
