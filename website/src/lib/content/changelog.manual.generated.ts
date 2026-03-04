@@ -41,3 +41,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Improved changelog update detection logic."
       ],
       "fixed": [
+        "Fixed stale changelog visibility in republish scenarios."
