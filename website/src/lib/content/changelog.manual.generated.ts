@@ -349,3 +349,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Initial structure and baseline workflows.",
         "N/A"
       ],
+      "added": [
