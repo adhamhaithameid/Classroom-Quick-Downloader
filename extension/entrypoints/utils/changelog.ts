@@ -77,7 +77,7 @@ function hashText(value: string): string {
     hash = ((hash << 5) - hash) + value.charCodeAt(i);
     hash |= 0;
   }
-  return out;
+  return (hash >>> 0).toString(16);
 }
 
 function sanitizeMeta(value: unknown): ChangelogMeta | undefined {
