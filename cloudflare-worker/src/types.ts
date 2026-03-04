@@ -372,6 +372,8 @@ export interface D1DatabaseBinding {
  */
 export interface Env {
   DOWNLOADS_DO: DurableObjectNamespace;
+  SITE_SNAPSHOT_KV?: KVNamespaceBinding;
+  SITE_CACHE_DB?: D1DatabaseBinding;
   DO_SHARED_SECRET: string;
   DASHBOARD_PASSWORD?: string;
   DANGER_PASSWORD: string;
