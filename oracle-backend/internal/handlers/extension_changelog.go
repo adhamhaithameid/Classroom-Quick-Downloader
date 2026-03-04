@@ -400,7 +400,53 @@ func previewExtChangelogFromGitHub(db *sql.DB, markdownURL string) (map[string]a
 	}
 	markdown, err := fetchRemoteUserFriendlyChangelogMarkdown(context.Background(), canonicalURL)
 	if err != nil {
-		return 0, fmt.Errorf("failed to fetch markdown: %w", err)
+		return nil, fmt.Errorf("failed to fetch markdown: %w", err)
+	}
+	releases := parseUserFriendlyChangelogMarkdown(markdown)
+	if len(releases) == 0 {
+		return nil, fmt.Errorf("no releases parsed from markdown")
+	}
+
+	hash := sha256.Sum256([]byte(markdown))
+	checksum := hex.EncodeToString(hash[:])[:16]
+
+	config, _ := loadExtChangelogConfig(db)
+	lastChecksum := getExtChangelogConfigValue(config, "last_import_checksum")
+	lastImportAt := parseExtInt64(getExtChangelogConfigValue(config, "last_import_at"))
+	duplicate := lastChecksum != "" && strings.EqualFold(lastChecksum, checksum)
+
+	preview := make([]map[string]any, 0, 5)
+	for i := 0; i < len(releases) && i < 5; i += 1 {
+		release := releases[i]
+		preview = append(preview, map[string]any{
+			"version": release.Version,
+			"summary": trimAndLimit(release.Summary, 200),
+			"added":   len(release.Added),
+			"changed": len(release.Changed),
+			"fixed":   len(release.Fixed),
+		})
+	}
+
+	return map[string]any{
+		"ok":            true,
+		"url":           canonicalURL,
+		"parsedCount":   len(releases),
+		"checksum":      checksum,
+		"duplicate":     duplicate,
+		"lastImportAt":  lastImportAt,
+		"preview":       preview,
+		"schemaVersion": "1",
+	}, nil
+}
+
+func importExtChangelogFromGitHub(db *sql.DB, markdownURL string) (extGitHubImportResult, error) {
+	canonicalURL, err := sanitizeGitHubRawMarkdownURL(markdownURL)
+	if err != nil {
+		return extGitHubImportResult{}, err
+	}
+	markdown, err := fetchRemoteUserFriendlyChangelogMarkdown(context.Background(), canonicalURL)
+	if err != nil {
+		return extGitHubImportResult{}, fmt.Errorf("failed to fetch markdown: %w", err)
 	}
 
 	releases := parseUserFriendlyChangelogMarkdown(markdown)
