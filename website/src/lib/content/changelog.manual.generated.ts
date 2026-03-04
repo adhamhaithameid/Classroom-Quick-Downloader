@@ -302,3 +302,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "version": "1.0.1",
       "title": "Release 1.0.1",
       "summary": "Post-launch stabilization release.",
+      "highlights": [
