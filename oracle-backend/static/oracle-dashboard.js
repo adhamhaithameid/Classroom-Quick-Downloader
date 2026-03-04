@@ -2663,6 +2663,26 @@
         return html;
       }
 
+      function applyFunnelFillWidths(container) {
+        if (!container) return;
+        var fills = container.querySelectorAll('.funnel-fill[data-width]');
+        fills.forEach(function(fill) {
+          var width = Number(fill.getAttribute('data-width') || '0');
+          var safeWidth = Math.max(0, Math.min(100, Number.isFinite(width) ? width : 0));
+          fill.style.width = safeWidth.toFixed(2) + '%';
+        });
+      }
+
+      function applyHeatmapOpacities(container) {
+        if (!container) return;
+        var cells = container.querySelectorAll('.heatmap-cell[data-opacity]');
+        cells.forEach(function(cell) {
+          var opacity = Number(cell.getAttribute('data-opacity') || '0');
+          var safeOpacity = Math.max(0.05, Math.min(1, Number.isFinite(opacity) ? opacity : 0.15));
+          cell.style.opacity = safeOpacity.toFixed(3);
+        });
+      }
+
       function releaseToHighlights(release) {
         var highlights = [];
         (release.added || []).forEach(function(item) { highlights.push('Added: ' + item); });
