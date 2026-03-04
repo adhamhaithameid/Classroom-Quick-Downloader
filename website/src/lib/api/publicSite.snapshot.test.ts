@@ -9,15 +9,111 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.useRealTimers();
   resetWebsiteSnapshotCacheForTests();
+  delete (globalThis as { window?: unknown }).window;
 });
 
 describe('fetchWebsiteSnapshot', () => {
+  function createMemoryStorage() {
+    const map = new Map<string, string>();
+    return {
+      getItem(key: string): string | null {
+        return map.has(key) ? (map.get(key) as string) : null;
+      },
+      setItem(key: string, value: string): void {
+        map.set(key, value);
+      },
+      removeItem(key: string): void {
+        map.delete(key);
+      }
+    };
+  }
+
+  function makeStoredSnapshot(snapshotId: string, generatedAt: number) {
+    return {
+      source: 'edge-backend',
+      snapshotId,
+      generatedAt,
+      fetchedAtUtc: generatedAt + 1,
+      nextRefreshAtUtc: generatedAt + ORACLE_SNAPSHOT_REFRESH_MS,
+      overview: {
+        schemaVersion: '1',
+        ok: true,
+        generatedAt,
+        totals: { downloads: generatedAt, success: 1, fail: 0 },
+        installs: { usersTotal: 1, lastSyncedAtUtc: generatedAt, browsers: [] },
+        versions: { github: null, chrome: null, firefox: null, edge: null },
+        status: { systemLive: true, liveSinceUtc: generatedAt, workerHealth: 'up' },
+        links: { chrome: 'https://c', firefox: 'https://f', edge: 'https://e', github: 'https://g' }
+      },
+      map: {
+        schemaVersion: '1',
+        ok: true,
+        generatedAt,
+        granularity: 'country',
+        countries: [{ countryCode: 'US', count: 1 }],
+        totals: { countries: 1, downloads: 1 },
+        privacyNote: 'country-only'
+      },
+      changelog: {
+        schemaVersion: '1',
+        ok: true,
+        generatedAt,
+        headline: '',
+        description: '',
+        entries: [],
+        fullChangelogUrl: '',
+        lastUpdatedAtUtc: null
+      },
+      userChangelogSummary: {
+        headline: '',
+        description: '',
+        entriesCount: 0,
+        lastUpdatedAtUtc: null,
+        fullChangelogUrl: ''
+      },
+      privacy: {
+        headline: '',
+        description: '',
+        userPrivacyUrl: '',
+        fullPrivacyUrl: ''
+      }
+    };
+  }
+
+  it('prefers newer local next snapshot over stale session snapshot on refresh', async () => {
+    const localStorage = createMemoryStorage();
+    const sessionStorage = createMemoryStorage();
+
+    const staleSession = makeStoredSnapshot('session-stale', 1772500000000);
+    const freshLocal = makeStoredSnapshot('local-next', 1772600000000);
+
+    sessionStorage.setItem('cqd.website.snapshot.session.v1', JSON.stringify(staleSession));
+    localStorage.setItem('cqd.website.snapshot.next.v1', JSON.stringify(freshLocal));
+    localStorage.setItem('cqd.website.snapshot.lastgood.v1', JSON.stringify(freshLocal));
+
+    (globalThis as { window?: unknown }).window = {
+      localStorage,
+      sessionStorage
+    };
+
+    const fetchMock = vi.fn(async () => new Response('missing', { status: 404 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const snapshot = await fetchWebsiteSnapshot();
+    expect(snapshot.snapshotId).toBe('local-next');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('loads canonical snapshot from Oracle and caches for 3 hours', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-02-23T00:00:00.000Z'));
 
-    const fetchMock = vi.fn(async () =>
-      new Response(
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url.includes('/data/bootstrap-snapshot.json')) {
+        return new Response('missing', { status: 404 });
+      }
+      return new Response(
         JSON.stringify({
           schemaVersion: '1',
           ok: true,
@@ -76,8 +172,8 @@ describe('fetchWebsiteSnapshot', () => {
           }
         }),
         { status: 200 }
-      )
-    );
+      );
+    });
 
     vi.stubGlobal('fetch', fetchMock);
 
@@ -96,12 +192,16 @@ describe('fetchWebsiteSnapshot', () => {
     expect(first.nextRefreshAtUtc - first.fetchedAtUtc).toBe(ORACLE_SNAPSHOT_REFRESH_MS);
   }, 15_000);
 
-  it('refreshes cache after 3 hours and when force=true', async () => {
+  it('keeps session-pinned snapshot stable until forced refresh', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-02-23T00:00:00.000Z'));
 
-    const fetchMock = vi.fn(async () =>
-      new Response(
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url.includes('/data/bootstrap-snapshot.json')) {
+        return new Response('missing', { status: 404 });
+      }
+      return new Response(
         JSON.stringify({
           schemaVersion: '1',
           ok: true,
@@ -148,8 +248,8 @@ describe('fetchWebsiteSnapshot', () => {
           }
         }),
         { status: 200 }
-      )
-    );
+      );
+    });
     vi.stubGlobal('fetch', fetchMock);
 
     const first = await fetchWebsiteSnapshot();
@@ -157,12 +257,12 @@ describe('fetchWebsiteSnapshot', () => {
     await fetchWebsiteSnapshot();
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
-    await fetchWebsiteSnapshot({ force: true });
+    const forced = await fetchWebsiteSnapshot({ force: true });
     expect(fetchMock).toHaveBeenCalledTimes(2);
 
     vi.setSystemTime(new Date('2026-02-23T04:10:00.000Z'));
     const refreshed = await fetchWebsiteSnapshot();
-    expect(fetchMock).toHaveBeenCalledTimes(3);
-    expect(refreshed.fetchedAtUtc).toBeGreaterThan(first.fetchedAtUtc);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(refreshed.fetchedAtUtc).toBe(forced.fetchedAtUtc);
   });
 });
