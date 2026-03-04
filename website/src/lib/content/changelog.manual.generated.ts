@@ -315,3 +315,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       ],
       "fixed": [
         "Fixed launch-adjacent regressions."
+      ],
