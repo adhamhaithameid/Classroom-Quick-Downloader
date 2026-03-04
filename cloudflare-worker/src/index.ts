@@ -2433,6 +2433,18 @@ export default {
 
     return new Response("Not found (worker)", { status: 404 });
   },
+  async scheduled(controller: ScheduledController, env: WorkerEnv, _ctx: ExecutionContext): Promise<void> {
+    const now = controller.scheduledTime || Date.now();
+    const hour = currentHourUtc(now);
+
+    if (ORACLE_PULL_HOURS_UTC.has(hour)) {
+      await refreshSiteSnapshotCacheFromOracle(env);
+    }
+
+    if (ORACLE_EXPORT_HOURS_UTC.has(hour)) {
+      await flushWebsiteTelemetryViaDo(env);
+    }
+  },
 };
 
 export { DownloadsDurable } from "./downloads_do";
