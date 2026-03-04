@@ -1,6 +1,6 @@
 import { browser } from '$app/environment';
 import { get, writable } from 'svelte/store';
-import { fetchWebsiteSnapshotResult, ORACLE_SNAPSHOT_REFRESH_MS } from '$lib/api/publicSite';
+import { fetchWebsiteSnapshotResult } from '$lib/api/publicSite';
 import type { WebsiteSnapshotStoreState } from '$lib/types/public';
 
 const initialState: WebsiteSnapshotStoreState = {
@@ -18,9 +18,9 @@ const initialState: WebsiteSnapshotStoreState = {
 
 const snapshotStateStore = writable<WebsiteSnapshotStoreState>(initialState);
 
-let refreshTimer: ReturnType<typeof setInterval> | null = null;
 let initRefCount = 0;
 let refreshInFlight: Promise<WebsiteSnapshotStoreState> | null = null;
+const SNAPSHOT_FORCE_APPLY_MAX_AGE_MS = 3 * 60 * 60 * 1000;
 
 function nowUtc(): number {
   return Date.now();
@@ -28,7 +28,7 @@ function nowUtc(): number {
 
 function toErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim()) return error.message.trim();
-  return 'Live Oracle snapshot is temporarily unavailable.';
+  return 'Site snapshot is temporarily unavailable.';
 }
 
 function updateState(next: Partial<WebsiteSnapshotStoreState>): WebsiteSnapshotStoreState {
@@ -41,24 +41,11 @@ function updateState(next: Partial<WebsiteSnapshotStoreState>): WebsiteSnapshotS
   return updated;
 }
 
-function stopRefreshTimer(): void {
-  if (!browser) return;
-  if (refreshTimer) {
-    clearInterval(refreshTimer);
-    refreshTimer = null;
-  }
-}
-
-function startRefreshTimer(intervalMs = ORACLE_SNAPSHOT_REFRESH_MS): void {
-  if (!browser) return;
-  stopRefreshTimer();
-  const safeInterval = Math.max(60_000, Math.floor(intervalMs));
-  refreshTimer = setInterval(() => {
-    void refreshWebsiteSnapshotStore({ force: true });
-  }, safeInterval);
-}
-
-export async function refreshWebsiteSnapshotStore(options: { force?: boolean; userInitiated?: boolean } = {}): Promise<WebsiteSnapshotStoreState> {
+export async function refreshWebsiteSnapshotStore(options: {
+  force?: boolean;
+  userInitiated?: boolean;
+  applyToCurrentSession?: boolean;
+} = {}): Promise<WebsiteSnapshotStoreState> {
   if (refreshInFlight) return refreshInFlight;
 
   const current = get(snapshotStateStore);
@@ -74,7 +61,10 @@ export async function refreshWebsiteSnapshotStore(options: { force?: boolean; us
 
   const runner = (async () => {
     try {
-      const result = await fetchWebsiteSnapshotResult({ force: options.force === true });
+      const result = await fetchWebsiteSnapshotResult({
+        force: options.force === true,
+        applyToCurrentSession: options.applyToCurrentSession === true
+      });
       return updateState({
         status: result.degraded ? 'degraded' : 'ready',
         snapshot: result.snapshot,
@@ -118,15 +108,31 @@ export async function refreshWebsiteSnapshotStore(options: { force?: boolean; us
   return runner;
 }
 
-export function initializeWebsiteSnapshotStore(options: { autoRefreshMs?: number } = {}): () => void {
+export function initializeWebsiteSnapshotStore(): () => void {
   if (!browser) {
     return () => {};
   }
 
   initRefCount += 1;
   if (initRefCount === 1) {
-    void refreshWebsiteSnapshotStore();
-    startRefreshTimer(options.autoRefreshMs ?? ORACLE_SNAPSHOT_REFRESH_MS);
+    // 1) Hydrate from local snapshot instantly.
+    // 2) Fetch latest snapshot in background.
+    // 3) If current snapshot is old, apply immediately; otherwise keep session stable.
+    void refreshWebsiteSnapshotStore({ force: false }).then((state) => {
+      const snapshotAgeMs =
+        typeof state.snapshot?.generatedAt === 'number' && state.snapshot.generatedAt > 0
+          ? nowUtc() - state.snapshot.generatedAt
+          : Number.POSITIVE_INFINITY;
+      const applyFreshNow =
+        !state.snapshot ||
+        state.source === 'bootstrap-cache' ||
+        snapshotAgeMs >= SNAPSHOT_FORCE_APPLY_MAX_AGE_MS;
+
+      void refreshWebsiteSnapshotStore({
+        force: true,
+        applyToCurrentSession: applyFreshNow
+      });
+    });
   }
 
   let disposed = false;
@@ -134,14 +140,10 @@ export function initializeWebsiteSnapshotStore(options: { autoRefreshMs?: number
     if (disposed) return;
     disposed = true;
     initRefCount = Math.max(0, initRefCount - 1);
-    if (initRefCount === 0) {
-      stopRefreshTimer();
-    }
   };
 }
 
 export function resetWebsiteSnapshotStoreForTests(): void {
-  stopRefreshTimer();
   initRefCount = 0;
   refreshInFlight = null;
   snapshotStateStore.set(initialState);
