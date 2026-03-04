@@ -54,7 +54,7 @@ jobs:
           script_stop: true
           command_timeout: 45m
           script: |
-            set -euo pipefail
+            set -eu
 
             REPO_DIR="$HOME/Classroom-Quick-Downloader"
             if [ ! -d "$REPO_DIR/.git" ]; then
@@ -72,7 +72,7 @@ jobs:
 
             cd oracle-backend
             if [ ! -f .env.production ]; then
-              for candidate in "$HOME/oracle-backend/.env.production" "$HOME/oracle-backend/.env" "$HOME/Classroom-Quick-Downloader/.env.production"; do
+              for candidate in ".env" "$HOME/oracle-backend/.env.production" "$HOME/oracle-backend/.env" "$HOME/Classroom-Quick-Downloader/.env.production"; do
                 if [ -f "$candidate" ]; then
                   cp "$candidate" .env.production
                   echo "Recovered .env.production from $candidate"
@@ -85,20 +85,7 @@ jobs:
               exit 1
             fi
 
-            required_env_keys=(
-              APP_ENV
-              ADDR
-              DB_PATH
-              STATIC_DIR
-              DO_SHARED_SECRET
-              DASHBOARD_PASSWORD
-              SUPER_ADMIN_PASSWORD
-              DANGER_PASSWORD
-              ARCHIVER_SHARED_SECRET
-              ORACLE_AUDIT_CHECKPOINT_SECRET
-              PUBLIC_WEBSITE_ALLOWED_ORIGINS
-            )
-            for key in "${required_env_keys[@]}"; do
+            for key in APP_ENV ADDR DB_PATH STATIC_DIR DO_SHARED_SECRET DASHBOARD_PASSWORD SUPER_ADMIN_PASSWORD DANGER_PASSWORD ARCHIVER_SHARED_SECRET ORACLE_AUDIT_CHECKPOINT_SECRET PUBLIC_WEBSITE_ALLOWED_ORIGINS; do
               value="$(grep -E "^${key}=" .env.production | head -n1 | cut -d= -f2- || true)"
               if [ -z "${value}" ]; then
                 echo "Missing required key in .env.production: ${key}"
