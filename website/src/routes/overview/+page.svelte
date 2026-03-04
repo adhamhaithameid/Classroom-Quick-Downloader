@@ -4,6 +4,7 @@
   import { quintOut } from 'svelte/easing';
   import { base } from '$app/paths';
   import { APP_VERSION, STORE_LINKS } from '$lib/config';
+  import SeoMeta from '$lib/components/SeoMeta.svelte';
   import { detectBrowserFromNavigator, type BrowserKey } from '$lib/browser/detect';
   import { refreshWebsiteSnapshotStore, websiteSnapshotStore } from '$lib/stores/websiteSnapshot';
   import type { MapResponse, OverviewResponse } from '$lib/types/public';
@@ -52,6 +53,18 @@
     map: false,
     cta: false,
     general: true
+  };
+
+  const softwareApplicationStructuredData = {
+    '@context': 'https://schema.org',
+    '@type': 'SoftwareApplication',
+    name: 'Classroom Quick Downloader',
+    applicationCategory: 'BrowserExtension',
+    operatingSystem: 'Chrome, Firefox, Edge',
+    offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+    publisher: { '@type': 'Person', name: 'Adham Haitham Eid' },
+    url: 'https://classroom-quick-downloader-website.pages.dev/overview',
+    downloadUrl: [STORE_LINKS.chrome, STORE_LINKS.firefox, STORE_LINKS.edge]
   };
 
   type RenderPlacement = ElementPlacement & {
@@ -122,6 +135,10 @@
   $: hoursSaved = computeTimeSaved(downloadCount).hours;
   $: clicksSaved = computeTimeSaved(downloadCount).clicks;
   $: metricsReady = downloadCount !== null && userCount !== null && countryCount !== null;
+  $: hasMeaningfulProof =
+    (typeof downloadCount === 'number' && downloadCount > 0) ||
+    (typeof userCount === 'number' && userCount > 0) ||
+    (typeof countryCount === 'number' && countryCount > 0);
 
   /* Top 3 countries by download count */
   $: topCountries = (mapData?.countries ?? [])
@@ -1286,9 +1303,15 @@
   on:pointercancel={onEditPointerUp}
 />
 
+<SeoMeta
+  title="Classroom Quick Downloader — Download All Google Classroom Files In One Click"
+  description="Free browser extension to bulk download all attachments from Google Classroom assignments. One click. Chrome, Firefox, and Edge."
+  path="/overview"
+  keywords="download all google classroom files, bulk download google classroom attachments, google classroom extension"
+  structuredData={softwareApplicationStructuredData}
+/>
+
 <svelte:head>
-  <title>Classroom Quick Downloader — The Free Extension That Supercharges Google Classroom</title>
-  <meta name="description" content="Download all your Google Classroom files with one click. Free, open-source, and privacy-first." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
@@ -1365,8 +1388,8 @@
   <section id="top" class="l2-hero l2-snap">
     <div class="l2-wrap l2-hero-content">
       <h1 class="l2-mega">
-        The free extension that<br/>
-        <span class="l2-em l2-em-supercharge">supercharges{#if pinnedSuperchargeStar}{@const pinnedResolved = resolveSvg(pinnedSuperchargeStar)}{@const pinnedSize = Math.max(18, Math.min(54, pinnedSuperchargeStar.renderSize))}<span
+        Download all Google Classroom files<br/>
+        <span class="l2-em l2-em-supercharge">in one click{#if pinnedSuperchargeStar}{@const pinnedResolved = resolveSvg(pinnedSuperchargeStar)}{@const pinnedSize = Math.max(18, Math.min(54, pinnedSuperchargeStar.renderSize))}<span
             class="l2-supercharge-star"
             aria-hidden="true"
             style="
@@ -1384,7 +1407,7 @@
               stroke-linecap="round"
               stroke-linejoin="round"
               style="width:100%;height:100%;"
-            >{@html pinnedResolved.svg}</svg></span>{/if}</span><br/>Google Classroom.
+            >{@html pinnedResolved.svg}</svg></span>{/if}</span><br/>for every assignment.
       </h1>
 
       <p class="l2-sub">
@@ -1467,24 +1490,30 @@
 
   <!-- ━━━━ Scrolling Metrics Marquee ━━━━ -->
   <section class="l2-marquee l2-snap">
-    <div class="l2-marquee-viewport" bind:this={marqueeViewport}>
-      <div class="l2-marquee-track">
-        {#each [0, 1, 2, 3, 4, 5, 6, 7] as _dup}
-          <div class="l2-marquee-set" aria-hidden={_dup > 0 ? 'true' : undefined}>
-            <div class="l2-mq-item"><span class="l2-mq-num">{formatNumber(downloadCount)}</span><span class="l2-mq-label">Files Downloaded</span></div>
-            <span class="l2-mq-dot">•</span>
-            <div class="l2-mq-item"><span class="l2-mq-num">{formatNumber(userCount)}</span><span class="l2-mq-label">Total Installs</span></div>
-            <span class="l2-mq-dot">•</span>
-            <div class="l2-mq-item"><span class="l2-mq-num">{formatNumber(countryCount)}</span><span class="l2-mq-label">Countries</span></div>
-            <span class="l2-mq-dot">•</span>
-            <div class="l2-mq-item"><span class="l2-mq-num">{formatCompact(hoursSaved)}</span><span class="l2-mq-label">Hours Saved</span></div>
-            <span class="l2-mq-dot">•</span>
-            <div class="l2-mq-item"><span class="l2-mq-num">{formatCompact(clicksSaved)}</span><span class="l2-mq-label">Clicks Saved</span></div>
-            <span class="l2-mq-dot">•</span>
-          </div>
-        {/each}
+    {#if hasMeaningfulProof}
+      <div class="l2-marquee-viewport" bind:this={marqueeViewport}>
+        <div class="l2-marquee-track">
+          {#each [0, 1, 2, 3, 4, 5, 6, 7] as _dup}
+            <div class="l2-marquee-set" aria-hidden={_dup > 0 ? 'true' : undefined}>
+              <div class="l2-mq-item"><span class="l2-mq-num">{formatNumber(downloadCount)}</span><span class="l2-mq-label">Files Downloaded</span></div>
+              <span class="l2-mq-dot">•</span>
+              <div class="l2-mq-item"><span class="l2-mq-num">{formatNumber(userCount)}</span><span class="l2-mq-label">Total Installs</span></div>
+              <span class="l2-mq-dot">•</span>
+              <div class="l2-mq-item"><span class="l2-mq-num">{formatNumber(countryCount)}</span><span class="l2-mq-label">Countries</span></div>
+              <span class="l2-mq-dot">•</span>
+              <div class="l2-mq-item"><span class="l2-mq-num">{formatCompact(hoursSaved)}</span><span class="l2-mq-label">Hours Saved</span></div>
+              <span class="l2-mq-dot">•</span>
+              <div class="l2-mq-item"><span class="l2-mq-num">{formatCompact(clicksSaved)}</span><span class="l2-mq-label">Clicks Saved</span></div>
+              <span class="l2-mq-dot">•</span>
+            </div>
+          {/each}
+        </div>
       </div>
-    </div>
+    {:else}
+      <div class="l2-marquee-fallback">
+        Trusted by students across Chrome, Firefox, and Edge. Real metrics appear automatically once live traffic snapshots are ready.
+      </div>
+    {/if}
   </section>
 
   <!-- ━━━━ Problem → Solution (Dual Feature) ━━━━ -->
@@ -1646,8 +1675,8 @@
       </div>
       <div class="l2-feature-grid">
         <div class="l2-fcard"><div class="l2-fcard-icon">⚡</div><h3>Instant</h3><p>Install → open Classroom → download. Zero configuration, zero learning curve.</p></div>
-        <div class="l2-fcard"><div class="l2-fcard-icon">🔒</div><h3>Private</h3><p>No tracking cookies. No analytics. No personal data. Your files stay yours.</p></div>
-        <div class="l2-fcard"><div class="l2-fcard-icon">🔓</div><h3>Open Source</h3><p>Every line is public on GitHub. Audit it, fork it, contribute to it.</p></div>
+        <div class="l2-fcard"><div class="l2-fcard-icon">🔒</div><h3>Private</h3><p>No third-party tracking, no cookies, and no user profiles. Only aggregate operational metrics.</p></div>
+        <div class="l2-fcard"><div class="l2-fcard-icon">🔓</div><h3>Transparent</h3><p>Clear docs, public roadmap, and predictable release notes for every update.</p></div>
         <div class="l2-fcard"><div class="l2-fcard-icon">🌐</div><h3>Universal</h3><p>Chrome, Firefox, Edge, Brave, Opera, Vivaldi, Arc — it just works.</p></div>
         <div class="l2-fcard"><div class="l2-fcard-icon">🎓</div><h3>For Students</h3><p>Built by a student who was tired of clicking. Designed for real classroom workflows.</p></div>
         <div class="l2-fcard"><div class="l2-fcard-icon">🌍</div><h3><AnimatedNumber value={100} format={{ useGrouping: false }} suffix="+" animated /> Languages</h3><p>Available in English, Arabic, Spanish, French, German, and over <AnimatedNumber value={100} format={{ useGrouping: false }} animated /> more languages.</p></div>
@@ -1872,6 +1901,12 @@
     <div class="l2-wrap l2-cta-content l2-reveal" data-placement-section="cta" style="position:relative;overflow:visible">
       <h2>Ready to save hours?</h2>
       <p>Install Classroom Quick Downloader in under 10 seconds. Free, forever. No account required.</p>
+      <div class="l2-seo-links" aria-label="Guides and install links">
+        <a href="{base}/download-all-attachments-google-classroom">Download-all guide</a>
+        <a href="{base}/google-drive-cant-scan-virus-warning-download">Drive warning fix</a>
+        <a href="{base}/install/chrome">Install on Chrome</a>
+        <a href="{base}/security">Security</a>
+      </div>
       <!-- NEWSLETTER_CTA_DISABLED_ROLLBACK_START
       <p>Install Classroom Quick Downloader in under 10 seconds, and add your email for future updates. Free, forever. No account required.</p>
       <form class="l2-newsletter-form" on:submit|preventDefault={submitNewsletterEmail}>
@@ -2742,6 +2777,15 @@
   }
   .l2-mq-label { font-size: 13px; font-weight: 500; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em; }
   .l2-mq-dot { color: var(--text-secondary); opacity: 0.72; font-size: 20px; }
+  .l2-marquee-fallback {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 10px 24px;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 14px;
+    line-height: 1.6;
+  }
 
   /* ── Content Blocks ────────────────── */
   .l2-block { padding: 80px 0; position: relative; z-index: 2; }
@@ -3641,7 +3685,32 @@
     font-size: clamp(32px, 4vw, 48px); font-weight: 900;
     letter-spacing: -0.03em; margin: 0 0 16px;
   }
-  .l2-cta-content p { font-size: 18px; color: var(--text-secondary); margin: 0 0 36px; }
+  .l2-cta-content p { font-size: 18px; color: var(--text-secondary); margin: 0 0 20px; }
+
+  .l2-seo-links {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0 auto 24px;
+  }
+
+  .l2-seo-links a {
+    text-decoration: none;
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    transition: color 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+  }
+
+  .l2-seo-links a:hover {
+    color: var(--gc-green);
+    border-color: rgba(26, 139, 85, 0.35);
+    background: rgba(26, 139, 85, 0.08);
+  }
   .l2-newsletter-form {
     width: min(580px, 100%);
     margin: 0 auto 22px;

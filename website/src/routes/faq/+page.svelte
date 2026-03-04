@@ -1,6 +1,7 @@
 <script lang="ts">
   import { base } from '$app/paths';
   import { STORE_LINKS } from '$lib/config';
+  import SeoMeta from '$lib/components/SeoMeta.svelte';
 
   type FaqItem = {
     id: string;
@@ -34,7 +35,7 @@
         {
           id: 'basics-free',
           q: 'Is it free?',
-          a: 'Yes. The extension is completely free to use, has no premium tier, and is open-source under a public license.'
+          a: 'Yes. The extension is completely free to use and has no premium tier.'
         },
         {
           id: 'basics-account',
@@ -289,7 +290,7 @@
         {
           id: 'trouble-blocked-school',
           q: 'My school\'s network blocks the extension. What can I do?',
-          a: 'Some school networks or managed Chromebooks restrict extension installation. Contact your IT administrator and reference the extension\'s store listing and open-source repository for review.'
+          a: 'Some school networks or managed Chromebooks restrict extension installation. Contact your IT administrator and reference the extension store listing and GitHub repository for review.'
         }
       ]
     },
@@ -378,7 +379,7 @@
         {
           id: 'dev-license',
           q: 'What license does CQD use?',
-          a: 'CQD is released under an open-source license. Check the LICENSE file in the GitHub repository for the exact terms and conditions.'
+          a: 'Check the LICENSE file in the GitHub repository for the exact terms and conditions currently used by this release.'
         },
         {
           id: 'dev-build',
@@ -429,15 +430,29 @@
     activeSection = activeSection === title ? null : title;
     searchQuery = '';
   }
+
+  const faqStructuredData = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: sections.flatMap((section) =>
+      section.items.map((item) => ({
+        '@type': 'Question',
+        name: item.q,
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: item.a
+        }
+      }))
+    )
+  };
 </script>
 
-<svelte:head>
-  <title>FAQ — Classroom Quick Downloader</title>
-  <meta
-    name="description"
-    content="Comprehensive FAQ for Classroom Quick Downloader: setup, browser support, privacy, troubleshooting, security, and release information."
-  />
-</svelte:head>
+<SeoMeta
+  title="FAQ — Classroom Quick Downloader"
+  description="Comprehensive FAQ for Classroom Quick Downloader: setup, browser support, privacy, troubleshooting, security, and release information."
+  path="/faq"
+  structuredData={faqStructuredData}
+/>
 
 <div class="fq">
   <!-- Decorative orbs -->
@@ -459,6 +474,45 @@
         Answers for students, developers, and everyone in between.
         Can't find what you need? <a href="mailto:adhamhaithameid@gmail.com" class="fq-contact-link">Get in touch</a>.
       </p>
+    </div>
+  </section>
+
+  <section class="fq-priority-section">
+    <div class="fq-wrap">
+      <div class="fq-priority-card fq-reveal">
+        <h2>Quick answers students search for most</h2>
+        <div class="fq-priority-grid">
+          <article>
+            <h3>How do I download all attachments from an assignment?</h3>
+            <p>Install Classroom Quick Downloader, open your assignment in Google Classroom, and click the download-all button shown by CQD. The extension queues files through your browser download manager, so you do not need to open every Drive preview manually. This is the fastest way to pull full assignment materials before study sessions, labs, or offline classes.</p>
+          </article>
+          <article>
+            <h3>Where do the downloads go?</h3>
+            <p>Files are saved using your browser’s default download location, exactly like normal downloads. If you changed your browser settings to ask for a save location each time, you will still get that prompt. CQD does not create cloud copies, external archives, or hidden file locations, so you stay in control of storage and folder organization.</p>
+          </article>
+          <article>
+            <h3>Why do I still see “Google Drive can’t scan this file”?</h3>
+            <p>This warning usually appears when files are too large for Drive’s preview scanner. It does not automatically mean the file is unsafe. CQD helps you avoid repetitive preview loops by keeping the download flow in Classroom, but your institution security policy should still be followed for large or unfamiliar files from external collaborators.</p>
+          </article>
+          <article>
+            <h3>Does it work with school Google Workspace accounts?</h3>
+            <p>Yes, CQD works with Google Workspace for Education accounts when browser extension installs are allowed on your device. Some schools restrict extension usage through managed policies, so installation might require IT approval. If blocked, share the store listing and repository with your administrator so they can review permissions and allow deployment.</p>
+          </article>
+          <article>
+            <h3>Does my teacher know if I use the extension?</h3>
+            <p>CQD runs in your own browser and improves how you download files already available to you. It does not post classroom messages or modify assignment metadata. Teachers only see normal Classroom interactions, not extension-specific usage signals. The extension is focused on reducing repetitive clicks, not changing classroom visibility or grade-related workflows.</p>
+          </article>
+          <article>
+            <h3>Is it safe and what data is collected?</h3>
+            <p>CQD is designed to avoid personal profiling: no third-party trackers, no cookies, and no file-content collection. Operational reliability signals are aggregated to keep services stable across browsers and regions. Public pages show aggregate metrics, while sensitive infrastructure data remains protected. For full details, review the website privacy page and repository privacy document.</p>
+          </article>
+        </div>
+        <div class="fq-priority-links">
+          <a href="{base}/privacy">Privacy details</a>
+          <a href="{base}/security">Security overview</a>
+          <a href="{base}/support">Support options</a>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -631,6 +685,79 @@
     font-size: 12px; font-weight: 700; color: var(--green);
     letter-spacing: 0.08em; text-transform: uppercase;
     display: block; margin-bottom: 12px;
+  }
+
+  .fq-priority-section {
+    position: relative;
+    z-index: 2;
+    padding: 4px 0 16px;
+  }
+
+  .fq-priority-card {
+    background: rgba(255,255,255,0.7);
+    border: 1px solid var(--border-subtle);
+    border-radius: 20px;
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    padding: 24px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+  }
+
+  .fq-priority-card h2 {
+    margin: 0 0 14px;
+    font-size: clamp(22px, 2.5vw, 30px);
+    color: var(--text);
+  }
+
+  .fq-priority-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .fq-priority-grid article {
+    border: 1px solid var(--border-subtle);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.78);
+    padding: 14px;
+  }
+
+  .fq-priority-grid h3 {
+    margin: 0 0 7px;
+    font-size: 15px;
+    color: var(--text);
+  }
+
+  .fq-priority-grid p {
+    margin: 0;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    font-size: 14px;
+  }
+
+  .fq-priority-links {
+    margin-top: 14px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .fq-priority-links a {
+    display: inline-flex;
+    align-items: center;
+    text-decoration: none;
+    color: var(--text-secondary);
+    border: 1px solid var(--border-subtle);
+    border-radius: 999px;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    transition: color 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+  }
+
+  .fq-priority-links a:hover {
+    color: var(--green);
+    border-color: rgba(26,139,85,0.35);
+    background: rgba(26,139,85,0.08);
   }
 
   /* ── Search + Controls ─────────── */
@@ -853,6 +980,7 @@
   @media (max-width: 900px) {
     .fq-section { padding: 20px; }
     .fq-cta-card { padding: 40px 24px; }
+    .fq-priority-grid { grid-template-columns: 1fr; }
     .fq-list { gap: 10px; }
     .fq-item {
       border-radius: 14px;

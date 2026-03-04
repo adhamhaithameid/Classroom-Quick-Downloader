@@ -2,6 +2,8 @@
   import { onMount, afterUpdate } from 'svelte';
   import { STORE_LINKS } from '$lib/config';
   import { fetchChangelog } from '$lib/api/changelog';
+  import { WEBSITE_MANUAL_CHANGELOG } from '$lib/content/changelog.manual.generated';
+  import SeoMeta from '$lib/components/SeoMeta.svelte';
 
   type ChangelogMdEntry = {
     version: string;
@@ -76,6 +78,26 @@
         };
       })
       .filter((entry): entry is ChangelogMdEntry => entry !== null);
+  }
+
+  const seededEntries = manualEntriesToMdEntries(
+    (WEBSITE_MANUAL_CHANGELOG.entries || []).map((entry) => ({
+      version: entry.version,
+      title: entry.title,
+      summary: entry.summary,
+      highlights: entry.highlights ? [...entry.highlights] : [],
+      added: entry.added ? [...entry.added] : [],
+      changed: entry.changed ? [...entry.changed] : [],
+      fixed: entry.fixed ? [...entry.fixed] : []
+    }))
+  ).sort((a, b) => semverCompareDesc(a.version, b.version));
+
+  if (seededEntries.length > 0) {
+    changelogEntries = seededEntries;
+    state = 'ready';
+    dataSource = 'manual';
+    lastLoadedAtUtc = Number(WEBSITE_MANUAL_CHANGELOG.generatedAt) || null;
+    activeVersion = seededEntries[0]?.version || '';
   }
 
   async function load(force = false): Promise<void> {
@@ -191,10 +213,11 @@
   });
 </script>
 
-<svelte:head>
-  <title>Changelog — Classroom Quick Downloader</title>
-  <meta name="description" content="See what's new in each version of Classroom Quick Downloader. Detailed release notes and improvements." />
-</svelte:head>
+<SeoMeta
+  title="Changelog — Classroom Quick Downloader"
+  description="See what's new in each version of Classroom Quick Downloader. Detailed release notes and improvements."
+  path="/changelog"
+/>
 
 <div class="cl">
   <!-- Decorative orbs -->

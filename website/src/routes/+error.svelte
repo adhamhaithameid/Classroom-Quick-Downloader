@@ -1,6 +1,7 @@
 <script lang="ts">
   import { page } from '$app/stores';
   import { base } from '$app/paths';
+  import SeoMeta from '$lib/components/SeoMeta.svelte';
 
   $: statusCode = $page.status;
   $: errorTitle = statusCode === 404 ? 'Page not found' : statusCode === 403 ? 'Access restricted' : 'Something went wrong';
@@ -19,10 +20,12 @@
       : 'Try checking the URL for typos, or use the navigation above.';
 </script>
 
-<svelte:head>
-  <title>{$page.status} — Classroom Quick Downloader</title>
-  <meta name="description" content="Error page for Classroom Quick Downloader." />
-</svelte:head>
+<SeoMeta
+  title={`${$page.status} — Classroom Quick Downloader`}
+  description="Error page for Classroom Quick Downloader."
+  path="/404"
+  noindex={true}
+/>
 
 <div class="err">
   <!-- Decorative orbs -->

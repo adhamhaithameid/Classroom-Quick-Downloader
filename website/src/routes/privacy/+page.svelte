@@ -1,5 +1,6 @@
 <script lang="ts">
   import { privacyContent as privacy } from '$lib/content/privacy';
+  import SeoMeta from '$lib/components/SeoMeta.svelte';
 
   const sectionIcons = ['🔒', '🚫', '💡', '⚡', '🗓️', '🧩', '⚖️', '👶', '🔑', '📬'];
 
@@ -15,10 +16,11 @@
 
 </script>
 
-<svelte:head>
-  <title>Privacy — Classroom Quick Downloader</title>
-  <meta name="description" content="Privacy policy summary for Classroom Quick Downloader. No tracking, no cookies, no personal data collection." />
-</svelte:head>
+<SeoMeta
+  title="Privacy — Classroom Quick Downloader"
+  description="Privacy policy summary for Classroom Quick Downloader. No third-party tracking, no cookies, and no user profiles."
+  path="/privacy"
+/>
 
 <div class="prv">
   <!-- Decorative orbs -->
@@ -57,8 +59,8 @@
           <div class="prv-banner-item">
             <span class="prv-banner-icon">📊</span>
             <div>
-              <strong>Zero tracking</strong>
-              <p>No analytics libraries or tracking pixels</p>
+              <strong>No third-party tracking</strong>
+              <p>No ad trackers, no pixels, and no user profiling</p>
             </div>
           </div>
           <span class="prv-banner-sep" aria-hidden="true"></span>

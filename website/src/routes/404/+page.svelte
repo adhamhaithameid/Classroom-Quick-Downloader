@@ -1,14 +1,14 @@
 <script lang="ts">
   import { base } from '$app/paths';
+  import SeoMeta from '$lib/components/SeoMeta.svelte';
 </script>
 
-<svelte:head>
-  <title>404 — Classroom Quick Downloader</title>
-  <meta
-    name="description"
-    content="The page you're looking for doesn't exist. Head back to the overview or explore our FAQ."
-  />
-</svelte:head>
+<SeoMeta
+  title="404 — Classroom Quick Downloader"
+  description="The page you're looking for doesn't exist. Head back to the overview or explore our FAQ."
+  path="/404"
+  noindex={true}
+/>
 
 <div class="nf">
   <!-- Decorative orbs -->

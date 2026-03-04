@@ -250,10 +250,13 @@
         <a href="{base}/privacy">Privacy</a>
         <a href="{base}/faq">FAQ</a>
         <a href="{base}/changelog">Changelog</a>
+        <a href="{base}/security">Security</a>
+        <a href="{base}/support">Support</a>
         <a href={snapshotLinks?.github || STORE_LINKS.github} target="_blank" rel="noopener noreferrer">GitHub</a>
         <a href="mailto:adhamhaithameid@gmail.com">Contact</a>
       </div>
     </div>
+    <div class="l2-wrap l2-footer-disclaimer">Not affiliated with Google or Google Classroom.</div>
   </footer>
   {/if}
 </div>
@@ -577,6 +580,13 @@
     font-size: 11px;
   }
 
+  .l2-footer-disclaimer {
+    margin-top: 6px;
+    text-align: right;
+    color: var(--muted);
+    font-size: 11px;
+  }
+
   @keyframes slideDown {
     from {
       opacity: 0;
@@ -682,6 +692,11 @@
       width: 100%;
       justify-content: center;
       flex-wrap: wrap;
+    }
+
+    .l2-footer-disclaimer {
+      text-align: center;
+      margin-top: 10px;
     }
   }
 

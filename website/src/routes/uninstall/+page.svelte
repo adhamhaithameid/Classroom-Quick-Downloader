@@ -6,6 +6,7 @@
   import { trackWebsiteEvent } from '$lib/analytics/websiteEvents';
   import { buildUninstallNotesPayload } from '$lib/uninstall/feedback';
   import { browserDisplayName, detectBrowserFromUserAgent, type BrowserKey } from '$lib/browser/detect';
+  import SeoMeta from '$lib/components/SeoMeta.svelte';
 
   const reasons: { label: string; icon: string }[] = [
     { label: "Didn't work as expected", icon: '⚙️' },
@@ -122,10 +123,12 @@
   });
 </script>
 
-<svelte:head>
-  <title>Uninstall Feedback — Classroom Quick Downloader</title>
-  <meta name="description" content="Help us improve Classroom Quick Downloader. Share why you uninstalled so we can make it better." />
-</svelte:head>
+<SeoMeta
+  title="Uninstall Feedback — Classroom Quick Downloader"
+  description="Help us improve Classroom Quick Downloader. Share why you uninstalled so we can make it better."
+  path="/uninstall"
+  noindex={true}
+/>
 
 <div class="un">
   <!-- Decorative background -->
