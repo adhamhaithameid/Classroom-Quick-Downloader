@@ -189,3 +189,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       ],
       "fixed": [
         "Fixed cancel-state reflection delays."
+      ],
