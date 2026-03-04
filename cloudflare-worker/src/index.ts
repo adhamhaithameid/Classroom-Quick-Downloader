@@ -1089,13 +1089,10 @@ async function handleWebsiteConsoleDashboard(request: Request, env: WorkerEnv): 
 
 function handleLogout(request: Request, env: WorkerEnv): Response {
   const logoutUrl = new URL(request.url);
-  return new Response(null, {
-    status: 302,
-    headers: {
-      "Location": "/",
-      "Set-Cookie": clearSessionCookieHeader(logoutUrl, env),
-    },
-  });
+  return redirectWithCookies("/", [
+    clearSessionCookieHeader(logoutUrl, env),
+    clearDangerStepUpCookieHeader(logoutUrl, env),
+  ]);
 }
 
 // ---------------------------------------------------------------------------
