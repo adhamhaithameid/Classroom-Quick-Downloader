@@ -103,8 +103,8 @@ jobs:
       - name: Run Website Typecheck
         run: pnpm -C website check
 
-      - name: Run Website Tests
-        run: pnpm -C website test
+      - name: Run Website Heavy Test Matrix
+        run: pnpm -C website test:strict
 
       - name: Build Website
         run: pnpm -C website build
