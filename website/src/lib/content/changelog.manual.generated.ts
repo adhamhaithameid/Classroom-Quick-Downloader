@@ -155,3 +155,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "version": "1.2.2",
       "title": "Release 1.2.2",
       "summary": "Cancellation polish release.",
+      "highlights": [
