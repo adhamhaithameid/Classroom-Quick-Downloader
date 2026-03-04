@@ -611,8 +611,9 @@ func ExtensionChangelogPublicHandler(sqliteDB *sql.DB) http.HandlerFunc {
 		}
 
 		writeExtJSON(w, http.StatusOK, extChangelogResponse{
-			OK:      true,
-			Entries: entries,
+			SchemaVersion: "1",
+			OK:            true,
+			Entries:       entries,
 			Config: extChangelogConfig{
 				Rules:       rules,
 				LastUpdated: lastUpdated,
