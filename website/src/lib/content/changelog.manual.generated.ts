@@ -83,3 +83,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Updated dependency resolution paths."
       ],
       "fixed": [
+        "Fixed `minimatch` export mismatch issues in development flow."
