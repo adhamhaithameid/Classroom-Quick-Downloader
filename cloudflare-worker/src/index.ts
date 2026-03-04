@@ -2349,6 +2349,9 @@ export default {
     if (pathname === "/dashboard") {
       return handleDashboard(request, env);
     }
+    if (pathname === "/dashboard/website") {
+      return handleWebsiteConsoleDashboard(request, env);
+    }
 
     // Logout
     if (pathname === "/logout") {
