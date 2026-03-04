@@ -103,3 +103,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "changed": [
         "Improved pipeline validation and retry behavior."
       ],
+      "fixed": [
