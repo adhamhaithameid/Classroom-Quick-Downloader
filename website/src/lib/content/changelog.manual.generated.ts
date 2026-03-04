@@ -286,3 +286,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Updated setup/runtime compatibility behavior.",
         "Fixed packaging/config alignment issues."
       ],
+      "added": [
