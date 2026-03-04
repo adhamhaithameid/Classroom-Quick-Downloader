@@ -352,3 +352,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "added": [
         "Initial project foundations."
       ],
+      "changed": [
