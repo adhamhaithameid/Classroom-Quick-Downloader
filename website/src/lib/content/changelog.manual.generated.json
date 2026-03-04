@@ -61,3 +61,4 @@
         "Improved changelog action layout and readability."
       ],
       "fixed": [
+        "Fixed close-button layout and hover inconsistencies."
