@@ -12,3 +12,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Full manual changelog history synced from extension release lineage.",
         "Website snapshot/cache behavior now prioritizes fresh local snapshots on reload.",
         "Fixed stale in-session snapshot behavior that could keep old metrics visible."
+      ],
