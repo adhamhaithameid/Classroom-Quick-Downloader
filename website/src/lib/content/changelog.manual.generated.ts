@@ -247,3 +247,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "added": [
         "Extended compatibility hardening."
       ],
+      "changed": [
