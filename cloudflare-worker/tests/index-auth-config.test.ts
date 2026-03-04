@@ -1191,6 +1191,7 @@ describe("Worker auth config hardening", () => {
     // Should reach the password check, and since password is correct, return 200
     expect(res.status).toBe(200);
     expect(body.ok).toBe(true);
+    expect(res.headers.get("Set-Cookie")).toContain("cqd_danger_stepup=");
   });
 
   it("allows /auth/verify-danger with valid session cookie", async () => {
