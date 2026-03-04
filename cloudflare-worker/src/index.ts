@@ -1738,6 +1738,11 @@ async function handleProtectedAdminEndpoint(request: Request, env: WorkerEnv): P
     }
   }
 
+  const websiteConsoleResponse = await handleWebsiteConsoleAdminEndpoint(request, env, auth);
+  if (websiteConsoleResponse) {
+    return websiteConsoleResponse;
+  }
+
   // If session-based auth but no secret header, inject the secret for DO
   const stub = getDownloadsStub(env);
   const country = (request.cf as unknown as { country?: string })?.country;
