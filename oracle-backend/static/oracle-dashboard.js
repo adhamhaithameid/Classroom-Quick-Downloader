@@ -1999,7 +1999,7 @@
             var count = Number(match.count || 0);
             var intensity = maxCount > 0 ? (count / maxCount) : 0;
             var packed = JSON.stringify({ day: dayLabels[d], hour: hour, count: count, intensity: intensity }).replace(/"/g, '&quot;');
-            html += '<div class="heatmap-cell" data-point="' + packed + '" style="opacity:' + (0.15 + intensity * 0.85).toFixed(3) + '"></div>';
+            html += '<div class="heatmap-cell" data-point="' + packed + '" data-opacity="' + (0.15 + intensity * 0.85).toFixed(3) + '"></div>';
           }
         }
         html += '</div></div>';
