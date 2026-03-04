@@ -4348,7 +4348,7 @@
           });
         }
 
-        [
+        var formBindings = [
           ['creative-email-template-form', saveCreativeEmailTemplate],
           ['newsletter-subscriber-form', saveNewsletterSubscriber],
           ['user-changelog-form', saveUserChangelogRecord],
