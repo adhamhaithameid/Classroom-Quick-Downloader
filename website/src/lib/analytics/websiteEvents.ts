@@ -24,6 +24,7 @@ let storageHydrated = false;
 let initialized = false;
 let flushTimer: ReturnType<typeof setInterval> | null = null;
 let flushing = false;
+let fallbackIdCounter = 0;
 
 function canUseBrowser(): boolean {
   return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
@@ -62,7 +63,36 @@ function createEventId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();
   }
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+  return `${Date.now().toString(36)}-${secureRandomLikeSuffix(20)}`;
+}
+
+function secureRandomLikeSuffix(length: number): string {
+  if (
+    typeof crypto !== 'undefined' &&
+    typeof crypto.getRandomValues === 'function' &&
+    Number.isFinite(length) &&
+    length > 0
+  ) {
+    const byteLength = Math.ceil(length / 2);
+    const bytes = new Uint8Array(byteLength);
+    crypto.getRandomValues(bytes);
+    let hex = '';
+    for (const byte of bytes) {
+      hex += byte.toString(16).padStart(2, '0');
+    }
+    return hex.slice(0, length);
+  }
+
+  fallbackIdCounter = (fallbackIdCounter + 1) % Number.MAX_SAFE_INTEGER;
+  const nowPart = Date.now().toString(36);
+  const counterPart = fallbackIdCounter.toString(36);
+  const perfPart =
+    typeof performance !== 'undefined' && typeof performance.now === 'function'
+      ? Math.floor(performance.now() * 1000).toString(36)
+      : '0';
+  const base = `${nowPart}${counterPart}${perfPart}`;
+  if (base.length >= length) return base.slice(base.length - length);
+  return `${base}${'0'.repeat(length - base.length)}`;
 }
 
 function readStoredQueue(): WebsiteEventPayload[] {
