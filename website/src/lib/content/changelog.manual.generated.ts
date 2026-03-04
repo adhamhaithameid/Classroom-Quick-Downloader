@@ -232,3 +232,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed repeated-session regressions."
       ],
+      "releasedAtUtc": 1771741980434
