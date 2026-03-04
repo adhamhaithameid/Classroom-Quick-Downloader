@@ -5627,25 +5627,42 @@ export function renderDashboard(stats: StatsResponse): string {
           const added = Array.isArray(entry.added) ? entry.added : [];
           const changed = Array.isArray(entry.changed) ? entry.changed : [];
           const fixed = Array.isArray(entry.fixed) ? entry.fixed : [];
-          html += '<article style="margin-bottom:10px; border-bottom:1px dashed var(--border-subtle); padding-bottom:8px;">';
-          html += '<h4>v' + escapeHtmlUnsafe(entry.version || '') + '</h4>';
-          html += '<p class="cl-preview-summary">' + escapeHtmlUnsafe(summary || (entry.changes && entry.changes[0]) || '') + '</p>';
-          if (added.length) {
-            html += '<div style="font-size:0.75em; color:#86efac; margin-bottom:2px;">Added</div><ul>';
-            added.slice(0, 3).forEach((point) => { html += '<li>' + escapeHtmlUnsafe(point) + '</li>'; });
-            html += '</ul>';
-          }
-          if (changed.length) {
-            html += '<div style="font-size:0.75em; color:#93c5fd; margin-bottom:2px;">Changed</div><ul>';
-            changed.slice(0, 3).forEach((point) => { html += '<li>' + escapeHtmlUnsafe(point) + '</li>'; });
-            html += '</ul>';
-          }
-          if (fixed.length) {
-            html += '<div style="font-size:0.75em; color:#fca5a5; margin-bottom:2px;">Fixed</div><ul>';
-            fixed.slice(0, 3).forEach((point) => { html += '<li>' + escapeHtmlUnsafe(point) + '</li>'; });
-            html += '</ul>';
-          }
-          html += '</article>';
+          const article = document.createElement("article");
+          article.style.marginBottom = "10px";
+          article.style.borderBottom = "1px dashed var(--border-subtle)";
+          article.style.paddingBottom = "8px";
+
+          const heading = document.createElement("h4");
+          heading.textContent = "v" + String(entry.version || "");
+          article.appendChild(heading);
+
+          const summaryNode = document.createElement("p");
+          summaryNode.className = "cl-preview-summary";
+          summaryNode.textContent = String(summary || (entry.changes && entry.changes[0]) || "");
+          article.appendChild(summaryNode);
+
+          const appendCategory = (title, color, points) => {
+            if (!Array.isArray(points) || points.length === 0) return;
+            const titleNode = document.createElement("div");
+            titleNode.style.fontSize = "0.75em";
+            titleNode.style.color = color;
+            titleNode.style.marginBottom = "2px";
+            titleNode.textContent = title;
+            article.appendChild(titleNode);
+
+            const listNode = document.createElement("ul");
+            points.slice(0, 3).forEach((point) => {
+              const li = document.createElement("li");
+              li.textContent = String(point || "");
+              listNode.appendChild(li);
+            });
+            article.appendChild(listNode);
+          };
+
+          appendCategory("Added", "#86efac", added);
+          appendCategory("Changed", "#93c5fd", changed);
+          appendCategory("Fixed", "#fca5a5", fixed);
+          container.appendChild(article);
         });
         container.innerHTML = html;
       }
