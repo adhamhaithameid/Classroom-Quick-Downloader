@@ -1958,6 +1958,9 @@
         color: #94a3b8;
         max-width: 72ch;
       }
+      .card-subtitle-spaced {
+        margin-bottom: 8px;
+      }
       .website-page .card-body {
         display: grid;
         gap: 14px;
