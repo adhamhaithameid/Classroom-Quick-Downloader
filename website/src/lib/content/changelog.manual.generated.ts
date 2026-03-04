@@ -59,3 +59,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Better website changelog integration from extension."
       ],
       "changed": [
+        "Improved changelog action layout and readability."
