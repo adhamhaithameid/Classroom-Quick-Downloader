@@ -2248,7 +2248,10 @@ export default {
     }
 
     const enforceProtectedCors =
-      !(pathname === "/api/public/website/events" && request.method !== "POST");
+      !(
+        (pathname === "/api/public/website/events" && request.method !== "POST") ||
+        (pathname === "/api/site/v1/events" && request.method !== "POST")
+      );
     if (
       isProtectedCorsRoute(pathname) &&
       enforceProtectedCors &&
