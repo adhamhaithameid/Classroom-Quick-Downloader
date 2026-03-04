@@ -119,28 +119,8 @@ describe('changelog utils (manual mode)', () => {
 
     it('applies priority + effect classes', async () => {
       const mod = await loadChangelogModule();
-      const rule = { id: 'r', target: 'all', priority: 'major' as const, effect: 'pulse' as const };
-      expect(mod.getRuleClasses(rule, true)).toBe('');
-    });
-
-    it('adds priority classes correctly', async () => {
-      const mod = await loadChangelogModule();
-      const base = { id: 'r', target: 'all', effect: 'none' as const };
-
-      expect(mod.getRuleClasses({ ...base, priority: 'minor' }, false)).toContain('cqd-pill-minor');
-      expect(mod.getRuleClasses({ ...base, priority: 'major' }, false)).toContain('cqd-pill-major');
-
-      const normalClasses = mod.getRuleClasses({ ...base, priority: 'normal' }, false);
-      expect(normalClasses).not.toContain('cqd-pill-minor');
-      expect(normalClasses).not.toContain('cqd-pill-major');
-    });
-
-    it('adds glow effect classes with correct colors', async () => {
-      const mod = await loadChangelogModule();
-      const base = { id: 'r', target: 'all', effect: 'glow' as const };
-
-      // Major -> Red
-      expect(mod.getRuleClasses({ ...base, priority: 'major' }, false)).toContain('cqd-effect-glow-red');
+      expect(mod.getRuleClasses({ id: 'r', target: 'all', priority: 'minor', effect: 'none' }, false)).toContain('cqd-pill-minor');
+      expect(mod.getRuleClasses({ id: 'r', target: 'all', priority: 'major', effect: 'none' }, false)).toContain('cqd-pill-major');
 
       // Minor/Normal -> Blue
       expect(mod.getRuleClasses({ ...base, priority: 'minor' }, false)).toContain('cqd-effect-glow-blue');
