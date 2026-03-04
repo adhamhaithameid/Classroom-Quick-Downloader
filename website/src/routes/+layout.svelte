@@ -15,11 +15,6 @@
     { href: '/privacy', label: 'Privacy' },
     { href: '/faq', label: 'FAQ' },
     { href: '/changelog', label: 'Changelog' },
-    { href: '/uninstall?source=navbar', label: 'Uninstall' },
-    { href: '/404', label: '404' }
-    // Samples and Overview2 are intentionally disabled for now.
-    // { href: '/samples', label: 'Samples' },
-    // { href: '/overview2', label: 'Overview2' }
   ];
   let nav = [...baseNav];
 
