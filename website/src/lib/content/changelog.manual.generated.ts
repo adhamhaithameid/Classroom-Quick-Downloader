@@ -178,3 +178,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "summary": "Unified cancel-system iteration release.",
       "highlights": [
         "Unified cancel control logic for active operations.",
+        "Refined runtime flow around cancel/retry.",
