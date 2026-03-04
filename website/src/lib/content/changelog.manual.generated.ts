@@ -31,3 +31,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "summary": "Changelog reliability release.",
       "highlights": [
         "Revision-aware changelog checks for same-version updates.",
+        "Improved changelog update detection logic.",
