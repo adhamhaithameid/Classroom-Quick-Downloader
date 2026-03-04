@@ -136,3 +136,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "summary": "Usability and telemetry consistency release.",
       "highlights": [
         "Better feedback and uninstall integration paths.",
+        "Improved user-facing messaging and data alignment.",
