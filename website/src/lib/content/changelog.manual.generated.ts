@@ -177,3 +177,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "title": "Release 1.2.1",
       "summary": "Unified cancel-system iteration release.",
       "highlights": [
+        "Unified cancel control logic for active operations.",
