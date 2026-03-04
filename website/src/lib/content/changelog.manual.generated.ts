@@ -294,3 +294,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       ],
       "fixed": [
         "Fixed packaging/config alignment issues."
+      ],
