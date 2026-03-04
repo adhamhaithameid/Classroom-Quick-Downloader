@@ -202,3 +202,4 @@
         "Fixed inability to interrupt active operations."
       ],
       "added": [
+        "Core cancel-download capability."
