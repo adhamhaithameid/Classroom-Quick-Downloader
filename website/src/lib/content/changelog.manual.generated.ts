@@ -119,3 +119,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Fixed sync/auth edge cases in production-like workloads."
       ],
       "added": [
+        "Expanded dashboard/telemetry integrations."
