@@ -814,6 +814,47 @@
       .card-body.no-padding { padding: 0; }
       .card-body-top { border-top: 1px solid var(--border-primary); }
 
+      .legacy-disabled-panel {
+        border: 1px solid rgba(255, 190, 92, 0.45);
+        background: rgba(255, 190, 92, 0.08);
+        border-radius: 12px;
+        padding: 14px;
+        display: grid;
+        gap: 10px;
+      }
+
+      .legacy-disabled-title {
+        font-size: 14px;
+        font-weight: 700;
+        color: #ffe1ad;
+      }
+
+      .legacy-disabled-copy {
+        font-size: 12px;
+        color: var(--text-secondary);
+      }
+
+      .legacy-disabled-note {
+        font-size: 11px;
+        color: var(--text-muted);
+      }
+
+      .legacy-disabled-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      #page-content-changelog[data-legacy-disabled="true"] .legacy-disabled-actions,
+      #page-ext-changelog[data-legacy-disabled="true"] .legacy-disabled-actions {
+        display: none;
+      }
+
+      #page-content-changelog[data-legacy-disabled="true"] .section-block,
+      #page-ext-changelog[data-legacy-disabled="true"] .section-block {
+        display: none;
+      }
+
       .section-heading {
         font-size: 13px;
         font-weight: 600;
