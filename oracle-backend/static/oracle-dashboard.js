@@ -4351,8 +4351,11 @@
         var formBindings = [
           ['creative-email-template-form', saveCreativeEmailTemplate],
           ['newsletter-subscriber-form', saveNewsletterSubscriber],
-          ['user-changelog-form', saveUserChangelogRecord],
-        ].forEach(function(entry) {
+        ];
+        if (LEGACY_CHANGELOG_CUSTOMIZATION_ENABLED) {
+          formBindings.push(['user-changelog-form', saveUserChangelogRecord]);
+        }
+        formBindings.forEach(function(entry) {
           var form = document.getElementById(entry[0]);
           if (!form || form.dataset.boundSubmit === '1') return;
           form.dataset.boundSubmit = '1';
