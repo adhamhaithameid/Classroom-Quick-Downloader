@@ -216,6 +216,15 @@ async function createSessionTokenWithBinding(
   return `${payloadB64}.${sigB64}`;
 }
 
+async function createDangerStepUpToken(
+  secret: string,
+  ip: string,
+  userAgent: string,
+  bindingMode: SessionBindingMode,
+): Promise<string> {
+  return createSessionTokenWithBinding(secret, ip, userAgent, bindingMode, DANGER_SESSION_DURATION_MS);
+}
+
 export async function verifySessionToken(
   token: string,
   secret: string,
