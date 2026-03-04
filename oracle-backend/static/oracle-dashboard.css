@@ -2499,6 +2499,9 @@
         .website-page .creative-grid {
           grid-template-columns: 1fr;
         }
+        .ext-pill-preview-meta .pill {
+          width: 100%;
+        }
         .website-page .table-container table {
           min-width: 520px;
         }
