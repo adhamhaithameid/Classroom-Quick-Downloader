@@ -143,3 +143,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Better feedback and uninstall integration paths."
       ],
       "changed": [
+        "Improved user-facing messaging and data alignment."
