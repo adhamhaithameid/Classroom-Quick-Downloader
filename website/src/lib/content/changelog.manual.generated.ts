@@ -121,3 +121,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "added": [
         "Expanded dashboard/telemetry integrations."
       ],
+      "changed": [
