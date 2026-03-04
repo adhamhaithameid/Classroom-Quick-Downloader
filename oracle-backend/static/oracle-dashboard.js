@@ -3062,6 +3062,22 @@
         var container = document.getElementById('newsletter-subscribers-list');
         var summary = document.getElementById('newsletter-summary');
         if (!container) return;
+        function renderNewsletterSummary(node, counts) {
+          if (!node) return;
+          while (node.firstChild) node.removeChild(node.firstChild);
+          var chips = [
+            'Total: ' + fmtNumber(Number(counts.total || 0)),
+            'Active: ' + fmtNumber(Number(counts.active || 0)),
+            'Paused: ' + fmtNumber(Number(counts.paused || 0)),
+            'Unsubscribed: ' + fmtNumber(Number(counts.unsubscribed || 0)),
+          ];
+          chips.forEach(function(label) {
+            var span = document.createElement('span');
+            span.className = 'newsletter-tag';
+            span.textContent = label;
+            node.appendChild(span);
+          });
+        }
         try {
           var payload = await fetchJSON('/api/admin/newsletter/subscribers');
           var records = payload.records || [];
