@@ -1280,6 +1280,431 @@ async function handleProtectedStats(request: Request, env: WorkerEnv): Promise<R
   return proxyToDO(request, env);
 }
 
+type ConsoleErrorShape = {
+  ok: false;
+  code: string;
+  message: string;
+  generatedAtUtc: number;
+  details?: Record<string, unknown>;
+};
+
+type D1PreparedStatementLike = {
+  bind(...args: unknown[]): D1PreparedStatementLike;
+  all<T = Record<string, unknown>>(): Promise<{ success?: boolean; results?: T[]; error?: string }>;
+};
+
+function buildConsoleError(
+  code: string,
+  message: string,
+  details?: Record<string, unknown>,
+): ConsoleErrorShape {
+  return {
+    ok: false,
+    code,
+    message,
+    generatedAtUtc: Date.now(),
+    ...(details ? { details } : {}),
+  };
+}
+
+function consoleErrorResponse(
+  request: Request,
+  env: WorkerEnv,
+  status: number,
+  code: string,
+  message: string,
+  details?: Record<string, unknown>,
+): Response {
+  return withCors(
+    request,
+    new Response(
+      JSON.stringify(buildConsoleError(code, message, details)),
+      { status, headers: { "content-type": "application/json; charset=utf-8" } },
+    ),
+    env,
+  );
+}
+
+const WEBSITE_CONSOLE_ADMIN_PATHS = new Set<string>([
+  "/admin/website/console/summary",
+  "/admin/website/console/kv",
+  "/admin/website/console/d1/tables",
+  "/admin/website/console/d1/query",
+  "/admin/website/console/telemetry",
+  "/admin/website/console/snapshot/raw",
+]);
+
+const WEBSITE_CONSOLE_RAW_PATHS = new Set<string>([
+  "/admin/website/console/kv",
+  "/admin/website/console/d1/tables",
+  "/admin/website/console/d1/query",
+  "/admin/website/console/snapshot/raw",
+]);
+
+const MAX_D1_QUERY_ROWS = 500;
+const D1_BLOCKED_KEYWORDS = /\b(insert|update|delete|alter|drop|attach|detach|pragma|vacuum|replace|create|truncate|reindex)\b/i;
+
+function isWebsiteConsoleAdminPath(pathname: string): boolean {
+  return WEBSITE_CONSOLE_ADMIN_PATHS.has(pathname);
+}
+
+function requiresWebsiteConsoleStepUp(pathname: string): boolean {
+  return WEBSITE_CONSOLE_RAW_PATHS.has(pathname);
+}
+
+async function fetchDoWebsiteStatus(env: WorkerEnv): Promise<Record<string, unknown>> {
+  const stub = getDownloadsStub(env);
+  const res = await stub.fetch(new Request("https://do/admin/website/status", {
+    method: "GET",
+    headers: {
+      "X-Admin-Secret": env.DO_SHARED_SECRET,
+    },
+  }));
+
+  if (!res.ok) {
+    throw new Error(`do_status_http_${res.status}`);
+  }
+  const payload = await res.json();
+  if (!payload || typeof payload !== "object") {
+    throw new Error("do_status_invalid_payload");
+  }
+  return payload as Record<string, unknown>;
+}
+
+async function executeD1All(
+  env: WorkerEnv,
+  query: string,
+): Promise<Record<string, unknown>[]> {
+  if (!env.SITE_CACHE_DB || typeof env.SITE_CACHE_DB.prepare !== "function") {
+    throw new Error("d1_not_configured");
+  }
+  const prepared = env.SITE_CACHE_DB.prepare(query) as D1PreparedStatementLike;
+  const result = await prepared.all<Record<string, unknown>>();
+  if (result && result.success === false) {
+    throw new Error(result.error || "d1_query_failed");
+  }
+  return Array.isArray(result?.results) ? result.results : [];
+}
+
+function extractTableNames(rows: Record<string, unknown>[]): string[] {
+  const names: string[] = [];
+  for (const row of rows) {
+    const raw = row.name;
+    if (typeof raw !== "string") continue;
+    const table = raw.trim();
+    if (!table || table.startsWith("sqlite_")) continue;
+    names.push(table);
+  }
+  names.sort((a, b) => a.localeCompare(b));
+  return names;
+}
+
+function extractReferencedTables(query: string): string[] {
+  const refs = new Set<string>();
+  const regex = /\b(?:from|join)\s+([a-zA-Z_][a-zA-Z0-9_]*)\b/gi;
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(query)) !== null) {
+    refs.add(match[1]);
+  }
+  return [...refs];
+}
+
+async function guardConsoleD1Query(
+  env: WorkerEnv,
+  queryRaw: string,
+  maxRowsRaw: unknown,
+): Promise<{ ok: true; query: string; maxRows: number } | { ok: false; code: string; message: string }> {
+  const query = queryRaw.trim();
+  if (!query) {
+    return { ok: false, code: "query_required", message: "SQL query is required." };
+  }
+  if (query.includes(";")) {
+    return { ok: false, code: "query_multiple_statements", message: "Only a single read-only statement is allowed." };
+  }
+  if (!/^(select|with)\b/i.test(query)) {
+    return { ok: false, code: "query_read_only_required", message: "Only SELECT/WITH read-only queries are allowed." };
+  }
+  if (D1_BLOCKED_KEYWORDS.test(query)) {
+    return { ok: false, code: "query_keyword_blocked", message: "Mutating SQL keywords are blocked." };
+  }
+  if (/\bjoin\b/i.test(query)) {
+    return { ok: false, code: "query_join_blocked", message: "Cross-table JOIN queries are blocked in console mode." };
+  }
+  if (/\bselect\s+\*/i.test(query) && !/\bfrom\s+sqlite_master\b/i.test(query)) {
+    return { ok: false, code: "query_wildcard_blocked", message: "SELECT * is blocked. Select explicit columns instead." };
+  }
+
+  const tableRows = await executeD1All(
+    env,
+    "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name ASC",
+  );
+  const allowedTables = new Set(extractTableNames(tableRows).map((name) => name.toLowerCase()));
+  const refs = extractReferencedTables(query.toLowerCase());
+  for (const table of refs) {
+    if (!allowedTables.has(table)) {
+      return {
+        ok: false,
+        code: "query_table_not_allowed",
+        message: `Table '${table}' is not available in SITE_CACHE_DB.`,
+      };
+    }
+  }
+
+  let maxRows = Number(maxRowsRaw);
+  if (!Number.isFinite(maxRows) || maxRows <= 0) maxRows = 200;
+  maxRows = Math.min(Math.floor(maxRows), MAX_D1_QUERY_ROWS);
+  if (!/\blimit\s+\d+\b/i.test(query)) {
+    return { ok: true, query: `${query} LIMIT ${maxRows}`, maxRows };
+  }
+  return { ok: true, query, maxRows };
+}
+
+async function handleWebsiteConsoleAdminEndpoint(
+  request: Request,
+  env: WorkerEnv,
+  auth: AuthContext,
+): Promise<Response | null> {
+  const pathname = new URL(request.url).pathname;
+  if (!isWebsiteConsoleAdminPath(pathname)) {
+    return null;
+  }
+
+  const expectedMethod =
+    pathname === "/admin/website/console/d1/query" ? "POST" : "GET";
+  if (request.method !== expectedMethod) {
+    return consoleErrorResponse(
+      request,
+      env,
+      405,
+      "method_not_allowed",
+      `Only ${expectedMethod} is allowed for this endpoint.`,
+      { path: pathname },
+    );
+  }
+
+  if (requiresWebsiteConsoleStepUp(pathname) && !auth.hasValidSecret && !auth.hasDangerStepUp) {
+    return consoleErrorResponse(
+      request,
+      env,
+      403,
+      "step_up_required",
+      "Danger step-up is required for raw website console data.",
+      { path: pathname },
+    );
+  }
+
+  try {
+    if (pathname === "/admin/website/console/summary") {
+      const doStatus = await fetchDoWebsiteStatus(env);
+      const cachedRaw = await readSiteSnapshotCache(env);
+      let cachedSnapshot: Record<string, unknown> | null = null;
+      if (cachedRaw) {
+        try {
+          const parsed = JSON.parse(cachedRaw);
+          if (parsed && typeof parsed === "object") {
+            cachedSnapshot = parsed as Record<string, unknown>;
+          }
+        } catch {
+          cachedSnapshot = null;
+        }
+      }
+
+      const payload = {
+        ok: true,
+        code: "ok",
+        message: "website_console_summary",
+        generatedAtUtc: Date.now(),
+        runtime: {
+          kvConfigured: !!env.SITE_SNAPSHOT_KV,
+          d1Configured: !!env.SITE_CACHE_DB,
+          oracleReachable: true,
+        },
+        snapshot: {
+          snapshotId: typeof cachedSnapshot?.snapshotId === "string" ? cachedSnapshot.snapshotId : null,
+          generatedAtUtc: typeof cachedSnapshot?.generatedAtUtc === "number" ? cachedSnapshot.generatedAtUtc : null,
+          totals: (cachedSnapshot?.totals && typeof cachedSnapshot.totals === "object")
+            ? cachedSnapshot.totals
+            : { downloads: 0, countries: 0 },
+          cacheState: cachedRaw ? "hit" : "miss",
+        },
+        telemetry: (doStatus.telemetry && typeof doStatus.telemetry === "object") ? doStatus.telemetry : {},
+        doWebsite: (doStatus.website && typeof doStatus.website === "object") ? doStatus.website : {},
+      };
+      return withCors(
+        request,
+        new Response(JSON.stringify(payload), {
+          status: 200,
+          headers: { "content-type": "application/json; charset=utf-8" },
+        }),
+        env,
+      );
+    }
+
+    if (pathname === "/admin/website/console/telemetry") {
+      const doStatus = await fetchDoWebsiteStatus(env);
+      const payload = {
+        ok: true,
+        code: "ok",
+        message: "website_console_telemetry",
+        generatedAtUtc: Date.now(),
+        telemetry: (doStatus.telemetry && typeof doStatus.telemetry === "object") ? doStatus.telemetry : {},
+        publicSnapshot: (doStatus.publicSnapshot && typeof doStatus.publicSnapshot === "object")
+          ? doStatus.publicSnapshot
+          : {},
+      };
+      return withCors(
+        request,
+        new Response(JSON.stringify(payload), {
+          status: 200,
+          headers: { "content-type": "application/json; charset=utf-8" },
+        }),
+        env,
+      );
+    }
+
+    if (pathname === "/admin/website/console/kv") {
+      const key = new URL(request.url).searchParams.get("key") || SITE_SNAPSHOT_KV_KEY;
+      if (!env.SITE_SNAPSHOT_KV) {
+        return consoleErrorResponse(request, env, 503, "kv_not_configured", "SITE_SNAPSHOT_KV binding is not configured.");
+      }
+      const value = await env.SITE_SNAPSHOT_KV.get(key);
+      let parsed: unknown = null;
+      if (value) {
+        try {
+          parsed = JSON.parse(value);
+        } catch {
+          parsed = null;
+        }
+      }
+      const payload = {
+        ok: true,
+        code: "ok",
+        message: "website_console_kv",
+        generatedAtUtc: Date.now(),
+        key,
+        sizeBytes: value ? value.length : 0,
+        exists: value !== null,
+        valueRaw: value,
+        valueJson: parsed,
+      };
+      return withCors(
+        request,
+        new Response(JSON.stringify(payload), {
+          status: 200,
+          headers: { "content-type": "application/json; charset=utf-8" },
+        }),
+        env,
+      );
+    }
+
+    if (pathname === "/admin/website/console/d1/tables") {
+      const rows = await executeD1All(
+        env,
+        "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name ASC",
+      );
+      const tables = extractTableNames(rows);
+      return withCors(
+        request,
+        new Response(
+          JSON.stringify({
+            ok: true,
+            code: "ok",
+            message: "website_console_d1_tables",
+            generatedAtUtc: Date.now(),
+            tables,
+          }),
+          { status: 200, headers: { "content-type": "application/json; charset=utf-8" } },
+        ),
+        env,
+      );
+    }
+
+    if (pathname === "/admin/website/console/d1/query") {
+      if (request.method !== "POST") {
+        return consoleErrorResponse(
+          request,
+          env,
+          405,
+          "method_not_allowed",
+          "Only POST is allowed for D1 query endpoint.",
+        );
+      }
+
+      const body = await request.json().catch(() => null) as {
+        query?: unknown;
+        maxRows?: unknown;
+      } | null;
+      const query = typeof body?.query === "string" ? body.query : "";
+      const guard = await guardConsoleD1Query(env, query, body?.maxRows);
+      if (!guard.ok) {
+        return consoleErrorResponse(request, env, 400, guard.code, guard.message);
+      }
+      const rows = await executeD1All(env, guard.query);
+      return withCors(
+        request,
+        new Response(
+          JSON.stringify({
+            ok: true,
+            code: "ok",
+            message: "website_console_d1_query",
+            generatedAtUtc: Date.now(),
+            maxRows: guard.maxRows,
+            rowCount: rows.length,
+            rows,
+            query: guard.query,
+          }),
+          { status: 200, headers: { "content-type": "application/json; charset=utf-8" } },
+        ),
+        env,
+      );
+    }
+
+    if (pathname === "/admin/website/console/snapshot/raw") {
+      const doStatus = await fetchDoWebsiteStatus(env);
+      const kvRaw = await readSiteSnapshotCache(env);
+      let kvParsed: Record<string, unknown> | null = null;
+      if (kvRaw) {
+        try {
+          const parsed = JSON.parse(kvRaw);
+          if (parsed && typeof parsed === "object") kvParsed = parsed as Record<string, unknown>;
+        } catch {
+          kvParsed = null;
+        }
+      }
+      return withCors(
+        request,
+        new Response(
+          JSON.stringify({
+            ok: true,
+            code: "ok",
+            message: "website_console_snapshot_raw",
+            generatedAtUtc: Date.now(),
+            kvSnapshotRaw: kvRaw,
+            kvSnapshotJson: kvParsed,
+            doPublicSnapshot: (doStatus.publicSnapshot && typeof doStatus.publicSnapshot === "object")
+              ? doStatus.publicSnapshot
+              : null,
+          }),
+          { status: 200, headers: { "content-type": "application/json; charset=utf-8" } },
+        ),
+        env,
+      );
+    }
+
+    return null;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "website_console_failed";
+    return consoleErrorResponse(
+      request,
+      env,
+      500,
+      "website_console_error",
+      "Failed to load website console data.",
+      { cause: message },
+    );
+  }
+}
+
 
 
 // ---------------------------------------------------------------------------
