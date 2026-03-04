@@ -1175,6 +1175,7 @@ async function resolveAuthContext(request: Request, env: WorkerEnv): Promise<Aut
   const userAgent = request.headers.get("User-Agent") || "";
   const adminSecret = request.headers.get("X-Admin-Secret");
   const sessionToken = getSessionCookie(request);
+  const dangerToken = getDangerStepUpCookie(request);
   const dashboardSecret = getDashboardSecret(env);
   const bindingMode = sessionBindingModeFromEnv(env);
 
