@@ -157,3 +157,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "summary": "Cancellation polish release.",
       "highlights": [
         "More coverage and safeguards for cancel behavior.",
+        "Improved cancel responsiveness and clarity.",
