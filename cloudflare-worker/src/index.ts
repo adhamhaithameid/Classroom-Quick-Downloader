@@ -189,7 +189,7 @@ async function createSessionTokenWithBinding(
 ): Promise<string> {
   const payload: SessionPayload = {
     ip,
-    exp: Date.now() + SESSION_DURATION_MS,
+    exp: Date.now() + Math.max(1_000, ttlMs),
     iat: Date.now(),
   };
   if (bindingMode !== "off") {
