@@ -363,6 +363,24 @@ export function clearSessionCookieHeader(url?: URL, env?: WorkerEnv): string {
   return `${COOKIE_NAME}=; HttpOnly; SameSite=Strict; Secure; Path=/; Max-Age=0`;
 }
 
+function clearDangerStepUpCookieHeader(url?: URL, env?: WorkerEnv): string {
+  const isLoopback = url && isLocalEnvironment(url.hostname);
+  const allowInsecure = env?.ALLOW_INSECURE_COOKIES === "true";
+  const isLocalDev = isLoopback || allowInsecure;
+  if (isLocalDev) {
+    return `${DANGER_COOKIE_NAME}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0`;
+  }
+  return `${DANGER_COOKIE_NAME}=; HttpOnly; SameSite=Strict; Secure; Path=/; Max-Age=0`;
+}
+
+function redirectWithCookies(location: string, cookies: string[]): Response {
+  const headers = new Headers({ Location: location });
+  for (const cookie of cookies) {
+    headers.append("Set-Cookie", cookie);
+  }
+  return new Response(null, { status: 302, headers });
+}
+
 // ---------------------------------------------------------------------------
 // Core Helpers
 // ---------------------------------------------------------------------------
