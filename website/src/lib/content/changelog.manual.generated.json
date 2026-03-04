@@ -313,3 +313,4 @@
         "Improved repeat-use reliability."
       ],
       "fixed": [
+        "Fixed launch-adjacent regressions."
