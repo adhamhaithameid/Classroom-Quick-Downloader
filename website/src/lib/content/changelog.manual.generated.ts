@@ -71,3 +71,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "version": "1.3.6",
       "title": "Release 1.3.6",
       "summary": "Dependency and compatibility maintenance release.",
+      "highlights": [
