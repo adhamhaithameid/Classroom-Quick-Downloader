@@ -266,3 +266,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Fixed early 1.1 runtime issues."
       ],
       "added": [
+        "Additional diagnostics and background-flow coverage."
