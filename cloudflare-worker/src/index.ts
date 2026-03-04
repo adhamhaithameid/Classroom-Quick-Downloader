@@ -1877,6 +1877,11 @@ async function handleOraclePublicWebsiteProxy(request: Request, env: WorkerEnv):
   if (pathname === "/api/public/website/uninstall") {
     allowedMethods = new Set(["GET", "POST"]);
   }
+  // NEWSLETTER_CTA_DISABLED_ROLLBACK_START
+  // else if (pathname === "/api/public/website/newsletter/subscribe") {
+  //   allowedMethods = new Set(["POST"]);
+  // }
+  // NEWSLETTER_CTA_DISABLED_ROLLBACK_END
 
   if (!allowedMethods.has(request.method)) {
     return withCors(
