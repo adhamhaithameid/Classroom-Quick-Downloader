@@ -80,3 +80,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Compatibility safeguards for tooling/runtime."
       ],
       "changed": [
+        "Updated dependency resolution paths."
