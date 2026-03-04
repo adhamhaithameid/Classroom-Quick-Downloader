@@ -327,3 +327,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Core one-click Classroom download workflow.",
         "Established baseline architecture/contracts.",
         "Fixed pre-release blockers."
+      ],
