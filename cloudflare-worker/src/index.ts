@@ -286,7 +286,7 @@ function getCookieValue(request: Request, name: string): string | null {
   for (const cookie of cookies) {
     const eqIndex = cookie.indexOf("=");
     if (eqIndex === -1) continue;
-    const name = cookie.substring(0, eqIndex);
+    const key = cookie.substring(0, eqIndex);
     const value = cookie.substring(eqIndex + 1);
     if (name === COOKIE_NAME) return value;
   }
