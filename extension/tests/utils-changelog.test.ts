@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ChangelogConfig } from '../entrypoints/utils/changelog';
 
-async function loadChangelogModule(changeLogUrl = 'https://worker.example/changelog') {
+async function loadChangelogModule() {
   vi.resetModules();
   vi.doMock('../entrypoints/utils/analytics/constants', () => ({
     CHANGELOG_URL: changeLogUrl,
