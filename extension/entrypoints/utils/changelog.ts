@@ -133,7 +133,6 @@ function normalizeManualData(): ChangelogData {
       : `manual-${now}`,
   };
 
-function computeRevisionToken(entries: ChangelogEntry[], config: ChangelogConfig, meta?: ChangelogMeta): string {
   const basis = {
     configLastUpdated: toFiniteInt(config.lastUpdated) ?? null,
     liveUpdatedAt: toFiniteInt(meta?.liveUpdatedAt) ?? null,
