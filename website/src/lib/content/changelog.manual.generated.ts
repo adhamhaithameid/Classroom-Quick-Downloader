@@ -55,3 +55,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Improved changelog action layout and readability.",
         "Fixed close-button layout and hover inconsistencies."
       ],
+      "added": [
