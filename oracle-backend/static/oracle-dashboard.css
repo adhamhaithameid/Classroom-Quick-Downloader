@@ -1884,6 +1884,39 @@
         color: var(--text-secondary);
         margin-bottom: 8px;
       }
+      .section-caption-inline {
+        margin-top: 8px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .section-note-tight {
+        margin-bottom: 10px;
+        font-size: 0.82em;
+        color: var(--text-soft, #aaa);
+      }
+      .table-container-spaced {
+        margin-top: 8px;
+      }
+      .stat-value-endpoint {
+        font-size: 0.75rem;
+      }
+      .action-inline-row {
+        display: flex;
+        gap: 8px;
+        margin-top: 10px;
+      }
+      .form-control-bulk-markdown {
+        width: 100%;
+        font-family: "SF Mono", Monaco, Consolas, monospace;
+        font-size: 0.85em;
+        resize: vertical;
+        background: rgba(0, 0, 0, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: #e2e8f0;
+        border-radius: 8px;
+        padding: 12px;
+      }
       .website-sync-anomaly {
         border: 1px solid rgba(245, 158, 11, 0.45);
         border-radius: 12px;
