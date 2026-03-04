@@ -283,3 +283,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "summary": "Feature and compatibility expansion release.",
       "highlights": [
         "Multi-browser support improvements.",
+        "Updated setup/runtime compatibility behavior.",
