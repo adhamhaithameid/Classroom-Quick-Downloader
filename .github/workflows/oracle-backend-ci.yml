@@ -25,6 +25,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 10.28.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install JS dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Oracle dashboard assets
+        run: pnpm -C oracle-backend build:dashboard
+
+      - name: Typecheck Oracle dashboard TS
+        run: pnpm -C oracle-backend typecheck:dashboard
+
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
