@@ -259,11 +259,6 @@ export function getMatchingRule(config: ChangelogConfig | undefined, currentVers
   return null;
 }
 
-
-
-/**
- * Helper: Get pill CSS classes based on rule & seen state
- */
 export function getRuleClasses(rule: NotificationRule | null, isSeen: boolean): string {
   if (!rule) return '';
   if (isSeen) return ''; // Default / Normal style if seen
