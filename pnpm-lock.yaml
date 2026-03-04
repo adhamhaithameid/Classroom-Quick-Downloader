@@ -44,8 +44,8 @@ importers:
         specifier: ^10.0.1
         version: 10.0.1(eslint@10.0.1(patch_hash=43f8a8c5c7b8c79b4aea08c38fe3fd0a0a7c251623cb5bc4b063db421c8ad170)(jiti@2.6.1))
       '@typescript-eslint/eslint-plugin':
-        specifier: ^8.56.0
-        version: 8.56.0(@typescript-eslint/parser@8.56.0(eslint@10.0.1(patch_hash=43f8a8c5c7b8c79b4aea08c38fe3fd0a0a7c251623cb5bc4b063db421c8ad170)(jiti@2.6.1))(typescript@5.9.3))(eslint@10.0.1(patch_hash=43f8a8c5c7b8c79b4aea08c38fe3fd0a0a7c251623cb5bc4b063db421c8ad170)(jiti@2.6.1))(typescript@5.9.3)
+        specifier: ^8.56.1
+        version: 8.56.1(@typescript-eslint/parser@8.56.1(eslint@10.0.1(patch_hash=43f8a8c5c7b8c79b4aea08c38fe3fd0a0a7c251623cb5bc4b063db421c8ad170)(jiti@2.6.1))(typescript@5.9.3))(eslint@10.0.1(patch_hash=43f8a8c5c7b8c79b4aea08c38fe3fd0a0a7c251623cb5bc4b063db421c8ad170)(jiti@2.6.1))(typescript@5.9.3)
       '@typescript-eslint/parser':
         specifier: ^8.56.0
         version: 8.56.0(eslint@10.0.1(patch_hash=43f8a8c5c7b8c79b4aea08c38fe3fd0a0a7c251623cb5bc4b063db421c8ad170)(jiti@2.6.1))(typescript@5.9.3)
