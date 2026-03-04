@@ -288,3 +288,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       ],
       "added": [
         "Multi-browser support improvements."
+      ],
