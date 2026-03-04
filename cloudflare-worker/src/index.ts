@@ -583,7 +583,7 @@ function isCloudflareAccessIdentityAllowed(request: Request, env: WorkerEnv): bo
 }
 
 function cloudflareAccessDeniedResponse(request: Request, env: WorkerEnv, pathname: string): Response {
-  if (pathname === "/" || pathname === "/dashboard" || pathname === "/logout") {
+  if (pathname === "/" || pathname === "/dashboard" || pathname === "/dashboard/website" || pathname === "/logout") {
     return new Response("Access denied: Cloudflare Access identity required.", {
       status: 403,
       headers: { "content-type": "text/plain; charset=utf-8" },
