@@ -307,3 +307,4 @@
         "Fixed launch-adjacent regressions."
       ],
       "added": [
+        "Better logging/diagnostics for early production behavior."
