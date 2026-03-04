@@ -4654,6 +4654,11 @@
       window.deleteExtClRule = async function(id) {
         if (!confirm('Delete rule "' + id + '"?')) return;
         try {
+          var okStepDeleteRule = await ensureStepUp();
+          if (!okStepDeleteRule) {
+            extClToast('Additional verification is required.', 'error');
+            return;
+          }
           await postJSON('/api/admin/extension-changelog/rules/delete', { id: id });
           extClToast('Rule deleted ✓', 'success');
           await loadExtChangelogRules();
