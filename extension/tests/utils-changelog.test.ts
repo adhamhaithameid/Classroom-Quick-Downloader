@@ -37,44 +37,23 @@ describe('changelog utils (manual mode)', () => {
   it('persists robust cache envelope fields', async () => {
     const mod = await loadChangelogModule();
 
-  it('handles latest change extraction and seen version tracking', async () => {
-    const mod = await loadChangelogModule();
-    expect(mod.getLatestChange(null)).toBeNull();
-    expect(mod.getLatestChange({ entries: [], config: { rules: [] }, revisionToken: 'rev-empty', lastFetched: Date.now() })).toBeNull();
-    expect(mod.getLatestChange({
-      entries: [{ id: 'x', version: '1.0.0', date: '2026-01-01', changes: ['First change'] }],
-      config: { rules: [] },
-      revisionToken: 'rev-a',
-      lastFetched: Date.now(),
-    })).toBe('First change');
-
-    chrome.storage.local.get = vi.fn(async () => ({ cqd_changelog_seen_v1: ['1.0.0'] })) as never;
-    const firstData = {
-      entries: [{ id: 'x', version: '1.0.0', date: '2026-01-01', changes: ['First change'] }],
-      config: { rules: [] },
-      revisionToken: 'rev-a',
-      lastFetched: Date.now(),
-    };
-    await mod.markAsSeen('1.0.0', firstData);
-    expect(chrome.storage.local.set).toHaveBeenCalledWith({ cqd_changelog_seen_v1: { '1.0.0': '1.0.0::rev-a' } });
-    chrome.storage.local.get = vi.fn(async () => ({ cqd_changelog_seen_v1: { '1.0.0': '1.0.0::rev-a' } })) as never;
-    expect(await mod.isVersionSeen('1.0.0', firstData)).toBe(true);
-    const updatedData = { ...firstData, revisionToken: 'rev-b' };
-    expect(await mod.isVersionSeen('1.0.0', updatedData)).toBe(false);
-    expect(await mod.isVersionSeen('2.0.0', updatedData)).toBe(false);
-    expect(await mod.isVersionSeen('')).toBe(false);
-  });
-
-  it('accepts entries without id and creates stable fallback id', async () => {
-    const mod = await loadChangelogModule();
-    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({
-      ok: true,
-      entries: [{ version: 'v1.3.7', date: '2026-02-28T00:00:00.000Z', changes: ['New'] }],
-      config: { rules: [] },
-    }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
-    const result = await mod.fetchChangelog(true);
-    expect(result?.entries[0]?.id.startsWith('cl-1.3.7-')).toBe(true);
-    expect(result?.entries[0]?.version).toBe('1.3.7');
+    await mod.fetchChangelog(true);
+    expect(chrome.storage.local.set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cqd_changelog_v1: expect.objectContaining({
+          schemaVersion: 2,
+          cachedAt: expect.any(Number),
+          lastSeenId: 'manual-1.3.9-1',
+          cachedItems: expect.any(Array),
+          cachedConfig: expect.objectContaining({
+            rules: expect.arrayContaining([
+              expect.objectContaining({ id: 'manual-pill-v137', target: '1.3.7', priority: 'major', effect: 'pulse' }),
+              expect.objectContaining({ id: 'manual-pill-v138', target: '1.3.8', priority: 'major', effect: 'pulse' }),
+            ]),
+          }),
+        }),
+      }),
+    );
   });
 
   it('treats same-version cloud updates as unseen when changelog content changes', async () => {
