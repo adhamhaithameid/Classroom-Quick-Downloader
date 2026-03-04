@@ -78,3 +78,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       ],
       "added": [
         "Compatibility safeguards for tooling/runtime."
+      ],
