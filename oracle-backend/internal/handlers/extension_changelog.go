@@ -520,7 +520,13 @@ func importExtChangelogFromGitHub(db *sql.DB, markdownURL string) (extGitHubImpo
 	_ = setExtChangelogConfigValue(db, "last_import_at", fmt.Sprintf("%d", lastImportAt))
 	_ = setExtChangelogConfigValue(db, "last_import_count", fmt.Sprintf("%d", imported))
 
-	return imported, nil
+	return extGitHubImportResult{
+		Imported:     imported,
+		Skipped:      false,
+		Checksum:     checksum,
+		LastImportAt: lastImportAt,
+		SourceURL:    canonicalURL,
+	}, nil
 }
 
 func limitStringSlice(items []string, max int) []string {
