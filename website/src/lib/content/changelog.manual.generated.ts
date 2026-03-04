@@ -53,3 +53,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "highlights": [
         "Better website changelog integration from extension.",
         "Improved changelog action layout and readability.",
+        "Fixed close-button layout and hover inconsistencies."
