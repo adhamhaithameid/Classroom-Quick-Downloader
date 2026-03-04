@@ -61,3 +61,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "changed": [
         "Improved changelog action layout and readability."
       ],
+      "fixed": [
