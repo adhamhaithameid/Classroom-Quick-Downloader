@@ -80,23 +80,37 @@ function hashText(value: string): string {
   return (hash >>> 0).toString(16);
 }
 
-function sanitizeMeta(value: unknown): ChangelogMeta | undefined {
-  if (!value || typeof value !== 'object') return undefined;
-  const row = value as Record<string, unknown>;
-  const liveUpdatedAt = toFiniteInt(row.liveUpdatedAt);
-  const lastAutoSyncAtRaw = row.lastAutoSyncAt;
-  const lastAutoSyncAt = lastAutoSyncAtRaw == null ? null : toFiniteInt(lastAutoSyncAtRaw) ?? null;
-  const applyMode = typeof row.applyMode === 'string' ? row.applyMode : undefined;
-  const lastAutoSyncStatus = typeof row.lastAutoSyncStatus === 'string' ? row.lastAutoSyncStatus : undefined;
-  const contentChecksum = typeof row.contentChecksum === 'string' ? row.contentChecksum : undefined;
-  if (
-    liveUpdatedAt === undefined &&
-    applyMode === undefined &&
-    lastAutoSyncStatus === undefined &&
-    lastAutoSyncAt === null &&
-    contentChecksum === undefined
-  ) {
-    return undefined;
+function normalizeManualData(): ChangelogData {
+  const now = Date.now();
+  const rawEntries = Array.isArray(EXTENSION_MANUAL_CHANGELOG.entries)
+    ? EXTENSION_MANUAL_CHANGELOG.entries
+    : [];
+
+  const entries: ChangelogEntry[] = [];
+  for (let index = 0; index < rawEntries.length; index += 1) {
+    const entry = rawEntries[index];
+    const version = normalizeVersion(String(entry?.version || ''));
+    if (!version) continue;
+    const date = typeof entry?.date === 'string' && entry.date.trim()
+      ? entry.date
+      : new Date(now - index * 86_400_000).toISOString();
+    const id = typeof entry?.id === 'string' && entry.id.trim()
+      ? entry.id.trim()
+      : `manual-${version}-${index + 1}`;
+    const changes = Array.isArray(entry?.changes)
+      ? entry.changes.filter((item: unknown): item is string => typeof item === 'string' && item.trim().length > 0)
+      : [];
+    entries.push({
+      id,
+      version,
+      date,
+      changes,
+      summary: typeof entry?.summary === 'string' ? entry.summary.trim() : undefined,
+      added: Array.isArray(entry?.added) ? entry.added.filter((item: unknown): item is string => typeof item === 'string' && item.trim().length > 0) : [],
+      changed: Array.isArray(entry?.changed) ? entry.changed.filter((item: unknown): item is string => typeof item === 'string' && item.trim().length > 0) : [],
+      fixed: Array.isArray(entry?.fixed) ? entry.fixed.filter((item: unknown): item is string => typeof item === 'string' && item.trim().length > 0) : [],
+      isImportant: entry?.isImportant === true,
+    });
   }
   return {
     liveUpdatedAt,
