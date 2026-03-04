@@ -273,3 +273,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       ],
       "fixed": [
         "Fixed early 1.1 runtime issues."
+      ],
