@@ -173,7 +173,7 @@ export async function fetchChangelogDetailed(force = false): Promise<ChangelogFe
     ...MANUAL_DATA,
     lastFetched: Date.now(),
   };
-  const meta = sanitizeMeta(json.meta);
+  await persistManualCache(data);
   return {
     entries: parsedEntries,
     config,
