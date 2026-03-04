@@ -50,7 +50,7 @@
     return entries
       .map((entry) => {
         const version = (entry.version || '').replace(/^v/i, '').trim();
-        if (!version) return null;
+        if (!version || version === '0.0.0') return null;
         let summary = (entry.summary || '').trim();
         const title = (entry.title || '').trim();
         const highlights = Array.isArray(entry.highlights)

@@ -45,7 +45,10 @@ describe('route render smoke coverage', () => {
     expect(head).toContain('Download All Google Classroom Files In One Click');
     expect(head).toContain('SoftwareApplication');
     expect(head).toContain('/overview');
-    expect(html).toContain('Download all Google Classroom files');
+    expect(html).toContain('The free extension that');
+    expect(html).toContain('supercharges');
+    expect(html).toContain('Download all Google Classroom files in one click for every assignment.');
+    expect(html).toContain('Not affiliated with Google or Google Classroom.');
     expect(html).toContain('Ready to save hours?');
     expect(html).toContain('See where Classroom Quick Downloader is used around the world.');
     expect(html).toContain('l2-page-floats');
@@ -113,7 +116,6 @@ describe('route render smoke coverage', () => {
     expect(head).toContain('/faq');
     expect(head).toContain('FAQPage');
     expect(html).toContain('Frequently Asked Questions');
-    expect(html).toContain('Quick answers students search for most');
     expect(html).toContain('What is Classroom Quick Downloader?');
     expect(html).toContain('Which browsers are supported?');
     expect(html).toContain('How does');

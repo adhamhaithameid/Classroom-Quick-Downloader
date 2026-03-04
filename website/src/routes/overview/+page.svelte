@@ -1388,8 +1388,8 @@
   <section id="top" class="l2-hero l2-snap">
     <div class="l2-wrap l2-hero-content">
       <h1 class="l2-mega">
-        Download all Google Classroom files<br/>
-        <span class="l2-em l2-em-supercharge">in one click{#if pinnedSuperchargeStar}{@const pinnedResolved = resolveSvg(pinnedSuperchargeStar)}{@const pinnedSize = Math.max(18, Math.min(54, pinnedSuperchargeStar.renderSize))}<span
+        The free extension that<br/>
+        <span class="l2-em l2-em-supercharge">supercharges{#if pinnedSuperchargeStar}{@const pinnedResolved = resolveSvg(pinnedSuperchargeStar)}{@const pinnedSize = Math.max(18, Math.min(54, pinnedSuperchargeStar.renderSize))}<span
             class="l2-supercharge-star"
             aria-hidden="true"
             style="
@@ -1407,12 +1407,13 @@
               stroke-linecap="round"
               stroke-linejoin="round"
               style="width:100%;height:100%;"
-            >{@html pinnedResolved.svg}</svg></span>{/if}</span><br/>for every assignment.
+            >{@html pinnedResolved.svg}</svg></span>{/if}</span><br/>Google Classroom.
       </h1>
 
       <p class="l2-sub">
-        Stop downloading files one by one. Classroom Quick Downloader adds batch downloads to Google Classroom — for every browser.
+        Download all Google Classroom files in one click for every assignment.
       </p>
+      <p class="l2-disclaimer">Not affiliated with Google or Google Classroom.</p>
 
       <div class="l2-hero-actions">
         {#each orderedBrowserCtas as b}
@@ -1901,12 +1902,6 @@
     <div class="l2-wrap l2-cta-content l2-reveal" data-placement-section="cta" style="position:relative;overflow:visible">
       <h2>Ready to save hours?</h2>
       <p>Install Classroom Quick Downloader in under 10 seconds. Free, forever. No account required.</p>
-      <div class="l2-seo-links" aria-label="Guides and install links">
-        <a href="{base}/download-all-attachments-google-classroom">Download-all guide</a>
-        <a href="{base}/google-drive-cant-scan-virus-warning-download">Drive warning fix</a>
-        <a href="{base}/install/chrome">Install on Chrome</a>
-        <a href="{base}/security">Security</a>
-      </div>
       <!-- NEWSLETTER_CTA_DISABLED_ROLLBACK_START
       <p>Install Classroom Quick Downloader in under 10 seconds, and add your email for future updates. Free, forever. No account required.</p>
       <form class="l2-newsletter-form" on:submit|preventDefault={submitNewsletterEmail}>
@@ -2311,6 +2306,12 @@
     font-size: 18px; line-height: 1.7; color: var(--text);
     opacity: 0.7;
     max-width: 640px; margin: 0 auto 40px;
+  }
+  .l2-disclaimer {
+    margin: -20px 0 22px;
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 600;
   }
   .l2-compat {
     font-size: 13px; color: var(--text-secondary); margin-top: 16px;
@@ -3687,30 +3688,6 @@
   }
   .l2-cta-content p { font-size: 18px; color: var(--text-secondary); margin: 0 0 20px; }
 
-  .l2-seo-links {
-    display: flex;
-    justify-content: center;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin: 0 auto 24px;
-  }
-
-  .l2-seo-links a {
-    text-decoration: none;
-    color: var(--text-secondary);
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    padding: 6px 12px;
-    font-size: 12px;
-    font-weight: 600;
-    transition: color 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
-  }
-
-  .l2-seo-links a:hover {
-    color: var(--gc-green);
-    border-color: rgba(26, 139, 85, 0.35);
-    background: rgba(26, 139, 85, 0.08);
-  }
   .l2-newsletter-form {
     width: min(580px, 100%);
     margin: 0 auto 22px;
