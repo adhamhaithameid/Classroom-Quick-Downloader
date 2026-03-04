@@ -347,6 +347,25 @@ export interface PipelineHealthResponse {
   };
 }
 
+export interface KVNamespaceBinding {
+  get(key: string): Promise<string | null>;
+  put(
+    key: string,
+    value: string,
+    options?: {
+      expirationTtl?: number;
+      expiration?: number;
+    }
+  ): Promise<void>;
+  delete?(key: string): Promise<void>;
+}
+
+export interface D1DatabaseBinding {
+  prepare(query: string): unknown;
+  batch?(statements: unknown[]): Promise<unknown>;
+  exec?(query: string): Promise<unknown>;
+}
+
 /**
  * Worker Env shape (bindings injected by Cloudflare).
  * This is used by index.ts (not the Durable Object itself).
