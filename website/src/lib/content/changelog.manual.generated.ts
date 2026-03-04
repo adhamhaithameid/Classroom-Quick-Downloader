@@ -197,3 +197,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "version": "1.2.0",
       "title": "Release 1.2.0",
       "summary": "Cancel feature baseline release.",
+      "highlights": [
