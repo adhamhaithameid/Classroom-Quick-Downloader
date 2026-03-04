@@ -224,3 +224,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Fixed repeated-session regressions."
       ],
       "added": [
+        "Additional runtime checks for long sessions."
