@@ -1955,6 +1955,288 @@ async function handleOraclePublicWebsiteProxy(request: Request, env: WorkerEnv):
   }
 }
 
+async function readSiteSnapshotCache(env: WorkerEnv): Promise<string | null> {
+  try {
+    if (!env.SITE_SNAPSHOT_KV) return null;
+    return await env.SITE_SNAPSHOT_KV.get(SITE_SNAPSHOT_KV_KEY);
+  } catch {
+    return null;
+  }
+}
+
+async function writeSiteSnapshotCache(env: WorkerEnv, payloadText: string): Promise<void> {
+  try {
+    if (!env.SITE_SNAPSHOT_KV) return;
+    await env.SITE_SNAPSHOT_KV.put(SITE_SNAPSHOT_KV_KEY, payloadText, {
+      expirationTtl: SITE_CACHE_TTL_SECONDS,
+    });
+  } catch {
+    // Best-effort cache write only.
+  }
+}
+
+function readSiteSnapshotTimestamp(snapshot: Record<string, unknown>): number {
+  const cacheWrittenAtUtc = Number(snapshot.cacheWrittenAtUtc);
+  if (Number.isFinite(cacheWrittenAtUtc) && cacheWrittenAtUtc > 0) return cacheWrittenAtUtc;
+
+  const generatedAtUtc = Number(snapshot.generatedAtUtc ?? snapshot.generatedAt);
+  if (Number.isFinite(generatedAtUtc) && generatedAtUtc > 0) return generatedAtUtc;
+
+  return 0;
+}
+
+function isCachedSiteSnapshotStale(cachedRaw: string): boolean {
+  try {
+    const parsed = JSON.parse(cachedRaw);
+    if (!parsed || typeof parsed !== "object") return true;
+
+    const snapshotTs = readSiteSnapshotTimestamp(parsed as Record<string, unknown>);
+    if (snapshotTs <= 0) return true;
+
+    return Date.now() - snapshotTs >= SITE_CACHE_REVALIDATE_AFTER_MS;
+  } catch {
+    return true;
+  }
+}
+
+function buildSiteSnapshotEnvelope(input: Record<string, unknown>): Record<string, unknown> {
+  const now = Date.now();
+  const generatedAtUtc = Number(input.generatedAtUtc ?? input.generatedAt) || now;
+  const snapshotId = typeof input.snapshotId === "string" && input.snapshotId.trim().length > 0
+    ? input.snapshotId
+    : `edge-${generatedAtUtc}`;
+  return {
+    ...input,
+    snapshotId,
+    generatedAtUtc,
+    cacheWrittenAtUtc: now,
+    sessionPinned: true,
+  };
+}
+
+async function fetchOracleSnapshotPayload(env: WorkerEnv): Promise<Record<string, unknown>> {
+  const resolvedOracleEndpoint = resolveOracleEndpoint(env.ORACLE_ENDPOINT, {
+    allowInsecureHttp: env.ALLOW_INSECURE_ORACLE_ENDPOINT === "true",
+  });
+  if (!resolvedOracleEndpoint.ok) {
+    throw new Error(resolvedOracleEndpoint.message);
+  }
+
+  const upstream = await fetch(`${resolvedOracleEndpoint.baseUrl}/api/public/website/snapshot`, {
+    method: "GET",
+    headers: { accept: "application/json" },
+    cache: "no-store",
+    redirect: "follow",
+  });
+  if (!upstream.ok) {
+    throw new Error(`oracle_http_${upstream.status}`);
+  }
+  const payload = await upstream.json();
+  if (!payload || typeof payload !== "object") {
+    throw new Error("oracle_invalid_snapshot");
+  }
+  return payload as Record<string, unknown>;
+}
+
+async function handleSiteV1Snapshot(request: Request, env: WorkerEnv): Promise<Response> {
+  if (request.method !== "GET") {
+    return withCors(
+      request,
+      new Response(JSON.stringify({ ok: false, error: "method_not_allowed" }), {
+        status: 405,
+        headers: { "content-type": "application/json; charset=utf-8" },
+      }),
+      env,
+    );
+  }
+
+  const cachedRaw = await readSiteSnapshotCache(env);
+  if (cachedRaw) {
+    if (!isCachedSiteSnapshotStale(cachedRaw)) {
+      return withCors(
+        request,
+        new Response(cachedRaw, {
+          status: 200,
+          headers: {
+            "content-type": "application/json; charset=utf-8",
+            "cache-control": "public, max-age=120, s-maxage=300",
+            "x-site-cache": "hit",
+          },
+        }),
+        env,
+      );
+    }
+
+    try {
+      const refreshedSnapshot = await fetchOracleSnapshotPayload(env);
+      const refreshedPayloadText = JSON.stringify(buildSiteSnapshotEnvelope(refreshedSnapshot));
+      await writeSiteSnapshotCache(env, refreshedPayloadText);
+      return withCors(
+        request,
+        new Response(refreshedPayloadText, {
+          status: 200,
+          headers: {
+            "content-type": "application/json; charset=utf-8",
+            "cache-control": "public, max-age=120, s-maxage=300",
+            "x-site-cache": "revalidated",
+          },
+        }),
+        env,
+      );
+    } catch {
+      return withCors(
+        request,
+        new Response(cachedRaw, {
+          status: 200,
+          headers: {
+            "content-type": "application/json; charset=utf-8",
+            "cache-control": "public, max-age=120, s-maxage=300",
+            "x-site-cache": "stale",
+          },
+        }),
+        env,
+      );
+    }
+  }
+
+  try {
+    const snapshot = await fetchOracleSnapshotPayload(env);
+    const enveloped = buildSiteSnapshotEnvelope(snapshot);
+    const payloadText = JSON.stringify(enveloped);
+    await writeSiteSnapshotCache(env, payloadText);
+    return withCors(
+      request,
+      new Response(payloadText, {
+        status: 200,
+        headers: {
+          "content-type": "application/json; charset=utf-8",
+          "cache-control": "public, max-age=120, s-maxage=300",
+          "x-site-cache": "miss",
+        },
+      }),
+      env,
+    );
+  } catch {
+    return withCors(
+      request,
+      new Response(JSON.stringify({ ok: false, error: "upstream_unavailable" }), {
+        status: 502,
+        headers: { "content-type": "application/json; charset=utf-8" },
+      }),
+      env,
+    );
+  }
+}
+
+async function handleSiteV1Privacy(request: Request, env: WorkerEnv): Promise<Response> {
+  if (request.method !== "GET") {
+    return withCors(
+      request,
+      new Response(JSON.stringify({ ok: false, error: "method_not_allowed" }), {
+        status: 405,
+        headers: { "content-type": "application/json; charset=utf-8" },
+      }),
+      env,
+    );
+  }
+
+  try {
+    const snapshot = await fetchOracleSnapshotPayload(env);
+    const privacy = (snapshot.privacy && typeof snapshot.privacy === "object")
+      ? snapshot.privacy
+      : {
+          headline: "Privacy-first by design",
+          summary: "Classroom Quick Downloader keeps telemetry minimal and avoids raw IP storage in public payloads.",
+        };
+    const payload = {
+      ok: true,
+      schemaVersion: "1",
+      generatedAtUtc: Date.now(),
+      sessionPinned: true,
+      privacy,
+    };
+    return withCors(
+      request,
+      new Response(JSON.stringify(payload), {
+        status: 200,
+        headers: {
+          "content-type": "application/json; charset=utf-8",
+          "cache-control": "public, max-age=120, s-maxage=300",
+        },
+      }),
+      env,
+    );
+  } catch {
+    return withCors(
+      request,
+      new Response(JSON.stringify({ ok: false, error: "upstream_unavailable" }), {
+        status: 502,
+        headers: { "content-type": "application/json; charset=utf-8" },
+      }),
+      env,
+    );
+  }
+}
+
+async function handleSiteV1Events(request: Request, env: WorkerEnv): Promise<Response> {
+  if (request.method !== "POST") {
+    return withCors(
+      request,
+      new Response(
+        JSON.stringify(
+          websiteEventsErrorBody(
+            "method_not_allowed",
+            "Only POST is allowed for this endpoint.",
+            false,
+          ),
+        ),
+        { status: 405, headers: { "content-type": "application/json; charset=utf-8" } },
+      ),
+      env,
+    );
+  }
+
+  const body = await request.text();
+  const proxied = new Request(new URL("/api/public/website/events", request.url).toString(), {
+    method: "POST",
+    headers: new Headers(request.headers),
+    body,
+  });
+  return proxyToDO(proxied, env);
+}
+
+function currentHourUtc(ts = Date.now()): number {
+  return new Date(ts).getUTCHours();
+}
+
+async function refreshSiteSnapshotCacheFromOracle(env: WorkerEnv): Promise<void> {
+  try {
+    const snapshot = await fetchOracleSnapshotPayload(env);
+    const payloadText = JSON.stringify(buildSiteSnapshotEnvelope(snapshot));
+    await writeSiteSnapshotCache(env, payloadText);
+  } catch {
+    // Best effort. Failures are surfaced through existing health endpoints.
+  }
+}
+
+async function flushWebsiteTelemetryViaDo(env: WorkerEnv): Promise<void> {
+  try {
+    if (!env.DO_SHARED_SECRET) return;
+    const stub = getDownloadsStub(env);
+    await stub.fetch(
+      new Request("https://do/admin/website/flush-now", {
+        method: "POST",
+        headers: {
+          "x-admin-secret": env.DO_SHARED_SECRET,
+          "content-type": "application/json; charset=utf-8",
+        },
+      }),
+    );
+  } catch {
+    // Best effort. DO keeps retry semantics internally.
+  }
+}
+
 export default {
   async fetch(request: Request, env: WorkerEnv, _ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
