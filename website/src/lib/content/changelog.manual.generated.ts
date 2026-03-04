@@ -287,3 +287,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Fixed packaging/config alignment issues."
       ],
       "added": [
+        "Multi-browser support improvements."
