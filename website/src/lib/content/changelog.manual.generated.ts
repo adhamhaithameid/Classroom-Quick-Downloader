@@ -118,3 +118,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Refined ingestion orchestration between worker and oracle.",
         "Fixed sync/auth edge cases in production-like workloads."
       ],
+      "added": [
