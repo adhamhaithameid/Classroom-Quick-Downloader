@@ -385,9 +385,18 @@ func setExtChangelogConfigValue(db *sql.DB, key, value string) error {
 // GitHub Import
 // ---------------------------------------------------------------------------
 
-func importExtChangelogFromGitHub(db *sql.DB, markdownURL string) (int, error) {
-	if markdownURL == "" {
-		markdownURL = githubRawMarkdownURL("user-friendly-changelog.md")
+type extGitHubImportResult struct {
+	Imported     int    `json:"imported"`
+	Skipped      bool   `json:"skipped"`
+	Checksum     string `json:"checksum"`
+	LastImportAt int64  `json:"lastImportAt"`
+	SourceURL    string `json:"sourceUrl"`
+}
+
+func previewExtChangelogFromGitHub(db *sql.DB, markdownURL string) (map[string]any, error) {
+	canonicalURL, err := sanitizeGitHubRawMarkdownURL(markdownURL)
+	if err != nil {
+		return nil, err
 	}
 	markdown, err := fetchRemoteUserFriendlyChangelogMarkdown(context.Background(), markdownURL)
 	if err != nil {
