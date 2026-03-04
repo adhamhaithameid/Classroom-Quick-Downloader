@@ -114,6 +114,7 @@ describe('changelog utils (manual mode)', () => {
       const mod = await loadChangelogModule();
       expect(mod.getRuleClasses(null, false)).toBe('');
       expect(mod.getRuleClasses(null, true)).toBe('');
+      expect(mod.getRuleClasses({ id: 'r', target: 'all', priority: 'major', effect: 'pulse' }, true)).toBe('');
     });
 
     it('returns empty string if seen is true', async () => {
