@@ -3495,7 +3495,7 @@
         if (!anomaly || anomaly.active !== true) {
           banner.classList.add('hidden');
           messageNode.textContent = '';
-          detailsNode.innerHTML = '';
+          clearChildren(detailsNode);
           return;
         }
         banner.classList.remove('hidden');
