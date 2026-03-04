@@ -181,53 +181,8 @@ export async function fetchChangelogDetailed(force = false): Promise<ChangelogFe
 }
 
 export async function fetchChangelog(force = false): Promise<ChangelogData | null> {
-  // 1. Check cache
-  const cached = await chrome.storage.local.get([STORAGE_KEY, ETAG_KEY]);
-  const data = sanitizeCachedData(cached[STORAGE_KEY]);
-  const storedEtag = typeof cached[ETAG_KEY] === 'string' ? cached[ETAG_KEY] : undefined;
-
-  if (!force && data && (Date.now() - data.lastFetched < CACHE_duration_MS)) {
-    return data;
-  }
-
-  // 2. Try Oracle (primary)
-  try {
-    if (ORACLE_CHANGELOG_URL) {
-      const [oracleData, newEtag] = await tryFetchEndpoint(ORACLE_CHANGELOG_URL, force, storedEtag);
-      if (oracleData) {
-        // Fresh data from Oracle
-        await chrome.storage.local.set({
-          [STORAGE_KEY]: oracleData,
-          [ETAG_KEY]: newEtag || '',
-        });
-        return oracleData;
-      }
-      // 304 response — data unchanged, update lastFetched
-      if (data) {
-        const refreshed = { ...data, lastFetched: Date.now() };
-        await chrome.storage.local.set({ [STORAGE_KEY]: refreshed });
-        return refreshed;
-      }
-    }
-  } catch (oracleErr) {
-    console.warn('[CQD Changelog] Oracle fetch failed, trying Worker fallback:', oracleErr);
-  }
-
-  // 3. Try Worker (fallback)
-  try {
-    if (CHANGELOG_URL) {
-      const [workerData] = await tryFetchEndpoint(CHANGELOG_URL, force);
-      if (workerData) {
-        await chrome.storage.local.set({ [STORAGE_KEY]: workerData });
-        return workerData;
-      }
-    }
-  } catch (workerErr) {
-    console.warn('[CQD Changelog] Worker fallback also failed:', workerErr);
-  }
-
-  // 4. Return cached data (offline fallback)
-  return data || null;
+  const result = await fetchChangelogDetailed(force);
+  return result.data;
 }
 
 /**
