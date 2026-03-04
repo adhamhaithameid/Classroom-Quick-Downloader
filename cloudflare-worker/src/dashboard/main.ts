@@ -5668,7 +5668,7 @@ export function renderDashboard(stats: StatsResponse): string {
 
       async function loadChangelogHistory() {
         if (!revisionHistoryEl) return;
-        revisionHistoryEl.innerHTML = '<div class="cl-preview-empty">Loading revisions…</div>';
+        setPreviewMessage(revisionHistoryEl, "Loading revisions…");
         try {
           const data = await fetchAdminChangelogState();
           syncChangelogUiFromState(data);
