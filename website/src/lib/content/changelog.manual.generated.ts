@@ -9,3 +9,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "title": "Release 1.3.9",
       "summary": "Current stable website-facing release for Classroom Quick Downloader.",
       "highlights": [
+        "Full manual changelog history synced from extension release lineage.",
