@@ -2326,6 +2326,21 @@ export default {
       return proxyToDO(request, env);
     }
 
+    if (pathname === "/api/site/v1/snapshot") {
+      return handleSiteV1Snapshot(request, env);
+    }
+    if (pathname === "/api/public/website/snapshot") {
+      return handleSiteV1Snapshot(request, env);
+    }
+
+    if (pathname === "/api/site/v1/privacy") {
+      return handleSiteV1Privacy(request, env);
+    }
+
+    if (pathname === "/api/site/v1/events") {
+      return handleSiteV1Events(request, env);
+    }
+
     if (isOraclePublicWebsiteRoute(pathname)) {
       return handleOraclePublicWebsiteProxy(request, env);
     }
