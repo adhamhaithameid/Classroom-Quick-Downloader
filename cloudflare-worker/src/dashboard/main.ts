@@ -5684,10 +5684,20 @@ export function renderDashboard(stats: StatsResponse): string {
             const source = String(row.source || 'manual');
             const valid = row.valid === true ? 'valid' : 'needs check';
             const releases = Number(row.releases || 0);
-            return '<div class="cl-revision-item"><strong>' + escapeHtmlUnsafe(source) + '</strong> · ' +
-              escapeHtmlUnsafe(valid) + ' · ' + releases + ' releases<br>' +
-              '<span>' + escapeHtmlUnsafe(when) + ' UTC</span></div>';
-          }).join('');
+            const item = document.createElement("div");
+            item.className = "cl-revision-item";
+
+            const strong = document.createElement("strong");
+            strong.textContent = source;
+            item.appendChild(strong);
+            item.appendChild(document.createTextNode(" · " + valid + " · " + String(releases) + " releases"));
+            item.appendChild(document.createElement("br"));
+
+            const span = document.createElement("span");
+            span.textContent = when + " UTC";
+            item.appendChild(span);
+            revisionHistoryEl.appendChild(item);
+          });
         } catch (_) {
           revisionHistoryEl.innerHTML = '<div class="cl-preview-empty">Failed to load revision history.</div>';
         }
