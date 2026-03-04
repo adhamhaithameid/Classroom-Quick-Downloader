@@ -276,3 +276,8 @@ export function getRuleClasses(rule: NotificationRule | null, isSeen: boolean): 
 
   return classes.join(' ');
 }
+
+// LEGACY_CHANGELOG_DISABLED_START
+// Remote Oracle changelog fetch path intentionally disabled.
+// Previously used: ORACLE_CHANGELOG_URL + ETag-based revalidation.
+// LEGACY_CHANGELOG_DISABLED_END
