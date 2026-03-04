@@ -93,14 +93,7 @@ jobs:
               fi
             done
 
-            if [ ! -f docker-compose.runtime.override.yml ]; then
-              cat > docker-compose.runtime.override.yml <<'EOF'
-            services:
-              oracle-backend:
-                env_file:
-                  - .env.production
-            EOF
-            fi
+            printf 'services:\n  oracle-backend:\n    env_file:\n      - .env.production\n' > docker-compose.runtime.override.yml
 
             SHA="$(cd .. && git rev-parse HEAD)"
             NOW="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
