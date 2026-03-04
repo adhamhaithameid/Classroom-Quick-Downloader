@@ -14,7 +14,7 @@ describe('changelog utils (manual mode)', () => {
     vi.stubGlobal('fetch', vi.fn());
   });
 
-  it('returns cached changelog when cache is still valid and force=false', async () => {
+  it('returns manual changelog entries and expected fetch status', async () => {
     const mod = await loadChangelogModule();
     const cached = {
       entries: [{ id: '1', version: '1.3.0', date: '2026-01-01', changes: ['A'] }],
