@@ -198,3 +198,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "title": "Release 1.2.0",
       "summary": "Cancel feature baseline release.",
       "highlights": [
+        "Core cancel-download capability.",
