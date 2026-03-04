@@ -857,6 +857,43 @@ function App() {
                 </button>
               </div>
               <div className="cqd-cl-body">
+                {changelogStatus === 'loading' && (
+                  <div className="cqd-cl-state cqd-cl-state-loading">Loading latest changelog from Oracle…</div>
+                )}
+
+                {changelogStatus === 'offline' && (
+                  <div className="cqd-cl-state cqd-cl-state-warn">
+                    {changelogStatusMessage || 'Offline fallback active. Showing cached changelog.'}
+                  </div>
+                )}
+
+                {changelogStatus === 'error' && (
+                  <div className="cqd-cl-state cqd-cl-state-error">
+                    <div>{changelogStatusMessage || 'Could not load changelog.'}</div>
+                    <button
+                      type="button"
+                      className="cqd-cl-retry-btn"
+                      onClick={async () => {
+                        setChangelogStatus('loading');
+                        const retryResult = await fetchChangelogDetailed(true);
+                        if (retryResult.data) setChangelogData(retryResult.data);
+                        if (retryResult.status === 'cache-fallback') {
+                          setChangelogStatus('offline');
+                          setChangelogStatusMessage(retryResult.error || 'Oracle is unreachable. Showing cached changelog.');
+                        } else if (retryResult.status === 'error') {
+                          setChangelogStatus('error');
+                          setChangelogStatusMessage(retryResult.error || 'Unable to load changelog from Oracle.');
+                        } else {
+                          setChangelogStatus('ready');
+                          setChangelogStatusMessage(retryResult.status === 'empty' ? 'No changelog entries are available yet.' : null);
+                        }
+                      }}
+                    >
+                      Retry
+                    </button>
+                  </div>
+                )}
+
                 {changelogData?.entries?.length ? (
                   changelogData.entries.map((entry) => (
                     <div key={entry.id} className="cqd-cl-entry">
