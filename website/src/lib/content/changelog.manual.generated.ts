@@ -330,3 +330,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       ],
       "added": [
         "Core one-click Classroom download workflow."
+      ],
