@@ -4812,6 +4812,33 @@
         if (importBtn) {
           importBtn.addEventListener('click', async function() {
             try {
+              var preview = await postJSON('/api/admin/extension-changelog/import-github/preview', {});
+              var parsedCount = Number(preview.parsedCount || 0);
+              var checksum = String(preview.checksum || '--');
+              var duplicate = preview.duplicate === true;
+              var lastImportAt = Number(preview.lastImportAt || 0);
+              var lastImportText = lastImportAt > 0
+                ? new Date(lastImportAt).toISOString().replace('T', ' ').replace('Z', ' UTC')
+                : 'never';
+
+              var previewMessage = ''
+                + 'GitHub preview parsed: ' + parsedCount + ' release(s).\n'
+                + 'Checksum: ' + checksum + '\n'
+                + 'Last import: ' + lastImportText + '\n';
+
+              if (duplicate) {
+                previewMessage += '\nThis import checksum matches the previous import.\nImport will be treated as duplicate and skipped.\nContinue anyway?';
+              } else {
+                previewMessage += '\nProceed with import?';
+              }
+
+              if (!confirm(previewMessage)) return;
+              var okStepImport = await ensureStepUp();
+              if (!okStepImport) {
+                extClToast('Additional verification is required.', 'error');
+                return;
+              }
+
               var result = await postJSON('/api/admin/extension-changelog/import-github', {});
               extClToast('Imported ' + (result.imported || 0) + ' entries from GitHub ✓', 'success');
               await loadExtChangelogEntries();
