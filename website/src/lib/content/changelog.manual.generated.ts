@@ -185,3 +185,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Unified cancel control logic for active operations."
       ],
       "changed": [
+        "Refined runtime flow around cancel/retry."
