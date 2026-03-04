@@ -10,3 +10,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "summary": "Current stable website-facing release for Classroom Quick Downloader.",
       "highlights": [
         "Full manual changelog history synced from extension release lineage.",
+        "Website snapshot/cache behavior now prioritizes fresh local snapshots on reload.",
