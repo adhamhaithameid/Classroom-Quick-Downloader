@@ -241,3 +241,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "summary": "Mid 1.1 quality update.",
       "highlights": [
         "Extended compatibility hardening.",
+        "Improved consistency across frequent workflows.",
