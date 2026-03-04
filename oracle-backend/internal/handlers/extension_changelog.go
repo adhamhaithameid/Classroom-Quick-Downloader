@@ -96,6 +96,25 @@ func sanitizeExtTarget(v string) string {
 	return strings.TrimPrefix(strings.TrimPrefix(trimmed, "v"), "V")
 }
 
+func sanitizeGitHubRawMarkdownURL(input string) (string, error) {
+	trimmed := strings.TrimSpace(input)
+	if trimmed == "" {
+		return githubRawMarkdownURL("user-friendly-changelog.md"), nil
+	}
+	parsed, err := url.Parse(trimmed)
+	if err != nil {
+		return "", fmt.Errorf("invalid markdown URL")
+	}
+	if !strings.EqualFold(parsed.Scheme, "https") {
+		return "", fmt.Errorf("markdown URL must use https")
+	}
+	host := strings.ToLower(strings.TrimSpace(parsed.Host))
+	if host != "raw.githubusercontent.com" {
+		return "", fmt.Errorf("only raw.githubusercontent.com URLs are allowed")
+	}
+	return parsed.String(), nil
+}
+
 func parseJSONStringArray(raw string) []string {
 	if raw == "" || raw == "[]" {
 		return []string{}
