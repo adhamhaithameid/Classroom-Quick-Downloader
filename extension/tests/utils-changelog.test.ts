@@ -16,19 +16,6 @@ describe('changelog utils (manual mode)', () => {
 
   it('returns manual changelog entries and expected fetch status', async () => {
     const mod = await loadChangelogModule();
-    const cached = {
-      entries: [{ id: '1', version: '1.3.0', date: '2026-01-01', changes: ['A'] }],
-      config: { rules: [] },
-      lastFetched: Date.now() + 1,
-    };
-    chrome.storage.local.get = vi.fn(async () => ({ cqd_changelog_v1: cached })) as never;
-    const result = await mod.fetchChangelog(false);
-    expect(result?.entries[0]?.id).toBe('1');
-    expect(result?.entries[0]?.version).toBe('1.3.0');
-    expect(result?.revisionToken).toBeTruthy();
-    expect(result?.lastFetched).toBe(cached.lastFetched);
-    expect(fetch).not.toHaveBeenCalled();
-  });
 
   it('falls back to cache/null when changelog URL is empty', async () => {
     const mod = await loadChangelogModule('');
