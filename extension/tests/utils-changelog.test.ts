@@ -128,6 +128,7 @@ describe('changelog utils (manual mode)', () => {
       expect(mod.getRuleClasses({ id: 'r', target: 'all', priority: 'major', effect: 'pulse' }, false)).toContain('cqd-effect-pulse-red');
       expect(mod.getRuleClasses({ id: 'r', target: 'all', priority: 'normal', effect: 'pulse' }, false)).toContain('cqd-effect-pulse-blue');
     });
+  });
 
     it('handles combinations of priority and effect', async () => {
       const mod = await loadChangelogModule();
