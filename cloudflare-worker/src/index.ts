@@ -625,7 +625,13 @@ function isCorsOriginAllowedForPath(request: Request, env: WorkerEnv, pathname: 
 }
 
 function corsAllowedHeadersForPath(pathname: string): string {
-  if (isOraclePublicWebsiteRoute(pathname) || pathname === "/api/public/website/events") {
+  if (
+    isOraclePublicWebsiteRoute(pathname) ||
+    pathname === "/api/public/website/events" ||
+    pathname === "/api/site/v1/events" ||
+    pathname === "/api/site/v1/snapshot" ||
+    pathname === "/api/site/v1/privacy"
+  ) {
     return "Content-Type, X-Requested-With";
   }
   if (isPublicCorsRoute(pathname)) {
