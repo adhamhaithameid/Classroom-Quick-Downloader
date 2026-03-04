@@ -348,6 +348,8 @@ function App() {
   // CHANGELOG STATE
   const [changelogData, setChangelogData] = useState<ChangelogData | null>(null);
   const [showChangelog, setShowChangelog] = useState(false);
+  const [changelogStatus, setChangelogStatus] = useState<'loading' | 'ready' | 'offline' | 'error'>('loading');
+  const [changelogStatusMessage, setChangelogStatusMessage] = useState<string | null>(null);
 
   // Track scroll to add blur/shadow under header when not at top
   useEffect(() => {
