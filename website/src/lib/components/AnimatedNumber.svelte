@@ -81,6 +81,7 @@
 
   onMount(() => {
     const initial = safeNumber(value);
+    displayValue = initial;
 
     if (!animated) {
       displayValue = initial;
@@ -90,14 +91,12 @@
 
     if (!animateOnView) {
       hasAnimatedInView = true;
-      displayValue = 0;
       animateTo(initial);
       return;
     }
 
     if (!hostEl || typeof IntersectionObserver === 'undefined') {
       hasAnimatedInView = true;
-      displayValue = 0;
       animateTo(initial);
       return () => stopAnimation();
     }
@@ -108,7 +107,6 @@
           if (!entry.isIntersecting) continue;
           if (!hasAnimatedInView) {
             hasAnimatedInView = true;
-            displayValue = 0;
             animateTo(value);
             observer.disconnect();
           }
