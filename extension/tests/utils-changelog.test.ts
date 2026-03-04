@@ -28,7 +28,7 @@ describe('changelog utils (manual mode)', () => {
     expect(forced.data?.entries[0]?.id).toBe('manual-1.3.9-1');
   });
 
-  it('fetches, validates, and stores changelog payload from network', async () => {
+  it('does not perform network fetch in manual mode', async () => {
     const mod = await loadChangelogModule();
     vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({
       ok: true,
