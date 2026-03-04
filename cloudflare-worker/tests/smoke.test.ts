@@ -119,4 +119,146 @@ describe('cloudflare worker smoke tests', () => {
     },
     TEST_TIMEOUT_MS
   );
+
+  it(
+    'serves fresh snapshot from KV without upstream pull',
+    async () => {
+      const now = Date.now();
+      const kvGet = vi.fn(async () =>
+        JSON.stringify({
+          schemaVersion: '1',
+          ok: true,
+          snapshotId: `cached-${now}`,
+          generatedAtUtc: now,
+          cacheWrittenAtUtc: now
+        })
+      );
+      const kvPut = vi.fn(async () => undefined);
+      const env = createEnv({
+        SITE_SNAPSHOT_KV: {
+          get: kvGet,
+          put: kvPut
+        } as unknown as KVNamespace
+      });
+
+      const fetchMock = vi.fn(async () => {
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      });
+      vi.stubGlobal('fetch', fetchMock);
+
+      const res = await worker.fetch(
+        new Request('https://worker.example.com/api/public/website/snapshot', {
+          headers: { Origin: 'https://classroom-quick-downloader-website.pages.dev' }
+        }),
+        env,
+        {} as ExecutionContext
+      );
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get('x-site-cache')).toBe('hit');
+      expect(kvGet).toHaveBeenCalledTimes(1);
+      expect(kvPut).not.toHaveBeenCalled();
+      expect(fetchMock).not.toHaveBeenCalled();
+    },
+    TEST_TIMEOUT_MS
+  );
+
+  it(
+    'revalidates stale snapshot from Oracle and rewrites KV cache',
+    async () => {
+      const staleTs = Date.now() - (4 * 60 * 60 * 1000);
+      const kvGet = vi.fn(async () =>
+        JSON.stringify({
+          schemaVersion: '1',
+          ok: true,
+          snapshotId: 'stale-cache',
+          generatedAtUtc: staleTs,
+          cacheWrittenAtUtc: staleTs
+        })
+      );
+      const kvPut = vi.fn(async () => undefined);
+      const env = createEnv({
+        SITE_SNAPSHOT_KV: {
+          get: kvGet,
+          put: kvPut
+        } as unknown as KVNamespace
+      });
+
+      const upstreamPayload = {
+        schemaVersion: '1',
+        ok: true,
+        snapshotId: `oracle-${Date.now()}`,
+        generatedAtUtc: Date.now()
+      };
+      const fetchMock = vi.fn(async () => {
+        return new Response(JSON.stringify(upstreamPayload), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      });
+      vi.stubGlobal('fetch', fetchMock);
+
+      const res = await worker.fetch(
+        new Request('https://worker.example.com/api/public/website/snapshot', {
+          headers: { Origin: 'https://classroom-quick-downloader-website.pages.dev' }
+        }),
+        env,
+        {} as ExecutionContext
+      );
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get('x-site-cache')).toBe('revalidated');
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[0]?.[0]).toBe('https://oracle.example.com/api/public/website/snapshot');
+      expect(kvPut).toHaveBeenCalledTimes(1);
+    },
+    TEST_TIMEOUT_MS
+  );
+
+  it(
+    'returns stale cached snapshot when Oracle refresh fails',
+    async () => {
+      const staleTs = Date.now() - (4 * 60 * 60 * 1000);
+      const stalePayload = {
+        schemaVersion: '1',
+        ok: true,
+        snapshotId: 'stale-cache',
+        generatedAtUtc: staleTs,
+        cacheWrittenAtUtc: staleTs
+      };
+      const kvGet = vi.fn(async () => JSON.stringify(stalePayload));
+      const kvPut = vi.fn(async () => undefined);
+      const env = createEnv({
+        SITE_SNAPSHOT_KV: {
+          get: kvGet,
+          put: kvPut
+        } as unknown as KVNamespace
+      });
+
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => {
+          throw new Error('oracle-down');
+        })
+      );
+
+      const res = await worker.fetch(
+        new Request('https://worker.example.com/api/public/website/snapshot', {
+          headers: { Origin: 'https://classroom-quick-downloader-website.pages.dev' }
+        }),
+        env,
+        {} as ExecutionContext
+      );
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get('x-site-cache')).toBe('stale');
+      expect(kvPut).not.toHaveBeenCalled();
+      const body = (await res.json()) as { snapshotId?: string };
+      expect(body.snapshotId).toBe('stale-cache');
+    },
+    TEST_TIMEOUT_MS
+  );
 });
