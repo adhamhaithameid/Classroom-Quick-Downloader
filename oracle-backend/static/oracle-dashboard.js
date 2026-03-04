@@ -3509,7 +3509,8 @@
           clearChildren(detailsNode);
           return;
         }
-        detailsNode.innerHTML = details
+        clearChildren(detailsNode);
+        details
           .slice(0, 8)
           .map(function(item) {
             return '<li>' + escapeHtml(String(item || '')) + '</li>';
