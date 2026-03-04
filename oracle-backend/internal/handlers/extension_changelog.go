@@ -451,7 +451,23 @@ func importExtChangelogFromGitHub(db *sql.DB, markdownURL string) (extGitHubImpo
 
 	releases := parseUserFriendlyChangelogMarkdown(markdown)
 	if len(releases) == 0 {
-		return 0, fmt.Errorf("no releases parsed from markdown")
+		return extGitHubImportResult{}, fmt.Errorf("no releases parsed from markdown")
+	}
+
+	hash := sha256.Sum256([]byte(markdown))
+	checksum := hex.EncodeToString(hash[:])[:16]
+	config, _ := loadExtChangelogConfig(db)
+	lastChecksum := getExtChangelogConfigValue(config, "last_import_checksum")
+	if lastChecksum != "" && strings.EqualFold(lastChecksum, checksum) {
+		lastImportAt := time.Now().UnixMilli()
+		_ = setExtChangelogConfigValue(db, "last_import_at", fmt.Sprintf("%d", lastImportAt))
+		return extGitHubImportResult{
+			Imported:     0,
+			Skipped:      true,
+			Checksum:     checksum,
+			LastImportAt: lastImportAt,
+			SourceURL:    canonicalURL,
+		}, nil
 	}
 
 	tx, err := db.Begin()
