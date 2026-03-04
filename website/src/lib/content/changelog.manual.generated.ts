@@ -56,3 +56,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Fixed close-button layout and hover inconsistencies."
       ],
       "added": [
+        "Better website changelog integration from extension."
