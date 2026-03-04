@@ -1351,6 +1351,51 @@ body {
   background: linear-gradient(to bottom, #f8fafc, #f1f5f9);
 }
 
+.cqd-cl-state {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  border: 1px solid transparent;
+}
+
+.cqd-cl-state-loading {
+  color: #1e40af;
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.cqd-cl-state-warn {
+  color: #92400e;
+  background: #fffbeb;
+  border-color: #fcd34d;
+}
+
+.cqd-cl-state-error {
+  color: #991b1b;
+  background: #fef2f2;
+  border-color: #fecaca;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cqd-cl-retry-btn {
+  align-self: flex-start;
+  border: 1px solid #fca5a5;
+  background: #fff;
+  color: #991b1b;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.cqd-cl-retry-btn:hover {
+  background: #fee2e2;
+}
+
 /* Scrollbar refinement */
 .cqd-cl-body::-webkit-scrollbar {
   width: 5px;
