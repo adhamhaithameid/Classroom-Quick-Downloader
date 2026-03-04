@@ -270,7 +270,6 @@ export function getRuleClasses(rule: NotificationRule | null, isSeen: boolean): 
   if (rule.effect === 'glow') {
     classes.push(rule.priority === 'major' ? 'cqd-effect-glow-red' : 'cqd-effect-glow-blue');
   }
-  // Pulse: Minor=Blue, Major=Red
   if (rule.effect === 'pulse') {
     classes.push(rule.priority === 'major' ? 'cqd-effect-pulse-red' : 'cqd-effect-pulse-blue');
   }
