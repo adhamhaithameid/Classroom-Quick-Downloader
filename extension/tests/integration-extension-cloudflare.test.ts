@@ -82,7 +82,7 @@ async function buildIntegrationContext() {
       WORKER_BASE_URL: 'https://worker.test',
       TRACK_URL: 'https://worker.test/track',
       CONFIG_URL: 'https://worker.test/config',
-      CHANGELOG_URL: 'https://worker.test/changelog',
+      ORACLE_CHANGELOG_URL: 'https://oracle.test/api/public/extension/changelog',
     };
   });
 
