@@ -268,3 +268,4 @@
         "Additional diagnostics and background-flow coverage."
       ],
       "changed": [
+        "Better queue/error defaults."
