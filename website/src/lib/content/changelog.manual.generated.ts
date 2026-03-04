@@ -204,3 +204,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       ],
       "added": [
         "Core cancel-download capability."
+      ],
