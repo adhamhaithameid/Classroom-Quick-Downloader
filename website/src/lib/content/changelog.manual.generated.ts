@@ -284,3 +284,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "highlights": [
         "Multi-browser support improvements.",
         "Updated setup/runtime compatibility behavior.",
+        "Fixed packaging/config alignment issues."
