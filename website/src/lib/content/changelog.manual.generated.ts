@@ -156,3 +156,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "title": "Release 1.2.2",
       "summary": "Cancellation polish release.",
       "highlights": [
+        "More coverage and safeguards for cancel behavior.",
