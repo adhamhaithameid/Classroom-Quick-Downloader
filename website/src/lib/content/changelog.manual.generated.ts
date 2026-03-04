@@ -182,3 +182,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Fixed cancel-state reflection delays."
       ],
       "added": [
+        "Unified cancel control logic for active operations."
