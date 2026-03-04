@@ -13,3 +13,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Website snapshot/cache behavior now prioritizes fresh local snapshots on reload.",
         "Fixed stale in-session snapshot behavior that could keep old metrics visible."
       ],
+      "added": [
