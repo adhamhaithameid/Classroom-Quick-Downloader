@@ -225,3 +225,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       ],
       "added": [
         "Additional runtime checks for long sessions."
+      ],
