@@ -2035,7 +2035,8 @@
       }
       #page-website-sync .pill,
       #page-website-analysis .pill,
-      #page-content-changelog .pill {
+      #page-content-changelog .pill,
+      #page-ext-changelog .pill {
         border-color: rgba(148, 163, 184, 0.26);
         background: rgba(15, 23, 42, 0.55);
         padding: 4px 10px;
