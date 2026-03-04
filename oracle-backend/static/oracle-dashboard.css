@@ -23,7 +23,9 @@
       *::-webkit-scrollbar { width: 0; height: 0; }
       
       body {
-        background: var(--bg-primary);
+        background: radial-gradient(1200px 700px at 12% -10%, rgba(78, 118, 255, 0.16), transparent 55%),
+                    radial-gradient(980px 580px at 90% 0%, rgba(118, 84, 255, 0.12), transparent 58%),
+                    var(--bg-primary);
         color: var(--text-primary);
         font-size: 14px;
         line-height: 1.5;
