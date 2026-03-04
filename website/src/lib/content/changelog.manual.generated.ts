@@ -272,3 +272,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Better queue/error defaults."
       ],
       "fixed": [
+        "Fixed early 1.1 runtime issues."
