@@ -4,8 +4,8 @@ account_id = "fc9538cb362e6266eea89037f6347225"
 compatibility_date = "2024-12-01"
 
 [vars]
-  # Oracle currently runs on HTTP on the Oracle VM.
-  # ALLOW_INSECURE_ORACLE_ENDPOINT must stay true until HTTPS is enabled there.
+  # Set this to your production Oracle HTTPS endpoint.
+  # Keep HTTP disabled by default; only enable ALLOW_INSECURE_ORACLE_ENDPOINT temporarily for local migration.
   # The worker appends "/ingest-batch" for flushes and "/api/public/website/*" for public reads.
   ORACLE_ENDPOINT = "http://129-151-233-229.sslip.io:8080"
   ALLOW_INSECURE_ORACLE_ENDPOINT = "true"
