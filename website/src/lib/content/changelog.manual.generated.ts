@@ -39,3 +39,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       ],
       "changed": [
         "Improved changelog update detection logic."
+      ],
