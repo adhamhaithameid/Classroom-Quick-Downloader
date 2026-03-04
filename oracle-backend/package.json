@@ -23,5 +23,9 @@
     "vet": "go vet ./...",
     "validate": "pnpm run build:dashboard && pnpm run test:dashboard:unit && pnpm run test && pnpm run vet",
     "gosec": "\"$(go env GOPATH)/bin/gosec\" -track-suppressions ./..."
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.10",
+    "typescript": "^5.9.3"
   }
 }
