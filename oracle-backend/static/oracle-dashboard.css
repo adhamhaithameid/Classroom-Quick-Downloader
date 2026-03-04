@@ -793,7 +793,7 @@
 
       /* Cards */
       .card {
-        background: var(--bg-secondary);
+        background: color-mix(in srgb, var(--bg-secondary) 94%, #1b2744 6%);
         border: 1px solid var(--border-primary);
         border-radius: 8px;
         margin-bottom: 20px;
