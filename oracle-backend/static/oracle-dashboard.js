@@ -3489,6 +3489,9 @@
         var messageNode = document.getElementById('website-sync-anomaly-message');
         var detailsNode = document.getElementById('website-sync-anomaly-details');
         if (!banner || !messageNode || !detailsNode) return;
+        function clearChildren(node) {
+          while (node.firstChild) node.removeChild(node.firstChild);
+        }
         if (!anomaly || anomaly.active !== true) {
           banner.classList.add('hidden');
           messageNode.textContent = '';
