@@ -93,3 +93,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "title": "Release 1.3.0",
       "summary": "Major reliability and security hardening release.",
       "highlights": [
+        "Expanded resilience/security checks across extension-worker-oracle flow.",
