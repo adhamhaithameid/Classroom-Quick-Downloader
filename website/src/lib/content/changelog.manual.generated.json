@@ -33,3 +33,4 @@
         "Improved changelog update detection logic.",
         "Fixed stale changelog visibility in republish scenarios."
       ],
+      "added": [
