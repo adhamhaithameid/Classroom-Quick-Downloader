@@ -7,3 +7,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "id": "manual-1.3.9-1",
       "version": "1.3.9",
       "title": "Release 1.3.9",
+      "summary": "Current stable website-facing release for Classroom Quick Downloader.",
