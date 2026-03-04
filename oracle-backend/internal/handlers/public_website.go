@@ -1397,9 +1397,9 @@ func defaultPublicWebsiteUserChangelogEntries() []publicWebsiteUserChangelogEntr
 			Title:   "Manual changelog mode and session-pinned live metrics",
 			Summary: "Release notes are now sourced from manual versioned files, and website metrics stay stable during an open session for clearer UX.",
 			Highlights: []string{
-				"Revision-aware changelog updates from Cloudflare to extension clients.",
-				"Improved version-pill behavior after same-version republish events.",
-				"Stronger sync consistency between dashboard publish and user-visible release notes.",
+				"Source-controlled manual changelog flow for extension and website.",
+				"Edge-first snapshot retrieval with Oracle fallback.",
+				"Session-pinned numbers that update only on refresh/reopen.",
 			},
 			ReleasedAtUTC: mkTS(1772409600000), // 2026-03-02
 		},
