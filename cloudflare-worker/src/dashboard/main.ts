@@ -284,7 +284,8 @@ export function renderLoginPage(errorMessage?: string): string {
 </html>`;
 }
 
-// Notification Rules Engine UI
+// LEGACY_CHANGELOG_DISABLED_START
+// Notification Rules Engine UI is retained for rollback only and intentionally not rendered.
 function renderNotificationSection(entries: ChangelogEntry[], config: ChangelogConfig): string {
   const sorted = [...entries].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   const knownVersions = Array.from(new Set(sorted.map(e => e.version)));
