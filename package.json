@@ -52,14 +52,14 @@
       "cookie": "0.7.2"
     },
     "packageExtensions": {
-      "eslint@10.0.1": {
+      "eslint@10.0.2": {
         "dependencies": {
           "ajv-draft-04": "1.0.0"
         }
       }
     },
     "patchedDependencies": {
-      "eslint@10.0.1": "patches/eslint@10.0.1.patch"
+      "eslint@10.0.2": "patches/eslint@10.0.2.patch"
     }
   },
   "devDependencies": {
