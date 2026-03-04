@@ -36,6 +36,7 @@
     "scan:security": "pnpm -C cloudflare-worker run validate && pnpm -C cloudflare-worker audit && pnpm -C website audit && pnpm -C extension audit && (cd oracle-backend && ./scripts/full-scan.sh)",
     "scan:repo": "pnpm run test:strict && pnpm run scan:security",
     "validate:oracle": "pnpm -C oracle-backend validate",
+    "sync:manual-changelog": "node tools/sync-manual-changelog.mjs",
     "changelog:full": "node tools/generate-full-changelog.mjs",
     "prepare": "husky"
   },
