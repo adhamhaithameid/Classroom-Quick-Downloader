@@ -137,6 +137,22 @@ pnpm zip -b edge
 pnpm zip -b safari
 ```
 
+### Safari: Local Testing and Distribution
+
+Safari requires an Xcode app container (you cannot install the extension zip directly in Safari like Chromium/Firefox).
+
+```bash
+# Build safari artifact
+pnpm -C extension run safari
+
+# Convert to Xcode project (macOS only)
+pnpm -C extension run safari:xcode
+```
+
+Full runbook:
+
+- `docs/SAFARI_DISTRIBUTION_RUNBOOK.md`
+
 ### Check for TypeScript Errors
 
 ```bash
