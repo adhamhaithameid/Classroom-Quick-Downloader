@@ -122,3 +122,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Expanded dashboard/telemetry integrations."
       ],
       "changed": [
+        "Refined ingestion orchestration between worker and oracle."
