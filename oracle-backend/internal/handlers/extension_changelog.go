@@ -353,6 +353,25 @@ func loadExtChangelogConfig(db *sql.DB) (map[string]string, error) {
 	return config, rows.Err()
 }
 
+func getExtChangelogConfigValue(config map[string]string, key string) string {
+	if config == nil {
+		return ""
+	}
+	return strings.TrimSpace(config[key])
+}
+
+func parseExtInt64(value string) int64 {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return 0
+	}
+	parsed, err := strconv.ParseInt(trimmed, 10, 64)
+	if err != nil {
+		return 0
+	}
+	return parsed
+}
+
 func setExtChangelogConfigValue(db *sql.DB, key, value string) error {
 	now := time.Now().UnixMilli()
 	_, err := db.Exec(`INSERT INTO extension_changelog_config (key, value, updated_at)
