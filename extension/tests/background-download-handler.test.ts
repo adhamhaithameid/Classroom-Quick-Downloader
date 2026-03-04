@@ -3,7 +3,6 @@ import type { PendingDownload } from '../entrypoints/background/types';
 
 type LoadOptions = {
   isFirefox?: boolean;
-  supportsDownloadsApi?: boolean;
   normalizeResult?: { baseUrl: string; isDrive: boolean };
   initialAuthUser?: number | undefined;
   authCandidates?: number[];
@@ -18,7 +17,6 @@ type TestContext = {
     pendingByBypassTabId: Map<number, PendingDownload>;
     AUTHUSER_CANDIDATES: number[];
     IS_FIREFOX: boolean;
-    SUPPORTS_DOWNLOADS_API: boolean;
   };
   cleanupSpy: ReturnType<typeof vi.fn>;
   sendStatusSpy: ReturnType<typeof vi.fn>;
@@ -66,7 +64,6 @@ async function loadDownloadHandler(options: LoadOptions = {}): Promise<TestConte
     pendingByBypassTabId: new Map<number, PendingDownload>(),
     AUTHUSER_CANDIDATES: options.authCandidates ?? [0, 1, 2],
     IS_FIREFOX: options.isFirefox ?? false,
-    SUPPORTS_DOWNLOADS_API: options.supportsDownloadsApi ?? true,
   };
 
   const cleanupSpy = vi.fn();
@@ -154,29 +151,6 @@ describe('background download handler', () => {
     expect(pending.currentDownloadId).toBe(42);
     expect(ctx.stateModule.pendingByDownloadId.get(42)).toBe(pending);
     expect(respondOnce).toHaveBeenCalledWith({ started: true, requestId: pending.requestId, downloadId: 42 });
-  });
-
-  it('startSingleAttempt falls back to tab-open flow when downloads API is unavailable', async () => {
-    const ctx = await loadDownloadHandler({ supportsDownloadsApi: false });
-    const pending = makePending();
-    const respondOnce = vi.fn();
-    (chrome.tabs.create as any).mockImplementation((_details: unknown, cb: () => void) => cb());
-
-    ctx.mod.startSingleAttempt(pending, respondOnce);
-
-    expect(chrome.tabs.create).toHaveBeenCalledWith(
-      expect.objectContaining({ url: pending.baseUrl, active: true }),
-      expect.any(Function),
-    );
-    expect(respondOnce).toHaveBeenCalledWith(expect.objectContaining({
-      started: true,
-      requestId: pending.requestId,
-    }));
-    expect(ctx.cleanupSpy).toHaveBeenCalledWith(pending);
-    expect(ctx.recordSpy).toHaveBeenCalledWith(expect.objectContaining({
-      status: 'success',
-      error_type: 'DOWNLOADS_API_UNAVAILABLE',
-    }));
   });
 
   it('openDriveBypassTab tracks bypass tab IDs when a tab is returned', async () => {

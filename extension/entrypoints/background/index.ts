@@ -17,7 +17,6 @@ import {
   recentDownloads,
   CLEANUP_INTERVAL_MS,
   IS_FIREFOX,
-  SUPPORTS_DOWNLOADS_API,
 } from './state';
 import { createIconUpdaters, isClassroomUrl, setActionIcon, GRAY_ICON_PATHS } from './icon-manager';
 import { extractDriveFileId } from './auth-utils';
@@ -302,46 +301,44 @@ export default defineBackground(() => {
   }
 
   // 3) onChanged: Analytics trigger
-  if (SUPPORTS_DOWNLOADS_API && chrome.downloads?.onChanged) {
-    chrome.downloads.onChanged.addListener((delta) => {
-      const pending = pendingByDownloadId.get(delta.id);
-      if (!pending) return;
+  chrome.downloads.onChanged.addListener((delta) => {
+    const pending = pendingByDownloadId.get(delta.id);
+    if (!pending) return;
 
-      if (delta.state && delta.state.current === 'complete') {
-        const duration = Date.now() - pending.startTime;
-        const ext = pending.finalExtension || pending.fileMeta?.ext || 'unknown';
-        recordDownloadEvent({
-          type: ext,
-          status: 'success',
-          duration_ms: duration,
-          bypass_used: !!pending.fallbackStarted,
-        });
-        if (pending.fileMeta?.name) recentDownloads.set(pending.fileMeta.name, Date.now());
-        cleanup(pending, delta.id);
+    if (delta.state && delta.state.current === 'complete') {
+      const duration = Date.now() - pending.startTime;
+      const ext = pending.finalExtension || pending.fileMeta?.ext || 'unknown';
+      recordDownloadEvent({
+        type: ext,
+        status: 'success',
+        duration_ms: duration,
+        bypass_used: !!pending.fallbackStarted,
+      });
+      if (pending.fileMeta?.name) recentDownloads.set(pending.fileMeta.name, Date.now());
+      cleanup(pending, delta.id);
+      return;
+    }
+
+    if (delta.state && delta.state.current === 'interrupted') {
+      if (cancelledByUs.has(delta.id)) {
+        cancelledByUs.delete(delta.id);
+        pendingByDownloadId.delete(delta.id);
         return;
       }
-
-      if (delta.state && delta.state.current === 'interrupted') {
-        if (cancelledByUs.has(delta.id)) {
-          cancelledByUs.delete(delta.id);
-          pendingByDownloadId.delete(delta.id);
-          return;
-        }
-        const duration = Date.now() - pending.startTime;
-        const errorType = delta.error?.current || 'UNKNOWN_INTERRUPT';
-        const ext = pending.finalExtension || pending.fileMeta?.ext || 'unknown';
-        recordDownloadEvent({
-          type: ext,
-          status: 'fail',
-          duration_ms: duration,
-          bypass_used: !!pending.fallbackStarted,
-          error_type: errorType,
-        });
-        sendStatusToTab(pending, 'error', t('downloadInterrupted'));
-        cleanup(pending, delta.id);
-      }
-    });
-  }
+      const duration = Date.now() - pending.startTime;
+      const errorType = delta.error?.current || 'UNKNOWN_INTERRUPT';
+      const ext = pending.finalExtension || pending.fileMeta?.ext || 'unknown';
+      recordDownloadEvent({
+        type: ext,
+        status: 'fail',
+        duration_ms: duration,
+        bypass_used: !!pending.fallbackStarted,
+        error_type: errorType,
+      });
+      sendStatusToTab(pending, 'error', t('downloadInterrupted'));
+      cleanup(pending, delta.id);
+    }
+  });
 
   // 4) CQD_DOWNLOAD handler
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -361,7 +358,7 @@ export default defineBackground(() => {
 
     pending.isCancelled = true;
 
-    if (pending.currentDownloadId != null && SUPPORTS_DOWNLOADS_API && chrome.downloads) {
+    if (pending.currentDownloadId != null) {
       const downloadId = pending.currentDownloadId;
       cancelledByUs.add(downloadId);
       try {

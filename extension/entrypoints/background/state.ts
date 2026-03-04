@@ -52,24 +52,5 @@ function isFirefox(): boolean {
   return /Firefox/i.test(navigator.userAgent);
 }
 
-/**
- * Detect if running in Safari browser.
- */
-function isSafari(): boolean {
-  if (typeof navigator === 'undefined') return false;
-  const ua = navigator.userAgent;
-  return /Safari/i.test(ua) && !/Chrome|Chromium|Edg|Firefox/i.test(ua);
-}
-
-/**
- * Detect support for browser downloads API.
- */
-function supportsDownloadsApi(): boolean {
-  if (typeof chrome === 'undefined' || !chrome.downloads) return false;
-  return typeof chrome.downloads.download === 'function';
-}
-
 /** Cached browser detection result */
 export const IS_FIREFOX = isFirefox();
-export const IS_SAFARI = isSafari();
-export const SUPPORTS_DOWNLOADS_API = supportsDownloadsApi();

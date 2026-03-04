@@ -12,7 +12,6 @@ import {
   pendingByBypassTabId,
   AUTHUSER_CANDIDATES,
   IS_FIREFOX,
-  SUPPORTS_DOWNLOADS_API,
 } from './state';
 import { extractAuthUserFromUrl } from './auth-utils';
 import { normalizeUrl, buildUrlWithAuthUser, getFilenameExt } from './url-helpers';
@@ -27,25 +26,6 @@ export function startSingleAttempt(
   pending: PendingDownload,
   respondOnce?: (payload: any) => void
 ): void {
-  if (!SUPPORTS_DOWNLOADS_API) {
-    chrome.tabs.create({ url: pending.baseUrl, active: true }, () => {
-      recordDownloadEvent({
-        type: pending.fileMeta?.ext || 'unknown',
-        status: 'success',
-        duration_ms: Date.now() - pending.startTime,
-        bypass_used: true,
-        error_type: 'DOWNLOADS_API_UNAVAILABLE',
-      });
-      respondOnce?.({
-        started: true,
-        requestId: pending.requestId,
-        userMessage: 'Opened file in a new tab for Safari download.',
-      });
-      cleanup(pending);
-    });
-    return;
-  }
-
   chrome.downloads.download(
     { url: pending.baseUrl, saveAs: false, conflictAction: 'uniquify' },
     (downloadId) => {
@@ -110,9 +90,6 @@ export function startNextDriveAttempt(pending: PendingDownload): void {
 
   if (IS_FIREFOX) {
     // Firefox: Open bypass tab with next auth
-    const attemptUrl = buildUrlWithAuthUser(pending.baseUrl, nextAuth);
-    openDriveBypassTab(pending, attemptUrl);
-  } else if (!SUPPORTS_DOWNLOADS_API) {
     const attemptUrl = buildUrlWithAuthUser(pending.baseUrl, nextAuth);
     openDriveBypassTab(pending, attemptUrl);
   } else {
@@ -201,22 +178,6 @@ export function handleDownloadRequest(
 
   // Chrome/Edge: Try native download first
   if (isDrive) {
-    if (!SUPPORTS_DOWNLOADS_API) {
-      const firstUrl =
-        typeof pending.currentAuthUser === 'number'
-          ? buildUrlWithAuthUser(pending.baseUrl, pending.currentAuthUser)
-          : pending.baseUrl;
-      pending.fallbackStarted = true;
-      chrome.tabs.create({ url: firstUrl, active: true }, () => {
-        respondOnce({
-          started: true,
-          requestId,
-          userMessage: 'Opened Drive file in Safari tab for download.',
-        });
-      });
-      return true;
-    }
-
     if (pending.isCancelled) {
       cleanup(pending);
       return true;

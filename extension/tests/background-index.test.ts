@@ -27,7 +27,6 @@ describe('background/index', () => {
       recentDownloads: new Map(),
       CLEANUP_INTERVAL_MS: 1000,
       IS_FIREFOX: false,
-      SUPPORTS_DOWNLOADS_API: true,
     }));
     vi.doMock('../entrypoints/background/icon-manager', () => ({
       createIconUpdaters: () => ({ updateTabIcon, updateGlobalIcon }),
