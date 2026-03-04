@@ -221,3 +221,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "highlights": [
         "Additional runtime checks for long sessions.",
         "Tuned defaults for safer prolonged usage.",
+        "Fixed repeated-session regressions."
