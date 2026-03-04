@@ -34,7 +34,7 @@ describe('changelog utils (manual mode)', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it('returns cached data when network fetch fails', async () => {
+  it('persists robust cache envelope fields', async () => {
     const mod = await loadChangelogModule();
     const cached = {
       entries: [{ id: 'c2', version: '1.2.1', date: '2025-02-01', changes: ['Cached'] }],
