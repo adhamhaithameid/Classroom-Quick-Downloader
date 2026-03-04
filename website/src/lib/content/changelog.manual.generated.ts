@@ -147,3 +147,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       ],
       "fixed": [
         "Fixed cross-service payload/shape mismatches."
+      ],
