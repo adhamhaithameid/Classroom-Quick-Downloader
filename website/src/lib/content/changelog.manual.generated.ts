@@ -5,3 +5,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
   "entries": [
     {
       "id": "manual-1.3.9-1",
+      "version": "1.3.9",
