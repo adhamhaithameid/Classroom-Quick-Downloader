@@ -311,3 +311,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Better logging/diagnostics for early production behavior."
       ],
       "changed": [
+        "Improved repeat-use reliability."
