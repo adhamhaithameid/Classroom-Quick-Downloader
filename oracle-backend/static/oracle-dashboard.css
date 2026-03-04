@@ -440,7 +440,8 @@
         justify-content: space-between;
         padding: 12px 20px;
         border-bottom: 1px solid var(--border-primary);
-        background: var(--bg-primary);
+        background: rgba(9, 14, 29, 0.88);
+        backdrop-filter: blur(8px);
         position: sticky;
         top: 0;
         z-index: 40;
