@@ -4736,6 +4736,11 @@
             var isImportant = document.getElementById('ext-cl-entry-important').checked;
             if (!id || !version) { extClToast('ID and Version are required.', 'error'); return; }
             if (!date) date = new Date().toISOString().slice(0, 10);
+            var okStepEntrySave = await ensureStepUp();
+            if (!okStepEntrySave) {
+              extClToast('Additional verification is required.', 'error');
+              return;
+            }
             try {
               await postJSON('/api/admin/extension-changelog/entries/upsert', {
                 id: id, version: version, date: date, summary: summary,
