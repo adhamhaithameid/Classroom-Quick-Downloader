@@ -139,56 +139,6 @@ function normalizeManualData(): ChangelogData {
     checksum: meta.contentChecksum,
   };
 
-function sanitizeCachedData(value: unknown): ChangelogData | null {
-  if (!value || typeof value !== 'object') return null;
-  const row = value as Record<string, unknown>;
-  const entriesRaw = Array.isArray(row.entries) ? row.entries : [];
-  const entries: ChangelogEntry[] = entriesRaw
-    .map((entryRaw, index): ChangelogEntry | null => {
-      const entry = entryRaw as Record<string, unknown> | null | undefined;
-      const versionRaw = typeof entry?.version === 'string' ? entry.version.trim() : '';
-      if (!versionRaw) return null;
-      const version = normalizeVersion(versionRaw);
-      const date = typeof entry?.date === 'string' ? entry.date : new Date().toISOString();
-      const id = typeof entry?.id === 'string' && entry.id.trim()
-        ? entry.id.trim()
-        : `cl-${version}-${Date.parse(date) || 0}-${index}`;
-      const added = normalizeStringList(entry?.added, 20);
-      const changed = normalizeStringList(entry?.changed, 20);
-      const fixed = normalizeStringList(entry?.fixed, 20);
-      const summary = typeof entry?.summary === 'string' ? entry.summary.trim() : '';
-      const markdown = typeof entry?.markdown === 'string' ? entry.markdown : '';
-      const parsedEntry: ChangelogEntry = {
-        id,
-        version,
-        date,
-        changes: toLegacyChanges({
-          summary,
-          added,
-          changed,
-          fixed,
-          changes: entry?.changes,
-        }),
-        added,
-        changed,
-        fixed,
-        isImportant: entry?.isImportant === true,
-      };
-      if (summary) parsedEntry.summary = summary;
-      if (markdown) parsedEntry.markdown = markdown;
-      return parsedEntry;
-    })
-    .filter((entry): entry is ChangelogEntry => entry !== null);
-  const configRaw = (row.config && typeof row.config === 'object') ? (row.config as Record<string, unknown>) : {};
-  const config: ChangelogConfig = {
-    rules: sanitizeRules(configRaw.rules),
-    lastUpdated: toFiniteInt(configRaw.lastUpdated),
-  };
-  const meta = sanitizeMeta(row.meta);
-  const lastFetched = toFiniteInt(row.lastFetched) ?? Date.now();
-  const revisionToken = typeof row.revisionToken === 'string' && row.revisionToken.trim()
-    ? row.revisionToken.trim()
-    : computeRevisionToken(entries, config, meta);
   return {
     entries,
     config,
