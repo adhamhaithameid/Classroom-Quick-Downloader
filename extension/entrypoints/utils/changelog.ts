@@ -151,53 +151,27 @@ function normalizeManualData(): ChangelogData {
   };
 }
 
-/**
- * Parse a raw API JSON response into ChangelogData.
- * Shared between Oracle and Worker responses (same format).
- */
-function parseApiResponse(json: any): ChangelogData | null {
-  if (!json || !json.ok) return null;
-  const rawEntries = Array.isArray(json.entries) ? json.entries : [];
-  const parsedEntries: ChangelogEntry[] = rawEntries
-    .map((entry: any, index: number) => {
-      const versionRaw = typeof entry?.version === 'string' ? entry.version.trim() : '';
-      const version = normalizeVersion(versionRaw);
-      const date = typeof entry?.date === 'string' ? entry.date : new Date().toISOString();
-      if (!version) return null;
-      const id = typeof entry?.id === 'string' && entry.id.trim()
-        ? entry.id.trim()
-        : `cl-${version}-${Date.parse(date) || 0}-${index}`;
-      const added = normalizeStringList(entry?.added, 20);
-      const changed = normalizeStringList(entry?.changed, 20);
-      const fixed = normalizeStringList(entry?.fixed, 20);
-      const summary = typeof entry?.summary === 'string' ? entry.summary.trim() : '';
-      const markdown = typeof entry?.markdown === 'string' ? entry.markdown : '';
-      const changes = toLegacyChanges({
-        summary,
-        added,
-        changed,
-        fixed,
-        changes: entry?.changes
-      });
-      return {
-        id,
-        version,
-        date,
-        changes,
-        summary: summary || undefined,
-        added,
-        changed,
-        fixed,
-        markdown: markdown || undefined,
-        isImportant: entry?.isImportant === true
-      };
-    })
-    .filter((entry: ChangelogEntry | null): entry is ChangelogEntry => entry !== null);
+const MANUAL_DATA = normalizeManualData();
 
-  const configRaw = (json.config && typeof json.config === 'object') ? json.config : {};
-  const config: ChangelogConfig = {
-    rules: sanitizeRules(configRaw.rules),
-    lastUpdated: toFiniteInt(configRaw.lastUpdated),
+async function persistManualCache(data: ChangelogData): Promise<void> {
+  await chrome.storage.local.set({
+    [STORAGE_KEY]: {
+      schemaVersion: 2,
+      cachedItems: data.entries,
+      cachedConfig: data.config,
+      cachedMeta: data.meta,
+      cachedAt: data.lastFetched,
+      revisionToken: data.revisionToken,
+      lastSeenId: data.entries[0]?.id || '',
+      lastChecksum: data.meta?.contentChecksum || '',
+    },
+  });
+}
+
+export async function fetchChangelogDetailed(force = false): Promise<ChangelogFetchResult> {
+  const data: ChangelogData = {
+    ...MANUAL_DATA,
+    lastFetched: Date.now(),
   };
   const meta = sanitizeMeta(json.meta);
   return {
