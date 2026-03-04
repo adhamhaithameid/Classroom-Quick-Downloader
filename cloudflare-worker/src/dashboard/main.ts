@@ -423,6 +423,10 @@ function renderNotificationSection(entries: ChangelogEntry[], config: ChangelogC
   `;
 }
 
+// Marked for rollback only while hidden from render tree.
+void renderNotificationSection;
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- Legacy Cloudflare changelog UI kept for rollback.
 function renderReleaseManagementSection(entries: ChangelogEntry[], config: ChangelogConfig): string {
   const sorted = [...entries].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   const applyMode = config.applyMode === "auto_github" ? "auto_github" : "manual";
