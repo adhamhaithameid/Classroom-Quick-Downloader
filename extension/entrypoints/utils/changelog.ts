@@ -263,9 +263,7 @@ export function getRuleClasses(rule: NotificationRule | null, isSeen: boolean): 
   if (!rule) return '';
   if (isSeen) return '';
 
-  const classes = [];
-  
-  // Priority (Color)
+  const classes: string[] = [];
   if (rule.priority === 'minor') classes.push('cqd-pill-minor');
   if (rule.priority === 'major') classes.push('cqd-pill-major');
   
