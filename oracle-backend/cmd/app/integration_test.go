@@ -137,6 +137,23 @@ func TestIntegration_AllRegisteredRoutesRespondNon404(t *testing.T) {
 	}
 }
 
+/* NEWSLETTER_CTA_DISABLED_ROLLBACK_START
+func TestIntegration_PublicWebsiteNewsletterSubscribeRouteIsRegistered(t *testing.T) {
+	mux, sqlDB := newIntegrationMux(t)
+	defer sqlDB.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/public/website/newsletter/subscribe", nil)
+	req.Header.Set("Origin", "https://classroom-quick-downloader-website.pages.dev")
+	req.Header.Set("X-Requested-With", "XMLHttpRequest")
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+
+	if rr.Code == http.StatusNotFound {
+		t.Fatalf("route /api/public/website/newsletter/subscribe returned 404 — not registered")
+	}
+}
+NEWSLETTER_CTA_DISABLED_ROLLBACK_END */
+
 func TestIntegration_HealthEndpointReturnsOK(t *testing.T) {
 	mux, sqlDB := newIntegrationMux(t)
 	defer sqlDB.Close()
