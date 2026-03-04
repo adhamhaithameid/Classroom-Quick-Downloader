@@ -188,3 +188,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Refined runtime flow around cancel/retry."
       ],
       "fixed": [
+        "Fixed cancel-state reflection delays."
