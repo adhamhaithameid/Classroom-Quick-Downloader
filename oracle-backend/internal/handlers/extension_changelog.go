@@ -623,6 +623,7 @@ func ExtensionChangelogPublicHandler(sqliteDB *sql.DB) http.HandlerFunc {
 				ApplyMode:       applyMode,
 				ContentChecksum: checksum,
 			},
+			UpdateState: "new_data",
 		})
 	}
 }
