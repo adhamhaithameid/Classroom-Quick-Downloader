@@ -974,16 +974,19 @@ describe("Durable Object security behaviors", () => {
 
   it("rate limits excessive track requests per IP", async () => {
     const { obj } = makeDO();
+    const nowSpy = vi.spyOn(Date, "now").mockReturnValue(new Date("2026-03-01T12:00:00.000Z").getTime());
     let lastStatus = 0;
     for (let i = 0; i < 121; i++) {
       const res = await callDO(obj, "/track", { events: [makeEvent()] }, { "CF-Connecting-IP": "9.9.9.9" });
       lastStatus = res.status;
     }
     expect(lastStatus).toBe(429);
+    nowSpy.mockRestore();
   });
 
   it("ignores X-Client-IP when rate limiting /track", async () => {
     const { obj } = makeDO();
+    const nowSpy = vi.spyOn(Date, "now").mockReturnValue(new Date("2026-03-01T12:00:00.000Z").getTime());
     let lastStatus = 0;
     for (let i = 0; i < 121; i++) {
       const res = await callDO(obj, "/track", { events: [makeEvent()] }, {
@@ -993,6 +996,7 @@ describe("Durable Object security behaviors", () => {
       lastStatus = res.status;
     }
     expect(lastStatus).toBe(429);
+    nowSpy.mockRestore();
   });
 
   it("accepts CF-IPCountry fallback for track country", async () => {
