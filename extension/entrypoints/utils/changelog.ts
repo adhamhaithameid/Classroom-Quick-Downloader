@@ -141,7 +141,10 @@ function normalizeManualData(): ChangelogData {
 
   return {
     entries,
-    config,
+    config: {
+      rules,
+      lastUpdated: Number(EXTENSION_MANUAL_CHANGELOG?.config?.lastUpdated) || now,
+    },
     meta,
     revisionToken,
     lastFetched,
