@@ -21,7 +21,7 @@
     "test:reliability": "go test ./cmd/app ./internal/handlers ./internal/relay ./internal/observability -run 'Reliability|SessionPersistence|RunOnce|Retry|RequestContext|Metrics|PublicWebsiteEventsHandler_DeduplicatesRetryBatch|PublicWebsiteEventsHandler_PartialAcceptDoesNotAbortBatch' -count=1",
     "test:strict": "pnpm run test:smoke && pnpm run test:functional && pnpm run test:integration && pnpm run test:regression && pnpm run test:load && pnpm run test:stress && pnpm run test:security && pnpm run test:ui && pnpm run test:fuzz && pnpm run test:reliability && pnpm run test",
     "vet": "go vet ./...",
-    "validate": "pnpm run test && pnpm run vet",
+    "validate": "pnpm run build:dashboard && pnpm run test:dashboard:unit && pnpm run test && pnpm run vet",
     "gosec": "\"$(go env GOPATH)/bin/gosec\" -track-suppressions ./..."
   }
 }
