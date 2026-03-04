@@ -7,7 +7,8 @@ compatibility_date = "2024-12-01"
   # Set this to your production Oracle HTTPS endpoint.
   # Keep HTTP disabled by default; only enable ALLOW_INSECURE_ORACLE_ENDPOINT temporarily for local migration.
   # The worker appends "/ingest-batch" for flushes and "/api/public/website/*" for public reads.
-  ORACLE_ENDPOINT = "http://129-151-233-229.sslip.io:8080"
+  # Use DNS host (not raw IP) so Cloudflare fetch does not hit direct-IP egress restrictions.
+  ORACLE_ENDPOINT = "http://129.151.233.229.nip.io:8080"
   ALLOW_INSECURE_ORACLE_ENDPOINT = "true"
   MAX_BATCH_EVENTS = "10000"
   # Website writes (telemetry + uninstall feedback) are origin-gated.
