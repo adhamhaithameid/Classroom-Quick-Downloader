@@ -109,7 +109,7 @@
       /* Sidebar */
       .sidebar {
         width: 276px;
-        background: var(--bg-primary);
+        background: color-mix(in srgb, var(--bg-primary) 86%, #020613 14%);
         border-right: 1px solid var(--border-primary);
         display: flex;
         flex-direction: column;
