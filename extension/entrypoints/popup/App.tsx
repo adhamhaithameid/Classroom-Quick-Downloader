@@ -555,6 +555,9 @@ function App() {
     const loadChangelog = async () => {
       if (inFlight) return;
       inFlight = true;
+      if (!changelogData) {
+        setChangelogStatus('loading');
+      }
       try {
         const data = await fetchChangelog(true);
         if (!cancelled && data) {
