@@ -41,20 +41,7 @@ export interface ChangelogData {
   lastFetched: number;
 }
 
-const STORAGE_KEY = 'cqd_changelog_v1';
-const CACHE_duration_MS = 0; // Always fetch on reload
-const SEEN_KEY = 'cqd_changelog_seen_v1';
-const ETAG_KEY = 'cqd_changelog_etag_v1';
-const FORCE_REFRESH_QUERY_KEY = '_';
-
-function normalizeStringList(value: unknown, maxItems = 24): string[] {
-  if (!Array.isArray(value)) return [];
-  return value
-    .filter((item): item is string => typeof item === 'string')
-    .map((item) => item.trim())
-    .filter(Boolean)
-    .slice(0, maxItems);
-}
+export type ChangelogFetchStatus = 'fresh' | 'not-modified' | 'cache-fallback' | 'empty' | 'error';
 
 function toLegacyChanges(entry: {
   summary?: string;
