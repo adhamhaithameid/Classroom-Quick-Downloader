@@ -5618,7 +5618,7 @@ export function renderDashboard(stats: StatsResponse): string {
         if (!container) return;
         const list = Array.isArray(entries) ? entries.slice(0, 3) : [];
         if (list.length === 0) {
-          container.innerHTML = '<div class="cl-preview-empty">No entries to preview.</div>';
+          setPreviewMessage(container, "No entries to preview.");
           return;
         }
         let html = '';
