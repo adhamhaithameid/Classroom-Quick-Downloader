@@ -8,7 +8,16 @@ import bmcLogoSrc from '../../assets/bmc-logo.svg';
 import chromeSvg from '../../assets/Chrome.svg';
 import firefoxSvg from '../../assets/Firefox.svg';
 import edgeSvg from '../../assets/Edge.svg';
-import { fetchChangelog, getMatchingRule, getRuleClasses, isVersionSeen, markAsSeen, getLatestChange, type ChangelogData } from '../utils/changelog';
+import {
+  fetchChangelogDetailed,
+  getMatchingRule,
+  getRuleClasses,
+  isVersionSeen,
+  markAsSeen,
+  getLatestChange,
+  type ChangelogData,
+  type ChangelogFetchResult
+} from '../utils/changelog';
 import { CHANGELOG_SITE_URL } from '../utils/analytics/constants';
 
 // External Links
