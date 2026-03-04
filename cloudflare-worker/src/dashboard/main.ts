@@ -5600,6 +5600,20 @@ export function renderDashboard(stats: StatsResponse): string {
           .replace(/'/g, '&#39;');
       }
 
+      function clearChildren(node) {
+        if (!node) return;
+        while (node.firstChild) node.removeChild(node.firstChild);
+      }
+
+      function setPreviewMessage(node, message) {
+        if (!node) return;
+        clearChildren(node);
+        const el = document.createElement("div");
+        el.className = "cl-preview-empty";
+        el.textContent = message;
+        node.appendChild(el);
+      }
+
       function renderReleasePreview(container, entries) {
         if (!container) return;
         const list = Array.isArray(entries) ? entries.slice(0, 3) : [];
