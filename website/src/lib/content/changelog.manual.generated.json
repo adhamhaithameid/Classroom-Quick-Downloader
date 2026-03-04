@@ -226,3 +226,4 @@
         "Additional runtime checks for long sessions."
       ],
       "changed": [
+        "Tuned defaults for safer prolonged usage."
