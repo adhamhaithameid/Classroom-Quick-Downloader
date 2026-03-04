@@ -4539,7 +4539,7 @@
           return;
         }
         var html = '<div class="table-responsive"><table><thead><tr>';
-        html += '<th>Version</th><th>Date</th><th>Summary</th><th style="text-align:center">+</th><th style="text-align:center">~</th><th style="text-align:center">!</th><th style="text-align:center">⭐</th><th>Actions</th>';
+        html += '<th>Version</th><th>Date</th><th>Summary</th><th class="ext-cl-cell-center">+</th><th class="ext-cl-cell-center">~</th><th class="ext-cl-cell-center">!</th><th class="ext-cl-cell-center">⭐</th><th>Actions</th>';
         html += '</tr></thead><tbody>';
         entries.forEach(function(entry) {
           var addedCount = Array.isArray(entry.added) ? entry.added.length : 0;
