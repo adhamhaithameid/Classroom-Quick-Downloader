@@ -69,6 +69,12 @@ function installChromeStorage(seed: StorageMap = {}): StorageMap {
 
 async function buildIntegrationContext() {
   vi.resetModules();
+  let oracleChangelogPayload: Record<string, unknown> = {
+    ok: true,
+    entries: [],
+    config: { rules: [] },
+    meta: { contentChecksum: 'empty' },
+  };
   vi.doMock('../entrypoints/utils/analytics/constants', async () => {
     const actual = await vi.importActual<Record<string, unknown>>('../entrypoints/utils/analytics/constants');
     return {
