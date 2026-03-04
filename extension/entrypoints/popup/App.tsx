@@ -815,7 +815,7 @@ function App() {
                          setChangelogStatusMessage(latest.status === 'empty' ? 'No changelog entries are available yet.' : null);
                        }
                        if (version) {
-                         await markAsSeen(version, latestData ?? changelogData);
+                         await markAsSeen(version, latest.data ?? changelogData);
                          setSeen(true);
                        }
                     }}
