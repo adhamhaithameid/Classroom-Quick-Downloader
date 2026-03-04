@@ -4811,7 +4811,6 @@
         var importBtn = document.getElementById('ext-cl-import-github-btn');
         if (importBtn) {
           importBtn.addEventListener('click', async function() {
-            if (!confirm('Import entries from GitHub user-friendly-changelog.md?\nThis will merge/update existing entries.')) return;
             try {
               var result = await postJSON('/api/admin/extension-changelog/import-github', {});
               extClToast('Imported ' + (result.imported || 0) + ' entries from GitHub ✓', 'success');
