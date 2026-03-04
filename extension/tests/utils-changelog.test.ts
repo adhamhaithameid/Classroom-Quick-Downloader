@@ -30,20 +30,8 @@ describe('changelog utils (manual mode)', () => {
 
   it('does not perform network fetch in manual mode', async () => {
     const mod = await loadChangelogModule();
-    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({
-      ok: true,
-      entries: [{ id: 'n1', version: '1.3.0', date: '2026-02-10', changes: ['Fixes'] }],
-      config: { rules: [{ id: 'r1', target: 'all', priority: 'normal', effect: 'none' }] },
-    }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
-
-    const result = await mod.fetchChangelog(true);
-    expect(result?.entries[0]?.id).toBe('n1');
-    expect(fetch).toHaveBeenCalled();
-    const [calledUrl, calledInit] = vi.mocked(fetch).mock.calls[0] as [string, RequestInit];
-    expect(calledUrl).toContain('https://worker.example/changelog');
-    expect(calledUrl).toContain('_=');
-    expect(calledInit.cache).toBe('no-store');
-    expect(chrome.storage.local.set).toHaveBeenCalled();
+    await mod.fetchChangelog(true);
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it('returns cached data when network fetch fails', async () => {
