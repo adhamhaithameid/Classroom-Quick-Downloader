@@ -1153,7 +1153,7 @@ async function handleVerifyDangerPassword(request: Request, env: WorkerEnv): Pro
 
     return withCors(request, new Response(
       JSON.stringify({ ok: true }),
-      { status: 200, headers: { "content-type": "application/json" } }
+      { status: 200, headers: responseHeaders }
     ), env);
   } catch {
     return withCors(request, new Response(
