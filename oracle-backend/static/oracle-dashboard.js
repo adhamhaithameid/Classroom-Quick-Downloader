@@ -4647,6 +4647,7 @@
         document.getElementById('ext-cl-rule-target').value = rule.target || 'all';
         document.getElementById('ext-cl-rule-priority').value = rule.priority || 'normal';
         document.getElementById('ext-cl-rule-effect').value = rule.effect || 'none';
+        updateExtClRulePreview();
         extClToast('Editing rule: ' + (rule.id || id), 'info');
       };
 
