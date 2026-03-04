@@ -515,10 +515,9 @@ func importExtChangelogFromGitHub(db *sql.DB, markdownURL string) (extGitHubImpo
 	}
 
 	// Record import metadata.
-	h := sha256.New()
-	_, _ = h.Write([]byte(markdown))
-	_ = setExtChangelogConfigValue(db, "last_import_checksum", hex.EncodeToString(h.Sum(nil))[:16])
-	_ = setExtChangelogConfigValue(db, "last_import_at", fmt.Sprintf("%d", time.Now().UnixMilli()))
+	lastImportAt := time.Now().UnixMilli()
+	_ = setExtChangelogConfigValue(db, "last_import_checksum", checksum)
+	_ = setExtChangelogConfigValue(db, "last_import_at", fmt.Sprintf("%d", lastImportAt))
 	_ = setExtChangelogConfigValue(db, "last_import_count", fmt.Sprintf("%d", imported))
 
 	return imported, nil
