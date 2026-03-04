@@ -687,7 +687,7 @@
         flex-direction: row;
         background: color-mix(in srgb, var(--bg-secondary) 92%, #1f2b4a 8%);
         border: 1px solid var(--border-primary);
-        border-radius: 8px;
+        border-radius: 12px;
         padding: 16px;
         transition: border-color 0.2s ease, box-shadow 0.2s ease;
         cursor: default;
