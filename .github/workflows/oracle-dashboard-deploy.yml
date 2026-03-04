@@ -152,9 +152,13 @@ jobs:
             echo "$snapshot_payload" | grep -Eq '"schemaVersion"[[:space:]]*:[[:space:]]*"1"'
 
             smoke_origin="$(grep -E '^PUBLIC_WEBSITE_ALLOWED_ORIGINS=' .env.production | head -n1 | cut -d= -f2- | tr ',' '\n' | head -n1 | xargs)"
-            if [ -z "$smoke_origin" ]; then
+            if [ -z "$smoke_origin" ] || printf '%s' "$smoke_origin" | grep -Eqi 'replace_me|example\.com'; then
               smoke_origin="https://classroom-quick-downloader-website.pages.dev"
             fi
+            case "$smoke_origin" in
+              http://*|https://*) ;;
+              *) smoke_origin="https://classroom-quick-downloader-website.pages.dev" ;;
+            esac
             event_id="gha-oracle-${GITHUB_RUN_ID:-manual}-${GITHUB_RUN_ATTEMPT:-1}"
             ingest_payload="$(cat <<JSON
             {"schemaVersion":"1","sessionId":"gha-oracle-smoke","pagePath":"/ci/smoke","events":[{"eventId":"${event_id}","eventType":"cta","action":"install_click","placement":"hero_install"}]}
