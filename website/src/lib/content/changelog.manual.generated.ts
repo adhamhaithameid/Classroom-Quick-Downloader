@@ -348,3 +348,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Initial project foundations.",
         "Initial structure and baseline workflows.",
         "N/A"
+      ],
