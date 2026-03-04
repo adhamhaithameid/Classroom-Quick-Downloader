@@ -282,3 +282,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "title": "Release 1.1.0",
       "summary": "Feature and compatibility expansion release.",
       "highlights": [
+        "Multi-browser support improvements.",
