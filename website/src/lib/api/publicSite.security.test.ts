@@ -25,16 +25,15 @@ describe('public website API security hardening', () => {
     });
 
     expect(payload.countries).toEqual([
-      { countryCode: 'X1', count: 15 },
       { countryCode: 'US', count: 7 },
       { countryCode: 'EG', count: 3 }
     ]);
-    expect(payload.totals).toEqual({ countries: 3, downloads: 25 });
+    expect(payload.totals).toEqual({ countries: 2, downloads: 10 });
   });
 
   it('sends required anti-CSRF style header for public write endpoints', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      expect(String(input)).toContain('/api/public/website/events');
+      expect(String(input)).toContain('/api/site/v1/events');
       expect(init?.method).toBe('POST');
       expect((init?.headers as Record<string, string>)['X-Requested-With']).toBe('XMLHttpRequest');
       return new Response(JSON.stringify({ ok: true, generatedAt: 1, acceptedCount: 1, rejectedCount: 0 }), {
