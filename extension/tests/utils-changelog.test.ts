@@ -110,7 +110,7 @@ describe('changelog utils (manual mode)', () => {
   });
 
   describe('getRuleClasses', () => {
-    it('returns empty string if rule is null', async () => {
+    it('returns empty string for null rule or seen versions', async () => {
       const mod = await loadChangelogModule();
       expect(mod.getRuleClasses(null, false)).toBe('');
       expect(mod.getRuleClasses(null, true)).toBe('');
