@@ -65,3 +65,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Fixed close-button layout and hover inconsistencies."
       ],
       "releasedAtUtc": 1772433180434
+    },
