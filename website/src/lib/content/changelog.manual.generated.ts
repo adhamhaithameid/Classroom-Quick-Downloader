@@ -38,3 +38,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Revision-aware changelog checks for same-version updates."
       ],
       "changed": [
+        "Improved changelog update detection logic."
