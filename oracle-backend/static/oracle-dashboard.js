@@ -1964,6 +1964,7 @@
         });
         html += '</div>';
         container.innerHTML = html;
+        applyFunnelFillWidths(container);
         bindMetricBarHover(container, function(row) {
           return {
             title: String(row.label || 'Stage'),
