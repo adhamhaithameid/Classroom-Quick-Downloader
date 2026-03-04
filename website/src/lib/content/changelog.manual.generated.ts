@@ -15,3 +15,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       ],
       "added": [
         "Full manual changelog history synced from extension release lineage."
+      ],
