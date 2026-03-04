@@ -245,3 +245,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Fixed smaller runtime mismatches."
       ],
       "added": [
+        "Extended compatibility hardening."
