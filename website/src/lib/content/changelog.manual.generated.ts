@@ -23,3 +23,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Fixed stale in-session snapshot behavior that could keep old metrics visible."
       ],
       "releasedAtUtc": 1772605980434
+    },
