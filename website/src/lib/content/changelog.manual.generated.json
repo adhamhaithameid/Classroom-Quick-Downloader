@@ -82,3 +82,4 @@
         "Updated dependency resolution paths."
       ],
       "fixed": [
+        "Fixed `minimatch` export mismatch issues in development flow."
