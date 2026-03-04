@@ -30,3 +30,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "title": "Release 1.3.8",
       "summary": "Changelog reliability release.",
       "highlights": [
+        "Revision-aware changelog checks for same-version updates.",
