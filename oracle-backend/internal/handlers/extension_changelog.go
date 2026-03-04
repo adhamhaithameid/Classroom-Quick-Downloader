@@ -1015,4 +1015,3 @@ func ExtChangelogBulkImportHandler(sqliteDB *sql.DB) http.HandlerFunc {
 		writeExtJSON(w, http.StatusOK, map[string]any{"ok": true, "imported": imported})
 	}
 }
-
