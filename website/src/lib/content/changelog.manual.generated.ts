@@ -323,3 +323,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "version": "1.0.0",
       "title": "Release 1.0.0",
       "summary": "First stable production release.",
+      "highlights": [
