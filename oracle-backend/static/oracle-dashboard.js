@@ -4840,7 +4840,11 @@
               }
 
               var result = await postJSON('/api/admin/extension-changelog/import-github', {});
-              extClToast('Imported ' + (result.imported || 0) + ' entries from GitHub ✓', 'success');
+              if (result.skipped) {
+                extClToast('Import skipped (duplicate checksum) ✓', 'info');
+              } else {
+                extClToast('Imported ' + (result.imported || 0) + ' entries from GitHub ✓', 'success');
+              }
               await loadExtChangelogEntries();
             } catch (e) {
               extClToast('Import failed: ' + e.message, 'error');
