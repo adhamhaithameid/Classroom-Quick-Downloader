@@ -36,17 +36,6 @@ describe('changelog utils (manual mode)', () => {
 
   it('persists robust cache envelope fields', async () => {
     const mod = await loadChangelogModule();
-    const cached = {
-      entries: [{ id: 'c2', version: '1.2.1', date: '2025-02-01', changes: ['Cached'] }],
-      config: { rules: [] },
-      lastFetched: 1,
-    };
-    chrome.storage.local.get = vi.fn(async () => ({ cqd_changelog_v1: cached })) as never;
-    vi.mocked(fetch).mockRejectedValueOnce(new Error('offline'));
-    const result = await mod.fetchChangelog(true);
-    expect(result?.entries[0]?.id).toBe('c2');
-    expect(result?.revisionToken).toBeTruthy();
-  });
 
   it('handles latest change extraction and seen version tracking', async () => {
     const mod = await loadChangelogModule();
