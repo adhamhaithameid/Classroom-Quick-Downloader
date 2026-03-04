@@ -180,43 +180,6 @@ export async function fetchChangelogDetailed(force = false): Promise<ChangelogFe
   };
 }
 
-/**
- * Try fetching from a URL. Returns [ChangelogData | null, newEtag | null].
- * Returns [null, storedEtag] on 304 Not Modified.
- */
-async function tryFetchEndpoint(
-  url: string,
-  force: boolean,
-  storedEtag?: string
-): Promise<[ChangelogData | null, string | null]> {
-  const requestUrl = force
-    ? `${url}${url.includes('?') ? '&' : '?'}${FORCE_REFRESH_QUERY_KEY}=${Date.now()}`
-    : url;
-
-  const headers: Record<string, string> = {};
-  if (storedEtag && !force) {
-    headers['If-None-Match'] = storedEtag;
-  }
-
-  const res = await fetch(requestUrl, { cache: 'no-store', headers });
-
-  // 304 Not Modified — data hasn't changed
-  if (res.status === 304) {
-    return [null, storedEtag || null];
-  }
-
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-  const json = await res.json();
-  const parsed = parseApiResponse(json);
-  const newEtag = res.headers.get('ETag') || null;
-  return [parsed, newEtag];
-}
-
-/**
- * Fetch changelog from Oracle (primary) or Worker (fallback).
- * Returns cached data if both fail; null if no cache exists.
- */
 export async function fetchChangelog(force = false): Promise<ChangelogData | null> {
   // 1. Check cache
   const cached = await chrome.storage.local.get([STORAGE_KEY, ETAG_KEY]);
