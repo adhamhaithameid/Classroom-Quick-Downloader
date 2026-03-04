@@ -1657,6 +1657,7 @@
         display: grid;
         gap: 12px;
       }
+      .batch-info-grid-spaced { margin-top: 12px; }
 
       .batch-info-row {
         display: flex;
