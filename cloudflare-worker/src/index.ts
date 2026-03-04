@@ -1137,6 +1137,20 @@ async function handleVerifyDangerPassword(request: Request, env: WorkerEnv): Pro
       ), env);
     }
 
+    const responseHeaders = new Headers({ "content-type": "application/json" });
+    if (dashboardSecret) {
+      const token = await createDangerStepUpToken(
+        dashboardSecret,
+        clientIp,
+        userAgent,
+        sessionBindingMode,
+      );
+      responseHeaders.set(
+        "Set-Cookie",
+        createDangerStepUpCookieHeader(token, new URL(request.url), env),
+      );
+    }
+
     return withCors(request, new Response(
       JSON.stringify({ ok: true }),
       { status: 200, headers: { "content-type": "application/json" } }
