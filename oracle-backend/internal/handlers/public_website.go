@@ -195,6 +195,20 @@ type publicWebsiteUninstallStats struct {
 	TopReasons         []publicWebsiteReasonCount `json:"topReasons"`
 }
 
+type publicWebsiteNewsletterSubscribeRequest struct {
+	Email  string `json:"email"`
+	Name   string `json:"name,omitempty"`
+	Source string `json:"source,omitempty"`
+}
+
+type publicWebsiteNewsletterSubscribeResponse struct {
+	SchemaVersion string `json:"schemaVersion"`
+	OK            bool   `json:"ok"`
+	GeneratedAt   int64  `json:"generatedAt"`
+	RecordKey     string `json:"recordKey"`
+	Message       string `json:"message"`
+}
+
 type publicWebsiteReasonCount struct {
 	Reason string `json:"reason"`
 	Count  int64  `json:"count"`
