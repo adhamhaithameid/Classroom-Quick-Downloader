@@ -325,3 +325,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "summary": "First stable production release.",
       "highlights": [
         "Core one-click Classroom download workflow.",
+        "Established baseline architecture/contracts.",
