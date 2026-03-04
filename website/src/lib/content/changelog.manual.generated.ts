@@ -26,3 +26,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
     },
     {
       "id": "manual-1.3.8-2",
+      "version": "1.3.8",
