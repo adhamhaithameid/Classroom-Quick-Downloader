@@ -4860,6 +4860,11 @@
             var md = (textarea && textarea.value || '').trim();
             if (!md) { extClToast('Paste changelog markdown first.', 'error'); return; }
             if (!confirm('Bulk import all parsed releases from the pasted markdown?')) return;
+            var okStepBulk = await ensureStepUp();
+            if (!okStepBulk) {
+              extClToast('Additional verification is required.', 'error');
+              return;
+            }
             try {
               var result = await postJSON('/api/admin/extension-changelog/bulk-import', { markdown: md });
               extClToast('Bulk imported ' + (result.imported || 0) + ' entries ✓', 'success');
