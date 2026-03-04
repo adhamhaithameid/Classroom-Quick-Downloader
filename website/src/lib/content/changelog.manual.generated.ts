@@ -135,3 +135,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "title": "Release 1.2.3",
       "summary": "Usability and telemetry consistency release.",
       "highlights": [
+        "Better feedback and uninstall integration paths.",
