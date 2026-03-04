@@ -4791,6 +4791,14 @@
         var ruleClear = document.getElementById('ext-cl-rule-clear');
         if (ruleClear) ruleClear.addEventListener('click', clearExtClRuleForm);
 
+        ['ext-cl-rule-target', 'ext-cl-rule-priority', 'ext-cl-rule-effect'].forEach(function(id) {
+          var node = document.getElementById(id);
+          if (!node) return;
+          node.addEventListener('input', updateExtClRulePreview);
+          node.addEventListener('change', updateExtClRulePreview);
+        });
+        updateExtClRulePreview();
+
         // Refresh
         var refreshBtn = document.getElementById('ext-cl-refresh-btn');
         if (refreshBtn) refreshBtn.addEventListener('click', async function() {
