@@ -176,3 +176,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "version": "1.2.1",
       "title": "Release 1.2.1",
       "summary": "Unified cancel-system iteration release.",
+      "highlights": [
