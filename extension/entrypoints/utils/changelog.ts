@@ -112,12 +112,25 @@ function normalizeManualData(): ChangelogData {
       isImportant: entry?.isImportant === true,
     });
   }
-  return {
-    liveUpdatedAt,
-    applyMode,
-    lastAutoSyncAt,
-    lastAutoSyncStatus,
-    contentChecksum,
+  entries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  const rawRules = Array.isArray(EXTENSION_MANUAL_CHANGELOG?.config?.rules)
+    ? EXTENSION_MANUAL_CHANGELOG.config.rules
+    : [];
+
+  const rules: NotificationRule[] = rawRules.map((rule, index) => ({
+    id: typeof rule?.id === 'string' && rule.id.trim() ? rule.id.trim() : `manual-rule-${index + 1}`,
+    target: normalizeRuleTarget(rule?.target),
+    priority: normalizeRulePriority(rule?.priority),
+    effect: normalizeRuleEffect(rule?.effect),
+  }));
+
+  const meta: ChangelogMeta = {
+    applyMode: 'manual',
+    liveUpdatedAt: Number(EXTENSION_MANUAL_CHANGELOG?.meta?.liveUpdatedAt) || now,
+    contentChecksum: typeof EXTENSION_MANUAL_CHANGELOG?.meta?.contentChecksum === 'string'
+      ? EXTENSION_MANUAL_CHANGELOG.meta.contentChecksum
+      : `manual-${now}`,
   };
 }
 
