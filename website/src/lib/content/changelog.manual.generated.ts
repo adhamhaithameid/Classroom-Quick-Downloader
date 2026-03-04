@@ -4,3 +4,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
   "source": "manual",
   "entries": [
     {
+      "id": "manual-1.3.9-1",
