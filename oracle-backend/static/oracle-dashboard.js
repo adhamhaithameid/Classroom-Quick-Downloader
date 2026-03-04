@@ -3506,7 +3506,7 @@
         messageNode.textContent = prefix + msg + (detectedAt > 0 ? (' · ' + fmtUtcDateTimeFromMs(detectedAt)) : '');
         var details = Array.isArray(anomaly.details) ? anomaly.details : [];
         if (!details.length) {
-          detailsNode.innerHTML = '';
+          clearChildren(detailsNode);
           return;
         }
         detailsNode.innerHTML = details
