@@ -227,9 +227,6 @@ function migrateSeenState(raw: unknown): SeenState {
   return state;
 }
 
-/**
- * Mark a version as seen.
- */
 export async function markAsSeen(version: string, data?: ChangelogData | null): Promise<void> {
   const normalizedVersion = normalizeVersion(version);
   if (!normalizedVersion) return;
