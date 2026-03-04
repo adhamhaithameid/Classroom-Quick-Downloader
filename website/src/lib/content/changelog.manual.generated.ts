@@ -324,3 +324,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "title": "Release 1.0.0",
       "summary": "First stable production release.",
       "highlights": [
+        "Core one-click Classroom download workflow.",
