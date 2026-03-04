@@ -244,6 +244,9 @@ func main() {
 	mux.Handle("/api/public/website/status", handlers.PublicWebsiteStatusHandler(sqlDB, postgresDB))
 	mux.Handle("/api/public/website/changelog", handlers.PublicWebsiteUserChangelogHandler(sqlDB, postgresDB))
 	mux.Handle("/api/public/website/uninstall", handlers.PublicWebsiteUninstallHandler(sqlDB))
+	// NEWSLETTER_CTA_DISABLED_ROLLBACK_START
+	// mux.Handle("/api/public/website/newsletter/subscribe", handlers.PublicWebsiteNewsletterSubscribeHandler(sqlDB, postgresDB))
+	// NEWSLETTER_CTA_DISABLED_ROLLBACK_END
 	mux.Handle("/api/public/website/events", handlers.PublicWebsiteEventsHandler(sqlDB))
 	mux.Handle("/api/internal/website/events/batch", handlers.InternalWebsiteEventsBatchHandler(sqlDB, doSecret))
 
