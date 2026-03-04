@@ -3,12 +3,6 @@ import type { ChangelogConfig } from '../entrypoints/utils/changelog';
 
 async function loadChangelogModule() {
   vi.resetModules();
-  vi.doMock('../entrypoints/utils/analytics/constants', () => ({
-    CHANGELOG_URL: changeLogUrl,
-  }));
-  vi.doMock('../entrypoints/utils/analytics/detection', () => ({
-    getExtensionVersion: vi.fn(() => '1.3.0'),
-  }));
   return import('../entrypoints/utils/changelog');
 }
 
