@@ -228,3 +228,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       ],
       "changed": [
         "Tuned defaults for safer prolonged usage."
+      ],
