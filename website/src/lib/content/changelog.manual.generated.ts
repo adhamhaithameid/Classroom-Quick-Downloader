@@ -84,3 +84,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       ],
       "fixed": [
         "Fixed `minimatch` export mismatch issues in development flow."
+      ],
