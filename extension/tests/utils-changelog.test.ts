@@ -130,15 +130,15 @@ describe('changelog utils (manual mode)', () => {
     });
   });
 
-    it('handles combinations of priority and effect', async () => {
-      const mod = await loadChangelogModule();
-      const res = mod.getRuleClasses({ id: 'r', target: 'all', priority: 'minor', effect: 'glow' }, false);
-      expect(res).toContain('cqd-pill-minor');
-      expect(res).toContain('cqd-effect-glow-blue');
-
-      const res2 = mod.getRuleClasses({ id: 'r', target: 'all', priority: 'major', effect: 'pulse' }, false);
-      expect(res2).toContain('cqd-pill-major');
-      expect(res2).toContain('cqd-effect-pulse-red');
-    });
+  it('still supports custom non-manual config matching behavior', async () => {
+    const mod = await loadChangelogModule();
+    const cfg: ChangelogConfig = {
+      rules: [
+        { id: 'r1', target: 'v1.3.0', priority: 'major', effect: 'pulse' },
+        { id: 'r2', target: 'all', priority: 'minor', effect: 'glow' },
+      ],
+    };
+    expect(mod.getMatchingRule(cfg, '1.3.0')?.id).toBe('r1');
+    expect(mod.getMatchingRule(cfg, '9.9.9')?.id).toBe('r2');
   });
 });
