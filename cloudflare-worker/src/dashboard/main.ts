@@ -5699,7 +5699,7 @@ export function renderDashboard(stats: StatsResponse): string {
             revisionHistoryEl.appendChild(item);
           });
         } catch (_) {
-          revisionHistoryEl.innerHTML = '<div class="cl-preview-empty">Failed to load revision history.</div>';
+          setPreviewMessage(revisionHistoryEl, "Failed to load revision history.");
         }
       }
 
