@@ -28,7 +28,7 @@
     "test:ui": "pnpm -C website run test:ui && pnpm -C cloudflare-worker run test:ui && pnpm -C oracle-backend run test:ui",
     "test:fuzz:all": "pnpm -C website run test:fuzz && pnpm -C cloudflare-worker run test:fuzz && pnpm -C oracle-backend run test:fuzz",
     "test:reliability": "pnpm -C website run test:reliability && pnpm -C cloudflare-worker run test:reliability && pnpm -C oracle-backend run test:reliability",
-    "test:strict": "pnpm run test:smoke && pnpm run test:functional && pnpm run test:integration:all && pnpm run test:regression && pnpm run test:load && pnpm run test:stress && pnpm run test:security:all && pnpm run test:ui && pnpm run test:fuzz:all && pnpm run test:reliability && pnpm -C website run test:strict && pnpm -C cloudflare-worker run test:strict && pnpm -C oracle-backend run test:strict",
+    "test:strict": "pnpm run test:smoke && pnpm run test:functional && pnpm run test:integration:all && pnpm run test:regression && pnpm run test:load && pnpm run test:stress && pnpm run test:security:all && pnpm run test:ui && pnpm run test:fuzz:all && pnpm run test:reliability && pnpm -C website run test:strict && pnpm -C cloudflare-worker run test:strict && pnpm -C oracle-backend run test:strict && pnpm -C extension run compile && pnpm -C extension run test",
     "phase12:verify": "bash tools/phase12_verify.sh",
     "phase13:smoke": "bash tools/phase13_smoke.sh",
     "phase13:monitor": "bash tools/phase13_monitor.sh",
