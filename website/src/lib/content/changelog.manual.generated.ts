@@ -285,3 +285,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Multi-browser support improvements.",
         "Updated setup/runtime compatibility behavior.",
         "Fixed packaging/config alignment issues."
+      ],
