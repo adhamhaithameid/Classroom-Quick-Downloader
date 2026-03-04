@@ -77,3 +77,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Fixed `minimatch` export mismatch issues in development flow."
       ],
       "added": [
+        "Compatibility safeguards for tooling/runtime."
