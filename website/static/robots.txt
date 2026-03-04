@@ -1,3 +1,5 @@
-# allow crawling everything by default
 User-agent: *
-Disallow:
+Disallow: /uninstall
+Disallow: /404
+
+Sitemap: https://classroom-quick-downloader-website.pages.dev/sitemap.xml
