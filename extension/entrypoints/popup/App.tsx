@@ -909,7 +909,9 @@ function App() {
                     </div>
                   ))
                 ) : (
-                  <div className="cqd-cl-empty">No changelog entries found.</div>
+                  <div className="cqd-cl-empty">
+                    {changelogStatusMessage || 'No changelog entries found.'}
+                  </div>
                 )}
               </div>
               
