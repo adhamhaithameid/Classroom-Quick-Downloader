@@ -219,3 +219,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "title": "Release 1.1.10",
       "summary": "Late 1.1 stability update.",
       "highlights": [
+        "Additional runtime checks for long sessions.",
