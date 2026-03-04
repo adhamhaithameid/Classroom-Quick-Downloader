@@ -81,29 +81,19 @@ describe('changelog utils (manual mode)', () => {
       Object.assign(inMemoryStorage, next);
     }) as never;
 
-    vi.mocked(fetch)
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        ok: true,
-        entries: [{ id: 'r1', version: '1.3.7', date: '2026-02-28T00:00:00.000Z', changes: ['Initial note'] }],
-        config: { rules: [{ id: 'rule', target: '1.3.7', priority: 'major', effect: 'pulse' }] },
-        meta: { liveUpdatedAt: 10 },
-      }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        ok: true,
-        entries: [{ id: 'r1', version: '1.3.7', date: '2026-02-28T00:00:00.000Z', changes: ['Updated note'] }],
-        config: { rules: [{ id: 'rule', target: '1.3.7', priority: 'major', effect: 'pulse' }] },
-        meta: { liveUpdatedAt: 20 },
-      }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    const data = await mod.fetchChangelog(true);
 
-    const first = await mod.fetchChangelog(true);
-    expect(first?.revisionToken).toBeTruthy();
-    await mod.markAsSeen('1.3.7', first);
-    expect(await mod.isVersionSeen('1.3.7', first)).toBe(true);
+    expect(mod.getLatestChange(null)).toBeNull();
+    expect(mod.getLatestChange({ entries: [], config: { rules: [] }, revisionToken: 'rev-empty', lastFetched: Date.now() })).toBeNull();
+    expect(mod.getLatestChange(data)).toContain('Summary:');
 
-    const second = await mod.fetchChangelog(true);
-    expect(second?.revisionToken).toBeTruthy();
-    expect(second?.revisionToken).not.toBe(first?.revisionToken);
-    expect(await mod.isVersionSeen('1.3.7', second)).toBe(false);
+    await mod.markAsSeen('1.3.8', data);
+    expect(await mod.isVersionSeen('1.3.8', data)).toBe(true);
+
+    const changedRevision = data ? { ...data, revisionToken: `${data.revisionToken}-changed` } : data;
+    expect(await mod.isVersionSeen('1.3.8', changedRevision)).toBe(false);
+    expect(await mod.isVersionSeen('9.9.9', changedRevision)).toBe(false);
+    expect(await mod.isVersionSeen('', changedRevision)).toBe(false);
   });
 
   it('matches notification rules', async () => {
