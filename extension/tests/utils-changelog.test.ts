@@ -96,7 +96,7 @@ describe('changelog utils (manual mode)', () => {
     expect(await mod.isVersionSeen('', changedRevision)).toBe(false);
   });
 
-  it('matches notification rules', async () => {
+  it('matches notification rules in manual configuration', async () => {
     const mod = await loadChangelogModule();
     const cfg: ChangelogConfig = {
       rules: [
