@@ -240,3 +240,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "title": "Release 1.1.5",
       "summary": "Mid 1.1 quality update.",
       "highlights": [
+        "Extended compatibility hardening.",
