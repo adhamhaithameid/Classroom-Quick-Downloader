@@ -308,3 +308,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Fixed launch-adjacent regressions."
       ],
       "added": [
+        "Better logging/diagnostics for early production behavior."
