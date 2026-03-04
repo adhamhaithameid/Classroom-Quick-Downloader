@@ -290,3 +290,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Multi-browser support improvements."
       ],
       "changed": [
+        "Updated setup/runtime compatibility behavior."
