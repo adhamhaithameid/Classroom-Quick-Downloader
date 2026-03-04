@@ -416,6 +416,19 @@ function isOraclePublicWebsiteRoute(pathname: string): boolean {
   return ORACLE_PUBLIC_WEBSITE_PATHS.has(pathname);
 }
 
+function isLegacyChangelogAdminRoute(pathname: string): boolean {
+  return (
+    pathname === "/admin/changelog" ||
+    pathname === "/admin/changelog/parse" ||
+    pathname === "/admin/changelog/history" ||
+    pathname === "/admin/changelog/rules" ||
+    pathname === "/admin/changelog/draft" ||
+    pathname === "/admin/changelog/publish" ||
+    pathname === "/admin/changelog/mode" ||
+    pathname === "/admin/changelog/sync-now"
+  );
+}
+
 function websiteEventsErrorBody(code: string, message: string, retryable: boolean): Record<string, unknown> {
   return {
     ok: false,
