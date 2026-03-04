@@ -79,3 +79,4 @@
         "Compatibility safeguards for tooling/runtime."
       ],
       "changed": [
+        "Updated dependency resolution paths."
