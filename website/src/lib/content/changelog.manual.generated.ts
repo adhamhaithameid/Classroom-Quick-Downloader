@@ -209,3 +209,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Lifecycle handling updated for cancellation-aware flow."
       ],
       "fixed": [
+        "Fixed inability to interrupt active operations."
