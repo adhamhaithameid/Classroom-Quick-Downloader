@@ -69,3 +69,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.3.6-4",
       "version": "1.3.6",
+      "title": "Release 1.3.6",
