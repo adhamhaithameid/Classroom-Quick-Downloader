@@ -2653,7 +2653,7 @@
         ];
         sections.forEach(function(section) {
           if (!section.items.length) return;
-          html += '<div class="content-record-meta" style="margin-top:6px;"><strong>' + escapeHtml(section.label) + '</strong></div>';
+          html += '<div class="content-record-meta content-record-meta-spaced"><strong>' + escapeHtml(section.label) + '</strong></div>';
           html += '<ul class="cl-changes-list">';
           section.items.slice(0, 5).forEach(function(item) {
             html += '<li>' + escapeHtml(item) + '</li>';
