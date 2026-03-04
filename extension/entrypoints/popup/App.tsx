@@ -1,6 +1,6 @@
 // filepath: entrypoints/popup/App.tsx
 
-import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
 import './App.css';
 import logoSrc from '../../assets/CQD.png';
 import logoGraySrc from '../../assets/CQD-gray.png';
@@ -1349,6 +1349,7 @@ export function ToggleRow({
   primary,
 }: ToggleRowProps) {
   const isDisabled = !!disabled || !!loading;
+  const descriptionId = useId();
 
   const handleChange = () => {
     if (!isDisabled) {
@@ -1370,10 +1371,16 @@ export function ToggleRow({
         primary ? 'cqd-toggle-row-primary' : ''
       } ${isDisabled ? 'disabled' : ''}`}
     >
-      <div className="cqd-toggle-text">
+      <div
+        className="cqd-toggle-text"
+        onClick={handleChange}
+        style={{ cursor: isDisabled ? 'not-allowed' : 'pointer' }}
+      >
         <div className="cqd-toggle-label">{label}</div>
         {description && (
-          <p className="cqd-toggle-description">{description}</p>
+          <p id={descriptionId} className="cqd-toggle-description">
+            {description}
+          </p>
         )}
       </div>
       <label
@@ -1386,6 +1393,7 @@ export function ToggleRow({
           onChange={handleChange}
           onKeyDown={handleKeyDown}
           aria-label={label}
+          aria-describedby={description ? descriptionId : undefined}
         />
         <div className="cqd-switch-slider">
           <div className="cqd-switch-circle">
