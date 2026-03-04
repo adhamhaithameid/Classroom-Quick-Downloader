@@ -266,9 +266,7 @@ export function getRuleClasses(rule: NotificationRule | null, isSeen: boolean): 
   const classes: string[] = [];
   if (rule.priority === 'minor') classes.push('cqd-pill-minor');
   if (rule.priority === 'major') classes.push('cqd-pill-major');
-  
-  // Effect
-  // Glow: Minor=Blue, Major=Red
+
   if (rule.effect === 'glow') {
     classes.push(rule.priority === 'major' ? 'cqd-effect-glow-red' : 'cqd-effect-glow-blue');
   }
