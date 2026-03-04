@@ -690,6 +690,33 @@ describe("Worker auth config hardening", () => {
     vi.unstubAllGlobals();
   });
 
+  it("keeps newsletter subscribe route disabled while preserving rollback code", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: false, error: "should_not_call_upstream" }), { status: 500 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const env = mockEnv({ ORACLE_ENDPOINT: "https://oracle.local" });
+    const request = new Request("https://example.com/api/public/website/newsletter/subscribe", {
+      method: "POST",
+      headers: {
+        Origin: "https://website.example",
+        "content-type": "application/json",
+        "x-requested-with": "XMLHttpRequest",
+      },
+      body: JSON.stringify({ email: "student@example.com", source: "overview_ready_to_save_hours" }),
+    });
+
+    const res = await worker.fetch(request, env, {} as ExecutionContext);
+    expect(res.status).toBe(404);
+    expect(fetchMock).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  /* NEWSLETTER_CTA_DISABLED_ROLLBACK_START
+  it("proxies newsletter subscribe POST to Oracle public website route", async () => {
+    // rollback implementation retained here for one-step restore
+  });
+  NEWSLETTER_CTA_DISABLED_ROLLBACK_END */
+
   it("routes website events POST through the DO gateway", async () => {
     const doFetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const req = input as Request;
