@@ -1178,6 +1178,18 @@ async function resolveAuthContext(request: Request, env: WorkerEnv): Promise<Aut
   const dangerToken = getDangerStepUpCookie(request);
   const dashboardSecret = getDashboardSecret(env);
   const bindingMode = sessionBindingModeFromEnv(env);
+  const hasValidSecret = !!adminSecret && timingSafeStringEqual(adminSecret, env.DO_SHARED_SECRET);
+  const hasValidSession =
+    !!dashboardSecret &&
+    !!sessionToken &&
+    await verifySessionToken(sessionToken, dashboardSecret, clientIp, userAgent, bindingMode);
+  const hasDangerStepUp =
+    hasValidSecret ||
+    (
+      !!dashboardSecret &&
+      !!dangerToken &&
+      await verifySessionToken(dangerToken, dashboardSecret, clientIp, userAgent, bindingMode)
+    );
 
   return {
     hasValidSecret: !!adminSecret && timingSafeStringEqual(adminSecret, env.DO_SHARED_SECRET),
