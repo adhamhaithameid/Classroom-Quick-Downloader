@@ -98,3 +98,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Fixed cancellation/flush consistency issues."
       ],
       "added": [
+        "Expanded resilience/security checks across extension-worker-oracle flow."
