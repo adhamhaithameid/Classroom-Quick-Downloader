@@ -4625,7 +4625,7 @@
           var previewClass = getExtRulePreviewClasses(priority, effect).join(' ') + ' rule-preview-mini';
           var effectIcon = effect === 'glow' ? '✨' : effect === 'pulse' ? '📡' : '—';
           html += '<tr>';
-          html += '<td><code style="font-size:0.82em">' + escapeHtml(rule.id || '') + '</code></td>';
+          html += '<td><code class="ext-cl-rule-id-code">' + escapeHtml(rule.id || '') + '</code></td>';
           html += '<td>' + escapeHtml(rule.target || 'all') + '</td>';
           html += '<td><span style="' + pillStyle + '">' + escapeHtml(rule.priority || 'normal') + '</span></td>';
           html += '<td>' + effectIcon + ' ' + escapeHtml(rule.effect || 'none') + '</td>';
