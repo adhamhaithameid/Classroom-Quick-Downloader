@@ -503,6 +503,7 @@ function isDashboardRoute(pathname: string): boolean {
   return (
     pathname === "/" ||
     pathname === "/dashboard" ||
+    pathname === "/dashboard/website" ||
     pathname === "/logout" ||
     pathname === "/stats" ||
     pathname === "/auth/verify-danger" ||
