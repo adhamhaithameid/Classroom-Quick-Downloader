@@ -2257,7 +2257,7 @@ export default {
       enforceProtectedCors &&
       !isCorsOriginAllowedForPath(request, env, pathname)
     ) {
-      if (pathname === "/api/public/website/events") {
+      if (pathname === "/api/public/website/events" || pathname === "/api/site/v1/events") {
         const hasOrigin = normalizeHeaderOrigin(request.headers.get("Origin")) !== null;
         const errorCode = hasOrigin ? "cors_origin_not_allowed" : "origin_required";
         const errorMessage = hasOrigin
