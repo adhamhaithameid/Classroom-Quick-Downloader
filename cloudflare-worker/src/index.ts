@@ -2368,6 +2368,25 @@ export default {
       return handleProtectedStats(request, env);
     }
 
+    // LEGACY_CHANGELOG_DISABLED_START
+    // Changelog customization is now manual and source-controlled.
+    // Keep legacy Cloudflare admin routes disabled but present for rollback visibility.
+    if (isLegacyChangelogAdminRoute(pathname)) {
+      return withCors(
+        request,
+        new Response(
+          JSON.stringify({
+            ok: false,
+            error: "legacy_changelog_disabled",
+            message: "Cloudflare changelog customization endpoints are disabled. Use manual/changelog sources.",
+          }),
+          { status: 410, headers: { "content-type": "application/json; charset=utf-8" } },
+        ),
+        env,
+      );
+    }
+    // LEGACY_CHANGELOG_DISABLED_END
+
     // Public endpoints (no auth required)
     if (
       (pathname === "/config" && request.method === "GET") ||
