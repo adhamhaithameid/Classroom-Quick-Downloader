@@ -96,3 +96,4 @@
         "Improved pipeline validation and retry behavior.",
         "Fixed cancellation/flush consistency issues."
       ],
+      "added": [
