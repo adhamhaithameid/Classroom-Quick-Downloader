@@ -1226,6 +1226,7 @@ describe("Worker auth config hardening", () => {
 
     expect(dangerRes.status).toBe(200);
     expect(body.ok).toBe(true);
+    expect(dangerRes.headers.get("Set-Cookie")).toContain("cqd_danger_stepup=");
   });
 
   // ---------------------------------------------------------------------------
