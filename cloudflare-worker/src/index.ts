@@ -1168,7 +1168,7 @@ async function handleVerifyDangerPassword(request: Request, env: WorkerEnv): Pro
 // Shared Auth Context (session OR X-Admin-Secret)
 // ---------------------------------------------------------------------------
 
-type AuthContext = { hasValidSecret: boolean; hasValidSession: boolean };
+type AuthContext = { hasValidSecret: boolean; hasValidSession: boolean; hasDangerStepUp: boolean };
 
 async function resolveAuthContext(request: Request, env: WorkerEnv): Promise<AuthContext> {
   const clientIp = request.headers.get("CF-Connecting-IP") || "unknown";
