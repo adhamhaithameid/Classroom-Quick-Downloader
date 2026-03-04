@@ -329,3 +329,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Fixed pre-release blockers."
       ],
       "added": [
+        "Core one-click Classroom download workflow."
