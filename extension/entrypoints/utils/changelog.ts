@@ -71,9 +71,8 @@ function normalizeRuleTarget(value: unknown): string {
   return normalizeVersion(trimmed);
 }
 
-function sanitizeRules(value: unknown): NotificationRule[] {
-  if (!Array.isArray(value)) return [];
-  const out: NotificationRule[] = [];
+function hashText(value: string): string {
+  let hash = 0;
   for (let i = 0; i < value.length; i += 1) {
     const row = value[i] as Record<string, unknown> | null | undefined;
     const idRaw = typeof row?.id === 'string' && row.id.trim()
