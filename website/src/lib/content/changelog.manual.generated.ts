@@ -117,3 +117,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Expanded dashboard/telemetry integrations.",
         "Refined ingestion orchestration between worker and oracle.",
         "Fixed sync/auth edge cases in production-like workloads."
+      ],
