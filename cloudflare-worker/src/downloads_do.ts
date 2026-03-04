@@ -399,9 +399,9 @@ const CHANGELOG_MAX_AUTO_SYNC_INTERVAL_MINUTES = 1440;
 function defaultExtensionChangelogEntries(): ChangelogEntry[] {
   return [
     {
-      id: "release-138",
-      version: "1.3.8",
-      date: "2026-03-02T00:00:00.000Z",
+      id: "release-139",
+      version: "1.3.9",
+      date: "2026-03-03T00:00:00.000Z",
       isImportant: true,
       changes: [
         "Changelog delivery is now revision-aware so users receive same-version updates.",
