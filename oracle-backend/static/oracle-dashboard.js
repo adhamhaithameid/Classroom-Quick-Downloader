@@ -2004,6 +2004,7 @@
         }
         html += '</div></div>';
         container.innerHTML = html;
+        applyHeatmapOpacities(container);
         bindMetricBarHover(container, function(row) {
           return {
             title: String(row.day || '') + ' ' + String(row.hour || '').padStart(2, '0') + ':00 UTC',
