@@ -142,15 +142,24 @@ describe('public website API integration', () => {
 
     const changelog = await fetchUserChangelog();
 
-    expect(changelog.entries[0]?.version).toBe('1.3.6');
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(changelog.entries[0]?.version).toBe('1.3.9');
+    expect(fetchMock).toHaveBeenCalledTimes(0);
   });
 
-  it('requests snapshot from Oracle API endpoint only', async () => {
+  it('requests public snapshot route first and falls back to legacy snapshot route', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString();
-      expect(url).toContain('/api/public/website/snapshot');
-      expect(url).not.toContain('/public/site-metrics');
+      if (url.includes('/data/bootstrap-snapshot.json')) {
+        return new Response('missing', { status: 404 });
+      }
+      if (url.includes('/api/public/website/snapshot')) {
+        return new Response('public snapshot unavailable', { status: 503 });
+      }
+      if (url.includes('/api/site/v1/snapshot')) {
+        return new Response(JSON.stringify(buildSnapshotPayload(10)), { status: 200 });
+      }
+      expect(url).not.toContain('/api/public/website/overview');
+      expect(url).not.toContain('/api/public/website/map');
       return new Response(JSON.stringify(buildSnapshotPayload(10)), { status: 200 });
     });
 
@@ -158,6 +167,38 @@ describe('public website API integration', () => {
     const payload = await fetchOverview();
     expect(payload.totals.downloads).toBe(10);
     expect(payload.installs.usersTotal).toBe(99);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const calledUrls = fetchMock.mock.calls.map((call) => String(call[0]));
+    expect(calledUrls.some((url) => url.includes('/api/site/v1/snapshot'))).toBe(true);
+    expect(calledUrls.some((url) => url.includes('/api/public/website/snapshot'))).toBe(true);
+    expect(calledUrls.some((url) => url.includes('/public/site-metrics'))).toBe(false);
+  });
+
+  it('falls back to composite overview+map snapshot when both snapshot routes fail', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url.includes('/data/bootstrap-snapshot.json')) {
+        return new Response('missing', { status: 404 });
+      }
+      if (url.includes('/api/public/website/snapshot')) {
+        return new Response('public snapshot unavailable', { status: 503 });
+      }
+      if (url.includes('/api/site/v1/snapshot')) {
+        return new Response('legacy snapshot unavailable', { status: 503 });
+      }
+      if (url.includes('/api/public/website/overview')) {
+        return new Response(JSON.stringify(buildSnapshotPayload(12).overview), { status: 200 });
+      }
+      if (url.includes('/api/public/website/map')) {
+        return new Response(JSON.stringify(buildSnapshotPayload(12).map), { status: 200 });
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const payload = await fetchOverview();
+    expect(payload.totals.downloads).toBe(12);
+    const calledUrls = fetchMock.mock.calls.map((call) => String(call[0]));
+    expect(calledUrls.some((url) => url.includes('/api/public/website/overview'))).toBe(true);
+    expect(calledUrls.some((url) => url.includes('/api/public/website/map'))).toBe(true);
   });
 });
