@@ -802,6 +802,78 @@ func PublicWebsiteUninstallHandler(sqliteDB *sql.DB) http.HandlerFunc {
 	}
 }
 
+func PublicWebsiteNewsletterSubscribeHandler(sqliteDB, postgresDB *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if sqliteDB == nil {
+			writePublicWebsiteError(w, http.StatusServiceUnavailable, "database_unavailable", "Database is unavailable.", true)
+			return
+		}
+		if !preparePublicWebsiteCORSWithOptions(w, r, publicWebsiteCORSOptions{
+			AllowedMethods:        "POST, OPTIONS",
+			RequireOriginForWrite: true,
+			StructuredErrors:      true,
+		}) {
+			return
+		}
+		if r.Method != http.MethodPost {
+			writePublicWebsiteError(w, http.StatusMethodNotAllowed, "method_not_allowed", "Only POST is allowed for this endpoint.", false)
+			return
+		}
+		if strings.TrimSpace(r.Header.Get("X-Requested-With")) != "XMLHttpRequest" {
+			writePublicWebsiteError(w, http.StatusBadRequest, "missing_required_header", "X-Requested-With header is required.", false)
+			return
+		}
+
+		r.Body = http.MaxBytesReader(w, r.Body, publicWebsiteNewsletterBodyLimitBytes)
+		var req publicWebsiteNewsletterSubscribeRequest
+		if err := decodeJSONBodyStrict(r, &req); err != nil {
+			writePublicWebsiteError(w, http.StatusBadRequest, "invalid_request_body", "Request body must be valid JSON and match the expected schema.", false)
+			return
+		}
+
+		email := strings.ToLower(strings.TrimSpace(req.Email))
+		if email == "" {
+			writePublicWebsiteError(w, http.StatusBadRequest, "email_required", "email is required.", false)
+			return
+		}
+		if !simpleEmailPattern.MatchString(email) {
+			writePublicWebsiteError(w, http.StatusBadRequest, "invalid_email", "email must be a valid email address.", false)
+			return
+		}
+
+		nowUTC := time.Now().UTC().UnixMilli()
+		source := trimAndLimit(req.Source, 120)
+		if source == "" {
+			source = "website_overview_cta"
+		}
+
+		data := map[string]any{
+			"email":           email,
+			"status":          "active",
+			"source":          source,
+			"subscribedAtUtc": nowUTC,
+			"updatedAtUtc":    nowUTC,
+		}
+		if name := trimAndLimit(req.Name, 120); name != "" {
+			data["name"] = name
+		}
+
+		store := newControlPlaneStore(sqliteDB, postgresDB)
+		if err := store.upsertRecord(r.Context(), "newsletter_subscriber", email, data); err != nil {
+			writePublicWebsiteError(w, http.StatusInternalServerError, "newsletter_subscribe_failed", "Failed to save email subscription.", true)
+			return
+		}
+
+		writePublicWebsiteJSON(w, http.StatusCreated, publicWebsiteNewsletterSubscribeResponse{
+			SchemaVersion: publicWebsiteSchemaVersion,
+			OK:            true,
+			GeneratedAt:   nowUTC,
+			RecordKey:     email,
+			Message:       "You are subscribed for future updates.",
+		})
+	}
+}
+
 func PublicWebsiteEventsHandler(sqliteDB *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if sqliteDB == nil {
