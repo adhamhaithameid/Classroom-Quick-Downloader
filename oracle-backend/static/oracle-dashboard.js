@@ -4301,11 +4301,6 @@
             if (!out || !out.textContent) return;
             copyText(out.textContent);
           }],
-          ['user-changelog-refresh-btn', loadUserChangelogRecords],
-          ['user-changelog-preview-btn', function() { previewUserChangelogDraft(false); }],
-          ['user-changelog-import-url-btn', function() { previewUserChangelogDraft(true); }],
-          ['user-changelog-source-save-btn', saveUserChangelogSourceConfig],
-          ['user-changelog-format-info', showUserChangelogFormatInfo],
           ['logs-refresh-btn', loadOracleLogs],
           ['logs-dry-run-delete-btn', function() { oracleLogsDeleteOlder(true); }],
           ['logs-delete-older-btn', function() { oracleLogsDeleteOlder(false); }],
