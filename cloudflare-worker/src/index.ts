@@ -342,6 +342,16 @@ export function createSessionCookieHeader(token: string, url?: URL, env?: Worker
   return `${COOKIE_NAME}=${token}; HttpOnly; SameSite=Strict; Secure; Path=/; Max-Age=3600`;
 }
 
+function createDangerStepUpCookieHeader(token: string, url?: URL, env?: WorkerEnv): string {
+  const isLoopback = url && isLocalEnvironment(url.hostname);
+  const allowInsecure = env?.ALLOW_INSECURE_COOKIES === "true";
+  const isLocalDev = isLoopback || allowInsecure;
+  if (isLocalDev) {
+    return `${DANGER_COOKIE_NAME}=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=900`;
+  }
+  return `${DANGER_COOKIE_NAME}=${token}; HttpOnly; SameSite=Strict; Secure; Path=/; Max-Age=900`;
+}
+
 export function clearSessionCookieHeader(url?: URL, env?: WorkerEnv): string {
   const isLoopback = url && isLocalEnvironment(url.hostname);
   const allowInsecure = env?.ALLOW_INSECURE_COOKIES === 'true';
