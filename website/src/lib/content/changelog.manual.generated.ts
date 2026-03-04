@@ -242,3 +242,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "highlights": [
         "Extended compatibility hardening.",
         "Improved consistency across frequent workflows.",
+        "Fixed smaller runtime mismatches."
