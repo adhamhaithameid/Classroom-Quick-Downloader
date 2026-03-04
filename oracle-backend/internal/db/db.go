@@ -96,6 +96,145 @@ func Migrate(db *sql.DB) error {
 			value INTEGER NOT NULL DEFAULT 0
 		);`,
 
+		// Public uninstall feedback submissions from the website.
+		`CREATE TABLE IF NOT EXISTS website_uninstall_feedback (
+			id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+			reason             TEXT NOT NULL,
+			browser            TEXT NOT NULL,
+			extension_version  TEXT NOT NULL,
+			source             TEXT NOT NULL,
+			notes              TEXT NOT NULL DEFAULT '',
+			origin             TEXT NOT NULL DEFAULT '',
+			created_at         INTEGER NOT NULL
+		);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_website_uninstall_feedback_created_at
+			ON website_uninstall_feedback(created_at DESC);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_website_uninstall_feedback_reason
+			ON website_uninstall_feedback(reason);`,
+
+		// Public website telemetry aggregates (daily counters) + idempotency guard.
+		`CREATE TABLE IF NOT EXISTS website_event_daily (
+			day_utc      TEXT NOT NULL,
+			event_type   TEXT NOT NULL,
+			action       TEXT NOT NULL,
+			placement    TEXT NOT NULL,
+			count        INTEGER NOT NULL DEFAULT 0,
+			last_seen_at INTEGER NOT NULL,
+			PRIMARY KEY(day_utc, event_type, action, placement)
+		);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_website_event_daily_day_utc
+			ON website_event_daily(day_utc DESC);`,
+
+		`CREATE TABLE IF NOT EXISTS website_event_idempotency (
+			event_id   TEXT PRIMARY KEY,
+			created_at INTEGER NOT NULL
+		);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_website_event_idempotency_created_at
+			ON website_event_idempotency(created_at DESC);`,
+
+		// Append-only raw website telemetry events (source of truth for website event writes).
+		`CREATE TABLE IF NOT EXISTS website_events_raw (
+			id               INTEGER PRIMARY KEY AUTOINCREMENT,
+			event_id         TEXT NOT NULL UNIQUE,
+			source           TEXT NOT NULL,
+			batch_id         TEXT NOT NULL,
+			session_id       TEXT NOT NULL,
+			page_path        TEXT NOT NULL,
+			event_type       TEXT NOT NULL,
+			action           TEXT NOT NULL,
+			placement        TEXT NOT NULL,
+			event_ts_utc     INTEGER,
+			generated_at_utc INTEGER,
+			attempt          INTEGER NOT NULL DEFAULT 1,
+			correlation_id   TEXT NOT NULL DEFAULT '',
+			meta_json        TEXT NOT NULL DEFAULT '{}',
+			raw_event_json   TEXT NOT NULL DEFAULT '{}',
+			ingested_at      INTEGER NOT NULL
+		);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_website_events_raw_ingested_at
+			ON website_events_raw(ingested_at DESC);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_website_events_raw_batch_id
+			ON website_events_raw(batch_id);`,
+
+		`CREATE TRIGGER IF NOT EXISTS trg_website_events_raw_no_update
+			BEFORE UPDATE ON website_events_raw
+			BEGIN
+				SELECT RAISE(ABORT, 'website_events_raw is append-only');
+			END;`,
+
+		`CREATE TRIGGER IF NOT EXISTS trg_website_events_raw_no_delete
+			BEFORE DELETE ON website_events_raw
+			BEGIN
+				SELECT RAISE(ABORT, 'website_events_raw is append-only');
+			END;`,
+
+		// Cloudflare website traffic aggregates ingested into Oracle (hourly grain).
+		`CREATE TABLE IF NOT EXISTS website_traffic_hourly (
+			hour_utc   TEXT PRIMARY KEY,
+			visits     INTEGER NOT NULL DEFAULT 0,
+			requests   INTEGER NOT NULL DEFAULT 0,
+			fetched_at INTEGER NOT NULL,
+			source     TEXT NOT NULL DEFAULT 'cloudflare_graphql'
+		);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_website_traffic_hourly_hour_utc
+			ON website_traffic_hourly(hour_utc DESC);`,
+
+		// Website sync control plane (Oracle/Cloudflare/Website transfer state).
+		`CREATE TABLE IF NOT EXISTS website_sync_control (
+			id                         INTEGER PRIMARY KEY CHECK (id = 1),
+			one_am_flush_enabled       INTEGER NOT NULL DEFAULT 1,
+			override_enabled           INTEGER NOT NULL DEFAULT 0,
+			override_downloads         INTEGER NOT NULL DEFAULT 0,
+			override_countries_json    TEXT NOT NULL DEFAULT '[]',
+			published_downloads        INTEGER NOT NULL DEFAULT 0,
+			published_countries_json   TEXT NOT NULL DEFAULT '[]',
+			published_source           TEXT NOT NULL DEFAULT 'oracle',
+			last_oracle_push_at        INTEGER,
+			last_cloudflare_push_at    INTEGER,
+			last_website_ingest_at     INTEGER,
+			updated_at                 INTEGER NOT NULL
+		);`,
+
+		`INSERT OR IGNORE INTO website_sync_control (
+			id, one_am_flush_enabled, override_enabled, override_downloads,
+			override_countries_json, published_downloads, published_countries_json,
+			published_source, last_oracle_push_at, last_cloudflare_push_at,
+			last_website_ingest_at, updated_at
+		) VALUES (1, 1, 0, 0, '[]', 0, '[]', 'oracle', NULL, NULL, NULL, 0);`,
+
+		`CREATE TABLE IF NOT EXISTS website_sync_batches (
+			id             INTEGER PRIMARY KEY AUTOINCREMENT,
+			direction      TEXT NOT NULL,
+			batch_id       TEXT NOT NULL,
+			triggered_by   TEXT NOT NULL DEFAULT '',
+			status         TEXT NOT NULL DEFAULT 'ok',
+			details_json   TEXT NOT NULL DEFAULT '{}',
+			created_at     INTEGER NOT NULL
+		);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_website_sync_batches_direction_created
+			ON website_sync_batches(direction, created_at DESC);`,
+
+		// Canonical public website snapshots consumed by the static site.
+		`CREATE TABLE IF NOT EXISTS website_public_snapshots (
+			id             INTEGER PRIMARY KEY AUTOINCREMENT,
+			snapshot_id    TEXT NOT NULL UNIQUE,
+			schema_version TEXT NOT NULL,
+			generated_at   INTEGER NOT NULL,
+			payload_json   TEXT NOT NULL,
+			created_at     INTEGER NOT NULL
+		);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_website_public_snapshots_generated_at
+			ON website_public_snapshots(generated_at DESC);`,
+
 		// DO state history (health + backlog + quota).
 		`CREATE TABLE IF NOT EXISTS do_state_snapshots (
 			snapshot_id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -466,6 +605,43 @@ func Migrate(db *sql.DB) error {
 
 		`CREATE INDEX IF NOT EXISTS idx_auth_rate_limits_scope_updated
 			ON auth_rate_limits(scope, updated_at DESC);`,
+
+		// Extension changelog entries (CRUD-managed via Oracle dashboard).
+		`CREATE TABLE IF NOT EXISTS extension_changelog_entries (
+			id           TEXT PRIMARY KEY,
+			version      TEXT NOT NULL,
+			date         TEXT NOT NULL,
+			summary      TEXT NOT NULL DEFAULT '',
+			added_json   TEXT NOT NULL DEFAULT '[]',
+			changed_json TEXT NOT NULL DEFAULT '[]',
+			fixed_json   TEXT NOT NULL DEFAULT '[]',
+			is_important INTEGER NOT NULL DEFAULT 0,
+			created_at   INTEGER NOT NULL,
+			updated_at   INTEGER NOT NULL
+		);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_ext_changelog_entries_version
+			ON extension_changelog_entries(version);`,
+
+		`CREATE INDEX IF NOT EXISTS idx_ext_changelog_entries_date
+			ON extension_changelog_entries(date DESC);`,
+
+		// Extension notification rules for changelog pill styling.
+		`CREATE TABLE IF NOT EXISTS extension_notification_rules (
+			id         TEXT PRIMARY KEY,
+			target     TEXT NOT NULL DEFAULT 'all',
+			priority   TEXT NOT NULL DEFAULT 'normal',
+			effect     TEXT NOT NULL DEFAULT 'none',
+			created_at INTEGER NOT NULL,
+			updated_at INTEGER NOT NULL
+		);`,
+
+		// Extension changelog configuration (source mode, GitHub import state).
+		`CREATE TABLE IF NOT EXISTS extension_changelog_config (
+			key        TEXT PRIMARY KEY,
+			value      TEXT NOT NULL DEFAULT '',
+			updated_at INTEGER NOT NULL
+		);`,
 	}
 
 	for _, stmt := range stmts {

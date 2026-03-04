@@ -30,7 +30,7 @@ export function renderLoginPage(errorMessage?: string): string {
   <form class="login-card" method="POST" action="/">
     <div class="login-badge"><span class="login-badge-dot"></span><span>CQD Analytics Admin</span></div>
     <h1 class="login-title">Enter admin password</h1>
-    <p class="login-subtitle">Unlock analytics dashboard & danger controls.</p>
+    <p class="login-subtitle">Allowlisted IPs use the normal password. If blocked-IP step-up is enabled, blocked IPs can use the admin danger password in the same field.</p>
     
     <div class="login-row">
       <div class="field">

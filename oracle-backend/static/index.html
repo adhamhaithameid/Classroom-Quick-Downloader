@@ -24,41 +24,98 @@
             </div>
             <span class="nav-utc-time">--:--:--</span>
           </button>
+          <div class="sidebar-version" data-tooltip="Oracle dashboard runtime version">
+            Oracle v6.0.0
+          </div>
         </div>
 
         <nav class="sidebar-nav">
-          <div class="nav-section">
-            <div class="nav-label">Sections</div>
-            <button class="nav-item active" data-page="overview" data-shortcut="Cmd+1"
-              data-tooltip="View summary statistics" data-tooltip-position="bottom" aria-label="Overview — summary statistics">
-              <span class="nav-item-emoji" aria-hidden="true">🏠</span>
-              <span class="nav-item-label">Overview</span>
-            </button>
-            <button class="nav-item" data-page="activity" data-shortcut="Cmd+2"
-              data-tooltip="View activity timeline and analytics charts" data-tooltip-position="bottom" aria-label="Activity and Charts — timeline and analytics">
-              <span class="nav-item-emoji" aria-hidden="true">📊</span>
-              <span class="nav-item-label">Activity &amp; Charts</span>
-            </button>
-            <button class="nav-item" data-page="dashboards" data-shortcut="Cmd+3"
-              data-tooltip="Dashboards, deployments, and notifications" data-tooltip-position="bottom" aria-label="Ops Hub — dashboards and deployments">
-              <span class="nav-item-emoji" aria-hidden="true">🛰️</span>
-              <span class="nav-item-label">Ops Hub</span>
-            </button>
-            <button class="nav-item" data-page="creative" data-shortcut="Cmd+4"
-              data-tooltip="Design, email templates, and newsletter management" data-tooltip-position="bottom" aria-label="Creative Hub — email templates and newsletters">
-              <span class="nav-item-emoji" aria-hidden="true">🎨</span>
-              <span class="nav-item-label">Creative Hub</span>
-            </button>
-            <button class="nav-item" data-page="logs" data-shortcut="Cmd+5"
-              data-tooltip="Oracle backend request and admin operation logs" data-tooltip-position="bottom" aria-label="Oracle Logs — backend request and admin logs">
-              <span class="nav-item-emoji" aria-hidden="true">🧾</span>
-              <span class="nav-item-label">Oracle Logs</span>
-            </button>
-            <button class="nav-item" data-page="danger" data-shortcut="Cmd+0"
-              data-tooltip="Critical administrative operations" data-tooltip-position="bottom" aria-label="Danger Zone — critical administrative operations">
-              <span class="nav-item-emoji" aria-hidden="true">☢️</span>
-              <span class="nav-item-label">Danger Zone</span>
-            </button>
+          <div class="nav-section nav-section-groups">
+            <div class="nav-group" data-nav-group="cockpit">
+              <button class="nav-group-toggle" type="button" data-nav-group-toggle="cockpit" aria-expanded="true" aria-controls="nav-group-cockpit">
+                <span class="nav-group-label">Cockpit</span>
+                <span class="nav-group-chevron" aria-hidden="true">▾</span>
+              </button>
+              <div class="nav-group-items" id="nav-group-cockpit">
+                <button class="nav-item active" data-page="overview" data-shortcut="Cmd+1"
+                  data-tooltip="View summary statistics" data-tooltip-position="bottom" aria-label="Overview — summary statistics">
+                  <span class="nav-item-emoji" aria-hidden="true">🏠</span>
+                  <span class="nav-item-label">Overview</span>
+                </button>
+                <button class="nav-item" data-page="dashboards" data-shortcut="Cmd+3"
+                  data-tooltip="Dashboards, deployments, and notifications" data-tooltip-position="bottom" aria-label="Ops Hub — dashboards and deployments">
+                  <span class="nav-item-emoji" aria-hidden="true">🛰️</span>
+                  <span class="nav-item-label">Ops Hub</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="nav-group" data-nav-group="website">
+              <button class="nav-group-toggle" type="button" data-nav-group-toggle="website" aria-expanded="true" aria-controls="nav-group-website">
+                <span class="nav-group-label">Website</span>
+                <span class="nav-group-chevron" aria-hidden="true">▾</span>
+              </button>
+              <div class="nav-group-items" id="nav-group-website">
+                <button class="nav-item" data-page="website-sync" data-shortcut="Cmd+8"
+                  data-tooltip="Website sync batches and public website controls" data-tooltip-position="bottom" aria-label="Website Sync controls">
+                  <span class="nav-item-emoji" aria-hidden="true">🌐</span>
+                  <span class="nav-item-label">Website Sync</span>
+                </button>
+                <button class="nav-item" data-page="website-analysis" data-shortcut="Cmd+6"
+                  data-tooltip="Website click telemetry and feedback analytics" data-tooltip-position="bottom" aria-label="Website Analysis — telemetry analytics">
+                  <span class="nav-item-emoji" aria-hidden="true">📈</span>
+                  <span class="nav-item-label">Website Analysis</span>
+                </button>
+                <button class="nav-item" data-page="content-changelog" data-shortcut="Cmd+5"
+                  data-tooltip="Legacy controls disabled. User changelog is now manual and source-controlled." data-tooltip-position="bottom" aria-label="User Changelog manual source status">
+                  <span class="nav-item-emoji" aria-hidden="true">🗞️</span>
+                  <span class="nav-item-label">User Changelog</span>
+                </button>
+                <button class="nav-item" data-page="ext-changelog" data-shortcut="Cmd+9"
+                  data-tooltip="Legacy controls disabled. Extension changelog and pill rules are now manual source files." data-tooltip-position="bottom" aria-label="Extension Changelog manual source status">
+                  <span class="nav-item-emoji" aria-hidden="true">🧩</span>
+                  <span class="nav-item-label">Ext Changelog</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="nav-group" data-nav-group="analysis">
+              <button class="nav-group-toggle" type="button" data-nav-group-toggle="analysis" aria-expanded="true" aria-controls="nav-group-analysis">
+                <span class="nav-group-label">Analysis</span>
+                <span class="nav-group-chevron" aria-hidden="true">▾</span>
+              </button>
+              <div class="nav-group-items" id="nav-group-analysis">
+                <button class="nav-item" data-page="activity" data-shortcut="Cmd+2"
+                  data-tooltip="View activity timeline and analytics charts" data-tooltip-position="bottom" aria-label="Activity and Charts — timeline and analytics">
+                  <span class="nav-item-emoji" aria-hidden="true">📊</span>
+                  <span class="nav-item-label">Activity &amp; Charts</span>
+                </button>
+                <button class="nav-item" data-page="creative" data-shortcut="Cmd+4"
+                  data-tooltip="Design, email templates, and newsletter management" data-tooltip-position="bottom" aria-label="Creative Hub — email templates and newsletters">
+                  <span class="nav-item-emoji" aria-hidden="true">🎨</span>
+                  <span class="nav-item-label">Creative Hub</span>
+                </button>
+                <button class="nav-item" data-page="logs" data-shortcut="Cmd+7"
+                  data-tooltip="Oracle backend request and admin operation logs" data-tooltip-position="bottom" aria-label="Oracle Logs — backend request and admin logs">
+                  <span class="nav-item-emoji" aria-hidden="true">🧾</span>
+                  <span class="nav-item-label">Oracle Logs</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="nav-group nav-group-danger" data-nav-group="danger">
+              <button class="nav-group-toggle" type="button" data-nav-group-toggle="danger" aria-expanded="true" aria-controls="nav-group-danger">
+                <span class="nav-group-label">Danger</span>
+                <span class="nav-group-chevron" aria-hidden="true">▾</span>
+              </button>
+              <div class="nav-group-items" id="nav-group-danger">
+                <button class="nav-item" data-page="danger" data-shortcut="Cmd+0"
+                  data-tooltip="Critical administrative operations" data-tooltip-position="bottom" aria-label="Danger Zone — critical administrative operations">
+                  <span class="nav-item-emoji" aria-hidden="true">☢️</span>
+                  <span class="nav-item-label">Danger Zone</span>
+                </button>
+              </div>
+            </div>
           </div>
 
           <!-- <div class="nav-section">
@@ -103,7 +160,7 @@
                   <path d="M8 9h.01M12 9h.01M16 9h.01M8 13h8"></path>
                 </svg>
               </button>
-              <a href="https://github.com/adhamhaithameid/Classroom-Quick-Downloader/commits/main" target="_blank" class="btn deploy-status-btn" id="deploy-status-btn" data-role="deploy-status-btn" data-tooltip="Deployment status - Click to view commit" data-tooltip-position="top">
+              <a href="https://github.com/adhamhaithameid/Classroom-Quick-Downloader/commits/main" target="_blank" class="btn deploy-status-btn" id="deploy-status-btn" data-role="deploy-status-btn" data-tooltip="Deployment status card: icon + commit + freshness. Click to open deployed commit." data-tooltip-position="top">
                 <span id="deploy-icon" data-role="deploy-icon">🔄</span>
                 <span id="deploy-commit" data-role="deploy-commit">Loading...</span>
               </a>
@@ -123,12 +180,24 @@
         <div class="mobile-toolbar" data-shortcuts-capture="true">
           <div class="mobile-toolbar-grid">
             <select id="mobile-page-select" class="mobile-page-select" aria-label="Select dashboard section">
-              <option value="overview">Overview</option>
-              <option value="activity">Activity &amp; Charts</option>
-              <option value="dashboards">Ops Hub</option>
-              <option value="creative">Creative Hub</option>
-              <option value="logs">Oracle Logs</option>
-              <option value="danger">Danger Zone</option>
+              <optgroup label="Cockpit">
+                <option value="overview">Overview</option>
+                <option value="dashboards">Ops Hub</option>
+              </optgroup>
+              <optgroup label="Website">
+                <option value="website-sync">Website Sync</option>
+                <option value="website-analysis">Website Analysis</option>
+                <option value="content-changelog">User Changelog</option>
+                <option value="ext-changelog">Ext Changelog</option>
+              </optgroup>
+              <optgroup label="Analysis">
+                <option value="activity">Activity &amp; Charts</option>
+                <option value="creative">Creative Hub</option>
+                <option value="logs">Oracle Logs</option>
+              </optgroup>
+              <optgroup label="Danger">
+                <option value="danger">Danger Zone</option>
+              </optgroup>
             </select>
             <button class="btn btn-secondary" id="shortcuts-btn-mobile" data-shortcut="Cmd+/" data-tooltip="Keyboard shortcuts">
               Shortcuts
@@ -142,7 +211,7 @@
             <button class="btn refresh-action-btn" id="refresh-btn-mobile" data-role="refresh-action" data-shortcut="Cmd+R" data-tooltip="Refresh all data">
               Refresh
             </button>
-            <a href="https://github.com/adhamhaithameid/Classroom-Quick-Downloader/commits/main" target="_blank" class="btn btn-secondary deploy-status-btn" data-role="deploy-status-btn" data-tooltip="Deployment status - Click to view commit">
+            <a href="https://github.com/adhamhaithameid/Classroom-Quick-Downloader/commits/main" target="_blank" class="btn btn-secondary deploy-status-btn" data-role="deploy-status-btn" data-tooltip="Deployment status card: icon + commit + freshness. Click to open deployed commit.">
               <span data-role="deploy-icon">🔄</span>
               <span data-role="deploy-commit">Loading...</span>
             </a>
@@ -265,7 +334,61 @@
               </div>
             </div>
 
-            <h3 class="section-heading">Top Today (UTC 00:00-24:00)</h3>
+            <div class="stats-grid" id="website-overview-stats-grid">
+              <div class="stat-card" data-tooltip="Website visits ingested into Oracle analytics" data-tooltip-position="bottom">
+                <div class="stat-header">
+                  <span class="stat-label">Website Visits</span>
+                  <div class="stat-icon cyan">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"></path>
+                      <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                  </div>
+                </div>
+                <div class="stat-value" id="stat-website-visits">--</div>
+                <div class="stat-subtext">Website traffic</div>
+              </div>
+              <div class="stat-card" data-tooltip="Feedback submissions from uninstall page" data-tooltip-position="bottom">
+                <div class="stat-header">
+                  <span class="stat-label">Website Feedback</span>
+                  <div class="stat-icon yellow">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                  </div>
+                </div>
+                <div class="stat-value" id="stat-website-feedback">--</div>
+                <div class="stat-subtext">Uninstall feedback</div>
+              </div>
+              <div class="stat-card" data-tooltip="Install/download CTA clicks tracked across website surfaces" data-tooltip-position="bottom">
+                <div class="stat-header">
+                  <span class="stat-label">Website CTA Clicks</span>
+                  <div class="stat-icon blue">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M12 19V5"></path>
+                      <path d="m5 12 7-7 7 7"></path>
+                    </svg>
+                  </div>
+                </div>
+                <div class="stat-value" id="stat-website-cta-clicks">--</div>
+                <div class="stat-subtext">Install + Download</div>
+              </div>
+              <div class="stat-card" data-tooltip="Map prompt responses from website users" data-tooltip-position="bottom">
+                <div class="stat-header">
+                  <span class="stat-label">Map Yes/No Ratio</span>
+                  <div class="stat-icon green">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="22 6 12 16 8 12"></polyline>
+                      <polyline points="2 6 8 12"></polyline>
+                    </svg>
+                  </div>
+                </div>
+                <div class="stat-value" id="stat-website-map-ratio">--</div>
+                <div class="stat-subtext" id="stat-website-map-total">--</div>
+              </div>
+            </div>
+
+            <h3 class="section-heading">Top Today</h3>
             <div class="top-today-grid" id="top-today-grid">
               <div class="top-card" data-tooltip="Most used browser today">
                 <div class="top-icon" id="top-browser-icon">🌐</div>
@@ -458,6 +581,45 @@
 
           <!-- CHARTS PAGE -->
           <div class="page" id="page-charts">
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <div class="card-title">📐 Analytics Controls</div>
+                  <div class="card-subtitle">Range presets, compare mode, and segment dimensions</div>
+                </div>
+                <div class="action-buttons-grid action-buttons-grid-four">
+                  <select id="charts-range-select" class="auth-input">
+                    <option value="today">Today (UTC)</option>
+                    <option value="week" selected>Last 7 Days</option>
+                    <option value="month">This Month</option>
+                    <option value="year">This Year</option>
+                    <option value="all">All Time</option>
+                  </select>
+                  <select id="charts-dimension-select" class="auth-input">
+                    <option value="browser" selected>Browser</option>
+                    <option value="os">OS</option>
+                    <option value="country">Country</option>
+                    <option value="type">File Type</option>
+                    <option value="action">Website Action</option>
+                    <option value="placement">Placement</option>
+                    <option value="path">Page Path</option>
+                    <option value="device">Device</option>
+                    <option value="referrer">Referrer</option>
+                  </select>
+                  <label class="auth-field-inline">
+                    <input type="checkbox" id="charts-compare-previous" />
+                    <span>Compare with previous window</span>
+                  </label>
+                  <button class="btn btn-secondary" id="charts-export-active-btn">Export Active Chart CSV</button>
+                </div>
+              </div>
+              <div class="card-body card-body-top">
+                <div class="pill-row">
+                  <span class="pill">UTC Window: <strong id="charts-window-meta">--</strong></span>
+                </div>
+              </div>
+            </div>
+
             <!-- Comparison Section -->
             <div class="card">
               <div class="card-header">
@@ -472,6 +634,33 @@
               </div>
               <div class="card-body" id="comparison-content">
                 <div class="loading"><div class="spinner"></div>Loading comparison...</div>
+              </div>
+            </div>
+
+            <div class="charts-grid">
+              <div class="card">
+                <div class="card-header">
+                  <div>
+                    <div class="card-title">Website Visitors Time Series</div>
+                    <div class="card-subtitle">Visits and requests over time</div>
+                  </div>
+                </div>
+                <div class="card-body">
+                  <div class="chart-container" id="chart-visitors-timeseries">
+                    <div class="loading"><div class="spinner"></div>Loading...</div>
+                  </div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-header">
+                  <div>
+                    <div class="card-title">Unique vs Returning Sessions</div>
+                    <div class="card-subtitle">Daily session quality split</div>
+                  </div>
+                </div>
+                <div class="card-body" id="chart-unique-returning">
+                  <div class="loading"><div class="spinner"></div>Loading...</div>
+                </div>
               </div>
             </div>
 
@@ -526,12 +715,58 @@
 
             </div>
 
+            <div class="charts-grid">
+              <div class="card">
+                <div class="card-header">
+                  <div>
+                    <div class="card-title">Conversion Funnel</div>
+                    <div class="card-subtitle">Journey from website visits to install/download clicks and map confirmations</div>
+                  </div>
+                </div>
+                <div class="card-body" id="chart-funnel">
+                  <div class="loading"><div class="spinner"></div>Loading...</div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-header">
+                  <div>
+                    <div class="card-title">Dynamic Segments</div>
+                    <div class="card-subtitle">Real-time split by selected dimension (browser, country, type, action, placement, path)</div>
+                  </div>
+                </div>
+                <div class="card-body" id="chart-segments">
+                  <div class="loading"><div class="spinner"></div>Loading...</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <div class="card-title">Hourly Activity Heatmap (UTC)</div>
+                  <div class="card-subtitle">Downloads by day-of-week and hour</div>
+                </div>
+              </div>
+              <div class="card-body" id="chart-heatmap">
+                <div class="loading"><div class="spinner"></div>Loading...</div>
+              </div>
+            </div>
+
             <!-- Daily Downloads Chart -->
             <div class="card">
               <div class="card-header">
                 <div>
                   <div class="card-title">Daily Downloads</div>
-                  <div class="card-subtitle">Last 14 days - Hover for details</div>
+                  <div class="card-subtitle">Selectable download window with daily totals</div>
+                </div>
+                <div>
+                  <select id="daily-downloads-range-select" class="auth-input">
+                    <option value="7">Last 7 Days</option>
+                    <option value="14" selected>Last 14 Days</option>
+                    <option value="30">Last 30 Days</option>
+                    <option value="60">Last 60 Days</option>
+                    <option value="all">All Time</option>
+                  </select>
                 </div>
               </div>
               <div class="card-body">
@@ -554,10 +789,13 @@
               <div class="card-body">
                 <div class="section-block">
                   <div class="section-caption">Core Dashboards</div>
-                  <div class="action-buttons-grid action-buttons-grid-five infra-button-grid">
+                  <div class="action-buttons-grid action-buttons-grid-six infra-button-grid">
                     <a href="https://cqd-analytics.adhamhaithameid.workers.dev/" target="_blank" rel="noopener noreferrer"
                       class="btn btn-secondary" id="infra-link-cloudflare">☁️ Cloudflare</a>
-                    <a href="http://129.151.233.229:3001/status/cqd" target="_blank" rel="noopener noreferrer" class="btn btn-secondary"
+                    <a href="#" target="_blank" rel="noopener noreferrer"
+                      class="btn btn-secondary disabled-link" id="infra-link-website" aria-disabled="true">🌐 Website</a>
+                    <button type="button" class="btn btn-secondary" id="infra-link-website-analysis">📈 Website Analysis</button>
+                    <a href="https://cqd-analytics.adhamhaithameid.workers.dev/pipeline-health" target="_blank" rel="noopener noreferrer" class="btn btn-secondary"
                       id="infra-link-uptime">🟢 Uptime Kuma</a>
                     <a href="https://github.com/adhamhaithameid/Classroom-Quick-Downloader" target="_blank" rel="noopener noreferrer"
                       class="btn btn-secondary" id="infra-link-github">🐙 GitHub Repo</a>
@@ -610,6 +848,364 @@
               </div>
               <div class="card-body card-body-top">
                 <pre id="deployment-sync-output" class="json-viewer json-viewer-compact hidden"></pre>
+              </div>
+            </div>
+          </div>
+
+          <div class="page website-page" id="page-website-sync">
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <div class="card-title">Website Sync Actions</div>
+                  <div class="card-subtitle">Control Oracle publish, Cloudflare pull, and website ingestion paths from one panel</div>
+                </div>
+                <div class="action-buttons-grid action-buttons-grid-three">
+                  <button class="btn btn-secondary" id="website-sync-refresh-btn">Refresh</button>
+                  <button class="btn btn-secondary" id="website-sync-force-push-btn">Force Push Oracle → Website</button>
+                  <button class="btn btn-secondary" id="website-sync-pull-cloudflare-btn">Pull Cloudflare → Website</button>
+                  <button class="btn btn-warning" id="website-sync-reconcile-btn" data-tooltip="Rebuild monotonic totals from trusted hourly history">Reconcile Totals</button>
+                </div>
+              </div>
+              <div class="card-body">
+                <div class="pill-row">
+                  <span class="pill">Refresh: reloads state and batch snapshots</span>
+                  <span class="pill">Force Push: publish current Oracle state immediately</span>
+                  <span class="pill">Pull Cloudflare: fetch latest website metrics snapshot</span>
+                  <span class="pill">Reconcile: repairs totals using trusted hourly history</span>
+                </div>
+                <div id="website-sync-anomaly-banner" class="website-sync-anomaly hidden" role="status" aria-live="polite">
+                  <div class="website-sync-anomaly-title">Monotonic Guard Alert</div>
+                  <div id="website-sync-anomaly-message" class="website-sync-anomaly-message">--</div>
+                  <ul id="website-sync-anomaly-details" class="website-sync-anomaly-details"></ul>
+                </div>
+                <div class="section-block">
+                  <div class="section-caption">Current State</div>
+                  <div class="stats-grid">
+                    <div class="stat-card2">
+                      <div class="stat-label">Published Source</div>
+                      <div class="stat-value" id="website-sync-published-source">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Published Downloads</div>
+                      <div class="stat-value" id="website-sync-published-downloads">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Published Countries</div>
+                      <div class="stat-value" id="website-sync-published-countries">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Published Success</div>
+                      <div class="stat-value" id="website-sync-published-success">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Published Fail</div>
+                      <div class="stat-value" id="website-sync-published-fail">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Map Countries (Snapshot)</div>
+                      <div class="stat-value" id="website-sync-map-countries">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Store Users (Snapshot)</div>
+                      <div class="stat-value" id="website-sync-installs-users">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Snapshot ID</div>
+                      <div class="stat-value" id="website-sync-snapshot-id">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Snapshot Generated (UTC)</div>
+                      <div class="stat-value" id="website-sync-snapshot-generated">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">1AM Flush</div>
+                      <div class="stat-value" id="website-sync-oneam-state">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Override</div>
+                      <div class="stat-value" id="website-sync-override-state">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Website Worker Health</div>
+                      <div class="stat-value" id="website-sync-worker-health">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Current User Changelog Source</div>
+                      <div class="stat-value" id="website-sync-changelog-source">--</div>
+                    </div>
+                  </div>
+                  <div class="pill-row" id="website-sync-times-row">
+                    <span class="pill">Last Oracle Push: <strong id="website-sync-last-oracle">--</strong></span>
+                    <span class="pill">Last Cloudflare Push: <strong id="website-sync-last-cloudflare">--</strong></span>
+                    <span class="pill">Last Website Ingest: <strong id="website-sync-last-website">--</strong></span>
+                    <span class="pill">Snapshot Versions: <strong id="website-sync-versions">--</strong></span>
+                  </div>
+                </div>
+
+                <div class="section-block">
+                  <div class="section-caption">Latest Batches</div>
+                  <div class="stats-grid">
+                    <div class="stat-card2">
+                      <div class="stat-label">Oracle → Website</div>
+                      <div class="stat-value" id="website-sync-last-batch-oracle">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Cloudflare → Website</div>
+                      <div class="stat-value" id="website-sync-last-batch-cloudflare">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Website → Oracle</div>
+                      <div class="stat-value" id="website-sync-last-batch-website">--</div>
+                    </div>
+                  </div>
+                  <div class="card-subtitle">Each card shows latest batch status, batch ID, and created timestamp.</div>
+                </div>
+
+                <div class="section-block">
+                  <div class="section-caption">Admin Controls</div>
+                  <div class="card-subtitle">Use these controls to change website publishing behavior. Changes here directly affect live website data.</div>
+                  <div class="action-buttons-grid action-buttons-grid-two">
+                    <label class="auth-field-inline">
+                      <input type="checkbox" id="website-sync-oneam-checkbox" />
+                      <span>Enable 1AM Oracle publish scheduler</span>
+                    </label>
+                    <button class="btn btn-secondary" id="website-sync-oneam-save-btn">Save 1AM Setting</button>
+                  </div>
+                  <div class="section-block">
+                    <label class="auth-field-inline">
+                      <input type="checkbox" id="website-sync-override-enabled" />
+                      <span>Enable override for website public data</span>
+                    </label>
+                    <div class="form-grid">
+                      <input id="website-sync-override-downloads" class="auth-input" type="number" min="0" placeholder="Override total downloads" />
+                      <textarea id="website-sync-override-countries" class="auth-input auth-input-lg" placeholder='Override countries JSON (e.g. [{"countryCode":"US","count":1234}])'></textarea>
+                      <button class="btn btn-danger" id="website-sync-override-save-btn">Save Override</button>
+                    </div>
+                  </div>
+                </div>
+
+                <pre id="website-sync-output" class="json-viewer json-viewer-compact hidden"></pre>
+              </div>
+            </div>
+          </div>
+
+          <div class="page website-page" id="page-website-analysis">
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <div class="card-title">Website Analysis</div>
+                  <div class="card-subtitle">Website actions, map responses, feedback analytics, and Cloudflare traffic health</div>
+                </div>
+                <div class="action-buttons-grid action-buttons-grid-four">
+                  <select id="website-analysis-range" class="auth-input">
+                    <option value="today">Today</option>
+                    <option value="7d" selected>Last 7 days</option>
+                    <option value="30d">Last 30 days</option>
+                    <option value="all">All time</option>
+                  </select>
+                  <button class="btn btn-secondary" id="website-analysis-refresh-btn">Refresh</button>
+                  <button class="btn btn-secondary" id="website-analysis-sync-traffic-btn">Sync Cloudflare Now</button>
+                  <button class="btn btn-secondary" id="website-analysis-export-json-btn">Export JSON</button>
+                </div>
+              </div>
+              <div class="card-body">
+                <div class="pill-row">
+                  <span class="pill">Range controls all website action + feedback aggregates.</span>
+                  <span class="pill">Cloudflare sync updates traffic cards/tables only.</span>
+                  <span class="pill">Use Export JSON for full payload diagnostics.</span>
+                </div>
+                <div class="section-block">
+                  <div class="section-caption">Headline Metrics</div>
+                  <div class="stats-grid">
+                    <div class="stat-card2">
+                      <div class="stat-label">Install Button Clicks</div>
+                      <div class="stat-value" id="website-analysis-install-clicks">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Download Button Clicks</div>
+                      <div class="stat-value" id="website-analysis-download-clicks">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Map Yes</div>
+                      <div class="stat-value" id="website-analysis-map-yes">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Map No</div>
+                      <div class="stat-value" id="website-analysis-map-no">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Map Yes Ratio</div>
+                      <div class="stat-value" id="website-analysis-map-yes-ratio">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Feedback Submissions</div>
+                      <div class="stat-value" id="website-analysis-feedback-total">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Cloudflare Visits</div>
+                      <div class="stat-value" id="website-analysis-traffic-visits">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Cloudflare Requests</div>
+                      <div class="stat-value" id="website-analysis-traffic-requests">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Cloudflare Sync Status</div>
+                      <div class="stat-value" id="website-analysis-traffic-status">--</div>
+                    </div>
+                  </div>
+                  <div class="pill-row">
+                    <span class="pill">Last Feedback Submission: <strong id="website-analysis-feedback-last">--</strong></span>
+                    <span class="pill">Last Cloudflare Sync: <strong id="website-analysis-traffic-last-sync">--</strong></span>
+                  </div>
+                </div>
+
+                <div class="section-block">
+                  <div class="section-caption">Website Data Chain Health</div>
+                  <div class="stats-grid">
+                    <div class="stat-card2">
+                      <div class="stat-label">Last Batch Accepted (UTC)</div>
+                      <div class="stat-value" id="website-chain-last-batch-accepted">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Last Snapshot Generated (UTC)</div>
+                      <div class="stat-value" id="website-chain-last-snapshot">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Lag Minutes</div>
+                      <div class="stat-value" id="website-chain-lag-minutes">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Lag Status</div>
+                      <div class="stat-value" id="website-chain-lag-status">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Backup Drift</div>
+                      <div class="stat-value" id="website-chain-backup-status">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Sheets Flush Verification</div>
+                      <div class="stat-value" id="website-chain-sheets-status">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Worker Batch Integrity</div>
+                      <div class="stat-value" id="website-chain-batch-integrity-status">--</div>
+                    </div>
+                  </div>
+                  <div class="pill-row">
+                    <span class="pill">Lag thresholds: <strong id="website-chain-thresholds-lag">--</strong></span>
+                    <span class="pill">Backup drift: <strong id="website-chain-thresholds-backup">--</strong></span>
+                    <span class="pill">Sheets drift: <strong id="website-chain-thresholds-sheets">--</strong></span>
+                    <span class="pill">Integrity checks: <strong id="website-chain-thresholds-integrity">--</strong></span>
+                  </div>
+                </div>
+
+                <div class="section-block">
+                  <div class="section-caption">Daily Events</div>
+                  <div class="table-container">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Day (UTC)</th>
+                          <th>Install</th>
+                          <th>Download</th>
+                          <th>Map Yes</th>
+                          <th>Map No</th>
+                          <th>Feedback</th>
+                        </tr>
+                      </thead>
+                      <tbody id="website-analysis-daily-body">
+                        <tr><td colspan="6" class="td-primary">Loading…</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div class="section-block">
+                  <div class="section-caption">Daily Traffic (Cloudflare)</div>
+                  <div class="table-container">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Day (UTC)</th>
+                          <th>Visits</th>
+                          <th>Requests</th>
+                        </tr>
+                      </thead>
+                      <tbody id="website-analysis-traffic-daily-body">
+                        <tr><td colspan="3" class="td-primary">Loading…</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div class="section-block">
+                  <div class="section-caption">Top CTA Placements</div>
+                  <div class="table-container">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Placement</th>
+                          <th>Action</th>
+                          <th>Count</th>
+                        </tr>
+                      </thead>
+                      <tbody id="website-analysis-placements-body">
+                        <tr><td colspan="3" class="td-primary">Loading…</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div class="section-block">
+                  <div class="section-caption">Top Feedback Reasons</div>
+                  <div class="table-container">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Reason</th>
+                          <th>Count</th>
+                        </tr>
+                      </thead>
+                      <tbody id="website-analysis-feedback-reasons-body">
+                        <tr><td colspan="2" class="td-primary">Loading…</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div class="section-block" id="website-analysis-feedback-panel">
+                  <div class="section-caption">Feedback Insights</div>
+                  <div class="stats-grid">
+                    <div class="stat-card2">
+                      <div class="stat-label">Top Browser in Feedback</div>
+                      <div class="stat-value" id="website-analysis-feedback-top-browser">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Top Reason</div>
+                      <div class="stat-value" id="website-analysis-feedback-top-reason">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Recent Daily Peak</div>
+                      <div class="stat-value" id="website-analysis-feedback-daily-peak">--</div>
+                    </div>
+                  </div>
+                  <div class="table-container">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Day (UTC)</th>
+                          <th>Feedback Submissions</th>
+                        </tr>
+                      </thead>
+                      <tbody id="website-analysis-feedback-daily-body">
+                        <tr><td colspan="2" class="td-primary">Loading…</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <pre id="website-analysis-output" class="json-viewer json-viewer-compact hidden"></pre>
               </div>
             </div>
           </div>
@@ -674,6 +1270,278 @@
             </div>
           </div>
 
+          <div class="page website-page" id="page-content-changelog" data-legacy-disabled="true">
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <div class="card-title">User Changelog Content</div>
+                  <div class="card-subtitle">Public release notes shown to students on the website</div>
+                </div>
+                <div class="action-buttons-grid action-buttons-grid-three legacy-disabled-actions">
+                  <button class="btn btn-secondary" id="user-changelog-refresh-btn">Refresh</button>
+                  <a
+                    href="#"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    id="user-changelog-open-website"
+                    aria-disabled="true"
+                    class="btn btn-secondary disabled-link"
+                  >Open Website Tap</a>
+                  <a
+                    class="btn btn-secondary"
+                    href="https://github.com/adhamhaithameid/Classroom-Quick-Downloader/blob/main/CHANGELOG.md"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >View Full on GitHub</a>
+                </div>
+              </div>
+              <div class="card-body">
+                <!-- LEGACY_CHANGELOG_DISABLED_START -->
+                <div class="legacy-disabled-panel">
+                  <div class="legacy-disabled-title">Legacy Oracle changelog editor is disabled</div>
+                  <div class="legacy-disabled-copy">
+                    Website changelog now ships from manual source-controlled files. Keep edits in GitHub, then run the sync script.
+                  </div>
+                  <div class="legacy-disabled-links">
+                    <a class="btn btn-secondary" href="https://github.com/adhamhaithameid/Classroom-Quick-Downloader/blob/main/manual/changelog/website-changelog.manual.md" target="_blank" rel="noopener noreferrer">Open Website Changelog Source</a>
+                    <a class="btn btn-secondary" href="https://github.com/adhamhaithameid/Classroom-Quick-Downloader/blob/main/manual/changelog/release-version.manual.json" target="_blank" rel="noopener noreferrer">Open Release Version Source</a>
+                    <a class="btn btn-secondary" href="https://github.com/adhamhaithameid/Classroom-Quick-Downloader/blob/main/tools/sync-manual-changelog.mjs" target="_blank" rel="noopener noreferrer">Open Sync Script</a>
+                  </div>
+                  <div class="legacy-disabled-note">
+                    Runtime customization controls are kept in code for rollback only, but hidden and excluded from active workflows.
+                  </div>
+                </div>
+                <!-- LEGACY_CHANGELOG_DISABLED_END -->
+                <div class="section-block">
+                  <div class="section-caption">Display Source Control</div>
+                  <div class="card-subtitle">Choose whether website users see changelog content from Oracle records or directly from GitHub <code>user-friendly-changelog.md</code>.</div>
+                  <div class="action-buttons-grid action-buttons-grid-three">
+                    <select id="user-changelog-source-select" class="auth-input">
+                      <option value="oracle">Oracle-managed user changelog</option>
+                      <option value="github">GitHub user-friendly-changelog.md</option>
+                    </select>
+                    <input id="user-changelog-source-url" class="auth-input" placeholder="GitHub RAW markdown URL (https://raw.githubusercontent.com/.../user-friendly-changelog.md)" />
+                    <button class="btn btn-secondary" id="user-changelog-source-save-btn" type="button">Save Source</button>
+                  </div>
+                  <div class="pill-row">
+                    <span class="pill">Source status: <strong id="user-changelog-source-status">--</strong></span>
+                    <span class="pill">Website reads: <strong>/api/public/website/changelog</strong></span>
+                  </div>
+                </div>
+                <div class="section-block">
+                  <div class="section-caption">Currently Displayed Changelog</div>
+                  <div class="stats-grid">
+                    <div class="stat-card2">
+                      <div class="stat-label">Current Source</div>
+                      <div class="stat-value" id="user-changelog-current-source">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Entry Count</div>
+                      <div class="stat-value" id="user-changelog-current-entry-count">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Last Updated (UTC)</div>
+                      <div class="stat-value" id="user-changelog-current-updated">--</div>
+                    </div>
+                  </div>
+                  <div id="user-changelog-current-preview" class="content-record-summary">--</div>
+                </div>
+                <div class="section-block">
+                  <div class="section-caption">Create / Update Entry (Required Format)</div>
+                  <div class="card-subtitle">Use this exact format only:</div>
+                  <pre class="json-viewer json-viewer-compact">## v1.3.7
+### Summary
+...
+### Added
+- ...
+### Changed
+- ...
+### Fixed
+- ...</pre>
+                  <form class="form-grid" id="user-changelog-form">
+                    <div class="section-caption section-caption-inline">
+                      User-Friendly Markdown
+                      <button class="btn btn-secondary" id="user-changelog-format-info" type="button" title="Show required markdown format">i</button>
+                    </div>
+                    <input id="user-changelog-markdown-url" class="auth-input" placeholder="GitHub raw markdown URL (optional)" />
+                    <textarea id="user-changelog-markdown" class="auth-input auth-input-lg" placeholder="## v1.3.8&#10;### Summary&#10;...&#10;### Added&#10;- ...&#10;### Changed&#10;- ...&#10;### Fixed&#10;- ..."></textarea>
+                    <div class="action-buttons-grid action-buttons-grid-three">
+                      <button class="btn btn-secondary" type="button" id="user-changelog-preview-btn">Preview Draft</button>
+                      <button class="btn btn-secondary" type="button" id="user-changelog-import-url-btn">Import from URL</button>
+                      <a class="btn btn-secondary" href="https://github.com/adhamhaithameid/Classroom-Quick-Downloader/blob/main/user-friendly-changelog.md" target="_blank" rel="noopener noreferrer">Open GitHub Source</a>
+                    </div>
+                    <button class="btn btn-start" type="submit">Save User Changelog Entry</button>
+                  </form>
+                </div>
+                <div class="section-block">
+                  <div class="section-caption">Preview</div>
+                  <div class="creative-grid">
+                    <div class="content-record-card">
+                      <div class="content-record-head">
+                        <div class="content-record-title">Draft Preview</div>
+                      </div>
+                      <div id="user-changelog-draft-preview" class="content-record-summary">--</div>
+                    </div>
+                  </div>
+                </div>
+                <div class="section-block">
+                  <div class="section-caption">Website API Sync</div>
+                  <div class="pill-row">
+                    <span class="pill">Public API status: <strong id="user-changelog-sync-status">--</strong></span>
+                    <span class="pill">Tap: <strong>/changelog</strong></span>
+                  </div>
+                  <pre id="user-changelog-output" class="json-viewer json-viewer-compact hidden"></pre>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- EXTENSION CHANGELOG PAGE -->
+          <div class="page website-page" id="page-ext-changelog" data-legacy-disabled="true">
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <div class="card-title">Extension Changelog & Notifications</div>
+                  <div class="card-subtitle">Manage changelog entries and notification pill rules for the browser extension.</div>
+                  <div class="pill-row">
+                    <span class="pill">Public source: <strong>/api/public/extension/changelog</strong></span>
+                    <span class="pill">Preview behavior matches extension pill classes</span>
+                  </div>
+                </div>
+                <div class="action-buttons-grid action-buttons-grid-three legacy-disabled-actions">
+                  <button class="btn btn-secondary" id="ext-cl-refresh-btn">Refresh</button>
+                  <button class="btn btn-secondary" id="ext-cl-import-github-btn">Import from GitHub</button>
+                  <button class="btn btn-secondary" id="ext-cl-preview-public-btn">Preview Public API</button>
+                </div>
+              </div>
+              <div class="card-body">
+                <!-- LEGACY_CHANGELOG_DISABLED_START -->
+                <div class="legacy-disabled-panel">
+                  <div class="legacy-disabled-title">Legacy Oracle extension changelog/pill customization is disabled</div>
+                  <div class="legacy-disabled-copy">
+                    Extension changelog and notification-pill rules are now manual source files. Update files, run sync, then build the extension.
+                  </div>
+                  <div class="legacy-disabled-links">
+                    <a class="btn btn-secondary" href="https://github.com/adhamhaithameid/Classroom-Quick-Downloader/blob/main/manual/changelog/extension-changelog.manual.md" target="_blank" rel="noopener noreferrer">Open Extension Changelog Source</a>
+                    <a class="btn btn-secondary" href="https://github.com/adhamhaithameid/Classroom-Quick-Downloader/blob/main/manual/changelog/extension-pill-rules.manual.json" target="_blank" rel="noopener noreferrer">Open Pill Rules Source</a>
+                    <a class="btn btn-secondary" href="https://github.com/adhamhaithameid/Classroom-Quick-Downloader/blob/main/tools/sync-manual-changelog.mjs" target="_blank" rel="noopener noreferrer">Open Sync Script</a>
+                  </div>
+                  <div class="legacy-disabled-note">
+                    Legacy CRUD endpoints and UI code are retained for rollback only and intentionally not used by production workflows.
+                  </div>
+                </div>
+                <!-- LEGACY_CHANGELOG_DISABLED_END -->
+                <!-- Stats -->
+                <div class="section-block">
+                  <div class="section-caption">Status</div>
+                  <div class="stats-grid">
+                    <div class="stat-card2">
+                      <div class="stat-label">Entries</div>
+                      <div class="stat-value" id="ext-cl-entry-count">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Rules</div>
+                      <div class="stat-value" id="ext-cl-rule-count">--</div>
+                    </div>
+                    <div class="stat-card2">
+                      <div class="stat-label">Public Endpoint</div>
+                      <div class="stat-value stat-value-endpoint">/api/public/extension/changelog</div>
+                    </div>
+                  </div>
+                </div>
+                <!-- Entries Table -->
+                <div class="section-block">
+                  <div class="section-caption">📋 Changelog Entries</div>
+                  <div id="ext-cl-entries-table" class="table-container">
+                    <div class="loading"><div class="spinner"></div>Loading...</div>
+                  </div>
+                </div>
+                <!-- Add/Edit Entry -->
+                <div class="section-block">
+                  <div class="section-caption">Add / Edit Entry</div>
+                  <form class="form-grid" id="ext-cl-entry-form">
+                    <div class="action-buttons-grid action-buttons-grid-three">
+                      <input id="ext-cl-entry-id" class="auth-input" placeholder="ID (e.g. v1.3.8-release)" />
+                      <input id="ext-cl-entry-version" class="auth-input" placeholder="Version (e.g. 1.3.8)" />
+                      <input id="ext-cl-entry-date" class="auth-input" type="date" />
+                    </div>
+                    <textarea id="ext-cl-entry-summary" class="auth-input" placeholder="Summary" rows="2"></textarea>
+                    <textarea id="ext-cl-entry-added" class="auth-input" placeholder="Added (one per line)" rows="3"></textarea>
+                    <textarea id="ext-cl-entry-changed" class="auth-input" placeholder="Changed (one per line)" rows="3"></textarea>
+                    <textarea id="ext-cl-entry-fixed" class="auth-input" placeholder="Fixed (one per line)" rows="3"></textarea>
+                    <label class="auth-field-inline">
+                      <input type="checkbox" id="ext-cl-entry-important" />
+                      <span>Mark as Important</span>
+                    </label>
+                    <div class="action-buttons-grid action-buttons-grid-two">
+                      <button class="btn btn-start" type="submit">Save Entry</button>
+                      <button class="btn btn-secondary" type="button" id="ext-cl-entry-clear">Clear Form</button>
+                    </div>
+                  </form>
+                </div>
+                <!-- Notification Rules -->
+                <div class="section-block">
+                  <div class="section-caption">🔔 Notification Rules (Pill Styling)</div>
+                  <div class="card-subtitle">Rules control the changelog pill color and animation in the extension. Target: "all" or specific version. Priority: normal/minor/major. Effect: none/glow/pulse.</div>
+                  <div id="ext-cl-rules-table" class="table-container table-container-spaced">
+                    <div class="loading"><div class="spinner"></div>Loading...</div>
+                  </div>
+                </div>
+                <!-- Add/Edit Rule -->
+                <div class="section-block">
+                  <div class="section-caption">Add / Edit Rule</div>
+                  <form class="form-grid" id="ext-cl-rule-form">
+                    <div class="action-buttons-grid action-buttons-grid-four">
+                      <input id="ext-cl-rule-id" class="auth-input" placeholder="Rule ID" />
+                      <input id="ext-cl-rule-target" class="auth-input" placeholder="Target (all or version)" value="all" />
+                      <select id="ext-cl-rule-priority" class="auth-input">
+                        <option value="normal">Normal</option>
+                        <option value="minor">Minor</option>
+                        <option value="major">Major</option>
+                      </select>
+                      <select id="ext-cl-rule-effect" class="auth-input">
+                        <option value="none">None</option>
+                        <option value="glow">Glow</option>
+                        <option value="pulse">Pulse</option>
+                      </select>
+                    </div>
+                    <div class="action-buttons-grid action-buttons-grid-two">
+                      <button class="btn btn-start" type="submit">Save Rule</button>
+                      <button class="btn btn-secondary" type="button" id="ext-cl-rule-clear">Clear Form</button>
+                    </div>
+                  </form>
+                  <div class="ext-pill-preview-shell">
+                    <div class="ext-pill-preview-surface">
+                      <div class="ext-pill-preview-label">Live Extension Preview</div>
+                      <span id="ext-cl-rule-preview-pill" class="cqd-brand-version">v1.3.8</span>
+                    </div>
+                    <div class="ext-pill-preview-meta">
+                      <span class="pill">Target: <strong id="ext-cl-rule-preview-target">all</strong></span>
+                      <span class="pill">Priority: <strong id="ext-cl-rule-preview-priority">normal</strong></span>
+                      <span class="pill">Effect: <strong id="ext-cl-rule-preview-effect">none</strong></span>
+                    </div>
+                  </div>
+                </div>
+                <!-- Bulk Markdown Import -->
+                <div class="section-block">
+                  <div class="section-caption">📋 Bulk Markdown Import</div>
+                  <div class="section-note section-note-tight">
+                    Paste changelog markdown below. Format: <code>## vX.Y.Z</code> → <code>### Summary</code> / <code>### Added</code> / <code>### Changed</code> / <code>### Fixed</code>
+                  </div>
+                  <textarea id="ext-cl-bulk-markdown" rows="12" class="form-control form-control-bulk-markdown" placeholder="## v1.3.8&#10;### Summary&#10;Improved changelog reliability…&#10;### Added&#10;- Revision-aware changelog tracking&#10;### Changed&#10;- Seen-state behavior now compares version plus revision&#10;### Fixed&#10;- Fixed same-version publish cases"></textarea>
+                  <div class="action-inline-row">
+                    <button class="btn btn-start" type="button" id="ext-cl-bulk-import-btn">📥 Bulk Import All</button>
+                  </div>
+                </div>
+                <!-- Public API preview -->
+                <div class="section-block">
+                  <div class="section-caption">Public API Preview</div>
+                  <pre id="ext-cl-public-preview" class="json-viewer json-viewer-compact hidden"></pre>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- NOTIFICATIONS PAGE -->
           <div class="page" id="page-notifications">
             <div class="card">
@@ -733,10 +1601,11 @@
                 </div>
               </div>
               <div class="card-body">
-                <div class="action-buttons-grid action-buttons-grid-four">
+                <div class="action-buttons-grid action-buttons-grid-five">
                   <button class="btn btn-secondary" id="danger-dryrun-clear-btn" aria-label="Dry run clear — preview non-core data deletion">🧪 Dry Run Clear (All Non-Core)</button>
                   <button class="btn btn-danger" id="danger-exec-clear-btn" aria-label="Execute clear — permanently delete non-core data">💥 Execute Clear (All Non-Core)</button>
                   <button class="btn btn-secondary" id="danger-run-backup-btn" aria-label="Run SQLite backup">💾 Run SQLite Backup</button>
+                  <button class="btn btn-secondary" id="danger-run-sheets-flush-btn" aria-label="Run Google Sheets flush now">🧮 Flush Google Sheets Now</button>
                   <button class="btn btn-secondary" id="stepup-btn" data-shortcut="Cmd+Shift+S" aria-label="Start step-up verification">🛂 Step-Up Now</button>
                 </div>
                 <div class="section-block">
@@ -764,6 +1633,7 @@
                     <div class="danger-help-item"><div class="danger-help-title">Dry Run Clear</div><div class="danger-help-text">Preview mode only. Oracle calculates exactly what would be deleted from non-core analytics tables and returns row counts per table, but commits nothing. Use this first before any destructive cleanup to validate scope and avoid accidental data loss.</div></div>
                     <div class="danger-help-item"><div class="danger-help-title">Execute Clear</div><div class="danger-help-text">Runs the same cleanup plan as Dry Run but actually deletes data. This action requires elevated verification and should be used only after reviewing Dry Run output. It does not remove core auth/config tables, but it will permanently remove matching operational data.</div></div>
                     <div class="danger-help-item"><div class="danger-help-title">Run SQLite Backup</div><div class="danger-help-text">Creates a point-in-time backup file under the server backup location. Use this immediately before risky operations. If cleanup or migration has unintended effects, this snapshot is your rollback anchor for the SQLite state.</div></div>
+                    <div class="danger-help-item"><div class="danger-help-title">Flush Google Sheets Now</div><div class="danger-help-text">Runs the Sheets archiver immediately and pushes the latest daily summary row to the configured Google Sheet. Use this to verify backups/sync on demand without waiting for the scheduled run.</div></div>
                     <div class="danger-help-item"><div class="danger-help-title">Step-Up Now</div><div class="danger-help-text">Starts elevated verification for the current admin session. Critical actions in this page rely on this elevated window. If buttons are rejected with permission errors, run this first and complete verification.</div></div>
                     <div class="danger-help-item"><div class="danger-help-title">Load Alerts</div><div class="danger-help-text">Retrieves active operational alerts such as no sync success, drift detection, backup failures, and backlog anomalies. This is the fastest health check when dashboard data looks stale or inconsistent.</div></div>
                     <div class="danger-help-item"><div class="danger-help-title">Verify Audit Chain</div><div class="danger-help-text">Validates append-only hash-chain integrity for admin audit records from oldest to newest. If a link is broken, response includes where validation failed. Run this after critical operations and before incident closure.</div></div>

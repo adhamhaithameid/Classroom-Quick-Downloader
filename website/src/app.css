@@ -1,0 +1,211 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap');
+
+:root {
+  /* Google Classroom-inspired palette */
+  --gc-green: #1a8b55;
+  --gc-green-light: #57bb8a;
+  --gc-green-dark: #137a47;
+  --gc-green-bg: rgba(26, 139, 85, 0.06);
+  --gc-green-surface: rgba(26, 139, 85, 0.06);
+  --gc-blue: #4285f4;
+  --gc-yellow: #fbbc04;
+  --gc-red: #ea4335;
+
+  /* Layout tokens — aligned with landing2 */
+  --bg: #fafcfb;
+  --bg-deep: #f1f6f2;
+  --surface: rgba(255, 255, 255, 0.65);
+  --surface-2: rgba(248, 252, 249, 0.92);
+  --border: rgba(226, 232, 240, 0.6);
+  --border-subtle: rgba(226, 232, 240, 0.35);
+  --border-hover: rgba(26, 139, 85, 0.25);
+  --text: #1a1a2e;
+  --text-secondary: #64748b;
+  --muted: #94a3b8;
+  --accent: var(--gc-green);
+  --accent-2: var(--gc-green-dark);
+
+  --shadow-sm: 0 1px 3px rgba(15, 20, 25, 0.04);
+  --shadow: 0 4px 20px rgba(15, 20, 25, 0.06);
+  --shadow-lg: 0 12px 40px rgba(15, 20, 25, 0.08);
+  --shadow-green: 0 4px 24px rgba(26, 139, 85, 0.12);
+
+  --radius: 18px;
+  --radius-sm: 12px;
+  --radius-lg: 24px;
+  --font-ui: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui;
+  --emoji-font-stack: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', 'Twemoji Mozilla';
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-ui), sans-serif;
+  color: var(--text);
+  background: var(--bg);
+  min-height: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 92px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+body::before,
+body::after {
+  content: '';
+  position: fixed;
+  z-index: -1;
+  border-radius: 50%;
+  filter: blur(100px);
+  pointer-events: none;
+  animation: floatOrb 20s ease-in-out infinite;
+}
+
+body::before {
+  width: 500px;
+  height: 500px;
+  background: rgba(26, 139, 85, 0.07);
+  left: -150px;
+  top: -100px;
+}
+
+body::after {
+  width: 400px;
+  height: 400px;
+  background: rgba(87, 187, 138, 0.06);
+  right: -120px;
+  bottom: 10vh;
+  animation-delay: -8s;
+}
+
+a {
+  color: inherit;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+.page-shell {
+  width: min(1200px, calc(100% - 32px));
+  margin: 0 auto;
+}
+
+.card {
+  border-radius: var(--radius);
+  border: 1px solid var(--border-subtle);
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: var(--shadow);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.state-loading,
+.state-error,
+.state-empty {
+  border-radius: var(--radius-sm);
+  border: 1px dashed var(--border);
+  background: var(--surface-2);
+  padding: 20px;
+  color: var(--muted);
+  font-size: 14px;
+  text-align: center;
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+}
+
+.metric {
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  padding: 18px;
+  animation: riseIn 0.6s ease both;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.3s ease;
+}
+
+.metric:hover {
+  border-color: var(--border-hover);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+}
+
+.metric-label {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.metric-value {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--gc-green);
+}
+
+@keyframes riseIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes floatOrb {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-20px) scale(1.04);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+::selection {
+  background: rgba(26, 139, 85, 0.2);
+  color: var(--text);
+}
+
+@media (max-width: 860px) {
+  .page-shell {
+    width: calc(100% - 20px);
+  }
+}

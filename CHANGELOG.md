@@ -12,6 +12,7 @@ It includes every commit from project inception and groups release windows by ex
 
 ## Table of Contents
 - [Unreleased](#unreleased)
+- [1.3.8](#138-20260302)
 - [1.3.6](#136-20260220)
 - [1.3.0](#130-20260218)
 - [1.2.7](#127-20260204)
@@ -46,6 +47,24 @@ It includes every commit from project inception and groups release windows by ex
 - `458331f` | 2026-02-20 | AdhamHaithamEid | docs(oracle): bump Oracle Hub references to v4.1 | category: Docs | components: Docs, Oracle Backend | files: `CHANGELOG.md`, `docs/ORACLE_HUB_V4.md`, `oracle-backend/README.md`
 - `2326373` | 2026-02-20 | AdhamHaithamEid | chore(deps): update npm deps and carry eslint 10.0.1 compatibility patch | category: Chore | components: Cloudflare Worker, Dependencies | files: `cloudflare-worker/package.json`, `package.json`, `patches/eslint@10.0.1.patch`, `pnpm-lock.yaml`
 - `ff9075d` | 2026-02-20 | AdhamHaithamEid | chore(deps): upgrade Oracle Go modules to latest Go 1.24-compatible versions | category: Chore | components: Dependencies, Oracle Backend | files: `oracle-backend/go.mod`, `oracle-backend/go.sum`
+
+## [1.3.8] - 2026-03-02
+
+### Summary
+- Reliability release for changelog propagation from Cloudflare to extension clients.
+- Scope: version-pill state, seen-state persistence, and same-version republish behavior.
+
+### Added
+- Revision-token awareness in extension changelog handling tests.
+- Integration coverage for same-version republish and re-open behavior.
+
+### Changed
+- Seen-state comparison now uses version + revision data contract.
+- Release metadata defaults updated to 1.3.8 across extension/worker/website surfaces.
+
+### Fixed
+- Fixed missed user updates when changelog content changed without version bump.
+- Fixed stale changelog visibility after Cloudflare publish/update/delete cycles.
 
 ## [1.3.6] - 2026-02-20
 
@@ -2143,4 +2162,3 @@ It includes every commit from project inception and groups release windows by ex
 - `1f782a5` | 2025-12-10 | AdhamHaithamEid | feat(worker-dashboard): gate analytics UI behind DO_SHARED_SECRET login | category: Added | components: Cloudflare Worker | files: `cloudflare-worker/src/dashboard.ts`, `cloudflare-worker/src/index.ts`, `cloudflare-worker/src/types.ts`
 - `d9fae22` | 2025-12-10 | AdhamHaithamEid | feat(analytics): add Cloudflare DO backend and admin dashboard | category: Added | components: Cloudflare Worker | files: `.gitignore`, `cloudflare-worker/.wrangler/state/v3/do/cqd-analytics-DownloadsDurable/ca1af5fd1a55636b10e2163e38086e5cb6ad71d17ed3d2da4e49efb8ce13fa6b.sqlite`, `cloudflare-worker/src/dashboard.ts`, `cloudflare-worker/src/downloads_do.ts`, `cloudflare-worker/src/index.ts`, `cloudflare-worker/src/types.ts`, `cloudflare-worker/wrangler.toml`
 - `002146b` | 2025-12-10 | AdhamHaithamEid | fixed a little parsing error in the extension's background | category: Changed | components: Extension | files: `extension/entrypoints/background.ts`, `extension/entrypoints/utils/analytics.ts`
-

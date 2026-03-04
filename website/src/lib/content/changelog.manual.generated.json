@@ -1,0 +1,363 @@
+{
+  "generatedAt": 1772605980439,
+  "source": "manual",
+  "entries": [
+    {
+      "id": "manual-1.3.9-1",
+      "version": "1.3.9",
+      "title": "Release 1.3.9",
+      "summary": "Current stable website-facing release for Classroom Quick Downloader.",
+      "highlights": [
+        "Full manual changelog history synced from extension release lineage.",
+        "Website snapshot/cache behavior now prioritizes fresh local snapshots on reload.",
+        "Fixed stale in-session snapshot behavior that could keep old metrics visible."
+      ],
+      "added": [
+        "Full manual changelog history synced from extension release lineage."
+      ],
+      "changed": [
+        "Website snapshot/cache behavior now prioritizes fresh local snapshots on reload."
+      ],
+      "fixed": [
+        "Fixed stale in-session snapshot behavior that could keep old metrics visible."
+      ],
+      "releasedAtUtc": 1772605980434
+    },
+    {
+      "id": "manual-1.3.8-2",
+      "version": "1.3.8",
+      "title": "Release 1.3.8",
+      "summary": "Changelog reliability release.",
+      "highlights": [
+        "Revision-aware changelog checks for same-version updates.",
+        "Improved changelog update detection logic.",
+        "Fixed stale changelog visibility in republish scenarios."
+      ],
+      "added": [
+        "Revision-aware changelog checks for same-version updates."
+      ],
+      "changed": [
+        "Improved changelog update detection logic."
+      ],
+      "fixed": [
+        "Fixed stale changelog visibility in republish scenarios."
+      ],
+      "releasedAtUtc": 1772519580434
+    },
+    {
+      "id": "manual-1.3.7-3",
+      "version": "1.3.7",
+      "title": "Release 1.3.7",
+      "summary": "Changelog UX improvement release.",
+      "highlights": [
+        "Better website changelog integration from extension.",
+        "Improved changelog action layout and readability.",
+        "Fixed close-button layout and hover inconsistencies."
+      ],
+      "added": [
+        "Better website changelog integration from extension."
+      ],
+      "changed": [
+        "Improved changelog action layout and readability."
+      ],
+      "fixed": [
+        "Fixed close-button layout and hover inconsistencies."
+      ],
+      "releasedAtUtc": 1772433180434
+    },
+    {
+      "id": "manual-1.3.6-4",
+      "version": "1.3.6",
+      "title": "Release 1.3.6",
+      "summary": "Dependency and compatibility maintenance release.",
+      "highlights": [
+        "Compatibility safeguards for tooling/runtime.",
+        "Updated dependency resolution paths.",
+        "Fixed `minimatch` export mismatch issues in development flow."
+      ],
+      "added": [
+        "Compatibility safeguards for tooling/runtime."
+      ],
+      "changed": [
+        "Updated dependency resolution paths."
+      ],
+      "fixed": [
+        "Fixed `minimatch` export mismatch issues in development flow."
+      ],
+      "releasedAtUtc": 1772346780434
+    },
+    {
+      "id": "manual-1.3.0-5",
+      "version": "1.3.0",
+      "title": "Release 1.3.0",
+      "summary": "Major reliability and security hardening release.",
+      "highlights": [
+        "Expanded resilience/security checks across extension-worker-oracle flow.",
+        "Improved pipeline validation and retry behavior.",
+        "Fixed cancellation/flush consistency issues."
+      ],
+      "added": [
+        "Expanded resilience/security checks across extension-worker-oracle flow."
+      ],
+      "changed": [
+        "Improved pipeline validation and retry behavior."
+      ],
+      "fixed": [
+        "Fixed cancellation/flush consistency issues."
+      ],
+      "releasedAtUtc": 1772260380434
+    },
+    {
+      "id": "manual-1.2.7-6",
+      "version": "1.2.7",
+      "title": "Release 1.2.7",
+      "summary": "Operations and architecture expansion release.",
+      "highlights": [
+        "Expanded dashboard/telemetry integrations.",
+        "Refined ingestion orchestration between worker and oracle.",
+        "Fixed sync/auth edge cases in production-like workloads."
+      ],
+      "added": [
+        "Expanded dashboard/telemetry integrations."
+      ],
+      "changed": [
+        "Refined ingestion orchestration between worker and oracle."
+      ],
+      "fixed": [
+        "Fixed sync/auth edge cases in production-like workloads."
+      ],
+      "releasedAtUtc": 1772173980434
+    },
+    {
+      "id": "manual-1.2.3-7",
+      "version": "1.2.3",
+      "title": "Release 1.2.3",
+      "summary": "Usability and telemetry consistency release.",
+      "highlights": [
+        "Better feedback and uninstall integration paths.",
+        "Improved user-facing messaging and data alignment.",
+        "Fixed cross-service payload/shape mismatches."
+      ],
+      "added": [
+        "Better feedback and uninstall integration paths."
+      ],
+      "changed": [
+        "Improved user-facing messaging and data alignment."
+      ],
+      "fixed": [
+        "Fixed cross-service payload/shape mismatches."
+      ],
+      "releasedAtUtc": 1772087580434
+    },
+    {
+      "id": "manual-1.2.2-8",
+      "version": "1.2.2",
+      "title": "Release 1.2.2",
+      "summary": "Cancellation polish release.",
+      "highlights": [
+        "More coverage and safeguards for cancel behavior.",
+        "Improved cancel responsiveness and clarity.",
+        "Fixed inconsistent cancellation cleanup paths."
+      ],
+      "added": [
+        "More coverage and safeguards for cancel behavior."
+      ],
+      "changed": [
+        "Improved cancel responsiveness and clarity."
+      ],
+      "fixed": [
+        "Fixed inconsistent cancellation cleanup paths."
+      ],
+      "releasedAtUtc": 1772001180434
+    },
+    {
+      "id": "manual-1.2.1-9",
+      "version": "1.2.1",
+      "title": "Release 1.2.1",
+      "summary": "Unified cancel-system iteration release.",
+      "highlights": [
+        "Unified cancel control logic for active operations.",
+        "Refined runtime flow around cancel/retry.",
+        "Fixed cancel-state reflection delays."
+      ],
+      "added": [
+        "Unified cancel control logic for active operations."
+      ],
+      "changed": [
+        "Refined runtime flow around cancel/retry."
+      ],
+      "fixed": [
+        "Fixed cancel-state reflection delays."
+      ],
+      "releasedAtUtc": 1771914780434
+    },
+    {
+      "id": "manual-1.2.0-10",
+      "version": "1.2.0",
+      "title": "Release 1.2.0",
+      "summary": "Cancel feature baseline release.",
+      "highlights": [
+        "Core cancel-download capability.",
+        "Lifecycle handling updated for cancellation-aware flow.",
+        "Fixed inability to interrupt active operations."
+      ],
+      "added": [
+        "Core cancel-download capability."
+      ],
+      "changed": [
+        "Lifecycle handling updated for cancellation-aware flow."
+      ],
+      "fixed": [
+        "Fixed inability to interrupt active operations."
+      ],
+      "releasedAtUtc": 1771828380434
+    },
+    {
+      "id": "manual-1.1.10-11",
+      "version": "1.1.10",
+      "title": "Release 1.1.10",
+      "summary": "Late 1.1 stability update.",
+      "highlights": [
+        "Additional runtime checks for long sessions.",
+        "Tuned defaults for safer prolonged usage.",
+        "Fixed repeated-session regressions."
+      ],
+      "added": [
+        "Additional runtime checks for long sessions."
+      ],
+      "changed": [
+        "Tuned defaults for safer prolonged usage."
+      ],
+      "fixed": [
+        "Fixed repeated-session regressions."
+      ],
+      "releasedAtUtc": 1771741980434
+    },
+    {
+      "id": "manual-1.1.5-12",
+      "version": "1.1.5",
+      "title": "Release 1.1.5",
+      "summary": "Mid 1.1 quality update.",
+      "highlights": [
+        "Extended compatibility hardening.",
+        "Improved consistency across frequent workflows.",
+        "Fixed smaller runtime mismatches."
+      ],
+      "added": [
+        "Extended compatibility hardening."
+      ],
+      "changed": [
+        "Improved consistency across frequent workflows."
+      ],
+      "fixed": [
+        "Fixed smaller runtime mismatches."
+      ],
+      "releasedAtUtc": 1771655580434
+    },
+    {
+      "id": "manual-1.1.1-13",
+      "version": "1.1.1",
+      "title": "Release 1.1.1",
+      "summary": "Post-1.1 stabilization release.",
+      "highlights": [
+        "Additional diagnostics and background-flow coverage.",
+        "Better queue/error defaults.",
+        "Fixed early 1.1 runtime issues."
+      ],
+      "added": [
+        "Additional diagnostics and background-flow coverage."
+      ],
+      "changed": [
+        "Better queue/error defaults."
+      ],
+      "fixed": [
+        "Fixed early 1.1 runtime issues."
+      ],
+      "releasedAtUtc": 1771569180434
+    },
+    {
+      "id": "manual-1.1.0-14",
+      "version": "1.1.0",
+      "title": "Release 1.1.0",
+      "summary": "Feature and compatibility expansion release.",
+      "highlights": [
+        "Multi-browser support improvements.",
+        "Updated setup/runtime compatibility behavior.",
+        "Fixed packaging/config alignment issues."
+      ],
+      "added": [
+        "Multi-browser support improvements."
+      ],
+      "changed": [
+        "Updated setup/runtime compatibility behavior."
+      ],
+      "fixed": [
+        "Fixed packaging/config alignment issues."
+      ],
+      "releasedAtUtc": 1771482780434
+    },
+    {
+      "id": "manual-1.0.1-15",
+      "version": "1.0.1",
+      "title": "Release 1.0.1",
+      "summary": "Post-launch stabilization release.",
+      "highlights": [
+        "Better logging/diagnostics for early production behavior.",
+        "Improved repeat-use reliability.",
+        "Fixed launch-adjacent regressions."
+      ],
+      "added": [
+        "Better logging/diagnostics for early production behavior."
+      ],
+      "changed": [
+        "Improved repeat-use reliability."
+      ],
+      "fixed": [
+        "Fixed launch-adjacent regressions."
+      ],
+      "releasedAtUtc": 1771396380434
+    },
+    {
+      "id": "manual-1.0.0-16",
+      "version": "1.0.0",
+      "title": "Release 1.0.0",
+      "summary": "First stable production release.",
+      "highlights": [
+        "Core one-click Classroom download workflow.",
+        "Established baseline architecture/contracts.",
+        "Fixed pre-release blockers."
+      ],
+      "added": [
+        "Core one-click Classroom download workflow."
+      ],
+      "changed": [
+        "Established baseline architecture/contracts."
+      ],
+      "fixed": [
+        "Fixed pre-release blockers."
+      ],
+      "releasedAtUtc": 1771309980434
+    },
+    {
+      "id": "manual-0.0.0-17",
+      "version": "0.0.0",
+      "title": "Release 0.0.0",
+      "summary": "Project bootstrap baseline.",
+      "highlights": [
+        "Initial project foundations.",
+        "Initial structure and baseline workflows.",
+        "N/A"
+      ],
+      "added": [
+        "Initial project foundations."
+      ],
+      "changed": [
+        "Initial structure and baseline workflows."
+      ],
+      "fixed": [
+        "N/A"
+      ],
+      "releasedAtUtc": 1771223580434
+    }
+  ]
+}

@@ -1,0 +1,597 @@
+<!-- Route disabled intentionally.
+     Keeping original Overview2 page content archived in this file. -->
+<script lang="ts">
+  import { onMount } from 'svelte';
+  import { categories, threeDElements, doodleItems } from '$lib/svgCatalog';
+
+  type SlotType = 'FLOAT' | 'DOODLE' | '3D';
+  interface Slot {
+    id: string;
+    type: SlotType;
+    x: number;       // px from left of overlay
+    y: number;       // px from top of overlay
+    sampleId: string; // assigned sample catalog ID or ''
+    section: string;
+    notes: string;
+  }
+
+  let slots: Slot[] = [];
+  let nextId = { FLOAT: 1, DOODLE: 1, '3D': 1 };
+  let selectedSlot: Slot | null = null;
+  let dragging: Slot | null = null;
+  let dragOff = { x: 0, y: 0 };
+  let sidebarTab: 'picker' | 'json' = 'picker';
+  let pickerFilter = '';
+  let pickerType: 'float' | '3d' | 'doodle' = 'float';
+  let showExport = false;
+  let sidebarOpen = true;
+  let importJson = '';
+  let overlayEl: HTMLElement;
+  let iframeHeight = 12000;
+
+  // Section markers (approximate y-px in the overview iframe at 1300px width)
+  const sectionMarkers = [
+    { name: 'Hero', y: 0 },
+    { name: 'Students', y: 900 },
+    { name: 'Marquee', y: 1400 },
+    { name: 'Problem', y: 1600 },
+    { name: 'Solution', y: 2200 },
+    { name: 'Features', y: 2900 },
+    { name: 'How It Works', y: 3500 },
+    { name: 'Social Proof', y: 4000 },
+    { name: 'Map', y: 4600 },
+    { name: 'CTA', y: 5400 },
+  ];
+
+  function guessSection(y: number): string {
+    let sec = 'Hero';
+    for (const m of sectionMarkers) {
+      if (y >= m.y - 50) sec = m.name;
+    }
+    return sec;
+  }
+
+  function addSlot(type: SlotType) {
+    const prefix = type === 'FLOAT' ? 'F' : type === 'DOODLE' ? 'D' : 'T';
+    const id = `${prefix}${nextId[type]++}`;
+    const scroll = overlayEl?.parentElement?.scrollTop ?? 0;
+    const x = 100 + Math.random() * 200;
+    const y = scroll + 200;
+    const slot: Slot = { id, type, x, y, sampleId: '', section: guessSection(y), notes: '' };
+    slots = [...slots, slot];
+    selectedSlot = slot;
+  }
+
+  function removeSlot(slot: Slot | null) {
+    if (!slot) return;
+    slots = slots.filter(s => s.id !== slot.id);
+    if (selectedSlot?.id === slot.id) selectedSlot = null;
+  }
+
+  function startDrag(e: MouseEvent, slot: Slot) {
+    e.preventDefault();
+    dragging = slot;
+    const rect = overlayEl.getBoundingClientRect();
+    const scrollTop = overlayEl.parentElement?.scrollTop ?? 0;
+    dragOff.x = e.clientX - rect.left - slot.x;
+    dragOff.y = e.clientY - rect.top + scrollTop - slot.y;
+    selectedSlot = slot;
+    sidebarOpen = true;
+  }
+
+  function onMouseMove(e: MouseEvent) {
+    if (!dragging || !overlayEl) return;
+    const rect = overlayEl.getBoundingClientRect();
+    const scrollTop = overlayEl.parentElement?.scrollTop ?? 0;
+    dragging.x = Math.max(0, e.clientX - rect.left - dragOff.x);
+    dragging.y = Math.max(0, e.clientY - rect.top + scrollTop - dragOff.y);
+    dragging.section = guessSection(dragging.y);
+    slots = [...slots];
+  }
+
+  function onMouseUp() {
+    dragging = null;
+  }
+
+  function assignSample(sampleId: string) {
+    if (!selectedSlot) return;
+    selectedSlot.sampleId = sampleId;
+    slots = [...slots];
+  }
+
+  function clearAssignment() {
+    if (!selectedSlot) return;
+    selectedSlot.sampleId = '';
+    slots = [...slots];
+  }
+
+  function exportJson(): string {
+    return JSON.stringify({
+      version: 1,
+      slots: slots.map(s => ({
+        slotId: s.id,
+        type: s.type,
+        sampleId: s.sampleId || null,
+        x: Math.round(s.x),
+        y: Math.round(s.y),
+        xPercent: +(s.x / (overlayEl?.clientWidth || 1300) * 100).toFixed(2),
+        yPercent: +(s.y / iframeHeight * 100).toFixed(2),
+        section: s.section,
+        notes: s.notes,
+      })),
+    }, null, 2);
+  }
+
+  function importSlots() {
+    try {
+      const data = JSON.parse(importJson);
+      if (!data.slots || !Array.isArray(data.slots)) throw new Error('Invalid format');
+      slots = data.slots.map((s: any) => ({
+        id: s.slotId || s.id,
+        type: s.type || 'FLOAT',
+        x: s.x || 0,
+        y: s.y || 0,
+        sampleId: s.sampleId || '',
+        section: s.section || '',
+        notes: s.notes || '',
+      }));
+      // Update nextId counters
+      for (const s of slots) {
+        const prefix = s.id[0];
+        const num = parseInt(s.id.slice(1));
+        if (prefix === 'F') nextId.FLOAT = Math.max(nextId.FLOAT, num + 1);
+        if (prefix === 'D') nextId.DOODLE = Math.max(nextId.DOODLE, num + 1);
+        if (prefix === 'T') nextId['3D'] = Math.max(nextId['3D'], num + 1);
+      }
+      importJson = '';
+      selectedSlot = null;
+    } catch {
+      alert('Invalid JSON format');
+    }
+  }
+
+  function slotColor(type: SlotType): string {
+    if (type === 'FLOAT') return '#22c55e';
+    if (type === 'DOODLE') return '#3b82f6';
+    return '#a78bfa';
+  }
+
+  function allSamples() {
+    const floating = categories.flatMap(c => c.items.map(i => ({ ...i, sType: 'float' as const })));
+    const threeD = threeDElements.map(i => ({ ...i, sType: '3d' as const }));
+    const doodles = doodleItems.map(i => ({ ...i, sType: 'doodle' as const }));
+    return [...floating, ...threeD, ...doodles];
+  }
+
+  function filteredSamples() {
+    let items = allSamples().filter(i => i.sType === pickerType);
+    if (pickerFilter) {
+      const q = pickerFilter.toLowerCase();
+      items = items.filter(i => i.id.toLowerCase().includes(q) || i.label.toLowerCase().includes(q));
+    }
+    return items;
+  }
+
+  function getSvgForItem(id: string): string {
+    for (const c of categories) {
+      const item = c.items.find(i => i.id === id);
+      if (item) return item.svg;
+    }
+    const td = threeDElements.find(i => i.id === id);
+    if (td) return td.svg;
+    const d = doodleItems.find(i => i.id === id);
+    if (d) return d.svg;
+    return '';
+  }
+
+  function getViewBox(id: string): string {
+    if (id.startsWith('3D-')) return '0 0 120 110';
+    if (id.startsWith('D-')) return '0 0 60 60';
+    return '0 0 64 64';
+  }
+
+  function copyJson() {
+    navigator.clipboard.writeText(exportJson());
+  }
+
+  onMount(() => {
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+  });
+</script>
+
+<svelte:head>
+  <title>Overview2 — Interactive SVG Placement Tool</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+</svelte:head>
+
+<div class="o2-app">
+  <!-- TOOLBAR -->
+  <header class="o2-toolbar">
+    <div class="toolbar-left">
+      <span class="toolbar-title">🧲 SVG Placement Tool</span>
+      <button class="tb-btn tb-add-float" on:click={() => addSlot('FLOAT')}>+ Float</button>
+      <button class="tb-btn tb-add-doodle" on:click={() => addSlot('DOODLE')}>+ Doodle</button>
+      <button class="tb-btn tb-add-3d" on:click={() => addSlot('3D')}>+ 3D</button>
+      <span class="tb-count">{slots.length} slot{slots.length !== 1 ? 's' : ''}</span>
+    </div>
+    <div class="toolbar-right">
+      <button class="tb-btn" on:click={() => { showExport = !showExport; sidebarOpen = true; sidebarTab = 'json'; }}>
+        {showExport ? '← Back' : '📋 Export JSON'}
+      </button>
+      <a class="tb-btn tb-link" href="/samples" target="_blank">🎨 Samples</a>
+      <button class="tb-btn tb-sidebar-toggle" on:click={() => sidebarOpen = !sidebarOpen}>
+        {sidebarOpen ? '✕ Close' : '◧ Panel'}
+      </button>
+    </div>
+  </header>
+
+  <div class="o2-body">
+    <!-- MAIN: iframe + overlay -->
+    <div class="o2-main">
+      <!-- Section markers -->
+      {#each sectionMarkers as marker}
+        <div class="section-marker" style="top:{marker.y}px">
+          <span class="marker-label">{marker.name}</span>
+        </div>
+      {/each}
+
+      <!-- Draggable magnet slots -->
+      <div class="overlay" bind:this={overlayEl}>
+        {#each slots as slot (slot.id)}
+          <div
+            class="magnet"
+            class:selected={selectedSlot?.id === slot.id}
+            class:has-sample={!!slot.sampleId}
+            role="button"
+            tabindex="0"
+            style="left:{slot.x}px; top:{slot.y}px; border-color:{slotColor(slot.type)}"
+            on:mousedown={(e) => startDrag(e, slot)}
+            on:keydown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                selectedSlot = slot;
+                sidebarOpen = true;
+              }
+            }}
+            title="{slot.id} — {slot.section}"
+          >
+            {#if slot.sampleId}
+              <div class="magnet-preview" style="color:{slotColor(slot.type)}">
+                <svg
+                  viewBox={getViewBox(slot.sampleId)}
+                  fill="none" stroke="currentColor" stroke-width="1.5"
+                  stroke-linecap="round" stroke-linejoin="round"
+                >
+                  {@html getSvgForItem(slot.sampleId)}
+                </svg>
+              </div>
+            {/if}
+            <span class="magnet-badge" style="background:{slotColor(slot.type)}">{slot.type}</span>
+            <span class="magnet-id">{slot.id}</span>
+            {#if slot.sampleId}
+              <span class="magnet-sample">{slot.sampleId}</span>
+            {/if}
+          </div>
+        {/each}
+      </div>
+
+      <iframe
+        src="/overview?embed=1"
+        title="Overview page preview"
+        class="preview-iframe"
+        style="height:{iframeHeight}px"
+      ></iframe>
+    </div>
+
+    <!-- SIDEBAR -->
+    <aside class="o2-sidebar" class:open={sidebarOpen}>
+      {#if showExport}
+        <!-- JSON Export/Import panel -->
+        <div class="sidebar-panel">
+          <h3>📋 JSON Configuration</h3>
+          <div class="json-actions">
+            <button class="sb-btn" on:click={copyJson}>Copy to Clipboard</button>
+          </div>
+          <pre class="json-preview">{exportJson()}</pre>
+
+          <h4>Import JSON</h4>
+          <textarea class="json-input" bind:value={importJson} placeholder="Paste JSON here..."></textarea>
+          <button class="sb-btn" on:click={importSlots}>Import</button>
+        </div>
+      {:else if selectedSlot}
+        <!-- Slot detail + sample picker -->
+        <div class="sidebar-panel">
+          <div class="slot-detail">
+            <div class="slot-header">
+              <span class="slot-id" style="color:{slotColor(selectedSlot.type)}">{selectedSlot.id}</span>
+              <span class="slot-badge" style="background:{slotColor(selectedSlot.type)}">{selectedSlot.type}</span>
+              <button class="slot-delete" on:click={() => removeSlot(selectedSlot)}>🗑️</button>
+            </div>
+            <div class="slot-info">
+              <p><b>Section:</b> {selectedSlot.section}</p>
+              <p><b>Position:</b> ({Math.round(selectedSlot.x)}, {Math.round(selectedSlot.y)})</p>
+              <p><b>Assigned:</b> {selectedSlot.sampleId || 'None'}</p>
+              {#if selectedSlot.sampleId}
+                <button class="sb-btn sb-clear" on:click={clearAssignment}>Clear Assignment</button>
+              {/if}
+            </div>
+            <div class="slot-notes">
+              <label for="slot-notes-input">Notes:</label>
+              <input id="slot-notes-input" type="text" bind:value={selectedSlot.notes} placeholder="Optional note..." />
+            </div>
+          </div>
+
+          <div class="picker">
+            <h4>Assign Sample</h4>
+            <div class="picker-tabs">
+              <button class:active={pickerType === 'float'} on:click={() => pickerType = 'float'}>Floating</button>
+              <button class:active={pickerType === '3d'} on:click={() => pickerType = '3d'}>3D</button>
+              <button class:active={pickerType === 'doodle'} on:click={() => pickerType = 'doodle'}>Doodle</button>
+            </div>
+            <input class="picker-search" type="text" bind:value={pickerFilter} placeholder="Search by ID or name..." />
+            <div class="picker-grid">
+              {#each filteredSamples() as item (item.id)}
+                <button
+                  class="picker-item"
+                  class:assigned={selectedSlot?.sampleId === item.id}
+                  on:click={() => assignSample(item.id)}
+                  title={item.label}
+                >
+                  <div class="picker-svg">
+                    <svg
+                      viewBox={item.sType === '3d' ? '0 0 120 110' : item.sType === 'doodle' ? '0 0 60 60' : '0 0 64 64'}
+                      fill="none" stroke="currentColor" stroke-width="1.5"
+                      stroke-linecap="round" stroke-linejoin="round"
+                    >
+                      {@html item.svg}
+                    </svg>
+                  </div>
+                  <span class="picker-id">{item.id}</span>
+                </button>
+              {/each}
+            </div>
+          </div>
+        </div>
+      {:else}
+        <!-- No selection -->
+        <div class="sidebar-panel sidebar-empty">
+          <p>👆 Click a magnet slot, or add one:</p>
+          <button class="sb-btn tb-add-float" on:click={() => addSlot('FLOAT')}>+ Float Slot</button>
+          <button class="sb-btn tb-add-doodle" on:click={() => addSlot('DOODLE')}>+ Doodle Slot</button>
+          <button class="sb-btn tb-add-3d" on:click={() => addSlot('3D')}>+ 3D Slot</button>
+          <p class="sidebar-hint">Drag slots over the page preview to position them. Then pick a sample from the catalog to assign.</p>
+        </div>
+      {/if}
+    </aside>
+  </div>
+</div>
+
+<style>
+  :global(body) { margin: 0 !important; overflow: hidden !important; }
+  :global(.site-shell) { display: contents !important; }
+  :global(.site-route-shell) { display: contents !important; }
+  :global(main) { padding: 0 !important; margin: 0 !important; max-width: none !important; flex: none !important; }
+
+  .o2-app {
+    --o2-green: #1a8b55;
+    --o2-bg: #0f1419;
+    --o2-card: #1a1f2e;
+    --o2-border: rgba(255,255,255,0.08);
+    --o2-text: #e2e8f0;
+    --o2-muted: #94a3b8;
+    font-family: 'Inter', system-ui, sans-serif !important;
+    background: #0f1419 !important;
+    color: #e2e8f0 !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    z-index: 99999 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+  }
+
+  .o2-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+    background: #161b26;
+    border-bottom: 1px solid var(--o2-border);
+    flex-shrink: 0;
+    z-index: 100;
+  }
+  .toolbar-left, .toolbar-right { display: flex; align-items: center; gap: 8px; }
+  .toolbar-title { font-weight: 700; font-size: 15px; margin-right: 8px; }
+  .tb-count { font-size: 12px; color: var(--o2-muted); margin-left: 4px; }
+
+  .tb-btn {
+    padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 600;
+    border: 1px solid var(--o2-border); background: var(--o2-card); color: var(--o2-text);
+    cursor: pointer; transition: all 0.15s; text-decoration: none;
+  }
+  .tb-btn:hover { background: #232a3b; }
+  .tb-add-float { border-color: rgba(34,197,94,0.3); color: #22c55e; }
+  .tb-add-doodle { border-color: rgba(59,130,246,0.3); color: #3b82f6; }
+  .tb-add-3d { border-color: rgba(167,139,250,0.3); color: #a78bfa; }
+  .tb-link { display: inline-flex; }
+
+  .o2-body { display: flex; flex: 1; overflow: hidden; }
+
+  .o2-main {
+    flex: 1;
+    position: relative;
+    overflow-y: auto;
+    overflow-x: hidden;
+    background: #f8faf9;
+  }
+
+  .preview-iframe {
+    width: 100%;
+    border: none;
+    pointer-events: none;
+    opacity: 1;
+    display: block;
+  }
+
+  .overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    bottom: 0;
+    z-index: 10;
+    pointer-events: none;
+    min-height: 12000px;
+  }
+
+  .section-marker {
+    position: absolute;
+    left: 0; right: 0;
+    z-index: 5;
+    border-top: 1px dashed rgba(255,255,255,0.12);
+    pointer-events: none;
+  }
+  .marker-label {
+    position: absolute;
+    top: -1px; left: 0;
+    background: rgba(26,139,85,0.8);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 0 0 6px 0;
+    letter-spacing: 0.05em;
+  }
+
+  .magnet {
+    position: absolute;
+    pointer-events: auto;
+    width: 80px; height: 70px;
+    border: 2px dashed;
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    cursor: grab;
+    background: rgba(0,0,0,0.4);
+    backdrop-filter: blur(4px);
+    transition: box-shadow 0.15s;
+    z-index: 20;
+  }
+  .magnet:active { cursor: grabbing; }
+  .magnet.selected { box-shadow: 0 0 0 3px rgba(255,255,255,0.3); z-index: 30; }
+  .magnet.has-sample { width: 90px; height: 80px; }
+
+  .magnet-preview { width: 32px; height: 32px; }
+  .magnet-preview svg { width: 100%; height: 100%; }
+
+  .magnet-badge {
+    font-size: 8px; font-weight: 700; color: #fff;
+    padding: 1px 5px; border-radius: 3px; letter-spacing: 0.5px;
+  }
+  .magnet-id { font-size: 14px; font-weight: 800; }
+  .magnet-sample { font-size: 8px; color: var(--o2-muted); font-family: monospace; }
+
+  /* Sidebar */
+  .o2-sidebar {
+    width: 0;
+    flex-shrink: 0;
+    border-left: 1px solid var(--o2-border);
+    overflow: hidden;
+    background: #161b26;
+    transition: width 0.25s ease;
+  }
+  .o2-sidebar.open {
+    width: 340px;
+    overflow-y: auto;
+  }
+  .tb-sidebar-toggle { font-size: 13px; }
+
+  .sidebar-panel { padding: 16px; }
+  .sidebar-empty { text-align: center; padding-top: 40px; }
+  .sidebar-empty p { color: var(--o2-muted); font-size: 14px; margin: 0 0 16px; }
+  .sidebar-hint { margin-top: 24px; font-size: 12px; line-height: 1.5; }
+
+  .slot-detail { margin-bottom: 16px; }
+  .slot-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .slot-id { font-size: 22px; font-weight: 800; }
+  .slot-badge { font-size: 10px; font-weight: 700; color: #fff; padding: 2px 8px; border-radius: 4px; }
+  .slot-delete { background: none; border: none; cursor: pointer; font-size: 16px; margin-left: auto; }
+  .slot-info p { margin: 4px 0; font-size: 13px; color: var(--o2-muted); }
+  .slot-info b { color: var(--o2-text); }
+  .slot-notes { margin-top: 8px; }
+  .slot-notes label { font-size: 11px; color: var(--o2-muted); display: block; margin-bottom: 4px; }
+  .slot-notes input {
+    width: 100%; padding: 6px 10px; border-radius: 6px; font-size: 12px;
+    background: var(--o2-card); border: 1px solid var(--o2-border); color: var(--o2-text);
+    box-sizing: border-box;
+  }
+
+  .sb-btn {
+    padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 600;
+    border: 1px solid var(--o2-border); background: var(--o2-card); color: var(--o2-text);
+    cursor: pointer; transition: all 0.15s; margin: 4px 2px; display: inline-block;
+  }
+  .sb-btn:hover { background: #232a3b; }
+  .sb-clear { border-color: rgba(239,68,68,0.3); color: #ef4444; }
+
+  .picker h4 { font-size: 14px; font-weight: 700; margin: 12px 0 8px; }
+  .picker-tabs { display: flex; gap: 4px; margin-bottom: 8px; }
+  .picker-tabs button {
+    padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 600;
+    border: 1px solid var(--o2-border); background: var(--o2-card); color: var(--o2-muted);
+    cursor: pointer; transition: all 0.15s;
+  }
+  .picker-tabs button.active { background: var(--o2-green); color: #fff; border-color: var(--o2-green); }
+
+  .picker-search {
+    width: 100%; padding: 6px 10px; border-radius: 6px; font-size: 12px;
+    background: var(--o2-card); border: 1px solid var(--o2-border); color: var(--o2-text);
+    margin-bottom: 8px; box-sizing: border-box;
+  }
+
+  .picker-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(62px, 1fr));
+    gap: 4px;
+    max-height: calc(100vh - 440px);
+    overflow-y: auto;
+  }
+
+  .picker-item {
+    background: var(--o2-card); border: 1px solid var(--o2-border); border-radius: 8px;
+    padding: 6px; display: flex; flex-direction: column; align-items: center;
+    gap: 2px; cursor: pointer; transition: all 0.15s;
+  }
+  .picker-item:hover { border-color: rgba(26,139,85,0.4); background: #232a3b; }
+  .picker-item.assigned { border-color: var(--o2-green); background: rgba(26,139,85,0.1); }
+  .picker-svg { width: 36px; height: 36px; color: var(--o2-green); }
+  .picker-svg svg { width: 100%; height: 100%; }
+  .picker-id { font-size: 8px; color: var(--o2-muted); font-family: monospace; font-weight: 600; }
+
+  /* JSON panel */
+  .json-actions { margin-bottom: 8px; }
+  .json-preview {
+    background: var(--o2-card); border: 1px solid var(--o2-border); border-radius: 8px;
+    padding: 12px; font-size: 11px; font-family: 'SF Mono', monospace;
+    overflow: auto; max-height: 50vh; color: var(--o2-green); white-space: pre-wrap;
+    word-break: break-all; margin: 0 0 16px;
+  }
+  .json-input {
+    width: 100%; height: 120px; padding: 10px; border-radius: 8px;
+    background: var(--o2-card); border: 1px solid var(--o2-border); color: var(--o2-text);
+    font-size: 11px; font-family: monospace; resize: vertical;
+    box-sizing: border-box; margin-bottom: 8px;
+  }
+
+  .sidebar-panel h3 { font-size: 16px; font-weight: 700; margin: 0 0 12px; }
+  .sidebar-panel h4 { font-size: 13px; font-weight: 600; margin: 12px 0 6px; }
+</style>

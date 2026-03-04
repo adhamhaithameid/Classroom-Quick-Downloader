@@ -83,9 +83,11 @@ type deploymentSyncResult struct {
 	URL         string `json:"url"`
 	Users       string `json:"users"`
 	UsersCount  int64  `json:"usersCount"`
+	UsersMetric string `json:"usersMetric,omitempty"`
 	Version     string `json:"version"`
 	Rating      string `json:"rating"`
 	RatingCount int64  `json:"ratingCount"`
+	SyncSource  string `json:"syncSource,omitempty"`
 	Status      string `json:"status"`
 	Error       string `json:"error,omitempty"`
 	LatencyMS   int64  `json:"latencyMs"`
@@ -95,9 +97,11 @@ type deploymentSyncResult struct {
 type storeStats struct {
 	users       string
 	usersCount  int64
+	usersMetric string
 	version     string
 	rating      string
 	ratingCount int64
+	source      string
 }
 
 type deploymentTargetResponse struct {
@@ -424,9 +428,11 @@ func syncDeploymentTargets(
 			URL:         targetURL,
 			Users:       stats.users,
 			UsersCount:  stats.usersCount,
+			UsersMetric: stats.usersMetric,
 			Version:     stats.version,
 			Rating:      stats.rating,
 			RatingCount: stats.ratingCount,
+			SyncSource:  stats.source,
 			LatencyMS:   latencyMs,
 			SyncedAtUTC: nowMs,
 		}
@@ -453,6 +459,9 @@ func syncDeploymentTargets(
 			if strings.TrimSpace(stats.users) != "" {
 				data["users"] = strings.TrimSpace(stats.users)
 				data["usersCount"] = stats.usersCount
+				if stats.usersMetric != "" {
+					data["usersMetric"] = stats.usersMetric
+				}
 			}
 			if strings.TrimSpace(stats.version) != "" {
 				data["version"] = strings.TrimSpace(stats.version)
@@ -463,6 +472,9 @@ func syncDeploymentTargets(
 			}
 			data["syncStatus"] = "ok"
 			data["syncError"] = ""
+			if stats.source != "" {
+				data["syncSource"] = stats.source
+			}
 			data["syncLatencyMs"] = latencyMs
 			data["syncedAt"] = nowMs
 
@@ -509,6 +521,18 @@ func fetchAndParseStoreStats(ctx context.Context, client *http.Client, key, url 
 	if err := validateStoreURL(key, url); err != nil {
 		return storeStats{}, err
 	}
+	if key == "chrome" {
+		stats, err := fetchChromeStoreStatsByListingPage(ctx, client, url)
+		if err == nil {
+			return stats, nil
+		}
+	}
+	if key == "firefox" {
+		stats, err := fetchFirefoxStoreStatsByAPI(ctx, client, url)
+		if err == nil {
+			return stats, nil
+		}
+	}
 	if key == "edge" {
 		stats, err := fetchEdgeStoreStatsByDetailsAPI(ctx, client, url)
 		if err == nil {
@@ -542,7 +566,216 @@ func fetchAndParseStoreStats(ctx context.Context, client *http.Client, key, url 
 	if stats.users != "" && stats.usersCount == 0 {
 		stats.usersCount = parseApproxUsersCount(stats.users)
 	}
+	stats.source = "store_listing_html_fallback"
 	return stats, nil
+}
+
+func fetchChromeStoreStatsByListingPage(ctx context.Context, client *http.Client, listingURL string) (storeStats, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, listingURL, nil)
+	if err != nil {
+		return storeStats{}, err
+	}
+	req.Header.Set("User-Agent", "oracle-dashboard-sync/1.0")
+	resp, err := client.Do(req) // #nosec G107,G704 -- URL is validated by validateStoreURL.
+	if err != nil {
+		return storeStats{}, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		return storeStats{}, fmt.Errorf("chrome listing request failed with status %d", resp.StatusCode)
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 2*1024*1024))
+	if err != nil {
+		return storeStats{}, err
+	}
+	stats, ok := parseChromeStoreStatsFromInitData(string(body))
+	if !ok {
+		return storeStats{}, fmt.Errorf("could not parse chrome listing init payload")
+	}
+	stats.source = "chrome_store_init_data"
+	stats.usersMetric = "active_users"
+	return stats, nil
+}
+
+func parseChromeStoreStatsFromInitData(html string) (storeStats, bool) {
+	marker := "AF_initDataCallback({key: 'ds:0'"
+	start := strings.Index(html, marker)
+	if start == -1 {
+		return storeStats{}, false
+	}
+
+	dataPosRel := strings.Index(html[start:], "data:")
+	if dataPosRel == -1 {
+		return storeStats{}, false
+	}
+	dataPos := start + dataPosRel + len("data:")
+
+	arrayStart := strings.IndexByte(html[dataPos:], '[')
+	if arrayStart == -1 {
+		return storeStats{}, false
+	}
+	arrayStart += dataPos
+
+	jsonArray, ok := extractBalancedJSONArray(html, arrayStart)
+	if !ok {
+		return storeStats{}, false
+	}
+
+	var payload []any
+	if err := json.Unmarshal([]byte(jsonArray), &payload); err != nil || len(payload) == 0 {
+		return storeStats{}, false
+	}
+	record, ok := payload[0].([]any)
+	if !ok || len(record) < 19 {
+		return storeStats{}, false
+	}
+
+	usersCount := int64FromAny(record[14])
+	ratingCount := int64FromAny(record[4])
+	version := extractStoreVersion(stringFromAny(record[18]))
+	if version == "" {
+		version = extractStoreVersion(html)
+	}
+
+	var rating string
+	switch value := record[3].(type) {
+	case float64:
+		rating = formatRating(value)
+	case int:
+		rating = formatRating(float64(value))
+	case int64:
+		rating = formatRating(float64(value))
+	case json.Number:
+		if f, err := value.Float64(); err == nil {
+			rating = formatRating(f)
+		}
+	}
+
+	stats := storeStats{
+		usersCount:  usersCount,
+		version:     strings.TrimSpace(version),
+		rating:      strings.TrimSpace(rating),
+		ratingCount: ratingCount,
+	}
+	if usersCount > 0 {
+		stats.users = strconv.FormatInt(usersCount, 10)
+	}
+	if stats.users == "" && stats.version == "" && stats.rating == "" {
+		return storeStats{}, false
+	}
+	return stats, true
+}
+
+func extractBalancedJSONArray(input string, start int) (string, bool) {
+	if start < 0 || start >= len(input) || input[start] != '[' {
+		return "", false
+	}
+
+	depth := 0
+	inString := false
+	escaped := false
+	for i := start; i < len(input); i++ {
+		ch := input[i]
+		if inString {
+			if escaped {
+				escaped = false
+				continue
+			}
+			if ch == '\\' {
+				escaped = true
+				continue
+			}
+			if ch == '"' {
+				inString = false
+			}
+			continue
+		}
+		switch ch {
+		case '"':
+			inString = true
+		case '[':
+			depth++
+		case ']':
+			depth--
+			if depth == 0 {
+				return input[start : i+1], true
+			}
+			if depth < 0 {
+				return "", false
+			}
+		}
+	}
+	return "", false
+}
+
+func fetchFirefoxStoreStatsByAPI(ctx context.Context, client *http.Client, listingURL string) (storeStats, error) {
+	parsed, err := url.Parse(strings.TrimSpace(listingURL))
+	if err != nil {
+		return storeStats{}, err
+	}
+	slug := extractFirefoxAddonSlug(parsed.Path)
+	if slug == "" {
+		return storeStats{}, fmt.Errorf("firefox listing URL missing addon slug")
+	}
+	apiURL := fmt.Sprintf("%s://%s/api/v5/addons/addon/%s/", parsed.Scheme, parsed.Host, url.PathEscape(slug))
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+	if err != nil {
+		return storeStats{}, err
+	}
+	req.Header.Set("User-Agent", "oracle-dashboard-sync/1.0")
+	resp, err := client.Do(req) // #nosec G107,G704 -- host/scheme are inherited from validated listing URL.
+	if err != nil {
+		return storeStats{}, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		return storeStats{}, fmt.Errorf("firefox addon API request failed with status %d", resp.StatusCode)
+	}
+
+	var payload struct {
+		AverageDailyUsers float64 `json:"average_daily_users"`
+		Ratings           struct {
+			Average float64 `json:"average"`
+			Count   float64 `json:"count"`
+		} `json:"ratings"`
+		CurrentVersion struct {
+			Version string `json:"version"`
+		} `json:"current_version"`
+	}
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 1024*1024)).Decode(&payload); err != nil {
+		return storeStats{}, err
+	}
+
+	stats := storeStats{
+		version:     strings.TrimSpace(payload.CurrentVersion.Version),
+		rating:      formatRating(payload.Ratings.Average),
+		ratingCount: int64(payload.Ratings.Count),
+		source:      "firefox_addons_api_v5",
+		usersMetric: "average_daily_users",
+	}
+	if payload.AverageDailyUsers >= 0 {
+		stats.usersCount = int64(payload.AverageDailyUsers)
+		stats.users = strconv.FormatInt(stats.usersCount, 10)
+	}
+
+	if stats.users == "" && stats.version == "" && stats.rating == "" {
+		return storeStats{}, fmt.Errorf("firefox addon API payload missing metrics")
+	}
+	return stats, nil
+}
+
+func extractFirefoxAddonSlug(pathValue string) string {
+	segments := strings.Split(strings.Trim(path.Clean(pathValue), "/"), "/")
+	for i := 0; i < len(segments)-1; i++ {
+		if strings.EqualFold(strings.TrimSpace(segments[i]), "addon") {
+			slug := strings.TrimSpace(segments[i+1])
+			if slug != "" {
+				return slug
+			}
+			return ""
+		}
+	}
+	return ""
 }
 
 func fetchEdgeStoreStatsByDetailsAPI(ctx context.Context, client *http.Client, listingURL string) (storeStats, error) {
@@ -581,7 +814,9 @@ func fetchEdgeStoreStatsByDetailsAPI(ctx context.Context, client *http.Client, l
 	}
 
 	stats := storeStats{
-		version: strings.TrimSpace(payload.Version),
+		version:     strings.TrimSpace(payload.Version),
+		source:      "edge_addons_details_api",
+		usersMetric: "active_install_count",
 	}
 	if payload.ActiveInstallCount >= 0 {
 		stats.usersCount = int64(payload.ActiveInstallCount)
@@ -868,8 +1103,9 @@ func StartDeploymentsAutoSyncLoop(
 			runCtx, cancel := context.WithTimeout(ctx, 40*time.Second)
 			results, okCount, err = syncDeploymentTargets(runCtx, store, sqliteDB, client, metrics, targetSet, false, true)
 			cancel()
-			// Any successful target means sync made progress; keep regular schedule.
-			if err == nil && (okCount > 0 || len(results) == 0) {
+			// Retry until the batch is fully successful so transient per-target
+			// failures do not leave partial stale state for an entire interval.
+			if err == nil && (len(results) == 0 || okCount == int64(len(results))) {
 				break
 			}
 			if attempt < maxAttempts {

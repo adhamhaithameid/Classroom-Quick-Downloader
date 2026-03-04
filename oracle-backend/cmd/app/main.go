@@ -4,7 +4,9 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io"
@@ -65,6 +67,7 @@ func validateAuditCheckpointSecret(secret string) error {
 
 func validateProductionSecurityConfig(
 	appEnv string,
+	sessionCookieMode string,
 	allowLoopbackBypass bool,
 	allowEmptyDashboardPassword bool,
 	allowHTTPStoreURLs bool,
@@ -87,6 +90,9 @@ func validateProductionSecurityConfig(
 	}
 	if allowUntrustedStoreURLs {
 		return errors.New("ORACLE_ALLOW_UNTRUSTED_STORE_URLS must be false in production")
+	}
+	if !strings.EqualFold(strings.TrimSpace(sessionCookieMode), "true") {
+		return errors.New("SESSION_COOKIE_SECURE must be true in production")
 	}
 	for _, network := range trustedProxyNets {
 		if network == nil {
@@ -118,6 +124,7 @@ func main() {
 
 	if err := validateProductionSecurityConfig(
 		os.Getenv("APP_ENV"),
+		sessionCookieSecureMode,
 		allowLoopbackBypass,
 		allowEmptyDashboardPassword,
 		os.Getenv("ORACLE_ALLOW_HTTP_STORE_URLS") == "true",
@@ -230,23 +237,47 @@ func main() {
 	// Backwards-compatible alias, if you ever used /storeBatch naming.
 	mux.HandleFunc("/storeBatch", ingestHandler)
 
+	// Public website endpoints (unauthenticated, sanitized, CORS restricted).
+	mux.Handle("/api/public/website/snapshot", handlers.PublicWebsiteSnapshotHandler(sqlDB, postgresDB))
+	mux.Handle("/api/public/website/overview", handlers.PublicWebsiteOverviewHandler(sqlDB, postgresDB))
+	mux.Handle("/api/public/website/map", handlers.PublicWebsiteMapHandler(sqlDB, postgresDB))
+	mux.Handle("/api/public/website/status", handlers.PublicWebsiteStatusHandler(sqlDB, postgresDB))
+	mux.Handle("/api/public/website/changelog", handlers.PublicWebsiteUserChangelogHandler(sqlDB, postgresDB))
+	mux.Handle("/api/public/website/uninstall", handlers.PublicWebsiteUninstallHandler(sqlDB))
+	// NEWSLETTER_CTA_DISABLED_ROLLBACK_START
+	// mux.Handle("/api/public/website/newsletter/subscribe", handlers.PublicWebsiteNewsletterSubscribeHandler(sqlDB, postgresDB))
+	// NEWSLETTER_CTA_DISABLED_ROLLBACK_END
+	mux.Handle("/api/public/website/events", handlers.PublicWebsiteEventsHandler(sqlDB))
+	mux.Handle("/api/internal/website/events/batch", handlers.InternalWebsiteEventsBatchHandler(sqlDB, doSecret))
+
+	// Extension changelog (public, CORS-enabled).
+	mux.Handle("/api/public/extension/changelog", handlers.ExtensionChangelogPublicHandler(sqlDB))
+
 	// Analytics API endpoints (protected by auth when DASHBOARD_PASSWORD is set).
 	setAuthStateDB(sqlDB)
 	authMiddleware := requireAuth(sqlDB, dashboardPassword, archiverSecret, allowLoopbackBypass)
 	criticalMiddleware := requireStepUp(sqlDB, superAdminPassword)
 	allowedRecordTypes := map[string]struct{}{
-		"deployment_target":          {},
-		"deployment_update_sentence": {},
-		"extension_version_note":     {},
-		"creative_design":            {},
-		"creative_email_template":    {},
-		"newsletter_subscriber":      {},
-		"newsletter_campaign":        {},
+		"deployment_target":               {},
+		"deployment_update_sentence":      {},
+		"extension_version_note":          {},
+		"creative_design":                 {},
+		"creative_email_template":         {},
+		"newsletter_subscriber":           {},
+		"newsletter_campaign":             {},
+		"website_user_changelog_entry":    {},
+		"website_user_changelog_revision": {},
+		"website_user_changelog_config":   {},
+		"website_user_privacy":            {},
 	}
 	mux.Handle("/api/stats/summary", authMiddleware(handlers.SummaryHandler(sqlDB)))
 	mux.Handle("/api/stats/timeseries", authMiddleware(handlers.TimeSeriesHandler(sqlDB)))
 	mux.Handle("/api/stats/breakdown", authMiddleware(handlers.BreakdownHandler(sqlDB)))
 	mux.Handle("/api/stats/comparison", authMiddleware(handlers.ComparisonHandler(sqlDB)))
+	mux.Handle("/api/stats/visitors-timeseries", authMiddleware(handlers.VisitorsTimeseriesHandler(sqlDB)))
+	mux.Handle("/api/stats/funnel", authMiddleware(handlers.FunnelHandler(sqlDB)))
+	mux.Handle("/api/stats/segments", authMiddleware(handlers.SegmentsHandler(sqlDB)))
+	mux.Handle("/api/stats/heatmap", authMiddleware(handlers.HeatmapHandler(sqlDB)))
 	mux.Handle("/api/stats/export", authMiddleware(handlers.ExportHandler(sqlDB)))
 	mux.Handle("/api/deploy-status", authMiddleware(handlers.DeployStatusHandler()))
 	mux.Handle("/api/pipeline/metrics", authMiddleware(handlers.PipelineMetricsHandler(sqlDB)))
@@ -287,7 +318,8 @@ func main() {
 	mux.Handle("/api/admin/deployments/sync", authMiddleware(handlers.DeploymentsSyncHandler(sqlDB, postgresDB, appMetrics)))
 	mux.Handle("/api/admin/dashboard-links", authMiddleware(handlers.DashboardLinksHandler(
 		getenv("CLOUDFLARE_DASHBOARD_URL", "https://cqd-analytics.adhamhaithameid.workers.dev/"),
-		getenv("UPTIME_KUMA_URL", "http://129.151.233.229:3001/status/cqd"),
+		getenv("PUBLIC_SITE_URL", ""),
+		getenv("UPTIME_KUMA_URL", "https://cqd-analytics.adhamhaithameid.workers.dev/pipeline-health"),
 		getenv("GITHUB_REPO_URL", "https://github.com/adhamhaithameid/Classroom-Quick-Downloader"),
 		getenv("GOOGLE_SHEETS_URL", "https://docs.google.com/spreadsheets/d/1ptzLKUVnAkyXnT635Zgb1C6Img9aeAZ1se3nRz_QZmI/edit?gid=0#gid=0"),
 		getenv("FIGMA_DESIGN_URL", "https://www.figma.com/design/hQLRpncinKnJQRG1lhCdQG/Google-Classroom-Downloade-Icon?node-id=0-1&t=5Eimhfrvp8RwFC19-1"),
@@ -300,7 +332,39 @@ func main() {
 	mux.Handle("/api/admin/oracle-logs", authMiddleware(handlers.OracleOperationLogsListHandler(sqlDB)))
 	mux.Handle("/api/admin/oracle-logs/delete-older", authMiddleware(criticalMiddleware(handlers.OracleOperationLogsDeleteOlderHandler(sqlDB))))
 	mux.Handle("/api/admin/oracle-logs/clear-all", authMiddleware(criticalMiddleware(handlers.OracleOperationLogsClearAllHandler(sqlDB))))
+	mux.Handle("/api/admin/sheets/flush-now", authMiddleware(criticalMiddleware(ManualSheetsFlushHandler(sqlDB))))
 	mux.Handle("/api/admin/sheets/last-flush", authMiddleware(handlers.SheetsLastFlushHandler(sqlDB)))
+	cloudflarePublicSiteMetricsURL := getenv("CLOUDFLARE_PUBLIC_SITE_METRICS_URL", "")
+	websiteTrafficSyncConfig := handlers.WebsiteTrafficSyncConfig{
+		Enabled:    websiteTrafficSyncEnabled(),
+		APIToken:   strings.TrimSpace(os.Getenv("CLOUDFLARE_ANALYTICS_API_TOKEN")),
+		AccountTag: strings.TrimSpace(os.Getenv("CLOUDFLARE_ANALYTICS_ACCOUNT_TAG")),
+		Hostname:   websiteTrafficSyncHostname(),
+		Interval:   websiteTrafficSyncInterval(),
+		Lookback:   websiteTrafficSyncLookback(),
+	}
+	mux.Handle("/api/admin/website/state", authMiddleware(handlers.WebsiteOpsStateHandler(sqlDB)))
+	mux.Handle("/api/admin/website/analytics", authMiddleware(handlers.WebsiteAnalyticsHandler(sqlDB, websiteTrafficSyncConfig)))
+	mux.Handle("/api/admin/website/traffic/refresh", authMiddleware(criticalMiddleware(handlers.WebsiteTrafficRefreshHandler(sqlDB, websiteTrafficSyncConfig))))
+	mux.Handle("/api/admin/website/force-push", authMiddleware(criticalMiddleware(handlers.WebsiteOpsForcePushHandler(sqlDB))))
+	mux.Handle("/api/admin/website/pull-cloudflare", authMiddleware(criticalMiddleware(handlers.WebsiteOpsPullCloudflareHandler(sqlDB, cloudflarePublicSiteMetricsURL))))
+	mux.Handle("/api/admin/website/reconcile-totals", authMiddleware(criticalMiddleware(handlers.WebsiteOpsReconcileTotalsHandler(sqlDB))))
+	mux.Handle("/api/admin/website/override", authMiddleware(criticalMiddleware(handlers.WebsiteOpsOverrideHandler(sqlDB))))
+	mux.Handle("/api/admin/website/one-am-toggle", authMiddleware(criticalMiddleware(handlers.WebsiteOpsOneAMToggleHandler(sqlDB))))
+
+	// Extension changelog admin endpoints.
+	mux.Handle("/api/admin/extension-changelog/entries", authMiddleware(handlers.ExtChangelogEntriesListHandler(sqlDB)))
+	mux.Handle("/api/admin/extension-changelog/entries/upsert", authMiddleware(criticalMiddleware(handlers.ExtChangelogEntriesUpsertHandler(sqlDB))))
+	mux.Handle("/api/admin/extension-changelog/entries/delete", authMiddleware(criticalMiddleware(handlers.ExtChangelogEntriesDeleteHandler(sqlDB))))
+	mux.Handle("/api/admin/extension-changelog/rules", authMiddleware(handlers.ExtChangelogRulesListHandler(sqlDB)))
+	mux.Handle("/api/admin/extension-changelog/rules/upsert", authMiddleware(criticalMiddleware(handlers.ExtChangelogRulesUpsertHandler(sqlDB))))
+	mux.Handle("/api/admin/extension-changelog/rules/delete", authMiddleware(criticalMiddleware(handlers.ExtChangelogRulesDeleteHandler(sqlDB))))
+	mux.Handle("/api/admin/extension-changelog/config", authMiddleware(handlers.ExtChangelogConfigHandler(sqlDB)))
+	mux.Handle("/api/admin/extension-changelog/config/save", authMiddleware(criticalMiddleware(handlers.ExtChangelogConfigSaveHandler(sqlDB))))
+	mux.Handle("/api/admin/extension-changelog/import-github/preview", authMiddleware(criticalMiddleware(handlers.ExtChangelogImportGitHubPreviewHandler(sqlDB))))
+	mux.Handle("/api/admin/extension-changelog/import-github", authMiddleware(criticalMiddleware(handlers.ExtChangelogImportGitHubHandler(sqlDB))))
+	mux.Handle("/api/admin/extension-changelog/bulk-import", authMiddleware(criticalMiddleware(handlers.ExtChangelogBulkImportHandler(sqlDB))))
+
 	mux.Handle("/metrics", authMiddleware(metricsHandler(appMetrics, sqlDB)))
 
 	// Auth endpoints
@@ -330,6 +394,10 @@ func main() {
 		log.Printf("[Scheduler] deployment auto-sync enabled (interval=%s)", interval)
 		go handlers.StartDeploymentsAutoSyncLoop(serverCtx, sqlDB, postgresDB, appMetrics, interval)
 	}
+	go handlers.StartWebsiteOneAMPublisherLoop(serverCtx, sqlDB)
+	go handlers.StartWebsiteCloudflareSlotPullLoop(serverCtx, sqlDB, cloudflarePublicSiteMetricsURL)
+	go handlers.StartWebsiteTrafficSyncLoop(serverCtx, sqlDB, websiteTrafficSyncConfig)
+	go handlers.StartPublicWebsiteSnapshotRefreshLoop(serverCtx, sqlDB, postgresDB)
 	go startInMemoryStoreCleanupLoop(serverCtx, 15*time.Minute)
 	log.Println("[WARN] Session stores are in-memory. Sessions will NOT survive restarts and are NOT shared " +
 		"across multiple replicas. For HA deployments, configure POSTGRES_DSN to enable persisted auth state, " +
@@ -412,6 +480,12 @@ const (
 	defaultDeploymentsAutoSyncInterval = 15 * time.Minute
 	minDeploymentsAutoSyncInterval     = 1 * time.Minute
 	maxDeploymentsAutoSyncInterval     = 24 * time.Hour
+	defaultWebsiteTrafficSyncInterval  = 1 * time.Hour
+	minWebsiteTrafficSyncInterval      = 1 * time.Minute
+	maxWebsiteTrafficSyncInterval      = 24 * time.Hour
+	defaultWebsiteTrafficSyncLookback  = 48 * time.Hour
+	minWebsiteTrafficSyncLookback      = 1 * time.Hour
+	maxWebsiteTrafficSyncLookback      = 30 * 24 * time.Hour
 )
 
 func deploymentsAutoSyncEnabled() bool {
@@ -419,11 +493,13 @@ func deploymentsAutoSyncEnabled() bool {
 	switch raw {
 	case "true", "1", "yes", "on":
 		return true
-	case "", "false", "0", "no", "off":
+	case "":
+		return true
+	case "false", "0", "no", "off":
 		return false
 	default:
-		log.Printf("[Scheduler] Invalid deployments auto-sync enabled value; defaulting to disabled")
-		return false
+		log.Printf("[Scheduler] Invalid deployments auto-sync enabled value; defaulting to enabled")
+		return true
 	}
 }
 
@@ -447,6 +523,93 @@ func deploymentsAutoSyncInterval() time.Duration {
 		return maxDeploymentsAutoSyncInterval
 	}
 	return interval
+}
+
+func websiteTrafficSyncEnabled() bool {
+	raw := strings.ToLower(getenvWithAliases("ORACLE_WEBSITE_TRAFFIC_SYNC_ENABLED", "WEBSITE_TRAFFIC_SYNC_ENABLED"))
+	switch raw {
+	case "true", "1", "yes", "on":
+		return true
+	case "":
+		return false
+	case "false", "0", "no", "off":
+		return false
+	default:
+		log.Printf("[Scheduler] Invalid ORACLE_WEBSITE_TRAFFIC_SYNC_ENABLED value; defaulting to disabled")
+		return false
+	}
+}
+
+func websiteTrafficSyncInterval() time.Duration {
+	raw := getenvWithAliases("ORACLE_WEBSITE_TRAFFIC_SYNC_INTERVAL_SECONDS", "WEBSITE_TRAFFIC_SYNC_INTERVAL_SECONDS")
+	if raw == "" {
+		return defaultWebsiteTrafficSyncInterval
+	}
+	seconds, err := strconv.Atoi(raw)
+	if err != nil || seconds <= 0 {
+		log.Printf("[Scheduler] Invalid ORACLE_WEBSITE_TRAFFIC_SYNC_INTERVAL_SECONDS value; using default %s", defaultWebsiteTrafficSyncInterval)
+		return defaultWebsiteTrafficSyncInterval
+	}
+	interval := time.Duration(seconds) * time.Second
+	if interval < minWebsiteTrafficSyncInterval {
+		log.Printf("[Scheduler] ORACLE_WEBSITE_TRAFFIC_SYNC_INTERVAL_SECONDS below minimum; clamping to %s", minWebsiteTrafficSyncInterval)
+		return minWebsiteTrafficSyncInterval
+	}
+	if interval > maxWebsiteTrafficSyncInterval {
+		log.Printf("[Scheduler] ORACLE_WEBSITE_TRAFFIC_SYNC_INTERVAL_SECONDS above maximum; clamping to %s", maxWebsiteTrafficSyncInterval)
+		return maxWebsiteTrafficSyncInterval
+	}
+	return interval
+}
+
+func websiteTrafficSyncLookback() time.Duration {
+	raw := getenvWithAliases("ORACLE_WEBSITE_TRAFFIC_SYNC_LOOKBACK_HOURS", "WEBSITE_TRAFFIC_SYNC_LOOKBACK_HOURS")
+	if raw == "" {
+		return defaultWebsiteTrafficSyncLookback
+	}
+	hours, err := strconv.Atoi(raw)
+	if err != nil || hours <= 0 {
+		log.Printf("[Scheduler] Invalid ORACLE_WEBSITE_TRAFFIC_SYNC_LOOKBACK_HOURS value; using default %s", defaultWebsiteTrafficSyncLookback)
+		return defaultWebsiteTrafficSyncLookback
+	}
+	lookback := time.Duration(hours) * time.Hour
+	if lookback < minWebsiteTrafficSyncLookback {
+		log.Printf("[Scheduler] ORACLE_WEBSITE_TRAFFIC_SYNC_LOOKBACK_HOURS below minimum; clamping to %s", minWebsiteTrafficSyncLookback)
+		return minWebsiteTrafficSyncLookback
+	}
+	if lookback > maxWebsiteTrafficSyncLookback {
+		log.Printf("[Scheduler] ORACLE_WEBSITE_TRAFFIC_SYNC_LOOKBACK_HOURS above maximum; clamping to %s", maxWebsiteTrafficSyncLookback)
+		return maxWebsiteTrafficSyncLookback
+	}
+	return lookback
+}
+
+func websiteTrafficSyncHostname() string {
+	if explicit := strings.TrimSpace(os.Getenv("CLOUDFLARE_ANALYTICS_HOSTNAME")); explicit != "" {
+		return explicit
+	}
+	siteURL := strings.TrimSpace(os.Getenv("PUBLIC_SITE_URL"))
+	if siteURL == "" {
+		return ""
+	}
+	if parsed, err := url.Parse(siteURL); err == nil {
+		if host := strings.TrimSpace(parsed.Hostname()); host != "" {
+			log.Printf( // #nosec G706 -- host is sanitized before it is written to logs.
+				"[Scheduler] CLOUDFLARE_ANALYTICS_HOSTNAME not set; using host from PUBLIC_SITE_URL (%s)",
+				sanitizeLogValue(host),
+			)
+			return host
+		}
+	}
+	candidate := strings.TrimSpace(strings.TrimSuffix(strings.Split(siteURL, "/")[0], "."))
+	if candidate != "" && !strings.Contains(candidate, " ") {
+		log.Printf( // #nosec G706 -- candidate value is sanitized before it is written to logs.
+			"[Scheduler] CLOUDFLARE_ANALYTICS_HOSTNAME not set; using PUBLIC_SITE_URL fallback value (%s)",
+			sanitizeLogValue(candidate),
+		)
+		return candidate
+	}
+	return ""
 }
 
 // HealthDBHandler returns a handler that checks the database connection
@@ -572,6 +735,50 @@ func resourceIDFromRequest(r *http.Request) string {
 	return "-"
 }
 
+var dangerAuditPaths = map[string]struct{}{
+	"/api/admin/flags/update":                              {},
+	"/api/admin/outbox/retry":                              {},
+	"/api/admin/outbox/replay-dead-letter":                 {},
+	"/api/admin/dr/drill":                                  {},
+	"/api/admin/retention/run":                             {},
+	"/api/admin/sql/query":                                 {},
+	"/api/admin/sql/exec":                                  {},
+	"/api/admin/danger/clear-data":                         {},
+	"/api/admin/backup/run":                                {},
+	"/api/admin/records/upsert":                            {},
+	"/api/admin/records/delete":                            {},
+	"/api/admin/creative/designs/upsert":                   {},
+	"/api/admin/creative/designs/delete":                   {},
+	"/api/admin/creative/emails/upsert":                    {},
+	"/api/admin/creative/emails/delete":                    {},
+	"/api/admin/newsletter/subscribers/upsert":             {},
+	"/api/admin/newsletter/subscribers/delete":             {},
+	"/api/admin/newsletter/campaigns/upsert":               {},
+	"/api/admin/newsletter/campaigns/delete":               {},
+	"/api/admin/oracle-logs/delete-older":                  {},
+	"/api/admin/oracle-logs/clear-all":                     {},
+	"/api/admin/sheets/flush-now":                          {},
+	"/api/admin/website/traffic/refresh":                   {},
+	"/api/admin/website/force-push":                        {},
+	"/api/admin/website/pull-cloudflare":                   {},
+	"/api/admin/website/reconcile-totals":                  {},
+	"/api/admin/website/override":                          {},
+	"/api/admin/website/one-am-toggle":                     {},
+	"/api/admin/extension-changelog/entries/upsert":        {},
+	"/api/admin/extension-changelog/entries/delete":        {},
+	"/api/admin/extension-changelog/rules/upsert":          {},
+	"/api/admin/extension-changelog/rules/delete":          {},
+	"/api/admin/extension-changelog/config/save":           {},
+	"/api/admin/extension-changelog/import-github/preview": {},
+	"/api/admin/extension-changelog/import-github":         {},
+	"/api/admin/extension-changelog/bulk-import":           {},
+}
+
+func isDangerAuditedPath(requestPath string) bool {
+	_, ok := dangerAuditPaths[strings.TrimSpace(requestPath)]
+	return ok
+}
+
 // loggingMiddleware emits structured request logs with correlation context.
 func loggingMiddleware(db *sql.DB, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -671,6 +878,30 @@ func loggingMiddleware(db *sql.DB, next http.Handler) http.Handler {
 		); err != nil {
 			log.Printf("[WARN] failed to write oracle operation log: %v", err)
 		}
+		if isDangerAuditedPath(r.URL.Path) {
+			auditResult := "ok"
+			if sw.statusCode >= 400 {
+				auditResult = "error"
+			}
+			if err := handlers.AppendAuditLog(
+				r.Context(),
+				db,
+				"danger_action_request",
+				resourceTypeFromRequest(r),
+				r.URL.Path,
+				auditResult,
+				map[string]any{
+					"method":      r.Method,
+					"path":        r.URL.Path,
+					"statusCode":  sw.statusCode,
+					"latencyMs":   duration.Milliseconds(),
+					"requestID":   requestID,
+					"correlation": correlationID,
+				},
+			); err != nil {
+				log.Printf("[WARN] failed to append danger action audit entry: %v", err)
+			}
+		}
 	})
 }
 
@@ -756,9 +987,9 @@ func serveIndexWithNonce(w http.ResponseWriter, r *http.Request, staticRoot stri
 // - GOOGLE_CREDS_PATH: Path to service account JSON (default: /run/secrets/google-credentials.json)
 // - KUMA_PUSH_URL: Optional Uptime Kuma push URL
 func scheduleSheetsArchiver() {
-	sheetsID := os.Getenv("SHEETS_ID")
+	sheetsID := resolveSheetsIDFromEnv()
 	if sheetsID == "" {
-		log.Println("[Scheduler] SHEETS_ID not set, skipping automated Sheets export")
+		log.Println("[Scheduler] Sheets ID not configured, skipping automated Sheets export")
 		return
 	}
 
@@ -788,8 +1019,61 @@ func scheduleSheetsArchiver() {
 
 		// Run the archiver
 		log.Println("[Scheduler] Running scheduled Sheets export...")
+		if !tryAcquireManualSheetsFlush() {
+			log.Println("[Scheduler] Skipping scheduled Sheets export because a flush is already running")
+			continue
+		}
 		runArchiver(sheetsID, credsPath, kumaPushURL, archiverSecret, archiverAPI)
+		releaseManualSheetsFlush()
 	}
+}
+
+func resolveSheetsIDFromEnv() string {
+	candidates := []string{
+		strings.TrimSpace(os.Getenv("SHEETS_ID")),
+		strings.TrimSpace(os.Getenv("GOOGLE_SHEETS_ID")),
+	}
+	for _, candidate := range candidates {
+		if candidate != "" {
+			return candidate
+		}
+	}
+	for _, key := range []string{"GOOGLE_SHEETS_URL", "SHEETS_URL"} {
+		if parsed := extractGoogleSheetID(strings.TrimSpace(os.Getenv(key))); parsed != "" {
+			return parsed
+		}
+	}
+	return ""
+}
+
+func extractGoogleSheetID(raw string) string {
+	if raw == "" {
+		return ""
+	}
+	if !strings.Contains(raw, "/") {
+		if len(raw) >= 20 && len(raw) <= 120 {
+			return raw
+		}
+		return ""
+	}
+	marker := "/d/"
+	idx := strings.Index(raw, marker)
+	if idx < 0 {
+		return ""
+	}
+	rest := raw[idx+len(marker):]
+	if rest == "" {
+		return ""
+	}
+	end := strings.IndexAny(rest, "/?#&")
+	if end >= 0 {
+		rest = rest[:end]
+	}
+	rest = strings.TrimSpace(rest)
+	if len(rest) < 20 || len(rest) > 120 {
+		return ""
+	}
+	return rest
 }
 
 // runArchiver executes the archiver binary with the given parameters.
@@ -963,6 +1247,7 @@ func recordSheetsFlushRunResult(
 	if db == nil {
 		return
 	}
+	verifiedMetaJSON := buildSheetsFlushVerificationMeta(status, rowJSON, summaryJSON, metaJSON, errorMessage)
 	recordCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	if err := handlers.RecordSheetsFlushRun(recordCtx, db, handlers.SheetsFlushRunRecordInput{
@@ -973,11 +1258,156 @@ func recordSheetsFlushRunResult(
 		APIURL:       apiURL,
 		RowJSON:      rowJSON,
 		SummaryJSON:  summaryJSON,
-		MetaJSON:     metaJSON,
+		MetaJSON:     verifiedMetaJSON,
 		ErrorMessage: errorMessage,
 	}); err != nil {
 		log.Printf("[Scheduler] Failed to persist sheets flush run: %v", err)
 	}
+}
+
+func buildSheetsFlushVerificationMeta(
+	status string,
+	rowJSON []byte,
+	summaryJSON []byte,
+	metaJSON []byte,
+	errorMessage string,
+) []byte {
+	meta := map[string]any{}
+	if trimmed := strings.TrimSpace(string(metaJSON)); trimmed != "" {
+		var parsed map[string]any
+		if err := json.Unmarshal([]byte(trimmed), &parsed); err == nil && parsed != nil {
+			meta = parsed
+		}
+	}
+
+	rowSHA := sha256Hex(rowJSON)
+	summarySHA := sha256Hex(summaryJSON)
+	previousMetaSHA := sha256Hex(metaJSON)
+	expectedRows := extractExpectedRowsFromSummary(summaryJSON)
+	actualRows := inferArchivedRowCount(rowJSON)
+	rowCountStatus := "unknown"
+	if expectedRows >= 0 {
+		if actualRows == expectedRows {
+			rowCountStatus = "match"
+		} else {
+			rowCountStatus = "mismatch"
+		}
+	}
+	checksumStatus := "unknown"
+	if rowSHA != "" && summarySHA != "" {
+		checksumStatus = "match"
+	}
+
+	notes := make([]string, 0, 4)
+	if rowCountStatus == "mismatch" {
+		notes = append(notes, "row_count_mismatch")
+	}
+	if strings.TrimSpace(errorMessage) != "" {
+		notes = append(notes, "flush_error_present")
+	}
+
+	verified := strings.EqualFold(strings.TrimSpace(status), "ok") &&
+		checksumStatus == "match" &&
+		(rowCountStatus == "match" || rowCountStatus == "unknown")
+
+	verification := map[string]any{
+		"schemaVersion":  "1",
+		"checkedAtUtc":   time.Now().UTC().UnixMilli(),
+		"rowSha256":      rowSHA,
+		"summarySha256":  summarySHA,
+		"metaSha256":     previousMetaSHA,
+		"checksumStatus": checksumStatus,
+		"rowCountStatus": rowCountStatus,
+		"expectedRows":   expectedRows,
+		"actualRows":     actualRows,
+		"verified":       verified,
+		"notes":          notes,
+	}
+	meta["verification"] = verification
+
+	encoded, err := json.Marshal(meta)
+	if err != nil {
+		return metaJSON
+	}
+	return encoded
+}
+
+func extractExpectedRowsFromSummary(summaryJSON []byte) int64 {
+	trimmed := strings.TrimSpace(string(summaryJSON))
+	if trimmed == "" {
+		return -1
+	}
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(trimmed), &payload); err != nil {
+		return -1
+	}
+	if value, ok := payload["rows"]; ok {
+		return int64FromInterface(value, -1)
+	}
+	if value, ok := payload["rowCount"]; ok {
+		return int64FromInterface(value, -1)
+	}
+	if totals, ok := payload["totals"].(map[string]any); ok {
+		if value, exists := totals["rows"]; exists {
+			return int64FromInterface(value, -1)
+		}
+		if value, exists := totals["rowCount"]; exists {
+			return int64FromInterface(value, -1)
+		}
+	}
+	return -1
+}
+
+func inferArchivedRowCount(rowJSON []byte) int64 {
+	trimmed := strings.TrimSpace(string(rowJSON))
+	if trimmed == "" {
+		return 0
+	}
+	var payload any
+	if err := json.Unmarshal([]byte(trimmed), &payload); err != nil {
+		return 0
+	}
+	switch value := payload.(type) {
+	case []any:
+		return int64(len(value))
+	case map[string]any:
+		return 1
+	default:
+		return 1
+	}
+}
+
+func int64FromInterface(value any, fallback int64) int64 {
+	switch n := value.(type) {
+	case int:
+		return int64(n)
+	case int64:
+		return n
+	case int32:
+		return int64(n)
+	case float64:
+		return int64(n)
+	case float32:
+		return int64(n)
+	case json.Number:
+		if parsed, err := n.Int64(); err == nil {
+			return parsed
+		}
+	case string:
+		parsed, err := strconv.ParseInt(strings.TrimSpace(n), 10, 64)
+		if err == nil {
+			return parsed
+		}
+	}
+	return fallback
+}
+
+func sha256Hex(input []byte) string {
+	if len(input) == 0 {
+		return ""
+	}
+	sum := sha256.Sum256(input)
+	return hex.EncodeToString(sum[:])
 }
 
 const (

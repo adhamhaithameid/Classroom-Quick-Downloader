@@ -11,9 +11,10 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MODE="${1:-help}"
-ORACLE_SSH_DEST="${ORACLE_SSH_DEST:-ubuntu@129.151.233.229}"
+ORACLE_SSH_DEST="${ORACLE_SSH_DEST:-}"
 ORACLE_SSH_KEY="${ORACLE_SSH_KEY:-$HOME/.ssh/oracle_key}"
 ORACLE_REMOTE_REPO_DIR="${ORACLE_REMOTE_REPO_DIR:-\$HOME/Classroom-Quick-Downloader}"
+ORACLE_TARGET_REF="${ORACLE_TARGET_REF:-origin/main}"
 
 require_cmd() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -32,6 +33,10 @@ deploy_cloudflare() {
 
 deploy_oracle() {
   require_cmd ssh
+  if [[ -z "${ORACLE_SSH_DEST:-}" ]]; then
+    echo "ORACLE_SSH_DEST is required (example: ubuntu@<oracle-host>)" >&2
+    exit 1
+  fi
   if [[ ! -f "$ORACLE_SSH_KEY" ]]; then
     echo "Oracle SSH key not found: $ORACLE_SSH_KEY" >&2
     exit 1
@@ -39,7 +44,8 @@ deploy_oracle() {
   echo "[oracle] deploying remotely via SSH"
   echo "  target: $ORACLE_SSH_DEST"
   echo "  key: $ORACLE_SSH_KEY"
-  ssh -i "$ORACLE_SSH_KEY" "$ORACLE_SSH_DEST" "REPO_DIR=$ORACLE_REMOTE_REPO_DIR bash -s" <<'EOF'
+  echo "  git ref: $ORACLE_TARGET_REF"
+  ssh -i "$ORACLE_SSH_KEY" "$ORACLE_SSH_DEST" "REPO_DIR=$ORACLE_REMOTE_REPO_DIR TARGET_REF=$ORACLE_TARGET_REF bash -s" <<'EOF'
 set -euo pipefail
 if [[ ! -d "$REPO_DIR/.git" ]]; then
   git clone https://github.com/adhamhaithameid/Classroom-Quick-Downloader.git "$REPO_DIR"
@@ -67,9 +73,10 @@ Usage:
   ./tools/deploy_manual.sh all
 
 Environment overrides:
-  ORACLE_SSH_DEST        SSH destination (default: ubuntu@129.151.233.229)
+  ORACLE_SSH_DEST        SSH destination (required, e.g. ubuntu@<oracle-host>)
   ORACLE_SSH_KEY         SSH key path (default: ~/.ssh/oracle_key)
   ORACLE_REMOTE_REPO_DIR Repo path on server (default: $HOME/Classroom-Quick-Downloader)
+  ORACLE_TARGET_REF      Git ref to deploy on Oracle (default: origin/main)
 EOF
     ;;
   *)

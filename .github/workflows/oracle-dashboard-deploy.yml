@@ -1,0 +1,166 @@
+name: Deploy Oracle Dashboard
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-oracle-dashboard-main
+  cancel-in-progress: true
+
+jobs:
+  preflight:
+    name: Pre-deploy Guardrails
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate required GitHub secrets
+        env:
+          ORACLE_HOST: ${{ secrets.ORACLE_HOST }}
+          ORACLE_SSH_KEY: ${{ secrets.ORACLE_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          required=(ORACLE_HOST ORACLE_SSH_KEY)
+          for key in "${required[@]}"; do
+            if [ -z "${!key:-}" ]; then
+              echo "::error::Missing required Actions secret: ${key}"
+              exit 1
+            fi
+          done
+
+      - name: Schema compatibility checks
+        run: bash tools/check_schema_compat.sh
+
+  deploy:
+    name: Deploy Oracle Backend on VM
+    runs-on: ubuntu-latest
+    needs: preflight
+
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.ORACLE_HOST }}
+          username: ubuntu
+          key: ${{ secrets.ORACLE_SSH_KEY }}
+          port: 22
+          script_stop: true
+          command_timeout: 45m
+          script: |
+            set -euo pipefail
+
+            REPO_DIR="$HOME/Classroom-Quick-Downloader"
+            if [ ! -d "$REPO_DIR/.git" ]; then
+              git clone https://github.com/adhamhaithameid/Classroom-Quick-Downloader.git "$REPO_DIR"
+            fi
+
+            cd "$REPO_DIR"
+            git fetch --prune origin main
+            git checkout main
+            git reset --hard origin/main
+
+            cd oracle-backend
+            if [ ! -f .env.production ]; then
+              echo ".env.production is missing on the Oracle VM. Create it first."
+              exit 1
+            fi
+
+            required_env_keys=(
+              APP_ENV
+              ADDR
+              DB_PATH
+              STATIC_DIR
+              DO_SHARED_SECRET
+              DASHBOARD_PASSWORD
+              SUPER_ADMIN_PASSWORD
+              DANGER_PASSWORD
+              ARCHIVER_SHARED_SECRET
+              ORACLE_AUDIT_CHECKPOINT_SECRET
+              PUBLIC_WEBSITE_ALLOWED_ORIGINS
+            )
+            for key in "${required_env_keys[@]}"; do
+              value="$(grep -E "^${key}=" .env.production | head -n1 | cut -d= -f2- || true)"
+              if [ -z "${value}" ]; then
+                echo "Missing required key in .env.production: ${key}"
+                exit 1
+              fi
+            done
+
+            if [ ! -f docker-compose.runtime.override.yml ]; then
+              cat > docker-compose.runtime.override.yml <<'EOF'
+            services:
+              oracle-backend:
+                env_file:
+                  - .env.production
+            EOF
+            fi
+
+            SHA="$(cd .. && git rev-parse HEAD)"
+            NOW="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+
+            if grep -q '^GIT_COMMIT=' .env.production; then
+              sed -i "s#^GIT_COMMIT=.*#GIT_COMMIT=${SHA}#" .env.production
+            else
+              printf '\nGIT_COMMIT=%s\n' "$SHA" >> .env.production
+            fi
+            if grep -q '^DEPLOY_TIME=' .env.production; then
+              sed -i "s#^DEPLOY_TIME=.*#DEPLOY_TIME=${NOW}#" .env.production
+            else
+              printf 'DEPLOY_TIME=%s\n' "$NOW" >> .env.production
+            fi
+
+            cp .env.production .env
+            chmod 600 .env.production .env docker-compose.runtime.override.yml
+
+            export COMPOSE_PROJECT_NAME=oracle-backend
+            docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.runtime.override.yml up -d --build --no-deps --force-recreate oracle-backend
+
+            health_ok="false"
+            for i in $(seq 1 60); do
+              if curl -fsS "http://127.0.0.1:8080/health" >/dev/null 2>&1; then
+                health_ok="true"
+                echo "Oracle health check passed"
+                break
+              fi
+              sleep 2
+            done
+
+            if [ "${health_ok}" != "true" ]; then
+              echo "Oracle health check failed after deploy"
+              docker logs --tail 120 cqd-oracle-backend || true
+              exit 1
+            fi
+
+            auth_code="$(curl -sS -o /tmp/oracle-auth.json -w "%{http_code}" "http://127.0.0.1:8080/api/admin/website/state" || true)"
+            if [ "$auth_code" != "401" ] && [ "$auth_code" != "403" ]; then
+              echo "Oracle auth smoke check expected 401/403, got ${auth_code}"
+              cat /tmp/oracle-auth.json || true
+              exit 1
+            fi
+
+            snapshot_payload="$(curl -fsS "http://127.0.0.1:8080/api/public/website/snapshot")"
+            echo "$snapshot_payload" | grep -Eq '"schemaVersion"[[:space:]]*:[[:space:]]*"1"'
+
+            smoke_origin="$(grep -E '^PUBLIC_WEBSITE_ALLOWED_ORIGINS=' .env.production | head -n1 | cut -d= -f2- | tr ',' '\n' | head -n1 | xargs)"
+            if [ -z "$smoke_origin" ]; then
+              smoke_origin="https://classroom-quick-downloader-website.pages.dev"
+            fi
+            event_id="gha-oracle-${GITHUB_RUN_ID:-manual}-${GITHUB_RUN_ATTEMPT:-1}"
+            ingest_payload="$(cat <<JSON
+            {"schemaVersion":"1","sessionId":"gha-oracle-smoke","pagePath":"/ci/smoke","events":[{"eventId":"${event_id}","eventType":"cta","action":"install_click","placement":"hero_install"}]}
+            JSON
+            )"
+            ingest_response="$(curl -fsS -X POST "http://127.0.0.1:8080/api/public/website/events" \
+              -H "Origin: ${smoke_origin}" \
+              -H "Content-Type: application/json" \
+              -H "X-Requested-With: XMLHttpRequest" \
+              --data "$ingest_payload")"
+            echo "$ingest_response" | grep -Eq '"ok"[[:space:]]*:[[:space:]]*true'
+            echo "Oracle post-deploy smoke checks passed"

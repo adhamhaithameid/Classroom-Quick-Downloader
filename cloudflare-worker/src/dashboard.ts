@@ -8,3 +8,4 @@
 // Re-export dashboard rendering functions
 export { renderLoginPage } from "./dashboard/main";
 export { renderDashboard } from "./dashboard/main";
+export { renderWebsiteConsole } from "./dashboard/websiteConsole";

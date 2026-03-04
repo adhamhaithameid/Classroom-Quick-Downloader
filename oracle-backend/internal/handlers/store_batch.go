@@ -2,6 +2,7 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"crypto/subtle"
@@ -156,7 +157,7 @@ func IngestBatchHandlerV4(sqliteDB, postgresDB *sql.DB, sharedSecret string) htt
 		}
 
 		var batch model.OracleBatch
-		if err := json.Unmarshal(bodyBytes, &batch); err != nil {
+		if err := decodeOracleBatchStrict(bodyBytes, &batch); err != nil {
 			logEvent("warn", "ingest_invalid_json", map[string]interface{}{
 				"error": err.Error(),
 			})
@@ -222,6 +223,22 @@ func IngestBatchHandlerV4(sqliteDB, postgresDB *sql.DB, sharedSecret string) htt
 			IngestedAt: time.Now().UnixMilli(),
 		})
 	}
+}
+
+func decodeOracleBatchStrict(body []byte, dst *model.OracleBatch) error {
+	dec := json.NewDecoder(bytes.NewReader(body))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(dst); err != nil {
+		return err
+	}
+	var extra any
+	if err := dec.Decode(&extra); err != io.EOF {
+		if err == nil {
+			return errTrailingJSON
+		}
+		return err
+	}
+	return nil
 }
 
 func shouldUsePostgresPrimaryIngest(ctx context.Context, sqliteDB, postgresDB *sql.DB) (bool, error) {

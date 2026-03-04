@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -64,6 +65,22 @@ func TestRecordSheetsFlushRunResult_PersistsToDB(t *testing.T) {
 	}
 	if count != 1 {
 		t.Fatalf("expected one stored flush record, got %d", count)
+	}
+
+	var metaRaw string
+	if err := sqlDB.QueryRow(`SELECT COALESCE(meta_json, '') FROM sheets_flush_runs ORDER BY id DESC LIMIT 1`).Scan(&metaRaw); err != nil {
+		t.Fatalf("query sheets meta_json failed: %v", err)
+	}
+	var meta map[string]any
+	if err := json.Unmarshal([]byte(metaRaw), &meta); err != nil {
+		t.Fatalf("decode meta_json failed: %v", err)
+	}
+	verification, ok := meta["verification"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected meta_json.verification object, got %v", meta["verification"])
+	}
+	if verified, ok := verification["verified"].(bool); !ok || !verified {
+		t.Fatalf("expected verification.verified=true, got %v", verification["verified"])
 	}
 }
 

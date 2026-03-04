@@ -25,14 +25,33 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 10.28.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install JS dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Oracle dashboard assets
+        run: pnpm -C oracle-backend build:dashboard
+
+      - name: Typecheck Oracle dashboard TS
+        run: pnpm -C oracle-backend typecheck:dashboard
+
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
           go-version: "1.24.13"
 
-      - name: Run unit + integration tests
-        working-directory: oracle-backend
-        run: go test ./... -count=1
+      - name: Run Oracle heavy test matrix
+        run: pnpm -C oracle-backend test:strict
 
       - name: Run go vet
         working-directory: oracle-backend
@@ -59,6 +78,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 10.28.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install JS dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Oracle dashboard assets
+        run: pnpm -C oracle-backend build:dashboard
+
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
@@ -84,17 +120,25 @@ jobs:
         with:
           go-version: "1.24.13"
 
+      - name: Generate runtime smoke secrets
+        run: |
+          echo "ORACLE_SMOKE_DO_SHARED_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          echo "ORACLE_SMOKE_DASHBOARD_PASSWORD=$(openssl rand -hex 24)" >> "$GITHUB_ENV"
+          echo "ORACLE_SMOKE_SUPER_ADMIN_PASSWORD=$(openssl rand -hex 24)" >> "$GITHUB_ENV"
+          echo "ORACLE_SMOKE_ARCHIVER_SHARED_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          echo "ORACLE_SMOKE_AUDIT_CHECKPOINT_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+
       - name: Start backend
         working-directory: oracle-backend
         env:
           ADDR: 127.0.0.1:18080
           DB_PATH: ${{ runner.temp }}/oracle-runtime-smoke.db
           STATIC_DIR: ./static
-          DO_SHARED_SECRET: do-shared-2026-02-14-strong
-          DASHBOARD_PASSWORD: DashAuth#2026!Oracle
-          SUPER_ADMIN_PASSWORD: SuperAdmin#2026!Oracle
-          ARCHIVER_SHARED_SECRET: Archiver#2026!Oracle
-          ORACLE_AUDIT_CHECKPOINT_SECRET: AuditAnchor2026OracleStrong
+          DO_SHARED_SECRET: ${{ env.ORACLE_SMOKE_DO_SHARED_SECRET }}
+          DASHBOARD_PASSWORD: ${{ env.ORACLE_SMOKE_DASHBOARD_PASSWORD }}
+          SUPER_ADMIN_PASSWORD: ${{ env.ORACLE_SMOKE_SUPER_ADMIN_PASSWORD }}
+          ARCHIVER_SHARED_SECRET: ${{ env.ORACLE_SMOKE_ARCHIVER_SHARED_SECRET }}
+          ORACLE_AUDIT_CHECKPOINT_SECRET: ${{ env.ORACLE_SMOKE_AUDIT_CHECKPOINT_SECRET }}
           SESSION_COOKIE_SECURE: "false"
           ALLOW_INSECURE_COOKIES: "true"
           ORACLE_ALLOW_HTTP_STORE_URLS: "true"
@@ -120,8 +164,8 @@ jobs:
         working-directory: oracle-backend
         env:
           BASE_URL: http://127.0.0.1:18080
-          DASHBOARD_PASSWORD: DashAuth#2026!Oracle
-          SUPER_ADMIN_PASSWORD: SuperAdmin#2026!Oracle
+          DASHBOARD_PASSWORD: ${{ env.ORACLE_SMOKE_DASHBOARD_PASSWORD }}
+          SUPER_ADMIN_PASSWORD: ${{ env.ORACLE_SMOKE_SUPER_ADMIN_PASSWORD }}
           ORACLE_ALLOW_HTTP_STORE_URLS: "true"
         run: ./scripts/api-matrix-smoke.sh
 

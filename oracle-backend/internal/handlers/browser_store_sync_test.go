@@ -45,6 +45,23 @@ func TestParseStoreStatsFullFromHTML_WithRatings(t *testing.T) {
 	}
 }
 
+func TestParseChromeStoreStatsFromInitData(t *testing.T) {
+	html := `<script>AF_initDataCallback({key: 'ds:0', hash: '2', data:[["oemoongiefmpmomjikcjmkkkhffcbdid","icon","Classroom Quick Downloader",4.9,12,null,null,null,null,null,null,null,null,null,345,null,null,null,"{\"version\":\"1.3.7\"}"]], sideChannel: {}});</script>`
+	stats, ok := parseChromeStoreStatsFromInitData(html)
+	if !ok {
+		t.Fatal("expected chrome init-data parser to succeed")
+	}
+	if stats.usersCount != 345 || stats.users != "345" {
+		t.Fatalf("unexpected users payload: %+v", stats)
+	}
+	if stats.version != "1.3.7" {
+		t.Fatalf("expected version 1.3.7, got %q", stats.version)
+	}
+	if stats.rating != "4.9" || stats.ratingCount != 12 {
+		t.Fatalf("unexpected rating payload: %+v", stats)
+	}
+}
+
 func TestParseApproxUsersCount(t *testing.T) {
 	cases := []struct {
 		in   string
@@ -104,6 +121,43 @@ func TestFetchEdgeStoreStatsByDetailsAPI(t *testing.T) {
 	}
 	if stats.rating != "5.0" || stats.ratingCount != 1 {
 		t.Fatalf("unexpected rating payload: %+v", stats)
+	}
+	if stats.source != "edge_addons_details_api" {
+		t.Fatalf("expected edge source marker, got %+v", stats)
+	}
+	if stats.usersMetric != "active_install_count" {
+		t.Fatalf("expected edge users metric marker, got %+v", stats)
+	}
+}
+
+func TestFetchFirefoxStoreStatsByAPI(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v5/addons/addon/classroom-quick-downloader/" {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write([]byte(`{"average_daily_users":17,"ratings":{"average":4.8,"count":23},"current_version":{"version":"1.3.7"}}`))
+	}))
+	defer server.Close()
+
+	stats, err := fetchFirefoxStoreStatsByAPI(context.Background(), server.Client(), server.URL+"/en-US/firefox/addon/classroom-quick-downloader/")
+	if err != nil {
+		t.Fatalf("fetchFirefoxStoreStatsByAPI failed: %v", err)
+	}
+	if stats.usersCount != 17 || stats.users != "17" {
+		t.Fatalf("unexpected users payload: %+v", stats)
+	}
+	if stats.version != "1.3.7" {
+		t.Fatalf("unexpected version payload: %+v", stats)
+	}
+	if stats.rating != "4.8" || stats.ratingCount != 23 {
+		t.Fatalf("unexpected rating payload: %+v", stats)
+	}
+	if stats.source != "firefox_addons_api_v5" {
+		t.Fatalf("expected firefox source marker, got %+v", stats)
+	}
+	if stats.usersMetric != "average_daily_users" {
+		t.Fatalf("expected firefox users metric marker, got %+v", stats)
 	}
 }
 

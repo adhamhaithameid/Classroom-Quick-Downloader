@@ -7,9 +7,36 @@
     "preinstall": "node tools/enforce-pnpm.cjs",
     "dev": "node tools/dev-browser.cjs",
     "dev:ext": "pnpm --filter extension dev",
+    "dev:oracle": "cd oracle-backend && go run ./cmd/app",
+    "dev:website": "pnpm -C website dev",
     "build:ext": "pnpm --filter extension build",
+    "build:website": "pnpm -C website build",
+    "test:website": "pnpm -C website test",
+    "test:unit": "pnpm -C website test:unit",
+    "test:integration": "pnpm -C website test:integration && (cd oracle-backend && go test ./internal/handlers -run PublicWebsite -count=1)",
+    "test:acceptance": "pnpm -C website test:acceptance",
+    "test:component": "pnpm -C website test:component",
+    "test:system": "pnpm -C website test:system && (cd oracle-backend && go test ./cmd/app -run Integration -count=1)",
     "test:oracle": "pnpm -C oracle-backend test",
+    "test:smoke": "pnpm -C website run test:smoke && pnpm -C cloudflare-worker run test:smoke && pnpm -C oracle-backend run test:smoke",
+    "test:functional": "pnpm -C website run test:functional && pnpm -C cloudflare-worker run test:functional && pnpm -C oracle-backend run test:functional",
+    "test:integration:all": "pnpm -C website run test:integration && pnpm -C cloudflare-worker run test:integration && pnpm -C oracle-backend run test:integration",
+    "test:regression": "pnpm -C website run test:regression && pnpm -C cloudflare-worker run test:regression && pnpm -C oracle-backend run test:regression",
+    "test:load": "pnpm -C website run test:load && pnpm -C cloudflare-worker run test:load && pnpm -C oracle-backend run test:load",
+    "test:stress": "pnpm -C website run test:stress && pnpm -C cloudflare-worker run test:stress && pnpm -C oracle-backend run test:stress",
+    "test:security:all": "pnpm -C website run test:security && pnpm -C cloudflare-worker run test:security && pnpm -C oracle-backend run test:security",
+    "test:ui": "pnpm -C website run test:ui && pnpm -C cloudflare-worker run test:ui && pnpm -C oracle-backend run test:ui",
+    "test:fuzz:all": "pnpm -C website run test:fuzz && pnpm -C cloudflare-worker run test:fuzz && pnpm -C oracle-backend run test:fuzz",
+    "test:reliability": "pnpm -C website run test:reliability && pnpm -C cloudflare-worker run test:reliability && pnpm -C oracle-backend run test:reliability",
+    "test:strict": "pnpm run test:smoke && pnpm run test:functional && pnpm run test:integration:all && pnpm run test:regression && pnpm run test:load && pnpm run test:stress && pnpm run test:security:all && pnpm run test:ui && pnpm run test:fuzz:all && pnpm run test:reliability && pnpm -C website run test:strict && pnpm -C cloudflare-worker run test:strict && pnpm -C oracle-backend run test:strict && pnpm -C extension run compile && pnpm -C extension run test",
+    "phase12:verify": "bash tools/phase12_verify.sh",
+    "phase13:smoke": "bash tools/phase13_smoke.sh",
+    "phase13:monitor": "bash tools/phase13_monitor.sh",
+    "phase13:rollout": "bash tools/phase13_rollout.sh",
+    "scan:security": "pnpm -C cloudflare-worker run validate && pnpm -C cloudflare-worker audit && pnpm -C website audit && pnpm -C extension audit && (cd oracle-backend && ./scripts/full-scan.sh)",
+    "scan:repo": "pnpm run test:strict && pnpm run scan:security",
     "validate:oracle": "pnpm -C oracle-backend validate",
+    "sync:manual-changelog": "node tools/sync-manual-changelog.mjs",
     "changelog:full": "node tools/generate-full-changelog.mjs",
     "prepare": "husky"
   },
@@ -19,18 +46,20 @@
       "eslint>ajv": "8.18.0",
       "undici": ">=7.18.2",
       "@isaacs/brace-expansion": ">=5.0.1",
-      "minimatch": "^10.2.1",
-      "web-ext-run>multimatch": "8.0.0"
+      "minimatch": "^10.2.3",
+      "rollup": "^4.59.0",
+      "web-ext-run>multimatch": "8.0.0",
+      "cookie": "0.7.2"
     },
     "packageExtensions": {
-      "eslint@10.0.1": {
+      "eslint@10.0.2": {
         "dependencies": {
           "ajv-draft-04": "1.0.0"
         }
       }
     },
     "patchedDependencies": {
-      "eslint@10.0.1": "patches/eslint@10.0.1.patch"
+      "eslint@10.0.2": "patches/eslint@10.0.2.patch"
     }
   },
   "devDependencies": {

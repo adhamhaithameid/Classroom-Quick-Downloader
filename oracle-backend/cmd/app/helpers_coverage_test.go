@@ -37,6 +37,25 @@ func TestGetenvAndGetenvFloat(t *testing.T) {
 	}
 }
 
+func TestWebsiteTrafficSyncHostname(t *testing.T) {
+	t.Setenv("CLOUDFLARE_ANALYTICS_HOSTNAME", "metrics.example.com")
+	t.Setenv("PUBLIC_SITE_URL", "https://fallback.example.com")
+	if got := websiteTrafficSyncHostname(); got != "metrics.example.com" {
+		t.Fatalf("expected explicit analytics hostname, got %q", got)
+	}
+
+	t.Setenv("CLOUDFLARE_ANALYTICS_HOSTNAME", "")
+	t.Setenv("PUBLIC_SITE_URL", "https://root.example.com/path")
+	if got := websiteTrafficSyncHostname(); got != "root.example.com" {
+		t.Fatalf("expected hostname derived from PUBLIC_SITE_URL, got %q", got)
+	}
+
+	t.Setenv("PUBLIC_SITE_URL", "")
+	if got := websiteTrafficSyncHostname(); got != "" {
+		t.Fatalf("expected empty hostname when envs are missing, got %q", got)
+	}
+}
+
 func TestHealthDBHandler(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "health.db")
 	sqlDB, err := db.Init(dbPath)
@@ -84,6 +103,9 @@ func TestHealthDBHandler(t *testing.T) {
 
 func TestScheduleSheetsArchiver_NoSheetConfiguredReturnsImmediately(t *testing.T) {
 	t.Setenv("SHEETS_ID", "")
+	t.Setenv("GOOGLE_SHEETS_ID", "")
+	t.Setenv("GOOGLE_SHEETS_URL", "")
+	t.Setenv("SHEETS_URL", "")
 	done := make(chan struct{})
 	go func() {
 		scheduleSheetsArchiver()
@@ -130,6 +152,24 @@ func TestSanitizeLogValue_ReplacesNewLines(t *testing.T) {
 	got := sanitizeLogValue(in)
 	if got != "line1_line2_line3" {
 		t.Fatalf("unexpected sanitized value: %q", got)
+	}
+}
+
+func TestResolveSheetsIDFromEnv_Fallbacks(t *testing.T) {
+	t.Setenv("SHEETS_ID", "")
+	t.Setenv("GOOGLE_SHEETS_ID", "")
+	t.Setenv("GOOGLE_SHEETS_URL", "https://docs.google.com/spreadsheets/d/1ptzLKUVnAkyXnT635Zgb1C6Img9aeAZ1se3nRz_QZmI/edit#gid=0")
+	t.Setenv("SHEETS_URL", "")
+	got := resolveSheetsIDFromEnv()
+	if got != "1ptzLKUVnAkyXnT635Zgb1C6Img9aeAZ1se3nRz_QZmI" {
+		t.Fatalf("expected sheet id to be parsed from URL, got %q", got)
+	}
+
+	t.Setenv("GOOGLE_SHEETS_URL", "")
+	t.Setenv("GOOGLE_SHEETS_ID", "sheet-direct-id-1234567890123456")
+	got = resolveSheetsIDFromEnv()
+	if got != "sheet-direct-id-1234567890123456" {
+		t.Fatalf("expected sheet id from GOOGLE_SHEETS_ID, got %q", got)
 	}
 }
 
@@ -317,8 +357,8 @@ func TestArchiverRunTimeout(t *testing.T) {
 func TestDeploymentsAutoSyncEnabled(t *testing.T) {
 	t.Setenv("DEPLOYMENTS_AUTO_SYNC_ENABLED", "")
 	t.Setenv("ORACLE_DEPLOYMENTS_AUTO_SYNC_ENABLED", "")
-	if deploymentsAutoSyncEnabled() {
-		t.Fatal("expected default auto-sync to be disabled when env is empty")
+	if !deploymentsAutoSyncEnabled() {
+		t.Fatal("expected default auto-sync to be enabled when env is empty")
 	}
 
 	t.Setenv("ORACLE_DEPLOYMENTS_AUTO_SYNC_ENABLED", "true")
@@ -350,8 +390,8 @@ func TestDeploymentsAutoSyncEnabled(t *testing.T) {
 
 	t.Setenv("ORACLE_DEPLOYMENTS_AUTO_SYNC_ENABLED", "garbage")
 	t.Setenv("DEPLOYMENTS_AUTO_SYNC_ENABLED", "")
-	if deploymentsAutoSyncEnabled() {
-		t.Fatal("expected invalid value to default to disabled")
+	if !deploymentsAutoSyncEnabled() {
+		t.Fatal("expected invalid value to default to enabled")
 	}
 }
 

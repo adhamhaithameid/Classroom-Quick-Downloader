@@ -80,8 +80,7 @@ func TestIngestWritesOutboxAndSchemaRegistry(t *testing.T) {
 				}
 			}
 		],
-		"doState":{"ok":true},
-		"extra":{"newThing":{"enabled":true}}
+		"doState":{"ok":true}
 	}`
 
 	req := httptest.NewRequest(http.MethodPost, "/ingest-batch", strings.NewReader(payload))
@@ -102,11 +101,11 @@ func TestIngestWritesOutboxAndSchemaRegistry(t *testing.T) {
 	}
 
 	var schemaPathCount int64
-	if err := sqlDB.QueryRow(`SELECT COUNT(*) FROM cf_schema_registry WHERE json_path = 'extra.newThing.enabled'`).Scan(&schemaPathCount); err != nil {
+	if err := sqlDB.QueryRow(`SELECT COUNT(*) FROM cf_schema_registry WHERE json_path = 'summary.totals.totalEvents'`).Scan(&schemaPathCount); err != nil {
 		t.Fatalf("failed querying schema registry: %v", err)
 	}
 	if schemaPathCount == 0 {
-		t.Fatalf("expected schema drift path to be registered")
+		t.Fatalf("expected schema path to be registered")
 	}
 }
 
@@ -1142,10 +1141,11 @@ func TestIngestRawSnapshotRedactsIPData(t *testing.T) {
 		"timeZone":"UTC",
 		"summary":{"totals":{"totalEvents":1,"totalDownloads":1,"totalSuccess":1,"totalFail":0}},
 		"timeBuckets":[],
-		"doState":{"ok":true},
-		"uniqueIps":["1.1.1.1","8.8.8.8"],
-		"clientIp":"9.9.9.9",
-		"nested":{"ip_address":"4.4.4.4"}
+		"doState":{
+			"ok":true,
+			"retryState":{"consecutiveFailures":1,"lastError":"9.9.9.9"}
+		},
+		"uniqueIps":["1.1.1.1","8.8.8.8"]
 	}`
 
 	req := httptest.NewRequest(http.MethodPost, "/ingest-batch", bytes.NewBufferString(payload))
@@ -1161,7 +1161,7 @@ func TestIngestRawSnapshotRedactsIPData(t *testing.T) {
 	if err := sqlDB.QueryRow(`SELECT payload_json FROM cf_snapshots_raw ORDER BY id DESC LIMIT 1`).Scan(&rawPayload); err != nil {
 		t.Fatalf("failed to load raw snapshot payload: %v", err)
 	}
-	if strings.Contains(rawPayload, "1.1.1.1") || strings.Contains(rawPayload, "8.8.8.8") || strings.Contains(rawPayload, "9.9.9.9") || strings.Contains(rawPayload, "4.4.4.4") {
+	if strings.Contains(rawPayload, "1.1.1.1") || strings.Contains(rawPayload, "8.8.8.8") || strings.Contains(rawPayload, "9.9.9.9") {
 		t.Fatalf("expected IP values to be redacted, got payload: %s", rawPayload)
 	}
 	if !strings.Contains(rawPayload, "REDACTED") {

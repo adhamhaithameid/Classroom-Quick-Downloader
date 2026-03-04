@@ -1,6 +1,6 @@
 // filepath: entrypoints/popup/App.tsx
 
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
 import './App.css';
 import logoSrc from '../../assets/CQD.png';
 import logoGraySrc from '../../assets/CQD-gray.png';
@@ -8,13 +8,27 @@ import bmcLogoSrc from '../../assets/bmc-logo.svg';
 import chromeSvg from '../../assets/Chrome.svg';
 import firefoxSvg from '../../assets/Firefox.svg';
 import edgeSvg from '../../assets/Edge.svg';
-import { fetchChangelog, getMatchingRule, getRuleClasses, isVersionSeen, markAsSeen, getLatestChange, type ChangelogData } from '../utils/changelog';
+import {
+  fetchChangelogDetailed,
+  getMatchingRule,
+  getRuleClasses,
+  isVersionSeen,
+  markAsSeen,
+  getLatestChange,
+  type ChangelogData,
+  type ChangelogFetchResult
+} from '../utils/changelog';
+import { CHANGELOG_SITE_URL } from '../utils/analytics/constants';
 
 // External Links
 const SURVEY_URL = 'https://forms.gle/wPU2b1Qxa7svHqJa6';
 const GITHUB_REPO_URL =
   'https://github.com/adhamhaithameid/classroom-quick-downloader';
+const GITHUB_PROFILE_URL = 'https://github.com/adhamhaithameid';
+const GITHUB_STAR_URL = `${GITHUB_REPO_URL}/stargazers`;
+const GITHUB_AVATAR_URL = 'https://github.com/adhamhaithameid.png?size=80';
 const BUY_ME_COFFEE_URL = 'https://buymeacoffee.com/adhamhaithameid';
+const CHANGELOG_POLL_MS = 15_000;
 
 // Extension Store URLs for each browser
 const EXTENSION_STORE_URLS = {
@@ -329,12 +343,13 @@ function App() {
   // REAL STATS STATE
   const [stats, setStats] = useState<StatItem[]>([]);
   const [totalDownloads, setTotalDownloads] = useState(0);
-  const [cancelledDownloads, setCancelledDownloads] = useState(0);
   const [hoveredStatId, setHoveredStatId] = useState<string | null>(null);
 
   // CHANGELOG STATE
   const [changelogData, setChangelogData] = useState<ChangelogData | null>(null);
   const [showChangelog, setShowChangelog] = useState(false);
+  const [changelogStatus, setChangelogStatus] = useState<'loading' | 'ready' | 'offline' | 'error'>('loading');
+  const [changelogStatusMessage, setChangelogStatusMessage] = useState<string | null>(null);
 
   // Track scroll to add blur/shadow under header when not at top
   useEffect(() => {
@@ -412,7 +427,6 @@ function App() {
         if (!browserApi || !browserApi.storage || !browserApi.storage.local) {
             if (isStale()) return;
             setTotalDownloads(0);
-            setCancelledDownloads(0);
             setStats([]); // Empty stats in dev
             return;
         }
@@ -432,10 +446,6 @@ function App() {
         if (isStale()) return;
         const raw = result.local_stats || { total: 0, byType: {} };
         const totalDownloadsNext = raw.total || 0;
-        const rawCancelled = Number(raw.cancelled);
-        const cancelledDownloadsNext = Number.isFinite(rawCancelled)
-          ? Math.max(0, Math.floor(rawCancelled))
-          : 0;
 
         // Convert byType object to sorted array
         const entries = Object.entries(raw.byType as Record<string, number>);
@@ -480,7 +490,6 @@ function App() {
         }
         if (isStale()) return;
         setTotalDownloads(totalDownloadsNext);
-        setCancelledDownloads(cancelledDownloadsNext);
         setStats(mapped);
 
       } catch (e) {
@@ -517,18 +526,77 @@ function App() {
 
   // --- CHANGELOG LOADING ---
   useEffect(() => {
-    fetchChangelog().then((data) => {
-      setChangelogData(data);
-    });
+    let cancelled = false;
+    let inFlight = false;
+
+    const applyChangelogFetchResult = (result: ChangelogFetchResult) => {
+      if (cancelled) return;
+      if (result.data) {
+        setChangelogData(result.data);
+      }
+      if (result.status === 'cache-fallback') {
+        setChangelogStatus('offline');
+        setChangelogStatusMessage(result.error || 'Oracle is unreachable. Showing cached changelog.');
+        return;
+      }
+      if (result.status === 'error') {
+        setChangelogStatus('error');
+        setChangelogStatusMessage(result.error || 'Unable to load changelog from Oracle.');
+        return;
+      }
+      setChangelogStatus('ready');
+      if (result.status === 'empty') {
+        setChangelogStatusMessage('No changelog entries are available yet.');
+      } else {
+        setChangelogStatusMessage(null);
+      }
+    };
+
+    const loadChangelog = async () => {
+      if (inFlight) return;
+      inFlight = true;
+      if (!changelogData) {
+        setChangelogStatus('loading');
+      }
+      try {
+        const result = await fetchChangelogDetailed(true);
+        applyChangelogFetchResult(result);
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    void loadChangelog();
+
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        void loadChangelog();
+      }
+    };
+
+    window.addEventListener('focus', handleVisibilityOrFocus);
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    const pollId = window.setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        void loadChangelog();
+      }
+    }, CHANGELOG_POLL_MS);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(pollId);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+    };
   }, []);
 
   // --- SEEN STATE ---
   const [seen, setSeen] = useState(false);
   useEffect(() => {
     if (version) {
-       isVersionSeen(version).then(setSeen);
+       isVersionSeen(version, changelogData).then(setSeen);
     }
-  }, [version]);
+  }, [version, changelogData?.revisionToken]);
 
   // --- GLOBAL SETTINGS LOGIC ---
   useEffect(() => {
@@ -603,6 +671,32 @@ function App() {
     }
   }
 
+  function openExternalUrl(url: string): void {
+    if (!url) return;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const browserApi = (globalThis as any).chrome as typeof chrome | undefined;
+    if (browserApi?.tabs?.create) {
+      try {
+        browserApi.tabs.create({ url });
+        return;
+      } catch {
+        // fallback below
+      }
+    }
+
+    try {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } catch {
+      // ignore
+    }
+  }
+
+  function handleChangelogWebsiteClick(event: MouseEvent<HTMLAnchorElement>): void {
+    event.preventDefault();
+    openExternalUrl(CHANGELOG_SITE_URL);
+  }
+
   const handleCopyLink = async (browser: BrowserType) => {
     try {
       await navigator.clipboard.writeText(EXTENSION_STORE_URLS[browser]);
@@ -644,6 +738,17 @@ function App() {
       index,
     };
   });
+
+  const matchedRule = version ? getMatchingRule(changelogData?.config, version) : null;
+  const fallbackRule = !matchedRule && changelogData?.entries?.length
+    ? {
+        id: 'fallback-unseen',
+        target: 'all',
+        priority: 'minor' as const,
+        effect: 'glow' as const,
+      }
+    : null;
+  const effectiveRule = matchedRule ?? fallbackRule;
 
   const isLoadingSettings = loadingState || settings == null;
   const isEnabled = settings?.extensionEnabled ?? true;
@@ -690,13 +795,27 @@ function App() {
                 </span>
                 {version && (
                   <button
-                    className={`cqd-brand-version ${getRuleClasses(getMatchingRule(changelogData?.config, version), seen)}`}
+                    className={`cqd-brand-version ${getRuleClasses(effectiveRule, seen)}`}
                     aria-label={`Version ${version} - View changelog`}
                     title={getLatestChange(changelogData) ? `Latest: ${getLatestChange(changelogData)}` : "View changelog"}
                     onClick={async () => {
                        setShowChangelog(true);
+                       const latest = await fetchChangelogDetailed(true);
+                       if (latest.data) {
+                         setChangelogData(latest.data);
+                       }
+                       if (latest.status === 'cache-fallback') {
+                         setChangelogStatus('offline');
+                         setChangelogStatusMessage(latest.error || 'Oracle is unreachable. Showing cached changelog.');
+                       } else if (latest.status === 'error') {
+                         setChangelogStatus('error');
+                         setChangelogStatusMessage(latest.error || 'Unable to load changelog from Oracle.');
+                       } else {
+                         setChangelogStatus('ready');
+                         setChangelogStatusMessage(latest.status === 'empty' ? 'No changelog entries are available yet.' : null);
+                       }
                        if (version) {
-                         await markAsSeen(version);
+                         await markAsSeen(version, latest.data ?? changelogData);
                          setSeen(true);
                        }
                     }}
@@ -738,6 +857,43 @@ function App() {
                 </button>
               </div>
               <div className="cqd-cl-body">
+                {changelogStatus === 'loading' && (
+                  <div className="cqd-cl-state cqd-cl-state-loading">Loading latest changelog from Oracle…</div>
+                )}
+
+                {changelogStatus === 'offline' && (
+                  <div className="cqd-cl-state cqd-cl-state-warn">
+                    {changelogStatusMessage || 'Offline fallback active. Showing cached changelog.'}
+                  </div>
+                )}
+
+                {changelogStatus === 'error' && (
+                  <div className="cqd-cl-state cqd-cl-state-error">
+                    <div>{changelogStatusMessage || 'Could not load changelog.'}</div>
+                    <button
+                      type="button"
+                      className="cqd-cl-retry-btn"
+                      onClick={async () => {
+                        setChangelogStatus('loading');
+                        const retryResult = await fetchChangelogDetailed(true);
+                        if (retryResult.data) setChangelogData(retryResult.data);
+                        if (retryResult.status === 'cache-fallback') {
+                          setChangelogStatus('offline');
+                          setChangelogStatusMessage(retryResult.error || 'Oracle is unreachable. Showing cached changelog.');
+                        } else if (retryResult.status === 'error') {
+                          setChangelogStatus('error');
+                          setChangelogStatusMessage(retryResult.error || 'Unable to load changelog from Oracle.');
+                        } else {
+                          setChangelogStatus('ready');
+                          setChangelogStatusMessage(retryResult.status === 'empty' ? 'No changelog entries are available yet.' : null);
+                        }
+                      }}
+                    >
+                      Retry
+                    </button>
+                  </div>
+                )}
+
                 {changelogData?.entries?.length ? (
                   changelogData.entries.map((entry) => (
                     <div key={entry.id} className="cqd-cl-entry">
@@ -753,19 +909,36 @@ function App() {
                     </div>
                   ))
                 ) : (
-                  <div className="cqd-cl-empty">No changelog entries found.</div>
+                  <div className="cqd-cl-empty">
+                    {changelogStatusMessage || 'No changelog entries found.'}
+                  </div>
                 )}
               </div>
               
               {/* Footer Link */}
               <div className="cqd-cl-footer">
+                <a
+                  href={CHANGELOG_SITE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={handleChangelogWebsiteClick}
+                  aria-label="Open changelog website"
+                  className="cqd-cl-footer-link cqd-cl-footer-link-secondary"
+                >
+                  <span className="cqd-cl-footer-link-content">
+                    <span className="cqd-cl-footer-link-title">Changelog</span>
+                  </span>
+                </a>
                 <a 
                   href={SURVEY_URL} 
                   target="_blank" 
                   rel="noopener noreferrer"
+                  aria-label="Report an issue or request a feature"
                   className="cqd-cl-footer-link"
                 >
-                  💡 Request a feature / Report a bug ↗
+                  <span className="cqd-cl-footer-link-content">
+                    <span className="cqd-cl-footer-link-title">Report Issue</span>
+                  </span>
                 </a>
               </div>
             </div>
@@ -907,10 +1080,6 @@ function App() {
                           <li className="cqd-muted-text">No downloads yet</li>
                         )}
                       </ul>
-                      <div className="cqd-temp-cancelled-counter" role="status" aria-live="polite">
-                        <span className="cqd-temp-cancelled-label">Temporary cancelled counter</span>
-                        <span className="cqd-temp-cancelled-value">{cancelledDownloads}</span>
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -974,12 +1143,26 @@ function App() {
                 <h2 className="cqd-card-title">About</h2>
                 <div className="cqd-designer-wrapper">
                   <p className="cqd-designer-credit">
-                    <span className="cqd-designer-main-line">
-                      Designed &amp; built by{' '}
-                      <span className="cqd-designer-name">Adham Haitham</span>
-                    </span>
+                    <a
+                      className="cqd-designer-main-line"
+                      href={GITHUB_PROFILE_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label="Open Adham Haitham GitHub profile"
+                      title="Open GitHub profile"
+                    >
+                      <img
+                        src={GITHUB_AVATAR_URL}
+                        alt="Adham Haitham avatar"
+                        className="cqd-designer-avatar"
+                      />
+                      <span>
+                        Designed &amp; built by{' '}
+                        <span className="cqd-designer-name">Adham Haitham</span>
+                      </span>
+                    </a>
                     <span className="cqd-designer-extra">
-                      Junior Software Engineer
+                      Junior Software Engineer • UI/UX Designer
                     </span>
                   </p>
                 </div>
@@ -1166,6 +1349,7 @@ export function ToggleRow({
   primary,
 }: ToggleRowProps) {
   const isDisabled = !!disabled || !!loading;
+  const descriptionId = useId();
 
   const handleChange = () => {
     if (!isDisabled) {
@@ -1187,10 +1371,16 @@ export function ToggleRow({
         primary ? 'cqd-toggle-row-primary' : ''
       } ${isDisabled ? 'disabled' : ''}`}
     >
-      <div className="cqd-toggle-text">
+      <div
+        className="cqd-toggle-text"
+        onClick={handleChange}
+        style={{ cursor: isDisabled ? 'not-allowed' : 'pointer' }}
+      >
         <div className="cqd-toggle-label">{label}</div>
         {description && (
-          <p className="cqd-toggle-description">{description}</p>
+          <p id={descriptionId} className="cqd-toggle-description">
+            {description}
+          </p>
         )}
       </div>
       <label
@@ -1203,6 +1393,7 @@ export function ToggleRow({
           onChange={handleChange}
           onKeyDown={handleKeyDown}
           aria-label={label}
+          aria-describedby={description ? descriptionId : undefined}
         />
         <div className="cqd-switch-slider">
           <div className="cqd-switch-circle">

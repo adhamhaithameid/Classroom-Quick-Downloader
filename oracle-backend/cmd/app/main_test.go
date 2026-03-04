@@ -144,6 +144,18 @@ func TestCSRFMiddleware_AllowsMutatingAPIWithHeader(t *testing.T) {
 	}
 }
 
+func TestCSRFMiddleware_SkipsPublicWebsiteEndpoints(t *testing.T) {
+	handler := csrfHeaderMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	req := httptest.NewRequest(http.MethodPost, "/api/public/website/uninstall", bytes.NewBufferString(`{}`))
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected 204 for public website endpoint, got %d", rr.Code)
+	}
+}
+
 func TestCSRFMiddleware_RejectsCrossOriginMutatingAPI(t *testing.T) {
 	prevOrigins := csrfAllowedOrigins
 	defer func() { csrfAllowedOrigins = prevOrigins }()
@@ -838,6 +850,47 @@ func TestLoggingMiddleware_PersistsOracleOperationLogs(t *testing.T) {
 	}
 }
 
+func TestIsDangerAuditedPath(t *testing.T) {
+	if !isDangerAuditedPath("/api/admin/website/force-push") {
+		t.Fatal("expected force-push to be treated as danger-audited path")
+	}
+	if isDangerAuditedPath("/api/admin/website/state") {
+		t.Fatal("did not expect website/state to be treated as danger-audited path")
+	}
+}
+
+func TestLoggingMiddleware_AppendsDangerAuditForCriticalPath(t *testing.T) {
+	sqlDB, err := db.Init(filepath.Join(t.TempDir(), "oracle-danger-audit.db"))
+	if err != nil {
+		t.Fatalf("db init failed: %v", err)
+	}
+	defer sqlDB.Close()
+
+	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		setActorContextOnWriter(w, "super-admin", "tok-123", "super_admin")
+		w.WriteHeader(http.StatusAccepted)
+	})
+	handler := observability.RequestContextMiddleware(loggingMiddleware(sqlDB, inner))
+
+	req := httptest.NewRequest(http.MethodPost, "/api/admin/website/force-push", nil).
+		WithContext(observability.WithActorContext(context.Background(), "super-admin", "tok-123", "super_admin"))
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+	if rr.Code != http.StatusAccepted {
+		t.Fatalf("unexpected status code: %d", rr.Code)
+	}
+
+	var count int64
+	if err := sqlDB.QueryRow(
+		`SELECT COUNT(*) FROM admin_audit_log WHERE action_type = 'danger_action_request' AND resource_id = '/api/admin/website/force-push'`,
+	).Scan(&count); err != nil {
+		t.Fatalf("query admin_audit_log failed: %v", err)
+	}
+	if count < 1 {
+		t.Fatalf("expected at least one danger_action_request audit row, got %d", count)
+	}
+}
+
 func TestLoggingMiddleware_SkipsStaticAssetPaths(t *testing.T) {
 	sqlDB, err := db.Init(filepath.Join(t.TempDir(), "oracle-no-log.db"))
 	if err != nil {
@@ -1040,6 +1093,7 @@ func TestValidateProductionSecurityConfig(t *testing.T) {
 	tests := []struct {
 		name                        string
 		appEnv                      string
+		sessionCookieMode           string
 		allowLoopbackBypass         bool
 		allowEmptyDashboardPassword bool
 		allowHTTPStoreURLs          bool
@@ -1056,48 +1110,67 @@ func TestValidateProductionSecurityConfig(t *testing.T) {
 			allowUntrustedStoreURLs:     true,
 			trustedProxyCIDRs:           "0.0.0.0/0,::/0",
 		},
-		{
-			name:                "prod rejects loopback bypass",
-			appEnv:              "production",
-			allowLoopbackBypass: true,
-			wantErrContains:     "ALLOW_LOOPBACK_BYPASS",
-		},
-		{
-			name:                        "prod rejects empty dashboard password",
-			appEnv:                      "production",
-			allowEmptyDashboardPassword: true,
-			wantErrContains:             "ALLOW_EMPTY_DASHBOARD_PASSWORD",
-		},
-		{
-			name:               "prod rejects http store urls",
-			appEnv:             "production",
-			allowHTTPStoreURLs: true,
-			wantErrContains:    "ORACLE_ALLOW_HTTP_STORE_URLS",
-		},
-		{
-			name:                    "prod rejects untrusted store urls",
-			appEnv:                  "production",
-			allowUntrustedStoreURLs: true,
-			wantErrContains:         "ORACLE_ALLOW_UNTRUSTED_STORE_URLS",
-		},
-		{
-			name:              "prod rejects ipv4 wildcard trusted proxy",
-			appEnv:            "production",
-			trustedProxyCIDRs: "0.0.0.0/0",
-			wantErrContains:   "TRUSTED_PROXY_CIDRS",
-		},
-		{
-			name:              "prod rejects ipv6 wildcard trusted proxy",
-			appEnv:            "production",
-			trustedProxyCIDRs: "::/0",
-			wantErrContains:   "TRUSTED_PROXY_CIDRS",
-		},
-		{
-			name:              "prod accepts strict trusted proxy cidrs",
-			appEnv:            "  PROD  ",
-			trustedProxyCIDRs: "10.0.0.0/8,2001:db8::/32",
-		},
-	}
+			{
+				name:                "prod rejects loopback bypass",
+				appEnv:              "production",
+				sessionCookieMode:   "true",
+				allowLoopbackBypass: true,
+				wantErrContains:     "ALLOW_LOOPBACK_BYPASS",
+			},
+			{
+				name:                        "prod rejects empty dashboard password",
+				appEnv:                      "production",
+				sessionCookieMode:           "true",
+				allowEmptyDashboardPassword: true,
+				wantErrContains:             "ALLOW_EMPTY_DASHBOARD_PASSWORD",
+			},
+			{
+				name:               "prod rejects http store urls",
+				appEnv:             "production",
+				sessionCookieMode:  "true",
+				allowHTTPStoreURLs: true,
+				wantErrContains:    "ORACLE_ALLOW_HTTP_STORE_URLS",
+			},
+			{
+				name:                    "prod rejects untrusted store urls",
+				appEnv:                  "production",
+				sessionCookieMode:       "true",
+				allowUntrustedStoreURLs: true,
+				wantErrContains:         "ORACLE_ALLOW_UNTRUSTED_STORE_URLS",
+			},
+			{
+				name:              "prod rejects ipv4 wildcard trusted proxy",
+				appEnv:            "production",
+				sessionCookieMode: "true",
+				trustedProxyCIDRs: "0.0.0.0/0",
+				wantErrContains:   "TRUSTED_PROXY_CIDRS",
+			},
+			{
+				name:              "prod rejects ipv6 wildcard trusted proxy",
+				appEnv:            "production",
+				sessionCookieMode: "true",
+				trustedProxyCIDRs: "::/0",
+				wantErrContains:   "TRUSTED_PROXY_CIDRS",
+			},
+			{
+				name:              "prod accepts strict trusted proxy cidrs",
+				appEnv:            "  PROD  ",
+				sessionCookieMode: "true",
+				trustedProxyCIDRs: "10.0.0.0/8,2001:db8::/32",
+			},
+			{
+				name:              "prod rejects insecure session cookie mode",
+				appEnv:            "production",
+			sessionCookieMode: "false",
+				wantErrContains:   "SESSION_COOKIE_SECURE",
+			},
+			{
+				name:              "prod rejects auto session cookie mode",
+				appEnv:            "production",
+				sessionCookieMode: "auto",
+				wantErrContains:   "SESSION_COOKIE_SECURE",
+			},
+		}
 
 	for _, tc := range tests {
 		tc := tc
@@ -1106,6 +1179,7 @@ func TestValidateProductionSecurityConfig(t *testing.T) {
 
 			err := validateProductionSecurityConfig(
 				tc.appEnv,
+				tc.sessionCookieMode,
 				tc.allowLoopbackBypass,
 				tc.allowEmptyDashboardPassword,
 				tc.allowHTTPStoreURLs,

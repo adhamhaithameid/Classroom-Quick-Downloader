@@ -71,10 +71,43 @@ export const BACKOFF_STEPS_SECONDS = [
 
 // --- Worker URLs ---
 
-const WORKER_URL = import.meta.env.VITE_WORKER_URL as string || '';
+const DEFAULT_WORKER_TRACK_URL = 'https://cqd-analytics.adhamhaithameid.workers.dev/track';
+const WORKER_URL = (import.meta.env.VITE_WORKER_URL as string) || DEFAULT_WORKER_TRACK_URL;
 export const WORKER_BASE_URL = WORKER_URL.replace(/\/+track$/, '');
 export const CONFIG_URL = WORKER_BASE_URL ? `${WORKER_BASE_URL}/config` : '';
 export const CHANGELOG_URL = WORKER_BASE_URL ? `${WORKER_BASE_URL}/changelog` : '';
+
+const DEFAULT_ORACLE_BASE_URL = 'https://oracle.classroom-quick-downloader.com';
+const ORACLE_BASE_URL = normalizeBaseUrl((import.meta.env.VITE_ORACLE_URL as string) || DEFAULT_ORACLE_BASE_URL) || DEFAULT_ORACLE_BASE_URL;
+export const ORACLE_CHANGELOG_URL = `${ORACLE_BASE_URL}/api/public/extension/changelog`;
+
+const DEFAULT_WEBSITE_BASE_URL = 'https://classroom-quick-downloader-website.pages.dev';
+const WEBSITE_URL = (import.meta.env.VITE_PUBLIC_SITE_URL as string) || resolveManifestHomepageUrl() || DEFAULT_WEBSITE_BASE_URL;
+
+function resolveManifestHomepageUrl(): string {
+  try {
+    const runtime = globalThis.chrome?.runtime;
+    const manifest = runtime?.getManifest?.();
+    return typeof manifest?.homepage_url === 'string' ? manifest.homepage_url : '';
+  } catch {
+    return '';
+  }
+}
+
+function normalizeBaseUrl(value: string): string {
+  const trimmed = value.trim().replace(/\/+$/, '');
+  if (!trimmed) return '';
+  try {
+    const parsed = new URL(trimmed);
+    return `${parsed.origin}${parsed.pathname}`.replace(/\/+$/, '');
+  } catch {
+    return '';
+  }
+}
+
+export const WEBSITE_BASE_URL = normalizeBaseUrl(WEBSITE_URL) || DEFAULT_WEBSITE_BASE_URL;
+export const CHANGELOG_SITE_URL = `${WEBSITE_BASE_URL}/changelog`;
+export const UNINSTALL_SITE_URL = `${WEBSITE_BASE_URL}/uninstall`;
 export const TRACK_URL = WORKER_URL;
 
 // --- Rate Limits ---

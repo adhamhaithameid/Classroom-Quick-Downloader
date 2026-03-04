@@ -30,16 +30,48 @@ import {
   openDriveBypassTab,
 } from './download-handler';
 import { refreshRemoteAnalyticsConfig, recordDownloadEvent } from '../utils/analytics';
+import { UNINSTALL_SITE_URL } from '../utils/analytics/constants';
 import { t } from '../content/i18n';
 
 // =====================================================
 // MAIN ENTRYPOINT
 // =====================================================
 
+function detectRuntimeBrowser(): 'chrome' | 'firefox' | 'edge' {
+  if (IS_FIREFOX) return 'firefox';
+  if (typeof navigator !== 'undefined' && /Edg\//i.test(navigator.userAgent)) {
+    return 'edge';
+  }
+  return 'chrome';
+}
+
+function initializeUninstallUrl(): void {
+  const setUninstallURL = chrome?.runtime?.setUninstallURL;
+  if (typeof setUninstallURL !== 'function') return;
+
+  const extensionVersion = chrome.runtime?.getManifest?.().version || 'unknown';
+  const uninstallUrl = new URL(UNINSTALL_SITE_URL);
+  uninstallUrl.searchParams.set('source', 'extension');
+  uninstallUrl.searchParams.set('browser', detectRuntimeBrowser());
+  uninstallUrl.searchParams.set('version', extensionVersion);
+
+  try {
+    setUninstallURL(uninstallUrl.toString(), () => {
+      void chrome.runtime.lastError;
+    });
+  } catch {
+    // Ignore uninstall URL initialization failures in unsupported runtimes.
+  }
+}
+
 export default defineBackground(() => {
   // Initialize analytics alarms
   ensureAnalyticsAlarm();
   refreshRemoteAnalyticsConfig().catch(() => {});
+  initializeUninstallUrl();
+  chrome.runtime.onInstalled?.addListener(() => {
+    initializeUninstallUrl();
+  });
 
   // Memory leak prevention: periodic cleanup
   setInterval(cleanupOrphanedPendingDownloads, CLEANUP_INTERVAL_MS);

@@ -1,0 +1,25 @@
+{
+  "rules": [
+    {
+      "id": "manual-pill-v137",
+      "target": "1.3.7",
+      "priority": "major",
+      "effect": "pulse",
+      "color": "red"
+    },
+    {
+      "id": "manual-pill-v138",
+      "target": "1.3.8",
+      "priority": "major",
+      "effect": "pulse",
+      "color": "red"
+    },
+    {
+      "id": "manual-pill-default",
+      "target": "all",
+      "priority": "normal",
+      "effect": "none",
+      "color": "default"
+    }
+  ]
+}

@@ -14,6 +14,92 @@ import (
 	"oracle-backend/internal/db"
 )
 
+type changelogPublicPayloadForRecordsTest struct {
+	GeneratedAt int64 `json:"generatedAt"`
+	Entries     []struct {
+		ID      string `json:"id"`
+		Version string `json:"version"`
+	} `json:"entries"`
+}
+
+func TestRecordsHandlersV4_RefreshesPublicWebsiteSnapshotForUserChangelog(t *testing.T) {
+	sqlDB := newAdminTestDB(t)
+	defer sqlDB.Close()
+
+	allowed := map[string]struct{}{
+		publicWebsiteUserChangelogRecordType: {},
+	}
+
+	readPublic := func() changelogPublicPayloadForRecordsTest {
+		req := httptest.NewRequest(http.MethodGet, "/api/public/website/changelog", nil)
+		rr := httptest.NewRecorder()
+		PublicWebsiteUserChangelogHandler(sqlDB, nil).ServeHTTP(rr, req)
+		if rr.Code != http.StatusOK {
+			t.Fatalf("public changelog read failed: %d %s", rr.Code, rr.Body.String())
+		}
+		var payload changelogPublicPayloadForRecordsTest
+		if err := json.Unmarshal(rr.Body.Bytes(), &payload); err != nil {
+			t.Fatalf("failed to decode public changelog payload: %v", err)
+		}
+		return payload
+	}
+
+	before := readPublic()
+	recordKey := "record-refresh-test-" + strings.ReplaceAll(time.Now().UTC().Format("150405.000"), ".", "")
+	version := "1.9.999"
+
+	upsertReq := httptest.NewRequest(
+		http.MethodPost,
+		"/api/admin/records/upsert",
+		bytes.NewBufferString(`{"recordType":"`+publicWebsiteUserChangelogRecordType+`","recordKey":"`+recordKey+`","data":{"version":"`+version+`","title":"Release update","summary":"snapshot refresh test","highlights":["test highlight"],"releasedAtUtc":1999999999999}}`),
+	)
+	upsertReq.Header.Set("Content-Type", "application/json")
+	upsertRR := httptest.NewRecorder()
+	RecordsUpsertHandlerV4(sqlDB, nil, allowed).ServeHTTP(upsertRR, upsertReq)
+	if upsertRR.Code != http.StatusOK {
+		t.Fatalf("upsert failed: %d %s", upsertRR.Code, upsertRR.Body.String())
+	}
+
+	afterUpsert := readPublic()
+	if afterUpsert.GeneratedAt < before.GeneratedAt {
+		t.Fatalf("expected snapshot to refresh after upsert, before=%d after=%d", before.GeneratedAt, afterUpsert.GeneratedAt)
+	}
+	foundAfterUpsert := false
+	for _, entry := range afterUpsert.Entries {
+		if entry.Version == version {
+			foundAfterUpsert = true
+			break
+		}
+	}
+	if !foundAfterUpsert {
+		t.Fatalf("expected version %q in public changelog after upsert", version)
+	}
+
+	deleteReq := httptest.NewRequest(
+		http.MethodPost,
+		"/api/admin/records/delete",
+		bytes.NewBufferString(`{"recordType":"`+publicWebsiteUserChangelogRecordType+`","recordKey":"`+recordKey+`"}`),
+	)
+	deleteReq.Header.Set("Content-Type", "application/json")
+	deleteRR := httptest.NewRecorder()
+	RecordsDeleteHandlerV4(sqlDB, nil, allowed).ServeHTTP(deleteRR, deleteReq)
+	if deleteRR.Code != http.StatusOK {
+		t.Fatalf("delete failed: %d %s", deleteRR.Code, deleteRR.Body.String())
+	}
+
+	afterDelete := readPublic()
+	foundAfterDelete := false
+	for _, entry := range afterDelete.Entries {
+		if entry.Version == version {
+			foundAfterDelete = true
+			break
+		}
+	}
+	if foundAfterDelete {
+		t.Fatalf("expected version %q to be removed from public changelog after delete", version)
+	}
+}
+
 func TestRecordsHandlersV4_SQLiteFallbackCRUD(t *testing.T) {
 	sqlDB := newAdminTestDB(t)
 	defer sqlDB.Close()

@@ -1,18 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ChangelogConfig } from '../entrypoints/utils/changelog';
 
-async function loadChangelogModule(changeLogUrl = 'https://worker.example/changelog') {
+async function loadChangelogModule() {
   vi.resetModules();
-  vi.doMock('../entrypoints/utils/analytics/constants', () => ({
-    CHANGELOG_URL: changeLogUrl,
-  }));
-  vi.doMock('../entrypoints/utils/analytics/detection', () => ({
-    getExtensionVersion: vi.fn(() => '1.3.0'),
-  }));
   return import('../entrypoints/utils/changelog');
 }
 
-describe('changelog utils', () => {
+describe('changelog utils (manual mode)', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     chrome.storage.local.get = vi.fn(async () => ({})) as never;
@@ -20,144 +14,131 @@ describe('changelog utils', () => {
     vi.stubGlobal('fetch', vi.fn());
   });
 
-  it('returns cached changelog when cache is still valid and force=false', async () => {
+  it('returns manual changelog entries and expected fetch status', async () => {
     const mod = await loadChangelogModule();
-    const cached = {
-      entries: [{ id: '1', version: '1.3.0', date: '2026-01-01', changes: ['A'] }],
-      config: { rules: [] },
-      lastFetched: Date.now() + 1,
-    };
-    chrome.storage.local.get = vi.fn(async () => ({ cqd_changelog_v1: cached })) as never;
-    const result = await mod.fetchChangelog(false);
-    expect(result).toEqual(cached);
+
+    const passive = await mod.fetchChangelogDetailed(false);
+    expect(passive.status).toBe('not-modified');
+    expect(passive.data).toBeTruthy();
+    expect(passive.data?.entries.length).toBeGreaterThan(0);
+    expect(passive.data?.entries[0]?.version).toBe('1.3.9');
+
+    const forced = await mod.fetchChangelogDetailed(true);
+    expect(forced.status).toBe('fresh');
+    expect(forced.data?.entries[0]?.id).toBe('manual-1.3.9-1');
+  });
+
+  it('does not perform network fetch in manual mode', async () => {
+    const mod = await loadChangelogModule();
+    await mod.fetchChangelog(true);
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it('falls back to cache/null when changelog URL is empty', async () => {
-    const mod = await loadChangelogModule('');
-    const cached = {
-      entries: [{ id: 'c1', version: '1.2.0', date: '2025-01-01', changes: ['Old'] }],
-      config: { rules: [] },
-      lastFetched: Date.now(),
-    };
-    chrome.storage.local.get = vi.fn(async () => ({ cqd_changelog_v1: cached })) as never;
-    expect(await mod.fetchChangelog()).toEqual(cached);
-  });
-
-  it('fetches, validates, and stores changelog payload from network', async () => {
+  it('persists robust cache envelope fields', async () => {
     const mod = await loadChangelogModule();
-    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({
-      ok: true,
-      entries: [{ id: 'n1', version: '1.3.0', date: '2026-02-10', changes: ['Fixes'] }],
-      config: { rules: [{ id: 'r1', target: 'all', priority: 'normal', effect: 'none' }] },
-    }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
 
-    const result = await mod.fetchChangelog(true);
-    expect(result?.entries[0]?.id).toBe('n1');
-    expect(chrome.storage.local.set).toHaveBeenCalled();
-  });
-
-  it('returns cached data when network fetch fails', async () => {
-    const mod = await loadChangelogModule();
-    const cached = {
-      entries: [{ id: 'c2', version: '1.2.1', date: '2025-02-01', changes: ['Cached'] }],
-      config: { rules: [] },
-      lastFetched: 1,
-    };
-    chrome.storage.local.get = vi.fn(async () => ({ cqd_changelog_v1: cached })) as never;
-    vi.mocked(fetch).mockRejectedValueOnce(new Error('offline'));
-    expect(await mod.fetchChangelog(true)).toEqual(cached);
+    await mod.fetchChangelog(true);
+    expect(chrome.storage.local.set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cqd_changelog_v1: expect.objectContaining({
+          schemaVersion: 2,
+          cachedAt: expect.any(Number),
+          lastSeenId: 'manual-1.3.9-1',
+          cachedItems: expect.any(Array),
+          cachedConfig: expect.objectContaining({
+            rules: expect.arrayContaining([
+              expect.objectContaining({ id: 'manual-pill-v137', target: '1.3.7', priority: 'major', effect: 'pulse' }),
+              expect.objectContaining({ id: 'manual-pill-v138', target: '1.3.8', priority: 'major', effect: 'pulse' }),
+            ]),
+          }),
+        }),
+      }),
+    );
   });
 
   it('handles latest change extraction and seen version tracking', async () => {
     const mod = await loadChangelogModule();
-    expect(mod.getLatestChange(null)).toBeNull();
-    expect(mod.getLatestChange({ entries: [], config: { rules: [] }, lastFetched: Date.now() })).toBeNull();
-    expect(mod.getLatestChange({
-      entries: [{ id: 'x', version: '1.0.0', date: '2026-01-01', changes: ['First change'] }],
-      config: { rules: [] },
-      lastFetched: Date.now(),
-    })).toBe('First change');
+    const inMemoryStorage: Record<string, unknown> = {};
+    chrome.storage.local.get = vi.fn(async (key?: string | string[] | Record<string, unknown>) => {
+      if (typeof key === 'string') {
+        return { [key]: inMemoryStorage[key] };
+      }
+      if (Array.isArray(key)) {
+        return key.reduce<Record<string, unknown>>((acc, item) => {
+          acc[item] = inMemoryStorage[item];
+          return acc;
+        }, {});
+      }
+      if (key && typeof key === 'object') {
+        return Object.entries(key).reduce<Record<string, unknown>>((acc, [storageKey, fallback]) => {
+          acc[storageKey] = storageKey in inMemoryStorage ? inMemoryStorage[storageKey] : fallback;
+          return acc;
+        }, {});
+      }
+      return { ...inMemoryStorage };
+    }) as never;
+    chrome.storage.local.set = vi.fn(async (next: Record<string, unknown>) => {
+      Object.assign(inMemoryStorage, next);
+    }) as never;
 
-    chrome.storage.local.get = vi.fn(async () => ({ cqd_changelog_seen_v1: ['1.0.0'] })) as never;
-    await mod.markAsSeen('1.1.0');
-    expect(chrome.storage.local.set).toHaveBeenCalledWith({ cqd_changelog_seen_v1: ['1.0.0', '1.1.0'] });
-    expect(await mod.isVersionSeen('1.0.0')).toBe(true);
-    expect(await mod.isVersionSeen('2.0.0')).toBe(false);
-    expect(await mod.isVersionSeen('')).toBe(false);
+    const data = await mod.fetchChangelog(true);
+
+    expect(mod.getLatestChange(null)).toBeNull();
+    expect(mod.getLatestChange({ entries: [], config: { rules: [] }, revisionToken: 'rev-empty', lastFetched: Date.now() })).toBeNull();
+    expect(mod.getLatestChange(data)).toContain('Summary:');
+
+    await mod.markAsSeen('1.3.8', data);
+    expect(await mod.isVersionSeen('1.3.8', data)).toBe(true);
+
+    const changedRevision = data ? { ...data, revisionToken: `${data.revisionToken}-changed` } : data;
+    expect(await mod.isVersionSeen('1.3.8', changedRevision)).toBe(false);
+    expect(await mod.isVersionSeen('9.9.9', changedRevision)).toBe(false);
+    expect(await mod.isVersionSeen('', changedRevision)).toBe(false);
   });
 
-  it('matches notification rules', async () => {
+  it('matches notification rules in manual configuration', async () => {
     const mod = await loadChangelogModule();
-    const cfg: ChangelogConfig = {
-      rules: [
-        { id: 'r1', target: '1.3.0', priority: 'major', effect: 'pulse' as const },
-        { id: 'r2', target: 'all', priority: 'minor', effect: 'glow' as const },
-      ],
-    };
-    expect(mod.getMatchingRule(cfg, '1.3.0')?.id).toBe('r1');
-    expect(mod.getMatchingRule(cfg, '9.9.9')?.id).toBe('r2');
+    const data = await mod.fetchChangelog(true);
+
+    const exact = mod.getMatchingRule(data?.config, '1.3.8');
+    expect(exact?.id).toBe('manual-pill-v138');
+
+    const fallback = mod.getMatchingRule(data?.config, '9.9.9');
+    expect(fallback?.id).toBe('manual-pill-default');
+
     expect(mod.getMatchingRule(undefined, '1.0.0')).toBeNull();
   });
 
   describe('getRuleClasses', () => {
-    it('returns empty string if rule is null', async () => {
+    it('returns empty string for null rule or seen versions', async () => {
       const mod = await loadChangelogModule();
       expect(mod.getRuleClasses(null, false)).toBe('');
       expect(mod.getRuleClasses(null, true)).toBe('');
+      expect(mod.getRuleClasses({ id: 'r', target: 'all', priority: 'major', effect: 'pulse' }, true)).toBe('');
     });
 
-    it('returns empty string if seen is true', async () => {
+    it('applies priority + effect classes', async () => {
       const mod = await loadChangelogModule();
-      const rule = { id: 'r', target: 'all', priority: 'major' as const, effect: 'pulse' as const };
-      expect(mod.getRuleClasses(rule, true)).toBe('');
+      expect(mod.getRuleClasses({ id: 'r', target: 'all', priority: 'minor', effect: 'none' }, false)).toContain('cqd-pill-minor');
+      expect(mod.getRuleClasses({ id: 'r', target: 'all', priority: 'major', effect: 'none' }, false)).toContain('cqd-pill-major');
+
+      expect(mod.getRuleClasses({ id: 'r', target: 'all', priority: 'major', effect: 'glow' }, false)).toContain('cqd-effect-glow-red');
+      expect(mod.getRuleClasses({ id: 'r', target: 'all', priority: 'normal', effect: 'glow' }, false)).toContain('cqd-effect-glow-blue');
+
+      expect(mod.getRuleClasses({ id: 'r', target: 'all', priority: 'major', effect: 'pulse' }, false)).toContain('cqd-effect-pulse-red');
+      expect(mod.getRuleClasses({ id: 'r', target: 'all', priority: 'normal', effect: 'pulse' }, false)).toContain('cqd-effect-pulse-blue');
     });
+  });
 
-    it('adds priority classes correctly', async () => {
-      const mod = await loadChangelogModule();
-      const base = { id: 'r', target: 'all', effect: 'none' as const };
-
-      expect(mod.getRuleClasses({ ...base, priority: 'minor' }, false)).toContain('cqd-pill-minor');
-      expect(mod.getRuleClasses({ ...base, priority: 'major' }, false)).toContain('cqd-pill-major');
-
-      const normalClasses = mod.getRuleClasses({ ...base, priority: 'normal' }, false);
-      expect(normalClasses).not.toContain('cqd-pill-minor');
-      expect(normalClasses).not.toContain('cqd-pill-major');
-    });
-
-    it('adds glow effect classes with correct colors', async () => {
-      const mod = await loadChangelogModule();
-      const base = { id: 'r', target: 'all', effect: 'glow' as const };
-
-      // Major -> Red
-      expect(mod.getRuleClasses({ ...base, priority: 'major' }, false)).toContain('cqd-effect-glow-red');
-
-      // Minor/Normal -> Blue
-      expect(mod.getRuleClasses({ ...base, priority: 'minor' }, false)).toContain('cqd-effect-glow-blue');
-      expect(mod.getRuleClasses({ ...base, priority: 'normal' }, false)).toContain('cqd-effect-glow-blue');
-    });
-
-    it('adds pulse effect classes with correct colors', async () => {
-      const mod = await loadChangelogModule();
-      const base = { id: 'r', target: 'all', effect: 'pulse' as const };
-
-      // Major -> Red
-      expect(mod.getRuleClasses({ ...base, priority: 'major' }, false)).toContain('cqd-effect-pulse-red');
-
-      // Minor/Normal -> Blue
-      expect(mod.getRuleClasses({ ...base, priority: 'minor' }, false)).toContain('cqd-effect-pulse-blue');
-      expect(mod.getRuleClasses({ ...base, priority: 'normal' }, false)).toContain('cqd-effect-pulse-blue');
-    });
-
-    it('handles combinations of priority and effect', async () => {
-      const mod = await loadChangelogModule();
-      const res = mod.getRuleClasses({ id: 'r', target: 'all', priority: 'minor', effect: 'glow' }, false);
-      expect(res).toContain('cqd-pill-minor');
-      expect(res).toContain('cqd-effect-glow-blue');
-
-      const res2 = mod.getRuleClasses({ id: 'r', target: 'all', priority: 'major', effect: 'pulse' }, false);
-      expect(res2).toContain('cqd-pill-major');
-      expect(res2).toContain('cqd-effect-pulse-red');
-    });
+  it('still supports custom non-manual config matching behavior', async () => {
+    const mod = await loadChangelogModule();
+    const cfg: ChangelogConfig = {
+      rules: [
+        { id: 'r1', target: 'v1.3.0', priority: 'major', effect: 'pulse' },
+        { id: 'r2', target: 'all', priority: 'minor', effect: 'glow' },
+      ],
+    };
+    expect(mod.getMatchingRule(cfg, '1.3.0')?.id).toBe('r1');
+    expect(mod.getMatchingRule(cfg, '9.9.9')?.id).toBe('r2');
   });
 });

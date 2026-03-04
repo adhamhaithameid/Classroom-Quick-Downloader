@@ -1,6 +1,6 @@
 # ⚡ CQD Analytics Worker
 
-> Update (2026-02-15): Latest changes include CI coverage-gate hardening for extension analytics storage migration fallback, popup stats race-condition guards, structured step-up auth error handling in Oracle dashboard, and backend/worker auth-security hardening. See /CHANGELOG.md for details.
+> Update (2026-02-28): Worker remains the public ingress/proxy for website telemetry and Oracle public website APIs; latest scan confirms clean dependency audit and passing strict suite in isolated runs.
 
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
 ![Cloudflare Workers](https://img.shields.io/badge/Cloudflare_Workers-F38020?logo=cloudflare&logoColor=white)
@@ -53,6 +53,7 @@ The **CQD Analytics Worker** is a high-performance, edge-deployed analytics inge
 │     GET  /stats          - Dashboard stats                                    │
 │     GET  /config         - Extension config                                   │
 │     GET  /health         - Health check                                       │
+│     GET  /public/site-metrics - Public website metrics snapshot                │
 │     POST /admin/*        - Admin actions (force-flush, cut-power, etc.)       │
 └───────────────────────────────────────┬───────────────────────────────────────┘
                                         │
@@ -138,13 +139,13 @@ All configuration is defined in `wrangler.toml`:
 
 | Variable              | Type                           | Description                                                                                         | Example                       |
 | --------------------- | ------------------------------ | --------------------------------------------------------------------------------------------------- | ----------------------------- |
-| `ORACLE_ENDPOINT`     | `[vars]`                       | Base URL of the Oracle backend. Do not include`/ingest-batch`.                                      | `http://your-server.com:8080` |
+| `ORACLE_ENDPOINT`     | `[vars]`                       | Base URL of the Oracle backend. Do not include`/ingest-batch`. Use HTTPS in production.             | `https://your-server.com` |
 | `MAX_BATCH_EVENTS`    | `[vars]`                       | Maximum events per flush. When buffer reaches this size, a flush is triggered.                      | `10000`                       |
 | `DO_SHARED_SECRET`    | **Secret**                     | Shared secret for admin endpoints + Oracle communication. **Do NOT put in `[vars]`**.              | —                            |
 | `DASHBOARD_PASSWORD`  | **Secret**                     | Password for the Worker dashboard login/session tokens (separate from `DO_SHARED_SECRET`).         | —                            |
 | `DANGER_PASSWORD`     | **Secret**                     | Password for Danger Zone actions.                                                                   | —                            |
 | `SESSION_BINDING_MODE`| `[vars]` (optional)            | Session replay hardening mode: `off`, `optional`, or `strict` (coarse IP-prefix + UA fingerprint). | `strict`                     |
-| `CORS_ALLOWED_ORIGINS`| `[vars]` (optional)            | Comma-separated allowed origins for non-admin protected routes (`/stats`, `/auth/verify-danger`). | `https://oracle.example.com` |
+| `CORS_ALLOWED_ORIGINS`| `[vars]` (optional)            | Comma-separated allowed origins for non-admin protected routes (`/stats`, `/auth/verify-danger`) and website ingest writes (`/api/public/website/events`). Include your active website domains. | `https://classroom-quick-downloader-website.pages.dev,https://your-root-domain` |
 | `ADMIN_CORS_ALLOWED_ORIGINS`| `[vars]` (optional)     | Comma-separated allowed origins for admin/debug routes only (`/admin/*`, `/debug/*`). No fallback to `CORS_ALLOWED_ORIGINS`. | `https://admin.example.com` |
 | `DOWNLOADS_DO`        | `[[durable_objects.bindings]]` | The binding name for the Durable Object.                                                            | `DOWNLOADS_DO`                |
 
@@ -303,7 +304,7 @@ curl https://cqd-analytics.your-subdomain.workers.dev/stats
   },
   "envSnapshot": {
     "maxBatchEvents": "10000",
-    "oracleEndpoint": "http://..."
+    "oracleEndpoint": "https://..."
   },
   "deliveryMetrics": {
     "totals": {
@@ -381,6 +382,47 @@ Simple health probe.
 
 ```bash
 curl https://cqd-analytics.your-subdomain.workers.dev/health
+```
+
+### `GET /public/site-metrics` — Public Website Metrics Snapshot
+
+Returns a sanitized, country-level aggregate payload for the user website.
+
+- No raw IP data
+- No admin-only counters
+- Snapshot refresh windows (UTC): `03:00`, `06:00`, `09:00`, `12:00`, `15:00`, `18:00`, `21:00`
+- CORS is wildcard (`Access-Control-Allow-Origin: *`) for safe public website reads.
+
+**Request:**
+
+```bash
+curl https://cqd-analytics.your-subdomain.workers.dev/public/site-metrics
+```
+
+**Response (example):**
+
+```json
+{
+  "ok": true,
+  "source": "cloudflare-worker",
+  "generatedAt": 1771700000000,
+  "snapshotAtUtc": 1771699200000,
+  "totals": {
+    "downloads": 1200,
+    "countries": 2
+  },
+  "countries": [
+    { "countryCode": "US", "count": 700 },
+    { "countryCode": "GB", "count": 500 }
+  ],
+  "schedule": {
+    "refreshHoursUtc": [3, 6, 9, 12, 15, 18, 21],
+    "activeHourUtc": 12,
+    "isRefreshWindow": true,
+    "lastRefreshAtUtc": 1771699200000,
+    "nextRefreshAtUtc": 1771702800000
+  }
+}
 ```
 
 ```json

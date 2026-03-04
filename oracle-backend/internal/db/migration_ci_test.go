@@ -3,6 +3,7 @@ package db
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -25,6 +26,9 @@ func TestMigrationBootstrapCleanDatabases(t *testing.T) {
 		"auth_sessions",
 		"auth_stepup_challenges",
 		"auth_rate_limits",
+		"website_traffic_hourly",
+		"website_events_raw",
+		"website_public_snapshots",
 	}
 	for _, table := range requiredSQLiteTables {
 		var count int
@@ -167,5 +171,51 @@ func TestMigrationCreatesRequiredIndexes(t *testing.T) {
 	}
 	if totalEvents != 1 {
 		t.Fatalf("expected 1, got %d", totalEvents)
+	}
+}
+
+func TestWebsiteEventsRaw_IsAppendOnly(t *testing.T) {
+	sqlitePath := filepath.Join(t.TempDir(), "append-only.db")
+	sqlDB, err := Init(sqlitePath)
+	if err != nil {
+		t.Fatalf("Init failed: %v", err)
+	}
+	defer sqlDB.Close()
+
+	_, err = sqlDB.Exec(
+		`INSERT INTO website_events_raw (
+			event_id, source, batch_id, session_id, page_path, event_type, action, placement,
+			event_ts_utc, generated_at_utc, attempt, correlation_id, meta_json, raw_event_json, ingested_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		"evt-append-only-1",
+		"test",
+		"batch-1",
+		"session-1",
+		"/overview",
+		"cta",
+		"install_click",
+		"hero_install",
+		int64(1700000000000),
+		int64(1700000000000),
+		1,
+		"corr-1",
+		`{}`,
+		`{"eventId":"evt-append-only-1"}`,
+		int64(1700000000000),
+	)
+	if err != nil {
+		t.Fatalf("insert website_events_raw failed: %v", err)
+	}
+
+	if _, err := sqlDB.Exec(`UPDATE website_events_raw SET action = 'download_click' WHERE event_id = ?`, "evt-append-only-1"); err == nil {
+		t.Fatal("expected update on website_events_raw to fail")
+	} else if !strings.Contains(strings.ToLower(err.Error()), "append-only") {
+		t.Fatalf("expected append-only update error, got: %v", err)
+	}
+
+	if _, err := sqlDB.Exec(`DELETE FROM website_events_raw WHERE event_id = ?`, "evt-append-only-1"); err == nil {
+		t.Fatal("expected delete on website_events_raw to fail")
+	} else if !strings.Contains(strings.ToLower(err.Error()), "append-only") {
+		t.Fatalf("expected append-only delete error, got: %v", err)
 	}
 }

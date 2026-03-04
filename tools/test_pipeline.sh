@@ -6,7 +6,8 @@ set -e
 
 WORKER_URL="http://localhost:8787"
 ORACLE_URL="http://localhost:8080"
-SECRET="123"
+# Optional admin secret for force-flush testing (never hardcode).
+SECRET="${PIPELINE_ADMIN_SECRET:-}"
 
 # Colors for output
 RED='\033[0;31m'
@@ -109,19 +110,24 @@ echo ""
 # 7. If no data, try force flush
 PENDING=$(curl -s "$WORKER_URL/stats" 2>/dev/null | jq -r '.pendingEvents // 0')
 if [ "$PENDING" -gt 0 ] 2>/dev/null; then
-  echo -e "${YELLOW}7. Pending events detected ($PENDING), forcing flush...${NC}"
-  curl -s -X POST "$WORKER_URL/admin/force-flush" \
-    -H "X-Admin-Secret: $SECRET" 2>/dev/null | jq . 2>/dev/null || echo "Flush failed"
-  echo ""
-  
-  echo -e "${YELLOW}8. Re-checking Oracle after flush...${NC}"
-  sleep 1
-  curl -s "$ORACLE_URL/api/stats/summary" 2>/dev/null | jq '{
-    status: .status,
-    totalDownloads: .totalDownloads,
-    lastBatch: .lastBatch
-  }' 2>/dev/null || echo "Oracle not available"
-  echo ""
+  if [ -n "$SECRET" ]; then
+    echo -e "${YELLOW}7. Pending events detected ($PENDING), forcing flush...${NC}"
+    curl -s -X POST "$WORKER_URL/admin/force-flush" \
+      -H "X-Admin-Secret: $SECRET" 2>/dev/null | jq . 2>/dev/null || echo "Flush failed"
+    echo ""
+    
+    echo -e "${YELLOW}8. Re-checking Oracle after flush...${NC}"
+    sleep 1
+    curl -s "$ORACLE_URL/api/stats/summary" 2>/dev/null | jq '{
+      status: .status,
+      totalDownloads: .totalDownloads,
+      lastBatch: .lastBatch
+    }' 2>/dev/null || echo "Oracle not available"
+    echo ""
+  else
+    echo -e "${YELLOW}7. Pending events detected ($PENDING), skipping force flush (set PIPELINE_ADMIN_SECRET).${NC}"
+    echo ""
+  fi
 fi
 
 # 8. Test other Oracle endpoints

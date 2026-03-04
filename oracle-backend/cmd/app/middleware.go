@@ -15,8 +15,9 @@ import (
 	"oracle-backend/internal/handlers"
 )
 
-const adminRequestBodyLimit = 1 << 20  // 1 MiB
-const authRequestBodyLimit = 256 << 10 // 256 KiB
+const adminRequestBodyLimit = 1 << 20      // 1 MiB
+const authRequestBodyLimit = 256 << 10     // 256 KiB
+const internalRequestBodyLimit = 256 << 10 // 256 KiB
 
 func requestBodyLimitMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -26,6 +27,8 @@ func requestBodyLimitMiddleware(next http.Handler) http.Handler {
 				r.Body = http.MaxBytesReader(w, r.Body, adminRequestBodyLimit)
 			case strings.HasPrefix(r.URL.Path, "/api/auth/"):
 				r.Body = http.MaxBytesReader(w, r.Body, authRequestBodyLimit)
+			case strings.HasPrefix(r.URL.Path, "/api/internal/"):
+				r.Body = http.MaxBytesReader(w, r.Body, internalRequestBodyLimit)
 			}
 		}
 		next.ServeHTTP(w, r)
@@ -34,6 +37,17 @@ func requestBodyLimitMiddleware(next http.Handler) http.Handler {
 
 func csrfHeaderMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Public website endpoints apply their own strict origin/CORS validation.
+		if strings.HasPrefix(r.URL.Path, "/api/public/website/") {
+			next.ServeHTTP(w, r)
+			return
+		}
+		// Internal service endpoints use shared-secret auth and are non-browser.
+		if strings.HasPrefix(r.URL.Path, "/api/internal/") {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		if strings.HasPrefix(r.URL.Path, "/api/") {
 			switch r.Method {
 			case http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:

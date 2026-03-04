@@ -1,6 +1,6 @@
 {
   "name": "@cqd/cloudflare-worker",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "private": true,
   "packageManager": "pnpm@10.28.2",
   "scripts": {
@@ -12,19 +12,30 @@
     "audit": "pnpm audit",
     "validate": "pnpm run lint && pnpm run typecheck && pnpm run audit",
     "test": "vitest run",
+    "test:smoke": "vitest run tests/smoke.test.ts tests/oracle-endpoint.test.ts",
+    "test:functional": "vitest run tests/functional.test.ts tests/index-auth-config.test.ts",
+    "test:integration": "vitest run tests/index-auth-config.test.ts tests/security.test.ts",
+    "test:regression": "vitest run tests/regression.test.ts tests/sanitization.test.ts tests/auth_timing.test.ts",
+    "test:load": "vitest run tests/load-stress.test.ts",
+    "test:stress": "vitest run tests/load-stress.test.ts tests/reliability.test.ts",
+    "test:security": "vitest run tests/security.test.ts tests/sanitization.test.ts tests/auth_timing.test.ts",
+    "test:ui": "vitest run tests/dashboard.test.ts",
+    "test:fuzz": "vitest run tests/fuzz.test.ts",
+    "test:reliability": "vitest run tests/reliability.test.ts tests/index-auth-config.test.ts",
+    "test:strict": "pnpm run test:smoke && pnpm run test:functional && pnpm run test:integration && pnpm run test:regression && pnpm run test:load && pnpm run test:stress && pnpm run test:security && pnpm run test:ui && pnpm run test:fuzz && pnpm run test:reliability && pnpm run test",
     "test:coverage": "vitest run --coverage.enabled --coverage.provider=v8 --coverage.reporter=json --coverage.reportsDirectory=coverage"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260227.0",
+    "@cloudflare/workers-types": "^4.20260305.0",
     "@eslint/js": "^10.0.1",
-    "@typescript-eslint/eslint-plugin": "^8.56.0",
-    "@typescript-eslint/parser": "^8.56.0",
+    "@typescript-eslint/eslint-plugin": "^8.56.1",
+    "@typescript-eslint/parser": "^8.56.1",
     "@vitest/coverage-v8": "^4.0.18",
-    "eslint": "^10.0.1",
-    "globals": "^17.3.0",
+    "eslint": "^10.0.2",
+    "globals": "^17.4.0",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.56.0",
+    "typescript-eslint": "^8.56.1",
     "vitest": "^4.0.18",
-    "wrangler": "^4.67.0"
+    "wrangler": "^4.70.0"
   }
 }

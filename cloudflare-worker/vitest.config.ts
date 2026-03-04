@@ -5,11 +5,19 @@ export default defineConfig({
     environment: "node",
     include: ["tests/**/*.test.ts"],
     clearMocks: true,
+    testTimeout: 30000,
+    hookTimeout: 30000,
     coverage: {
       provider: "v8",
       reporter: ["text", "json"],
       include: ["src/**/*.ts"],
       exclude: ["**/*.d.ts", "**/node_modules/**"],
+      thresholds: {
+        lines: 65,
+        functions: 70,
+        branches: 50,
+        statements: 60,
+      },
     },
   },
 });

@@ -4,8 +4,28 @@ account_id = "fc9538cb362e6266eea89037f6347225"
 compatibility_date = "2024-12-01"
 
 [vars]
+  # Set this to your production Oracle HTTPS endpoint.
+  # Keep HTTP disabled by default; only enable ALLOW_INSECURE_ORACLE_ENDPOINT temporarily for local migration.
+  # The worker appends "/ingest-batch" for flushes and "/api/public/website/*" for public reads.
+  # Use DNS host (not raw IP) so Cloudflare fetch does not hit direct-IP egress restrictions.
   ORACLE_ENDPOINT = "http://129.151.233.229.nip.io:8080"
+  ALLOW_INSECURE_ORACLE_ENDPOINT = "true"
   MAX_BATCH_EVENTS = "10000"
+  # Website writes (telemetry + uninstall feedback) are origin-gated.
+  # Keep this synced with your active website domains.
+  CORS_ALLOWED_ORIGINS = "https://classroom-quick-downloader-website.pages.dev"
+  # Free-tier default keeps queue-first pipeline disabled.
+  ENABLE_SITE_QUEUE_PIPELINE = "false"
+
+[[kv_namespaces]]
+  binding = "SITE_SNAPSHOT_KV"
+  id = "34a558d6cb094467b67a31465e09776b"
+  preview_id = "78c3997a24a843eabdff73ed36cffa99"
+
+[[d1_databases]]
+  binding = "SITE_CACHE_DB"
+  database_name = "cqd_site_cache"
+  database_id = "b77cac38-4aec-46db-acb3-c9e35ff2868e"
 
 [[durable_objects.bindings]]
   name = "DOWNLOADS_DO"
@@ -24,3 +44,6 @@ compatibility_date = "2024-12-01"
   head_sampling_rate = 1
   invocation_logs = true
   persist = true
+
+[triggers]
+  crons = ["0 */3 * * *", "0 1-22/3 * * *"]

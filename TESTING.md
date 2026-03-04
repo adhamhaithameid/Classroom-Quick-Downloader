@@ -1,6 +1,6 @@
 # Testing Guide
 
-> Update (2026-02-15): Latest changes include CI coverage-gate hardening for extension analytics storage migration fallback, popup stats race-condition guards, structured step-up auth error handling in Oracle dashboard, and backend/worker auth-security hardening. See /CHANGELOG.md for details.
+> Update (2026-02-28): Major full-repo scan completed. Security scans are clean; known residual issue is intermittent timeout flakiness during heavy combined test runs (not deterministic functional regressions). See `/docs/MAJOR_SCAN_2026-02-28.md` for full evidence.
 
 > Comprehensive reference for every test suite, integration test, CI workflow, and manual verification script in the **Classroom Quick Downloader** monorepo.
 
@@ -9,6 +9,7 @@
 ## Table of Contents
 
 - [Quick Start](#quick-start)
+- [Latest Major Scan Snapshot (2026-02-28)](#latest-major-scan-snapshot-2026-02-28)
 - [Project Structure](#project-structure)
 - [Extension Tests (Vitest)](#extension-tests-vitest)
   - [Unit Tests](#unit-tests)
@@ -23,6 +24,7 @@
 - [Manual Testing Scripts](#manual-testing-scripts)
 - [Git Hooks](#git-hooks)
 - [Running Everything at Once](#running-everything-at-once)
+- [Phase 12 + 13 Execution](#phase-12--13-execution)
 
 ---
 
@@ -41,6 +43,66 @@ cd oracle-backend && go test ./...            # Oracle Backend Go tests
 pnpm -C extension test:coverage:all           # Critical + runtime 100 % gates
 ```
 
+## Phase 12 + 13 Execution
+
+Strict phase-12 closure:
+
+```bash
+bash tools/phase12_verify.sh
+```
+
+Phase-12 matrix reference:
+
+- `/Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/docs/PHASE12_TEST_MATRIX.md`
+
+Phase-13 rollout sequence (dry-run style validation + smoke):
+
+```bash
+WORKER_BASE_URL='https://cqd-analytics.adhamhaithameid.workers.dev' \
+ORACLE_BASE_URL='https://<your-oracle-public-https-domain>' \
+WEBSITE_URL='https://classroom-quick-downloader-website.pages.dev' \
+bash tools/phase13_rollout.sh
+```
+
+Phase-13 rollout including deployments:
+
+```bash
+ORACLE_SSH_DEST='ubuntu@<oracle-host>' \
+CLOUDFLARE_ACCOUNT_ID='<account-id>' \
+CLOUDFLARE_API_TOKEN='<token>' \
+CLOUDFLARE_PAGES_PROJECT_NAME='classroom-quick-downloader-website' \
+PUBLIC_BASE_PATH='' \
+PUBLIC_ORACLE_API_BASE_URL='https://<your-oracle-public-https-domain>' \
+PUBLIC_WORKER_BASE_URL='https://cqd-analytics.adhamhaithameid.workers.dev' \
+PUBLIC_SITE_URL='https://<your-root-domain>' \
+WORKER_BASE_URL='https://cqd-analytics.adhamhaithameid.workers.dev' \
+ORACLE_BASE_URL='https://<your-oracle-public-https-domain>' \
+WEBSITE_URL='https://<your-root-domain>' \
+bash tools/phase13_rollout.sh --deploy
+```
+
+24h monitoring window (lag/retry/DLQ guardrails):
+
+```bash
+WORKER_BASE_URL='https://cqd-analytics.adhamhaithameid.workers.dev' \
+ORACLE_BASE_URL='https://<your-oracle-public-https-domain>' \
+DURATION_HOURS=24 \
+INTERVAL_SECONDS=300 \
+bash tools/phase13_monitor.sh
+```
+
+## Latest Major Scan Snapshot (2026-02-28)
+
+- `pnpm run scan:security` -> PASS
+- `pnpm -C website run test:strict` -> PASS (isolated)
+- `pnpm -C cloudflare-worker run test:strict` -> PASS (isolated)
+- `pnpm -C oracle-backend run test:strict` -> PASS
+- `pnpm -C extension run test -- --maxWorkers=1` -> PASS
+
+Known caveat:
+- Vitest timeout/hook budgets were raised to `30s` for `website`, `cloudflare-worker`, and `extension` to reduce false negatives in heavy runs.
+- If a shared host is under heavy contention, rerun affected suites in isolation for deterministic signal.
+
 ---
 
 ## Project Structure
@@ -48,11 +110,11 @@ pnpm -C extension test:coverage:all           # Critical + runtime 100 % gates
 ```
 Classroom-Quick-Downloader/
 ├── extension/                  # Browser extension (TypeScript / WXT)
-│   ├── tests/                  # 43 Vitest test files
+│   ├── tests/                  # 47 Vitest test files
 │   ├── vitest.config.ts        # Vitest config with 3 coverage profiles
 │   └── package.json            # Test scripts
 ├── cloudflare-worker/          # Edge analytics & dashboard (TypeScript)
-│   ├── tests/                  # 2 Vitest test files
+│   ├── tests/                  # 13 Vitest test files
 │   ├── vitest.config.ts        # Vitest config (Node env)
 │   └── package.json            # Test scripts
 ├── oracle-backend/             # Analytics API (Go / Docker)
@@ -327,7 +389,13 @@ Results appear in the **Security** tab of the GitHub repository.
 
 ### Deployment Model
 
-Production deployments are manual (no auto-deploy workflow in this repo):
+Production deploys are automated through GitHub Actions on `main`:
+
+- `/.github/workflows/deploy-cloudflare-worker.yml` deploys the Worker on every `main` push (and supports manual dispatch).
+- `/.github/workflows/oracle-dashboard-deploy.yml` deploys Oracle backend/dashboard to the VM on every `main` push (and supports manual dispatch).
+- `/.github/workflows/website-deploy.yml` deploys Website on `main` pushes affecting website/docs paths (and supports manual dispatch).
+
+Manual deploy scripts remain available for emergency/ops use:
 
 ```bash
 # Cloudflare Worker deploy (from your local machine)
@@ -510,3 +578,81 @@ pnpm --filter cloudflare-worker test && \
 | `verify_oracle.sh` | Go vet + tests + Docker build |
 | `oracle-backend/scripts/deploy_main_inplace.sh` | In-place Oracle production deploy with rollback image tag |
 | `deploy_manual.sh` | One-command manual deploy wrapper (`cloudflare`, `oracle`, `all`) |
+
+---
+
+## Runbook Validation Suite (Phase 11)
+
+Use this section to validate that deployment/incident/data-flow runbooks are still accurate.
+
+Related docs:
+
+- `/Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/docs/RUNBOOK_DEPLOYMENT.md`
+- `/Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/docs/RUNBOOK_INCIDENT_RESPONSE.md`
+- `/Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/docs/DATA_FLOW_WORKER_ORACLE_WEBSITE.md`
+- `/Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/docs/DEPLOYMENT_RUNBOOK.md`
+
+### A. Command Accuracy Check
+
+```bash
+cd /Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader
+bash tools/check_schema_compat.sh
+pnpm -C cloudflare-worker test:smoke
+pnpm -C website test:smoke
+cd oracle-backend && go test ./... && cd ..
+```
+
+Expected output:
+
+- schema check prints `Schema compatibility check passed (version=1)`
+- test suites complete with pass counts and no failures
+
+### B. Data-Flow Smoke Check
+
+```bash
+WORKER_BASE=\"https://cqd-analytics.adhamhaithameid.workers.dev\"
+SITE_ORIGIN=\"https://<your-root-domain>\"
+
+curl -fsS \"${WORKER_BASE}/health\"
+curl -fsS \"${WORKER_BASE}/api/public/website/snapshot\"
+curl -fsS -X POST \"${WORKER_BASE}/api/public/website/events\" \
+  -H \"Origin: ${SITE_ORIGIN}\" \
+  -H 'Content-Type: application/json' \
+  -H 'X-Requested-With: XMLHttpRequest' \
+  -d '{\"schemaVersion\":\"1\",\"sessionId\":\"testing-smoke\",\"pagePath\":\"/testing\",\"events\":[{\"eventId\":\"testing-smoke-1\",\"eventType\":\"cta\",\"action\":\"install_click\",\"placement\":\"hero_install\"}]}'
+```
+
+Expected output:
+
+- `/health` returns `200`
+- snapshot response includes `schemaVersion: \"1\"`
+- ingest response includes `ok: true`
+
+### C. Replay/Recovery Procedure Check
+
+```bash
+curl -fsS https://cqd-analytics.adhamhaithameid.workers.dev/admin/website/status \
+  -H 'X-Admin-Secret: <DO_SHARED_SECRET>'
+curl -fsS -X POST https://cqd-analytics.adhamhaithameid.workers.dev/admin/website/replay-dlq \
+  -H 'Content-Type: application/json' \
+  -H 'X-Admin-Secret: <DO_SHARED_SECRET>' \
+  -d '{\"limit\":25}'
+curl -fsS -X POST https://cqd-analytics.adhamhaithameid.workers.dev/admin/website/flush-now \
+  -H 'X-Admin-Secret: <DO_SHARED_SECRET>'
+```
+
+Expected output:
+
+- status payload includes queue and dead-letter fields
+- replay/flush endpoints return `ok: true`
+
+### D. Security Containment Drill (Procedure Validation)
+
+This is a procedural test. Do not run in production without change control.
+
+Checklist:
+
+1. Verify runbook paths resolve and are current.
+2. Verify secret rotation commands execute in staging.
+3. Verify rollback commands are executable and known-good SHA is available.
+4. Verify post-rollback smoke checks pass.

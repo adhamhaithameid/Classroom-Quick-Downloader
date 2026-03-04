@@ -440,39 +440,40 @@ function executeLayer3_GoldenSelectors(post: HTMLElement, keywords: CommentKeywo
 // ============================================================================
 
 function executeLayer4_NuclearScan(post: HTMLElement, keywords: CommentKeywords): LayerResult {
-  // Create a clone to avoid modifying the original
-  const clone = post.cloneNode(true) as HTMLElement;
-  
-  // Remove user content areas that might have false positives
-  for (const selector of GOLDEN_SELECTORS.userContentExclusions) {
-    clone.querySelectorAll(selector).forEach(el => el.remove());
-  }
-  
-  // TreeWalker for text nodes
+  // Traverse in-place and filter elements instead of cloning for better performance.
   const walker = document.createTreeWalker(
-    clone,
-    NodeFilter.SHOW_TEXT,
+    post,
+    NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT,
     {
       acceptNode: (node) => {
-        const parent = node.parentElement;
-        if (!parent) return NodeFilter.FILTER_REJECT;
-        
-        const tagName = parent.tagName.toLowerCase();
-        if (tagName === 'script' || tagName === 'style' || tagName === 'noscript') {
-          return NodeFilter.FILTER_REJECT;
-        }
-        
-        // Skip hidden elements
-        try {
-          const style = window.getComputedStyle(parent);
-          if (style.display === 'none' || style.visibility === 'hidden') {
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          const element = node as HTMLElement;
+          const tagName = element.tagName.toLowerCase();
+          if (tagName === 'script' || tagName === 'style' || tagName === 'noscript') {
             return NodeFilter.FILTER_REJECT;
           }
-        } catch {
-          // Ignore
+
+          if (GOLDEN_SELECTORS.userContentExclusions.some((selector) => element.matches(selector))) {
+            return NodeFilter.FILTER_REJECT;
+          }
+
+          try {
+            const style = window.getComputedStyle(element);
+            if (style.display === 'none' || style.visibility === 'hidden') {
+              return NodeFilter.FILTER_REJECT;
+            }
+          } catch {
+            // Ignore style lookup failures.
+          }
+
+          return NodeFilter.FILTER_SKIP;
         }
-        
-        return NodeFilter.FILTER_ACCEPT;
+
+        if (node.nodeType === Node.TEXT_NODE) {
+          return NodeFilter.FILTER_ACCEPT;
+        }
+
+        return NodeFilter.FILTER_SKIP;
       },
     }
   );

@@ -34,7 +34,7 @@ function makeStats(overrides: Partial<StatsResponse> = {}): StatsResponse {
     },
     envSnapshot: {
       maxBatchEvents: "10000",
-      oracleEndpoint: "http://example.com",
+      oracleEndpoint: "https://example.com",
     },
     requestsToday: 0,
     requestDate: "2026-02-09",
@@ -120,6 +120,62 @@ describe("Dashboard pipeline health UI", () => {
   });
 });
 
+describe("Dashboard website sync UI", () => {
+  it("renders website sync controls in the data hub", () => {
+    const html = renderDashboard(makeStats());
+    expect(html).toContain('id="btn-website-status-refresh"');
+    expect(html).toContain('id="btn-website-flush-now"');
+    expect(html).toContain('id="btn-website-refresh-toggle"');
+    expect(html).toContain('id="btn-website-override-save"');
+    expect(html).toContain('id="website-admin-output"');
+  });
+
+  it("does not render weekly or monthly events rows in quota usage", () => {
+    const html = renderDashboard(makeStats());
+    expect(html).not.toContain("Weekly Events");
+    expect(html).not.toContain("Monthly Events");
+    expect(html).not.toContain('data-bind="weeklyEvents"');
+    expect(html).not.toContain('data-bind="monthlyEvents"');
+  });
+});
+
+describe("Dashboard website console CTA", () => {
+  it("renders giant link to the dedicated website data console", () => {
+    const html = renderDashboard(makeStats());
+    expect(html).toContain("Open Website Data Console");
+    expect(html).toContain('href="/dashboard/website"');
+  });
+
+  it("removes legacy release and notification nav entries", () => {
+    const html = renderDashboard(makeStats());
+    expect(html).not.toContain('href="#config"');
+    expect(html).not.toContain('href="#release"');
+    expect(html).not.toContain("Notifications");
+    expect(html).not.toContain("Releases");
+  });
+});
+
+describe("Dashboard country label tooltips", () => {
+  it("adds human-readable country names for ISO-2 country codes on hover", () => {
+    const html = renderDashboard(
+      makeStats({
+        counters: {
+          byStatus: {},
+          byType: {},
+          byBrowser: {},
+          byOs: {},
+          byExtVersion: {},
+          byLanguage: {},
+          byCountry: { EG: 12 },
+          byErrorType: {},
+        },
+      })
+    );
+    expect(html).toContain('data-tooltip="Egypt"');
+    expect(html).toContain(">EG<");
+  });
+});
+
 describe("Dashboard login rendering", () => {
   it("escapes injected login error content in the full dashboard template", () => {
     const html = renderMainLoginPage(`<img src=x onerror=alert("xss")>`);
@@ -137,7 +193,7 @@ describe("Dashboard login rendering", () => {
 });
 
 describe("Dashboard security rendering", () => {
-  it("escapes changelog fields and script-embedded config JSON", () => {
+  it("escapes changelog fields inside embedded raw stats JSON", () => {
     const stats = makeStats({
       changelog: [
         {
@@ -163,10 +219,10 @@ describe("Dashboard security rendering", () => {
 
     expect(html).not.toContain(`<script>alert('xss')</script>`);
     expect(html).not.toContain(`</script><script>alert(1)</script>`);
-    expect(html).not.toContain(`data-release-id="rel-1"><img src=x onerror=alert(1)>"`);
+    expect(html).not.toContain(`<img src=x onerror=alert(1)>`);
 
-    expect(html).toContain("&lt;script&gt;alert(&#039;xss&#039;)&lt;/script&gt;");
-    expect(html).toContain("\\u003c/script\\u003e\\u003cscript\\u003ealert(1)\\u003c/script\\u003e");
-    expect(html).toContain("data-release-id=\"rel-1&quot;&gt;&lt;img src=x onerror=alert(1)&gt;\"");
+    expect(html).toContain("&lt;script&gt;alert('xss')&lt;/script&gt;");
+    expect(html).toContain("&lt;/script&gt;&lt;script&gt;alert(1)&lt;/script&gt;");
+    expect(html).toContain("&lt;img src=x onerror=alert(1)&gt;");
   });
 });

@@ -69,6 +69,12 @@ function installChromeStorage(seed: StorageMap = {}): StorageMap {
 
 async function buildIntegrationContext() {
   vi.resetModules();
+  let oracleChangelogPayload: Record<string, unknown> = {
+    ok: true,
+    entries: [],
+    config: { rules: [] },
+    meta: { contentChecksum: 'empty' },
+  };
   vi.doMock('../entrypoints/utils/analytics/constants', async () => {
     const actual = await vi.importActual<Record<string, unknown>>('../entrypoints/utils/analytics/constants');
     return {
@@ -76,6 +82,7 @@ async function buildIntegrationContext() {
       WORKER_BASE_URL: 'https://worker.test',
       TRACK_URL: 'https://worker.test/track',
       CONFIG_URL: 'https://worker.test/config',
+      ORACLE_CHANGELOG_URL: 'https://oracle.test/api/public/extension/changelog',
     };
   });
 
@@ -115,6 +122,15 @@ async function buildIntegrationContext() {
         method: 'GET',
       }));
     }
+    if (url.pathname === '/api/public/extension/changelog') {
+      return new Response(JSON.stringify(oracleChangelogPayload), {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          ETag: '"oracle-etag"',
+        },
+      });
+    }
     throw new Error(`Unexpected integration fetch URL: ${requestUrl}`);
   });
   vi.stubGlobal('fetch', fetchSpy);
@@ -122,8 +138,12 @@ async function buildIntegrationContext() {
   const storage = await import('../entrypoints/utils/analytics/storage');
   const flush = await import('../entrypoints/utils/analytics/flush');
   const analytics = await import('../entrypoints/utils/analytics/index');
+  const changelog = await import('../entrypoints/utils/changelog');
 
-  return { durable, state, fetchSpy, storage, flush, analytics };
+  const setOracleChangelogPayload = (payload: Record<string, unknown>) => {
+    oracleChangelogPayload = payload;
+  };
+  return { durable, state, fetchSpy, storage, flush, analytics, changelog, setOracleChangelogPayload };
 }
 
 describe('extension <-> cloudflare integration', () => {
@@ -260,5 +280,30 @@ describe('extension <-> cloudflare integration', () => {
 
     expect(fetchSpy).toHaveBeenCalled();
     expect(String(fetchSpy.mock.calls[0]?.[0])).toContain('/config');
+  });
+
+  it('loads manual changelog data, applies notification rules, and keeps revision-aware seen state', async () => {
+    const { changelog, fetchSpy } = await buildIntegrationContext();
+
+    const data = await changelog.fetchChangelog(true);
+    expect(data?.entries.length).toBeGreaterThan(0);
+    expect(data?.entries[0]?.version).toBe('1.3.9');
+    expect(data?.entries[0]?.changes[0]).toContain('Summary:');
+    expect(data?.revisionToken).toBeTruthy();
+
+    const rule = changelog.getMatchingRule(data?.config, '1.3.8');
+    expect(rule?.priority).toBe('major');
+    expect(rule?.effect).toBe('pulse');
+    expect(changelog.getRuleClasses(rule, false)).toContain('cqd-pill-major');
+    await changelog.markAsSeen('1.3.8', data);
+    expect(await changelog.isVersionSeen('1.3.8', data)).toBe(true);
+
+    const updated = await changelog.fetchChangelog(true);
+    expect(updated?.revisionToken).toBeTruthy();
+    expect(updated?.revisionToken).toBe(data?.revisionToken);
+    expect(updated?.entries[0]?.version).toBe('1.3.9');
+    expect(await changelog.isVersionSeen('1.3.8', updated)).toBe(true);
+
+    expect(fetchSpy.mock.calls.some((call) => String(call[0]).includes('/api/public/extension/changelog'))).toBe(false);
   });
 });

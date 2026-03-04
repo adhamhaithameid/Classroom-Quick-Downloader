@@ -359,6 +359,40 @@ func isRecordTypeAllowed(recordType string, allowed map[string]struct{}) bool {
 	return ok
 }
 
+func shouldRefreshPublicWebsiteSnapshotForRecordType(recordType string) bool {
+	switch strings.TrimSpace(recordType) {
+	case publicWebsiteUserChangelogRecordType,
+		publicWebsiteUserChangelogConfigType,
+		publicWebsitePrivacyRecordType,
+		"deployment_target":
+		return true
+	default:
+		return false
+	}
+}
+
+func refreshPublicWebsiteSnapshotAfterRecordMutation(
+	ctx context.Context,
+	sqliteDB, postgresDB *sql.DB,
+	recordType string,
+) {
+	if !shouldRefreshPublicWebsiteSnapshotForRecordType(recordType) || sqliteDB == nil {
+		return
+	}
+	snapshot, err := loadOrRefreshPublicWebsiteSnapshot(ctx, sqliteDB, postgresDB, true)
+	if err != nil {
+		logEvent("warn", "public_website_snapshot_refresh_after_record_mutation_failed", map[string]interface{}{
+			"recordType": trimAndLimit(recordType, 120),
+			"error":      trimAndLimit(err.Error(), 240),
+		})
+		return
+	}
+	logEvent("info", "public_website_snapshot_refreshed_after_record_mutation", map[string]interface{}{
+		"recordType": trimAndLimit(recordType, 120),
+		"snapshotId": trimAndLimit(snapshot.SnapshotID, 120),
+	})
+}
+
 func RecordsListHandlerV4(sqliteDB, postgresDB *sql.DB, allowedRecordTypes map[string]struct{}) http.HandlerFunc {
 	store := newControlPlaneStore(sqliteDB, postgresDB)
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -434,6 +468,7 @@ func RecordsUpsertHandlerV4(sqliteDB, postgresDB *sql.DB, allowedRecordTypes map
 		) {
 			return
 		}
+		refreshPublicWebsiteSnapshotAfterRecordMutation(r.Context(), sqliteDB, postgresDB, req.RecordType)
 
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{"ok": true})
@@ -481,6 +516,7 @@ func RecordsDeleteHandlerV4(sqliteDB, postgresDB *sql.DB, allowedRecordTypes map
 		) {
 			return
 		}
+		refreshPublicWebsiteSnapshotAfterRecordMutation(r.Context(), sqliteDB, postgresDB, req.RecordType)
 
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{

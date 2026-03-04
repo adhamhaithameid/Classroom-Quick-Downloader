@@ -150,8 +150,6 @@ export interface StatsResponse {
   requestDate: string | null;
   uniqueRequestsToday: number;
   uniqueIpsToday: number; // Backwards compatibility
-  weeklyRequests?: number;
-  monthlyRequests?: number;
   uniqueCountriesAllTime?: number;
   // CAP INDICATOR: true when unique counts are approximated (10,000+ capped)
   isApproximated: boolean;
@@ -199,6 +197,7 @@ export interface StatsResponse {
   
   // Changelog data for dashboard
   changelog: ChangelogEntry[];
+  changelogRevisions?: ChangelogRevision[];
   changelogConfig: ChangelogConfig;
 
   // End-to-end delivery metrics chain
@@ -241,6 +240,28 @@ export interface StatsResponse {
       firstTs: number;
       lastTs: number;
     }>;
+  };
+}
+
+export interface PublicSiteMetricsResponse {
+  ok: boolean;
+  source: "cloudflare-worker";
+  generatedAt: number;
+  snapshotAtUtc: number;
+  totals: {
+    downloads: number;
+    countries: number;
+  };
+  countries: Array<{
+    countryCode: string;
+    count: number;
+  }>;
+  schedule: {
+    refreshHoursUtc: number[];
+    activeHourUtc: number;
+    isRefreshWindow: boolean;
+    lastRefreshAtUtc: number;
+    nextRefreshAtUtc: number;
   };
 }
 
@@ -312,6 +333,37 @@ export interface PipelineHealthResponse {
     warnBufferUtil: number;
     criticalBufferUtil: number;
   };
+  websiteTelemetry?: {
+    pendingBatches: number;
+    deadLetterBatches: number;
+    retryCount: number;
+    lastBatchCreatedAtUtc: number | null;
+    lastBatchSentAtUtc: number | null;
+    lastBatchAckAtUtc: number | null;
+    lastBatchId: string | null;
+    lastCorrelationId: string | null;
+    lastError: string | null;
+    nextRetryAtUtc: number | null;
+  };
+}
+
+export interface KVNamespaceBinding {
+  get(key: string): Promise<string | null>;
+  put(
+    key: string,
+    value: string,
+    options?: {
+      expirationTtl?: number;
+      expiration?: number;
+    }
+  ): Promise<void>;
+  delete?(key: string): Promise<void>;
+}
+
+export interface D1DatabaseBinding {
+  prepare(query: string): unknown;
+  batch?(statements: unknown[]): Promise<unknown>;
+  exec?(query: string): Promise<unknown>;
 }
 
 /**
@@ -320,10 +372,17 @@ export interface PipelineHealthResponse {
  */
 export interface Env {
   DOWNLOADS_DO: DurableObjectNamespace;
+  SITE_SNAPSHOT_KV?: KVNamespaceBinding;
+  SITE_CACHE_DB?: D1DatabaseBinding;
   DO_SHARED_SECRET: string;
   DASHBOARD_PASSWORD?: string;
   DANGER_PASSWORD: string;
   ORACLE_ENDPOINT: string;
+  /**
+   * Optional emergency/dev override to allow non-loopback HTTP Oracle endpoints.
+   * Keep unset in production once HTTPS Oracle endpoint is available.
+   */
+  ALLOW_INSECURE_ORACLE_ENDPOINT?: string;
   MAX_BATCH_EVENTS: string;
   ALERT_WEBHOOK_URL?: string;
   /**
@@ -346,6 +405,99 @@ export interface Env {
    * No fallback to CORS_ALLOWED_ORIGINS; admin/debug origins must be explicitly set.
    */
   ADMIN_CORS_ALLOWED_ORIGINS?: string;
+  /**
+   * Optional Cloudflare Access enforcement for dashboard/admin routes.
+   * When true, dashboard routes require Access identity headers.
+   */
+  CLOUDFLARE_ACCESS_REQUIRED?: string;
+  /**
+   * Optional comma-separated Access email allowlist.
+   * If configured, access identity email must match one of these entries.
+   */
+  CLOUDFLARE_ACCESS_EMAIL_ALLOWLIST?: string;
+  /**
+   * Optional feature flag for queue-first website event pipeline on free plan.
+   * Default false.
+   */
+  ENABLE_SITE_QUEUE_PIPELINE?: string;
+}
+
+export interface WebsiteConsoleSummaryResponse {
+  ok: boolean;
+  code: string;
+  message: string;
+  generatedAtUtc: number;
+  runtime: {
+    kvConfigured: boolean;
+    d1Configured: boolean;
+    oracleReachable: boolean;
+  };
+  snapshot: {
+    snapshotId: string | null;
+    generatedAtUtc: number | null;
+    totals: {
+      downloads: number;
+      countries: number;
+    };
+    cacheState: "hit" | "miss";
+  };
+  telemetry: Record<string, unknown>;
+  doWebsite: Record<string, unknown>;
+}
+
+export interface WebsiteConsoleKVResponse {
+  ok: boolean;
+  code: string;
+  message: string;
+  generatedAtUtc: number;
+  key: string;
+  sizeBytes: number;
+  exists: boolean;
+  valueRaw: string | null;
+  valueJson: unknown;
+}
+
+export interface WebsiteConsoleD1TablesResponse {
+  ok: boolean;
+  code: string;
+  message: string;
+  generatedAtUtc: number;
+  tables: string[];
+}
+
+export interface WebsiteConsoleD1QueryRequest {
+  query: string;
+  maxRows?: number;
+}
+
+export interface WebsiteConsoleD1QueryResponse {
+  ok: boolean;
+  code: string;
+  message: string;
+  generatedAtUtc: number;
+  maxRows: number;
+  rowCount: number;
+  query: string;
+  rows: Record<string, unknown>[];
+}
+
+export interface WebsiteConsoleTelemetryResponse {
+  ok: boolean;
+  code: string;
+  message: string;
+  generatedAtUtc: number;
+  telemetry: Record<string, unknown>;
+  publicSnapshot: Record<string, unknown>;
+}
+
+export interface WebsiteConsoleSnapshotRawResponse {
+  ok: boolean;
+  code: string;
+  message: string;
+  generatedAtUtc: number;
+  kvSnapshotRaw: string | null;
+  kvSnapshotJson: Record<string, unknown> | null;
+  doPublicSnapshot: Record<string, unknown> | null;
 }
 
 /**
@@ -356,7 +508,25 @@ export interface ChangelogEntry {
   version: string;
   date: string; // ISO date string
   changes: string[]; // List of changes
+  summary?: string;
+  added?: string[];
+  changed?: string[];
+  fixed?: string[];
+  markdown?: string;
+  source?: "manual" | "github" | "import";
   isImportant?: boolean; // Highlight in UI?
+}
+
+export interface ChangelogRevision {
+  id: string;
+  source: "manual" | "github" | "github_auto" | "api";
+  createdAt: number;
+  actor: string;
+  markdownUrl?: string;
+  markdownLength: number;
+  releases: number;
+  valid: boolean;
+  errors?: string[];
 }
 
 export interface NotificationRule {
@@ -366,11 +536,25 @@ export interface NotificationRule {
   effect: 'none' | 'glow' | 'pulse';
 }
 
+export type ChangelogApplyMode = "manual" | "auto_github";
+export type ChangelogSyncStatus = "idle" | "ok" | "error";
+
 /**
  * Configuration for the "Version Pill" in the extension.
  */
 export interface ChangelogConfig {
   rules: NotificationRule[];
+  applyMode?: ChangelogApplyMode;
+  autoSyncEnabled?: boolean;
+  autoSyncIntervalMinutes?: number;
+  lastAutoSyncAt?: number;
+  lastAutoSyncStatus?: ChangelogSyncStatus;
+  lastAutoSyncError?: string;
+  nextAutoSyncAt?: number;
+  liveHash?: string;
+  markdownSourceUrl?: string;
+  markdownHelpUrl?: string;
+  lastParsedAt?: number;
   lastUpdated?: number;
 }
 

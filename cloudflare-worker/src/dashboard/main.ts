@@ -1,6 +1,7 @@
 // filepath: cloudflare-worker/src/dashboard/main.ts
 import type { StatsResponse, QuotaDescriptor, ChangelogEntry, ChangelogConfig } from "../types";
 import { FAVICON_PNG_DATA_URI } from "../assets";
+import { resolveOracleEndpoint } from "../oracle-endpoint";
 
 function escapeHtml(unsafe: string): string {
   return unsafe
@@ -43,6 +44,29 @@ function formatAge(ts: number | null): string {
   if (hr > 0) return `${hr}h`;
   if (min > 0) return `${min}m`;
   return `${sec}s`;
+}
+
+const COUNTRY_NAME_ALIASES: Record<string, string> = {
+  UK: "United Kingdom",
+  EL: "Greece",
+};
+const COUNTRY_CODE_PATTERN = /^[A-Z]{2}$/;
+const countryDisplayNames =
+  typeof Intl !== "undefined" && typeof Intl.DisplayNames === "function"
+    ? new Intl.DisplayNames(["en"], { type: "region" })
+    : null;
+
+function countryNameFromCode(code: string): string {
+  const normalized = String(code || "").trim().toUpperCase();
+  if (!COUNTRY_CODE_PATTERN.test(normalized)) return "";
+  if (normalized === "XX" || normalized === "ZZ" || normalized === "UN" || normalized === "EU") return "";
+  if (COUNTRY_NAME_ALIASES[normalized]) return COUNTRY_NAME_ALIASES[normalized];
+  if (!countryDisplayNames) return "";
+  try {
+    return countryDisplayNames.of(normalized) || "";
+  } catch {
+    return "";
+  }
 }
 
 function quotaToStateTag(quota?: QuotaDescriptor) {
@@ -245,7 +269,7 @@ export function renderLoginPage(errorMessage?: string): string {
   <form class="login-card" method="POST" action="/">
     <div class="login-badge"><span class="login-badge-dot"></span><span>CQD Analytics Admin</span></div>
     <h1 class="login-title">Enter admin password</h1>
-    <p class="login-subtitle">Unlock analytics dashboard & danger controls.</p>
+    <p class="login-subtitle">Allowlisted IPs use the normal password. If blocked-IP step-up is enabled, blocked IPs can use the admin danger password in the same field.</p>
     
     <div class="login-row">
       <div class="field">
@@ -260,7 +284,8 @@ export function renderLoginPage(errorMessage?: string): string {
 </html>`;
 }
 
-// Notification Rules Engine UI
+// LEGACY_CHANGELOG_DISABLED_START
+// Notification Rules Engine UI is retained for rollback only and intentionally not rendered.
 function renderNotificationSection(entries: ChangelogEntry[], config: ChangelogConfig): string {
   const sorted = [...entries].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   const knownVersions = Array.from(new Set(sorted.map(e => e.version)));
@@ -388,14 +413,32 @@ function renderNotificationSection(entries: ChangelogEntry[], config: ChangelogC
           <div id="rules-list-container" style="display: flex; flex-direction: column; gap: 8px; max-height: 400px; overflow-y: auto; padding-right: 4px;">
              <!-- Renders via JS -->
           </div>
+          <div style="display:flex; align-items:center; gap:10px; margin-top:12px;">
+            <button id="btn-save-rules" class="btn btn-primary" style="padding:8px 12px;">Save Notification Rules</button>
+            <span id="rules-save-status" style="font-size:0.75em; color: var(--text-soft);">Idle</span>
+          </div>
         </div>
       </div>
     </section>
   `;
 }
 
-function renderReleaseManagementSection(entries: ChangelogEntry[], _config: ChangelogConfig): string {
+// Marked for rollback only while hidden from render tree.
+void renderNotificationSection;
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- Legacy Cloudflare changelog UI kept for rollback.
+function renderReleaseManagementSection(entries: ChangelogEntry[], config: ChangelogConfig): string {
   const sorted = [...entries].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const applyMode = config.applyMode === "auto_github" ? "auto_github" : "manual";
+  const autoSyncEnabled = config.autoSyncEnabled === true;
+  const autoSyncIntervalMinutes = Number.isFinite(Number(config.autoSyncIntervalMinutes))
+    ? Math.max(5, Math.min(1440, Number(config.autoSyncIntervalMinutes)))
+    : 60;
+  const syncStatus = config.lastAutoSyncStatus || "idle";
+  const syncStatusText =
+    syncStatus === "ok" ? "Auto sync healthy" : syncStatus === "error" ? "Auto sync error" : "Auto sync idle";
+  const syncStatusColor =
+    syncStatus === "ok" ? "#86efac" : syncStatus === "error" ? "#fca5a5" : "var(--text-soft)";
   
   // Versions for DataList
   const knownVersions = Array.from(new Set(sorted.map(e => e.version)));
@@ -422,7 +465,16 @@ function renderReleaseManagementSection(entries: ChangelogEntry[], _config: Chan
         </div>
       </div>
       <ul class="cl-changes-list">
-        ${e.changes.map(c => `<li>${escapeHtml(c)}</li>`).join('')}
+        ${
+          (e.summary || (Array.isArray(e.added) && e.added.length) || (Array.isArray(e.changed) && e.changed.length) || (Array.isArray(e.fixed) && e.fixed.length))
+            ? `
+              ${e.summary ? `<li><strong>Summary:</strong> ${escapeHtml(e.summary)}</li>` : ""}
+              ${Array.isArray(e.added) ? e.added.map((c) => `<li><strong>Added:</strong> ${escapeHtml(c)}</li>`).join("") : ""}
+              ${Array.isArray(e.changed) ? e.changed.map((c) => `<li><strong>Changed:</strong> ${escapeHtml(c)}</li>`).join("") : ""}
+              ${Array.isArray(e.fixed) ? e.fixed.map((c) => `<li><strong>Fixed:</strong> ${escapeHtml(c)}</li>`).join("") : ""}
+            `
+            : e.changes.map(c => `<li>${escapeHtml(c)}</li>`).join('')
+        }
       </ul>
     </div>
   `).join('') || `
@@ -447,6 +499,27 @@ function renderReleaseManagementSection(entries: ChangelogEntry[], _config: Chan
        </h2>
        <div class="section-subtitle">
          Publish a new changelog entry. This text appears when users click the version pill.
+       </div>
+       <div style="display:grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap:10px; margin: 10px 0 16px;">
+         <label style="display:flex; flex-direction:column; gap:6px; font-size:0.78em; color: var(--text-soft);">
+           Apply Mode
+           <select id="cl-apply-mode" class="input-field" style="padding:8px 10px; background: var(--bg-surface); border: 1px solid var(--border-subtle); color: white; border-radius: 8px;">
+             <option value="manual" ${applyMode === "manual" ? "selected" : ""}>Manual</option>
+             <option value="auto_github" ${applyMode === "auto_github" ? "selected" : ""}>Auto GitHub</option>
+           </select>
+         </label>
+         <label style="display:flex; flex-direction:column; gap:6px; font-size:0.78em; color: var(--text-soft);">
+           Auto Sync Interval (minutes)
+           <input id="cl-auto-sync-interval" type="number" min="5" max="1440" value="${autoSyncIntervalMinutes}" class="input-field" style="padding:8px 10px; background: var(--bg-surface); border: 1px solid var(--border-subtle); color: white; border-radius: 8px;" />
+         </label>
+         <label style="display:flex; align-items:center; gap:8px; font-size:0.78em; color: var(--text-soft); margin-top: 20px;">
+           <input id="cl-auto-sync-enabled" type="checkbox" ${autoSyncEnabled ? "checked" : ""} />
+           Auto Sync Enabled
+         </label>
+         <div style="display:flex; flex-direction:column; justify-content:center; gap:4px; font-size:0.78em;">
+           <span id="cl-sync-status" style="color:${syncStatusColor}; font-weight:600;">${syncStatusText}</span>
+           <span id="cl-sync-error" style="color:#fca5a5;">${escapeHtml(config.lastAutoSyncError || "")}</span>
+         </div>
        </div>
 
        <!-- Edit Mode Banner -->
@@ -478,13 +551,33 @@ function renderReleaseManagementSection(entries: ChangelogEntry[], _config: Chan
                    <span id="char-counter" class="char-counter">0 / 500</span>
                  </div>
               </div>
+
+              <div style="margin-bottom: 14px;">
+                 <label style="font-size: 0.75em; color: var(--text-soft); display: flex; align-items:center; gap:8px; margin-bottom: 6px;">
+                   User-Friendly Markdown
+                   <button type="button" id="cl-format-help" class="cl-help-btn" title="Show markdown format help">i</button>
+                 </label>
+                 <input id="new-cl-markdown-url" class="input-field" placeholder="GitHub raw URL (optional)" style="width:100%; padding:10px 12px; background: var(--bg-surface); border: 1px solid var(--border-subtle); color:white; border-radius:8px; font-size:0.88em; margin-bottom:8px;">
+                 <textarea id="new-cl-markdown" rows="10" class="input-field" placeholder="## v1.3.8&#10;### Summary&#10;Improved changelog reliability and release delivery for normal users.&#10;### Added&#10;- ...&#10;### Changed&#10;- ...&#10;### Fixed&#10;- ..." style="width:100%; padding:10px 12px; background: var(--bg-surface); border: 1px solid var(--border-subtle); color:white; border-radius:8px; font-size:0.88em; line-height:1.5; resize:vertical;"></textarea>
+                 <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">
+                   <button type="button" id="btn-preview-markdown" class="btn btn-secondary" style="padding:8px 12px;">Preview Draft</button>
+                   <button type="button" id="btn-import-markdown-url" class="btn btn-secondary" style="padding:8px 12px;">Import From URL</button>
+                   <a href="https://github.com/adhamhaithameid/Classroom-Quick-Downloader/blob/main/user-friendly-changelog.md" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="padding:8px 12px; text-decoration:none;">Open GitHub Source</a>
+                 </div>
+              </div>
               
               <button id="btn-save-all" class="btn btn-primary" style="width: 100%; padding: 14px 24px; background: var(--success); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s;">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                <span id="btn-save-text">Save & Publish</span>
+                <span id="btn-save-text">Save Draft</span>
               </button>
+              <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">
+                <button id="btn-publish-draft" class="btn btn-secondary" style="padding:8px 12px;">Publish Draft</button>
+                <button id="btn-sync-now" class="btn btn-secondary" style="padding:8px 12px;">Sync Now (Auto)</button>
+                <button id="btn-save-mode" class="btn btn-secondary" style="padding:8px 12px;">Save Mode</button>
+              </div>
+              <div id="cl-action-status" style="margin-top:8px; font-size:0.75em; color: var(--text-soft);">Idle</div>
               
-              <div style="margin-top: 10px; font-size: 0.75em; color: var(--text-soft); text-align: center;">
+           <div style="margin-top: 10px; font-size: 0.75em; color: var(--text-soft); text-align: center;">
                  💡 Tip: Press <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace;">Ctrl+Enter</kbd> to save quickly
               </div>
            </div>
@@ -500,11 +593,24 @@ function renderReleaseManagementSection(entries: ChangelogEntry[], _config: Chan
            <div class="cl-history-list" style="overflow-y: auto; max-height: 400px; padding-right: 8px;">
              ${historyHtml}
            </div>
+           <div style="margin-top:14px; padding:12px; border:1px solid var(--border-subtle); border-radius:10px; background:rgba(255,255,255,0.03);">
+             <div class="section-header" style="margin-bottom:8px;">Live Preview (Users See This)</div>
+             <div id="cl-current-preview" class="cl-render-preview" style="max-height:180px; overflow:auto;"></div>
+           </div>
+           <div style="margin-top:10px; padding:12px; border:1px solid var(--border-subtle); border-radius:10px; background:rgba(255,255,255,0.03);">
+             <div class="section-header" style="margin-bottom:8px;">Draft Preview (Unpublished)</div>
+             <div id="cl-draft-preview" class="cl-render-preview" style="max-height:220px; overflow:auto;"></div>
+           </div>
+           <div style="margin-top:10px; padding:12px; border:1px solid var(--border-subtle); border-radius:10px; background:rgba(255,255,255,0.03);">
+             <div class="section-header" style="margin-bottom:8px;">Revision History</div>
+             <div id="cl-revision-history" style="max-height:180px; overflow:auto; display:flex; flex-direction:column; gap:8px;"></div>
+           </div>
          </div>
        </div>
     </section>
   `;
 }
+// LEGACY_CHANGELOG_DISABLED_END
 
 export function renderDashboard(stats: StatsResponse): string {
   const quota = stats.quota;
@@ -538,8 +644,6 @@ export function renderDashboard(stats: StatsResponse): string {
       return normalized !== "" && normalized !== "xx" && normalized !== "unknown";
     }).length;
   const uniqueIpsDisplay = uniqueCountriesAllTime.toLocaleString();
-  const weeklyRequests = stats.weeklyRequests ?? requestsToday;
-  const monthlyRequests = stats.monthlyRequests ?? weeklyRequests;
 
   const remoteConfig = stats.remoteConfig || {};
   const cfgVersion = remoteConfig.configVersion ?? 1;
@@ -558,6 +662,14 @@ export function renderDashboard(stats: StatsResponse): string {
   const cfgAllowLegacy = remoteConfig.allowLegacyEvents ?? true;
   const cfgRemoteReason = remoteConfig.remoteEnabledReason ?? "ok";
   const pipelineHealthUrl = `${workerUrl}/pipeline-health`;
+  const oracleDashboardUrl = (() => {
+    const resolved = resolveOracleEndpoint(oracleEndpoint);
+    if (resolved.ok && resolved.protocol === "https:") {
+      return `${resolved.baseUrl}/`;
+    }
+    return `${workerUrl}/api/public/website/overview`;
+  })();
+  const uptimeStatusUrl = pipelineHealthUrl;
   const cfgHealth = remoteConfig.healthThresholds || {
     warnPendingBatches: 10,
     criticalPendingBatches: 25,
@@ -583,11 +695,15 @@ export function renderDashboard(stats: StatsResponse): string {
   const cfgHealthNotifyWarnMin = Math.round((cfgHealthNotify.warn ?? 1800000) / 60000);
   const cfgHealthNotifyCritMin = Math.round((cfgHealthNotify.critical ?? 600000) / 60000);
 
-  const renderTableRows = (data: Record<string, number>) => {
+  const renderTableRows = (data: Record<string, number>, dimension?: string) => {
     const keys = Object.keys(data).sort((a, b) => data[b] - data[a]);
     if (keys.length === 0) return "<tr><td colspan='2'>—</td></tr>";
     return keys
-      .map((k) => `<tr><td>${escapeHtml(k)}</td><td>${data[k]}</td></tr>`)
+      .map((k) => {
+        const countryName = dimension === "country" ? countryNameFromCode(k) : "";
+        const tooltipAttr = countryName ? ` data-tooltip="${escapeHtml(countryName)}"` : "";
+        return `<tr><td${tooltipAttr}>${escapeHtml(k)}</td><td>${data[k]}</td></tr>`;
+      })
       .join("");
   };
 
@@ -597,7 +713,7 @@ export function renderDashboard(stats: StatsResponse): string {
   const byOsRows = renderTableRows(stats.counters.byOs || {});
   const byExtVersionRows = renderTableRows(stats.counters.byExtVersion || {});
   const byLangRows = renderTableRows(stats.counters.byLanguage || {});
-  const byCountryRows = renderTableRows(stats.counters.byCountry || {});
+  const byCountryRows = renderTableRows(stats.counters.byCountry || {}, "country");
   const byErrorRows = renderTableRows(stats.counters.byErrorType || {});
 
   const totalSuccess = stats.totalSuccess || 0;
@@ -628,6 +744,10 @@ export function renderDashboard(stats: StatsResponse): string {
   const hotBrowser = topKey(stats.counters.byBrowser);
   const hotOs = topKey(stats.counters.byOs);
   const hotCountry = topKey(stats.counters.byCountry);
+  const hotCountryTooltipAttr = (() => {
+    const countryName = countryNameFromCode(hotCountry);
+    return countryName ? ` data-tooltip="${escapeHtml(countryName)}"` : "";
+  })();
 
   const rawStatsJson = JSON.stringify(stats, null, 2)
     .replace(/&/g, "&amp;")
@@ -2830,6 +2950,64 @@ export function renderDashboard(stats: StatsResponse): string {
     .char-counter.warning { color: #f59e0b; }
     .char-counter.error { color: #ef4444; }
 
+    .cl-help-btn {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 1px solid var(--border-subtle);
+      background: rgba(255,255,255,0.08);
+      color: var(--text-muted);
+      font-size: 11px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      padding: 0;
+      line-height: 1;
+    }
+    .cl-help-btn:hover {
+      color: var(--text-primary);
+      border-color: rgba(59, 130, 246, 0.5);
+      background: rgba(59,130,246,0.12);
+    }
+    .cl-render-preview h4 {
+      margin: 0 0 4px;
+      font-size: 0.86em;
+      color: #cbd5e1;
+    }
+    .cl-render-preview .cl-preview-summary {
+      margin: 0 0 8px;
+      font-size: 0.82em;
+      color: #d1d5db;
+      line-height: 1.55;
+    }
+    .cl-render-preview ul {
+      margin: 0 0 8px 16px;
+      padding: 0;
+      color: #9ca3af;
+      font-size: 0.8em;
+      line-height: 1.5;
+    }
+    .cl-revision-item {
+      padding: 8px 10px;
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      background: rgba(255,255,255,0.02);
+      font-size: 0.77em;
+      color: #9ca3af;
+      line-height: 1.45;
+    }
+    .cl-revision-item strong {
+      color: #e5e7eb;
+      font-size: 0.95em;
+    }
+    .cl-preview-empty {
+      color: #94a3b8;
+      font-size: 0.82em;
+      font-style: italic;
+    }
+
     /* Loading State */
     .btn-loading {
       position: relative;
@@ -2953,14 +3131,6 @@ export function renderDashboard(stats: StatsResponse): string {
       <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
       Debug & Actions
     </a>
-    <a href="#config" class="nav-item" data-section="config">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-      Notifications
-    </a>
-    <a href="#release" class="nav-item" data-section="release">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-      Releases
-    </a>
     <a href="#raw" class="nav-item" data-section="raw">
       <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
       Raw JSON
@@ -3016,11 +3186,19 @@ export function renderDashboard(stats: StatsResponse): string {
 
     <!-- External Links Bar -->
     <div class="external-links">
+      <a href="/dashboard/website" class="btn-external oracle" data-tooltip="Open full website data console (KV, D1, telemetry, flush correlation)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M7 8h10"></path><path d="M7 12h10"></path><path d="M7 16h6"></path></svg>
+        Open Website Data Console
+      </a>
+      <a href="https://classroom-quick-downloader-website.pages.dev/" target="_blank" class="btn-external oracle" data-tooltip="Open the public CQD website">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18"></path><path d="M12 3a15 15 0 0 1 0 18"></path><path d="M12 3a15 15 0 0 0 0 18"></path></svg>
+        Website
+      </a>
       <a href="https://github.com/adhamhaithameid/Classroom-Quick-Downloader" target="_blank" class="btn-external github" data-tooltip="View source code on GitHub">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
         GitHub
       </a>
-      <a href="http://129.151.233.229:8080/" target="_blank" class="btn-external oracle" data-tooltip="View Oracle Analytics Dashboard with historical data">
+      <a href="${escapeHtml(oracleDashboardUrl)}" target="_blank" class="btn-external oracle" data-tooltip="View Oracle analytics source">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
         Oracle
       </a>
@@ -3028,7 +3206,7 @@ export function renderDashboard(stats: StatsResponse): string {
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
         Sheets
       </a>
-      <a href="http://129.151.233.229:3001/status/cqd" target="_blank" class="btn-external uptime" data-tooltip="Check service uptime and status via Uptime Kuma">
+      <a href="${escapeHtml(uptimeStatusUrl)}" target="_blank" class="btn-external uptime" data-tooltip="Check system pipeline health">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
         Status
       </a>
@@ -3167,7 +3345,7 @@ export function renderDashboard(stats: StatsResponse): string {
               </div>
               <div class="hot-item">
                 <div class="hot-label">Country</div>
-                <div class="hot-value" data-bind="hotCountry">${escapeHtml(hotCountry)}</div>
+                <div class="hot-value" data-bind="hotCountry"${hotCountryTooltipAttr}>${escapeHtml(hotCountry)}</div>
               </div>
             </div>
           </div>
@@ -3188,7 +3366,7 @@ export function renderDashboard(stats: StatsResponse): string {
               </div>
               <div class="hot-item">
                 <div class="hot-label">Country</div>
-                <div class="hot-value" data-bind="hotCountryAllTime">${escapeHtml(hotCountry)}</div>
+                <div class="hot-value" data-bind="hotCountryAllTime"${hotCountryTooltipAttr}>${escapeHtml(hotCountry)}</div>
               </div>
             </div>
           </div>
@@ -3355,14 +3533,6 @@ export function renderDashboard(stats: StatsResponse): string {
             <div class="quota-stat">
               <span class="quota-label">Unique IPs / Countries</span>
               <span class="quota-val" data-bind="uniqueIps" style="color:${isApproximated ? 'var(--warning)' : 'inherit'}">${uniqueIpsDisplay}</span>
-            </div>
-            <div class="quota-stat">
-              <span class="quota-label">Weekly Events</span>
-              <span class="quota-val" data-bind="weeklyEvents" style="color:var(--success)">${weeklyRequests.toLocaleString()}</span>
-            </div>
-            <div class="quota-stat">
-              <span class="quota-label">Monthly Events</span>
-              <span class="quota-val" data-bind="monthlyEvents" style="color:var(--accent)">${monthlyRequests.toLocaleString()}</span>
             </div>
             <div class="quota-stat">
               <span class="quota-label">Status</span>
@@ -3651,8 +3821,17 @@ export function renderDashboard(stats: StatsResponse): string {
         </div>
       </section>
 
-      ${renderNotificationSection(stats.changelog || [], stats.changelogConfig || {})}
-      ${renderReleaseManagementSection(stats.changelog || [], stats.changelogConfig || {})}
+      <section class="card" id="legacy-changelog-disabled">
+        <h2>Extension Changelog Controls Moved</h2>
+        <div class="section-subtitle" style="margin-bottom: 12px;">
+          Legacy Cloudflare sections <strong>📢 Release Publishing</strong> and
+          <strong> 🔔 Notification Styling</strong> are disabled.
+        </div>
+        <div class="metric-sub">
+          Manage extension changelog entries and changelog pill rules in the
+          Oracle Dashboard under <code>Extension Changelog</code>.
+        </div>
+      </section>
 
       <!-- Raw /stats payload -->
       <section class="card" id="raw">
@@ -3691,6 +3870,19 @@ export function renderDashboard(stats: StatsResponse): string {
             <span class="toggle-slider"></span>
           </label>
         </div>
+
+        <div class="security-row" style="padding: 16px 20px; background: var(--bg-surface); border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 16px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:16px;">
+            <div>
+              <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">Blocked-IP login policy</div>
+              <div style="font-size: 0.8rem; color: var(--text-muted);">Allow blocked IPs to step up using admin danger password.</div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="blocked-ip-stepup-toggle" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
         
         <!-- Current Session Info -->
         <div class="session-info" style="display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap;">
@@ -3700,7 +3892,11 @@ export function renderDashboard(stats: StatsResponse): string {
           </div>
           <div style="flex: 1; min-width: 200px; padding: 14px 18px; background: var(--bg-surface); border-radius: var(--radius-sm); border: 1px solid var(--border);">
             <div style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-disabled); margin-bottom: 6px;">Status</div>
-            <div id="ip-status" style="font-size: 0.95rem; font-weight: 600; color: var(--success);">Allowed</div>
+            <div id="ip-status" style="font-size: 0.95rem; font-weight: 600; color: var(--success); margin-bottom: 8px;">Allowed</div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <span id="ip-allowlist-badge" style="font-size:0.7rem; font-weight:700; letter-spacing:0.04em; text-transform:uppercase; color:var(--text-primary); background:rgba(34,197,94,0.12); border:1px solid rgba(34,197,94,0.3); padding:3px 8px; border-radius:999px;">Allowlist: OFF</span>
+              <span id="ip-stepup-badge" style="font-size:0.7rem; font-weight:700; letter-spacing:0.04em; text-transform:uppercase; color:#93c5fd; background:rgba(59,130,246,0.12); border:1px solid rgba(59,130,246,0.3); padding:3px 8px; border-radius:999px;">Blocked IP Login: Step-Up ON</span>
+            </div>
           </div>
         </div>
         
@@ -3850,6 +4046,80 @@ export function renderDashboard(stats: StatsResponse): string {
               Last sync: ${ageLastFlush}
             </div>
           </div>
+          
+          <!-- Website Sync Card -->
+          <div class="info-card" style="padding: 20px; background: var(--bg-surface); border-radius: var(--radius); border: 1px solid var(--border);">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+              <span style="font-size: 1.2rem;">🌐</span>
+              <div style="font-weight: 600; color: var(--text-primary);">Website Sync</div>
+            </div>
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 14px;">
+              Manage public website metrics snapshot and website-control actions.
+            </div>
+            <div style="display:flex; flex-direction:column; gap:10px; margin-bottom: 12px;">
+              <div style="display:flex; justify-content:space-between; gap:10px; font-size:0.78rem;">
+                <span style="color: var(--text-muted);">Last Batch Slot</span>
+                <strong id="website-last-batch-slot" style="color:var(--text-primary);">—</strong>
+              </div>
+              <div style="display:flex; justify-content:space-between; gap:10px; font-size:0.78rem;">
+                <span style="color: var(--text-muted);">Telemetry Queue</span>
+                <strong id="website-telemetry-queue" style="color:var(--text-primary);">—</strong>
+              </div>
+              <div style="display:flex; justify-content:space-between; gap:10px; font-size:0.78rem;">
+                <span style="color: var(--text-muted);">Telemetry Retry Count</span>
+                <strong id="website-telemetry-retry-count" style="color:var(--text-primary);">—</strong>
+              </div>
+              <div style="display:flex; justify-content:space-between; gap:10px; font-size:0.78rem;">
+                <span style="color: var(--text-muted);">Last Telemetry Created (UTC)</span>
+                <strong id="website-last-telemetry-created" style="color:var(--text-primary);">—</strong>
+              </div>
+              <div style="display:flex; justify-content:space-between; gap:10px; font-size:0.78rem;">
+                <span style="color: var(--text-muted);">Last Telemetry Sent (UTC)</span>
+                <strong id="website-last-telemetry-sent" style="color:var(--text-primary);">—</strong>
+              </div>
+              <div style="display:flex; justify-content:space-between; gap:10px; font-size:0.78rem;">
+                <span style="color: var(--text-muted);">Telemetry Dead-Letter</span>
+                <strong id="website-telemetry-dlq" style="color:var(--text-primary);">—</strong>
+              </div>
+              <div style="display:flex; justify-content:space-between; gap:10px; font-size:0.78rem;">
+                <span style="color: var(--text-muted);">Last Refresh (UTC)</span>
+                <strong id="website-last-refresh-at" style="color:var(--text-primary);">—</strong>
+              </div>
+              <div style="display:flex; justify-content:space-between; gap:10px; font-size:0.78rem;">
+                <span style="color: var(--text-muted);">Refresh Mode</span>
+                <strong id="website-refresh-mode" style="color:var(--text-primary);">—</strong>
+              </div>
+              <div style="display:flex; justify-content:space-between; gap:10px; font-size:0.78rem;">
+                <span style="color: var(--text-muted);">Last Manual Flush (UTC)</span>
+                <strong id="website-last-manual-flush" style="color:var(--text-primary);">—</strong>
+              </div>
+              <div style="display:flex; justify-content:space-between; gap:10px; font-size:0.78rem;">
+                <span style="color: var(--text-muted);">Last Telemetry ACK (UTC)</span>
+                <strong id="website-last-telemetry-ack" style="color:var(--text-primary);">—</strong>
+              </div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:8px; margin-bottom: 10px;">
+              <label style="display:flex; align-items:center; gap:8px; font-size:0.78rem; color:var(--text-secondary);">
+                <input id="website-refresh-enabled" type="checkbox" checked />
+                Enable scheduled website refreshes
+              </label>
+              <label style="display:flex; align-items:center; gap:8px; font-size:0.78rem; color:var(--text-secondary);">
+                <input id="website-override-enabled" type="checkbox" />
+                Enable public website override
+              </label>
+              <input id="website-override-downloads" type="number" min="0" placeholder="Override total downloads" style="width:100%; padding:8px 10px; background: var(--bg-elevated); border:1px solid var(--border); color:var(--text-primary); border-radius:8px; font-size:0.8rem;" />
+              <textarea id="website-override-countries" placeholder='Override countries JSON [{"countryCode":"US","count":123}]' style="width:100%; min-height:84px; padding:8px 10px; resize:vertical; background: var(--bg-elevated); border:1px solid var(--border); color:var(--text-primary); border-radius:8px; font-size:0.78rem;"></textarea>
+            </div>
+            <div style="display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px;">
+              <button id="btn-website-status-refresh" class="btn" style="justify-content:center; padding: 8px 10px; font-size:0.78rem;">Refresh State</button>
+              <button id="btn-website-flush-now" class="btn" style="justify-content:center; padding: 8px 10px; font-size:0.78rem;">Flush Data Now</button>
+              <button id="btn-website-refresh-toggle" class="btn" style="justify-content:center; padding: 8px 10px; font-size:0.78rem;">Save Refresh Toggle</button>
+              <button id="btn-website-override-save" class="btn" style="justify-content:center; padding: 8px 10px; font-size:0.78rem;">Save Override</button>
+              <button id="btn-website-replay-dlq" class="btn" style="justify-content:center; padding: 8px 10px; font-size:0.78rem;">Replay Dead-Letter</button>
+            </div>
+            <pre id="website-admin-output" class="code-block code-block-large" style="margin-top:10px; max-height:180px; overflow:auto;">{"status":"idle"}</pre>
+          </div>
+        </div>
       </section>
 
       <!-- Admin Controls / Danger Zone -->
@@ -4064,6 +4334,39 @@ export function renderDashboard(stats: StatsResponse): string {
       let lastRefreshAt = 0;
       let configDirty = false;
 
+      // Enforce CSRF header for same-origin mutating requests made from dashboard UI.
+      const nativeFetch = window.fetch.bind(window);
+      window.fetch = function patchedFetch(input, init) {
+        try {
+          const requestUrl = (() => {
+            if (typeof input === "string" || input instanceof URL) {
+              return new URL(String(input), window.location.href);
+            }
+            if (input && typeof input.url === "string") {
+              return new URL(input.url, window.location.href);
+            }
+            return null;
+          })();
+          const method = (
+            (init && init.method) ||
+            (input && typeof input === "object" && "method" in input ? input.method : "GET") ||
+            "GET"
+          ).toUpperCase();
+          const isMutating = method !== "GET" && method !== "HEAD" && method !== "OPTIONS";
+          const isSameOrigin = requestUrl && requestUrl.origin === window.location.origin;
+          if (isMutating && isSameOrigin) {
+            const headers = new Headers(init && init.headers ? init.headers : (input && "headers" in input ? input.headers : undefined));
+            if (!headers.has("X-Requested-With")) {
+              headers.set("X-Requested-With", "XMLHttpRequest");
+            }
+            return nativeFetch(input, { ...(init || {}), headers });
+          }
+        } catch (err) {
+          console.warn("fetch patch fallback", err);
+        }
+        return nativeFetch(input, init);
+      };
+
       function formatTs(ts) {
         if (!ts) return "—";
         const d = new Date(ts);
@@ -4205,7 +4508,30 @@ export function renderDashboard(stats: StatsResponse): string {
         };
       }
 
-      function renderTableRowsJS(data) {
+      const COUNTRY_CODE_RE = /^[A-Z]{2}$/;
+      const COUNTRY_ALIASES = {
+        UK: "United Kingdom",
+        EL: "Greece",
+      };
+      const countryDisplayNamesJS =
+        typeof Intl !== "undefined" && typeof Intl.DisplayNames === "function"
+          ? new Intl.DisplayNames(["en"], { type: "region" })
+          : null;
+
+      function countryNameFromCodeJS(code) {
+        const normalized = String(code || "").trim().toUpperCase();
+        if (!COUNTRY_CODE_RE.test(normalized)) return "";
+        if (normalized === "XX" || normalized === "ZZ" || normalized === "UN" || normalized === "EU") return "";
+        if (COUNTRY_ALIASES[normalized]) return COUNTRY_ALIASES[normalized];
+        if (!countryDisplayNamesJS) return "";
+        try {
+          return countryDisplayNamesJS.of(normalized) || "";
+        } catch (_) {
+          return "";
+        }
+      }
+
+      function renderTableRowsJS(data, dimension) {
         const entries = Object.entries(data || {});
         if (!entries.length) return "<tr><td colspan='2'>—</td></tr>";
         entries.sort((a, b) => b[1] - a[1]);
@@ -4213,7 +4539,9 @@ export function renderDashboard(stats: StatsResponse): string {
           .map(function ([k, v]) {
             const numeric = Number(v);
             const safeValue = Number.isFinite(numeric) ? numeric.toString() : "0";
-            return "<tr><td>" + escapeHtmlJS(k) + "</td><td>" + safeValue + "</td></tr>";
+            const countryName = dimension === "country" ? countryNameFromCodeJS(k) : "";
+            const tooltipAttr = countryName ? ' data-tooltip="' + escapeHtmlJS(countryName) + '"' : "";
+            return "<tr><td" + tooltipAttr + ">" + escapeHtmlJS(k) + "</td><td>" + safeValue + "</td></tr>";
           })
           .join("");
       }
@@ -4234,6 +4562,7 @@ export function renderDashboard(stats: StatsResponse): string {
           hotBrowser: topKeyJS(counters.byBrowser),
           hotOs: topKeyJS(counters.byOs),
           hotCountry: topKeyJS(counters.byCountry),
+          hotCountryAllTime: topKeyJS(counters.byCountry),
         };
         Object.entries(values).forEach(function ([key, value]) {
           const els = document.querySelectorAll('[data-bind="' + key + '"]');
@@ -4252,6 +4581,16 @@ export function renderDashboard(stats: StatsResponse): string {
                 parent.classList.add("updated");
               }
             }
+            if (key === "hotCountry" || key === "hotCountryAllTime") {
+              const countryName = countryNameFromCodeJS(next);
+              if (countryName) {
+                el.setAttribute("data-tooltip", countryName);
+              } else {
+                el.removeAttribute("data-tooltip");
+              }
+            } else {
+              el.removeAttribute("data-tooltip");
+            }
           });
         });
       }
@@ -4259,21 +4598,22 @@ export function renderDashboard(stats: StatsResponse): string {
       function updateBreakdowns(counters) {
         if (!counters) return;
         const mapping = [
-          ["tbody-type", counters.byType],
-          ["tbody-status", counters.byStatus],
-          ["tbody-browser", counters.byBrowser],
-          ["tbody-os", counters.byOs],
-          ["tbody-ext", counters.byExtVersion],
-          ["tbody-lang", counters.byLanguage],
-          ["tbody-country", counters.byCountry],
-          ["tbody-error", counters.byErrorType], // NEW
+          ["tbody-type", counters.byType, "type"],
+          ["tbody-status", counters.byStatus, "status"],
+          ["tbody-browser", counters.byBrowser, "browser"],
+          ["tbody-os", counters.byOs, "os"],
+          ["tbody-ext", counters.byExtVersion, "ext"],
+          ["tbody-lang", counters.byLanguage, "language"],
+          ["tbody-country", counters.byCountry, "country"],
+          ["tbody-error", counters.byErrorType, "error"], // NEW
         ];
         mapping.forEach(function (item) {
           const id = item[0];
           const data = item[1] || {};
+          const dimension = item[2] || "";
           const el = document.getElementById(id);
           if (!el) return;
-          const next = renderTableRowsJS(data);
+          const next = renderTableRowsJS(data, dimension);
           if (el.innerHTML !== next) {
             el.innerHTML = next;
             const parent =
@@ -4466,8 +4806,6 @@ export function renderDashboard(stats: StatsResponse): string {
           map.batchSize = stats.quota.batchSizeSuggestion || 0;
         }
         const requestsToday = Number(map.requestsToday ?? stats.requestsToday ?? 0);
-        map.weeklyEvents = stats.weeklyRequests ?? requestsToday;
-        map.monthlyEvents = stats.monthlyRequests ?? map.weeklyEvents;
         
         const uniqueCountriesAllTime = Number.isFinite(stats.uniqueCountriesAllTime)
           ? Number(stats.uniqueCountriesAllTime)
@@ -5128,51 +5466,406 @@ export function renderDashboard(stats: StatsResponse): string {
        */
       const btnSaveAll = document.getElementById("btn-save-all");
       const btnSaveText = document.getElementById("btn-save-text");
+      const btnSaveRules = document.getElementById("btn-save-rules");
+      const btnPublishDraft = document.getElementById("btn-publish-draft");
+      const btnSyncNow = document.getElementById("btn-sync-now");
+      const btnSaveMode = document.getElementById("btn-save-mode");
+      const rulesSaveStatusEl = document.getElementById("rules-save-status");
+      const changelogActionStatusEl = document.getElementById("cl-action-status");
+      const markdownInputEl = document.getElementById("new-cl-markdown");
+      const markdownUrlInputEl = document.getElementById("new-cl-markdown-url");
+      const modeInputEl = document.getElementById("cl-apply-mode");
+      const autoSyncEnabledInputEl = document.getElementById("cl-auto-sync-enabled");
+      const autoSyncIntervalInputEl = document.getElementById("cl-auto-sync-interval");
+      const syncStatusEl = document.getElementById("cl-sync-status");
+      const syncErrorEl = document.getElementById("cl-sync-error");
+      const draftPreviewEl = document.getElementById("cl-draft-preview");
+      const currentPreviewEl = document.getElementById("cl-current-preview");
+      const revisionHistoryEl = document.getElementById("cl-revision-history");
       
-      async function sendChangelogUpdate(payload) {
-        // Show loading state
-        if (btnSaveAll) {
-          btnSaveAll.classList.add("btn-loading");
-          btnSaveAll.style.pointerEvents = "none";
+      function setChangelogActionStatus(message, tone) {
+        if (!changelogActionStatusEl) return;
+        changelogActionStatusEl.textContent = message || "Idle";
+        changelogActionStatusEl.style.color = tone === "ok" ? "#86efac" : tone === "err" ? "#fca5a5" : "var(--text-soft)";
+      }
+
+      function setRuleStatus(message, tone) {
+        if (!rulesSaveStatusEl) return;
+        rulesSaveStatusEl.textContent = message || "Idle";
+        rulesSaveStatusEl.style.color = tone === "ok" ? "#86efac" : tone === "err" ? "#fca5a5" : "var(--text-soft)";
+      }
+
+      async function callChangelogAdmin(endpoint, payload) {
+        const res = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          credentials: "same-origin",
+          body: JSON.stringify(payload || {})
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.ok === false) {
+          const error = (data && data.error) ? data.error : "request_failed";
+          throw new Error(error);
         }
-        if (btnSaveText) btnSaveText.textContent = "Saving...";
-        
+        return data;
+      }
+
+      async function fetchAdminChangelogState() {
+        const res = await fetch("/admin/changelog", { credentials: "same-origin" });
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          throw new Error(data.error || "state_load_failed");
+        }
+        return data;
+      }
+
+      async function refreshLivePreviewFromPublicEndpoint() {
+        if (!currentPreviewEl) return;
+        currentPreviewEl.innerHTML = '<div class="cl-preview-empty">Loading public /changelog…</div>';
         try {
-          const res = await fetch("/admin/changelog", {
-            method: "POST",
-            headers: { 
-              "Content-Type": "application/json"
-            },
-            credentials: "same-origin",
+          const res = await fetch("/changelog", { credentials: "same-origin", cache: "no-store" });
+          const data = await res.json();
+          renderReleasePreview(currentPreviewEl, Array.isArray(data.entries) ? data.entries : []);
+        } catch (_) {
+          currentPreviewEl.innerHTML = '<div class="cl-preview-empty">Failed to load public /changelog preview.</div>';
+        }
+      }
+
+      function renderSyncStatus(sync) {
+        if (!syncStatusEl || !syncErrorEl) return;
+        const status = String(sync && sync.lastAutoSyncStatus || "idle");
+        const text = status === "ok" ? "Auto sync healthy" : status === "error" ? "Auto sync error" : "Auto sync idle";
+        syncStatusEl.textContent = text;
+        syncStatusEl.style.color = status === "ok" ? "#86efac" : status === "error" ? "#fca5a5" : "var(--text-soft)";
+        syncErrorEl.textContent = String(sync && sync.lastAutoSyncError || "");
+      }
+
+      function syncChangelogUiFromState(state) {
+        if (!state || state.ok !== true) return;
+        const liveEntries = state.live && Array.isArray(state.live.entries)
+          ? state.live.entries
+          : (Array.isArray(state.entries) ? state.entries : []);
+        const draftEntries = state.draft && Array.isArray(state.draft.entries) ? state.draft.entries : [];
+        renderReleasePreview(draftPreviewEl, draftEntries);
+        renderReleasePreview(currentPreviewEl, liveEntries);
+        const cfg = state.config || {};
+        if (markdownInputEl && state.draft && typeof state.draft.markdown === "string") {
+          markdownInputEl.value = state.draft.markdown;
+        }
+        if (markdownUrlInputEl) {
+          const sourceUrl = (state.draft && state.draft.markdownUrl) || cfg.markdownSourceUrl || "";
+          markdownUrlInputEl.value = sourceUrl;
+        }
+        if (modeInputEl) modeInputEl.value = cfg.applyMode === "auto_github" ? "auto_github" : "manual";
+        if (autoSyncEnabledInputEl) autoSyncEnabledInputEl.checked = cfg.autoSyncEnabled === true;
+        if (autoSyncIntervalInputEl) autoSyncIntervalInputEl.value = String(cfg.autoSyncIntervalMinutes || 60);
+        renderSyncStatus(state.sync || cfg || {});
+        const rawStatsEl = document.getElementById("raw-stats-json");
+        if (rawStatsEl) {
+          try {
+            const parsedRaw = JSON.parse(rawStatsEl.textContent || "{}");
+            parsedRaw.changelog = liveEntries;
+            parsedRaw.changelogConfig = cfg;
+            rawStatsEl.textContent = JSON.stringify(parsedRaw, null, 2);
+          } catch (_) {
+            // ignore
+          }
+        }
+        updateModeDependentControls();
+      }
+
+      async function sendChangelogUpdate(payload) {
+        try {
+          setChangelogActionStatus("Saving…", "info");
+          const data = await callChangelogAdmin("/admin/changelog", payload || {});
+          syncChangelogUiFromState(data);
+          await loadChangelogHistory();
+          setChangelogActionStatus("Saved", "ok");
+          return data;
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : "save_failed";
+          setChangelogActionStatus("Error: " + msg, "err");
+          throw error;
+        }
+      }
+
+      function escapeHtmlUnsafe(value) {
+        return String(value || '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      function clearChildren(node) {
+        if (!node) return;
+        while (node.firstChild) node.removeChild(node.firstChild);
+      }
+
+      function setPreviewMessage(node, message) {
+        if (!node) return;
+        clearChildren(node);
+        const el = document.createElement("div");
+        el.className = "cl-preview-empty";
+        el.textContent = message;
+        node.appendChild(el);
+      }
+
+      function renderReleasePreview(container, entries) {
+        if (!container) return;
+        const list = Array.isArray(entries) ? entries.slice(0, 3) : [];
+        if (list.length === 0) {
+          setPreviewMessage(container, "No entries to preview.");
+          return;
+        }
+        clearChildren(container);
+        list.forEach((entry) => {
+          const summary = entry.summary || '';
+          const added = Array.isArray(entry.added) ? entry.added : [];
+          const changed = Array.isArray(entry.changed) ? entry.changed : [];
+          const fixed = Array.isArray(entry.fixed) ? entry.fixed : [];
+          const article = document.createElement("article");
+          article.style.marginBottom = "10px";
+          article.style.borderBottom = "1px dashed var(--border-subtle)";
+          article.style.paddingBottom = "8px";
+
+          const heading = document.createElement("h4");
+          heading.textContent = "v" + String(entry.version || "");
+          article.appendChild(heading);
+
+          const summaryNode = document.createElement("p");
+          summaryNode.className = "cl-preview-summary";
+          summaryNode.textContent = String(summary || (entry.changes && entry.changes[0]) || "");
+          article.appendChild(summaryNode);
+
+          const appendCategory = (title, color, points) => {
+            if (!Array.isArray(points) || points.length === 0) return;
+            const titleNode = document.createElement("div");
+            titleNode.style.fontSize = "0.75em";
+            titleNode.style.color = color;
+            titleNode.style.marginBottom = "2px";
+            titleNode.textContent = title;
+            article.appendChild(titleNode);
+
+            const listNode = document.createElement("ul");
+            points.slice(0, 3).forEach((point) => {
+              const li = document.createElement("li");
+              li.textContent = String(point || "");
+              listNode.appendChild(li);
+            });
+            article.appendChild(listNode);
+          };
+
+          appendCategory("Added", "#86efac", added);
+          appendCategory("Changed", "#93c5fd", changed);
+          appendCategory("Fixed", "#fca5a5", fixed);
+          container.appendChild(article);
+        });
+      }
+
+      async function loadChangelogHistory() {
+        if (!revisionHistoryEl) return;
+        setPreviewMessage(revisionHistoryEl, "Loading revisions…");
+        try {
+          const data = await fetchAdminChangelogState();
+          syncChangelogUiFromState(data);
+          await refreshLivePreviewFromPublicEndpoint();
+          const history = Array.isArray(data.history) ? data.history : [];
+          if (!history.length) {
+            setPreviewMessage(revisionHistoryEl, "No revisions saved yet.");
+            return;
+          }
+          clearChildren(revisionHistoryEl);
+          history.slice(0, 15).forEach((row) => {
+            const when = new Date(Number(row.createdAt || 0)).toLocaleString('en-US', { timeZone: 'UTC' });
+            const source = String(row.source || 'manual');
+            const valid = row.valid === true ? 'valid' : 'needs check';
+            const releases = Number(row.releases || 0);
+            const item = document.createElement("div");
+            item.className = "cl-revision-item";
+
+            const strong = document.createElement("strong");
+            strong.textContent = source;
+            item.appendChild(strong);
+            item.appendChild(document.createTextNode(" · " + valid + " · " + String(releases) + " releases"));
+            item.appendChild(document.createElement("br"));
+
+            const span = document.createElement("span");
+            span.textContent = when + " UTC";
+            item.appendChild(span);
+            revisionHistoryEl.appendChild(item);
+          });
+        } catch (_) {
+          setPreviewMessage(revisionHistoryEl, "Failed to load revision history.");
+        }
+      }
+
+      async function previewMarkdownDraft(fromUrlOnly) {
+        const markdown = markdownInputEl ? markdownInputEl.value.trim() : '';
+        const markdownUrl = markdownUrlInputEl ? markdownUrlInputEl.value.trim() : '';
+        if (!markdown && !markdownUrl) {
+          if (draftPreviewEl) draftPreviewEl.innerHTML = '<div class="cl-preview-empty">Paste markdown or provide a URL first.</div>';
+          return;
+        }
+        const payload = {};
+        if (!fromUrlOnly && markdown) payload.markdown = markdown;
+        if (markdownUrl) payload.markdownUrl = markdownUrl;
+        if (fromUrlOnly && !markdownUrl) {
+          if (draftPreviewEl) draftPreviewEl.innerHTML = '<div class="cl-preview-empty">Provide a markdown URL to import.</div>';
+          return;
+        }
+        if (draftPreviewEl) draftPreviewEl.innerHTML = '<div class="cl-preview-empty">Parsing markdown…</div>';
+        try {
+          const res = await fetch('/admin/changelog/parse', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
             body: JSON.stringify(payload)
           });
           const data = await res.json();
-          if (data.ok) {
-            // Reload the page to show updated changelog/releases
-            window.location.reload();
-          } else {
-            // Check for unauthorized/IP block
-            if (res.status === 403 || res.status === 401) {
-              window.location.reload(); // Likely session expired
-              return;
-            }
-            alert("Error: " + (data.error || "Unknown"));
-            // Reset button state
-            if (btnSaveAll) {
-              btnSaveAll.classList.remove("btn-loading");
-              btnSaveAll.style.pointerEvents = "";
-            }
-            if (btnSaveText) btnSaveText.textContent = "Save Configuration & Publish";
+          if (!data.ok) {
+            const msg = data.error || 'parse_failed';
+            if (draftPreviewEl) draftPreviewEl.innerHTML = '<div class="cl-preview-empty">Parse failed: ' + escapeHtmlUnsafe(msg) + '</div>';
+            return;
           }
-        } catch(e) {
-          alert("Network error");
-          // Reset button state
-          if (btnSaveAll) {
-            btnSaveAll.classList.remove("btn-loading");
-            btnSaveAll.style.pointerEvents = "";
+          if (fromUrlOnly && markdownInputEl && Array.isArray(data.entries) && data.entries.length > 0) {
+            markdownInputEl.value = data.entries.map((entry) => entry.markdown || '').filter(Boolean).join('\\n\\n');
           }
-          if (btnSaveText) btnSaveText.textContent = "Save Configuration & Publish";
+          if (Array.isArray(data.errors) && data.errors.length > 0 && draftPreviewEl) {
+            const errList = data.errors.slice(0, 4).map((e) => '<li>' + escapeHtmlUnsafe(e) + '</li>').join('');
+            draftPreviewEl.innerHTML = '<div style="font-size:0.82em; color:#fca5a5; margin-bottom:6px;">Parser warnings:</div><ul>' + errList + '</ul>';
+          }
+          renderReleasePreview(draftPreviewEl, data.entries || []);
+        } catch (_) {
+          if (draftPreviewEl) draftPreviewEl.innerHTML = '<div class="cl-preview-empty">Preview request failed.</div>';
         }
+      }
+
+      (function initChangelogPreviewState() {
+        const raw = document.getElementById('raw-stats-json');
+        if (!raw) return;
+        try {
+          const parsed = JSON.parse(raw.textContent || '{}');
+          const entries = Array.isArray(parsed.changelog) ? parsed.changelog : [];
+          renderReleasePreview(currentPreviewEl, entries);
+        } catch (_) {
+          renderReleasePreview(currentPreviewEl, []);
+        }
+      })();
+
+      const previewBtn = document.getElementById('btn-preview-markdown');
+      if (previewBtn) previewBtn.onclick = () => previewMarkdownDraft(false);
+
+      const importBtn = document.getElementById('btn-import-markdown-url');
+      if (importBtn) importBtn.onclick = () => previewMarkdownDraft(true);
+
+      const helpBtn = document.getElementById('cl-format-help');
+      if (helpBtn) {
+        helpBtn.onclick = () => {
+          alert(
+            "Format:\\n\\n## v1.3.8\\n### Summary\\nOne summary line.\\n### Added\\n- Bullet\\n### Changed\\n- Bullet\\n### Fixed\\n- Bullet\\n\\nSource file: user-friendly-changelog.md on GitHub."
+          );
+        };
+      }
+
+      loadChangelogHistory();
+
+      function buildLegacyEditorMarkdown() {
+        const versionEl = document.getElementById("new-cl-version");
+        const changesEl = document.getElementById("new-cl-changes");
+        if (!versionEl || !changesEl) return "";
+        let version = String(versionEl.value || "").trim();
+        if (version.toLowerCase().startsWith("v")) {
+          version = version.slice(1);
+        }
+        const rows = String(changesEl.value || "")
+          .split("\\n")
+          .map((row) => row.trim())
+          .filter(Boolean);
+        if (!version || rows.length === 0) return "";
+        const summary = rows[0].replace(/^[-*][ \t]+/, "");
+        const bullets = rows.map((row) => row.replace(/^[-*][ \t]+/, ""));
+        return [
+          "## v" + version,
+          "### Summary",
+          summary,
+          "### Added",
+          ...bullets.map((row) => "- " + row),
+          "### Changed",
+          "- No structural changes documented.",
+          "### Fixed",
+          "- No fixes documented.",
+        ].join("\\n");
+      }
+
+      function readModePayload() {
+        return {
+          applyMode: modeInputEl ? modeInputEl.value : "manual",
+          autoSyncEnabled: autoSyncEnabledInputEl ? autoSyncEnabledInputEl.checked : false,
+          autoSyncIntervalMinutes: autoSyncIntervalInputEl ? Number(autoSyncIntervalInputEl.value || "60") : 60,
+          markdownSourceUrl: markdownUrlInputEl ? String(markdownUrlInputEl.value || "").trim() : "",
+        };
+      }
+
+      function updateModeDependentControls() {
+        const mode = modeInputEl ? modeInputEl.value : "manual";
+        const isAuto = mode === "auto_github";
+        if (autoSyncEnabledInputEl) autoSyncEnabledInputEl.disabled = !isAuto;
+        if (autoSyncIntervalInputEl) autoSyncIntervalInputEl.disabled = !isAuto;
+        if (btnPublishDraft) btnPublishDraft.disabled = isAuto;
+        if (btnSyncNow) btnSyncNow.disabled = !isAuto;
+      }
+      if (modeInputEl) {
+        modeInputEl.addEventListener("change", updateModeDependentControls);
+      }
+      updateModeDependentControls();
+
+      if (btnSaveMode) {
+        btnSaveMode.onclick = async () => {
+          try {
+            setChangelogActionStatus("Saving mode…", "info");
+            const data = await callChangelogAdmin("/admin/changelog/mode", readModePayload());
+            syncChangelogUiFromState(data);
+            await loadChangelogHistory();
+            setChangelogActionStatus("Mode saved", "ok");
+          } catch (error) {
+            const msg = error instanceof Error ? error.message : "mode_save_failed";
+            setChangelogActionStatus("Mode save failed: " + msg, "err");
+          }
+        };
+      }
+
+      if (btnSyncNow) {
+        btnSyncNow.onclick = async () => {
+          try {
+            setChangelogActionStatus("Running sync…", "info");
+            const data = await callChangelogAdmin("/admin/changelog/sync-now", {});
+            syncChangelogUiFromState(data);
+            await loadChangelogHistory();
+            setChangelogActionStatus("Auto sync completed", "ok");
+          } catch (error) {
+            const msg = error instanceof Error ? error.message : "sync_now_failed";
+            setChangelogActionStatus("Sync failed: " + msg, "err");
+          }
+        };
+      }
+
+      if (btnPublishDraft) {
+        btnPublishDraft.onclick = async () => {
+          try {
+            setChangelogActionStatus("Publishing draft…", "info");
+            const data = await callChangelogAdmin("/admin/changelog/publish", {});
+            syncChangelogUiFromState(data);
+            await loadChangelogHistory();
+            setChangelogActionStatus("Draft published", "ok");
+          } catch (error) {
+            const msg = error instanceof Error ? error.message : "publish_failed";
+            setChangelogActionStatus("Publish failed: " + msg, "err");
+          }
+        };
       }
 
       // --- NEW RULES ENGINE LOGIC ---
@@ -5341,52 +6034,58 @@ export function renderDashboard(stats: StatsResponse): string {
          };
       }
 
+      if (btnSaveRules) {
+        btnSaveRules.onclick = async () => {
+          try {
+            setRuleStatus("Saving…", "info");
+            const data = await callChangelogAdmin("/admin/changelog/rules", { rules: activeRules });
+            const nextRules = data && data.config && Array.isArray(data.config.rules) ? data.config.rules : activeRules;
+            activeRules = nextRules;
+            renderRulesList();
+            setRuleStatus("Saved", "ok");
+            syncChangelogUiFromState(data);
+          } catch (error) {
+            const msg = error instanceof Error ? error.message : "rules_save_failed";
+            setRuleStatus("Error: " + msg, "err");
+          }
+        };
+      }
+
       if (btnSaveAll) {
-        btnSaveAll.onclick = () => {
-          // 1. Gather Config (Active Rules)
-          const payload = {
-            config: { rules: activeRules }
-          };
-
-          // 2. Gather New/Edit Release (if ANY text entered)
-          let ver = document.getElementById("new-cl-version").value.trim();
-          // Normalize version: strip leading 'v' or 'V' to prevent double-v display (e.g., "vv1.2.3")
-          if (ver.toLowerCase().startsWith('v')) {
-            ver = ver.substring(1);
+        btnSaveAll.onclick = async () => {
+          if (btnSaveAll) {
+            btnSaveAll.classList.add("btn-loading");
+            btnSaveAll.style.pointerEvents = "none";
           }
-          const text = document.getElementById("new-cl-changes").value.trim();
-          const editId = document.getElementById("edit-cl-id").value;
-          
-          if (ver && text) {
-            const changes = text.split("\\n").map(l => l.trim()).filter(Boolean);
-            
-            // Access raw stats to append/update
-            const statsEl = document.getElementById("raw-stats-json");
-            const currentEntries = statsEl ? (JSON.parse(statsEl.textContent).changelog || []) : [];
-            
-            if (editId) {
-               // UPDATE existing
-               const updated = currentEntries.map(e => e.id === editId ? { ...e, version: ver, changes } : e);
-               payload.changelog = updated;
-            } else {
-               // CREATE new
-               const newEntry = {
-                 id: crypto.randomUUID(),
-                 version: ver,
-                 date: new Date().toISOString(),
-                 changes: changes,
-                 isImportant: false
-               };
-               payload.changelog = [newEntry, ...currentEntries];
+          if (btnSaveText) btnSaveText.textContent = "Saving Draft...";
+          try {
+            let markdownText = markdownInputEl ? String(markdownInputEl.value || "").trim() : "";
+            const markdownUrl = markdownUrlInputEl ? String(markdownUrlInputEl.value || "").trim() : "";
+            if (!markdownText) {
+              markdownText = buildLegacyEditorMarkdown();
+              if (markdownInputEl && markdownText) markdownInputEl.value = markdownText;
             }
-
-          } else if (ver || text) {
-             if (!confirm("Release fields are partially filled but will NOT be saved. Proceed with saving ONLY config?")) {
-               return;
-             }
+            if (!markdownText && !markdownUrl) {
+              setChangelogActionStatus("Provide markdown or markdown URL first.", "err");
+              return;
+            }
+            const payload = {};
+            if (markdownText) payload.markdown = markdownText;
+            if (markdownUrl) payload.markdownUrl = markdownUrl;
+            const data = await callChangelogAdmin("/admin/changelog/draft", payload);
+            syncChangelogUiFromState(data);
+            await loadChangelogHistory();
+            setChangelogActionStatus("Draft saved", "ok");
+          } catch (error) {
+            const msg = error instanceof Error ? error.message : "draft_save_failed";
+            setChangelogActionStatus("Draft save failed: " + msg, "err");
+          } finally {
+            if (btnSaveAll) {
+              btnSaveAll.classList.remove("btn-loading");
+              btnSaveAll.style.pointerEvents = "";
+            }
+            if (btnSaveText) btnSaveText.textContent = "Save Draft";
           }
-
-          sendChangelogUpdate(payload);
         };
       }
 
@@ -5429,12 +6128,15 @@ export function renderDashboard(stats: StatsResponse): string {
           changesTextarea.value = entry.changes.join("\\n");
           updateCharCounter();
         }
+        if (markdownInputEl) {
+          markdownInputEl.value = entry.markdown || "";
+        }
         if (editIdInput) editIdInput.value = entry.id;
         
         // Show edit mode banner
         if (editModeBanner) editModeBanner.classList.add("active");
         if (editModeVersion) editModeVersion.textContent = "v" + entry.version;
-        if (btnSaveText) btnSaveText.textContent = "Update Release & Save Config";
+        if (btnSaveText) btnSaveText.textContent = "Save Draft";
         
         // Highlight the item being edited
         document.querySelectorAll(".cl-history-item").forEach(item => {
@@ -5456,11 +6158,12 @@ export function renderDashboard(stats: StatsResponse): string {
           changesTextarea.value = "";
           updateCharCounter();
         }
+        if (markdownInputEl) markdownInputEl.value = "";
         if (editIdInput) editIdInput.value = "";
         
         // Hide edit mode banner
         if (editModeBanner) editModeBanner.classList.remove("active");
-        if (btnSaveText) btnSaveText.textContent = "Save Configuration & Publish";
+        if (btnSaveText) btnSaveText.textContent = "Save Draft";
         
         // Remove editing highlight
         document.querySelectorAll(".cl-history-item.editing").forEach(item => {
@@ -5812,7 +6515,7 @@ export function renderDashboard(stats: StatsResponse): string {
 
       // ===== SECURITY SETTINGS HANDLERS =====
       let currentUserIp = '';
-      let ipAllowlistData = { enabled: false, allowlist: [] };
+      let ipAllowlistData = { enabled: false, allowlist: [], stepUpBypassEnabled: true };
       
       // Utility: Show toast notification
       function showToast(message, type) {
@@ -5826,6 +6529,56 @@ export function renderDashboard(stats: StatsResponse): string {
         toast.style.color = 'white';
         document.body.appendChild(toast);
         setTimeout(() => toast.remove(), 3000);
+      }
+
+      function setBadgeState(node, enabled, onLabel, offLabel, onColors, offColors) {
+        if (!node) return;
+        node.textContent = enabled ? onLabel : offLabel;
+        const colors = enabled ? onColors : offColors;
+        node.style.background = colors.bg;
+        node.style.borderColor = colors.border;
+        node.style.color = colors.text;
+      }
+
+      function refreshIpSecurityBadges() {
+        const allowlistBadge = document.getElementById('ip-allowlist-badge');
+        const statusEl = document.getElementById('ip-status');
+        const stepUpBadge = document.getElementById('ip-stepup-badge');
+
+        setBadgeState(
+          allowlistBadge,
+          ipAllowlistData.enabled === true,
+          'Allowlist: ON',
+          'Allowlist: OFF',
+          { bg: 'rgba(34,197,94,0.16)', border: 'rgba(34,197,94,0.45)', text: '#86efac' },
+          { bg: 'rgba(148,163,184,0.14)', border: 'rgba(148,163,184,0.35)', text: '#cbd5e1' }
+        );
+        setBadgeState(
+          stepUpBadge,
+          ipAllowlistData.stepUpBypassEnabled === true,
+          'Blocked IP Login: Step-Up ON',
+          'Blocked IP Login: Step-Up OFF',
+          { bg: 'rgba(59,130,246,0.12)', border: 'rgba(59,130,246,0.3)', text: '#93c5fd' },
+          { bg: 'rgba(251,146,60,0.15)', border: 'rgba(251,146,60,0.4)', text: '#fdba74' }
+        );
+        if (!statusEl) return;
+        if (!ipAllowlistData.enabled) {
+          statusEl.textContent = 'Open (Allowlist Off)';
+          statusEl.style.color = 'var(--warning)';
+          return;
+        }
+        if (ipAllowlistData.allowlist.includes(currentUserIp)) {
+          statusEl.textContent = 'Allowlisted';
+          statusEl.style.color = 'var(--success)';
+          return;
+        }
+        if (ipAllowlistData.stepUpBypassEnabled) {
+          statusEl.textContent = 'Blocked IP (Use Admin Password)';
+          statusEl.style.color = 'var(--warning)';
+          return;
+        }
+        statusEl.textContent = 'Blocked IP (Step-Up Disabled)';
+        statusEl.style.color = 'var(--danger)';
       }
       
       // Utility: Validate IP address or CIDR (IPv4/IPv6)
@@ -5920,15 +6673,22 @@ export function renderDashboard(stats: StatsResponse): string {
           .then(r => r.json())
           .then(data => {
             if (data.ok) {
-              ipAllowlistData = { enabled: data.enabled, allowlist: data.allowlist || [] };
+              ipAllowlistData = {
+                enabled: data.enabled,
+                allowlist: data.allowlist || [],
+                stepUpBypassEnabled: data.stepUpBypassEnabled !== false
+              };
               const toggle = document.getElementById('ip-protection-toggle');
               if (toggle) toggle.checked = data.enabled;
+              const stepUpToggle = document.getElementById('blocked-ip-stepup-toggle');
+              if (stepUpToggle) stepUpToggle.checked = ipAllowlistData.stepUpBypassEnabled;
               if (data.yourIp) {
                 currentUserIp = data.yourIp;
                 const ipEl = document.getElementById('current-ip');
                 if (ipEl) ipEl.textContent = data.yourIp;
               }
               renderIpList();
+              refreshIpSecurityBadges();
             }
           })
           .catch(() => {
@@ -5951,6 +6711,10 @@ export function renderDashboard(stats: StatsResponse): string {
           .then(data => {
             if (data.ok) {
               ipAllowlistData.enabled = data.enabled;
+              if (typeof data.stepUpBypassEnabled === 'boolean') {
+                ipAllowlistData.stepUpBypassEnabled = data.stepUpBypassEnabled;
+              }
+              refreshIpSecurityBadges();
               showToast('IP Protection ' + (data.enabled ? 'enabled' : 'disabled'), 'success');
             } else {
               this.checked = !enabled; // Revert
@@ -5963,7 +6727,36 @@ export function renderDashboard(stats: StatsResponse): string {
           });
         });
       }
-      
+
+      const stepUpToggle = document.getElementById('blocked-ip-stepup-toggle');
+      if (stepUpToggle) {
+        stepUpToggle.addEventListener('change', function() {
+          const enabled = this.checked;
+          fetch('/admin/ip-allowlist', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ stepUpBypassEnabled: enabled })
+          })
+          .then(r => r.json())
+          .then(data => {
+            if (data.ok) {
+              ipAllowlistData.stepUpBypassEnabled = data.stepUpBypassEnabled !== false;
+              this.checked = ipAllowlistData.stepUpBypassEnabled;
+              refreshIpSecurityBadges();
+              showToast('Blocked-IP step-up ' + (ipAllowlistData.stepUpBypassEnabled ? 'enabled' : 'disabled'), 'success');
+            } else {
+              this.checked = !enabled;
+              showToast('Failed to update: ' + (data.error || 'Unknown'), 'error');
+            }
+          })
+          .catch(() => {
+            this.checked = !enabled;
+            showToast('Network error', 'error');
+          });
+        });
+      }
+
       // Add IP
       function addIp(ip) {
         if (!ip || !isValidIpAddress(ip)) {
@@ -5980,7 +6773,9 @@ export function renderDashboard(stats: StatsResponse): string {
         .then(data => {
           if (data.ok) {
             ipAllowlistData.allowlist = data.allowlist || [];
+            ipAllowlistData.stepUpBypassEnabled = data.stepUpBypassEnabled !== false;
             renderIpList();
+            refreshIpSecurityBadges();
             showToast('IP added: ' + ip, 'success');
             const input = document.getElementById('add-ip-input');
             if (input) input.value = '';
@@ -6003,7 +6798,9 @@ export function renderDashboard(stats: StatsResponse): string {
         .then(data => {
           if (data.ok) {
             ipAllowlistData.allowlist = data.allowlist || [];
+            ipAllowlistData.stepUpBypassEnabled = data.stepUpBypassEnabled !== false;
             renderIpList();
+            refreshIpSecurityBadges();
             showToast('IP removed: ' + ip, 'success');
           } else {
             showToast('Failed: ' + (data.error || 'Unknown'), 'error');
@@ -6061,6 +6858,210 @@ export function renderDashboard(stats: StatsResponse): string {
           .catch(() => showToast('Network error', 'error'))
           .finally(() => { if (btn) btn.disabled = false; });
       });
+
+      function setWebsiteAdminOutput(payload) {
+        const out = document.getElementById('website-admin-output');
+        if (!out) return;
+        out.textContent = JSON.stringify(payload || {}, null, 2);
+      }
+
+      function normalizeWebsiteCountriesFromInput(raw) {
+        const text = String(raw || '').trim();
+        if (!text) return { ok: true, countries: [] };
+        let parsed;
+        try {
+          parsed = JSON.parse(text);
+        } catch (_) {
+          return { ok: false, error: 'Invalid countries JSON.' };
+        }
+        if (!Array.isArray(parsed)) {
+          return { ok: false, error: 'Countries must be a JSON array.' };
+        }
+        const out = [];
+        parsed.forEach((row) => {
+          if (!row || typeof row !== 'object') return;
+          const code = String(row.countryCode || '').trim().toUpperCase();
+          if (!/^[A-Z]{2}$/.test(code)) return;
+          if (code === 'XX' || code === 'ZZ' || code === 'UN' || code === 'EU') return;
+          const count = Number(row.count || 0);
+          if (!Number.isFinite(count) || count <= 0) return;
+          out.push({ countryCode: code, count: Math.floor(count) });
+        });
+        return { ok: true, countries: out };
+      }
+
+      function applyWebsiteStatus(payload) {
+        const website = payload && payload.website ? payload.website : {};
+        const telemetry = payload && payload.telemetry ? payload.telemetry : {};
+        const snapshot = payload && payload.publicSnapshot ? payload.publicSnapshot : {};
+        const totals = snapshot && snapshot.totals ? snapshot.totals : {};
+        const refreshHours = Array.isArray(website.refreshHoursUtc) ? website.refreshHoursUtc.join(', ') : '3,6,9,12,15,18,21';
+
+        const setText = (id, value) => {
+          const node = document.getElementById(id);
+          if (node) node.textContent = value;
+        };
+
+        setText('website-last-batch-slot', snapshot.snapshotAtUtc ? new Date(snapshot.snapshotAtUtc).toISOString().slice(0, 13) + ':00 UTC' : '—');
+        setText('website-telemetry-queue', String(Number(telemetry.pendingBatches || 0)));
+        setText('website-telemetry-retry-count', String(Number(telemetry.retryCount || 0)));
+        setText('website-last-telemetry-created', telemetry.lastBatchCreatedAtUtc ? formatTs(telemetry.lastBatchCreatedAtUtc) : '—');
+        setText('website-last-telemetry-sent', telemetry.lastBatchSentAtUtc ? formatTs(telemetry.lastBatchSentAtUtc) : '—');
+        setText('website-telemetry-dlq', String(Number(telemetry.deadLetterBatches || 0)));
+        setText('website-last-refresh-at', snapshot.snapshotAtUtc ? formatTs(snapshot.snapshotAtUtc) : '—');
+        setText('website-refresh-mode', website.refreshEnabled ? ('AUTO (' + refreshHours + ')') : 'MANUAL ONLY');
+        setText('website-last-manual-flush', website.lastManualFlushAtUtc ? formatTs(website.lastManualFlushAtUtc) : '—');
+        setText('website-last-telemetry-ack', telemetry.lastBatchAckAtUtc ? formatTs(telemetry.lastBatchAckAtUtc) : '—');
+
+        const refreshEnabled = document.getElementById('website-refresh-enabled');
+        if (refreshEnabled) {
+          refreshEnabled.checked = !!website.refreshEnabled;
+        }
+        const overrideEnabled = document.getElementById('website-override-enabled');
+        if (overrideEnabled) {
+          overrideEnabled.checked = !!website.overrideEnabled;
+        }
+        const overrideDownloads = document.getElementById('website-override-downloads');
+        if (overrideDownloads && document.activeElement !== overrideDownloads) {
+          overrideDownloads.value = String(Number(website.overrideDownloads || totals.downloads || 0));
+        }
+        const overrideCountries = document.getElementById('website-override-countries');
+        if (overrideCountries && document.activeElement !== overrideCountries) {
+          overrideCountries.value = JSON.stringify(website.overrideCountries || snapshot.countries || [], null, 2);
+        }
+      }
+
+      function fetchWebsiteStatus() {
+        fetch('/admin/website/status', { method: 'GET', credentials: 'same-origin' })
+          .then(r => r.json())
+          .then((data) => {
+            if (!data || !data.ok) {
+              setWebsiteAdminOutput(data || { ok: false, error: 'failed_to_load_status' });
+              return;
+            }
+            applyWebsiteStatus(data);
+            setWebsiteAdminOutput(data);
+          })
+          .catch(() => setWebsiteAdminOutput({ ok: false, error: 'network_error' }));
+      }
+
+      bind('btn-website-status-refresh', () => {
+        fetchWebsiteStatus();
+      });
+
+      bind('btn-website-flush-now', () => {
+        const btn = document.getElementById('btn-website-flush-now');
+        if (btn) btn.disabled = true;
+        fetch('/admin/website/flush-now', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        })
+          .then(r => r.json())
+          .then((data) => {
+            setWebsiteAdminOutput(data);
+            if (data && data.ok) {
+              const sentEvents = Number(data?.telemetry?.sentEvents || 0);
+              const deadLettered = Number(data?.telemetry?.deadLetteredBatches || 0);
+              showToast(
+                'Website telemetry flushed. Sent ' + sentEvents + ' events' + (deadLettered ? (', DLQ +' + deadLettered) : '') + '.',
+                'success'
+              );
+              fetchWebsiteStatus();
+            } else {
+              showToast('Flush failed: ' + (data?.telemetry?.error || data?.error || 'unknown_error'), 'error');
+            }
+          })
+          .catch(() => showToast('Network error', 'error'))
+          .finally(() => { if (btn) btn.disabled = false; });
+      });
+
+      bind('btn-website-replay-dlq', () => {
+        const btn = document.getElementById('btn-website-replay-dlq');
+        if (btn) btn.disabled = true;
+        fetch('/admin/website/replay-dlq', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        })
+          .then(r => r.json())
+          .then((data) => {
+            setWebsiteAdminOutput(data);
+            if (data && data.ok) {
+              showToast('Replayed ' + Number(data.replayed || 0) + ' dead-letter batches.', 'success');
+              fetchWebsiteStatus();
+            } else {
+              showToast('Replay failed.', 'error');
+            }
+          })
+          .catch(() => showToast('Network error', 'error'))
+          .finally(() => { if (btn) btn.disabled = false; });
+      });
+
+      bind('btn-website-refresh-toggle', () => {
+        const btn = document.getElementById('btn-website-refresh-toggle');
+        const checkbox = document.getElementById('website-refresh-enabled');
+        const enabled = !!(checkbox && checkbox.checked);
+        if (btn) btn.disabled = true;
+        fetch('/admin/website/refresh-toggle', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled }),
+        })
+          .then(r => r.json())
+          .then((data) => {
+            setWebsiteAdminOutput(data);
+            if (data && data.ok) {
+              showToast('Website refresh mode updated.', 'success');
+              fetchWebsiteStatus();
+            } else {
+              showToast('Failed to update refresh mode.', 'error');
+            }
+          })
+          .catch(() => showToast('Network error', 'error'))
+          .finally(() => { if (btn) btn.disabled = false; });
+      });
+
+      bind('btn-website-override-save', () => {
+        const btn = document.getElementById('btn-website-override-save');
+        const enabled = !!(document.getElementById('website-override-enabled') && document.getElementById('website-override-enabled').checked);
+        const downloads = Number((document.getElementById('website-override-downloads') && document.getElementById('website-override-downloads').value) || 0);
+        const countriesRaw = (document.getElementById('website-override-countries') && document.getElementById('website-override-countries').value) || '';
+        const parsed = normalizeWebsiteCountriesFromInput(countriesRaw);
+        if (!parsed.ok) {
+          showToast(parsed.error || 'Invalid override payload.', 'error');
+          setWebsiteAdminOutput({ ok: false, error: parsed.error || 'invalid_override_payload' });
+          return;
+        }
+        if (btn) btn.disabled = true;
+        fetch('/admin/website/override', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            enabled,
+            downloads: Number.isFinite(downloads) && downloads > 0 ? Math.floor(downloads) : 0,
+            countries: parsed.countries,
+          }),
+        })
+          .then(r => r.json())
+          .then((data) => {
+            setWebsiteAdminOutput(data);
+            if (data && data.ok) {
+              showToast('Website override saved.', 'success');
+              fetchWebsiteStatus();
+            } else {
+              showToast('Failed to save website override.', 'error');
+            }
+          })
+          .catch(() => showToast('Network error', 'error'))
+          .finally(() => { if (btn) btn.disabled = false; });
+      });
+
+      fetchWebsiteStatus();
 
       updateLiveIndicator();
       setInterval(updateLiveIndicator, 5000);

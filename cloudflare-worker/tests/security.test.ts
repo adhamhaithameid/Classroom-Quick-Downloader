@@ -57,6 +57,21 @@ type StoredState = {
     recent?: Array<Record<string, unknown>>;
   };
   failureRollups?: Array<Record<string, unknown>>;
+  publicSiteMetricsSnapshot?: {
+    slotKey?: string;
+    snapshotAtUtc?: number;
+    downloads?: number;
+    countries?: Array<{ countryCode?: string; count?: number }>;
+  } | null;
+  websitePublicSyncEnabled?: boolean;
+  websiteManualFlushAt?: number | null;
+  websiteOverrideEnabled?: boolean;
+  websiteOverrideDownloads?: number;
+  websiteOverrideCountries?: Array<{ countryCode?: string; count?: number }>;
+  websiteTelemetryQueue?: Array<Record<string, unknown>>;
+  websiteTelemetryDeadLetter?: Array<Record<string, unknown>>;
+  websiteTelemetrySeenEventIds?: string[];
+  dangerActionAuditLogs?: Array<Record<string, unknown>>;
 };
 
 type TestEvent = {
@@ -123,7 +138,7 @@ class MockState {
 function makeDO() {
   const state = new MockState();
   const env: Env = {
-    ORACLE_ENDPOINT: "http://example.com",
+    ORACLE_ENDPOINT: "https://example.com",
     DO_SHARED_SECRET: "secret",
     MAX_BATCH_EVENTS: "10000",
   } as Env;
@@ -135,7 +150,7 @@ function makeDOWithStored(stored: StoredState) {
   const state = new MockState();
   state.storage.seed(STORAGE_KEY, stored);
   const env: Env = {
-    ORACLE_ENDPOINT: "http://example.com",
+    ORACLE_ENDPOINT: "https://example.com",
     DO_SHARED_SECRET: "secret",
     MAX_BATCH_EVENTS: "10000",
   } as Env;
@@ -149,7 +164,7 @@ function makeDOWithEnv(envOverride: Partial<Env>, stored?: StoredState) {
     state.storage.seed(STORAGE_KEY, stored);
   }
   const env: Env = {
-    ORACLE_ENDPOINT: "http://example.com",
+    ORACLE_ENDPOINT: "https://example.com",
     DO_SHARED_SECRET: "secret",
     MAX_BATCH_EVENTS: "10000",
     ...envOverride,
@@ -256,6 +271,348 @@ describe("Worker security helpers", () => {
     spy.mockReturnValue(1_000_000 + 2 * 60 * 60 * 1000);
     expect(await verifySessionToken(token, "secret", "1.2.3.4")).toBe(false);
     spy.mockRestore();
+  });
+});
+
+describe("public site metrics snapshot endpoint", () => {
+  it("returns sanitized country-level metrics without leaking internal counters", async () => {
+    const { obj } = makeDOWithStored({
+      totalDownloads: 1200,
+      counters: {
+        byCountry: {
+          us: 400,
+          gb: 220,
+          unknown: 99,
+          xx: 77,
+          u1: 55,
+        },
+      },
+    });
+
+    const res = await callDOGet(obj, "/public/site-metrics");
+    expect(res.status).toBe(200);
+
+    const payload = await res.json() as {
+      ok: boolean;
+      source: string;
+      totals?: { downloads?: number; countries?: number };
+      countries?: Array<{ countryCode?: string; count?: number }>;
+      counters?: unknown;
+      schedule?: { refreshHoursUtc?: number[] };
+    };
+
+    expect(payload.ok).toBe(true);
+    expect(payload.source).toBe("cloudflare-worker");
+    expect(payload.totals?.downloads).toBe(1200);
+    expect(payload.totals?.countries).toBe(2);
+    expect(payload.countries).toEqual([
+      { countryCode: "US", count: 400 },
+      { countryCode: "GB", count: 220 },
+    ]);
+    expect(payload.counters).toBeUndefined();
+    expect(payload.schedule?.refreshHoursUtc).toEqual([3, 6, 9, 12, 15, 18, 21]);
+  });
+
+  it("refreshes snapshots only once per scheduled UTC slot", async () => {
+    vi.useFakeTimers();
+    try {
+      const { obj } = makeDOWithStored({
+        totalDownloads: 10,
+        counters: {
+          byCountry: {
+            us: 10,
+          },
+        },
+      });
+
+      vi.setSystemTime(new Date("2026-02-21T04:10:00.000Z"));
+      const first = await callDOGet(obj, "/public/site-metrics");
+      const firstPayload = await first.json() as { snapshotAtUtc: number };
+
+      vi.setSystemTime(new Date("2026-02-21T04:50:00.000Z"));
+      const second = await callDOGet(obj, "/public/site-metrics");
+      const secondPayload = await second.json() as { snapshotAtUtc: number };
+      expect(secondPayload.snapshotAtUtc).toBe(firstPayload.snapshotAtUtc);
+
+      vi.setSystemTime(new Date("2026-02-21T06:05:00.000Z"));
+      const third = await callDOGet(obj, "/public/site-metrics");
+      const thirdPayload = await third.json() as { snapshotAtUtc: number };
+      expect(thirdPayload.snapshotAtUtc).toBeGreaterThan(firstPayload.snapshotAtUtc);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("supports admin website override for public metrics output", async () => {
+    const { obj } = makeDOWithStored({
+      totalDownloads: 1200,
+      counters: {
+        byCountry: {
+          us: 400,
+          gb: 220,
+        },
+      },
+    });
+
+    const overrideRes = await callDO(obj, "/admin/website/override", {
+      enabled: true,
+      downloads: 777,
+      countries: [
+        { countryCode: "US", count: 600 },
+        { countryCode: "CA", count: 177 },
+        { countryCode: "xx", count: 123 },
+      ],
+    }, { "X-Admin-Secret": "secret" });
+    expect(overrideRes.status).toBe(200);
+
+    const publicRes = await callDOGet(obj, "/public/site-metrics");
+    expect(publicRes.status).toBe(200);
+    const payload = await publicRes.json() as {
+      totals?: { downloads?: number; countries?: number };
+      dataSource?: string;
+      countries?: Array<{ countryCode?: string; count?: number }>;
+    };
+    expect(payload.dataSource).toBe("override");
+    expect(payload.totals?.downloads).toBe(777);
+    expect(payload.totals?.countries).toBe(2);
+    expect(payload.countries).toEqual([
+      { countryCode: "US", count: 600 },
+      { countryCode: "CA", count: 177 },
+    ]);
+  });
+
+  it("allows toggling website auto refresh and forcing flush now", async () => {
+    const { obj } = makeDOWithStored({
+      totalDownloads: 90,
+      counters: { byCountry: { us: 90 } },
+    });
+
+    const toggleRes = await callDO(obj, "/admin/website/refresh-toggle", {
+      enabled: false,
+    }, { "X-Admin-Secret": "secret" });
+    expect(toggleRes.status).toBe(200);
+
+    const flushRes = await callDO(obj, "/admin/website/flush-now", {}, { "X-Admin-Secret": "secret" });
+    expect(flushRes.status).toBe(200);
+
+    const statusRes = await callDOGetWithAdmin(obj, "/admin/website/status");
+    expect(statusRes.status).toBe(200);
+    const statusPayload = await statusRes.json() as {
+      ok: boolean;
+      website?: { refreshEnabled?: boolean; lastManualFlushAtUtc?: number | null };
+      publicSnapshot?: { totals?: { downloads?: number } };
+    };
+    expect(statusPayload.ok).toBe(true);
+    expect(statusPayload.website?.refreshEnabled).toBe(false);
+    expect(typeof statusPayload.website?.lastManualFlushAtUtc).toBe("number");
+    expect(statusPayload.publicSnapshot?.totals?.downloads).toBe(90);
+  });
+
+  it("queues website telemetry at ingress without immediate Oracle dependency", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { obj, state } = makeDOWithEnv({ ORACLE_ENDPOINT: "" });
+    const ingestRes = await callDOWithoutAdmin(
+      obj,
+      "/api/public/website/events",
+      {
+        schemaVersion: "1",
+        sessionId: "session-queue-test",
+        pagePath: "/overview",
+        events: [
+          {
+            eventId: "evt-phase3-queue-1",
+            eventType: "cta",
+            action: "install_click",
+            placement: "hero_install",
+          },
+        ],
+      },
+      {
+        "X-Requested-With": "XMLHttpRequest",
+      },
+    );
+    expect(ingestRes.status).toBe(200);
+    const ingestPayload = await ingestRes.json() as { ok?: boolean; acceptedCount?: number; rejectedCount?: number };
+    expect(ingestPayload.ok).toBe(true);
+    expect(ingestPayload.acceptedCount).toBe(1);
+    expect(ingestPayload.rejectedCount).toBe(0);
+    expect(fetchMock).toHaveBeenCalledTimes(0);
+
+    const stored = await state.storage.get<StoredState>(STORAGE_KEY);
+    expect(Array.isArray(stored?.websiteTelemetryQueue)).toBe(true);
+    expect(stored?.websiteTelemetryQueue?.length).toBe(1);
+    expect(stored?.websiteTelemetryDeadLetter?.length ?? 0).toBe(0);
+
+    vi.unstubAllGlobals();
+  });
+
+  it("flushes queued website telemetry to Oracle internal endpoint and carries correlation id", async () => {
+    const { obj } = makeDOWithEnv({ ORACLE_ENDPOINT: "https://oracle.example.com/ingest-batch" });
+
+    const ingestRes = await callDOWithoutAdmin(
+      obj,
+      "/api/public/website/events",
+      {
+        schemaVersion: "1",
+        sessionId: "session-flush-test",
+        pagePath: "/overview",
+        events: [
+          {
+            eventId: "evt-phase3-flush-1",
+            eventType: "map",
+            action: "map_yes",
+            placement: "map_prompt_yes",
+          },
+        ],
+      },
+      {
+        "X-Requested-With": "XMLHttpRequest",
+      },
+    );
+    expect(ingestRes.status).toBe(200);
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const requestUrl = String(input);
+      expect(requestUrl).toContain("/api/internal/website/events/batch");
+      const headerSource = new Headers(init?.headers);
+      const corr = headerSource.get("x-correlation-id");
+      expect(typeof corr).toBe("string");
+      expect((corr || "").startsWith("wscorr-")).toBe(true);
+      const payload = JSON.parse(String(init?.body || "{}")) as { batchId?: string };
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          batchId: payload.batchId,
+          generatedAt: Date.now(),
+          acceptedCount: 1,
+          rejectedCount: 0,
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        },
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const flushRes = await callDO(obj, "/admin/website/flush-now", {}, { "X-Admin-Secret": "secret" });
+    expect(flushRes.status).toBe(200);
+    const flushPayload = await flushRes.json() as {
+      telemetry?: { ok?: boolean; sentEvents?: number; deadLetteredBatches?: number };
+    };
+    expect(flushPayload.telemetry?.ok).toBe(true);
+    expect(flushPayload.telemetry?.sentEvents).toBe(1);
+    expect(flushPayload.telemetry?.deadLetteredBatches).toBe(0);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    const statusRes = await callDOGetWithAdmin(obj, "/admin/website/status");
+    expect(statusRes.status).toBe(200);
+    const statusPayload = await statusRes.json() as {
+      telemetry?: {
+        pendingBatches?: number;
+        deadLetterBatches?: number;
+        retryCount?: number;
+        lastBatchCreatedAtUtc?: number | null;
+        lastBatchSentAtUtc?: number | null;
+        lastBatchAckAtUtc?: number | null;
+      };
+    };
+    expect(statusPayload.telemetry?.pendingBatches).toBe(0);
+    expect(statusPayload.telemetry?.deadLetterBatches).toBe(0);
+    expect(statusPayload.telemetry?.retryCount).toBe(0);
+    expect(typeof statusPayload.telemetry?.lastBatchCreatedAtUtc).toBe("number");
+    expect(typeof statusPayload.telemetry?.lastBatchSentAtUtc).toBe("number");
+    expect(typeof statusPayload.telemetry?.lastBatchAckAtUtc).toBe("number");
+
+    vi.unstubAllGlobals();
+  });
+
+  it("replays website DLQ batches and flushes them successfully", async () => {
+    const now = Date.now();
+    const { obj } = makeDOWithEnv(
+      { ORACLE_ENDPOINT: "https://oracle.example.com/ingest-batch" },
+      {
+        websiteTelemetryQueue: [],
+        websiteTelemetryDeadLetter: [
+          {
+            schemaVersion: "1",
+            batchId: "ws-dead-letter-1",
+            correlationId: "wscorr-dead-letter-1",
+            generatedAtUtc: now,
+            sessionId: "session-dlq-replay",
+            pagePath: "/overview",
+            events: [
+              {
+                eventId: "evt-dlq-replay-1",
+                eventType: "cta",
+                action: "download_click",
+                placement: "hero_download",
+                tsUtc: now,
+              },
+            ],
+            attempt: 6,
+            nextRetryAtUtc: now + 60_000,
+            lastError: "upstream timeout",
+          },
+        ],
+      },
+    );
+
+    const replayRes = await callDO(obj, "/admin/website/replay-dlq", { limit: 5 }, { "X-Admin-Secret": "secret" });
+    expect(replayRes.status).toBe(200);
+    const replayPayload = await replayRes.json() as {
+      ok?: boolean;
+      replayed?: number;
+      pendingBatches?: number;
+      deadLetterBatches?: number;
+    };
+    expect(replayPayload.ok).toBe(true);
+    expect(replayPayload.replayed).toBe(1);
+    expect(replayPayload.pendingBatches).toBe(1);
+    expect(replayPayload.deadLetterBatches).toBe(0);
+
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const payload = JSON.parse(String(init?.body || "{}")) as { batchId?: string; expectedEventCount?: number };
+      expect(payload.batchId).toBe("ws-dead-letter-1");
+      expect(payload.expectedEventCount).toBe(1);
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          batchId: payload.batchId,
+          generatedAt: Date.now(),
+          acceptedCount: 1,
+          rejectedCount: 0,
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        },
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const flushRes = await callDO(obj, "/admin/website/flush-now", {}, { "X-Admin-Secret": "secret" });
+    expect(flushRes.status).toBe(200);
+    const flushPayload = await flushRes.json() as {
+      telemetry?: {
+        ok?: boolean;
+        sentEvents?: number;
+        deadLetteredBatches?: number;
+      };
+    };
+    expect(flushPayload.telemetry?.ok).toBe(true);
+    expect(flushPayload.telemetry?.sentEvents).toBe(1);
+    expect(flushPayload.telemetry?.deadLetteredBatches).toBe(0);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    vi.unstubAllGlobals();
   });
 });
 
@@ -448,7 +805,7 @@ describe("Durable Object security behaviors", () => {
     expect(res.status).toBe(200);
     const payload = await res.json() as { serverTimeUtc?: number; dailyFlushWindowStartUtc?: number; dailyFlushWindowMinutes?: number; committedSeq?: number; healthNotifyIntervalsMs?: { warn?: number; critical?: number } };
     expect(typeof payload.serverTimeUtc).toBe("number");
-    expect(payload.dailyFlushWindowStartUtc).toBe(1);
+    expect(payload.dailyFlushWindowStartUtc).toBe(23);
     expect(payload.dailyFlushWindowMinutes).toBe(120);
     expect(typeof payload.committedSeq).toBe("number");
     expect(typeof payload.healthNotifyIntervalsMs?.warn).toBe("number");
@@ -508,7 +865,7 @@ describe("Durable Object security behaviors", () => {
     expect(payload.remoteConfig?.healthNotifyIntervalsMs?.critical).toBe(20 * 60 * 1000);
   });
 
-  it("reports weekly/monthly request windows and unique country reach in stats", async () => {
+  it("reports unique country reach in stats without weekly/monthly dashboard counters", async () => {
     const base = new Date();
     base.setUTCHours(0, 0, 0, 0);
     const dateKey = (offset: number) => {
@@ -547,8 +904,8 @@ describe("Durable Object security behaviors", () => {
       uniqueCountriesAllTime?: number;
     };
 
-    expect(payload.weeklyRequests).toBe(11);
-    expect(payload.monthlyRequests).toBe(111);
+    expect(payload.weeklyRequests).toBeUndefined();
+    expect(payload.monthlyRequests).toBeUndefined();
     expect(payload.uniqueCountriesAllTime).toBe(2);
   });
 
@@ -678,6 +1035,43 @@ describe("Durable Object security behaviors", () => {
     const denied = await callDO(obj, "/auth/check-ip-allowlist", { ip: "192.168.1.1" });
     const deniedPayload = await denied.json() as { allowed: boolean };
     expect(deniedPayload.allowed).toBe(false);
+  });
+
+  it("persists and exposes step-up bypass setting in allowlist endpoints", async () => {
+    const { obj } = makeDO();
+    const update = await callDO(obj, "/admin/ip-allowlist", {
+      enabled: true,
+      allowlist: ["10.0.0.0/8"],
+      stepUpBypassEnabled: false,
+    }, { "X-Admin-Secret": "secret" });
+    expect(update.status).toBe(200);
+    const updatePayload = await update.json() as { stepUpBypassEnabled?: boolean };
+    expect(updatePayload.stepUpBypassEnabled).toBe(false);
+
+    const read = await callDOGetWithAdmin(obj, "/admin/ip-allowlist");
+    expect(read.status).toBe(200);
+    const readPayload = await read.json() as { stepUpBypassEnabled?: boolean };
+    expect(readPayload.stepUpBypassEnabled).toBe(false);
+
+    const check = await callDO(obj, "/auth/check-ip-allowlist", { ip: "192.168.1.10" });
+    expect(check.status).toBe(200);
+    const checkPayload = await check.json() as { allowed?: boolean; stepUpBypassEnabled?: boolean };
+    expect(checkPayload.allowed).toBe(false);
+    expect(checkPayload.stepUpBypassEnabled).toBe(false);
+  });
+
+  it("records danger action audit entries for destructive admin actions", async () => {
+    const { obj, state } = makeDO();
+    const resetRes = await callDO(obj, "/debug/reset", {}, { "X-Admin-Secret": "secret" });
+    expect(resetRes.status).toBe(200);
+
+    const stored = await state.storage.get<StoredState>(STORAGE_KEY);
+    const entries = Array.isArray(stored?.dangerActionAuditLogs) ? stored?.dangerActionAuditLogs : [];
+    expect(entries.length).toBeGreaterThan(0);
+    const latest = entries[entries.length - 1] as Record<string, unknown>;
+    expect(typeof latest.action).toBe("string");
+    expect(typeof latest.correlationId).toBe("string");
+    expect(latest.path).toBe("/debug/reset");
   });
 
   it("returns pipeline health status", async () => {

@@ -1,0 +1,190 @@
+<!-- Route disabled intentionally.
+     Keeping original Samples page content archived in this file. -->
+<script lang="ts">
+  import { categories, threeDElements, doodleItems } from '$lib/svgCatalog';
+
+  let activeCategory = 'all';
+</script>
+
+<svelte:head>
+  <title>SVG Design System — Samples Catalog</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+</svelte:head>
+
+<div class="samples">
+  <header class="samples-header">
+    <h1>🎨 SVG Design System</h1>
+    <p>Browse all available SVG decorations. Use IDs to reference items in the magnet-slot system.</p>
+  </header>
+
+  <!-- Category Filter -->
+  <nav class="cat-nav">
+    <button class="cat-btn" class:active={activeCategory === 'all'} on:click={() => activeCategory = 'all'}>All ({categories.reduce((a, c) => a + c.items.length, 0)})</button>
+    {#each categories as cat}
+      <button class="cat-btn" class:active={activeCategory === cat.key} on:click={() => activeCategory = cat.key}>
+        {cat.emoji} {cat.name} ({cat.items.length})
+      </button>
+    {/each}
+  </nav>
+
+  <!-- ━━━ Floating SVGs ━━━ -->
+  <section class="catalog-section">
+    <h2>Floating SVGs <span class="count">{categories.reduce((a, c) => a + c.items.length, 0)} items</span></h2>
+    {#each categories as cat}
+      {#if activeCategory === 'all' || activeCategory === cat.key}
+        <div class="cat-block">
+          <h3 class="cat-heading">{cat.emoji} {cat.name}</h3>
+          <div class="svg-grid">
+            {#each cat.items as item}
+              <div class="svg-card">
+                <div class="svg-preview">
+                  <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    {@html item.svg}
+                  </svg>
+                </div>
+                <div class="svg-meta">
+                  <span class="svg-id">{item.id}</span>
+                  <span class="svg-label">{item.label}</span>
+                </div>
+              </div>
+            {/each}
+          </div>
+        </div>
+      {/if}
+    {/each}
+  </section>
+
+  <!-- ━━━ 3D Elements ━━━ -->
+  <section class="catalog-section">
+    <h2>3D Isometric Elements <span class="count">{threeDElements.length} items</span></h2>
+    <div class="threed-grid">
+      {#each threeDElements as item}
+        <div class="threed-card">
+          <div class="threed-preview">
+            <svg viewBox="0 0 120 120" fill="none" stroke-linecap="round" stroke-linejoin="round">
+              {@html item.svg}
+            </svg>
+          </div>
+          <div class="svg-meta">
+            <span class="svg-id threed-id">{item.id}</span>
+            <span class="svg-label">{item.label}</span>
+          </div>
+        </div>
+      {/each}
+    </div>
+  </section>
+
+  <!-- ━━━ Doodles ━━━ -->
+  <section class="catalog-section">
+    <h2>Section Doodles <span class="count">{doodleItems.length} items</span></h2>
+    <div class="svg-grid">
+      {#each doodleItems as item}
+        <div class="svg-card doodle-card">
+          <div class="svg-preview doodle-preview">
+            <svg viewBox="0 0 80 80" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              {@html item.svg}
+            </svg>
+          </div>
+          <div class="svg-meta">
+            <span class="svg-id doodle-id">{item.id}</span>
+            <span class="svg-label">{item.label}</span>
+          </div>
+        </div>
+      {/each}
+    </div>
+  </section>
+</div>
+
+<style>
+  .samples {
+    --green: #1a8b55;
+    --bg: #0f1419;
+    --card: #1a1f2e;
+    --card-hover: #232a3b;
+    --border: rgba(255,255,255,0.08);
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 40px 24px 80px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .samples-header { text-align: center; margin-bottom: 40px; }
+  .samples-header h1 { font-size: 36px; font-weight: 800; margin: 0 0 8px; }
+  .samples-header p { color: var(--muted); font-size: 16px; margin: 0; }
+
+  .cat-nav {
+    display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;
+    margin-bottom: 48px; padding: 0 16px;
+  }
+  .cat-btn {
+    background: var(--card); border: 1px solid var(--border); color: var(--muted);
+    padding: 8px 16px; border-radius: 20px; cursor: pointer; font-size: 13px;
+    font-weight: 500; transition: all 0.2s;
+  }
+  .cat-btn:hover { background: var(--card-hover); color: var(--text); }
+  .cat-btn.active { background: var(--green); color: #fff; border-color: var(--green); }
+
+  .catalog-section { margin-bottom: 64px; }
+  .catalog-section h2 {
+    font-size: 24px; font-weight: 700; margin: 0 0 24px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .count {
+    font-size: 13px; font-weight: 500; color: var(--green);
+    background: rgba(26,139,85,0.12); padding: 4px 10px; border-radius: 12px;
+  }
+
+  .cat-block { margin-bottom: 40px; }
+  .cat-heading {
+    font-size: 18px; font-weight: 600; margin: 0 0 16px;
+    padding-bottom: 8px; border-bottom: 1px solid var(--border);
+  }
+
+  .svg-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px;
+  }
+  .svg-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 12px; display: flex; flex-direction: column; align-items: center;
+    gap: 8px; transition: all 0.2s; cursor: default;
+  }
+  .svg-card:hover { background: var(--card-hover); border-color: rgba(26,139,85,0.3); transform: translateY(-2px); }
+
+  .svg-preview {
+    width: 64px; height: 64px; display: flex; align-items: center; justify-content: center;
+    color: var(--green);
+  }
+  .svg-preview svg { width: 100%; height: 100%; }
+
+  .svg-meta { text-align: center; width: 100%; }
+  .svg-id {
+    display: block; font-size: 11px; font-weight: 700; color: var(--green);
+    font-family: 'SF Mono', 'Fira Code', monospace; letter-spacing: 0.5px;
+    background: rgba(26,139,85,0.1); padding: 2px 8px; border-radius: 6px;
+    margin-bottom: 4px; display: inline-block;
+  }
+  .svg-label { display: block; font-size: 11px; color: var(--muted); line-height: 1.3; }
+
+  .threed-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px;
+  }
+  .threed-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+    padding: 20px; display: flex; flex-direction: column; align-items: center;
+    gap: 12px; transition: all 0.2s;
+  }
+  .threed-card:hover { border-color: rgba(139,92,246,0.3); transform: translateY(-2px); }
+
+  .threed-preview { width: 140px; height: 120px; }
+  .threed-preview svg { width: 100%; height: 100%; }
+  .threed-id { background: rgba(139,92,246,0.15); color: #a78bfa; }
+
+  .doodle-card:hover { border-color: rgba(59,130,246,0.3); }
+  .doodle-preview { width: 72px; height: 72px; }
+  .doodle-id { background: rgba(59,130,246,0.12); color: #60a5fa; }
+</style>

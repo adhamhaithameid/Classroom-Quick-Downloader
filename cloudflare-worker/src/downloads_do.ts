@@ -13,11 +13,16 @@ import {
   DOStateBatch,
   BatchSummary,
   ChangelogEntry,
+  ChangelogRevision,
   ChangelogConfig,
+  ChangelogApplyMode,
+  ChangelogSyncStatus,
 } from "./types";
+import { resolveOracleEndpoint } from "./oracle-endpoint";
 
 export interface Env {
   ORACLE_ENDPOINT: string;
+  ALLOW_INSECURE_ORACLE_ENDPOINT?: string;
   DO_SHARED_SECRET: string;
   MAX_BATCH_EVENTS: string;
   ALERT_WEBHOOK_URL?: string;
@@ -88,6 +93,8 @@ type DurableStateShape = {
   // IP Allowlist configuration
   ipAllowlistEnabled: boolean;
   ipAllowlist: string[];
+  ipAllowlistStepUpBypassEnabled: boolean;
+  dangerActionAuditLogs: DangerActionAuditRecord[];
 
   // Track endpoint rate limiting (per-IP, per-minute)
   trackRates: Record<string, { count: number; minute: number }>;
@@ -96,7 +103,26 @@ type DurableStateShape = {
   // CHANGELOG & CONFIG
   // =========================================================================
   changelog: ChangelogEntry[];
+  changelogRevisions: ChangelogRevision[];
   changelogConfig: ChangelogConfig;
+  changelogDraft: ChangelogDraftState | null;
+
+  // Public website metrics snapshot refreshed on a fixed UTC schedule.
+  publicSiteMetricsSnapshot: PublicSiteMetricsSnapshot | null;
+  websitePublicSyncEnabled: boolean;
+  websiteManualFlushAt: number | null;
+  websiteOverrideEnabled: boolean;
+  websiteOverrideDownloads: number;
+  websiteOverrideCountries: PublicSiteCountryCount[];
+  websiteTelemetryQueue: WebsiteTelemetryQueuedBatch[];
+  websiteTelemetryDeadLetter: WebsiteTelemetryQueuedBatch[];
+  websiteTelemetrySeenEventIds: string[];
+  websiteTelemetryLastBatchCreatedAt: number | null;
+  websiteTelemetryLastBatchSentAt: number | null;
+  websiteTelemetryLastBatchAckAt: number | null;
+  websiteTelemetryLastBatchID: string | null;
+  websiteTelemetryLastCorrelationID: string | null;
+  websiteTelemetryLastError: string | null;
 
   // =========================================================================
   // REMOTE CONFIG - Controllable from Cloudflare Dashboard
@@ -161,6 +187,16 @@ type DurableStateShape = {
   lastHealthNotifyAt?: number | null;
 };
 
+type ChangelogDraftState = {
+  markdown: string;
+  markdownUrl?: string;
+  entries: ChangelogEntry[];
+  errors: string[];
+  valid: boolean;
+  updatedAt: number;
+  source: "manual" | "github" | "import";
+};
+
 type PendingOracleBatch = {
   batch: OracleBatch;
   weightedCount: number;
@@ -201,6 +237,42 @@ type FailureRollupState = {
   unsentCount: number;
   firstTs: number;
   lastTs: number;
+};
+
+type PublicSiteCountryCount = {
+  countryCode: string;
+  count: number;
+};
+
+type PublicSiteMetricsSnapshot = {
+  slotKey: string;
+  snapshotAtUtc: number;
+  downloads: number;
+  countries: PublicSiteCountryCount[];
+};
+
+type WebsiteTelemetryQueuedBatch = {
+  schemaVersion: typeof WEBSITE_EVENTS_SCHEMA_VERSION;
+  batchId: string;
+  correlationId: string;
+  generatedAtUtc: number;
+  sessionId: string;
+  pagePath: string;
+  events: WebsiteEventPayload[];
+  attempt: number;
+  nextRetryAtUtc: number | null;
+  lastError: string | null;
+};
+
+type DangerActionAuditRecord = {
+  id: string;
+  tsUtc: number;
+  actorIp: string;
+  action: string;
+  path: string;
+  result: "ok" | "error";
+  correlationId: string;
+  detail: string | null;
 };
 
 const DEFAULT_RETRY_STATE: RetryState = {
@@ -244,8 +316,40 @@ function cloneCounterMap(input: Record<string, number> | undefined): Record<stri
 }
 
 const CONFIG_VERSION = 2;
-const DEFAULT_DAILY_FLUSH_WINDOW_START_UTC = 1;
+const DEFAULT_DAILY_FLUSH_WINDOW_START_UTC = 23;
 const DEFAULT_DAILY_FLUSH_WINDOW_MINUTES = 120;
+const WEBSITE_EVENTS_BODY_LIMIT_BYTES = 128 * 1024;
+const WEBSITE_EVENTS_MAX_BATCH = 64;
+const WEBSITE_EVENTS_SCHEMA_VERSION = "1" as const;
+const WEBSITE_EVENTS_MAX_SESSION_ID_LEN = 96;
+const WEBSITE_EVENTS_MAX_PAGE_PATH_LEN = 200;
+const WEBSITE_EVENTS_MAX_PLACEMENT_LEN = 64;
+const WEBSITE_EVENTS_MAX_META_KEYS = 8;
+const WEBSITE_EVENTS_MAX_META_KEY_LEN = 40;
+const WEBSITE_EVENTS_MAX_META_VALUE_STRING_LEN = 120;
+const WEBSITE_EVENT_ID_PATTERN = /^[A-Za-z0-9._:-]{6,120}$/;
+const WEBSITE_EVENT_TYPE_VALUES = ["cta", "map"] as const;
+const WEBSITE_EVENT_ACTION_VALUES = [
+  "install_click",
+  "download_click",
+  "map_yes",
+  "map_no",
+] as const;
+const WEBSITE_EVENT_ACTION_TO_TYPE: Record<(typeof WEBSITE_EVENT_ACTION_VALUES)[number], (typeof WEBSITE_EVENT_TYPE_VALUES)[number]> = {
+  install_click: "cta",
+  download_click: "cta",
+  map_yes: "map",
+  map_no: "map",
+};
+const WEBSITE_EVENT_ROOT_KEYS = new Set(["schemaVersion", "sessionId", "pagePath", "events"]);
+const WEBSITE_EVENT_KEYS = new Set(["eventId", "eventType", "action", "placement", "tsUtc", "meta"]);
+const MAX_DANGER_AUDIT_LOGS = 500;
+const WEBSITE_TELEMETRY_MAX_QUEUE_BATCHES = 4000;
+const WEBSITE_TELEMETRY_MAX_DLQ_BATCHES = 1000;
+const WEBSITE_TELEMETRY_MAX_DEDUPE_IDS = 50_000;
+const WEBSITE_TELEMETRY_MAX_RETRY_ATTEMPTS = 5;
+const WEBSITE_TELEMETRY_RETRY_BASE_MS = 60_000;
+const WEBSITE_TELEMETRY_RETRY_MAX_MS = 6 * 60 * 60 * 1000;
 
 // Quota thresholds (approx. Cloudflare daily request quotas)
 const QUOTA_VERY_SOFT_LIMIT = 30_000;
@@ -281,12 +385,485 @@ const TRACK_RATE_LIMIT_PER_MIN = 120;
 const TRACK_RATE_PRUNE_AFTER_MIN = 10;
 const TRACK_RATE_MAX_KEYS = 5000;
 const REQUEST_HISTORY_DAYS = 400;
+const PUBLIC_SITE_METRICS_REFRESH_HOURS_UTC = [3, 6, 9, 12, 15, 18, 21] as const;
+const MAX_PUBLIC_SITE_COUNTRIES = 300;
+const ISO_ALPHA2_PATTERN = /^[A-Z]{2}$/;
+const USER_FRIENDLY_CHANGELOG_GITHUB_URL =
+  "https://raw.githubusercontent.com/adhamhaithameid/Classroom-Quick-Downloader/main/user-friendly-changelog.md";
+const CHANGELOG_DEFAULT_APPLY_MODE: ChangelogApplyMode = "manual";
+const CHANGELOG_DEFAULT_AUTO_SYNC_ENABLED = false;
+const CHANGELOG_DEFAULT_AUTO_SYNC_INTERVAL_MINUTES = 60;
+const CHANGELOG_MIN_AUTO_SYNC_INTERVAL_MINUTES = 5;
+const CHANGELOG_MAX_AUTO_SYNC_INTERVAL_MINUTES = 1440;
+
+function defaultExtensionChangelogEntries(): ChangelogEntry[] {
+  return [
+    {
+      id: "release-139",
+      version: "1.3.9",
+      date: "2026-03-03T00:00:00.000Z",
+      isImportant: true,
+      changes: [
+        "Manual changelog mode is now source-controlled for deterministic release notes.",
+        "Session-pinned website metrics prevent in-tab number drift until refresh.",
+        "Improved telemetry routing through edge snapshot and events endpoints."
+      ]
+    },
+    {
+      id: "release-137",
+      version: "1.3.7",
+      date: "2026-02-28T00:00:00.000Z",
+      isImportant: true,
+      changes: [
+        "New cleaner release notes experience so updates are easier to read.",
+        "Better download flow stability in large classes with many files.",
+        "Polished install and version messaging for non-technical users."
+      ]
+    },
+    {
+      id: "release-136",
+      version: "1.3.6",
+      date: "2026-02-20T00:00:00.000Z",
+      changes: [
+        "Improved reliability when batch downloads include mixed file types.",
+        "Reduced stuck-progress cases after tab wake or network hiccups.",
+        "Small security hardening updates across extension internals."
+      ]
+    },
+    {
+      id: "release-135",
+      version: "1.3.5",
+      date: "2026-02-19T00:00:00.000Z",
+      changes: [
+        "Smoother keyboard and popup interactions for faster navigation.",
+        "More consistent status updates while downloads are running.",
+        "General bug fixes focused on everyday classroom workflows."
+      ]
+    },
+    {
+      id: "release-134",
+      version: "1.3.4",
+      date: "2026-02-18T00:00:00.000Z",
+      changes: [
+        "Safer handling around internal requests and validation checks.",
+        "Improved compatibility with current Chromium and Firefox builds.",
+        "UI polish for clearer feedback in the extension popup."
+      ]
+    },
+    {
+      id: "release-133",
+      version: "1.3.3",
+      date: "2026-02-12T00:00:00.000Z",
+      changes: [
+        "Faster response when starting multi-file downloads.",
+        "Better recovery when a tab refreshes mid-download.",
+        "Reduced noisy errors in normal successful runs."
+      ]
+    },
+    {
+      id: "release-132",
+      version: "1.3.2",
+      date: "2026-02-08T00:00:00.000Z",
+      changes: [
+        "Improved analytics reliability without collecting personal data.",
+        "More accurate completion tracking for partial/cancelled actions.",
+        "Refined background logic for steadier long sessions."
+      ]
+    },
+    {
+      id: "release-131",
+      version: "1.3.1",
+      date: "2026-02-04T00:00:00.000Z",
+      changes: [
+        "First stability wave for the 1.3 series with faster queue handling.",
+        "Improved extension behavior on heavy Google Classroom pages.",
+        "General fixes and cleanup for a smoother daily experience."
+      ]
+    }
+  ];
+}
+
+type UserFriendlyRelease = {
+  version: string;
+  summary: string;
+  added: string[];
+  changed: string[];
+  fixed: string[];
+};
+
+type ParsedUserFriendlyChangelog = {
+  releases: UserFriendlyRelease[];
+  errors: string[];
+};
+
+function normalizeReleaseVersion(raw: string): string {
+  const value = raw.trim().replace(/^v/i, "");
+  if (!value) return "";
+  return value.replace(/\s+/g, "");
+}
+
+function parseUserFriendlyChangelogMarkdown(markdown: string): ParsedUserFriendlyChangelog {
+  const lines = markdown.replace(/\r\n/g, "\n").split("\n");
+  const errors: string[] = [];
+  const releases: UserFriendlyRelease[] = [];
+
+  let current: UserFriendlyRelease | null = null;
+  let activeSection: "summary" | "added" | "changed" | "fixed" | null = null;
+
+  const pushCurrent = () => {
+    if (!current) return;
+    current.summary = current.summary.trim();
+    if (!current.version) {
+      errors.push("Found a release block without a version heading.");
+      current = null;
+      return;
+    }
+    if (!current.summary) {
+      const fallback = current.added[0] || current.changed[0] || current.fixed[0] || "";
+      current.summary = fallback.trim();
+    }
+    if (!current.summary) {
+      errors.push(`Release v${current.version} is missing a Summary section.`);
+      current = null;
+      return;
+    }
+    releases.push({
+      version: current.version,
+      summary: current.summary,
+      added: [...current.added],
+      changed: [...current.changed],
+      fixed: [...current.fixed],
+    });
+    current = null;
+  };
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) continue;
+
+    const releaseMatch = line.match(/^##\s+v?([A-Za-z0-9._-]+)\s*$/i);
+    if (releaseMatch) {
+      pushCurrent();
+      const version = normalizeReleaseVersion(releaseMatch[1] || "");
+      current = {
+        version,
+        summary: "",
+        added: [],
+        changed: [],
+        fixed: [],
+      };
+      activeSection = null;
+      continue;
+    }
+
+    if (!current) {
+      // Ignore preamble text outside release blocks.
+      continue;
+    }
+
+    if (/^###\s+summary\s*$/i.test(line)) {
+      activeSection = "summary";
+      continue;
+    }
+    if (/^###\s+added\s*$/i.test(line)) {
+      activeSection = "added";
+      continue;
+    }
+    if (/^###\s+changed\s*$/i.test(line)) {
+      activeSection = "changed";
+      continue;
+    }
+    if (/^###\s+fixed\s*$/i.test(line)) {
+      activeSection = "fixed";
+      continue;
+    }
+
+    const bullet = line.match(/^-\s+(.+)$/);
+    const value = trimAndLimitString((bullet ? bullet[1] : line), 400);
+    if (!value) continue;
+
+    if (activeSection === "summary") {
+      current.summary = current.summary ? `${current.summary} ${value}` : value;
+      continue;
+    }
+    if (activeSection === "added") {
+      current.added.push(value);
+      continue;
+    }
+    if (activeSection === "changed") {
+      current.changed.push(value);
+      continue;
+    }
+    if (activeSection === "fixed") {
+      current.fixed.push(value);
+      continue;
+    }
+
+    // If no section heading was set, treat as summary continuation.
+    current.summary = current.summary ? `${current.summary} ${value}` : value;
+  }
+
+  pushCurrent();
+  return { releases, errors };
+}
+
+function buildReleaseMarkdown(entry: UserFriendlyRelease): string {
+  const lines: string[] = [];
+  lines.push(`## v${entry.version}`);
+  lines.push("### Summary");
+  lines.push(entry.summary);
+  lines.push("### Added");
+  for (const point of entry.added) lines.push(`- ${point}`);
+  lines.push("### Changed");
+  for (const point of entry.changed) lines.push(`- ${point}`);
+  lines.push("### Fixed");
+  for (const point of entry.fixed) lines.push(`- ${point}`);
+  return lines.join("\n");
+}
+
+function buildLegacyChanges(entry: UserFriendlyRelease): string[] {
+  const out: string[] = [];
+  out.push(`Summary: ${entry.summary}`);
+  for (const point of entry.added) out.push(`Added: ${point}`);
+  for (const point of entry.changed) out.push(`Changed: ${point}`);
+  for (const point of entry.fixed) out.push(`Fixed: ${point}`);
+  return out.slice(0, 24);
+}
+
+function toStructuredChangelogEntries(
+  parsed: ParsedUserFriendlyChangelog,
+  source: "manual" | "github" | "import",
+  nowMs: number,
+): ChangelogEntry[] {
+  return parsed.releases.map((release, idx) => ({
+    id: `release-${release.version.replace(/[^A-Za-z0-9]+/g, "-").replace(/^-+|-+$/g, "").toLowerCase() || String(nowMs + idx)}`,
+    version: release.version,
+    date: new Date(nowMs - idx * 1000).toISOString(),
+    summary: release.summary,
+    added: [...release.added],
+    changed: [...release.changed],
+    fixed: [...release.fixed],
+    markdown: buildReleaseMarkdown(release),
+    source,
+    changes: buildLegacyChanges(release),
+    isImportant: idx === 0,
+  }));
+}
+
+function sanitizeIncomingChangelogEntries(input: unknown): ChangelogEntry[] {
+  if (!Array.isArray(input)) return [];
+  return input
+    .map((row) => {
+      if (!isPlainObject(row)) return null;
+      const source = row as Record<string, unknown>;
+      const id = trimAndLimitString(source.id, 160);
+      const version = normalizeReleaseVersion(trimAndLimitString(source.version, 64));
+      const dateRaw = trimAndLimitString(source.date, 64);
+      const parsedDate = dateRaw ? Date.parse(dateRaw) : NaN;
+      const date = Number.isFinite(parsedDate) ? new Date(parsedDate).toISOString() : new Date().toISOString();
+      if (!id || !version) return null;
+      const summary = trimAndLimitString(source.summary, 600);
+      const added = Array.isArray(source.added)
+        ? source.added.map((item) => trimAndLimitString(item, 300)).filter((item) => item.length > 0).slice(0, 20)
+        : [];
+      const changed = Array.isArray(source.changed)
+        ? source.changed.map((item) => trimAndLimitString(item, 300)).filter((item) => item.length > 0).slice(0, 20)
+        : [];
+      const fixed = Array.isArray(source.fixed)
+        ? source.fixed.map((item) => trimAndLimitString(item, 300)).filter((item) => item.length > 0).slice(0, 20)
+        : [];
+      const markdown = trimAndLimitString(source.markdown, 12000);
+      const changes = Array.isArray(source.changes)
+        ? source.changes.map((item) => trimAndLimitString(item, 300)).filter((item) => item.length > 0).slice(0, 40)
+        : [];
+      const release: UserFriendlyRelease = {
+        version,
+        summary: summary || "",
+        added,
+        changed,
+        fixed,
+      };
+      const derivedChanges = changes.length > 0 ? changes : buildLegacyChanges(release);
+      return {
+        id,
+        version,
+        date,
+        summary: summary || undefined,
+        added,
+        changed,
+        fixed,
+        markdown: markdown || (summary ? buildReleaseMarkdown(release) : undefined),
+        source:
+          source.source === "github" || source.source === "import" || source.source === "manual"
+            ? source.source
+            : "manual",
+        changes: derivedChanges,
+        isImportant: source.isImportant === true,
+      } as ChangelogEntry;
+    })
+    .filter((entry): entry is ChangelogEntry => entry !== null);
+}
+
+function normalizeChangelogApplyMode(value: unknown): ChangelogApplyMode {
+  return value === "auto_github" ? "auto_github" : CHANGELOG_DEFAULT_APPLY_MODE;
+}
+
+function normalizeChangelogSyncStatus(value: unknown): ChangelogSyncStatus {
+  if (value === "ok" || value === "error") return value;
+  return "idle";
+}
+
+function normalizeRuleTarget(value: unknown): string {
+  const raw = trimAndLimitString(value, 64).toLowerCase();
+  if (!raw) return "";
+  if (raw === "all") return "all";
+  return normalizeReleaseVersion(raw);
+}
+
+function sanitizeNotificationRules(input: unknown): ChangelogConfig["rules"] {
+  if (!Array.isArray(input)) return [];
+  const byTarget = new Map<string, ChangelogConfig["rules"][number]>();
+  for (const row of input) {
+    if (!isPlainObject(row)) continue;
+    const source = row as Record<string, unknown>;
+    const target = normalizeRuleTarget(source.target);
+    if (!target) continue;
+    const priority =
+      source.priority === "major" || source.priority === "minor" || source.priority === "normal"
+        ? source.priority
+        : "normal";
+    const effect = source.effect === "glow" || source.effect === "pulse" || source.effect === "none"
+      ? source.effect
+      : "none";
+    const id = trimAndLimitString(source.id, 80) || `rule-${target.replace(/[^a-z0-9]+/g, "-")}`;
+    byTarget.set(target, { id, target, priority, effect });
+  }
+  return [...byTarget.values()].slice(0, 200);
+}
+
+function normalizeAutoSyncIntervalMinutes(value: unknown): number {
+  return clampInt(
+    value,
+    CHANGELOG_MIN_AUTO_SYNC_INTERVAL_MINUTES,
+    CHANGELOG_MAX_AUTO_SYNC_INTERVAL_MINUTES,
+    CHANGELOG_DEFAULT_AUTO_SYNC_INTERVAL_MINUTES,
+  );
+}
+
+function computeChangelogLiveHash(entries: ChangelogEntry[]): string {
+  const stable = entries
+    .map((entry) => ({
+      version: normalizeReleaseVersion(entry.version),
+      summary: trimAndLimitString(entry.summary, 2000),
+      added: Array.isArray(entry.added) ? entry.added.map((row) => trimAndLimitString(row, 400)) : [],
+      changed: Array.isArray(entry.changed) ? entry.changed.map((row) => trimAndLimitString(row, 400)) : [],
+      fixed: Array.isArray(entry.fixed) ? entry.fixed.map((row) => trimAndLimitString(row, 400)) : [],
+      changes: Array.isArray(entry.changes) ? entry.changes.map((row) => trimAndLimitString(row, 400)) : [],
+    }))
+    .filter((entry) => entry.version.length > 0)
+    .sort((a, b) => a.version.localeCompare(b.version));
+  return JSON.stringify(stable);
+}
+
+function sanitizeLoadedChangelogDraft(raw: unknown): ChangelogDraftState | null {
+  if (!isPlainObject(raw)) return null;
+  const source = raw as Record<string, unknown>;
+  const markdown = trimAndLimitString(source.markdown, 750_000);
+  const markdownUrl = trimAndLimitString(source.markdownUrl, 600);
+  const entries = sanitizeIncomingChangelogEntries(source.entries);
+  const errors = Array.isArray(source.errors)
+    ? source.errors
+        .filter((item): item is string => typeof item === "string")
+        .map((item) => trimAndLimitString(item, 240))
+        .filter((item) => item.length > 0)
+        .slice(0, 20)
+    : [];
+  const valid = source.valid === true;
+  const updatedAt = clampInt(source.updatedAt, 0, Number.MAX_SAFE_INTEGER, 0);
+  const draftSource =
+    source.source === "github" || source.source === "import" || source.source === "manual"
+      ? source.source
+      : "manual";
+  if (!markdown && entries.length === 0) return null;
+  return {
+    markdown,
+    markdownUrl: markdownUrl || undefined,
+    entries,
+    errors,
+    valid,
+    updatedAt: updatedAt > 0 ? updatedAt : Date.now(),
+    source: draftSource,
+  };
+}
 
 // Storage key inside DO storage
 const STORAGE_KEY = "analytics_state";
 
 function todayUtcDate(): string {
   return new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+}
+
+function currentUtcHour(ts: number): number {
+  return new Date(ts).getUTCHours();
+}
+
+function makeSlotKey(ts: number): string {
+  const now = new Date(ts);
+  const year = now.getUTCFullYear();
+  const month = String(now.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(now.getUTCDate()).padStart(2, "0");
+  const hour = String(now.getUTCHours()).padStart(2, "0");
+  return `${year}-${month}-${day}T${hour}`;
+}
+
+function normalizePublicCountryCode(input: string): string | null {
+  const normalized = input.trim().toUpperCase();
+  if (!ISO_ALPHA2_PATTERN.test(normalized)) return null;
+  if (normalized === "XX" || normalized === "ZZ") return null;
+  if (normalized === "UN" || normalized === "EU") return null;
+  return normalized;
+}
+
+function normalizeCountryCountsForPublicMap(
+  byCountry: Record<string, number> | undefined,
+): PublicSiteCountryCount[] {
+  if (!byCountry || typeof byCountry !== "object") return [];
+
+  const merged = new Map<string, number>();
+  for (const [rawCountry, rawCount] of Object.entries(byCountry)) {
+    const count = clampInt(rawCount, 0, Number.MAX_SAFE_INTEGER, 0);
+    if (count <= 0) continue;
+    const code = normalizePublicCountryCode(rawCountry);
+    if (!code) continue;
+    merged.set(code, (merged.get(code) ?? 0) + count);
+  }
+
+  const countries = [...merged.entries()].map(([countryCode, count]) => ({ countryCode, count }));
+  countries.sort((a, b) => {
+    if (a.count === b.count) return a.countryCode.localeCompare(b.countryCode);
+    return b.count - a.count;
+  });
+  return countries.slice(0, MAX_PUBLIC_SITE_COUNTRIES);
+}
+
+function normalizePublicSiteCountryList(input: unknown): PublicSiteCountryCount[] {
+  if (!Array.isArray(input)) return [];
+  const merged = new Map<string, number>();
+  for (const row of input) {
+    if (!isPlainObject(row)) continue;
+    const raw = row as Record<string, unknown>;
+    const code = normalizePublicCountryCode(typeof raw.countryCode === "string" ? raw.countryCode : "");
+    if (!code) continue;
+    const count = clampInt(raw.count, 0, Number.MAX_SAFE_INTEGER, 0);
+    if (count <= 0) continue;
+    merged.set(code, (merged.get(code) ?? 0) + count);
+  }
+  const countries = [...merged.entries()].map(([countryCode, count]) => ({ countryCode, count }));
+  countries.sort((a, b) => {
+    if (a.count === b.count) return a.countryCode.localeCompare(b.countryCode);
+    return b.count - a.count;
+  });
+  return countries.slice(0, MAX_PUBLIC_SITE_COUNTRIES);
 }
 
 function shiftUtcDateByDays(dateKey: string, deltaDays: number): string | null {
@@ -320,6 +897,444 @@ function clampFloat(value: unknown, min: number, max: number, fallback: number):
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+type WebsiteEventType = (typeof WEBSITE_EVENT_TYPE_VALUES)[number];
+type WebsiteEventAction = (typeof WEBSITE_EVENT_ACTION_VALUES)[number];
+type WebsiteEventMetaValue = string | number | boolean | null;
+
+type WebsiteEventPayload = {
+  eventId: string;
+  eventType: WebsiteEventType;
+  action: WebsiteEventAction;
+  placement: string;
+  tsUtc?: number;
+  meta?: Record<string, WebsiteEventMetaValue>;
+};
+
+type WebsiteEventsRequest = {
+  schemaVersion: typeof WEBSITE_EVENTS_SCHEMA_VERSION;
+  sessionId: string;
+  pagePath: string;
+  events: WebsiteEventPayload[];
+};
+
+type WebsiteEventsBatchRequest = {
+  schemaVersion: typeof WEBSITE_EVENTS_SCHEMA_VERSION;
+  batchId: string;
+  batchChecksum?: string;
+  expectedEventCount?: number;
+  generatedAtUtc: number;
+  attempt: number;
+  sessionId: string;
+  pagePath: string;
+  events: WebsiteEventPayload[];
+};
+
+type WebsiteEventsErrorCode =
+  | "invalid_content_type"
+  | "payload_too_large"
+  | "invalid_json"
+  | "invalid_payload"
+  | "schema_version_required"
+  | "unknown_field"
+  | "event_unknown_field"
+  | "events_required"
+  | "events_batch_too_large"
+  | "invalid_event_id"
+  | "invalid_event_type"
+  | "invalid_event_action"
+  | "event_action_type_mismatch"
+  | "invalid_placement"
+  | "invalid_ts_utc"
+  | "invalid_meta"
+  | "internal_misconfigured"
+  | "upstream_unavailable"
+  | "upstream_rejected"
+  | "upstream_invalid_response";
+
+type WebsiteEventsErrorResponse = {
+  ok: false;
+  schemaVersion: typeof WEBSITE_EVENTS_SCHEMA_VERSION;
+  error: {
+    code: WebsiteEventsErrorCode;
+    message: string;
+    retryable: boolean;
+  };
+};
+
+async function computeWebsiteEventsBatchChecksum(input: {
+  batchId: string;
+  generatedAtUtc: number;
+  sessionId: string;
+  pagePath: string;
+  events: WebsiteEventPayload[];
+}): Promise<string> {
+  if (
+    typeof crypto === "undefined" ||
+    !crypto.subtle ||
+    typeof crypto.subtle.digest !== "function"
+  ) {
+    return "";
+  }
+
+  const lines: string[] = [];
+  lines.push(WEBSITE_EVENTS_SCHEMA_VERSION);
+  lines.push(input.batchId || "");
+  lines.push(String(Math.max(0, Math.trunc(input.generatedAtUtc || 0))));
+  lines.push(input.sessionId || "");
+  lines.push(input.pagePath || "/");
+  lines.push(String(Array.isArray(input.events) ? input.events.length : 0));
+
+  for (const event of input.events || []) {
+    lines.push(event.eventId || "");
+    lines.push(event.eventType || "");
+    lines.push(event.action || "");
+    lines.push(event.placement || "");
+    lines.push(String(typeof event.tsUtc === "number" ? Math.max(0, Math.trunc(event.tsUtc)) : 0));
+  }
+
+  const payload = lines.join("\n");
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(payload));
+  const bytes = new Uint8Array(digest);
+  let out = "";
+  for (const b of bytes) out += b.toString(16).padStart(2, "0");
+  return out;
+}
+
+function isWebsiteEventType(value: string): value is WebsiteEventType {
+  return (WEBSITE_EVENT_TYPE_VALUES as readonly string[]).includes(value);
+}
+
+function isWebsiteEventAction(value: string): value is WebsiteEventAction {
+  return (WEBSITE_EVENT_ACTION_VALUES as readonly string[]).includes(value);
+}
+
+function websiteEventsError(
+  code: WebsiteEventsErrorCode,
+  message: string,
+  status: number,
+  retryable = false,
+): Response {
+  const payload: WebsiteEventsErrorResponse = {
+    ok: false,
+    schemaVersion: WEBSITE_EVENTS_SCHEMA_VERSION,
+    error: {
+      code,
+      message,
+      retryable,
+    },
+  };
+  return json(payload, { status });
+}
+
+function hasOnlyAllowedKeys(value: Record<string, unknown>, allowed: Set<string>): boolean {
+  for (const key of Object.keys(value)) {
+    if (!allowed.has(key)) return false;
+  }
+  return true;
+}
+
+function normalizeWebsiteEventsPagePath(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return "/";
+  const normalized = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+  return normalized.length <= WEBSITE_EVENTS_MAX_PAGE_PATH_LEN
+    ? normalized
+    : normalized.slice(0, WEBSITE_EVENTS_MAX_PAGE_PATH_LEN);
+}
+
+function sanitizeWebsiteEventMeta(raw: unknown): Record<string, WebsiteEventMetaValue> | null | undefined {
+  if (raw == null) return undefined;
+  if (!isPlainObject(raw)) return null;
+  const out: Record<string, WebsiteEventMetaValue> = {};
+  const entries = Object.entries(raw);
+  if (entries.length > WEBSITE_EVENTS_MAX_META_KEYS) {
+    return null;
+  }
+  for (const [key, value] of entries) {
+    const cleanKey = key.trim();
+    if (!cleanKey || cleanKey.length > WEBSITE_EVENTS_MAX_META_KEY_LEN) {
+      return null;
+    }
+    if (typeof value === "string") {
+      out[cleanKey] = value.slice(0, WEBSITE_EVENTS_MAX_META_VALUE_STRING_LEN);
+      continue;
+    }
+    if (typeof value === "number" || typeof value === "boolean" || value === null) {
+      out[cleanKey] = value;
+      continue;
+    }
+    return null;
+  }
+  return out;
+}
+
+function parseWebsiteEventsRequest(raw: unknown): { ok: true; value: WebsiteEventsRequest } | { ok: false; response: Response } {
+  if (!isPlainObject(raw)) {
+    return {
+      ok: false,
+      response: websiteEventsError("invalid_payload", "Request body must be a JSON object.", 400, false),
+    };
+  }
+  if (!hasOnlyAllowedKeys(raw, WEBSITE_EVENT_ROOT_KEYS)) {
+    return {
+      ok: false,
+      response: websiteEventsError("unknown_field", "Request body contains unsupported fields.", 400, false),
+    };
+  }
+
+  if (raw.schemaVersion !== WEBSITE_EVENTS_SCHEMA_VERSION) {
+    return {
+      ok: false,
+      response: websiteEventsError("schema_version_required", "schemaVersion must be \"1\".", 400, false),
+    };
+  }
+
+  const sessionId = typeof raw.sessionId === "string" ? raw.sessionId.trim() : "";
+  if (!sessionId || sessionId.length > WEBSITE_EVENTS_MAX_SESSION_ID_LEN) {
+    return {
+      ok: false,
+      response: websiteEventsError("invalid_payload", "sessionId is required and must be <= 96 characters.", 400, false),
+    };
+  }
+
+  const pagePathRaw = typeof raw.pagePath === "string" ? raw.pagePath : "/";
+  const pagePath = normalizeWebsiteEventsPagePath(pagePathRaw);
+
+  if (!Array.isArray(raw.events) || raw.events.length === 0) {
+    return {
+      ok: false,
+      response: websiteEventsError("events_required", "events must be a non-empty array.", 400, false),
+    };
+  }
+
+  if (raw.events.length > WEBSITE_EVENTS_MAX_BATCH) {
+    return {
+      ok: false,
+      response: websiteEventsError(
+        "events_batch_too_large",
+        `events length must be <= ${WEBSITE_EVENTS_MAX_BATCH}.`,
+        413,
+        false,
+      ),
+    };
+  }
+
+  const events: WebsiteEventPayload[] = [];
+  for (const entry of raw.events) {
+    if (!isPlainObject(entry)) {
+      return {
+        ok: false,
+        response: websiteEventsError("invalid_payload", "Each event must be an object.", 400, false),
+      };
+    }
+    if (!hasOnlyAllowedKeys(entry, WEBSITE_EVENT_KEYS)) {
+      return {
+        ok: false,
+        response: websiteEventsError("event_unknown_field", "Event contains unsupported fields.", 400, false),
+      };
+    }
+
+    const eventId = typeof entry.eventId === "string" ? entry.eventId.trim() : "";
+    if (!WEBSITE_EVENT_ID_PATTERN.test(eventId)) {
+      return {
+        ok: false,
+        response: websiteEventsError("invalid_event_id", "eventId must match the expected format.", 400, false),
+      };
+    }
+
+    const rawEventType = typeof entry.eventType === "string" ? entry.eventType.trim().toLowerCase() : "";
+    if (!isWebsiteEventType(rawEventType)) {
+      return {
+        ok: false,
+        response: websiteEventsError("invalid_event_type", "eventType must be one of: cta, map.", 400, false),
+      };
+    }
+    const eventType: WebsiteEventType = rawEventType;
+
+    const rawAction = typeof entry.action === "string" ? entry.action.trim().toLowerCase() : "";
+    if (!isWebsiteEventAction(rawAction)) {
+      return {
+        ok: false,
+        response: websiteEventsError(
+          "invalid_event_action",
+          "action must be one of: install_click, download_click, map_yes, map_no.",
+          400,
+          false,
+        ),
+      };
+    }
+    const action: WebsiteEventAction = rawAction;
+    if (WEBSITE_EVENT_ACTION_TO_TYPE[action] !== eventType) {
+      return {
+        ok: false,
+        response: websiteEventsError("event_action_type_mismatch", "action does not match eventType.", 400, false),
+      };
+    }
+
+    const placement = typeof entry.placement === "string" ? entry.placement.trim().toLowerCase() : "";
+    if (!placement || placement.length > WEBSITE_EVENTS_MAX_PLACEMENT_LEN) {
+      return {
+        ok: false,
+        response: websiteEventsError("invalid_placement", "placement is required and must be <= 64 characters.", 400, false),
+      };
+    }
+
+    let tsUtc: number | undefined;
+    if (entry.tsUtc !== undefined) {
+      if (typeof entry.tsUtc !== "number" || !Number.isFinite(entry.tsUtc) || entry.tsUtc <= 0) {
+        return {
+          ok: false,
+          response: websiteEventsError("invalid_ts_utc", "tsUtc must be a positive Unix ms timestamp.", 400, false),
+        };
+      }
+      tsUtc = Math.floor(entry.tsUtc);
+    }
+
+    const meta = sanitizeWebsiteEventMeta(entry.meta);
+    if (meta === null) {
+      return {
+        ok: false,
+        response: websiteEventsError("invalid_meta", "meta must be a small object of primitive values.", 400, false),
+      };
+    }
+
+    events.push({
+      eventId,
+      eventType,
+      action,
+      placement,
+      ...(tsUtc ? { tsUtc } : {}),
+      ...(meta ? { meta } : {}),
+    });
+  }
+
+  return {
+    ok: true,
+    value: {
+      schemaVersion: WEBSITE_EVENTS_SCHEMA_VERSION,
+      sessionId,
+      pagePath,
+      events,
+    },
+  };
+}
+
+function trimAndLimitString(value: unknown, maxLen: number): string {
+  if (typeof value !== "string") return "";
+  return value.trim().slice(0, Math.max(0, maxLen));
+}
+
+function sanitizeWebsiteTelemetrySessionID(value: unknown): string {
+  return trimAndLimitString(value, WEBSITE_EVENTS_MAX_SESSION_ID_LEN);
+}
+
+function sanitizeWebsiteTelemetryPagePath(value: unknown): string {
+  if (typeof value !== "string") return "/";
+  return normalizeWebsiteEventsPagePath(value);
+}
+
+function sanitizeLoadedChangelogRevision(raw: unknown): ChangelogRevision | null {
+  if (!isPlainObject(raw)) return null;
+  const source = raw as Record<string, unknown>;
+  const id = trimAndLimitString(source.id, 160);
+  const createdAt = clampInt(source.createdAt, 1, Number.MAX_SAFE_INTEGER, 0);
+  const actor = trimAndLimitString(source.actor, 120);
+  const sourceTypeRaw = trimAndLimitString(source.source, 24).toLowerCase();
+  const sourceType: "manual" | "github" | "github_auto" | "api" =
+    sourceTypeRaw === "github" || sourceTypeRaw === "github_auto" || sourceTypeRaw === "api"
+      ? sourceTypeRaw
+      : "manual";
+  const markdownUrl = trimAndLimitString(source.markdownUrl, 600);
+  const markdownLength = clampInt(source.markdownLength, 0, 2_000_000, 0);
+  const releases = clampInt(source.releases, 0, 2000, 0);
+  const valid = source.valid === true;
+  const errors = Array.isArray(source.errors)
+    ? source.errors
+        .filter((item): item is string => typeof item === "string")
+        .map((item) => trimAndLimitString(item, 240))
+        .filter((item) => item.length > 0)
+        .slice(0, 8)
+    : [];
+  if (!id || createdAt <= 0) return null;
+  return {
+    id,
+    source: sourceType,
+    createdAt,
+    actor: actor || "unknown",
+    markdownUrl: markdownUrl || undefined,
+    markdownLength,
+    releases,
+    valid,
+    errors: errors.length > 0 ? errors : undefined,
+  };
+}
+
+function sanitizeLoadedWebsiteTelemetryBatch(raw: unknown): WebsiteTelemetryQueuedBatch | null {
+  if (!isPlainObject(raw)) return null;
+  const source = raw as Record<string, unknown>;
+  if (source.schemaVersion !== WEBSITE_EVENTS_SCHEMA_VERSION) return null;
+  const batchId = trimAndLimitString(source.batchId, 160);
+  const correlationId =
+    trimAndLimitString(source.correlationId, 160);
+  const generatedAtUtc = clampInt(source.generatedAtUtc, 1, Number.MAX_SAFE_INTEGER, 0);
+  const sessionId = sanitizeWebsiteTelemetrySessionID(source.sessionId);
+  const pagePath = sanitizeWebsiteTelemetryPagePath(source.pagePath);
+  const attempt = clampInt(source.attempt, 0, 100, 0);
+  const nextRetryAtUtc = (() => {
+    const value = clampInt(source.nextRetryAtUtc, 0, Number.MAX_SAFE_INTEGER, 0);
+    return value > 0 ? value : null;
+  })();
+  const lastError = (() => {
+    if (typeof source.lastError !== "string") return null;
+    const normalized = trimAndLimitString(source.lastError, 280);
+    return normalized || null;
+  })();
+  if (!batchId || !correlationId || generatedAtUtc <= 0 || sessionId === "" || pagePath === "") {
+    return null;
+  }
+  if (!Array.isArray(source.events) || source.events.length === 0 || source.events.length > WEBSITE_EVENTS_MAX_BATCH) {
+    return null;
+  }
+  const normalizedEvents: WebsiteEventPayload[] = [];
+  for (const eventRaw of source.events) {
+    if (!isPlainObject(eventRaw)) continue;
+    const eventSource = eventRaw as Record<string, unknown>;
+    const eventId = typeof eventSource.eventId === "string" ? eventSource.eventId.trim() : "";
+    const eventType = typeof eventSource.eventType === "string" ? eventSource.eventType.trim().toLowerCase() : "";
+    const action = typeof eventSource.action === "string" ? eventSource.action.trim().toLowerCase() : "";
+    const placement = typeof eventSource.placement === "string" ? eventSource.placement.trim().toLowerCase() : "";
+    if (!WEBSITE_EVENT_ID_PATTERN.test(eventId)) continue;
+    if (!isWebsiteEventType(eventType)) continue;
+    if (!isWebsiteEventAction(action)) continue;
+    if (WEBSITE_EVENT_ACTION_TO_TYPE[action] !== eventType) continue;
+    if (!placement || placement.length > WEBSITE_EVENTS_MAX_PLACEMENT_LEN) continue;
+    const tsUtc = clampInt(eventSource.tsUtc, 1, Number.MAX_SAFE_INTEGER, generatedAtUtc);
+    const meta = sanitizeWebsiteEventMeta(eventSource.meta);
+    if (meta === null) continue;
+    normalizedEvents.push({
+      eventId,
+      eventType,
+      action,
+      placement,
+      tsUtc,
+      ...(meta ? { meta } : {}),
+    });
+  }
+  if (normalizedEvents.length === 0) return null;
+  return {
+    schemaVersion: WEBSITE_EVENTS_SCHEMA_VERSION,
+    batchId,
+    correlationId,
+    generatedAtUtc,
+    sessionId,
+    pagePath,
+    events: normalizedEvents,
+    attempt,
+    nextRetryAtUtc,
+    lastError,
+  };
 }
 
 function sanitizeString(
@@ -502,6 +1517,18 @@ type PipelineHealthResponse = {
     criticalStaleMs: number;
     warnBufferUtil: number;
     criticalBufferUtil: number;
+  };
+  websiteTelemetry?: {
+    pendingBatches: number;
+    deadLetterBatches: number;
+    retryCount: number;
+    lastBatchCreatedAtUtc: number | null;
+    lastBatchSentAtUtc: number | null;
+    lastBatchAckAtUtc: number | null;
+    lastBatchId: string | null;
+    lastCorrelationId: string | null;
+    lastError: string | null;
+    nextRetryAtUtc: number | null;
   };
 };
 
@@ -764,6 +1791,8 @@ export class DownloadsDurable {
       loginAttempts: {},
       ipAllowlistEnabled: false,
       ipAllowlist: [],
+      ipAllowlistStepUpBypassEnabled: true,
+      dangerActionAuditLogs: [],
       trackRates: {},
 
       // Remote config defaults
@@ -791,11 +1820,35 @@ export class DownloadsDurable {
       configHealthNotifyCritIntervalMs: HEALTH_NOTIFY_CRIT_INTERVAL_MS,
 
       // Changelog defaults
-      changelog: [],
+      changelog: defaultExtensionChangelogEntries(),
+      changelogRevisions: [],
       changelogConfig: {
         rules: [],
+        applyMode: CHANGELOG_DEFAULT_APPLY_MODE,
+        autoSyncEnabled: CHANGELOG_DEFAULT_AUTO_SYNC_ENABLED,
+        autoSyncIntervalMinutes: CHANGELOG_DEFAULT_AUTO_SYNC_INTERVAL_MINUTES,
+        lastAutoSyncStatus: "idle",
+        liveHash: computeChangelogLiveHash(defaultExtensionChangelogEntries()),
+        markdownSourceUrl: USER_FRIENDLY_CHANGELOG_GITHUB_URL,
+        markdownHelpUrl: USER_FRIENDLY_CHANGELOG_GITHUB_URL,
         lastUpdated: Date.now(),
       },
+      changelogDraft: null,
+      publicSiteMetricsSnapshot: null,
+      websitePublicSyncEnabled: true,
+      websiteManualFlushAt: null,
+      websiteOverrideEnabled: false,
+      websiteOverrideDownloads: 0,
+      websiteOverrideCountries: [],
+      websiteTelemetryQueue: [],
+      websiteTelemetryDeadLetter: [],
+      websiteTelemetrySeenEventIds: [],
+      websiteTelemetryLastBatchCreatedAt: null,
+      websiteTelemetryLastBatchSentAt: null,
+      websiteTelemetryLastBatchAckAt: null,
+      websiteTelemetryLastBatchID: null,
+      websiteTelemetryLastCorrelationID: null,
+      websiteTelemetryLastError: null,
 
       lastHealthStatus: "ok",
       lastHealthNotifyAt: null,
@@ -807,6 +1860,26 @@ export class DownloadsDurable {
     }
 
     // Merge stored with defaults to be robust to schema changes.
+    const stepUpBypassNeedsMigration =
+      typeof stored.ipAllowlistStepUpBypassEnabled !== "boolean";
+    const changelogRevisionNeedsMigration = !Array.isArray(
+      (stored as unknown as Record<string, unknown>).changelogRevisions,
+    );
+    const changelogConfigNeedsMigration = (() => {
+      if (!isPlainObject(stored.changelogConfig)) return true;
+      const cfg = stored.changelogConfig as Record<string, unknown>;
+      if (cfg.applyMode !== "manual" && cfg.applyMode !== "auto_github") return true;
+      if (typeof cfg.autoSyncEnabled !== "boolean") return true;
+      if (typeof cfg.autoSyncIntervalMinutes !== "number") return true;
+      if (cfg.lastAutoSyncStatus !== "idle" && cfg.lastAutoSyncStatus !== "ok" && cfg.lastAutoSyncStatus !== "error") return true;
+      if (typeof cfg.liveHash !== "string" || cfg.liveHash.trim() === "") return true;
+      return false;
+    })();
+    const changelogDraftNeedsMigration = (() => {
+      const draftRaw = (stored as unknown as Record<string, unknown>).changelogDraft;
+      if (typeof draftRaw === "undefined" || draftRaw === null) return false;
+      return !isPlainObject(draftRaw);
+    })();
     this.data = {
       totalEvents: stored.totalEvents ?? base.totalEvents,
       totalDownloads: stored.totalDownloads ?? base.totalDownloads,
@@ -906,6 +1979,36 @@ export class DownloadsDurable {
       loginAttempts: stored.loginAttempts ?? base.loginAttempts,
       ipAllowlistEnabled: stored.ipAllowlistEnabled ?? base.ipAllowlistEnabled,
       ipAllowlist: Array.isArray(stored.ipAllowlist) ? stored.ipAllowlist : base.ipAllowlist,
+      ipAllowlistStepUpBypassEnabled:
+        typeof stored.ipAllowlistStepUpBypassEnabled === "boolean"
+          ? stored.ipAllowlistStepUpBypassEnabled
+          : base.ipAllowlistStepUpBypassEnabled,
+      dangerActionAuditLogs: (() => {
+        const source = (stored as unknown as Record<string, unknown>).dangerActionAuditLogs;
+        if (!Array.isArray(source)) return [];
+        return source
+          .filter((entry) => isPlainObject(entry))
+          .map((entry) => {
+            const row = entry as Record<string, unknown>;
+            const resultRaw = typeof row.result === "string" ? row.result : "ok";
+            const result: "ok" | "error" = resultRaw === "error" ? "error" : "ok";
+            return {
+              id: trimAndLimitString(row.id, 120) || "",
+              tsUtc: clampInt(row.tsUtc, 0, Number.MAX_SAFE_INTEGER, 0),
+              actorIp: trimAndLimitString(row.actorIp, 120) || "unknown",
+              action: trimAndLimitString(row.action, 80) || "unknown",
+              path: trimAndLimitString(row.path, 120) || "",
+              result,
+              correlationId: trimAndLimitString(row.correlationId, 160) || "",
+              detail: (() => {
+                const value = trimAndLimitString(row.detail, 280);
+                return value || null;
+              })(),
+            };
+          })
+          .filter((entry) => entry.id !== "" && entry.tsUtc > 0)
+          .slice(0, MAX_DANGER_AUDIT_LOGS);
+      })(),
       trackRates: stored.trackRates && typeof stored.trackRates === "object" ? stored.trackRates : base.trackRates,
 
       // Remote config - preserve stored values or use defaults
@@ -945,8 +2048,178 @@ export class DownloadsDurable {
       configHealthNotifyCritIntervalMs:
         stored.configHealthNotifyCritIntervalMs ?? base.configHealthNotifyCritIntervalMs,
 
-      changelog: Array.isArray(stored.changelog) ? stored.changelog : base.changelog,
-      changelogConfig: stored.changelogConfig ?? base.changelogConfig,
+      changelog:
+        (() => {
+          if (!Array.isArray(stored.changelog) || stored.changelog.length === 0) return base.changelog;
+          const sanitized = sanitizeIncomingChangelogEntries(stored.changelog);
+          return sanitized.length > 0 ? sanitized : base.changelog;
+        })(),
+      changelogRevisions: Array.isArray((stored as unknown as Record<string, unknown>).changelogRevisions)
+        ? ((stored as unknown as Record<string, unknown>).changelogRevisions as unknown[])
+            .map((row) => sanitizeLoadedChangelogRevision(row))
+            .filter((row): row is ChangelogRevision => row !== null)
+            .slice(0, 100)
+        : [],
+      changelogConfig: (() => {
+        const config = isPlainObject(stored.changelogConfig)
+          ? (stored.changelogConfig as ChangelogConfig)
+          : base.changelogConfig;
+        return {
+          ...base.changelogConfig,
+          ...config,
+          rules: sanitizeNotificationRules(config.rules),
+          applyMode: normalizeChangelogApplyMode(config.applyMode),
+          autoSyncEnabled:
+            typeof config.autoSyncEnabled === "boolean"
+              ? config.autoSyncEnabled
+              : CHANGELOG_DEFAULT_AUTO_SYNC_ENABLED,
+          autoSyncIntervalMinutes: normalizeAutoSyncIntervalMinutes(config.autoSyncIntervalMinutes),
+          lastAutoSyncAt: clampInt(config.lastAutoSyncAt, 0, Number.MAX_SAFE_INTEGER, 0) || undefined,
+          lastAutoSyncStatus: normalizeChangelogSyncStatus(config.lastAutoSyncStatus),
+          lastAutoSyncError: trimAndLimitString(config.lastAutoSyncError, 320) || undefined,
+          nextAutoSyncAt: clampInt(config.nextAutoSyncAt, 0, Number.MAX_SAFE_INTEGER, 0) || undefined,
+          liveHash:
+            trimAndLimitString(config.liveHash, 2_000_000) ||
+            computeChangelogLiveHash(
+              Array.isArray(stored.changelog) && stored.changelog.length > 0
+                ? (() => {
+                    const sanitized = sanitizeIncomingChangelogEntries(stored.changelog);
+                    return sanitized.length > 0 ? sanitized : base.changelog;
+                  })()
+                : base.changelog,
+            ),
+          markdownSourceUrl: trimAndLimitString(config.markdownSourceUrl, 600) || USER_FRIENDLY_CHANGELOG_GITHUB_URL,
+          markdownHelpUrl: trimAndLimitString(config.markdownHelpUrl, 600) || USER_FRIENDLY_CHANGELOG_GITHUB_URL,
+        };
+      })(),
+      changelogDraft: sanitizeLoadedChangelogDraft(
+        (stored as unknown as Record<string, unknown>).changelogDraft,
+      ),
+      publicSiteMetricsSnapshot: (() => {
+        const snapshot = (stored as unknown as Record<string, unknown>).publicSiteMetricsSnapshot;
+        if (!isPlainObject(snapshot)) return null;
+        const countriesRaw = Array.isArray(snapshot.countries) ? snapshot.countries : [];
+        const countries = countriesRaw
+          .filter((entry) => isPlainObject(entry))
+          .map((entry) => {
+            const row = entry as Record<string, unknown>;
+            return {
+              countryCode: normalizePublicCountryCode(typeof row.countryCode === "string" ? row.countryCode : "") ?? "",
+              count: clampInt(row.count, 0, Number.MAX_SAFE_INTEGER, 0),
+            };
+          })
+          .filter((entry) => entry.countryCode !== "" && entry.count > 0);
+        countries.sort((a, b) => {
+          if (a.count === b.count) return a.countryCode.localeCompare(b.countryCode);
+          return b.count - a.count;
+        });
+
+        const snapshotAtUtc = clampInt(snapshot.snapshotAtUtc, 0, Number.MAX_SAFE_INTEGER, 0);
+        const slotKey = typeof snapshot.slotKey === "string" ? snapshot.slotKey.slice(0, 32) : "";
+        const downloads = clampInt(snapshot.downloads, 0, Number.MAX_SAFE_INTEGER, 0);
+        if (!slotKey || snapshotAtUtc <= 0) return null;
+        return { slotKey, snapshotAtUtc, downloads, countries };
+      })(),
+      websitePublicSyncEnabled:
+        typeof (stored as unknown as Record<string, unknown>).websitePublicSyncEnabled === "boolean"
+          ? Boolean((stored as unknown as Record<string, unknown>).websitePublicSyncEnabled)
+          : base.websitePublicSyncEnabled,
+      websiteManualFlushAt: (() => {
+        const value = clampInt(
+          (stored as unknown as Record<string, unknown>).websiteManualFlushAt,
+          0,
+          Number.MAX_SAFE_INTEGER,
+          0,
+        );
+        return value > 0 ? value : null;
+      })(),
+      websiteOverrideEnabled:
+        typeof (stored as unknown as Record<string, unknown>).websiteOverrideEnabled === "boolean"
+          ? Boolean((stored as unknown as Record<string, unknown>).websiteOverrideEnabled)
+          : base.websiteOverrideEnabled,
+      websiteOverrideDownloads: clampInt(
+        (stored as unknown as Record<string, unknown>).websiteOverrideDownloads,
+        0,
+        Number.MAX_SAFE_INTEGER,
+        0,
+      ),
+      websiteOverrideCountries: normalizePublicSiteCountryList(
+        (stored as unknown as Record<string, unknown>).websiteOverrideCountries,
+      ),
+      websiteTelemetryQueue: (() => {
+        const raw = (stored as unknown as Record<string, unknown>).websiteTelemetryQueue;
+        if (!Array.isArray(raw)) return [];
+        return raw
+          .map((row) => sanitizeLoadedWebsiteTelemetryBatch(row))
+          .filter((row): row is WebsiteTelemetryQueuedBatch => row !== null)
+          .slice(0, WEBSITE_TELEMETRY_MAX_QUEUE_BATCHES);
+      })(),
+      websiteTelemetryDeadLetter: (() => {
+        const raw = (stored as unknown as Record<string, unknown>).websiteTelemetryDeadLetter;
+        if (!Array.isArray(raw)) return [];
+        return raw
+          .map((row) => sanitizeLoadedWebsiteTelemetryBatch(row))
+          .filter((row): row is WebsiteTelemetryQueuedBatch => row !== null)
+          .slice(0, WEBSITE_TELEMETRY_MAX_DLQ_BATCHES);
+      })(),
+      websiteTelemetrySeenEventIds: (() => {
+        const raw = (stored as unknown as Record<string, unknown>).websiteTelemetrySeenEventIds;
+        if (!Array.isArray(raw)) return [];
+        const normalized = raw
+          .filter((value) => typeof value === "string")
+          .map((value) => value.trim())
+          .filter((value) => WEBSITE_EVENT_ID_PATTERN.test(value));
+        if (normalized.length <= WEBSITE_TELEMETRY_MAX_DEDUPE_IDS) return normalized;
+        return normalized.slice(normalized.length - WEBSITE_TELEMETRY_MAX_DEDUPE_IDS);
+      })(),
+      websiteTelemetryLastBatchCreatedAt: (() => {
+        const value = clampInt(
+          (stored as unknown as Record<string, unknown>).websiteTelemetryLastBatchCreatedAt,
+          0,
+          Number.MAX_SAFE_INTEGER,
+          0,
+        );
+        return value > 0 ? value : null;
+      })(),
+      websiteTelemetryLastBatchSentAt: (() => {
+        const value = clampInt(
+          (stored as unknown as Record<string, unknown>).websiteTelemetryLastBatchSentAt,
+          0,
+          Number.MAX_SAFE_INTEGER,
+          0,
+        );
+        return value > 0 ? value : null;
+      })(),
+      websiteTelemetryLastBatchAckAt: (() => {
+        const value = clampInt(
+          (stored as unknown as Record<string, unknown>).websiteTelemetryLastBatchAckAt,
+          0,
+          Number.MAX_SAFE_INTEGER,
+          0,
+        );
+        return value > 0 ? value : null;
+      })(),
+      websiteTelemetryLastBatchID: (() => {
+        const value = trimAndLimitString(
+          (stored as unknown as Record<string, unknown>).websiteTelemetryLastBatchID,
+          160,
+        );
+        return value || null;
+      })(),
+      websiteTelemetryLastCorrelationID: (() => {
+        const value = trimAndLimitString(
+          (stored as unknown as Record<string, unknown>).websiteTelemetryLastCorrelationID,
+          160,
+        );
+        return value || null;
+      })(),
+      websiteTelemetryLastError: (() => {
+        const value = trimAndLimitString(
+          (stored as unknown as Record<string, unknown>).websiteTelemetryLastError,
+          280,
+        );
+        return value || null;
+      })(),
 
       lastHealthStatus: stored.lastHealthStatus ?? base.lastHealthStatus,
       lastHealthNotifyAt: stored.lastHealthNotifyAt ?? base.lastHealthNotifyAt,
@@ -1208,12 +2481,26 @@ export class DownloadsDurable {
       }
     }
 
-    if (hadLegacyIps || strippedEventIps || configDirty || pendingCompacted || failurePruned) {
+    if (
+      hadLegacyIps ||
+      strippedEventIps ||
+      configDirty ||
+      pendingCompacted ||
+      failurePruned ||
+      stepUpBypassNeedsMigration ||
+      changelogRevisionNeedsMigration ||
+      changelogConfigNeedsMigration ||
+      changelogDraftNeedsMigration
+    ) {
       await this.persist();
     }
 
-    // Ensure midnight alarm is scheduled
+    // Ensure daily Oracle flush alarm is scheduled.
     await this.scheduleNextMidnightAlarm();
+    const changelogAlarmDirty = await this.ensureChangelogAutoSyncAlarm(Date.now());
+    if (changelogAlarmDirty) {
+      await this.persist();
+    }
   }
 
   private async persist(): Promise<void> {
@@ -1296,6 +2583,57 @@ export class DownloadsDurable {
     return request.headers.get("CF-Connecting-IP") || "unknown";
   }
 
+  private buildDangerAuditID(now: number): string {
+    try {
+      if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+        return `wdaudit-${now}-${crypto.randomUUID()}`;
+      }
+    } catch {
+      // Fallback handled below.
+    }
+    return `wdaudit-${now}-${Math.random().toString(36).slice(2, 12)}`;
+  }
+
+  private buildDangerAuditCorrelationID(now: number): string {
+    try {
+      if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+        return `wdcorr-${now}-${crypto.randomUUID()}`;
+      }
+    } catch {
+      // Fallback handled below.
+    }
+    return `wdcorr-${now}-${Math.random().toString(36).slice(2, 12)}`;
+  }
+
+  private appendDangerAudit(
+    request: Request,
+    action: string,
+    path: string,
+    result: "ok" | "error",
+    detail?: string,
+  ): void {
+    const now = Date.now();
+    const entry: DangerActionAuditRecord = {
+      id: this.buildDangerAuditID(now),
+      tsUtc: now,
+      actorIp: trimAndLimitString(this.getClientIp(request), 120) || "unknown",
+      action: trimAndLimitString(action, 80) || "unknown",
+      path: trimAndLimitString(path, 120) || "",
+      result,
+      correlationId: this.buildDangerAuditCorrelationID(now),
+      detail: (() => {
+        const value = trimAndLimitString(detail, 280);
+        return value || null;
+      })(),
+    };
+    this.d.dangerActionAuditLogs.push(entry);
+    if (this.d.dangerActionAuditLogs.length > MAX_DANGER_AUDIT_LOGS) {
+      this.d.dangerActionAuditLogs = this.d.dangerActionAuditLogs.slice(
+        this.d.dangerActionAuditLogs.length - MAX_DANGER_AUDIT_LOGS,
+      );
+    }
+  }
+
   private checkTrackRateLimit(ip: string, nowMs: number): { allowed: boolean; retryAfterSec?: number } {
     const minute = Math.floor(nowMs / 60000);
     const entry = this.d.trackRates[ip];
@@ -1369,7 +2707,7 @@ export class DownloadsDurable {
       if (!this.isAuthorizedAdmin(request)) {
         return json({ ok: false, error: "unauthorized" }, { status: 401 });
       }
-      return this.handleDebugFlush();
+      return this.handleDebugFlush(request);
     }
 
     if (pathname === "/debug/reset" && request.method === "POST") {
@@ -1377,7 +2715,7 @@ export class DownloadsDurable {
       if (!this.isAuthorizedAdmin(request)) {
         return json({ ok: false, error: "unauthorized" }, { status: 401 });
       }
-      return this.handleDebugReset();
+      return this.handleDebugReset(request);
     }
 
     if (pathname === "/admin/force-flush" && request.method === "POST") {
@@ -1401,14 +2739,66 @@ export class DownloadsDurable {
       return this.handleAdminFullSync(request);
     }
 
+    if (pathname === "/admin/website/status" && request.method === "GET") {
+      return this.handleAdminWebsiteStatus(request);
+    }
+
+    if (pathname === "/admin/website/flush-now" && request.method === "POST") {
+      return this.handleAdminWebsiteFlushNow(request);
+    }
+
+    if (pathname === "/admin/website/replay-dlq" && request.method === "POST") {
+      return this.handleAdminWebsiteReplayDLQ(request);
+    }
+
+    if (pathname === "/admin/website/override" && request.method === "POST") {
+      return this.handleAdminWebsiteOverride(request);
+    }
+
+    if (pathname === "/admin/website/refresh-toggle" && request.method === "POST") {
+      return this.handleAdminWebsiteRefreshToggle(request);
+    }
+
     // Public Changelog
     if (pathname === "/changelog" && request.method === "GET") {
       return this.handleGetChangelog();
     }
 
+    if (pathname === "/public/site-metrics" && request.method === "GET") {
+      return this.handlePublicSiteMetrics();
+    }
+
+    if (pathname === "/api/public/website/events" && request.method === "POST") {
+      return this.handlePublicWebsiteEvents(request);
+    }
+
     // Admin Changelog Update
     if (pathname === "/admin/changelog" && request.method === "POST") {
       return this.handleAdminUpdateChangelog(request);
+    }
+    if (pathname === "/admin/changelog" && request.method === "GET") {
+      return this.handleAdminGetChangelogState(request);
+    }
+    if (pathname === "/admin/changelog/parse" && request.method === "POST") {
+      return this.handleAdminParseChangelog(request);
+    }
+    if (pathname === "/admin/changelog/history" && request.method === "GET") {
+      return this.handleAdminChangelogHistory(request);
+    }
+    if (pathname === "/admin/changelog/rules" && request.method === "POST") {
+      return this.handleAdminSaveChangelogRules(request);
+    }
+    if (pathname === "/admin/changelog/draft" && request.method === "POST") {
+      return this.handleAdminSaveChangelogDraft(request);
+    }
+    if (pathname === "/admin/changelog/publish" && request.method === "POST") {
+      return this.handleAdminPublishChangelogDraft(request);
+    }
+    if (pathname === "/admin/changelog/mode" && request.method === "POST") {
+      return this.handleAdminSetChangelogMode(request);
+    }
+    if (pathname === "/admin/changelog/sync-now" && request.method === "POST") {
+      return this.handleAdminSyncChangelogNow(request);
     }
 
     // Login rate limiting - used by worker to check/record attempts
@@ -1433,7 +2823,7 @@ export class DownloadsDurable {
   }
 
   // ---------------------------------------------------------------------------
-  // Alarms for retry / backoff AND scheduled midnight flush
+  // Alarms for retry / backoff AND scheduled daily flush
   // ---------------------------------------------------------------------------
 
   async alarm(): Promise<void> {
@@ -1441,23 +2831,68 @@ export class DownloadsDurable {
     const now = Date.now();
     this.ensureRequestDay();
 
-    // =========================================================================
-    // SCHEDULED MIDNIGHT FLUSH TO ORACLE
-    // At 00:00-00:15, flush all buffered events to Oracle
-    // This happens before extensions wake up at 1:00 AM
-    // =========================================================================
+    // Flush extension buffered events once daily at 23:00 UTC.
     const currentHour = new Date().getUTCHours();
-    if (this.d.buffer.length > 0 && currentHour === 0) {
-      logEvent("info", "alarm_midnight_flush", { bufferedEvents: this.d.buffer.length });
+    if ((this.d.buffer.length > 0 || this.d.pendingBatches.length > 0) && currentHour === 23) {
+      logEvent("info", "alarm_daily_flush", {
+        bufferedEvents: this.d.buffer.length,
+        pendingBatches: this.d.pendingBatches.length,
+      });
       await this.flushToOracle(true);
     }
 
-    // Schedule next midnight alarm
+    // Flush website telemetry queue once daily at 23:00 UTC.
+    if (this.d.websiteTelemetryQueue.length > 0 && currentHour === 23) {
+      await this.flushWebsiteTelemetryQueue({
+        force: true,
+        trigger: "daily_alarm",
+        maxBatches: 300,
+      });
+    }
+
+    // Schedule next daily alarm
     await this.scheduleNextMidnightAlarm();
 
-    // Retry failed Oracle flushes
+    const changelogSync = this.getChangelogSyncState();
+    if (changelogSync.applyMode === "auto_github" && changelogSync.autoSyncEnabled) {
+      let syncTouchedState = false;
+      const syncDueAt = changelogSync.nextAutoSyncAt || 0;
+      if (syncDueAt <= 0 || now >= syncDueAt) {
+        const syncResult = await this.applyAutoGithubSync({
+          now,
+          actor: "alarm",
+          source: "alarm",
+        });
+        syncTouchedState = true;
+        if (!syncResult.ok) {
+          logEvent("warn", "changelog_auto_sync_failed", {
+            error: syncResult.error || "sync_failed",
+          });
+        }
+      }
+      const alarmDirty = await this.ensureChangelogAutoSyncAlarm(now);
+      if (syncTouchedState || alarmDirty) {
+        await this.persist();
+      }
+    }
+
+    // Retry failed extension Oracle flushes.
     if (this.d.retryState && this.d.retryState.nextRetryAt && now >= this.d.retryState.nextRetryAt) {
       await this.flushToOracle(false);
+    }
+
+    // Retry failed website telemetry batches.
+    const websiteHead = this.d.websiteTelemetryQueue[0];
+    if (
+      websiteHead &&
+      websiteHead.nextRetryAtUtc &&
+      now >= websiteHead.nextRetryAtUtc
+    ) {
+      await this.flushWebsiteTelemetryQueue({
+        force: false,
+        trigger: "retry_alarm",
+        maxBatches: 100,
+      });
     }
 
     const health = this.buildPipelineHealthPayload(now);
@@ -1465,23 +2900,394 @@ export class DownloadsDurable {
   }
 
   /**
-   * Schedule an alarm for the next midnight (00:00 UTC).
+   * Schedule an alarm for the next 23:00 UTC daily flush.
    * Called after each alarm to ensure continuous scheduling.
    */
   private async scheduleNextMidnightAlarm(): Promise<void> {
     const now = new Date();
-    const tomorrow = new Date(now);
-    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
-    tomorrow.setUTCHours(0, 0, 0, 0); // Midnight UTC tomorrow
+    const next = new Date(now);
+    next.setUTCHours(23, 0, 0, 0);
+    if (next.getTime() <= now.getTime()) {
+      next.setUTCDate(next.getUTCDate() + 1);
+    }
 
-    const alarmTime = tomorrow.getTime();
+    const alarmTime = next.getTime();
     
     // Only set if no alarm is scheduled or if this is earlier
     const currentAlarm = await this.state.storage.getAlarm();
     if (!currentAlarm || currentAlarm > alarmTime) {
       await this.state.storage.setAlarm(alarmTime);
-      logEvent("info", "alarm_scheduled_next_midnight_flush", { at: tomorrow.toISOString() });
+      logEvent("info", "alarm_scheduled_next_daily_flush", { at: next.toISOString() });
     }
+  }
+
+  private buildWebsiteTelemetryBatchID(now: number): string {
+    try {
+      if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+        return `ws-${now}-${crypto.randomUUID()}`;
+      }
+    } catch {
+      // Fallback handled below.
+    }
+    return `ws-${now}-${Math.random().toString(36).slice(2, 12)}`;
+  }
+
+  private buildWebsiteTelemetryCorrelationID(now: number): string {
+    try {
+      if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+        return `wscorr-${now}-${crypto.randomUUID()}`;
+      }
+    } catch {
+      // Fallback handled below.
+    }
+    return `wscorr-${now}-${Math.random().toString(36).slice(2, 12)}`;
+  }
+
+  private appendWebsiteTelemetrySeenEventIDs(eventIDs: string[]): void {
+    if (!Array.isArray(eventIDs) || eventIDs.length === 0) return;
+    this.d.websiteTelemetrySeenEventIds.push(...eventIDs);
+    if (this.d.websiteTelemetrySeenEventIds.length > WEBSITE_TELEMETRY_MAX_DEDUPE_IDS) {
+      this.d.websiteTelemetrySeenEventIds = this.d.websiteTelemetrySeenEventIds.slice(
+        this.d.websiteTelemetrySeenEventIds.length - WEBSITE_TELEMETRY_MAX_DEDUPE_IDS,
+      );
+    }
+  }
+
+  private nextWebsiteTelemetryRetryAt(attempt: number): number {
+    const safeAttempt = Math.max(1, Math.floor(attempt));
+    const base = Math.min(
+      WEBSITE_TELEMETRY_RETRY_MAX_MS,
+      WEBSITE_TELEMETRY_RETRY_BASE_MS * Math.pow(2, safeAttempt - 1),
+    );
+    const jitter = Math.floor(base * (Math.random() * 0.35));
+    return Date.now() + base + jitter;
+  }
+
+  private async scheduleAlarmAtEarliest(targetAt: number): Promise<void> {
+    const safeTarget = clampInt(targetAt, 1, Number.MAX_SAFE_INTEGER, 0);
+    if (safeTarget <= 0) return;
+    const currentAlarm = await this.state.storage.getAlarm();
+    if (!currentAlarm || currentAlarm > safeTarget) {
+      await this.state.storage.setAlarm(safeTarget);
+    }
+  }
+
+  private moveWebsiteTelemetryBatchToDeadLetter(
+    batch: WebsiteTelemetryQueuedBatch,
+    errorMessage: string,
+  ): void {
+    const normalizedError = trimAndLimitString(errorMessage, 280) || "unknown_error";
+    const deadLetterBatch: WebsiteTelemetryQueuedBatch = {
+      ...batch,
+      lastError: normalizedError,
+      nextRetryAtUtc: null,
+    };
+    this.d.websiteTelemetryDeadLetter.push(deadLetterBatch);
+    if (this.d.websiteTelemetryDeadLetter.length > WEBSITE_TELEMETRY_MAX_DLQ_BATCHES) {
+      this.d.websiteTelemetryDeadLetter = this.d.websiteTelemetryDeadLetter.slice(
+        this.d.websiteTelemetryDeadLetter.length - WEBSITE_TELEMETRY_MAX_DLQ_BATCHES,
+      );
+    }
+  }
+
+  private async flushWebsiteTelemetryQueue(options: {
+    force: boolean;
+    trigger: string;
+    maxBatches?: number;
+  }): Promise<{
+    ok: boolean;
+    processedBatches: number;
+    sentEvents: number;
+    deadLetteredBatches: number;
+    remainingQueue: number;
+    remainingDeadLetter: number;
+    error?: string;
+  }> {
+    const maxBatches = clampInt(options.maxBatches, 1, 1000, 100);
+    const now = Date.now();
+    let processedBatches = 0;
+    let sentEvents = 0;
+    let deadLetteredBatches = 0;
+    let lastError: string | undefined;
+
+    if (this.d.websiteTelemetryQueue.length === 0) {
+      return {
+        ok: true,
+        processedBatches,
+        sentEvents,
+        deadLetteredBatches,
+        remainingQueue: 0,
+        remainingDeadLetter: this.d.websiteTelemetryDeadLetter.length,
+      };
+    }
+
+    const resolvedOracleEndpoint = resolveOracleEndpoint(this.env.ORACLE_ENDPOINT, {
+      allowInsecureHttp: this.env.ALLOW_INSECURE_ORACLE_ENDPOINT === "true",
+    });
+    if (!resolvedOracleEndpoint.ok || !this.env.DO_SHARED_SECRET) {
+      const msg = !resolvedOracleEndpoint.ok
+        ? resolvedOracleEndpoint.message
+        : "DO_SHARED_SECRET is not configured";
+      this.d.websiteTelemetryLastError = msg;
+      const head = this.d.websiteTelemetryQueue[0];
+      if (head) {
+        head.attempt = Math.max(1, head.attempt + 1);
+        if (head.attempt >= WEBSITE_TELEMETRY_MAX_RETRY_ATTEMPTS) {
+          this.moveWebsiteTelemetryBatchToDeadLetter(head, msg);
+          this.d.websiteTelemetryQueue.shift();
+          deadLetteredBatches += 1;
+        } else {
+          head.lastError = msg;
+          head.nextRetryAtUtc = this.nextWebsiteTelemetryRetryAt(head.attempt);
+          await this.scheduleAlarmAtEarliest(head.nextRetryAtUtc);
+        }
+      }
+      await this.scheduleNextMidnightAlarm();
+      await this.persist();
+      return {
+        ok: false,
+        processedBatches,
+        sentEvents,
+        deadLetteredBatches,
+        remainingQueue: this.d.websiteTelemetryQueue.length,
+        remainingDeadLetter: this.d.websiteTelemetryDeadLetter.length,
+        error: msg,
+      };
+    }
+
+    while (this.d.websiteTelemetryQueue.length > 0 && processedBatches < maxBatches) {
+      const batch = this.d.websiteTelemetryQueue[0];
+      if (!batch) break;
+
+      if (!options.force && batch.nextRetryAtUtc && now < batch.nextRetryAtUtc) {
+        break;
+      }
+
+      const attempt = Math.max(1, batch.attempt + 1);
+      const payloadBase: WebsiteEventsBatchRequest = {
+        schemaVersion: WEBSITE_EVENTS_SCHEMA_VERSION,
+        batchId: batch.batchId,
+        generatedAtUtc: batch.generatedAtUtc,
+        attempt,
+        sessionId: batch.sessionId,
+        pagePath: batch.pagePath,
+        events: batch.events,
+        expectedEventCount: batch.events.length,
+      };
+      const checksum = await computeWebsiteEventsBatchChecksum({
+        batchId: payloadBase.batchId,
+        generatedAtUtc: payloadBase.generatedAtUtc,
+        sessionId: payloadBase.sessionId,
+        pagePath: payloadBase.pagePath,
+        events: payloadBase.events,
+      });
+      const payload: WebsiteEventsBatchRequest = checksum
+        ? { ...payloadBase, batchChecksum: checksum }
+        : payloadBase;
+
+      this.d.websiteTelemetryLastBatchSentAt = Date.now();
+      this.d.websiteTelemetryLastBatchID = batch.batchId;
+      this.d.websiteTelemetryLastCorrelationID = batch.correlationId;
+
+      logEvent("info", "website_telemetry_flush_attempt", {
+        trigger: options.trigger,
+        batchId: batch.batchId,
+        correlationId: batch.correlationId,
+        attempt,
+        eventCount: batch.events.length,
+      });
+
+      try {
+        const response = await fetch(resolvedOracleEndpoint.websiteEventsBatchUrl, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json; charset=utf-8",
+            "x-do-secret": this.env.DO_SHARED_SECRET,
+            "x-correlation-id": batch.correlationId,
+            "x-requested-with": "XMLHttpRequest",
+          },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          const body = await response.text().catch(() => "");
+          throw new Error(
+            trimAndLimitString(
+              `oracle_http_${response.status}: ${body || response.statusText || "upstream_rejected"}`,
+              280,
+            ),
+          );
+        }
+
+        const ack = (await response.json().catch(() => null)) as
+          | { ok?: boolean; batchId?: string }
+          | null;
+        if (!ack || ack.ok !== true || ack.batchId !== batch.batchId) {
+          throw new Error("oracle_ack_invalid");
+        }
+
+        this.d.websiteTelemetryQueue.shift();
+        this.d.websiteTelemetryLastBatchAckAt = Date.now();
+        this.d.websiteTelemetryLastError = null;
+        sentEvents += batch.events.length;
+        processedBatches += 1;
+        continue;
+      } catch (error) {
+        const message = trimAndLimitString(String(error), 280) || "website_telemetry_flush_failed";
+        batch.attempt = attempt;
+        batch.lastError = message;
+        this.d.websiteTelemetryLastError = message;
+        lastError = message;
+
+        if (batch.attempt >= WEBSITE_TELEMETRY_MAX_RETRY_ATTEMPTS) {
+          this.moveWebsiteTelemetryBatchToDeadLetter(batch, message);
+          this.d.websiteTelemetryQueue.shift();
+          deadLetteredBatches += 1;
+          processedBatches += 1;
+          logEvent("warn", "website_telemetry_batch_dead_lettered", {
+            trigger: options.trigger,
+            batchId: batch.batchId,
+            correlationId: batch.correlationId,
+            attempt: batch.attempt,
+          });
+          continue;
+        }
+
+        batch.nextRetryAtUtc = this.nextWebsiteTelemetryRetryAt(batch.attempt);
+        await this.scheduleAlarmAtEarliest(batch.nextRetryAtUtc);
+        logEvent("warn", "website_telemetry_flush_retry_scheduled", {
+          trigger: options.trigger,
+          batchId: batch.batchId,
+          correlationId: batch.correlationId,
+          attempt: batch.attempt,
+          nextRetryAtUtc: batch.nextRetryAtUtc,
+        });
+        break;
+      }
+    }
+
+    const head = this.d.websiteTelemetryQueue[0];
+    if (head?.nextRetryAtUtc) {
+      await this.scheduleAlarmAtEarliest(head.nextRetryAtUtc);
+    }
+    await this.scheduleNextMidnightAlarm();
+    await this.persist();
+
+    return {
+      ok: !lastError,
+      processedBatches,
+      sentEvents,
+      deadLetteredBatches,
+      remainingQueue: this.d.websiteTelemetryQueue.length,
+      remainingDeadLetter: this.d.websiteTelemetryDeadLetter.length,
+      ...(lastError ? { error: lastError } : {}),
+    };
+  }
+
+  private async handlePublicWebsiteEvents(request: Request): Promise<Response> {
+    const contentType = request.headers.get("content-type") || "";
+    if (!contentType.toLowerCase().includes("application/json")) {
+      return websiteEventsError(
+        "invalid_content_type",
+        "Content-Type must be application/json.",
+        400,
+        false,
+      );
+    }
+
+    const bodyText = await request.text();
+    if (!bodyText || bodyText.length > WEBSITE_EVENTS_BODY_LIMIT_BYTES) {
+      return websiteEventsError(
+        "payload_too_large",
+        `Request body must be <= ${WEBSITE_EVENTS_BODY_LIMIT_BYTES} bytes.`,
+        413,
+        false,
+      );
+    }
+
+    let parsedBody: unknown;
+    try {
+      parsedBody = JSON.parse(bodyText) as unknown;
+    } catch {
+      return websiteEventsError("invalid_json", "Request body must be valid JSON.", 400, false);
+    }
+
+    const validation = parseWebsiteEventsRequest(parsedBody);
+    if (!validation.ok) {
+      return validation.response;
+    }
+    const payload = validation.value;
+    if (this.d.websiteTelemetryQueue.length >= WEBSITE_TELEMETRY_MAX_QUEUE_BATCHES) {
+      return websiteEventsError(
+        "upstream_unavailable",
+        "Telemetry queue is full. Please retry shortly.",
+        503,
+        true,
+      );
+    }
+
+    const knownIDs = new Set(this.d.websiteTelemetrySeenEventIds);
+    const payloadSeenIDs = new Set<string>();
+    const acceptedEvents: WebsiteEventPayload[] = [];
+    let rejectedCount = 0;
+    for (const event of payload.events) {
+      if (payloadSeenIDs.has(event.eventId) || knownIDs.has(event.eventId)) {
+        rejectedCount += 1;
+        continue;
+      }
+      payloadSeenIDs.add(event.eventId);
+      acceptedEvents.push({
+        ...event,
+        tsUtc: event.tsUtc && event.tsUtc > 0 ? Math.floor(event.tsUtc) : Date.now(),
+      });
+    }
+
+    if (acceptedEvents.length === 0) {
+      return json(
+        {
+          ok: true,
+          schemaVersion: WEBSITE_EVENTS_SCHEMA_VERSION,
+          generatedAt: Date.now(),
+          acceptedCount: 0,
+          rejectedCount,
+        },
+        { status: 200 },
+      );
+    }
+
+    const now = Date.now();
+    const batchId = this.buildWebsiteTelemetryBatchID(now);
+    const correlationId = this.buildWebsiteTelemetryCorrelationID(now);
+    const queuedBatch: WebsiteTelemetryQueuedBatch = {
+      schemaVersion: WEBSITE_EVENTS_SCHEMA_VERSION,
+      batchId,
+      correlationId,
+      generatedAtUtc: now,
+      sessionId: sanitizeWebsiteTelemetrySessionID(payload.sessionId),
+      pagePath: sanitizeWebsiteTelemetryPagePath(payload.pagePath),
+      events: acceptedEvents,
+      attempt: 0,
+      nextRetryAtUtc: null,
+      lastError: null,
+    };
+    this.d.websiteTelemetryQueue.push(queuedBatch);
+    this.appendWebsiteTelemetrySeenEventIDs(acceptedEvents.map((event) => event.eventId));
+    this.d.websiteTelemetryLastBatchCreatedAt = now;
+    this.d.websiteTelemetryLastBatchID = batchId;
+    this.d.websiteTelemetryLastCorrelationID = correlationId;
+    await this.scheduleNextMidnightAlarm();
+    await this.persist();
+
+    return json(
+      {
+        ok: true,
+        schemaVersion: WEBSITE_EVENTS_SCHEMA_VERSION,
+        generatedAt: now,
+        acceptedCount: acceptedEvents.length,
+        rejectedCount,
+      },
+      { status: 200 },
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -1846,6 +3652,343 @@ export class DownloadsDurable {
     }, { status: 202 });
   }
 
+  private computeNextPublicMetricsRefreshAt(now: number): number {
+    const sortedHours = [...PUBLIC_SITE_METRICS_REFRESH_HOURS_UTC].sort((a, b) => a - b);
+    const current = new Date(now);
+    for (const hour of sortedHours) {
+      const candidate = new Date(current);
+      candidate.setUTCHours(hour, 0, 0, 0);
+      if (candidate.getTime() > now) {
+        return candidate.getTime();
+      }
+    }
+
+    const nextDay = new Date(current);
+    nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+    nextDay.setUTCHours(sortedHours[0], 0, 0, 0);
+    return nextDay.getTime();
+  }
+
+  private buildPublicSiteMetricsSnapshot(now: number, slotKey: string): PublicSiteMetricsSnapshot {
+    return {
+      slotKey,
+      snapshotAtUtc: now,
+      downloads: clampInt(this.d.totalDownloads, 0, Number.MAX_SAFE_INTEGER, 0),
+      countries: normalizeCountryCountsForPublicMap(this.d.counters?.byCountry),
+    };
+  }
+
+  private shouldRefreshPublicSiteSnapshot(now: number, currentSlotKey: string): boolean {
+    const snapshot = this.d.publicSiteMetricsSnapshot;
+    if (!this.d.websitePublicSyncEnabled) {
+      return !snapshot;
+    }
+    if (!snapshot) return true;
+
+    const hour = currentUtcHour(now);
+    const refreshHour = PUBLIC_SITE_METRICS_REFRESH_HOURS_UTC.includes(hour as (typeof PUBLIC_SITE_METRICS_REFRESH_HOURS_UTC)[number]);
+    if (!refreshHour) {
+      return false;
+    }
+
+    return snapshot.slotKey !== currentSlotKey;
+  }
+
+  private resolveEffectivePublicSiteSnapshot(baseSnapshot: PublicSiteMetricsSnapshot): PublicSiteMetricsSnapshot {
+    if (!this.d.websiteOverrideEnabled) {
+      return baseSnapshot;
+    }
+    return {
+      slotKey: baseSnapshot.slotKey,
+      snapshotAtUtc: baseSnapshot.snapshotAtUtc,
+      downloads: clampInt(this.d.websiteOverrideDownloads, 0, Number.MAX_SAFE_INTEGER, 0),
+      countries: normalizePublicSiteCountryList(this.d.websiteOverrideCountries),
+    };
+  }
+
+  private async handlePublicSiteMetrics(): Promise<Response> {
+    const now = Date.now();
+    const slotKey = makeSlotKey(now);
+
+    if (this.shouldRefreshPublicSiteSnapshot(now, slotKey)) {
+      this.d.publicSiteMetricsSnapshot = this.buildPublicSiteMetricsSnapshot(now, slotKey);
+      await this.persist();
+    }
+
+    const snapshot = this.d.publicSiteMetricsSnapshot ?? this.buildPublicSiteMetricsSnapshot(now, slotKey);
+    const effectiveSnapshot = this.resolveEffectivePublicSiteSnapshot(snapshot);
+    const activeHour = currentUtcHour(now);
+    const isRefreshWindow = PUBLIC_SITE_METRICS_REFRESH_HOURS_UTC.includes(activeHour as (typeof PUBLIC_SITE_METRICS_REFRESH_HOURS_UTC)[number]);
+
+    return json({
+      ok: true,
+      source: "cloudflare-worker",
+      dataSource: this.d.websiteOverrideEnabled ? "override" : "snapshot",
+      generatedAt: now,
+      snapshotAtUtc: effectiveSnapshot.snapshotAtUtc,
+      totals: {
+        downloads: effectiveSnapshot.downloads,
+        countries: effectiveSnapshot.countries.length,
+      },
+      countries: effectiveSnapshot.countries,
+      schedule: {
+        refreshHoursUtc: PUBLIC_SITE_METRICS_REFRESH_HOURS_UTC,
+        activeHourUtc: activeHour,
+        isRefreshWindow,
+        autoRefreshEnabled: this.d.websitePublicSyncEnabled,
+        overrideEnabled: this.d.websiteOverrideEnabled,
+        lastRefreshAtUtc: snapshot.snapshotAtUtc,
+        nextRefreshAtUtc: this.computeNextPublicMetricsRefreshAt(now),
+      },
+    });
+  }
+
+  private async handleAdminWebsiteStatus(request: Request): Promise<Response> {
+    if (!this.isAuthorizedAdmin(request)) {
+      return json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+    const now = Date.now();
+    const slotKey = makeSlotKey(now);
+    const snapshot = this.d.publicSiteMetricsSnapshot ?? this.buildPublicSiteMetricsSnapshot(now, slotKey);
+    const effectiveSnapshot = this.resolveEffectivePublicSiteSnapshot(snapshot);
+    const telemetryRetryCount = this.d.websiteTelemetryQueue.reduce(
+      (max, batch) => Math.max(max, Math.max(0, Math.floor(batch.attempt || 0))),
+      0,
+    );
+    const activeHour = currentUtcHour(now);
+    const isRefreshWindow = PUBLIC_SITE_METRICS_REFRESH_HOURS_UTC.includes(activeHour as (typeof PUBLIC_SITE_METRICS_REFRESH_HOURS_UTC)[number]);
+    return json({
+      ok: true,
+      generatedAt: now,
+      website: {
+        refreshEnabled: this.d.websitePublicSyncEnabled,
+        overrideEnabled: this.d.websiteOverrideEnabled,
+        overrideDownloads: clampInt(this.d.websiteOverrideDownloads, 0, Number.MAX_SAFE_INTEGER, 0),
+        overrideCountries: normalizePublicSiteCountryList(this.d.websiteOverrideCountries),
+        lastSnapshotAtUtc: snapshot.snapshotAtUtc,
+        lastManualFlushAtUtc: this.d.websiteManualFlushAt ?? null,
+        refreshHoursUtc: PUBLIC_SITE_METRICS_REFRESH_HOURS_UTC,
+        activeHourUtc: activeHour,
+        isRefreshWindow,
+        nextRefreshAtUtc: this.computeNextPublicMetricsRefreshAt(now),
+      },
+      telemetry: {
+        pendingBatches: this.d.websiteTelemetryQueue.length,
+        deadLetterBatches: this.d.websiteTelemetryDeadLetter.length,
+        retryCount: telemetryRetryCount,
+        seenEventIdCacheSize: this.d.websiteTelemetrySeenEventIds.length,
+        lastBatchCreatedAtUtc: this.d.websiteTelemetryLastBatchCreatedAt,
+        lastBatchSentAtUtc: this.d.websiteTelemetryLastBatchSentAt,
+        lastBatchAckAtUtc: this.d.websiteTelemetryLastBatchAckAt,
+        lastBatchId: this.d.websiteTelemetryLastBatchID,
+        lastCorrelationId: this.d.websiteTelemetryLastCorrelationID,
+        lastError: this.d.websiteTelemetryLastError,
+        nextRetryAtUtc: this.d.websiteTelemetryQueue[0]?.nextRetryAtUtc ?? null,
+      },
+      publicSnapshot: {
+        source: this.d.websiteOverrideEnabled ? "override" : "snapshot",
+        snapshotAtUtc: effectiveSnapshot.snapshotAtUtc,
+        totals: {
+          downloads: effectiveSnapshot.downloads,
+          countries: effectiveSnapshot.countries.length,
+        },
+        countries: effectiveSnapshot.countries,
+      },
+      security: {
+        ipAllowlistEnabled: this.d.ipAllowlistEnabled,
+        stepUpBypassEnabled: this.d.ipAllowlistStepUpBypassEnabled,
+        dangerAuditRecent: [...this.d.dangerActionAuditLogs]
+          .sort((a, b) => b.tsUtc - a.tsUtc)
+          .slice(0, 25),
+      },
+    });
+  }
+
+  private async handleAdminWebsiteFlushNow(request: Request): Promise<Response> {
+    if (!this.isAuthorizedAdmin(request)) {
+      return json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+    const now = Date.now();
+    const slotKey = makeSlotKey(now);
+    this.d.publicSiteMetricsSnapshot = this.buildPublicSiteMetricsSnapshot(now, slotKey);
+    this.d.websiteManualFlushAt = now;
+    const telemetryFlush = await this.flushWebsiteTelemetryQueue({
+      force: true,
+      trigger: "admin_flush_now",
+      maxBatches: 600,
+    });
+    if (!telemetryFlush.ok && telemetryFlush.error) {
+      this.d.websiteTelemetryLastError = telemetryFlush.error;
+    }
+    this.appendDangerAudit(
+      request,
+      "website_flush_now",
+      "/admin/website/flush-now",
+      telemetryFlush.ok ? "ok" : "error",
+      telemetryFlush.error || `processed=${telemetryFlush.processedBatches}`,
+    );
+    await this.persist();
+
+    const effectiveSnapshot = this.resolveEffectivePublicSiteSnapshot(this.d.publicSiteMetricsSnapshot);
+    return json({
+      ok: telemetryFlush.ok,
+      flushedAtUtc: now,
+      source: this.d.websiteOverrideEnabled ? "override" : "snapshot",
+      telemetry: telemetryFlush,
+      snapshotAtUtc: effectiveSnapshot.snapshotAtUtc,
+      totals: {
+        downloads: effectiveSnapshot.downloads,
+        countries: effectiveSnapshot.countries.length,
+      },
+      countries: effectiveSnapshot.countries,
+    });
+  }
+
+  private async handleAdminWebsiteReplayDLQ(request: Request): Promise<Response> {
+    if (!this.isAuthorizedAdmin(request)) {
+      return json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+
+    let limit = this.d.websiteTelemetryDeadLetter.length;
+    if (request.headers.get("content-type")?.toLowerCase().includes("application/json")) {
+      try {
+        const body = await request.json() as { limit?: number };
+        if (body && typeof body.limit === "number" && Number.isFinite(body.limit)) {
+          limit = clampInt(body.limit, 1, 1000, limit);
+        }
+      } catch {
+        // Ignore malformed body and replay all by default.
+      }
+    }
+
+    const replayCount = Math.min(limit, this.d.websiteTelemetryDeadLetter.length);
+    const replaying = this.d.websiteTelemetryDeadLetter.splice(0, replayCount);
+    for (const batch of replaying.reverse()) {
+      this.d.websiteTelemetryQueue.unshift({
+        ...batch,
+        attempt: 0,
+        nextRetryAtUtc: null,
+        lastError: null,
+      });
+    }
+    if (this.d.websiteTelemetryQueue.length > WEBSITE_TELEMETRY_MAX_QUEUE_BATCHES) {
+      this.d.websiteTelemetryQueue = this.d.websiteTelemetryQueue.slice(0, WEBSITE_TELEMETRY_MAX_QUEUE_BATCHES);
+    }
+    this.d.websiteTelemetryLastError = null;
+    this.appendDangerAudit(
+      request,
+      "website_replay_dlq",
+      "/admin/website/replay-dlq",
+      "ok",
+      `replayed=${replayCount}`,
+    );
+    await this.scheduleAlarmAtEarliest(Date.now() + 500);
+    await this.persist();
+
+    return json({
+      ok: true,
+      replayed: replayCount,
+      pendingBatches: this.d.websiteTelemetryQueue.length,
+      deadLetterBatches: this.d.websiteTelemetryDeadLetter.length,
+      nextRetryAtUtc: this.d.websiteTelemetryQueue[0]?.nextRetryAtUtc ?? null,
+    });
+  }
+
+  private async handleAdminWebsiteRefreshToggle(request: Request): Promise<Response> {
+    if (!this.isAuthorizedAdmin(request)) {
+      return json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+
+    let body: Record<string, unknown>;
+    try {
+      body = await request.json();
+    } catch {
+      return json({ ok: false, error: "invalid_json" }, { status: 400 });
+    }
+    if (!isPlainObject(body) || typeof body.enabled !== "boolean") {
+      return json({ ok: false, error: "invalid_payload", field: "enabled" }, { status: 400 });
+    }
+
+    this.d.websitePublicSyncEnabled = body.enabled;
+    this.appendDangerAudit(
+      request,
+      "website_refresh_toggle",
+      "/admin/website/refresh-toggle",
+      "ok",
+      `enabled=${String(this.d.websitePublicSyncEnabled)}`,
+    );
+    await this.persist();
+    return json({
+      ok: true,
+      refreshEnabled: this.d.websitePublicSyncEnabled,
+    });
+  }
+
+  private async handleAdminWebsiteOverride(request: Request): Promise<Response> {
+    if (!this.isAuthorizedAdmin(request)) {
+      return json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+
+    let body: Record<string, unknown>;
+    try {
+      body = await request.json();
+    } catch {
+      return json({ ok: false, error: "invalid_json" }, { status: 400 });
+    }
+    if (!isPlainObject(body)) {
+      return json({ ok: false, error: "invalid_payload" }, { status: 400 });
+    }
+
+    if ("enabled" in body) {
+      if (typeof body.enabled !== "boolean") {
+        return json({ ok: false, error: "invalid_payload", field: "enabled" }, { status: 400 });
+      }
+      this.d.websiteOverrideEnabled = body.enabled;
+    }
+
+    if ("downloads" in body) {
+      if (typeof body.downloads !== "number" || !Number.isFinite(body.downloads)) {
+        return json({ ok: false, error: "invalid_payload", field: "downloads" }, { status: 400 });
+      }
+      this.d.websiteOverrideDownloads = clampInt(body.downloads, 0, Number.MAX_SAFE_INTEGER, 0);
+    }
+
+    if ("countries" in body) {
+      this.d.websiteOverrideCountries = normalizePublicSiteCountryList(body.countries);
+    }
+
+    this.appendDangerAudit(
+      request,
+      "website_override",
+      "/admin/website/override",
+      "ok",
+      `enabled=${String(this.d.websiteOverrideEnabled)}`,
+    );
+    await this.persist();
+    const now = Date.now();
+    const slotKey = makeSlotKey(now);
+    const snapshot = this.d.publicSiteMetricsSnapshot ?? this.buildPublicSiteMetricsSnapshot(now, slotKey);
+    const effectiveSnapshot = this.resolveEffectivePublicSiteSnapshot(snapshot);
+
+    return json({
+      ok: true,
+      override: {
+        enabled: this.d.websiteOverrideEnabled,
+        downloads: clampInt(this.d.websiteOverrideDownloads, 0, Number.MAX_SAFE_INTEGER, 0),
+        countries: normalizePublicSiteCountryList(this.d.websiteOverrideCountries),
+      },
+      publicSnapshot: {
+        source: this.d.websiteOverrideEnabled ? "override" : "snapshot",
+        snapshotAtUtc: effectiveSnapshot.snapshotAtUtc,
+        totals: {
+          downloads: effectiveSnapshot.downloads,
+          countries: effectiveSnapshot.countries.length,
+        },
+        countries: effectiveSnapshot.countries,
+      },
+    });
+  }
+
   private async handleStats(): Promise<Response> {
     this.ensureRequestDay();
     const quota = computeQuotaDescriptor(
@@ -1910,8 +4053,6 @@ export class DownloadsDurable {
       maxSize: remoteConfig.maxBufferSize,
       utilizationPercent: ((this.d.buffer?.length ?? 0) / remoteConfig.maxBufferSize * 100).toFixed(2),
     };
-    const weeklyRequests = this.sumRecentRequestHistory(7);
-    const monthlyRequests = this.sumRecentRequestHistory(30);
     const uniqueCountriesAllTime = Object.keys(this.d.counters?.byCountry ?? {}).filter((country) => {
       const normalized = country.trim().toLowerCase();
       return normalized !== "" && normalized !== "xx" && normalized !== "unknown";
@@ -1943,14 +4084,13 @@ export class DownloadsDurable {
       uniqueRequestsToday: this.d.uniqueRequestsToday ?? 0,
       // BACKWARDS COMPATIBILITY: Legacy dashboard uses uniqueIpsToday
       uniqueIpsToday: this.d.uniqueRequestsToday ?? 0,
-      weeklyRequests,
-      monthlyRequests,
       uniqueCountriesAllTime,
       // IP tracking disabled -> unique counts are not approximated
       isApproximated: false,
       
       // NEW: Changelog data
       changelog: this.d.changelog,
+      changelogRevisions: this.d.changelogRevisions,
       changelogConfig: this.d.changelogConfig,
 
       // Delivery observability chain
@@ -1971,6 +4111,13 @@ export class DownloadsDurable {
         recent: [...this.d.failureRollups]
           .sort((a, b) => b.lastTs - a.lastTs)
           .slice(0, 20),
+      },
+      security: {
+        ipAllowlistEnabled: this.d.ipAllowlistEnabled,
+        stepUpBypassEnabled: this.d.ipAllowlistStepUpBypassEnabled,
+        dangerAuditRecent: [...this.d.dangerActionAuditLogs]
+          .sort((a, b) => b.tsUtc - a.tsUtc)
+          .slice(0, 50),
       },
     };
 
@@ -2154,6 +4301,21 @@ export class DownloadsDurable {
         warnBufferUtil,
         criticalBufferUtil: critBufferUtil,
       },
+      websiteTelemetry: {
+        pendingBatches: this.d.websiteTelemetryQueue.length,
+        deadLetterBatches: this.d.websiteTelemetryDeadLetter.length,
+        retryCount: this.d.websiteTelemetryQueue.reduce(
+          (max, batch) => Math.max(max, Math.max(0, Math.floor(batch.attempt || 0))),
+          0,
+        ),
+        lastBatchCreatedAtUtc: this.d.websiteTelemetryLastBatchCreatedAt,
+        lastBatchSentAtUtc: this.d.websiteTelemetryLastBatchSentAt,
+        lastBatchAckAtUtc: this.d.websiteTelemetryLastBatchAckAt,
+        lastBatchId: this.d.websiteTelemetryLastBatchID,
+        lastCorrelationId: this.d.websiteTelemetryLastCorrelationID,
+        lastError: this.d.websiteTelemetryLastError,
+        nextRetryAtUtc: this.d.websiteTelemetryQueue[0]?.nextRetryAtUtc ?? null,
+      },
     };
   }
 
@@ -2215,8 +4377,10 @@ export class DownloadsDurable {
     await this.persist();
   }
 
-  private async handleDebugFlush(): Promise<Response> {
+  private async handleDebugFlush(request: Request): Promise<Response> {
     const before = this.d.buffer.length;
+    this.appendDangerAudit(request, "clear_buffer", "/debug/flush", "ok", `buffer=${before}`);
+    await this.persist();
     return json({
       ok: true,
       message: "debug flush not implemented in this step",
@@ -2224,7 +4388,7 @@ export class DownloadsDurable {
     });
   }
 
-  private async handleDebugReset(): Promise<Response> {
+  private async handleDebugReset(request: Request): Promise<Response> {
     const today = todayUtcDate();
     // Preserve config settings during reset
     const preservedConfig = {
@@ -2253,11 +4417,37 @@ export class DownloadsDurable {
       
       // Preserve Changelog
       changelog: this.d.changelog ?? [],
+      changelogRevisions: this.d.changelogRevisions ?? [],
       changelogConfig: this.d.changelogConfig ?? {
-        customPill: false,
-        showNotification: false,
+        rules: [],
+        applyMode: CHANGELOG_DEFAULT_APPLY_MODE,
+        autoSyncEnabled: CHANGELOG_DEFAULT_AUTO_SYNC_ENABLED,
+        autoSyncIntervalMinutes: CHANGELOG_DEFAULT_AUTO_SYNC_INTERVAL_MINUTES,
+        lastAutoSyncStatus: "idle",
+        liveHash: computeChangelogLiveHash(this.d.changelog ?? []),
+        markdownSourceUrl: USER_FRIENDLY_CHANGELOG_GITHUB_URL,
+        markdownHelpUrl: USER_FRIENDLY_CHANGELOG_GITHUB_URL,
         lastUpdated: Date.now(),
       },
+      changelogDraft: this.d.changelogDraft ?? null,
+      publicSiteMetricsSnapshot: this.d.publicSiteMetricsSnapshot ?? null,
+      websitePublicSyncEnabled:
+        typeof this.d.websitePublicSyncEnabled === "boolean" ? this.d.websitePublicSyncEnabled : true,
+      websiteManualFlushAt: this.d.websiteManualFlushAt ?? null,
+      websiteOverrideEnabled:
+        typeof this.d.websiteOverrideEnabled === "boolean" ? this.d.websiteOverrideEnabled : false,
+      websiteOverrideDownloads: clampInt(this.d.websiteOverrideDownloads, 0, Number.MAX_SAFE_INTEGER, 0),
+      websiteOverrideCountries: normalizePublicSiteCountryList(this.d.websiteOverrideCountries),
+      websiteTelemetryQueue: [],
+      websiteTelemetryDeadLetter: [],
+      websiteTelemetrySeenEventIds: [],
+      websiteTelemetryLastBatchCreatedAt: null,
+      websiteTelemetryLastBatchSentAt: null,
+      websiteTelemetryLastBatchAckAt: null,
+      websiteTelemetryLastBatchID: null,
+      websiteTelemetryLastCorrelationID: null,
+      websiteTelemetryLastError: null,
+      dangerActionAuditLogs: this.d.dangerActionAuditLogs ?? [],
     };
     
     this.data = {
@@ -2290,11 +4480,13 @@ export class DownloadsDurable {
       loginAttempts: {},
       ipAllowlistEnabled: false,
       ipAllowlist: [],
+      ipAllowlistStepUpBypassEnabled: true,
       trackRates: {},
       ...preservedConfig,
     };
     await this.state.storage.delete(STORAGE_KEY);
     await this.state.storage.deleteAlarm();
+    this.appendDangerAudit(request, "full_reset", "/debug/reset", "ok", "full_state_reset");
     await this.persist();
     return json({ ok: true, message: "state reset" });
   }
@@ -2306,6 +4498,14 @@ export class DownloadsDurable {
 
     const result = await this.flushToOracle(true);
     if (!result.ok) {
+      this.appendDangerAudit(
+        request,
+        "force_flush",
+        "/admin/force-flush",
+        "error",
+        result.error || "flush_failed",
+      );
+      await this.persist();
       return json(
         {
           ok: false,
@@ -2315,6 +4515,15 @@ export class DownloadsDurable {
         { status: 500 },
       );
     }
+
+    this.appendDangerAudit(
+      request,
+      "force_flush",
+      "/admin/force-flush",
+      "ok",
+      `sent=${result.sent}`,
+    );
+    await this.persist();
 
     return json({
       ok: true,
@@ -2630,6 +4839,7 @@ export class DownloadsDurable {
     }
 
     this.d.hardRemoteOff = true;
+    this.appendDangerAudit(request, "cut_power", "/admin/cut-power", "ok", "remote_off");
     await this.persist();
 
     const quota = computeQuotaDescriptor(
@@ -2651,6 +4861,7 @@ export class DownloadsDurable {
     }
 
     this.d.hardRemoteOff = false;
+    this.appendDangerAudit(request, "restore_power", "/admin/restore-power", "ok", "remote_on");
     await this.persist();
 
     const quota = computeQuotaDescriptor(
@@ -2684,6 +4895,14 @@ export class DownloadsDurable {
     }
 
     const ok = this.d.buffer.length === 0 && this.d.pendingBatches.length === 0 && !lastError;
+    this.appendDangerAudit(
+      request,
+      "full_sync",
+      "/admin/full-sync",
+      ok ? "ok" : "error",
+      lastError || `iterations=${iterations}`,
+    );
+    await this.persist();
 
     return json({
       ok,
@@ -3335,12 +5554,20 @@ export class DownloadsDurable {
       return { ok: true, sent: 0 };
     }
 
-    if (!this.env.ORACLE_ENDPOINT || !this.env.DO_SHARED_SECRET) {
-      const msg = "ORACLE_ENDPOINT or DO_SHARED_SECRET not configured";
+    const resolvedOracleEndpoint = resolveOracleEndpoint(this.env.ORACLE_ENDPOINT, {
+      allowInsecureHttp: this.env.ALLOW_INSECURE_ORACLE_ENDPOINT === "true",
+    });
+    if (!resolvedOracleEndpoint.ok || !this.env.DO_SHARED_SECRET) {
+      const msg = !resolvedOracleEndpoint.ok
+        ? resolvedOracleEndpoint.message
+        : "DO_SHARED_SECRET is not configured";
       if (!this.d.retryState) this.d.retryState = { ...DEFAULT_RETRY_STATE };
       this.d.retryState.lastError = msg;
       this.d.retryState.lastFlushAttemptAt = now;
-      logEvent("error", "oracle_flush_misconfigured", { error: msg });
+      logEvent("error", "oracle_flush_misconfigured", {
+        error: msg,
+        reason: !resolvedOracleEndpoint.ok ? resolvedOracleEndpoint.error : "do_shared_secret_missing",
+      });
       this.recordFailure("oracle_forward", "misconfigured", msg, 1, now);
       // Don't schedule retries if endpoint is missing - just report error
       await this.state.storage.deleteAlarm();
@@ -3417,9 +5644,16 @@ export class DownloadsDurable {
       this.mergePendingBatchesIfNeeded();
     };
 
-    const targetUrl = this.env.ORACLE_ENDPOINT + "/ingest-batch";
+    const targetUrl = resolvedOracleEndpoint.ingestBatchUrl;
+    const targetPath = (() => {
+      try {
+        return new URL(targetUrl).pathname;
+      } catch {
+        return targetUrl;
+      }
+    })();
     logEvent("info", "oracle_flush_attempt", {
-      target: "/ingest-batch",
+      target: targetPath,
       fromPendingBatch: !!pendingMeta,
       eventCount: eventsToFlush.length,
     });
@@ -3442,8 +5676,7 @@ export class DownloadsDurable {
     }
 
     try {
-      // Send to /ingest-batch endpoint (aggregated format)
-      // We append "/ingest-batch" here to correct the base URL if needed
+      // Send to Oracle internal website events batch endpoint.
       const res = await fetch(targetUrl, {
         method: "POST",
         headers: {
@@ -3552,15 +5785,479 @@ export class DownloadsDurable {
    * Returns sorted entries and current config.
    */
   private async handleGetChangelog(): Promise<Response> {
-    const sorted = [...this.d.changelog].sort((a, b) => 
-      new Date(b.date).getTime() - new Date(a.date).getTime()
+    const sorted = this.getSortedChangelogEntries();
+    const sync = this.getChangelogSyncState();
+    return json(
+      {
+        ok: true,
+        entries: sorted,
+        config: this.d.changelogConfig,
+        meta: {
+          liveUpdatedAt: this.d.changelogConfig.lastUpdated ?? null,
+          applyMode: sync.applyMode,
+          lastAutoSyncAt: sync.lastAutoSyncAt,
+          lastAutoSyncStatus: sync.lastAutoSyncStatus,
+        },
+      },
+      {
+        headers: {
+          "cache-control": "no-store, max-age=0, must-revalidate",
+        },
+      },
     );
+  }
 
+  private getSortedChangelogEntries(): ChangelogEntry[] {
+    return [...this.d.changelog].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }
+
+  private getChangelogSyncState(): {
+    applyMode: ChangelogApplyMode;
+    autoSyncEnabled: boolean;
+    autoSyncIntervalMinutes: number;
+    lastAutoSyncAt: number | null;
+    lastAutoSyncStatus: ChangelogSyncStatus;
+    lastAutoSyncError: string | null;
+    nextAutoSyncAt: number | null;
+  } {
+    return {
+      applyMode: normalizeChangelogApplyMode(this.d.changelogConfig.applyMode),
+      autoSyncEnabled: this.d.changelogConfig.autoSyncEnabled === true,
+      autoSyncIntervalMinutes: normalizeAutoSyncIntervalMinutes(this.d.changelogConfig.autoSyncIntervalMinutes),
+      lastAutoSyncAt: this.d.changelogConfig.lastAutoSyncAt ?? null,
+      lastAutoSyncStatus: normalizeChangelogSyncStatus(this.d.changelogConfig.lastAutoSyncStatus),
+      lastAutoSyncError: trimAndLimitString(this.d.changelogConfig.lastAutoSyncError, 320) || null,
+      nextAutoSyncAt: this.d.changelogConfig.nextAutoSyncAt ?? null,
+    };
+  }
+
+  private getAdminChangelogStatePayload(): Record<string, unknown> {
+    const entries = this.getSortedChangelogEntries();
+    const revisions = [...(this.d.changelogRevisions || [])].sort((a, b) => b.createdAt - a.createdAt);
+    const sync = this.getChangelogSyncState();
+    return {
+      ok: true,
+      // Backward compatibility
+      entries,
+      config: this.d.changelogConfig,
+      history: revisions,
+      // New explicit lifecycle payload
+      live: {
+        entries,
+        config: this.d.changelogConfig,
+        meta: {
+          lastUpdatedAt: this.d.changelogConfig.lastUpdated ?? null,
+          liveHash: this.d.changelogConfig.liveHash || computeChangelogLiveHash(entries),
+        },
+      },
+      draft: this.d.changelogDraft,
+      sync,
+    };
+  }
+
+  private async parseMarkdownToEntries(params: {
+    markdown?: unknown;
+    markdownUrl?: unknown;
+    now: number;
+  }): Promise<
+    | { ok: false; error: string; status: number }
+    | {
+        ok: true;
+        markdown: string;
+        markdownUrl?: string;
+        source: "manual" | "github";
+        errors: string[];
+        entries: ChangelogEntry[];
+        valid: boolean;
+      }
+  > {
+    const markdownInput = trimAndLimitString(params.markdown, 750_000);
+    const markdownUrl = trimAndLimitString(params.markdownUrl, 600);
+    let markdown = markdownInput;
+    let source: "manual" | "github" = "manual";
+
+    if (!markdown && markdownUrl) {
+      const fetched = await this.fetchMarkdownFromUrl(markdownUrl);
+      if (!fetched.ok) {
+        return { ok: false, error: fetched.error, status: 400 };
+      }
+      markdown = fetched.markdown;
+      source = "github";
+    }
+
+    if (!markdown) {
+      return { ok: false, error: "markdown_required", status: 400 };
+    }
+
+    const parsed = parseUserFriendlyChangelogMarkdown(markdown);
+    const entries = toStructuredChangelogEntries(parsed, source, params.now);
+    if (entries.length === 0) {
+      return { ok: false, error: "markdown_parse_failed", status: 400 };
+    }
+
+    return {
+      ok: true,
+      markdown,
+      markdownUrl: markdownUrl || undefined,
+      source,
+      errors: parsed.errors,
+      entries,
+      valid: parsed.errors.length === 0,
+    };
+  }
+
+  private async applyAutoGithubSync(options: {
+    now: number;
+    actor: string;
+    source: "alarm" | "manual";
+  }): Promise<{ ok: boolean; updated: boolean; error?: string }> {
+    const mode = normalizeChangelogApplyMode(this.d.changelogConfig.applyMode);
+    const autoSyncEnabled = this.d.changelogConfig.autoSyncEnabled === true;
+    const intervalMinutes = normalizeAutoSyncIntervalMinutes(this.d.changelogConfig.autoSyncIntervalMinutes);
+    const nextAutoSyncAt = options.now + intervalMinutes * 60_000;
+
+    if (mode !== "auto_github" || !autoSyncEnabled) {
+      return { ok: false, updated: false, error: "auto_mode_disabled" };
+    }
+
+    const markdownUrl =
+      trimAndLimitString(this.d.changelogConfig.markdownSourceUrl, 600) || USER_FRIENDLY_CHANGELOG_GITHUB_URL;
+    const parsed = await this.parseMarkdownToEntries({
+      markdownUrl,
+      now: options.now,
+    });
+
+    if (!parsed.ok) {
+      this.d.changelogConfig = {
+        ...this.d.changelogConfig,
+        applyMode: mode,
+        autoSyncEnabled,
+        autoSyncIntervalMinutes: intervalMinutes,
+        lastAutoSyncStatus: "error",
+        lastAutoSyncError: parsed.error,
+        nextAutoSyncAt,
+      };
+      return { ok: false, updated: false, error: parsed.error };
+    }
+
+    const nextHash = computeChangelogLiveHash(parsed.entries);
+    const prevHash = trimAndLimitString(this.d.changelogConfig.liveHash, 2_000_000);
+    const changed = nextHash !== prevHash;
+    if (changed) {
+      this.d.changelog = parsed.entries;
+      this.appendChangelogRevision({
+        id: `rev-${options.now}-${Math.floor(Math.random() * 1000000)}`,
+        source: "github_auto",
+        createdAt: options.now,
+        actor: options.actor || options.source,
+        markdownUrl,
+        markdownLength: parsed.markdown.length,
+        releases: parsed.entries.length,
+        valid: parsed.valid,
+        errors: parsed.errors.length > 0 ? parsed.errors.slice(0, 8) : undefined,
+      });
+    }
+
+    this.d.changelogDraft = {
+      markdown: parsed.markdown,
+      markdownUrl,
+      entries: parsed.entries,
+      errors: parsed.errors.slice(0, 20),
+      valid: parsed.valid,
+      updatedAt: options.now,
+      source: "github",
+    };
+
+    this.d.changelogConfig = {
+      ...this.d.changelogConfig,
+      applyMode: mode,
+      autoSyncEnabled,
+      autoSyncIntervalMinutes: intervalMinutes,
+      markdownSourceUrl: markdownUrl,
+      markdownHelpUrl: this.d.changelogConfig.markdownHelpUrl || USER_FRIENDLY_CHANGELOG_GITHUB_URL,
+      lastParsedAt: options.now,
+      lastUpdated: changed ? options.now : this.d.changelogConfig.lastUpdated,
+      lastAutoSyncAt: options.now,
+      lastAutoSyncStatus: "ok",
+      lastAutoSyncError: undefined,
+      nextAutoSyncAt,
+      liveHash: nextHash,
+    };
+
+    return { ok: true, updated: changed };
+  }
+
+  private async ensureChangelogAutoSyncAlarm(now: number): Promise<boolean> {
+    const mode = normalizeChangelogApplyMode(this.d.changelogConfig.applyMode);
+    const autoSyncEnabled = this.d.changelogConfig.autoSyncEnabled === true;
+    if (mode !== "auto_github" || !autoSyncEnabled) {
+      return false;
+    }
+    const intervalMinutes = normalizeAutoSyncIntervalMinutes(this.d.changelogConfig.autoSyncIntervalMinutes);
+    const existingNext = clampInt(this.d.changelogConfig.nextAutoSyncAt, 0, Number.MAX_SAFE_INTEGER, 0);
+    const nextAt = existingNext > now ? existingNext : now + intervalMinutes * 60_000;
+    const changed = nextAt !== existingNext;
+    this.d.changelogConfig.nextAutoSyncAt = nextAt;
+    this.d.changelogConfig.autoSyncIntervalMinutes = intervalMinutes;
+    await this.scheduleAlarmAtEarliest(nextAt);
+    return changed;
+  }
+
+  private async fetchMarkdownFromUrl(url: string): Promise<{ ok: true; markdown: string } | { ok: false; error: string }> {
+    const target = trimAndLimitString(url, 600);
+    if (!target) return { ok: false, error: "markdown_url_required" };
+    let parsed: URL;
+    try {
+      parsed = new URL(target);
+    } catch {
+      return { ok: false, error: "invalid_markdown_url" };
+    }
+    if (parsed.protocol !== "https:") {
+      return { ok: false, error: "markdown_url_must_be_https" };
+    }
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8_000);
+    try {
+      const res = await fetch(parsed.toString(), { method: "GET", signal: controller.signal });
+      if (!res.ok) {
+        return { ok: false, error: `markdown_fetch_failed_${res.status}` };
+      }
+      const markdown = trimAndLimitString(await res.text(), 750_000);
+      if (!markdown) return { ok: false, error: "markdown_empty" };
+      return { ok: true, markdown };
+    } catch {
+      return { ok: false, error: "markdown_fetch_failed" };
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  private appendChangelogRevision(revision: ChangelogRevision): void {
+    const next = [revision, ...(this.d.changelogRevisions || [])];
+    this.d.changelogRevisions = next.slice(0, 100);
+  }
+
+  private async handleAdminGetChangelogState(request: Request): Promise<Response> {
+    if (!this.isAuthorizedAdmin(request)) {
+      return json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+    return json(this.getAdminChangelogStatePayload());
+  }
+
+  private async handleAdminParseChangelog(request: Request): Promise<Response> {
+    if (!this.isAuthorizedAdmin(request)) {
+      return json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+    let body: { markdown?: string; markdownUrl?: string };
+    try {
+      body = await request.json();
+    } catch {
+      return json({ ok: false, error: "invalid_payload" }, { status: 400 });
+    }
+
+    let markdown = trimAndLimitString(body.markdown, 750_000);
+    let source: "manual" | "github" | "import" = "manual";
+    let markdownUrl: string | undefined;
+    if (!markdown && body.markdownUrl) {
+      markdownUrl = trimAndLimitString(body.markdownUrl, 600);
+      const fetched = await this.fetchMarkdownFromUrl(markdownUrl);
+      if (!fetched.ok) {
+        return json({ ok: false, error: fetched.error }, { status: 400 });
+      }
+      markdown = fetched.markdown;
+      source = "github";
+    }
+    if (!markdown) {
+      return json({ ok: false, error: "markdown_required" }, { status: 400 });
+    }
+
+    const parsed = parseUserFriendlyChangelogMarkdown(markdown);
+    const entries = toStructuredChangelogEntries(parsed, source, Date.now());
     return json({
       ok: true,
-      entries: sorted,
-      config: this.d.changelogConfig,
+      valid: parsed.errors.length === 0 && entries.length > 0,
+      errors: parsed.errors,
+      entries,
+      source,
+      markdownUrl: markdownUrl || null,
     });
+  }
+
+  private async handleAdminChangelogHistory(request: Request): Promise<Response> {
+    if (!this.isAuthorizedAdmin(request)) {
+      return json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+    const revisions = [...(this.d.changelogRevisions || [])].sort((a, b) => b.createdAt - a.createdAt);
+    return json({
+      ok: true,
+      history: revisions,
+    });
+  }
+
+  private async handleAdminSaveChangelogRules(request: Request): Promise<Response> {
+    if (!this.isAuthorizedAdmin(request)) {
+      return json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+    let body: { rules?: unknown };
+    try {
+      body = await request.json();
+    } catch {
+      return json({ ok: false, error: "invalid_payload" }, { status: 400 });
+    }
+    const now = Date.now();
+    this.d.changelogConfig = {
+      ...this.d.changelogConfig,
+      rules: sanitizeNotificationRules(body.rules),
+      lastUpdated: now,
+    };
+    await this.persist();
+    return json(this.getAdminChangelogStatePayload());
+  }
+
+  private async handleAdminSaveChangelogDraft(request: Request): Promise<Response> {
+    if (!this.isAuthorizedAdmin(request)) {
+      return json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+    let body: { markdown?: unknown; markdownUrl?: unknown };
+    try {
+      body = await request.json();
+    } catch {
+      return json({ ok: false, error: "invalid_payload" }, { status: 400 });
+    }
+    const now = Date.now();
+    const parsed = await this.parseMarkdownToEntries({
+      markdown: body.markdown,
+      markdownUrl: body.markdownUrl,
+      now,
+    });
+    if (!parsed.ok) {
+      return json({ ok: false, error: parsed.error }, { status: parsed.status });
+    }
+
+    this.d.changelogDraft = {
+      markdown: parsed.markdown,
+      markdownUrl: parsed.markdownUrl,
+      entries: parsed.entries,
+      errors: parsed.errors.slice(0, 20),
+      valid: parsed.valid,
+      updatedAt: now,
+      source: parsed.source,
+    };
+    this.d.changelogConfig = {
+      ...this.d.changelogConfig,
+      markdownSourceUrl:
+        parsed.markdownUrl || this.d.changelogConfig.markdownSourceUrl || USER_FRIENDLY_CHANGELOG_GITHUB_URL,
+      markdownHelpUrl: this.d.changelogConfig.markdownHelpUrl || USER_FRIENDLY_CHANGELOG_GITHUB_URL,
+      lastParsedAt: now,
+      lastUpdated: now,
+    };
+    await this.persist();
+    return json(this.getAdminChangelogStatePayload());
+  }
+
+  private async handleAdminPublishChangelogDraft(request: Request): Promise<Response> {
+    if (!this.isAuthorizedAdmin(request)) {
+      return json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+    const mode = normalizeChangelogApplyMode(this.d.changelogConfig.applyMode);
+    if (mode !== "manual") {
+      return json({ ok: false, error: "manual_mode_required" }, { status: 409 });
+    }
+    if (!this.d.changelogDraft || this.d.changelogDraft.entries.length === 0) {
+      return json({ ok: false, error: "draft_missing" }, { status: 400 });
+    }
+    const now = Date.now();
+    const actor = trimAndLimitString(request.headers.get("CF-Connecting-IP") || "admin", 120) || "admin";
+    this.d.changelog = this.d.changelogDraft.entries;
+    const nextHash = computeChangelogLiveHash(this.d.changelog);
+    this.d.changelogConfig = {
+      ...this.d.changelogConfig,
+      applyMode: mode,
+      lastUpdated: now,
+      lastParsedAt: now,
+      liveHash: nextHash,
+    };
+    this.appendChangelogRevision({
+      id: `rev-${now}-${Math.floor(Math.random() * 1000000)}`,
+      source: this.d.changelogDraft.source === "github" ? "github" : "manual",
+      createdAt: now,
+      actor,
+      markdownUrl: this.d.changelogDraft.markdownUrl,
+      markdownLength: this.d.changelogDraft.markdown.length,
+      releases: this.d.changelog.length,
+      valid: this.d.changelogDraft.valid,
+      errors: this.d.changelogDraft.errors.length > 0 ? this.d.changelogDraft.errors.slice(0, 8) : undefined,
+    });
+    await this.persist();
+    return json(this.getAdminChangelogStatePayload());
+  }
+
+  private async handleAdminSetChangelogMode(request: Request): Promise<Response> {
+    if (!this.isAuthorizedAdmin(request)) {
+      return json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+    let body: {
+      applyMode?: unknown;
+      autoSyncEnabled?: unknown;
+      autoSyncIntervalMinutes?: unknown;
+      markdownSourceUrl?: unknown;
+    };
+    try {
+      body = await request.json();
+    } catch {
+      return json({ ok: false, error: "invalid_payload" }, { status: 400 });
+    }
+
+    const now = Date.now();
+    const applyMode = normalizeChangelogApplyMode(body.applyMode ?? this.d.changelogConfig.applyMode);
+    const explicitAutoSync = typeof body.autoSyncEnabled === "boolean" ? body.autoSyncEnabled : null;
+    const nextAutoSyncEnabled = applyMode === "auto_github"
+      ? explicitAutoSync ?? true
+      : false;
+    const autoSyncIntervalMinutes = normalizeAutoSyncIntervalMinutes(
+      body.autoSyncIntervalMinutes ?? this.d.changelogConfig.autoSyncIntervalMinutes,
+    );
+    const markdownSourceUrl =
+      trimAndLimitString(body.markdownSourceUrl, 600) ||
+      trimAndLimitString(this.d.changelogConfig.markdownSourceUrl, 600) ||
+      USER_FRIENDLY_CHANGELOG_GITHUB_URL;
+
+    this.d.changelogConfig = {
+      ...this.d.changelogConfig,
+      applyMode,
+      autoSyncEnabled: nextAutoSyncEnabled,
+      autoSyncIntervalMinutes,
+      markdownSourceUrl,
+      markdownHelpUrl: this.d.changelogConfig.markdownHelpUrl || USER_FRIENDLY_CHANGELOG_GITHUB_URL,
+      nextAutoSyncAt:
+        applyMode === "auto_github" && nextAutoSyncEnabled
+          ? now + autoSyncIntervalMinutes * 60_000
+          : undefined,
+      lastUpdated: now,
+    };
+    const changed = await this.ensureChangelogAutoSyncAlarm(now);
+    if (!changed && (applyMode !== "auto_github" || !nextAutoSyncEnabled)) {
+      this.d.changelogConfig.nextAutoSyncAt = undefined;
+    }
+    await this.persist();
+    return json(this.getAdminChangelogStatePayload());
+  }
+
+  private async handleAdminSyncChangelogNow(request: Request): Promise<Response> {
+    if (!this.isAuthorizedAdmin(request)) {
+      return json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+    const now = Date.now();
+    const actor = trimAndLimitString(request.headers.get("CF-Connecting-IP") || "admin", 120) || "admin";
+    const result = await this.applyAutoGithubSync({ now, actor, source: "manual" });
+    await this.ensureChangelogAutoSyncAlarm(now);
+    await this.persist();
+    if (!result.ok) {
+      const payload = this.getAdminChangelogStatePayload();
+      return json({ ...payload, ok: false, error: result.error || "sync_failed" }, { status: 400 });
+    }
+    const payload = this.getAdminChangelogStatePayload();
+    return json({ ...payload, ok: true, updated: result.updated });
   }
 
   /**
@@ -3573,32 +6270,145 @@ export class DownloadsDurable {
     }
 
     try {
-      const body = await request.json() as { 
-        changelog?: ChangelogEntry[]; 
+      const body = await request.json() as {
+        changelog?: unknown;
         config?: ChangelogConfig;
+        markdown?: string;
+        markdownUrl?: string;
+        previewOnly?: boolean;
       };
 
       let updated = false;
+      const now = Date.now();
+      const previewOnly = body.previewOnly === true;
+      const actor = trimAndLimitString(request.headers.get("CF-Connecting-IP") || "admin", 120) || "admin";
+      let parsedErrors: string[] = [];
+      let markdownSource: "manual" | "github" | "import" | null = null;
+      let markdownUrl: string | undefined;
+      let changelogFromMarkdown: ChangelogEntry[] | null = null;
+      let markdownLength = 0;
 
-      if (Array.isArray(body.changelog)) {
-        this.d.changelog = body.changelog;
-        updated = true;
+      if (body.markdown || body.markdownUrl) {
+        const parsed = await this.parseMarkdownToEntries({
+          markdown: body.markdown,
+          markdownUrl: body.markdownUrl,
+          now,
+        });
+        if (!parsed.ok) {
+          return json({ ok: false, error: parsed.error }, { status: parsed.status });
+        }
+        parsedErrors = parsed.errors;
+        markdownSource = parsed.source;
+        markdownUrl = parsed.markdownUrl;
+        markdownLength = parsed.markdown.length;
+        changelogFromMarkdown = parsed.entries;
+        if (!previewOnly) {
+          this.d.changelogDraft = {
+            markdown: parsed.markdown,
+            markdownUrl: parsed.markdownUrl,
+            entries: parsed.entries,
+            errors: parsed.errors.slice(0, 20),
+            valid: parsed.valid,
+            updatedAt: now,
+            source: parsed.source,
+          };
+        }
       }
 
-      if (body.config) {
+      if (changelogFromMarkdown) {
+        this.d.changelog = changelogFromMarkdown;
         this.d.changelogConfig = {
           ...this.d.changelogConfig,
-          ...body.config,
-          lastUpdated: Date.now(),
+          liveHash: computeChangelogLiveHash(changelogFromMarkdown),
+          markdownSourceUrl: markdownUrl || this.d.changelogConfig.markdownSourceUrl || USER_FRIENDLY_CHANGELOG_GITHUB_URL,
+          markdownHelpUrl: this.d.changelogConfig.markdownHelpUrl || USER_FRIENDLY_CHANGELOG_GITHUB_URL,
+          lastParsedAt: now,
+          lastUpdated: now,
+        };
+        updated = true;
+      } else if (Array.isArray(body.changelog)) {
+        this.d.changelog = sanitizeIncomingChangelogEntries(body.changelog);
+        this.d.changelogConfig = {
+          ...this.d.changelogConfig,
+          liveHash: computeChangelogLiveHash(this.d.changelog),
+          lastUpdated: now,
         };
         updated = true;
       }
 
+      if (body.config) {
+        const nextConfig: ChangelogConfig = {
+          ...this.d.changelogConfig,
+          ...body.config,
+        };
+        if (typeof body.config.markdownSourceUrl === "string") {
+          nextConfig.markdownSourceUrl =
+            trimAndLimitString(body.config.markdownSourceUrl, 600) || USER_FRIENDLY_CHANGELOG_GITHUB_URL;
+        }
+        if (typeof body.config.markdownHelpUrl === "string") {
+          nextConfig.markdownHelpUrl =
+            trimAndLimitString(body.config.markdownHelpUrl, 600) || USER_FRIENDLY_CHANGELOG_GITHUB_URL;
+        }
+        nextConfig.rules = sanitizeNotificationRules(nextConfig.rules);
+        nextConfig.applyMode = normalizeChangelogApplyMode(nextConfig.applyMode);
+        nextConfig.autoSyncEnabled =
+          typeof nextConfig.autoSyncEnabled === "boolean"
+            ? nextConfig.autoSyncEnabled
+            : CHANGELOG_DEFAULT_AUTO_SYNC_ENABLED;
+        nextConfig.autoSyncIntervalMinutes = normalizeAutoSyncIntervalMinutes(nextConfig.autoSyncIntervalMinutes);
+        nextConfig.lastAutoSyncStatus = normalizeChangelogSyncStatus(nextConfig.lastAutoSyncStatus);
+        nextConfig.lastAutoSyncError = trimAndLimitString(nextConfig.lastAutoSyncError, 320) || undefined;
+        nextConfig.nextAutoSyncAt = clampInt(nextConfig.nextAutoSyncAt, 0, Number.MAX_SAFE_INTEGER, 0) || undefined;
+        nextConfig.liveHash =
+          trimAndLimitString(nextConfig.liveHash, 2_000_000) ||
+          trimAndLimitString(this.d.changelogConfig.liveHash, 2_000_000) ||
+          computeChangelogLiveHash(this.d.changelog);
+        this.d.changelogConfig = {
+          ...nextConfig,
+          lastUpdated: now,
+        };
+        updated = true;
+      }
+
+      if (previewOnly) {
+        return json({
+          ok: true,
+          updated: false,
+          previewOnly: true,
+          entries: changelogFromMarkdown ?? this.d.changelog,
+          config: this.d.changelogConfig,
+          errors: parsedErrors,
+        });
+      }
+
+      if (updated && (changelogFromMarkdown || Array.isArray(body.changelog))) {
+        const revision: ChangelogRevision = {
+          id: `rev-${now}-${Math.floor(Math.random() * 1000000)}`,
+          source: changelogFromMarkdown ? (markdownSource === "github" ? "github" : "manual") : "api",
+          createdAt: now,
+          actor,
+          markdownUrl,
+          markdownLength,
+          releases: this.d.changelog.length,
+          valid: parsedErrors.length === 0,
+          errors: parsedErrors.length > 0 ? parsedErrors.slice(0, 8) : undefined,
+        };
+        this.appendChangelogRevision(revision);
+      }
+
       if (updated) {
+        await this.ensureChangelogAutoSyncAlarm(now);
         await this.persist();
       }
 
-      return json({ ok: true, updated });
+      return json({
+        ok: true,
+        updated,
+        entries: [...this.d.changelog].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+        config: this.d.changelogConfig,
+        history: [...(this.d.changelogRevisions || [])].sort((a, b) => b.createdAt - a.createdAt).slice(0, 30),
+        errors: parsedErrors,
+      });
     } catch {
       return json({ ok: false, error: "invalid_payload" }, { status: 400 });
     }
@@ -3764,20 +6574,32 @@ export class DownloadsDurable {
     try {
       body = await request.json();
     } catch {
-      return json({ allowed: true }); // Allow on parse error to prevent lockout
+      return json({
+        allowed: true,
+        enabled: this.d.ipAllowlistEnabled,
+        stepUpBypassEnabled: this.d.ipAllowlistStepUpBypassEnabled,
+      }); // Allow on parse error to prevent lockout
     }
 
     const ip = normalizeIp(body.ip || "");
 
     // If allowlist is disabled, allow all
     if (!this.d.ipAllowlistEnabled || this.d.ipAllowlist.length === 0) {
-      return json({ allowed: true });
+      return json({
+        allowed: true,
+        enabled: this.d.ipAllowlistEnabled,
+        stepUpBypassEnabled: this.d.ipAllowlistStepUpBypassEnabled,
+      });
     }
 
     // Check CIDR/IP match
     const isAllowed = ip ? isIpAllowed(ip, this.d.ipAllowlist) : false;
     
-    return json({ allowed: isAllowed });
+    return json({
+      allowed: isAllowed,
+      enabled: this.d.ipAllowlistEnabled,
+      stepUpBypassEnabled: this.d.ipAllowlistStepUpBypassEnabled,
+    });
   }
 
   /**
@@ -3797,6 +6619,7 @@ export class DownloadsDurable {
       ok: true,
       enabled: this.d.ipAllowlistEnabled,
       allowlist: this.d.ipAllowlist,
+      stepUpBypassEnabled: this.d.ipAllowlistStepUpBypassEnabled,
       yourIp: clientIp,
     });
   }
@@ -3816,7 +6639,8 @@ export class DownloadsDurable {
       enabled?: boolean; 
       allowlist?: string[]; 
       add?: string; 
-      remove?: string 
+      remove?: string;
+      stepUpBypassEnabled?: boolean;
     };
     try {
       body = await request.json();
@@ -3829,6 +6653,11 @@ export class DownloadsDurable {
     // Set enabled state
     if (typeof body.enabled === "boolean") {
       this.d.ipAllowlistEnabled = body.enabled;
+      updated = true;
+    }
+
+    if (typeof body.stepUpBypassEnabled === "boolean") {
+      this.d.ipAllowlistStepUpBypassEnabled = body.stepUpBypassEnabled;
       updated = true;
     }
 
@@ -3862,6 +6691,13 @@ export class DownloadsDurable {
     }
 
     if (updated) {
+      this.appendDangerAudit(
+        request,
+        "ip_allowlist_update",
+        "/admin/ip-allowlist",
+        "ok",
+        `enabled=${String(this.d.ipAllowlistEnabled)};bypass=${String(this.d.ipAllowlistStepUpBypassEnabled)};entries=${this.d.ipAllowlist.length}`,
+      );
       await this.persist();
     }
 
@@ -3870,6 +6706,7 @@ export class DownloadsDurable {
       updated,
       enabled: this.d.ipAllowlistEnabled,
       allowlist: this.d.ipAllowlist,
+      stepUpBypassEnabled: this.d.ipAllowlistStepUpBypassEnabled,
     });
   }
 }

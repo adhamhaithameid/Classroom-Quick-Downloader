@@ -6,6 +6,7 @@
 
 export { renderLoginPage } from "./login";
 export { renderDashboard } from "./main";
+export { renderWebsiteConsole } from "./websiteConsole";
 export {
   formatTs,
   formatAge,

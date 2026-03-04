@@ -20,6 +20,7 @@ export default defineConfig({
   manifest: {
     name: "Classroom Quick Downloader",
     short_name: "Classroom Quick Downloader",
+    homepage_url: "https://classroom-quick-downloader-website.pages.dev",
     permissions: [
       'downloads',
       'tabs',
@@ -33,10 +34,8 @@ export default defineConfig({
       'https://drive.usercontent.google.com/*',
       'https://accounts.google.com/*',
       'https://cqd-analytics.adhamhaithameid.workers.dev/*',
+      'https://oracle.classroom-quick-downloader.com/*',
     ],
-    content_security_policy: {
-      extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self' https://cqd-analytics.adhamhaithameid.workers.dev https://drive.google.com https://classroom.google.com https://drive.usercontent.google.com https://accounts.google.com;"
-    },
     icons: {
       "16": "icon/16.png",
       "32": "icon/32.png",

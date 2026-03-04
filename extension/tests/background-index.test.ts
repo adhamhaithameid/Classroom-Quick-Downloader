@@ -13,6 +13,10 @@ describe('background/index', () => {
     const updateGlobalIcon = vi.fn();
     const ensureAnalyticsAlarm = vi.fn();
     const refreshRemoteAnalyticsConfig = vi.fn(async () => {});
+    const setUninstallURL = vi.fn((_url: string, callback?: () => void) => {
+      callback?.();
+    });
+    const onInstalledAddListener = vi.fn();
 
     vi.doMock('../entrypoints/background/state', () => ({
       pendingByRequestId: new Map(),
@@ -64,6 +68,10 @@ describe('background/index', () => {
     vi.spyOn(chrome.storage.local, 'get').mockImplementation((_key: any, cb: (result: any) => void) => {
       cb({ extensionEnabled: false });
     });
+    (chrome.runtime as unknown as Record<string, unknown>).setUninstallURL = setUninstallURL;
+    (chrome.runtime as unknown as Record<string, unknown>).onInstalled = {
+      addListener: onInstalledAddListener,
+    };
 
     const mod = await import('../entrypoints/background/index');
     const start = mod.default as unknown as () => void;
@@ -72,6 +80,13 @@ describe('background/index', () => {
     expect(ensureAnalyticsAlarm).toHaveBeenCalledTimes(1);
     expect(refreshRemoteAnalyticsConfig).toHaveBeenCalledTimes(1);
     expect(updateGlobalIcon).toHaveBeenCalledWith(false);
+    expect(setUninstallURL).toHaveBeenCalledTimes(1);
+    expect(onInstalledAddListener).toHaveBeenCalledTimes(1);
+    const uninstallUrl = String(setUninstallURL.mock.calls[0]?.[0] || '');
+    expect(uninstallUrl).toContain('/uninstall?');
+    expect(uninstallUrl).toContain('source=extension');
+    expect(uninstallUrl).toContain('browser=chrome');
+    expect(uninstallUrl).toContain('version=1.3.0-test');
     expect(chrome.runtime.onMessage.addListener).toHaveBeenCalled();
     expect(chrome.tabs.onUpdated.addListener).toHaveBeenCalled();
   });
