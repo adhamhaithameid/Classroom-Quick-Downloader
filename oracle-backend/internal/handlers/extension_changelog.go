@@ -505,7 +505,7 @@ func importExtChangelogFromGitHub(db *sql.DB, markdownURL string) (extGitHubImpo
 			now, now,
 		)
 		if execErr != nil {
-			return 0, execErr
+			return extGitHubImportResult{}, execErr
 		}
 		imported++
 	}
