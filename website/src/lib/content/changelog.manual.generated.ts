@@ -52,3 +52,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "summary": "Changelog UX improvement release.",
       "highlights": [
         "Better website changelog integration from extension.",
+        "Improved changelog action layout and readability.",
