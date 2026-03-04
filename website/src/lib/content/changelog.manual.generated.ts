@@ -97,3 +97,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Improved pipeline validation and retry behavior.",
         "Fixed cancellation/flush consistency issues."
       ],
+      "added": [
