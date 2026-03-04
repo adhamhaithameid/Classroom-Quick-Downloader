@@ -50,9 +50,8 @@ jobs:
         with:
           go-version: "1.24.13"
 
-      - name: Run unit + integration tests
-        working-directory: oracle-backend
-        run: go test ./... -count=1
+      - name: Run Oracle heavy test matrix
+        run: pnpm -C oracle-backend test:strict
 
       - name: Run go vet
         working-directory: oracle-backend
