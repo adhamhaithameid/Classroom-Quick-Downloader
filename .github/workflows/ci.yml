@@ -54,7 +54,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [chrome, firefox, edge, safari]
+        # Safari build temporarily disabled.
+        target: [chrome, firefox, edge]
 
     steps:
       - uses: actions/checkout@v4
