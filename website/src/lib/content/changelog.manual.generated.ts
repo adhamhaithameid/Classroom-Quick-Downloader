@@ -74,3 +74,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "highlights": [
         "Compatibility safeguards for tooling/runtime.",
         "Updated dependency resolution paths.",
+        "Fixed `minimatch` export mismatch issues in development flow."
