@@ -128,6 +128,13 @@
   });
 </script>
 
+<svelte:head>
+  <meta
+    name="google-site-verification"
+    content="ztz5RVR7CeToYxt4nB4AEJMFmdD0LhgLHEjgvGFII-4"
+  />
+</svelte:head>
+
 <LoadingScreen />
 
 <div class="site-shell" class:o2-fullscreen={hideChrome}>
