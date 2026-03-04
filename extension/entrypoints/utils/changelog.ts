@@ -185,9 +185,6 @@ export async function fetchChangelog(force = false): Promise<ChangelogData | nul
   return result.data;
 }
 
-/**
- * Get the latest change description from the most recent entry.
- */
 export function getLatestChange(data: ChangelogData | null): string | null {
   if (!data || !data.entries.length) return null;
   const latest = data.entries[0];
