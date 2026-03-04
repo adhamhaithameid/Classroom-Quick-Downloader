@@ -237,3 +237,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
     {
       "id": "manual-1.1.5-12",
       "version": "1.1.5",
+      "title": "Release 1.1.5",
