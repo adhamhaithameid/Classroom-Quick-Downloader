@@ -263,3 +263,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "highlights": [
         "Additional diagnostics and background-flow coverage.",
         "Better queue/error defaults.",
+        "Fixed early 1.1 runtime issues."
