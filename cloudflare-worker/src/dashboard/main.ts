@@ -5675,7 +5675,7 @@ export function renderDashboard(stats: StatsResponse): string {
           await refreshLivePreviewFromPublicEndpoint();
           const history = Array.isArray(data.history) ? data.history : [];
           if (!history.length) {
-            revisionHistoryEl.innerHTML = '<div class="cl-preview-empty">No revisions saved yet.</div>';
+            setPreviewMessage(revisionHistoryEl, "No revisions saved yet.");
             return;
           }
           revisionHistoryEl.innerHTML = history.slice(0, 15).map((row) => {
