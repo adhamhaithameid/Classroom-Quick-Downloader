@@ -63,7 +63,11 @@ jobs:
 
             cd "$REPO_DIR"
             git fetch --prune origin main
-            git checkout main
+            if git show-ref --verify --quiet refs/heads/main; then
+              git checkout -f main
+            else
+              git checkout -f -b main origin/main
+            fi
             git reset --hard origin/main
 
             cd oracle-backend
