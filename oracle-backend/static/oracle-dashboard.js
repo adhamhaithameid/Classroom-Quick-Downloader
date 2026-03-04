@@ -1292,8 +1292,8 @@
         if (page === 'website-sync') loadWebsiteSyncState();
         if (page === 'website-analysis') loadWebsiteAnalytics();
         if (page === 'creative') loadCreativeHub();
-        if (page === 'content-changelog') loadUserChangelogRecords();
-        if (page === 'ext-changelog') loadExtChangelog();
+        if (page === 'content-changelog' && LEGACY_CHANGELOG_CUSTOMIZATION_ENABLED) loadUserChangelogRecords();
+        if (page === 'ext-changelog' && LEGACY_CHANGELOG_CUSTOMIZATION_ENABLED) loadExtChangelog();
         if (page === 'logs') loadOracleLogs();
       }
 
