@@ -1111,6 +1111,9 @@ async function handleVerifyDangerPassword(request: Request, env: WorkerEnv): Pro
   }
 
   const clientIp = request.headers.get("CF-Connecting-IP") || "unknown";
+  const userAgent = request.headers.get("User-Agent") || "";
+  const dashboardSecret = getDashboardSecret(env);
+  const sessionBindingMode = sessionBindingModeFromEnv(env);
 
   const stub = getDownloadsStub(env);
 
