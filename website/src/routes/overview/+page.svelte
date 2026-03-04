@@ -1,6 +1,7 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { fade, scale } from 'svelte/transition';
+  import { onMount, type ComponentType } from 'svelte';
+  import { fade, fly, scale } from 'svelte/transition';
+  import { quintOut } from 'svelte/easing';
   import { base } from '$app/paths';
   import { APP_VERSION, STORE_LINKS } from '$lib/config';
   import { detectBrowserFromNavigator, type BrowserKey } from '$lib/browser/detect';
@@ -10,9 +11,6 @@
   import AnimatedNumber from '$lib/components/AnimatedNumber.svelte';
   import MediaLoader from '$lib/components/MediaLoader.svelte';
   import AnimatedNumericText from '$lib/components/AnimatedNumericText.svelte';
-  import CountryHeatmap from '$lib/components/CountryHeatmap.svelte';
-  import RotatingGlobe from '$lib/components/RotatingGlobe.svelte';
-  import { balloons as launchHyperBalloons } from 'balloons-js';
   import {
     canStartCelebration,
     nextCooldownUntil
@@ -98,14 +96,22 @@
 
   let overview: OverviewResponse | null = null;
   let mapData: MapResponse | null = null;
-  let downloadCount = 0;
-  let userCount = 0;
-  let countryCount = 0;
+  let RotatingGlobeComponent: ComponentType | null = null;
+  let CountryHeatmapComponent: ComponentType | null = null;
+  let downloadCount: number | null = null;
+  let userCount: number | null = null;
+  let countryCount: number | null = null;
+  let metricsReady = false;
   let detectedBrowser: BrowserKey = 'chrome';
   let mapState: 'loading' | 'ready' | 'error' = 'loading';
   let mapError = '';
   let isDataDegraded = false;
   let mapExpanded = false;
+  /* NEWSLETTER_CTA_DISABLED_ROLLBACK_START
+  let newsletterEmail = '';
+  let newsletterSubmitState: 'idle' | 'submitting' | 'success' | 'error' = 'idle';
+  let newsletterStatusMessage = '';
+  NEWSLETTER_CTA_DISABLED_ROLLBACK_END */
   let mediaExpanded: string | null = null;
   const browserCtas: Array<'chrome' | 'firefox' | 'edge'> = ['chrome', 'firefox', 'edge'];
   let marqueeViewport: HTMLDivElement | null = null;
@@ -115,6 +121,7 @@
   /* Computed from downloadCount — used in marquee (raw) */
   $: hoursSaved = computeTimeSaved(downloadCount).hours;
   $: clicksSaved = computeTimeSaved(downloadCount).clicks;
+  $: metricsReady = downloadCount !== null && userCount !== null && countryCount !== null;
 
   /* Top 3 countries by download count */
   $: topCountries = (mapData?.countries ?? [])
@@ -149,6 +156,7 @@
   let mapPromptVisible = false;
   let mapPromptTimer: ReturnType<typeof setTimeout> | null = null;
   let celebrationBurstTimers: number[] = [];
+  let launchHyperBalloonsFn: (() => Promise<void>) | null = null;
 
   function readCelebrationSessionState(): boolean {
     if (typeof window === 'undefined') return false;
@@ -201,6 +209,23 @@
     celebrationBurstTimers = [];
   }
 
+  async function getLaunchHyperBalloons(): Promise<() => Promise<void>> {
+    if (launchHyperBalloonsFn) return launchHyperBalloonsFn;
+    const module = await import('balloons-js');
+    launchHyperBalloonsFn = module.balloons;
+    return launchHyperBalloonsFn;
+  }
+
+  async function loadMapComponents(): Promise<void> {
+    if (RotatingGlobeComponent && CountryHeatmapComponent) return;
+    const [globeModule, heatmapModule] = await Promise.all([
+      import('$lib/components/RotatingGlobe.svelte'),
+      import('$lib/components/CountryHeatmap.svelte')
+    ]);
+    RotatingGlobeComponent = globeModule.default;
+    CountryHeatmapComponent = heatmapModule.default;
+  }
+
   async function launchDenseBalloonBursts(): Promise<boolean> {
     if (typeof window === 'undefined') return false;
     clearCelebrationBurstTimers();
@@ -209,6 +234,7 @@
       return new Promise<boolean>((resolve) => {
         const timer = window.setTimeout(async () => {
           try {
+            const launchHyperBalloons = await getLaunchHyperBalloons();
             await launchHyperBalloons();
             forceCelebrationLayerZIndex();
             resolve(true);
@@ -355,11 +381,13 @@
     setTimeout(type, 300); // brief pause before typing starts
   }
 
-  function formatNumber(v: number): string {
-    return new Intl.NumberFormat('en-US').format(v || 0);
+  function formatNumber(v: number | null): string {
+    if (v === null || !Number.isFinite(v)) return '—';
+    return new Intl.NumberFormat('en-US').format(v);
   }
 
-  function formatCompact(v: number): string {
+  function formatCompact(v: number | null): string {
+    if (v === null || !Number.isFinite(v)) return '—';
     if (v >= 1000000) return (v / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
     if (v >= 1000) return (v / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
     return String(v);
@@ -383,7 +411,38 @@
     });
   }
 
-  function computeTimeSaved(downloads: number) {
+  /* NEWSLETTER_CTA_DISABLED_ROLLBACK_START
+  async function submitNewsletterEmail(): Promise<void> {
+    const normalizedEmail = newsletterEmail.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      newsletterSubmitState = 'error';
+      newsletterStatusMessage = 'Please enter a valid email address.';
+      return;
+    }
+
+    newsletterSubmitState = 'submitting';
+    newsletterStatusMessage = '';
+    try {
+      const response = await submitNewsletterSubscription({
+        email: normalizedEmail,
+        source: 'overview_ready_to_save_hours'
+      });
+      newsletterSubmitState = response.ok ? 'success' : 'error';
+      newsletterStatusMessage = response.ok ? response.message || 'Subscribed.' : 'Subscription failed.';
+      if (response.ok) {
+        newsletterEmail = '';
+      }
+    } catch (error) {
+      newsletterSubmitState = 'error';
+      newsletterStatusMessage = error instanceof Error ? error.message : 'Subscription failed. Please try again.';
+    }
+  }
+  NEWSLETTER_CTA_DISABLED_ROLLBACK_END */
+
+  function computeTimeSaved(downloads: number | null): { totalSeconds: number | null; hours: number | null; clicks: number | null } {
+    if (downloads === null || !Number.isFinite(downloads)) {
+      return { totalSeconds: null, hours: null, clicks: null };
+    }
     const SECONDS_PER_DOWNLOAD = 13;
     const CLICKS_PER_DOWNLOAD = 5;
     const totalSeconds = downloads * SECONDS_PER_DOWNLOAD;
@@ -570,6 +629,36 @@
     mapExpanded = false;
   }
 
+  const MEDIA_GROUPS: Record<string, string[]> = {
+    video: ['problem-video', 'solution-video'],
+    image: ['problem-flags', 'solution-flags'],
+  };
+
+  function getMediaGroup(id: string): string[] {
+    for (const group of Object.values(MEDIA_GROUPS)) {
+      if (group.includes(id)) return group;
+    }
+    return [];
+  }
+
+  function navigateMedia(direction: 'prev' | 'next'): void {
+    if (!mediaExpanded) return;
+    const group = getMediaGroup(mediaExpanded);
+    const idx = group.indexOf(mediaExpanded);
+    if (idx === -1) return;
+    const next = direction === 'next' ? idx + 1 : idx - 1;
+    if (next >= 0 && next < group.length) {
+      mediaExpanded = group[next];
+    }
+  }
+
+  function getMediaNav(id: string | null): { hasPrev: boolean; hasNext: boolean } {
+    if (!id) return { hasPrev: false, hasNext: false };
+    const group = getMediaGroup(id);
+    const idx = group.indexOf(id);
+    return { hasPrev: idx > 0, hasNext: idx < group.length - 1 };
+  }
+
   function toggleMediaExpanded(id: string): void {
     mediaExpanded = mediaExpanded === id ? null : id;
     document.body.classList.toggle('l2-media-modal-open', !!mediaExpanded);
@@ -584,6 +673,8 @@
     if (event.key === 'Escape' && mapExpanded) closeMapExpanded();
     if (event.key === 'Escape' && mediaExpanded) closeMediaExpanded();
     if (event.key === 'Escape' && pickerOpen) pickerOpen = false;
+    if (event.key === 'ArrowRight' && mediaExpanded) navigateMedia('next');
+    if (event.key === 'ArrowLeft' && mediaExpanded) navigateMedia('prev');
 
     if (!editMode || !selectedPlacement) return;
 
@@ -1032,6 +1123,12 @@
     return 0;
   }
 
+  function placementRevealShift(placement: RenderPlacement): number {
+    if (editMode) return 0;
+    if (placementSectionVisible[placement.section]) return 0;
+    return 24;
+  }
+
   function placementRenderLeftCss(placement: RenderPlacement): string {
     if (!editMode && placementCanvasLocked) {
       const frozen = frozenPlacementCoords[placement.id];
@@ -1110,7 +1207,8 @@
       ? loadDraftPlacements(publishedPlacements)
       : clonePlacements(publishedPlacements);
     initSillyState();
-    void loadSiteData().then(() => {
+    const mapComponentsLoad = loadMapComponents().catch(() => undefined);
+    void Promise.all([loadSiteData(), mapComponentsLoad]).then(() => {
       requestAnimationFrame(async () => {
         await waitForStableLayoutBeforePlacementLock();
         syncPlacementCanvasHeight(true);
@@ -1152,15 +1250,15 @@
     if (snapshot) {
       overview = snapshot.overview;
       mapData = snapshot.map;
-      downloadCount = snapshot.overview.totals.downloads || 0;
+      downloadCount = snapshot.overview.totals.downloads;
       userCount = computeUsersTotal(snapshot.overview);
-      countryCount = snapshot.map.totals.countries || 0;
+      countryCount = snapshot.map.totals.countries;
     } else {
       overview = null;
       mapData = null;
-      downloadCount = 0;
-      userCount = 0;
-      countryCount = 0;
+      downloadCount = null;
+      userCount = null;
+      countryCount = null;
     }
 
     mapError = $websiteSnapshotStore.errorMessage || '';
@@ -1232,6 +1330,7 @@
           opacity: {placementRenderOpacity(p)};
           color: {p.renderColor};
           --placement-rotate: {p.renderRotate}deg;
+          --placement-shift: {placementRevealShift(p)}px;
           animation-duration: {p.renderAnimDuration}s;
           animation-play-state: {placementAnimationPlayState(p)};
           z-index: {10000 + p.renderZIndex};
@@ -1407,7 +1506,7 @@
           <div class="l2-ps-media-card l2-ps-problem">
             <div class="l2-ps-media-badge">Without Classroom Quick Downloader</div>
             <div class="l2-ps-media-wrap">
-              <MediaLoader type="video" src="{base}/videos/problem.mp4" class="l2-ps-video" autoplay loop muted playsinline preload="metadata" ariaLabel="Tedious manual download process">
+              <MediaLoader type="video" src="{base}/videos/problem.mp4" class="l2-ps-video" autoplay loop muted playsinline preload="metadata" ariaLabel="Tedious manual download process" aspectRatio="16/9">
                 <button type="button" class="l2-ps-expand-btn" on:click={() => toggleMediaExpanded('problem-video')} aria-label="Expand video">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg>
                 </button>
@@ -1423,7 +1522,7 @@
           <div class="l2-ps-media-card l2-ps-solution">
             <div class="l2-ps-media-badge l2-ps-badge-green">With Classroom Quick Downloader</div>
             <div class="l2-ps-media-wrap">
-              <MediaLoader type="video" src="{base}/videos/solution.mp4" class="l2-ps-video" autoplay loop muted playsinline preload="metadata" ariaLabel="Instant batch download with CQD">
+              <MediaLoader type="video" src="{base}/videos/solution.mp4" class="l2-ps-video" autoplay loop muted playsinline preload="metadata" ariaLabel="Instant batch download with CQD" aspectRatio="16/9">
                 <button type="button" class="l2-ps-expand-btn" on:click={() => toggleMediaExpanded('solution-video')} aria-label="Expand video">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg>
                 </button>
@@ -1450,7 +1549,7 @@
           <div class="l2-ps-media-card l2-ps-problem">
             <div class="l2-ps-media-badge">Without Classroom Quick Downloader</div>
             <div class="l2-ps-media-wrap">
-              <MediaLoader type="image" src="{base}/images/problem-flags.webp" class="l2-ps-img" alt="Classroom posts without edit/comment flags" loading="lazy">
+              <MediaLoader type="image" src="{base}/images/problem-flags.webp" class="l2-ps-img" alt="Classroom posts without edit/comment flags" loading="lazy" aspectRatio="16/10">
                 <button type="button" class="l2-ps-expand-btn" on:click={() => toggleMediaExpanded('problem-flags')} aria-label="Expand image">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg>
                 </button>
@@ -1466,7 +1565,7 @@
           <div class="l2-ps-media-card l2-ps-solution">
             <div class="l2-ps-media-badge l2-ps-badge-green">With Classroom Quick Downloader</div>
             <div class="l2-ps-media-wrap">
-              <MediaLoader type="image" src="{base}/images/solution-flags.webp" class="l2-ps-img" alt="CQD flags showing edited and commented posts" loading="lazy">
+              <MediaLoader type="image" src="{base}/images/solution-flags.webp" class="l2-ps-img" alt="CQD flags showing edited and commented posts" loading="lazy" aspectRatio="16/10">
                 <button type="button" class="l2-ps-expand-btn" on:click={() => toggleMediaExpanded('solution-flags')} aria-label="Expand image">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg>
                 </button>
@@ -1492,7 +1591,18 @@
 
   <!-- Media expand modals -->
   {#if mediaExpanded}
+    {@const nav = getMediaNav(mediaExpanded)}
     <div class="l2-media-modal-backdrop" transition:fade={{ duration: 180 }} on:click|self={closeMediaExpanded} role="presentation">
+
+      <!-- Prev arrow (outside modal to avoid overflow: hidden clipping) -->
+      {#if nav.hasPrev}
+        <button type="button" class="l2-media-nav-btn l2-media-nav-prev" on:click|stopPropagation={() => navigateMedia('prev')} aria-label="Previous" title="Previous">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+        </button>
+      {/if}
+
       <div class="l2-media-modal" transition:scale={{ duration: 220, start: 0.96 }} role="dialog" tabindex="-1" aria-modal="true" aria-label="Expanded media">
         <button type="button" class="l2-media-modal-close l2-ps-expand-btn l2-ps-expand-btn-modal" on:click={closeMediaExpanded} aria-label="Close" title="Collapse">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1500,16 +1610,29 @@
             <path d="M18 6 6 18" />
           </svg>
         </button>
-        {#if mediaExpanded === 'problem-video'}
-          <MediaLoader type="video" src="{base}/videos/problem.mp4" class="l2-media-modal-content" autoplay loop muted playsinline />
-        {:else if mediaExpanded === 'solution-video'}
-          <MediaLoader type="video" src="{base}/videos/solution.mp4" class="l2-media-modal-content" autoplay loop muted playsinline />
-        {:else if mediaExpanded === 'problem-flags'}
-          <MediaLoader type="image" src="{base}/images/problem-flags.webp" class="l2-media-modal-content" alt="Expanded view" />
-        {:else if mediaExpanded === 'solution-flags'}
-          <MediaLoader type="image" src="{base}/images/solution-flags.webp" class="l2-media-modal-content" alt="Expanded view" />
-        {/if}
+        {#key mediaExpanded}
+          <div class="l2-media-crossfade" in:fade={{ duration: 120 }} out:fade={{ duration: 100 }}>
+            {#if mediaExpanded === 'problem-video'}
+              <MediaLoader type="video" src="{base}/videos/problem.mp4" class="l2-media-modal-content" autoplay loop muted playsinline preload="auto" eager />
+            {:else if mediaExpanded === 'solution-video'}
+              <MediaLoader type="video" src="{base}/videos/solution.mp4" class="l2-media-modal-content" autoplay loop muted playsinline preload="auto" eager />
+            {:else if mediaExpanded === 'problem-flags'}
+              <MediaLoader type="image" src="{base}/images/problem-flags.webp" class="l2-media-modal-content" alt="Expanded view" eager />
+            {:else if mediaExpanded === 'solution-flags'}
+              <MediaLoader type="image" src="{base}/images/solution-flags.webp" class="l2-media-modal-content" alt="Expanded view" eager />
+            {/if}
+          </div>
+        {/key}
       </div>
+
+      <!-- Next arrow (outside modal to avoid overflow: hidden clipping) -->
+      {#if nav.hasNext}
+        <button type="button" class="l2-media-nav-btn l2-media-nav-next" on:click|stopPropagation={() => navigateMedia('next')} aria-label="Next" title="Next">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </button>
+      {/if}
     </div>
   {/if}
 
@@ -1552,22 +1675,38 @@
     <div class="l2-wrap l2-reveal" data-placement-section="proof" style="position:relative">
       <div class="l2-section-head">
         <span class="l2-label">TRUSTED WORLDWIDE</span>
-        <h2>Used in <AnimatedNumber value={countryCount} suffix="+" animated /> countries.</h2>
+        <h2>
+          Used in
+          {#if metricsReady}
+            <AnimatedNumber value={countryCount ?? 0} suffix="+" animated />
+          {:else}
+            <span class="l2-metric-pending">—</span>
+          {/if}
+          countries.
+        </h2>
         <p>Students, teachers, and universities around the world trust Classroom Quick Downloader.</p>
-        <div class="l2-data-actions">
-          <button
-            type="button"
-            class="l2-refresh-btn"
-            on:click={() => loadSiteData(true)}
-            disabled={$websiteSnapshotStore.isRefreshing}
-          >
-            {$websiteSnapshotStore.isRefreshing ? 'Refreshing…' : 'Refresh live data'}
-          </button>
-        </div>
       </div>
       <div class="l2-proof-grid">
-        <div class="l2-proof-card"><div class="l2-proof-num"><AnimatedNumber value={downloadCount} animated /></div><div class="l2-proof-label">Total Downloads</div></div>
-        <div class="l2-proof-card"><div class="l2-proof-num"><AnimatedNumber value={userCount} animated /></div><div class="l2-proof-label">Active Users</div></div>
+        <div class="l2-proof-card">
+          <div class="l2-proof-num">
+            {#if metricsReady}
+              <AnimatedNumber value={downloadCount ?? 0} animated />
+            {:else}
+              <span class="l2-metric-pending">—</span>
+            {/if}
+          </div>
+          <div class="l2-proof-label">Total Downloads</div>
+        </div>
+        <div class="l2-proof-card">
+          <div class="l2-proof-num">
+            {#if metricsReady}
+              <AnimatedNumber value={userCount ?? 0} animated />
+            {:else}
+              <span class="l2-metric-pending">—</span>
+            {/if}
+          </div>
+          <div class="l2-proof-label">Active Users</div>
+        </div>
         <div class="l2-proof-card"><div class="l2-proof-num"><AnimatedNumber value={100} suffix="+" animated /></div><div class="l2-proof-label">Languages</div></div>
         <div class="l2-proof-card"><div class="l2-proof-num"><AnimatedNumericText text={APP_VERSION} animated /></div><div class="l2-proof-label">Latest Release</div></div>
       </div>
@@ -1589,6 +1728,10 @@
               <p>{mapError}</p>
             </div>
           </div>
+        {:else if !RotatingGlobeComponent}
+          <div class="l2-map-state-card">
+            <div class="state-loading">Preparing globe renderer…</div>
+          </div>
         {:else}
           <div class="l2-map-shell">
             <div class="l2-map-frame">
@@ -1604,7 +1747,8 @@
                   <path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5" />
                 </svg>
               </button>
-              <RotatingGlobe
+              <svelte:component
+                this={RotatingGlobeComponent}
                 mapData={mapData}
                 className="l2-main-globe"
                 tooltipAnimated={false}
@@ -1634,39 +1778,44 @@
           </div>
 
           {#if ENABLE_SILLY_QUESTION && mapPromptVisible}
-          <div class="l2-silly-divider"></div>
-          <div class="l2-silly-inline">
-            {#if mapInteractionState === 'idle'}
-              <h3 class="l2-silly-q">Is your country downloading? 🌍</h3>
-              <p class="l2-silly-sub">Join students from <strong>{countryCount}+</strong> countries already using CQD</p>
-              <div class="l2-silly-btns">
-                <button type="button" class="l2-silly-btn l2-silly-yes" on:click={onMapYes} disabled={sillyAnswered}>Yes 🎉</button>
-                <button type="button" class="l2-silly-btn l2-silly-no" on:click={onMapNo} disabled={sillyAnswered}>Not yet 😢</button>
-              </div>
-            {:else if mapInteractionState === 'yes'}
-              <div class="l2-silly-result l2-silly-yay" transition:scale={{ duration: 400, start: 0.3 }}>
-                <span class="l2-silly-yay-text">Yay! 🎊</span>
-                <p class="l2-silly-yay-sub">You're part of the global Classroom Quick Downloader family!</p>
-              </div>
-            {:else if mapInteractionState === 'no'}
-              <div class="l2-silly-result l2-silly-waiting" transition:scale={{ duration: 400, start: 0.3 }}>
-                <p class="l2-silly-typed">{noTypedText}<span class="l2-typing-cursor">|</span></p>
-                {#if noShowCta}
-                  <div class="l2-silly-cta-reveal" transition:scale={{ duration: 300, start: 0.7 }}>
-                    <a
-                      class="l2-cta l2-cta-current l2-silly-install"
-                      href={browserLink(detectedBrowser)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      on:click={() => trackInstallClick('map_prompt_install')}
-                    >
-                      <img src="{base}/images/{detectedBrowser}.svg" alt="" class="l2-cta-icon" />
-                      Install for {browserDisplayName(detectedBrowser)}
-                    </a>
-                  </div>
-                {/if}
-              </div>
-            {/if}
+          <div
+            class="l2-silly-entrance"
+            in:fly={{ y: 20, duration: 600, easing: quintOut }}
+          >
+            <div class="l2-silly-divider"></div>
+            <div class="l2-silly-inline">
+              {#if mapInteractionState === 'idle'}
+                <h3 class="l2-silly-q">Is your country downloading? 🌍</h3>
+                <p class="l2-silly-sub">Join students from <strong>{metricsReady ? `${countryCount}+` : 'many'}</strong> countries already using CQD</p>
+                <div class="l2-silly-btns">
+                  <button type="button" class="l2-silly-btn l2-silly-yes" on:click={onMapYes} disabled={sillyAnswered}>Yes 🎉</button>
+                  <button type="button" class="l2-silly-btn l2-silly-no" on:click={onMapNo} disabled={sillyAnswered}>Not yet 😢</button>
+                </div>
+              {:else if mapInteractionState === 'yes'}
+                <div class="l2-silly-result l2-silly-yay" transition:scale={{ duration: 400, start: 0.3 }}>
+                  <span class="l2-silly-yay-text">Yay! 🎊</span>
+                  <p class="l2-silly-yay-sub">You're part of the global Classroom Quick Downloader family!</p>
+                </div>
+              {:else if mapInteractionState === 'no'}
+                <div class="l2-silly-result l2-silly-waiting" transition:scale={{ duration: 400, start: 0.3 }}>
+                  <p class="l2-silly-typed">{noTypedText}<span class="l2-typing-cursor">|</span></p>
+                  {#if noShowCta}
+                    <div class="l2-silly-cta-reveal" transition:scale={{ duration: 300, start: 0.7 }}>
+                      <a
+                        class="l2-cta l2-cta-current l2-silly-install"
+                        href={browserLink(detectedBrowser)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        on:click={() => trackInstallClick('map_prompt_install')}
+                      >
+                        <img src="{base}/images/{detectedBrowser}.svg" alt="" class="l2-cta-icon" />
+                        Install for {browserDisplayName(detectedBrowser)}
+                      </a>
+                    </div>
+                  {/if}
+                </div>
+              {/if}
+            </div>
           </div>
           {/if}
         </div>
@@ -1701,12 +1850,19 @@
             <path d="M18 6 6 18" />
           </svg>
         </button>
-        <CountryHeatmap
-          mapData={mapData}
-          className="l2-main-flatmap-modal"
-          tooltipAnimated={false}
-          showLegend={false}
-        />
+        {#if CountryHeatmapComponent}
+          <svelte:component
+            this={CountryHeatmapComponent}
+            mapData={mapData}
+            className="l2-main-flatmap-modal"
+            tooltipAnimated={false}
+            showLegend={false}
+          />
+        {:else}
+          <div class="l2-map-state-card">
+            <div class="state-loading">Preparing map renderer…</div>
+          </div>
+        {/if}
       </div>
     </div>
   {/if}
@@ -1716,6 +1872,32 @@
     <div class="l2-wrap l2-cta-content l2-reveal" data-placement-section="cta" style="position:relative;overflow:visible">
       <h2>Ready to save hours?</h2>
       <p>Install Classroom Quick Downloader in under 10 seconds. Free, forever. No account required.</p>
+      <!-- NEWSLETTER_CTA_DISABLED_ROLLBACK_START
+      <p>Install Classroom Quick Downloader in under 10 seconds, and add your email for future updates. Free, forever. No account required.</p>
+      <form class="l2-newsletter-form" on:submit|preventDefault={submitNewsletterEmail}>
+        <input
+          type="email"
+          class="l2-newsletter-input"
+          bind:value={newsletterEmail}
+          placeholder="Enter your email for future updates"
+          inputmode="email"
+          autocomplete="email"
+          required
+        />
+        <button
+          type="submit"
+          class="l2-newsletter-submit"
+          disabled={newsletterSubmitState === 'submitting'}
+        >
+          {#if newsletterSubmitState === 'submitting'}Submitting…{:else}Notify me{/if}
+        </button>
+      </form>
+      {#if newsletterStatusMessage}
+        <p class="l2-newsletter-status l2-newsletter-status-{newsletterSubmitState}">
+          {newsletterStatusMessage}
+        </p>
+      {/if}
+      NEWSLETTER_CTA_DISABLED_ROLLBACK_END -->
       <div class="l2-hero-actions">
         {#each orderedBrowserCtas as b}
           <a
@@ -2254,7 +2436,8 @@
     color: var(--green);
     animation: float-a ease-in-out infinite;
     pointer-events: none;
-    transition: box-shadow 0.2s, outline 0.2s, opacity 0.7s ease;
+    transition: box-shadow 0.2s, outline 0.2s, opacity 0.7s ease, margin-top 0.7s ease;
+    margin-top: var(--placement-shift, 0px);
     will-change: opacity;
   }
   .l2-placement-el.edit-mode {
@@ -2805,15 +2988,76 @@
     overflow: hidden;
     background: #000;
     box-shadow: 0 32px 80px rgba(0, 0, 0, 0.5);
+    display: grid;
   }
 
-  .l2-media-modal-content {
+  .l2-media-crossfade {
+    grid-area: 1 / 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 0;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  :global(.l2-media-modal-content) {
     display: block;
     max-width: 90vw;
     max-height: 90vh;
     width: auto;
     height: auto;
     border-radius: 16px;
+    object-fit: contain;
+  }
+
+  /* ── Navigation arrows ──────────── */
+  .l2-media-nav-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    border: 1px solid var(--border-subtle, rgba(26, 139, 85, 0.18));
+    background: rgba(255, 255, 255, 0.92);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+    transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1),
+                box-shadow 0.24s ease,
+                background-color 0.2s ease,
+                border-color 0.2s ease;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  .l2-media-nav-prev { left: 20px; }
+  .l2-media-nav-next { right: 20px; }
+
+  .l2-media-nav-btn svg {
+    width: 22px;
+    height: 22px;
+    stroke: #333;
+    transition: stroke 0.2s ease;
+  }
+
+  .l2-media-nav-btn:hover {
+    background: var(--gc-green, #1a8b55);
+    border-color: var(--gc-green, #1a8b55);
+    transform: translateY(-50%) scale(1.06);
+    box-shadow: 0 8px 24px rgba(26, 139, 85, 0.25);
+  }
+
+  .l2-media-nav-btn:hover svg {
+    stroke: #fff;
+  }
+
+  .l2-media-nav-btn:active {
+    transform: translateY(-50%) scale(0.97);
   }
 
   /* Collapse button in modal — same style as expand button */
@@ -2959,6 +3203,10 @@
     opacity: 0.3;
   }
 
+  .l2-silly-entrance {
+    overflow: hidden;
+  }
+
   .l2-silly-inline {
     text-align: center;
     position: relative;
@@ -2969,12 +3217,6 @@
     border-radius: 20px;
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
-    animation: silly-fadein 0.6s ease-out;
-  }
-
-  @keyframes silly-fadein {
-    0% { opacity: 0; transform: translateY(12px); }
-    100% { opacity: 1; transform: translateY(0); }
   }
 
   .l2-silly-q {
@@ -3134,36 +3376,6 @@
     letter-spacing: -0.02em; margin: 0 0 12px;
   }
   .l2-section-head p { font-size: 16px; color: var(--text-secondary); max-width: 560px; margin: 0 auto; }
-  .l2-data-actions {
-    margin-top: 16px;
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-    justify-content: center;
-  }
-  .l2-refresh-btn {
-    border: 1px solid rgba(26, 139, 85, 0.24);
-    background: rgba(26, 139, 85, 0.08);
-    color: var(--green);
-    border-radius: 999px;
-    padding: 8px 14px;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    transition: all 0.2s ease;
-    cursor: pointer;
-  }
-  .l2-refresh-btn:hover:not(:disabled) {
-    background: rgba(26, 139, 85, 0.14);
-    border-color: rgba(26, 139, 85, 0.36);
-    transform: translateY(-1px);
-  }
-  .l2-refresh-btn:disabled {
-    opacity: 0.55;
-    cursor: wait;
-  }
   .l2-degraded-pill {
     border: 1px solid rgba(217, 119, 6, 0.32);
     background: rgba(217, 119, 6, 0.1);
@@ -3226,6 +3438,7 @@
   }
   .l2-proof-card:hover { border-color: var(--green-border); transform: translateY(-3px); box-shadow: 0 10px 28px rgba(0, 0, 0, 0.05); }
   .l2-proof-num { font-size: 28px; font-weight: 800; color: var(--green); margin-bottom: 6px; }
+  .l2-metric-pending { color: #64748b; font-size: 1em; font-weight: 700; letter-spacing: 0.02em; }
   .l2-proof-label { font-size: 13px; font-weight: 500; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em; }
 
   /* ── Map spotlight ────────────────── */
@@ -3266,6 +3479,7 @@
 
   .l2-map-copy {
     max-width: 560px;
+    transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
   }
 
   .l2-map-copy h2 {
@@ -3428,6 +3642,68 @@
     letter-spacing: -0.03em; margin: 0 0 16px;
   }
   .l2-cta-content p { font-size: 18px; color: var(--text-secondary); margin: 0 0 36px; }
+  .l2-newsletter-form {
+    width: min(580px, 100%);
+    margin: 0 auto 22px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .l2-newsletter-input {
+    flex: 1;
+    min-width: 0;
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.86);
+    color: var(--text-primary);
+    padding: 12px 14px;
+    font-size: 15px;
+    line-height: 1.2;
+  }
+  .l2-newsletter-input::placeholder {
+    color: var(--text-muted);
+  }
+  .l2-newsletter-input:focus {
+    outline: none;
+    border-color: var(--green-border);
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.14);
+  }
+  .l2-newsletter-submit {
+    border: 1px solid var(--green-border);
+    background: linear-gradient(180deg, var(--green), #127043);
+    color: #fff;
+    border-radius: 12px;
+    padding: 11px 16px;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+    transition: transform 0.18s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+  }
+  .l2-newsletter-submit:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 22px rgba(18, 112, 67, 0.35);
+  }
+  .l2-newsletter-submit:disabled {
+    opacity: 0.7;
+    cursor: wait;
+  }
+  .l2-newsletter-status {
+    margin: 0 0 26px;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .l2-newsletter-status-success {
+    color: #127043;
+  }
+  .l2-newsletter-status-error {
+    color: #b91c1c;
+  }
+  .l2-newsletter-status-submitting {
+    color: var(--text-muted);
+  }
+  .l2-newsletter-status-idle {
+    color: var(--text-muted);
+  }
 
   /* ── Reveal Animations ─────────────── */
   .l2-reveal {
@@ -3458,6 +3734,14 @@
     .l2-ps-flow-arrow { transform: rotate(90deg); justify-self: center; }
     .l2-ps-expand-btn { opacity: 1; transform: scale(1); }
     .l2-media-modal-backdrop { padding: 8px; }
+    .l2-media-nav-prev { left: 8px; }
+    .l2-media-nav-next { right: 8px; }
+    .l2-media-nav-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.9);
+    }
     .l2-map-layout { grid-template-columns: 1fr; gap: 20px; }
     .l2-map-degraded-note { font-size: 11px; }
     .l2-map-copy { max-width: none; }
@@ -3490,7 +3774,15 @@
       margin-bottom: 26px;
       font-size: 16px;
     }
-    .l2-data-actions { width: 100%; }
+    .l2-newsletter-form {
+      flex-direction: column;
+      align-items: stretch;
+      margin-bottom: 18px;
+    }
+    .l2-newsletter-submit {
+      width: 100%;
+      justify-content: center;
+    }
     .l2-degraded-pill { white-space: normal; text-align: center; }
     .l2-ps-expand-btn-modal {
       width: 34px;
