@@ -40,3 +40,4 @@
         "Improved changelog update detection logic."
       ],
       "fixed": [
+        "Fixed stale changelog visibility in republish scenarios."
