@@ -51,3 +51,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "title": "Release 1.3.7",
       "summary": "Changelog UX improvement release.",
       "highlights": [
+        "Better website changelog integration from extension.",
