@@ -160,3 +160,4 @@
         "Fixed inconsistent cancellation cleanup paths."
       ],
       "added": [
+        "More coverage and safeguards for cancel behavior."
