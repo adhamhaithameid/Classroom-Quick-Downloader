@@ -345,3 +345,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "title": "Release 0.0.0",
       "summary": "Project bootstrap baseline.",
       "highlights": [
+        "Initial project foundations.",
