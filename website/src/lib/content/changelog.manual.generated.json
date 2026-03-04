@@ -292,3 +292,4 @@
         "Updated setup/runtime compatibility behavior."
       ],
       "fixed": [
+        "Fixed packaging/config alignment issues."
