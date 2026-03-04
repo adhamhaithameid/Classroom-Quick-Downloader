@@ -472,7 +472,7 @@ func importExtChangelogFromGitHub(db *sql.DB, markdownURL string) (extGitHubImpo
 
 	tx, err := db.Begin()
 	if err != nil {
-		return 0, err
+		return extGitHubImportResult{}, err
 	}
 	defer func() { _ = tx.Rollback() }()
 
