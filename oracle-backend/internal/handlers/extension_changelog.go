@@ -398,7 +398,7 @@ func previewExtChangelogFromGitHub(db *sql.DB, markdownURL string) (map[string]a
 	if err != nil {
 		return nil, err
 	}
-	markdown, err := fetchRemoteUserFriendlyChangelogMarkdown(context.Background(), markdownURL)
+	markdown, err := fetchRemoteUserFriendlyChangelogMarkdown(context.Background(), canonicalURL)
 	if err != nil {
 		return 0, fmt.Errorf("failed to fetch markdown: %w", err)
 	}
