@@ -3512,10 +3512,11 @@
         clearChildren(detailsNode);
         details
           .slice(0, 8)
-          .map(function(item) {
-            return '<li>' + escapeHtml(String(item || '')) + '</li>';
-          })
-          .join('');
+          .forEach(function(item) {
+            var li = document.createElement('li');
+            li.textContent = String(item || '');
+            detailsNode.appendChild(li);
+          });
       }
 
       function formatWebsiteSyncTimestamp(ts) {
