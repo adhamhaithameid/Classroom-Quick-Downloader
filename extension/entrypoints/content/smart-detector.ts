@@ -66,23 +66,6 @@ export interface PostStateResult {
 // UTILITY FUNCTIONS
 // ============================================================================
 
-function createSanitizedClone(element: HTMLElement): HTMLElement {
-  const clone = element.cloneNode(true) as HTMLElement;
-  
-  for (const selector of GOLDEN_SELECTORS.userContentExclusions) {
-    clone.querySelectorAll(selector).forEach(el => el.remove());
-  }
-  
-  clone.querySelectorAll('[role="button"]').forEach(btn => {
-    const text = normalizeText(btn.textContent || '').toLowerCase();
-    if (/more|less|show|hide|voir|mehr|menos/i.test(text)) {
-      btn.remove();
-    }
-  });
-  
-  return clone;
-}
-
 function extractAriaLabels(element: HTMLElement): string[] {
   const labels: string[] = [];
   
@@ -231,31 +214,47 @@ function executeEditedLayer2(post: HTMLElement, keywords: string[]): LayerResult
 // ============================================================================
 
 function executeEditedLayer3(post: HTMLElement, keywords: string[]): LayerResult {
-  const sanitizedPost = createSanitizedClone(post);
-  
+  // Traverse live DOM directly with element-level filtering to avoid clone cost.
   const walker = document.createTreeWalker(
-    sanitizedPost,
-    NodeFilter.SHOW_TEXT,
+    post,
+    NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT,
     {
       acceptNode: (node) => {
-        const parent = node.parentElement;
-        if (!parent) return NodeFilter.FILTER_REJECT;
-        
-        try {
-          const style = window.getComputedStyle(parent);
-          if (style.display === 'none' || style.visibility === 'hidden') {
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          const element = node as HTMLElement;
+          const tagName = element.tagName.toLowerCase();
+          if (tagName === 'script' || tagName === 'style' || tagName === 'noscript') {
             return NodeFilter.FILTER_REJECT;
           }
-        } catch {
-          // Ignore
+
+          if (GOLDEN_SELECTORS.userContentExclusions.some((selector) => element.matches(selector))) {
+            return NodeFilter.FILTER_REJECT;
+          }
+
+          try {
+            const style = window.getComputedStyle(element);
+            if (style.display === 'none' || style.visibility === 'hidden') {
+              return NodeFilter.FILTER_REJECT;
+            }
+          } catch {
+            // Ignore style lookup failures.
+          }
+
+          if (tagName === 'button' || element.getAttribute('role') === 'button') {
+            const text = normalizeText(element.textContent || '').toLowerCase();
+            if (/more|less|show|hide|voir|mehr|menos/i.test(text)) {
+              return NodeFilter.FILTER_REJECT;
+            }
+          }
+
+          return NodeFilter.FILTER_SKIP;
         }
-        
-        const tagName = parent.tagName.toLowerCase();
-        if (tagName === 'script' || tagName === 'style' || tagName === 'noscript') {
-          return NodeFilter.FILTER_REJECT;
+
+        if (node.nodeType === Node.TEXT_NODE) {
+          return NodeFilter.FILTER_ACCEPT;
         }
-        
-        return NodeFilter.FILTER_ACCEPT;
+
+        return NodeFilter.FILTER_SKIP;
       },
     }
   );
