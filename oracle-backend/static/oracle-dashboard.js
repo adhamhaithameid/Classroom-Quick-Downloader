@@ -4912,6 +4912,7 @@
         document.getElementById('ext-cl-rule-target').value = 'all';
         document.getElementById('ext-cl-rule-priority').value = 'normal';
         document.getElementById('ext-cl-rule-effect').value = 'none';
+        updateExtClRulePreview();
       }
 
 
