@@ -73,3 +73,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "summary": "Dependency and compatibility maintenance release.",
       "highlights": [
         "Compatibility safeguards for tooling/runtime.",
+        "Updated dependency resolution paths.",
