@@ -1,6 +1,7 @@
 <script lang="ts">
   import { base } from '$app/paths';
   import { STORE_LINKS } from '$lib/config';
+  import SeoMeta from '$lib/components/SeoMeta.svelte';
 
   type FaqItem = {
     id: string;
@@ -34,7 +35,7 @@
         {
           id: 'basics-free',
           q: 'Is it free?',
-          a: 'Yes. The extension is completely free to use, has no premium tier, and is open-source under a public license.'
+          a: 'Yes. The extension is completely free to use and has no premium tier.'
         },
         {
           id: 'basics-account',
@@ -289,7 +290,7 @@
         {
           id: 'trouble-blocked-school',
           q: 'My school\'s network blocks the extension. What can I do?',
-          a: 'Some school networks or managed Chromebooks restrict extension installation. Contact your IT administrator and reference the extension\'s store listing and open-source repository for review.'
+          a: 'Some school networks or managed Chromebooks restrict extension installation. Contact your IT administrator and reference the extension store listing and GitHub repository for review.'
         }
       ]
     },
@@ -378,7 +379,7 @@
         {
           id: 'dev-license',
           q: 'What license does CQD use?',
-          a: 'CQD is released under an open-source license. Check the LICENSE file in the GitHub repository for the exact terms and conditions.'
+          a: 'Check the LICENSE file in the GitHub repository for the exact terms and conditions currently used by this release.'
         },
         {
           id: 'dev-build',
@@ -429,15 +430,29 @@
     activeSection = activeSection === title ? null : title;
     searchQuery = '';
   }
+
+  const faqStructuredData = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: sections.flatMap((section) =>
+      section.items.map((item) => ({
+        '@type': 'Question',
+        name: item.q,
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: item.a
+        }
+      }))
+    )
+  };
 </script>
 
-<svelte:head>
-  <title>FAQ — Classroom Quick Downloader</title>
-  <meta
-    name="description"
-    content="Comprehensive FAQ for Classroom Quick Downloader: setup, browser support, privacy, troubleshooting, security, and release information."
-  />
-</svelte:head>
+<SeoMeta
+  title="FAQ — Classroom Quick Downloader"
+  description="Comprehensive FAQ for Classroom Quick Downloader: setup, browser support, privacy, troubleshooting, security, and release information."
+  path="/faq"
+  structuredData={faqStructuredData}
+/>
 
 <div class="fq">
   <!-- Decorative orbs -->
