@@ -1967,7 +1967,8 @@
       }
       #page-website-sync .card-header,
       #page-website-analysis .card-header,
-      #page-content-changelog .card-header {
+      #page-content-changelog .card-header,
+      #page-ext-changelog .card-header {
         border-bottom: 1px solid rgba(148, 163, 184, 0.22);
       }
       .website-page .section-block {
