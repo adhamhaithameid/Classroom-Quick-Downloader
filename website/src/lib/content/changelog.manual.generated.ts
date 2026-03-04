@@ -63,3 +63,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       ],
       "fixed": [
         "Fixed close-button layout and hover inconsistencies."
+      ],
