@@ -43,22 +43,10 @@ export interface ChangelogData {
 
 export type ChangelogFetchStatus = 'fresh' | 'not-modified' | 'cache-fallback' | 'empty' | 'error';
 
-function toLegacyChanges(entry: {
-  summary?: string;
-  added?: string[];
-  changed?: string[];
-  fixed?: string[];
-  changes?: unknown;
-}): string[] {
-  const fallback = normalizeStringList(entry.changes, 40);
-  if (fallback.length > 0) return fallback;
-  const out: string[] = [];
-  const summary = (entry.summary || '').trim();
-  if (summary) out.push(`Summary: ${summary}`);
-  for (const row of normalizeStringList(entry.added, 20)) out.push(`Added: ${row}`);
-  for (const row of normalizeStringList(entry.changed, 20)) out.push(`Changed: ${row}`);
-  for (const row of normalizeStringList(entry.fixed, 20)) out.push(`Fixed: ${row}`);
-  return out;
+export interface ChangelogFetchResult {
+  data: ChangelogData | null;
+  status: ChangelogFetchStatus;
+  error?: string;
 }
 
 function normalizeVersion(value: string): string {
