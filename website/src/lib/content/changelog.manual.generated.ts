@@ -163,3 +163,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "added": [
         "More coverage and safeguards for cancel behavior."
       ],
+      "changed": [
