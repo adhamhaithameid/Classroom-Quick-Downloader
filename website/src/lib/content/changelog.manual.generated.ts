@@ -168,3 +168,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       ],
       "fixed": [
         "Fixed inconsistent cancellation cleanup paths."
+      ],
