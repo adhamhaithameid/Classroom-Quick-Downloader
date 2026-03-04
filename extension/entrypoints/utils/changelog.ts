@@ -253,8 +253,7 @@ export function getMatchingRule(config: ChangelogConfig | undefined, currentVers
   const exact = config.rules.find((rule) => normalizeRuleTarget(rule.target) === version);
   if (exact) return exact;
 
-  // 2. Wildcard "all"
-  const all = config.rules.find(r => normalizeRuleTarget(r.target) === 'all');
+  const all = config.rules.find((rule) => normalizeRuleTarget(rule.target) === 'all');
   if (all) return all;
 
   return null;
