@@ -313,3 +313,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "changed": [
         "Improved repeat-use reliability."
       ],
+      "fixed": [
