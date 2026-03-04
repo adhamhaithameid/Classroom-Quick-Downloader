@@ -886,7 +886,7 @@ func ExtChangelogImportGitHubHandler(sqliteDB *sql.DB) http.HandlerFunc {
 		_ = json.Unmarshal(body, &input)
 
 		markdownURL := strings.TrimSpace(input.URL)
-		imported, err := importExtChangelogFromGitHub(sqliteDB, markdownURL)
+		importResult, err := importExtChangelogFromGitHub(sqliteDB, markdownURL)
 		if err != nil {
 			logEvent("error", "ext_changelog_github_import_failed", map[string]interface{}{
 				"error": trimAndLimit(err.Error(), 240),
