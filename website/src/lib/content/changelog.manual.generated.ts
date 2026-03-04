@@ -335,3 +335,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Established baseline architecture/contracts."
       ],
       "fixed": [
+        "Fixed pre-release blockers."
