@@ -56,21 +56,6 @@ function normalizeVersion(value: string): string {
   return value.trim().replace(/^v/i, '');
 }
 
-function toFiniteInt(value: unknown): number | undefined {
-  const num = Number(value);
-  if (!Number.isFinite(num)) return undefined;
-  return Math.floor(num);
-}
-
-function hashText(value: string): string {
-  let hash = 0;
-  for (let i = 0; i < value.length; i += 1) {
-    hash = ((hash << 5) - hash) + value.charCodeAt(i);
-    hash |= 0;
-  }
-  return (hash >>> 0).toString(16);
-}
-
 function normalizeRulePriority(value: unknown): NotificationRule['priority'] {
   return value === 'minor' || value === 'major' ? value : 'normal';
 }
