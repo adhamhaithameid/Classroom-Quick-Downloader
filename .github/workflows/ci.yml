@@ -133,8 +133,8 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Run Cloudflare Worker Tests
-        run: pnpm -C cloudflare-worker test
+      - name: Run Cloudflare Worker Heavy Test Matrix
+        run: pnpm -C cloudflare-worker test:strict
 
       - name: Run Static Analysis (Lint, Typecheck, Audit)
         run: pnpm -C cloudflare-worker run validate
