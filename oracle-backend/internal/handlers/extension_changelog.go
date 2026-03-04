@@ -511,7 +511,7 @@ func importExtChangelogFromGitHub(db *sql.DB, markdownURL string) (extGitHubImpo
 	}
 
 	if err := tx.Commit(); err != nil {
-		return 0, err
+		return extGitHubImportResult{}, err
 	}
 
 	// Record import metadata.
