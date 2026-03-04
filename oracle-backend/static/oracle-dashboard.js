@@ -4318,7 +4318,18 @@
           ['danger-logs-delete-all-btn', dangerDeleteAllLogs],
           ['batch-modal-close-btn', closeBatchModal],
           ['flush-modal-close-btn', closeFlushModal]
-        ].forEach(function(entry) {
+        ];
+        if (LEGACY_CHANGELOG_CUSTOMIZATION_ENABLED) {
+          clickBindings.push(
+            ['user-changelog-refresh-btn', loadUserChangelogRecords],
+            ['user-changelog-preview-btn', function() { previewUserChangelogDraft(false); }],
+            ['user-changelog-import-url-btn', function() { previewUserChangelogDraft(true); }],
+            ['user-changelog-source-save-btn', saveUserChangelogSourceConfig],
+            ['user-changelog-format-info', showUserChangelogFormatInfo],
+          );
+        }
+
+        clickBindings.forEach(function(entry) {
           var node = document.getElementById(entry[0]);
           if (!node || node.dataset.boundClick === '1') return;
           node.dataset.boundClick = '1';
