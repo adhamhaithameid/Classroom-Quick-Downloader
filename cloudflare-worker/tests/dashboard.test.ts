@@ -139,6 +139,22 @@ describe("Dashboard website sync UI", () => {
   });
 });
 
+describe("Dashboard website console CTA", () => {
+  it("renders giant link to the dedicated website data console", () => {
+    const html = renderDashboard(makeStats());
+    expect(html).toContain("Open Website Data Console");
+    expect(html).toContain('href="/dashboard/website"');
+  });
+
+  it("removes legacy release and notification nav entries", () => {
+    const html = renderDashboard(makeStats());
+    expect(html).not.toContain('href="#config"');
+    expect(html).not.toContain('href="#release"');
+    expect(html).not.toContain("Notifications");
+    expect(html).not.toContain("Releases");
+  });
+});
+
 describe("Dashboard country label tooltips", () => {
   it("adds human-readable country names for ISO-2 country codes on hover", () => {
     const html = renderDashboard(
