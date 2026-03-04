@@ -350,3 +350,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "N/A"
       ],
       "added": [
+        "Initial project foundations."
