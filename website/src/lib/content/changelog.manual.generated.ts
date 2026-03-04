@@ -343,3 +343,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "id": "manual-0.0.0-17",
       "version": "0.0.0",
       "title": "Release 0.0.0",
+      "summary": "Project bootstrap baseline.",
