@@ -94,3 +94,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "summary": "Major reliability and security hardening release.",
       "highlights": [
         "Expanded resilience/security checks across extension-worker-oracle flow.",
+        "Improved pipeline validation and retry behavior.",
