@@ -823,6 +823,146 @@ describe("Worker auth config hardening", () => {
     expect(doFetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("redirects /dashboard/website to login when session is missing", async () => {
+    const env = mockEnv();
+    const res = await worker.fetch(
+      new Request("https://example.com/dashboard/website", { method: "GET" }),
+      env,
+      {} as ExecutionContext,
+    );
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe("/");
+  });
+
+  it("serves /dashboard/website after normal dashboard login", async () => {
+    const env = mockEnv();
+    const loginReq = new Request("https://example.com/", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        "CF-Connecting-IP": "203.0.113.10",
+      },
+      body: "password=dashboard-secret",
+    });
+
+    const loginRes = await worker.fetch(loginReq, env, {} as ExecutionContext);
+    expect(loginRes.status).toBe(302);
+    const cookie = loginRes.headers.get("Set-Cookie") || "";
+    expect(cookie).toContain("cqd_session=");
+
+    const dashboardRes = await worker.fetch(
+      new Request("https://example.com/dashboard/website", {
+        method: "GET",
+        headers: {
+          Cookie: cookie,
+          "CF-Connecting-IP": "203.0.113.10",
+        },
+      }),
+      env,
+      {} as ExecutionContext,
+    );
+    const html = await dashboardRes.text();
+    expect(dashboardRes.status).toBe(200);
+    expect(html).toContain("Website Data Console");
+    expect(html).toContain("/admin/website/console/summary");
+  });
+
+  it("serves /admin/website/console/summary with X-Admin-Secret", async () => {
+    const doFetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const req = input as Request;
+      if (new URL(req.url).pathname === "/admin/website/status") {
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            website: { refreshEnabled: true },
+            telemetry: { pendingBatches: 2, deadLetterBatches: 1 },
+            publicSnapshot: { totals: { downloads: 42, countries: 3 } },
+          }),
+          { status: 200, headers: { "content-type": "application/json; charset=utf-8" } },
+        );
+      }
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "content-type": "application/json; charset=utf-8" },
+      });
+    });
+    const namespace = {
+      idFromName: (_name: string) => "downloads-id",
+      get: (_id: string) => ({ fetch: doFetchMock }),
+    };
+    const env = mockEnv({
+      DOWNLOADS_DO: namespace as unknown as DurableObjectNamespace,
+      SITE_SNAPSHOT_KV: {
+        get: async () => JSON.stringify({
+          snapshotId: "snap-1",
+          generatedAtUtc: 1771700000000,
+          totals: { downloads: 21, countries: 2 },
+        }),
+        put: async () => undefined,
+      },
+    });
+
+    const res = await worker.fetch(
+      new Request("https://example.com/admin/website/console/summary", {
+        method: "GET",
+        headers: {
+          "X-Admin-Secret": "do-shared-secret",
+        },
+      }),
+      env,
+      {} as ExecutionContext,
+    );
+
+    const body = await res.json() as {
+      ok?: boolean;
+      snapshot?: { totals?: { downloads?: number } };
+      telemetry?: { pendingBatches?: number };
+    };
+    expect(res.status).toBe(200);
+    expect(body.ok).toBe(true);
+    expect(body.snapshot?.totals?.downloads).toBe(21);
+    expect(body.telemetry?.pendingBatches).toBe(2);
+    expect(doFetchMock).toHaveBeenCalled();
+  });
+
+  it("requires danger step-up cookie for raw website console endpoints", async () => {
+    const env = mockEnv({
+      SITE_SNAPSHOT_KV: {
+        get: async () => JSON.stringify({ ok: true }),
+        put: async () => undefined,
+      },
+    });
+
+    const loginReq = new Request("https://example.com/", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        "CF-Connecting-IP": "203.0.113.10",
+      },
+      body: "password=dashboard-secret",
+    });
+    const loginRes = await worker.fetch(loginReq, env, {} as ExecutionContext);
+    expect(loginRes.status).toBe(302);
+    const cookie = loginRes.headers.get("Set-Cookie") || "";
+    expect(cookie).toContain("cqd_session=");
+
+    const rawRes = await worker.fetch(
+      new Request("https://example.com/admin/website/console/kv", {
+        method: "GET",
+        headers: {
+          Cookie: cookie,
+          "CF-Connecting-IP": "203.0.113.10",
+        },
+      }),
+      env,
+      {} as ExecutionContext,
+    );
+    const payload = await rawRes.json() as { code?: string; message?: string };
+    expect(rawRes.status).toBe(403);
+    expect(payload.code).toBe("step_up_required");
+    expect(payload.message).toContain("Danger step-up");
+  });
+
   it("returns 503 for proxied Oracle public routes when ORACLE_ENDPOINT is missing", async () => {
     const env = mockEnv({ ORACLE_ENDPOINT: "" });
     const request = new Request("https://example.com/api/public/website/changelog", {
