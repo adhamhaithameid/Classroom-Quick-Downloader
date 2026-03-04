@@ -126,3 +126,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       ],
       "fixed": [
         "Fixed sync/auth edge cases in production-like workloads."
+      ],
