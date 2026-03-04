@@ -516,6 +516,7 @@ function isProtectedCorsRoute(pathname: string): boolean {
     pathname === "/stats" ||
     pathname === "/auth/verify-danger" ||
     pathname === "/api/public/website/events" ||
+    pathname === "/api/site/v1/events" ||
     isAdminCorsRoute(pathname)
   );
 }
