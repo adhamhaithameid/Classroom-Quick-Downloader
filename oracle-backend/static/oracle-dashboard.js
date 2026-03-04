@@ -4671,6 +4671,54 @@
         return String(text || '').split('\n').map(function(l) { return l.trim(); }).filter(function(l) { return l.length > 0; });
       }
 
+      function normalizeExtRuleVersionForPreview(value) {
+        var token = String(value || '').trim();
+        if (!token || token.toLowerCase() === 'all') return '';
+        if (/^v/i.test(token)) token = token.slice(1);
+        token = token.replace(/[^0-9A-Za-z._-]/g, '');
+        return token.slice(0, 32);
+      }
+
+      function getExtRulePreviewClasses(priority, effect) {
+        var p = String(priority || 'normal').toLowerCase();
+        var e = String(effect || 'none').toLowerCase();
+        var classes = ['cqd-brand-version'];
+        if (p === 'minor') classes.push('cqd-pill-minor');
+        else if (p === 'major') classes.push('cqd-pill-major');
+        if (e === 'glow') classes.push(p === 'major' ? 'cqd-effect-glow-red' : 'cqd-effect-glow-blue');
+        else if (e === 'pulse') classes.push(p === 'major' ? 'cqd-effect-pulse-red' : 'cqd-effect-pulse-blue');
+        return classes;
+      }
+
+      function updateExtClRulePreview() {
+        var targetEl = document.getElementById('ext-cl-rule-target');
+        var priorityEl = document.getElementById('ext-cl-rule-priority');
+        var effectEl = document.getElementById('ext-cl-rule-effect');
+        var pillEl = document.getElementById('ext-cl-rule-preview-pill');
+        var targetMeta = document.getElementById('ext-cl-rule-preview-target');
+        var priorityMeta = document.getElementById('ext-cl-rule-preview-priority');
+        var effectMeta = document.getElementById('ext-cl-rule-preview-effect');
+
+        var rawTarget = targetEl ? String(targetEl.value || '').trim() : 'all';
+        var priority = priorityEl ? String(priorityEl.value || 'normal').trim().toLowerCase() : 'normal';
+        var effect = effectEl ? String(effectEl.value || 'none').trim().toLowerCase() : 'none';
+
+        if (priority !== 'minor' && priority !== 'major') priority = 'normal';
+        if (effect !== 'glow' && effect !== 'pulse') effect = 'none';
+
+        var normalizedTarget = normalizeExtRuleVersionForPreview(rawTarget);
+        var shownTarget = normalizedTarget ? normalizedTarget : 'all';
+        var shownVersion = normalizedTarget ? ('v' + normalizedTarget) : 'v1.3.8';
+
+        if (pillEl) {
+          pillEl.textContent = shownVersion;
+          pillEl.className = getExtRulePreviewClasses(priority, effect).join(' ');
+        }
+        if (targetMeta) targetMeta.textContent = shownTarget;
+        if (priorityMeta) priorityMeta.textContent = priority;
+        if (effectMeta) effectMeta.textContent = effect;
+      }
+
       function bindExtChangelogEvents() {
         // Entry form submit
         var entryForm = document.getElementById('ext-cl-entry-form');
