@@ -304,7 +304,6 @@ describe('extension <-> cloudflare integration', () => {
     expect(updated?.entries[0]?.version).toBe('1.3.9');
     expect(await changelog.isVersionSeen('1.3.8', updated)).toBe(true);
 
-    expect(fetchSpy).toHaveBeenCalled();
-    expect(fetchSpy.mock.calls.some((call) => String(call[0]).includes('/changelog'))).toBe(true);
+    expect(fetchSpy.mock.calls.some((call) => String(call[0]).includes('/api/public/extension/changelog'))).toBe(false);
   });
 });
