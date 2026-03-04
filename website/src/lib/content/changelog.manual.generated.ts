@@ -227,3 +227,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Additional runtime checks for long sessions."
       ],
       "changed": [
+        "Tuned defaults for safer prolonged usage."
