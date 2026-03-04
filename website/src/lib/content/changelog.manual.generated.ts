@@ -115,3 +115,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "summary": "Operations and architecture expansion release.",
       "highlights": [
         "Expanded dashboard/telemetry integrations.",
+        "Refined ingestion orchestration between worker and oracle.",
