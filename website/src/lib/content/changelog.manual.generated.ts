@@ -141,3 +141,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       ],
       "added": [
         "Better feedback and uninstall integration paths."
+      ],
