@@ -1905,7 +1905,7 @@
         var leadText = options && typeof options.leadText === 'string' ? options.leadText.trim() : '';
         var html = '';
         if (leadText) {
-          html += '<div class="card-subtitle" style="margin-bottom:8px;">' + escapeHtml(leadText) + '</div>';
+          html += '<div class="card-subtitle card-subtitle-spaced">' + escapeHtml(leadText) + '</div>';
         }
         html += '<div class="breakdown-bars">';
         rows.slice(0, 8).forEach(function(v) {
