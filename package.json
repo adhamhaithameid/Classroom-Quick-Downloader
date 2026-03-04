@@ -33,7 +33,7 @@
     "phase13:smoke": "bash tools/phase13_smoke.sh",
     "phase13:monitor": "bash tools/phase13_monitor.sh",
     "phase13:rollout": "bash tools/phase13_rollout.sh",
-    "scan:security": "pnpm -C cloudflare-worker run validate && pnpm -C cloudflare-worker audit && pnpm -C website audit && (cd oracle-backend && ./scripts/full-scan.sh)",
+    "scan:security": "pnpm -C cloudflare-worker run validate && pnpm -C cloudflare-worker audit && pnpm -C website audit && pnpm -C extension audit && (cd oracle-backend && ./scripts/full-scan.sh)",
     "scan:repo": "pnpm run test:strict && pnpm run scan:security",
     "validate:oracle": "pnpm -C oracle-backend validate",
     "changelog:full": "node tools/generate-full-changelog.mjs",
