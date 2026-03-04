@@ -201,3 +201,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Core cancel-download capability.",
         "Lifecycle handling updated for cancellation-aware flow.",
         "Fixed inability to interrupt active operations."
+      ],
