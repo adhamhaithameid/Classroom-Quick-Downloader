@@ -35,6 +35,11 @@
       const USER_CHANGELOG_RECORD_TYPE = 'website_user_changelog_entry';
       const USER_CHANGELOG_REVISION_RECORD_TYPE = 'website_user_changelog_revision';
       const USER_CHANGELOG_CONFIG_RECORD_TYPE = 'website_user_changelog_config';
+      // LEGACY_CHANGELOG_DISABLED_START
+      // Runtime changelog customization is intentionally disabled.
+      // Manual changelog source files + sync script are now the primary workflow.
+      // LEGACY_CHANGELOG_DISABLED_END
+      const LEGACY_CHANGELOG_CUSTOMIZATION_ENABLED = false;
 
       // Helpers
       let authInFlight = null;
