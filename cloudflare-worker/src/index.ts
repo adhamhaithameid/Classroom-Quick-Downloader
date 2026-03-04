@@ -638,7 +638,7 @@ function corsAllowedHeadersForPath(pathname: string): string {
     return "Content-Type";
   }
   if (pathname === "/stats" || pathname === "/auth/verify-danger" || isAdminCorsRoute(pathname)) {
-    return "Content-Type, X-Admin-Secret";
+    return "Content-Type, X-Admin-Secret, X-Requested-With";
   }
   return "Content-Type";
 }
