@@ -239,3 +239,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "version": "1.1.5",
       "title": "Release 1.1.5",
       "summary": "Mid 1.1 quality update.",
+      "highlights": [
