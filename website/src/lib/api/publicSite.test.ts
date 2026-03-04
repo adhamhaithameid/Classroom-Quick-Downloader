@@ -65,11 +65,12 @@ describe('coerceMapPayload', () => {
 });
 
 describe('oracle-only website data source routing', () => {
-  it('reads overview from Oracle canonical snapshot endpoint', async () => {
+  it('reads overview from edge snapshot route with Oracle-compatible payload', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString();
-      expect(url).toContain('/api/public/website/snapshot');
-      expect(url).not.toContain('/public/site-metrics');
+      if (url.includes('/data/bootstrap-snapshot.json')) {
+        return new Response('missing', { status: 404 });
+      }
       return new Response(
         JSON.stringify({
           schemaVersion: '1',
@@ -123,14 +124,17 @@ describe('oracle-only website data source routing', () => {
 
     const payload = await fetchOverview();
     expect(payload.totals.downloads).toBe(77);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const calledUrls = fetchMock.mock.calls.map((call) => String(call[0]));
+    expect(calledUrls.some((url) => url.includes('/api/site/v1/snapshot') || url.includes('/api/public/website/snapshot'))).toBe(true);
+    expect(calledUrls.some((url) => url.includes('/public/site-metrics'))).toBe(false);
   });
 
-  it('reads map from Oracle canonical snapshot endpoint', async () => {
+  it('reads map from edge snapshot route with Oracle-compatible payload', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString();
-      expect(url).toContain('/api/public/website/snapshot');
-      expect(url).not.toContain('/public/site-metrics');
+      if (url.includes('/data/bootstrap-snapshot.json')) {
+        return new Response('missing', { status: 404 });
+      }
       return new Response(
         JSON.stringify({
           schemaVersion: '1',
@@ -185,7 +189,9 @@ describe('oracle-only website data source routing', () => {
     const payload = await fetchMapData();
     expect(payload.totals.downloads).toBe(88);
     expect(payload.countries).toEqual([{ countryCode: 'US', count: 88 }]);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const calledUrls = fetchMock.mock.calls.map((call) => String(call[0]));
+    expect(calledUrls.some((url) => url.includes('/api/site/v1/snapshot') || url.includes('/api/public/website/snapshot'))).toBe(true);
+    expect(calledUrls.some((url) => url.includes('/public/site-metrics'))).toBe(false);
   });
 });
 
@@ -266,77 +272,44 @@ describe('uninstall feedback API', () => {
     const requestBody = JSON.parse(String(init?.body || '{}')) as { schemaVersion?: string };
     expect(requestBody.schemaVersion).toBe('1');
   });
+
+  /* NEWSLETTER_CTA_DISABLED_ROLLBACK_START
+  it('submits newsletter subscription payload', async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          ok: true,
+          generatedAt: 1700003,
+          recordKey: 'student@example.com',
+          message: 'You are subscribed for future updates.'
+        }),
+        { status: 201 }
+      )
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await submitNewsletterSubscription({
+      email: 'student@example.com',
+      source: 'overview_ready_to_save_hours'
+    });
+
+    expect(response.ok).toBe(true);
+    expect(response.recordKey).toBe('student@example.com');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const call = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    const [url, init] = call;
+    expect(url).toContain('/api/public/website/newsletter/subscribe');
+    expect(init?.method).toBe('POST');
+  });
+  NEWSLETTER_CTA_DISABLED_ROLLBACK_END */
 });
 
 describe('user-facing content APIs', () => {
-  it('fetches and normalizes user changelog payload', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () =>
-        new Response(
-          JSON.stringify({
-            schemaVersion: '1',
-            ok: true,
-            generatedAt: 1700000000000,
-            snapshotId: 'snapshot-1',
-            overview: {
-              ok: true,
-              generatedAt: 1700000000000,
-              totals: { downloads: 1, success: 1, fail: 0 },
-              installs: { usersTotal: 1, lastSyncedAtUtc: 1700000000000, browsers: [] },
-              versions: { github: '1.3.6', chrome: '1.3.6', firefox: null, edge: null },
-              status: { systemLive: true, liveSinceUtc: 1700000000000, workerHealth: 'up' },
-              links: { chrome: 'https://c', firefox: 'https://f', edge: 'https://e', github: 'https://g' }
-            },
-            map: {
-              ok: true,
-              generatedAt: 1700000000000,
-              granularity: 'country',
-              countries: [{ countryCode: 'US', count: 1 }],
-              totals: { countries: 1, downloads: 1 },
-              privacyNote: 'country only'
-            },
-            changelog: {
-              ok: true,
-              generatedAt: 1700000000000,
-              headline: "What's new for students",
-              description: 'Simple updates',
-              entries: [
-                {
-                  id: 'release-136',
-                  version: '1.3.6',
-                  title: 'Stability improvements',
-                  summary: 'This release includes stability and security improvements.',
-                  highlights: ['Fewer errors', 'More reliable downloads'],
-                  releasedAtUtc: 1700000000001
-                }
-              ],
-              fullChangelogUrl: 'https://github.com/adhamhaithameid/Classroom-Quick-Downloader/blob/main/CHANGELOG.md',
-              lastUpdatedAtUtc: 1700000000001
-            },
-            userChangelogSummary: {
-              headline: "What's new for students",
-              description: 'Simple updates',
-              entriesCount: 1,
-              lastUpdatedAtUtc: 1700000000001,
-              fullChangelogUrl: 'https://github.com/adhamhaithameid/Classroom-Quick-Downloader/blob/main/CHANGELOG.md'
-            },
-            privacy: {
-              headline: 'Privacy',
-              description: 'No raw IP storage.',
-              userPrivacyUrl: 'https://classroom-quick-downloader-website.pages.dev/privacy',
-              fullPrivacyUrl: 'https://github.com/adhamhaithameid/Classroom-Quick-Downloader/blob/main/PRIVACY.md'
-            }
-          }),
-          { status: 200 }
-        )
-      )
-    );
-
+  it('loads user changelog from manual source-controlled data', async () => {
     const data = await fetchUserChangelog();
     expect(data.ok).toBe(true);
-    expect(data.entries).toHaveLength(1);
-    expect(data.entries[0]?.version).toBe('1.3.6');
+    expect(data.entries.length).toBeGreaterThan(0);
+    expect(data.entries[0]?.version).toBe('1.3.9');
   });
 
 });
