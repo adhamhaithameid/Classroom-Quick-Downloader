@@ -4627,10 +4627,10 @@
           html += '<tr>';
           html += '<td><code class="ext-cl-rule-id-code">' + escapeHtml(rule.id || '') + '</code></td>';
           html += '<td>' + escapeHtml(rule.target || 'all') + '</td>';
-          html += '<td><span style="' + pillStyle + '">' + escapeHtml(rule.priority || 'normal') + '</span></td>';
-          html += '<td>' + effectIcon + ' ' + escapeHtml(rule.effect || 'none') + '</td>';
-          html += '<td><span style="display:inline-block;padding:3px 10px;border-radius:12px;font-size:0.82em;background:' + pillBg + ';' + pillStyle + '">' + escapeHtml(rule.priority || 'normal') + '</span></td>';
-          html += '<td style="white-space:nowrap">';
+          html += '<td>' + escapeHtml(priority) + '</td>';
+          html += '<td>' + effectIcon + ' ' + escapeHtml(effect) + '</td>';
+          html += '<td><span class="' + escapeHtml(previewClass) + '">' + escapeHtml(previewText) + '</span></td>';
+          html += '<td class="ext-cl-actions-cell">';
           html += '<button class="btn btn-secondary btn-xs" onclick="editExtClRule(\'' + escapeHtml(rule.id || '') + '\')">✏️</button> ';
           html += '<button class="btn btn-danger btn-xs" onclick="deleteExtClRule(\'' + escapeHtml(rule.id || '') + '\')">🗑️</button>';
           html += '</td>';
