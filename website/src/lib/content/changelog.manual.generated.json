@@ -74,3 +74,4 @@
         "Compatibility safeguards for tooling/runtime.",
         "Updated dependency resolution paths.",
         "Fixed `minimatch` export mismatch issues in development flow."
+      ],
