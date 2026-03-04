@@ -72,3 +72,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "title": "Release 1.3.6",
       "summary": "Dependency and compatibility maintenance release.",
       "highlights": [
+        "Compatibility safeguards for tooling/runtime.",
