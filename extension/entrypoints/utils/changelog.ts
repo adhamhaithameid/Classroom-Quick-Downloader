@@ -1,4 +1,4 @@
-import { CHANGELOG_URL, ORACLE_CHANGELOG_URL } from './analytics/constants';
+import { EXTENSION_MANUAL_CHANGELOG } from './manual-changelog.generated';
 
 export interface ChangelogEntry {
   id: string;
