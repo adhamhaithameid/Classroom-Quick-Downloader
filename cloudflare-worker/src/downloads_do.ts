@@ -404,9 +404,9 @@ function defaultExtensionChangelogEntries(): ChangelogEntry[] {
       date: "2026-03-03T00:00:00.000Z",
       isImportant: true,
       changes: [
-        "Changelog delivery is now revision-aware so users receive same-version updates.",
-        "Version-pill state now refreshes against latest Cloudflare changelog data.",
-        "Improved sync reliability between published release data and extension UI."
+        "Manual changelog mode is now source-controlled for deterministic release notes.",
+        "Session-pinned website metrics prevent in-tab number drift until refresh.",
+        "Improved telemetry routing through edge snapshot and events endpoints."
       ]
     },
     {
