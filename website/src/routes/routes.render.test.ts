@@ -8,6 +8,10 @@ import PrivacyPage from './privacy/+page.svelte';
 import FaqPage from './faq/+page.svelte';
 import UninstallPage from './uninstall/+page.svelte';
 import NotFoundPage from './404/+page.svelte';
+import DownloadAllAttachmentsPage from './download-all-attachments-google-classroom/+page.svelte';
+import InstallChromePage from './install/chrome/+page.svelte';
+import SecurityPage from './security/+page.svelte';
+import CompareClassfetchPage from './compare/classroom-quick-downloader-vs-classfetch/+page.svelte';
 import { privacyContent } from '$lib/content/privacy';
 
 function squish(html: string): string {
@@ -20,7 +24,9 @@ describe('route render smoke coverage', () => {
     const html = squish(body);
 
     expect(html).toContain('Redirecting…');
-    expect(head).toContain('Classroom Quick Downloader — The Free Extension That Supercharges Google Classroom');
+    expect(head).toContain('Classroom Quick Downloader — Redirecting To Overview');
+    expect(head).toContain('noindex, nofollow');
+    expect(head).toContain('/overview');
   });
 
   it('renders landing2 redirect fallback and metadata', () => {
@@ -28,16 +34,18 @@ describe('route render smoke coverage', () => {
     const html = squish(body);
 
     expect(html).toContain('Redirecting…');
-    expect(head).toContain('Classroom Quick Downloader — Overview');
+    expect(head).toContain('Classroom Quick Downloader — Redirecting To Overview');
+    expect(head).toContain('noindex, nofollow');
   });
 
   it('renders overview page shell, hero copy, and CTA sections', () => {
     const { body, head } = render(OverviewPage);
     const html = squish(body);
 
-    expect(head).toContain('The Free Extension That Supercharges Google Classroom');
-    expect(html).toContain('The free extension that');
-    expect(html).toContain('supercharges');
+    expect(head).toContain('Download All Google Classroom Files In One Click');
+    expect(head).toContain('SoftwareApplication');
+    expect(head).toContain('/overview');
+    expect(html).toContain('Download all Google Classroom files');
     expect(html).toContain('Ready to save hours?');
     expect(html).toContain('See where Classroom Quick Downloader is used around the world.');
     expect(html).toContain('l2-page-floats');
@@ -49,7 +57,9 @@ describe('route render smoke coverage', () => {
     const html = squish(body);
 
     expect(head).toContain('Changelog — Classroom Quick Downloader');
-    expect(html).toContain('Loading changelog from the servers');
+    expect(head).toContain('/changelog');
+    expect(html).toContain('RELEASE HISTORY');
+    expect(html).toContain('v1.3.9');
     expect(html).toContain('Open changelog on GitHub');
   });
 
@@ -58,6 +68,7 @@ describe('route render smoke coverage', () => {
     const html = squish(body);
 
     expect(head).toContain('Uninstall Feedback — Classroom Quick Downloader');
+    expect(head).toContain('noindex, nofollow');
     expect(html).toContain("We'd love to hear why.");
     expect(html).toContain('What made you uninstall?');
     expect(html).toContain('Submit feedback');
@@ -71,6 +82,7 @@ describe('route render smoke coverage', () => {
     const html = squish(body);
 
     expect(head).toContain('404 — Classroom Quick Downloader');
+    expect(head).toContain('noindex, nofollow');
     expect(html).toContain('Page not found');
     expect(html).toContain('Go home');
     expect(html).toContain('Browse FAQ');
@@ -83,12 +95,13 @@ describe('route render smoke coverage', () => {
     const html = squish(body);
 
     expect(head).toContain('Privacy — Classroom Quick Downloader');
+    expect(head).toContain('/privacy');
     expect(html).toContain(privacyContent.headline);
     expect(html).toContain(privacyContent.sections[0]?.title ?? '');
     expect(html).toContain(privacyContent.sections[1]?.title ?? '');
     expect(html).toContain('Read full privacy policy');
     expect(html).toContain('Zero cookies');
-    expect(html).toContain('Zero tracking');
+    expect(html).toContain('No third-party tracking');
     expect(html).toContain('Zero personal data');
   });
 
@@ -97,7 +110,10 @@ describe('route render smoke coverage', () => {
     const html = squish(body);
 
     expect(head).toContain('FAQ');
+    expect(head).toContain('/faq');
+    expect(head).toContain('FAQPage');
     expect(html).toContain('Frequently Asked Questions');
+    expect(html).toContain('Quick answers students search for most');
     expect(html).toContain('What is Classroom Quick Downloader?');
     expect(html).toContain('Which browsers are supported?');
     expect(html).toContain('How does');
@@ -105,6 +121,36 @@ describe('route render smoke coverage', () => {
     expect(html).toContain('For Students');
     expect(html).toContain('For Developers');
     expect(html).toContain('Search questions');
+  });
+
+  it('renders SEO use-case page content and canonical metadata', () => {
+    const { body, head } = render(DownloadAllAttachmentsPage);
+    const html = squish(body);
+
+    expect(head).toContain('/download-all-attachments-google-classroom');
+    expect(html).toContain('How To Download All Attachments From Google Classroom');
+    expect(html).toContain('Install for Chrome');
+  });
+
+  it('renders browser install SEO page', () => {
+    const { body, head } = render(InstallChromePage);
+    const html = squish(body);
+
+    expect(head).toContain('/install/chrome');
+    expect(html).toContain('Install CQD For Chrome');
+    expect(html).toContain('Install from Chrome Web Store');
+  });
+
+  it('renders trust and comparison SEO pages', () => {
+    const securityRendered = render(SecurityPage);
+    const compareRendered = render(CompareClassfetchPage);
+    const securityHtml = squish(securityRendered.body);
+    const compareHtml = squish(compareRendered.body);
+
+    expect(securityRendered.head).toContain('/security');
+    expect(securityHtml).toContain('Security Overview');
+    expect(compareRendered.head).toContain('/compare/classroom-quick-downloader-vs-classfetch');
+    expect(compareHtml).toContain('Classroom Quick Downloader vs Classfetch');
   });
 
 });
