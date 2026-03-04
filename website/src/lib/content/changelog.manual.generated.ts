@@ -183,3 +183,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       ],
       "added": [
         "Unified cancel control logic for active operations."
+      ],
