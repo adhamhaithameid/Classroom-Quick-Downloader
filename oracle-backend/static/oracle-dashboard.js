@@ -4618,11 +4618,12 @@
         html += '<th>ID</th><th>Target</th><th>Priority</th><th>Effect</th><th>Preview</th><th>Actions</th>';
         html += '</tr></thead><tbody>';
         rules.forEach(function(rule) {
-          var pillStyle = '';
-          var pillBg = 'rgba(255,255,255,0.08)';
-          if (rule.priority === 'minor') { pillStyle = 'color:#60a5fa;'; pillBg = 'rgba(59,130,246,0.15)'; }
-          if (rule.priority === 'major') { pillStyle = 'color:#f87171;font-weight:700;'; pillBg = 'rgba(239,68,68,0.15)'; }
-          var effectIcon = rule.effect === 'glow' ? '✨' : rule.effect === 'pulse' ? '📡' : '—';
+          var priority = String(rule.priority || 'normal').toLowerCase();
+          var effect = String(rule.effect || 'none').toLowerCase();
+          var targetVersion = normalizeExtRuleVersionForPreview(rule.target || '');
+          var previewText = targetVersion ? ('v' + targetVersion) : 'v1.3.8';
+          var previewClass = getExtRulePreviewClasses(priority, effect).join(' ') + ' rule-preview-mini';
+          var effectIcon = effect === 'glow' ? '✨' : effect === 'pulse' ? '📡' : '—';
           html += '<tr>';
           html += '<td><code style="font-size:0.82em">' + escapeHtml(rule.id || '') + '</code></td>';
           html += '<td>' + escapeHtml(rule.target || 'all') + '</td>';
