@@ -72,6 +72,15 @@ jobs:
 
             cd oracle-backend
             if [ ! -f .env.production ]; then
+              for candidate in "$HOME/oracle-backend/.env.production" "$HOME/oracle-backend/.env" "$HOME/Classroom-Quick-Downloader/.env.production"; do
+                if [ -f "$candidate" ]; then
+                  cp "$candidate" .env.production
+                  echo "Recovered .env.production from $candidate"
+                  break
+                fi
+              done
+            fi
+            if [ ! -f .env.production ]; then
               echo ".env.production is missing on the Oracle VM. Create it first."
               exit 1
             fi
