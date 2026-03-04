@@ -4720,6 +4720,7 @@
       }
 
       function bindExtChangelogEvents() {
+        if (!LEGACY_CHANGELOG_CUSTOMIZATION_ENABLED) return;
         // Entry form submit
         var entryForm = document.getElementById('ext-cl-entry-form');
         if (entryForm) {
