@@ -159,3 +159,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "More coverage and safeguards for cancel behavior.",
         "Improved cancel responsiveness and clarity.",
         "Fixed inconsistent cancellation cleanup paths."
+      ],
