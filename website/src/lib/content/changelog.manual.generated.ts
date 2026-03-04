@@ -336,3 +336,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       ],
       "fixed": [
         "Fixed pre-release blockers."
+      ],
