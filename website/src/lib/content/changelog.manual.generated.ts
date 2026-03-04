@@ -96,3 +96,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Expanded resilience/security checks across extension-worker-oracle flow.",
         "Improved pipeline validation and retry behavior.",
         "Fixed cancellation/flush consistency issues."
+      ],
