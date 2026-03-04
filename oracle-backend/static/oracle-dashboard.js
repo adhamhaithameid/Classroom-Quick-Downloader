@@ -1145,7 +1145,7 @@
         html += '</div>';
 
         if (row.length > 0) {
-          html += '<div class="batch-info-grid" style="margin-top:12px">';
+          html += '<div class="batch-info-grid batch-info-grid-spaced">';
           for (var i = 0; i < row.length; i++) {
             var label = columnNames[i] || ('Column ' + (i + 1));
             var value = row[i];
