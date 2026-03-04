@@ -305,3 +305,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "highlights": [
         "Better logging/diagnostics for early production behavior.",
         "Improved repeat-use reliability.",
+        "Fixed launch-adjacent regressions."
