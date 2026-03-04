@@ -895,7 +895,40 @@ func ExtChangelogImportGitHubHandler(sqliteDB *sql.DB) http.HandlerFunc {
 			writeExtError(w, http.StatusInternalServerError, "Import failed: "+trimAndLimit(err.Error(), 200))
 			return
 		}
-		writeExtJSON(w, http.StatusOK, map[string]any{"ok": true, "imported": imported})
+		writeExtJSON(w, http.StatusOK, map[string]any{
+			"ok":            true,
+			"imported":      importResult.Imported,
+			"skipped":       importResult.Skipped,
+			"checksum":      importResult.Checksum,
+			"lastImportAt":  importResult.LastImportAt,
+			"sourceUrl":     importResult.SourceURL,
+			"schemaVersion": "1",
+		})
+	}
+}
+
+// ExtChangelogImportGitHubPreviewHandler previews markdown import from GitHub before commit.
+func ExtChangelogImportGitHubPreviewHandler(sqliteDB *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeExtError(w, http.StatusMethodNotAllowed, "Only POST is allowed.")
+			return
+		}
+		body, err := readLimitedBody(r, extChangelogBodyLimitBytes)
+		if err != nil {
+			writeExtError(w, http.StatusBadRequest, "Invalid request body.")
+			return
+		}
+		var input struct {
+			URL string `json:"url"`
+		}
+		_ = json.Unmarshal(body, &input)
+		previewPayload, err := previewExtChangelogFromGitHub(sqliteDB, strings.TrimSpace(input.URL))
+		if err != nil {
+			writeExtError(w, http.StatusBadRequest, trimAndLimit(err.Error(), 200))
+			return
+		}
+		writeExtJSON(w, http.StatusOK, previewPayload)
 	}
 }
 
