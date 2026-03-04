@@ -167,3 +167,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Improved cancel responsiveness and clarity."
       ],
       "fixed": [
+        "Fixed inconsistent cancellation cleanup paths."
