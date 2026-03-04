@@ -361,6 +361,7 @@ func main() {
 	mux.Handle("/api/admin/extension-changelog/rules/delete", authMiddleware(criticalMiddleware(handlers.ExtChangelogRulesDeleteHandler(sqlDB))))
 	mux.Handle("/api/admin/extension-changelog/config", authMiddleware(handlers.ExtChangelogConfigHandler(sqlDB)))
 	mux.Handle("/api/admin/extension-changelog/config/save", authMiddleware(criticalMiddleware(handlers.ExtChangelogConfigSaveHandler(sqlDB))))
+	mux.Handle("/api/admin/extension-changelog/import-github/preview", authMiddleware(criticalMiddleware(handlers.ExtChangelogImportGitHubPreviewHandler(sqlDB))))
 	mux.Handle("/api/admin/extension-changelog/import-github", authMiddleware(criticalMiddleware(handlers.ExtChangelogImportGitHubHandler(sqlDB))))
 	mux.Handle("/api/admin/extension-changelog/bulk-import", authMiddleware(criticalMiddleware(handlers.ExtChangelogBulkImportHandler(sqlDB))))
 
