@@ -145,3 +145,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "changed": [
         "Improved user-facing messaging and data alignment."
       ],
+      "fixed": [
