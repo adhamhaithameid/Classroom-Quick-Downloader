@@ -281,3 +281,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "version": "1.1.0",
       "title": "Release 1.1.0",
       "summary": "Feature and compatibility expansion release.",
+      "highlights": [
