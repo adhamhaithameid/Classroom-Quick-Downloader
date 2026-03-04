@@ -139,3 +139,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Improved user-facing messaging and data alignment.",
         "Fixed cross-service payload/shape mismatches."
       ],
+      "added": [
