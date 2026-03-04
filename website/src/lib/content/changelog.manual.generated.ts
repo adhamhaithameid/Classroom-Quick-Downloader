@@ -340,3 +340,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "releasedAtUtc": 1771309980434
     },
     {
+      "id": "manual-0.0.0-17",
