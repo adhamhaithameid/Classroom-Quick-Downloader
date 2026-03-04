@@ -6,7 +6,7 @@ async function loadChangelogModule() {
   return import('../entrypoints/utils/changelog');
 }
 
-describe('changelog utils', () => {
+describe('changelog utils (manual mode)', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     chrome.storage.local.get = vi.fn(async () => ({})) as never;
