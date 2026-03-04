@@ -5678,7 +5678,8 @@ export function renderDashboard(stats: StatsResponse): string {
             setPreviewMessage(revisionHistoryEl, "No revisions saved yet.");
             return;
           }
-          revisionHistoryEl.innerHTML = history.slice(0, 15).map((row) => {
+          clearChildren(revisionHistoryEl);
+          history.slice(0, 15).forEach((row) => {
             const when = new Date(Number(row.createdAt || 0)).toLocaleString('en-US', { timeZone: 'UTC' });
             const source = String(row.source || 'manual');
             const valid = row.valid === true ? 'valid' : 'needs check';
