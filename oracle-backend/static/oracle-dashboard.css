@@ -1077,6 +1077,8 @@
         height: 100%;
         border-radius: 999px;
         background: linear-gradient(90deg, #22c55e, #3b82f6);
+        width: 0%;
+        transition: width 0.24s ease;
       }
 
       .heatmap-wrap {
