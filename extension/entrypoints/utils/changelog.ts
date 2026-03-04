@@ -146,8 +146,8 @@ function normalizeManualData(): ChangelogData {
       lastUpdated: Number(EXTENSION_MANUAL_CHANGELOG?.config?.lastUpdated) || now,
     },
     meta,
-    revisionToken,
-    lastFetched,
+    revisionToken: `rev-${hashText(JSON.stringify(basis))}`,
+    lastFetched: now,
   };
 }
 
