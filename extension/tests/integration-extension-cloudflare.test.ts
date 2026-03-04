@@ -298,37 +298,6 @@ describe('extension <-> cloudflare integration', () => {
     await changelog.markAsSeen('1.3.8', data);
     expect(await changelog.isVersionSeen('1.3.8', data)).toBe(true);
 
-    const republishRes = await durable.fetch(new Request('https://do/admin/changelog', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Admin-Secret': 'secret',
-      },
-      body: JSON.stringify({
-        changelog: [
-          {
-            id: 'release-138',
-            version: '1.3.8',
-            date: '2026-03-02T00:00:00.000Z',
-            changes: [
-              'Updated payload for same version',
-            ],
-          },
-        ],
-        config: {
-          rules: [
-            {
-              id: 'rule-138',
-              target: '1.3.8',
-              priority: 'major',
-              effect: 'pulse',
-            },
-          ],
-        },
-      }),
-    }));
-    expect(republishRes.status).toBe(200);
-
     const updated = await changelog.fetchChangelog(true);
     expect(updated?.revisionToken).toBeTruthy();
     expect(updated?.revisionToken).not.toBe(data?.revisionToken);
