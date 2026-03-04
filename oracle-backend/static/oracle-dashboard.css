@@ -588,7 +588,7 @@
         cursor: pointer;
         transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
         border: 1px solid var(--border-primary);
-        background: var(--bg-secondary);
+        background: color-mix(in srgb, var(--bg-secondary) 90%, #1c2c50 10%);
         color: var(--text-secondary);
         text-decoration: none;
         white-space: nowrap;
