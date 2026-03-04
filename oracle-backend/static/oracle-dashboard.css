@@ -2636,6 +2636,9 @@
         font-size: 11px;
         color: var(--text-muted);
       }
+      .content-record-meta-spaced {
+        margin-top: 6px;
+      }
       .content-record-summary {
         font-size: 12px;
         line-height: 1.5;
