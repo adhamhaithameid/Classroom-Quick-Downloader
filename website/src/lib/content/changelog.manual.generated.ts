@@ -124,3 +124,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "changed": [
         "Refined ingestion orchestration between worker and oracle."
       ],
+      "fixed": [
