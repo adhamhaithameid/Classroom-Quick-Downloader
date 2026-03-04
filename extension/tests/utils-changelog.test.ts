@@ -56,7 +56,7 @@ describe('changelog utils (manual mode)', () => {
     );
   });
 
-  it('treats same-version cloud updates as unseen when changelog content changes', async () => {
+  it('handles latest change extraction and seen version tracking', async () => {
     const mod = await loadChangelogModule();
     const inMemoryStorage: Record<string, unknown> = {};
     chrome.storage.local.get = vi.fn(async (key?: string | string[] | Record<string, unknown>) => {
