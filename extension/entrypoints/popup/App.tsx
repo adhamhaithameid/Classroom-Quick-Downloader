@@ -800,9 +800,19 @@ function App() {
                     title={getLatestChange(changelogData) ? `Latest: ${getLatestChange(changelogData)}` : "View changelog"}
                     onClick={async () => {
                        setShowChangelog(true);
-                       const latestData = await fetchChangelog(true);
-                       if (latestData) {
-                         setChangelogData(latestData);
+                       const latest = await fetchChangelogDetailed(true);
+                       if (latest.data) {
+                         setChangelogData(latest.data);
+                       }
+                       if (latest.status === 'cache-fallback') {
+                         setChangelogStatus('offline');
+                         setChangelogStatusMessage(latest.error || 'Oracle is unreachable. Showing cached changelog.');
+                       } else if (latest.status === 'error') {
+                         setChangelogStatus('error');
+                         setChangelogStatusMessage(latest.error || 'Unable to load changelog from Oracle.');
+                       } else {
+                         setChangelogStatus('ready');
+                         setChangelogStatusMessage(latest.status === 'empty' ? 'No changelog entries are available yet.' : null);
                        }
                        if (version) {
                          await markAsSeen(version, latestData ?? changelogData);
