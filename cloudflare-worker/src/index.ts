@@ -1058,6 +1058,31 @@ async function handleDashboard(request: Request, env: WorkerEnv): Promise<Respon
   });
 }
 
+async function handleWebsiteConsoleDashboard(request: Request, env: WorkerEnv): Promise<Response> {
+  const clientIp = request.headers.get("CF-Connecting-IP") || "unknown";
+  const userAgent = request.headers.get("User-Agent") || "";
+  const sessionBindingMode = sessionBindingModeFromEnv(env);
+  const sessionToken = getSessionCookie(request);
+  const dashboardSecret = getDashboardSecret(env);
+
+  if (
+    !dashboardSecret ||
+    !sessionToken ||
+    !await verifySessionToken(sessionToken, dashboardSecret, clientIp, userAgent, sessionBindingMode)
+  ) {
+    const logoutUrl = new URL(request.url);
+    return redirectWithCookies("/", [
+      clearSessionCookieHeader(logoutUrl, env),
+      clearDangerStepUpCookieHeader(logoutUrl, env),
+    ]);
+  }
+
+  return new Response(renderWebsiteConsole(), {
+    status: 200,
+    headers: { "content-type": "text/html; charset=utf-8" },
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Logout Handler
 // ---------------------------------------------------------------------------
