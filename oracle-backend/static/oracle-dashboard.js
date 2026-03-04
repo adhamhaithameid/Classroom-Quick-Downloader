@@ -3083,13 +3083,7 @@
           var records = payload.records || [];
           if (!records.length) {
             container.innerHTML = '<div class="empty-state">No subscribers yet</div>';
-            if (summary) {
-              summary.innerHTML =
-                '<span class="newsletter-tag">Total: 0</span>' +
-                '<span class="newsletter-tag">Active: 0</span>' +
-                '<span class="newsletter-tag">Paused: 0</span>' +
-                '<span class="newsletter-tag">Unsubscribed: 0</span>';
-            }
+            renderNewsletterSummary(summary, { total: 0, active: 0, paused: 0, unsubscribed: 0 });
             return;
           }
           var counts = { total: records.length, active: 0, paused: 0, unsubscribed: 0 };
