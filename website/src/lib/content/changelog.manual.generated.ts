@@ -134,3 +134,4 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "version": "1.2.3",
       "title": "Release 1.2.3",
       "summary": "Usability and telemetry consistency release.",
+      "highlights": [
