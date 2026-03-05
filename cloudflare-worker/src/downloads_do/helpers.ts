@@ -54,3 +54,31 @@ export function maskIpAddress(ip: string): string {
   // IPv6 or other - just take first segment
   return ip.split(':')[0] + ':*';
 }
+
+/**
+ * Generates a random string using cryptographically secure random values.
+ * Uses lowercase alphanumeric characters (a-z, 0-9).
+ *
+ * @param length The length of the string to generate
+ */
+export function generateSecureRandomString(length: number): string {
+  const charset = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  const values = new Uint32Array(length);
+  crypto.getRandomValues(values);
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += charset[values[i] % charset.length];
+  }
+  return result;
+}
+
+/**
+ * Generates a random number in the range [0, 1) using
+ * cryptographically secure random values.
+ * Use this as a secure drop-in replacement for Math.random().
+ */
+export function secureRandom(): number {
+  const values = new Uint32Array(1);
+  crypto.getRandomValues(values);
+  return values[0] / (0xffffffff + 1);
+}

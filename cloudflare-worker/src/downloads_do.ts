@@ -19,6 +19,7 @@ import {
   ChangelogSyncStatus,
 } from "./types";
 import { resolveOracleEndpoint } from "./oracle-endpoint";
+import { generateSecureRandomString, secureRandom } from "./downloads_do/helpers";
 
 export interface Env {
   ORACLE_ENDPOINT: string;
@@ -1710,7 +1711,7 @@ function generateAckId(): string {
   } catch {
     // ignore and fallback
   }
-  const rand = Math.random().toString(36).slice(2, 10);
+  const rand = generateSecureRandomString(8);
   return `ack-${Date.now().toString(36)}-${rand}`;
 }
 
@@ -1722,7 +1723,7 @@ function generateEventId(): string {
   } catch {
     // ignore and fallback
   }
-  const rand = Math.random().toString(36).slice(2, 10);
+  const rand = generateSecureRandomString(8);
   return `legacy-${Date.now().toString(36)}-${rand}`;
 }
 
@@ -2591,7 +2592,7 @@ export class DownloadsDurable {
     } catch {
       // Fallback handled below.
     }
-    return `wdaudit-${now}-${Math.random().toString(36).slice(2, 12)}`;
+    return `wdaudit-${now}-${generateSecureRandomString(10)}`;
   }
 
   private buildDangerAuditCorrelationID(now: number): string {
@@ -2602,7 +2603,7 @@ export class DownloadsDurable {
     } catch {
       // Fallback handled below.
     }
-    return `wdcorr-${now}-${Math.random().toString(36).slice(2, 12)}`;
+    return `wdcorr-${now}-${generateSecureRandomString(10)}`;
   }
 
   private appendDangerAudit(
@@ -2929,7 +2930,7 @@ export class DownloadsDurable {
     } catch {
       // Fallback handled below.
     }
-    return `ws-${now}-${Math.random().toString(36).slice(2, 12)}`;
+    return `ws-${now}-${generateSecureRandomString(10)}`;
   }
 
   private buildWebsiteTelemetryCorrelationID(now: number): string {
@@ -2940,7 +2941,7 @@ export class DownloadsDurable {
     } catch {
       // Fallback handled below.
     }
-    return `wscorr-${now}-${Math.random().toString(36).slice(2, 12)}`;
+    return `wscorr-${now}-${generateSecureRandomString(10)}`;
   }
 
   private appendWebsiteTelemetrySeenEventIDs(eventIDs: string[]): void {
@@ -2959,7 +2960,7 @@ export class DownloadsDurable {
       WEBSITE_TELEMETRY_RETRY_MAX_MS,
       WEBSITE_TELEMETRY_RETRY_BASE_MS * Math.pow(2, safeAttempt - 1),
     );
-    const jitter = Math.floor(base * (Math.random() * 0.35));
+    const jitter = Math.floor(base * (secureRandom() * 0.35));
     return Date.now() + base + jitter;
   }
 
@@ -5946,7 +5947,7 @@ export class DownloadsDurable {
     if (changed) {
       this.d.changelog = parsed.entries;
       this.appendChangelogRevision({
-        id: `rev-${options.now}-${Math.floor(Math.random() * 1000000)}`,
+        id: `rev-${options.now}-${Math.floor(secureRandom() * 1000000)}`,
         source: "github_auto",
         createdAt: options.now,
         actor: options.actor || options.source,
@@ -6178,7 +6179,7 @@ export class DownloadsDurable {
       liveHash: nextHash,
     };
     this.appendChangelogRevision({
-      id: `rev-${now}-${Math.floor(Math.random() * 1000000)}`,
+      id: `rev-${now}-${Math.floor(secureRandom() * 1000000)}`,
       source: this.d.changelogDraft.source === "github" ? "github" : "manual",
       createdAt: now,
       actor,
@@ -6383,7 +6384,7 @@ export class DownloadsDurable {
 
       if (updated && (changelogFromMarkdown || Array.isArray(body.changelog))) {
         const revision: ChangelogRevision = {
-          id: `rev-${now}-${Math.floor(Math.random() * 1000000)}`,
+          id: `rev-${now}-${Math.floor(secureRandom() * 1000000)}`,
           source: changelogFromMarkdown ? (markdownSource === "github" ? "github" : "manual") : "api",
           createdAt: now,
           actor,
