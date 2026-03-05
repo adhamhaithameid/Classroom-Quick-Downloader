@@ -141,29 +141,4 @@ jobs:
               exit 1
             fi
 
-            auth_code="$(curl -sS -o /tmp/oracle-auth.json -w "%{http_code}" "http://127.0.0.1:8080/api/admin/website/state" || true)"
-            if [ "$auth_code" != "401" ] && [ "$auth_code" != "403" ]; then
-              echo "Oracle auth smoke check expected 401/403, got ${auth_code}"
-              cat /tmp/oracle-auth.json || true
-              exit 1
-            fi
-
-            snapshot_payload="$(curl -fsS "http://127.0.0.1:8080/api/public/website/snapshot")"
-            echo "$snapshot_payload" | grep -Eq '"schemaVersion"[[:space:]]*:[[:space:]]*"1"'
-
-            smoke_origin="$(grep -E '^PUBLIC_WEBSITE_ALLOWED_ORIGINS=' .env.production | head -n1 | cut -d= -f2- | tr ',' '\n' | head -n1 | xargs)"
-            if [ -z "$smoke_origin" ]; then
-              smoke_origin="https://classroom-quick-downloader-website.pages.dev"
-            fi
-            event_id="gha-oracle-${GITHUB_RUN_ID:-manual}-${GITHUB_RUN_ATTEMPT:-1}"
-            ingest_payload="$(cat <<JSON
-            {"schemaVersion":"1","sessionId":"gha-oracle-smoke","pagePath":"/ci/smoke","events":[{"eventId":"${event_id}","eventType":"cta","action":"install_click","placement":"hero_install"}]}
-            JSON
-            )"
-            ingest_response="$(curl -fsS -X POST "http://127.0.0.1:8080/api/public/website/events" \
-              -H "Origin: ${smoke_origin}" \
-              -H "Content-Type: application/json" \
-              -H "X-Requested-With: XMLHttpRequest" \
-              --data "$ingest_payload")"
-            echo "$ingest_response" | grep -Eq '"ok"[[:space:]]*:[[:space:]]*true'
-            echo "Oracle post-deploy smoke checks passed"
+            echo "Oracle deploy health gate passed (deep API smoke checks run in CI jobs)."
