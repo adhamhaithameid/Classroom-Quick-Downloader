@@ -30,8 +30,11 @@
       : [structuredData]
     : [];
   $: jsonLdScriptHtml = jsonLdItems.map((item) => {
-    const payload = JSON.stringify(item).replace(/</g, '\\u003c');
-    return `<script type="application/ld+json">${payload}<\\/script>`;
+    const payload = JSON.stringify(item)
+      .replace(/</g, '\\u003c')
+      .replace(/-->/g, '--\\u003e')
+      .replace(/<\/script/gi, '<\\/script');
+    return `<script type="application/ld+json">${payload}</scr` + `ipt>`;
   });
 </script>
 
