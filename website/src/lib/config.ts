@@ -1,4 +1,6 @@
-import { env } from '$env/dynamic/public';
+import * as publicEnvModule from '$env/static/public';
+
+const publicEnv = publicEnvModule as Record<string, string | undefined>;
 
 const DEFAULT_SITE_URL = 'https://classroom-quick-downloader-website.pages.dev';
 const DEFAULT_WORKER_URL = 'https://cqd-analytics.adhamhaithameid.workers.dev';
@@ -41,16 +43,16 @@ function envBool(value: string | undefined, fallback = false): boolean {
   return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
 }
 
-export const SITE_URL = ensureUrl(env.PUBLIC_SITE_URL ?? '', resolveDefaultSiteUrl());
-export const ORACLE_API_BASE_URL = ensureUrl(env.PUBLIC_ORACLE_API_BASE_URL ?? '', DEFAULT_ORACLE_URL);
-export const WORKER_BASE_URL = ensureUrl(env.PUBLIC_WORKER_BASE_URL ?? '', DEFAULT_WORKER_URL);
-export const SITE_BACKEND_BASE_URL = ensureUrl(env.PUBLIC_SITE_BACKEND_BASE_URL ?? '', WORKER_BASE_URL);
+export const SITE_URL = ensureUrl(publicEnv.PUBLIC_SITE_URL ?? '', resolveDefaultSiteUrl());
+export const ORACLE_API_BASE_URL = ensureUrl(publicEnv.PUBLIC_ORACLE_API_BASE_URL ?? '', DEFAULT_ORACLE_URL);
+export const WORKER_BASE_URL = ensureUrl(publicEnv.PUBLIC_WORKER_BASE_URL ?? '', DEFAULT_WORKER_URL);
+export const SITE_BACKEND_BASE_URL = ensureUrl(publicEnv.PUBLIC_SITE_BACKEND_BASE_URL ?? '', WORKER_BASE_URL);
 export const APP_VERSION = (() => {
-  const raw = (env.PUBLIC_APP_VERSION ?? DEFAULT_APP_VERSION).trim();
+  const raw = (publicEnv.PUBLIC_APP_VERSION ?? DEFAULT_APP_VERSION).trim();
   if (!raw) return DEFAULT_APP_VERSION;
   return raw.startsWith('v') ? raw : `v${raw}`;
 })();
-export const ENABLE_FEEDBACK_NAV = envBool(env.PUBLIC_ENABLE_FEEDBACK_NAV, false);
+export const ENABLE_FEEDBACK_NAV = envBool(publicEnv.PUBLIC_ENABLE_FEEDBACK_NAV, false);
 
 export const STORE_LINKS = {
   chrome:
