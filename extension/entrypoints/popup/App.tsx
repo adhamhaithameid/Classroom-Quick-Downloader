@@ -594,7 +594,7 @@ function App() {
   useEffect(() => {
     if (!showChangelog) return;
 
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const handleKeyDown = (e: globalThis.KeyboardEvent) => {
       if (e.key === 'Escape') {
         setShowChangelog(false);
       }
