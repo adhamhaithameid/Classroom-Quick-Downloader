@@ -699,3 +699,41 @@ export function isExcludedEditedPattern(text: string): boolean {
   const normalized = normalizeForComparison(text);
   return EDITED_EXCLUSION_PATTERNS.some(p => normalized.includes(normalizeForComparison(p)));
 }
+
+// ============================================================================
+// MEMOIZED COMBINED KEYWORDS
+// ============================================================================
+
+const combinedCommentKeywordsCache = new Map<string, CommentKeywords>();
+const combinedEditedKeywordsCache = new Map<string, string[]>();
+
+export function getCombinedCommentKeywords(lang: string): CommentKeywords {
+  if (combinedCommentKeywordsCache.has(lang)) {
+    return combinedCommentKeywordsCache.get(lang)!;
+  }
+  const keywords = getCommentKeywords(lang);
+  const englishKeywords = getCommentKeywords('en');
+  const arabicKeywords = getCommentKeywords('ar');
+
+  const combined: CommentKeywords = {
+    singular: [...new Set([...keywords.singular, ...englishKeywords.singular, ...arabicKeywords.singular])],
+    plural: [...new Set([...keywords.plural, ...englishKeywords.plural, ...arabicKeywords.plural])],
+    classComment: [...new Set([...keywords.classComment, ...englishKeywords.classComment, ...arabicKeywords.classComment])],
+  };
+
+  combinedCommentKeywordsCache.set(lang, combined);
+  return combined;
+}
+
+export function getCombinedEditedKeywords(lang: string): string[] {
+  if (combinedEditedKeywordsCache.has(lang)) {
+    return combinedEditedKeywordsCache.get(lang)!;
+  }
+  const keywords = getEditedKeywords(lang);
+  const englishKeywords = getEditedKeywords('en');
+  const arabicKeywords = getEditedKeywords('ar');
+
+  const combined = [...new Set([...keywords, ...englishKeywords, ...arabicKeywords])];
+  combinedEditedKeywordsCache.set(lang, combined);
+  return combined;
+}

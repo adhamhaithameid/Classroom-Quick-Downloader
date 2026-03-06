@@ -12,6 +12,7 @@ import {
   normalizeText,
   normalizeForComparison,
   getEditedKeywords,
+  getCombinedEditedKeywords,
   hasDatePattern,
   isExcludedEditedPattern,
 } from './detection-keywords';
@@ -386,12 +387,8 @@ function executeEditedLayer4(post: HTMLElement, matchedText: string | null): Lay
 // ============================================================================
 
 export function detectEdited(post: HTMLElement, pageLang: string): EditedDetectionResult {
-  const keywords = getEditedKeywords(pageLang);
-  const englishKeywords = getEditedKeywords('en');
-  const arabicKeywords = getEditedKeywords('ar');
-  
   // Always include English and Arabic as fallbacks for maximum detection
-  const combinedKeywords = [...new Set([...keywords, ...englishKeywords, ...arabicKeywords])];
+  const combinedKeywords = getCombinedEditedKeywords(pageLang);
   
   const layer1 = executeEditedLayer1(post, combinedKeywords);
   const layer2 = executeEditedLayer2(post, combinedKeywords);

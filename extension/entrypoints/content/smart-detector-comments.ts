@@ -22,6 +22,7 @@ import {
   normalizeForComparison,
   parseUnicodeInteger,
   getCommentKeywords,
+  getCombinedCommentKeywords,
   isExcludedCommentPattern,
   type CommentKeywords,
 } from './detection-keywords';
@@ -515,17 +516,8 @@ function executeLayer4_NuclearScan(post: HTMLElement, keywords: CommentKeywords)
 // ============================================================================
 
 export function detectComments(post: HTMLElement, pageLang: string): CommentDetectionResult {
-  // Get keywords for current language + English fallback + Arabic (common)
-  const keywords = getCommentKeywords(pageLang);
-  const englishKeywords = getCommentKeywords('en');
-  const arabicKeywords = getCommentKeywords('ar');
-  
-  // Combine keywords (deduplicated)
-  const combinedKeywords: CommentKeywords = {
-    singular: [...new Set([...keywords.singular, ...englishKeywords.singular, ...arabicKeywords.singular])],
-    plural: [...new Set([...keywords.plural, ...englishKeywords.plural, ...arabicKeywords.plural])],
-    classComment: [...new Set([...keywords.classComment, ...englishKeywords.classComment, ...arabicKeywords.classComment])],
-  };
+  // Combine keywords (deduplicated) using memoized helper
+  const combinedKeywords = getCombinedCommentKeywords(pageLang);
   
   // LAYER 0: DOM TRUTH (ABSOLUTE AUTHORITY)
   // If the specific Classwork comment container exists, its value is the AUTHORITY
