@@ -1,6 +1,6 @@
 # Phase 12 Test Matrix (Strict + Comprehensive)
 
-This document maps each `plan.md` phase-12 requirement to concrete tests and commands in this repository.
+This document maps each `refactor-plan.md` phase-12 requirement to concrete tests and commands in this repository.
 
 Primary runner:
 

@@ -288,7 +288,7 @@ If deploy exposes unsafe behavior (open admin route, auth bypass, CSRF bypass, C
 
 ## 10. Phase 12 + 13 Operator Scripts
 
-These scripts execute the strict `plan.md` phase-12 and phase-13 gates directly:
+These scripts execute the strict `refactor-plan.md` phase-12 and phase-13 gates directly:
 
 ```bash
 # Full phase-12 strict matrix
