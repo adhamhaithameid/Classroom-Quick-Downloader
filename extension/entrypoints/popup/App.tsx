@@ -846,14 +846,18 @@ function App() {
 
         <div className="cqd-content-area">
           {/* ChangeLog Overlay */}
-          <div className={`cqd-changelog-overlay ${showChangelog ? 'open' : ''}`} onClick={(e) => {
+          <div
+            className={`cqd-changelog-overlay ${showChangelog ? 'open' : ''}`}
+            aria-hidden={!showChangelog}
+            onClick={(e) => {
              if (e.target === e.currentTarget) setShowChangelog(false);
-          }}>
+            }}
+          >
             <div
               className="cqd-changelog-card"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="changelog-title"
+              role={showChangelog ? 'dialog' : undefined}
+              aria-modal={showChangelog ? true : undefined}
+              aria-labelledby={showChangelog ? 'changelog-title' : undefined}
             >
               <div className="cqd-cl-header">
                 <h3 id="changelog-title" className="cqd-cl-title">
