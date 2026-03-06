@@ -590,6 +590,22 @@ function App() {
     };
   }, []);
 
+  // --- ESCAPE KEY TO CLOSE CHANGELOG ---
+  useEffect(() => {
+    if (!showChangelog) return;
+
+    const handleKeyDown = (e: globalThis.KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowChangelog(false);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showChangelog]);
+
   // --- SEEN STATE ---
   const [seen, setSeen] = useState(false);
   useEffect(() => {
@@ -833,9 +849,14 @@ function App() {
           <div className={`cqd-changelog-overlay ${showChangelog ? 'open' : ''}`} onClick={(e) => {
              if (e.target === e.currentTarget) setShowChangelog(false);
           }}>
-            <div className="cqd-changelog-card">
+            <div
+              className="cqd-changelog-card"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="changelog-title"
+            >
               <div className="cqd-cl-header">
-                <h3 className="cqd-cl-title">
+                <h3 id="changelog-title" className="cqd-cl-title">
                   <span className="btn-bullet">📜</span> What's New
                 </h3>
                 <button
