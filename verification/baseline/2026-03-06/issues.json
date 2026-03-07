@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "cqd-baseline-issues",
+  "type": "object",
+  "properties": {
+    "captureDate": { "type": "string", "format": "date" },
+    "extensionVersion": { "type": "string" },
+    "browserVersion": { "type": "string" },
+    "testResults": {
+      "type": "object",
+      "properties": {
+        "totalFiles": { "type": "integer" },
+        "totalTests": { "type": "integer" },
+        "passed": { "type": "integer" },
+        "failed": { "type": "integer" },
+        "duration": { "type": "string" }
+      }
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "description": "Unique issue ID, e.g. BASELINE-001" },
+          "page": { "type": "string", "enum": ["stream", "classwork_list", "classwork_topic", "assignment_details", "material_details", "student_submissions", "student_work_teacher", "announcement_detail"] },
+          "url": { "type": "string", "description": "URL pattern where issue was found" },
+          "issue_type": { "type": "string", "enum": ["missing_button", "duplicate_button", "wrong_placement", "false_positive_flag", "false_negative_flag", "wrong_count", "styling", "performance", "crash", "other"] },
+          "selector": { "type": "string", "description": "CSS selector involved, if applicable" },
+          "screenshot_ref": { "type": "string", "description": "Path to screenshot relative to this directory" },
+          "expected": { "type": "string", "description": "What should happen" },
+          "actual": { "type": "string", "description": "What actually happens" },
+          "severity": { "type": "string", "enum": ["critical", "major", "minor", "cosmetic"] },
+          "language": { "type": "string", "description": "Page language when issue was found" },
+          "account_type": { "type": "string", "enum": ["single", "dual", "multi", "restricted"] },
+          "reproducible": { "type": "boolean" },
+          "notes": { "type": "string" }
+        },
+        "required": ["id", "page", "issue_type", "expected", "actual", "severity"]
+      }
+    }
+  },
+  "required": ["captureDate", "extensionVersion", "issues"],
+
+  "__baseline_data": {
+    "captureDate": "2026-03-06",
+    "extensionVersion": "1.3.9",
+    "browserVersion": "pending manual capture",
+    "testResults": {
+      "totalFiles": 48,
+      "totalTests": 2040,
+      "passed": 2040,
+      "failed": 0,
+      "duration": "8.69s"
+    },
+    "issues": [
+      {
+        "id": "KNOWN-001",
+        "page": "student_submissions",
+        "issue_type": "missing_button",
+        "expected": "Download buttons on student-uploaded files",
+        "actual": "No buttons rendered — page type not covered",
+        "severity": "major",
+        "notes": "V2 Phase 2 will add this page type"
+      },
+      {
+        "id": "KNOWN-002",
+        "page": "student_work_teacher",
+        "issue_type": "missing_button",
+        "expected": "Download buttons on all student submissions",
+        "actual": "No buttons rendered — page type not covered",
+        "severity": "major",
+        "notes": "V2 Phase 2 will add this page type"
+      },
+      {
+        "id": "KNOWN-003",
+        "page": "assignment_details",
+        "issue_type": "missing_button",
+        "expected": "Download buttons on all file attachments",
+        "actual": "Partial coverage — some attachment types missed",
+        "severity": "minor",
+        "notes": "Partial support exists, V2 will complete it"
+      },
+      {
+        "id": "KNOWN-004",
+        "page": "stream",
+        "issue_type": "performance",
+        "expected": "Single MutationObserver for all features",
+        "actual": "3 independent MutationObservers + 3 heartbeat intervals running simultaneously",
+        "severity": "major",
+        "notes": "comment_frame, edited_frame, download_all each spin their own observer"
+      },
+      {
+        "id": "KNOWN-005",
+        "page": "stream",
+        "issue_type": "false_positive_flag",
+        "expected": "No comment badge on posts without comments",
+        "actual": "Action button text 'Add class comment' can trigger false positive",
+        "severity": "minor",
+        "notes": "Exclusion patterns exist but are regex-based and per-language"
+      }
+    ]
+  }
+}
