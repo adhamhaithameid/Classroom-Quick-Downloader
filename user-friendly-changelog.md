@@ -1,3 +1,16 @@
+## v1.3.9
+### Summary
+Improved release consistency and user-facing clarity across the website and extension experiences.
+### Added
+- Added clearer user-facing release communication for the current update cycle.
+- Added stronger coverage for changelog publishing and display paths.
+### Changed
+- Updated changelog delivery flow so website and extension updates are more predictable.
+- Refined release-note formatting consistency for easier reading.
+### Fixed
+- Fixed issues where changelog visibility could be inconsistent across surfaces.
+- Fixed multiple reliability edge cases in update-state handling.
+
 ## v1.3.8
 ### Summary
 Improved changelog reliability so users always receive updates, even when the version number stays the same.
