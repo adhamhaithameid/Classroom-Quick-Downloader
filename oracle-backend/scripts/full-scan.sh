@@ -9,6 +9,21 @@ if ! command -v go >/dev/null 2>&1; then
   exit 1
 fi
 
+MODULE_GO_VERSION="$(go list -m -f '{{.GoVersion}}' 2>/dev/null || true)"
+SCAN_GOTOOLCHAIN=""
+if [[ -n "$MODULE_GO_VERSION" ]]; then
+  SCAN_GOTOOLCHAIN="go${MODULE_GO_VERSION}"
+fi
+
+go_install_with_module_toolchain() {
+  local target="$1"
+  if [[ -n "$SCAN_GOTOOLCHAIN" ]]; then
+    GOTOOLCHAIN="$SCAN_GOTOOLCHAIN" go install "$target"
+  else
+    go install "$target"
+  fi
+}
+
 ensure_worker_toolchain() {
   if ! command -v node >/dev/null 2>&1; then
     echo "error: node is required for cloudflare-worker checks" >&2
@@ -60,13 +75,11 @@ go vet ./...
 
 if ! command -v gosec >/dev/null 2>&1; then
   echo "[oracle-scan] installing gosec"
-  go install github.com/securego/gosec/v2/cmd/gosec@v2.22.9
+  go_install_with_module_toolchain github.com/securego/gosec/v2/cmd/gosec@v2.22.9
 fi
 
-if ! command -v govulncheck >/dev/null 2>&1; then
-  echo "[oracle-scan] installing govulncheck"
-  go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
-fi
+echo "[oracle-scan] installing govulncheck"
+go_install_with_module_toolchain golang.org/x/vuln/cmd/govulncheck@v1.1.4
 
 GO_BIN_DIR="$(go env GOPATH)/bin"
 
