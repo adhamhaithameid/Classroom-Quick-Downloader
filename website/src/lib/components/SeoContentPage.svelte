@@ -4,14 +4,65 @@
   import SeoMeta from '$lib/components/SeoMeta.svelte';
   import { relatedPagesFor, type SeoPageConfig } from '$lib/content/seoPages';
   import { SITE_NAME, SOCIAL_IMAGE, lastModForPath } from '$lib/seo/site';
-  import { glassSheen } from '$lib/actions/glassSheen';
+  import { trackGuideCtaClick, trackGuideEngaged, GUIDE_ENGAGEMENT_PERCENT } from '$lib/analytics/websiteEvents';
 
   export let config: SeoPageConfig;
+
+  // Fire the engagement event once per guide, at the shared scroll threshold.
+  let engagedPath = '';
+  let engaged = false;
+  $: if (config.path !== engagedPath) {
+    engagedPath = config.path;
+    engaged = false;
+  }
+
+  function handleGuideScroll(): void {
+    if (engaged || typeof window === 'undefined' || typeof document === 'undefined') return;
+    const scrollable = document.documentElement.scrollHeight - window.innerHeight;
+    if (scrollable <= 0) return;
+    if (window.scrollY / scrollable >= GUIDE_ENGAGEMENT_PERCENT / 100) {
+      engaged = true;
+      trackGuideEngaged(config.path);
+    }
+  }
 
   function resolveHref(href: string): string {
     if (href.startsWith('http://') || href.startsWith('https://') || href.startsWith('mailto:')) return href;
     if (!href.startsWith('/')) return href;
     return `${base}${href}`;
+  }
+
+  // Tiny inline-link syntax for section copy: [label](href). Only
+  // site-relative and https hrefs are linkified — anything else (and any
+  // unlinked text) stays literal. Segments render through plain Svelte
+  // elements (never {@html}), so the output is XSS-safe by construction.
+  type InlineSegment =
+    | { kind: 'text'; value: string }
+    | { kind: 'link'; label: string; href: string; external: boolean };
+
+  const INLINE_LINK_PATTERN = /\[([^\]]+)\]\(([^)]+)\)/g;
+
+  function isLinkifiableHref(href: string): boolean {
+    return href.startsWith('/') || href.startsWith('https://');
+  }
+
+  function parseInlineSegments(text: string): InlineSegment[] {
+    const segments: InlineSegment[] = [];
+    let cursor = 0;
+    for (const match of text.matchAll(INLINE_LINK_PATTERN)) {
+      const [raw, label, href] = match;
+      const start = match.index ?? 0;
+      if (start > cursor) segments.push({ kind: 'text', value: text.slice(cursor, start) });
+      if (isLinkifiableHref(href)) {
+        segments.push({ kind: 'link', label, href, external: href.startsWith('https://') });
+      } else {
+        // Unsafe href: keep the original bracket syntax as visible text.
+        segments.push({ kind: 'text', value: raw });
+      }
+      cursor = start + raw.length;
+    }
+    if (cursor < text.length) segments.push({ kind: 'text', value: text.slice(cursor) });
+    return segments;
   }
 
   function normalizePath(path: string): string {
@@ -154,6 +205,8 @@
   structuredData={seoStructuredData}
 />
 
+<svelte:window on:scroll={handleGuideScroll} />
+
 <article class="seo-page">
   <section class="seo-hero glass-panel">
     <span class="seo-eyebrow">{config.eyebrow}</span>
@@ -169,6 +222,7 @@
           href={resolveHref(config.primaryCta.href)}
           target={config.primaryCta.external ? '_blank' : undefined}
           rel={config.primaryCta.external ? 'noopener noreferrer' : undefined}
+          on:click={() => trackGuideCtaClick('guide_primary', config.path)}
         >
           {config.primaryCta.label}
         </a>
@@ -179,6 +233,7 @@
           href={resolveHref(config.secondaryCta.href)}
           target={config.secondaryCta.external ? '_blank' : undefined}
           rel={config.secondaryCta.external ? 'noopener noreferrer' : undefined}
+          on:click={() => trackGuideCtaClick('guide_secondary', config.path)}
         >
           {config.secondaryCta.label}
         </a>
@@ -188,15 +243,28 @@
 
   <section class="seo-sections">
     {#each config.sections as section, i}
-      <article class="seo-card glass-panel glass-hover" style="--card-i: {i}" use:glassSheen>
+      <article class="seo-card glass-panel glass-hover" style="--card-i: {i}">
         <h2>{section.heading}</h2>
         {#each section.paragraphs ?? [] as paragraph}
-          <p>{paragraph}</p>
+          <p>{#each parseInlineSegments(paragraph) as segment, segmentIndex (segmentIndex)}{#if segment.kind === 'link'}<a href={resolveHref(segment.href)} target={segment.external ? '_blank' : undefined} rel={segment.external ? 'noopener noreferrer' : undefined}>{segment.label}</a>{:else}{segment.value}{/if}{/each}</p>
         {/each}
         {#if section.bullets && section.bullets.length > 0}
           <ul>
             {#each section.bullets as bullet}
-              <li>{bullet}</li>
+              <li>{#each parseInlineSegments(bullet) as segment, segmentIndex (segmentIndex)}{#if segment.kind === 'link'}<a href={resolveHref(segment.href)} target={segment.external ? '_blank' : undefined} rel={segment.external ? 'noopener noreferrer' : undefined}>{segment.label}</a>{:else}{segment.value}{/if}{/each}</li>
+            {/each}
+          </ul>
+        {/if}
+        {#if section.links && section.links.length > 0}
+          <ul class="seo-section-links">
+            {#each section.links as link}
+              <li>
+                <a
+                  href={resolveHref(link.href)}
+                  target={link.external ? '_blank' : undefined}
+                  rel={link.external ? 'noopener noreferrer' : undefined}
+                >{link.label}</a>
+              </li>
             {/each}
           </ul>
         {/if}
@@ -363,6 +431,17 @@
 
   .seo-card li + li {
     margin-top: 0.3rem;
+  }
+
+  /* Inline links inside card copy share the guide link look. */
+  .seo-card a {
+    color: var(--gc-green-dark);
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .seo-card a:hover {
+    text-decoration: underline;
   }
 
   .seo-related {
