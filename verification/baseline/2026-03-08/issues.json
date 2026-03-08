@@ -1,0 +1,64 @@
+{
+  "captureDate": "2026-03-08",
+  "extensionVersion": "1.5.0",
+  "browserVersion": "pending manual capture",
+  "testResults": {
+    "totalFiles": 76,
+    "totalTests": 2703,
+    "passed": 2703,
+    "failed": 0,
+    "duration": "19.66s (transform 4.72s, setup 6.23s, import 4.97s, tests 15.31s, environment 87.13s)"
+  },
+  "issues": [
+    {
+      "id": "KNOWN-001",
+      "page": "student_submissions",
+      "issue_type": "missing_button",
+      "expected": "Download buttons on student-uploaded files",
+      "actual": "No buttons rendered because the student submissions surface is still a known coverage gap.",
+      "severity": "major",
+      "reproducible": true,
+      "notes": "Tracked by extension/docs/student-work-api-plan.md and refactor-plan.md."
+    },
+    {
+      "id": "KNOWN-002",
+      "page": "student_work_teacher",
+      "issue_type": "missing_button",
+      "expected": "Download buttons on all student submissions in teacher view.",
+      "actual": "No buttons rendered because the teacher student-work surface is still a known coverage gap.",
+      "severity": "major",
+      "reproducible": true,
+      "notes": "Tracked by extension/docs/student-work-api-plan.md and refactor-plan.md."
+    },
+    {
+      "id": "KNOWN-003",
+      "page": "assignment_details",
+      "issue_type": "missing_button",
+      "expected": "Download buttons on all attached files.",
+      "actual": "Partial coverage remains for some attachment types in details views.",
+      "severity": "minor",
+      "reproducible": true,
+      "notes": "Use this as the pre-refactor reference point."
+    },
+    {
+      "id": "KNOWN-004",
+      "page": "stream",
+      "issue_type": "performance",
+      "expected": "A single shared observation pipeline for extension runtime behavior.",
+      "actual": "Legacy runtime still contains multiple independent observer-driven feature paths.",
+      "severity": "major",
+      "reproducible": true,
+      "notes": "Primary architectural reason to complete the V2 migration."
+    },
+    {
+      "id": "KNOWN-005",
+      "page": "stream",
+      "issue_type": "false_positive_flag",
+      "expected": "No comment badge on posts without comments.",
+      "actual": "Action-area text and nearby controls can still contribute to comment false positives in edge cases.",
+      "severity": "minor",
+      "reproducible": true,
+      "notes": "Unified exclusion engine and V2 flag scoring should reduce this."
+    }
+  ]
+}

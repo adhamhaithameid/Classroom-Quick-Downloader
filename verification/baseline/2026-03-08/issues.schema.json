@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "cqd-phase0-baseline-issues",
+  "type": "object",
+  "properties": {
+    "captureDate": {
+      "type": "string",
+      "format": "date"
+    },
+    "extensionVersion": {
+      "type": "string"
+    },
+    "browserVersion": {
+      "type": "string"
+    },
+    "testResults": {
+      "type": "object",
+      "properties": {
+        "totalFiles": {
+          "type": "integer"
+        },
+        "totalTests": {
+          "type": "integer"
+        },
+        "passed": {
+          "type": "integer"
+        },
+        "failed": {
+          "type": "integer"
+        },
+        "duration": {
+          "type": "string"
+        }
+      }
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "page": {
+            "type": "string",
+            "enum": [
+              "stream",
+              "classwork_list",
+              "classwork_topic",
+              "assignment_details",
+              "material_details",
+              "student_submissions",
+              "student_work_teacher",
+              "announcement_detail"
+            ]
+          },
+          "url": {
+            "type": "string"
+          },
+          "issue_type": {
+            "type": "string",
+            "enum": [
+              "missing_button",
+              "duplicate_button",
+              "wrong_placement",
+              "false_positive_flag",
+              "false_negative_flag",
+              "wrong_count",
+              "styling",
+              "performance",
+              "crash",
+              "other"
+            ]
+          },
+          "selector": {
+            "type": "string"
+          },
+          "screenshot_ref": {
+            "type": "string"
+          },
+          "expected": {
+            "type": "string"
+          },
+          "actual": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "critical",
+              "major",
+              "minor",
+              "cosmetic"
+            ]
+          },
+          "language": {
+            "type": "string"
+          },
+          "account_type": {
+            "type": "string",
+            "enum": [
+              "single",
+              "dual",
+              "multi",
+              "restricted"
+            ]
+          },
+          "reproducible": {
+            "type": "boolean"
+          },
+          "notes": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "page",
+          "issue_type",
+          "expected",
+          "actual",
+          "severity"
+        ]
+      }
+    }
+  },
+  "required": [
+    "captureDate",
+    "extensionVersion",
+    "issues"
+  ]
+}
