@@ -7,6 +7,7 @@ import { detectEdited } from './content/smart-detector';
 import { subscribeToGlobalState, createEditedBadge } from './content/flags';
 import { triggerPostClick, upgradeCombinedBadge, ATTR_EDIT_DIFF } from './content/both-badge';
 import { triggerPulseEffect, markTargetElements } from './content/pulse-effect';
+import { queryPostCards } from './content/post-card-utils';
 
 // Selector for the main stream card (works for both Stream and Classwork tabs)
 // Stream: div[data-stream-item-id], Classwork: li[data-stream-item-id]
@@ -23,6 +24,44 @@ let running = false;
 let domObserver: MutationObserver | null = null;
 let heartbeatId: number | null = null;
 let urlObserver: MutationObserver | null = null;
+
+// Flag toggle state (controlled from popup)
+let editedFlagEnabled = true;
+
+// Load flag state from storage
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const _browserApi = (globalThis as any).chrome;
+if (_browserApi?.storage?.local) {
+  _browserApi.storage.local.get('editedFlagEnabled', (res: { editedFlagEnabled?: boolean }) => {
+    editedFlagEnabled = res.editedFlagEnabled !== false; // default true
+  });
+  _browserApi.storage.onChanged.addListener((changes: any, area: string) => {
+    if (area === 'local' && 'editedFlagEnabled' in changes) {
+      const wasEnabled = editedFlagEnabled;
+      editedFlagEnabled = changes.editedFlagEnabled.newValue !== false;
+
+      if (wasEnabled && !editedFlagEnabled) {
+        // Just disabled — remove all edited badges immediately
+        document.querySelectorAll<HTMLElement>(
+          '.cqd-edited-badge, .cqd-both-badge'
+        ).forEach((el) => el.remove());
+        document.querySelectorAll<HTMLElement>('.cqd-overlay-container').forEach((el) => {
+          if (!el.querySelector('.cqd-comment-badge')) el.remove();
+        });
+        document.querySelectorAll<HTMLElement>(POST_SELECTOR).forEach((post) => {
+          post.removeAttribute(EDITED_ATTR);
+          post.removeAttribute(ATTR_EDIT_DIFF);
+        });
+      } else if (!wasEnabled && editedFlagEnabled && running) {
+        // Just re-enabled — clear processed attrs and rescan
+        document.querySelectorAll<HTMLElement>(POST_SELECTOR).forEach((post) => {
+          post.removeAttribute(EDITED_ATTR);
+        });
+        scanForEditedPosts();
+      }
+    }
+  });
+}
 
 /* --------------------------------------------------------------------------
  * Content script entry
@@ -139,6 +178,7 @@ function stopEditedFeature(): void {
  * ---------------------------------------------------*/
 function scanForEditedPosts() {
   if (!running) return;
+  if (!editedFlagEnabled) return; // Flag disabled from popup settings
   try {
     const direction = getPageDirection();
     document.body.setAttribute('data-cqd-dir', direction);
@@ -148,7 +188,7 @@ function scanForEditedPosts() {
     // then falls back to keywords with page language + English
     const currentLang = getCurrentCachedLanguage();
 
-    const posts = document.querySelectorAll<HTMLElement>(POST_SELECTOR);
+    const posts = queryPostCards();
     posts.forEach((post) => {
       // Smart detection - language agnostic
       const result = detectEdited(post, currentLang);
