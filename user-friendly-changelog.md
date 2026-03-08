@@ -1,3 +1,71 @@
+## v1.5.0 — The V2 Engine
+### Summary
+The biggest architectural upgrade since launch. Introduces the **V2 Engine** — a completely rewritten content engine that runs alongside legacy, providing smarter file detection, unified flag rendering, and a self-healing selector system. V2 independently discovers posts, detects comments and edits, places download buttons, and renders premium badge-style flags — all with zero interference to the legacy engine.
+
+### ⚡ V2 Engine Highlights
+- **Multi-Engine Architecture**: Engine Registry + Orchestrator pattern allows V1 and V2 to coexist. A Route Watcher detects page navigation and initializes the correct engine for each view (Stream, Classwork, Student Work).
+- **SelectorScorer with 5-Level Fallback**: Every DOM query uses a priority cascade — L1 (data attributes) → L2 (ARIA/semantic) → L3 (structural) → L4 (golden classes) → L5 (heuristic). If Google changes class names, the scorers self-heal by promoting working selectors.
+- **Unified Flag Detection**: A single `scoreFlagsForPost()` function replaces three separate legacy scripts. Runs a 5-layer comment scorer + 4-layer edited scorer with an exclusion engine to avoid false positives from user-typed content.
+- **CSS-Only Badge Rendering**: Flag badges use CSS-only hover expansion with `max-width` transitions — zero JavaScript on hover. Template cloning makes rendering ~10× faster than legacy `createElement` chains.
+- **Performance Budget Controller**: Hard caps, fast-pass timing, and deep validation scheduling ensure V2 never exceeds its CPU budget, even on pages with 100+ posts.
+- **Correction Queue + Deep Validation**: A repair system detects and fixes rendering issues asynchronously during idle time.
+
+### Added
+- V2 Engine with full discovery → flag detection → placement → rendering pipeline.
+- SelectorScorer: 5-level fallback system with self-healing selector promotion.
+- Flag badge rendering: comment (blue), edited (orange), both (red gradient) badges with CSS-only animation.
+- Performance monitoring with per-scan timing, budget gates, and instability detection.
+- Deep validation system that runs during idle time to catch missed/stale elements.
+- Correction queue for asynchronous repair of rendering issues.
+- Student Work page detection improvements with expanded Drive URL support.
+- Student Work download strategy plan documenting 3 implementation approaches.
+- New selectors for edited/deleted markers (`.JZk9qf.P354se`) and structural comment detection.
+- Engine toggle buttons in extension settings for manual V1/V2 testing.
+
+### Changed
+- Download button rendering now uses template cloning (~10× faster than createElement).
+- Flag detection is now view-aware — different detection strategies per page type.
+- Version pill in popup settings now reflects live version 1.5.0.
+- Improved console logging: pipeline results logged verbosely for first 3 scans, then every 10th.
+- Updated selector registry with L3 structural selectors for resilience against class name changes.
+
+### Fixed
+- Fixed V2 engine crash isolation — dynamic imports prevent V2 failures from breaking legacy features.
+- Fixed flag detection false positives from user-typed content (exclusion engine).
+- Fixed stale badge cleanup on page navigation (proper `destroy()` lifecycle).
+- Fixed duplicate badge injection via idempotent `renderFlagBadge()`.
+- Fixed Student Work page URL handling for Google Docs/Sheets/Slides viewer links.
+
+---
+
+## v1.4.0 — Accumulated Fixes
+### Summary
+A comprehensive stability and polish release consolidating months of fixes across the extension popup, content scripts, analytics pipeline, and accessibility layer. Addresses popup performance issues, dark mode improvements, changelog delivery reliability, and CSP compliance.
+
+### Added
+- Keyboard focus indicators for popup buttons and interactive elements.
+- Accessible native checkbox switch replacing custom toggle component.
+- Mutation observer deduplication to avoid redundant DOM scans.
+- Browser-selectable dev launcher for faster local development.
+- Extended test coverage for analytics, cancelled-download accounting, and changelog rules.
+
+### Changed
+- Popup performance: batched color assignment localStorage access, skipped redundant storage writes.
+- Changelog seen-state detection now uses version + revision data contract.
+- Analytics flush scheduling moved to UTC-based daily windows.
+- Extension CSP policy refined — removed strict popup override that caused issues.
+
+### Fixed
+- Fixed popup lag caused by excessive localStorage reads during stats rendering.
+- Fixed keyboard legend interaction regressions in popup.
+- Fixed cancelled-download events being included in download totals.
+- Fixed stale changelog visibility after Cloudflare publish/update/delete cycles.
+- Fixed same-version publish cases where users could miss new changelog updates.
+- Fixed `minimatch`/ESM export runtime failures during dev startup.
+- Fixed mutation observer firing redundant scans on the same DOM roots.
+
+---
+
 ## v1.3.9
 ### Summary
 Improved release consistency and user-facing clarity across the website and extension experiences.
