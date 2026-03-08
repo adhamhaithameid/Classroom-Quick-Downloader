@@ -1,6 +1,6 @@
 // filepath: entrypoints/popup/App.tsx
 
-import { useEffect, useId, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, useCallback, type KeyboardEvent, type MouseEvent } from 'react';
 import './App.css';
 import logoSrc from '../../assets/CQD.png';
 import logoGraySrc from '../../assets/CQD-gray.png';
@@ -8,6 +8,7 @@ import bmcLogoSrc from '../../assets/bmc-logo.svg';
 import chromeSvg from '../../assets/Chrome.svg';
 import firefoxSvg from '../../assets/Firefox.svg';
 import edgeSvg from '../../assets/Edge.svg';
+import avatarSrc from '../../assets/me.jpg';
 import {
   fetchChangelogDetailed,
   getMatchingRule,
@@ -26,9 +27,8 @@ const GITHUB_REPO_URL =
   'https://github.com/adhamhaithameid/classroom-quick-downloader';
 const GITHUB_PROFILE_URL = 'https://github.com/adhamhaithameid';
 const GITHUB_STAR_URL = `${GITHUB_REPO_URL}/stargazers`;
-const GITHUB_AVATAR_URL = 'https://github.com/adhamhaithameid.png?size=80';
+const GITHUB_AVATAR_URL = avatarSrc;
 const BUY_ME_COFFEE_URL = 'https://buymeacoffee.com/adhamhaithameid';
-const CHANGELOG_POLL_MS = 15_000;
 
 // Extension Store URLs for each browser
 const EXTENSION_STORE_URLS = {
@@ -351,6 +351,23 @@ function App() {
   const [changelogStatus, setChangelogStatus] = useState<'loading' | 'ready' | 'offline' | 'error'>('loading');
   const [changelogStatusMessage, setChangelogStatusMessage] = useState<string | null>(null);
 
+  // ENGINE MODE STATE
+  const [engineMode, setEngineMode] = useState<string>('legacy');
+  const [engineModeLoading, setEngineModeLoading] = useState(true);
+
+  // COLLAPSIBLE SETTINGS STATE (persisted)
+  const [settingsCollapsed, setSettingsCollapsed] = useState(true);
+
+  // Load collapse state from storage
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const browserApi = (globalThis as any).chrome;
+    if (!browserApi?.storage?.local) return;
+    browserApi.storage.local.get('cqdSettingsCollapsed', (res: { cqdSettingsCollapsed?: boolean }) => {
+      setSettingsCollapsed(res.cqdSettingsCollapsed !== false); // default collapsed
+    });
+  }, []);
+
   // Track scroll to add blur/shadow under header when not at top
   useEffect(() => {
     const el = scrollRef.current;
@@ -568,25 +585,8 @@ function App() {
 
     void loadChangelog();
 
-    const handleVisibilityOrFocus = () => {
-      if (document.visibilityState === 'visible') {
-        void loadChangelog();
-      }
-    };
-
-    window.addEventListener('focus', handleVisibilityOrFocus);
-    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
-    const pollId = window.setInterval(() => {
-      if (document.visibilityState === 'visible') {
-        void loadChangelog();
-      }
-    }, CHANGELOG_POLL_MS);
-
     return () => {
       cancelled = true;
-      window.clearInterval(pollId);
-      window.removeEventListener('focus', handleVisibilityOrFocus);
-      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
     };
   }, []);
 
@@ -629,13 +629,23 @@ function App() {
       return;
     }
 
-    // Initial load
-    browserApi.storage.local.get('extensionEnabled', (res: { extensionEnabled?: boolean }) => {
-      const isEnabled = res.extensionEnabled !== false; // default true
+    // Initial load — load ALL settings keys
+    const settingsKeys = [
+      'extensionEnabled',
+      'downloadAllEnabled',
+      'commentsFlagEnabled',
+      'editedFlagEnabled',
+      'combinedFlagEnabled',
+    ];
+    browserApi.storage.local.get(settingsKeys, (res: Record<string, boolean | undefined>) => {
       setSettings((prev) => ({
         ...DEFAULT_SETTINGS,
         ...prev,
-        extensionEnabled: isEnabled
+        extensionEnabled: res.extensionEnabled !== false,
+        downloadAllEnabled: res.downloadAllEnabled !== false,
+        commentsFlagEnabled: res.commentsFlagEnabled !== false,
+        editedFlagEnabled: res.editedFlagEnabled !== false,
+        combinedFlagEnabled: res.combinedFlagEnabled !== false,
       }));
       setLoadingState(false);
     });
@@ -643,13 +653,16 @@ function App() {
     // Listen for changes (cross-tab sync)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const listener = (changes: any, area: string) => {
-      if (area === 'local' && changes.extensionEnabled) {
-        setSettings((prev) => ({
-          ...DEFAULT_SETTINGS,
-          ...prev,
-          extensionEnabled: changes.extensionEnabled.newValue !== false
-        }));
-      }
+      if (area !== 'local') return;
+      setSettings((prev) => {
+        if (!prev) return prev;
+        const updated = { ...prev };
+        if ('extensionEnabled' in changes) updated.extensionEnabled = changes.extensionEnabled.newValue !== false;
+        if ('commentsFlagEnabled' in changes) updated.commentsFlagEnabled = changes.commentsFlagEnabled.newValue !== false;
+        if ('editedFlagEnabled' in changes) updated.editedFlagEnabled = changes.editedFlagEnabled.newValue !== false;
+        if ('combinedFlagEnabled' in changes) updated.combinedFlagEnabled = changes.combinedFlagEnabled.newValue !== false;
+        return updated;
+      });
     };
     
     if (browserApi.storage.onChanged) {
@@ -670,6 +683,103 @@ function App() {
     const browserApi = (globalThis as any).chrome;
     if (browserApi && browserApi.storage && browserApi.storage.local) {
       browserApi.storage.local.set({ extensionEnabled: nextState });
+    }
+  }
+
+  function handleToggleSettingsCollapse() {
+    const next = !settingsCollapsed;
+    setSettingsCollapsed(next);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const browserApi = (globalThis as any).chrome;
+    if (browserApi?.storage?.local) {
+      browserApi.storage.local.set({ cqdSettingsCollapsed: next });
+    }
+  }
+
+  function handleToggleFlag(flag: 'commentsFlagEnabled' | 'editedFlagEnabled' | 'combinedFlagEnabled') {
+    if (!settings) return;
+    const nextState = !settings[flag];
+    const updatedSettings = { ...settings, [flag]: nextState };
+    setSettings(updatedSettings);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const browserApi = (globalThis as any).chrome;
+    if (browserApi?.storage?.local) {
+      browserApi.storage.local.set({ [flag]: nextState });
+    }
+    // Notify content scripts
+    if (browserApi?.tabs?.query) {
+      browserApi.tabs.query({ active: true, currentWindow: true }, (tabs: any[]) => {
+        if (tabs?.[0]?.id) {
+          browserApi.tabs.sendMessage(tabs[0].id, {
+            type: 'cqd-flag-toggle',
+            flag,
+            enabled: nextState,
+          });
+        }
+      });
+    }
+  }
+
+  // --- ENGINE MODE LOADING ---
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const browserApi = (globalThis as any).chrome;
+    if (!browserApi?.storage?.local) {
+      setEngineModeLoading(false);
+      return;
+    }
+    browserApi.storage.local.get('cqdV2Mode', (res: { cqdV2Mode?: string }) => {
+      setEngineMode(res.cqdV2Mode || 'legacy');
+      setEngineModeLoading(false);
+    });
+
+    // Listen for mode changes from content script or other tabs
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const listener = (changes: any, area: string) => {
+      if (area === 'local' && changes.cqdV2Mode) {
+        setEngineMode(changes.cqdV2Mode.newValue || 'legacy');
+      }
+    };
+    if (browserApi.storage.onChanged) {
+      browserApi.storage.onChanged.addListener(listener);
+      return () => browserApi.storage.onChanged.removeListener(listener);
+    }
+  }, []);
+
+  function handleToggleV2Engine() {
+    const nextMode = engineMode === 'v2' ? 'legacy' : 'v2';
+    setEngineMode(nextMode);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const browserApi = (globalThis as any).chrome;
+    if (browserApi?.storage?.local) {
+      browserApi.storage.local.set({ cqdV2Mode: nextMode });
+    }
+    // Also notify content script via message
+    if (browserApi?.tabs?.query) {
+      browserApi.tabs.query({ active: true, currentWindow: true }, (tabs: any[]) => {
+        if (tabs?.[0]?.id) {
+          browserApi.tabs.sendMessage(tabs[0].id, { type: 'cqd-set-mode', mode: nextMode });
+        }
+      });
+    }
+  }
+
+  function handleToggleLegacyEngine() {
+    const nextMode = engineMode === 'legacy' ? 'v2' : 'legacy';
+    setEngineMode(nextMode);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const browserApi = (globalThis as any).chrome;
+    if (browserApi?.storage?.local) {
+      browserApi.storage.local.set({ cqdV2Mode: nextMode });
+    }
+    // Also notify content script via message
+    if (browserApi?.tabs?.query) {
+      browserApi.tabs.query({ active: true, currentWindow: true }, (tabs: any[]) => {
+        if (tabs?.[0]?.id) {
+          browserApi.tabs.sendMessage(tabs[0].id, { type: 'cqd-set-mode', mode: nextMode });
+        }
+      });
     }
   }
 
@@ -734,26 +844,22 @@ function App() {
   const circumference = 2 * Math.PI * radius;
   const gapAngle = 3; // Gap angle in degrees between segments
   const gapLength = (gapAngle / 360) * circumference; // Convert gap to stroke units
-  let cumulativeOffset = 0;
-
-  const chartSegments = stats.map((stat, index) => {
-    const percentage = totalDownloads === 0 ? 0 : stat.value / totalDownloads;
-    const fullStrokeLength = percentage * circumference;
-    
-    // Each segment gets reduced by one gap (shown after it)
-    const strokeLength = Math.max(0, fullStrokeLength - gapLength);
-    
-    // Offset includes cumulative length plus half gap to center the segment
-    const offset = cumulativeOffset + (gapLength / 2);
-    cumulativeOffset += fullStrokeLength;
-
-    return {
-      ...stat,
-      strokeLength,
-      offset: -offset,
-      index,
-    };
-  });
+  const chartSegments = useMemo(() => {
+    let offset = 0;
+    return stats.map((stat, index) => {
+      const percentage = totalDownloads === 0 ? 0 : stat.value / totalDownloads;
+      const fullStrokeLength = percentage * circumference;
+      const strokeLength = Math.max(0, fullStrokeLength - gapLength);
+      const currentOffset = offset + (gapLength / 2);
+      offset += fullStrokeLength;
+      return {
+        ...stat,
+        strokeLength,
+        offset: -currentOffset,
+        index,
+      };
+    });
+  }, [stats, totalDownloads, circumference, gapLength]);
 
   const matchedRule = version ? getMatchingRule(changelogData?.config, version) : null;
   const fallbackRule = !matchedRule && changelogData?.entries?.length
@@ -816,22 +922,25 @@ function App() {
                     title={getLatestChange(changelogData) ? `Latest: ${getLatestChange(changelogData)}` : "View changelog"}
                     onClick={async () => {
                        setShowChangelog(true);
-                       const latest = await fetchChangelogDetailed(true);
-                       if (latest.data) {
-                         setChangelogData(latest.data);
-                       }
-                       if (latest.status === 'cache-fallback') {
-                         setChangelogStatus('offline');
-                         setChangelogStatusMessage(latest.error || 'Oracle is unreachable. Showing cached changelog.');
-                       } else if (latest.status === 'error') {
-                         setChangelogStatus('error');
-                         setChangelogStatusMessage(latest.error || 'Unable to load changelog from Oracle.');
-                       } else {
-                         setChangelogStatus('ready');
-                         setChangelogStatusMessage(latest.status === 'empty' ? 'No changelog entries are available yet.' : null);
+                       // Only fetch if we don't have data yet or last fetch was >30s ago
+                       if (!changelogData) {
+                         const latest = await fetchChangelogDetailed(true);
+                         if (latest.data) {
+                           setChangelogData(latest.data);
+                         }
+                         if (latest.status === 'cache-fallback') {
+                           setChangelogStatus('offline');
+                           setChangelogStatusMessage(latest.error || 'Oracle is unreachable. Showing cached changelog.');
+                         } else if (latest.status === 'error') {
+                           setChangelogStatus('error');
+                           setChangelogStatusMessage(latest.error || 'Unable to load changelog from Oracle.');
+                         } else {
+                           setChangelogStatus('ready');
+                           setChangelogStatusMessage(latest.status === 'empty' ? 'No changelog entries are available yet.' : null);
+                         }
                        }
                        if (version) {
-                         await markAsSeen(version, latest.data ?? changelogData);
+                         await markAsSeen(version, changelogData);
                          setSeen(true);
                        }
                     }}
@@ -849,9 +958,6 @@ function App() {
           <div
             className={`cqd-changelog-overlay ${showChangelog ? 'open' : ''}`}
             aria-hidden={!showChangelog}
-            onClick={(e) => {
-             if (e.target === e.currentTarget) setShowChangelog(false);
-            }}
           >
             <div
               className="cqd-changelog-card"
@@ -865,20 +971,21 @@ function App() {
                 </h3>
                 <button
                   type="button"
-                  className="cqd-cl-close"
+                  className="cqd-cl-back"
                   onClick={() => setShowChangelog(false)}
-                  aria-label="Close changelog"
+                  aria-label="Go back"
                 >
                   <svg
-                    className="cqd-cl-close-icon"
+                    className="cqd-cl-back-icon"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
                     strokeWidth="2.5"
                     aria-hidden="true"
                   >
-                    <path d="M6 6L18 18M18 6L6 18" />
+                    <path d="M19 12H5M12 19l-7-7 7-7" />
                   </svg>
+                  Back
                 </button>
               </div>
               <div className="cqd-cl-body">
@@ -920,19 +1027,30 @@ function App() {
                 )}
 
                 {changelogData?.entries?.length ? (
-                  changelogData.entries.map((entry) => (
-                    <div key={entry.id} className="cqd-cl-entry">
-                      <div className="cqd-cl-ver-row">
-                         <span className="cqd-cl-version">v{entry.version}</span>
-                        <span className="cqd-cl-date">{new Date(entry.date).toLocaleDateString('en-US', { timeZone: 'UTC' })}</span>
+                  changelogData.entries.map((entry) => {
+                    const isCurrent = version && entry.version === version;
+                    const isNewerThanInstalled = version && entry.version !== version && 
+                      entry.version.localeCompare(version, undefined, { numeric: true }) > 0;
+                    return (
+                      <div key={entry.id} className="cqd-cl-entry">
+                        <div className="cqd-cl-ver-row">
+                          <span className="cqd-cl-version">v{entry.version}</span>
+                          {isCurrent && (
+                            <span className="cqd-cl-tag cqd-cl-tag-current">Current</span>
+                          )}
+                          {!isCurrent && isNewerThanInstalled && (
+                            <span className="cqd-cl-tag cqd-cl-tag-new">New</span>
+                          )}
+                          <span className="cqd-cl-date">{new Date(entry.date).toLocaleDateString('en-US', { timeZone: 'UTC' })}</span>
+                        </div>
+                        <ul className="cqd-cl-list">
+                          {entry.changes.map((change, i) => (
+                            <li key={i}>{change}</li>
+                          ))}
+                        </ul>
                       </div>
-                      <ul className="cqd-cl-list">
-                        {entry.changes.map((change, i) => (
-                          <li key={i}>{change}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  ))
+                    );
+                  })
                 ) : (
                   <div className="cqd-cl-empty">
                     {changelogStatusMessage || 'No changelog entries found.'}
@@ -1083,18 +1201,11 @@ function App() {
                             >
                               <span
                                 className={`cqd-legend-dot ${hoveredStatId === stat.id ? 'hovered' : ''}`}
-                                style={{ 
+                                style={{
                                   backgroundColor: stat.color,
-                                  border: isColorDark(stat.color) 
-                                    ? '1.5px solid rgba(255, 255, 255, 0.8)' 
+                                  border: isColorDark(stat.color)
+                                    ? '1.5px solid rgba(255, 255, 255, 0.8)'
                                     : '1.5px solid rgba(0, 0, 0, 0.25)',
-                                  boxShadow: hoveredStatId === stat.id
-                                    ? '0 2px 8px rgba(0, 0, 0, 0.25)'
-                                    : isColorDark(stat.color)
-                                      ? '0 0 0 0.5px rgba(0, 0, 0, 0.15)'
-                                      : 'none',
-                                  transform: hoveredStatId === stat.id ? 'scale(1.3)' : 'scale(1)',
-                                  transition: 'transform 0.15s ease, box-shadow 0.15s ease'
                                 }}
                               />
                               <span className="cqd-legend-label">{stat.label}</span>
@@ -1110,26 +1221,101 @@ function App() {
                 </div>
               </section>
 
-              {/* Section 2: Settings (per-tab enable/disable) */}
+              {/* Section 2: Settings (collapsible) */}
               <section className="cqd-panel">
                 <div className="cqd-card cqd-card-settings">
-                  <div className="cqd-card-header">
-                    <h2 className="cqd-card-title">Extension Settings</h2>
-                    <p className="cqd-card-subtitle">
-                      Turn the extension on or off for this Classroom tab only.
-                    </p>
-                  </div>
+                  <button
+                    type="button"
+                    className="cqd-card-header cqd-settings-collapse-btn"
+                    onClick={handleToggleSettingsCollapse}
+                    aria-expanded={!settingsCollapsed}
+                    aria-controls="cqd-settings-body"
+                  >
+                    <div>
+                      <h2 className="cqd-card-title">Extension Settings</h2>
+                      <p className="cqd-card-subtitle">
+                        Configure extension, flags, and engine behavior.
+                      </p>
+                    </div>
+                    <svg
+                      className={`cqd-settings-chevron ${settingsCollapsed ? '' : 'cqd-settings-chevron-open'}`}
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      width="16"
+                      height="16"
+                      aria-hidden="true"
+                    >
+                      <path d="M6 9l6 6 6-6" />
+                    </svg>
+                  </button>
 
-                  <div className="cqd-toggle-group">
-                    <ToggleRow
-                      label="Enable Extension"
-                      description="Turn the extension on or off globally."
-                      checked={settings?.extensionEnabled ?? true}
-                      loading={isLoadingSettings}
-                      onToggle={handleToggleExtension}
-                      disabled={isLoadingSettings}
-                      primary
-                    />
+                  <div
+                    id="cqd-settings-body"
+                    className={`cqd-settings-body ${settingsCollapsed ? 'cqd-settings-body-collapsed' : ''}`}
+                  >
+                    <div className="cqd-toggle-group">
+                      <ToggleRow
+                        label="Enable Extension"
+                        description="Turn the extension on or off globally."
+                        checked={settings?.extensionEnabled ?? true}
+                        loading={isLoadingSettings}
+                        onToggle={handleToggleExtension}
+                        disabled={isLoadingSettings}
+                        primary
+                      />
+
+                      {/* Engine toggles — both engines always run together now
+                      <div className="cqd-divider" />
+                      <ToggleRow
+                        label="V2 Engine"
+                        description={engineMode === 'v2' ? 'New engine is active' : 'Switch to new V2 engine'}
+                        checked={engineMode === 'v2'}
+                        loading={engineModeLoading}
+                        onToggle={handleToggleV2Engine}
+                        disabled={engineModeLoading}
+                      />
+                      <ToggleRow
+                        label="Legacy Engine"
+                        description={engineMode === 'legacy' ? 'Old engine is active' : 'Switch to legacy engine'}
+                        checked={engineMode === 'legacy'}
+                        loading={engineModeLoading}
+                        onToggle={handleToggleLegacyEngine}
+                        disabled={engineModeLoading}
+                      />
+                      */}
+
+                      <div className="cqd-divider" />
+
+                      <div className="cqd-settings-section-label">Flag Detection</div>
+
+                      <div className="cqd-flag-toggle-row cqd-flag-toggle-comment">
+                        <ToggleRow
+                          label="Comment Flags"
+                          description="Show badges on posts with comments."
+                          checked={settings?.commentsFlagEnabled ?? true}
+                          loading={isLoadingSettings}
+                          onToggle={() => handleToggleFlag('commentsFlagEnabled')}
+                          disabled={isLoadingSettings}
+                        />
+                      </div>
+
+                      <div className="cqd-flag-toggle-row cqd-flag-toggle-edited">
+                        <ToggleRow
+                          label="Edited Flags"
+                          description="Show badges on edited posts."
+                          checked={settings?.editedFlagEnabled ?? true}
+                          loading={isLoadingSettings}
+                          onToggle={() => handleToggleFlag('editedFlagEnabled')}
+                          disabled={isLoadingSettings}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="cqd-disclaimer">
+                      Flag detection is experimental and may not always be accurate.
+                    </div>
                   </div>
                 </div>
               </section>
@@ -1356,6 +1542,7 @@ function App() {
               </p>
             </div>
           </footer>
+
         </div>
       </div>
     </main>
