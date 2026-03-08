@@ -371,30 +371,78 @@ export class EngineV2 implements CQDEngine {
       }
     }
 
-    // 4. PLAN PLACEMENTS
+    // 4. PLAN PLACEMENTS (compute-only, no rendering)
     this.placementDecisions = this.planPlacements();
 
-    // 5. RENDER FLAG BADGES
-    this.renderDetectedFlags();
+    // V2 is detection-only: NO rendering. Legacy handles all visuals.
+    // this.renderDetectedFlags();    ← removed: legacy badges are perfect
+    // this.renderPlacedButtons();    ← removed: legacy buttons are perfect
 
     const elapsed = performance.now() - startTime;
     this.totalScanMs += elapsed;
 
-    // 6. RECORD TIMING + BUDGET CHECK
+    // Count results for logging
+    const flagCount = [...this.flagDecisions.values()].filter(
+      d => d.finalVerdict !== 'none',
+    ).length;
+    const fileCount = [...this.postMap.values()].reduce(
+      (sum, p) => sum + p.files.length,
+      0,
+    );
+
+    // 5. RECORD TIMING + BUDGET CHECK
     this.performanceMonitor.stopTimer('fullScan');
     const budgetResult = this.budgetController.recordFastPass(elapsed);
     this.budgetController.updatePostCount(this.postMap.size);
 
-    // 7. SCHEDULE DEEP VALIDATION (idle time)
+    // 6. SCHEDULE DEEP VALIDATION (idle time)
     this.scheduleDeepValidation();
 
-    // Log performance every 10th scan
-    if (this.scanCount % 10 === 0) {
+    // Log pipeline results — verbose for first 3 scans, then every 10th
+    const shouldLog = this.scanCount <= 3 || this.scanCount % 10 === 0;
+    if (shouldLog) {
       console.log(
-        `[Engine V2] Scan #${this.scanCount}: ${postElements.length} posts, ` +
-        `${elapsed.toFixed(1)}ms, avg ${(this.totalScanMs / this.scanCount).toFixed(1)}ms` +
+        `[Engine V2] Scan #${this.scanCount} [${this.currentView}]: ` +
+        `${postElements.length} posts, ${fileCount} files, ${flagCount} flags, ` +
+        `${this.placementDecisions.length} placements — ` +
+        `${elapsed.toFixed(1)}ms (detection-only)` +
         `${budgetResult !== 'ok' ? ` [BUDGET: ${budgetResult}]` : ''}`,
       );
+
+      // Engine Combiner: Compare V2 detection vs legacy data attributes
+      if (flagCount > 0) {
+        const lines: string[] = ['[Engine V2] Detection Report (V2 vs Legacy):'];
+        for (const [postId, decision] of this.flagDecisions) {
+          if (decision.finalVerdict === 'none') continue;
+          const post = this.postMap.get(postId);
+          if (!post?.element) continue;
+
+          const el = post.element;
+          // What legacy has set on this post
+          const legacyComment = el.hasAttribute('data-cqd-comments-processed');
+          const legacyEdited = el.hasAttribute('data-cqd-edited-processed');
+
+          // What V2 detected
+          const v2Flags: string[] = [];
+          if (decision.finalVerdict === 'comment' || decision.finalVerdict === 'both') {
+            v2Flags.push(`comment(${decision.commentCount ?? '?'})`);
+          }
+          if (decision.finalVerdict === 'edited' || decision.finalVerdict === 'both') {
+            v2Flags.push('edited');
+          }
+
+          const legacyFlags: string[] = [];
+          if (legacyComment) legacyFlags.push('comment ✓');
+          if (legacyEdited) legacyFlags.push('edited ✓');
+
+          // Get a readable title
+          const title = el.querySelector('h2')?.textContent?.trim().slice(0, 40) || postId;
+          lines.push(
+            `  "${title}" — V2: ${v2Flags.join(' + ')} | Legacy: ${legacyFlags.join(' + ') || '(none yet)'}`,
+          );
+        }
+        console.log(lines.join('\n'));
+      }
     }
   }
 
@@ -554,12 +602,9 @@ export class EngineV2 implements CQDEngine {
    * Each post with a non-'none' verdict gets a badge injected.
    */
   private renderDetectedFlags(): void {
-    for (const [postId, decision] of this.flagDecisions) {
-      const post = this.postMap.get(postId);
-      if (!post || !post.element.isConnected) continue;
-
-      renderFlagBadge(decision, post.element);
-    }
+    // V2 is detection-only — legacy handles all visual rendering.
+    // This method is intentionally a no-op.
+    return;
   }
 
   // ========================================================================
@@ -645,10 +690,7 @@ export class EngineV2 implements CQDEngine {
         }
 
         case 'update-flag': {
-          const decision = this.flagDecisions.get(item.postId);
-          const post = this.postMap.get(item.postId);
-          if (!decision || !post) return false;
-          renderFlagBadge(decision, post.element);
+          // V2 is detection-only — flag rendering handled by legacy
           return true;
         }
 
@@ -665,10 +707,7 @@ export class EngineV2 implements CQDEngine {
         }
 
         case 'fix-overlay': {
-          const decision2 = this.flagDecisions.get(item.postId);
-          const post2 = this.postMap.get(item.postId);
-          if (!decision2 || !post2) return false;
-          renderFlagBadge(decision2, post2.element);
+          // V2 is detection-only — overlay rendering handled by legacy
           return true;
         }
 
