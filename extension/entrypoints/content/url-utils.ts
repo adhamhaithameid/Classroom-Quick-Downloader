@@ -96,6 +96,15 @@ export function toDownloadUrl(originalUrl: string, depth = 0): string {
         parsed.searchParams.get('fileId');
       if (id) return appendAuth(`https://drive.google.com/uc?export=download&id=${id}`);
     }
+
+    // Google Docs/Sheets/Slides/Drawings viewer URLs
+    // Pattern: docs.google.com/{type}/d/{fileId}/...
+    if (parsed.hostname === 'docs.google.com') {
+      const docsMatch = parsed.pathname.match(/^\/(document|spreadsheets|presentation|drawings)\/d\/([^/]+)/);
+      if (docsMatch) {
+        return appendAuth(`https://drive.google.com/uc?export=download&id=${docsMatch[2]}`);
+      }
+    }
     
     return appendAuth(originalUrl);
   } catch {
