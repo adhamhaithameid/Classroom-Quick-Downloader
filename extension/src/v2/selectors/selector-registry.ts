@@ -212,6 +212,10 @@ export const COMMENT_FLAG_CANDIDATES: SelectorCandidate[] = [
   candidate('comment-l4-huI6Cb', '.huI6Cb.Cx437e', SelectorLevel.L4_GOLDEN_CLASS, 'comment icon+count'),
   candidate('comment-l4-yqQS0c', '.yqQS0c', SelectorLevel.L4_GOLDEN_CLASS, 'comment click area'),
   candidate('comment-l4-gVJHxe', '.gVJHxe', SelectorLevel.L4_GOLDEN_CLASS, 'comment button area'),
+
+  // L3: Structure-based (resilient to class renames)
+  candidate('comment-l3-count-span', '.z3vRcc span.RZC0Db', SelectorLevel.L3_STRUCTURAL, 'comment count text'),
+  candidate('comment-l3-button-count', 'button[aria-label*="comment"] span', SelectorLevel.L3_STRUCTURAL, 'comment button count'),
 ];
 
 // ============================================================================
@@ -232,6 +236,11 @@ export const DATE_CONTAINER_CANDIDATES: SelectorCandidate[] = [
   candidate('date-l4-EZrbnd', '.EZrbnd', SelectorLevel.L4_GOLDEN_CLASS, 'date container alt'),
   candidate('date-l4-vGGYOe-Vu2fZd', '.vGGYOe.Vu2fZd', SelectorLevel.L4_GOLDEN_CLASS, 'classwork expanded date'),
   candidate('date-l4-vGGYOe', '.vGGYOe', SelectorLevel.L4_GOLDEN_CLASS, 'classwork date'),
+  candidate('date-l4-JZk9qf', '.JZk9qf.P354se', SelectorLevel.L4_GOLDEN_CLASS, 'edited/deleted marker'),
+
+  // L3: Structure-based (resilient to class renames)
+  candidate('date-l3-edited-span', 'span[data-stream-item-id] span.IMvYId ~ span', SelectorLevel.L3_STRUCTURAL, 'edit date sibling'),
+  candidate('date-l3-hover-date', '[data-tooltip*="Edited"]', SelectorLevel.L3_STRUCTURAL, 'edited tooltip'),
 ];
 
 // ============================================================================

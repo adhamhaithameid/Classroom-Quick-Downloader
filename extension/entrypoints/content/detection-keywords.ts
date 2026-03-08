@@ -590,6 +590,8 @@ export const DATE_PATTERNS: RegExp[] = [
 export const GOLDEN_SELECTORS = {
   dateContainer: [
     // Stream tab selectors
+    '.JZk9qf.Vu2fZd',  // Primary: contains "Feb 28 (Edited Feb 28)" — parent of .jzdBjc
+    '.JZk9qf',          // Fallback: the date/deleted marker container
     '.IMvYId.dDKhVc.Vu2fZd',
     '.IMvYId.Vu2fZd',
     '.IMvYId',
