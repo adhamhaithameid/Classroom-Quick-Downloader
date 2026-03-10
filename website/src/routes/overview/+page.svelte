@@ -715,12 +715,6 @@
     document.querySelectorAll('.l2-reveal').forEach((el) => observer.observe(el));
   }
 
-  function placementRevealShift(placement: RenderPlacement): number {
-    if (editMode) return 0;
-    if (placementSectionVisible[placement.section]) return 0;
-    return 24;
-  }
-
   function placementRenderLeftCss(placement: RenderPlacement): string {
     if (!editMode && placementCanvasLocked) {
       const frozen = frozenPlacementCoords[placement.id];
