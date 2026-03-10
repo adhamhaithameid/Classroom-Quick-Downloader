@@ -24,7 +24,9 @@
 
 const POST_SELECTOR = '[data-stream-item-id]';
 const INTERNAL_STREAM_ITEM_CONTROLLERS = new Set([
-  'h38nBf',
+  'h38nBf',   // Three-dots menu container
+  'yP6Lwf',   // Materials section controller
+  'dk8rTb',   // Bottom post controller (visibility, type metadata)
 ]);
 
 function isIgnoredInternalStreamItemElement(el: HTMLElement): boolean {
@@ -39,14 +41,20 @@ function isIgnoredInternalStreamItemElement(el: HTMLElement): boolean {
 }
 
 function isPromotableWrapperDescendant(el: HTMLElement): boolean {
-  if (isIgnoredInternalStreamItemElement(el)) return false;
-
+  // Strong positive signals — check these BEFORE the ignore list.
   // Material/topic cards often expose the stream item on a compact controller
-  // instead of the outer rounded wrapper. Preserve wrapper promotion there.
+  // instead of the outer rounded wrapper. These attributes prove it's a real post.
   if (el.hasAttribute('data-material-parent-id')) return true;
   if (el.matches('div.sVNOQ[data-stream-item-id], li[data-stream-item-id]')) return true;
 
-  return el.offsetHeight === 0 || el.offsetHeight >= 80;
+  // If this is an h38nBf three-dots menu only, it's not strong enough to promote.
+  // But dk8rTb (bottom controller) and yP6Lwf (materials controller) should
+  // promote when they carry data-stream-item-id — they prove a real post exists.
+  const jscontroller = (el.getAttribute('jscontroller') || '').trim();
+  if (jscontroller === 'h38nBf') return false;
+  if (el.hasAttribute('data-role')) return false;
+
+  return true;
 }
 
 /**
@@ -55,8 +63,13 @@ function isPromotableWrapperDescendant(el: HTMLElement): boolean {
  *
  * Internal elements are identified by:
  * - Having `data-role` attribute (e.g., `data-role="student"`)
- * - Being very small (height < 80px — internal trackers, not visible cards)
- * - Being nested inside another `[data-stream-item-id]` element
+ * - Being a known menu controller (e.g., `jscontroller="h38nBf"`)
+ * - Being nested inside another VALID `[data-stream-item-id]` post card
+ *
+ * NOTE: We intentionally do NOT filter by height. Google Classroom uses lazy
+ * rendering and some posts have 0 height at scan time. The previous
+ * `offsetHeight < 80` check caused a major regression where valid posts
+ * were silently skipped.
  *
  * @param el - Element to check
  * @returns true if this looks like a real post card
@@ -65,13 +78,14 @@ export function isActualPostCard(el: HTMLElement): boolean {
   // Skip known internal tracking/menu elements.
   if (isIgnoredInternalStreamItemElement(el)) return false;
 
-  // Skip elements nested inside another post
-  if (el.parentElement?.closest(POST_SELECTOR)) return false;
-
-  // Skip elements that are too small to be a post card.
-  // Real post cards are tall (200px+); internal elements are tiny.
-  // Use 80px threshold to be safe — even collapsed classwork items are > 80px.
-  if (el.offsetHeight > 0 && el.offsetHeight < 80) return false;
+  // Skip elements nested inside another VALID post card.
+  // Only skip if the ancestor is itself a valid card — not if the ancestor
+  // is an ignored internal element (which would cause topic-grouped posts
+  // to be incorrectly filtered out).
+  const parentWithId = el.parentElement?.closest<HTMLElement>(POST_SELECTOR);
+  if (parentWithId && !isIgnoredInternalStreamItemElement(parentWithId)) {
+    return false;
+  }
 
   return true;
 }
@@ -166,6 +180,13 @@ export function queryPostCards(): HTMLElement[] {
       if (el.contains(existing)) { containsExisting = true; break; }
     }
     if (containsExisting) continue;
+    // Skip nested wrappers inside an already-identified card. These are
+    // the main source of duplicate inner borders on comments/text sections.
+    let nestedInsideExisting = false;
+    for (const existing of cards) {
+      if (existing.contains(el)) { nestedInsideExisting = true; break; }
+    }
+    if (nestedInsideExisting) continue;
     // Skip tiny elements
     if (el.offsetHeight > 0 && el.offsetHeight < 80) continue;
     const descendants = Array.from(el.querySelectorAll<HTMLElement>(POST_SELECTOR));

@@ -38,6 +38,39 @@ let urlObserver: MutationObserver | null = null;
 // Flag toggle state (controlled from popup)
 let commentsFlagEnabled = true;
 
+function removeCommentArtifacts(): void {
+  document.querySelectorAll<HTMLElement>(
+    '.cqd-comment-badge, .cqd-both-badge, .cqd-overlay-container',
+  ).forEach((el) => el.remove());
+
+  document.querySelectorAll<HTMLElement>(POST_SELECTOR).forEach((post) => {
+    post.removeAttribute(PROCESSED_ATTR);
+    post.removeAttribute(ATTR_COMMENT_COUNT);
+  });
+}
+
+function requestCommentRefresh(): void {
+  if (!running || !commentsFlagEnabled) return;
+  document.querySelectorAll<HTMLElement>(POST_SELECTOR).forEach((post) => {
+    post.removeAttribute(PROCESSED_ATTR);
+  });
+  scanForComments();
+}
+
+function applyCommentsFlagState(enabled: boolean): void {
+  const wasEnabled = commentsFlagEnabled;
+  commentsFlagEnabled = enabled;
+
+  if (wasEnabled && !commentsFlagEnabled) {
+    removeCommentArtifacts();
+    return;
+  }
+
+  if (!wasEnabled && commentsFlagEnabled) {
+    requestCommentRefresh();
+  }
+}
+
 // Load flag state from storage
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const _browserApi = (globalThis as any).chrome;
@@ -47,29 +80,22 @@ if (_browserApi?.storage?.local) {
   });
   _browserApi.storage.onChanged.addListener((changes: any, area: string) => {
     if (area === 'local' && 'commentsFlagEnabled' in changes) {
-      const wasEnabled = commentsFlagEnabled;
-      commentsFlagEnabled = changes.commentsFlagEnabled.newValue !== false;
+      applyCommentsFlagState(changes.commentsFlagEnabled.newValue !== false);
+    }
+  });
+}
 
-      if (wasEnabled && !commentsFlagEnabled) {
-        // Just disabled — remove all comment badges immediately
-        document.querySelectorAll<HTMLElement>(
-          '.cqd-comment-badge, .cqd-both-badge'
-        ).forEach((el) => el.remove());
-        // Remove overlay containers that only have comment styling
-        document.querySelectorAll<HTMLElement>('.cqd-overlay-container').forEach((el) => {
-          if (!el.querySelector('.cqd-edited-badge')) el.remove();
-        });
-        document.querySelectorAll<HTMLElement>(POST_SELECTOR).forEach((post) => {
-          post.removeAttribute(PROCESSED_ATTR);
-          post.removeAttribute(ATTR_COMMENT_COUNT);
-        });
-      } else if (!wasEnabled && commentsFlagEnabled && running) {
-        // Just re-enabled — clear processed attrs and rescan
-        document.querySelectorAll<HTMLElement>(POST_SELECTOR).forEach((post) => {
-          post.removeAttribute(PROCESSED_ATTR);
-        });
-        scanForComments();
-      }
+if (_browserApi?.runtime?.onMessage) {
+  _browserApi.runtime.onMessage.addListener((message: any) => {
+    if (!message || message.type !== 'cqd-flag-toggle') return;
+
+    if (message.flag === 'commentsFlagEnabled') {
+      applyCommentsFlagState(message.enabled !== false);
+      return;
+    }
+
+    if ((message.flag === 'editedFlagEnabled' || message.flag === 'combinedFlagEnabled') && running && commentsFlagEnabled) {
+      window.setTimeout(() => requestCommentRefresh(), 0);
     }
   });
 }

@@ -49,7 +49,7 @@ describe('post-card-utils', () => {
       expect(isActualPostCard(menuEl)).toBe(false);
     });
 
-    it('returns false for nested [data-stream-item-id] elements', () => {
+    it('returns false for nested elements under a valid post card', () => {
       const parent = document.createElement('div');
       parent.setAttribute('data-stream-item-id', '123456');
       const child = document.createElement('div');
@@ -61,18 +61,18 @@ describe('post-card-utils', () => {
       expect(isActualPostCard(parent)).toBe(true);
     });
 
-    it('returns false for very small elements (< 80px height)', () => {
+    it('returns true for small elements (no height filtering)', () => {
+      // We intentionally do NOT filter by height anymore.
+      // The offsetHeight < 80 check caused regressions with lazy-rendered posts.
       const small = document.createElement('div');
       small.setAttribute('data-stream-item-id', '123456');
       Object.defineProperty(small, 'offsetHeight', { value: 30 });
       document.body.appendChild(small);
 
-      expect(isActualPostCard(small)).toBe(false);
+      expect(isActualPostCard(small)).toBe(true);
     });
 
     it('returns true for elements with zero offsetHeight (not rendered yet)', () => {
-      // Before the element is rendered, offsetHeight is 0
-      // We should NOT filter these out — they may become valid after render
       const unrendered = document.createElement('div');
       unrendered.setAttribute('data-stream-item-id', '123456');
       Object.defineProperty(unrendered, 'offsetHeight', { value: 0 });
@@ -89,6 +89,21 @@ describe('post-card-utils', () => {
 
       expect(isActualPostCard(li)).toBe(true);
     });
+
+    it('allows nested element when parent is an ignored internal element', () => {
+      // When the parent with data-stream-item-id is a data-role or menu controller,
+      // the child should NOT be filtered by the nesting check.
+      const parent = document.createElement('div');
+      parent.setAttribute('data-stream-item-id', '123456');
+      parent.setAttribute('data-role', 'student');
+      const child = document.createElement('div');
+      child.setAttribute('data-stream-item-id', '789');
+      parent.appendChild(child);
+      document.body.appendChild(parent);
+
+      // Parent is ignored (data-role), so child nesting check should pass
+      expect(isActualPostCard(child)).toBe(true);
+    });
   });
 
   // ========================================================================
@@ -97,7 +112,6 @@ describe('post-card-utils', () => {
 
   describe('queryPostCards', () => {
     it('returns only real post card elements', () => {
-      // Create a realistic Classroom DOM structure
       const stream = document.createElement('div');
 
       // Post 1 — the real card
@@ -130,7 +144,6 @@ describe('post-card-utils', () => {
     });
 
     it('deduplicates elements by data-stream-item-id', () => {
-      // Multiple top-level elements with the same ID (shouldn't happen but defensive)
       const el1 = document.createElement('div');
       el1.setAttribute('data-stream-item-id', '999');
       Object.defineProperty(el1, 'offsetHeight', { value: 300 });
@@ -143,7 +156,6 @@ describe('post-card-utils', () => {
       document.body.appendChild(el2);
 
       const result = queryPostCards();
-      // Should only return the first one
       expect(result).toHaveLength(1);
       expect(result[0]).toBe(el1);
     });
@@ -153,18 +165,17 @@ describe('post-card-utils', () => {
       expect(queryPostCards()).toHaveLength(0);
     });
 
-    it('handles the three-dots menu container correctly (real DOM pattern)', () => {
+    it('does not return wrapper when all descendants are ignored internal elements', () => {
       /*
-       * Real Classroom DOM pattern (material posts):
-       * <div class="n4xnA JUr7jb">               (NO data-stream-item-id)
-       *   <div data-role="student" data-stream-item-id="846995674251">  (filtered: has data-role)
-       *   <div jscontroller="h38nBf" data-stream-item-id="846995674251"> (filtered: too small)
+       * <div class="n4xnA JUr7jb">
+       *   <div data-role="student" data-stream-item-id="846995674251">
+       *   <div jscontroller="h38nBf" data-stream-item-id="846995674251">
        *
-       * Neither internal element should be returned.
-       * The .n4xnA wrapper has no data-stream-item-id so it's invisible to queryPostCards().
+       * Both are ignored → .n4xnA fallback should NOT promote this wrapper.
        */
       const wrapper = document.createElement('div');
       wrapper.className = 'n4xnA JUr7jb';
+      Object.defineProperty(wrapper, 'offsetHeight', { value: 220 });
 
       const headerRole = document.createElement('div');
       headerRole.setAttribute('data-stream-item-id', '846995674251');
@@ -180,12 +191,11 @@ describe('post-card-utils', () => {
       wrapper.appendChild(threeDots);
       document.body.appendChild(wrapper);
 
-      // Neither internal element should be returned — no ancestor walk
       const result = queryPostCards();
       expect(result).toHaveLength(0);
     });
 
-    it('promotes a wrapper card when only a compact material controller has the stream id', () => {
+    it('promotes a wrapper card when a compact material controller has the stream id', () => {
       const wrapper = document.createElement('div');
       wrapper.className = 'n4xnA JUr7jb';
       Object.defineProperty(wrapper, 'offsetHeight', { value: 220 });
@@ -202,6 +212,55 @@ describe('post-card-utils', () => {
       const result = queryPostCards();
       expect(result).toHaveLength(1);
       expect(result[0]).toBe(wrapper);
+    });
+
+    it('promotes .n4xnA wrapper when bottom controller has stream id', () => {
+      /*
+       * Real post where only a bottom controller div has the stream id:
+       * <div class="n4xnA JUr7jb">
+       *   <div jscontroller="dk8rTb" data-stream-item-id="844739525372" data-type="2">
+       */
+      const wrapper = document.createElement('div');
+      wrapper.className = 'n4xnA JUr7jb';
+      Object.defineProperty(wrapper, 'offsetHeight', { value: 200 });
+
+      const bottomController = document.createElement('div');
+      bottomController.setAttribute('data-stream-item-id', '844739525372');
+      bottomController.setAttribute('jscontroller', 'dk8rTb');
+      bottomController.setAttribute('data-type', '2');
+      Object.defineProperty(bottomController, 'offsetHeight', { value: 0 });
+
+      wrapper.appendChild(bottomController);
+      document.body.appendChild(wrapper);
+
+      const result = queryPostCards();
+      expect(result).toHaveLength(1);
+      expect(result[0]).toBe(wrapper);
+    });
+
+    it('does not promote a nested .n4xnA wrapper inside an already-detected post card', () => {
+      const outerCard = document.createElement('div');
+      outerCard.setAttribute('data-stream-item-id', 'outer-1');
+      outerCard.className = 'n4xnA JUr7jb';
+      Object.defineProperty(outerCard, 'offsetHeight', { value: 260 });
+
+      const nestedWrapper = document.createElement('div');
+      nestedWrapper.className = 'n4xnA';
+      Object.defineProperty(nestedWrapper, 'offsetHeight', { value: 180 });
+
+      const nestedController = document.createElement('div');
+      nestedController.setAttribute('data-stream-item-id', 'inner-1');
+      nestedController.setAttribute('data-material-parent-id', 'parent-1');
+      nestedController.setAttribute('jscontroller', 'yP6Lwf');
+      Object.defineProperty(nestedController, 'offsetHeight', { value: 36 });
+
+      nestedWrapper.appendChild(nestedController);
+      outerCard.appendChild(nestedWrapper);
+      document.body.appendChild(outerCard);
+
+      const result = queryPostCards();
+      expect(result).toHaveLength(1);
+      expect(result[0]).toBe(outerCard);
     });
   });
 });

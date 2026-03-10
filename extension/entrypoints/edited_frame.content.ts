@@ -28,6 +28,40 @@ let urlObserver: MutationObserver | null = null;
 // Flag toggle state (controlled from popup)
 let editedFlagEnabled = true;
 
+function removeEditedArtifacts(): void {
+  document.querySelectorAll<HTMLElement>(
+    '.cqd-edited-badge, .cqd-both-badge, .cqd-overlay-container',
+  ).forEach((el) => el.remove());
+
+  document.querySelectorAll<HTMLElement>(POST_SELECTOR).forEach((post) => {
+    post.removeAttribute(EDITED_ATTR);
+    post.removeAttribute(ATTR_EDIT_DIFF);
+    post.removeAttribute('data-cqd-edit-tooltip');
+  });
+}
+
+function requestEditedRefresh(): void {
+  if (!running || !editedFlagEnabled) return;
+  document.querySelectorAll<HTMLElement>(POST_SELECTOR).forEach((post) => {
+    post.removeAttribute(EDITED_ATTR);
+  });
+  scanForEditedPosts();
+}
+
+function applyEditedFlagState(enabled: boolean): void {
+  const wasEnabled = editedFlagEnabled;
+  editedFlagEnabled = enabled;
+
+  if (wasEnabled && !editedFlagEnabled) {
+    removeEditedArtifacts();
+    return;
+  }
+
+  if (!wasEnabled && editedFlagEnabled) {
+    requestEditedRefresh();
+  }
+}
+
 // Load flag state from storage
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const _browserApi = (globalThis as any).chrome;
@@ -37,28 +71,22 @@ if (_browserApi?.storage?.local) {
   });
   _browserApi.storage.onChanged.addListener((changes: any, area: string) => {
     if (area === 'local' && 'editedFlagEnabled' in changes) {
-      const wasEnabled = editedFlagEnabled;
-      editedFlagEnabled = changes.editedFlagEnabled.newValue !== false;
+      applyEditedFlagState(changes.editedFlagEnabled.newValue !== false);
+    }
+  });
+}
 
-      if (wasEnabled && !editedFlagEnabled) {
-        // Just disabled — remove all edited badges immediately
-        document.querySelectorAll<HTMLElement>(
-          '.cqd-edited-badge, .cqd-both-badge'
-        ).forEach((el) => el.remove());
-        document.querySelectorAll<HTMLElement>('.cqd-overlay-container').forEach((el) => {
-          if (!el.querySelector('.cqd-comment-badge')) el.remove();
-        });
-        document.querySelectorAll<HTMLElement>(POST_SELECTOR).forEach((post) => {
-          post.removeAttribute(EDITED_ATTR);
-          post.removeAttribute(ATTR_EDIT_DIFF);
-        });
-      } else if (!wasEnabled && editedFlagEnabled && running) {
-        // Just re-enabled — clear processed attrs and rescan
-        document.querySelectorAll<HTMLElement>(POST_SELECTOR).forEach((post) => {
-          post.removeAttribute(EDITED_ATTR);
-        });
-        scanForEditedPosts();
-      }
+if (_browserApi?.runtime?.onMessage) {
+  _browserApi.runtime.onMessage.addListener((message: any) => {
+    if (!message || message.type !== 'cqd-flag-toggle') return;
+
+    if (message.flag === 'editedFlagEnabled') {
+      applyEditedFlagState(message.enabled !== false);
+      return;
+    }
+
+    if ((message.flag === 'commentsFlagEnabled' || message.flag === 'combinedFlagEnabled') && running && editedFlagEnabled) {
+      window.setTimeout(() => requestEditedRefresh(), 0);
     }
   });
 }
