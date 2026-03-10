@@ -59,7 +59,7 @@ export default defineContentScript({
       console.log('[CQD V2 Bootstrap] Engines registered:', engineRegistry.getSummary());
 
       // 2. Initialize mode controller
-      //    Reads cqdV2Mode from chrome.storage.local (default: 'legacy')
+      //    Reads cqdV2Mode from chrome.storage.local (default: 'shadow')
       //    Sets up message listener for popup → content script mode changes
       //    Sets up storage.onChanged listener for cross-tab mode sync
       await initModeController();
@@ -70,9 +70,18 @@ export default defineContentScript({
       //    Creates RouteWatcher (URL → ViewKind classification)
       //    Sets mode-change callback for live switching
       //    Initializes engines for the current page
+      //    In shadow mode: starts ShadowComparator for V1 vs V2 comparison
       orchestrator.start();
 
       console.log('[CQD V2 Bootstrap] Orchestrator started');
+
+      // 4. Initialize debug panel (Ctrl+Shift+D to toggle)
+      try {
+        const { initDebugPanel } = await import('../src/v2/debug/debug-panel');
+        await initDebugPanel();
+      } catch {
+        // Debug panel is non-critical — silently skip on error
+      }
     } catch (e) {
       // This MUST NOT propagate — legacy features must keep working
       console.error('[CQD V2 Bootstrap] Failed to initialize (legacy unaffected):', e);

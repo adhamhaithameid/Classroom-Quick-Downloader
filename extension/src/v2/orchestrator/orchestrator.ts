@@ -51,6 +51,7 @@
 import { ViewKind, type CQDEngine } from '../../engines/types';
 import { engineRegistry } from '../../engines/engine-registry';
 import { RouteWatcher, isClassroomUrl } from '../context/route-classifier';
+import { ShadowComparator, type ShadowCompareResult } from '../compat/shadow-compare';
 
 // ============================================================================
 // ORCHESTRATOR CLASS
@@ -79,6 +80,12 @@ export class Orchestrator {
 
   /** Currently active engine instances */
   private activeEngines: CQDEngine[] = [];
+
+  /** Shadow comparator — runs periodic V1 vs V2 comparisons in shadow mode */
+  private shadowComparator: ShadowComparator | null = null;
+
+  /** Latest shadow comparison report (for debug panel) */
+  private latestShadowReport: ShadowCompareResult | null = null;
 
   // ========================================================================
   // LIFECYCLE
@@ -230,6 +237,65 @@ export class Orchestrator {
     if (!signal.aborted) {
       this.setupDomObserver();
     }
+
+    // 6. Start shadow comparison if in shadow mode
+    if (!signal.aborted && engineRegistry.getMode() === 'shadow') {
+      this.startShadowComparison();
+    }
+  }
+
+  /**
+   * Start the ShadowComparator for V1 vs V2 comparison.
+   * Only runs in shadow mode. Logs mismatch reports to console.
+   */
+  private startShadowComparison(): void {
+    this.stopShadowComparison();
+
+    const v1 = engineRegistry.getEngine('engine-v1');
+    const v2 = engineRegistry.getEngine('engine-v2');
+    if (!v1 || !v2) {
+      console.warn('[CQD Orchestrator] Cannot start shadow comparison: missing V1 or V2 engine');
+      return;
+    }
+
+    this.shadowComparator = new ShadowComparator(v1, v2, 10_000, 50);
+
+    // Override the comparator's internal interval to also log reports
+    const originalRunComparison = this.shadowComparator.runComparison.bind(this.shadowComparator);
+    const self = this;
+    this.shadowComparator.runComparison = function() {
+      const report = originalRunComparison();
+      self.latestShadowReport = report;
+
+      if (report.mismatchCount > 0) {
+        console.warn(
+          `[CQD-SHADOW] Mismatches: ${report.mismatchCount} / ${report.postsAnalyzed} posts ` +
+          `(${report.matchPercentage.toFixed(1)}% match) — ` +
+          `flags: ${report.mismatchBreakdown.FLAG_MISMATCH || 0}, ` +
+          `placements: ${report.mismatchBreakdown.PLACEMENT_MISMATCH || 0}, ` +
+          `counts: ${report.mismatchBreakdown.COUNT_MISMATCH || 0}`,
+        );
+      } else if (report.postsAnalyzed > 0) {
+        console.log(
+          `[CQD-SHADOW] ✓ All ${report.postsAnalyzed} posts match (${report.duration_ms}ms)`,
+        );
+      }
+
+      return report;
+    };
+
+    this.shadowComparator.start();
+    console.log('[CQD Orchestrator] Shadow comparator started (10s interval)');
+  }
+
+  /**
+   * Stop the shadow comparator.
+   */
+  private stopShadowComparison(): void {
+    if (this.shadowComparator) {
+      this.shadowComparator.stop();
+      this.shadowComparator = null;
+    }
   }
 
   // ========================================================================
@@ -313,6 +379,9 @@ export class Orchestrator {
    * - Timers and delayed operations
    */
   private abortCurrentPage(): void {
+    // 0. Stop shadow comparison first
+    this.stopShadowComparison();
+
     // 1. Abort the signal
     if (this.pageAbortController) {
       this.pageAbortController.abort();
@@ -370,6 +439,20 @@ export class Orchestrator {
    */
   getActiveEngines(): CQDEngine[] {
     return this.activeEngines;
+  }
+
+  /**
+   * Get the latest shadow comparison report (for debug panel).
+   */
+  getShadowReport(): ShadowCompareResult | null {
+    return this.latestShadowReport;
+  }
+
+  /**
+   * Get all shadow reports (for debug panel history).
+   */
+  getShadowReports(): ShadowCompareResult[] {
+    return this.shadowComparator?.getReports() ?? [];
   }
 }
 

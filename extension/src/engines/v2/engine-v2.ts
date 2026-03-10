@@ -67,6 +67,7 @@ import {
   createHeaderScorer,
   createExclusionScorer,
 } from '../../v2/selectors/selector-registry';
+import { engineRegistry } from '../engine-registry';
 import type { SelectorScorer } from '../../v2/selectors/selector-scorer';
 import { computePlacement } from '../../v2/decision/file-placement';
 import { scoreFlagsForPost } from '../../v2/decision/flag-scoring';
@@ -588,6 +589,19 @@ export class EngineV2 implements CQDEngine {
       this.flagDecisions.set(postId, decision);
       this.decisionTraces.set(postId, decision.trace);
 
+      // Shadow mode decision trace logging — enables debugging wrong decisions
+      // via DevTools console. Filter console by [CQD-V2-SHADOW] to see only these.
+      if (decision.finalVerdict !== 'none') {
+        console.log(
+          `[CQD-V2-SHADOW] Flag: post=${postId} verdict=${decision.finalVerdict} ` +
+          `comment=${decision.commentScore} edited=${decision.editedScore} ` +
+          `confidence=${decision.confidence} ` +
+          `exclusions=${decision.exclusionPenalties.length > 0
+            ? decision.exclusionPenalties.map((e) => e.ruleId).join(',')
+            : 'none'}`,
+        );
+      }
+
       return decision;
     } catch (err) {
       console.warn(`[Engine V2] Flag detection failed for post ${postId}:`, err);
@@ -600,11 +614,32 @@ export class EngineV2 implements CQDEngine {
    *
    * Called after flag detection + placement planning in fullScan().
    * Each post with a non-'none' verdict gets a badge injected.
+   *
+   * ONLY renders when V2 is the primary engine ('v2' or 'v3' mode).
+   * In 'shadow' mode, V1 (legacy) handles all rendering — V2 is
+   * detection-only and this method is a no-op.
    */
   private renderDetectedFlags(): void {
-    // V2 is detection-only — legacy handles all visual rendering.
-    // This method is intentionally a no-op.
-    return;
+    // Only render when V2 is the primary engine
+    const mode = engineRegistry.getMode();
+    if (mode !== 'v2' && mode !== 'v3') {
+      // Shadow/legacy mode — V1 handles rendering, V2 is detection-only
+      return;
+    }
+
+    for (const [postId, decision] of this.flagDecisions) {
+      const postNode = this.postMap.get(postId);
+      if (!postNode?.element || !postNode.element.isConnected) {
+        // Post was removed from DOM — skip rendering
+        continue;
+      }
+
+      try {
+        renderFlagBadge(decision, postNode.element);
+      } catch (err) {
+        console.warn(`[Engine V2] Flag render failed for post ${postId}:`, err);
+      }
+    }
   }
 
   // ========================================================================

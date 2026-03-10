@@ -40,10 +40,10 @@ describe('Mode Controller', () => {
   // ========================================================================
 
   describe('readMode', () => {
-    it('returns "legacy" as default mode', async () => {
+    it('returns "shadow" as default mode', async () => {
       const { modeController } = await loadModeControllerModule();
       const mode = await modeController.readMode();
-      expect(mode).toBe('legacy');
+      expect(mode).toBe('shadow');
     });
 
     it('reads mode from chrome.storage.local', async () => {
@@ -57,22 +57,22 @@ describe('Mode Controller', () => {
       expect(mode).toBe('shadow');
     });
 
-    it('returns "legacy" for invalid stored value', async () => {
+    it('returns "shadow" for invalid stored value', async () => {
       chrome.storage.local.get = vi.fn().mockResolvedValue({
         cqdV2Mode: 'invalid-mode',
       });
 
       const { modeController } = await loadModeControllerModule();
       const mode = await modeController.readMode();
-      expect(mode).toBe('legacy');
+      expect(mode).toBe('shadow');
     });
 
-    it('returns "legacy" when storage read fails', async () => {
+    it('returns "shadow" when storage read fails', async () => {
       chrome.storage.local.get = vi.fn().mockRejectedValue(new Error('quota exceeded'));
 
       const { modeController } = await loadModeControllerModule();
       const mode = await modeController.readMode();
-      expect(mode).toBe('legacy');
+      expect(mode).toBe('shadow');
     });
 
     it('reads v2 and v3 modes correctly', async () => {
@@ -177,13 +177,13 @@ describe('Mode Controller', () => {
       expect(addListenerSpy).toHaveBeenCalled();
     });
 
-    it('defaults to legacy when storage is empty', async () => {
+    it('defaults to shadow when storage is empty', async () => {
       chrome.storage.local.get = vi.fn().mockResolvedValue({});
 
       const { modeController, registry } = await loadModeControllerModule();
       await modeController.initModeController();
 
-      expect(registry.getMode()).toBe('legacy');
+      expect(registry.getMode()).toBe('shadow');
     });
   });
 });
