@@ -1,5 +1,6 @@
 <script lang="ts">
   import { SITE_URL } from '$lib/config';
+  import { SOCIAL_IMAGE } from '$lib/seo/site';
 
   export let title: string;
   export let description: string;
