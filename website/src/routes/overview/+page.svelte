@@ -1617,9 +1617,7 @@
     outline-offset: 4px;
     box-shadow: 0 0 30px rgba(26,139,85,0.25);
     cursor: grabbing;
-  }
-  .l2-placement-el.edit-selected.edit-locked { cursor: not-allowed; }
-  .el-delete-btn {
+  }  .el-delete-btn {
     position: absolute; top: -8px; right: -8px;
     width: 20px; height: 20px; border-radius: 50%;
     background: #ef4444; color: #fff; border: none;
