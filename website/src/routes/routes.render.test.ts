@@ -31,6 +31,7 @@ describe('route render smoke coverage', () => {
     expect(head).toContain('https://classroom-quick-downloader-website.pages.dev/');
     expect(head).toContain('og:image');
     expect(head).toContain('twitter:image');
+    expect(head).not.toContain('fonts.googleapis.com');
     expect(head).not.toContain('noindex, nofollow');
     expect(html).toContain('Download all Google Classroom files in one click for every assignment.');
   });
