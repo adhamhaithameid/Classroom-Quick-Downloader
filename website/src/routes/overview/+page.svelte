@@ -715,11 +715,6 @@
     document.querySelectorAll('.l2-reveal').forEach((el) => observer.observe(el));
   }
 
-  function toggleEditIsolation() {
-    editIsolation = !editIsolation;
-    setEditorStatus(editIsolation ? 'Page interactions frozen for placement editing.' : 'Page interactions restored.');
-  }
-
   function persistEditingState() {
     if (!editMode) return;
     saveDraftPlacements(placements);
