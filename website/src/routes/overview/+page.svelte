@@ -715,13 +715,6 @@
     document.querySelectorAll('.l2-reveal').forEach((el) => observer.observe(el));
   }
 
-  function deleteElement(id: string) {
-    placements = placements.filter(p => p.id !== id);
-    persistEditingState();
-    if (selectedElementId === id) selectedElementId = null;
-    setEditorStatus(`Deleted '${id}'.`, 'warn');
-  }
-
   function assignSample(sampleId: string) {
     if (!selectedElementId) return;
     placements = placements.map(p => p.id === selectedElementId ? { ...p, sampleId } : p);
