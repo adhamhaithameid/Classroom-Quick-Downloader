@@ -1654,17 +1654,7 @@
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: 8px 14px;
     align-items: center;
-  }
-  .edit-color-input input[type='color'] {
-    width: 28px;
-    height: 22px;
-    border: 0;
-    padding: 0;
-    border-radius: 5px;
-    background: transparent;
-    cursor: pointer;
-  }
-  .edit-layer-controls {
+  }  .edit-layer-controls {
     display: flex;
     gap: 8px;
     align-items: center;
