@@ -715,14 +715,6 @@
     document.querySelectorAll('.l2-reveal').forEach((el) => observer.observe(el));
   }
 
-  function assignSample(sampleId: string) {
-    if (!selectedElementId) return;
-    placements = placements.map(p => p.id === selectedElementId ? { ...p, sampleId } : p);
-    persistEditingState();
-    pickerOpen = false;
-    setEditorStatus(`Applied sample '${sampleId}'.`);
-  }
-
   function updatePlacement(id: string, updates: Partial<ElementPlacement>) {
     placements = placements.map(p => p.id === id ? { ...p, ...updates } : p);
     persistEditingState();
