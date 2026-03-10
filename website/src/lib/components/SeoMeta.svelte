@@ -9,6 +9,10 @@
   export let keywords = '';
   export let type: 'website' | 'article' = 'website';
   export let structuredData: Record<string, unknown> | Array<Record<string, unknown>> | null = null;
+  export let imagePath = SOCIAL_IMAGE.path;
+  export let imageAlt = SOCIAL_IMAGE.alt;
+  export let imageWidth = SOCIAL_IMAGE.width;
+  export let imageHeight = SOCIAL_IMAGE.height;
 
   function normalizePath(value: string): string {
     const trimmed = value.trim();
