@@ -715,12 +715,6 @@
     document.querySelectorAll('.l2-reveal').forEach((el) => observer.observe(el));
   }
 
-  function handleEditPublish() {
-    publishedPlacements = publishPlacements(placements);
-    placements = clonePlacements(publishedPlacements);
-    setEditorStatus('Draft applied to live overview.', 'ok');
-  }
-
   function handleEditDiscard() {
     placements = discardDraftPlacements(publishedPlacements);
     selectedElementId = null;
