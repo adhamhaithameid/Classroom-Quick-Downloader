@@ -3,6 +3,7 @@ import { render } from 'svelte/server';
 import RootRedirectPage from './+page.svelte';
 import Landing2RedirectPage from './landing2/+page.svelte';
 import OverviewPage from './overview/+page.svelte';
+import OverviewEditorPage from './overview-editor/+page.svelte';
 import ChangelogPage from './changelog/+page.svelte';
 import PrivacyPage from './privacy/+page.svelte';
 import FaqPage from './faq/+page.svelte';
