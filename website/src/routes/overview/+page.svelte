@@ -798,7 +798,7 @@
   structuredData={softwareApplicationStructuredData}
 />
 
-<div class="l2" class:edit-mode={editMode} class:edit-isolation={editMode && editIsolation} bind:this={pageEl}>
+<div class="l2">
   <!-- ━━━━ Page-wide decorative layer ━━━━ -->
   <div class="l2-page-orbs" aria-hidden="true">
     <div class="orb orb-1"></div>
