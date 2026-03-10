@@ -35,6 +35,7 @@
   }
 
   $: canonical = buildCanonical(SITE_URL, path);
+  $: socialImageUrl = buildAbsoluteAssetUrl(SITE_URL, imagePath);
   $: robots = noindex ? 'noindex, nofollow' : 'index, follow';
   $: jsonLdItems = structuredData
     ? Array.isArray(structuredData)
