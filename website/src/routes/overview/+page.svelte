@@ -715,47 +715,6 @@
     document.querySelectorAll('.l2-reveal').forEach((el) => observer.observe(el));
   }
 
-  function freezePlacementCoordinates(): void {
-    if (!pageEl) return;
-    const viewportHeight = typeof window !== 'undefined' ? window.innerHeight || 0 : 0;
-    const canvasHeight = placementCanvasHeight > 0 ? placementCanvasHeight : pageEl.scrollHeight || viewportHeight;
-    const canvasWidth = pageEl.clientWidth || (typeof window !== 'undefined' ? window.innerWidth || 0 : 0);
-    if (!Number.isFinite(canvasHeight) || canvasHeight <= 0) return;
-    if (!Number.isFinite(canvasWidth) || canvasWidth <= 0) return;
-
-    const next: Record<string, { leftPx: number; topPx: number }> = {};
-    for (const placement of visiblePlacements) {
-      next[placement.id] = {
-        leftPx: Number(((canvasWidth * placement.renderX) / 100).toFixed(2)),
-        topPx: Number(((canvasHeight * placement.renderY) / 100).toFixed(2))
-      };
-    }
-    frozenPlacementCoords = next;
-  }
-
-  async function waitForStableLayoutBeforePlacementLock(): Promise<void> {
-    if (typeof document === 'undefined' || typeof window === 'undefined') return;
-
-    const fontsReady = (
-      document as Document & {
-        fonts?: { ready?: Promise<unknown> };
-      }
-    ).fonts?.ready;
-
-    if (fontsReady) {
-      await Promise.race([
-        fontsReady,
-        new Promise((resolve) => window.setTimeout(resolve, 1200))
-      ]);
-    }
-
-    await new Promise<void>((resolve) => {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => resolve());
-      });
-    });
-  }
-
   function resolvePlacementForViewport(placement: ElementPlacement): RenderPlacement {
     const onMobile = isMobilePlacementsViewport;
     return {
