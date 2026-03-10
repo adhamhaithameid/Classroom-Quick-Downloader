@@ -1690,13 +1690,6 @@
     border-radius: 10px; padding: 8px; display: flex; flex-direction: column;
     align-items: center; gap: 4px; cursor: pointer; transition: all 0.15s;
   }  .edit-picker-id { font-size: 8px; color: #94a3b8; font-family: monospace; font-weight: 600; }
-
-  @keyframes float-a {
-    0%, 100% { transform: translateY(0) rotate(var(--placement-rotate, 0deg)); }
-    25% { transform: translateY(-20px) rotate(calc(var(--placement-rotate, 0deg) + 5deg)); }
-    50% { transform: translateY(10px) rotate(calc(var(--placement-rotate, 0deg) - 3deg)); }
-    75% { transform: translateY(-15px) rotate(calc(var(--placement-rotate, 0deg) + 4deg)); }
-  }
   @keyframes float-b {
     0%, 100% { transform: translateY(0) rotate(var(--placement-rotate, 0deg)); }
     33% { transform: translateY(15px) rotate(calc(var(--placement-rotate, 0deg) - 4deg)); }
