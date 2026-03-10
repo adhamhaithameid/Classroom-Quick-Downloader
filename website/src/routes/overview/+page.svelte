@@ -726,18 +726,10 @@
     initSillyState();
     const mapComponentsLoad = loadMapComponents().catch(() => undefined);
     void Promise.all([loadSiteData(), mapComponentsLoad]).then(() => {
-      requestAnimationFrame(async () => {
-        await waitForStableLayoutBeforePlacementLock();
-        syncPlacementCanvasHeight(true);
-        if (!editMode) {
-          placementCanvasLocked = true;
-          freezePlacementCoordinates();
-        }
-        if (isEmbed || editMode) {
-          resetPlacementSectionVisibility(true);
+      requestAnimationFrame(() => {
+        if (isEmbed) {
           document.querySelectorAll('.l2-reveal').forEach((el) => el.classList.add('in-view'));
         } else {
-          resetPlacementSectionVisibility(false);
           setupReveal();
         }
         stopMarquee = initMarquee();
