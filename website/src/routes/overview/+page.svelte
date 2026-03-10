@@ -1626,18 +1626,6 @@
     z-index: 10; line-height: 1;
   }  .l2-placement-el.edit-selected .el-delete-btn { display: flex; }  .l2-placement-el.edit-mode:hover .el-id-label,
   .l2-placement-el.edit-selected .el-id-label { display: block; }
-
-  /* ── Edit Mode Toolbar ───────────── */
-  .edit-toolbar {
-    position: fixed; bottom: 0; left: 0; right: 0;
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 10px 20px; gap: 8px;
-    background: rgba(15,20,30,0.92); backdrop-filter: blur(12px);
-    border-top: 1px solid rgba(255,255,255,0.1);
-    z-index: 60000; color: #e2e8f0;
-    font-family: var(--font-ui), sans-serif;
-    flex-wrap: wrap;
-  }
   .edit-tb-left, .edit-tb-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .edit-tb-title { font-weight: 700; font-size: 14px; margin-right: 8px; }
   .edit-tb-count { font-size: 11px; color: #94a3b8; }
