@@ -715,11 +715,6 @@
     document.querySelectorAll('.l2-reveal').forEach((el) => observer.observe(el));
   }
 
-  function clampForRender(value: number, min: number, max: number): number {
-    if (!Number.isFinite(value)) return min;
-    return Math.min(max, Math.max(min, value));
-  }
-
   function syncPlacementCanvasHeight(force = false): void {
     if (!pageEl) return;
     if (placementCanvasLocked && !force) return;
