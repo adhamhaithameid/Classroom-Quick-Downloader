@@ -1644,15 +1644,7 @@
     padding: 0 6px;
   }  .edit-tb-status.tone-ok { color: #4ade80; border-color: rgba(74,222,128,0.35); background: rgba(74,222,128,0.1); }
   .edit-tb-status.tone-warn { color: #fbbf24; border-color: rgba(251,191,36,0.35); background: rgba(251,191,36,0.1); }
-  .edit-tb-status.tone-error { color: #f87171; border-color: rgba(248,113,113,0.35); background: rgba(248,113,113,0.1); }
-  .edit-inspector-top {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    align-items: center;
-    margin-bottom: 10px;
-  }
-  .edit-inspector-id {
+  .edit-tb-status.tone-error { color: #f87171; border-color: rgba(248,113,113,0.35); background: rgba(248,113,113,0.1); }  .edit-inspector-id {
     font-family: monospace;
     font-size: 12px;
     font-weight: 700;
