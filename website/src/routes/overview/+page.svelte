@@ -1358,39 +1358,6 @@
     </div>
   </section>
 
-  <!-- ━━━━ Edit Mode Toolbar & Picker ━━━━ -->
-  {#if editMode}
-    <div class="edit-toolbar" transition:fade={{ duration: 200 }}>
-      <div class="edit-tb-left">
-        <span class="edit-tb-title">✏️ Element Editor</span>
-        <button class="edit-tb-btn edit-tb-add-float" on:click={() => addElement('float')}>+ Float</button>
-        <button class="edit-tb-btn edit-tb-add-doodle" on:click={() => addElement('doodle')}>+ Doodle</button>
-        <button class="edit-tb-btn edit-tb-add-3d" on:click={() => addElement('3d')}>+ 3D</button>
-        <span class="edit-tb-count">{placements.length} element{placements.length !== 1 ? 's' : ''}</span>
-        {#if editorStatus}
-          <span class="edit-tb-status tone-{editorStatusTone}">{editorStatus}</span>
-        {/if}
-      </div>
-      <div class="edit-tb-right">
-        <button class="edit-tb-btn" on:click={toggleEditIsolation}>{editIsolation ? '🧊 Editing Locked' : '🌐 Page Interactive'}</button>
-        <button class="edit-tb-btn" on:click={handleEditExport}>📋 Export</button>
-        <button
-          class="edit-tb-btn"
-          on:click={() => {
-            const next = !showImportPanel;
-            showImportPanel = next;
-            if (next) {
-              importErrors = [];
-              importWarnings = [];
-            }
-          }}
-        >📥 Import</button>
-        <button class="edit-tb-btn" on:click={handleEditDiscard}>↩️ Discard Draft</button>
-        <button class="edit-tb-btn edit-tb-publish" on:click={handleEditPublish}>✅ Apply Draft</button>
-        <button class="edit-tb-btn edit-tb-reset" on:click={handleEditResetDraft}>🔄 Reset Draft</button>
-      </div>
-    </div>
-
     {#if selectedPlacement}
       <div class="edit-inspector" transition:fade={{ duration: 120 }}>
         <div class="edit-inspector-top">
