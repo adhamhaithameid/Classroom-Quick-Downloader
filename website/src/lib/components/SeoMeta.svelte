@@ -65,6 +65,12 @@
   <meta property="og:title" content={title} />
   <meta property="og:description" content={description} />
   <meta property="og:url" content={canonical} />
+  {#if socialImageUrl}
+    <meta property="og:image" content={socialImageUrl} />
+    <meta property="og:image:alt" content={imageAlt} />
+    <meta property="og:image:width" content={String(imageWidth)} />
+    <meta property="og:image:height" content={String(imageHeight)} />
+  {/if}
 
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content={title} />
