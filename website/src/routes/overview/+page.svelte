@@ -715,13 +715,6 @@
     document.querySelectorAll('.l2-reveal').forEach((el) => observer.observe(el));
   }
 
-  function placementAnimationPlayState(placement: RenderPlacement): 'running' | 'paused' {
-    if (placement.renderAnimDuration <= 0) return 'paused';
-    if (editMode) return 'running';
-    if (!placementSectionVisible[placement.section]) return 'paused';
-    return 'running';
-  }
-
   $: selectedPlacement = placements.find(p => p.id === selectedElementId) || null;
   $: pinnedSuperchargeStar = isMobilePlacementsViewport
     ? null
