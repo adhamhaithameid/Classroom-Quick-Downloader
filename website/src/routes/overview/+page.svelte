@@ -2807,11 +2807,7 @@
       height: 34px;
       top: 10px;
       right: 10px;
-    }
-    .edit-toolbar {
-      padding: 8px 10px;
-    }
-    .edit-inspector {
+    }    .edit-inspector {
       left: 10px;
       right: 10px;
       bottom: 64px;
