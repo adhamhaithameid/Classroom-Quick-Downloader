@@ -715,11 +715,6 @@
     document.querySelectorAll('.l2-reveal').forEach((el) => observer.observe(el));
   }
 
-  function toggleSelectedVisibility() {
-    if (!selectedPlacement) return;
-    updatePlacement(selectedPlacement.id, { hidden: !selectedPlacement.hidden });
-  }
-
   function startEditDrag(e: PointerEvent, p: ElementPlacement) {
     if (!editMode || p.locked) return;
     e.preventDefault();
