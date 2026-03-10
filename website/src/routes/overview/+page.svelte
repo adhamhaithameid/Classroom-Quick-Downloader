@@ -715,11 +715,6 @@
     document.querySelectorAll('.l2-reveal').forEach((el) => observer.observe(el));
   }
 
-  function updatePlacement(id: string, updates: Partial<ElementPlacement>) {
-    placements = placements.map(p => p.id === id ? { ...p, ...updates } : p);
-    persistEditingState();
-  }
-
   function bumpSelectedLayer(direction: 'up' | 'down') {
     if (!selectedPlacement) return;
     const next = Math.max(0, (selectedPlacement.zIndex ?? 0) + (direction === 'up' ? 1 : -1));
