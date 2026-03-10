@@ -715,47 +715,6 @@
     document.querySelectorAll('.l2-reveal').forEach((el) => observer.observe(el));
   }
 
-  function addElement(type: 'float' | 'doodle' | '3d') {
-    const id = genPlacementId(type);
-    const defaultSamples: Record<'float' | 'doodle' | '3d', string> = {
-      float: 'F-1-1',
-      doodle: doodleItems[0]?.id || 'D-1',
-      '3d': threeDElements[0]?.id || '3D-1'
-    };
-
-    let spawnY = 30;
-    const canvasHeight = placementCanvasHeight > 0 ? placementCanvasHeight : pageEl?.scrollHeight || 0;
-    if (canvasHeight > 0) {
-      const vh = window.innerHeight;
-      const sy = window.scrollY;
-      spawnY = ((sy + vh / 2) / canvasHeight) * 100;
-      spawnY = Math.round(spawnY * 10) / 10;
-    }
-
-    placements = [
-      ...placements,
-      {
-        id,
-        sampleId: defaultSamples[type],
-        type,
-        section: 'general',
-        x: 50,
-        y: spawnY,
-        size: type === '3d' ? 120 : type === 'float' ? 90 : 60,
-        opacity: type === 'float' ? 0.06 : type === '3d' ? 0.72 : 0.7,
-        rotate: 0,
-        animDuration: type === '3d' ? 14 : 20,
-        color: 'var(--green)',
-        zIndex: maxPlacementZIndex(placements) + 1,
-        hidden: false,
-        locked: false
-      }
-    ];
-    persistEditingState();
-    selectedElementId = id;
-    setEditorStatus(`Added ${type} element '${id}'.`);
-  }
-
   function duplicateSelectedElement() {
     if (!selectedPlacement) return;
     const duplicated: ElementPlacement = {
