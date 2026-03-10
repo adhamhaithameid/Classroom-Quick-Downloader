@@ -1398,11 +1398,6 @@
 
   .l2-wrap { max-width: var(--wrap); margin: 0 auto; padding: 0 24px; }
 
-  .l2.edit-isolation .l2-page-floats {
-    pointer-events: auto;
-    z-index: 4000;
-  }
-
   /* ── Hero ───────────────────────────── */
   .l2-hero {
     position: relative; z-index: 2;
