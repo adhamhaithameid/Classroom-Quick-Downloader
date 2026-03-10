@@ -1659,16 +1659,6 @@
     gap: 8px;
     align-items: center;
   }
-
-  /* ── Import Panel ────────────────── */
-  .edit-import-panel {
-    position: fixed; bottom: 56px; right: 20px;
-    width: min(520px, calc(100vw - 40px)); padding: 16px;
-    background: rgba(15,20,30,0.96); backdrop-filter: blur(12px);
-    border: 1px solid rgba(255,255,255,0.1); border-radius: 12px;
-    z-index: 60001; color: #e2e8f0;
-    font-family: var(--font-ui), sans-serif;
-  }
   .edit-import-panel h4 { margin: 0 0 8px; font-size: 14px; font-weight: 700; }
   .edit-import-textarea {
     width: 100%; height: 120px; padding: 10px; border-radius: 8px;
