@@ -242,7 +242,7 @@
 
   .ml-error-hint {
     margin: 0;
-    font-family: var(--font-ui, 'Plus Jakarta Sans'), sans-serif;
+    font-family: var(--font-ui, 'Avenir Next'), sans-serif;
     font-size: 12px;
     color: #94a3b8;
     font-weight: 500;
