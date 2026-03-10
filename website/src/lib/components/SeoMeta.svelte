@@ -75,6 +75,10 @@
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content={title} />
   <meta name="twitter:description" content={description} />
+  {#if socialImageUrl}
+    <meta name="twitter:image" content={socialImageUrl} />
+    <meta name="twitter:image:alt" content={imageAlt} />
+  {/if}
 
   {#each jsonLdScriptHtml as scriptHtml}
     {@html scriptHtml}
