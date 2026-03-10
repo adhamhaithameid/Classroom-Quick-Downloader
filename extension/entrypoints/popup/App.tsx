@@ -1234,87 +1234,74 @@ function App() {
                     <div>
                       <h2 className="cqd-card-title">Extension Settings</h2>
                       <p className="cqd-card-subtitle">
-                        Configure extension, flags, and engine behavior.
+                        Downloads and flags.
                       </p>
                     </div>
-                    <svg
-                      className={`cqd-settings-chevron ${settingsCollapsed ? '' : 'cqd-settings-chevron-open'}`}
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      width="16"
-                      height="16"
-                      aria-hidden="true"
-                    >
-                      <path d="M6 9l6 6 6-6" />
-                    </svg>
+                    <span className="cqd-settings-toggle-pill" aria-hidden="true">
+                      <span className="cqd-settings-toggle-pill-label">
+                        {settingsCollapsed ? 'Open' : 'Close'}
+                      </span>
+                      <svg
+                        className={`cqd-settings-chevron ${settingsCollapsed ? '' : 'cqd-settings-chevron-open'}`}
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        width="16"
+                        height="16"
+                      >
+                        <path d="M6 9l6 6 6-6" />
+                      </svg>
+                    </span>
                   </button>
 
                   <div
                     id="cqd-settings-body"
                     className={`cqd-settings-body ${settingsCollapsed ? 'cqd-settings-body-collapsed' : ''}`}
                   >
-                    <div className="cqd-toggle-group">
-                      <ToggleRow
-                        label="Enable Extension"
-                        description="Turn the extension on or off globally."
-                        checked={settings?.extensionEnabled ?? true}
-                        loading={isLoadingSettings}
-                        onToggle={handleToggleExtension}
-                        disabled={isLoadingSettings}
-                        primary
-                      />
-
-                      {/* Engine toggles — both engines always run together now
-                      <div className="cqd-divider" />
-                      <ToggleRow
-                        label="V2 Engine"
-                        description={engineMode === 'v2' ? 'New engine is active' : 'Switch to new V2 engine'}
-                        checked={engineMode === 'v2'}
-                        loading={engineModeLoading}
-                        onToggle={handleToggleV2Engine}
-                        disabled={engineModeLoading}
-                      />
-                      <ToggleRow
-                        label="Legacy Engine"
-                        description={engineMode === 'legacy' ? 'Old engine is active' : 'Switch to legacy engine'}
-                        checked={engineMode === 'legacy'}
-                        loading={engineModeLoading}
-                        onToggle={handleToggleLegacyEngine}
-                        disabled={engineModeLoading}
-                      />
-                      */}
-
-                      <div className="cqd-divider" />
-
-                      <div className="cqd-settings-section-label">Flag Detection</div>
-
-                      <div className="cqd-flag-toggle-row cqd-flag-toggle-comment">
-                        <ToggleRow
-                          label="Comment Flags"
-                          description="Show badges on posts with comments."
-                          checked={settings?.commentsFlagEnabled ?? true}
-                          loading={isLoadingSettings}
-                          onToggle={() => handleToggleFlag('commentsFlagEnabled')}
-                          disabled={isLoadingSettings}
-                        />
+                    <div className="cqd-settings-list">
+                      <div className="cqd-settings-section">
+                        <div className="cqd-settings-section-label">General</div>
+                        <div className="cqd-toggle-group">
+                          <ToggleRow
+                            label="Enable Extension"
+                            description="Turn the extension on or off globally."
+                            checked={settings?.extensionEnabled ?? true}
+                            loading={isLoadingSettings}
+                            onToggle={handleToggleExtension}
+                            disabled={isLoadingSettings}
+                            primary
+                          />
+                        </div>
                       </div>
 
-                      <div className="cqd-flag-toggle-row cqd-flag-toggle-edited">
-                        <ToggleRow
-                          label="Edited Flags"
-                          description="Show badges on edited posts."
-                          checked={settings?.editedFlagEnabled ?? true}
-                          loading={isLoadingSettings}
-                          onToggle={() => handleToggleFlag('editedFlagEnabled')}
-                          disabled={isLoadingSettings}
-                        />
-                      </div>
-                    </div>
+                      <div className="cqd-settings-section">
+                        <div className="cqd-settings-section-label">Flags</div>
+                        <div className="cqd-toggle-group">
+                          <div className="cqd-flag-toggle-row cqd-flag-toggle-comment">
+                            <ToggleRow
+                              label="Comment Flags"
+                              description="Badges for posts with comments."
+                              checked={settings?.commentsFlagEnabled ?? true}
+                              loading={isLoadingSettings}
+                              onToggle={() => handleToggleFlag('commentsFlagEnabled')}
+                              disabled={isLoadingSettings}
+                            />
+                          </div>
 
-                    <div className="cqd-disclaimer">
-                      Flag detection is experimental and may not always be accurate.
+                          <div className="cqd-flag-toggle-row cqd-flag-toggle-edited">
+                            <ToggleRow
+                              label="Edited Flags"
+                              description="Badges for edited posts."
+                              checked={settings?.editedFlagEnabled ?? true}
+                              loading={isLoadingSettings}
+                              onToggle={() => handleToggleFlag('editedFlagEnabled')}
+                              disabled={isLoadingSettings}
+                            />
+                          </div>
+                        </div>
+                        <div className="cqd-settings-section-note">Flag detection is experimental and may not always be accurate.</div>
+                      </div>
                     </div>
                   </div>
                 </div>
