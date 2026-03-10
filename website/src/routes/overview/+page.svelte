@@ -1358,33 +1358,6 @@
     </div>
   </section>
 
-    {#if showImportPanel}
-      <div class="edit-import-panel" transition:fade={{ duration: 150 }}>
-        <h4>Import Placements JSON</h4>
-        <textarea class="edit-import-textarea" bind:value={importJsonText} placeholder="Paste JSON here..."></textarea>
-        {#if importWarnings.length > 0}
-          <div class="edit-import-log warn">
-            <strong>Warnings</strong>
-            {#each importWarnings as warning}
-              <div>{warning}</div>
-            {/each}
-          </div>
-        {/if}
-        {#if importErrors.length > 0}
-          <div class="edit-import-log error">
-            <strong>Errors</strong>
-            {#each importErrors as error}
-              <div>{error}</div>
-            {/each}
-          </div>
-        {/if}
-        <div class="edit-import-actions">
-          <button class="edit-tb-btn edit-tb-publish" on:click={handleEditImport}>Apply To Draft</button>
-          <button class="edit-tb-btn" on:click={() => showImportPanel = false}>Cancel</button>
-        </div>
-      </div>
-    {/if}
-
     {#if pickerOpen}
       <div
         class="edit-picker-overlay"
