@@ -58,7 +58,7 @@ describe('route render smoke coverage', () => {
     expect(html).toContain('Not affiliated with Google or Google Classroom.');
     expect(html).toContain('Ready to save hours?');
     expect(html).toContain('See where Classroom Quick Downloader is used around the world.');
-    expect(html).toContain('l2-page-floats');
+    expect(html).not.toContain('l2-page-floats');
     expect(html).not.toContain('Element Editor');
   });
 
