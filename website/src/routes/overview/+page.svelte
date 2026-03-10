@@ -715,11 +715,6 @@
     document.querySelectorAll('.l2-reveal').forEach((el) => observer.observe(el));
   }
 
-  function isPinnedSuperchargeStarPlacement(placement: ElementPlacement): boolean {
-    if (placement.id === PINNED_SUPERCHARGE_STAR_ID) return true;
-    return placement.sampleId === PINNED_SUPERCHARGE_STAR_SAMPLE_ID && placement.section === 'general';
-  }
-
   function clampForRender(value: number, min: number, max: number): number {
     if (!Number.isFinite(value)) return min;
     return Math.min(max, Math.max(min, value));
