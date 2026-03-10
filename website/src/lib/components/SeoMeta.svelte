@@ -27,6 +27,13 @@
     return normalizedPath === '/' ? `${normalizedBase}/` : `${normalizedBase}${normalizedPath}`;
   }
 
+  function buildAbsoluteAssetUrl(urlBase: string, assetPath: string): string {
+    const trimmed = assetPath.trim();
+    if (!trimmed) return '';
+    if (trimmed.startsWith('https://') || trimmed.startsWith('http://')) return trimmed;
+    return buildCanonical(urlBase, trimmed);
+  }
+
   $: canonical = buildCanonical(SITE_URL, path);
   $: robots = noindex ? 'noindex, nofollow' : 'index, follow';
   $: jsonLdItems = structuredData
