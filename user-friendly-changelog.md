@@ -1,70 +1,28 @@
-## v1.5.0 — The V2 Engine
+## v1.5.0
 ### Summary
-The biggest architectural upgrade since launch. Introduces the **V2 Engine** — a completely rewritten content engine that runs alongside legacy, providing smarter file detection, unified flag rendering, and a self-healing selector system. V2 independently discovers posts, detects comments and edits, places download buttons, and renders premium badge-style flags — all with zero interference to the legacy engine.
-
-### ⚡ V2 Engine Highlights
-- **Multi-Engine Architecture**: Engine Registry + Orchestrator pattern allows V1 and V2 to coexist. A Route Watcher detects page navigation and initializes the correct engine for each view (Stream, Classwork, Student Work).
-- **SelectorScorer with 5-Level Fallback**: Every DOM query uses a priority cascade — L1 (data attributes) → L2 (ARIA/semantic) → L3 (structural) → L4 (golden classes) → L5 (heuristic). If Google changes class names, the scorers self-heal by promoting working selectors.
-- **Unified Flag Detection**: A single `scoreFlagsForPost()` function replaces three separate legacy scripts. Runs a 5-layer comment scorer + 4-layer edited scorer with an exclusion engine to avoid false positives from user-typed content.
-- **CSS-Only Badge Rendering**: Flag badges use CSS-only hover expansion with `max-width` transitions — zero JavaScript on hover. Template cloning makes rendering ~10× faster than legacy `createElement` chains.
-- **Performance Budget Controller**: Hard caps, fast-pass timing, and deep validation scheduling ensure V2 never exceeds its CPU budget, even on pages with 100+ posts.
-- **Correction Queue + Deep Validation**: A repair system detects and fixes rendering issues asynchronously during idle time.
-
+This is the best and most reliable state the extension has reached so far. Download buttons, flag placement, and post detection are now much more accurate in real Google Classroom usage.
 ### Added
-- V2 Engine with full discovery → flag detection → placement → rendering pipeline.
-- SelectorScorer: 5-level fallback system with self-healing selector promotion.
-- Flag badge rendering: comment (blue), edited (orange), both (red gradient) badges with CSS-only animation.
-- Performance monitoring with per-scan timing, budget gates, and instability detection.
-- Deep validation system that runs during idle time to catch missed/stale elements.
-- Correction queue for asynchronous repair of rendering issues.
-- Student Work page detection improvements with expanded Drive URL support.
-- Student Work download strategy plan documenting 3 implementation approaches.
-- New selectors for edited/deleted markers (`.JZk9qf.P354se`) and structural comment detection.
-- Engine toggle buttons in extension settings for manual V1/V2 testing.
-
+- Better internal engine foundations for safer future upgrades.
+- Stronger protection against bad detections and unstable page structures.
 ### Changed
-- Download button rendering now uses template cloning (~10× faster than createElement).
-- Flag detection is now view-aware — different detection strategies per page type.
-- Version pill in popup settings now reflects live version 1.5.0.
-- Improved console logging: pipeline results logged verbosely for first 3 scans, then every 10th.
-- Updated selector registry with L3 structural selectors for resilience against class name changes.
-
+- Download buttons are now much more careful about where they appear.
+- The engine roadmap now keeps `1.5.0` as the stable DOM-first milestone and `1.6.0` as the later API-assisted step.
 ### Fixed
-- Fixed V2 engine crash isolation — dynamic imports prevent V2 failures from breaking legacy features.
-- Fixed flag detection false positives from user-typed content (exclusion engine).
-- Fixed stale badge cleanup on page navigation (proper `destroy()` lifecycle).
-- Fixed duplicate badge injection via idempotent `renderFlagBadge()`.
-- Fixed Student Work page URL handling for Google Docs/Sheets/Slides viewer links.
+- Fixed random buttons appearing on Google Forms and Google Sheets links.
+- Fixed missing buttons on real Classroom attachment cards after stricter filtering.
+- Fixed duplicate or nested flag borders on some posts.
+- Fixed download states that could stay stuck even after the browser finished the file.
 
----
-
-## v1.4.0 — Accumulated Fixes
+## v1.4.0
 ### Summary
-A comprehensive stability and polish release consolidating months of fixes across the extension popup, content scripts, analytics pipeline, and accessibility layer. Addresses popup performance issues, dark mode improvements, changelog delivery reliability, and CSP compliance.
-
+A major under-the-hood release that introduced the V2 engine foundation. It made the extension safer to improve without breaking the stable experience you already rely on.
 ### Added
-- Keyboard focus indicators for popup buttons and interactive elements.
-- Accessible native checkbox switch replacing custom toggle component.
-- Mutation observer deduplication to avoid redundant DOM scans.
-- Browser-selectable dev launcher for faster local development.
-- Extended test coverage for analytics, cancelled-download accounting, and changelog rules.
-
+- A new V2 engine foundation for smarter discovery, placement, and flag logic.
+- Better internal tooling for testing and catching regressions.
 ### Changed
-- Popup performance: batched color assignment localStorage access, skipped redundant storage writes.
-- Changelog seen-state detection now uses version + revision data contract.
-- Analytics flush scheduling moved to UTC-based daily windows.
-- Extension CSP policy refined — removed strict popup override that caused issues.
-
+- The extension architecture is now much more structured and ready for future upgrades.
 ### Fixed
-- Fixed popup lag caused by excessive localStorage reads during stats rendering.
-- Fixed keyboard legend interaction regressions in popup.
-- Fixed cancelled-download events being included in download totals.
-- Fixed stale changelog visibility after Cloudflare publish/update/delete cycles.
-- Fixed same-version publish cases where users could miss new changelog updates.
-- Fixed `minimatch`/ESM export runtime failures during dev startup.
-- Fixed mutation observer firing redundant scans on the same DOM roots.
-
----
+- Fixed several fragile internal paths by giving the extension clearer runtime boundaries.
 
 ## v1.3.9
 ### Summary
@@ -83,21 +41,21 @@ Improved release consistency and user-facing clarity across the website and exte
 ### Summary
 Improved changelog reliability so users always receive updates, even when the version number stays the same.
 ### Added
-- Revision-aware changelog tracking that detects content/rule changes from Cloudflare publishes.
-- Stronger integration coverage for extension-to-Cloudflare changelog synchronization.
+- Revision-aware changelog tracking that detects content changes during same-version publishes.
+- Stronger integration coverage for changelog synchronization.
 ### Changed
-- Seen-state behavior now compares version plus changelog revision instead of version alone.
-- Popup changelog open flow now force-refreshes from Cloudflare before marking as seen.
+- Update detection now compares version plus changelog revision instead of version alone.
+- Popup changelog flow now force-refreshes before marking an update as seen.
 ### Fixed
 - Fixed same-version publish cases where users could miss new changelog updates.
-- Fixed stale version-pill/changelog content after Cloudflare-side updates.
+- Fixed stale version-pill and changelog content after changelog updates.
 
 ## v1.3.7
 ### Summary
 Improved daily reliability and clearer release communication for normal users.
 ### Added
-- Cleaner user-facing release note wording in extension update channels.
-- Better in-product guidance around install/update flow.
+- Cleaner user-facing release-note wording in extension update channels.
+- Better in-product guidance around install and update flow.
 ### Changed
 - Refined runtime status handling for smoother transitions.
 - Improved behavior during heavy multi-file class sessions.
@@ -107,94 +65,28 @@ Improved daily reliability and clearer release communication for normal users.
 
 ## v1.3.6
 ### Summary
-Focused on stability and security hardening for heavy classroom workloads.
+Focused on stability and compatibility hardening for heavy classroom workloads.
 ### Added
 - Extra runtime safety checks for extension processing.
 - Expanded internal coverage for changelog and analytics behavior.
 ### Changed
 - Improved handling of mixed and large file batches.
-- Improved recovery after temporary tab sleep/network interruptions.
+- Improved recovery after temporary tab sleep or network interruptions.
 ### Fixed
 - Fixed stuck-progress scenarios during long runs.
 - Fixed dependency-path compatibility friction.
-
-## v1.3.5
-### Summary
-Improved popup interaction quality and reduced day-to-day friction.
-### Added
-- Better keyboard support in popup interactions.
-- Additional runtime checks for popup state transitions.
-### Changed
-- Smoother popup flow and status feedback.
-- More consistent behavior in repetitive classroom usage.
-### Fixed
-- Fixed keyboard legend interaction regressions.
-- Fixed minor popup UI behavior inconsistencies.
-
-## v1.3.4
-### Summary
-Improved browser compatibility and safer internal request handling.
-### Added
-- Stronger guardrails for internal request validation.
-- Additional compatibility checks for modern browser builds.
-### Changed
-- Improved cross-browser consistency across extension flows.
-- Refined feedback in key extension actions.
-### Fixed
-- Fixed browser-specific instability edge cases.
-- Fixed validation issues in extension request paths.
-
-## v1.3.3
-### Summary
-Improved responsiveness and reliability in high-volume classroom usage.
-### Added
-- Better internal handling for heavy multi-file operations.
-- More robust long-session state continuity protections.
-### Changed
-- Faster startup for large download batches.
-- Better continuity after interruptions during active runs.
-### Fixed
-- Fixed noisy non-actionable error output in successful flows.
-- Fixed recovery issues after refresh during active sessions.
-
-## v1.3.2
-### Summary
-Improved long-session stability while keeping analytics privacy-first.
-### Added
-- Better safeguards for aggregated telemetry flow.
-- Additional queue safety handling for long-running sessions.
-### Changed
-- Improved accuracy for partial/cancelled completion reporting.
-- Refined background processing stability over long sessions.
-### Fixed
-- Fixed interrupted-flow accounting inconsistencies.
-- Fixed queue flush timing reliability issues.
-
-## v1.3.1
-### Summary
-Started the 1.3 line with core stability and predictability improvements.
-### Added
-- Baseline hardening for runtime behavior.
-- Better internal checks for queue/state transitions.
-### Changed
-- Improved queue handling on heavy Classroom pages.
-- Improved consistency for large attachment sets.
-### Fixed
-- Fixed early 1.3 regression points in normal flows.
-- Fixed minor runtime consistency issues.
 
 ## v1.3.0
 ### Summary
 Delivered major reliability, remote-config, and analytics improvements.
 ### Added
-- UTC-based scheduling/timestamp handling for extension analytics.
-- End-to-end ACK metadata handling for accepted/duplicate/invalid events.
-- Server-time drift tracking support in config handling.
+- UTC-based scheduling and timestamp handling for extension analytics.
+- Stronger metadata handling for accepted, duplicate, and invalid events.
 ### Changed
 - Improved payload validation and safer queue processing.
-- Improved retry behavior with strict retry-limit handling.
+- Improved retry behavior with stricter retry-limit handling.
 ### Fixed
-- Fixed remote-config application issues on key limits/timing.
+- Fixed remote-config application issues on key limits and timing.
 - Fixed queue integrity mismatch handling to avoid data drops.
 
 ## v1.2.7
@@ -202,7 +94,7 @@ Delivered major reliability, remote-config, and analytics improvements.
 Broad security and reliability hardening across extension behavior.
 ### Added
 - Stronger extension-side protections and validation coverage.
-- Expanded runtime/security-oriented extension tests.
+- Expanded runtime and security-oriented extension tests.
 ### Changed
 - Improved resilience during high-volume mixed workloads.
 - Improved consistency in security-sensitive paths.
@@ -210,145 +102,102 @@ Broad security and reliability hardening across extension behavior.
 - Fixed multiple reliability edge cases found during hardening.
 - Fixed several production stability regressions.
 
-## v1.2.6
-### Summary
-Improved reliability and prepared safer long-session behavior.
-### Added
-- More internal guard checks for queue/state control.
-- Additional edge-case test coverage.
-### Changed
-- Refined in-flight download lifecycle handling.
-- Improved user-facing state consistency in long sessions.
-### Fixed
-- Fixed intermittent state mismatch issues.
-- Fixed repeated-workflow regression cases.
-
-## v1.2.5
-### Summary
-Focused on predictable behavior and lower daily friction.
-### Added
-- Better fallback handling for unstable browser moments.
-- Added diagnostics hooks used for stability verification.
-### Changed
-- Improved responsiveness under repeated actions.
-- Refined UI-state transitions for clearer feedback.
-### Fixed
-- Fixed download-flow continuity regressions.
-- Fixed status desync edge cases.
-
-## v1.2.4
-### Summary
-Continued incremental runtime hardening for consistency.
-### Added
-- Additional background-processing safety checks.
-- Better resilience for interrupted runtime states.
-### Changed
-- Improved event and queue sequencing behavior.
-- Improved consistency across page variations.
-### Fixed
-- Fixed intermittent bugs in repeated batch actions.
-- Fixed smaller session continuity issues.
-
 ## v1.2.3
 ### Summary
-Improved cancellation handling and overall workflow stability.
+Usability and telemetry consistency release.
 ### Added
-- Unified cancellation handling foundations.
-- Better sequencing safeguards for active operations.
+- Better feedback and uninstall data-capture integrations.
 ### Changed
-- Improved cancellation feedback during ongoing operations.
-- Refined runtime flow for more predictable outcomes.
+- Improved extension schema alignment with backend endpoints.
 ### Fixed
-- Fixed cancellation edge cases in active downloads.
-- Fixed stale-state leftovers after interruption paths.
+- Fixed inconsistent telemetry fields in specific event paths.
 
 ## v1.2.2
 ### Summary
-Polished cancellation UX and improved practical reliability.
+Cancel-flow polish release.
 ### Added
-- Better cancellation control handling in interaction flows.
-- Extra test coverage for cancel-flow behavior.
+- Extra cancellation behavior coverage and safety checks.
 ### Changed
-- Improved cancel button responsiveness and clarity.
-- Improved behavior when stopping heavy operations.
+- Improved cancel interaction responsiveness.
 ### Fixed
-- Fixed cancellation regressions in specific usage patterns.
 - Fixed inconsistent cleanup after cancellation.
 
 ## v1.2.1
 ### Summary
-Introduced a unified cancel system with UI polish.
+Unified cancel-system iteration release.
 ### Added
-- Unified cancel system for active operations.
-- UI updates for clearer cancel-related state.
+- Unified cancel-system handling for active operations.
 ### Changed
-- Improved interaction flow around cancel/retry behavior.
-- Refined telemetry for cancellation outcomes.
+- Refined cancel and retry behavior.
 ### Fixed
 - Fixed slow cancel-state reflection edge cases.
-- Fixed minor inconsistencies in cancel-adjacent controls.
 
 ## v1.2.0
 ### Summary
-Introduced the cancel-download feature baseline.
+Cancel feature baseline release.
 ### Added
 - Core cancel-download functionality for in-progress operations.
-- Supporting state model for cancellation-aware workflow.
 ### Changed
-- Updated lifecycle handling to support cancellation.
-- Updated popup behavior for cancel-capable states.
+- Updated operation lifecycle to support cancellation.
 ### Fixed
-- Fixed flow limitations where operations could not be interrupted.
-- Fixed pre-1.2 state transition weaknesses.
+- Fixed flow limitations where in-flight operations could not be interrupted.
+
+## v1.1.10
+### Summary
+Late 1.1 line reliability release.
+### Added
+- Additional stability checks for repeated classroom workflows.
+### Changed
+- Tuned runtime defaults for safer long-session operation.
+### Fixed
+- Fixed regressions discovered across prolonged usage sessions.
+
+## v1.1.5
+### Summary
+Mid 1.1 quality and compatibility release.
+### Added
+- Expanded compatibility checks for supported browsers.
+### Changed
+- Improved popup and runtime consistency.
+### Fixed
+- Fixed minor behavior mismatches in repeated task flows.
 
 ## v1.1.1
 ### Summary
-Improved runtime consistency and quality in the 1.1 line.
+Post-1.1 stabilization release.
 ### Added
-- Better multi-browser compatibility foundations.
-- More resilient default configuration behavior.
+- Additional background-flow instrumentation coverage.
 ### Changed
-- Improved classroom workflow consistency in normal usage.
-- Improved popup state handling stability.
+- Improved queue and error-handling defaults.
 ### Fixed
-- Fixed post-1.1.0 quality issues.
-- Fixed smaller bugs affecting daily usage smoothness.
+- Fixed early 1.1 edge-case runtime failures.
 
 ## v1.1.0
 ### Summary
-Expanded browser support and improved packaging quality.
+Feature and packaging expansion release.
 ### Added
-- Multi-browser support improvements.
-- Refreshed icon and distribution asset set.
+- Broader multi-browser support improvements.
 ### Changed
-- Improved setup/compatibility behavior across browsers.
-- Updated dependency baseline for better stability.
+- Updated setup and runtime behavior for wider compatibility.
 ### Fixed
-- Fixed compatibility gaps in non-primary browsers.
-- Fixed packaging/config mismatch issues.
+- Fixed packaging and configuration mismatches.
 
 ## v1.0.1
 ### Summary
-Delivered early post-launch stability and quality refinements.
+Post-launch stabilization release.
 ### Added
-- Early quality-of-life improvements in runtime handling.
-- Additional compatibility and configuration tuning.
+- Better diagnostics for analytics and sync.
 ### Changed
-- Improved dependency behavior for steadier runtime results.
-- Improved reliability in repeat-use scenarios.
+- Improved compatibility in repeat-use scenarios.
 ### Fixed
-- Fixed first-run and repeat-usage issues after launch.
-- Fixed minor regressions discovered after 1.0.0.
+- Fixed first-wave regressions after 1.0.0 rollout.
 
 ## v1.0.0
 ### Summary
-First stable extension release for one-click Classroom download workflows.
+First stable production release.
 ### Added
-- Initial stable architecture and core download workflow.
-- Popup UI/settings baseline with analytics foundations.
+- Core one-click Classroom download experience.
 ### Changed
-- Standardized project structure for extension evolution.
-- Established baseline behavior for classroom interactions.
+- Established baseline extension data contracts.
 ### Fixed
-- Fixed pre-stable blockers required for production release.
-- Fixed core flow issues discovered during stabilization.
+- Fixed pre-stable blockers before public release.
