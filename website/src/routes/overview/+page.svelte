@@ -1629,9 +1629,7 @@
     padding: 5px 12px; border-radius: 8px; font-size: 11px; font-weight: 600;
     border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.06);
     color: #e2e8f0; cursor: pointer; transition: all 0.15s; white-space: nowrap;
-  }
-  .edit-tb-btn:hover { background: rgba(255,255,255,0.12); }
-  .edit-tb-add-float { border-color: rgba(34,197,94,0.3); color: #22c55e; }
+  }  .edit-tb-add-float { border-color: rgba(34,197,94,0.3); color: #22c55e; }
   .edit-tb-add-doodle { border-color: rgba(59,130,246,0.3); color: #3b82f6; }
   .edit-tb-add-3d { border-color: rgba(167,139,250,0.3); color: #a78bfa; }
   .edit-tb-swap { border-color: rgba(251,191,36,0.3); color: #fbbf24; }
