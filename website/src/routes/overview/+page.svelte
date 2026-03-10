@@ -1625,9 +1625,7 @@
     display: none; align-items: center; justify-content: center;
     z-index: 10; line-height: 1;
   }  .l2-placement-el.edit-selected .el-delete-btn { display: flex; }  .l2-placement-el.edit-mode:hover .el-id-label,
-  .l2-placement-el.edit-selected .el-id-label { display: block; }  .edit-tb-title { font-weight: 700; font-size: 14px; margin-right: 8px; }
-  .edit-tb-count { font-size: 11px; color: #94a3b8; }
-  .edit-tb-btn {
+  .l2-placement-el.edit-selected .el-id-label { display: block; }  .edit-tb-title { font-weight: 700; font-size: 14px; margin-right: 8px; }  .edit-tb-btn {
     padding: 5px 12px; border-radius: 8px; font-size: 11px; font-weight: 600;
     border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.06);
     color: #e2e8f0; cursor: pointer; transition: all 0.15s; white-space: nowrap;
