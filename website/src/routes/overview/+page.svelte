@@ -23,21 +23,6 @@
   const CELEBRATION_OVERLAY_Z_INDEX = '2147483647';
   const CELEBRATION_BURST_COUNT = 4;
   const CELEBRATION_BURST_STAGGER_MS = 320;
-  const PINNED_SUPERCHARGE_STAR_ID = 'dd-1772174598462-101';
-  const PINNED_SUPERCHARGE_STAR_SAMPLE_ID = 'D-50';
-  const MOBILE_PLACEMENT_BREAKPOINT = 900;
-  const INITIAL_PLACEMENT_SECTION_VISIBILITY: Record<PlacementSection, boolean> = {
-    hero: true,
-    students: false,
-    problem: false,
-    features: false,
-    steps: false,
-    proof: false,
-    map: false,
-    cta: false,
-    general: true
-  };
-
   export let seoPath = '/';
 
   function buildCanonicalUrl(path: string): string {
