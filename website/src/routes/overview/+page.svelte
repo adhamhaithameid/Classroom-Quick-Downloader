@@ -715,24 +715,6 @@
     document.querySelectorAll('.l2-reveal').forEach((el) => observer.observe(el));
   }
 
-  function resolvePlacementForViewport(placement: ElementPlacement): RenderPlacement {
-    const onMobile = isMobilePlacementsViewport;
-    return {
-      ...placement,
-      renderX: Number(clampForRender(onMobile && placement.mobileX !== undefined ? placement.mobileX : placement.x, -25, 125).toFixed(2)),
-      renderY: Number(clampForRender(onMobile && placement.mobileY !== undefined ? placement.mobileY : placement.y, -25, 125).toFixed(2)),
-      renderSize: Math.round(clampForRender(onMobile && placement.mobileSize !== undefined ? placement.mobileSize : placement.size, 16, 640)),
-      renderOpacity: Number(clampForRender(onMobile && placement.mobileOpacity !== undefined ? placement.mobileOpacity : placement.opacity, 0, 1).toFixed(3)),
-      renderRotate: Number(clampForRender(onMobile && placement.mobileRotate !== undefined ? placement.mobileRotate : placement.rotate, -360, 360).toFixed(2)),
-      renderAnimDuration: Number(
-        clampForRender(onMobile && placement.mobileAnimDuration !== undefined ? placement.mobileAnimDuration : placement.animDuration, 0, 120).toFixed(2)
-      ),
-      renderColor: onMobile && placement.mobileColor ? placement.mobileColor : placement.color || 'var(--green)',
-      renderZIndex: Math.round(clampForRender(onMobile && placement.mobileZIndex !== undefined ? placement.mobileZIndex : placement.zIndex ?? 0, 0, 30000)),
-      renderHidden: Boolean(placement.hidden || (onMobile && placement.mobileHidden === true))
-    };
-  }
-
   function placementRenderOpacity(placement: RenderPlacement): number {
     if (editMode) return placement.renderOpacity;
     if (placementSectionVisible[placement.section]) return placement.renderOpacity;
