@@ -1681,11 +1681,7 @@
     padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 600;
     border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04);
     color: #94a3b8; cursor: pointer; transition: all 0.15s;
-  }
-  .edit-picker-tabs button.active {
-    background: var(--green); color: #fff; border-color: var(--green);
-  }
-  .edit-picker-search {
+  }  .edit-picker-search {
     width: 100%; padding: 8px 12px; border-radius: 8px; font-size: 13px;
     background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
     color: #e2e8f0; margin-bottom: 10px; box-sizing: border-box;
