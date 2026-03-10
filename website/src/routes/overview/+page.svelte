@@ -1634,9 +1634,7 @@
   .edit-tb-add-3d { border-color: rgba(167,139,250,0.3); color: #a78bfa; }  .edit-tb-slider {
     display: flex; align-items: center; gap: 6px;
     font-size: 10px; color: #94a3b8;
-  }
-  .edit-tb-slider input[type="range"] { width: 80px; accent-color: var(--green); }
-  .edit-tb-slider select {
+  }  .edit-tb-slider select {
     height: 24px;
     border-radius: 6px;
     border: 1px solid rgba(255,255,255,0.12);
