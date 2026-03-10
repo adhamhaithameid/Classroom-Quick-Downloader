@@ -1,0 +1,50 @@
+{
+  "meta": {
+    "url": "https://classroom.google.com/c/EXAMPLE_CLASS_ID",
+    "timestamp": "2026-03-09T21:00:00.000Z",
+    "extensionVersion": "4.0.0-alpha",
+    "totalPosts": 3,
+    "capturedBy": "manual"
+  },
+  "posts": [
+    {
+      "streamItemId": "123456789",
+      "outerHTML": "<div data-stream-item-id=\"123456789\" class=\"n4xnA JUr7jb\"><div class=\"JZicYb gmNu1d\"><div class=\"GQW44b\"><div class=\"QUEiXc\"><h2><span class=\"jzdBjc\">Assignment: Homework 1</span></h2><div class=\"gmNu1d\"><span class=\"Vu2fZd VjRxGc\">Dr. Smith posted a new assignment</span></div></div><span class=\"JZk9qf Vu2fZd\"><span class=\"jzdBjc\">Created Feb 13</span><span class=\"jzdBjc\">(Edited Feb 14)</span></span></div></div></div>",
+      "flags": {
+        "hasCommentBadge": false,
+        "commentCount": null,
+        "hasEditedBadge": true,
+        "hasBothBadge": false
+      },
+      "textPreview": "Assignment: Homework 1 Dr. Smith posted a new assignment Created Feb 13 (Edited Feb 14)",
+      "classList": ["n4xnA", "JUr7jb"],
+      "hasCqdStyling": true
+    },
+    {
+      "streamItemId": "987654321",
+      "outerHTML": "<div data-stream-item-id=\"987654321\" class=\"n4xnA JUr7jb\"><div class=\"JZicYb gmNu1d\"><div class=\"GQW44b\"><div class=\"QUEiXc\"><h2><span class=\"jzdBjc\">Announcement</span></h2></div><div class=\"asQXV QRiHXd\"><span class=\"z3vRcc\"><span class=\"RZC0Db\">3 class comments</span></span></div></div></div></div>",
+      "flags": {
+        "hasCommentBadge": true,
+        "commentCount": 3,
+        "hasEditedBadge": false,
+        "hasBothBadge": false
+      },
+      "textPreview": "Announcement 3 class comments",
+      "classList": ["n4xnA", "JUr7jb"],
+      "hasCqdStyling": true
+    },
+    {
+      "streamItemId": "555555555",
+      "outerHTML": "<div data-stream-item-id=\"555555555\" class=\"n4xnA JUr7jb\"><div class=\"JZicYb gmNu1d\"><div class=\"GQW44b\"><div class=\"QUEiXc\"><h2><span class=\"jzdBjc\">Material: Introduction</span></h2><div class=\"gmNu1d\"><span class=\"Vu2fZd VjRxGc\">Dr. Mohamed K. Hussein posted a new material: Introduction</span></div></div><span class=\"JZk9qf Vu2fZd\"><span class=\"jzdBjc\">Created Feb 13</span></span></div></div></div>",
+      "flags": {
+        "hasCommentBadge": false,
+        "commentCount": null,
+        "hasEditedBadge": false,
+        "hasBothBadge": false
+      },
+      "textPreview": "Material: Introduction Dr. Mohamed K. Hussein posted a new material: Introduction Created Feb 13",
+      "classList": ["n4xnA", "JUr7jb"],
+      "hasCqdStyling": false
+    }
+  ]
+}
