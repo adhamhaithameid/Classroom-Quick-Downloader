@@ -234,7 +234,7 @@
 
   .ml-error-text {
     margin: 0;
-    font-family: var(--font-ui, 'Plus Jakarta Sans'), sans-serif;
+    font-family: var(--font-ui, 'Avenir Next'), sans-serif;
     font-size: 14px;
     font-weight: 600;
     color: #475569;
