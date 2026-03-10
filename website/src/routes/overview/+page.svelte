@@ -788,9 +788,6 @@
 
 <svelte:window
   on:keydown={handleGlobalKeydown}
-  on:pointermove={onEditPointerMove}
-  on:pointerup={onEditPointerUp}
-  on:pointercancel={onEditPointerUp}
 />
 
 <SeoMeta
