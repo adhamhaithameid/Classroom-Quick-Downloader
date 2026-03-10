@@ -1677,9 +1677,7 @@
     border: 1px solid rgba(255,255,255,0.1); border-radius: 16px;
     padding: 20px; color: #e2e8f0; display: flex; flex-direction: column;
     font-family: var(--font-ui), sans-serif;
-  }
-  .edit-picker-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-  .edit-picker-header h3 { margin: 0; font-size: 18px; font-weight: 700; }
+  }  .edit-picker-header h3 { margin: 0; font-size: 18px; font-weight: 700; }
   .edit-picker-close {
     background: none; border: none; color: #94a3b8; font-size: 22px;
     cursor: pointer; padding: 4px 8px; border-radius: 6px;
