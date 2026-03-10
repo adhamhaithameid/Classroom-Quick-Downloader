@@ -1649,14 +1649,7 @@
     font-size: 12px;
     font-weight: 700;
     color: #bbf7d0;
-  }
-  .edit-inspector-type {
-    text-transform: uppercase;
-    font-size: 10px;
-    letter-spacing: 0.06em;
-    color: #94a3b8;
-  }
-  .edit-inspector-grid {
+  }  .edit-inspector-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: 8px 14px;
