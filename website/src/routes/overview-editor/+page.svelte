@@ -55,7 +55,7 @@
     general: true
   };
 
-  export let seoPath = '/';
+  export let seoPath = '/overview-editor';
 
   function buildCanonicalUrl(path: string): string {
     const normalizedPath = path === '/' ? '/' : path.replace(/\/+$/, '');
