@@ -42,18 +42,6 @@
     downloadUrl: [STORE_LINKS.chrome, STORE_LINKS.firefox, STORE_LINKS.edge]
   };
 
-  type RenderPlacement = ElementPlacement & {
-    renderX: number;
-    renderY: number;
-    renderSize: number;
-    renderOpacity: number;
-    renderRotate: number;
-    renderAnimDuration: number;
-    renderColor: string;
-    renderZIndex: number;
-    renderHidden: boolean;
-  };
-
   /* ━━━ Edit Mode — inline element editor ━━━ */
   let editMode = false;
   let editIsolation = false;
