@@ -715,14 +715,6 @@
     document.querySelectorAll('.l2-reveal').forEach((el) => observer.observe(el));
   }
 
-  function placementRenderLeftCss(placement: RenderPlacement): string {
-    if (!editMode && placementCanvasLocked) {
-      const frozen = frozenPlacementCoords[placement.id];
-      if (frozen) return `${frozen.leftPx}px`;
-    }
-    return `${placement.renderX}%`;
-  }
-
   function placementRenderTopCss(placement: RenderPlacement): string {
     if (!editMode && placementCanvasLocked) {
       const frozen = frozenPlacementCoords[placement.id];
