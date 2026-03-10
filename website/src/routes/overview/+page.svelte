@@ -715,13 +715,6 @@
     document.querySelectorAll('.l2-reveal').forEach((el) => observer.observe(el));
   }
 
-  function onEditPointerUp(e: PointerEvent) {
-    if (!editDrag) return;
-    if (e.pointerId !== editDrag.pointerId) return;
-    persistEditingState();
-    editDrag = null;
-  }
-
   function handleEditExport() {
     const json = exportPlacementsJSON(placements);
     navigator.clipboard.writeText(json)
