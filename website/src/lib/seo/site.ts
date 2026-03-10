@@ -14,3 +14,9 @@ export const INDEXABLE_SITE_PATHS = [
   ...CORE_INDEXABLE_PATHS,
   ...Object.values(seoPages).map((page) => page.path)
 ] as const;
+
+export function toAbsoluteSiteUrl(path: string): string {
+  const base = SITE_URL.replace(/\/+$/, '');
+  const normalizedPath = path === '/' ? '/' : `/${path.replace(/^\/+/, '').replace(/\/+$/, '')}`;
+  return normalizedPath === '/' ? `${base}/` : `${base}${normalizedPath}`;
+}
