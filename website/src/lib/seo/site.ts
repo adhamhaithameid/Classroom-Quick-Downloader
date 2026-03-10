@@ -20,3 +20,12 @@ export function toAbsoluteSiteUrl(path: string): string {
   const normalizedPath = path === '/' ? '/' : `/${path.replace(/^\/+/, '').replace(/\/+$/, '')}`;
   return normalizedPath === '/' ? `${base}/` : `${base}${normalizedPath}`;
 }
+
+export function escapeXml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
