@@ -1631,11 +1631,7 @@
     color: #e2e8f0; cursor: pointer; transition: all 0.15s; white-space: nowrap;
   }  .edit-tb-add-float { border-color: rgba(34,197,94,0.3); color: #22c55e; }
   .edit-tb-add-doodle { border-color: rgba(59,130,246,0.3); color: #3b82f6; }
-  .edit-tb-add-3d { border-color: rgba(167,139,250,0.3); color: #a78bfa; }
-  .edit-tb-swap { border-color: rgba(251,191,36,0.3); color: #fbbf24; }
-  .edit-tb-publish { border-color: rgba(34,197,94,0.4); color: #4ade80; }
-  .edit-tb-reset { border-color: rgba(239,68,68,0.3); color: #ef4444; }
-  .edit-tb-slider {
+  .edit-tb-add-3d { border-color: rgba(167,139,250,0.3); color: #a78bfa; }  .edit-tb-slider {
     display: flex; align-items: center; gap: 6px;
     font-size: 10px; color: #94a3b8;
   }
