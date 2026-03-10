@@ -1658,9 +1658,7 @@
     display: flex;
     gap: 8px;
     align-items: center;
-  }
-  .edit-import-panel h4 { margin: 0 0 8px; font-size: 14px; font-weight: 700; }
-  .edit-import-textarea {
+  }  .edit-import-textarea {
     width: 100%; height: 120px; padding: 10px; border-radius: 8px;
     background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
     color: #e2e8f0; font-size: 11px; font-family: monospace; resize: vertical;
