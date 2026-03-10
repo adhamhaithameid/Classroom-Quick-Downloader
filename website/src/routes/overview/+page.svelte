@@ -815,56 +815,6 @@
     <div class="orb orb-12"></div>
   </div>
   <div class="l2-page-grid" aria-hidden="true"></div>
-  <div class="l2-page-floats" aria-hidden="true">
-    {#each visiblePlacements as p (p.id)}
-      {@const resolved = resolveSvg(p)}
-      <div
-        class="l2-placement-el"
-        class:edit-selected={editMode && selectedElementId === p.id}
-        class:edit-mode={editMode}
-        class:edit-locked={editMode && !!p.locked}
-        role="button"
-        tabindex={editMode ? 0 : -1}
-        aria-disabled={!editMode}
-        style="
-          left: {placementRenderLeftCss(p)};
-          top: {placementRenderTopCss(p)};
-          width: {p.renderSize}px;
-          height: {p.renderSize}px;
-          opacity: {placementRenderOpacity(p)};
-          color: {p.renderColor};
-          --placement-rotate: {p.renderRotate}deg;
-          --placement-shift: {placementRevealShift(p)}px;
-          animation-duration: {p.renderAnimDuration}s;
-          animation-play-state: {placementAnimationPlayState(p)};
-          z-index: {10000 + p.renderZIndex};
-        "
-        on:pointerdown={(e) => { if (editMode) startEditDrag(e, p); }}
-        on:click|stopPropagation={() => { if (editMode) { selectedElementId = p.id; } }}
-        on:keydown={(e) => {
-          if (!editMode) return;
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            selectedElementId = p.id;
-          }
-        }}
-      >
-        <svg
-          viewBox={resolved.viewBox}
-          fill="none" stroke="currentColor" stroke-width="1.5"
-          stroke-linecap="round" stroke-linejoin="round"
-          style="width:100%;height:100%;"
-        >
-          {@html resolved.svg}
-        </svg>
-        {#if editMode}
-          <button class="el-delete-btn" on:pointerdown|stopPropagation on:click|stopPropagation={() => deleteElement(p.id)} title="Delete">✕</button>
-          <span class="el-id-label">{p.id}</span>
-        {/if}
-      </div>
-    {/each}
-  </div>
-
   <!-- ━━━━ Hero ━━━━ -->
   <section id="top" class="l2-hero l2-snap">
     <div class="l2-wrap l2-hero-content">
