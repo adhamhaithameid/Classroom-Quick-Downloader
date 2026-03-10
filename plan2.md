@@ -1,413 +1,436 @@
-# Extension Plan 2 — Core Reliability, Performance, Security, and Smarter Detection
+# Extension Plan 2 — Practical To-Do Checklist
 
-Last updated: 2026-03-08
+Last updated: 2026-03-10
 
-## Purpose
+## What This File Is
 
-This plan is the extension-only execution track for the CQD core product.
-It focuses on:
+This is the practical, human-readable extension plan.
+It is written as a to-do list instead of a pure architecture document.
 
-1. extension-only priority work,
-2. security hardening,
-3. smarter download detection,
-4. smarter flag detection.
+The goal is to answer three questions clearly:
 
-This file is meant to be practical, not aspirational. The goal is to improve
-the main user value of the extension: detecting downloadable files correctly,
-injecting the right controls once, and surfacing comment/edited flags with
-high confidence and low CPU cost.
+1. what still needs to be done,
+2. why that work matters,
+3. what effect it will have if we do it.
 
-## Current State Summary
+## Release Naming Decision
 
-The repo already contains a strong V2 architecture direction:
+Use this version mapping going forward:
 
-1. a shared orchestrator,
-2. a canonical DOM scanner,
-3. selector scoring,
-4. a unified render pipeline,
-5. repair and budget-control modules.
+- `1.5.0` = the big DOM-first engine milestone and current "strong stable" line.
+- `1.6.0` = any true API-assisted engine milestone.
 
-The main remaining problem is not lack of ideas. It is incomplete migration.
-Legacy content scripts still carry real production behavior while V2 remains
-partly validation-oriented and conservative.
+This means:
 
-That means the highest-value work is architectural consolidation around the
-extension core, not more dashboard work.
+- there is **no** `4.0.0` target anymore,
+- there is **no** `4.2.1` target anymore,
+- API work is not just a rename or internal tweak; it is a real release step and should earn a full version move to `1.6.0`.
 
----
+## Important Current-State Note
 
-## Track A — Extension-Only Priority Plan
+The extension is currently in a very good state.
 
-### Goal
+You already said the current behavior feels right:
 
-Make the extension reliable across all supported Classroom surfaces while
-reducing DOM cost and making failures explainable.
+- button placements feel correct,
+- flag placements feel correct,
+- flag detection feels correct,
+- the extension feels like it "just works".
 
-### Priority Order
-
-#### A1. Phase 0 baseline capture and fixture workflow
-
-Deliverables:
-
-1. reproducible snapshot capture,
-2. sanitized fixture extraction,
-3. selector catalog,
-4. issue catalog,
-5. test baseline.
-
-Why first:
-
-Without a baseline, every future selector or detection change becomes guesswork.
-
-#### A2. Finish the V2 runtime migration
-
-Target:
-
-1. one orchestrator,
-2. one lifecycle,
-3. one mutation feed,
-4. one canonical post/file model,
-5. one shadow-validation path.
-
-What to do:
-
-1. move remaining legacy scan responsibilities behind V2-compatible modules,
-2. stop maintaining duplicate behavior in multiple content scripts,
-3. keep legacy mode as rollback only, not as the long-term normal path.
-
-#### A3. Expand page coverage to all real download surfaces
-
-Required surfaces:
-
-1. stream,
-2. classwork list,
-3. topic classwork,
-4. assignment details,
-5. material details,
-6. student submissions,
-7. teacher student-work view,
-8. announcement details.
-
-Success criteria:
-
-1. every downloadable file gets a control,
-2. open-only resources are explicitly classified as non-downloadable,
-3. unsupported resources are excluded deterministically.
-
-#### A4. Make V2 the source of truth in shadow first, then primary
-
-Rollout:
-
-1. legacy default with V2 shadow evidence,
-2. compare coverage and mismatch rate,
-3. promote V2 to primary when coverage/precision thresholds are met,
-4. keep legacy rollback available for two release cycles.
-
-#### A5. Build a debugging surface for wrong decisions
-
-Required output per post:
-
-1. discovered files,
-2. chosen placement target,
-3. final flag verdict,
-4. evidence sources,
-5. exclusions applied,
-6. fallback usage,
-7. mismatch against legacy.
-
-This must exist before broad rollout, otherwise every regression is expensive to explain.
+Because of that, not every item below is urgent.
+A lot of this plan is now about **protecting what works**, **documenting why it works**, and **making future changes safer**.
 
 ---
 
-## Track B — Security Hardening Plan
+## Priority 1 — Protect The Current Good State
 
-### Goal
+These are the safest and highest-value tasks.
+If you only do a few things from this file, do these first.
 
-Keep the extension secure by default while improving detection capability.
+### [ ] 1. Capture a real Classroom baseline fixture set
 
-### Rules
+What this means:
+- Save sanitized HTML snapshots and screenshots from real Google Classroom pages that currently work well.
+- Cover the exact surfaces that matter most: stream, classwork list, material details, assignment details, and at least one page with flags.
 
-#### B1. Prefer least-privilege permissions
+Why do it:
+- Right now the extension works well, but that good state is still mostly "live behavior" instead of a frozen baseline.
+- Without fixtures, future fixes can accidentally break a perfect setup and we only notice later.
 
-1. do not add new permissions unless they unlock a measurable detection gap,
-2. gate risky capabilities behind flags,
-3. document the exact user-facing reason for every new permission.
+Effect if completed:
+- You get a permanent safety net.
+- Every future selector or detection change can be tested against real pages that are known-good.
+- Regressions become cheaper to catch.
 
-#### B2. Validate download targets aggressively
+Can this be skipped for now:
+- Not recommended.
+- This is the best "insurance policy" task in the whole plan.
 
-For every derived download:
+### [ ] 2. Turn current good behavior into regression tests
 
-1. validate allowed host,
-2. validate expected URL shape,
-3. reject malformed redirect chains,
-4. reject unsupported schemes,
-5. reject ambiguous targets that cannot be tied to a canonical file identity.
+What this means:
+- Convert the known-good button placements, flag placements, and false-positive exclusions into test fixtures and assertions.
+- Examples:
+  - a real PDF/material card should get a button,
+  - a Google Form link should not get a button,
+  - a Google Sheet link should not get a button,
+  - a correctly flagged post should render exactly one outer flag treatment.
 
-#### B3. Keep API-assisted discovery opt-in until proven
+Why do it:
+- The extension is finally behaving the way you want.
+- The next job is to lock that behavior in.
 
-If OAuth or API discovery is introduced later:
+Effect if completed:
+- Future work becomes much safer.
+- "It used to work better before" stops becoming a mystery.
 
-1. ship DOM-only first,
-2. add explicit user consent UX,
-3. degrade safely when auth is denied,
-4. never break base downloads when API mode fails.
+Can this be skipped for now:
+- Only if no more core engine work is planned.
+- If the engine will keep evolving, this should be done.
 
-#### B4. Protect baseline and fixture data
+### [ ] 3. Build a small decision trace for each post/file
 
-1. no raw classroom HTML checked in without sanitization,
-2. strip emails, names, IDs, image URLs, and auth hints,
-3. mark all fixture files as processed artifacts only.
+What this means:
+- When the extension chooses to inject or not inject something, record the reason in a debug-friendly format.
+- Examples of useful trace output:
+  - why a file was treated as downloadable,
+  - why a link was rejected,
+  - why a comment flag was shown,
+  - what exclusion rule blocked a false positive.
 
-#### B5. Standardize extension-side security checks
+Why do it:
+- The current system works well now, but future issues will be much easier to debug if every decision is explainable.
 
-Add or maintain tests for:
+Effect if completed:
+- Faster debugging.
+- Less trial-and-error selector work.
+- Safer future refactors.
 
-1. XSS prevention,
-2. unsafe URL rejection,
-3. state corruption fallback,
-4. stale analytics replay prevention,
-5. malformed message handling,
-6. hostile DOM text injection edge cases.
-
-#### B6. Treat DOM-derived evidence as untrusted
-
-That means:
-
-1. no blind use of visible text for navigation or privileged behavior,
-2. no trust in arbitrary attributes unless they match expected patterns,
-3. no feature state tied to mutable user content without exclusion rules.
-
----
-
-## Track C — Smarter Download Detection Design
-
-### Goal
-
-Find more real files with fewer false positives and better resilience to Google Classroom DOM changes.
-
-### Design
-
-#### C1. Use a layered discovery model
-
-Each file candidate should come from one or more of:
-
-1. direct Drive/docs/sheets URL evidence,
-2. stable data attributes,
-3. semantic attachment structures,
-4. Classroom viewer/network-derived metadata,
-5. future Classroom API inventory.
-
-Each candidate gets a confidence score and source list.
-
-#### C2. Canonical file identity
-
-Every file must resolve to a canonical ID using priority:
-
-1. `data-drive-id`,
-2. direct Drive file ID,
-3. known docs/sheets/slides ID,
-4. normalized viewer-derived file ID,
-5. hashed normalized URL only as lowest-confidence fallback.
-
-This is mandatory for dedupe and stable Download All grouping.
-
-#### C3. Explicit file classification
-
-Every discovered attachment should be classified as:
-
-1. downloadable file,
-2. open-only resource,
-3. unsupported resource,
-4. unknown candidate.
-
-Examples:
-
-1. Drive PDF/docx/pptx => downloadable,
-2. Google Form => open-only,
-3. embedded YouTube => open-only,
-4. opaque Classroom tg viewer without resolved file ID => unknown until promoted by another evidence source.
-
-#### C4. Student Work gap closure
-
-Short term:
-
-1. intercept the Classroom viewer/network path for student work,
-2. extract real file identifiers from observed payloads,
-3. map them into canonical download URLs.
-
-Long term:
-
-1. add Classroom API mode behind a flag,
-2. cross-check DOM findings against API inventory,
-3. reconcile mismatches instead of trusting either side blindly.
-
-#### C5. Better placement strategy
-
-Placement should be based on:
-
-1. semantic attachment block,
-2. stable header/footer anchor,
-3. per-view placement recipes,
-4. exclusion of action bars and menu containers,
-5. confidence-weighted fallback targets.
-
-This avoids accidentally attaching controls to the three-dots menu region or decorative wrappers.
-
-#### C6. Performance rules for download detection
-
-1. scan changed subtrees only,
-2. skip unchanged posts using fingerprints,
-3. use viewport-aware preloading on long pages,
-4. batch DOM writes,
-5. keep hover behavior CSS-only.
+Can this be skipped for now:
+- Yes, if the extension remains in maintenance mode.
+- No, if deeper engine work is still planned.
 
 ---
 
-## Track D — Smarter Flag Detection Design
+## Priority 2 — Make The Current Runtime Cleaner Under The Hood
 
-### Goal
+These tasks are valuable, but they matter more for maintainability than for immediate user-visible gains.
 
-Make comment/edited/both flags more accurate, explainable, and language-safe.
+### [ ] 4. Finish the V2 migration under the hood
 
-### Design
+What this means:
+- Move remaining runtime responsibility toward one shared V2-style lifecycle instead of several independent legacy scripts.
+- The extension can still look the same to users while the internals become cleaner.
 
-#### D1. Replace ad-hoc layered scripts with one evidence engine
+Why do it:
+- Right now, a lot of the architecture exists, but the old and new systems still overlap.
+- That overlap makes future changes riskier and harder to reason about.
 
-The unified flag engine should score:
+Effect if completed:
+- Simpler mental model.
+- Lower long-term maintenance cost.
+- Fewer race conditions and fewer "which script owns this?" moments.
 
-1. semantic labels and titles,
-2. stable structural containers,
-3. localized keywords,
-4. date/timestamp containers,
-5. text-tree evidence,
-6. negative evidence and exclusions.
+Can this be skipped for now:
+- Yes, if the extension is mostly feature-frozen.
+- No, if more core behavior changes are still expected.
 
-The result should be:
+### [ ] 5. Unify mutation observation and lifecycle ownership
 
-1. `none`,
-2. `comment`,
-3. `edited`,
-4. `both`.
+What this means:
+- Move toward one shared observer/lifecycle owner instead of several independent observers and heartbeats.
 
-#### D2. Add a strong exclusion engine
+Why do it:
+- Multiple independent scanners cost CPU and make timing problems harder to understand.
 
-The system must explicitly exclude:
+Effect if completed:
+- Better performance on large Classroom pages.
+- Lower DOM observation cost.
+- Cleaner start/stop behavior across navigation.
 
-1. add-comment buttons,
-2. action menus,
-3. hidden nodes,
-4. editable areas,
-5. text from adjacent posts,
-6. show more/less toggles,
-7. known non-content controls.
+Can this be skipped for now:
+- Yes, if performance already feels fine and development is slowing down.
+- Still worth doing eventually.
 
-This is where many false positives come from today.
+### [ ] 6. Keep legacy behavior as rollback only
 
-#### D3. Language-aware keyword loading
+What this means:
+- The old path stays available as a safety fallback, but it stops being the main architecture to build new work on.
 
-1. detect page language,
-2. lazy-load only relevant keyword packs,
-3. keep a fallback neutral pack,
-4. audit edited/comment wording gaps for RTL and non-Latin locales.
+Why do it:
+- A fallback is useful.
+- Building on two different systems forever is not.
 
-#### D4. Decision trace per verdict
+Effect if completed:
+- Clearer ownership of behavior.
+- Less duplicated logic.
+- Safer future releases.
 
-Each final flag decision should include:
-
-1. evidence hits,
-2. evidence weights,
-3. exclusions triggered,
-4. fallback used or not,
-5. final confidence,
-6. mismatch with legacy.
-
-This is required for fast debugging.
-
-#### D5. Confidence thresholds
-
-Suggested thresholds:
-
-1. high-confidence render immediately,
-2. medium-confidence render only if corroborated by second evidence source,
-3. low-confidence hold back unless deep validation confirms.
-
-#### D6. Deep validation and repair
-
-Idle-time repair should verify:
-
-1. duplicate badges,
-2. wrong badge placement,
-3. missing overlays,
-4. stale verdict attributes,
-5. contradictory comment/edited states.
+Can this be skipped for now:
+- Temporarily yes.
+- Long term no.
 
 ---
 
-## Execution Sequence
+## Priority 3 — Smarter Download Detection
 
-### Phase 0
+These tasks matter if you want to make the engine more intelligent rather than just "good enough".
 
-1. baseline capture,
-2. fixture workflow,
-3. selector catalog,
-4. issue catalog,
-5. extension test baseline.
+### [ ] 7. Add first-class attachment classification
 
-### Phase 1
+What this means:
+- Every discovered target should be classified as one of:
+  - downloadable file,
+  - open-only resource,
+  - unsupported resource,
+  - unknown.
 
-1. finish shared V2 lifecycle path,
-2. unify observer ownership,
-3. keep shadow mode safe.
+Why do it:
+- This is the cleanest way to stop random buttons from appearing on the wrong link types.
+- It also gives the engine a clearer model for future APIs and future page types.
 
-### Phase 2
+Effect if completed:
+- Fewer false positives.
+- Cleaner logic.
+- Easier future support for things like "Open" actions on Forms/YouTube.
 
-1. smarter download discovery,
-2. student work coverage,
-3. canonical file model hardening.
+Can this be skipped for now:
+- Only if the current false-positive rate stays near zero.
+- This is still the next smartest engine improvement.
 
-### Phase 3
+### [ ] 8. Enforce canonical file identity everywhere
 
-1. unified flag scoring,
-2. exclusion engine,
-3. decision tracing.
+What this means:
+- Every attachment should resolve to one stable internal identity, preferably from:
+  1. `data-drive-id`,
+  2. parsed Drive/docs file ID,
+  3. normalized viewer-derived ID,
+  4. URL hash fallback.
 
-### Phase 4
+Why do it:
+- Canonical IDs are what make dedupe, grouping, and stable behavior possible.
 
-1. shadow validation,
-2. metrics review,
-3. V2 promotion,
-4. rollback safety.
+Effect if completed:
+- Better Download All grouping.
+- Fewer duplicates.
+- Better confidence in future API reconciliation.
+
+Can this be skipped for now:
+- Partially, because some of this already exists.
+- Still worth hardening if more engine work continues.
+
+### [ ] 9. Close the Student Work gap
+
+What this means:
+- Support the pages and flows where Classroom hides the real file behind student-work / viewer / indirect routing.
+
+Why do it:
+- This is one of the biggest real functional gaps left if broader coverage is the goal.
+
+Effect if completed:
+- More files become downloadable.
+- Fewer "why didn’t CQD catch this file?" cases.
+
+Can this be skipped for now:
+- Yes, if your daily use does not depend on Student Work pages.
+- No, if completeness matters.
+
+### [ ] 10. Expand page coverage only where it actually matters
+
+What this means:
+- Instead of chasing every possible Classroom page immediately, prioritize the pages users actually use and report issues on.
+
+Why do it:
+- The extension already feels strong in its main flow.
+- This keeps expansion practical instead of theoretical.
+
+Effect if completed:
+- Better ROI on engine work.
+- Less wasted effort on rare page types.
+
+Can this be skipped for now:
+- Yes, if current usage coverage already satisfies you.
 
 ---
 
-## Acceptance Criteria
+## Priority 4 — Smarter Flag Detection
 
-The plan is successful when:
+These tasks matter if you want flag logic to become more explainable and future-proof, not just visually correct right now.
 
-1. downloadable file coverage is near-complete on all supported surfaces,
-2. student work no longer behaves like a blind spot,
-3. duplicate or misplaced controls are effectively eliminated,
-4. false-positive comment/edited flags are measurably reduced,
-5. every wrong decision can be explained through a decision trace,
-6. legacy mode becomes a rollback path, not the main implementation,
-7. security posture stays least-privilege and validated.
+### [ ] 11. Unify comment + edited + both into one decision model
+
+What this means:
+- One scoring/exclusion system should own the full verdict instead of separate paths trying to coordinate after the fact.
+
+Why do it:
+- It reduces weird interaction bugs.
+- It makes "both" logic cleaner.
+
+Effect if completed:
+- Cleaner behavior.
+- Easier debugging.
+- Fewer edge-case race conditions.
+
+Can this be skipped for now:
+- Yes, if current flags feel perfect and you do not want to touch a stable area.
+
+### [ ] 12. Keep flag exclusions explicit and test-backed
+
+What this means:
+- Keep a clear, shared set of rules for what should *not* count as a comment/edit signal.
+
+Why do it:
+- Most flag bugs come from the engine detecting user text, action labels, menus, or nearby UI noise.
+
+Effect if completed:
+- Lower false-positive rate.
+- Better trust in the badges.
+
+Can this be skipped for now:
+- Only if no new flag regressions appear.
+
+### [ ] 13. Make dark mode / RTL / long posts first-class validation cases
+
+What this means:
+- Treat them as required regression cases, not bonus compatibility work.
+
+Why do it:
+- These are the kinds of environments where visually correct logic often breaks quietly.
+
+Effect if completed:
+- Better global reliability.
+- Fewer UI edge-case regressions.
+
+Can this be skipped for now:
+- Only if those environments are not important to your users.
 
 ---
 
-## Not In Scope Yet
+## Priority 5 — Security Hardening
 
-1. LLM or AI-powered DOM reasoning inside the extension runtime,
-2. broad new permissions without evidence they are necessary,
-3. website/dashboard work that does not improve the extension’s core download/flag behavior.
+These are the "stay safe while changing things" tasks.
+
+### [ ] 14. Keep strict download URL validation
+
+What this means:
+- Continue validating hosts, URL shape, redirects, and allowed file targets before creating or using a download URL.
+
+Why do it:
+- Download features are sensitive by nature.
+- A loose validator is a long-term risk.
+
+Effect if completed:
+- Lower security risk.
+- Fewer malformed-target bugs.
+
+Can this be skipped for now:
+- No. This should remain part of the baseline.
+
+### [ ] 15. Treat DOM evidence as untrusted
+
+What this means:
+- Do not trust random page text or random attributes unless they match known safe patterns.
+
+Why do it:
+- Google Classroom pages contain lots of user-generated content and shifting UI text.
+
+Effect if completed:
+- Fewer logic mistakes.
+- Safer future engine changes.
+
+Can this be skipped for now:
+- No. This should stay as a design rule.
+
+### [ ] 16. Keep fixture sanitization strict
+
+What this means:
+- Any captured Classroom HTML must be scrubbed before living in the repo.
+
+Why do it:
+- Real Classroom pages can contain names, emails, file IDs, image URLs, and account details.
+
+Effect if completed:
+- Safer repo hygiene.
+- Lower accidental privacy leakage.
+
+Can this be skipped for now:
+- No, if fixtures are going to be used.
 
 ---
 
-## Immediate Next Action
+## Priority 6 — API-Enhanced Engine (`1.6.0`)
 
-Implement Phase 0 completely and keep it reproducible:
+This is intentionally later.
+Do not start it just because it sounds smarter.
+Start it only if the DOM-first line reaches a real ceiling.
 
-1. capture live snapshots,
-2. sanitize fixtures,
-3. catalog selectors,
-4. record known issues,
-5. lock in a clean baseline before deeper V2 work.
+### [ ] 17. Decide whether API work is actually needed
+
+What this means:
+- Ask a simple question: is the DOM-first engine still missing important real-world files or not?
+
+Why do it:
+- API work adds complexity, consent, permissions, and store-review risk.
+
+Effect if completed:
+- Better decision making.
+- Less risk of building unnecessary complexity.
+
+Can this be skipped for now:
+- Yes. If the current extension already feels perfect, this can stay deferred.
+
+### [ ] 18. Design the OAuth consent flow before writing API logic
+
+What this means:
+- If `identity` is ever added, the user-facing consent flow, denial behavior, and fallback path must be designed first.
+
+Why do it:
+- Permission changes are product changes, not just code changes.
+
+Effect if completed:
+- Cleaner rollout.
+- Safer browser-store review.
+- Better user trust.
+
+Can this be skipped for now:
+- Yes, until API work is truly needed.
+
+### [ ] 19. Use API as inventory truth, not as placement truth
+
+What this means:
+- Even in `1.6.0`, the API should help discover what exists, while the DOM still decides where UI goes.
+
+Why do it:
+- APIs are great at inventory.
+- DOM is still better at matching what the user is actually looking at.
+
+Effect if completed:
+- Best hybrid architecture.
+- Fewer placement mistakes.
+- Stronger future resilience.
+
+Can this be skipped for now:
+- Yes, until API work begins.
+
+---
+
+## Suggested Practical Order From Here
+
+If you want the most practical order, do this:
+
+1. capture a real baseline fixture set,
+2. turn the current good behavior into regression tests,
+3. add first-class attachment classification,
+4. close Student Work only if it matters to your usage,
+5. finish under-the-hood V2 consolidation only if more core work is still planned,
+6. defer API work until the DOM-first line proves insufficient.
+
+## Short Recommendation
+
+Because the extension currently feels excellent, the best next move is **not** a huge rewrite.
+
+The best next move is:
+
+1. protect the current behavior,
+2. document why it works,
+3. only then decide whether deeper engine work is worth the risk.
