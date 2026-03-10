@@ -1612,13 +1612,7 @@
     font-size: 15px;
     line-height: 1.7;
     color: var(--text-secondary);
-  }
-  .l2-placement-el.edit-mode {
-    pointer-events: auto;
-    cursor: grab;
-    border-radius: 8px;
-  }
-  .l2-placement-el.edit-locked { cursor: not-allowed; opacity: 0.75; }
+  }  .l2-placement-el.edit-locked { cursor: not-allowed; opacity: 0.75; }
   .l2-placement-el.edit-mode:hover {
     outline: 2px dashed rgba(26,139,85,0.5);
     outline-offset: 4px;
