@@ -715,14 +715,6 @@
     document.querySelectorAll('.l2-reveal').forEach((el) => observer.observe(el));
   }
 
-  function placementRenderTopCss(placement: RenderPlacement): string {
-    if (!editMode && placementCanvasLocked) {
-      const frozen = frozenPlacementCoords[placement.id];
-      if (frozen) return `${frozen.topPx}px`;
-    }
-    return `${placement.renderY}%`;
-  }
-
   function placementAnimationPlayState(placement: RenderPlacement): 'running' | 'paused' {
     if (placement.renderAnimDuration <= 0) return 'paused';
     if (editMode) return 'running';
