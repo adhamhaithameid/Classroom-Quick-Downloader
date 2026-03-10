@@ -1645,21 +1645,6 @@
   }  .edit-tb-status.tone-ok { color: #4ade80; border-color: rgba(74,222,128,0.35); background: rgba(74,222,128,0.1); }
   .edit-tb-status.tone-warn { color: #fbbf24; border-color: rgba(251,191,36,0.35); background: rgba(251,191,36,0.1); }
   .edit-tb-status.tone-error { color: #f87171; border-color: rgba(248,113,113,0.35); background: rgba(248,113,113,0.1); }
-
-  .edit-inspector {
-    position: fixed;
-    bottom: 72px;
-    left: 20px;
-    right: 20px;
-    padding: 12px 14px;
-    border-radius: 12px;
-    border: 1px solid rgba(255,255,255,0.1);
-    background: rgba(12, 16, 24, 0.92);
-    backdrop-filter: blur(12px);
-    z-index: 60000;
-    color: #e2e8f0;
-    font-family: var(--font-ui), sans-serif;
-  }
   .edit-inspector-top {
     display: flex;
     flex-wrap: wrap;
