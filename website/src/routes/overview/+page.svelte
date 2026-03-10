@@ -715,14 +715,6 @@
     document.querySelectorAll('.l2-reveal').forEach((el) => observer.observe(el));
   }
 
-  function startEditDrag(e: PointerEvent, p: ElementPlacement) {
-    if (!editMode || p.locked) return;
-    e.preventDefault();
-    e.stopPropagation();
-    selectedElementId = p.id;
-    editDrag = { id: p.id, pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, origX: p.x, origY: p.y };
-  }
-
   function onEditPointerMove(e: PointerEvent) {
     if (!editDrag || !pageEl) return;
     if (e.pointerId !== editDrag.pointerId) return;
