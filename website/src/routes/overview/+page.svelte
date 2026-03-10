@@ -745,8 +745,6 @@
       if (typeof stopMarquee === 'function') stopMarquee();
       if (typeof stopHeavierScroll === 'function') stopHeavierScroll();
       if (typeof stopMapPromptDelay === 'function') stopMapPromptDelay();
-      if (typeof stopPlacementViewportWatcher === 'function') stopPlacementViewportWatcher();
-      if (statusTimer) clearTimeout(statusTimer);
       document.body.classList.remove('l2-map-modal-open');
     };
   });
