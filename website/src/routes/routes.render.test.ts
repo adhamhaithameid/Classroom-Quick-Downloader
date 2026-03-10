@@ -62,6 +62,16 @@ describe('route render smoke coverage', () => {
     expect(html).not.toContain('Element Editor');
   });
 
+  it('keeps the internal overview editor route out of indexing', () => {
+    const { body, head } = render(OverviewEditorPage);
+    const html = squish(body);
+
+    expect(head).toContain('Overview Editor — Classroom Quick Downloader');
+    expect(head).toContain('noindex, nofollow');
+    expect(head).toContain('/overview-editor');
+    expect(html).toContain('l2-page-floats');
+  });
+
   it('renders changelog loading state and refresh actions', () => {
     const { body, head } = render(ChangelogPage);
     const html = squish(body);
