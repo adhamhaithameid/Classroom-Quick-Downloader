@@ -1685,12 +1685,7 @@
     width: 100%; padding: 8px 12px; border-radius: 8px; font-size: 13px;
     background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
     color: #e2e8f0; margin-bottom: 10px; box-sizing: border-box;
-  }
-  .edit-picker-grid {
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
-    gap: 6px; overflow-y: auto; flex: 1; max-height: 50vh;
-  }
-  .edit-picker-item {
+  }  .edit-picker-item {
     background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
     border-radius: 10px; padding: 8px; display: flex; flex-direction: column;
     align-items: center; gap: 4px; cursor: pointer; transition: all 0.15s;
