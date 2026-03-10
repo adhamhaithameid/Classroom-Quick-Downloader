@@ -42,25 +42,6 @@
     downloadUrl: [STORE_LINKS.chrome, STORE_LINKS.firefox, STORE_LINKS.edge]
   };
 
-  /* ━━━ Edit Mode — inline element editor ━━━ */
-  let editMode = false;
-  let editIsolation = false;
-  let publishedPlacements: ElementPlacement[] = [];
-  let placements: ElementPlacement[] = [];
-  let selectedElementId: string | null = null;
-  let pickerOpen = false;
-  let pickerSearch = '';
-  let pickerTab: 'float' | 'doodle' | '3d' = 'float';
-  let importJsonText = '';
-  let showImportPanel = false;
-  let importErrors: string[] = [];
-  let importWarnings: string[] = [];
-  let editorStatus = '';
-  let editorStatusTone: 'ok' | 'warn' | 'error' = 'ok';
-  let statusTimer: ReturnType<typeof setTimeout> | null = null;
-  let selectedPlacement: ElementPlacement | null = null;
-  let pinnedSuperchargeStar: RenderPlacement | null = null;
-  let visiblePlacements: RenderPlacement[] = [];
   let placementSectionVisible: Record<PlacementSection, boolean> = { ...INITIAL_PLACEMENT_SECTION_VISIBILITY };
   let placementCanvasHeight = 0;
   let placementCanvasLocked = false;
