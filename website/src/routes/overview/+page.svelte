@@ -1624,14 +1624,7 @@
     font-size: 10px; font-weight: 700; cursor: pointer;
     display: none; align-items: center; justify-content: center;
     z-index: 10; line-height: 1;
-  }  .l2-placement-el.edit-selected .el-delete-btn { display: flex; }
-  .el-id-label {
-    position: absolute; bottom: -16px; left: 50%; transform: translateX(-50%);
-    font-size: 8px; font-weight: 700; color: var(--green);
-    background: rgba(255,255,255,0.9); padding: 1px 4px; border-radius: 3px;
-    white-space: nowrap; pointer-events: none; display: none;
-  }
-  .l2-placement-el.edit-mode:hover .el-id-label,
+  }  .l2-placement-el.edit-selected .el-delete-btn { display: flex; }  .l2-placement-el.edit-mode:hover .el-id-label,
   .l2-placement-el.edit-selected .el-id-label { display: block; }
 
   /* ── Edit Mode Toolbar ───────────── */
