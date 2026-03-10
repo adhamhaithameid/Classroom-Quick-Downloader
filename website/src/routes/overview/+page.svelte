@@ -1613,17 +1613,6 @@
     line-height: 1.7;
     color: var(--text-secondary);
   }
-
-  /* Config-driven placement elements */
-  .l2-placement-el {
-    position: absolute;
-    color: var(--green);
-    animation: float-a ease-in-out infinite;
-    pointer-events: none;
-    transition: box-shadow 0.2s, outline 0.2s, opacity 0.7s ease, margin-top 0.7s ease;
-    margin-top: var(--placement-shift, 0px);
-    will-change: opacity;
-  }
   .l2-placement-el.edit-mode {
     pointer-events: auto;
     cursor: grab;
