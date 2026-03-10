@@ -1209,8 +1209,8 @@
     reducedMotionPreferred = shouldReduceMotion();
     const searchParams = new URLSearchParams(window.location.search);
     const isEmbed = searchParams.has('embed');
-    editMode = searchParams.has('edit');
-    editIsolation = editMode && !searchParams.has('interactive');
+    editMode = true;
+    editIsolation = !searchParams.has('interactive');
     const placementViewportMedia = window.matchMedia(`(max-width: ${MOBILE_PLACEMENT_BREAKPOINT}px)`);
     const onPlacementViewportChange = () => {
       isMobilePlacementsViewport = placementViewportMedia.matches;
