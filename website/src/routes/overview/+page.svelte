@@ -715,11 +715,6 @@
     document.querySelectorAll('.l2-reveal').forEach((el) => observer.observe(el));
   }
 
-  function persistEditingState() {
-    if (!editMode) return;
-    saveDraftPlacements(placements);
-  }
-
   function nudgeSelected(dx: number, dy: number): void {
     if (!selectedPlacement || selectedPlacement.locked) return;
     updatePlacement(selectedPlacement.id, {
