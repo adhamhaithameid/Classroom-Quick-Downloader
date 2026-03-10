@@ -1671,13 +1671,7 @@
     line-height: 1.4;
     max-height: 120px;
     overflow: auto;
-  }
-  /* ── Catalog Picker Popup ─────────── */
-  .edit-picker-overlay {
-    position: fixed; inset: 0; z-index: 60002;
-    background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center;
-  }
-  .edit-picker-panel {
+  }  .edit-picker-panel {
     width: 600px; max-width: 90vw; max-height: 80vh;
     background: rgba(15,20,30,0.98); backdrop-filter: blur(16px);
     border: 1px solid rgba(255,255,255,0.1); border-radius: 16px;
