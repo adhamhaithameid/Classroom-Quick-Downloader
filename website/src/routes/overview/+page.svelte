@@ -715,28 +715,6 @@
     document.querySelectorAll('.l2-reveal').forEach((el) => observer.observe(el));
   }
 
-  function handleEditImport() {
-    const result = importPlacementsJSON(importJsonText);
-    importErrors = result.errors;
-    importWarnings = result.warnings;
-    if (!result.ok) {
-      setEditorStatus('Import failed. Fix JSON and try again.', 'error');
-      return;
-    }
-
-    placements = result.placements;
-    persistEditingState();
-    showImportPanel = false;
-    importJsonText = '';
-    selectedElementId = null;
-    setEditorStatus(
-      result.warnings.length > 0
-        ? `Imported with ${result.warnings.length} warning(s).`
-        : `Imported ${placements.length} placement(s).`,
-      result.warnings.length > 0 ? 'warn' : 'ok'
-    );
-  }
-
   function handleEditPublish() {
     publishedPlacements = publishPlacements(placements);
     placements = clonePlacements(publishedPlacements);
