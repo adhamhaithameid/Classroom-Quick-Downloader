@@ -715,22 +715,6 @@
     document.querySelectorAll('.l2-reveal').forEach((el) => observer.observe(el));
   }
 
-  function onEditPointerMove(e: PointerEvent) {
-    if (!editDrag || !pageEl) return;
-    if (e.pointerId !== editDrag.pointerId) return;
-    const rect = pageEl.getBoundingClientRect();
-    const pageW = rect.width;
-    const pageH = placementCanvasHeight > 0 ? placementCanvasHeight : pageEl.scrollHeight;
-    const dx = e.clientX - editDrag.startX;
-    const dy = e.clientY - editDrag.startY;
-    const newX = Math.max(-25, Math.min(125, editDrag.origX + (dx / pageW) * 100));
-    const newY = Math.max(-25, Math.min(125, editDrag.origY + (dy / pageH) * 100));
-    const dragId = editDrag.id;
-    placements = placements.map(p =>
-      p.id === dragId ? { ...p, x: Math.round(newX * 10) / 10, y: Math.round(newY * 10) / 10 } : p
-    );
-  }
-
   function onEditPointerUp(e: PointerEvent) {
     if (!editDrag) return;
     if (e.pointerId !== editDrag.pointerId) return;
