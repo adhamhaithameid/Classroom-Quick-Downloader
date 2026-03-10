@@ -715,23 +715,6 @@
     document.querySelectorAll('.l2-reveal').forEach((el) => observer.observe(el));
   }
 
-  function duplicateSelectedElement() {
-    if (!selectedPlacement) return;
-    const duplicated: ElementPlacement = {
-      ...selectedPlacement,
-      id: genPlacementId(selectedPlacement.type),
-      x: Math.round(Math.max(-25, Math.min(125, selectedPlacement.x + 2)) * 10) / 10,
-      y: Math.round(Math.max(-25, Math.min(125, selectedPlacement.y + 2)) * 10) / 10,
-      zIndex: maxPlacementZIndex(placements) + 1,
-      locked: false,
-      hidden: false
-    };
-    placements = [...placements, duplicated];
-    persistEditingState();
-    selectedElementId = duplicated.id;
-    setEditorStatus(`Duplicated '${selectedPlacement.id}' -> '${duplicated.id}'.`);
-  }
-
   function deleteElement(id: string) {
     placements = placements.filter(p => p.id !== id);
     persistEditingState();
