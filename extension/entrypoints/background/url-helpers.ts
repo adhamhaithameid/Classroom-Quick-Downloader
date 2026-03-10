@@ -12,6 +12,7 @@ export function normalizeUrl(rawUrl: string): { baseUrl: string; isDrive: boolea
     const url = new URL(rawUrl);
     const isDrive = url.hostname.includes('drive');
     if (!isDrive) return { baseUrl: rawUrl, isDrive: false };
+    url.pathname = url.pathname.replace(/^\/u\/\d+(?=\/)/, '');
     url.searchParams.delete('authuser');
     if (url.pathname.includes('/open')) url.pathname = '/uc';
     if (!url.searchParams.has('export')) url.searchParams.set('export', 'download');

@@ -88,6 +88,9 @@ async function loadDownloadHandler(options: LoadOptions = {}): Promise<TestConte
   vi.doMock('../entrypoints/background/cleanup', () => ({ cleanup: cleanupSpy }));
   vi.doMock('../entrypoints/background/message-sender', () => ({ sendStatusToTab: sendStatusSpy }));
   vi.doMock('../entrypoints/utils/analytics', () => ({ recordDownloadEvent: recordSpy }));
+  vi.doMock('../src/v2/decision/download-validator', () => ({
+    validateDownloadUrl: vi.fn(() => ({ valid: true, url: '', reason: 'OK', host: null })),
+  }));
 
   const mod = await import('../entrypoints/background/download-handler');
   return {

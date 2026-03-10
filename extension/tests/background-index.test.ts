@@ -90,4 +90,99 @@ describe('background/index', () => {
     expect(chrome.runtime.onMessage.addListener).toHaveBeenCalled();
     expect(chrome.tabs.onUpdated.addListener).toHaveBeenCalled();
   });
+
+  it('sends success on download completion even when filename hook did not finalize the request', async () => {
+    vi.resetModules();
+
+    const pending = {
+      requestId: 'req-complete',
+      startTime: Date.now() - 250,
+      originalUrl: 'https://drive.google.com/file/d/abc/view',
+      baseUrl: 'https://drive.google.com/uc?export=download&id=abc',
+      isDrive: true,
+      fileMeta: { ext: 'pdf', name: 'lecture.pdf' },
+      attemptedAuthUsers: [],
+      fallbackStarted: false,
+      isCancelled: false,
+      tabId: 12,
+      finalized: false,
+    };
+    const pendingByDownloadId = new Map([[42, pending]]);
+    const cleanup = vi.fn();
+    const sendStatusToTab = vi.fn();
+    const recordDownloadEvent = vi.fn();
+
+    vi.doMock('../entrypoints/background/state', () => ({
+      pendingByRequestId: new Map(),
+      pendingByDownloadId,
+      pendingByUrl: new Map(),
+      pendingByBypassTabId: new Map(),
+      cancelledByUs: new Set(),
+      recentDownloads: new Map(),
+      CLEANUP_INTERVAL_MS: 1000,
+      IS_FIREFOX: false,
+    }));
+    vi.doMock('../entrypoints/background/icon-manager', () => ({
+      createIconUpdaters: () => ({ updateTabIcon: vi.fn(), updateGlobalIcon: vi.fn() }),
+      isClassroomUrl: () => true,
+      setActionIcon: vi.fn(),
+      GRAY_ICON_PATHS: {},
+    }));
+    vi.doMock('../entrypoints/background/auth-utils', () => ({
+      extractDriveFileId: () => null,
+    }));
+    vi.doMock('../entrypoints/background/url-helpers', () => ({
+      getFilenameExt: () => 'pdf',
+      buildUrlWithAuthUser: (url: string) => url,
+    }));
+    vi.doMock('../entrypoints/background/cleanup', () => ({
+      cleanup,
+      cleanupOrphanedPendingDownloads: vi.fn(),
+    }));
+    vi.doMock('../entrypoints/background/analytics-alarm', () => ({
+      ensureAnalyticsAlarm: vi.fn(),
+      checkAndCloseFileTab: vi.fn(),
+    }));
+    vi.doMock('../entrypoints/background/message-sender', () => ({
+      sendStatusToTab,
+    }));
+    vi.doMock('../entrypoints/background/download-handler', () => ({
+      handleDownloadRequest: vi.fn(() => true),
+      startNextDriveAttempt: vi.fn(),
+      openDriveBypassTab: vi.fn(),
+    }));
+    vi.doMock('../entrypoints/utils/analytics', () => ({
+      refreshRemoteAnalyticsConfig: vi.fn(async () => {}),
+      recordDownloadEvent,
+    }));
+    vi.doMock('../entrypoints/content/i18n', () => ({
+      t: (key: string) => key,
+    }));
+
+    const downloadChangedListeners: Array<(delta: any) => void> = [];
+    chrome.downloads.onChanged.addListener = vi.fn((listener: (delta: any) => void) => {
+      downloadChangedListeners.push(listener);
+    }) as never;
+
+    vi.spyOn(chrome.storage.local, 'get').mockImplementation((_key: any, cb: (result: any) => void) => {
+      cb({ extensionEnabled: true });
+    });
+
+    const mod = await import('../entrypoints/background/index');
+    const start = mod.default as unknown as () => void;
+    start();
+
+    expect(downloadChangedListeners).toHaveLength(1);
+    downloadChangedListeners[0]({
+      id: 42,
+      state: { current: 'complete' },
+    });
+
+    expect(sendStatusToTab).toHaveBeenCalledWith(pending, 'success');
+    expect(recordDownloadEvent).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'success',
+      type: 'pdf',
+    }));
+    expect(cleanup).toHaveBeenCalledWith(pending, 42);
+  });
 });
