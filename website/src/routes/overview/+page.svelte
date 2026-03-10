@@ -2812,11 +2812,7 @@
       right: 10px;
       bottom: 64px;
       padding: 10px;
-    }
-    .edit-inspector-grid {
-      grid-template-columns: 1fr;
-    }
-    .edit-import-panel {
+    }    .edit-import-panel {
       right: 10px;
       bottom: 52px;
       width: calc(100vw - 20px);
