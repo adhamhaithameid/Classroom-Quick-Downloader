@@ -14,6 +14,9 @@ import InstallChromePage from './install/chrome/+page.svelte';
 import SecurityPage from './security/+page.svelte';
 import CompareClassfetchPage from './compare/classroom-quick-downloader-vs-classfetch/+page.svelte';
 import { privacyContent } from '$lib/content/privacy';
+import { SITE_URL } from '$lib/config';
+import { GET as getRobotsTxt } from './robots.txt/+server';
+import { GET as getSitemapXml } from './sitemap.xml/+server';
 
 function squish(html: string): string {
   return html.replace(/\s+/g, ' ').trim();
