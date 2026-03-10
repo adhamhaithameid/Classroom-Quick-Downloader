@@ -7,3 +7,10 @@ export const SOCIAL_IMAGE = {
   width: 1642,
   height: 1520
 } as const;
+
+const CORE_INDEXABLE_PATHS = ['/', '/privacy', '/faq', '/changelog'] as const;
+
+export const INDEXABLE_SITE_PATHS = [
+  ...CORE_INDEXABLE_PATHS,
+  ...Object.values(seoPages).map((page) => page.path)
+] as const;
