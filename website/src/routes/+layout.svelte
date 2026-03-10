@@ -11,7 +11,7 @@
   import '../app.css';
 
   const baseNav = [
-    { href: '/overview', label: 'Overview' },
+    { href: '/', label: 'Overview' },
     { href: '/privacy', label: 'Privacy' },
     { href: '/faq', label: 'FAQ' },
     { href: '/changelog', label: 'Changelog' },
@@ -40,6 +40,9 @@
   function isActive(navHref: string, currentPath: string): boolean {
     const normalizedCurrent = normalizePath(currentPath);
     const normalizedNav = normalizePath(navHref);
+    if (normalizedNav === '/' && normalizedCurrent === '/overview') {
+      return true;
+    }
     return normalizedCurrent === normalizedNav;
   }
 
@@ -102,6 +105,8 @@
 
   $: route = $page.url.pathname.replace(/\/$/, '') || '/';
   $: isOverviewStyleRoute =
+    $page.status === 404 ||
+    route === '/' ||
     route === '/overview' ||
     route === '/landing2' ||
     route === '/404' ||
@@ -141,7 +146,7 @@
   {#if !hideChrome}
   <header class="l2-nav-shell">
     <div class="l2-nav-inner l2-nav-fullwidth">
-      <a href="{base}/overview" class="l2-nav-brand">
+      <a href="{base}/" class="l2-nav-brand">
         <img src={logo} alt="Classroom Quick Downloader" class="l2-nav-logo" />
         <span class="l2-nav-brand-text">Classroom Quick Downloader</span>
       </a>

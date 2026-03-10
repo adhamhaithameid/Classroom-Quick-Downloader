@@ -43,7 +43,7 @@
       <p class="err-sub">{errorDescription}</p>
 
       <div class="err-actions">
-        <a class="err-btn err-btn-primary" href="{base}/overview">
+        <a class="err-btn err-btn-primary" href="{base}/">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
           Go home
         </a>
@@ -73,6 +73,8 @@
     color: var(--text);
     overflow: clip;
     position: relative;
+    width: 100%;
+    height: 100%;
     min-height: 100%;
     display: flex;
     flex-direction: column;
