@@ -715,19 +715,6 @@
     document.querySelectorAll('.l2-reveal').forEach((el) => observer.observe(el));
   }
 
-  function syncPlacementCanvasHeight(force = false): void {
-    if (!pageEl) return;
-    if (placementCanvasLocked && !force) return;
-    const measuredHeight = Math.max(
-      window.innerHeight || 0,
-      pageEl.scrollHeight || 0,
-      document.documentElement?.scrollHeight || 0,
-      document.body?.scrollHeight || 0
-    );
-    if (!Number.isFinite(measuredHeight) || measuredHeight <= 0) return;
-    placementCanvasHeight = Math.round(measuredHeight);
-  }
-
   function freezePlacementCoordinates(): void {
     if (!pageEl) return;
     const viewportHeight = typeof window !== 'undefined' ? window.innerHeight || 0 : 0;
