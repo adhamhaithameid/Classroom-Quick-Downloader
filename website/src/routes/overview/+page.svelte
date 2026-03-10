@@ -16,6 +16,7 @@
     canStartCelebration,
     nextCooldownUntil
   } from '$lib/celebration/balloons';
+
   /* ━━━ Feature toggle: set to false to hide the silly question ━━━ */
   const ENABLE_SILLY_QUESTION = true;
   const CELEBRATION_SESSION_KEY = 'cqd-balloon-celebration-session-v1';
@@ -23,6 +24,7 @@
   const CELEBRATION_OVERLAY_Z_INDEX = '2147483647';
   const CELEBRATION_BURST_COUNT = 4;
   const CELEBRATION_BURST_STAGGER_MS = 320;
+
   export let seoPath = '/';
 
   function buildCanonicalUrl(path: string): string {
@@ -257,7 +259,7 @@
   }
 
   function setupMapPromptDelay(): (() => void) | undefined {
-    if (!ENABLE_SILLY_QUESTION || editMode || !mapSectionEl || typeof window === 'undefined') return undefined;
+    if (!ENABLE_SILLY_QUESTION || !mapSectionEl || typeof window === 'undefined') return undefined;
 
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -643,6 +645,10 @@
     document.querySelectorAll('.l2-reveal').forEach((el) => observer.observe(el));
   }
 
+  async function loadSiteData(force = false): Promise<void> {
+    await refreshWebsiteSnapshotStore({ force, userInitiated: force });
+  }
+
   onMount(() => {
     let stopMarquee: (() => void) | undefined;
     let stopHeavierScroll: (() => void) | undefined;
@@ -743,6 +749,7 @@
     <div class="orb orb-12"></div>
   </div>
   <div class="l2-page-grid" aria-hidden="true"></div>
+
   <!-- ━━━━ Hero ━━━━ -->
   <section id="top" class="l2-hero l2-snap">
     <div class="l2-wrap l2-hero-content">
@@ -1382,9 +1389,8 @@
     -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
     animation: gradient-shift 5s ease-in-out infinite;
   }
-  .l2-em-supercharge {
-    position: relative;
-  }  .l2-sub {
+  .l2-em-supercharge { position: relative; }
+  .l2-sub {
     font-size: 18px; line-height: 1.7; color: var(--text);
     opacity: 0.7;
     max-width: 640px; margin: 0 auto 40px;
@@ -1540,84 +1546,8 @@
     font-size: 15px;
     line-height: 1.7;
     color: var(--text-secondary);
-  }  .l2-placement-el.edit-locked { cursor: not-allowed; opacity: 0.75; }  .l2-placement-el.edit-selected {
-    outline: 2px solid var(--green) !important;
-    outline-offset: 4px;
-    box-shadow: 0 0 30px rgba(26,139,85,0.25);
-    cursor: grabbing;
-  }  .el-delete-btn {
-    position: absolute; top: -8px; right: -8px;
-    width: 20px; height: 20px; border-radius: 50%;
-    background: #ef4444; color: #fff; border: none;
-    font-size: 10px; font-weight: 700; cursor: pointer;
-    display: none; align-items: center; justify-content: center;
-    z-index: 10; line-height: 1;
-  }  .l2-placement-el.edit-selected .el-delete-btn { display: flex; }  .l2-placement-el.edit-mode:hover .el-id-label,
-  .l2-placement-el.edit-selected .el-id-label { display: block; }  .edit-tb-title { font-weight: 700; font-size: 14px; margin-right: 8px; }  .edit-tb-btn {
-    padding: 5px 12px; border-radius: 8px; font-size: 11px; font-weight: 600;
-    border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.06);
-    color: #e2e8f0; cursor: pointer; transition: all 0.15s; white-space: nowrap;
-  }  .edit-tb-add-float { border-color: rgba(34,197,94,0.3); color: #22c55e; }
-  .edit-tb-add-doodle { border-color: rgba(59,130,246,0.3); color: #3b82f6; }
-  .edit-tb-add-3d { border-color: rgba(167,139,250,0.3); color: #a78bfa; }  .edit-tb-slider {
-    display: flex; align-items: center; gap: 6px;
-    font-size: 10px; color: #94a3b8;
-  }  .edit-tb-slider select {
-    height: 24px;
-    border-radius: 6px;
-    border: 1px solid rgba(255,255,255,0.12);
-    background: rgba(255,255,255,0.06);
-    color: #e2e8f0;
-    font-size: 11px;
-    padding: 0 6px;
-  }  .edit-tb-status.tone-ok { color: #4ade80; border-color: rgba(74,222,128,0.35); background: rgba(74,222,128,0.1); }
-  .edit-tb-status.tone-warn { color: #fbbf24; border-color: rgba(251,191,36,0.35); background: rgba(251,191,36,0.1); }
-  .edit-tb-status.tone-error { color: #f87171; border-color: rgba(248,113,113,0.35); background: rgba(248,113,113,0.1); }  .edit-inspector-id {
-    font-family: monospace;
-    font-size: 12px;
-    font-weight: 700;
-    color: #bbf7d0;
-  }  .edit-inspector-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 8px 14px;
-    align-items: center;
-  }  .edit-layer-controls {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-  }  .edit-import-textarea {
-    width: 100%; height: 120px; padding: 10px; border-radius: 8px;
-    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
-    color: #e2e8f0; font-size: 11px; font-family: monospace; resize: vertical;
-    box-sizing: border-box; margin-bottom: 8px;
-  }  .edit-import-log {
-    margin-bottom: 8px;
-    border-radius: 8px;
-    padding: 8px;
-    font-size: 11px;
-    line-height: 1.4;
-    max-height: 120px;
-    overflow: auto;
-  }  .edit-picker-panel {
-    width: 600px; max-width: 90vw; max-height: 80vh;
-    background: rgba(15,20,30,0.98); backdrop-filter: blur(16px);
-    border: 1px solid rgba(255,255,255,0.1); border-radius: 16px;
-    padding: 20px; color: #e2e8f0; display: flex; flex-direction: column;
-    font-family: var(--font-ui), sans-serif;
-  }  .edit-picker-header h3 { margin: 0; font-size: 18px; font-weight: 700; }  .edit-picker-close:hover { background: rgba(255,255,255,0.08); }  .edit-picker-tabs button {
-    padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 600;
-    border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04);
-    color: #94a3b8; cursor: pointer; transition: all 0.15s;
-  }  .edit-picker-search {
-    width: 100%; padding: 8px 12px; border-radius: 8px; font-size: 13px;
-    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
-    color: #e2e8f0; margin-bottom: 10px; box-sizing: border-box;
-  }  .edit-picker-item {
-    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 10px; padding: 8px; display: flex; flex-direction: column;
-    align-items: center; gap: 4px; cursor: pointer; transition: all 0.15s;
-  }  .edit-picker-id { font-size: 8px; color: #94a3b8; font-family: monospace; font-weight: 600; }
+  }
+
   /* ── CTA Buttons ───────────────────── */
   .l2-hero-actions {
     display: flex; gap: 14px; justify-content: center; flex-wrap: wrap;
@@ -2735,15 +2665,6 @@
       height: 34px;
       top: 10px;
       right: 10px;
-    }    .edit-inspector {
-      left: 10px;
-      right: 10px;
-      bottom: 64px;
-      padding: 10px;
-    }    .edit-import-panel {
-      right: 10px;
-      bottom: 52px;
-      width: calc(100vw - 20px);
     }
     :global(.l2-main-flatmap-modal.heatmap-shell) {
       padding: 6px;
