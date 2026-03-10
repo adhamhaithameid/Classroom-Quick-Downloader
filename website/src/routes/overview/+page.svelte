@@ -1614,12 +1614,6 @@
     color: var(--text-secondary);
   }
 
-  /* ── Floating SVGs (page-wide) ───── */
-  .l2-page-floats {
-    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-    pointer-events: none; overflow: hidden; z-index: 4;
-  }
-
   /* Config-driven placement elements */
   .l2-placement-el {
     position: absolute;
