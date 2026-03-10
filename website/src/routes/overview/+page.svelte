@@ -1663,9 +1663,7 @@
     background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
     color: #e2e8f0; font-size: 11px; font-family: monospace; resize: vertical;
     box-sizing: border-box; margin-bottom: 8px;
-  }
-  .edit-import-actions { display: flex; gap: 8px; }
-  .edit-import-log {
+  }  .edit-import-log {
     margin-bottom: 8px;
     border-radius: 8px;
     padding: 8px;
