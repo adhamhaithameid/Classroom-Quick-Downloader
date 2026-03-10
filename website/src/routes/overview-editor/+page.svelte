@@ -1311,11 +1311,10 @@
 />
 
 <SeoMeta
-  title="Classroom Quick Downloader — Download All Google Classroom Files In One Click"
-  description="Free browser extension to bulk download all attachments from Google Classroom assignments. One click. Chrome, Firefox, and Edge."
+  title="Overview Editor — Classroom Quick Downloader"
+  description="Internal overview editor for Classroom Quick Downloader page composition."
   path={seoPath}
-  keywords="download all google classroom files, bulk download google classroom attachments, google classroom extension"
-  structuredData={softwareApplicationStructuredData}
+  noindex={true}
 />
 
 <svelte:head>
