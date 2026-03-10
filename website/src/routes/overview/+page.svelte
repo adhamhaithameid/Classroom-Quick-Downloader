@@ -715,11 +715,6 @@
     document.querySelectorAll('.l2-reveal').forEach((el) => observer.observe(el));
   }
 
-  function toggleSelectedLock() {
-    if (!selectedPlacement) return;
-    updatePlacement(selectedPlacement.id, { locked: !selectedPlacement.locked });
-  }
-
   function toggleSelectedVisibility() {
     if (!selectedPlacement) return;
     updatePlacement(selectedPlacement.id, { hidden: !selectedPlacement.hidden });
