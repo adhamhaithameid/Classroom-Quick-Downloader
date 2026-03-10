@@ -172,4 +172,23 @@ describe('route render smoke coverage', () => {
     expect(compareHtml).toContain('Classroom Quick Downloader vs Classfetch');
   });
 
+  it('renders robots.txt and sitemap.xml from the current site URL', async () => {
+    const expectedBaseUrl = SITE_URL.replace(/\/+$/, '');
+    const robots = await getRobotsTxt();
+    const sitemap = await getSitemapXml();
+    const robotsText = await robots.text();
+    const sitemapText = await sitemap.text();
+
+    expect(robots.headers.get('content-type')).toContain('text/plain');
+    expect(robotsText).toContain(`Sitemap: ${expectedBaseUrl}/sitemap.xml`);
+    expect(robotsText).toContain('Disallow: /uninstall');
+    expect(robotsText).toContain('Disallow: /404');
+
+    expect(sitemap.headers.get('content-type')).toContain('application/xml');
+    expect(sitemapText).toContain(`<loc>${expectedBaseUrl}/</loc>`);
+    expect(sitemapText).toContain(`<loc>${expectedBaseUrl}/faq</loc>`);
+    expect(sitemapText).not.toContain('/uninstall');
+    expect(sitemapText).not.toContain('/404');
+  });
+
 });
