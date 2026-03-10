@@ -715,30 +715,6 @@
     document.querySelectorAll('.l2-reveal').forEach((el) => observer.observe(el));
   }
 
-  function handleEditResetDraft() {
-    placements = clonePlacements(defaultPlacements);
-    persistEditingState();
-    selectedElementId = null;
-    setEditorStatus('Draft reset to defaults (not published yet).', 'warn');
-  }
-
-  /** Get all catalog items for the picker */
-  function getPickerItems(tab: 'float' | 'doodle' | '3d', search: string): SvgItem[] {
-    let items: SvgItem[] = [];
-    if (tab === 'float') {
-      items = svgCategories.flatMap(c => c.items);
-    } else if (tab === 'doodle') {
-      items = doodleItems;
-    } else {
-      items = threeDElements;
-    }
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      items = items.filter(i => i.id.toLowerCase().includes(q) || i.label.toLowerCase().includes(q));
-    }
-    return items;
-  }
-
   function isPinnedSuperchargeStarPlacement(placement: ElementPlacement): boolean {
     if (placement.id === PINNED_SUPERCHARGE_STAR_ID) return true;
     return placement.sampleId === PINNED_SUPERCHARGE_STAR_SAMPLE_ID && placement.section === 'general';
