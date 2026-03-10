@@ -715,12 +715,6 @@
     document.querySelectorAll('.l2-reveal').forEach((el) => observer.observe(el));
   }
 
-  function bumpSelectedLayer(direction: 'up' | 'down') {
-    if (!selectedPlacement) return;
-    const next = Math.max(0, (selectedPlacement.zIndex ?? 0) + (direction === 'up' ? 1 : -1));
-    updatePlacement(selectedPlacement.id, { zIndex: next });
-  }
-
   function toggleSelectedLock() {
     if (!selectedPlacement) return;
     updatePlacement(selectedPlacement.id, { locked: !selectedPlacement.locked });
