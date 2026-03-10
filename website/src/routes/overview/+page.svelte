@@ -715,16 +715,6 @@
     document.querySelectorAll('.l2-reveal').forEach((el) => observer.observe(el));
   }
 
-  function setEditorStatus(message: string, tone: 'ok' | 'warn' | 'error' = 'ok') {
-    editorStatus = message;
-    editorStatusTone = tone;
-    if (statusTimer) clearTimeout(statusTimer);
-    statusTimer = setTimeout(() => {
-      editorStatus = '';
-      statusTimer = null;
-    }, 3500);
-  }
-
   function toggleEditIsolation() {
     editIsolation = !editIsolation;
     setEditorStatus(editIsolation ? 'Page interactions frozen for placement editing.' : 'Page interactions restored.');
