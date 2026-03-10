@@ -30,7 +30,7 @@ async function loadObserversModule() {
     RESCAN_INTERVAL_MS: 1000,
     CLASSROOM_URL_PATTERN: /^https:\/\/classroom\.google\.com\//,
     DRIVE_ANCHOR_SELECTOR: 'a[href*="drive.google.com"]',
-    ATTACHMENT_CONTAINER_SELECTOR: '.KlRXdf, [data-drive-id]',
+    ATTACHMENT_CONTAINER_SELECTOR: '[data-attachment-id], .luto0c, .KlRXdf, [data-drive-id]',
     INJECTED_ATTR: 'data-cqd-injected',
     PROCESSED_ATTR: 'data-cqd-processed',
   }));
@@ -85,6 +85,68 @@ describe('content/observers', () => {
 
     mod.injectSingleFileButtons(root);
     expect(injectButtonIntoAttachment).toHaveBeenCalledTimes(2);
+  });
+
+  it('injects buttons for Classroom material attachment cards', async () => {
+    const { mod, injectButtonIntoAttachment } = await loadObserversModule();
+    const root = document.createElement('div');
+    root.innerHTML = `
+      <div class="luto0c" data-attachment-id="a-1">
+        <a
+          class="VkhHKd e7EEH nQaZq"
+          aria-label="Attachment: PDF: CNN q.pdf"
+          href="https://drive.google.com/file/d/abc/view?usp=classroom_web&authuser=0"
+        >
+          <div class="rzTfPe xSP5ic"><img src="//ssl.gstatic.com/docs/doclist/images/mediatype/icon_3_pdf_x16.png" /></div>
+          <div class="YVvGBb VjRxGc">CNN q.pdf</div>
+        </a>
+      </div>
+    `;
+    document.body.appendChild(root);
+
+    mod.injectSingleFileButtons(root);
+    expect(injectButtonIntoAttachment).toHaveBeenCalledTimes(1);
+    expect(injectButtonIntoAttachment).toHaveBeenCalledWith(
+      root.querySelector('.luto0c'),
+      'https://drive.google.com/file/d/abc/view?usp=classroom_web&authuser=0',
+    );
+  });
+
+  it('ignores bare post-body links that are not inside attachment containers', async () => {
+    const { mod, injectButtonIntoAttachment } = await loadObserversModule();
+    const root = document.createElement('div');
+    root.innerHTML = `
+      <p>
+        <a href="https://docs.google.com/forms/d/1M3u5g0b2T4p_XIW28TODxnfknP4CAzHqmwjVkl5GljI/viewform">Form</a>
+        <a href="https://docs.google.com/spreadsheets/d/163qjQTcw2skYB8oWJ4FgfwdOvGP9jGUhUSdEYlccrts/edit?gid=0#gid=0">Sheet</a>
+        <a href="https://drive.google.com/file/d/abc/view">Loose Drive Link</a>
+      </p>
+    `;
+    document.body.appendChild(root);
+
+    mod.injectSingleFileButtons(root);
+    expect(injectButtonIntoAttachment).not.toHaveBeenCalled();
+  });
+
+  it('does not inject buttons for Forms or Sheets even inside attachment-like wrappers', async () => {
+    const { mod, injectButtonIntoAttachment } = await loadObserversModule();
+    const root = document.createElement('div');
+    root.innerHTML = `
+      <div class="luto0c" data-attachment-id="form-1">
+        <a aria-label="Attachment: Google Form" href="https://docs.google.com/forms/d/e/1FAIpQLSdZBCCxLrM0oZiJF2QEFBR4RdhBj_byOSGFBD5rs74U8XaAWw/viewform?usp=dialog">
+          Form
+        </a>
+      </div>
+      <div class="luto0c" data-attachment-id="sheet-1">
+        <a aria-label="Attachment: Google Sheet" href="https://docs.google.com/spreadsheets/d/1BigjQBFGGYLQr3N1i6mlLX7SDFIx1FuwvVb-8NU62Fs/edit?usp=sharing">
+          Sheet
+        </a>
+      </div>
+    `;
+    document.body.appendChild(root);
+
+    mod.injectSingleFileButtons(root);
+    expect(injectButtonIntoAttachment).not.toHaveBeenCalled();
   });
 
   it('scanForAttachments respects effectiveEnabled state', async () => {
@@ -144,9 +206,9 @@ describe('content/observers', () => {
 
     // Create a parent with a drive link and a child with a drive link
     const parent = document.createElement('div');
-    parent.innerHTML = '<a href="https://drive.google.com/file/d/123">Link 1</a>';
+    parent.innerHTML = '<div class="KlRXdf"><a href="https://drive.google.com/file/d/123">Link 1</a></div>';
     const child = document.createElement('div');
-    child.innerHTML = '<a href="https://drive.google.com/file/d/456">Link 2</a>';
+    child.innerHTML = '<div class="KlRXdf"><a href="https://drive.google.com/file/d/456">Link 2</a></div>';
     parent.appendChild(child);
 
     // Simulate mutation where parent is added (so child is implicitly added)

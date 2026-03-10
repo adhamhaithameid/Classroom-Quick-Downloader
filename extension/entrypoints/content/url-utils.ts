@@ -5,6 +5,13 @@
 
 import { DRIVE_URL_PATTERNS, DRIVE_ANCHOR_SELECTOR } from './state';
 
+const DOWNLOADABLE_DOCS_PATH = /^\/(document|presentation|drawings)\/d\/[^/]+/;
+
+function isSupportedDocsUrl(parsed: URL, normalizedPath: string): boolean {
+  if (parsed.hostname !== 'docs.google.com') return false;
+  return DOWNLOADABLE_DOCS_PATH.test(normalizedPath);
+}
+
 /**
  * Get authuser from current page URL.
  */
@@ -24,6 +31,17 @@ export function getAuthUser(): string | null {
 export function extractDriveUrlFromAnchor(anchor: HTMLAnchorElement): string | null {
   const href = anchor.href;
   if (!href) return null;
+  try {
+    const parsed = new URL(href, location.href);
+    const normalizedPath = parsed.pathname.replace(/^\/u\/\d+(?=\/)/, '');
+
+    if (parsed.hostname === 'docs.google.com' && !isSupportedDocsUrl(parsed, normalizedPath)) {
+      return null;
+    }
+  } catch {
+    return null;
+  }
+
   return DRIVE_URL_PATTERNS.some((re) => re.test(href)) ? href : null;
 }
 
@@ -59,6 +77,7 @@ export function toDownloadUrl(originalUrl: string, depth = 0): string {
 
   try {
     const parsed = new URL(originalUrl, location.href);
+    const normalizedPath = parsed.pathname.replace(/^\/u\/\d+(?=\/)/, '');
     
     const appendAuth = (u: string): string => {
       if (!authUser) return u;
@@ -70,7 +89,7 @@ export function toDownloadUrl(originalUrl: string, depth = 0): string {
     };
 
     if (parsed.hostname === 'drive.google.com') {
-      if (parsed.pathname.startsWith('/auth_warmup')) {
+      if (normalizedPath.startsWith('/auth_warmup')) {
         const cont = parsed.searchParams.get('continue');
         if (cont) return toDownloadUrl(cont, depth + 1);
         const id = parsed.searchParams.get('id');
@@ -78,23 +97,34 @@ export function toDownloadUrl(originalUrl: string, depth = 0): string {
         return appendAuth(originalUrl);
       }
       
-      const fileMatch = parsed.pathname.match(/^\/file\/d\/([^/]+)/);
+      const fileMatch = normalizedPath.match(/^\/file\/d\/([^/]+)/);
       if (fileMatch) {
         return appendAuth(`https://drive.google.com/uc?export=download&id=${fileMatch[1]}`);
       }
       
-      if (parsed.pathname === '/open' || parsed.pathname === '/uc') {
-        parsed.searchParams.set('export', 'download');
-        if (authUser) parsed.searchParams.set('authuser', authUser);
-        return parsed.toString();
+      if (normalizedPath === '/open' || normalizedPath === '/uc') {
+        const normalizedUrl = new URL(parsed.toString());
+        normalizedUrl.pathname = normalizedPath;
+        normalizedUrl.searchParams.set('export', 'download');
+        if (authUser) normalizedUrl.searchParams.set('authuser', authUser);
+        return normalizedUrl.toString();
       }
     }
     
-    if (parsed.hostname === 'classroom.google.com' && parsed.pathname.startsWith('/drive')) {
+    if (parsed.hostname === 'classroom.google.com' && normalizedPath.startsWith('/drive')) {
       const id = parsed.searchParams.get('id') ||
         parsed.searchParams.get('resourceId') ||
         parsed.searchParams.get('fileId');
       if (id) return appendAuth(`https://drive.google.com/uc?export=download&id=${id}`);
+    }
+
+    // Google Docs/Sheets/Slides/Drawings viewer URLs
+    // Pattern: docs.google.com/{type}/d/{fileId}/...
+    if (parsed.hostname === 'docs.google.com') {
+      const docsMatch = normalizedPath.match(/^\/(document|presentation|drawings)\/d\/([^/]+)/);
+      if (docsMatch) {
+        return appendAuth(`https://drive.google.com/uc?export=download&id=${docsMatch[2]}`);
+      }
     }
     
     return appendAuth(originalUrl);

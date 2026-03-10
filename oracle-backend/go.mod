@@ -1,7 +1,7 @@
 // filepath: oracle-backend/go.mod
 module oracle-backend
 
-go 1.24.13
+go 1.26.1
 
 require (
 	github.com/jackc/pgx/v5 v5.8.0

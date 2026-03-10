@@ -1,0 +1,421 @@
+
+> Classroom Quick Downloader@1.5.0 test /Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/extension
+> vitest run
+
+
+ RUN  v4.0.18 /Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/extension
+
+ ✓ tests/content-flags.test.ts (3 tests) 531ms
+ ✓ tests/content-both-badge.test.ts (3 tests) 528ms
+ ✓ tests/analytics-flush-runtime.test.ts (25 tests) 542ms
+ ✓ tests/v2-flag-renderer.test.ts (16 tests) 658ms
+ ✓ tests/v2-flag-scoring.test.ts (22 tests) 1109ms
+ ✓ tests/flag-detection-comprehensive.test.ts (27 tests) 2627ms
+     ✓ handles multiple comments with varying counts  641ms
+ ✓ tests/entrypoints-smoke.test.ts (1 test) 494ms
+     ✓ loads content script entrypoints with expected metadata  492ms
+ ✓ tests/content-button-factory.test.ts (3 tests) 548ms
+     ✓ injects a button into an attachment container  309ms
+ ✓ tests/dom.test.ts (45 tests) 3741ms
+       ✓ [ar-1] Arabic: Single class comment with word-number "واحد"  311ms
+       ✓ [hacker-1] Hacker/1337: c0mm3nt5  304ms
+ ✓ tests/ui.test.ts (29 tests) 389ms
+stdout | tests/v2-engines.test.ts > EngineV1 > initializes without error
+[Engine V1] Initialized for view: stream
+
+stdout | tests/v2-engines.test.ts > EngineV1 > destroys without error
+[Engine V1] Initialized for view: stream
+
+stdout | tests/v2-engines.test.ts > EngineV1 > destroys without error
+[Engine V1] Destroyed
+
+stdout | tests/v2-engines.test.ts > EngineV1 > getTrackedPosts returns PostNode[] from DOM after init
+[Engine V1] Initialized for view: stream
+
+stdout | tests/v2-engines.test.ts > EngineV2 > initializes with a view kind and abort signal
+[Engine V2] Initialized for view: stream
+
+stdout | tests/v2-engines.test.ts > EngineV2 > destroys cleanly after initialization
+[Engine V2] Initialized for view: stream
+
+stdout | tests/v2-engines.test.ts > EngineV2 > destroys cleanly after initialization
+[Engine V2] Destroyed (0 scans, avg 0ms, injected: 0)
+
+stdout | tests/v2-engines.test.ts > EngineV2 > destroys cleanly without initialization
+[Engine V2] Destroyed (0 scans, avg 0ms, injected: 0)
+
+stdout | tests/v2-engines.test.ts > EngineV2 > handles mutations without crashing
+[Engine V2] Initialized for view: stream
+
+stdout | tests/v2-engines.test.ts > EngineV2 > handles mutations without crashing
+[Engine V2] Scan #1 [stream]: 1 posts, 0 files, 0 flags, 0 placements — 0.0ms (detection-only)
+
+stdout | tests/v2-engines.test.ts > EngineV2 > fullScan discovers posts in the DOM
+[Engine V2] Initialized for view: stream
+
+stdout | tests/v2-engines.test.ts > EngineV2 > fullScan discovers posts in the DOM
+[Engine V2] Scan #1 [stream]: 2 posts, 1 files, 0 flags, 1 placements — 0.0ms (detection-only)
+
+stdout | tests/v2-engines.test.ts > EngineV2 > filters irrelevant mutations
+[Engine V2] Initialized for view: stream
+
+stdout | tests/v2-engines.test.ts > EngineV3 > initializes without error
+[Engine V2] Initialized for view: stream
+
+stdout | tests/v2-engines.test.ts > EngineV3 > initializes without error
+[Engine V3] Initialized for view: stream (API integration: STUB)
+
+stdout | tests/v2-engines.test.ts > EngineV3 > destroys without error
+[Engine V2] Destroyed (0 scans, avg 0ms, injected: 0)
+[Engine V3] Destroyed
+
+stdout | tests/v2-engines.test.ts > Engine Interface Compliance > V1 > init → destroy lifecycle completes without error
+[Engine V1] Initialized for view: stream
+
+stdout | tests/v2-engines.test.ts > Engine Interface Compliance > V1 > init → destroy lifecycle completes without error
+[Engine V1] Destroyed
+
+stdout | tests/v2-engines.test.ts > Engine Interface Compliance > V2 > init → destroy lifecycle completes without error
+[Engine V2] Initialized for view: stream
+
+stdout | tests/v2-engines.test.ts > Engine Interface Compliance > V2 > init → destroy lifecycle completes without error
+[Engine V2] Destroyed (0 scans, avg 0ms, injected: 0)
+
+stdout | tests/v2-engines.test.ts > Engine Interface Compliance > V3 > init → destroy lifecycle completes without error
+[Engine V2] Initialized for view: stream
+
+stdout | tests/v2-engines.test.ts > Engine Interface Compliance > V3 > init → destroy lifecycle completes without error
+[Engine V3] Initialized for view: stream (API integration: STUB)
+
+stdout | tests/v2-engines.test.ts > Engine Interface Compliance > V3 > init → destroy lifecycle completes without error
+[Engine V2] Destroyed (0 scans, avg 0ms, injected: 0)
+[Engine V3] Destroyed
+
+ ✓ tests/v2-engines.test.ts (41 tests) 316ms
+ ✓ tests/popup-legend-a11y.test.ts (1 test) 280ms
+ ✓ tests/background-download-handler.test.ts (21 tests) 208ms
+ ✓ tests/content-observers.test.ts (5 tests) 102ms
+ ✓ tests/analytics-index-runtime.test.ts (5 tests) 240ms
+ ✓ tests/content-theme.test.ts (4 tests) 246ms
+ ✓ tests/v2-button-renderer.test.ts (28 tests) 157ms
+ ✓ tests/analytics-storage.test.ts (32 tests) 115ms
+ ✓ tests/integration-extension-cloudflare.test.ts (3 tests) 201ms
+ ✓ tests/content-styles.test.ts (1 test) 170ms
+ ✓ tests/v2-entities.test.ts (24 tests) 83ms
+ ✓ tests/v2-exclusion-engine.test.ts (28 tests) 63ms
+ ✓ tests/v2-selector-scorer.test.ts (33 tests) 70ms
+ ✓ tests/utils-changelog.massive.test.ts (1560 tests) 89ms
+ ✓ tests/v2-file-placement.test.ts (28 tests) 176ms
+ ✓ tests/v2-dom-scanner.test.ts (19 tests) 110ms
+ ✓ tests/background-index.test.ts (1 test) 68ms
+ ✓ tests/content-i18n.test.ts (3 tests) 25ms
+ ✓ tests/v2-reconciler.test.ts (10 tests) 40ms
+ ✓ tests/content-url-utils.test.ts (5 tests) 38ms
+ ✓ tests/v2-deep-validator.test.ts (27 tests) 71ms
+ ✓ tests/popup-toggle-switch.test.ts (3 tests) 46ms
+ ✓ tests/content-post-card-utils.test.ts (12 tests) 38ms
+ ✓ tests/background-analytics-alarm.test.ts (4 tests) 46ms
+ ✓ tests/content-message-handler.test.ts (5 tests) 56ms
+ ✓ tests/content-download-handler.test.ts (5 tests) 56ms
+ ✓ tests/content-button-state.test.ts (4 tests) 57ms
+ ✓ tests/content-pulse-effect.test.ts (3 tests) 31ms
+stdout | tests/v2-mode-controller.test.ts > Mode Controller > setMode > writes to chrome.storage and updates registry
+[CQD Registry] Mode changed: legacy → shadow
+[CQD Mode] Mode set to: shadow
+
+stdout | tests/v2-mode-controller.test.ts > Mode Controller > setMode > sets all valid mode values
+[CQD Mode] Mode set to: legacy
+
+stdout | tests/v2-mode-controller.test.ts > Mode Controller > setMode > sets all valid mode values
+[CQD Registry] Mode changed: legacy → shadow
+[CQD Mode] Mode set to: shadow
+
+stdout | tests/v2-mode-controller.test.ts > Mode Controller > setMode > sets all valid mode values
+[CQD Registry] Mode changed: shadow → v2
+[CQD Mode] Mode set to: v2
+
+stdout | tests/v2-mode-controller.test.ts > Mode Controller > setMode > sets all valid mode values
+[CQD Registry] Mode changed: v2 → v3
+[CQD Mode] Mode set to: v3
+
+stdout | tests/v2-mode-controller.test.ts > Mode Controller > initModeController > reads mode from storage and sets it in registry
+[CQD Registry] Mode changed: legacy → v2
+[CQD Mode] Initialized with mode: v2
+
+stdout | tests/v2-mode-controller.test.ts > Mode Controller > initModeController > sets up message listener for remote mode changes
+[CQD Mode] Initialized with mode: legacy
+
+stdout | tests/v2-mode-controller.test.ts > Mode Controller > initModeController > sets up storage change listener
+[CQD Mode] Initialized with mode: legacy
+
+stdout | tests/v2-mode-controller.test.ts > Mode Controller > initModeController > defaults to legacy when storage is empty
+[CQD Mode] Initialized with mode: legacy
+
+ ✓ tests/v2-mode-controller.test.ts (13 tests) 125ms
+ ✓ tests/v2-element-lifecycle.test.ts (14 tests) 100ms
+ ✓ tests/utils-language-controller.test.ts (7 tests) 46ms
+ ✓ tests/content-tab-detector.test.ts (3 tests) 21ms
+ ✓ tests/utils-changelog.test.ts (8 tests) 21ms
+ ✓ tests/v2-viewport-observer.test.ts (16 tests) 14ms
+ ✓ tests/analytics-cancelled-accounting.integration.test.ts (2 tests) 24ms
+ ✓ tests/engine-combiner.test.ts (10 tests) 50ms
+ ✓ tests/content-state.test.ts (4 tests) 46ms
+ ✓ tests/v2-download-all-renderer.test.ts (18 tests) 36ms
+ ✓ tests/v2-performance-monitor.test.ts (30 tests) 36ms
+ ✓ tests/v2-budget-controller.test.ts (34 tests) 21ms
+ ✓ tests/v2-correction-queue.test.ts (30 tests) 22ms
+ ✓ tests/utils-analytics-reexports.test.ts (4 tests) 32ms
+ ✓ tests/utils-global-state.test.ts (4 tests) 20ms
+ ✓ tests/cancel.test.ts (47 tests) 30ms
+ ✓ tests/analytics-storage-internals.test.ts (10 tests) 16ms
+ ✓ tests/analytics-detection.test.ts (25 tests) 21ms
+stdout | tests/v2-engine-registry.test.ts > EngineRegistry: Registration > registers an engine and exposes it via getEngine
+[CQD Registry] Registered engine: engine-v1 v1.3.9
+
+stdout | tests/v2-engine-registry.test.ts > EngineRegistry: Registration > registers multiple engines
+[CQD Registry] Registered engine: engine-v1 v1.0.0
+[CQD Registry] Registered engine: engine-v2 v1.0.0
+[CQD Registry] Registered engine: engine-v3 v1.0.0
+
+stdout | tests/v2-engine-registry.test.ts > EngineRegistry: Registration > replaces a previously registered engine with the same name
+[CQD Registry] Registered engine: engine-v1 v1.0.0
+[CQD Registry] Registered engine: engine-v1 v2.0.0
+
+stdout | tests/v2-engine-registry.test.ts > EngineRegistry: Registration > unregisters an engine
+[CQD Registry] Registered engine: engine-v1 v1.0.0
+
+stdout | tests/v2-engine-registry.test.ts > EngineRegistry: Mode Management > sets and gets mode
+[CQD Registry] Mode changed: legacy → shadow
+[CQD Registry] Mode changed: shadow → v2
+[CQD Registry] Mode changed: v2 → v3
+
+stdout | tests/v2-engine-registry.test.ts > EngineRegistry: Mode Management > ignores redundant mode set (same mode)
+[CQD Registry] Mode changed: legacy → shadow
+
+stdout | tests/v2-engine-registry.test.ts > EngineRegistry: Mode Management > fires onModeChange callback when mode changes
+[CQD Registry] Mode changed: legacy → shadow
+[CQD Registry] Mode changed: shadow → v2
+
+stdout | tests/v2-engine-registry.test.ts > EngineRegistry: Mode Management > does not fire callback if none is set
+[CQD Registry] Mode changed: legacy → v2
+
+stdout | tests/v2-engine-registry.test.ts > EngineRegistry: Active Engines > legacy mode → only V1
+[CQD Registry] Registered engine: engine-v1 v1.0.0
+[CQD Registry] Registered engine: engine-v2 v1.0.0
+[CQD Registry] Registered engine: engine-v3 v1.0.0
+
+stdout | tests/v2-engine-registry.test.ts > EngineRegistry: Active Engines > shadow mode → V1 first (primary), V2 second (secondary)
+[CQD Registry] Registered engine: engine-v1 v1.0.0
+[CQD Registry] Registered engine: engine-v2 v1.0.0
+[CQD Registry] Registered engine: engine-v3 v1.0.0
+
+stdout | tests/v2-engine-registry.test.ts > EngineRegistry: Active Engines > shadow mode → V1 first (primary), V2 second (secondary)
+[CQD Registry] Mode changed: legacy → shadow
+
+stdout | tests/v2-engine-registry.test.ts > EngineRegistry: Active Engines > v2 mode → only V2
+[CQD Registry] Registered engine: engine-v1 v1.0.0
+[CQD Registry] Registered engine: engine-v2 v1.0.0
+[CQD Registry] Registered engine: engine-v3 v1.0.0
+
+stdout | tests/v2-engine-registry.test.ts > EngineRegistry: Active Engines > v2 mode → only V2
+[CQD Registry] Mode changed: legacy → v2
+
+stdout | tests/v2-engine-registry.test.ts > EngineRegistry: Active Engines > v3 mode → only V3
+[CQD Registry] Registered engine: engine-v1 v1.0.0
+[CQD Registry] Registered engine: engine-v2 v1.0.0
+[CQD Registry] Registered engine: engine-v3 v1.0.0
+
+stdout | tests/v2-engine-registry.test.ts > EngineRegistry: Active Engines > v3 mode → only V3
+[CQD Registry] Mode changed: legacy → v3
+
+stdout | tests/v2-engine-registry.test.ts > EngineRegistry: Active Engines > returns empty if required engine is not registered
+[CQD Registry] Registered engine: engine-v1 v1.0.0
+[CQD Registry] Registered engine: engine-v2 v1.0.0
+[CQD Registry] Registered engine: engine-v3 v1.0.0
+
+stdout | tests/v2-engine-registry.test.ts > EngineRegistry: Active Engines > partial registration: shadow with only V1 registered
+[CQD Registry] Registered engine: engine-v1 v1.0.0
+[CQD Registry] Registered engine: engine-v2 v1.0.0
+[CQD Registry] Registered engine: engine-v3 v1.0.0
+
+stdout | tests/v2-engine-registry.test.ts > EngineRegistry: Active Engines > partial registration: shadow with only V1 registered
+[CQD Registry] Registered engine: engine-v1 v1.0.0
+[CQD Registry] Mode changed: legacy → shadow
+
+stdout | tests/v2-engine-registry.test.ts > EngineRegistry: Primary & Secondary > primary in legacy mode is V1
+[CQD Registry] Registered engine: engine-v1 v1.0.0
+[CQD Registry] Registered engine: engine-v2 v1.0.0
+[CQD Registry] Registered engine: engine-v3 v1.0.0
+
+stdout | tests/v2-engine-registry.test.ts > EngineRegistry: Primary & Secondary > primary in shadow mode is V1 (V1 renders)
+[CQD Registry] Registered engine: engine-v1 v1.0.0
+[CQD Registry] Registered engine: engine-v2 v1.0.0
+[CQD Registry] Registered engine: engine-v3 v1.0.0
+
+stdout | tests/v2-engine-registry.test.ts > EngineRegistry: Primary & Secondary > primary in shadow mode is V1 (V1 renders)
+[CQD Registry] Mode changed: legacy → shadow
+
+stdout | tests/v2-engine-registry.test.ts > EngineRegistry: Primary & Secondary > primary in v2 mode is V2
+[CQD Registry] Registered engine: engine-v1 v1.0.0
+[CQD Registry] Registered engine: engine-v2 v1.0.0
+[CQD Registry] Registered engine: engine-v3 v1.0.0
+
+stdout | tests/v2-engine-registry.test.ts > EngineRegistry: Primary & Secondary > primary in v2 mode is V2
+[CQD Registry] Mode changed: legacy → v2
+
+stdout | tests/v2-engine-registry.test.ts > EngineRegistry: Primary & Secondary > secondary in shadow mode is [V2]
+[CQD Registry] Registered engine: engine-v1 v1.0.0
+[CQD Registry] Registered engine: engine-v2 v1.0.0
+[CQD Registry] Registered engine: engine-v3 v1.0.0
+
+stdout | tests/v2-engine-registry.test.ts > EngineRegistry: Primary & Secondary > secondary in shadow mode is [V2]
+[CQD Registry] Mode changed: legacy → shadow
+
+stdout | tests/v2-engine-registry.test.ts > EngineRegistry: Primary & Secondary > secondary in legacy mode is empty
+[CQD Registry] Registered engine: engine-v1 v1.0.0
+[CQD Registry] Registered engine: engine-v2 v1.0.0
+[CQD Registry] Registered engine: engine-v3 v1.0.0
+
+stdout | tests/v2-engine-registry.test.ts > EngineRegistry: Primary & Secondary > secondary in v2 mode is empty
+[CQD Registry] Registered engine: engine-v1 v1.0.0
+[CQD Registry] Registered engine: engine-v2 v1.0.0
+[CQD Registry] Registered engine: engine-v3 v1.0.0
+
+stdout | tests/v2-engine-registry.test.ts > EngineRegistry: Primary & Secondary > secondary in v2 mode is empty
+[CQD Registry] Mode changed: legacy → v2
+
+stdout | tests/v2-engine-registry.test.ts > EngineRegistry: Primary & Secondary > getPrimaryEngine returns null when no engines are registered
+[CQD Registry] Registered engine: engine-v1 v1.0.0
+[CQD Registry] Registered engine: engine-v2 v1.0.0
+[CQD Registry] Registered engine: engine-v3 v1.0.0
+
+stdout | tests/v2-engine-registry.test.ts > EngineRegistry: Summary > produces readable summary with active markers
+[CQD Registry] Registered engine: engine-v1 v1.3.9
+[CQD Registry] Registered engine: engine-v2 v4.0.0
+[CQD Registry] Mode changed: legacy → shadow
+
+ ✓ tests/v2-engine-registry.test.ts (25 tests) 18ms
+ ✓ tests/background-state.test.ts (4 tests) 5ms
+ ✓ tests/v2-shadow-diff-report.test.ts (34 tests) 21ms
+ ✓ tests/v2-launch-controller.test.ts (36 tests) 37ms
+ ✓ tests/background-icon-manager.test.ts (5 tests) 15ms
+ ✓ tests/content-file-meta.test.ts (5 tests) 9ms
+ ✓ tests/core.test.ts (60 tests) 17ms
+ ✓ tests/analytics-rate-limiter.test.ts (4 tests) 7ms
+ ✓ tests/xss-prevention.test.ts (19 tests) 12ms
+ ✓ tests/analytics-flush.test.ts (28 tests) 8ms
+ ✓ tests/v2-readiness-gate.test.ts (35 tests) 16ms
+ ✓ tests/v2-route-classifier.test.ts (16 tests) 19ms
+ ✓ tests/scan_optimization.test.ts (5 tests) 36ms
+ ✓ tests/v2-keyword-loader.test.ts (16 tests) 9ms
+ ✓ tests/background-message-sender.test.ts (4 tests) 19ms
+ ✓ tests/v2-placement-recipes.test.ts (21 tests) 9ms
+ ✓ tests/background-cleanup.test.ts (4 tests) 5ms
+ ✓ tests/background-url-helpers.test.ts (7 tests) 3ms
+ ✓ tests/utils-firefox-debug.test.ts (3 tests) 3ms
+ ✓ tests/background-auth-utils.test.ts (4 tests) 2ms
+
+ Test Files  76 passed (76)
+      Tests  2703 passed (2703)
+   Start at  20:22:51
+   Duration  19.66s (transform 4.72s, setup 6.23s, import 4.97s, tests 15.31s, environment 87.13s)
+
+
+stderr | tests/analytics-flush-runtime.test.ts > analytics flush runtime > internalFlush saves queue when integrity is invalid and exits when all events are committed
+[CQD Analytics] Queue integrity check failed; re-saving queue to restore checksum
+
+stderr | tests/v2-mode-controller.test.ts > Mode Controller > readMode > returns "legacy" when storage read fails
+[CQD Mode] Failed to read mode from storage: Error: quota exceeded
+    at /Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/extension/tests/v2-mode-controller.test.ts:71:60
+    at file:///Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/node_modules/.pnpm/@vitest+runner@4.0.18/node_modules/@vitest/runner/dist/index.js:145:11
+    at file:///Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/node_modules/.pnpm/@vitest+runner@4.0.18/node_modules/@vitest/runner/dist/index.js:915:26
+    at file:///Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/node_modules/.pnpm/@vitest+runner@4.0.18/node_modules/@vitest/runner/dist/index.js:1243:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/node_modules/.pnpm/@vitest+runner@4.0.18/node_modules/@vitest/runner/dist/index.js:1209:10)
+    at file:///Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/node_modules/.pnpm/@vitest+runner@4.0.18/node_modules/@vitest/runner/dist/index.js:1653:37
+    at Traces.$ (file:///Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/node_modules/.pnpm/vitest@4.0.18_@types+node@25.3.3_happy-dom@20.8.3_jiti@2.6.1_jsdom@28.1.0/node_modules/vitest/dist/chunks/traces.CCmnQaNT.js:142:27)
+    at trace (file:///Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/node_modules/.pnpm/vitest@4.0.18_@types+node@25.3.3_happy-dom@20.8.3_jiti@2.6.1_jsdom@28.1.0/node_modules/vitest/dist/chunks/test.B8ej_ZHS.js:239:21)
+    at runTest (file:///Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/node_modules/.pnpm/@vitest+runner@4.0.18/node_modules/@vitest/runner/dist/index.js:1653:12)
+
+stderr | tests/v2-mode-controller.test.ts > Mode Controller > setMode > rejects invalid mode values
+[CQD Mode] Invalid mode: "not-a-mode". Must be: legacy, shadow, v2, v3
+
+stderr | tests/v2-mode-controller.test.ts > Mode Controller > setMode > handles storage write failure gracefully
+[CQD Mode] Failed to set mode: Error: write failed
+    at /Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/extension/tests/v2-mode-controller.test.ts:124:60
+    at file:///Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/node_modules/.pnpm/@vitest+runner@4.0.18/node_modules/@vitest/runner/dist/index.js:145:11
+    at file:///Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/node_modules/.pnpm/@vitest+runner@4.0.18/node_modules/@vitest/runner/dist/index.js:915:26
+    at file:///Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/node_modules/.pnpm/@vitest+runner@4.0.18/node_modules/@vitest/runner/dist/index.js:1243:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/node_modules/.pnpm/@vitest+runner@4.0.18/node_modules/@vitest/runner/dist/index.js:1209:10)
+    at file:///Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/node_modules/.pnpm/@vitest+runner@4.0.18/node_modules/@vitest/runner/dist/index.js:1653:37
+    at Traces.$ (file:///Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/node_modules/.pnpm/vitest@4.0.18_@types+node@25.3.3_happy-dom@20.8.3_jiti@2.6.1_jsdom@28.1.0/node_modules/vitest/dist/chunks/traces.CCmnQaNT.js:142:27)
+    at trace (file:///Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/node_modules/.pnpm/vitest@4.0.18_@types+node@25.3.3_happy-dom@20.8.3_jiti@2.6.1_jsdom@28.1.0/node_modules/vitest/dist/chunks/test.B8ej_ZHS.js:239:21)
+    at runTest (file:///Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/node_modules/.pnpm/@vitest+runner@4.0.18/node_modules/@vitest/runner/dist/index.js:1653:12)
+
+stderr | tests/utils-language-controller.test.ts > language controller > falls back to default state when storage read fails
+[CQD Language] Failed to load state from storage: Error: storage offline
+    at Object.<anonymous> (/Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/extension/tests/utils-language-controller.test.ts:34:13)
+    at Object.Mock [as get] (file:///Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/node_modules/.pnpm/@vitest+spy@4.0.18/node_modules/@vitest/spy/dist/index.js:285:34)
+    at /Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/extension/entrypoints/utils/language-controller.ts:51:53
+    at LanguageController.initialize (/Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/extension/entrypoints/utils/language-controller.ts:60:5)
+    at LanguageController.getState (/Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/extension/entrypoints/utils/language-controller.ts:146:16)
+    at /Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/extension/tests/utils-language-controller.test.ts:37:38
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at file:///Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/node_modules/.pnpm/@vitest+runner@4.0.18/node_modules/@vitest/runner/dist/index.js:915:20
+
+stderr | tests/utils-global-state.test.ts > global state utils > gracefully handles storage get errors
+Failed to get global enabled state: Error: storage down
+    at Object.<anonymous> (/Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/extension/tests/utils-global-state.test.ts:21:13)
+    at Object.Mock [as get] (file:///Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/node_modules/.pnpm/@vitest+spy@4.0.18/node_modules/@vitest/spy/dist/index.js:285:34)
+    at getGlobalEnabled (/Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/extension/entrypoints/utils/global-state.ts:5:44)
+    at /Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/extension/tests/utils-global-state.test.ts:23:18
+    at file:///Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/node_modules/.pnpm/@vitest+runner@4.0.18/node_modules/@vitest/runner/dist/index.js:145:11
+    at file:///Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/node_modules/.pnpm/@vitest+runner@4.0.18/node_modules/@vitest/runner/dist/index.js:915:26
+    at file:///Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/node_modules/.pnpm/@vitest+runner@4.0.18/node_modules/@vitest/runner/dist/index.js:1243:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/node_modules/.pnpm/@vitest+runner@4.0.18/node_modules/@vitest/runner/dist/index.js:1209:10)
+    at file:///Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/node_modules/.pnpm/@vitest+runner@4.0.18/node_modules/@vitest/runner/dist/index.js:1653:37
+
+stderr | tests/utils-global-state.test.ts > global state utils > persists global enabled value and swallows set errors
+Failed to set global enabled state: Error: quota
+    at Object.<anonymous> (/Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/extension/tests/utils-global-state.test.ts:33:13)
+    at Object.Mock [as set] (file:///Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/node_modules/.pnpm/@vitest+spy@4.0.18/node_modules/@vitest/spy/dist/index.js:285:34)
+    at setGlobalEnabled (/Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/extension/entrypoints/utils/global-state.ts:16:32)
+    at /Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/extension/tests/utils-global-state.test.ts:35:18
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at file:///Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/node_modules/.pnpm/@vitest+runner@4.0.18/node_modules/@vitest/runner/dist/index.js:915:20
+
+stderr | tests/analytics-storage-internals.test.ts > analytics storage internals > loadQueueWithIntegrity uses in-memory fallback when persistent storage is unavailable
+[CQD Analytics] storageSet failed: set-fail
+
+stderr | tests/v2-engine-registry.test.ts > EngineRegistry: Registration > replaces a previously registered engine with the same name
+[CQD Registry] Engine "engine-v1" is already registered. Replacing with new instance.
+
+stderr | tests/v2-engine-registry.test.ts > EngineRegistry: Active Engines > returns empty if required engine is not registered
+[CQD Registry] Engine "engine-v1" requested but not registered. Available engines: 
+
+stderr | tests/v2-engine-registry.test.ts > EngineRegistry: Active Engines > partial registration: shadow with only V1 registered
+[CQD Registry] Engine "engine-v2" requested but not registered. Available engines: engine-v1
+
+stderr | tests/v2-engine-registry.test.ts > EngineRegistry: Primary & Secondary > getPrimaryEngine returns null when no engines are registered
+[CQD Registry] Engine "engine-v1" requested but not registered. Available engines: 
+
+stderr | tests/v2-launch-controller.test.ts > Promotion > fails from shadow-validating state
+[LaunchController] Cannot promote — state is shadow-validating, need 'ready'
+
+stderr | tests/v2-launch-controller.test.ts > Promotion > fails from pre-launch state
+[LaunchController] Cannot promote — state is pre-launch, need 'ready'
+
+stderr | tests/v2-launch-controller.test.ts > Promotion > fails without mode function
+[LaunchController] Cannot promote — no mode change function set
+
+stderr | tests/v2-launch-controller.test.ts > Rollback > fails without mode function
+[LaunchController] Cannot rollback — no mode change function set
+
+stderr | tests/v2-launch-controller.test.ts > Auto-rollback > triggers when match % drops below threshold
+[LaunchController] Auto-rollback triggered: match 90.0% < 95%
+
+stderr | tests/v2-launch-controller.test.ts > Auto-rollback > logs auto-rollback event
+[LaunchController] Auto-rollback triggered: match 80.0% < 95%
+

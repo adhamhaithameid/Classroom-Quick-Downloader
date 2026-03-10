@@ -1,16 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-type AlarmName = 'CQD_ANALYTICS_FLUSH' | 'CQD_ANALYTICS_CONFIG';
+type AlarmName = 'CQD_ANALYTICS_FLUSH' | 'CQD_ANALYTICS_CONFIG' | 'CQD_CHANGELOG_DAILY';
 
 async function loadAlarmModule(isFirefox = false) {
   vi.resetModules();
   const flushSpy = vi.fn();
   const refreshSpy = vi.fn(async () => {});
+  const fetchChangelogSpy = vi.fn(async () => ({ data: null, status: 'fresh' }));
   const recentDownloads = new Map<string, number>();
 
   vi.doMock('../entrypoints/utils/analytics', () => ({
     Analytics: { flush: flushSpy },
     refreshRemoteAnalyticsConfig: refreshSpy,
+  }));
+  vi.doMock('../entrypoints/utils/changelog', () => ({
+    fetchChangelogDetailed: fetchChangelogSpy,
   }));
   vi.doMock('../entrypoints/background/state', () => ({
     IS_FIREFOX: isFirefox,
@@ -18,7 +22,7 @@ async function loadAlarmModule(isFirefox = false) {
   }));
 
   const mod = await import('../entrypoints/background/analytics-alarm');
-  return { mod, flushSpy, refreshSpy, recentDownloads };
+  return { mod, flushSpy, refreshSpy, fetchChangelogSpy, recentDownloads };
 }
 
 describe('background analytics alarm', () => {
@@ -36,14 +40,15 @@ describe('background analytics alarm', () => {
   });
 
   it('initializes analytics alarms once and dispatches alarm handlers', async () => {
-    const { mod, flushSpy, refreshSpy } = await loadAlarmModule(false);
+    const { mod, flushSpy, refreshSpy, fetchChangelogSpy } = await loadAlarmModule(false);
     const addListener = (chrome as any).alarms.onAlarm.addListener as ReturnType<typeof vi.fn>;
     mod.ensureAnalyticsAlarm();
     mod.ensureAnalyticsAlarm();
 
-    expect((chrome as any).alarms.create).toHaveBeenCalledTimes(2);
+    expect((chrome as any).alarms.create).toHaveBeenCalledTimes(3);
     expect((chrome as any).alarms.create).toHaveBeenNthCalledWith(1, 'CQD_ANALYTICS_FLUSH', { periodInMinutes: 5 });
     expect((chrome as any).alarms.create).toHaveBeenNthCalledWith(2, 'CQD_ANALYTICS_CONFIG', { periodInMinutes: 180 });
+    expect((chrome as any).alarms.create).toHaveBeenNthCalledWith(3, 'CQD_CHANGELOG_DAILY', expect.objectContaining({ periodInMinutes: 1440 }));
     expect(addListener).toHaveBeenCalledTimes(1);
 
     const listener = addListener.mock.calls[0]?.[0] as (alarm: { name: AlarmName }) => void;
@@ -52,6 +57,9 @@ describe('background analytics alarm', () => {
     listener({ name: 'CQD_ANALYTICS_CONFIG' });
     await Promise.resolve();
     expect(refreshSpy).toHaveBeenCalledTimes(1);
+    listener({ name: 'CQD_CHANGELOG_DAILY' });
+    await Promise.resolve();
+    expect(fetchChangelogSpy).toHaveBeenCalledTimes(1);
   });
 
   it('no-ops when alarms API is unavailable', async () => {

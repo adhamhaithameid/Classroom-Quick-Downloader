@@ -1,7 +1,7 @@
 # oracle-backend/Dockerfile
 # Multi-stage build for minimal production image
 
-FROM golang:1.24-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 WORKDIR /app
 

@@ -23,6 +23,15 @@ describe('background url helpers', () => {
     expect(result.baseUrl.includes('export=download')).toBe(true);
   });
 
+  it('normalizes Google Drive /u/N paths before download', () => {
+    const input = 'https://drive.google.com/u/1/file/d/abc123/view?authuser=1';
+    const result = normalizeUrl(input);
+    expect(result.isDrive).toBe(true);
+    expect(result.baseUrl).toContain('https://drive.google.com/file/d/abc123/view');
+    expect(result.baseUrl).not.toContain('/u/1/');
+    expect(result.baseUrl).not.toContain('authuser=');
+  });
+
   it('returns non-drive URLs untouched', () => {
     const input = 'https://classroom.google.com/u/0/h';
     const result = normalizeUrl(input);

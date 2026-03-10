@@ -21,11 +21,11 @@ describe('changelog utils (manual mode)', () => {
     expect(passive.status).toBe('not-modified');
     expect(passive.data).toBeTruthy();
     expect(passive.data?.entries.length).toBeGreaterThan(0);
-    expect(passive.data?.entries[0]?.version).toBe('1.3.9');
+    expect(passive.data?.entries[0]?.version).toBe('1.5.0');
 
     const forced = await mod.fetchChangelogDetailed(true);
     expect(forced.status).toBe('fresh');
-    expect(forced.data?.entries[0]?.id).toBe('manual-1.3.9-1');
+    expect(forced.data?.entries[0]?.id).toBe('manual-1.5.0-1');
   });
 
   it('does not perform network fetch in manual mode', async () => {
@@ -43,7 +43,7 @@ describe('changelog utils (manual mode)', () => {
         cqd_changelog_v1: expect.objectContaining({
           schemaVersion: 2,
           cachedAt: expect.any(Number),
-          lastSeenId: 'manual-1.3.9-1',
+          lastSeenId: 'manual-1.5.0-1',
           cachedItems: expect.any(Array),
           cachedConfig: expect.objectContaining({
             rules: expect.arrayContaining([

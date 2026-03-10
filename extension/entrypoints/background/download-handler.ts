@@ -18,6 +18,7 @@ import { normalizeUrl, buildUrlWithAuthUser, getFilenameExt } from './url-helper
 import { cleanup } from './cleanup';
 import { sendStatusToTab } from './message-sender';
 import { recordDownloadEvent } from '../utils/analytics';
+import { validateDownloadUrl } from '../../src/v2/decision/download-validator';
 
 /**
  * Start a single (non-Drive) download attempt.
@@ -26,6 +27,15 @@ export function startSingleAttempt(
   pending: PendingDownload,
   respondOnce?: (payload: any) => void
 ): void {
+  // Security gate: validate URL before downloading
+  const validation = validateDownloadUrl(pending.baseUrl);
+  if (!validation.valid) {
+    console.error(`[CQD Security] Blocked download: ${validation.reason} — ${pending.baseUrl}`);
+    cleanup(pending);
+    respondOnce?.({ started: false, userMessage: 'Download blocked: invalid URL.' });
+    return;
+  }
+
   chrome.downloads.download(
     { url: pending.baseUrl, saveAs: false, conflictAction: 'uniquify' },
     (downloadId) => {
@@ -95,6 +105,15 @@ export function startNextDriveAttempt(pending: PendingDownload): void {
   } else {
     // Chrome: Try native download
     const attemptUrl = buildUrlWithAuthUser(pending.baseUrl, nextAuth);
+
+    // Security gate: validate URL before downloading
+    const validation = validateDownloadUrl(attemptUrl);
+    if (!validation.valid) {
+      console.error(`[CQD Security] Blocked Drive download: ${validation.reason} — ${attemptUrl}`);
+      startNextDriveAttempt(pending);
+      return;
+    }
+
     chrome.downloads.download(
       { url: attemptUrl, saveAs: false, conflictAction: 'uniquify' },
       (downloadId) => {
@@ -187,6 +206,15 @@ export function handleDownloadRequest(
       typeof pending.currentAuthUser === 'number'
         ? buildUrlWithAuthUser(pending.baseUrl, pending.currentAuthUser)
         : pending.baseUrl;
+
+    // Security gate: validate URL before downloading
+    const validation = validateDownloadUrl(firstUrl);
+    if (!validation.valid) {
+      console.error(`[CQD Security] Blocked initial Drive download: ${validation.reason} — ${firstUrl}`);
+      respondOnce({ started: false, userMessage: 'Download blocked: invalid URL.' });
+      cleanup(pending);
+      return true;
+    }
 
     chrome.downloads.download(
       { url: firstUrl, saveAs: false, conflictAction: 'uniquify' },

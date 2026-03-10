@@ -6,6 +6,9 @@ type LoadOptions = {
   normalizeResult?: { baseUrl: string; isDrive: boolean };
   initialAuthUser?: number | undefined;
   authCandidates?: number[];
+  validateDownloadUrlResult?:
+    | { valid: boolean; url?: string; reason: string; host?: string | null }
+    | ((url: string) => { valid: boolean; url?: string; reason: string; host?: string | null });
 };
 
 type TestContext = {
@@ -24,6 +27,7 @@ type TestContext = {
   normalizeUrlSpy: ReturnType<typeof vi.fn>;
   buildUrlSpy: ReturnType<typeof vi.fn>;
   extractAuthSpy: ReturnType<typeof vi.fn>;
+  validateSpy: ReturnType<typeof vi.fn>;
 };
 
 function makePending(overrides: Partial<PendingDownload> = {}): PendingDownload {
@@ -75,6 +79,11 @@ async function loadDownloadHandler(options: LoadOptions = {}): Promise<TestConte
   });
   const buildUrlSpy = vi.fn((baseUrl: string, authuser: number) => `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}authuser=${authuser}`);
   const extractAuthSpy = vi.fn(() => options.initialAuthUser);
+  const validateSpy = vi.fn((url: string) => {
+    const result = options.validateDownloadUrlResult;
+    if (typeof result === 'function') return result(url);
+    return result ?? { valid: true, url, reason: 'OK', host: null };
+  });
 
   vi.doMock('../entrypoints/background/state', () => stateModule);
   vi.doMock('../entrypoints/background/auth-utils', () => ({
@@ -88,6 +97,9 @@ async function loadDownloadHandler(options: LoadOptions = {}): Promise<TestConte
   vi.doMock('../entrypoints/background/cleanup', () => ({ cleanup: cleanupSpy }));
   vi.doMock('../entrypoints/background/message-sender', () => ({ sendStatusToTab: sendStatusSpy }));
   vi.doMock('../entrypoints/utils/analytics', () => ({ recordDownloadEvent: recordSpy }));
+  vi.doMock('../src/v2/decision/download-validator', () => ({
+    validateDownloadUrl: validateSpy,
+  }));
 
   const mod = await import('../entrypoints/background/download-handler');
   return {
@@ -99,6 +111,7 @@ async function loadDownloadHandler(options: LoadOptions = {}): Promise<TestConte
     normalizeUrlSpy,
     buildUrlSpy,
     extractAuthSpy,
+    validateSpy,
   };
 }
 
@@ -123,6 +136,23 @@ describe('background download handler', () => {
     }));
     expect(ctx.cleanupSpy).toHaveBeenCalledWith(pending);
     expect(respondOnce).toHaveBeenCalledWith({ started: false, userMessage: 'Browser blocked download.' });
+  });
+
+  it('startSingleAttempt blocks invalid direct-download URLs before calling the browser API', async () => {
+    const ctx = await loadDownloadHandler({
+      validateDownloadUrlResult: { valid: false, reason: 'Unsupported Google Docs resource' },
+    });
+    const pending = makePending({ baseUrl: 'https://docs.google.com/forms/d/abc/viewform' });
+    const respondOnce = vi.fn();
+
+    ctx.mod.startSingleAttempt(pending, respondOnce);
+
+    expect(chrome.downloads.download).not.toHaveBeenCalled();
+    expect(ctx.cleanupSpy).toHaveBeenCalledWith(pending);
+    expect(respondOnce).toHaveBeenCalledWith({
+      started: false,
+      userMessage: 'Download blocked: invalid URL.',
+    });
   });
 
   it('startSingleAttempt falls back to unknown file type when metadata is missing', async () => {
@@ -231,6 +261,29 @@ describe('background download handler', () => {
     expect(ctx.stateModule.pendingByDownloadId.get(99)).toBe(pending);
   });
 
+  it('startNextDriveAttempt skips invalid Drive auth URLs and advances to the next account', async () => {
+    const ctx = await loadDownloadHandler({
+      isFirefox: false,
+      authCandidates: [0, 1],
+      validateDownloadUrlResult: (url) =>
+        url.includes('authuser=0')
+          ? { valid: false, reason: 'Unsupported host', url, host: 'drive.google.com' }
+          : { valid: true, reason: 'OK', url, host: 'drive.google.com' },
+    });
+    const pending = makePending({ isDrive: true });
+    (chrome.downloads.download as any).mockImplementation((_: unknown, cb: (id?: number) => void) => {
+      (chrome.runtime as { lastError?: { message: string } }).lastError = undefined;
+      cb(55);
+    });
+
+    ctx.mod.startNextDriveAttempt(pending);
+
+    expect(ctx.validateSpy).toHaveBeenCalledTimes(2);
+    expect(pending.attemptedAuthUsers).toEqual([0, 1]);
+    expect(pending.currentAuthUser).toBe(1);
+    expect(ctx.stateModule.pendingByDownloadId.get(55)).toBe(pending);
+  });
+
   it('handleDownloadRequest rejects empty URL payloads', async () => {
     const ctx = await loadDownloadHandler();
     const sendResponse = vi.fn();
@@ -324,6 +377,31 @@ describe('background download handler', () => {
     expect(ctx.buildUrlSpy).toHaveBeenCalled();
     expect(ctx.stateModule.pendingByDownloadId.get(321)?.requestId).toBe('req-drive-success');
     expect(sendResponse).toHaveBeenCalledWith({ started: true, requestId: 'req-drive-success', downloadId: 321 });
+  });
+
+  it('handleDownloadRequest blocks invalid initial Drive URLs before starting the browser download', async () => {
+    const ctx = await loadDownloadHandler({
+      isFirefox: false,
+      normalizeResult: { baseUrl: 'https://drive.google.com/uc?id=bad', isDrive: true },
+      validateDownloadUrlResult: { valid: false, reason: 'Unsupported Google Docs resource' },
+    });
+    const sendResponse = vi.fn();
+
+    const result = ctx.mod.handleDownloadRequest(
+      { url: 'https://drive.google.com/open?id=bad', requestId: 'req-invalid-drive' },
+      { tab: { id: 41 } } as chrome.runtime.MessageSender,
+      sendResponse,
+    );
+
+    expect(result).toBe(true);
+    expect(chrome.downloads.download).not.toHaveBeenCalled();
+    expect(sendResponse).toHaveBeenCalledWith({
+      started: false,
+      userMessage: 'Download blocked: invalid URL.',
+    });
+    expect(ctx.cleanupSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ requestId: 'req-invalid-drive' }),
+    );
   });
 
   it('handleDownloadRequest falls back to bypass tab when native Drive start fails', async () => {

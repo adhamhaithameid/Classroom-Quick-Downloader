@@ -281,6 +281,13 @@ function findGroupRoot(btn: HTMLElement): HTMLElement | null {
   const post = btn.closest<HTMLElement>(GROUP_SELECTOR);
   if (post) return post;
 
+  // Student Work page: submission cards may use different containers
+  // Try common submission card patterns
+  const submissionCard = btn.closest<HTMLElement>(
+    '[data-submission-id], [data-studentid], [data-assignee-id], .nQ1Fvb, .TBvOpe'
+  );
+  if (submissionCard) return submissionCard;
+
   let node: HTMLElement | null = btn.parentElement;
   while (node && node !== document.body && node !== document.documentElement) {
     if (node.querySelector('.N5dSp')) {

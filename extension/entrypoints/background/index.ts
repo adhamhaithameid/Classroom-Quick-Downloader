@@ -308,6 +308,7 @@ export default defineBackground(() => {
     if (delta.state && delta.state.current === 'complete') {
       const duration = Date.now() - pending.startTime;
       const ext = pending.finalExtension || pending.fileMeta?.ext || 'unknown';
+      sendStatusToTab(pending, 'success');
       recordDownloadEvent({
         type: ext,
         status: 'success',

@@ -3,7 +3,7 @@
   import { fade, fly, scale } from 'svelte/transition';
   import { quintOut } from 'svelte/easing';
   import { base } from '$app/paths';
-  import { APP_VERSION, STORE_LINKS } from '$lib/config';
+  import { APP_VERSION, SITE_URL, STORE_LINKS } from '$lib/config';
   import SeoMeta from '$lib/components/SeoMeta.svelte';
   import { detectBrowserFromNavigator, type BrowserKey } from '$lib/browser/detect';
   import { refreshWebsiteSnapshotStore, websiteSnapshotStore } from '$lib/stores/websiteSnapshot';
@@ -55,7 +55,14 @@
     general: true
   };
 
-  const softwareApplicationStructuredData = {
+  export let seoPath = '/';
+
+  function buildCanonicalUrl(path: string): string {
+    const normalizedPath = path === '/' ? '/' : path.replace(/\/+$/, '');
+    return normalizedPath === '/' ? `${SITE_URL}/` : `${SITE_URL}${normalizedPath}`;
+  }
+
+  $: softwareApplicationStructuredData = {
     '@context': 'https://schema.org',
     '@type': 'SoftwareApplication',
     name: 'Classroom Quick Downloader',
@@ -63,7 +70,7 @@
     operatingSystem: 'Chrome, Firefox, Edge',
     offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
     publisher: { '@type': 'Person', name: 'Adham Haitham Eid' },
-    url: 'https://classroom-quick-downloader-website.pages.dev/overview',
+    url: buildCanonicalUrl(seoPath),
     downloadUrl: [STORE_LINKS.chrome, STORE_LINKS.firefox, STORE_LINKS.edge]
   };
 
@@ -1306,7 +1313,7 @@
 <SeoMeta
   title="Classroom Quick Downloader — Download All Google Classroom Files In One Click"
   description="Free browser extension to bulk download all attachments from Google Classroom assignments. One click. Chrome, Firefox, and Edge."
-  path="/overview"
+  path={seoPath}
   keywords="download all google classroom files, bulk download google classroom attachments, google classroom extension"
   structuredData={softwareApplicationStructuredData}
 />

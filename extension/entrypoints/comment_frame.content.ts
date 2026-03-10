@@ -7,6 +7,7 @@ import { isPageDark } from './content/theme';
 import { subscribeToGlobalState, createCommentBadge } from './content/flags';
 import { triggerPostClick, upgradeCombinedBadge, ATTR_COMMENT_COUNT } from './content/both-badge';
 import { triggerPulseEffect, markTargetElements } from './content/pulse-effect';
+import { queryPostCards } from './content/post-card-utils';
 
 // Selector for the main stream card (works for both Stream and Classwork tabs)
 // Stream: div[data-stream-item-id], Classwork: li[data-stream-item-id]
@@ -33,6 +34,71 @@ let running = false;
 let domObserver: MutationObserver | null = null;
 let heartbeatId: number | null = null;
 let urlObserver: MutationObserver | null = null;
+
+// Flag toggle state (controlled from popup)
+let commentsFlagEnabled = true;
+
+function removeCommentArtifacts(): void {
+  document.querySelectorAll<HTMLElement>(
+    '.cqd-comment-badge, .cqd-both-badge, .cqd-overlay-container',
+  ).forEach((el) => el.remove());
+
+  document.querySelectorAll<HTMLElement>(POST_SELECTOR).forEach((post) => {
+    post.removeAttribute(PROCESSED_ATTR);
+    post.removeAttribute(ATTR_COMMENT_COUNT);
+  });
+}
+
+function requestCommentRefresh(): void {
+  if (!running || !commentsFlagEnabled) return;
+  document.querySelectorAll<HTMLElement>(POST_SELECTOR).forEach((post) => {
+    post.removeAttribute(PROCESSED_ATTR);
+  });
+  scanForComments();
+}
+
+function applyCommentsFlagState(enabled: boolean): void {
+  const wasEnabled = commentsFlagEnabled;
+  commentsFlagEnabled = enabled;
+
+  if (wasEnabled && !commentsFlagEnabled) {
+    removeCommentArtifacts();
+    return;
+  }
+
+  if (!wasEnabled && commentsFlagEnabled) {
+    requestCommentRefresh();
+  }
+}
+
+// Load flag state from storage
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const _browserApi = (globalThis as any).chrome;
+if (_browserApi?.storage?.local) {
+  _browserApi.storage.local.get('commentsFlagEnabled', (res: { commentsFlagEnabled?: boolean }) => {
+    commentsFlagEnabled = res.commentsFlagEnabled !== false; // default true
+  });
+  _browserApi.storage.onChanged.addListener((changes: any, area: string) => {
+    if (area === 'local' && 'commentsFlagEnabled' in changes) {
+      applyCommentsFlagState(changes.commentsFlagEnabled.newValue !== false);
+    }
+  });
+}
+
+if (_browserApi?.runtime?.onMessage) {
+  _browserApi.runtime.onMessage.addListener((message: any) => {
+    if (!message || message.type !== 'cqd-flag-toggle') return;
+
+    if (message.flag === 'commentsFlagEnabled') {
+      applyCommentsFlagState(message.enabled !== false);
+      return;
+    }
+
+    if ((message.flag === 'editedFlagEnabled' || message.flag === 'combinedFlagEnabled') && running && commentsFlagEnabled) {
+      window.setTimeout(() => requestCommentRefresh(), 0);
+    }
+  });
+}
 
 /* -----------------------------------------------------
  * Content script entry
@@ -151,15 +217,13 @@ function stopCommentsFeature(): void {
  * ---------------------------------------------------*/
 function scanForComments() {
   if (!running) return;
+  if (!commentsFlagEnabled) return; // Flag disabled from popup settings
   try {
     const direction = getPageDirection();
     document.body.setAttribute('data-cqd-dir', direction);
-    const posts = document.querySelectorAll<HTMLElement>(POST_SELECTOR);
+    const posts = queryPostCards();
 
     posts.forEach((post) => {
-      // Prevent double borders on nested posts
-      if (post.parentElement?.closest(POST_SELECTOR)) return;
-
       // Use smart detector for language-agnostic comment detection
       // Checks current language + English fallback, uses DOM analysis + pattern matching
       const currentLang = getCurrentCachedLanguage();

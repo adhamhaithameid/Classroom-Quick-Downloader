@@ -19,14 +19,14 @@ function squish(html: string): string {
 }
 
 describe('route render smoke coverage', () => {
-  it('renders root redirect fallback and metadata', () => {
+  it('renders root homepage content without noindex metadata', () => {
     const { body, head } = render(RootRedirectPage);
     const html = squish(body);
 
-    expect(html).toContain('Redirecting…');
-    expect(head).toContain('Classroom Quick Downloader — Redirecting To Overview');
-    expect(head).toContain('noindex, nofollow');
-    expect(head).toContain('/overview');
+    expect(head).toContain('Download All Google Classroom Files In One Click');
+    expect(head).toContain('https://classroom-quick-downloader-website.pages.dev/');
+    expect(head).not.toContain('noindex, nofollow');
+    expect(html).toContain('Download all Google Classroom files in one click for every assignment.');
   });
 
   it('renders landing2 redirect fallback and metadata', () => {
@@ -44,7 +44,7 @@ describe('route render smoke coverage', () => {
 
     expect(head).toContain('Download All Google Classroom Files In One Click');
     expect(head).toContain('SoftwareApplication');
-    expect(head).toContain('/overview');
+    expect(head).toContain('https://classroom-quick-downloader-website.pages.dev/');
     expect(html).toContain('The free extension that');
     expect(html).toContain('supercharges');
     expect(html).toContain('Download all Google Classroom files in one click for every assignment.');

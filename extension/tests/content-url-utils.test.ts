@@ -27,6 +27,14 @@ describe('content url utils', () => {
     anchor.href = 'https://drive.google.com/file/d/abc/view';
     expect(extractDriveUrlFromAnchor(anchor)).toContain('drive.google.com');
 
+    const sheetsAnchor = document.createElement('a');
+    sheetsAnchor.href = 'https://docs.google.com/spreadsheets/d/163qjQTcw2skYB8oWJ4FgfwdOvGP9jGUhUSdEYlccrts/edit?gid=0#gid=0';
+    expect(extractDriveUrlFromAnchor(sheetsAnchor)).toBeNull();
+
+    const formsAnchor = document.createElement('a');
+    formsAnchor.href = 'https://docs.google.com/forms/d/e/1FAIpQLSdZBCCxLrM0oZiJF2QEFBR4RdhBj_byOSGFBD5rs74U8XaAWw/viewform?usp=dialog';
+    expect(extractDriveUrlFromAnchor(formsAnchor)).toBeNull();
+
     const nonDrive = document.createElement('a');
     nonDrive.href = 'https://example.com';
     expect(extractDriveUrlFromAnchor(nonDrive)).toBeNull();
@@ -63,9 +71,29 @@ describe('content url utils', () => {
     expect(classroomDrive).toContain('id=class123');
   });
 
+  it('converts /u/N drive and docs URLs into direct download form', () => {
+    setLocation('/u/1/w/class1/t/all');
+
+    const driveUrl = toDownloadUrl('https://drive.google.com/u/1/file/d/abc/view');
+    expect(driveUrl).toContain('uc?export=download&id=abc');
+    expect(driveUrl).toContain('authuser=1');
+
+    const docsUrl = toDownloadUrl('https://docs.google.com/u/1/document/d/xyz/edit');
+    expect(docsUrl).toContain('uc?export=download&id=xyz');
+    expect(docsUrl).toContain('authuser=1');
+
+    const classroomDrive = toDownloadUrl('https://classroom.google.com/u/1/drive?resourceId=class456');
+    expect(classroomDrive).toContain('id=class456');
+    expect(classroomDrive).toContain('authuser=1');
+  });
+
   it('returns original url on invalid inputs or excessive recursion depth', () => {
     expect(toDownloadUrl('https://example.com/file.pdf')).toContain('https://example.com/file.pdf');
     expect(toDownloadUrl('not-a-url')).toBe('not-a-url');
     expect(toDownloadUrl('https://drive.google.com/open?id=abc', 4)).toBe('https://drive.google.com/open?id=abc');
+    expect(toDownloadUrl('https://docs.google.com/spreadsheets/d/1BigjQBFGGYLQr3N1i6mlLX7SDFIx1FuwvVb-8NU62Fs/edit?usp=sharing'))
+      .toBe('https://docs.google.com/spreadsheets/d/1BigjQBFGGYLQr3N1i6mlLX7SDFIx1FuwvVb-8NU62Fs/edit?usp=sharing&authuser=1');
+    expect(toDownloadUrl('https://docs.google.com/forms/d/1M3u5g0b2T4p_XIW28TODxnfknP4CAzHqmwjVkl5GljI/viewform'))
+      .toBe('https://docs.google.com/forms/d/1M3u5g0b2T4p_XIW28TODxnfknP4CAzHqmwjVkl5GljI/viewform?authuser=1');
   });
 });
