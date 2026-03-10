@@ -1358,59 +1358,6 @@
     </div>
   </section>
 
-    {#if pickerOpen}
-      <div
-        class="edit-picker-overlay"
-        role="button"
-        tabindex="0"
-        aria-label="Close sample picker"
-        on:click|self={() => pickerOpen = false}
-        on:keydown={(e) => {
-          if (e.currentTarget !== e.target) return;
-          if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            pickerOpen = false;
-          }
-        }}
-        transition:fade={{ duration: 150 }}
-      >
-        <div class="edit-picker-panel">
-          <div class="edit-picker-header">
-            <h3>Pick a Sample</h3>
-            <button class="edit-picker-close" on:click={() => pickerOpen = false}>✕</button>
-          </div>
-          <div class="edit-picker-tabs">
-            <button class:active={pickerTab === 'float'} on:click={() => pickerTab = 'float'}>🎈 Floats</button>
-            <button class:active={pickerTab === 'doodle'} on:click={() => pickerTab = 'doodle'}>✏️ Doodles</button>
-            <button class:active={pickerTab === '3d'} on:click={() => pickerTab = '3d'}>🧊 3D</button>
-          </div>
-          <input class="edit-picker-search" type="text" placeholder="Search..." bind:value={pickerSearch} />
-          <div class="edit-picker-grid">
-            {#each pickerItems as item (item.id)}
-              <button
-                class="edit-picker-item"
-                class:active={selectedPlacement?.sampleId === item.id}
-                on:click={() => assignSample(item.id)}
-                title={item.label}
-              >
-                <svg
-                  viewBox={pickerTab === '3d' ? '0 0 120 110' : pickerTab === 'doodle' ? '0 0 60 60' : '0 0 64 64'}
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.5"
-                  stroke-linecap="round" stroke-linejoin="round"
-                  style="width:36px;height:36px;color:var(--green);">
-                  {@html item.svg}
-                </svg>
-                <span class="edit-picker-id">{item.id}</span>
-              </button>
-            {/each}
-          </div>
-        </div>
-      </div>
-    {/if}
-  {/if}
-
 </div>
 
 <style>
