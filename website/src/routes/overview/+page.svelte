@@ -42,15 +42,6 @@
     downloadUrl: [STORE_LINKS.chrome, STORE_LINKS.firefox, STORE_LINKS.edge]
   };
 
-  let placementSectionVisible: Record<PlacementSection, boolean> = { ...INITIAL_PLACEMENT_SECTION_VISIBILITY };
-  let placementCanvasHeight = 0;
-  let placementCanvasLocked = false;
-  let frozenPlacementCoords: Record<string, { leftPx: number; topPx: number }> = {};
-  let isMobilePlacementsViewport = false;
-  let pickerItems: SvgItem[] = [];
-  let editDrag: { id: string; pointerId: number; startX: number; startY: number; origX: number; origY: number } | null = null;
-  let pageEl: HTMLElement | null = null;
-
   let overview: OverviewResponse | null = null;
   let mapData: MapResponse | null = null;
   let RotatingGlobeComponent: ComponentType | null = null;
