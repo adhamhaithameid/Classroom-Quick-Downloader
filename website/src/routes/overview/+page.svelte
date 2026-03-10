@@ -16,23 +16,6 @@
     canStartCelebration,
     nextCooldownUntil
   } from '$lib/celebration/balloons';
-  import {
-    type PlacementSection,
-    type ElementPlacement,
-    defaultPlacements,
-    clonePlacements,
-    loadPublishedPlacements,
-    loadDraftPlacements,
-    saveDraftPlacements,
-    publishPlacements,
-    discardDraftPlacements,
-    exportPlacementsJSON, importPlacementsJSON,
-    genPlacementId, getBuiltinSvg,
-    maxPlacementZIndex
-  } from '$lib/svgCatalog/placements';
-  import { categories as svgCategories, doodleItems, threeDElements } from '$lib/svgCatalog/index';
-  import type { SvgItem } from '$lib/svgCatalog/index';
-
   /* ━━━ Feature toggle: set to false to hide the silly question ━━━ */
   const ENABLE_SILLY_QUESTION = true;
   const CELEBRATION_SESSION_KEY = 'cqd-balloon-celebration-session-v1';
