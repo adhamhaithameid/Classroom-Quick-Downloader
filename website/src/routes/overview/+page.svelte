@@ -1672,17 +1672,6 @@
     max-height: 120px;
     overflow: auto;
   }
-  .edit-import-log.warn {
-    background: rgba(251,191,36,0.09);
-    border: 1px solid rgba(251,191,36,0.3);
-    color: #fcd34d;
-  }
-  .edit-import-log.error {
-    background: rgba(248,113,113,0.09);
-    border: 1px solid rgba(248,113,113,0.3);
-    color: #fda4af;
-  }
-
   /* ── Catalog Picker Popup ─────────── */
   .edit-picker-overlay {
     position: fixed; inset: 0; z-index: 60002;
