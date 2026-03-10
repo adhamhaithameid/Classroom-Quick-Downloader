@@ -715,14 +715,6 @@
     document.querySelectorAll('.l2-reveal').forEach((el) => observer.observe(el));
   }
 
-  function nudgeSelected(dx: number, dy: number): void {
-    if (!selectedPlacement || selectedPlacement.locked) return;
-    updatePlacement(selectedPlacement.id, {
-      x: Math.round(Math.max(-25, Math.min(125, selectedPlacement.x + dx)) * 10) / 10,
-      y: Math.round(Math.max(-25, Math.min(125, selectedPlacement.y + dy)) * 10) / 10
-    });
-  }
-
   function addElement(type: 'float' | 'doodle' | '3d') {
     const id = genPlacementId(type);
     const defaultSamples: Record<'float' | 'doodle' | '3d', string> = {
