@@ -715,30 +715,6 @@
     document.querySelectorAll('.l2-reveal').forEach((el) => observer.observe(el));
   }
 
-  $: selectedPlacement = placements.find(p => p.id === selectedElementId) || null;
-  $: pinnedSuperchargeStar = isMobilePlacementsViewport
-    ? null
-    : placements
-        .map((placement) => resolvePlacementForViewport(placement))
-        .find((placement) => isPinnedSuperchargeStarPlacement(placement) && !placement.renderHidden) || null;
-  $: visiblePlacements = isMobilePlacementsViewport
-    ? []
-    : placements
-        .map((placement) => resolvePlacementForViewport(placement))
-        .filter((placement) => !placement.renderHidden && !isPinnedSuperchargeStarPlacement(placement))
-        .slice()
-        .sort((a, b) => a.renderZIndex - b.renderZIndex);
-  $: pickerItems = editMode ? getPickerItems(pickerTab, pickerSearch) : [];
-  $: if (!editMode && placementCanvasLocked) {
-    const frozenCount = Object.keys(frozenPlacementCoords).length;
-    const needsFreeze =
-      frozenCount !== visiblePlacements.length ||
-      visiblePlacements.some((placement) => !(placement.id in frozenPlacementCoords));
-    if (needsFreeze) {
-      freezePlacementCoordinates();
-    }
-  }
-
   onMount(() => {
     let stopMarquee: (() => void) | undefined;
     let stopHeavierScroll: (() => void) | undefined;
