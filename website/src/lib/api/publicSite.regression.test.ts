@@ -14,7 +14,7 @@ describe('public website API regressions', () => {
     const versions = payload.entries.map((entry) => entry.version);
 
     // Guard the visible top releases while allowing the full-history list to grow.
-    expect(versions.slice(0, 3)).toEqual(['1.3.9', '1.3.8', '1.3.7']);
+    expect(versions.slice(0, 3)).toEqual(['1.5.0', '1.4.0', '1.3.9']);
 
     // Regression guard: manual list must stay sorted from newest to oldest.
     const toTuple = (version: string): [number, number, number] => {

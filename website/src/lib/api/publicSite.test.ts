@@ -309,7 +309,7 @@ describe('user-facing content APIs', () => {
     const data = await fetchUserChangelog();
     expect(data.ok).toBe(true);
     expect(data.entries.length).toBeGreaterThan(0);
-    expect(data.entries[0]?.version).toBe('1.3.9');
+    expect(data.entries[0]?.version).toBe('1.5.0');
   });
 
 });

@@ -142,7 +142,7 @@ describe('public website API integration', () => {
 
     const changelog = await fetchUserChangelog();
 
-    expect(changelog.entries[0]?.version).toBe('1.3.9');
+    expect(changelog.entries[0]?.version).toBe('1.5.0');
     expect(fetchMock).toHaveBeenCalledTimes(0);
   });
 

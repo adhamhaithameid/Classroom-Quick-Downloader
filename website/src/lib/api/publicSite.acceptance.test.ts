@@ -88,6 +88,6 @@ describe('public website acceptance contracts', () => {
 
     expect(changelog.ok).toBe(true);
     expect(changelog.entries.length).toBeGreaterThan(0);
-    expect(changelog.entries[0]?.title).toContain('Release 1.3.9');
+    expect(changelog.entries[0]?.title).toContain('Release 1.5.0');
   });
 });
