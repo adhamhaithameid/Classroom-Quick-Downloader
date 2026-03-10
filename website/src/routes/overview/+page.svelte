@@ -715,12 +715,6 @@
     document.querySelectorAll('.l2-reveal').forEach((el) => observer.observe(el));
   }
 
-  function placementRenderOpacity(placement: RenderPlacement): number {
-    if (editMode) return placement.renderOpacity;
-    if (placementSectionVisible[placement.section]) return placement.renderOpacity;
-    return 0;
-  }
-
   function placementRevealShift(placement: RenderPlacement): number {
     if (editMode) return 0;
     if (placementSectionVisible[placement.section]) return 0;
