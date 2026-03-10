@@ -27,6 +27,61 @@ import { extractDriveUrlFromAnchor, findDriveUrl } from './url-utils';
 import { injectButtonIntoAttachment } from './button-factory';
 import { injectStyles } from './styles';
 
+const ATTACHMENT_ICON_SELECTOR = 'img[src*="doclist/images/mediatype/icon_"]';
+
+function hasAttachmentSignals(container: HTMLElement, anchor: HTMLAnchorElement): boolean {
+  if (
+    container.hasAttribute('data-attachment-id') ||
+    container.hasAttribute('data-drive-id') ||
+    container.hasAttribute('data-resource-id') ||
+    container.hasAttribute('data-submission-attachment-id') ||
+    (container.hasAttribute('data-id') &&
+      (container.hasAttribute('data-item-id') || container.hasAttribute('data-tooltip'))) ||
+    container.classList.contains('luto0c') ||
+    container.classList.contains('KlRXdf') ||
+    container.classList.contains('nQ1Fvb') ||
+    container.classList.contains('ndfuHe') ||
+    container.classList.contains('VfPpkd-aPP78e')
+  ) {
+    return true;
+  }
+
+  if (container.querySelector(ATTACHMENT_ICON_SELECTOR)) {
+    return true;
+  }
+
+  const ariaLabel = (anchor.getAttribute('aria-label') || '').toLowerCase();
+  return ariaLabel.startsWith('attachment:');
+}
+
+function resolveAttachmentContainer(anchor: HTMLAnchorElement): HTMLElement | null {
+  const candidates = [
+    anchor.closest<HTMLElement>('[data-attachment-id]'),
+    anchor.closest<HTMLElement>('.luto0c'),
+    anchor.closest<HTMLElement>('[data-submission-attachment-id]'),
+    anchor.closest<HTMLElement>('[data-resource-id]'),
+    anchor.closest<HTMLElement>('[data-drive-id]'),
+    anchor.closest<HTMLElement>('[data-id][data-item-id]'),
+    anchor.closest<HTMLElement>('.KlRXdf'),
+    anchor.closest<HTMLElement>('.nQ1Fvb'),
+    anchor.closest<HTMLElement>('.ndfuHe'),
+    anchor.closest<HTMLElement>('.VfPpkd-aPP78e'),
+    anchor.closest<HTMLElement>(ATTACHMENT_CONTAINER_SELECTOR),
+  ].filter((candidate, index, all): candidate is HTMLElement => !!candidate && all.indexOf(candidate) === index);
+
+  for (const candidate of candidates) {
+    if (candidate === anchor && !candidate.hasAttribute('data-attachment-id')) {
+      continue;
+    }
+
+    if (hasAttachmentSignals(candidate, anchor)) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
 /**
  * Check if current page is Google Classroom.
  */
@@ -80,10 +135,7 @@ export function injectSingleFileButtons(root: QueryRoot = document): void {
     const url = extractDriveUrlFromAnchor(anchor);
     if (!url) continue;
 
-    const container =
-      (anchor.closest(ATTACHMENT_CONTAINER_SELECTOR) as HTMLElement | null) ||
-      anchor.parentElement ||
-      anchor;
+    const container = resolveAttachmentContainer(anchor);
 
     if (!container) continue;
 

@@ -16,12 +16,16 @@ export const DRIVE_ANCHOR_SELECTOR = [
   'a[href*="https://drive.google.com"]',
   'a[href*="//drive.google.com"]',
   'a[href*="classroom.google.com/drive"]',
-  'a[href*="docs.google.com/"]',
+  'a[href*="docs.google.com/document/"]',
+  'a[href*="docs.google.com/presentation/"]',
+  'a[href*="docs.google.com/drawings/"]',
   'a[href*="/file/d/"]',
 ].join(', ');
 
 /** Selector for attachment containers */
 export const ATTACHMENT_CONTAINER_SELECTOR = [
+  '[data-attachment-id]',
+  '.luto0c',
   '.KlRXdf',
   '.z3vRcc',
   '.VfPpkd-aPP78e',
@@ -39,7 +43,7 @@ export const DRIVE_URL_PATTERNS: RegExp[] = [
   /https:\/\/drive\.google\.com\/open\?/,
   /https:\/\/drive\.google\.com\/uc\?/,
   /https:\/\/classroom\.google\.com\/drive\//,
-  /https:\/\/docs\.google\.com\/[a-z]+\/d\//,
+  /https:\/\/docs\.google\.com\/(?:document|presentation|drawings)\/d\//,
   /\/file\/d\/[A-Za-z0-9_-]+/,
 ];
 
