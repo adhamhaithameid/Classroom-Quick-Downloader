@@ -715,13 +715,6 @@
     document.querySelectorAll('.l2-reveal').forEach((el) => observer.observe(el));
   }
 
-  function handleEditExport() {
-    const json = exportPlacementsJSON(placements);
-    navigator.clipboard.writeText(json)
-      .then(() => setEditorStatus('Placements JSON copied to clipboard.'))
-      .catch(() => setEditorStatus('Could not copy JSON to clipboard.', 'error'));
-  }
-
   function handleEditImport() {
     const result = importPlacementsJSON(importJsonText);
     importErrors = result.errors;
