@@ -715,60 +715,6 @@
     document.querySelectorAll('.l2-reveal').forEach((el) => observer.observe(el));
   }
 
-  function setPlacementSectionVisible(section: string): void {
-    const normalized = section.trim().toLowerCase();
-    if (
-      normalized !== 'hero' &&
-      normalized !== 'students' &&
-      normalized !== 'problem' &&
-      normalized !== 'features' &&
-      normalized !== 'steps' &&
-      normalized !== 'proof' &&
-      normalized !== 'map' &&
-      normalized !== 'cta' &&
-      normalized !== 'general'
-    ) {
-      return;
-    }
-    const sectionKey = normalized as PlacementSection;
-    if (placementSectionVisible[sectionKey]) return;
-    placementSectionVisible = { ...placementSectionVisible, [sectionKey]: true };
-  }
-
-  async function loadSiteData(force = false): Promise<void> {
-    await refreshWebsiteSnapshotStore({ force, userInitiated: force });
-  }
-
-  /* ━━━ Edit-mode helpers ━━━ */
-  /** Resolve SVG content for a placement — from catalog or builtins */
-  function resolveSvg(p: ElementPlacement): { svg: string; viewBox: string } {
-    const builtin = getBuiltinSvg(p.sampleId);
-    if (builtin) return builtin;
-
-    if (p.customSvg) {
-      return { svg: p.customSvg, viewBox: p.viewBox || '0 0 64 64' };
-    }
-
-    for (const cat of svgCategories) {
-      const item = cat.items.find((i: SvgItem) => i.id === p.sampleId);
-      if (item) {
-        return { svg: item.svg, viewBox: '0 0 64 64' };
-      }
-    }
-    for (const d of doodleItems) {
-      if (d.id === p.sampleId) {
-        return { svg: d.svg, viewBox: '0 0 60 60' };
-      }
-    }
-    for (const t of threeDElements) {
-      if (t.id === p.sampleId) {
-        return { svg: t.svg, viewBox: '0 0 120 110' };
-      }
-    }
-
-    return { svg: '<text x="32" y="40" text-anchor="middle" font-size="24" fill="currentColor">?</text>', viewBox: '0 0 64 64' };
-  }
-
   function setEditorStatus(message: string, tone: 'ok' | 'warn' | 'error' = 'ok') {
     editorStatus = message;
     editorStatusTone = tone;
