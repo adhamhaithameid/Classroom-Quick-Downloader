@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"oracle-backend/internal/db"
@@ -130,5 +131,43 @@ func TestPipelineFailuresHandler_WithFailureData(t *testing.T) {
 	PipelineFailuresHandler(d).ServeHTTP(rr, req)
 	if rr.Code != 200 {
 		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+}
+
+func TestPipelineMetricsHandler_DoesNotLeakInternalErrors(t *testing.T) {
+	d := openPipelineDB(t)
+	_ = d.Close()
+
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/pipeline/metrics?days=7&limit=50", nil)
+	PipelineMetricsHandler(d).ServeHTTP(rr, req)
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d", rr.Code)
+	}
+	body := rr.Body.String()
+	if !strings.Contains(body, "internal server error") {
+		t.Fatalf("expected generic failure body, got %q", body)
+	}
+	if strings.Contains(strings.ToLower(body), "sql") || strings.Contains(strings.ToLower(body), "closed") {
+		t.Fatalf("expected internal details to stay out of response body, got %q", body)
+	}
+}
+
+func TestPipelineFailuresHandler_DoesNotLeakInternalErrors(t *testing.T) {
+	d := openPipelineDB(t)
+	_ = d.Close()
+
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/pipeline/failures?days=7&limit=20", nil)
+	PipelineFailuresHandler(d).ServeHTTP(rr, req)
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d", rr.Code)
+	}
+	body := rr.Body.String()
+	if !strings.Contains(body, "internal server error") {
+		t.Fatalf("expected generic failure body, got %q", body)
+	}
+	if strings.Contains(strings.ToLower(body), "sql") || strings.Contains(strings.ToLower(body), "closed") {
+		t.Fatalf("expected internal details to stay out of response body, got %q", body)
 	}
 }
