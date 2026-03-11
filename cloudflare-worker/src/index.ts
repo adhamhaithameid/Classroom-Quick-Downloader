@@ -5,6 +5,19 @@ import { resolveOracleEndpoint } from "./oracle-endpoint";
 import { timingSafeStringEqual } from "./timing";
 import type { Env as WorkerEnv, StatsResponse } from "./types";
 
+type WorkerLogLevel = "info" | "warn" | "error";
+
+function logEvent(level: WorkerLogLevel, message: string, fields?: Record<string, unknown>): void {
+  console.log(
+    JSON.stringify({
+      level,
+      message,
+      ts: new Date().toISOString(),
+      ...(fields ?? {}),
+    }),
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Session Token Utilities (HMAC-SHA256 based)
 // ---------------------------------------------------------------------------
@@ -22,6 +35,13 @@ interface SessionPayload {
 }
 
 type SessionBindingMode = "off" | "optional" | "strict";
+type SessionBindingMismatchInfo = {
+  expectedPrefix: string;
+  actualPrefix: string;
+};
+type VerifySessionTokenOptions = {
+  onOptionalBindingMismatch?: (info: SessionBindingMismatchInfo) => void | Promise<void>;
+};
 
 function getDashboardSecret(env: WorkerEnv): string | null {
   // Security hardening: require a dedicated dashboard secret.
@@ -156,6 +176,11 @@ async function buildSessionFingerprint(clientIp: string, userAgent: string): Pro
   return `${prefix}|${uaHash}`;
 }
 
+function fingerprintPrefix(value: string): string {
+  const [prefix] = value.split("|", 1);
+  return prefix || "unknown";
+}
+
 async function createSessionTokenWithBinding(
   secret: string,
   ip: string,
@@ -207,6 +232,7 @@ export async function verifySessionToken(
   clientIp: string,
   clientUserAgent = "",
   bindingMode: SessionBindingMode = "off",
+  options: VerifySessionTokenOptions = {},
 ): Promise<boolean> {
   try {
     const [payloadB64, sigB64] = token.split(".");
@@ -250,6 +276,14 @@ export async function verifySessionToken(
     }
     if (bindingMode === "strict") {
       return false;
+    }
+    const mismatch = {
+      expectedPrefix: fingerprintPrefix(payload.fp),
+      actualPrefix: fingerprintPrefix(expectedFingerprint),
+    };
+    logEvent("warn", "session_binding_mismatch_optional_accept", mismatch);
+    if (options.onOptionalBindingMismatch) {
+      await options.onOptionalBindingMismatch(mismatch);
     }
     return true;
   } catch {
@@ -589,6 +623,50 @@ function cloudflareAccessDeniedResponse(request: Request, env: WorkerEnv, pathna
   );
 }
 
+async function recordOptionalSessionBindingMismatch(
+  stub: DurableObjectStub,
+  requestUrl: string,
+  adminSecret: string,
+  mismatch: SessionBindingMismatchInfo,
+): Promise<void> {
+  const auditReq = new Request(new URL("/auth/session-binding-mismatch", requestUrl).toString(), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Admin-Secret": adminSecret,
+    },
+    body: JSON.stringify(mismatch),
+  });
+  const res = await stub.fetch(auditReq);
+  if (!res.ok) {
+    throw new Error(`session-binding-mismatch endpoint returned ${res.status}`);
+  }
+}
+
+function makeSessionVerificationOptions(
+  env: WorkerEnv,
+  request: Request,
+  stub: DurableObjectStub,
+  bindingMode: SessionBindingMode,
+): VerifySessionTokenOptions {
+  if (bindingMode !== "optional" || !env.DO_SHARED_SECRET) {
+    return {};
+  }
+  return {
+    onOptionalBindingMismatch: async (mismatch) => {
+      try {
+        await recordOptionalSessionBindingMismatch(stub, request.url, env.DO_SHARED_SECRET, mismatch);
+      } catch (error) {
+        logEvent("warn", "session_binding_mismatch_audit_failed", {
+          error: String(error),
+          expectedPrefix: mismatch.expectedPrefix,
+          actualPrefix: mismatch.actualPrefix,
+        });
+      }
+    },
+  };
+}
+
 function isCorsOriginAllowedForPath(request: Request, env: WorkerEnv, pathname: string): boolean {
   const headerOrigin = normalizeHeaderOrigin(request.headers.get("Origin"));
   if (!headerOrigin) return !isOriginRequiredForPath(pathname);
@@ -806,6 +884,7 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
   const sessionBindingMode = sessionBindingModeFromEnv(env);
   const stub = getDownloadsStub(env);
   const dashboardSecret = getDashboardSecret(env);
+  const sessionVerifyOptions = makeSessionVerificationOptions(env, request, stub, sessionBindingMode);
 
   // GET: Show login page OR redirect to dashboard if valid session
   if (method === "GET") {
@@ -813,7 +892,7 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
     if (
       sessionToken &&
       dashboardSecret &&
-      await verifySessionToken(sessionToken, dashboardSecret, clientIp, userAgent, sessionBindingMode)
+      await verifySessionToken(sessionToken, dashboardSecret, clientIp, userAgent, sessionBindingMode, sessionVerifyOptions)
     ) {
       // Valid session - redirect to dashboard
       return Response.redirect(new URL("/dashboard", request.url).toString(), 302);
@@ -1006,11 +1085,13 @@ async function handleDashboard(request: Request, env: WorkerEnv): Promise<Respon
   const sessionBindingMode = sessionBindingModeFromEnv(env);
   const sessionToken = getSessionCookie(request);
   const dashboardSecret = getDashboardSecret(env);
+  const stub = getDownloadsStub(env);
+  const sessionVerifyOptions = makeSessionVerificationOptions(env, request, stub, sessionBindingMode);
 
   if (
     !dashboardSecret ||
     !sessionToken ||
-    !await verifySessionToken(sessionToken, dashboardSecret, clientIp, userAgent, sessionBindingMode)
+    !await verifySessionToken(sessionToken, dashboardSecret, clientIp, userAgent, sessionBindingMode, sessionVerifyOptions)
   ) {
     // Invalid or missing session - redirect to login
     const logoutUrl = new URL(request.url);
@@ -1019,8 +1100,6 @@ async function handleDashboard(request: Request, env: WorkerEnv): Promise<Respon
       clearDangerStepUpCookieHeader(logoutUrl, env),
     ]);
   }
-
-  const stub = getDownloadsStub(env);
   const url = new URL(request.url);
   url.pathname = "/stats";
 
@@ -1048,11 +1127,13 @@ async function handleWebsiteConsoleDashboard(request: Request, env: WorkerEnv): 
   const sessionBindingMode = sessionBindingModeFromEnv(env);
   const sessionToken = getSessionCookie(request);
   const dashboardSecret = getDashboardSecret(env);
+  const stub = getDownloadsStub(env);
+  const sessionVerifyOptions = makeSessionVerificationOptions(env, request, stub, sessionBindingMode);
 
   if (
     !dashboardSecret ||
     !sessionToken ||
-    !await verifySessionToken(sessionToken, dashboardSecret, clientIp, userAgent, sessionBindingMode)
+    !await verifySessionToken(sessionToken, dashboardSecret, clientIp, userAgent, sessionBindingMode, sessionVerifyOptions)
   ) {
     const logoutUrl = new URL(request.url);
     return redirectWithCookies("/", [
@@ -1162,17 +1243,19 @@ async function resolveAuthContext(request: Request, env: WorkerEnv): Promise<Aut
   const dangerToken = getDangerStepUpCookie(request);
   const dashboardSecret = getDashboardSecret(env);
   const bindingMode = sessionBindingModeFromEnv(env);
+  const stub = getDownloadsStub(env);
+  const sessionVerifyOptions = makeSessionVerificationOptions(env, request, stub, bindingMode);
   const hasValidSecret = !!adminSecret && timingSafeStringEqual(adminSecret, env.DO_SHARED_SECRET);
   const hasValidSession =
     !!dashboardSecret &&
     !!sessionToken &&
-    await verifySessionToken(sessionToken, dashboardSecret, clientIp, userAgent, bindingMode);
+    await verifySessionToken(sessionToken, dashboardSecret, clientIp, userAgent, bindingMode, sessionVerifyOptions);
   const hasDangerStepUp =
     hasValidSecret ||
     (
       !!dashboardSecret &&
       !!dangerToken &&
-      await verifySessionToken(dangerToken, dashboardSecret, clientIp, userAgent, bindingMode)
+      await verifySessionToken(dangerToken, dashboardSecret, clientIp, userAgent, bindingMode, sessionVerifyOptions)
     );
 
   return {

@@ -97,6 +97,10 @@ type DurableStateShape = {
   ipAllowlist: string[];
   ipAllowlistStepUpBypassEnabled: boolean;
   dangerActionAuditLogs: DangerActionAuditRecord[];
+  sessionBindingMismatchCount: number;
+  sessionBindingLastMismatchAt: number | null;
+  sessionBindingLastExpectedPrefix: string | null;
+  sessionBindingLastActualPrefix: string | null;
 
   // Track endpoint rate limiting (per-IP, per-minute)
   trackRates: Record<string, { count: number; minute: number }>;
@@ -1770,6 +1774,10 @@ export class DownloadsDurable {
       ipAllowlist: [],
       ipAllowlistStepUpBypassEnabled: true,
       dangerActionAuditLogs: [],
+      sessionBindingMismatchCount: 0,
+      sessionBindingLastMismatchAt: null,
+      sessionBindingLastExpectedPrefix: null,
+      sessionBindingLastActualPrefix: null,
       trackRates: {},
 
       // Remote config defaults
@@ -1986,6 +1994,25 @@ export class DownloadsDurable {
           .filter((entry) => entry.id !== "" && entry.tsUtc > 0)
           .slice(0, MAX_DANGER_AUDIT_LOGS);
       })(),
+      sessionBindingMismatchCount: clampInt(
+        (stored as unknown as Record<string, unknown>).sessionBindingMismatchCount,
+        0,
+        Number.MAX_SAFE_INTEGER,
+        0,
+      ),
+      sessionBindingLastMismatchAt: (() => {
+        const value = clampInt(
+          (stored as unknown as Record<string, unknown>).sessionBindingLastMismatchAt,
+          0,
+          Number.MAX_SAFE_INTEGER,
+          0,
+        );
+        return value > 0 ? value : null;
+      })(),
+      sessionBindingLastExpectedPrefix:
+        trimAndLimitString((stored as unknown as Record<string, unknown>).sessionBindingLastExpectedPrefix, 120) || null,
+      sessionBindingLastActualPrefix:
+        trimAndLimitString((stored as unknown as Record<string, unknown>).sessionBindingLastActualPrefix, 120) || null,
       trackRates: stored.trackRates && typeof stored.trackRates === "object" ? stored.trackRates : base.trackRates,
 
       // Remote config - preserve stored values or use defaults
@@ -2781,6 +2808,9 @@ export class DownloadsDurable {
     // Login rate limiting - used by worker to check/record attempts
     if (pathname === "/auth/login-attempt" && request.method === "POST") {
       return this.handleLoginAttempt(request);
+    }
+    if (pathname === "/auth/session-binding-mismatch" && request.method === "POST") {
+      return this.handleSessionBindingMismatch(request);
     }
 
     // IP Allowlist check - used by worker before login
@@ -3774,6 +3804,10 @@ export class DownloadsDurable {
       security: {
         ipAllowlistEnabled: this.d.ipAllowlistEnabled,
         stepUpBypassEnabled: this.d.ipAllowlistStepUpBypassEnabled,
+        sessionBindingMismatches: this.d.sessionBindingMismatchCount,
+        lastSessionBindingMismatchAt: this.d.sessionBindingLastMismatchAt,
+        lastSessionBindingExpectedPrefix: this.d.sessionBindingLastExpectedPrefix,
+        lastSessionBindingActualPrefix: this.d.sessionBindingLastActualPrefix,
         dangerAuditRecent: [...this.d.dangerActionAuditLogs]
           .sort((a, b) => b.tsUtc - a.tsUtc)
           .slice(0, 25),
@@ -4092,6 +4126,10 @@ export class DownloadsDurable {
       security: {
         ipAllowlistEnabled: this.d.ipAllowlistEnabled,
         stepUpBypassEnabled: this.d.ipAllowlistStepUpBypassEnabled,
+        sessionBindingMismatches: this.d.sessionBindingMismatchCount,
+        lastSessionBindingMismatchAt: this.d.sessionBindingLastMismatchAt,
+        lastSessionBindingExpectedPrefix: this.d.sessionBindingLastExpectedPrefix,
+        lastSessionBindingActualPrefix: this.d.sessionBindingLastActualPrefix,
         dangerAuditRecent: [...this.d.dangerActionAuditLogs]
           .sort((a, b) => b.tsUtc - a.tsUtc)
           .slice(0, 50),
@@ -4425,6 +4463,10 @@ export class DownloadsDurable {
       websiteTelemetryLastCorrelationID: null,
       websiteTelemetryLastError: null,
       dangerActionAuditLogs: this.d.dangerActionAuditLogs ?? [],
+      sessionBindingMismatchCount: this.d.sessionBindingMismatchCount ?? 0,
+      sessionBindingLastMismatchAt: this.d.sessionBindingLastMismatchAt ?? null,
+      sessionBindingLastExpectedPrefix: this.d.sessionBindingLastExpectedPrefix ?? null,
+      sessionBindingLastActualPrefix: this.d.sessionBindingLastActualPrefix ?? null,
     };
     
     this.data = {
@@ -6529,6 +6571,41 @@ export class DownloadsDurable {
       ok: true, 
       allowed: true, 
       attemptsRemaining: MAX_ATTEMPTS - 1 
+    });
+  }
+
+  private async handleSessionBindingMismatch(request: Request): Promise<Response> {
+    if (!this.isAuthorizedAdmin(request)) {
+      return json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+
+    let body: { expectedPrefix?: string; actualPrefix?: string };
+    try {
+      body = await request.json();
+    } catch {
+      return json({ ok: false, error: "invalid_json" }, { status: 400 });
+    }
+
+    const expectedPrefix = trimAndLimitString(body.expectedPrefix, 120) || "unknown";
+    const actualPrefix = trimAndLimitString(body.actualPrefix, 120) || "unknown";
+    const now = Date.now();
+
+    this.d.sessionBindingMismatchCount += 1;
+    this.d.sessionBindingLastMismatchAt = now;
+    this.d.sessionBindingLastExpectedPrefix = expectedPrefix;
+    this.d.sessionBindingLastActualPrefix = actualPrefix;
+    await this.persist();
+
+    logEvent("warn", "session_binding_mismatch_recorded", {
+      expectedPrefix,
+      actualPrefix,
+      count: this.d.sessionBindingMismatchCount,
+    });
+
+    return json({
+      ok: true,
+      count: this.d.sessionBindingMismatchCount,
+      lastMismatchAt: this.d.sessionBindingLastMismatchAt,
     });
   }
 
