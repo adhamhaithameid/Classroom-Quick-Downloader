@@ -37,11 +37,40 @@ That changes how this plan should be used:
 
 So every phase below should be read through that lens.
 
+## Operating Rule For `1.5.0`
+
+For the current release line:
+
+1. treat the current runtime behavior as the product baseline,
+2. preserve current button and flag behavior unless a real bug proves they are wrong,
+3. use fixtures and regression tests as the enforcement layer for that baseline,
+4. capture new fixtures only when Google Classroom changes shape or a real bug exposes a missing case.
+
+This keeps the plan grounded in the product that already works well instead of
+pulling us into unnecessary engine churn.
+
+## Current Progress Snapshot
+
+Already completed in the protection-focused pass:
+
+1. initial real Classroom baseline capture from a dedicated non-Arc browser profile,
+2. committed sanitized golden fixtures for current good attachment and flag behavior,
+3. extension-only regression, fuzz, stress, and visual suites,
+4. CI gating for the extension golden suites,
+5. dedicated runbooks for testing and fixture capture.
+
+Still intentionally not done in this pass:
+
+1. runtime ownership changes,
+2. Student Work support,
+3. API-assisted discovery,
+4. broad V2 promotion.
+
 ---
 
 ## Phase 0 — Protect The Current Good State
 
-### [ ] Capture real baselines from working Classroom pages
+### [x] Capture real baselines from working Classroom pages
 
 What this means:
 - Save real HTML snapshots and screenshots from the exact page types where CQD currently behaves correctly.
@@ -53,7 +82,13 @@ Effect:
 - Future changes become much safer.
 - You get a real before/after reference instead of relying on memory.
 
-### [ ] Convert those baselines into reusable test fixtures
+Maintenance rule:
+
+1. do not keep capturing fixtures just to grow the library,
+2. add new fixtures only when Classroom changes or when a real bug reveals a new shape,
+3. treat the current fixture set as the default protection layer for `1.5.0`.
+
+### [x] Convert those baselines into reusable test fixtures
 
 What this means:
 - Turn the captured pages into sanitized regression fixtures for tests.
@@ -65,7 +100,7 @@ Effect:
 - Safer selector work.
 - Safer engine work.
 
-### [ ] Record a simple issue catalog for any remaining misses
+### [x] Record a simple issue catalog for any remaining misses
 
 What this means:
 - Document the exact pages or link types that still fail, instead of keeping them as vague future work.

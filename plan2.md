@@ -40,6 +40,34 @@ You already said the current behavior feels right:
 Because of that, not every item below is urgent.
 A lot of this plan is now about **protecting what works**, **documenting why it works**, and **making future changes safer**.
 
+## Operating Rule For The Current Release Line
+
+For the current `1.5.0` line, use this rule:
+
+1. treat the current runtime behavior as the product baseline,
+2. protect that baseline with fixtures and regression tests,
+3. add new fixtures only when Classroom changes or a real bug reveals a missing shape,
+4. avoid touching the runtime just to "improve" code that is already behaving correctly.
+
+This keeps us from turning a strong release line into an unnecessary rewrite.
+
+## Progress Snapshot — Test/Documentation Hardening
+
+Completed in the current hardening pass:
+
+1. a real non-Arc Classroom baseline was captured and recorded under `verification/baseline/2026-03-10/`,
+2. committed sanitized fixtures now lock current good button and flag behavior,
+3. extension-only regression, fuzz, stress, and visual suites were added,
+4. CI now runs the extension golden suites explicitly,
+5. dedicated testing and fixture-capture docs were added.
+
+What still remains from the larger engine plan:
+
+1. deeper live fixture coverage for more Classroom surfaces,
+2. Student Work support,
+3. runtime consolidation under V2,
+4. any future API-assisted `1.6.0` work.
+
 ---
 
 ## Priority 1 — Protect The Current Good State
@@ -47,7 +75,7 @@ A lot of this plan is now about **protecting what works**, **documenting why it 
 These are the safest and highest-value tasks.
 If you only do a few things from this file, do these first.
 
-### [ ] 1. Capture a real Classroom baseline fixture set
+### [x] 1. Capture a real Classroom baseline fixture set
 
 What this means:
 - Save sanitized HTML snapshots and screenshots from real Google Classroom pages that currently work well.
@@ -66,7 +94,7 @@ Can this be skipped for now:
 - Not recommended.
 - This is the best "insurance policy" task in the whole plan.
 
-### [ ] 2. Turn current good behavior into regression tests
+### [x] 2. Turn current good behavior into regression tests
 
 What this means:
 - Convert the known-good button placements, flag placements, and false-positive exclusions into test fixtures and assertions.
@@ -87,6 +115,12 @@ Effect if completed:
 Can this be skipped for now:
 - Only if no more core engine work is planned.
 - If the engine will keep evolving, this should be done.
+
+Maintenance rule from now on:
+
+1. do not keep adding fixtures just because we can,
+2. add them only when Classroom changes or when a real bug uncovers a gap,
+3. prefer expanding the golden matrix only when there is a concrete new shape to protect.
 
 ### [ ] 3. Build a small decision trace for each post/file
 
@@ -193,6 +227,8 @@ Effect if completed:
 - Fewer false positives.
 - Cleaner logic.
 - Easier future support for things like "Open" actions on Forms/YouTube.
+- The extension stops asking "does this URL look maybe okay?" and starts saying
+  "this is definitely a downloadable file" or "this is definitely not."
 
 Can this be skipped for now:
 - Only if the current false-positive rate stays near zero.
