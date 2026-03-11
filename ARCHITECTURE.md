@@ -829,6 +829,12 @@ sequenceDiagram
 | **No secret in logs**        | Never logged or included in error messages       |
 | **HTTPS only**               | All traffic encrypted in transit                 |
 
+**Changelog Auto-Sync Trust Note:**
+
+- Cloudflare Worker changelog auto-sync only accepts HTTPS sources.
+- The worker now rejects responses that exceed the markdown byte cap or advertise a non-markdown/plain-text `Content-Type`.
+- This still trusts the configured upstream host and CDN path. It is a bounded content-distribution trust, not a signed release verification flow.
+
 ---
 
 ### Multi-Layer Health Monitoring

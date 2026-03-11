@@ -75,6 +75,9 @@ function isPromotableWrapperDescendant(el: HTMLElement): boolean {
  * @returns true if this looks like a real post card
  */
 export function isActualPostCard(el: HTMLElement): boolean {
+  // This looks stricter than it needs to be, but every time we loosen it we
+  // end up painting borders on menus, comment shells, or tiny inner wrappers.
+  // The boring rule here is what keeps the visible UI feeling stable.
   // Skip known internal tracking/menu elements.
   if (isIgnoredInternalStreamItemElement(el)) return false;
 
@@ -180,8 +183,8 @@ export function queryPostCards(): HTMLElement[] {
       if (el.contains(existing)) { containsExisting = true; break; }
     }
     if (containsExisting) continue;
-    // Skip nested wrappers inside an already-identified card. These are
-    // the main source of duplicate inner borders on comments/text sections.
+    // Skip nested wrappers inside an already-identified card. This is the
+    // whole reason the "double border" bug stays dead.
     let nestedInsideExisting = false;
     for (const existing of cards) {
       if (existing.contains(el)) { nestedInsideExisting = true; break; }

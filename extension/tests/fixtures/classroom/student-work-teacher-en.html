@@ -1,0 +1,20 @@
+<!--
+  CQD sanitized fixture derived from the 2026-03-11 teacher submissions route.
+  Protects:
+  - admin action buttons on the submissions dashboard do not get treated as attachments
+  - the teacher submissions shell can be scanned without stray buttons
+-->
+<section class="teacher-submissions-shell" data-page="student-work-teacher">
+  <header class="toolbar">
+    <button type="button" aria-label="Return work to 0 selected students">Return</button>
+    <button type="button" aria-label="Bulk actions">Bulk actions</button>
+    <button type="button" aria-label="Email selected students">Email selected students</button>
+    <button type="button" aria-label="Assignment/Question settings">Assignment settings</button>
+  </header>
+
+  <div class="submission-summary">
+    <div class="metric">Assigned</div>
+    <div class="metric">Turned in</div>
+    <div class="metric">Returned</div>
+  </div>
+</section>
