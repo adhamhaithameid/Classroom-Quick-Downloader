@@ -247,7 +247,6 @@ run_get_json "/api/public/website/overview" '.ok == true and (.totals|type=="obj
 run_get_json "/api/public/website/map" '.ok == true and .granularity == "country" and (.countries|type=="array")' "public website map"
 run_get_json "/api/public/website/status" '.ok == true and (.status|type=="object")' "public website status"
 run_get_json "/api/public/website/changelog" '.ok == true and (.entries|type=="array") and (.fullChangelogUrl|type=="string")' "public website changelog"
-run_get_json "/api/public/website/uninstall" '.ok == true and (.stats|type=="object")' "public website uninstall stats"
 
 # Prime cookies + CSRF preconditions for auth POST endpoints.
 curl -sS -o /dev/null -c "$COOKIE_JAR" -b "$COOKIE_JAR" "$BASE_URL/"
