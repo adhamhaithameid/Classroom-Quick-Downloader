@@ -35,6 +35,24 @@ several high/medium issues should be addressed in the next development cycle.
 | 🔵 LOW / Info | 6 |
 | **Total** | **28** |
 
+### Status Update — 2026-03-11
+
+This report started as a static review snapshot. Since then, the repository has moved
+substantially.
+
+Current status of the original 28 findings:
+
+| Status | Count | Notes |
+|--------|-------|-------|
+| ✅ Closed / effectively closed | 20 | Includes Worker/Oracle remediation landed after the original audit. |
+| 💤 Stale finding | 1 | `H-09` assumed Go `1.26` did not exist; that assumption is now outdated. |
+| ⚠️ Accepted for now | 0 | — |
+| 🔓 Still open | 7 | Remaining open items are now extension-runtime follow-up items only. |
+| **Total** | **28** | |
+
+The tables and narrative below preserve the original findings, but the current closure
+state should be read from this status block and the updated remediation matrix.
+
 ---
 
 ## 2. Severity Legend
@@ -198,6 +216,10 @@ if (insecureHttp && !allowInsecureHttp && !isLoopbackHostname(parsed.hostname)) 
 ```
 
 But the env var overrides this protection and silently allows HTTP for any hostname.
+
+> **Status (2026-03-11):** Closed in committed defaults. Worker config and deploy
+> guardrails now require an HTTPS Oracle endpoint by default, and the Oracle compose
+> stack ships with a bundled Caddy TLS terminator for production-style deployments.
 
 #### Why it is dangerous
 
@@ -839,6 +861,9 @@ eliminates the polling entirely and is more responsive.
 **Affected file:** `oracle-backend/docker-compose.yml`
 **Subsystem:** Oracle Backend
 
+> **Status (2026-03-11):** Closed. The compose stack now fronts the backend with
+> Caddy on ports `80/443`, and backend health checks stay internal to the app container.
+
 ```oracle-backend/docker-compose.yml#L10-11
 ports:
   - "8080:8080"
@@ -1085,34 +1110,34 @@ a critical correctness property for analytics pipelines.
 
 | ID | Subsystem | Finding | Effort | Priority |
 |----|-----------|---------|--------|----------|
-| C-01 | CF Worker | Committed `.dev.vars` credentials | Low | 🔴 Immediate |
-| C-02 | CF Worker | Infra IDs + IP in `wrangler.toml` | Low | 🔴 Immediate |
-| C-03 | CF + Oracle | HTTP (not HTTPS) Worker→Oracle | Medium | 🔴 Immediate |
-| H-09 | Oracle | Dockerfile Go 1.26 (non-existent) | Low | 🟠 This Sprint |
-| H-02 | Oracle | Error details leaked in HTTP responses | Low | 🟠 This Sprint |
-| H-04 | Oracle | localhost origins in production CORS | Low | 🟠 This Sprint |
-| H-01 | CF Worker | Duplicate `timingSafeStringEqual` | Low | 🟠 This Sprint |
-| H-08 | Extension | `pendingByUrl` clobbers concurrent downloads | Medium | 🟠 This Sprint |
-| H-07 | Extension | Bypass tab closes wrong tab (race) | Low | 🟠 This Sprint |
-| H-03 | CF Worker | CORS origin cache never expires | Low | 🟠 This Sprint |
-| H-05 | CF Worker | `ingestUrl === ingestBatchUrl` dead code | Low | 🟠 Next Sprint |
-| H-06 | CF Worker | Optional session binding silent pass | Medium | 🟠 Next Sprint |
-| M-01 | Oracle | Inconsistent structured logging | Low | 🟡 Next Sprint |
-| M-07 | Extension | `isEdited` exclusion check fragile | Low | 🟡 Next Sprint |
-| M-10 | Extension | `while(true)` polling in content script | Medium | 🟡 Next Sprint |
-| M-04 | Extension | Personal workers.dev in host permissions | Low | 🟡 Next Sprint |
-| M-02 | Oracle | Obsolete `version: '3.8'` in compose | Trivial | 🟡 Housekeeping |
-| M-03 | Oracle | `X-Requested-With` false CSRF protection | Low | 🟡 Housekeeping |
-| M-05 | CF Worker | `ALLOW_INSECURE_COOKIES` case-sensitivity | Trivial | 🟡 Housekeeping |
-| M-06 | CF Worker | Changelog fetch no content verification | Medium | 🟡 Next Sprint |
-| M-08 | CF Worker | Origin cache unbounded growth | Low | 🟡 Housekeeping |
-| M-09 | Oracle | Uninstall stats publicly accessible | Low | 🟡 Next Sprint |
-| L-01 | Oracle | No TLS terminator in docker-compose | Medium | 🔵 Backlog |
-| L-02 | Oracle | No correlation ID in `logEvent` | Medium | 🔵 Backlog |
-| L-03 | Oracle | Wrong default TARGETARCH in Dockerfile | Low | 🔵 Backlog |
-| L-04 | Oracle | `deploy.sh` indirection wrapper | Trivial | 🔵 Backlog |
-| L-05 | Extension | No explicit `web_accessible_resources` | Low | 🔵 Backlog |
-| L-06 | Extension | `recentDownloads` no size cap | Low | 🔵 Backlog |
+| C-01 | CF Worker | Committed `.dev.vars` credentials | Low | ✅ Closed |
+| C-02 | CF Worker | Infra IDs + IP in `wrangler.toml` | Low | ✅ Partially closed: raw IP/account ID removed; required binding IDs retained as non-secret deployment metadata |
+| C-03 | CF + Oracle | HTTP (not HTTPS) Worker→Oracle | Medium | ✅ Closed: Worker defaults/workflow now require HTTPS Oracle endpoints |
+| H-09 | Oracle | Dockerfile Go 1.26 (non-existent) | Low | 💤 Stale finding |
+| H-02 | Oracle | Error details leaked in HTTP responses | Low | ✅ Closed |
+| H-04 | Oracle | localhost origins in production CORS | Low | ✅ Closed |
+| H-01 | CF Worker | Duplicate `timingSafeStringEqual` | Low | ✅ Closed |
+| H-08 | Extension | `pendingByUrl` clobbers concurrent downloads | Medium | 🔓 Still open |
+| H-07 | Extension | Bypass tab closes wrong tab (race) | Low | 🔓 Still open |
+| H-03 | CF Worker | CORS origin cache never expires | Low | ✅ Closed |
+| H-05 | CF Worker | `ingestUrl === ingestBatchUrl` dead code | Low | ✅ Closed |
+| H-06 | CF Worker | Optional session binding silent pass | Medium | ✅ Closed |
+| M-01 | Oracle | Inconsistent structured logging | Low | ✅ Closed |
+| M-07 | Extension | `isEdited` exclusion check fragile | Low | 🔓 Still open |
+| M-10 | Extension | `while(true)` polling in content script | Medium | 🔓 Still open |
+| M-04 | Extension | Personal workers.dev in host permissions | Low | 🔓 Still open |
+| M-02 | Oracle | Obsolete `version: '3.8'` in compose | Trivial | ✅ Closed |
+| M-03 | Oracle | `X-Requested-With` false CSRF protection | Low | ✅ Closed |
+| M-05 | CF Worker | `ALLOW_INSECURE_COOKIES` case-sensitivity | Trivial | ✅ Closed |
+| M-06 | CF Worker | Changelog fetch no content verification | Medium | ✅ Closed |
+| M-08 | CF Worker | Origin cache unbounded growth | Low | ✅ Closed |
+| M-09 | Oracle | Uninstall stats publicly accessible | Low | ✅ Closed |
+| L-01 | Oracle | No TLS terminator in docker-compose | Medium | ✅ Closed: compose stack now fronts Oracle with Caddy on `80/443` |
+| L-02 | Oracle | No correlation ID in `logEvent` | Medium | ✅ Closed |
+| L-03 | Oracle | Wrong default TARGETARCH in Dockerfile | Low | ✅ Closed |
+| L-04 | Oracle | `deploy.sh` indirection wrapper | Trivial | ✅ Effectively closed (deprecated and documented) |
+| L-05 | Extension | No explicit `web_accessible_resources` | Low | 🔓 Still open |
+| L-06 | Extension | `recentDownloads` no size cap | Low | 🔓 Still open |
 
 ---
 
