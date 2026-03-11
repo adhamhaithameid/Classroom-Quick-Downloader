@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"log"
 	"net/http"
 	"regexp"
 	"strings"
@@ -99,7 +98,9 @@ func SQLQueryHandler(db *sql.DB, readOnlyDB *sql.DB) http.HandlerFunc {
 		defer cancel()
 		rows, err := queryDB.QueryContext(sqlCtx, stmt) // #nosec G701 -- SQL text is validated by strict single-statement read-only guards and restricted table policy.
 		if err != nil {
-			log.Printf("[SQLQuery] query error: %v", err)
+			logEventWithContext(r.Context(), "warn", "sql_query_failed", map[string]any{
+				"error": truncateAlertError(err.Error()),
+			})
 			writeJSONError(w, "query_failed", "SQL query execution error", http.StatusBadRequest)
 			return
 		}
@@ -158,10 +159,10 @@ func SQLQueryHandler(db *sql.DB, readOnlyDB *sql.DB) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{
-			"ok":     true,
-			"limit":  limit,
-			"count":  len(out),
-			"rows":   out,
+			"ok":    true,
+			"limit": limit,
+			"count": len(out),
+			"rows":  out,
 		})
 	}
 }
@@ -221,7 +222,10 @@ func SQLExecHandler(db *sql.DB) http.HandlerFunc {
 			}
 			_ = tx.Rollback()
 			if err != nil {
-				log.Printf("[SQLExec] dry run error: %v", err)
+				logEventWithContext(r.Context(), "warn", "sql_exec_dry_run_failed", map[string]any{
+					"error": truncateAlertError(err.Error()),
+					"table": tableName,
+				})
 				writeJSONError(w, "dry_run_failed", "SQL dry run execution error", http.StatusBadRequest)
 				return
 			}
@@ -230,7 +234,10 @@ func SQLExecHandler(db *sql.DB) http.HandlerFunc {
 			defer cancel()
 			res, err := db.ExecContext(sqlCtx, stmt) // #nosec G701 -- SQL text is constant or derived from validated allowlisted identifiers; values are passed as bound parameters.
 			if err != nil {
-				log.Printf("[SQLExec] exec error: %v", err)
+				logEventWithContext(r.Context(), "warn", "sql_exec_failed", map[string]any{
+					"error": truncateAlertError(err.Error()),
+					"table": tableName,
+				})
 				writeJSONError(w, "exec_failed", "SQL execution error", http.StatusBadRequest)
 				return
 			}
