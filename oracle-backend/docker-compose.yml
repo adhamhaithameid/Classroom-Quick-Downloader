@@ -1,8 +1,6 @@
 # oracle-backend/docker-compose.yml
 # For local development and easy deployment
 
-version: '3.8'
-
 services:
   oracle-backend:
     build:
