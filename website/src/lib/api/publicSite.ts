@@ -732,8 +732,21 @@ export async function fetchUserChangelog(): Promise<UserChangelogResponse> {
 }
 
 export async function fetchUninstallStats(): Promise<UninstallStatsResponse> {
-  const payload = await fetchOracleJSON('/api/public/website/uninstall');
-  return coerceUninstallStatsPayload(payload);
+  try {
+    const payload = await fetchOracleJSON('/api/public/website/uninstall');
+    return coerceUninstallStatsPayload(payload);
+  } catch {
+    return {
+      schemaVersion: PUBLIC_SCHEMA_VERSION,
+      ok: false,
+      generatedAt: Date.now(),
+      stats: {
+        totalSubmissions: 0,
+        lastSubmittedAtUtc: null,
+        topReasons: []
+      }
+    };
+  }
 }
 
 export async function submitUninstallFeedback(body: UninstallFeedbackRequest): Promise<UninstallFeedbackResponse> {
