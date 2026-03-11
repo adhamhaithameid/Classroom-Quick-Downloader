@@ -29,6 +29,22 @@
     "test:fuzz:all": "pnpm -C website run test:fuzz && pnpm -C cloudflare-worker run test:fuzz && pnpm -C oracle-backend run test:fuzz",
     "test:reliability": "pnpm -C website run test:reliability && pnpm -C cloudflare-worker run test:reliability && pnpm -C oracle-backend run test:reliability",
     "test:strict": "pnpm run test:smoke && pnpm run test:functional && pnpm run test:integration:all && pnpm run test:regression && pnpm run test:load && pnpm run test:stress && pnpm run test:security:all && pnpm run test:ui && pnpm run test:fuzz:all && pnpm run test:reliability && pnpm -C website run test:strict && pnpm -C cloudflare-worker run test:strict && pnpm -C oracle-backend run test:strict && pnpm -C extension run compile && pnpm -C extension run test",
+    "test:last2:smoke": "pnpm -C extension run test:smoke && pnpm -C cloudflare-worker run test:smoke && pnpm -C website run test:smoke && pnpm -C oracle-backend run test:smoke",
+    "test:last2:functional": "pnpm -C extension run test:smoke && pnpm -C cloudflare-worker run test:functional && pnpm -C website run test:functional && pnpm -C oracle-backend run test:functional",
+    "test:last2:integration": "pnpm -C extension run test:connector && pnpm -C cloudflare-worker run test:integration && pnpm -C website run test:integration && pnpm -C oracle-backend run test:integration",
+    "test:last2:regression": "pnpm -C extension run test:regression && pnpm -C cloudflare-worker run test:regression && pnpm -C website run test:regression && pnpm -C oracle-backend run test:regression",
+    "test:last2:security": "pnpm -C extension run test:fuzz && pnpm -C cloudflare-worker run test:security && pnpm -C website run test:security && pnpm -C oracle-backend run test:security",
+    "test:last2:load": "pnpm -C extension run test:stress && pnpm -C cloudflare-worker run test:load && pnpm -C website run test:load && pnpm -C oracle-backend run test:load",
+    "test:last2:stress": "pnpm -C extension run test:stress && pnpm -C cloudflare-worker run test:stress && pnpm -C website run test:stress && pnpm -C oracle-backend run test:stress",
+    "test:last2:fuzz": "pnpm -C extension run test:fuzz && pnpm -C cloudflare-worker run test:fuzz && pnpm -C website run test:fuzz && pnpm -C oracle-backend run test:fuzz",
+    "test:last2:reliability": "pnpm -C extension run test:regression && pnpm -C cloudflare-worker run test:reliability && pnpm -C website run test:reliability && pnpm -C oracle-backend run test:reliability",
+    "test:last2:ui": "pnpm -C extension run test:visual && pnpm -C cloudflare-worker run test:ui && pnpm -C website run test:ui && pnpm -C oracle-backend run test:ui",
+    "test:last2:unit": "pnpm -C extension exec vitest run tests/content-observers.test.ts tests/content-post-card-utils.test.ts && pnpm -C cloudflare-worker run test:connector && pnpm -C website run test:unit && pnpm -C oracle-backend run test:connector",
+    "test:last2:connector": "pnpm -C extension run test:connector && pnpm -C cloudflare-worker run test:connector && pnpm -C website run test:connector && pnpm -C oracle-backend run test:connector",
+    "test:last2:component": "pnpm -C extension run test:component && pnpm -C cloudflare-worker run test:component && pnpm -C website run test:component && pnpm -C oracle-backend run test:component",
+    "test:last2:coverage:tools": "vitest run cloudflare-worker/tests/tools-hardening.test.ts --coverage.enabled --coverage.provider=v8 --coverage.reporter=json --coverage.reportsDirectory=coverage-last2-tools --coverage.include=tools/generate-selector-catalog.mjs --coverage.include=tools/url-guards.ts",
+    "test:last2:coverage": "pnpm -C extension run test:coverage:last2 && pnpm -C cloudflare-worker run test:coverage:last2 && pnpm run test:last2:coverage:tools && pnpm -C website run test:coverage:last2 && pnpm -C oracle-backend run test:coverage:last2 && node tools/verify-last2-coverage.mjs",
+    "test:last2:massive": "pnpm run test:last2:smoke && pnpm run test:last2:functional && pnpm run test:last2:integration && pnpm run test:last2:regression && pnpm run test:last2:security && pnpm run test:last2:load && pnpm run test:last2:stress && pnpm run test:last2:fuzz && pnpm run test:last2:reliability && pnpm run test:last2:ui && pnpm run test:last2:unit && pnpm run test:last2:connector && pnpm run test:last2:component && pnpm run test:last2:coverage",
     "phase12:verify": "bash tools/phase12_verify.sh",
     "phase13:smoke": "bash tools/phase13_smoke.sh",
     "phase13:monitor": "bash tools/phase13_monitor.sh",
@@ -66,7 +82,9 @@
     "@commitlint/cli": "^20.4.3",
     "@commitlint/config-conventional": "^20.4.3",
     "@playwright/test": "^1.58.2",
+    "@vitest/coverage-v8": "^4.0.18",
     "husky": "^9.1.7",
-    "playwright": "^1.58.2"
+    "playwright": "^1.58.2",
+    "vitest": "^4.0.18"
   }
 }
