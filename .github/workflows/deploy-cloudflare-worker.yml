@@ -59,6 +59,13 @@ jobs:
               exit 1
               ;;
           esac
+          case "${ORACLE_ENDPOINT}" in
+            https://*) ;;
+            *)
+              echo "::error::ORACLE_ENDPOINT must start with https://"
+              exit 1
+              ;;
+          esac
 
       - name: Schema compatibility checks
         run: bash tools/check_schema_compat.sh
@@ -105,7 +112,7 @@ jobs:
           import os
           path = Path("wrangler.toml")
           text = path.read_text()
-          placeholder = 'ORACLE_ENDPOINT = "http://oracle-endpoint-placeholder.invalid:8080"'
+          placeholder = 'ORACLE_ENDPOINT = "https://oracle-endpoint-placeholder.invalid"'
           replacement = f'ORACLE_ENDPOINT = "{os.environ["ORACLE_ENDPOINT"]}"'
           if placeholder not in text:
               raise SystemExit("Expected ORACLE_ENDPOINT placeholder not found in wrangler.toml")
