@@ -4,5 +4,6 @@
 DO_SHARED_SECRET=replace-me-with-a-strong-secret
 DANGER_PASSWORD=replace-me-with-a-strong-secret
 DASHBOARD_PASSWORD=replace-me-with-a-strong-secret
-ORACLE_ENDPOINT=http://your-oracle-host.example:8080
-ALLOW_INSECURE_ORACLE_ENDPOINT=true
+ORACLE_ENDPOINT=https://your-oracle-host.example
+# Local-only migration/debug override. Do not commit this in real .dev.vars.
+# ALLOW_INSECURE_ORACLE_ENDPOINT=true
