@@ -1,6 +1,6 @@
 # CQD Refactor Plan — Current Practical Roadmap
 
-Last updated: 2026-03-10
+Last updated: 2026-03-11
 
 ## Purpose
 
@@ -57,7 +57,9 @@ Already completed in the protection-focused pass:
 2. committed sanitized golden fixtures for current good attachment and flag behavior,
 3. extension-only regression, fuzz, stress, and visual suites,
 4. CI gating for the extension golden suites,
-5. dedicated runbooks for testing and fixture capture.
+5. dedicated runbooks for testing and fixture capture,
+6. explicit policy that `1.5.0` is the protected product baseline,
+7. explicit maintenance rule to capture new fixtures only when Classroom changes or a real bug reveals a missing case.
 
 Still intentionally not done in this pass:
 
@@ -374,12 +376,11 @@ Effect:
 
 If the goal is to be practical and low-risk, use this order:
 
-1. capture and sanitize the current good state,
-2. turn it into regression tests,
-3. add first-class attachment classification,
-4. close Student Work only if it matters to real usage,
-5. consolidate the runtime only if more engine work is still planned,
-6. defer API work until the DOM-first line clearly needs it.
+1. preserve and maintain the current good state,
+2. add first-class attachment classification,
+3. close Student Work only if it matters to real usage,
+4. consolidate the runtime only if more engine work is still planned,
+5. defer API work until the DOM-first line clearly needs it.
 
 ## Final Guidance
 

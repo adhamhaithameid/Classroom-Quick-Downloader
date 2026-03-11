@@ -1,6 +1,6 @@
 # Extension Plan 2 — Practical To-Do Checklist
 
-Last updated: 2026-03-10
+Last updated: 2026-03-11
 
 ## What This File Is
 
@@ -59,13 +59,15 @@ Completed in the current hardening pass:
 2. committed sanitized fixtures now lock current good button and flag behavior,
 3. extension-only regression, fuzz, stress, and visual suites were added,
 4. CI now runs the extension golden suites explicitly,
-5. dedicated testing and fixture-capture docs were added.
+5. dedicated testing and fixture-capture docs were added,
+6. the current `1.5.0` behavior is now the documented product baseline,
+7. the rule is now explicit: add new fixtures only when Classroom changes or a real bug reveals a missing shape.
 
 What still remains from the larger engine plan:
 
-1. deeper live fixture coverage for more Classroom surfaces,
-2. Student Work support,
-3. runtime consolidation under V2,
+1. Student Work support,
+2. runtime consolidation under V2,
+3. attachment classification / canonical identity,
 4. any future API-assisted `1.6.0` work.
 
 ---
@@ -454,12 +456,11 @@ Can this be skipped for now:
 
 If you want the most practical order, do this:
 
-1. capture a real baseline fixture set,
-2. turn the current good behavior into regression tests,
-3. add first-class attachment classification,
-4. close Student Work only if it matters to your usage,
-5. finish under-the-hood V2 consolidation only if more core work is still planned,
-6. defer API work until the DOM-first line proves insufficient.
+1. preserve the current `1.5.0` baseline,
+2. add first-class attachment classification,
+3. close Student Work only if it matters to your usage,
+4. finish under-the-hood V2 consolidation only if more core work is still planned,
+5. defer API work until the DOM-first line proves insufficient.
 
 ## Short Recommendation
 
