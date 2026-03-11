@@ -442,6 +442,33 @@ func TestResolvePublicWebsiteAllowedOrigins_IncludesPublicSiteURL(t *testing.T) 
 	}
 }
 
+func TestResolvePublicWebsiteAllowedOrigins_DefaultsExcludeDevOrigins(t *testing.T) {
+	t.Setenv("PUBLIC_SITE_URL", "")
+	t.Setenv("PUBLIC_WEBSITE_ALLOWED_ORIGINS", "")
+	allowed := resolvePublicWebsiteAllowedOrigins()
+	if _, ok := allowed["http://localhost:5173"]; ok {
+		t.Fatalf("expected localhost origin to be excluded from production defaults")
+	}
+	if _, ok := allowed["http://127.0.0.1:5173"]; ok {
+		t.Fatalf("expected loopback origin to be excluded from production defaults")
+	}
+	if _, ok := allowed["https://not-stable.classroom-quick-downloader-website.pages.dev"]; ok {
+		t.Fatalf("expected not-stable pages origin to be excluded from production defaults")
+	}
+}
+
+func TestResolvePublicWebsiteAllowedOrigins_EnvAllowsExplicitDevOrigin(t *testing.T) {
+	t.Setenv("PUBLIC_SITE_URL", "")
+	t.Setenv("PUBLIC_WEBSITE_ALLOWED_ORIGINS", "http://localhost:5173,https://not-stable.classroom-quick-downloader-website.pages.dev")
+	allowed := resolvePublicWebsiteAllowedOrigins()
+	if _, ok := allowed["http://localhost:5173"]; !ok {
+		t.Fatalf("expected localhost origin to be allowed when explicitly configured")
+	}
+	if _, ok := allowed["https://not-stable.classroom-quick-downloader-website.pages.dev"]; !ok {
+		t.Fatalf("expected not-stable pages origin to be allowed when explicitly configured")
+	}
+}
+
 func TestPublicWebsiteHandlers_PreflightForAllowedOrigin(t *testing.T) {
 	sqlDB := openPublicWebsiteDB(t)
 	t.Setenv("PUBLIC_WEBSITE_ALLOWED_ORIGINS", "https://adhamhaithameid.github.io")
