@@ -2,6 +2,7 @@
 import { renderDashboard, renderLoginPage, renderWebsiteConsole } from "./dashboard";
 import { renderReleaseNotesPage, sanitizeReleaseEntries } from "./release-notes";
 import { resolveOracleEndpoint } from "./oracle-endpoint";
+import { timingSafeStringEqual } from "./timing";
 import type { Env as WorkerEnv, StatsResponse } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -26,31 +27,6 @@ function getDashboardSecret(env: WorkerEnv): string | null {
   // Security hardening: require a dedicated dashboard secret.
   // Do not silently fall back to DO_SHARED_SECRET.
   return env.DASHBOARD_PASSWORD || null;
-}
-
-/**
- * Best-effort timing-safe string comparison for JavaScript.
- *
- * IMPORTANT: JavaScript does not guarantee constant-time execution.
- * JIT compilers, garbage collection, and branch prediction can all
- * introduce timing variations. This implementation minimizes the
- * most obvious timing channels (early exit on length mismatch,
- * character-by-character short-circuit) but is NOT equivalent to
- * crypto.subtle.timingSafeEqual (unavailable in Workers runtime for
- * arbitrary strings).
- *
- * For password verification, prefer bcrypt/scrypt which have their
- * own timing-safe comparison built in.
- */
-function timingSafeStringEqual(a: string, b: string): boolean {
-  let mismatch = a.length ^ b.length;
-  const maxLength = Math.max(a.length, b.length);
-  for (let i = 0; i < maxLength; i += 1) {
-    const aCode = i < a.length ? a.charCodeAt(i) : 0;
-    const bCode = i < b.length ? b.charCodeAt(i) : 0;
-    mismatch |= aCode ^ bCode;
-  }
-  return mismatch === 0;
 }
 
 export async function createSessionToken(secret: string, ip: string): Promise<string> {
@@ -412,8 +388,6 @@ function getDownloadsStub(env: WorkerEnv): DurableObjectStub {
 
 // --- CORS helpers -----------------------------------------------------------
 
-const parsedAllowedOriginsCache = new Map<string, Set<string>>();
-const parsedAllowedEmailsCache = new Map<string, Set<string>>();
 const WEBSITE_EVENTS_SCHEMA_VERSION = "1" as const;
 const SITE_SNAPSHOT_KV_KEY = "site:v1:snapshot";
 const SITE_CACHE_TTL_SECONDS = 3 * 60 * 60;
@@ -466,9 +440,6 @@ function parseAllowedOrigins(raw: string | undefined): Set<string> {
   const cacheKey = raw.trim();
   if (!cacheKey) return new Set<string>();
 
-  const cached = parsedAllowedOriginsCache.get(cacheKey);
-  if (cached) return cached;
-
   const allowed = new Set<string>();
   for (const item of cacheKey.split(",")) {
     const candidate = item.trim();
@@ -482,7 +453,6 @@ function parseAllowedOrigins(raw: string | undefined): Set<string> {
       // Ignore malformed values to fail safely.
     }
   }
-  parsedAllowedOriginsCache.set(cacheKey, allowed);
   return allowed;
 }
 
@@ -490,15 +460,12 @@ function parseAllowedEmails(raw: string | undefined): Set<string> {
   if (!raw) return new Set<string>();
   const cacheKey = raw.trim().toLowerCase();
   if (!cacheKey) return new Set<string>();
-  const cached = parsedAllowedEmailsCache.get(cacheKey);
-  if (cached) return cached;
   const emails = new Set<string>();
   for (const item of cacheKey.split(",")) {
     const value = item.trim().toLowerCase();
     if (!value) continue;
     emails.add(value);
   }
-  parsedAllowedEmailsCache.set(cacheKey, emails);
   return emails;
 }
 
