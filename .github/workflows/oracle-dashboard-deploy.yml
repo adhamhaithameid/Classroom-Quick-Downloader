@@ -98,21 +98,17 @@ jobs:
               session_mode="$(grep -E '^SESSION_COOKIE_SECURE=' .env.production | head -n1 | cut -d= -f2- || true)"
               session_mode_lc="$(printf '%s' "${session_mode}" | tr '[:upper:]' '[:lower:]' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
 
-              case "${session_mode_lc}" in
-                true|auto)
-                  :
-                  ;;
-                '')
+              if [ -z "${session_mode_lc}" ]; then
+                printf 'SESSION_COOKIE_SECURE=auto\n' >> .env.production
+              elif [ "${session_mode_lc}" = "true" ] || [ "${session_mode_lc}" = "auto" ]; then
+                :
+              else
+                if grep -q '^SESSION_COOKIE_SECURE=' .env.production; then
+                  sed -i 's#^SESSION_COOKIE_SECURE=.*#SESSION_COOKIE_SECURE=auto#' .env.production
+                else
                   printf 'SESSION_COOKIE_SECURE=auto\n' >> .env.production
-                  ;;
-                *)
-                  if grep -q '^SESSION_COOKIE_SECURE=' .env.production; then
-                    sed -i 's#^SESSION_COOKIE_SECURE=.*#SESSION_COOKIE_SECURE=auto#' .env.production
-                  else
-                    printf 'SESSION_COOKIE_SECURE=auto\n' >> .env.production
-                  fi
-                  ;;
-              esac
+                fi
+              fi
               final_session_mode="$(grep -E '^SESSION_COOKIE_SECURE=' .env.production | head -n1 | cut -d= -f2- || true)"
               echo "Using SESSION_COOKIE_SECURE=${final_session_mode} for production deploy."
             fi
