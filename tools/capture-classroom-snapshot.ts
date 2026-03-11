@@ -154,7 +154,12 @@ async function main() {
 
   // Check if logged in
   const isLoggedIn = await page.evaluate(() => {
-    return !window.location.href.includes('accounts.google.com');
+    try {
+      const hostname = new URL(window.location.href).hostname.toLowerCase();
+      return !(hostname === "accounts.google.com" || hostname.endsWith(".accounts.google.com"));
+    } catch {
+      return false;
+    }
   });
 
   if (!isLoggedIn) {

@@ -20,9 +20,41 @@ const STRING_PATTERNS = [
 ];
 
 const URL_PATTERN = /\/(?:c|w|r|u|g)\/\[\^?[^ \n]*|\/(?:c|w|r|u|g)\/\[\^?[^ \n]*/g;
+const DISALLOWED_SELECTOR_URL_HOSTS = new Set([
+  "classroom.google.com",
+  "drive.google.com",
+  "docs.google.com",
+]);
 
 function normalizeSelector(value) {
   return value.replace(/\s+/g, ' ').trim();
+}
+
+function parseHostnameFromHttpUrl(value) {
+  if (!/^https?:\/\//i.test(value)) return null;
+  try {
+    return new URL(value).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+function hasDisallowedSelectorHost(value) {
+  const hostname = parseHostnameFromHttpUrl(value);
+  if (!hostname) return false;
+  for (const allowedHost of DISALLOWED_SELECTOR_URL_HOSTS) {
+    if (hostname === allowedHost || hostname.endsWith(`.${allowedHost}`)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function escapeMarkdownInlineCode(value) {
+  return value
+    .replace(/\\/g, "\\\\")
+    .replace(/`/g, "\\`")
+    .replace(/\|/g, "\\|");
 }
 
 function isLikelySelector(value) {
@@ -33,7 +65,7 @@ function isLikelySelector(value) {
   if (value.includes('Date.now') || value.includes('Math.random')) return false;
   if (value.includes('Found "') || value.startsWith('Layer')) return false;
   if (value.includes('visibility ===') || value.includes('&&') || value.includes('||')) return false;
-  if (value.includes('classroom.google.com') || value.includes('drive.google.com') || value.includes('docs.google.com')) return false;
+  if (hasDisallowedSelectorHost(value)) return false;
   if (value.length < 3) return false;
   if (/^(button|div|span|input|textarea|script|noscript|style)$/.test(value)) return true;
   if (/^(high|medium|low|none|true|false|stream|classwork|grades|people|unknown|hidden|click|title|role|aria-label)$/.test(value)) return false;
@@ -100,7 +132,7 @@ function buildFileSection(relPath) {
     lines.push('| Pattern |');
     lines.push('|---------|');
     for (const regex of regexes) {
-      lines.push(`| \`${regex.replace(/\|/g, '\\|')}\` |`);
+      lines.push(`| \`${escapeMarkdownInlineCode(regex)}\` |`);
     }
     lines.push('');
   }
@@ -111,7 +143,7 @@ function buildFileSection(relPath) {
   lines.push('|----------|------|');
   for (const selector of selectors) {
     const risk = selectorRisk(selector);
-    lines.push(`| \`${selector.replace(/\|/g, '\\|')}\` | ${riskEmoji(risk)} ${risk} |`);
+    lines.push(`| \`${escapeMarkdownInlineCode(selector)}\` | ${riskEmoji(risk)} ${risk} |`);
   }
   lines.push('');
 
