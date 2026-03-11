@@ -216,6 +216,61 @@ describe("DO changelog lifecycle", () => {
     expect(adminPayload.sync?.lastAutoSyncError).toBeTruthy();
   });
 
+  it("rejects changelog sync responses with oversized markdown bodies", async () => {
+    const { obj } = makeDO();
+    const tooLargeMarkdown = `## v9.0.0\n### Summary\n${"A".repeat(750_001)}`;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(tooLargeMarkdown, {
+          status: 200,
+          headers: { "content-type": "text/plain; charset=utf-8" },
+        }),
+      ),
+    );
+
+    const modeRes = await adminPost(obj, "/admin/changelog/mode", {
+      applyMode: "auto_github",
+      autoSyncEnabled: true,
+      autoSyncIntervalMinutes: 60,
+      markdownSourceUrl: "https://example.com/user-friendly-changelog.md",
+    });
+    expect(modeRes.status).toBe(200);
+
+    const syncRes = await adminPost(obj, "/admin/changelog/sync-now", {});
+    const syncBody = (await syncRes.json()) as { ok?: boolean; error?: string };
+    expect(syncRes.status).toBe(400);
+    expect(syncBody.ok).toBe(false);
+    expect(syncBody.error).toBe("markdown_too_large");
+  });
+
+  it("rejects changelog sync responses with unexpected content-type", async () => {
+    const { obj } = makeDO();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response("<html>not markdown</html>", {
+          status: 200,
+          headers: { "content-type": "text/html; charset=utf-8" },
+        }),
+      ),
+    );
+
+    const modeRes = await adminPost(obj, "/admin/changelog/mode", {
+      applyMode: "auto_github",
+      autoSyncEnabled: true,
+      autoSyncIntervalMinutes: 60,
+      markdownSourceUrl: "https://example.com/user-friendly-changelog.md",
+    });
+    expect(modeRes.status).toBe(200);
+
+    const syncRes = await adminPost(obj, "/admin/changelog/sync-now", {});
+    const syncBody = (await syncRes.json()) as { ok?: boolean; error?: string };
+    expect(syncRes.status).toBe(400);
+    expect(syncBody.ok).toBe(false);
+    expect(syncBody.error).toBe("markdown_content_type_invalid");
+  });
+
   it("public /changelog returns full config with rules, entries, and meta after admin updates", async () => {
     const { obj } = makeDO();
 

@@ -2,7 +2,21 @@
 import { renderDashboard, renderLoginPage, renderWebsiteConsole } from "./dashboard";
 import { renderReleaseNotesPage, sanitizeReleaseEntries } from "./release-notes";
 import { resolveOracleEndpoint } from "./oracle-endpoint";
+import { timingSafeStringEqual } from "./timing";
 import type { Env as WorkerEnv, StatsResponse } from "./types";
+
+type WorkerLogLevel = "info" | "warn" | "error";
+
+function logEvent(level: WorkerLogLevel, message: string, fields?: Record<string, unknown>): void {
+  console.log(
+    JSON.stringify({
+      level,
+      message,
+      ts: new Date().toISOString(),
+      ...(fields ?? {}),
+    }),
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Session Token Utilities (HMAC-SHA256 based)
@@ -21,6 +35,13 @@ interface SessionPayload {
 }
 
 type SessionBindingMode = "off" | "optional" | "strict";
+type SessionBindingMismatchInfo = {
+  expectedPrefix: string;
+  actualPrefix: string;
+};
+type VerifySessionTokenOptions = {
+  onOptionalBindingMismatch?: (info: SessionBindingMismatchInfo) => void | Promise<void>;
+};
 
 function getDashboardSecret(env: WorkerEnv): string | null {
   // Security hardening: require a dedicated dashboard secret.
@@ -28,29 +49,8 @@ function getDashboardSecret(env: WorkerEnv): string | null {
   return env.DASHBOARD_PASSWORD || null;
 }
 
-/**
- * Best-effort timing-safe string comparison for JavaScript.
- *
- * IMPORTANT: JavaScript does not guarantee constant-time execution.
- * JIT compilers, garbage collection, and branch prediction can all
- * introduce timing variations. This implementation minimizes the
- * most obvious timing channels (early exit on length mismatch,
- * character-by-character short-circuit) but is NOT equivalent to
- * crypto.subtle.timingSafeEqual (unavailable in Workers runtime for
- * arbitrary strings).
- *
- * For password verification, prefer bcrypt/scrypt which have their
- * own timing-safe comparison built in.
- */
-function timingSafeStringEqual(a: string, b: string): boolean {
-  let mismatch = a.length ^ b.length;
-  const maxLength = Math.max(a.length, b.length);
-  for (let i = 0; i < maxLength; i += 1) {
-    const aCode = i < a.length ? a.charCodeAt(i) : 0;
-    const bCode = i < b.length ? b.charCodeAt(i) : 0;
-    mismatch |= aCode ^ bCode;
-  }
-  return mismatch === 0;
+function envFlagEnabled(raw: string | undefined): boolean {
+  return (raw || "").trim().toLowerCase() === "true";
 }
 
 export async function createSessionToken(secret: string, ip: string): Promise<string> {
@@ -180,6 +180,11 @@ async function buildSessionFingerprint(clientIp: string, userAgent: string): Pro
   return `${prefix}|${uaHash}`;
 }
 
+function fingerprintPrefix(value: string): string {
+  const [prefix] = value.split("|", 1);
+  return prefix || "unknown";
+}
+
 async function createSessionTokenWithBinding(
   secret: string,
   ip: string,
@@ -231,6 +236,7 @@ export async function verifySessionToken(
   clientIp: string,
   clientUserAgent = "",
   bindingMode: SessionBindingMode = "off",
+  options: VerifySessionTokenOptions = {},
 ): Promise<boolean> {
   try {
     const [payloadB64, sigB64] = token.split(".");
@@ -274,6 +280,14 @@ export async function verifySessionToken(
     }
     if (bindingMode === "strict") {
       return false;
+    }
+    const mismatch = {
+      expectedPrefix: fingerprintPrefix(payload.fp),
+      actualPrefix: fingerprintPrefix(expectedFingerprint),
+    };
+    logEvent("warn", "session_binding_mismatch_optional_accept", mismatch);
+    if (options.onOptionalBindingMismatch) {
+      await options.onOptionalBindingMismatch(mismatch);
     }
     return true;
   } catch {
@@ -331,7 +345,7 @@ export function createSessionCookieHeader(token: string, url?: URL, env?: Worker
   // SECURITY: Only disable Secure flag for loopback OR explicit override
   // For production (Cloudflare Workers serve HTTPS), use Secure; SameSite=Strict
   const isLoopback = url && isLocalEnvironment(url.hostname);
-  const allowInsecure = env?.ALLOW_INSECURE_COOKIES === 'true';
+  const allowInsecure = envFlagEnabled(env?.ALLOW_INSECURE_COOKIES);
   const isLocalDev = isLoopback || allowInsecure;
   
   if (isLocalDev) {
@@ -344,7 +358,7 @@ export function createSessionCookieHeader(token: string, url?: URL, env?: Worker
 
 function createDangerStepUpCookieHeader(token: string, url?: URL, env?: WorkerEnv): string {
   const isLoopback = url && isLocalEnvironment(url.hostname);
-  const allowInsecure = env?.ALLOW_INSECURE_COOKIES === "true";
+  const allowInsecure = envFlagEnabled(env?.ALLOW_INSECURE_COOKIES);
   const isLocalDev = isLoopback || allowInsecure;
   if (isLocalDev) {
     return `${DANGER_COOKIE_NAME}=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=900`;
@@ -354,7 +368,7 @@ function createDangerStepUpCookieHeader(token: string, url?: URL, env?: WorkerEn
 
 export function clearSessionCookieHeader(url?: URL, env?: WorkerEnv): string {
   const isLoopback = url && isLocalEnvironment(url.hostname);
-  const allowInsecure = env?.ALLOW_INSECURE_COOKIES === 'true';
+  const allowInsecure = envFlagEnabled(env?.ALLOW_INSECURE_COOKIES);
   const isLocalDev = isLoopback || allowInsecure;
   
   if (isLocalDev) {
@@ -365,7 +379,7 @@ export function clearSessionCookieHeader(url?: URL, env?: WorkerEnv): string {
 
 function clearDangerStepUpCookieHeader(url?: URL, env?: WorkerEnv): string {
   const isLoopback = url && isLocalEnvironment(url.hostname);
-  const allowInsecure = env?.ALLOW_INSECURE_COOKIES === "true";
+  const allowInsecure = envFlagEnabled(env?.ALLOW_INSECURE_COOKIES);
   const isLocalDev = isLoopback || allowInsecure;
   if (isLocalDev) {
     return `${DANGER_COOKIE_NAME}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0`;
@@ -412,8 +426,6 @@ function getDownloadsStub(env: WorkerEnv): DurableObjectStub {
 
 // --- CORS helpers -----------------------------------------------------------
 
-const parsedAllowedOriginsCache = new Map<string, Set<string>>();
-const parsedAllowedEmailsCache = new Map<string, Set<string>>();
 const WEBSITE_EVENTS_SCHEMA_VERSION = "1" as const;
 const SITE_SNAPSHOT_KV_KEY = "site:v1:snapshot";
 const SITE_CACHE_TTL_SECONDS = 3 * 60 * 60;
@@ -466,9 +478,6 @@ function parseAllowedOrigins(raw: string | undefined): Set<string> {
   const cacheKey = raw.trim();
   if (!cacheKey) return new Set<string>();
 
-  const cached = parsedAllowedOriginsCache.get(cacheKey);
-  if (cached) return cached;
-
   const allowed = new Set<string>();
   for (const item of cacheKey.split(",")) {
     const candidate = item.trim();
@@ -482,7 +491,6 @@ function parseAllowedOrigins(raw: string | undefined): Set<string> {
       // Ignore malformed values to fail safely.
     }
   }
-  parsedAllowedOriginsCache.set(cacheKey, allowed);
   return allowed;
 }
 
@@ -490,15 +498,12 @@ function parseAllowedEmails(raw: string | undefined): Set<string> {
   if (!raw) return new Set<string>();
   const cacheKey = raw.trim().toLowerCase();
   if (!cacheKey) return new Set<string>();
-  const cached = parsedAllowedEmailsCache.get(cacheKey);
-  if (cached) return cached;
   const emails = new Set<string>();
   for (const item of cacheKey.split(",")) {
     const value = item.trim().toLowerCase();
     if (!value) continue;
     emails.add(value);
   }
-  parsedAllowedEmailsCache.set(cacheKey, emails);
   return emails;
 }
 
@@ -620,6 +625,50 @@ function cloudflareAccessDeniedResponse(request: Request, env: WorkerEnv, pathna
     ),
     env,
   );
+}
+
+async function recordOptionalSessionBindingMismatch(
+  stub: DurableObjectStub,
+  requestUrl: string,
+  adminSecret: string,
+  mismatch: SessionBindingMismatchInfo,
+): Promise<void> {
+  const auditReq = new Request(new URL("/auth/session-binding-mismatch", requestUrl).toString(), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Admin-Secret": adminSecret,
+    },
+    body: JSON.stringify(mismatch),
+  });
+  const res = await stub.fetch(auditReq);
+  if (!res.ok) {
+    throw new Error(`session-binding-mismatch endpoint returned ${res.status}`);
+  }
+}
+
+function makeSessionVerificationOptions(
+  env: WorkerEnv,
+  request: Request,
+  stub: DurableObjectStub,
+  bindingMode: SessionBindingMode,
+): VerifySessionTokenOptions {
+  if (bindingMode !== "optional" || !env.DO_SHARED_SECRET) {
+    return {};
+  }
+  return {
+    onOptionalBindingMismatch: async (mismatch) => {
+      try {
+        await recordOptionalSessionBindingMismatch(stub, request.url, env.DO_SHARED_SECRET, mismatch);
+      } catch (error) {
+        logEvent("warn", "session_binding_mismatch_audit_failed", {
+          error: String(error),
+          expectedPrefix: mismatch.expectedPrefix,
+          actualPrefix: mismatch.actualPrefix,
+        });
+      }
+    },
+  };
 }
 
 function isCorsOriginAllowedForPath(request: Request, env: WorkerEnv, pathname: string): boolean {
@@ -839,6 +888,7 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
   const sessionBindingMode = sessionBindingModeFromEnv(env);
   const stub = getDownloadsStub(env);
   const dashboardSecret = getDashboardSecret(env);
+  const sessionVerifyOptions = makeSessionVerificationOptions(env, request, stub, sessionBindingMode);
 
   // GET: Show login page OR redirect to dashboard if valid session
   if (method === "GET") {
@@ -846,7 +896,7 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
     if (
       sessionToken &&
       dashboardSecret &&
-      await verifySessionToken(sessionToken, dashboardSecret, clientIp, userAgent, sessionBindingMode)
+      await verifySessionToken(sessionToken, dashboardSecret, clientIp, userAgent, sessionBindingMode, sessionVerifyOptions)
     ) {
       // Valid session - redirect to dashboard
       return Response.redirect(new URL("/dashboard", request.url).toString(), 302);
@@ -1039,11 +1089,13 @@ async function handleDashboard(request: Request, env: WorkerEnv): Promise<Respon
   const sessionBindingMode = sessionBindingModeFromEnv(env);
   const sessionToken = getSessionCookie(request);
   const dashboardSecret = getDashboardSecret(env);
+  const stub = getDownloadsStub(env);
+  const sessionVerifyOptions = makeSessionVerificationOptions(env, request, stub, sessionBindingMode);
 
   if (
     !dashboardSecret ||
     !sessionToken ||
-    !await verifySessionToken(sessionToken, dashboardSecret, clientIp, userAgent, sessionBindingMode)
+    !await verifySessionToken(sessionToken, dashboardSecret, clientIp, userAgent, sessionBindingMode, sessionVerifyOptions)
   ) {
     // Invalid or missing session - redirect to login
     const logoutUrl = new URL(request.url);
@@ -1052,8 +1104,6 @@ async function handleDashboard(request: Request, env: WorkerEnv): Promise<Respon
       clearDangerStepUpCookieHeader(logoutUrl, env),
     ]);
   }
-
-  const stub = getDownloadsStub(env);
   const url = new URL(request.url);
   url.pathname = "/stats";
 
@@ -1081,11 +1131,13 @@ async function handleWebsiteConsoleDashboard(request: Request, env: WorkerEnv): 
   const sessionBindingMode = sessionBindingModeFromEnv(env);
   const sessionToken = getSessionCookie(request);
   const dashboardSecret = getDashboardSecret(env);
+  const stub = getDownloadsStub(env);
+  const sessionVerifyOptions = makeSessionVerificationOptions(env, request, stub, sessionBindingMode);
 
   if (
     !dashboardSecret ||
     !sessionToken ||
-    !await verifySessionToken(sessionToken, dashboardSecret, clientIp, userAgent, sessionBindingMode)
+    !await verifySessionToken(sessionToken, dashboardSecret, clientIp, userAgent, sessionBindingMode, sessionVerifyOptions)
   ) {
     const logoutUrl = new URL(request.url);
     return redirectWithCookies("/", [
@@ -1195,17 +1247,19 @@ async function resolveAuthContext(request: Request, env: WorkerEnv): Promise<Aut
   const dangerToken = getDangerStepUpCookie(request);
   const dashboardSecret = getDashboardSecret(env);
   const bindingMode = sessionBindingModeFromEnv(env);
+  const stub = getDownloadsStub(env);
+  const sessionVerifyOptions = makeSessionVerificationOptions(env, request, stub, bindingMode);
   const hasValidSecret = !!adminSecret && timingSafeStringEqual(adminSecret, env.DO_SHARED_SECRET);
   const hasValidSession =
     !!dashboardSecret &&
     !!sessionToken &&
-    await verifySessionToken(sessionToken, dashboardSecret, clientIp, userAgent, bindingMode);
+    await verifySessionToken(sessionToken, dashboardSecret, clientIp, userAgent, bindingMode, sessionVerifyOptions);
   const hasDangerStepUp =
     hasValidSecret ||
     (
       !!dashboardSecret &&
       !!dangerToken &&
-      await verifySessionToken(dangerToken, dashboardSecret, clientIp, userAgent, bindingMode)
+      await verifySessionToken(dangerToken, dashboardSecret, clientIp, userAgent, bindingMode, sessionVerifyOptions)
     );
 
   return {
@@ -1889,7 +1943,7 @@ async function handleOraclePublicWebsiteProxy(request: Request, env: WorkerEnv):
   const pathname = new URL(request.url).pathname;
   let allowedMethods = new Set(["GET"]);
   if (pathname === "/api/public/website/uninstall") {
-    allowedMethods = new Set(["GET", "POST"]);
+    allowedMethods = new Set(["POST"]);
   }
   // NEWSLETTER_CTA_DISABLED_ROLLBACK_START
   // else if (pathname === "/api/public/website/newsletter/subscribe") {
