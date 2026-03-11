@@ -95,12 +95,25 @@ jobs:
             app_env="$(grep -E '^APP_ENV=' .env.production | head -n1 | cut -d= -f2- || true)"
             app_env_lc="$(printf '%s' "${app_env}" | tr '[:upper:]' '[:lower:]')"
             if [ "${app_env_lc}" = "production" ] || [ "${app_env_lc}" = "prod" ]; then
-              if grep -q '^SESSION_COOKIE_SECURE=' .env.production; then
-                sed -i 's#^SESSION_COOKIE_SECURE=.*#SESSION_COOKIE_SECURE=true#' .env.production
-              else
-                printf 'SESSION_COOKIE_SECURE=true\n' >> .env.production
-              fi
-              echo "Enforced SESSION_COOKIE_SECURE=true for production deploy."
+              session_mode="$(grep -E '^SESSION_COOKIE_SECURE=' .env.production | head -n1 | cut -d= -f2- || true)"
+              session_mode_lc="$(printf '%s' "${session_mode}" | tr '[:upper:]' '[:lower:]' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+
+              case "${session_mode_lc}" in
+                true|auto)
+                  ;;
+                "")
+                  printf 'SESSION_COOKIE_SECURE=auto\n' >> .env.production
+                  ;;
+                *)
+                  if grep -q '^SESSION_COOKIE_SECURE=' .env.production; then
+                    sed -i 's#^SESSION_COOKIE_SECURE=.*#SESSION_COOKIE_SECURE=auto#' .env.production
+                  else
+                    printf 'SESSION_COOKIE_SECURE=auto\n' >> .env.production
+                  fi
+                  ;;
+              esac
+              final_session_mode="$(grep -E '^SESSION_COOKIE_SECURE=' .env.production | head -n1 | cut -d= -f2- || true)"
+              echo "Using SESSION_COOKIE_SECURE=${final_session_mode} for production deploy."
             fi
 
             printf 'services:\n  oracle-backend:\n    env_file:\n      - .env.production\n' > docker-compose.runtime.override.yml

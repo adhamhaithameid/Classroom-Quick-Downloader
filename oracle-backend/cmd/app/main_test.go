@@ -1161,14 +1161,13 @@ func TestValidateProductionSecurityConfig(t *testing.T) {
 			{
 				name:              "prod rejects insecure session cookie mode",
 				appEnv:            "production",
-			sessionCookieMode: "false",
+				sessionCookieMode: "false",
 				wantErrContains:   "SESSION_COOKIE_SECURE",
 			},
 			{
-				name:              "prod rejects auto session cookie mode",
+				name:              "prod accepts auto session cookie mode",
 				appEnv:            "production",
 				sessionCookieMode: "auto",
-				wantErrContains:   "SESSION_COOKIE_SECURE",
 			},
 		}
 

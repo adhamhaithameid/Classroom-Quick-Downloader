@@ -167,7 +167,7 @@
             // Some browsers can apply Set-Cookie from fetch responses with slight delay.
             const checkPayload = await fetchAuthCheckWithRetry(4);
             if (!checkPayload || (checkPayload.authRequired !== false && checkPayload.authenticated !== true)) {
-              setAuthError('Session cookie was not saved by your browser. Enable cookies and refresh. For HTTP mode set SESSION_COOKIE_SECURE=false.');
+              setAuthError('Session cookie was not saved by your browser. Enable cookies and refresh. For HTTP mode use SESSION_COOKIE_SECURE=auto (recommended) or false.');
               input.select();
               input.focus();
               return;

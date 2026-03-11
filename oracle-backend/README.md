@@ -231,7 +231,7 @@ All configuration is done via environment variables, defined in `docker-compose.
 | `ARCHIVER_SHARED_SECRET` | *(required when auth enabled)* | Secret header for the archiver to read stats. |
 | `ALLOW_LOOPBACK_BYPASS` | `false` | Set `true` to allow loopback auth bypass (dev only). |
 | `ALLOW_EMPTY_DASHBOARD_PASSWORD` | `false` | Set `true` to allow an empty dashboard password (dev only). |
-| `SESSION_COOKIE_SECURE` | `auto` | Cookie Secure mode: `auto` (TLS-aware), `true` (always secure), `false` (always non-secure; needed for plain HTTP). |
+| `SESSION_COOKIE_SECURE` | `auto` | Cookie Secure mode: `auto` (TLS-aware and recommended), `true` (always secure), `false` (always non-secure for legacy HTTP-only setups). |
 | `PUBLIC_BASE_URL` | *(optional)* | Canonical public origin (for CSRF origin allow checks), e.g. `https://oracle.example.com`. |
 | `CSRF_ALLOWED_ORIGINS` | *(optional)* | Comma-separated explicit CSRF origin allowlist (scheme + host), e.g. `https://oracle.example.com,https://admin.example.com`. |
 | `POSTGRES_DSN` | *(optional)* | Enables Postgres bootstrap and v4.1 cutover paths. |
@@ -1055,7 +1055,7 @@ This page shows:
 
 **Solution:**
 1. For HTTPS deployments keep `SESSION_COOKIE_SECURE=auto` (or `true`).
-2. For plain HTTP deployments set `SESSION_COOKIE_SECURE=false`.
+2. For plain HTTP deployments use `SESSION_COOKIE_SECURE=auto` (or `false` only if you explicitly need non-secure cookies).
 3. Refresh the page and retry login after updating env vars.
 
 ---
