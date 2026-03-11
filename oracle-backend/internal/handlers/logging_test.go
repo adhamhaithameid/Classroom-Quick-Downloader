@@ -2,11 +2,14 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"log"
 	"os"
 	"testing"
 	"time"
+
+	"oracle-backend/internal/observability"
 )
 
 func captureLogOutput(fn func()) string {
@@ -120,5 +123,28 @@ func TestLogEvent_HandlesEmptyFields(t *testing.T) {
 	}
 	if parsed.Message != "empty_fields" {
 		t.Fatalf("expected message=empty_fields, got %q", parsed.Message)
+	}
+}
+
+func TestLogEventWithContext_IncludesRequestAndCorrelationIDs(t *testing.T) {
+	ctx := observability.WithRequestContext(context.Background(), "req-test-123", "corr-test-456")
+
+	output := captureLogOutput(func() {
+		logEventWithContext(ctx, "info", "ctx_test", map[string]interface{}{"ok": true})
+	})
+
+	idx := bytes.IndexByte([]byte(output), '{')
+	if idx == -1 {
+		t.Fatalf("expected JSON in log output")
+	}
+	var parsed logPayload
+	if err := json.Unmarshal([]byte(output[idx:]), &parsed); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if parsed.RequestID != "req-test-123" {
+		t.Fatalf("expected requestId=req-test-123, got %q", parsed.RequestID)
+	}
+	if parsed.CorrelationID != "corr-test-456" {
+		t.Fatalf("expected correlationId=corr-test-456, got %q", parsed.CorrelationID)
 	}
 }
