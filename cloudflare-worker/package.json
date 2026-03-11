@@ -19,11 +19,14 @@
     "test:load": "vitest run tests/load-stress.test.ts",
     "test:stress": "vitest run tests/load-stress.test.ts tests/reliability.test.ts",
     "test:security": "vitest run tests/security.test.ts tests/sanitization.test.ts tests/auth_timing.test.ts",
+    "test:connector": "vitest run tests/oracle-endpoint.test.ts tests/timing.test.ts",
+    "test:component": "vitest run tests/dashboard.test.ts tests/d1-query-guard.test.ts",
     "test:ui": "vitest run tests/dashboard.test.ts",
     "test:fuzz": "vitest run tests/fuzz.test.ts",
     "test:reliability": "vitest run tests/reliability.test.ts tests/index-auth-config.test.ts",
     "test:strict": "pnpm run test:smoke && pnpm run test:functional && pnpm run test:integration && pnpm run test:regression && pnpm run test:load && pnpm run test:stress && pnpm run test:security && pnpm run test:ui && pnpm run test:fuzz && pnpm run test:reliability && pnpm run test",
-    "test:coverage": "vitest run --coverage.enabled --coverage.provider=v8 --coverage.reporter=json --coverage.reportsDirectory=coverage"
+    "test:coverage": "vitest run --coverage.enabled --coverage.provider=v8 --coverage.reporter=json --coverage.reportsDirectory=coverage",
+    "test:coverage:last2": "vitest run tests/oracle-endpoint.test.ts tests/timing.test.ts --coverage.enabled --coverage.provider=v8 --coverage.reporter=json --coverage.reportsDirectory=coverage-last2 --coverage.include=src/oracle-endpoint.ts --coverage.include=src/timing.ts"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260310.1",
@@ -36,6 +39,6 @@
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.57.0",
     "vitest": "^4.0.18",
-    "wrangler": "^4.71.0"
+    "wrangler": "^4.72.0"
   }
 }
