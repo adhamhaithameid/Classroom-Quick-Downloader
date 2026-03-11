@@ -401,6 +401,13 @@ const CHANGELOG_DEFAULT_AUTO_SYNC_ENABLED = false;
 const CHANGELOG_DEFAULT_AUTO_SYNC_INTERVAL_MINUTES = 60;
 const CHANGELOG_MIN_AUTO_SYNC_INTERVAL_MINUTES = 5;
 const CHANGELOG_MAX_AUTO_SYNC_INTERVAL_MINUTES = 1440;
+const CHANGELOG_MARKDOWN_MAX_BYTES = 750_000;
+const CHANGELOG_ALLOWED_CONTENT_TYPES = new Set([
+  "text/plain",
+  "text/markdown",
+  "text/x-markdown",
+  "application/octet-stream",
+]);
 
 function defaultExtensionChangelogEntries(): ChangelogEntry[] {
   return [
@@ -6041,7 +6048,19 @@ export class DownloadsDurable {
       if (!res.ok) {
         return { ok: false, error: `markdown_fetch_failed_${res.status}` };
       }
-      const markdown = trimAndLimitString(await res.text(), 750_000);
+      const contentLength = clampInt(res.headers.get("content-length"), 0, Number.MAX_SAFE_INTEGER, 0);
+      if (contentLength > CHANGELOG_MARKDOWN_MAX_BYTES) {
+        return { ok: false, error: "markdown_too_large" };
+      }
+      const contentType = (res.headers.get("content-type") || "").split(";", 1)[0].trim().toLowerCase();
+      if (contentType && !CHANGELOG_ALLOWED_CONTENT_TYPES.has(contentType)) {
+        return { ok: false, error: "markdown_content_type_invalid" };
+      }
+      const rawMarkdown = await res.text();
+      if (rawMarkdown.length > CHANGELOG_MARKDOWN_MAX_BYTES) {
+        return { ok: false, error: "markdown_too_large" };
+      }
+      const markdown = trimAndLimitString(rawMarkdown, CHANGELOG_MARKDOWN_MAX_BYTES);
       if (!markdown) return { ok: false, error: "markdown_empty" };
       return { ok: true, markdown };
     } catch {

@@ -49,6 +49,10 @@ function getDashboardSecret(env: WorkerEnv): string | null {
   return env.DASHBOARD_PASSWORD || null;
 }
 
+function envFlagEnabled(raw: string | undefined): boolean {
+  return (raw || "").trim().toLowerCase() === "true";
+}
+
 export async function createSessionToken(secret: string, ip: string): Promise<string> {
   return createSessionTokenWithBinding(secret, ip, "", "off");
 }
@@ -341,7 +345,7 @@ export function createSessionCookieHeader(token: string, url?: URL, env?: Worker
   // SECURITY: Only disable Secure flag for loopback OR explicit override
   // For production (Cloudflare Workers serve HTTPS), use Secure; SameSite=Strict
   const isLoopback = url && isLocalEnvironment(url.hostname);
-  const allowInsecure = env?.ALLOW_INSECURE_COOKIES === 'true';
+  const allowInsecure = envFlagEnabled(env?.ALLOW_INSECURE_COOKIES);
   const isLocalDev = isLoopback || allowInsecure;
   
   if (isLocalDev) {
@@ -354,7 +358,7 @@ export function createSessionCookieHeader(token: string, url?: URL, env?: Worker
 
 function createDangerStepUpCookieHeader(token: string, url?: URL, env?: WorkerEnv): string {
   const isLoopback = url && isLocalEnvironment(url.hostname);
-  const allowInsecure = env?.ALLOW_INSECURE_COOKIES === "true";
+  const allowInsecure = envFlagEnabled(env?.ALLOW_INSECURE_COOKIES);
   const isLocalDev = isLoopback || allowInsecure;
   if (isLocalDev) {
     return `${DANGER_COOKIE_NAME}=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=900`;
@@ -364,7 +368,7 @@ function createDangerStepUpCookieHeader(token: string, url?: URL, env?: WorkerEn
 
 export function clearSessionCookieHeader(url?: URL, env?: WorkerEnv): string {
   const isLoopback = url && isLocalEnvironment(url.hostname);
-  const allowInsecure = env?.ALLOW_INSECURE_COOKIES === 'true';
+  const allowInsecure = envFlagEnabled(env?.ALLOW_INSECURE_COOKIES);
   const isLocalDev = isLoopback || allowInsecure;
   
   if (isLocalDev) {
@@ -375,7 +379,7 @@ export function clearSessionCookieHeader(url?: URL, env?: WorkerEnv): string {
 
 function clearDangerStepUpCookieHeader(url?: URL, env?: WorkerEnv): string {
   const isLoopback = url && isLocalEnvironment(url.hostname);
-  const allowInsecure = env?.ALLOW_INSECURE_COOKIES === "true";
+  const allowInsecure = envFlagEnabled(env?.ALLOW_INSECURE_COOKIES);
   const isLocalDev = isLoopback || allowInsecure;
   if (isLocalDev) {
     return `${DANGER_COOKIE_NAME}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0`;
@@ -1939,7 +1943,7 @@ async function handleOraclePublicWebsiteProxy(request: Request, env: WorkerEnv):
   const pathname = new URL(request.url).pathname;
   let allowedMethods = new Set(["GET"]);
   if (pathname === "/api/public/website/uninstall") {
-    allowedMethods = new Set(["GET", "POST"]);
+    allowedMethods = new Set(["POST"]);
   }
   // NEWSLETTER_CTA_DISABLED_ROLLBACK_START
   // else if (pathname === "/api/public/website/newsletter/subscribe") {

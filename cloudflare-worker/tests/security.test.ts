@@ -260,6 +260,14 @@ describe("Worker security helpers", () => {
     expect(cleared).not.toContain("Secure");
   });
 
+  it("treats ALLOW_INSECURE_COOKIES as a case-insensitive boolean flag", () => {
+    const cookie = createSessionCookieHeader("token", new URL("https://example.com"), {
+      ALLOW_INSECURE_COOKIES: " TRUE ",
+    } as Env);
+    expect(cookie).not.toContain("Secure");
+    expect(cookie).toContain("SameSite=Lax");
+  });
+
   it("verifies and rejects session tokens correctly", async () => {
     const spy = vi.spyOn(Date, "now").mockReturnValue(1_000_000);
     const token = await createSessionToken("secret", "1.2.3.4");
