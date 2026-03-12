@@ -397,7 +397,9 @@ function redirectWithCookies(location: string, cookies: string[]): Response {
 
 const HTML_SECURITY_HEADERS = {
   "content-security-policy":
-    "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https:; font-src 'self' data:",
+    // Emergency compatibility: dashboard/login HTML currently includes inline scripts.
+    // Keep script inline enabled until nonce-based CSP is fully rolled out.
+    "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https:; font-src 'self' data:",
   "x-content-type-options": "nosniff",
   "x-frame-options": "DENY",
   "referrer-policy": "strict-origin-when-cross-origin",
