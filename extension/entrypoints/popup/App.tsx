@@ -974,6 +974,7 @@ function App() {
                   className="cqd-cl-back"
                   onClick={() => setShowChangelog(false)}
                   aria-label="Go back"
+                  title="Go back"
                 >
                   <svg
                     className="cqd-cl-back-icon"
@@ -1101,6 +1102,7 @@ function App() {
                 className="cqd-banner-close"
                 onClick={() => setError(null)}
                 aria-label="Dismiss error message"
+                title="Dismiss error message"
               >
                 ×
               </button>
@@ -1373,6 +1375,7 @@ function App() {
                   rel="noreferrer"
                   className="cqd-button cqd-button-primary"
                   aria-label="Open the GitHub repository"
+                  title="Open GitHub repository"
                 >
                   <span className="cqd-button-icon">
                     <svg
@@ -1400,6 +1403,7 @@ function App() {
                     )
                   }
                   aria-label="Support the developer on Buy Me a Coffee"
+                  title="Support on Buy Me a Coffee"
                 >
                   <img
                     src={bmcLogoSrc}
