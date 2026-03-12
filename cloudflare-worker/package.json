@@ -29,7 +29,7 @@
     "test:coverage:last2": "vitest run tests/oracle-endpoint.test.ts tests/timing.test.ts --coverage.enabled --coverage.provider=v8 --coverage.reporter=json --coverage.reportsDirectory=coverage-last2 --coverage.include=src/oracle-endpoint.ts --coverage.include=src/timing.ts"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260310.1",
+    "@cloudflare/workers-types": "^4.20260312.1",
     "@eslint/js": "^10.0.1",
     "@typescript-eslint/eslint-plugin": "^8.57.0",
     "@typescript-eslint/parser": "^8.57.0",
