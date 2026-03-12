@@ -5288,6 +5288,23 @@ export function renderDashboard(stats: StatsResponse): string {
         return pct / 100;
       }
 
+      function adminFetch(url, init) {
+        const requestInit = Object.assign({}, init || {});
+        if (!requestInit.credentials) requestInit.credentials = "same-origin";
+
+        const method = String(requestInit.method || "GET").toUpperCase();
+        const headers = new Headers(requestInit.headers || {});
+
+        if (method !== "GET" && method !== "HEAD" && method !== "OPTIONS") {
+          if (!headers.has("X-Requested-With")) {
+            headers.set("X-Requested-With", "XMLHttpRequest");
+          }
+        }
+
+        requestInit.headers = headers;
+        return fetch(url, requestInit);
+      }
+
       async function sendRemoteConfigUpdate(payload) {
         const btnSave = document.getElementById("btn-config-save");
         if (btnSave) {
@@ -5297,7 +5314,7 @@ export function renderDashboard(stats: StatsResponse): string {
         setConfigStatus("Saving...", "");
 
         try {
-          const res = await fetch("/admin/update-config", {
+          const res = await adminFetch("/admin/update-config", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             credentials: "same-origin",
@@ -5513,7 +5530,7 @@ export function renderDashboard(stats: StatsResponse): string {
       }
 
       async function fetchAdminChangelogState() {
-        const res = await fetch("/admin/changelog", { credentials: "same-origin" });
+        const res = await adminFetch("/admin/changelog", { credentials: "same-origin" });
         const data = await res.json();
         if (!res.ok || !data.ok) {
           throw new Error(data.error || "state_load_failed");
@@ -5719,7 +5736,7 @@ export function renderDashboard(stats: StatsResponse): string {
         }
         if (draftPreviewEl) draftPreviewEl.innerHTML = '<div class="cl-preview-empty">Parsing markdown…</div>';
         try {
-          const res = await fetch('/admin/changelog/parse', {
+          const res = await adminFetch('/admin/changelog/parse', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'same-origin',
@@ -6393,7 +6410,7 @@ export function renderDashboard(stats: StatsResponse): string {
           btn.disabled = true;
           btn.textContent = "Exporting...";
         }
-        fetch("/admin/force-flush", { method: "POST", credentials: "same-origin" })
+        adminFetch("/admin/force-flush", { method: "POST", credentials: "same-origin" })
           .then((r) => r.json())
           .then((d) => {
             if (d.ok) {
@@ -6418,7 +6435,7 @@ export function renderDashboard(stats: StatsResponse): string {
           btn.disabled = true;
           btn.textContent = "Syncing...";
         }
-        fetch("/admin/full-sync", { method: "POST", credentials: "same-origin" })
+        adminFetch("/admin/full-sync", { method: "POST", credentials: "same-origin" })
           .then((r) => r.json())
           .then((d) => {
             if (d.ok) {
@@ -6669,7 +6686,7 @@ export function renderDashboard(stats: StatsResponse): string {
       
       // Fetch IP allowlist
       function fetchIpAllowlist() {
-        fetch('/admin/ip-allowlist', { credentials: 'same-origin' })
+        adminFetch('/admin/ip-allowlist', { credentials: 'same-origin' })
           .then(r => r.json())
           .then(data => {
             if (data.ok) {
@@ -6701,7 +6718,7 @@ export function renderDashboard(stats: StatsResponse): string {
       if (ipToggle) {
         ipToggle.addEventListener('change', function() {
           const enabled = this.checked;
-          fetch('/admin/ip-allowlist', {
+          adminFetch('/admin/ip-allowlist', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'same-origin',
@@ -6732,7 +6749,7 @@ export function renderDashboard(stats: StatsResponse): string {
       if (stepUpToggle) {
         stepUpToggle.addEventListener('change', function() {
           const enabled = this.checked;
-          fetch('/admin/ip-allowlist', {
+          adminFetch('/admin/ip-allowlist', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'same-origin',
@@ -6763,7 +6780,7 @@ export function renderDashboard(stats: StatsResponse): string {
           showToast('Please enter a valid IPv4 address', 'error');
           return;
         }
-        fetch('/admin/ip-allowlist', {
+        adminFetch('/admin/ip-allowlist', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'same-origin',
@@ -6788,7 +6805,7 @@ export function renderDashboard(stats: StatsResponse): string {
       
       // Remove IP
       function removeIp(ip) {
-        fetch('/admin/ip-allowlist', {
+        adminFetch('/admin/ip-allowlist', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'same-origin',
@@ -6828,7 +6845,7 @@ export function renderDashboard(stats: StatsResponse): string {
       bind('btn-datahub-flush', () => {
         const btn = document.getElementById('btn-datahub-flush');
         if (btn) btn.disabled = true;
-        fetch('/admin/force-flush', { method: 'POST', credentials: 'same-origin' })
+        adminFetch('/admin/force-flush', { method: 'POST', credentials: 'same-origin' })
           .then(r => r.json())
           .then(data => {
             if (data.ok) {
@@ -6845,7 +6862,7 @@ export function renderDashboard(stats: StatsResponse): string {
       bind('btn-datahub-sync', () => {
         const btn = document.getElementById('btn-datahub-sync');
         if (btn) btn.disabled = true;
-        fetch('/admin/full-sync', { method: 'POST', credentials: 'same-origin' })
+        adminFetch('/admin/full-sync', { method: 'POST', credentials: 'same-origin' })
           .then(r => r.json())
           .then(data => {
             if (data.ok) {
@@ -6932,7 +6949,7 @@ export function renderDashboard(stats: StatsResponse): string {
       }
 
       function fetchWebsiteStatus() {
-        fetch('/admin/website/status', { method: 'GET', credentials: 'same-origin' })
+        adminFetch('/admin/website/status', { method: 'GET', credentials: 'same-origin' })
           .then(r => r.json())
           .then((data) => {
             if (!data || !data.ok) {
@@ -6952,7 +6969,7 @@ export function renderDashboard(stats: StatsResponse): string {
       bind('btn-website-flush-now', () => {
         const btn = document.getElementById('btn-website-flush-now');
         if (btn) btn.disabled = true;
-        fetch('/admin/website/flush-now', {
+        adminFetch('/admin/website/flush-now', {
           method: 'POST',
           credentials: 'same-origin',
           headers: { 'Content-Type': 'application/json' },
@@ -6980,7 +6997,7 @@ export function renderDashboard(stats: StatsResponse): string {
       bind('btn-website-replay-dlq', () => {
         const btn = document.getElementById('btn-website-replay-dlq');
         if (btn) btn.disabled = true;
-        fetch('/admin/website/replay-dlq', {
+        adminFetch('/admin/website/replay-dlq', {
           method: 'POST',
           credentials: 'same-origin',
           headers: { 'Content-Type': 'application/json' },
@@ -7005,7 +7022,7 @@ export function renderDashboard(stats: StatsResponse): string {
         const checkbox = document.getElementById('website-refresh-enabled');
         const enabled = !!(checkbox && checkbox.checked);
         if (btn) btn.disabled = true;
-        fetch('/admin/website/refresh-toggle', {
+        adminFetch('/admin/website/refresh-toggle', {
           method: 'POST',
           credentials: 'same-origin',
           headers: { 'Content-Type': 'application/json' },
@@ -7037,7 +7054,7 @@ export function renderDashboard(stats: StatsResponse): string {
           return;
         }
         if (btn) btn.disabled = true;
-        fetch('/admin/website/override', {
+        adminFetch('/admin/website/override', {
           method: 'POST',
           credentials: 'same-origin',
           headers: { 'Content-Type': 'application/json' },
