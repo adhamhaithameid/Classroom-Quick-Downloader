@@ -3,13 +3,10 @@ main = "src/index.ts"
 compatibility_date = "2024-12-01"
 
 [vars]
-  # The committed config intentionally uses a placeholder value here.
-  # Set the real endpoint via local .dev.vars or CI-time injection.
-  # Production must point at an HTTPS origin. Local-only HTTP overrides belong in
-  # untracked .dev.vars, never in committed config.
-  # The worker appends "/ingest-batch" for flushes and "/api/public/website/*" for public reads.
-  # Use DNS host (not raw IP) so Cloudflare fetch does not hit direct-IP egress restrictions.
-  ORACLE_ENDPOINT = "https://oracle-endpoint-placeholder.invalid"
+  # Production Oracle endpoint for current HTTP-only Oracle deployment.
+  # Uses nip.io host instead of raw IP for Cloudflare egress compatibility.
+  ORACLE_ENDPOINT = "http://129.151.233.229.nip.io:8080"
+  ALLOW_INSECURE_ORACLE_ENDPOINT = "true"
   MAX_BATCH_EVENTS = "10000"
   # Website writes (telemetry + uninstall feedback) are origin-gated.
   # Keep this synced with your active website domains.
