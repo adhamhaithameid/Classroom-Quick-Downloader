@@ -36,8 +36,20 @@ Fixtures currently committed:
 Generate a sanitized fixture with:
 
 ```bash
-npx tsx tools/extract-fixture.ts verification/baseline/2026-03-08/snapshots/<page-type>/snapshot.html --output extension/tests/fixtures/classroom --page-type <page-type> --lang <lang>
+npx tsx tools/extract-fixture.ts verification/baseline/<baseline-date>/snapshots/<page-type>/snapshot.html --output extension/tests/fixtures/classroom --page-type <page-type> --lang <lang>
 ```
+
+Refresh integrity manifest checksums after fixture changes:
+
+```bash
+pnpm -C extension run fixtures:manifest:update
+```
+
+The manifest (`manifest.json`) stores:
+
+1. source metadata (GitHub PR/branch/commit reference),
+2. per-file byte-size,
+3. per-file SHA-256 checksum.
 
 Important rules:
 
@@ -45,3 +57,4 @@ Important rules:
 2. Keep raw captures in `verification/baseline/<date>/snapshots/` locally only.
 3. Commit only sanitized fixtures that are safe for regression tests.
 4. If a fixture represents current "golden" behavior, add or update a matching test in `extension/tests/`.
+5. After adding/changing any fixture `.html`, regenerate `manifest.json` and keep checksum test passing.

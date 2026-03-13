@@ -19,6 +19,8 @@
     "test:coverage:critical": "COVERAGE_PROFILE=critical vitest run --coverage",
     "test:coverage:runtime": "COVERAGE_PROFILE=runtime vitest run --coverage",
     "test:coverage:all": "pnpm run test:coverage:critical && pnpm run test:coverage:runtime",
+    "test:fixtures:manifest": "vitest run tests/classroom-fixture-manifest.test.ts",
+    "fixtures:manifest:update": "node tools/update-fixture-manifest.mjs",
     "postinstall": "wxt prepare",
     "edge": "wxt build -b edge && wxt zip -b edge",
     "firefox": "wxt build -b firefox && wxt zip -b firefox",
