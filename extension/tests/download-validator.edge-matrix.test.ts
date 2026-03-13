@@ -947,6 +947,12 @@ const EDGE_CASES: EdgeCase[] = [
     expectedValid: false,
     expectedReasonContains: 'INVALID_SCHEME',
   },
+  {
+    name: 'invalid http drive file account 2',
+    url: 'http://drive.google.com/u/2/file/d/1http2/view?usp=drivesdk',
+    expectedValid: false,
+    expectedReasonContains: 'INVALID_SCHEME',
+  },
 ];
 
 describe('download-validator edge matrix', () => {
