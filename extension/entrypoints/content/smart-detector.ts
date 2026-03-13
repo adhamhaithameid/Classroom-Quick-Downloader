@@ -8,10 +8,12 @@
 
 import {
   GOLDEN_SELECTORS,
+  USER_CONTENT_EXCLUSIONS_SELECTOR,
+  USER_CONTENT_EXCLUSIONS_TOP4_SELECTOR,
   CONFIDENCE_WEIGHTS,
   normalizeText,
   normalizeForComparison,
-  getEditedKeywords,
+  getCombinedEditedKeywords,
   hasDatePattern,
   isExcludedEditedPattern,
 } from './detection-keywords';
@@ -227,7 +229,7 @@ function executeEditedLayer3(post: HTMLElement, keywords: string[]): LayerResult
             return NodeFilter.FILTER_REJECT;
           }
 
-          if (GOLDEN_SELECTORS.userContentExclusions.some((selector) => element.matches(selector))) {
+          if (element.matches(USER_CONTENT_EXCLUSIONS_SELECTOR)) {
             return NodeFilter.FILTER_REJECT;
           }
 
@@ -356,19 +358,19 @@ function executeEditedLayer4(post: HTMLElement, matchedText: string | null): Lay
     };
   }
   
-  for (const selector of GOLDEN_SELECTORS.userContentExclusions.slice(0, 4)) {
-    const userContent = post.querySelector(selector);
-    if (userContent) {
-      const userText = normalizeForComparison(userContent.textContent || '');
-      if (userText.includes(normalizeForComparison(matchedText))) {
-        return {
-          score: CONFIDENCE_WEIGHTS.LAYER_4_EXCLUSION,
-          matchedText,
-          hasDateProximity: false,
-          usedParentContext: false,
-          details: `Layer4: PENALTY - Found in user content "${selector}"`,
-        };
-      }
+  const userContents = post.querySelectorAll(USER_CONTENT_EXCLUSIONS_TOP4_SELECTOR);
+  const normalizedMatchedText = normalizeForComparison(matchedText);
+
+  for (const userContent of userContents) {
+    const userText = normalizeForComparison(userContent.textContent || '');
+    if (userText.includes(normalizedMatchedText)) {
+      return {
+        score: CONFIDENCE_WEIGHTS.LAYER_4_EXCLUSION,
+        matchedText,
+        hasDateProximity: false,
+        usedParentContext: false,
+        details: `Layer4: PENALTY - Found in user content`,
+      };
     }
   }
   
@@ -386,12 +388,7 @@ function executeEditedLayer4(post: HTMLElement, matchedText: string | null): Lay
 // ============================================================================
 
 export function detectEdited(post: HTMLElement, pageLang: string): EditedDetectionResult {
-  const keywords = getEditedKeywords(pageLang);
-  const englishKeywords = getEditedKeywords('en');
-  const arabicKeywords = getEditedKeywords('ar');
-  
-  // Always include English and Arabic as fallbacks for maximum detection
-  const combinedKeywords = [...new Set([...keywords, ...englishKeywords, ...arabicKeywords])];
+  const combinedKeywords = getCombinedEditedKeywords(pageLang);
   
   const layer1 = executeEditedLayer1(post, combinedKeywords);
   const layer2 = executeEditedLayer2(post, combinedKeywords);

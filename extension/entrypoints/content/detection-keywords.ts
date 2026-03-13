@@ -639,6 +639,9 @@ export const GOLDEN_SELECTORS = {
   ],
 };
 
+export const USER_CONTENT_EXCLUSIONS_SELECTOR = GOLDEN_SELECTORS.userContentExclusions.join(',');
+export const USER_CONTENT_EXCLUSIONS_TOP4_SELECTOR = GOLDEN_SELECTORS.userContentExclusions.slice(0, 4).join(',');
+
 // ============================================================================
 // CONFIDENCE WEIGHTS
 // ============================================================================
@@ -667,10 +670,47 @@ export function getCommentKeywords(lang: string): CommentKeywords {
   return COMMENT_KEYWORDS[fullLang] || COMMENT_KEYWORDS[shortLang] || COMMENT_KEYWORDS['en'];
 }
 
+const combinedCommentKeywordsCache = new Map<string, CommentKeywords>();
+
+export function getCombinedCommentKeywords(lang: string): CommentKeywords {
+  if (combinedCommentKeywordsCache.has(lang)) {
+    return combinedCommentKeywordsCache.get(lang)!;
+  }
+
+  const keywords = getCommentKeywords(lang);
+  const englishKeywords = getCommentKeywords('en');
+  const arabicKeywords = getCommentKeywords('ar');
+
+  const combined: CommentKeywords = {
+    singular: [...new Set([...keywords.singular, ...englishKeywords.singular, ...arabicKeywords.singular])],
+    plural: [...new Set([...keywords.plural, ...englishKeywords.plural, ...arabicKeywords.plural])],
+    classComment: [...new Set([...keywords.classComment, ...englishKeywords.classComment, ...arabicKeywords.classComment])],
+  };
+
+  combinedCommentKeywordsCache.set(lang, combined);
+  return combined;
+}
+
 export function getEditedKeywords(lang: string): string[] {
   const shortLang = lang.split('-')[0].toLowerCase();
   const fullLang = lang.toLowerCase();
   return EDITED_KEYWORDS[fullLang] || EDITED_KEYWORDS[shortLang] || EDITED_KEYWORDS['en'];
+}
+
+const combinedEditedKeywordsCache = new Map<string, string[]>();
+
+export function getCombinedEditedKeywords(lang: string): string[] {
+  if (combinedEditedKeywordsCache.has(lang)) {
+    return combinedEditedKeywordsCache.get(lang)!;
+  }
+
+  const keywords = getEditedKeywords(lang);
+  const englishKeywords = getEditedKeywords('en');
+  const arabicKeywords = getEditedKeywords('ar');
+
+  const combined = [...new Set([...keywords, ...englishKeywords, ...arabicKeywords])];
+  combinedEditedKeywordsCache.set(lang, combined);
+  return combined;
 }
 
 export function getAllEditedKeywords(): string[] {

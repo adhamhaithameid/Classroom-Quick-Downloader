@@ -17,11 +17,12 @@
 
 import {
   GOLDEN_SELECTORS,
+  USER_CONTENT_EXCLUSIONS_SELECTOR,
   CONFIDENCE_WEIGHTS,
   normalizeText,
   normalizeForComparison,
   parseUnicodeInteger,
-  getCommentKeywords,
+  getCombinedCommentKeywords,
   isExcludedCommentPattern,
   type CommentKeywords,
 } from './detection-keywords';
@@ -453,7 +454,7 @@ function executeLayer4_NuclearScan(post: HTMLElement, keywords: CommentKeywords)
             return NodeFilter.FILTER_REJECT;
           }
 
-          if (GOLDEN_SELECTORS.userContentExclusions.some((selector) => element.matches(selector))) {
+          if (element.matches(USER_CONTENT_EXCLUSIONS_SELECTOR)) {
             return NodeFilter.FILTER_REJECT;
           }
 
@@ -515,17 +516,7 @@ function executeLayer4_NuclearScan(post: HTMLElement, keywords: CommentKeywords)
 // ============================================================================
 
 export function detectComments(post: HTMLElement, pageLang: string): CommentDetectionResult {
-  // Get keywords for current language + English fallback + Arabic (common)
-  const keywords = getCommentKeywords(pageLang);
-  const englishKeywords = getCommentKeywords('en');
-  const arabicKeywords = getCommentKeywords('ar');
-  
-  // Combine keywords (deduplicated)
-  const combinedKeywords: CommentKeywords = {
-    singular: [...new Set([...keywords.singular, ...englishKeywords.singular, ...arabicKeywords.singular])],
-    plural: [...new Set([...keywords.plural, ...englishKeywords.plural, ...arabicKeywords.plural])],
-    classComment: [...new Set([...keywords.classComment, ...englishKeywords.classComment, ...arabicKeywords.classComment])],
-  };
+  const combinedKeywords = getCombinedCommentKeywords(pageLang);
   
   // LAYER 0: DOM TRUTH (ABSOLUTE AUTHORITY)
   // If the specific Classwork comment container exists, its value is the AUTHORITY
