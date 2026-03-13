@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, Not_Stable]
   pull_request:
-    branches: [main, master]
+    branches: [main, master, Not_Stable]
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -34,6 +34,9 @@ jobs:
 
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Verify Extension Fixture Manifest Integrity
+        run: pnpm -C extension run test:fixtures:manifest
 
       - name: Run Extension Tests
         run: pnpm -C extension test
