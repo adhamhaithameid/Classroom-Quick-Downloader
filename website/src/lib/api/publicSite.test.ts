@@ -221,6 +221,21 @@ describe('uninstall feedback API', () => {
     expect(payload.stats.topReasons[0]?.reason).toBe('Temporary uninstall');
   });
 
+  it('returns an empty uninstall stats payload when the public stats route is disabled', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        new Response(JSON.stringify({ ok: false, error: { code: 'method_not_allowed' } }), { status: 405 })
+      )
+    );
+
+    const payload = await fetchUninstallStats();
+    expect(payload.ok).toBe(false);
+    expect(payload.stats.totalSubmissions).toBe(0);
+    expect(payload.stats.lastSubmittedAtUtc).toBeNull();
+    expect(payload.stats.topReasons).toEqual([]);
+  });
+
   it('submits uninstall feedback payload', async () => {
     const fetchMock = vi.fn(async () =>
       new Response(JSON.stringify({ ok: true, generatedAt: 1700001, submissionId: 12, message: 'ok' }), {

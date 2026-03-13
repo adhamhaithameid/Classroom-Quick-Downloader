@@ -69,7 +69,7 @@
     --text-secondary: #64748b;
     --muted: #94a3b8;
     --border-subtle: rgba(226, 232, 240, 0.35);
-    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    font-family: var(--font-ui, 'Avenir Next'), sans-serif;
     color: var(--text);
     overflow: clip;
     position: relative;

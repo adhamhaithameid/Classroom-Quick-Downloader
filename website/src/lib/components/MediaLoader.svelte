@@ -234,7 +234,7 @@
 
   .ml-error-text {
     margin: 0;
-    font-family: var(--font-ui, 'Plus Jakarta Sans'), sans-serif;
+    font-family: var(--font-ui, 'Avenir Next'), sans-serif;
     font-size: 14px;
     font-weight: 600;
     color: #475569;
@@ -242,7 +242,7 @@
 
   .ml-error-hint {
     margin: 0;
-    font-family: var(--font-ui, 'Plus Jakarta Sans'), sans-serif;
+    font-family: var(--font-ui, 'Avenir Next'), sans-serif;
     font-size: 12px;
     color: #94a3b8;
     font-weight: 500;
@@ -254,7 +254,7 @@
     gap: 6px;
     margin-top: 8px;
     padding: 8px 18px;
-    font-family: var(--font-ui, 'Plus Jakarta Sans'), sans-serif;
+    font-family: var(--font-ui, 'Avenir Next'), sans-serif;
     font-size: 13px;
     font-weight: 600;
     color: #fff;
