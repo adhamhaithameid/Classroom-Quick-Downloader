@@ -379,7 +379,8 @@ export interface Env {
   DANGER_PASSWORD: string;
   ORACLE_ENDPOINT: string;
   /**
-   * Optional emergency/dev override to allow non-loopback HTTP Oracle endpoints.
+   * Optional legacy compatibility override to allow non-loopback HTTP Oracle endpoints.
+   * This is intentionally strict: only the literal string "true" enables it.
    * Keep unset in production once HTTPS Oracle endpoint is available.
    */
   ALLOW_INSECURE_ORACLE_ENDPOINT?: string;

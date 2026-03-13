@@ -73,6 +73,8 @@ func validateProductionSecurityConfig(
 	allowHTTPStoreURLs bool,
 	allowUntrustedStoreURLs bool,
 	trustedProxyNets []*net.IPNet,
+	publicBaseURL string,
+	csrfAllowedOriginsRaw string,
 ) error {
 	normalizedEnv := strings.ToLower(strings.TrimSpace(appEnv))
 	if normalizedEnv != "production" && normalizedEnv != "prod" {
@@ -94,6 +96,27 @@ func validateProductionSecurityConfig(
 	if !strings.EqualFold(strings.TrimSpace(sessionCookieMode), "true") {
 		return errors.New("SESSION_COOKIE_SECURE must be true in production")
 	}
+	publicBaseOrigin, err := validateProductionHTTPSOrigin(publicBaseURL, "PUBLIC_BASE_URL")
+	if err != nil {
+		return err
+	}
+	csrfRaw := strings.TrimSpace(csrfAllowedOriginsRaw)
+	if csrfRaw == "" {
+		return errors.New("CSRF_ALLOWED_ORIGINS is required in production")
+	}
+	hasPublicBaseInCSRFList := false
+	for _, candidate := range strings.Split(csrfRaw, ",") {
+		normalizedCandidate, candidateErr := validateProductionHTTPSOrigin(candidate, "CSRF_ALLOWED_ORIGINS")
+		if candidateErr != nil {
+			return candidateErr
+		}
+		if normalizedCandidate == publicBaseOrigin {
+			hasPublicBaseInCSRFList = true
+		}
+	}
+	if !hasPublicBaseInCSRFList {
+		return errors.New("CSRF_ALLOWED_ORIGINS must include PUBLIC_BASE_URL in production")
+	}
 	for _, network := range trustedProxyNets {
 		if network == nil {
 			continue
@@ -105,6 +128,21 @@ func validateProductionSecurityConfig(
 	}
 
 	return nil
+}
+
+func validateProductionHTTPSOrigin(rawValue string, fieldName string) (string, error) {
+	trimmed := strings.TrimSpace(rawValue)
+	if trimmed == "" {
+		return "", errors.New(fieldName + " is required in production")
+	}
+	normalized, err := normalizeOriginValue(trimmed)
+	if err != nil {
+		return "", errors.New(fieldName + " must be a valid absolute origin")
+	}
+	if !strings.HasPrefix(normalized, "https://") {
+		return "", errors.New(fieldName + " must use https:// in production")
+	}
+	return normalized, nil
 }
 
 func main() {
@@ -130,6 +168,8 @@ func main() {
 		os.Getenv("ORACLE_ALLOW_HTTP_STORE_URLS") == "true",
 		os.Getenv("ORACLE_ALLOW_UNTRUSTED_STORE_URLS") == "true",
 		trustedProxyNets,
+		os.Getenv("PUBLIC_BASE_URL"),
+		os.Getenv("CSRF_ALLOWED_ORIGINS"),
 	); err != nil {
 		log.Fatalf("[FATAL] %v", err)
 	}

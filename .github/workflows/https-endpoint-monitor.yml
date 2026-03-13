@@ -1,0 +1,49 @@
+name: HTTPS Endpoint Monitor
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 * * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  https-smoke:
+    name: External HTTPS Smoke Matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate required endpoint variables
+        env:
+          ORACLE_ENDPOINT: ${{ vars.ORACLE_ENDPOINT }}
+          PUBLIC_WORKER_BASE_URL: ${{ vars.PUBLIC_WORKER_BASE_URL }}
+          PUBLIC_SITE_URL: ${{ vars.PUBLIC_SITE_URL }}
+        run: |
+          set -euo pipefail
+          required=(ORACLE_ENDPOINT PUBLIC_WORKER_BASE_URL PUBLIC_SITE_URL)
+          for key in "${required[@]}"; do
+            if [ -z "${!key:-}" ]; then
+              echo "::error::Missing required Actions variable: ${key}"
+              exit 1
+            fi
+            case "${!key}" in
+              https://*) ;;
+              *)
+                echo "::error::${key} must start with https://"
+                exit 1
+                ;;
+            esac
+          done
+
+      - name: Run HTTPS smoke matrix
+        env:
+          ORACLE_ENDPOINT: ${{ vars.ORACLE_ENDPOINT }}
+          PUBLIC_WORKER_BASE_URL: ${{ vars.PUBLIC_WORKER_BASE_URL }}
+          PUBLIC_SITE_URL: ${{ vars.PUBLIC_SITE_URL }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: bash tools/https_smoke_matrix.sh

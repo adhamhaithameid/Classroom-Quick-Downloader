@@ -18,12 +18,20 @@ import {
   ChangelogApplyMode,
   ChangelogSyncStatus,
 } from "./types";
-import { resolveOracleEndpoint } from "./oracle-endpoint";
+import {
+  isAllowInsecureOracleEndpointEnabled,
+  resolveOracleEndpoint,
+  shouldWarnOnInsecureOracleEndpoint,
+} from "./oracle-endpoint";
 import { generateSecureRandomString, secureRandom } from "./downloads_do/helpers";
 import { timingSafeStringEqual } from "./timing";
 
 export interface Env {
   ORACLE_ENDPOINT: string;
+  /**
+   * Legacy compatibility override for Oracle HTTP endpoints during HTTPS migration.
+   * Only the literal "true" is treated as enabled.
+   */
   ALLOW_INSECURE_ORACLE_ENDPOINT?: string;
   DO_SHARED_SECRET: string;
   MAX_BATCH_EVENTS: string;
@@ -3035,9 +3043,17 @@ export class DownloadsDurable {
       };
     }
 
+    // Compatibility bridge for migration: preserve explicit insecure override
+    // semantics while keeping HTTPS as the default transport expectation.
     const resolvedOracleEndpoint = resolveOracleEndpoint(this.env.ORACLE_ENDPOINT, {
-      allowInsecureHttp: this.env.ALLOW_INSECURE_ORACLE_ENDPOINT === "true",
+      allowInsecureHttp: isAllowInsecureOracleEndpointEnabled(this.env.ALLOW_INSECURE_ORACLE_ENDPOINT),
     });
+    if (shouldWarnOnInsecureOracleEndpoint("do.flushWebsiteTelemetryQueue", resolvedOracleEndpoint)) {
+      logEvent("warn", "oracle_insecure_endpoint_override_in_use", {
+        context: "do.flushWebsiteTelemetryQueue",
+        oracleEndpoint: resolvedOracleEndpoint.ok ? resolvedOracleEndpoint.baseUrl : this.env.ORACLE_ENDPOINT,
+      });
+    }
     if (!resolvedOracleEndpoint.ok || !this.env.DO_SHARED_SECRET) {
       const msg = !resolvedOracleEndpoint.ok
         ? resolvedOracleEndpoint.message
@@ -5580,9 +5596,17 @@ export class DownloadsDurable {
       return { ok: true, sent: 0 };
     }
 
+    // Compatibility bridge for migration: preserve explicit insecure override
+    // semantics while keeping HTTPS as the default transport expectation.
     const resolvedOracleEndpoint = resolveOracleEndpoint(this.env.ORACLE_ENDPOINT, {
-      allowInsecureHttp: this.env.ALLOW_INSECURE_ORACLE_ENDPOINT === "true",
+      allowInsecureHttp: isAllowInsecureOracleEndpointEnabled(this.env.ALLOW_INSECURE_ORACLE_ENDPOINT),
     });
+    if (shouldWarnOnInsecureOracleEndpoint("do.flushToOracle", resolvedOracleEndpoint)) {
+      logEvent("warn", "oracle_insecure_endpoint_override_in_use", {
+        context: "do.flushToOracle",
+        oracleEndpoint: resolvedOracleEndpoint.ok ? resolvedOracleEndpoint.baseUrl : this.env.ORACLE_ENDPOINT,
+      });
+    }
     if (!resolvedOracleEndpoint.ok || !this.env.DO_SHARED_SECRET) {
       const msg = !resolvedOracleEndpoint.ok
         ? resolvedOracleEndpoint.message

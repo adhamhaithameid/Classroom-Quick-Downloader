@@ -1,6 +1,11 @@
 # Oracle Dashboard — Security Audit Report
 
 > Update (2026-02-28): This document is a historical deep-audit snapshot. Current repository-wide security/reliability status is tracked in `/docs/MAJOR_SCAN_2026-02-28.md` (latest full scan baseline).
+>
+> Update (2026-03-13): Operational hardening completed for Oracle endpoint transport:
+> - Cloudflare Worker committed config now uses an HTTPS placeholder endpoint, not committed plaintext Oracle HTTP.
+> - Production deploy uses `ORACLE_ENDPOINT=https://129.151.233.229.nip.io` and passed workflow validation in GitHub Actions run `23058007463`.
+> - Oracle VM runtime confirms secure cookie + HTTPS public base URL (`SESSION_COOKIE_SECURE=true`, `PUBLIC_BASE_URL=https://129.151.233.229.nip.io`).
 
 > **Date:** 2026-02-12
 > **Scope:** Full-stack audit — Go backend (30+ source files) and HTML/JS frontend (5021-line `index.html`)
