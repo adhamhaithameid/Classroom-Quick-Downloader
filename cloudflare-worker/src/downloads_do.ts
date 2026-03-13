@@ -20,6 +20,7 @@ import {
 } from "./types";
 import { resolveOracleEndpoint } from "./oracle-endpoint";
 import { generateSecureRandomString, secureRandom } from "./downloads_do/helpers";
+import { timingSafeStringEqual } from "./timing";
 
 export interface Env {
   ORACLE_ENDPOINT: string;
@@ -96,6 +97,10 @@ type DurableStateShape = {
   ipAllowlist: string[];
   ipAllowlistStepUpBypassEnabled: boolean;
   dangerActionAuditLogs: DangerActionAuditRecord[];
+  sessionBindingMismatchCount: number;
+  sessionBindingLastMismatchAt: number | null;
+  sessionBindingLastExpectedPrefix: string | null;
+  sessionBindingLastActualPrefix: string | null;
 
   // Track endpoint rate limiting (per-IP, per-minute)
   trackRates: Record<string, { count: number; minute: number }>;
@@ -396,6 +401,13 @@ const CHANGELOG_DEFAULT_AUTO_SYNC_ENABLED = false;
 const CHANGELOG_DEFAULT_AUTO_SYNC_INTERVAL_MINUTES = 60;
 const CHANGELOG_MIN_AUTO_SYNC_INTERVAL_MINUTES = 5;
 const CHANGELOG_MAX_AUTO_SYNC_INTERVAL_MINUTES = 1440;
+const CHANGELOG_MARKDOWN_MAX_BYTES = 750_000;
+const CHANGELOG_ALLOWED_CONTENT_TYPES = new Set([
+  "text/plain",
+  "text/markdown",
+  "text/x-markdown",
+  "application/octet-stream",
+]);
 
 function defaultExtensionChangelogEntries(): ChangelogEntry[] {
   return [
@@ -1666,31 +1678,6 @@ function json<T>(obj: T, init: ResponseInit = {}): Response {
   });
 }
 
-/**
- * Best-effort timing-safe string comparison for JavaScript.
- *
- * IMPORTANT: JavaScript does not guarantee constant-time execution.
- * JIT compilers, garbage collection, and branch prediction can all
- * introduce timing variations. This implementation minimizes the
- * most obvious timing channels (early exit on length mismatch,
- * character-by-character short-circuit) but is NOT equivalent to
- * crypto.subtle.timingSafeEqual (unavailable in Workers runtime for
- * arbitrary strings).
- *
- * For password verification, prefer bcrypt/scrypt which have their
- * own timing-safe comparison built in.
- */
-function timingSafeStringEqual(a: string, b: string): boolean {
-  let mismatch = a.length ^ b.length;
-  const maxLength = Math.max(a.length, b.length);
-  for (let i = 0; i < maxLength; i += 1) {
-    const aCode = i < a.length ? a.charCodeAt(i) : 0;
-    const bCode = i < b.length ? b.charCodeAt(i) : 0;
-    mismatch |= aCode ^ bCode;
-  }
-  return mismatch === 0;
-}
-
 type LogLevel = "info" | "warn" | "error";
 
 function logEvent(level: LogLevel, message: string, fields?: Record<string, unknown>): void {
@@ -1794,6 +1781,10 @@ export class DownloadsDurable {
       ipAllowlist: [],
       ipAllowlistStepUpBypassEnabled: true,
       dangerActionAuditLogs: [],
+      sessionBindingMismatchCount: 0,
+      sessionBindingLastMismatchAt: null,
+      sessionBindingLastExpectedPrefix: null,
+      sessionBindingLastActualPrefix: null,
       trackRates: {},
 
       // Remote config defaults
@@ -2010,6 +2001,25 @@ export class DownloadsDurable {
           .filter((entry) => entry.id !== "" && entry.tsUtc > 0)
           .slice(0, MAX_DANGER_AUDIT_LOGS);
       })(),
+      sessionBindingMismatchCount: clampInt(
+        (stored as unknown as Record<string, unknown>).sessionBindingMismatchCount,
+        0,
+        Number.MAX_SAFE_INTEGER,
+        0,
+      ),
+      sessionBindingLastMismatchAt: (() => {
+        const value = clampInt(
+          (stored as unknown as Record<string, unknown>).sessionBindingLastMismatchAt,
+          0,
+          Number.MAX_SAFE_INTEGER,
+          0,
+        );
+        return value > 0 ? value : null;
+      })(),
+      sessionBindingLastExpectedPrefix:
+        trimAndLimitString((stored as unknown as Record<string, unknown>).sessionBindingLastExpectedPrefix, 120) || null,
+      sessionBindingLastActualPrefix:
+        trimAndLimitString((stored as unknown as Record<string, unknown>).sessionBindingLastActualPrefix, 120) || null,
       trackRates: stored.trackRates && typeof stored.trackRates === "object" ? stored.trackRates : base.trackRates,
 
       // Remote config - preserve stored values or use defaults
@@ -2805,6 +2815,9 @@ export class DownloadsDurable {
     // Login rate limiting - used by worker to check/record attempts
     if (pathname === "/auth/login-attempt" && request.method === "POST") {
       return this.handleLoginAttempt(request);
+    }
+    if (pathname === "/auth/session-binding-mismatch" && request.method === "POST") {
+      return this.handleSessionBindingMismatch(request);
     }
 
     // IP Allowlist check - used by worker before login
@@ -3798,6 +3811,10 @@ export class DownloadsDurable {
       security: {
         ipAllowlistEnabled: this.d.ipAllowlistEnabled,
         stepUpBypassEnabled: this.d.ipAllowlistStepUpBypassEnabled,
+        sessionBindingMismatches: this.d.sessionBindingMismatchCount,
+        lastSessionBindingMismatchAt: this.d.sessionBindingLastMismatchAt,
+        lastSessionBindingExpectedPrefix: this.d.sessionBindingLastExpectedPrefix,
+        lastSessionBindingActualPrefix: this.d.sessionBindingLastActualPrefix,
         dangerAuditRecent: [...this.d.dangerActionAuditLogs]
           .sort((a, b) => b.tsUtc - a.tsUtc)
           .slice(0, 25),
@@ -4116,6 +4133,10 @@ export class DownloadsDurable {
       security: {
         ipAllowlistEnabled: this.d.ipAllowlistEnabled,
         stepUpBypassEnabled: this.d.ipAllowlistStepUpBypassEnabled,
+        sessionBindingMismatches: this.d.sessionBindingMismatchCount,
+        lastSessionBindingMismatchAt: this.d.sessionBindingLastMismatchAt,
+        lastSessionBindingExpectedPrefix: this.d.sessionBindingLastExpectedPrefix,
+        lastSessionBindingActualPrefix: this.d.sessionBindingLastActualPrefix,
         dangerAuditRecent: [...this.d.dangerActionAuditLogs]
           .sort((a, b) => b.tsUtc - a.tsUtc)
           .slice(0, 50),
@@ -4449,6 +4470,10 @@ export class DownloadsDurable {
       websiteTelemetryLastCorrelationID: null,
       websiteTelemetryLastError: null,
       dangerActionAuditLogs: this.d.dangerActionAuditLogs ?? [],
+      sessionBindingMismatchCount: this.d.sessionBindingMismatchCount ?? 0,
+      sessionBindingLastMismatchAt: this.d.sessionBindingLastMismatchAt ?? null,
+      sessionBindingLastExpectedPrefix: this.d.sessionBindingLastExpectedPrefix ?? null,
+      sessionBindingLastActualPrefix: this.d.sessionBindingLastActualPrefix ?? null,
     };
     
     this.data = {
@@ -6023,7 +6048,19 @@ export class DownloadsDurable {
       if (!res.ok) {
         return { ok: false, error: `markdown_fetch_failed_${res.status}` };
       }
-      const markdown = trimAndLimitString(await res.text(), 750_000);
+      const contentLength = clampInt(res.headers.get("content-length"), 0, Number.MAX_SAFE_INTEGER, 0);
+      if (contentLength > CHANGELOG_MARKDOWN_MAX_BYTES) {
+        return { ok: false, error: "markdown_too_large" };
+      }
+      const contentType = (res.headers.get("content-type") || "").split(";", 1)[0].trim().toLowerCase();
+      if (contentType && !CHANGELOG_ALLOWED_CONTENT_TYPES.has(contentType)) {
+        return { ok: false, error: "markdown_content_type_invalid" };
+      }
+      const rawMarkdown = await res.text();
+      if (rawMarkdown.length > CHANGELOG_MARKDOWN_MAX_BYTES) {
+        return { ok: false, error: "markdown_too_large" };
+      }
+      const markdown = trimAndLimitString(rawMarkdown, CHANGELOG_MARKDOWN_MAX_BYTES);
       if (!markdown) return { ok: false, error: "markdown_empty" };
       return { ok: true, markdown };
     } catch {
@@ -6553,6 +6590,41 @@ export class DownloadsDurable {
       ok: true, 
       allowed: true, 
       attemptsRemaining: MAX_ATTEMPTS - 1 
+    });
+  }
+
+  private async handleSessionBindingMismatch(request: Request): Promise<Response> {
+    if (!this.isAuthorizedAdmin(request)) {
+      return json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+
+    let body: { expectedPrefix?: string; actualPrefix?: string };
+    try {
+      body = await request.json();
+    } catch {
+      return json({ ok: false, error: "invalid_json" }, { status: 400 });
+    }
+
+    const expectedPrefix = trimAndLimitString(body.expectedPrefix, 120) || "unknown";
+    const actualPrefix = trimAndLimitString(body.actualPrefix, 120) || "unknown";
+    const now = Date.now();
+
+    this.d.sessionBindingMismatchCount += 1;
+    this.d.sessionBindingLastMismatchAt = now;
+    this.d.sessionBindingLastExpectedPrefix = expectedPrefix;
+    this.d.sessionBindingLastActualPrefix = actualPrefix;
+    await this.persist();
+
+    logEvent("warn", "session_binding_mismatch_recorded", {
+      expectedPrefix,
+      actualPrefix,
+      count: this.d.sessionBindingMismatchCount,
+    });
+
+    return json({
+      ok: true,
+      count: this.d.sessionBindingMismatchCount,
+      lastMismatchAt: this.d.sessionBindingLastMismatchAt,
     });
   }
 

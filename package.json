@@ -49,17 +49,18 @@
       "minimatch": "^10.2.3",
       "rollup": "^4.59.0",
       "web-ext-run>multimatch": "8.0.0",
+      "devalue": "^5.6.4",
       "cookie": "0.7.2"
     },
     "packageExtensions": {
-      "eslint@10.0.2": {
+      "eslint@10.0.3": {
         "dependencies": {
           "ajv-draft-04": "1.0.0"
         }
       }
     },
     "patchedDependencies": {
-      "eslint@10.0.2": "patches/eslint@10.0.2.patch"
+      "eslint@10.0.3": "patches/eslint@10.0.2.patch"
     }
   },
   "devDependencies": {
