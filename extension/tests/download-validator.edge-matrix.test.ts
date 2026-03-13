@@ -1643,6 +1643,12 @@ const EDGE_CASES: EdgeCase[] = [
     expectedValid: false,
     expectedReasonContains: 'UNEXPECTED_URL_SHAPE',
   },
+  {
+    name: 'invalid userinfo spoof drive 18',
+    url: 'https://attacker18.example@drive.google.com/file/d/1spoof18/view',
+    expectedValid: false,
+    expectedReasonContains: 'UNEXPECTED_URL_SHAPE',
+  },
 ];
 
 describe('download-validator edge matrix', () => {
