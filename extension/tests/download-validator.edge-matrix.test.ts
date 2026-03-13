@@ -854,6 +854,11 @@ const EDGE_CASES: EdgeCase[] = [
     url: 'https://drive.google.com/file/d/1mixbad8/..%252f..%252fsecret',
     expectedValid: false,
     expectedReasonContains: 'SUSPICIOUS_ENCODING',
+  },  {
+    name: 'invalid mixed hostile bundle 9',
+    url: 'https://drive.google.com/file/d/1mixbad9/..%252f..%252fsecret',
+    expectedValid: false,
+    expectedReasonContains: 'SUSPICIOUS_ENCODING',
   },
 ];
 
