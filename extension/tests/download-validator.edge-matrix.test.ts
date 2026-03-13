@@ -1055,6 +1055,12 @@ const EDGE_CASES: EdgeCase[] = [
     expectedValid: false,
     expectedReasonContains: 'INVALID_SCHEME',
   },
+  {
+    name: 'invalid ftp docs export 0',
+    url: 'ftp://docs.google.com/document/d/1ftp0/export?format=pdf',
+    expectedValid: false,
+    expectedReasonContains: 'INVALID_SCHEME',
+  },
 ];
 
 describe('download-validator edge matrix', () => {
