@@ -1361,6 +1361,12 @@ const EDGE_CASES: EdgeCase[] = [
     expectedValid: false,
     expectedReasonContains: 'UNEXPECTED_URL_SHAPE',
   },
+  {
+    name: 'invalid unexpected shape drive thumbnail 11',
+    url: 'https://drive.google.com/thumbnail?id=1thumb11&sz=w11',
+    expectedValid: false,
+    expectedReasonContains: 'UNEXPECTED_URL_SHAPE',
+  },
 ];
 
 describe('download-validator edge matrix', () => {
