@@ -1,0 +1,27 @@
+import { describe, expect, it } from 'vitest';
+import { validateDownloadUrl } from '../src/v2/decision/download-validator';
+
+type EdgeCase = {
+  name: string;
+  url: string;
+  expectedValid: boolean;
+  expectedReasonContains?: string;
+};
+
+const EDGE_CASES: EdgeCase[] = [
+  {
+    name: 'valid drive file route account 0',
+    url: 'https://drive.google.com/u/0/file/d/1abcDEF0/view?usp=drivesdk',
+    expectedValid: true,
+  },
+];
+
+describe('download-validator edge matrix', () => {
+  it.each(EDGE_CASES)('$name', ({ url, expectedValid, expectedReasonContains }) => {
+    const result = validateDownloadUrl(url);
+    expect(result.valid).toBe(expectedValid);
+    if (expectedReasonContains) {
+      expect(result.reason).toContain(expectedReasonContains);
+    }
+  });
+});
