@@ -357,6 +357,10 @@ const EDGE_CASES: EdgeCase[] = [
     name: 'valid classroom drive proxy 6',
     url: 'https://classroom.google.com/u/2/drive/file/1class6/view',
     expectedValid: true,
+  },  {
+    name: 'valid classroom drive proxy 7',
+    url: 'https://classroom.google.com/u/3/drive/file/1class7/view',
+    expectedValid: true,
   },
 ];
 
