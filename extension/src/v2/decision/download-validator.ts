@@ -140,6 +140,8 @@ export function validateDownloadUrl(rawUrl: string): ValidationResult {
   }
 
   // 5. URL shape must match at least one expected pattern
+  // This is intentionally opinionated. A false negative here is annoying, but a
+  // false positive here means the extension tries to download the wrong thing.
   const shapeMatch = ALLOWED_URL_PATTERNS.some((pattern) => pattern.test(trimmed));
   if (!shapeMatch) {
     return {

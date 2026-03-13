@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, Not_Stable]
   pull_request:
-    branches: [main, master]
+    branches: [main, master, Not_Stable]
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -35,8 +35,24 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Verify Extension Fixture Manifest Integrity
+        run: |
+          if [ -f extension/tests/classroom-fixture-manifest.test.ts ]; then
+            pnpm -C extension run test:fixtures:manifest
+          else
+            echo "Fixture manifest integrity test is not present on this branch yet; skipping."
+          fi
+
       - name: Run Extension Tests
         run: pnpm -C extension test
+
+      - name: Run Extension Golden Regression Suites
+        run: |
+          if [ -f extension/tests/classroom-baseline-regression.test.ts ]; then
+            pnpm -C extension run test:golden
+          else
+            echo "Golden regression suite is not present on this branch yet; skipping."
+          fi
 
       - name: Run Extension Typecheck
         run: pnpm -C extension compile

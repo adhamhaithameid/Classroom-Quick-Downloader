@@ -1,17 +1,14 @@
 # oracle-backend/docker-compose.yml
 # For local development and easy deployment
 
-version: '3.8'
-
 services:
   oracle-backend:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: cqd-oracle-backend
-    ports:
-      - "8080:8080"
     environment:
+      - APP_ENV=${APP_ENV:-}
       - ADDR=:8080
       - DB_PATH=/data/analytics.db
       - STATIC_DIR=/app/static
@@ -20,6 +17,11 @@ services:
       - DASHBOARD_PASSWORD=${DASHBOARD_PASSWORD:?DASHBOARD_PASSWORD is required}
       - SUPER_ADMIN_PASSWORD=${SUPER_ADMIN_PASSWORD:?SUPER_ADMIN_PASSWORD is required}
       - ORACLE_AUDIT_CHECKPOINT_SECRET=${ORACLE_AUDIT_CHECKPOINT_SECRET:?ORACLE_AUDIT_CHECKPOINT_SECRET is required}
+      # HTTPS hardening: required by production startup validation.
+      # Keep PUBLIC_BASE_URL and CSRF_ALLOWED_ORIGINS aligned with your TLS hostname(s).
+      - SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-auto}
+      - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-}
+      - CSRF_ALLOWED_ORIGINS=${CSRF_ALLOWED_ORIGINS:-}
       - POSTGRES_DSN=${POSTGRES_DSN:-}
       - STORAGE_WATERMARK_WARN=${STORAGE_WATERMARK_WARN:-70}
       - STORAGE_WATERMARK_CRITICAL=${STORAGE_WATERMARK_CRITICAL:-85}
@@ -40,6 +42,10 @@ services:
     volumes:
       - oracle_data:/data
       - ${GOOGLE_CREDS_PATH_HOST:-/dev/null}:/run/secrets/google-credentials.json:ro
+    # HTTPS-only hardening: keep backend HTTP bound to loopback only.
+    # Public traffic should enter through Caddy TLS on :443.
+    ports:
+      - "127.0.0.1:8080:8080"
     restart: always
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]      
@@ -48,6 +54,27 @@ services:
       retries: 3
       start_period: 10s
 
+  caddy:
+    image: caddy:2-alpine
+    container_name: cqd-oracle-proxy
+    depends_on:
+      oracle-backend:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - ORACLE_PUBLIC_HOSTNAME=${ORACLE_PUBLIC_HOSTNAME:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: always
+
 volumes:
   oracle_data:
+    driver: local
+  caddy_data:
+    driver: local
+  caddy_config:
     driver: local

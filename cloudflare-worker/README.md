@@ -134,12 +134,14 @@ cloudflare-worker/
 
 ## ⚙️ Configuration & Environment
 
-All configuration is defined in `wrangler.toml`:
+Static deployment config lives in `wrangler.toml`, but environment-specific
+values should be injected outside the committed file:
 
 
 | Variable              | Type                           | Description                                                                                         | Example                       |
 | --------------------- | ------------------------------ | --------------------------------------------------------------------------------------------------- | ----------------------------- |
-| `ORACLE_ENDPOINT`     | `[vars]`                       | Base URL of the Oracle backend. Do not include`/ingest-batch`. Use HTTPS in production.             | `https://your-server.com` |
+| `ORACLE_ENDPOINT`     | local `.dev.vars` / CI variable | Base URL of the Oracle backend. Do not include `/ingest-batch`. The committed `wrangler.toml` keeps a placeholder value; inject the real value in local dev or CI. Use HTTPS in production; only local loopback/debug flows should ever use insecure HTTP overrides. | `https://your-server.com` |
+| `ALLOW_INSECURE_ORACLE_ENDPOINT` | local `.dev.vars` / CI variable (optional) | Legacy compatibility override for temporary migration windows. Only literal `"true"` enables non-loopback HTTP Oracle endpoints. Keep unset in production and remove after HTTPS cutover is complete. | `true` |
 | `MAX_BATCH_EVENTS`    | `[vars]`                       | Maximum events per flush. When buffer reaches this size, a flush is triggered.                      | `10000`                       |
 | `DO_SHARED_SECRET`    | **Secret**                     | Shared secret for admin endpoints + Oracle communication. **Do NOT put in `[vars]`**.              | —                            |
 | `DASHBOARD_PASSWORD`  | **Secret**                     | Password for the Worker dashboard login/session tokens (separate from `DO_SHARED_SECRET`).         | —                            |
@@ -618,7 +620,7 @@ The Worker will be deployed to `https://cqd-analytics.<your-subdomain>.workers.d
 
 **Solution:**
 
-1. Check `wrangler.toml` for `ORACLE_ENDPOINT` under `[vars]`.
+1. Check the effective `ORACLE_ENDPOINT` in local `.dev.vars` or in your CI variables.
 2. Ensure `DO_SHARED_SECRET` was set via `wrangler secret put`.
 3. Redeploy after making changes: `pnpm run deploy`.
 

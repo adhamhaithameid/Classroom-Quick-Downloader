@@ -11,7 +11,6 @@ export type OracleEndpointResolution =
   | {
       ok: true;
       baseUrl: string;
-      ingestUrl: string;
       ingestBatchUrl: string;
       websiteEventsBatchUrl: string;
       protocol: "https:" | "http:";
@@ -26,6 +25,43 @@ export type OracleEndpointResolution =
 type ResolveOracleEndpointOptions = {
   allowInsecureHttp?: boolean;
 };
+
+const warnedInsecureOracleContexts = new Set<string>();
+
+/**
+ * Parse the legacy insecure-endpoint override in a strict way.
+ *
+ * Intentionally only the literal "true" enables the override so accidental
+ * values cannot silently weaken transport security.
+ */
+export function isAllowInsecureOracleEndpointEnabled(rawValue: string | undefined): boolean {
+  return (rawValue || "").trim().toLowerCase() === "true";
+}
+
+/**
+ * Returns true only once per context/baseUrl pair when the resolved endpoint is
+ * a non-loopback HTTP origin. Callers can use this to log a deprecation warning
+ * without spamming logs on every request/flush.
+ */
+export function shouldWarnOnInsecureOracleEndpoint(
+  context: string,
+  resolution: OracleEndpointResolution,
+): boolean {
+  if (!resolution.ok || !resolution.insecureHttp) return false;
+
+  try {
+    const hostname = new URL(resolution.baseUrl).hostname;
+    if (isLoopbackHostname(hostname)) return false;
+  } catch {
+    // If URL parsing unexpectedly fails, keep warning enabled to stay fail-loud.
+  }
+
+  const normalizedContext = context.trim() || "unknown";
+  const key = `${normalizedContext}|${resolution.baseUrl}`;
+  if (warnedInsecureOracleContexts.has(key)) return false;
+  warnedInsecureOracleContexts.add(key);
+  return true;
+}
 
 function isLoopbackHostname(hostname: string): boolean {
   const h = hostname.toLowerCase();
@@ -86,6 +122,9 @@ export function resolveOracleEndpoint(
     };
   }
 
+  // Compatibility bridge:
+  // Keep the explicit insecure override path while environments finish HTTPS
+  // migration. This preserves current behavior for controlled rollouts.
   const allowInsecureHttp = options.allowInsecureHttp === true;
   const insecureHttp = protocol === "http:";
   if (insecureHttp && !allowInsecureHttp && !isLoopbackHostname(parsed.hostname)) {
@@ -103,7 +142,6 @@ export function resolveOracleEndpoint(
   return {
     ok: true,
     baseUrl,
-    ingestUrl: `${baseUrl}${EXTENSION_INGEST_BATCH_PATH}`,
     ingestBatchUrl: `${baseUrl}${EXTENSION_INGEST_BATCH_PATH}`,
     websiteEventsBatchUrl: `${baseUrl}${WEBSITE_INTERNAL_BATCH_PATH}`,
     protocol: insecureHttp ? "http:" : "https:",

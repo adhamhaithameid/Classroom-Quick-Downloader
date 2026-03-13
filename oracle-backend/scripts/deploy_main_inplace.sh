@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Manual production deploy helper for Oracle VM.
-# Preserves the current image under a rollback tag and recreates only the backend service.
+# Preserves the current image under a rollback tag and recreates the backend + TLS proxy.
 
 REPO_URL="${REPO_URL:-https://github.com/adhamhaithameid/Classroom-Quick-Downloader.git}"
 REPO_DIR="${REPO_DIR:-$HOME/Classroom-Quick-Downloader}"
@@ -34,7 +34,7 @@ if [[ -f "$LEGACY_DIR/google-credentials.json" ]]; then
 fi
 
 cd "$REPO_DIR"
-git fetch --prune origin main
+git fetch --prune origin
 
 if ! git rev-parse --verify "$TARGET_REF^{commit}" >/dev/null 2>&1; then
   echo "⚠️ Target '$TARGET_REF' not found. Falling back to origin/main"
@@ -81,17 +81,46 @@ else
 fi
 
 "${COMPOSE_BIN[@]}" build oracle-backend
-"${COMPOSE_BIN[@]}" up -d --build --no-deps --force-recreate oracle-backend
+"${COMPOSE_BIN[@]}" up -d --build --force-recreate oracle-backend caddy
+
+echo "🔒 Verifying backend HTTP bind is loopback-only"
+backend_bind="$("${COMPOSE_BIN[@]}" port oracle-backend 8080 2>/dev/null || true)"
+if [[ -z "$backend_bind" ]]; then
+  echo "❌ Could not resolve published bind for oracle-backend:8080"
+  exit 1
+fi
+if [[ "$backend_bind" != 127.0.0.1:* && "$backend_bind" != "[::1]:"* && "$backend_bind" != localhost:* ]]; then
+  echo "❌ Refusing deploy: oracle-backend:8080 is published as '$backend_bind' (must be loopback only)"
+  exit 1
+fi
+echo "✅ Backend HTTP bind verified: $backend_bind"
 
 echo "✅ Verifying health..."
 for attempt in {1..12}; do
-  if curl -sf "http://localhost:8080/health" >/dev/null; then
+  if "${COMPOSE_BIN[@]}" exec -T oracle-backend wget --no-verbose --tries=1 --spider "http://localhost:8080/health" >/dev/null 2>&1; then
     echo "✅ Health check passed"
     break
   fi
   sleep 5
 done
-curl -sf "http://localhost:8080/health" >/dev/null
+"${COMPOSE_BIN[@]}" exec -T oracle-backend wget --no-verbose --tries=1 --spider "http://localhost:8080/health" >/dev/null
+
+if [[ -n "${ORACLE_PUBLIC_HOSTNAME:-}" ]]; then
+  echo "🔐 Verifying proxy endpoint via https://${ORACLE_PUBLIC_HOSTNAME}/health"
+  proxy_ok="false"
+  for attempt in {1..12}; do
+    if curl --fail --silent --show-error --resolve "${ORACLE_PUBLIC_HOSTNAME}:443:127.0.0.1" "https://${ORACLE_PUBLIC_HOSTNAME}/health" >/dev/null 2>&1; then
+      echo "✅ Proxy health check passed"
+      proxy_ok="true"
+      break
+    fi
+    sleep 5
+  done
+  if [[ "${proxy_ok}" != "true" ]]; then
+    echo "❌ Proxy health check failed"
+    exit 1
+  fi
+fi
 
 echo "🎉 Deployment complete"
 echo "   commit: $DEPLOYED_SHA"

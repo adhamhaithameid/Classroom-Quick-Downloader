@@ -998,6 +998,56 @@ describe("Worker auth config hardening", () => {
     expect(payload.error).toBe("oracle_endpoint_insecure");
   });
 
+  it("allows insecure non-loopback ORACLE_ENDPOINT only when explicit override is enabled", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.toString()
+            : input.url;
+      if (url === "http://oracle.local:8080/api/public/website/overview") {
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            generatedAt: 1771700000000,
+            totals: { downloads: 11, success: 10, fail: 1 },
+          }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json; charset=utf-8" },
+          },
+        );
+      }
+      return new Response(JSON.stringify({ ok: false, error: "not_found" }), {
+        status: 404,
+        headers: { "content-type": "application/json; charset=utf-8" },
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const env = mockEnv({
+      ORACLE_ENDPOINT: "http://oracle.local:8080",
+      ALLOW_INSECURE_ORACLE_ENDPOINT: "true",
+    });
+    const request = new Request("https://example.com/api/public/website/overview", {
+      method: "GET",
+      headers: {
+        Origin: "https://website.example",
+      },
+    });
+
+    const res = await worker.fetch(request, env, {} as ExecutionContext);
+    const payload = await res.json() as { ok?: boolean; totals?: { downloads?: number } };
+
+    expect(res.status).toBe(200);
+    expect(payload.ok).toBe(true);
+    expect(payload.totals?.downloads).toBe(11);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    vi.unstubAllGlobals();
+  });
+
   it("does not emit CORS origin for protected requests without Origin header", async () => {
     const env = mockEnv();
     const request = new Request("https://example.com/stats", {
@@ -1227,6 +1277,80 @@ describe("Worker auth config hardening", () => {
     expect(dangerRes.status).toBe(200);
     expect(body.ok).toBe(true);
     expect(dangerRes.headers.get("Set-Cookie")).toContain("cqd_danger_stepup=");
+  });
+
+  it("records optional session-binding mismatches without blocking the session", async () => {
+    const doFetch = vi.fn(async (input: RequestInfo) => {
+      const url = typeof input === "string" ? input : input instanceof Request ? input.url : "";
+      if (url.includes("/auth/check-ip-allowlist")) {
+        return new Response(JSON.stringify({ allowed: true, enabled: true, stepUpBypassEnabled: false }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      if (url.includes("/auth/login-attempt")) {
+        return new Response(JSON.stringify({ ok: true, allowed: true }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      if (url.includes("/auth/session-binding-mismatch")) {
+        return new Response(JSON.stringify({ ok: true, count: 1 }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    });
+    const namespace = {
+      idFromName: (_name: string) => "downloads-id",
+      get: (_id: string) => ({ fetch: doFetch }),
+    };
+    const env = mockEnv({
+      DOWNLOADS_DO: namespace as unknown as DurableObjectNamespace,
+      SESSION_BINDING_MODE: "optional",
+    });
+
+    const loginRes = await worker.fetch(
+      new Request("https://example.com/", {
+        method: "POST",
+        headers: {
+          "content-type": "application/x-www-form-urlencoded",
+          "CF-Connecting-IP": "41.33.62.123",
+          "User-Agent": "CQD Test Agent A",
+        },
+        body: "password=dashboard-secret",
+      }),
+      env,
+      {} as ExecutionContext,
+    );
+    expect(loginRes.status).toBe(302);
+    const cookie = extractCookie(loginRes.headers.get("Set-Cookie"));
+    expect(cookie).toContain("cqd_session=");
+
+    const revisitRes = await worker.fetch(
+      new Request("https://example.com/", {
+        method: "GET",
+        headers: {
+          Cookie: cookie,
+          "CF-Connecting-IP": "41.33.62.123",
+          "User-Agent": "CQD Test Agent B",
+        },
+      }),
+      env,
+      {} as ExecutionContext,
+    );
+
+    expect(revisitRes.status).toBe(302);
+    expect(revisitRes.headers.get("Location")).toBe("https://example.com/dashboard");
+    const mismatchCall = doFetch.mock.calls.find(([input]) => {
+      const url = typeof input === "string" ? input : input instanceof Request ? input.url : "";
+      return url.includes("/auth/session-binding-mismatch");
+    });
+    expect(mismatchCall).toBeDefined();
   });
 
   // ---------------------------------------------------------------------------

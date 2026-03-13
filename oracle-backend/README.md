@@ -197,7 +197,7 @@ oracle-backend/
 │   └── favicon.png           # Browser favicon
 ├── Dockerfile                # Multi-stage production build
 ├── docker-compose.yml        # Deployment configuration
-├── deploy.sh                 # One-liner deploy script
+├── deploy.sh                 # Deprecated compatibility wrapper
 ├── go.mod                    # Go module dependencies
 └── README.md                 # You are here! 📍
 ```
@@ -211,7 +211,7 @@ oracle-backend/
 | `static/` | Pre-built dashboard SPA (served by the Go server). |
 | `Dockerfile` | Multi-stage build for minimal production image. |
 | `docker-compose.yml` | Docker Compose service definition for deployment. |
-| `deploy.sh` | Helper script for rebuilding and restarting the container. |
+| `deploy.sh` | Deprecated compatibility wrapper that forwards to `scripts/deploy_main_inplace.sh`. |
 
 ---
 
@@ -231,9 +231,9 @@ All configuration is done via environment variables, defined in `docker-compose.
 | `ARCHIVER_SHARED_SECRET` | *(required when auth enabled)* | Secret header for the archiver to read stats. |
 | `ALLOW_LOOPBACK_BYPASS` | `false` | Set `true` to allow loopback auth bypass (dev only). |
 | `ALLOW_EMPTY_DASHBOARD_PASSWORD` | `false` | Set `true` to allow an empty dashboard password (dev only). |
-| `SESSION_COOKIE_SECURE` | `auto` | Cookie Secure mode: `auto` (TLS-aware), `true` (always secure), `false` (always non-secure; needed for plain HTTP). |
-| `PUBLIC_BASE_URL` | *(optional)* | Canonical public origin (for CSRF origin allow checks), e.g. `https://oracle.example.com`. |
-| `CSRF_ALLOWED_ORIGINS` | *(optional)* | Comma-separated explicit CSRF origin allowlist (scheme + host), e.g. `https://oracle.example.com,https://admin.example.com`. |
+| `SESSION_COOKIE_SECURE` | `auto` | Cookie Secure mode: `auto` (TLS-aware), `true` (always secure), `false` (always non-secure; needed for plain HTTP). Must be `true` when `APP_ENV=production`. |
+| `PUBLIC_BASE_URL` | *(optional)* | Canonical public origin (for CSRF origin allow checks), e.g. `https://oracle.example.com`. Required and HTTPS when `APP_ENV=production`. |
+| `CSRF_ALLOWED_ORIGINS` | *(optional)* | Comma-separated explicit CSRF origin allowlist (scheme + host), e.g. `https://oracle.example.com,https://admin.example.com`. Required and HTTPS-only when `APP_ENV=production`, and must include `PUBLIC_BASE_URL`. |
 | `POSTGRES_DSN` | *(optional)* | Enables Postgres bootstrap and v4.1 cutover paths. |
 | `STORAGE_WATERMARK_WARN` | `70` | Disk usage warning watermark percentage. |
 | `STORAGE_WATERMARK_CRITICAL` | `85` | Disk usage critical watermark percentage. |
@@ -750,25 +750,50 @@ docker build --build-arg TARGETARCH=amd64 -t cqd-oracle-backend .
 ### Running with Docker Compose
 
 ```bash
-# Set the shared secret
+# Set the shared secret + public HTTPS hostname
 export DO_SHARED_SECRET="your-strong-secret"
+export ORACLE_PUBLIC_HOSTNAME="oracle.your-domain.com"
+export APP_ENV="production"
+export SESSION_COOKIE_SECURE="true"
+export PUBLIC_BASE_URL="https://oracle.your-domain.com"
+export CSRF_ALLOWED_ORIGINS="https://oracle.your-domain.com"
 
-# Start the service
+# Start the backend behind the bundled Caddy TLS proxy
 docker compose up -d
 
 # View logs
-docker compose logs -f oracle-backend
+docker compose logs -f oracle-backend caddy
 ```
 
-### Using `deploy.sh`
+Compose now fronts the Go service with Caddy on ports `80/443`.
+The backend `:8080` container port is mapped to loopback only (`127.0.0.1:8080`)
+so plaintext HTTP is not published publicly.
+Keep direct `http://localhost:8080` usage only for local `go run ./cmd/app`
+development, not for production-style compose deployments.
 
-For quick redeploys after code changes:
+When `APP_ENV=production`, startup is fail-closed for transport settings:
+- `SESSION_COOKIE_SECURE` must be `true`
+- `PUBLIC_BASE_URL` must be a valid `https://` origin
+- `CSRF_ALLOWED_ORIGINS` must be set to `https://` origins and include `PUBLIC_BASE_URL`
+
+### Preferred deployment entrypoint
+
+For quick redeploys after code changes, use the real deploy script directly:
+
+```bash
+./scripts/deploy_main_inplace.sh
+```
+
+### Using `deploy.sh` (compatibility only)
+
+`deploy.sh` still works, but it is only a wrapper for older local habits and
+should not be used in new automation or documentation.
 
 ```bash
 ./deploy.sh
 ```
 
-This script:
+The underlying deploy flow:
 1. Rebuilds the Docker image.
 2. Restarts the container.
 3. Prunes unused images.
@@ -1040,8 +1065,8 @@ This page shows:
 **Cause:** Browser drops the session cookie due to Secure policy mismatch for HTTP deployments.
 
 **Solution:**
-1. For HTTPS deployments keep `SESSION_COOKIE_SECURE=auto` (or `true`).
-2. For plain HTTP deployments set `SESSION_COOKIE_SECURE=false`.
+1. For HTTPS production deployments set `SESSION_COOKIE_SECURE=true`.
+2. For local/plain-HTTP development use `SESSION_COOKIE_SECURE=auto` (recommended) or `false`.
 3. Refresh the page and retry login after updating env vars.
 
 ---
