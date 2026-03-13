@@ -564,6 +564,11 @@ const EDGE_CASES: EdgeCase[] = [
     url: 'https://drive.google.com/drive/folders/1folder0',
     expectedValid: false,
     expectedReasonContains: 'UNEXPECTED_URL_SHAPE',
+  },  {
+    name: 'invalid unexpected shape on drive host 1',
+    url: 'https://drive.google.com/drive/folders/1folder1',
+    expectedValid: false,
+    expectedReasonContains: 'UNEXPECTED_URL_SHAPE',
   },
 ];
 
