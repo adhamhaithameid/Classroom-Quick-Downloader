@@ -70,6 +70,9 @@ function resolveAttachmentContainer(anchor: HTMLAnchorElement): HTMLElement | nu
   ].filter((candidate, index, all): candidate is HTMLElement => !!candidate && all.indexOf(candidate) === index);
 
   for (const candidate of candidates) {
+    // Loose body links are exactly where the random-button regressions come from.
+    // If a node only proves "I'm an anchor" and not "I'm a real attachment card",
+    // we leave it alone on purpose.
     if (candidate === anchor && !candidate.hasAttribute('data-attachment-id')) {
       continue;
     }
@@ -140,6 +143,8 @@ export function injectSingleFileButtons(root: QueryRoot = document): void {
     if (!container) continue;
 
     if (container.hasAttribute(PROCESSED_ATTR)) {
+      // This self-heals after DOM churn. Classroom loves to recycle nodes, and
+      // when it does we would rather re-check than silently strand a real file.
       if (!hasInjectedButton(container)) {
         container.removeAttribute(PROCESSED_ATTR);
       } else {

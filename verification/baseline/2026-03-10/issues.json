@@ -1,0 +1,51 @@
+{
+  "generatedAtUtc": "2026-03-11T04:05:00Z",
+  "status": "baseline-expanded-with-detail-surfaces",
+  "workingSurfacesLockedByFixtures": [
+    {
+      "name": "classwork-material-card",
+      "fixtures": [
+        "extension/tests/fixtures/classroom/classwork-material-post-en.html",
+        "extension/tests/fixtures/classroom/mixed-links-post-en.html"
+      ],
+      "protectedBehaviors": [
+        "real attachments get download buttons",
+        "loose Forms and Sheets links do not get buttons",
+        "nested wrappers do not become duplicate cards"
+      ]
+    },
+    {
+      "name": "stream-flagged-post",
+      "fixtures": [
+        "extension/tests/fixtures/classroom/stream-flagged-post-en.html",
+        "extension/tests/fixtures/classroom/rtl-flagged-post-ar.html"
+      ],
+      "protectedBehaviors": [
+        "edited and comment text stay on one outer card",
+        "RTL card ownership matches LTR card ownership"
+      ]
+    },
+    {
+      "name": "detail-surfaces",
+      "fixtures": [
+        "extension/tests/fixtures/classroom/material-details-en.html",
+        "extension/tests/fixtures/classroom/assignment-details-en.html",
+        "extension/tests/fixtures/classroom/announcement-detail-en.html",
+        "extension/tests/fixtures/classroom/student-work-teacher-en.html",
+        "extension/tests/fixtures/classroom/student-submissions-en.html"
+      ],
+      "protectedBehaviors": [
+        "details-view attachments stay actionable",
+        "unsupported links on details surfaces do not get buttons",
+        "teacher submissions controls do not get stray buttons",
+        "student work rows stay deduplicated"
+      ]
+    }
+  ],
+  "remainingCaptureTargets": [],
+  "notes": [
+    "Raw snapshots remain local-only because they contain real classroom data.",
+    "The committed fixtures intentionally freeze current good behavior rather than every possible classroom surface.",
+    "The student submissions fixture is based on the reachable View-your-work route because direct per-submission IDs were not discoverable from the signed-in account."
+  ]
+}
