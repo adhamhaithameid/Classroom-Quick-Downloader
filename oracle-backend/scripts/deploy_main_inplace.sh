@@ -34,7 +34,7 @@ if [[ -f "$LEGACY_DIR/google-credentials.json" ]]; then
 fi
 
 cd "$REPO_DIR"
-git fetch --prune origin main
+git fetch --prune origin
 
 if ! git rev-parse --verify "$TARGET_REF^{commit}" >/dev/null 2>&1; then
   echo "⚠️ Target '$TARGET_REF' not found. Falling back to origin/main"
