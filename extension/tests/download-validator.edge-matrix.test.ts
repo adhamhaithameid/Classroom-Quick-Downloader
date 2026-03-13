@@ -797,6 +797,10 @@ const EDGE_CASES: EdgeCase[] = [
     name: 'valid mixed route bundle 21',
     url: 'https://docs.google.com/document/d/1mix21/export?format=pdf&authuser=0',
     expectedValid: true,
+  },  {
+    name: 'valid mixed route bundle 22',
+    url: 'https://docs.google.com/document/d/1mix22/export?format=pdf&authuser=1',
+    expectedValid: true,
   },
 ];
 
