@@ -113,6 +113,10 @@ const EDGE_CASES: EdgeCase[] = [
     name: 'valid drive file route account 25',
     url: 'https://drive.google.com/u/0/file/d/1abcDEF25/view?usp=drivesdk',
     expectedValid: true,
+  },  {
+    name: 'valid drive file route account 26',
+    url: 'https://drive.google.com/u/1/file/d/1abcDEF26/view?usp=drivesdk',
+    expectedValid: true,
   },
 ];
 
