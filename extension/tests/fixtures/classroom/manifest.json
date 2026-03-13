@@ -1,0 +1,59 @@
+{
+  "manifestVersion": 1,
+  "generatedAtUtc": "2026-03-13T00:54:45.013Z",
+  "generatedBy": "extension/tools/update-fixture-manifest.mjs",
+  "source": {
+    "acquisition": "github-pr-history",
+    "pullRequest": "#419",
+    "branch": "try/post-merge-hardening-followups",
+    "commit": "33fbc94b59c8191f77b3f7b38870fe7a101156ae",
+    "baselineReference": "verification/baseline/2026-03-10/manifest.json"
+  },
+  "fixtures": [
+    {
+      "file": "announcement-detail-en.html",
+      "bytes": 1053,
+      "sha256": "2b80780ec138577ca7e570852fc3e6d224dfcf6e2251896a42f7ad18c7fff03b"
+    },
+    {
+      "file": "assignment-details-en.html",
+      "bytes": 1167,
+      "sha256": "b6a0d47083e2f8b7aa2a104832b39b978e12a8dff13e459fd8125b45c293a461"
+    },
+    {
+      "file": "classwork-material-post-en.html",
+      "bytes": 1440,
+      "sha256": "af0374ea0dcf2ff2fc0f44692581863f011ee01a2858b0429e5fc7d4aa0c9d4f"
+    },
+    {
+      "file": "material-details-en.html",
+      "bytes": 1141,
+      "sha256": "5d405edb8d4aa25ff670d40b143986d28b6a40e24451a6d18e1b0721810a33f2"
+    },
+    {
+      "file": "mixed-links-post-en.html",
+      "bytes": 2399,
+      "sha256": "6efb0e6ecf082669f308d7cd70a6484f3534eee940e2198dc7f8d9ba8dd76164"
+    },
+    {
+      "file": "rtl-flagged-post-ar.html",
+      "bytes": 1478,
+      "sha256": "5d64e197f07e1b08cf0cb326e7cae953f9b90d622187c4e9f4b23425ab65b67e"
+    },
+    {
+      "file": "stream-flagged-post-en.html",
+      "bytes": 831,
+      "sha256": "4109cd142ca4f688b1fec208cceeec48427edc8e222c3a57dde52dbc46c45bb2"
+    },
+    {
+      "file": "student-submissions-en.html",
+      "bytes": 1283,
+      "sha256": "2214108075df9ec4871e1c9f6aab88fa48f233adda3b8ba59a7320a6aed4dcf6"
+    },
+    {
+      "file": "student-work-teacher-en.html",
+      "bytes": 906,
+      "sha256": "1b7d8dd9855b20e8ded37d40e608602b4c139f9431181eee4d662ef1473d471a"
+    }
+  ]
+}
