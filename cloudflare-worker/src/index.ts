@@ -1,7 +1,11 @@
 // filepath: cloudflare-worker/src/index.ts
 import { renderDashboard, renderLoginPage, renderWebsiteConsole } from "./dashboard";
 import { renderReleaseNotesPage, sanitizeReleaseEntries } from "./release-notes";
-import { resolveOracleEndpoint } from "./oracle-endpoint";
+import {
+  isAllowInsecureOracleEndpointEnabled,
+  resolveOracleEndpoint,
+  shouldWarnOnInsecureOracleEndpoint,
+} from "./oracle-endpoint";
 import { timingSafeStringEqual } from "./timing";
 import type { Env as WorkerEnv, StatsResponse } from "./types";
 
@@ -1962,9 +1966,17 @@ async function handleOraclePublicWebsiteProxy(request: Request, env: WorkerEnv):
     );
   }
 
+  // Migration-safe behavior: keep the legacy override path (when explicitly
+  // enabled) while defaulting to HTTPS enforcement.
   const resolvedOracleEndpoint = resolveOracleEndpoint(env.ORACLE_ENDPOINT, {
-    allowInsecureHttp: env.ALLOW_INSECURE_ORACLE_ENDPOINT === "true",
+    allowInsecureHttp: isAllowInsecureOracleEndpointEnabled(env.ALLOW_INSECURE_ORACLE_ENDPOINT),
   });
+  if (shouldWarnOnInsecureOracleEndpoint("worker.publicWebsiteProxy", resolvedOracleEndpoint)) {
+    logEvent("warn", "oracle_insecure_endpoint_override_in_use", {
+      context: "worker.publicWebsiteProxy",
+      oracleEndpoint: resolvedOracleEndpoint.ok ? resolvedOracleEndpoint.baseUrl : env.ORACLE_ENDPOINT,
+    });
+  }
   if (!resolvedOracleEndpoint.ok) {
     return withCors(
       request,
@@ -2083,9 +2095,17 @@ function buildSiteSnapshotEnvelope(input: Record<string, unknown>): Record<strin
 }
 
 async function fetchOracleSnapshotPayload(env: WorkerEnv): Promise<Record<string, unknown>> {
+  // Migration-safe behavior: keep the legacy override path (when explicitly
+  // enabled) while defaulting to HTTPS enforcement.
   const resolvedOracleEndpoint = resolveOracleEndpoint(env.ORACLE_ENDPOINT, {
-    allowInsecureHttp: env.ALLOW_INSECURE_ORACLE_ENDPOINT === "true",
+    allowInsecureHttp: isAllowInsecureOracleEndpointEnabled(env.ALLOW_INSECURE_ORACLE_ENDPOINT),
   });
+  if (shouldWarnOnInsecureOracleEndpoint("worker.siteSnapshotFetch", resolvedOracleEndpoint)) {
+    logEvent("warn", "oracle_insecure_endpoint_override_in_use", {
+      context: "worker.siteSnapshotFetch",
+      oracleEndpoint: resolvedOracleEndpoint.ok ? resolvedOracleEndpoint.baseUrl : env.ORACLE_ENDPOINT,
+    });
+  }
   if (!resolvedOracleEndpoint.ok) {
     throw new Error(resolvedOracleEndpoint.message);
   }

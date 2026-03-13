@@ -998,6 +998,56 @@ describe("Worker auth config hardening", () => {
     expect(payload.error).toBe("oracle_endpoint_insecure");
   });
 
+  it("allows insecure non-loopback ORACLE_ENDPOINT only when explicit override is enabled", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.toString()
+            : input.url;
+      if (url === "http://oracle.local:8080/api/public/website/overview") {
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            generatedAt: 1771700000000,
+            totals: { downloads: 11, success: 10, fail: 1 },
+          }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json; charset=utf-8" },
+          },
+        );
+      }
+      return new Response(JSON.stringify({ ok: false, error: "not_found" }), {
+        status: 404,
+        headers: { "content-type": "application/json; charset=utf-8" },
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const env = mockEnv({
+      ORACLE_ENDPOINT: "http://oracle.local:8080",
+      ALLOW_INSECURE_ORACLE_ENDPOINT: "true",
+    });
+    const request = new Request("https://example.com/api/public/website/overview", {
+      method: "GET",
+      headers: {
+        Origin: "https://website.example",
+      },
+    });
+
+    const res = await worker.fetch(request, env, {} as ExecutionContext);
+    const payload = await res.json() as { ok?: boolean; totals?: { downloads?: number } };
+
+    expect(res.status).toBe(200);
+    expect(payload.ok).toBe(true);
+    expect(payload.totals?.downloads).toBe(11);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    vi.unstubAllGlobals();
+  });
+
   it("does not emit CORS origin for protected requests without Origin header", async () => {
     const env = mockEnv();
     const request = new Request("https://example.com/stats", {

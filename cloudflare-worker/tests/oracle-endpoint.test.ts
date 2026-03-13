@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { resolveOracleEndpoint } from "../src/oracle-endpoint";
+import {
+  isAllowInsecureOracleEndpointEnabled,
+  resolveOracleEndpoint,
+  shouldWarnOnInsecureOracleEndpoint,
+} from "../src/oracle-endpoint";
 
 describe("resolveOracleEndpoint", () => {
   it("returns missing error when endpoint is empty", () => {
@@ -68,6 +72,34 @@ describe("resolveOracleEndpoint", () => {
     if (result.ok) {
       expect(result.baseUrl).toBe("http://oracle.example.com:8080");
       expect(result.insecureHttp).toBe(true);
+    }
+  });
+
+  it("parses insecure override flag in strict compatibility mode", () => {
+    expect(isAllowInsecureOracleEndpointEnabled(undefined)).toBe(false);
+    expect(isAllowInsecureOracleEndpointEnabled("")).toBe(false);
+    expect(isAllowInsecureOracleEndpointEnabled("false")).toBe(false);
+    expect(isAllowInsecureOracleEndpointEnabled("1")).toBe(false);
+    expect(isAllowInsecureOracleEndpointEnabled("true")).toBe(true);
+    expect(isAllowInsecureOracleEndpointEnabled(" TRUE ")).toBe(true);
+  });
+
+  it("emits insecure-endpoint warning gate once for non-loopback HTTP endpoints", () => {
+    const result = resolveOracleEndpoint("http://oracle.example.com:8080", {
+      allowInsecureHttp: true,
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(shouldWarnOnInsecureOracleEndpoint("vitest.oracle.warning.once", result)).toBe(true);
+      expect(shouldWarnOnInsecureOracleEndpoint("vitest.oracle.warning.once", result)).toBe(false);
+    }
+  });
+
+  it("does not emit insecure-endpoint warning gate for loopback HTTP endpoints", () => {
+    const result = resolveOracleEndpoint("http://127.0.0.1:8080");
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(shouldWarnOnInsecureOracleEndpoint("vitest.oracle.warning.loopback", result)).toBe(false);
     }
   });
 });

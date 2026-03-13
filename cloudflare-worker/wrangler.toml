@@ -7,6 +7,8 @@ compatibility_date = "2024-12-01"
   # Set the real endpoint via local .dev.vars or CI-time injection.
   # Production must point at an HTTPS origin. Local-only HTTP overrides belong in
   # untracked .dev.vars, never in committed config.
+  # Legacy compatibility flag (for temporary migration only):
+  # ALLOW_INSECURE_ORACLE_ENDPOINT = "true"
   # The worker appends "/ingest-batch" for flushes and "/api/public/website/*" for public reads.
   # Use DNS host (not raw IP) so Cloudflare fetch does not hit direct-IP egress restrictions.
   ORACLE_ENDPOINT = "https://oracle-endpoint-placeholder.invalid"

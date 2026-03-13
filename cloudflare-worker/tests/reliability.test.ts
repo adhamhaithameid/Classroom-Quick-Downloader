@@ -82,4 +82,43 @@ describe('cloudflare worker reliability behavior', () => {
     expect(insecureResponse.status).toBe(503);
     expect((await insecureResponse.json() as { error?: string }).error).toBe('oracle_endpoint_insecure');
   });
+
+  it('keeps legacy insecure override behavior when explicitly enabled', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url =
+        typeof input === 'string'
+          ? input
+          : input instanceof URL
+            ? input.toString()
+            : input.url;
+      if (url === 'http://oracle.example.com:8080/api/public/website/overview') {
+        return new Response(
+          JSON.stringify({ ok: true, totals: { downloads: 7 } }),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json; charset=utf-8' }
+          }
+        );
+      }
+      return new Response(JSON.stringify({ ok: false, error: 'not_found' }), {
+        status: 404,
+        headers: { 'content-type': 'application/json; charset=utf-8' }
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await worker.fetch(
+      new Request('https://worker.example.com/api/public/website/overview'),
+      env({
+        ORACLE_ENDPOINT: 'http://oracle.example.com:8080',
+        ALLOW_INSECURE_ORACLE_ENDPOINT: 'true'
+      }),
+      {} as ExecutionContext
+    );
+
+    expect(response.status).toBe(200);
+    expect((await response.json() as { ok?: boolean; totals?: { downloads?: number } }).ok).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    vi.unstubAllGlobals();
+  });
 });
