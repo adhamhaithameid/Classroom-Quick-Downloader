@@ -1,0 +1,44 @@
+{
+  "capturedAtUtc": "2026-03-10T08:50:00Z",
+  "captureProfile": "dedicated-non-arc-chrome",
+  "committedRawSnapshots": false,
+  "pages": [
+    {
+      "name": "home",
+      "description": "Classroom home with enrolled courses visible"
+    },
+    {
+      "name": "stream",
+      "description": "First reachable course stream page"
+    },
+    {
+      "name": "classwork_list",
+      "description": "Classwork tab for the same course"
+    },
+    {
+      "name": "material_details",
+      "description": "Direct material details route for the first material in classwork"
+    },
+    {
+      "name": "assignment_details",
+      "description": "Direct assignment details route for the first assignment in classwork"
+    },
+    {
+      "name": "announcement_detail",
+      "description": "Direct post details route for the first stream post"
+    },
+    {
+      "name": "student_work_teacher",
+      "description": "Teacher submissions dashboard for the first assignment"
+    },
+    {
+      "name": "student_submissions",
+      "description": "View-your-work route reachable from classwork"
+    }
+  ],
+  "notes": [
+    "Raw HTML and screenshots were captured locally and intentionally left untracked because they contain real classroom data.",
+    "Safe structural regression fixtures were committed under extension/tests/fixtures/classroom/.",
+    "The direct details routes were captured from a dedicated non-Arc Chrome profile and remain local-only."
+  ]
+}
