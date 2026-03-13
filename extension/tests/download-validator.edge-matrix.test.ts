@@ -809,6 +809,11 @@ const EDGE_CASES: EdgeCase[] = [
     name: 'valid mixed route bundle 24',
     url: 'https://docs.google.com/document/d/1mix24/export?format=pdf&authuser=0',
     expectedValid: true,
+  },  {
+    name: 'invalid mixed hostile bundle 0',
+    url: 'https://drive.google.com/file/d/1mixbad0/..%252f..%252fsecret',
+    expectedValid: false,
+    expectedReasonContains: 'SUSPICIOUS_ENCODING',
   },
 ];
 
