@@ -201,6 +201,10 @@ const EDGE_CASES: EdgeCase[] = [
     name: 'valid drive uc route 2',
     url: 'https://drive.google.com/uc?export=download&id=1uc2&confirm=t',
     expectedValid: true,
+  },  {
+    name: 'valid drive uc route 3',
+    url: 'https://drive.google.com/uc?export=download&id=1uc3&confirm=t',
+    expectedValid: true,
   },
 ];
 
