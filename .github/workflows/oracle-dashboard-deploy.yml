@@ -85,7 +85,7 @@ jobs:
               exit 1
             fi
 
-            for key in APP_ENV ADDR DB_PATH STATIC_DIR DO_SHARED_SECRET DASHBOARD_PASSWORD SUPER_ADMIN_PASSWORD DANGER_PASSWORD ARCHIVER_SHARED_SECRET ORACLE_AUDIT_CHECKPOINT_SECRET PUBLIC_WEBSITE_ALLOWED_ORIGINS; do
+            for key in APP_ENV ADDR DB_PATH STATIC_DIR DO_SHARED_SECRET DASHBOARD_PASSWORD SUPER_ADMIN_PASSWORD DANGER_PASSWORD ARCHIVER_SHARED_SECRET ORACLE_AUDIT_CHECKPOINT_SECRET PUBLIC_WEBSITE_ALLOWED_ORIGINS ORACLE_PUBLIC_HOSTNAME; do
               value="$(grep -E "^${key}=" .env.production | head -n1 | cut -d= -f2- || true)"
               if [ -z "${value}" ]; then
                 echo "Missing required key in .env.production: ${key}"
@@ -123,11 +123,11 @@ jobs:
             chmod 600 .env.production .env docker-compose.runtime.override.yml
 
             export COMPOSE_PROJECT_NAME=oracle-backend
-            docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.runtime.override.yml up -d --build --no-deps --force-recreate oracle-backend
+            docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.runtime.override.yml up -d --build --force-recreate oracle-backend caddy
 
             health_ok="false"
             for i in $(seq 1 60); do
-              if curl -fsS "http://127.0.0.1:8080/health" >/dev/null 2>&1; then
+              if docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.runtime.override.yml exec -T oracle-backend wget --no-verbose --tries=1 --spider "http://localhost:8080/health" >/dev/null 2>&1; then
                 health_ok="true"
                 echo "Oracle health check passed"
                 break
@@ -138,6 +138,7 @@ jobs:
             if [ "${health_ok}" != "true" ]; then
               echo "Oracle health check failed after deploy"
               docker logs --tail 120 cqd-oracle-backend || true
+              docker logs --tail 120 cqd-oracle-proxy || true
               exit 1
             fi
 

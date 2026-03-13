@@ -308,11 +308,6 @@ func TestPublicWebsiteEndpoints_IncludeSchemaVersionForCompatibility(t *testing.
 			request: httptest.NewRequest(http.MethodGet, "/api/public/website/changelog", nil),
 			handler: PublicWebsiteUserChangelogHandler(sqlDB, nil),
 		},
-		{
-			name:    "uninstall-stats",
-			request: httptest.NewRequest(http.MethodGet, "/api/public/website/uninstall", nil),
-			handler: PublicWebsiteUninstallHandler(sqlDB),
-		},
 	}
 
 	for _, tc := range cases {
@@ -442,6 +437,33 @@ func TestResolvePublicWebsiteAllowedOrigins_IncludesPublicSiteURL(t *testing.T) 
 	}
 }
 
+func TestResolvePublicWebsiteAllowedOrigins_DefaultsExcludeDevOrigins(t *testing.T) {
+	t.Setenv("PUBLIC_SITE_URL", "")
+	t.Setenv("PUBLIC_WEBSITE_ALLOWED_ORIGINS", "")
+	allowed := resolvePublicWebsiteAllowedOrigins()
+	if _, ok := allowed["http://localhost:5173"]; ok {
+		t.Fatalf("expected localhost origin to be excluded from production defaults")
+	}
+	if _, ok := allowed["http://127.0.0.1:5173"]; ok {
+		t.Fatalf("expected loopback origin to be excluded from production defaults")
+	}
+	if _, ok := allowed["https://not-stable.classroom-quick-downloader-website.pages.dev"]; ok {
+		t.Fatalf("expected not-stable pages origin to be excluded from production defaults")
+	}
+}
+
+func TestResolvePublicWebsiteAllowedOrigins_EnvAllowsExplicitDevOrigin(t *testing.T) {
+	t.Setenv("PUBLIC_SITE_URL", "")
+	t.Setenv("PUBLIC_WEBSITE_ALLOWED_ORIGINS", "http://localhost:5173,https://not-stable.classroom-quick-downloader-website.pages.dev")
+	allowed := resolvePublicWebsiteAllowedOrigins()
+	if _, ok := allowed["http://localhost:5173"]; !ok {
+		t.Fatalf("expected localhost origin to be allowed when explicitly configured")
+	}
+	if _, ok := allowed["https://not-stable.classroom-quick-downloader-website.pages.dev"]; !ok {
+		t.Fatalf("expected not-stable pages origin to be allowed when explicitly configured")
+	}
+}
+
 func TestPublicWebsiteHandlers_PreflightForAllowedOrigin(t *testing.T) {
 	sqlDB := openPublicWebsiteDB(t)
 	t.Setenv("PUBLIC_WEBSITE_ALLOWED_ORIGINS", "https://adhamhaithameid.github.io")
@@ -515,28 +537,8 @@ func TestPublicWebsiteUninstallHandler_SubmitsAndAggregatesFeedback(t *testing.T
 	statsReq.Header.Set("Origin", "https://adhamhaithameid.github.io")
 	statsRR := httptest.NewRecorder()
 	PublicWebsiteUninstallHandler(sqlDB).ServeHTTP(statsRR, statsReq)
-	if statsRR.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", statsRR.Code, statsRR.Body.String())
-	}
-
-	var stats struct {
-		OK    bool `json:"ok"`
-		Stats struct {
-			TotalSubmissions int64 `json:"totalSubmissions"`
-			TopReasons       []struct {
-				Reason string `json:"reason"`
-				Count  int64  `json:"count"`
-			} `json:"topReasons"`
-		} `json:"stats"`
-	}
-	if err := json.Unmarshal(statsRR.Body.Bytes(), &stats); err != nil {
-		t.Fatalf("failed to decode stats payload: %v", err)
-	}
-	if !stats.OK || stats.Stats.TotalSubmissions != 1 {
-		t.Fatalf("unexpected stats payload: %+v", stats)
-	}
-	if len(stats.Stats.TopReasons) == 0 || stats.Stats.TopReasons[0].Reason != "I found another workflow" {
-		t.Fatalf("expected top reason to be recorded, got %+v", stats.Stats.TopReasons)
+	if statsRR.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("expected 405, got %d: %s", statsRR.Code, statsRR.Body.String())
 	}
 }
 
@@ -559,16 +561,9 @@ func TestPublicWebsiteUninstallHandler_RejectsBadInputs(t *testing.T) {
 			wantStatus: http.StatusForbidden,
 		},
 		{
-			name:       "missing required header",
-			origin:     "https://adhamhaithameid.github.io",
-			header:     "",
-			body:       `{"reason":"x","browser":"chrome","version":"1","source":"website"}`,
-			wantStatus: http.StatusBadRequest,
-		},
-		{
 			name:       "missing reason",
 			origin:     "https://adhamhaithameid.github.io",
-			header:     "XMLHttpRequest",
+			header:     "",
 			body:       `{"reason":"","browser":"chrome","version":"1","source":"website"}`,
 			wantStatus: http.StatusBadRequest,
 		},
@@ -595,7 +590,7 @@ func TestPublicWebsiteUninstallHandler_RejectsBadInputs(t *testing.T) {
 func TestPublicWebsiteUninstallHandler_FailsClosedWhenDatabaseMissing(t *testing.T) {
 	t.Setenv("PUBLIC_WEBSITE_ALLOWED_ORIGINS", "https://adhamhaithameid.github.io")
 
-	req := httptest.NewRequest(http.MethodGet, "/api/public/website/uninstall", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/public/website/uninstall", nil)
 	req.Header.Set("Origin", "https://adhamhaithameid.github.io")
 	rr := httptest.NewRecorder()
 	PublicWebsiteUninstallHandler(nil).ServeHTTP(rr, req)
@@ -692,19 +687,10 @@ func TestPublicWebsiteNewsletterSubscribeHandler_RejectsInvalidRequests(t *testi
 			wantCode:   "origin_not_allowed",
 		},
 		{
-			name:       "missing requested-with header",
+			name:       "invalid email without requested-with header",
 			method:     http.MethodPost,
 			origin:     "https://classroom-quick-downloader-website.pages.dev",
 			header:     "",
-			body:       `{"email":"ok@example.com"}`,
-			wantStatus: http.StatusBadRequest,
-			wantCode:   "missing_required_header",
-		},
-		{
-			name:       "invalid email",
-			method:     http.MethodPost,
-			origin:     "https://classroom-quick-downloader-website.pages.dev",
-			header:     "XMLHttpRequest",
 			body:       `{"email":"not-an-email"}`,
 			wantStatus: http.StatusBadRequest,
 			wantCode:   "invalid_email",
