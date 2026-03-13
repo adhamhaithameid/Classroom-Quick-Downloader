@@ -42,10 +42,10 @@ services:
     volumes:
       - oracle_data:/data
       - ${GOOGLE_CREDS_PATH_HOST:-/dev/null}:/run/secrets/google-credentials.json:ro
-    # Backward compatibility: keep direct HTTP dashboard access on :8080 while
-    # Caddy serves the hardened HTTPS endpoint on :443.
+    # HTTPS-only hardening: keep backend HTTP bound to loopback only.
+    # Public traffic should enter through Caddy TLS on :443.
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     restart: always
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]      
