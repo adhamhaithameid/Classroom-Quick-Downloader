@@ -1,16 +1,12 @@
 # oracle-backend/docker-compose.yml
 # For local development and easy deployment
 
-version: '3.8'
-
 services:
   oracle-backend:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: cqd-oracle-backend
-    ports:
-      - "8080:8080"
     environment:
       - ADDR=:8080
       - DB_PATH=/data/analytics.db
@@ -40,6 +36,10 @@ services:
     volumes:
       - oracle_data:/data
       - ${GOOGLE_CREDS_PATH_HOST:-/dev/null}:/run/secrets/google-credentials.json:ro
+    # Backward compatibility: keep direct HTTP dashboard access on :8080 while
+    # Caddy serves the hardened HTTPS endpoint on :443.
+    ports:
+      - "8080:8080"
     restart: always
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]      
@@ -48,6 +48,27 @@ services:
       retries: 3
       start_period: 10s
 
+  caddy:
+    image: caddy:2-alpine
+    container_name: cqd-oracle-proxy
+    depends_on:
+      oracle-backend:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - ORACLE_PUBLIC_HOSTNAME=${ORACLE_PUBLIC_HOSTNAME:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: always
+
 volumes:
   oracle_data:
+    driver: local
+  caddy_data:
+    driver: local
+  caddy_config:
     driver: local

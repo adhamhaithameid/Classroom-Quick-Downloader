@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -1109,15 +1108,17 @@ func StartDeploymentsAutoSyncLoop(
 				break
 			}
 			if attempt < maxAttempts {
-				log.Printf(
-					"[Scheduler] deployment auto-sync attempt %d/%d failed (ok=%d total=%d err=%v); retrying in %s",
-					attempt,
-					maxAttempts,
-					okCount,
-					len(results),
-					err,
-					retryDelay,
-				)
+				retryFields := map[string]any{
+					"attempt":     attempt,
+					"maxAttempts": maxAttempts,
+					"ok":          okCount,
+					"total":       len(results),
+					"retryDelay":  retryDelay.String(),
+				}
+				if err != nil {
+					retryFields["error"] = truncateAlertError(err.Error())
+				}
+				logEventWithContext(ctx, "warn", "deployment_auto_sync_retry", retryFields)
 				select {
 				case <-ctx.Done():
 					return
@@ -1133,14 +1134,13 @@ func StartDeploymentsAutoSyncLoop(
 		} else if int64(len(results)) != okCount {
 			resultState = "partial"
 		}
-		log.Printf(
-			"[Scheduler] deployment auto-sync completed: state=%s ok=%d total=%d attempts=%d targets=%s",
-			resultState,
-			okCount,
-			len(results),
-			attemptsUsed,
-			strings.Join(targetKeys, ","),
-		)
+		logEventWithContext(ctx, "info", "deployment_auto_sync_completed", map[string]any{
+			"state":    resultState,
+			"ok":       okCount,
+			"total":    len(results),
+			"attempts": attemptsUsed,
+			"targets":  strings.Join(targetKeys, ","),
+		})
 
 		if sqliteDB != nil {
 			payload := map[string]any{
@@ -1155,7 +1155,10 @@ func StartDeploymentsAutoSyncLoop(
 			}
 			auditCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 			if err := AppendAuditLog(auditCtx, sqliteDB, "deployment_sync_auto", "deployment_target", "bulk", resultState, payload); err != nil {
-				log.Printf("[Scheduler] deployment auto-sync audit write failed: %v", err)
+				logEventWithContext(ctx, "error", "deployment_auto_sync_audit_failed", map[string]any{
+					"state": resultState,
+					"error": truncateAlertError(err.Error()),
+				})
 			}
 			cancel()
 		}

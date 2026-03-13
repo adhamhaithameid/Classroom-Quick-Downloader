@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Backward-compatible wrapper. The old deployment flow used destructive
-# down/prune operations and legacy branch names. Keep this entrypoint, but
-# forward to the current safe in-place deploy flow.
+# Deprecated compatibility wrapper.
+# Use scripts/deploy_main_inplace.sh directly for all new docs, automation, and
+# operator workflows. This file stays only so older muscle-memory commands do
+# not break while the runbooks finish converging on the real deploy entrypoint.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 exec bash "$SCRIPT_DIR/scripts/deploy_main_inplace.sh" "$@"

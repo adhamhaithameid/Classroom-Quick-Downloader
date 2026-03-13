@@ -42,10 +42,7 @@ var (
 	defaultPublicWebsiteAllowedOrigins = []string{
 		"https://adhamhaithameid.github.io",
 		"https://classroom-quick-downloader-website.pages.dev",
-		"https://not-stable.classroom-quick-downloader-website.pages.dev",
 		"https://classroom-quick-downloader.pages.dev",
-		"http://localhost:5173",
-		"http://127.0.0.1:5173",
 	}
 
 	publicWebsiteEventActionToType = map[string]string{
@@ -721,24 +718,7 @@ func PublicWebsiteUninstallHandler(sqliteDB *sql.DB) http.HandlerFunc {
 		}
 
 		switch r.Method {
-		case http.MethodGet:
-			stats, err := loadPublicWebsiteUninstallStats(r.Context(), sqliteDB)
-			if err != nil {
-				writePublicWebsiteError(w, http.StatusInternalServerError, "uninstall_stats_load_failed", "Failed to load uninstall stats.", true)
-				return
-			}
-			writePublicWebsiteJSON(w, http.StatusOK, publicWebsiteUninstallStatsResponse{
-				SchemaVersion: publicWebsiteSchemaVersion,
-				OK:            true,
-				GeneratedAt:   time.Now().UTC().UnixMilli(),
-				Stats:         stats,
-			})
-			return
 		case http.MethodPost:
-			if strings.TrimSpace(r.Header.Get("X-Requested-With")) != "XMLHttpRequest" {
-				writePublicWebsiteError(w, http.StatusBadRequest, "missing_required_header", "X-Requested-With header is required.", false)
-				return
-			}
 			r.Body = http.MaxBytesReader(w, r.Body, publicWebsiteEventsBodyLimitBytes)
 
 			var req publicWebsiteUninstallRequest
@@ -796,7 +776,7 @@ func PublicWebsiteUninstallHandler(sqliteDB *sql.DB) http.HandlerFunc {
 			})
 			return
 		default:
-			writePublicWebsiteError(w, http.StatusMethodNotAllowed, "method_not_allowed", "Only GET and POST are allowed for this endpoint.", false)
+			writePublicWebsiteError(w, http.StatusMethodNotAllowed, "method_not_allowed", "Only POST is allowed for this endpoint.", false)
 			return
 		}
 	}
@@ -817,10 +797,6 @@ func PublicWebsiteNewsletterSubscribeHandler(sqliteDB, postgresDB *sql.DB) http.
 		}
 		if r.Method != http.MethodPost {
 			writePublicWebsiteError(w, http.StatusMethodNotAllowed, "method_not_allowed", "Only POST is allowed for this endpoint.", false)
-			return
-		}
-		if strings.TrimSpace(r.Header.Get("X-Requested-With")) != "XMLHttpRequest" {
-			writePublicWebsiteError(w, http.StatusBadRequest, "missing_required_header", "X-Requested-With header is required.", false)
 			return
 		}
 
