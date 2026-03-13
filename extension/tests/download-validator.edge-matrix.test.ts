@@ -1415,6 +1415,12 @@ const EDGE_CASES: EdgeCase[] = [
     expectedValid: false,
     expectedReasonContains: 'UNEXPECTED_URL_SHAPE',
   },
+  {
+    name: 'invalid suspicious encoding docs traversal 0',
+    url: 'https://docs.google.com/document/d/1enc0/..%252fsecret/export?format=pdf',
+    expectedValid: false,
+    expectedReasonContains: 'SUSPICIOUS_ENCODING',
+  },
 ];
 
 describe('download-validator edge matrix', () => {
