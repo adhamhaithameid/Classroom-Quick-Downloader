@@ -1229,6 +1229,12 @@ const EDGE_CASES: EdgeCase[] = [
     expectedValid: false,
     expectedReasonContains: 'DISALLOWED_HOST',
   },
+  {
+    name: 'invalid disallowed host mirror 9',
+    url: 'https://drive-google-com.evil.example/file/d/1host9/view',
+    expectedValid: false,
+    expectedReasonContains: 'DISALLOWED_HOST',
+  },
 ];
 
 describe('download-validator edge matrix', () => {
