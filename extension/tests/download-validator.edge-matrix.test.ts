@@ -429,6 +429,11 @@ const EDGE_CASES: EdgeCase[] = [
     url: 'http://drive.google.com/file/d/1bad3/view',
     expectedValid: false,
     expectedReasonContains: 'INVALID_SCHEME',
+  },  {
+    name: 'invalid http scheme 4',
+    url: 'http://drive.google.com/file/d/1bad4/view',
+    expectedValid: false,
+    expectedReasonContains: 'INVALID_SCHEME',
   },
 ];
 
