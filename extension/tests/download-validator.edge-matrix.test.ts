@@ -269,6 +269,10 @@ const EDGE_CASES: EdgeCase[] = [
     name: 'valid docs presentation route 4',
     url: 'https://docs.google.com/u/4/presentation/d/1doc4/export/pptx',
     expectedValid: true,
+  },  {
+    name: 'valid docs drawings route 5',
+    url: 'https://docs.google.com/u/0/drawings/d/1doc5/export/png',
+    expectedValid: true,
   },
 ];
 
