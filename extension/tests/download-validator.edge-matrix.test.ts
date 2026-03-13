@@ -409,6 +409,11 @@ const EDGE_CASES: EdgeCase[] = [
     name: 'valid docs googleusercontent host 9',
     url: 'https://doc-13-1d-docs.googleusercontent.com/downloads/file9.pdf',
     expectedValid: true,
+  },  {
+    name: 'invalid http scheme 0',
+    url: 'http://drive.google.com/file/d/1bad0/view',
+    expectedValid: false,
+    expectedReasonContains: 'INVALID_SCHEME',
   },
 ];
 
