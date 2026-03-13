@@ -83,6 +83,18 @@ fi
 "${COMPOSE_BIN[@]}" build oracle-backend
 "${COMPOSE_BIN[@]}" up -d --build --force-recreate oracle-backend caddy
 
+echo "🔒 Verifying backend HTTP bind is loopback-only"
+backend_bind="$("${COMPOSE_BIN[@]}" port oracle-backend 8080 2>/dev/null || true)"
+if [[ -z "$backend_bind" ]]; then
+  echo "❌ Could not resolve published bind for oracle-backend:8080"
+  exit 1
+fi
+if [[ "$backend_bind" != 127.0.0.1:* && "$backend_bind" != "[::1]:"* && "$backend_bind" != localhost:* ]]; then
+  echo "❌ Refusing deploy: oracle-backend:8080 is published as '$backend_bind' (must be loopback only)"
+  exit 1
+fi
+echo "✅ Backend HTTP bind verified: $backend_bind"
+
 echo "✅ Verifying health..."
 for attempt in {1..12}; do
   if "${COMPOSE_BIN[@]}" exec -T oracle-backend wget --no-verbose --tries=1 --spider "http://localhost:8080/health" >/dev/null 2>&1; then
