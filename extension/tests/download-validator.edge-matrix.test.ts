@@ -709,6 +709,10 @@ const EDGE_CASES: EdgeCase[] = [
     url: 'https://drive.google.com/file/d/../../etc/passwd9',
     expectedValid: false,
     expectedReasonContains: 'SUSPICIOUS_ENCODING',
+  },  {
+    name: 'valid mixed route bundle 0',
+    url: 'https://docs.google.com/document/d/1mix0/export?format=pdf&authuser=0',
+    expectedValid: true,
   },
 ];
 
