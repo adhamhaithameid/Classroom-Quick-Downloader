@@ -23,7 +23,6 @@ describe("resolveOracleEndpoint", () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.baseUrl).toBe("https://oracle.example.com");
-      expect(result.ingestUrl).toBe("https://oracle.example.com/ingest-batch");
       expect(result.ingestBatchUrl).toBe("https://oracle.example.com/ingest-batch");
       expect(result.websiteEventsBatchUrl).toBe("https://oracle.example.com/api/internal/website/events/batch");
       expect(result.insecureHttp).toBe(false);
@@ -35,7 +34,6 @@ describe("resolveOracleEndpoint", () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.baseUrl).toBe("http://127.0.0.1:8080");
-      expect(result.ingestUrl).toBe("http://127.0.0.1:8080/ingest-batch");
       expect(result.ingestBatchUrl).toBe("http://127.0.0.1:8080/ingest-batch");
       expect(result.websiteEventsBatchUrl).toBe("http://127.0.0.1:8080/api/internal/website/events/batch");
       expect(result.insecureHttp).toBe(true);
@@ -49,7 +47,6 @@ describe("resolveOracleEndpoint", () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.baseUrl).toBe("https://oracle.example.com");
-      expect(result.ingestUrl).toBe("https://oracle.example.com/ingest-batch");
       expect(result.ingestBatchUrl).toBe("https://oracle.example.com/ingest-batch");
       expect(result.websiteEventsBatchUrl).toBe("https://oracle.example.com/api/internal/website/events/batch");
     }

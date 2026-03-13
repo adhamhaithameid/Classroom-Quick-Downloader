@@ -260,6 +260,14 @@ describe("Worker security helpers", () => {
     expect(cleared).not.toContain("Secure");
   });
 
+  it("treats ALLOW_INSECURE_COOKIES as a case-insensitive boolean flag", () => {
+    const cookie = createSessionCookieHeader("token", new URL("https://example.com"), {
+      ALLOW_INSECURE_COOKIES: " TRUE ",
+    } as Env);
+    expect(cookie).not.toContain("Secure");
+    expect(cookie).toContain("SameSite=Lax");
+  });
+
   it("verifies and rejects session tokens correctly", async () => {
     const spy = vi.spyOn(Date, "now").mockReturnValue(1_000_000);
     const token = await createSessionToken("secret", "1.2.3.4");
@@ -271,6 +279,23 @@ describe("Worker security helpers", () => {
     spy.mockReturnValue(1_000_000 + 2 * 60 * 60 * 1000);
     expect(await verifySessionToken(token, "secret", "1.2.3.4")).toBe(false);
     spy.mockRestore();
+  });
+
+  it("does not invoke optional binding mismatch callbacks for unbound legacy sessions", async () => {
+    const mismatchSpy = vi.fn();
+    const token = await createSessionToken("secret", "1.2.3.4");
+
+    const ok = await verifySessionToken(
+      token,
+      "secret",
+      "1.2.3.4",
+      "Mozilla/5.0",
+      "optional",
+      { onOptionalBindingMismatch: mismatchSpy },
+    );
+
+    expect(ok).toBe(true);
+    expect(mismatchSpy).not.toHaveBeenCalled();
   });
 });
 
@@ -311,6 +336,32 @@ describe("public site metrics snapshot endpoint", () => {
     ]);
     expect(payload.counters).toBeUndefined();
     expect(payload.schedule?.refreshHoursUtc).toEqual([3, 6, 9, 12, 15, 18, 21]);
+  });
+
+  it("records session binding mismatches in durable security state", async () => {
+    const { obj } = makeDO();
+
+    const recordRes = await callDO(obj, "/auth/session-binding-mismatch", {
+      expectedPrefix: "41.33.62.0/24",
+      actualPrefix: "41.33.63.0/24",
+    });
+    expect(recordRes.status).toBe(200);
+    const payload = await recordRes.json() as { ok?: boolean; count?: number };
+    expect(payload.ok).toBe(true);
+    expect(payload.count).toBe(1);
+
+    const statsRes = await callDOGetWithAdmin(obj, "/stats");
+    expect(statsRes.status).toBe(200);
+    const statsPayload = await statsRes.json() as {
+      security?: {
+        sessionBindingMismatches?: number;
+        lastSessionBindingExpectedPrefix?: string | null;
+        lastSessionBindingActualPrefix?: string | null;
+      };
+    };
+    expect(statsPayload.security?.sessionBindingMismatches).toBe(1);
+    expect(statsPayload.security?.lastSessionBindingExpectedPrefix).toBe("41.33.62.0/24");
+    expect(statsPayload.security?.lastSessionBindingActualPrefix).toBe("41.33.63.0/24");
   });
 
   it("refreshes snapshots only once per scheduled UTC slot", async () => {
