@@ -8,6 +8,7 @@ services:
       dockerfile: Dockerfile
     container_name: cqd-oracle-backend
     environment:
+      - APP_ENV=${APP_ENV:-}
       - ADDR=:8080
       - DB_PATH=/data/analytics.db
       - STATIC_DIR=/app/static
