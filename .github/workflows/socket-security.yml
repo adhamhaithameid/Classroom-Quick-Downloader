@@ -2,7 +2,7 @@ name: Socket Security
 
 on:
   pull_request:
-    branches: [main, master]
+    branches: [main, master, Not_Stable]
 
 permissions:
   contents: read

@@ -6,9 +6,7 @@ on:
       - "oracle-backend/**"
       - ".github/workflows/oracle-backend-ci.yml"
   pull_request:
-    paths:
-      - "oracle-backend/**"
-      - ".github/workflows/oracle-backend-ci.yml"
+    branches: [main, master, Not_Stable]
   workflow_dispatch:
   schedule:
     - cron: "17 3 * * *"
