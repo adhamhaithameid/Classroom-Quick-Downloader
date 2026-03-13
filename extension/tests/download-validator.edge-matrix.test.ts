@@ -377,6 +377,10 @@ const EDGE_CASES: EdgeCase[] = [
     name: 'valid docs googleusercontent host 1',
     url: 'https://doc-0b-15-docs.googleusercontent.com/downloads/file1.pdf',
     expectedValid: true,
+  },  {
+    name: 'valid docs googleusercontent host 2',
+    url: 'https://doc-0c-16-docs.googleusercontent.com/downloads/file2.pdf',
+    expectedValid: true,
   },
 ];
 
