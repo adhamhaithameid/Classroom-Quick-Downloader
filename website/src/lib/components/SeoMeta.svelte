@@ -1,5 +1,6 @@
 <script lang="ts">
   import { SITE_URL } from '$lib/config';
+  import { SOCIAL_IMAGE } from '$lib/seo/site';
 
   export let title: string;
   export let description: string;
@@ -8,6 +9,10 @@
   export let keywords = '';
   export let type: 'website' | 'article' = 'website';
   export let structuredData: Record<string, unknown> | Array<Record<string, unknown>> | null = null;
+  export let imagePath = SOCIAL_IMAGE.path;
+  export let imageAlt = SOCIAL_IMAGE.alt;
+  export let imageWidth = SOCIAL_IMAGE.width;
+  export let imageHeight = SOCIAL_IMAGE.height;
 
   function normalizePath(value: string): string {
     const trimmed = value.trim();
@@ -22,7 +27,15 @@
     return normalizedPath === '/' ? `${normalizedBase}/` : `${normalizedBase}${normalizedPath}`;
   }
 
+  function buildAbsoluteAssetUrl(urlBase: string, assetPath: string): string {
+    const trimmed = assetPath.trim();
+    if (!trimmed) return '';
+    if (trimmed.startsWith('https://') || trimmed.startsWith('http://')) return trimmed;
+    return buildCanonical(urlBase, trimmed);
+  }
+
   $: canonical = buildCanonical(SITE_URL, path);
+  $: socialImageUrl = buildAbsoluteAssetUrl(SITE_URL, imagePath);
   $: robots = noindex ? 'noindex, nofollow' : 'index, follow';
   $: jsonLdItems = structuredData
     ? Array.isArray(structuredData)
@@ -52,10 +65,20 @@
   <meta property="og:title" content={title} />
   <meta property="og:description" content={description} />
   <meta property="og:url" content={canonical} />
+  {#if socialImageUrl}
+    <meta property="og:image" content={socialImageUrl} />
+    <meta property="og:image:alt" content={imageAlt} />
+    <meta property="og:image:width" content={String(imageWidth)} />
+    <meta property="og:image:height" content={String(imageHeight)} />
+  {/if}
 
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content={title} />
   <meta name="twitter:description" content={description} />
+  {#if socialImageUrl}
+    <meta name="twitter:image" content={socialImageUrl} />
+    <meta name="twitter:image:alt" content={imageAlt} />
+  {/if}
 
   {#each jsonLdScriptHtml as scriptHtml}
     {@html scriptHtml}

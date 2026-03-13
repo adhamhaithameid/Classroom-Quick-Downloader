@@ -3,6 +3,7 @@ import { render } from 'svelte/server';
 import RootRedirectPage from './+page.svelte';
 import Landing2RedirectPage from './landing2/+page.svelte';
 import OverviewPage from './overview/+page.svelte';
+import OverviewEditorPage from './overview-editor/+page.svelte';
 import ChangelogPage from './changelog/+page.svelte';
 import PrivacyPage from './privacy/+page.svelte';
 import FaqPage from './faq/+page.svelte';
@@ -13,6 +14,9 @@ import InstallChromePage from './install/chrome/+page.svelte';
 import SecurityPage from './security/+page.svelte';
 import CompareClassfetchPage from './compare/classroom-quick-downloader-vs-classfetch/+page.svelte';
 import { privacyContent } from '$lib/content/privacy';
+import { SITE_URL } from '$lib/config';
+import { GET as getRobotsTxt } from './robots.txt/+server';
+import { GET as getSitemapXml } from './sitemap.xml/+server';
 
 function squish(html: string): string {
   return html.replace(/\s+/g, ' ').trim();
@@ -25,6 +29,9 @@ describe('route render smoke coverage', () => {
 
     expect(head).toContain('Download All Google Classroom Files In One Click');
     expect(head).toContain('https://classroom-quick-downloader-website.pages.dev/');
+    expect(head).toContain('og:image');
+    expect(head).toContain('twitter:image');
+    expect(head).not.toContain('fonts.googleapis.com');
     expect(head).not.toContain('noindex, nofollow');
     expect(html).toContain('Download all Google Classroom files in one click for every assignment.');
   });
@@ -51,8 +58,18 @@ describe('route render smoke coverage', () => {
     expect(html).toContain('Not affiliated with Google or Google Classroom.');
     expect(html).toContain('Ready to save hours?');
     expect(html).toContain('See where Classroom Quick Downloader is used around the world.');
-    expect(html).toContain('l2-page-floats');
+    expect(html).not.toContain('l2-page-floats');
     expect(html).not.toContain('Element Editor');
+  });
+
+  it('keeps the internal overview editor route out of indexing', () => {
+    const { body, head } = render(OverviewEditorPage);
+    const html = squish(body);
+
+    expect(head).toContain('Overview Editor — Classroom Quick Downloader');
+    expect(head).toContain('noindex, nofollow');
+    expect(head).toContain('/overview-editor');
+    expect(html).toContain('l2-page-floats');
   });
 
   it('renders changelog loading state and refresh actions', () => {
@@ -153,6 +170,25 @@ describe('route render smoke coverage', () => {
     expect(securityHtml).toContain('Security Overview');
     expect(compareRendered.head).toContain('/compare/classroom-quick-downloader-vs-classfetch');
     expect(compareHtml).toContain('Classroom Quick Downloader vs Classfetch');
+  });
+
+  it('renders robots.txt and sitemap.xml from the current site URL', async () => {
+    const expectedBaseUrl = SITE_URL.replace(/\/+$/, '');
+    const robots = await getRobotsTxt();
+    const sitemap = await getSitemapXml();
+    const robotsText = await robots.text();
+    const sitemapText = await sitemap.text();
+
+    expect(robots.headers.get('content-type')).toContain('text/plain');
+    expect(robotsText).toContain(`Sitemap: ${expectedBaseUrl}/sitemap.xml`);
+    expect(robotsText).toContain('Disallow: /uninstall');
+    expect(robotsText).toContain('Disallow: /404');
+
+    expect(sitemap.headers.get('content-type')).toContain('application/xml');
+    expect(sitemapText).toContain(`<loc>${expectedBaseUrl}/</loc>`);
+    expect(sitemapText).toContain(`<loc>${expectedBaseUrl}/faq</loc>`);
+    expect(sitemapText).not.toContain('/uninstall');
+    expect(sitemapText).not.toContain('/404');
   });
 
 });

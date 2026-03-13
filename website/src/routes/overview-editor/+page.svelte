@@ -16,6 +16,22 @@
     canStartCelebration,
     nextCooldownUntil
   } from '$lib/celebration/balloons';
+  import {
+    type PlacementSection,
+    type ElementPlacement,
+    defaultPlacements,
+    clonePlacements,
+    loadPublishedPlacements,
+    loadDraftPlacements,
+    saveDraftPlacements,
+    publishPlacements,
+    discardDraftPlacements,
+    exportPlacementsJSON, importPlacementsJSON,
+    genPlacementId, getBuiltinSvg,
+    maxPlacementZIndex
+  } from '$lib/svgCatalog/placements';
+  import { categories as svgCategories, doodleItems, threeDElements } from '$lib/svgCatalog/index';
+  import type { SvgItem } from '$lib/svgCatalog/index';
 
   /* ━━━ Feature toggle: set to false to hide the silly question ━━━ */
   const ENABLE_SILLY_QUESTION = true;
@@ -24,8 +40,22 @@
   const CELEBRATION_OVERLAY_Z_INDEX = '2147483647';
   const CELEBRATION_BURST_COUNT = 4;
   const CELEBRATION_BURST_STAGGER_MS = 320;
+  const PINNED_SUPERCHARGE_STAR_ID = 'dd-1772174598462-101';
+  const PINNED_SUPERCHARGE_STAR_SAMPLE_ID = 'D-50';
+  const MOBILE_PLACEMENT_BREAKPOINT = 900;
+  const INITIAL_PLACEMENT_SECTION_VISIBILITY: Record<PlacementSection, boolean> = {
+    hero: true,
+    students: false,
+    problem: false,
+    features: false,
+    steps: false,
+    proof: false,
+    map: false,
+    cta: false,
+    general: true
+  };
 
-  export let seoPath = '/';
+  export let seoPath = '/overview-editor';
 
   function buildCanonicalUrl(path: string): string {
     const normalizedPath = path === '/' ? '/' : path.replace(/\/+$/, '');
@@ -43,6 +73,46 @@
     url: buildCanonicalUrl(seoPath),
     downloadUrl: [STORE_LINKS.chrome, STORE_LINKS.firefox, STORE_LINKS.edge]
   };
+
+  type RenderPlacement = ElementPlacement & {
+    renderX: number;
+    renderY: number;
+    renderSize: number;
+    renderOpacity: number;
+    renderRotate: number;
+    renderAnimDuration: number;
+    renderColor: string;
+    renderZIndex: number;
+    renderHidden: boolean;
+  };
+
+  /* ━━━ Edit Mode — inline element editor ━━━ */
+  let editMode = false;
+  let editIsolation = false;
+  let publishedPlacements: ElementPlacement[] = [];
+  let placements: ElementPlacement[] = [];
+  let selectedElementId: string | null = null;
+  let pickerOpen = false;
+  let pickerSearch = '';
+  let pickerTab: 'float' | 'doodle' | '3d' = 'float';
+  let importJsonText = '';
+  let showImportPanel = false;
+  let importErrors: string[] = [];
+  let importWarnings: string[] = [];
+  let editorStatus = '';
+  let editorStatusTone: 'ok' | 'warn' | 'error' = 'ok';
+  let statusTimer: ReturnType<typeof setTimeout> | null = null;
+  let selectedPlacement: ElementPlacement | null = null;
+  let pinnedSuperchargeStar: RenderPlacement | null = null;
+  let visiblePlacements: RenderPlacement[] = [];
+  let placementSectionVisible: Record<PlacementSection, boolean> = { ...INITIAL_PLACEMENT_SECTION_VISIBILITY };
+  let placementCanvasHeight = 0;
+  let placementCanvasLocked = false;
+  let frozenPlacementCoords: Record<string, { leftPx: number; topPx: number }> = {};
+  let isMobilePlacementsViewport = false;
+  let pickerItems: SvgItem[] = [];
+  let editDrag: { id: string; pointerId: number; startX: number; startY: number; origX: number; origY: number } | null = null;
+  let pageEl: HTMLElement | null = null;
 
   let overview: OverviewResponse | null = null;
   let mapData: MapResponse | null = null;
@@ -259,7 +329,7 @@
   }
 
   function setupMapPromptDelay(): (() => void) | undefined {
-    if (!ENABLE_SILLY_QUESTION || !mapSectionEl || typeof window === 'undefined') return undefined;
+    if (!ENABLE_SILLY_QUESTION || editMode || !mapSectionEl || typeof window === 'undefined') return undefined;
 
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -626,8 +696,58 @@
   function handleGlobalKeydown(event: KeyboardEvent): void {
     if (event.key === 'Escape' && mapExpanded) closeMapExpanded();
     if (event.key === 'Escape' && mediaExpanded) closeMediaExpanded();
+    if (event.key === 'Escape' && pickerOpen) pickerOpen = false;
     if (event.key === 'ArrowRight' && mediaExpanded) navigateMedia('next');
     if (event.key === 'ArrowLeft' && mediaExpanded) navigateMedia('prev');
+
+    if (!editMode || !selectedPlacement) return;
+
+    const target = event.target as HTMLElement | null;
+    if (
+      target &&
+      (target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT' ||
+        target.isContentEditable)
+    ) {
+      return;
+    }
+
+    if (selectedPlacement.locked) return;
+
+    const step = event.shiftKey ? 2 : 0.5;
+
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      event.preventDefault();
+      deleteElement(selectedPlacement.id);
+      return;
+    }
+
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'd') {
+      event.preventDefault();
+      duplicateSelectedElement();
+      return;
+    }
+
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault();
+      nudgeSelected(-step, 0);
+      return;
+    }
+    if (event.key === 'ArrowRight') {
+      event.preventDefault();
+      nudgeSelected(step, 0);
+      return;
+    }
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      nudgeSelected(0, -step);
+      return;
+    }
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      nudgeSelected(0, step);
+    }
   }
 
   function setupReveal(): void {
@@ -636,6 +756,10 @@
         for (const entry of entries) {
           if (entry.isIntersecting) {
             entry.target.classList.add('in-view');
+            const revealSection = (entry.target as HTMLElement).dataset.placementSection;
+            if (revealSection) {
+              setPlacementSectionVisible(revealSection);
+            }
             observer.unobserve(entry.target);
           }
         }
@@ -645,25 +769,482 @@
     document.querySelectorAll('.l2-reveal').forEach((el) => observer.observe(el));
   }
 
+  function resetPlacementSectionVisibility(showAll = false): void {
+    if (showAll) {
+      placementSectionVisible = {
+        hero: true,
+        students: true,
+        problem: true,
+        features: true,
+        steps: true,
+        proof: true,
+        map: true,
+        cta: true,
+        general: true
+      };
+      return;
+    }
+    placementSectionVisible = { ...INITIAL_PLACEMENT_SECTION_VISIBILITY };
+  }
+
+  function setPlacementSectionVisible(section: string): void {
+    const normalized = section.trim().toLowerCase();
+    if (
+      normalized !== 'hero' &&
+      normalized !== 'students' &&
+      normalized !== 'problem' &&
+      normalized !== 'features' &&
+      normalized !== 'steps' &&
+      normalized !== 'proof' &&
+      normalized !== 'map' &&
+      normalized !== 'cta' &&
+      normalized !== 'general'
+    ) {
+      return;
+    }
+    const sectionKey = normalized as PlacementSection;
+    if (placementSectionVisible[sectionKey]) return;
+    placementSectionVisible = { ...placementSectionVisible, [sectionKey]: true };
+  }
+
   async function loadSiteData(force = false): Promise<void> {
     await refreshWebsiteSnapshotStore({ force, userInitiated: force });
+  }
+
+  /* ━━━ Edit-mode helpers ━━━ */
+  /** Resolve SVG content for a placement — from catalog or builtins */
+  function resolveSvg(p: ElementPlacement): { svg: string; viewBox: string } {
+    const builtin = getBuiltinSvg(p.sampleId);
+    if (builtin) return builtin;
+
+    if (p.customSvg) {
+      return { svg: p.customSvg, viewBox: p.viewBox || '0 0 64 64' };
+    }
+
+    for (const cat of svgCategories) {
+      const item = cat.items.find((i: SvgItem) => i.id === p.sampleId);
+      if (item) {
+        return { svg: item.svg, viewBox: '0 0 64 64' };
+      }
+    }
+    for (const d of doodleItems) {
+      if (d.id === p.sampleId) {
+        return { svg: d.svg, viewBox: '0 0 60 60' };
+      }
+    }
+    for (const t of threeDElements) {
+      if (t.id === p.sampleId) {
+        return { svg: t.svg, viewBox: '0 0 120 110' };
+      }
+    }
+
+    return { svg: '<text x="32" y="40" text-anchor="middle" font-size="24" fill="currentColor">?</text>', viewBox: '0 0 64 64' };
+  }
+
+  function setEditorStatus(message: string, tone: 'ok' | 'warn' | 'error' = 'ok') {
+    editorStatus = message;
+    editorStatusTone = tone;
+    if (statusTimer) clearTimeout(statusTimer);
+    statusTimer = setTimeout(() => {
+      editorStatus = '';
+      statusTimer = null;
+    }, 3500);
+  }
+
+  function toggleEditIsolation() {
+    editIsolation = !editIsolation;
+    setEditorStatus(editIsolation ? 'Page interactions frozen for placement editing.' : 'Page interactions restored.');
+  }
+
+  function persistEditingState() {
+    if (!editMode) return;
+    saveDraftPlacements(placements);
+  }
+
+  function nudgeSelected(dx: number, dy: number): void {
+    if (!selectedPlacement || selectedPlacement.locked) return;
+    updatePlacement(selectedPlacement.id, {
+      x: Math.round(Math.max(-25, Math.min(125, selectedPlacement.x + dx)) * 10) / 10,
+      y: Math.round(Math.max(-25, Math.min(125, selectedPlacement.y + dy)) * 10) / 10
+    });
+  }
+
+  function addElement(type: 'float' | 'doodle' | '3d') {
+    const id = genPlacementId(type);
+    const defaultSamples: Record<'float' | 'doodle' | '3d', string> = {
+      float: 'F-1-1',
+      doodle: doodleItems[0]?.id || 'D-1',
+      '3d': threeDElements[0]?.id || '3D-1'
+    };
+
+    let spawnY = 30;
+    const canvasHeight = placementCanvasHeight > 0 ? placementCanvasHeight : pageEl?.scrollHeight || 0;
+    if (canvasHeight > 0) {
+      const vh = window.innerHeight;
+      const sy = window.scrollY;
+      spawnY = ((sy + vh / 2) / canvasHeight) * 100;
+      spawnY = Math.round(spawnY * 10) / 10;
+    }
+
+    placements = [
+      ...placements,
+      {
+        id,
+        sampleId: defaultSamples[type],
+        type,
+        section: 'general',
+        x: 50,
+        y: spawnY,
+        size: type === '3d' ? 120 : type === 'float' ? 90 : 60,
+        opacity: type === 'float' ? 0.06 : type === '3d' ? 0.72 : 0.7,
+        rotate: 0,
+        animDuration: type === '3d' ? 14 : 20,
+        color: 'var(--green)',
+        zIndex: maxPlacementZIndex(placements) + 1,
+        hidden: false,
+        locked: false
+      }
+    ];
+    persistEditingState();
+    selectedElementId = id;
+    setEditorStatus(`Added ${type} element '${id}'.`);
+  }
+
+  function duplicateSelectedElement() {
+    if (!selectedPlacement) return;
+    const duplicated: ElementPlacement = {
+      ...selectedPlacement,
+      id: genPlacementId(selectedPlacement.type),
+      x: Math.round(Math.max(-25, Math.min(125, selectedPlacement.x + 2)) * 10) / 10,
+      y: Math.round(Math.max(-25, Math.min(125, selectedPlacement.y + 2)) * 10) / 10,
+      zIndex: maxPlacementZIndex(placements) + 1,
+      locked: false,
+      hidden: false
+    };
+    placements = [...placements, duplicated];
+    persistEditingState();
+    selectedElementId = duplicated.id;
+    setEditorStatus(`Duplicated '${selectedPlacement.id}' -> '${duplicated.id}'.`);
+  }
+
+  function deleteElement(id: string) {
+    placements = placements.filter(p => p.id !== id);
+    persistEditingState();
+    if (selectedElementId === id) selectedElementId = null;
+    setEditorStatus(`Deleted '${id}'.`, 'warn');
+  }
+
+  function assignSample(sampleId: string) {
+    if (!selectedElementId) return;
+    placements = placements.map(p => p.id === selectedElementId ? { ...p, sampleId } : p);
+    persistEditingState();
+    pickerOpen = false;
+    setEditorStatus(`Applied sample '${sampleId}'.`);
+  }
+
+  function updatePlacement(id: string, updates: Partial<ElementPlacement>) {
+    placements = placements.map(p => p.id === id ? { ...p, ...updates } : p);
+    persistEditingState();
+  }
+
+  function bumpSelectedLayer(direction: 'up' | 'down') {
+    if (!selectedPlacement) return;
+    const next = Math.max(0, (selectedPlacement.zIndex ?? 0) + (direction === 'up' ? 1 : -1));
+    updatePlacement(selectedPlacement.id, { zIndex: next });
+  }
+
+  function toggleSelectedLock() {
+    if (!selectedPlacement) return;
+    updatePlacement(selectedPlacement.id, { locked: !selectedPlacement.locked });
+  }
+
+  function toggleSelectedVisibility() {
+    if (!selectedPlacement) return;
+    updatePlacement(selectedPlacement.id, { hidden: !selectedPlacement.hidden });
+  }
+
+  function startEditDrag(e: PointerEvent, p: ElementPlacement) {
+    if (!editMode || p.locked) return;
+    e.preventDefault();
+    e.stopPropagation();
+    selectedElementId = p.id;
+    editDrag = { id: p.id, pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, origX: p.x, origY: p.y };
+  }
+
+  function onEditPointerMove(e: PointerEvent) {
+    if (!editDrag || !pageEl) return;
+    if (e.pointerId !== editDrag.pointerId) return;
+    const rect = pageEl.getBoundingClientRect();
+    const pageW = rect.width;
+    const pageH = placementCanvasHeight > 0 ? placementCanvasHeight : pageEl.scrollHeight;
+    const dx = e.clientX - editDrag.startX;
+    const dy = e.clientY - editDrag.startY;
+    const newX = Math.max(-25, Math.min(125, editDrag.origX + (dx / pageW) * 100));
+    const newY = Math.max(-25, Math.min(125, editDrag.origY + (dy / pageH) * 100));
+    const dragId = editDrag.id;
+    placements = placements.map(p =>
+      p.id === dragId ? { ...p, x: Math.round(newX * 10) / 10, y: Math.round(newY * 10) / 10 } : p
+    );
+  }
+
+  function onEditPointerUp(e: PointerEvent) {
+    if (!editDrag) return;
+    if (e.pointerId !== editDrag.pointerId) return;
+    persistEditingState();
+    editDrag = null;
+  }
+
+  function handleEditExport() {
+    const json = exportPlacementsJSON(placements);
+    navigator.clipboard.writeText(json)
+      .then(() => setEditorStatus('Placements JSON copied to clipboard.'))
+      .catch(() => setEditorStatus('Could not copy JSON to clipboard.', 'error'));
+  }
+
+  function handleEditImport() {
+    const result = importPlacementsJSON(importJsonText);
+    importErrors = result.errors;
+    importWarnings = result.warnings;
+    if (!result.ok) {
+      setEditorStatus('Import failed. Fix JSON and try again.', 'error');
+      return;
+    }
+
+    placements = result.placements;
+    persistEditingState();
+    showImportPanel = false;
+    importJsonText = '';
+    selectedElementId = null;
+    setEditorStatus(
+      result.warnings.length > 0
+        ? `Imported with ${result.warnings.length} warning(s).`
+        : `Imported ${placements.length} placement(s).`,
+      result.warnings.length > 0 ? 'warn' : 'ok'
+    );
+  }
+
+  function handleEditPublish() {
+    publishedPlacements = publishPlacements(placements);
+    placements = clonePlacements(publishedPlacements);
+    setEditorStatus('Draft applied to live overview.', 'ok');
+  }
+
+  function handleEditDiscard() {
+    placements = discardDraftPlacements(publishedPlacements);
+    selectedElementId = null;
+    setEditorStatus('Draft reverted to published version.', 'warn');
+  }
+
+  function handleEditResetDraft() {
+    placements = clonePlacements(defaultPlacements);
+    persistEditingState();
+    selectedElementId = null;
+    setEditorStatus('Draft reset to defaults (not published yet).', 'warn');
+  }
+
+  /** Get all catalog items for the picker */
+  function getPickerItems(tab: 'float' | 'doodle' | '3d', search: string): SvgItem[] {
+    let items: SvgItem[] = [];
+    if (tab === 'float') {
+      items = svgCategories.flatMap(c => c.items);
+    } else if (tab === 'doodle') {
+      items = doodleItems;
+    } else {
+      items = threeDElements;
+    }
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      items = items.filter(i => i.id.toLowerCase().includes(q) || i.label.toLowerCase().includes(q));
+    }
+    return items;
+  }
+
+  function isPinnedSuperchargeStarPlacement(placement: ElementPlacement): boolean {
+    if (placement.id === PINNED_SUPERCHARGE_STAR_ID) return true;
+    return placement.sampleId === PINNED_SUPERCHARGE_STAR_SAMPLE_ID && placement.section === 'general';
+  }
+
+  function clampForRender(value: number, min: number, max: number): number {
+    if (!Number.isFinite(value)) return min;
+    return Math.min(max, Math.max(min, value));
+  }
+
+  function syncPlacementCanvasHeight(force = false): void {
+    if (!pageEl) return;
+    if (placementCanvasLocked && !force) return;
+    const measuredHeight = Math.max(
+      window.innerHeight || 0,
+      pageEl.scrollHeight || 0,
+      document.documentElement?.scrollHeight || 0,
+      document.body?.scrollHeight || 0
+    );
+    if (!Number.isFinite(measuredHeight) || measuredHeight <= 0) return;
+    placementCanvasHeight = Math.round(measuredHeight);
+  }
+
+  function freezePlacementCoordinates(): void {
+    if (!pageEl) return;
+    const viewportHeight = typeof window !== 'undefined' ? window.innerHeight || 0 : 0;
+    const canvasHeight = placementCanvasHeight > 0 ? placementCanvasHeight : pageEl.scrollHeight || viewportHeight;
+    const canvasWidth = pageEl.clientWidth || (typeof window !== 'undefined' ? window.innerWidth || 0 : 0);
+    if (!Number.isFinite(canvasHeight) || canvasHeight <= 0) return;
+    if (!Number.isFinite(canvasWidth) || canvasWidth <= 0) return;
+
+    const next: Record<string, { leftPx: number; topPx: number }> = {};
+    for (const placement of visiblePlacements) {
+      next[placement.id] = {
+        leftPx: Number(((canvasWidth * placement.renderX) / 100).toFixed(2)),
+        topPx: Number(((canvasHeight * placement.renderY) / 100).toFixed(2))
+      };
+    }
+    frozenPlacementCoords = next;
+  }
+
+  async function waitForStableLayoutBeforePlacementLock(): Promise<void> {
+    if (typeof document === 'undefined' || typeof window === 'undefined') return;
+
+    const fontsReady = (
+      document as Document & {
+        fonts?: { ready?: Promise<unknown> };
+      }
+    ).fonts?.ready;
+
+    if (fontsReady) {
+      await Promise.race([
+        fontsReady,
+        new Promise((resolve) => window.setTimeout(resolve, 1200))
+      ]);
+    }
+
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => resolve());
+      });
+    });
+  }
+
+  function resolvePlacementForViewport(placement: ElementPlacement): RenderPlacement {
+    const onMobile = isMobilePlacementsViewport;
+    return {
+      ...placement,
+      renderX: Number(clampForRender(onMobile && placement.mobileX !== undefined ? placement.mobileX : placement.x, -25, 125).toFixed(2)),
+      renderY: Number(clampForRender(onMobile && placement.mobileY !== undefined ? placement.mobileY : placement.y, -25, 125).toFixed(2)),
+      renderSize: Math.round(clampForRender(onMobile && placement.mobileSize !== undefined ? placement.mobileSize : placement.size, 16, 640)),
+      renderOpacity: Number(clampForRender(onMobile && placement.mobileOpacity !== undefined ? placement.mobileOpacity : placement.opacity, 0, 1).toFixed(3)),
+      renderRotate: Number(clampForRender(onMobile && placement.mobileRotate !== undefined ? placement.mobileRotate : placement.rotate, -360, 360).toFixed(2)),
+      renderAnimDuration: Number(
+        clampForRender(onMobile && placement.mobileAnimDuration !== undefined ? placement.mobileAnimDuration : placement.animDuration, 0, 120).toFixed(2)
+      ),
+      renderColor: onMobile && placement.mobileColor ? placement.mobileColor : placement.color || 'var(--green)',
+      renderZIndex: Math.round(clampForRender(onMobile && placement.mobileZIndex !== undefined ? placement.mobileZIndex : placement.zIndex ?? 0, 0, 30000)),
+      renderHidden: Boolean(placement.hidden || (onMobile && placement.mobileHidden === true))
+    };
+  }
+
+  function placementRenderOpacity(placement: RenderPlacement): number {
+    if (editMode) return placement.renderOpacity;
+    if (placementSectionVisible[placement.section]) return placement.renderOpacity;
+    return 0;
+  }
+
+  function placementRevealShift(placement: RenderPlacement): number {
+    if (editMode) return 0;
+    if (placementSectionVisible[placement.section]) return 0;
+    return 24;
+  }
+
+  function placementRenderLeftCss(placement: RenderPlacement): string {
+    if (!editMode && placementCanvasLocked) {
+      const frozen = frozenPlacementCoords[placement.id];
+      if (frozen) return `${frozen.leftPx}px`;
+    }
+    return `${placement.renderX}%`;
+  }
+
+  function placementRenderTopCss(placement: RenderPlacement): string {
+    if (!editMode && placementCanvasLocked) {
+      const frozen = frozenPlacementCoords[placement.id];
+      if (frozen) return `${frozen.topPx}px`;
+    }
+    return `${placement.renderY}%`;
+  }
+
+  function placementAnimationPlayState(placement: RenderPlacement): 'running' | 'paused' {
+    if (placement.renderAnimDuration <= 0) return 'paused';
+    if (editMode) return 'running';
+    if (!placementSectionVisible[placement.section]) return 'paused';
+    return 'running';
+  }
+
+  $: selectedPlacement = placements.find(p => p.id === selectedElementId) || null;
+  $: pinnedSuperchargeStar = isMobilePlacementsViewport
+    ? null
+    : placements
+        .map((placement) => resolvePlacementForViewport(placement))
+        .find((placement) => isPinnedSuperchargeStarPlacement(placement) && !placement.renderHidden) || null;
+  $: visiblePlacements = isMobilePlacementsViewport
+    ? []
+    : placements
+        .map((placement) => resolvePlacementForViewport(placement))
+        .filter((placement) => !placement.renderHidden && !isPinnedSuperchargeStarPlacement(placement))
+        .slice()
+        .sort((a, b) => a.renderZIndex - b.renderZIndex);
+  $: pickerItems = editMode ? getPickerItems(pickerTab, pickerSearch) : [];
+  $: if (!editMode && placementCanvasLocked) {
+    const frozenCount = Object.keys(frozenPlacementCoords).length;
+    const needsFreeze =
+      frozenCount !== visiblePlacements.length ||
+      visiblePlacements.some((placement) => !(placement.id in frozenPlacementCoords));
+    if (needsFreeze) {
+      freezePlacementCoordinates();
+    }
   }
 
   onMount(() => {
     let stopMarquee: (() => void) | undefined;
     let stopHeavierScroll: (() => void) | undefined;
     let stopMapPromptDelay: (() => void) | undefined;
+    let stopPlacementViewportWatcher: (() => void) | undefined;
     detectedBrowser = detectBrowserFromNavigator();
     reducedMotionPreferred = shouldReduceMotion();
     const searchParams = new URLSearchParams(window.location.search);
     const isEmbed = searchParams.has('embed');
+    editMode = true;
+    editIsolation = !searchParams.has('interactive');
+    const placementViewportMedia = window.matchMedia(`(max-width: ${MOBILE_PLACEMENT_BREAKPOINT}px)`);
+    const onPlacementViewportChange = () => {
+      isMobilePlacementsViewport = placementViewportMedia.matches;
+    };
+    onPlacementViewportChange();
+    if (typeof placementViewportMedia.addEventListener === 'function') {
+      placementViewportMedia.addEventListener('change', onPlacementViewportChange);
+      stopPlacementViewportWatcher = () => placementViewportMedia.removeEventListener('change', onPlacementViewportChange);
+    } else if (typeof placementViewportMedia.addListener === 'function') {
+      placementViewportMedia.addListener(onPlacementViewportChange);
+      stopPlacementViewportWatcher = () => placementViewportMedia.removeListener(onPlacementViewportChange);
+    }
+    if (editMode && ENABLE_SILLY_QUESTION) {
+      mapPromptVisible = true;
+    }
+    publishedPlacements = loadPublishedPlacements();
+    placements = editMode
+      ? loadDraftPlacements(publishedPlacements)
+      : clonePlacements(publishedPlacements);
     initSillyState();
     const mapComponentsLoad = loadMapComponents().catch(() => undefined);
     void Promise.all([loadSiteData(), mapComponentsLoad]).then(() => {
-      requestAnimationFrame(() => {
-        if (isEmbed) {
+      requestAnimationFrame(async () => {
+        await waitForStableLayoutBeforePlacementLock();
+        syncPlacementCanvasHeight(true);
+        if (!editMode) {
+          placementCanvasLocked = true;
+          freezePlacementCoordinates();
+        }
+        if (isEmbed || editMode) {
+          resetPlacementSectionVisibility(true);
           document.querySelectorAll('.l2-reveal').forEach((el) => el.classList.add('in-view'));
         } else {
+          resetPlacementSectionVisibility(false);
           setupReveal();
         }
         stopMarquee = initMarquee();
@@ -679,6 +1260,8 @@
       if (typeof stopMarquee === 'function') stopMarquee();
       if (typeof stopHeavierScroll === 'function') stopHeavierScroll();
       if (typeof stopMapPromptDelay === 'function') stopMapPromptDelay();
+      if (typeof stopPlacementViewportWatcher === 'function') stopPlacementViewportWatcher();
+      if (statusTimer) clearTimeout(statusTimer);
       document.body.classList.remove('l2-map-modal-open');
     };
   });
@@ -722,17 +1305,25 @@
 
 <svelte:window
   on:keydown={handleGlobalKeydown}
+  on:pointermove={onEditPointerMove}
+  on:pointerup={onEditPointerUp}
+  on:pointercancel={onEditPointerUp}
 />
 
 <SeoMeta
-  title="Classroom Quick Downloader — Download All Google Classroom Files In One Click"
-  description="Free browser extension to bulk download all attachments from Google Classroom assignments. One click. Chrome, Firefox, and Edge."
+  title="Overview Editor — Classroom Quick Downloader"
+  description="Internal overview editor for Classroom Quick Downloader page composition."
   path={seoPath}
-  keywords="download all google classroom files, bulk download google classroom attachments, google classroom extension"
-  structuredData={softwareApplicationStructuredData}
+  noindex={true}
 />
 
-<div class="l2">
+<svelte:head>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+</svelte:head>
+
+<div class="l2" class:edit-mode={editMode} class:edit-isolation={editMode && editIsolation} bind:this={pageEl}>
   <!-- ━━━━ Page-wide decorative layer ━━━━ -->
   <div class="l2-page-orbs" aria-hidden="true">
     <div class="orb orb-1"></div>
@@ -749,13 +1340,80 @@
     <div class="orb orb-12"></div>
   </div>
   <div class="l2-page-grid" aria-hidden="true"></div>
+  <div class="l2-page-floats" aria-hidden="true">
+    {#each visiblePlacements as p (p.id)}
+      {@const resolved = resolveSvg(p)}
+      <div
+        class="l2-placement-el"
+        class:edit-selected={editMode && selectedElementId === p.id}
+        class:edit-mode={editMode}
+        class:edit-locked={editMode && !!p.locked}
+        role="button"
+        tabindex={editMode ? 0 : -1}
+        aria-disabled={!editMode}
+        style="
+          left: {placementRenderLeftCss(p)};
+          top: {placementRenderTopCss(p)};
+          width: {p.renderSize}px;
+          height: {p.renderSize}px;
+          opacity: {placementRenderOpacity(p)};
+          color: {p.renderColor};
+          --placement-rotate: {p.renderRotate}deg;
+          --placement-shift: {placementRevealShift(p)}px;
+          animation-duration: {p.renderAnimDuration}s;
+          animation-play-state: {placementAnimationPlayState(p)};
+          z-index: {10000 + p.renderZIndex};
+        "
+        on:pointerdown={(e) => { if (editMode) startEditDrag(e, p); }}
+        on:click|stopPropagation={() => { if (editMode) { selectedElementId = p.id; } }}
+        on:keydown={(e) => {
+          if (!editMode) return;
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            selectedElementId = p.id;
+          }
+        }}
+      >
+        <svg
+          viewBox={resolved.viewBox}
+          fill="none" stroke="currentColor" stroke-width="1.5"
+          stroke-linecap="round" stroke-linejoin="round"
+          style="width:100%;height:100%;"
+        >
+          {@html resolved.svg}
+        </svg>
+        {#if editMode}
+          <button class="el-delete-btn" on:pointerdown|stopPropagation on:click|stopPropagation={() => deleteElement(p.id)} title="Delete">✕</button>
+          <span class="el-id-label">{p.id}</span>
+        {/if}
+      </div>
+    {/each}
+  </div>
 
   <!-- ━━━━ Hero ━━━━ -->
   <section id="top" class="l2-hero l2-snap">
     <div class="l2-wrap l2-hero-content">
       <h1 class="l2-mega">
         The free extension that<br/>
-        <span class="l2-em l2-em-supercharge">supercharges</span><br/>Google Classroom.
+        <span class="l2-em l2-em-supercharge">supercharges{#if pinnedSuperchargeStar}{@const pinnedResolved = resolveSvg(pinnedSuperchargeStar)}{@const pinnedSize = Math.max(18, Math.min(54, pinnedSuperchargeStar.renderSize))}<span
+            class="l2-supercharge-star"
+            aria-hidden="true"
+            style="
+              width: {pinnedSize}px;
+              height: {pinnedSize}px;
+              opacity: {pinnedSuperchargeStar.renderOpacity};
+              color: {pinnedSuperchargeStar.renderColor};
+              transform: rotate({pinnedSuperchargeStar.renderRotate}deg);
+            "
+          ><svg
+              viewBox={pinnedResolved.viewBox}
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              style="width:100%;height:100%;"
+            >{@html pinnedResolved.svg}</svg></span>{/if}</span><br/>Google Classroom.
       </h1>
 
       <p class="l2-sub">
@@ -1293,6 +1951,239 @@
     </div>
   </section>
 
+  <!-- ━━━━ Edit Mode Toolbar & Picker ━━━━ -->
+  {#if editMode}
+    <div class="edit-toolbar" transition:fade={{ duration: 200 }}>
+      <div class="edit-tb-left">
+        <span class="edit-tb-title">✏️ Element Editor</span>
+        <button class="edit-tb-btn edit-tb-add-float" on:click={() => addElement('float')}>+ Float</button>
+        <button class="edit-tb-btn edit-tb-add-doodle" on:click={() => addElement('doodle')}>+ Doodle</button>
+        <button class="edit-tb-btn edit-tb-add-3d" on:click={() => addElement('3d')}>+ 3D</button>
+        <span class="edit-tb-count">{placements.length} element{placements.length !== 1 ? 's' : ''}</span>
+        {#if editorStatus}
+          <span class="edit-tb-status tone-{editorStatusTone}">{editorStatus}</span>
+        {/if}
+      </div>
+      <div class="edit-tb-right">
+        <button class="edit-tb-btn" on:click={toggleEditIsolation}>{editIsolation ? '🧊 Editing Locked' : '🌐 Page Interactive'}</button>
+        <button class="edit-tb-btn" on:click={handleEditExport}>📋 Export</button>
+        <button
+          class="edit-tb-btn"
+          on:click={() => {
+            const next = !showImportPanel;
+            showImportPanel = next;
+            if (next) {
+              importErrors = [];
+              importWarnings = [];
+            }
+          }}
+        >📥 Import</button>
+        <button class="edit-tb-btn" on:click={handleEditDiscard}>↩️ Discard Draft</button>
+        <button class="edit-tb-btn edit-tb-publish" on:click={handleEditPublish}>✅ Apply Draft</button>
+        <button class="edit-tb-btn edit-tb-reset" on:click={handleEditResetDraft}>🔄 Reset Draft</button>
+      </div>
+    </div>
+
+    {#if selectedPlacement}
+      <div class="edit-inspector" transition:fade={{ duration: 120 }}>
+        <div class="edit-inspector-top">
+          <span class="edit-inspector-id">{selectedPlacement.id}</span>
+          <span class="edit-inspector-type">{selectedPlacement.type}</span>
+          <button class="edit-tb-btn edit-tb-swap" on:click={() => { pickerOpen = true; pickerSearch = ''; }}>🎨 Swap</button>
+          <button class="edit-tb-btn" on:click={duplicateSelectedElement}>⧉ Duplicate</button>
+          <button class="edit-tb-btn" on:click={toggleSelectedVisibility}>{selectedPlacement.hidden ? '👁️ Show' : '🙈 Hide'}</button>
+          <button class="edit-tb-btn" on:click={toggleSelectedLock}>{selectedPlacement.locked ? '🔓 Unlock' : '🔒 Lock'}</button>
+          <button class="edit-tb-btn edit-tb-reset" on:click={() => deleteElement(selectedPlacement.id)}>✕ Delete</button>
+        </div>
+        <div class="edit-inspector-grid">
+          <label class="edit-tb-slider">
+            X: {selectedPlacement.x.toFixed(1)}%
+            <input
+              type="range"
+              min="-25"
+              max="125"
+              step="0.1"
+              value={selectedPlacement.x}
+              on:input={(e) => updatePlacement(selectedPlacement.id, { x: Number(e.currentTarget.value) })}
+            />
+          </label>
+          <label class="edit-tb-slider">
+            Y: {selectedPlacement.y.toFixed(1)}%
+            <input
+              type="range"
+              min="-25"
+              max="125"
+              step="0.1"
+              value={selectedPlacement.y}
+              on:input={(e) => updatePlacement(selectedPlacement.id, { y: Number(e.currentTarget.value) })}
+            />
+          </label>
+          <label class="edit-tb-slider">
+            Size: {selectedPlacement.size}px
+            <input
+              type="range"
+              min="16"
+              max="640"
+              value={selectedPlacement.size}
+              on:input={(e) => updatePlacement(selectedPlacement.id, { size: Number(e.currentTarget.value) })}
+            />
+          </label>
+          <label class="edit-tb-slider">
+            Opacity: {(selectedPlacement.opacity * 100).toFixed(0)}%
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={selectedPlacement.opacity * 100}
+              on:input={(e) => updatePlacement(selectedPlacement.id, { opacity: Number(e.currentTarget.value) / 100 })}
+            />
+          </label>
+          <label class="edit-tb-slider">
+            Rotate: {selectedPlacement.rotate.toFixed(1)}°
+            <input
+              type="range"
+              min="-360"
+              max="360"
+              step="0.1"
+              value={selectedPlacement.rotate}
+              on:input={(e) => updatePlacement(selectedPlacement.id, { rotate: Number(e.currentTarget.value) })}
+            />
+          </label>
+          <label class="edit-tb-slider">
+            Speed: {selectedPlacement.animDuration.toFixed(1)}s
+            <input
+              type="range"
+              min="0"
+              max="120"
+              step="0.1"
+              value={selectedPlacement.animDuration}
+              on:input={(e) => updatePlacement(selectedPlacement.id, { animDuration: Number(e.currentTarget.value) })}
+            />
+          </label>
+          <label class="edit-tb-slider">
+            Layer: {selectedPlacement.zIndex ?? 0}
+            <input
+              type="range"
+              min="0"
+              max="500"
+              value={selectedPlacement.zIndex ?? 0}
+              on:input={(e) => updatePlacement(selectedPlacement.id, { zIndex: Number(e.currentTarget.value) })}
+            />
+          </label>
+          <label class="edit-tb-slider edit-color-input">
+            Color:
+            <input
+              type="color"
+              value={selectedPlacement.color?.startsWith('#') ? selectedPlacement.color : '#1a8b55'}
+              on:input={(e) => updatePlacement(selectedPlacement.id, { color: e.currentTarget.value })}
+            />
+            <button class="edit-tb-btn" on:click={() => updatePlacement(selectedPlacement.id, { color: 'var(--green)' })}>Theme</button>
+          </label>
+          <label class="edit-tb-slider">
+            Section:
+            <select
+              value={selectedPlacement.section}
+              on:change={(e) => updatePlacement(selectedPlacement.id, { section: e.currentTarget.value as ElementPlacement['section'] })}
+            >
+              <option value="hero">Hero</option>
+              <option value="students">Students</option>
+              <option value="problem">Problem</option>
+              <option value="features">Features</option>
+              <option value="steps">Steps</option>
+              <option value="proof">Proof</option>
+              <option value="map">Map</option>
+              <option value="cta">CTA</option>
+              <option value="general">General</option>
+            </select>
+          </label>
+          <div class="edit-layer-controls">
+            <button class="edit-tb-btn" on:click={() => bumpSelectedLayer('down')}>Layer -1</button>
+            <button class="edit-tb-btn" on:click={() => bumpSelectedLayer('up')}>Layer +1</button>
+          </div>
+        </div>
+      </div>
+    {/if}
+
+    {#if showImportPanel}
+      <div class="edit-import-panel" transition:fade={{ duration: 150 }}>
+        <h4>Import Placements JSON</h4>
+        <textarea class="edit-import-textarea" bind:value={importJsonText} placeholder="Paste JSON here..."></textarea>
+        {#if importWarnings.length > 0}
+          <div class="edit-import-log warn">
+            <strong>Warnings</strong>
+            {#each importWarnings as warning}
+              <div>{warning}</div>
+            {/each}
+          </div>
+        {/if}
+        {#if importErrors.length > 0}
+          <div class="edit-import-log error">
+            <strong>Errors</strong>
+            {#each importErrors as error}
+              <div>{error}</div>
+            {/each}
+          </div>
+        {/if}
+        <div class="edit-import-actions">
+          <button class="edit-tb-btn edit-tb-publish" on:click={handleEditImport}>Apply To Draft</button>
+          <button class="edit-tb-btn" on:click={() => showImportPanel = false}>Cancel</button>
+        </div>
+      </div>
+    {/if}
+
+    {#if pickerOpen}
+      <div
+        class="edit-picker-overlay"
+        role="button"
+        tabindex="0"
+        aria-label="Close sample picker"
+        on:click|self={() => pickerOpen = false}
+        on:keydown={(e) => {
+          if (e.currentTarget !== e.target) return;
+          if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            pickerOpen = false;
+          }
+        }}
+        transition:fade={{ duration: 150 }}
+      >
+        <div class="edit-picker-panel">
+          <div class="edit-picker-header">
+            <h3>Pick a Sample</h3>
+            <button class="edit-picker-close" on:click={() => pickerOpen = false}>✕</button>
+          </div>
+          <div class="edit-picker-tabs">
+            <button class:active={pickerTab === 'float'} on:click={() => pickerTab = 'float'}>🎈 Floats</button>
+            <button class:active={pickerTab === 'doodle'} on:click={() => pickerTab = 'doodle'}>✏️ Doodles</button>
+            <button class:active={pickerTab === '3d'} on:click={() => pickerTab = '3d'}>🧊 3D</button>
+          </div>
+          <input class="edit-picker-search" type="text" placeholder="Search..." bind:value={pickerSearch} />
+          <div class="edit-picker-grid">
+            {#each pickerItems as item (item.id)}
+              <button
+                class="edit-picker-item"
+                class:active={selectedPlacement?.sampleId === item.id}
+                on:click={() => assignSample(item.id)}
+                title={item.label}
+              >
+                <svg
+                  viewBox={pickerTab === '3d' ? '0 0 120 110' : pickerTab === 'doodle' ? '0 0 60 60' : '0 0 64 64'}
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round" stroke-linejoin="round"
+                  style="width:36px;height:36px;color:var(--green);">
+                  {@html item.svg}
+                </svg>
+                <span class="edit-picker-id">{item.id}</span>
+              </button>
+            {/each}
+          </div>
+        </div>
+      </div>
+    {/if}
+  {/if}
+
 </div>
 
 <style>
@@ -1332,6 +2223,22 @@
   }
 
   .l2-wrap { max-width: var(--wrap); margin: 0 auto; padding: 0 24px; }
+
+  .l2.edit-isolation {
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .l2.edit-isolation section,
+  .l2.edit-isolation .l2-map-modal-backdrop,
+  .l2.edit-isolation .l2-media-modal-backdrop {
+    pointer-events: none !important;
+  }
+
+  .l2.edit-isolation .l2-page-floats {
+    pointer-events: auto;
+    z-index: 4000;
+  }
 
   /* ── Hero ───────────────────────────── */
   .l2-hero {
@@ -1389,7 +2296,18 @@
     -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
     animation: gradient-shift 5s ease-in-out infinite;
   }
-  .l2-em-supercharge { position: relative; }
+  .l2-em-supercharge {
+    position: relative;
+  }
+  .l2-supercharge-star {
+    position: absolute;
+    left: calc(100% + clamp(2px, 0.25vw, 8px));
+    top: 0.08em;
+    pointer-events: none;
+    z-index: 2;
+    animation: none !important;
+    transform-origin: center;
+  }
   .l2-sub {
     font-size: 18px; line-height: 1.7; color: var(--text);
     opacity: 0.7;
@@ -1546,6 +2464,258 @@
     font-size: 15px;
     line-height: 1.7;
     color: var(--text-secondary);
+  }
+
+  /* ── Floating SVGs (page-wide) ───── */
+  .l2-page-floats {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none; overflow: hidden; z-index: 4;
+  }
+
+  /* Config-driven placement elements */
+  .l2-placement-el {
+    position: absolute;
+    color: var(--green);
+    animation: float-a ease-in-out infinite;
+    pointer-events: none;
+    transition: box-shadow 0.2s, outline 0.2s, opacity 0.7s ease, margin-top 0.7s ease;
+    margin-top: var(--placement-shift, 0px);
+    will-change: opacity;
+  }
+  .l2-placement-el.edit-mode {
+    pointer-events: auto;
+    cursor: grab;
+    border-radius: 8px;
+  }
+  .l2-placement-el.edit-locked { cursor: not-allowed; opacity: 0.75; }
+  .l2-placement-el.edit-mode:hover {
+    outline: 2px dashed rgba(26,139,85,0.5);
+    outline-offset: 4px;
+    box-shadow: 0 0 20px rgba(26,139,85,0.15);
+  }
+  .l2-placement-el.edit-selected {
+    outline: 2px solid var(--green) !important;
+    outline-offset: 4px;
+    box-shadow: 0 0 30px rgba(26,139,85,0.25);
+    cursor: grabbing;
+  }
+  .l2-placement-el.edit-selected.edit-locked { cursor: not-allowed; }
+  .el-delete-btn {
+    position: absolute; top: -8px; right: -8px;
+    width: 20px; height: 20px; border-radius: 50%;
+    background: #ef4444; color: #fff; border: none;
+    font-size: 10px; font-weight: 700; cursor: pointer;
+    display: none; align-items: center; justify-content: center;
+    z-index: 10; line-height: 1;
+  }
+  .l2-placement-el.edit-mode:hover .el-delete-btn,
+  .l2-placement-el.edit-selected .el-delete-btn { display: flex; }
+  .el-id-label {
+    position: absolute; bottom: -16px; left: 50%; transform: translateX(-50%);
+    font-size: 8px; font-weight: 700; color: var(--green);
+    background: rgba(255,255,255,0.9); padding: 1px 4px; border-radius: 3px;
+    white-space: nowrap; pointer-events: none; display: none;
+  }
+  .l2-placement-el.edit-mode:hover .el-id-label,
+  .l2-placement-el.edit-selected .el-id-label { display: block; }
+
+  /* ── Edit Mode Toolbar ───────────── */
+  .edit-toolbar {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 20px; gap: 8px;
+    background: rgba(15,20,30,0.92); backdrop-filter: blur(12px);
+    border-top: 1px solid rgba(255,255,255,0.1);
+    z-index: 60000; color: #e2e8f0;
+    font-family: var(--font-ui), sans-serif;
+    flex-wrap: wrap;
+  }
+  .edit-tb-left, .edit-tb-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .edit-tb-title { font-weight: 700; font-size: 14px; margin-right: 8px; }
+  .edit-tb-count { font-size: 11px; color: #94a3b8; }
+  .edit-tb-btn {
+    padding: 5px 12px; border-radius: 8px; font-size: 11px; font-weight: 600;
+    border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.06);
+    color: #e2e8f0; cursor: pointer; transition: all 0.15s; white-space: nowrap;
+  }
+  .edit-tb-btn:hover { background: rgba(255,255,255,0.12); }
+  .edit-tb-add-float { border-color: rgba(34,197,94,0.3); color: #22c55e; }
+  .edit-tb-add-doodle { border-color: rgba(59,130,246,0.3); color: #3b82f6; }
+  .edit-tb-add-3d { border-color: rgba(167,139,250,0.3); color: #a78bfa; }
+  .edit-tb-swap { border-color: rgba(251,191,36,0.3); color: #fbbf24; }
+  .edit-tb-publish { border-color: rgba(34,197,94,0.4); color: #4ade80; }
+  .edit-tb-reset { border-color: rgba(239,68,68,0.3); color: #ef4444; }
+  .edit-tb-slider {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 10px; color: #94a3b8;
+  }
+  .edit-tb-slider input[type="range"] { width: 80px; accent-color: var(--green); }
+  .edit-tb-slider select {
+    height: 24px;
+    border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.06);
+    color: #e2e8f0;
+    font-size: 11px;
+    padding: 0 6px;
+  }
+  .edit-tb-status {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.12);
+  }
+  .edit-tb-status.tone-ok { color: #4ade80; border-color: rgba(74,222,128,0.35); background: rgba(74,222,128,0.1); }
+  .edit-tb-status.tone-warn { color: #fbbf24; border-color: rgba(251,191,36,0.35); background: rgba(251,191,36,0.1); }
+  .edit-tb-status.tone-error { color: #f87171; border-color: rgba(248,113,113,0.35); background: rgba(248,113,113,0.1); }
+
+  .edit-inspector {
+    position: fixed;
+    bottom: 72px;
+    left: 20px;
+    right: 20px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(12, 16, 24, 0.92);
+    backdrop-filter: blur(12px);
+    z-index: 60000;
+    color: #e2e8f0;
+    font-family: var(--font-ui), sans-serif;
+  }
+  .edit-inspector-top {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  .edit-inspector-id {
+    font-family: monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: #bbf7d0;
+  }
+  .edit-inspector-type {
+    text-transform: uppercase;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    color: #94a3b8;
+  }
+  .edit-inspector-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 8px 14px;
+    align-items: center;
+  }
+  .edit-color-input input[type='color'] {
+    width: 28px;
+    height: 22px;
+    border: 0;
+    padding: 0;
+    border-radius: 5px;
+    background: transparent;
+    cursor: pointer;
+  }
+  .edit-layer-controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  /* ── Import Panel ────────────────── */
+  .edit-import-panel {
+    position: fixed; bottom: 56px; right: 20px;
+    width: min(520px, calc(100vw - 40px)); padding: 16px;
+    background: rgba(15,20,30,0.96); backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.1); border-radius: 12px;
+    z-index: 60001; color: #e2e8f0;
+    font-family: var(--font-ui), sans-serif;
+  }
+  .edit-import-panel h4 { margin: 0 0 8px; font-size: 14px; font-weight: 700; }
+  .edit-import-textarea {
+    width: 100%; height: 120px; padding: 10px; border-radius: 8px;
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+    color: #e2e8f0; font-size: 11px; font-family: monospace; resize: vertical;
+    box-sizing: border-box; margin-bottom: 8px;
+  }
+  .edit-import-actions { display: flex; gap: 8px; }
+  .edit-import-log {
+    margin-bottom: 8px;
+    border-radius: 8px;
+    padding: 8px;
+    font-size: 11px;
+    line-height: 1.4;
+    max-height: 120px;
+    overflow: auto;
+  }
+  .edit-import-log.warn {
+    background: rgba(251,191,36,0.09);
+    border: 1px solid rgba(251,191,36,0.3);
+    color: #fcd34d;
+  }
+  .edit-import-log.error {
+    background: rgba(248,113,113,0.09);
+    border: 1px solid rgba(248,113,113,0.3);
+    color: #fda4af;
+  }
+
+  /* ── Catalog Picker Popup ─────────── */
+  .edit-picker-overlay {
+    position: fixed; inset: 0; z-index: 60002;
+    background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center;
+  }
+  .edit-picker-panel {
+    width: 600px; max-width: 90vw; max-height: 80vh;
+    background: rgba(15,20,30,0.98); backdrop-filter: blur(16px);
+    border: 1px solid rgba(255,255,255,0.1); border-radius: 16px;
+    padding: 20px; color: #e2e8f0; display: flex; flex-direction: column;
+    font-family: var(--font-ui), sans-serif;
+  }
+  .edit-picker-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .edit-picker-header h3 { margin: 0; font-size: 18px; font-weight: 700; }
+  .edit-picker-close {
+    background: none; border: none; color: #94a3b8; font-size: 22px;
+    cursor: pointer; padding: 4px 8px; border-radius: 6px;
+  }
+  .edit-picker-close:hover { background: rgba(255,255,255,0.08); }
+  .edit-picker-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+  .edit-picker-tabs button {
+    padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 600;
+    border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04);
+    color: #94a3b8; cursor: pointer; transition: all 0.15s;
+  }
+  .edit-picker-tabs button.active {
+    background: var(--green); color: #fff; border-color: var(--green);
+  }
+  .edit-picker-search {
+    width: 100%; padding: 8px 12px; border-radius: 8px; font-size: 13px;
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+    color: #e2e8f0; margin-bottom: 10px; box-sizing: border-box;
+  }
+  .edit-picker-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+    gap: 6px; overflow-y: auto; flex: 1; max-height: 50vh;
+  }
+  .edit-picker-item {
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px; padding: 8px; display: flex; flex-direction: column;
+    align-items: center; gap: 4px; cursor: pointer; transition: all 0.15s;
+  }
+  .edit-picker-item:hover { border-color: rgba(26,139,85,0.4); background: rgba(255,255,255,0.08); }
+  .edit-picker-item.active { border-color: var(--green); background: rgba(26,139,85,0.15); }
+  .edit-picker-id { font-size: 8px; color: #94a3b8; font-family: monospace; font-weight: 600; }
+
+  @keyframes float-a {
+    0%, 100% { transform: translateY(0) rotate(var(--placement-rotate, 0deg)); }
+    25% { transform: translateY(-20px) rotate(calc(var(--placement-rotate, 0deg) + 5deg)); }
+    50% { transform: translateY(10px) rotate(calc(var(--placement-rotate, 0deg) - 3deg)); }
+    75% { transform: translateY(-15px) rotate(calc(var(--placement-rotate, 0deg) + 4deg)); }
+  }
+  @keyframes float-b {
+    0%, 100% { transform: translateY(0) rotate(var(--placement-rotate, 0deg)); }
+    33% { transform: translateY(15px) rotate(calc(var(--placement-rotate, 0deg) - 4deg)); }
+    66% { transform: translateY(-25px) rotate(calc(var(--placement-rotate, 0deg) + 6deg)); }
   }
 
   /* ── CTA Buttons ───────────────────── */
@@ -2393,6 +3563,12 @@
     padding: 30px;
   }
 
+  .l2.edit-mode .l2-map-state-card {
+    aspect-ratio: 1 / 1;
+    display: grid;
+    align-content: center;
+  }
+
   .l2-map-frame {
     position: relative;
     width: min(100%, 760px);
@@ -2665,6 +3841,23 @@
       height: 34px;
       top: 10px;
       right: 10px;
+    }
+    .edit-toolbar {
+      padding: 8px 10px;
+    }
+    .edit-inspector {
+      left: 10px;
+      right: 10px;
+      bottom: 64px;
+      padding: 10px;
+    }
+    .edit-inspector-grid {
+      grid-template-columns: 1fr;
+    }
+    .edit-import-panel {
+      right: 10px;
+      bottom: 52px;
+      width: calc(100vw - 20px);
     }
     :global(.l2-main-flatmap-modal.heatmap-shell) {
       padding: 6px;
