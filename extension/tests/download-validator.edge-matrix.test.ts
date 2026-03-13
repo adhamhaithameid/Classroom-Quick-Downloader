@@ -609,6 +609,11 @@ const EDGE_CASES: EdgeCase[] = [
     url: 'https://drive.google.com/drive/folders/1folder9',
     expectedValid: false,
     expectedReasonContains: 'UNEXPECTED_URL_SHAPE',
+  },  {
+    name: 'invalid suspicious encoded percent 0',
+    url: 'https://drive.google.com/file/d/1enc0%252Fview',
+    expectedValid: false,
+    expectedReasonContains: 'SUSPICIOUS_ENCODING',
   },
 ];
 
