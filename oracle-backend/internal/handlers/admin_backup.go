@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -105,7 +104,10 @@ func BackupRunHandler(db *sql.DB, metrics *observability.Registry) http.HandlerF
 
 		if err != nil {
 			recordBackupFailure(r.Context(), db, metrics, backupPath, startedAt, finishedAt, err)
-			log.Printf("[Backup] VACUUM INTO failed: %v", err)
+			logEventWithContext(r.Context(), "error", "backup_vacuum_failed", map[string]any{
+				"path":  backupPath,
+				"error": truncateAlertError(err.Error()),
+			})
 			writeJSONError(w, "backup_failed", "Database backup operation failed", http.StatusInternalServerError)
 			return
 		}

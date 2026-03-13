@@ -12,12 +12,12 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Build the application
+# Build the application.
+# Build inside the container's native architecture so the resulting binaries
+# always match the runtime platform (important for arm64 Oracle VM deploys).
 COPY . .
-# Use TARGETARCH from Docker buildx (defaults to amd64 if not set, but we want flexibility)
-ARG TARGETARCH=arm64
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build -ldflags="-s -w" -o oracle-backend ./cmd/app
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build -ldflags="-s -w" -o archiver ./cmd/archiver
+RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o oracle-backend ./cmd/app
+RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o archiver ./cmd/archiver
 
 # -------------------------------------------
 # Production image

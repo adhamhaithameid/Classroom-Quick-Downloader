@@ -197,7 +197,7 @@ oracle-backend/
 │   └── favicon.png           # Browser favicon
 ├── Dockerfile                # Multi-stage production build
 ├── docker-compose.yml        # Deployment configuration
-├── deploy.sh                 # One-liner deploy script
+├── deploy.sh                 # Deprecated compatibility wrapper
 ├── go.mod                    # Go module dependencies
 └── README.md                 # You are here! 📍
 ```
@@ -211,7 +211,7 @@ oracle-backend/
 | `static/` | Pre-built dashboard SPA (served by the Go server). |
 | `Dockerfile` | Multi-stage build for minimal production image. |
 | `docker-compose.yml` | Docker Compose service definition for deployment. |
-| `deploy.sh` | Helper script for rebuilding and restarting the container. |
+| `deploy.sh` | Deprecated compatibility wrapper that forwards to `scripts/deploy_main_inplace.sh`. |
 
 ---
 
@@ -750,25 +750,39 @@ docker build --build-arg TARGETARCH=amd64 -t cqd-oracle-backend .
 ### Running with Docker Compose
 
 ```bash
-# Set the shared secret
+# Set the shared secret + public HTTPS hostname
 export DO_SHARED_SECRET="your-strong-secret"
+export ORACLE_PUBLIC_HOSTNAME="oracle.your-domain.com"
 
-# Start the service
+# Start the backend behind the bundled Caddy TLS proxy
 docker compose up -d
 
 # View logs
-docker compose logs -f oracle-backend
+docker compose logs -f oracle-backend caddy
 ```
 
-### Using `deploy.sh`
+Compose now fronts the Go service with Caddy on ports `80/443`. Keep direct
+`http://localhost:8080` usage only for local `go run ./cmd/app` development, not
+for production-style compose deployments.
 
-For quick redeploys after code changes:
+### Preferred deployment entrypoint
+
+For quick redeploys after code changes, use the real deploy script directly:
+
+```bash
+./scripts/deploy_main_inplace.sh
+```
+
+### Using `deploy.sh` (compatibility only)
+
+`deploy.sh` still works, but it is only a wrapper for older local habits and
+should not be used in new automation or documentation.
 
 ```bash
 ./deploy.sh
 ```
 
-This script:
+The underlying deploy flow:
 1. Rebuilds the Docker image.
 2. Restarts the container.
 3. Prunes unused images.
