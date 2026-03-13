@@ -329,6 +329,10 @@ const EDGE_CASES: EdgeCase[] = [
     name: 'valid docs presentation route 19',
     url: 'https://docs.google.com/u/4/presentation/d/1doc19/export/pptx',
     expectedValid: true,
+  },  {
+    name: 'valid classroom drive proxy 0',
+    url: 'https://classroom.google.com/u/0/drive/file/1class0/view',
+    expectedValid: true,
   },
 ];
 
