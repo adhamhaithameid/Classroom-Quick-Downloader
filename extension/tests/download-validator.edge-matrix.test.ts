@@ -674,6 +674,11 @@ const EDGE_CASES: EdgeCase[] = [
     url: 'https://drive.google.com/file/d/../../etc/passwd2',
     expectedValid: false,
     expectedReasonContains: 'SUSPICIOUS_ENCODING',
+  },  {
+    name: 'invalid suspicious traversal 3',
+    url: 'https://drive.google.com/file/d/../../etc/passwd3',
+    expectedValid: false,
+    expectedReasonContains: 'SUSPICIOUS_ENCODING',
   },
 ];
 
