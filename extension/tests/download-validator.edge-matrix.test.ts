@@ -469,6 +469,11 @@ const EDGE_CASES: EdgeCase[] = [
     url: 'ftp://docs.google.com/document/d/1bad1/export?format=pdf',
     expectedValid: false,
     expectedReasonContains: 'INVALID_SCHEME',
+  },  {
+    name: 'invalid ftp scheme 2',
+    url: 'ftp://docs.google.com/document/d/1bad2/export?format=pdf',
+    expectedValid: false,
+    expectedReasonContains: 'INVALID_SCHEME',
   },
 ];
 
