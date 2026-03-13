@@ -1229,6 +1229,80 @@ describe("Worker auth config hardening", () => {
     expect(dangerRes.headers.get("Set-Cookie")).toContain("cqd_danger_stepup=");
   });
 
+  it("records optional session-binding mismatches without blocking the session", async () => {
+    const doFetch = vi.fn(async (input: RequestInfo) => {
+      const url = typeof input === "string" ? input : input instanceof Request ? input.url : "";
+      if (url.includes("/auth/check-ip-allowlist")) {
+        return new Response(JSON.stringify({ allowed: true, enabled: true, stepUpBypassEnabled: false }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      if (url.includes("/auth/login-attempt")) {
+        return new Response(JSON.stringify({ ok: true, allowed: true }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      if (url.includes("/auth/session-binding-mismatch")) {
+        return new Response(JSON.stringify({ ok: true, count: 1 }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    });
+    const namespace = {
+      idFromName: (_name: string) => "downloads-id",
+      get: (_id: string) => ({ fetch: doFetch }),
+    };
+    const env = mockEnv({
+      DOWNLOADS_DO: namespace as unknown as DurableObjectNamespace,
+      SESSION_BINDING_MODE: "optional",
+    });
+
+    const loginRes = await worker.fetch(
+      new Request("https://example.com/", {
+        method: "POST",
+        headers: {
+          "content-type": "application/x-www-form-urlencoded",
+          "CF-Connecting-IP": "41.33.62.123",
+          "User-Agent": "CQD Test Agent A",
+        },
+        body: "password=dashboard-secret",
+      }),
+      env,
+      {} as ExecutionContext,
+    );
+    expect(loginRes.status).toBe(302);
+    const cookie = extractCookie(loginRes.headers.get("Set-Cookie"));
+    expect(cookie).toContain("cqd_session=");
+
+    const revisitRes = await worker.fetch(
+      new Request("https://example.com/", {
+        method: "GET",
+        headers: {
+          Cookie: cookie,
+          "CF-Connecting-IP": "41.33.62.123",
+          "User-Agent": "CQD Test Agent B",
+        },
+      }),
+      env,
+      {} as ExecutionContext,
+    );
+
+    expect(revisitRes.status).toBe(302);
+    expect(revisitRes.headers.get("Location")).toBe("https://example.com/dashboard");
+    const mismatchCall = doFetch.mock.calls.find(([input]) => {
+      const url = typeof input === "string" ? input : input instanceof Request ? input.url : "";
+      return url.includes("/auth/session-binding-mismatch");
+    });
+    expect(mismatchCall).toBeDefined();
+  });
+
   // ---------------------------------------------------------------------------
   // /auth/verify-danger: CORS (Phase 3)
   // ---------------------------------------------------------------------------

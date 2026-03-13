@@ -1,15 +1,15 @@
 name = "cqd-analytics"
 main = "src/index.ts"
-account_id = "fc9538cb362e6266eea89037f6347225"
 compatibility_date = "2024-12-01"
 
 [vars]
-  # Set this to your production Oracle HTTPS endpoint.
-  # Keep HTTP disabled by default; only enable ALLOW_INSECURE_ORACLE_ENDPOINT temporarily for local migration.
+  # The committed config intentionally uses a placeholder value here.
+  # Set the real endpoint via local .dev.vars or CI-time injection.
+  # Production must point at an HTTPS origin. Local-only HTTP overrides belong in
+  # untracked .dev.vars, never in committed config.
   # The worker appends "/ingest-batch" for flushes and "/api/public/website/*" for public reads.
   # Use DNS host (not raw IP) so Cloudflare fetch does not hit direct-IP egress restrictions.
-  ORACLE_ENDPOINT = "http://129.151.233.229.nip.io:8080"
-  ALLOW_INSECURE_ORACLE_ENDPOINT = "true"
+  ORACLE_ENDPOINT = "https://oracle-endpoint-placeholder.invalid"
   MAX_BATCH_EVENTS = "10000"
   # Website writes (telemetry + uninstall feedback) are origin-gated.
   # Keep this synced with your active website domains.
@@ -17,6 +17,9 @@ compatibility_date = "2024-12-01"
   # Free-tier default keeps queue-first pipeline disabled.
   ENABLE_SITE_QUEUE_PIPELINE = "false"
 
+# These Cloudflare resource IDs are deployment metadata for existing bindings,
+# not runtime secrets. They stay committed so Wrangler can bind the Worker to
+# the correct KV/D1 resources during deploys.
 [[kv_namespaces]]
   binding = "SITE_SNAPSHOT_KV"
   id = "34a558d6cb094467b67a31465e09776b"
