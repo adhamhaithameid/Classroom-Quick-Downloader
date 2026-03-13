@@ -9,7 +9,6 @@
 import {
   GOLDEN_SELECTORS,
   USER_CONTENT_EXCLUSIONS_SELECTOR,
-  USER_CONTENT_EXCLUSIONS_TOP4_SELECTOR,
   CONFIDENCE_WEIGHTS,
   normalizeText,
   normalizeForComparison,
@@ -358,19 +357,21 @@ function executeEditedLayer4(post: HTMLElement, matchedText: string | null): Lay
     };
   }
   
-  const userContents = post.querySelectorAll(USER_CONTENT_EXCLUSIONS_TOP4_SELECTOR);
   const normalizedMatchedText = normalizeForComparison(matchedText);
 
-  for (const userContent of userContents) {
-    const userText = normalizeForComparison(userContent.textContent || '');
-    if (userText.includes(normalizedMatchedText)) {
-      return {
-        score: CONFIDENCE_WEIGHTS.LAYER_4_EXCLUSION,
-        matchedText,
-        hasDateProximity: false,
-        usedParentContext: false,
-        details: `Layer4: PENALTY - Found in user content`,
-      };
+  for (const selector of GOLDEN_SELECTORS.userContentExclusions.slice(0, 4)) {
+    const userContent = post.querySelector(selector);
+    if (userContent) {
+      const userText = normalizeForComparison(userContent.textContent || '');
+      if (userText.includes(normalizedMatchedText)) {
+        return {
+          score: CONFIDENCE_WEIGHTS.LAYER_4_EXCLUSION,
+          matchedText,
+          hasDateProximity: false,
+          usedParentContext: false,
+          details: `Layer4: PENALTY - Found in user content "${selector}"`,
+        };
+      }
     }
   }
   

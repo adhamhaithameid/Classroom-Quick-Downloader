@@ -640,7 +640,6 @@ export const GOLDEN_SELECTORS = {
 };
 
 export const USER_CONTENT_EXCLUSIONS_SELECTOR = GOLDEN_SELECTORS.userContentExclusions.join(',');
-export const USER_CONTENT_EXCLUSIONS_TOP4_SELECTOR = GOLDEN_SELECTORS.userContentExclusions.slice(0, 4).join(',');
 
 // ============================================================================
 // CONFIDENCE WEIGHTS
