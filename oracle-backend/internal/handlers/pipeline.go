@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"net/http"
@@ -84,6 +85,14 @@ func parsePositiveInt(raw string, fallback int, min int, max int) int {
 	return v
 }
 
+func writePipelineInternalServerError(ctx context.Context, w http.ResponseWriter, operation string, err error) {
+	logEventWithContext(ctx, "error", "pipeline_internal_error", map[string]any{
+		"operation": operation,
+		"error":     truncateAlertError(err.Error()),
+	})
+	http.Error(w, "internal server error", http.StatusInternalServerError)
+}
+
 func PipelineMetricsHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
@@ -124,7 +133,7 @@ func PipelineMetricsHandler(db *sql.DB) http.HandlerFunc {
 			dayFloor,
 		)
 		if err != nil {
-			http.Error(w, "failed to query stage daily: "+err.Error(), http.StatusInternalServerError)
+			writePipelineInternalServerError(ctx, w, "query stage daily", err)
 			return
 		}
 		defer rows.Close()
@@ -133,7 +142,7 @@ func PipelineMetricsHandler(db *sql.DB) http.HandlerFunc {
 			var day, stage string
 			var count int64
 			if err := rows.Scan(&day, &stage, &count); err != nil {
-				http.Error(w, "failed to scan stage daily: "+err.Error(), http.StatusInternalServerError)
+				writePipelineInternalServerError(ctx, w, "scan stage daily", err)
 				return
 			}
 			resp.Daily = append(resp.Daily, pipelineStageDailyPoint{
@@ -147,7 +156,7 @@ func PipelineMetricsHandler(db *sql.DB) http.HandlerFunc {
 			}
 		}
 		if err := rows.Err(); err != nil {
-			http.Error(w, "failed to iterate stage daily: "+err.Error(), http.StatusInternalServerError)
+			writePipelineInternalServerError(ctx, w, "iterate stage daily", err)
 			return
 		}
 
@@ -166,7 +175,7 @@ func PipelineMetricsHandler(db *sql.DB) http.HandlerFunc {
 			limit,
 		)
 		if err != nil {
-			http.Error(w, "failed to query delivery events: "+err.Error(), http.StatusInternalServerError)
+			writePipelineInternalServerError(ctx, w, "query delivery events", err)
 			return
 		}
 		defer deliveryRows.Close()
@@ -187,7 +196,7 @@ func PipelineMetricsHandler(db *sql.DB) http.HandlerFunc {
 				&maxSeq,
 				&item.Status,
 			); err != nil {
-				http.Error(w, "failed to scan delivery event: "+err.Error(), http.StatusInternalServerError)
+				writePipelineInternalServerError(ctx, w, "scan delivery event", err)
 				return
 			}
 			if minSeq.Valid {
@@ -212,7 +221,7 @@ func PipelineMetricsHandler(db *sql.DB) http.HandlerFunc {
 			resp.Recent = append(resp.Recent, item)
 		}
 		if err := deliveryRows.Err(); err != nil {
-			http.Error(w, "failed to iterate delivery events: "+err.Error(), http.StatusInternalServerError)
+			writePipelineInternalServerError(ctx, w, "iterate delivery events", err)
 			return
 		}
 
@@ -250,7 +259,7 @@ func PipelineFailuresHandler(db *sql.DB) http.HandlerFunc {
 			limit,
 		)
 		if err != nil {
-			http.Error(w, "failed to query failure logs: "+err.Error(), http.StatusInternalServerError)
+			writePipelineInternalServerError(ctx, w, "query failure logs", err)
 			return
 		}
 		defer rows.Close()
@@ -269,13 +278,13 @@ func PipelineFailuresHandler(db *sql.DB) http.HandlerFunc {
 				&item.BatchID,
 				&item.DeliveryID,
 			); err != nil {
-				http.Error(w, "failed to scan failure log: "+err.Error(), http.StatusInternalServerError)
+				writePipelineInternalServerError(ctx, w, "scan failure log", err)
 				return
 			}
 			resp.Recent = append(resp.Recent, item)
 		}
 		if err := rows.Err(); err != nil {
-			http.Error(w, "failed to iterate failure logs: "+err.Error(), http.StatusInternalServerError)
+			writePipelineInternalServerError(ctx, w, "iterate failure logs", err)
 			return
 		}
 
@@ -289,7 +298,7 @@ func PipelineFailuresHandler(db *sql.DB) http.HandlerFunc {
 			dayFloor,
 		)
 		if err != nil {
-			http.Error(w, "failed to query failure summary: "+err.Error(), http.StatusInternalServerError)
+			writePipelineInternalServerError(ctx, w, "query failure summary", err)
 			return
 		}
 		defer sumRows.Close()
@@ -303,13 +312,13 @@ func PipelineFailuresHandler(db *sql.DB) http.HandlerFunc {
 				&item.Events,
 				&item.Occurrences,
 			); err != nil {
-				http.Error(w, "failed to scan failure summary: "+err.Error(), http.StatusInternalServerError)
+				writePipelineInternalServerError(ctx, w, "scan failure summary", err)
 				return
 			}
 			resp.Daily = append(resp.Daily, item)
 		}
 		if err := sumRows.Err(); err != nil {
-			http.Error(w, "failed to iterate failure summary: "+err.Error(), http.StatusInternalServerError)
+			writePipelineInternalServerError(ctx, w, "iterate failure summary", err)
 			return
 		}
 

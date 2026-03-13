@@ -1,0 +1,10 @@
+{
+	admin off
+}
+
+# Docker Compose passes ORACLE_PUBLIC_HOSTNAME into the Caddy container.
+# Use a real public DNS name in production; localhost is fine for local smoke tests.
+{$ORACLE_PUBLIC_HOSTNAME:localhost} {
+	encode zstd gzip
+	reverse_proxy oracle-backend:8080
+}
