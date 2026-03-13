@@ -1090,6 +1090,9 @@ func TestValidateAuditCheckpointSecret(t *testing.T) {
 func TestValidateProductionSecurityConfig(t *testing.T) {
 	t.Parallel()
 
+	const prodPublicBaseURL = "https://oracle.example.com"
+	const prodCSRFOrigins = "https://oracle.example.com,https://admin.example.com"
+
 	tests := []struct {
 		name                        string
 		appEnv                      string
@@ -1099,6 +1102,8 @@ func TestValidateProductionSecurityConfig(t *testing.T) {
 		allowHTTPStoreURLs          bool
 		allowUntrustedStoreURLs     bool
 		trustedProxyCIDRs           string
+		publicBaseURL               string
+		csrfAllowedOrigins          string
 		wantErrContains             string
 	}{
 		{
@@ -1110,67 +1115,123 @@ func TestValidateProductionSecurityConfig(t *testing.T) {
 			allowUntrustedStoreURLs:     true,
 			trustedProxyCIDRs:           "0.0.0.0/0,::/0",
 		},
-			{
-				name:                "prod rejects loopback bypass",
-				appEnv:              "production",
-				sessionCookieMode:   "true",
-				allowLoopbackBypass: true,
-				wantErrContains:     "ALLOW_LOOPBACK_BYPASS",
-			},
-			{
-				name:                        "prod rejects empty dashboard password",
-				appEnv:                      "production",
-				sessionCookieMode:           "true",
-				allowEmptyDashboardPassword: true,
-				wantErrContains:             "ALLOW_EMPTY_DASHBOARD_PASSWORD",
-			},
-			{
-				name:               "prod rejects http store urls",
-				appEnv:             "production",
-				sessionCookieMode:  "true",
-				allowHTTPStoreURLs: true,
-				wantErrContains:    "ORACLE_ALLOW_HTTP_STORE_URLS",
-			},
-			{
-				name:                    "prod rejects untrusted store urls",
-				appEnv:                  "production",
-				sessionCookieMode:       "true",
-				allowUntrustedStoreURLs: true,
-				wantErrContains:         "ORACLE_ALLOW_UNTRUSTED_STORE_URLS",
-			},
-			{
-				name:              "prod rejects ipv4 wildcard trusted proxy",
-				appEnv:            "production",
-				sessionCookieMode: "true",
-				trustedProxyCIDRs: "0.0.0.0/0",
-				wantErrContains:   "TRUSTED_PROXY_CIDRS",
-			},
-			{
-				name:              "prod rejects ipv6 wildcard trusted proxy",
-				appEnv:            "production",
-				sessionCookieMode: "true",
-				trustedProxyCIDRs: "::/0",
-				wantErrContains:   "TRUSTED_PROXY_CIDRS",
-			},
-			{
-				name:              "prod accepts strict trusted proxy cidrs",
-				appEnv:            "  PROD  ",
-				sessionCookieMode: "true",
-				trustedProxyCIDRs: "10.0.0.0/8,2001:db8::/32",
-			},
-			{
-				name:              "prod rejects insecure session cookie mode",
-				appEnv:            "production",
-			sessionCookieMode: "false",
-				wantErrContains:   "SESSION_COOKIE_SECURE",
-			},
-			{
-				name:              "prod rejects auto session cookie mode",
-				appEnv:            "production",
-				sessionCookieMode: "auto",
-				wantErrContains:   "SESSION_COOKIE_SECURE",
-			},
-		}
+		{
+			name:                "prod rejects loopback bypass",
+			appEnv:              "production",
+			sessionCookieMode:   "true",
+			allowLoopbackBypass: true,
+			publicBaseURL:       prodPublicBaseURL,
+			csrfAllowedOrigins:  prodCSRFOrigins,
+			wantErrContains:     "ALLOW_LOOPBACK_BYPASS",
+		},
+		{
+			name:                        "prod rejects empty dashboard password",
+			appEnv:                      "production",
+			sessionCookieMode:           "true",
+			allowEmptyDashboardPassword: true,
+			publicBaseURL:               prodPublicBaseURL,
+			csrfAllowedOrigins:          prodCSRFOrigins,
+			wantErrContains:             "ALLOW_EMPTY_DASHBOARD_PASSWORD",
+		},
+		{
+			name:               "prod rejects http store urls",
+			appEnv:             "production",
+			sessionCookieMode:  "true",
+			allowHTTPStoreURLs: true,
+			publicBaseURL:      prodPublicBaseURL,
+			csrfAllowedOrigins: prodCSRFOrigins,
+			wantErrContains:    "ORACLE_ALLOW_HTTP_STORE_URLS",
+		},
+		{
+			name:                    "prod rejects untrusted store urls",
+			appEnv:                  "production",
+			sessionCookieMode:       "true",
+			allowUntrustedStoreURLs: true,
+			publicBaseURL:           prodPublicBaseURL,
+			csrfAllowedOrigins:      prodCSRFOrigins,
+			wantErrContains:         "ORACLE_ALLOW_UNTRUSTED_STORE_URLS",
+		},
+		{
+			name:               "prod rejects ipv4 wildcard trusted proxy",
+			appEnv:             "production",
+			sessionCookieMode:  "true",
+			trustedProxyCIDRs:  "0.0.0.0/0",
+			publicBaseURL:      prodPublicBaseURL,
+			csrfAllowedOrigins: prodCSRFOrigins,
+			wantErrContains:    "TRUSTED_PROXY_CIDRS",
+		},
+		{
+			name:               "prod rejects ipv6 wildcard trusted proxy",
+			appEnv:             "production",
+			sessionCookieMode:  "true",
+			trustedProxyCIDRs:  "::/0",
+			publicBaseURL:      prodPublicBaseURL,
+			csrfAllowedOrigins: prodCSRFOrigins,
+			wantErrContains:    "TRUSTED_PROXY_CIDRS",
+		},
+		{
+			name:               "prod accepts strict trusted proxy cidrs",
+			appEnv:             "  PROD  ",
+			sessionCookieMode:  "true",
+			trustedProxyCIDRs:  "10.0.0.0/8,2001:db8::/32",
+			publicBaseURL:      prodPublicBaseURL,
+			csrfAllowedOrigins: prodCSRFOrigins,
+		},
+		{
+			name:               "prod rejects insecure session cookie mode",
+			appEnv:             "production",
+			sessionCookieMode:  "false",
+			publicBaseURL:      prodPublicBaseURL,
+			csrfAllowedOrigins: prodCSRFOrigins,
+			wantErrContains:    "SESSION_COOKIE_SECURE",
+		},
+		{
+			name:               "prod rejects auto session cookie mode",
+			appEnv:             "production",
+			sessionCookieMode:  "auto",
+			publicBaseURL:      prodPublicBaseURL,
+			csrfAllowedOrigins: prodCSRFOrigins,
+			wantErrContains:    "SESSION_COOKIE_SECURE",
+		},
+		{
+			name:               "prod requires public base url",
+			appEnv:             "production",
+			sessionCookieMode:  "true",
+			csrfAllowedOrigins: prodCSRFOrigins,
+			wantErrContains:    "PUBLIC_BASE_URL",
+		},
+		{
+			name:               "prod requires https public base url",
+			appEnv:             "production",
+			sessionCookieMode:  "true",
+			publicBaseURL:      "http://oracle.example.com",
+			csrfAllowedOrigins: prodCSRFOrigins,
+			wantErrContains:    "PUBLIC_BASE_URL",
+		},
+		{
+			name:              "prod requires csrf allowed origins",
+			appEnv:            "production",
+			sessionCookieMode: "true",
+			publicBaseURL:     prodPublicBaseURL,
+			wantErrContains:   "CSRF_ALLOWED_ORIGINS",
+		},
+		{
+			name:               "prod rejects non-https csrf origin",
+			appEnv:             "production",
+			sessionCookieMode:  "true",
+			publicBaseURL:      prodPublicBaseURL,
+			csrfAllowedOrigins: "http://oracle.example.com",
+			wantErrContains:    "CSRF_ALLOWED_ORIGINS",
+		},
+		{
+			name:               "prod requires csrf list to include public base url",
+			appEnv:             "production",
+			sessionCookieMode:  "true",
+			publicBaseURL:      prodPublicBaseURL,
+			csrfAllowedOrigins: "https://admin.example.com",
+			wantErrContains:    "CSRF_ALLOWED_ORIGINS",
+		},
+	}
 
 	for _, tc := range tests {
 		tc := tc
@@ -1185,6 +1246,8 @@ func TestValidateProductionSecurityConfig(t *testing.T) {
 				tc.allowHTTPStoreURLs,
 				tc.allowUntrustedStoreURLs,
 				parseTrustedProxyCIDRs(tc.trustedProxyCIDRs),
+				tc.publicBaseURL,
+				tc.csrfAllowedOrigins,
 			)
 			if tc.wantErrContains == "" {
 				if err != nil {
