@@ -524,6 +524,11 @@ const EDGE_CASES: EdgeCase[] = [
     url: 'https://evil2.example.com/file/d/1bad2/view',
     expectedValid: false,
     expectedReasonContains: 'DISALLOWED_HOST',
+  },  {
+    name: 'invalid non-google host 3',
+    url: 'https://evil3.example.com/file/d/1bad3/view',
+    expectedValid: false,
+    expectedReasonContains: 'DISALLOWED_HOST',
   },
 ];
 
