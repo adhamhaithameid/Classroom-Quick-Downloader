@@ -177,6 +177,10 @@ const EDGE_CASES: EdgeCase[] = [
     name: 'valid drive open route 11',
     url: 'https://drive.google.com/open?id=1open11&authuser=3',
     expectedValid: true,
+  },  {
+    name: 'valid drive open route 12',
+    url: 'https://drive.google.com/open?id=1open12&authuser=0',
+    expectedValid: true,
   },
 ];
 
