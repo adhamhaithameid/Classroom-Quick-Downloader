@@ -765,9 +765,11 @@ docker compose up -d
 docker compose logs -f oracle-backend caddy
 ```
 
-Compose now fronts the Go service with Caddy on ports `80/443`. Keep direct
-`http://localhost:8080` usage only for local `go run ./cmd/app` development, not
-for production-style compose deployments.
+Compose now fronts the Go service with Caddy on ports `80/443`.
+The backend `:8080` container port is mapped to loopback only (`127.0.0.1:8080`)
+so plaintext HTTP is not published publicly.
+Keep direct `http://localhost:8080` usage only for local `go run ./cmd/app`
+development, not for production-style compose deployments.
 
 When `APP_ENV=production`, startup is fail-closed for transport settings:
 - `SESSION_COOKIE_SECURE` must be `true`
