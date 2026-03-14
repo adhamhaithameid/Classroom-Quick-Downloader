@@ -400,17 +400,46 @@ function redirectWithCookies(location: string, cookies: string[]): Response {
 }
 
 const HTML_SECURITY_HEADERS = {
-  "content-security-policy":
-    "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https:; font-src 'self' data:",
   "x-content-type-options": "nosniff",
   "x-frame-options": "DENY",
   "referrer-policy": "strict-origin-when-cross-origin",
   "permissions-policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
 } as const;
 
-function withHtmlSecurityHeaders(init?: HeadersInit): Headers {
+function generateCspNonce(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  let binary = "";
+  for (const b of bytes) {
+    binary += String.fromCharCode(b);
+  }
+  return btoa(binary);
+}
+
+function buildHtmlCsp(nonce?: string): string {
+  const scriptSrc = nonce
+    ? `script-src 'self' 'nonce-${nonce}'`
+    : "script-src 'self'";
+  return [
+    "default-src 'self'",
+    "base-uri 'self'",
+    "object-src 'none'",
+    "frame-ancestors 'none'",
+    "form-action 'self'",
+    scriptSrc,
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: https:",
+    "connect-src 'self' https:",
+    "font-src 'self' data:",
+  ].join("; ");
+}
+
+function withHtmlSecurityHeaders(init?: HeadersInit, nonce?: string): Headers {
   const headers = new Headers(init);
   headers.set("content-type", headers.get("content-type") || "text/html; charset=utf-8");
+  if (!headers.has("content-security-policy")) {
+    headers.set("content-security-policy", buildHtmlCsp(nonce));
+  }
   for (const [key, value] of Object.entries(HTML_SECURITY_HEADERS)) {
     if (!headers.has(key)) {
       headers.set(key, value);
@@ -447,6 +476,15 @@ const ORACLE_PUBLIC_WEBSITE_PATHS = new Set<string>([
   // "/api/public/website/newsletter/subscribe",
   // NEWSLETTER_CTA_DISABLED_ROLLBACK_END
 ]);
+
+const SNAPSHOT_FALLBACK_PATHS = new Set<string>([
+  "/api/public/website/overview",
+  "/api/public/website/map",
+  "/api/public/website/status",
+  "/api/public/website/changelog",
+]);
+const ORACLE_PUBLIC_PROXY_CIRCUIT_TTL_MS = 60_000;
+let oraclePublicProxyCircuitOpenUntilMs = 0;
 
 function isOraclePublicWebsiteRoute(pathname: string): boolean {
   return ORACLE_PUBLIC_WEBSITE_PATHS.has(pathname);
@@ -906,9 +944,10 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
       // Valid session - redirect to dashboard
       return Response.redirect(new URL("/dashboard", request.url).toString(), 302);
     }
-    return new Response(renderLoginPage(), {
+    const nonce = generateCspNonce();
+    return new Response(renderLoginPage(undefined, nonce), {
       status: 200,
-      headers: withHtmlSecurityHeaders(),
+      headers: withHtmlSecurityHeaders(undefined, nonce),
     });
   }
 
@@ -923,15 +962,17 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
     }
 
     if (!dashboardSecret) {
+      const nonce = generateCspNonce();
       return new Response(
-        renderLoginPage("Server misconfigured: DASHBOARD_PASSWORD missing."),
-        { status: 500, headers: withHtmlSecurityHeaders() },
+        renderLoginPage("Server misconfigured: DASHBOARD_PASSWORD missing.", nonce),
+        { status: 500, headers: withHtmlSecurityHeaders(undefined, nonce) },
       );
     }
     if (!env.DO_SHARED_SECRET) {
+      const nonce = generateCspNonce();
       return new Response(
-        renderLoginPage("Server misconfigured: DO_SHARED_SECRET missing."),
-        { status: 500, headers: withHtmlSecurityHeaders() },
+        renderLoginPage("Server misconfigured: DO_SHARED_SECRET missing.", nonce),
+        { status: 500, headers: withHtmlSecurityHeaders(undefined, nonce) },
       );
     }
 
@@ -942,55 +983,61 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
     try {
       allowlistDecision = await checkLoginAllowlist(stub, request.url, env.DO_SHARED_SECRET, clientIp);
     } catch {
+      const nonce = generateCspNonce();
       return new Response(
-        renderLoginPage("Access policy service temporarily unavailable. Please try again shortly."),
+        renderLoginPage("Access policy service temporarily unavailable. Please try again shortly.", nonce),
         {
           status: 503,
           headers: withHtmlSecurityHeaders({
             "Retry-After": "30",
             "X-Dependency-Error": "durable-object-unavailable",
-          }),
+          }, nonce),
         },
       );
     }
 
     if (!allowlistDecision.allowed) {
       if (!allowlistDecision.stepUpBypassEnabled) {
+        const nonce = generateCspNonce();
         return new Response(
-          renderLoginPage("This device is not allowlisted. Ask an admin to add your IP before trying again."),
-          { status: 403, headers: withHtmlSecurityHeaders() },
+          renderLoginPage("This device is not allowlisted. Ask an admin to add your IP before trying again.", nonce),
+          { status: 403, headers: withHtmlSecurityHeaders(undefined, nonce) },
         );
       }
       if (!env.DANGER_PASSWORD) {
+        const nonce = generateCspNonce();
         return new Response(
-          renderLoginPage("Server misconfigured: DANGER_PASSWORD missing."),
-          { status: 500, headers: withHtmlSecurityHeaders() },
+          renderLoginPage("Server misconfigured: DANGER_PASSWORD missing.", nonce),
+          { status: 500, headers: withHtmlSecurityHeaders(undefined, nonce) },
         );
       }
       const stepUpResult = await verifyDangerStepUpPassword(stub, env, clientIp, password);
       if (!stepUpResult.ok) {
         if (stepUpResult.status === 429) {
           const mins = Math.ceil((stepUpResult.blockedForSeconds || 900) / 60);
+          const nonce = generateCspNonce();
           return new Response(
-            renderLoginPage(`Too many failed step-up attempts. Please try again in ${mins} minutes.`),
-            { status: 429, headers: withHtmlSecurityHeaders() },
+            renderLoginPage(`Too many failed step-up attempts. Please try again in ${mins} minutes.`, nonce),
+            { status: 429, headers: withHtmlSecurityHeaders(undefined, nonce) },
           );
         }
         if (stepUpResult.status === 503) {
+          const nonce = generateCspNonce();
           return new Response(
-            renderLoginPage("Step-up verification service is temporarily unavailable. Please try again."),
+            renderLoginPage("Step-up verification service is temporarily unavailable. Please try again.", nonce),
             {
               status: 503,
               headers: withHtmlSecurityHeaders({
                 "Retry-After": "30",
                 "X-Dependency-Error": "durable-object-unavailable",
-              }),
+              }, nonce),
             },
           );
         }
+        const nonce = generateCspNonce();
         return new Response(
-          renderLoginPage("This device is not allowlisted. Enter the admin danger password to continue."),
-          { status: 401, headers: withHtmlSecurityHeaders() },
+          renderLoginPage("This device is not allowlisted. Enter the admin danger password to continue.", nonce),
+          { status: 401, headers: withHtmlSecurityHeaders(undefined, nonce) },
         );
       }
     } else if (!timingSafeStringEqual(password, dashboardSecret)) {
@@ -1022,30 +1069,33 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
           throw new Error("login-attempt payload missing allowed boolean");
         }
       } catch {
+        const nonce = generateCspNonce();
         return new Response(
-          renderLoginPage("Login service temporarily unavailable. Please try again shortly."),
+          renderLoginPage("Login service temporarily unavailable. Please try again shortly.", nonce),
           {
             status: 503,
             headers: withHtmlSecurityHeaders({
               "Retry-After": "30",
               "X-Dependency-Error": "durable-object-unavailable",
-            }),
+            }, nonce),
           },
         );
       }
 
       if (!rateLimitData.allowed) {
         const mins = Math.ceil((rateLimitData.blockedForSeconds || 900) / 60);
+        const nonce = generateCspNonce();
         return new Response(
-          renderLoginPage(`Too many failed attempts. Please try again in ${mins} minutes.`),
-          { status: 429, headers: withHtmlSecurityHeaders() }
+          renderLoginPage(`Too many failed attempts. Please try again in ${mins} minutes.`, nonce),
+          { status: 429, headers: withHtmlSecurityHeaders(undefined, nonce) }
         );
       }
 
       const remaining = rateLimitData.attemptsRemaining ?? 4;
+      const nonce = generateCspNonce();
       return new Response(
-        renderLoginPage(`Invalid password. ${remaining} attempts remaining.`),
-        { status: 401, headers: withHtmlSecurityHeaders() }
+        renderLoginPage(`Invalid password. ${remaining} attempts remaining.`, nonce),
+        { status: 401, headers: withHtmlSecurityHeaders(undefined, nonce) }
       );
     }
 
@@ -1122,11 +1172,12 @@ async function handleDashboard(request: Request, env: WorkerEnv): Promise<Respon
   }
 
   const stats = (await statsRes.json()) as StatsResponse;
-  const html = renderDashboard(stats);
+  const nonce = generateCspNonce();
+  const html = renderDashboard(stats, nonce);
 
   return new Response(html, {
     status: 200,
-    headers: withHtmlSecurityHeaders(),
+    headers: withHtmlSecurityHeaders(undefined, nonce),
   });
 }
 
@@ -1151,9 +1202,10 @@ async function handleWebsiteConsoleDashboard(request: Request, env: WorkerEnv): 
     ]);
   }
 
-  return new Response(renderWebsiteConsole(), {
+  const nonce = generateCspNonce();
+  return new Response(renderWebsiteConsole(nonce), {
     status: 200,
-    headers: withHtmlSecurityHeaders(),
+    headers: withHtmlSecurityHeaders(undefined, nonce),
   });
 }
 
@@ -2023,6 +2075,29 @@ async function handleOraclePublicWebsiteProxy(request: Request, env: WorkerEnv):
   }
 
   const targetUrl = `${resolvedOracleEndpoint.baseUrl}${pathname}`;
+  const canFallbackToSnapshot =
+    request.method === "GET" &&
+    SNAPSHOT_FALLBACK_PATHS.has(pathname);
+
+  if (canFallbackToSnapshot && Date.now() < oraclePublicProxyCircuitOpenUntilMs) {
+    const fallbackPayload = await getSnapshotFallbackPayload(pathname, env);
+    if (fallbackPayload) {
+      return withCors(
+        request,
+        new Response(JSON.stringify(fallbackPayload), {
+          status: 200,
+          headers: {
+            "content-type": "application/json; charset=utf-8",
+            "cache-control": "public, max-age=120, s-maxage=300",
+            "x-site-fallback": "snapshot-cache",
+            "x-upstream-status": "circuit_open",
+          },
+        }),
+        env,
+      );
+    }
+  }
+
   const upstreamHeaders = new Headers();
   const contentType = request.headers.get("content-type");
   if (contentType) upstreamHeaders.set("content-type", contentType);
@@ -2036,14 +2111,46 @@ async function handleOraclePublicWebsiteProxy(request: Request, env: WorkerEnv):
   const hasBody = request.method !== "GET" && request.method !== "HEAD";
   const requestBody = hasBody ? await request.text() : undefined;
 
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
   try {
+    const timeoutController = new AbortController();
+    timeoutId = setTimeout(() => timeoutController.abort("oracle_public_proxy_timeout"), 8_000);
     const upstream = await fetch(targetUrl, {
       method: request.method,
       headers: upstreamHeaders,
       body: requestBody,
       redirect: "follow",
+      signal: timeoutController.signal,
     });
+    clearTimeout(timeoutId);
+    timeoutId = null;
     const body = await upstream.text();
+
+    if (!upstream.ok && canFallbackToSnapshot) {
+      if (upstream.status >= 500) {
+        oraclePublicProxyCircuitOpenUntilMs = Date.now() + ORACLE_PUBLIC_PROXY_CIRCUIT_TTL_MS;
+      }
+      const fallbackPayload = await getSnapshotFallbackPayload(pathname, env);
+      if (fallbackPayload) {
+        return withCors(
+          request,
+          new Response(JSON.stringify(fallbackPayload), {
+            status: 200,
+            headers: {
+              "content-type": "application/json; charset=utf-8",
+              "cache-control": "public, max-age=120, s-maxage=300",
+              "x-site-fallback": "snapshot-cache",
+              "x-upstream-status": String(upstream.status),
+            },
+          }),
+          env,
+        );
+      }
+    }
+    if (upstream.ok) {
+      oraclePublicProxyCircuitOpenUntilMs = 0;
+    }
+
     const responseHeaders = new Headers({
       "content-type": upstream.headers.get("content-type") || "application/json; charset=utf-8",
     });
@@ -2058,6 +2165,27 @@ async function handleOraclePublicWebsiteProxy(request: Request, env: WorkerEnv):
       env,
     );
   } catch {
+    if (canFallbackToSnapshot) {
+      oraclePublicProxyCircuitOpenUntilMs = Date.now() + ORACLE_PUBLIC_PROXY_CIRCUIT_TTL_MS;
+    }
+    if (canFallbackToSnapshot) {
+      const fallbackPayload = await getSnapshotFallbackPayload(pathname, env);
+      if (fallbackPayload) {
+        return withCors(
+          request,
+          new Response(JSON.stringify(fallbackPayload), {
+            status: 200,
+            headers: {
+              "content-type": "application/json; charset=utf-8",
+              "cache-control": "public, max-age=120, s-maxage=300",
+              "x-site-fallback": "snapshot-cache",
+              "x-upstream-status": "timeout_or_unavailable",
+            },
+          }),
+          env,
+        );
+      }
+    }
     return withCors(
       request,
       new Response(JSON.stringify({ ok: false, error: "upstream_unavailable" }), {
@@ -2066,6 +2194,10 @@ async function handleOraclePublicWebsiteProxy(request: Request, env: WorkerEnv):
       }),
       env,
     );
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
   }
 }
 
@@ -2126,6 +2258,69 @@ function buildSiteSnapshotEnvelope(input: Record<string, unknown>): Record<strin
     cacheWrittenAtUtc: now,
     sessionPinned: true,
   };
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+function buildSnapshotFallbackPayload(
+  pathname: string,
+  snapshot: Record<string, unknown>,
+): Record<string, unknown> | null {
+  const overview = asRecord(snapshot.overview);
+  const map = asRecord(snapshot.map);
+  const changelog = asRecord(snapshot.changelog);
+
+  if (pathname === "/api/public/website/overview") {
+    return overview;
+  }
+  if (pathname === "/api/public/website/map") {
+    return map;
+  }
+  if (pathname === "/api/public/website/changelog") {
+    return changelog;
+  }
+  if (pathname === "/api/public/website/status") {
+    const overviewStatus = asRecord(overview?.status);
+    return {
+      schemaVersion: "1",
+      ok: true,
+      generatedAt: Number(snapshot.generatedAtUtc ?? snapshot.generatedAt ?? Date.now()),
+      systemLive: overviewStatus?.systemLive === true,
+      liveSinceUtc:
+        typeof overviewStatus?.liveSinceUtc === "number" && Number.isFinite(overviewStatus.liveSinceUtc)
+          ? overviewStatus.liveSinceUtc
+          : null,
+      workerHealth:
+        overviewStatus?.workerHealth === "up" ||
+        overviewStatus?.workerHealth === "degraded" ||
+        overviewStatus?.workerHealth === "down"
+          ? overviewStatus.workerHealth
+          : "degraded",
+      fallbackSource: "snapshot-cache",
+    };
+  }
+
+  return null;
+}
+
+async function getSnapshotFallbackPayload(
+  pathname: string,
+  env: WorkerEnv,
+): Promise<Record<string, unknown> | null> {
+  const cachedRaw = await readSiteSnapshotCache(env);
+  if (!cachedRaw) return null;
+
+  try {
+    const parsed = JSON.parse(cachedRaw);
+    const snapshot = asRecord(parsed);
+    if (!snapshot) return null;
+    return buildSnapshotFallbackPayload(pathname, snapshot);
+  } catch {
+    return null;
+  }
 }
 
 async function fetchOracleSnapshotPayload(env: WorkerEnv): Promise<Record<string, unknown>> {
