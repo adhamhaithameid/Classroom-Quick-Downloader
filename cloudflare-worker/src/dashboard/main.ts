@@ -238,7 +238,8 @@ function topKey(data?: Record<string, number>): string {
   return entries[0][0];
 }
 
-export function renderLoginPage(errorMessage?: string): string {
+export function renderLoginPage(errorMessage?: string, scriptNonce?: string): string {
+  const scriptAttr = scriptNonce ? ` nonce="${escapeHtml(scriptNonce)}"` : "";
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -279,7 +280,7 @@ export function renderLoginPage(errorMessage?: string): string {
     </div>
     ${errorMessage ? `<div class="login-error">${escapeHtml(errorMessage)}</div>` : ""}
   </form>
-  <script>document.getElementById("password-input")?.focus();</script>
+  <script${scriptAttr}>document.getElementById("password-input")?.focus();</script>
 </body>
 </html>`;
 }
@@ -612,7 +613,8 @@ function renderReleaseManagementSection(entries: ChangelogEntry[], config: Chang
 }
 // LEGACY_CHANGELOG_DISABLED_END
 
-export function renderDashboard(stats: StatsResponse): string {
+export function renderDashboard(stats: StatsResponse, scriptNonce?: string): string {
+  const scriptAttr = scriptNonce ? ` nonce="${escapeHtml(scriptNonce)}"` : "";
   const quota = stats.quota;
   const stateTag = quotaToStateTag(quota);
   const flag = quotaToFlag(quota);
@@ -4319,7 +4321,7 @@ export function renderDashboard(stats: StatsResponse): string {
     </div>
   </div>
 
-  <script>
+  <script${scriptAttr}>
     (function () {
       // XSS prevention: HTML escape for untrusted data
       function escapeHtmlJS(unsafe) {
