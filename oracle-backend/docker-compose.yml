@@ -43,9 +43,9 @@ services:
       - oracle_data:/data
       - ${GOOGLE_CREDS_PATH_HOST:-/dev/null}:/run/secrets/google-credentials.json:ro
     # HTTPS-only hardening: keep backend HTTP bound to loopback only.
-    # Public traffic should enter through Caddy TLS on :443.
+    # Keep host port private and non-public so Caddy can own public ingress.
     ports:
-      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:18080:8080"
     restart: always
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]      
@@ -63,6 +63,8 @@ services:
     ports:
       - "80:80"
       - "443:443"
+      # OCI ingress currently blocks 443 on this host; keep HTTPS fallback on 8080.
+      - "8080:8080"
     environment:
       - ORACLE_PUBLIC_HOSTNAME=${ORACLE_PUBLIC_HOSTNAME:-localhost}
     volumes:
