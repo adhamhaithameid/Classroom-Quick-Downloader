@@ -516,6 +516,7 @@ function isPublicCorsRoute(pathname: string): boolean {
     pathname === "/config" ||
     pathname === "/health" ||
     pathname === "/pipeline-health" ||
+    pathname === "/public/site-metrics" ||
     pathname === "/changelog" ||
     pathname === "/track" ||
     pathname === "/api/site/v1/snapshot" ||
@@ -1788,6 +1789,7 @@ async function handleWebsiteConsoleAdminEndpoint(
 // ---------------------------------------------------------------------------
 
 async function handleProtectedAdminEndpoint(request: Request, env: WorkerEnv): Promise<Response> {
+  const pathname = new URL(request.url).pathname;
   const auth = await resolveAuthContext(request, env);
   if (!auth.hasValidSecret && !auth.hasValidSession) {
     return unauthorizedResponse(request, env);
@@ -1811,6 +1813,38 @@ async function handleProtectedAdminEndpoint(request: Request, env: WorkerEnv): P
         env,
       );
     }
+  }
+
+  if (pathname === "/admin/website/snapshot/refresh" && request.method === "POST") {
+    await refreshSiteSnapshotCacheFromOracle(env);
+    const cachedRaw = await readSiteSnapshotCache(env);
+    let refreshedVersion: string | null = null;
+    if (cachedRaw) {
+      try {
+        const parsed = JSON.parse(cachedRaw) as {
+          changelog?: { entries?: Array<{ version?: unknown }> };
+        };
+        const firstVersion = parsed?.changelog?.entries?.[0]?.version;
+        if (typeof firstVersion === "string" && firstVersion.trim().length > 0) {
+          refreshedVersion = firstVersion.trim();
+        }
+      } catch {
+        refreshedVersion = null;
+      }
+    }
+    return withCors(
+      request,
+      new Response(
+        JSON.stringify({
+          ok: true,
+          refreshed: cachedRaw !== null,
+          generatedAtUtc: Date.now(),
+          latestVersion: refreshedVersion,
+        }),
+        { status: 200, headers: { "content-type": "application/json; charset=utf-8" } },
+      ),
+      env,
+    );
   }
 
   const websiteConsoleResponse = await handleWebsiteConsoleAdminEndpoint(request, env, auth);
@@ -2480,6 +2514,7 @@ export default {
       (pathname === "/config" && request.method === "GET") ||
       (pathname === "/health" && request.method === "GET") ||
       (pathname === "/pipeline-health" && request.method === "GET") ||
+      (pathname === "/public/site-metrics" && request.method === "GET") ||
       (pathname === "/changelog" && request.method === "GET") ||
       (pathname === "/track" && request.method === "POST")
     ) {
@@ -2509,6 +2544,7 @@ export default {
       pathname === "/admin/website/replay-dlq" ||
       pathname === "/admin/website/override" ||
       pathname === "/admin/website/refresh-toggle" ||
+      pathname === "/admin/website/snapshot/refresh" ||
       pathname === "/admin/website/console/summary" ||
       pathname === "/admin/website/console/kv" ||
       pathname === "/admin/website/console/d1/tables" ||

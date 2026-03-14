@@ -562,7 +562,7 @@ describe("Worker auth config hardening", () => {
     expect(res.headers.get("Access-Control-Allow-Headers")).not.toContain("X-Admin-Secret");
   });
 
-  it("does not expose legacy /public/site-metrics edge read endpoint", async () => {
+  it("proxies /public/site-metrics to Durable Object public metrics endpoint", async () => {
     const env = mockEnv();
     const request = new Request("https://example.com/public/site-metrics", {
       method: "GET",
@@ -572,7 +572,9 @@ describe("Worker auth config hardening", () => {
     });
 
     const res = await worker.fetch(request, env, {} as ExecutionContext);
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(200);
+    const payload = await res.json() as { ok?: boolean };
+    expect(payload.ok).toBe(true);
   });
 
   it("proxies Oracle public website overview through the Worker with wildcard CORS", async () => {
@@ -821,6 +823,83 @@ describe("Worker auth config hardening", () => {
     expect(payload.ok).toBe(true);
     expect(payload.replayed).toBe(3);
     expect(doFetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("refreshes cached public website snapshot via /admin/website/snapshot/refresh", async () => {
+    let kvValue: string | null = null;
+    const kv = {
+      get: vi.fn(async () => kvValue),
+      put: vi.fn(async (_key: string, value: string) => {
+        kvValue = value;
+      }),
+    };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.toString()
+            : input.url;
+      if (url === "https://oracle.local/api/public/website/snapshot") {
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            generatedAtUtc: 1771700000000,
+            changelog: {
+              entries: [{ version: "1.5.0" }],
+            },
+          }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json; charset=utf-8" },
+          },
+        );
+      }
+      return new Response(JSON.stringify({ ok: false, error: "not_found" }), {
+        status: 404,
+        headers: { "content-type": "application/json; charset=utf-8" },
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const env = mockEnv({
+      ORACLE_ENDPOINT: "https://oracle.local",
+      SITE_SNAPSHOT_KV: kv as unknown as KVNamespace,
+    });
+    const request = new Request("https://example.com/admin/website/snapshot/refresh", {
+      method: "POST",
+      headers: {
+        "X-Admin-Secret": "do-shared-secret",
+      },
+    });
+
+    const res = await worker.fetch(request, env, {} as ExecutionContext);
+    const payload = await res.json() as { ok?: boolean; refreshed?: boolean; latestVersion?: string | null };
+
+    expect(res.status).toBe(200);
+    expect(payload.ok).toBe(true);
+    expect(payload.refreshed).toBe(true);
+    expect(payload.latestVersion).toBe("1.5.0");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(kv.put).toHaveBeenCalledTimes(1);
+    expect(kvValue).not.toBeNull();
+
+    vi.unstubAllGlobals();
+  });
+
+  it("requires auth for /admin/website/snapshot/refresh", async () => {
+    const env = mockEnv();
+    const res = await worker.fetch(
+      new Request("https://example.com/admin/website/snapshot/refresh", {
+        method: "POST",
+      }),
+      env,
+      {} as ExecutionContext,
+    );
+    const payload = await res.json() as { ok?: boolean; error?: string };
+    expect(res.status).toBe(401);
+    expect(payload.ok).toBe(false);
+    expect(payload.error).toBe("unauthorized");
   });
 
   it("redirects /dashboard/website to login when session is missing", async () => {

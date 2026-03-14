@@ -12,6 +12,7 @@ compatibility_date = "2024-12-01"
   # The worker appends "/ingest-batch" for flushes and "/api/public/website/*" for public reads.
   # Use DNS host (not raw IP) so Cloudflare fetch does not hit direct-IP egress restrictions.
   ORACLE_ENDPOINT = "https://oracle-endpoint-placeholder.invalid"
+  ALLOW_INSECURE_ORACLE_ENDPOINT = "false"
   MAX_BATCH_EVENTS = "10000"
   # Website writes (telemetry + uninstall feedback) are origin-gated.
   # Keep this synced with your active website domains.

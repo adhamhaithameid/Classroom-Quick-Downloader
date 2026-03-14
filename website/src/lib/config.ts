@@ -5,7 +5,7 @@ const publicEnv = publicEnvModule as Record<string, string | undefined>;
 const DEFAULT_SITE_URL = 'https://classroom-quick-downloader-website.pages.dev';
 const DEFAULT_WORKER_URL = 'https://cqd-analytics.adhamhaithameid.workers.dev';
 const DEFAULT_ORACLE_URL = DEFAULT_WORKER_URL;
-const DEFAULT_APP_VERSION = 'v1.3.9';
+const DEFAULT_APP_VERSION = 'v1.5.0';
 
 function cleanBaseUrl(value: string): string {
   return value.trim().replace(/\/+$/, '');
