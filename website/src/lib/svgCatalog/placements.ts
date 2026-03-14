@@ -185,7 +185,10 @@ function withHighDefaultZIndex(placements: ElementPlacement[]): ElementPlacement
   }));
 }
 
-/** Default placements used for fresh installs and hard reset. */
+/** Default placements used for fresh installs and hard reset.
+ * Visual identity guard: maintain float + doodle + 3d mix and pinned star.
+ * Guard assertions live in src/routes/overview.visual-guard.test.ts.
+ */
 export const defaultPlacements: ElementPlacement[] = withHighDefaultZIndex(
   defaultPlacementsSeed.placements as ElementPlacement[]
 );
