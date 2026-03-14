@@ -109,3 +109,18 @@ func TestDashboardStoreMetricsUI_TopTodayUsesOpsDayWindow(t *testing.T) {
 		t.Fatalf("dashboard JS must query top today cards with range=opsday")
 	}
 }
+
+func TestDashboardStoreMetricsUI_HasCanonicalInfraFallbackLinks(t *testing.T) {
+	dashboardJS := loadDashboardJS(t)
+	required := []string{
+		`cloudflare: 'https://cqd-analytics.adhamhaithameid.workers.dev/'`,
+		`website: 'https://classroom-quick-downloader-website.pages.dev'`,
+		`uptimeKuma: 'https://cqd-analytics.adhamhaithameid.workers.dev/pipeline-health'`,
+		`githubRepo: 'https://github.com/adhamhaithameid/Classroom-Quick-Downloader'`,
+	}
+	for _, snippet := range required {
+		if !strings.Contains(dashboardJS, snippet) {
+			t.Fatalf("dashboard JS missing infra fallback link snippet: %s", snippet)
+		}
+	}
+}

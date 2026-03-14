@@ -153,6 +153,15 @@ describe("Dashboard website console CTA", () => {
     expect(html).not.toContain("Notifications");
     expect(html).not.toContain("Releases");
   });
+
+  it("renders canonical external links in the dashboard shell", () => {
+    const html = renderDashboard(makeStats());
+    expect(html).toContain('href="https://classroom-quick-downloader-website.pages.dev/"');
+    expect(html).toContain('href="https://github.com/adhamhaithameid/Classroom-Quick-Downloader"');
+    expect(html).toContain(
+      'href="https://docs.google.com/spreadsheets/d/1ptzLKUVnAkyXnT635Zgb1C6Img9aeAZ1se3nRz_QZmI/edit?gid=0#gid=0"',
+    );
+  });
 });
 
 describe("Dashboard country label tooltips", () => {

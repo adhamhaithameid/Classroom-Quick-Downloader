@@ -20,7 +20,7 @@
 	      const NAV_GROUP_STATE_KEY = 'oracle_nav_group_state_v1';
 	          const DEFAULT_INFRA_LINKS = {
 	            cloudflare: 'https://cqd-analytics.adhamhaithameid.workers.dev/',
-	            website: '',
+	            website: 'https://classroom-quick-downloader-website.pages.dev',
 	            uptimeKuma: 'https://cqd-analytics.adhamhaithameid.workers.dev/pipeline-health',
 	            githubRepo: 'https://github.com/adhamhaithameid/Classroom-Quick-Downloader',
 	            googleSheets: 'https://docs.google.com/spreadsheets/d/1ptzLKUVnAkyXnT635Zgb1C6Img9aeAZ1se3nRz_QZmI/edit?gid=0#gid=0',
