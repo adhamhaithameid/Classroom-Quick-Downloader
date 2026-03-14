@@ -1475,7 +1475,8 @@
         for (var i = 0; i < dimensions.length; i++) {
           var dim = dimensions[i];
           try {
-            var data = await fetchJSON('/api/stats/breakdown?dimension=' + dim + '&range=today');
+            // Top Today cards are defined as the closed operational day window (UTC 23:00 -> 23:00).
+            var data = await fetchJSON('/api/stats/breakdown?dimension=' + dim + '&range=opsday');
             var valueEl = document.getElementById('top-' + dim);
             var countEl = document.getElementById('top-' + dim + '-count');
             var tiedEl = document.getElementById('top-' + dim + '-tied');

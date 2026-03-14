@@ -97,3 +97,15 @@ func TestDashboardStoreMetricsUI_HasUtcToggleAnimationAndStatusHoverHooks(t *tes
 		t.Fatalf("dashboard JS missing UTC toggle animation snippet")
 	}
 }
+
+func TestDashboardStoreMetricsUI_TopTodayUsesOpsDayWindow(t *testing.T) {
+	indexHTML := loadDashboardIndexHTML(t)
+	dashboardJS := loadDashboardJS(t)
+
+	if !strings.Contains(indexHTML, `id="top-today-grid"`) {
+		t.Fatalf("dashboard index missing top today grid")
+	}
+	if !strings.Contains(dashboardJS, `'/api/stats/breakdown?dimension=' + dim + '&range=opsday'`) {
+		t.Fatalf("dashboard JS must query top today cards with range=opsday")
+	}
+}
