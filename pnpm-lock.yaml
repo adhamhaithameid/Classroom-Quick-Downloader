@@ -7,7 +7,7 @@ settings:
 overrides:
   '@commitlint/config-validator>ajv': 8.18.0
   eslint>ajv: 8.18.0
-  undici: '>=7.18.2'
+  undici: '>=7.24.0'
   '@isaacs/brace-expansion': '>=5.0.1'
   minimatch: ^10.2.3
   rollup: ^4.59.0
@@ -3357,8 +3357,8 @@ packages:
   undici-types@7.22.0:
     resolution: {integrity: sha512-RKZvifiL60xdsIuC80UY0dq8Z7DbJUV8/l2hOVbyZAxBzEeQU4Z58+4ZzJ6WN2Lidi9KzT5EbiGX+PI/UGYuRw==}
 
-  undici@7.22.0:
-    resolution: {integrity: sha512-RqslV2Us5BrllB+JeiZnK4peryVTndy9Dnqq62S3yYRRTj0tFQCwEniUy2167skdGOy3vqRzEvl1Dm4sV2ReDg==}
+  undici@7.24.2:
+    resolution: {integrity: sha512-P9J1HWYV/ajFr8uCqk5QixwiRKmB1wOamgS0e+o2Z4A44Ej2+thFVRLG/eA7qprx88XXhnV5Bl8LHXTURpzB3Q==}
     engines: {node: '>=20.18.1'}
 
   unenv@2.0.0-rc.24:
@@ -5749,7 +5749,7 @@ snapshots:
       saxes: 6.0.0
       symbol-tree: 3.2.4
       tough-cookie: 6.0.0
-      undici: 7.22.0
+      undici: 7.24.2
       w3c-xmlserializer: 5.0.0
       webidl-conversions: 8.0.1
       whatwg-mimetype: 5.0.0
@@ -6011,7 +6011,7 @@ snapshots:
     dependencies:
       '@cspotcode/source-map-support': 0.8.1
       sharp: 0.34.5
-      undici: 7.22.0
+      undici: 7.24.2
       workerd: 1.20260312.1
       ws: 8.18.0
       youch: 4.1.0-beta.10
@@ -6709,7 +6709,7 @@ snapshots:
 
   undici-types@7.22.0: {}
 
-  undici@7.22.0: {}
+  undici@7.24.2: {}
 
   unenv@2.0.0-rc.24:
     dependencies:
