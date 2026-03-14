@@ -32,7 +32,7 @@ function createEnv(overrides: Partial<Env> = {}): Env {
 
 describe('cloudflare worker smoke tests', () => {
   it(
-    'returns healthy payload for /health and does not expose /public/site-metrics',
+    'returns healthy payload for /health and exposes /public/site-metrics',
     async () => {
     const env = createEnv();
 
@@ -42,7 +42,9 @@ describe('cloudflare worker smoke tests', () => {
     expect(healthBody.ok).toBe(true);
 
     const metricsRes = await worker.fetch(new Request('https://worker.example.com/public/site-metrics'), env, {} as ExecutionContext);
-    expect(metricsRes.status).toBe(404);
+    expect(metricsRes.status).toBe(200);
+    const metricsBody = await metricsRes.json() as { ok?: boolean };
+    expect(metricsBody.ok).toBe(true);
     },
     TEST_TIMEOUT_MS
   );
