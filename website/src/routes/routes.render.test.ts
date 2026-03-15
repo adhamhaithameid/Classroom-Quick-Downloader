@@ -31,7 +31,9 @@ describe('route render smoke coverage', () => {
     expect(head).toContain('https://classroom-quick-downloader-website.pages.dev/');
     expect(head).toContain('og:image');
     expect(head).toContain('twitter:image');
-    expect(head).not.toContain('fonts.googleapis.com');
+    expect(head).toContain('fonts.googleapis.com');
+    expect(head).toContain('Plus+Jakarta+Sans');
+    expect(head).not.toContain('family=Inter');
     expect(head).not.toContain('noindex, nofollow');
     expect(html).toContain('Download all Google Classroom files in one click for every assignment.');
   });
@@ -58,8 +60,12 @@ describe('route render smoke coverage', () => {
     expect(html).toContain('Not affiliated with Google or Google Classroom.');
     expect(html).toContain('Ready to save hours?');
     expect(html).toContain('See where Classroom Quick Downloader is used around the world.');
-    expect(html).not.toContain('l2-page-floats');
+    expect(html).toContain('l2-page-orbs');
+    expect(html).toContain('l2-page-grid');
+    expect(html).toContain('l2-page-floats');
     expect(html).not.toContain('Element Editor');
+    expect(head).toContain('Plus+Jakarta+Sans');
+    expect(head).not.toContain('family=Inter');
   });
 
   it('keeps the internal overview editor route out of indexing', () => {
@@ -70,6 +76,8 @@ describe('route render smoke coverage', () => {
     expect(head).toContain('noindex, nofollow');
     expect(head).toContain('/overview-editor');
     expect(html).toContain('l2-page-floats');
+    expect(head).toContain('Plus+Jakarta+Sans');
+    expect(head).not.toContain('family=Inter');
   });
 
   it('renders changelog loading state and refresh actions', () => {

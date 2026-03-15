@@ -106,20 +106,21 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_WORKER_API_TOKEN != '' && secrets.CLOUDFLARE_WORKER_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           ORACLE_ENDPOINT: ${{ vars.ORACLE_ENDPOINT }}
+          PUBLIC_SITE_URL: ${{ vars.PUBLIC_SITE_URL }}
         run: |
-          python - <<'PY'
-          from pathlib import Path
-          import os
-          path = Path("wrangler.toml")
-          text = path.read_text()
-          placeholder = 'ORACLE_ENDPOINT = "https://oracle-endpoint-placeholder.invalid"'
-          replacement = f'ORACLE_ENDPOINT = "{os.environ["ORACLE_ENDPOINT"]}"'
-          if placeholder not in text:
-              raise SystemExit("Expected ORACLE_ENDPOINT placeholder not found in wrangler.toml")
-          path.write_text(text.replace(placeholder, replacement))
-          PY
+          set -euo pipefail
+          site_origin="$(printf '%s' "${PUBLIC_SITE_URL}" | sed -E 's#(https?://[^/]+).*#\1#')"
+          cors_origins="${site_origin}"
+          if [ "${site_origin}" != "https://classroom-quick-downloader-website.pages.dev" ]; then
+            cors_origins="${cors_origins},https://classroom-quick-downloader-website.pages.dev"
+          fi
+
           set +e
-          npx wrangler deploy 2>&1 | tee /tmp/wrangler-deploy.log
+          npx wrangler deploy \
+            --var "ORACLE_ENDPOINT:${ORACLE_ENDPOINT}" \
+            --var "ALLOW_INSECURE_ORACLE_ENDPOINT:false" \
+            --var "CORS_ALLOWED_ORIGINS:${cors_origins}" \
+            2>&1 | tee /tmp/wrangler-deploy.log
           status="${PIPESTATUS[0]}"
           set -e
           if [ "${status}" -eq 0 ]; then

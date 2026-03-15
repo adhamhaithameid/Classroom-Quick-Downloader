@@ -68,6 +68,38 @@ func TestResolveRange_Today(t *testing.T) {
 	}
 }
 
+func TestResolveRange_OpsDayBeforeBoundary(t *testing.T) {
+	d := openStatsDB(t)
+	now := time.Date(2025, 6, 15, 10, 30, 0, 0, time.UTC)
+	from, to, err := resolveRange(context.Background(), d, "opsday", now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := time.Date(2025, 6, 13, 23, 0, 0, 0, time.UTC)
+	if !from.Equal(expected) {
+		t.Fatalf("expected opsday start %v, got %v", expected, from)
+	}
+	if !to.Equal(from) {
+		t.Fatalf("expected to == from for opsday, got %v != %v", to, from)
+	}
+}
+
+func TestResolveRange_OpsDayAfterBoundary(t *testing.T) {
+	d := openStatsDB(t)
+	now := time.Date(2025, 6, 15, 23, 30, 0, 0, time.UTC)
+	from, to, err := resolveRange(context.Background(), d, "opsday", now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := time.Date(2025, 6, 14, 23, 0, 0, 0, time.UTC)
+	if !from.Equal(expected) {
+		t.Fatalf("expected opsday start %v, got %v", expected, from)
+	}
+	if !to.Equal(from) {
+		t.Fatalf("expected to == from for opsday, got %v != %v", to, from)
+	}
+}
+
 func TestResolveRange_Week(t *testing.T) {
 	d := openStatsDB(t)
 	now := time.Date(2025, 6, 15, 10, 0, 0, 0, time.UTC)

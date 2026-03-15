@@ -9,7 +9,8 @@ function escapeHtml(value: string): string {
     .replace(/'/g, "&#039;");
 }
 
-export function renderWebsiteConsole(): string {
+export function renderWebsiteConsole(scriptNonce?: string): string {
+  const scriptAttr = scriptNonce ? ` nonce="${escapeHtml(scriptNonce)}"` : "";
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -347,7 +348,7 @@ export function renderWebsiteConsole(): string {
     </footer>
   </div>
 
-  <script>
+  <script${scriptAttr}>
     (function () {
       var rawUnlocked = false;
 

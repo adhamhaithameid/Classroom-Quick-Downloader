@@ -1318,9 +1318,11 @@
 />
 
 <svelte:head>
+  <!-- Visual identity guard: editor mirrors overview typography.
+       Keep this aligned with overview/+page.svelte and guard tests. -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap" rel="stylesheet" />
 </svelte:head>
 
 <div class="l2" class:edit-mode={editMode} class:edit-isolation={editMode && editIsolation} bind:this={pageEl}>
@@ -2466,7 +2468,8 @@
     color: var(--text-secondary);
   }
 
-  /* ── Floating SVGs (page-wide) ───── */
+  /* ── Floating SVGs (page-wide) ─────
+     Visual identity guard: keep this layer; tests assert presence. */
   .l2-page-floats {
     position: absolute; top: 0; left: 0; right: 0; bottom: 0;
     pointer-events: none; overflow: hidden; z-index: 4;
