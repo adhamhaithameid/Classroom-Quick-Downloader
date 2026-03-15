@@ -43,6 +43,7 @@ Open:
 
 ```bash
 pnpm -C website check
+pnpm -C website test:visual-guards
 pnpm -C website test:unit
 pnpm -C website test:integration
 pnpm -C website test:acceptance
@@ -51,6 +52,17 @@ pnpm -C website test:system
 pnpm -C website build
 pnpm -C website preview
 ```
+
+## Visual Guardrails
+
+The website has explicit visual guardrails to prevent accidental regressions in:
+
+- primary font baseline (`Plus Jakarta Sans`)
+- decorative floating + 3D placement layers on overview pages
+
+See:
+
+- `docs/VISUAL_GUARDRAILS.md`
 
 Preview URL:
 

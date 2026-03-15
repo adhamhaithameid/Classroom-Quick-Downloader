@@ -1436,7 +1436,7 @@ func getTopKey(m map[string]int64) string {
 
 func granularityForRange(rangeName string) string {
 	switch rangeName {
-	case "today":
+	case "today", "opsday", "ops_day", "today_23utc":
 		return "hour"
 	default:
 		return "day"
@@ -1447,6 +1447,17 @@ func resolveRange(ctx context.Context, db *sql.DB, rangeName string, now time.Ti
 	switch rangeName {
 	case "today":
 		start := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+		return start, start, nil
+	case "opsday", "ops_day", "today_23utc":
+		anchor := time.Date(now.Year(), now.Month(), now.Day(), 23, 0, 0, 0, time.UTC)
+		// Use the LAST fully closed operational day window (23:00 -> 23:00).
+		// If now is before today's 23:00, the latest closed window ended yesterday at 23:00.
+		// If now is at/after today's 23:00, the latest closed window ended today at 23:00.
+		latestClosedEnd := anchor
+		if now.UTC().Before(anchor) {
+			latestClosedEnd = anchor.AddDate(0, 0, -1)
+		}
+		start := latestClosedEnd.AddDate(0, 0, -1)
 		return start, start, nil
 	case "week":
 		start := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC).AddDate(0, 0, -6)
@@ -1472,7 +1483,7 @@ func resolveRange(ctx context.Context, db *sql.DB, rangeName string, now time.Ti
 		}
 		return now, now, nil
 	default:
-		return time.Time{}, time.Time{}, errors.New("invalid range (use today|week|month|year|all)")
+		return time.Time{}, time.Time{}, errors.New("invalid range (use today|opsday|week|month|year|all)")
 	}
 }
 

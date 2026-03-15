@@ -44,7 +44,7 @@
     "overrides": {
       "@commitlint/config-validator>ajv": "8.18.0",
       "eslint>ajv": "8.18.0",
-      "undici": ">=7.18.2",
+      "undici": ">=7.24.0",
       "@isaacs/brace-expansion": ">=5.0.1",
       "minimatch": "^10.2.3",
       "rollup": "^4.59.0",
@@ -65,8 +65,8 @@
     }
   },
   "devDependencies": {
-    "@commitlint/cli": "^20.4.3",
-    "@commitlint/config-conventional": "^20.4.3",
+    "@commitlint/cli": "^20.4.4",
+    "@commitlint/config-conventional": "^20.4.4",
     "@playwright/test": "^1.58.2",
     "husky": "^9.1.7",
     "playwright": "^1.58.2"

@@ -120,6 +120,9 @@ jobs:
       - name: Run Website Typecheck
         run: pnpm -C website check
 
+      - name: Run Website Visual Guardrails
+        run: pnpm -C website test:visual-guards
+
       - name: Run Website Heavy Test Matrix
         run: pnpm -C website test:strict
 

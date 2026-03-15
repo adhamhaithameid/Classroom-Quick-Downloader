@@ -20,7 +20,7 @@
 	      const NAV_GROUP_STATE_KEY = 'oracle_nav_group_state_v1';
 	          const DEFAULT_INFRA_LINKS = {
 	            cloudflare: 'https://cqd-analytics.adhamhaithameid.workers.dev/',
-	            website: '',
+	            website: 'https://classroom-quick-downloader-website.pages.dev',
 	            uptimeKuma: 'https://cqd-analytics.adhamhaithameid.workers.dev/pipeline-health',
 	            githubRepo: 'https://github.com/adhamhaithameid/Classroom-Quick-Downloader',
 	            googleSheets: 'https://docs.google.com/spreadsheets/d/1ptzLKUVnAkyXnT635Zgb1C6Img9aeAZ1se3nRz_QZmI/edit?gid=0#gid=0',
@@ -1475,7 +1475,8 @@
         for (var i = 0; i < dimensions.length; i++) {
           var dim = dimensions[i];
           try {
-            var data = await fetchJSON('/api/stats/breakdown?dimension=' + dim + '&range=today');
+            // Top Today cards are defined as the closed operational day window (UTC 23:00 -> 23:00).
+            var data = await fetchJSON('/api/stats/breakdown?dimension=' + dim + '&range=opsday');
             var valueEl = document.getElementById('top-' + dim);
             var countEl = document.getElementById('top-' + dim + '-count');
             var tiedEl = document.getElementById('top-' + dim + '-tied');

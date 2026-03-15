@@ -16,6 +16,16 @@ function safeJson(data: unknown): string {
   return JSON.stringify(data).replace(/</g, "\\u003c").replace(/>/g, "\\u003e");
 }
 
+const DASHBOARD_LINKS = {
+  workerBaseUrl: "https://cqd-analytics.adhamhaithameid.workers.dev",
+  websitePublicUrl: "https://classroom-quick-downloader-website.pages.dev/",
+  githubRepoUrl: "https://github.com/adhamhaithameid/Classroom-Quick-Downloader",
+  googleSheetsUrl:
+    "https://docs.google.com/spreadsheets/d/1ptzLKUVnAkyXnT635Zgb1C6Img9aeAZ1se3nRz_QZmI/edit?gid=0#gid=0",
+  userChangelogSourceUrl:
+    "https://github.com/adhamhaithameid/Classroom-Quick-Downloader/blob/main/user-friendly-changelog.md",
+};
+
 function formatTs(ts: number | null): string {
   if (!ts) return "—";
   const d = new Date(ts);
@@ -238,7 +248,8 @@ function topKey(data?: Record<string, number>): string {
   return entries[0][0];
 }
 
-export function renderLoginPage(errorMessage?: string): string {
+export function renderLoginPage(errorMessage?: string, scriptNonce?: string): string {
+  const scriptAttr = scriptNonce ? ` nonce="${escapeHtml(scriptNonce)}"` : "";
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -279,7 +290,7 @@ export function renderLoginPage(errorMessage?: string): string {
     </div>
     ${errorMessage ? `<div class="login-error">${escapeHtml(errorMessage)}</div>` : ""}
   </form>
-  <script>document.getElementById("password-input")?.focus();</script>
+  <script${scriptAttr}>document.getElementById("password-input")?.focus();</script>
 </body>
 </html>`;
 }
@@ -562,7 +573,7 @@ function renderReleaseManagementSection(entries: ChangelogEntry[], config: Chang
                  <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">
                    <button type="button" id="btn-preview-markdown" class="btn btn-secondary" style="padding:8px 12px;">Preview Draft</button>
                    <button type="button" id="btn-import-markdown-url" class="btn btn-secondary" style="padding:8px 12px;">Import From URL</button>
-                   <a href="https://github.com/adhamhaithameid/Classroom-Quick-Downloader/blob/main/user-friendly-changelog.md" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="padding:8px 12px; text-decoration:none;">Open GitHub Source</a>
+                   <a href="${escapeHtml(DASHBOARD_LINKS.userChangelogSourceUrl)}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="padding:8px 12px; text-decoration:none;">Open GitHub Source</a>
                  </div>
               </div>
               
@@ -612,7 +623,8 @@ function renderReleaseManagementSection(entries: ChangelogEntry[], config: Chang
 }
 // LEGACY_CHANGELOG_DISABLED_END
 
-export function renderDashboard(stats: StatsResponse): string {
+export function renderDashboard(stats: StatsResponse, scriptNonce?: string): string {
+  const scriptAttr = scriptNonce ? ` nonce="${escapeHtml(scriptNonce)}"` : "";
   const quota = stats.quota;
   const stateTag = quotaToStateTag(quota);
   const flag = quotaToFlag(quota);
@@ -634,7 +646,7 @@ export function renderDashboard(stats: StatsResponse): string {
       ? `when buffer ≥ ${maxBatchEvents} events`
       : "unknown";
 
-  const workerUrl = "https://cqd-analytics.adhamhaithameid.workers.dev";
+  const workerUrl = DASHBOARD_LINKS.workerBaseUrl;
   
   const isApproximated = stats.isApproximated ?? false;
   const uniqueCountriesAllTime =
@@ -3190,11 +3202,11 @@ export function renderDashboard(stats: StatsResponse): string {
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M7 8h10"></path><path d="M7 12h10"></path><path d="M7 16h6"></path></svg>
         Open Website Data Console
       </a>
-      <a href="https://classroom-quick-downloader-website.pages.dev/" target="_blank" class="btn-external oracle" data-tooltip="Open the public CQD website">
+      <a href="${escapeHtml(DASHBOARD_LINKS.websitePublicUrl)}" target="_blank" class="btn-external oracle" data-tooltip="Open the public CQD website">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18"></path><path d="M12 3a15 15 0 0 1 0 18"></path><path d="M12 3a15 15 0 0 0 0 18"></path></svg>
         Website
       </a>
-      <a href="https://github.com/adhamhaithameid/Classroom-Quick-Downloader" target="_blank" class="btn-external github" data-tooltip="View source code on GitHub">
+      <a href="${escapeHtml(DASHBOARD_LINKS.githubRepoUrl)}" target="_blank" class="btn-external github" data-tooltip="View source code on GitHub">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
         GitHub
       </a>
@@ -3202,7 +3214,7 @@ export function renderDashboard(stats: StatsResponse): string {
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
         Oracle
       </a>
-      <a href="https://docs.google.com/spreadsheets/d/1ptzLKUVnAkyXnT635Zgb1C6Img9aeAZ1se3nRz_QZmI/edit?usp=sharing" target="_blank" class="btn-external sheets" data-tooltip="View historical analytics data and trends">
+      <a href="${escapeHtml(DASHBOARD_LINKS.googleSheetsUrl)}" target="_blank" class="btn-external sheets" data-tooltip="View historical analytics data and trends">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
         Sheets
       </a>
@@ -4319,7 +4331,7 @@ export function renderDashboard(stats: StatsResponse): string {
     </div>
   </div>
 
-  <script>
+  <script${scriptAttr}>
     (function () {
       // XSS prevention: HTML escape for untrusted data
       function escapeHtmlJS(unsafe) {

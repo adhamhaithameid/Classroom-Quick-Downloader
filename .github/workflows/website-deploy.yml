@@ -91,6 +91,9 @@ jobs:
       - name: Website typecheck
         run: pnpm -C website check
 
+      - name: Website visual guardrails
+        run: pnpm -C website test:visual-guards
+
       - name: Website smoke tests
         run: pnpm -C website test:smoke
 
