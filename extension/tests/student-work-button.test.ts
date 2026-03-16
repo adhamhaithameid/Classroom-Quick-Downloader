@@ -121,5 +121,103 @@ describe('student_work/button', () => {
     expect(mocks.handleCancelClick).not.toHaveBeenCalled();
     expect(button.classList.contains('cqd-cancelled')).toBe(true);
   });
-});
 
+  it('appends request nonce to resolved download URL before dispatch', async () => {
+    const mocks = setupModule();
+    const { createStudentWorkButton } = await import('../src/student_work/button');
+
+    const button = createStudentWorkButton(
+      'https://classroom.google.com/g/tg/a/b/c',
+      { name: 'File', ext: 'pdf', kind: 'other' },
+      {
+        resolve: async () => ({ ok: true, url: 'https://drive.google.com/uc?export=download&id=NONCE_1', reason: 'resolved' }),
+      },
+    );
+    document.body.appendChild(button);
+
+    button.click();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(mocks.handleSingleDownloadClick).toHaveBeenCalledTimes(1);
+    const [, resolvedUrl] = mocks.handleSingleDownloadClick.mock.calls[0];
+    expect(resolvedUrl).toContain('id=NONCE_1');
+    expect(resolvedUrl).toContain('cqd_sw_req=');
+  });
+
+  it('ignores clicks when source URL is missing', async () => {
+    const mocks = setupModule();
+    const { createStudentWorkButton } = await import('../src/student_work/button');
+
+    const button = createStudentWorkButton(
+      '',
+      { name: 'File', ext: 'pdf', kind: 'other' },
+      {
+        resolve: async () => ({ ok: true, url: 'https://drive.google.com/uc?export=download&id=NO_SOURCE', reason: 'resolved' }),
+      },
+    );
+    document.body.appendChild(button);
+
+    button.click();
+    await Promise.resolve();
+
+    expect(mocks.handleSingleDownloadClick).not.toHaveBeenCalled();
+    expect(mocks.showErrorState).not.toHaveBeenCalled();
+  });
+
+  it('triggers resolver flow on middle-click auxclick', async () => {
+    const mocks = setupModule();
+    const { createStudentWorkButton } = await import('../src/student_work/button');
+
+    const button = createStudentWorkButton(
+      'https://classroom.google.com/g/tg/a/b/c',
+      { name: 'File', ext: 'pdf', kind: 'other' },
+      {
+        resolve: async () => ({ ok: true, url: 'https://drive.google.com/uc?export=download&id=AUX_1', reason: 'resolved' }),
+      },
+    );
+    document.body.appendChild(button);
+
+    button.dispatchEvent(new MouseEvent('auxclick', { bubbles: true, button: 1 }));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(mocks.handleSingleDownloadClick).toHaveBeenCalledTimes(1);
+    const [, resolvedUrl] = mocks.handleSingleDownloadClick.mock.calls[0];
+    expect(resolvedUrl).toContain('id=AUX_1');
+  });
+
+  it('does not start duplicate resolve requests while already resolving', async () => {
+    const mocks = setupModule();
+    const { createStudentWorkButton } = await import('../src/student_work/button');
+    let resolverCalls = 0;
+    let releaseResolver: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      releaseResolver = resolve;
+    });
+
+    const button = createStudentWorkButton(
+      'https://classroom.google.com/g/tg/a/b/c',
+      { name: 'File', ext: 'pdf', kind: 'other' },
+      {
+        resolve: async () => {
+          resolverCalls += 1;
+          await gate;
+          return { ok: true, url: 'https://drive.google.com/uc?export=download&id=SINGLE_RESOLVE', reason: 'resolved' };
+        },
+      },
+    );
+    document.body.appendChild(button);
+
+    button.click();
+    button.click();
+    await Promise.resolve();
+    expect(resolverCalls).toBe(1);
+
+    releaseResolver();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(mocks.handleSingleDownloadClick).toHaveBeenCalledTimes(1);
+  });
+});
