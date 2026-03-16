@@ -115,6 +115,7 @@ export default defineContentScript({
     'https://classroom.google.com/g/tg/*',
     'https://classroom.google.com/u/*/g/tg/*',
   ],
+  allFrames: true,
   runAt: 'document_idle',
   main() {
     startBridge();
