@@ -185,4 +185,30 @@ describe('student_work_sidecar content script', () => {
       expect.any(Object),
     );
   });
+
+  it('clears processed markers and sidecar buttons when test reset runs', async () => {
+    const { mod } = await loadSidecar();
+    mod.setStudentWorkSidecarRunningForTest(true);
+    vi.stubGlobal(
+      'location',
+      new URL('https://classroom.google.com/c/C/a/A/submissions/by-status/and-sort-name/all/all'),
+    );
+
+    document.body.innerHTML = `
+      <div data-stream-item-id="s1">
+        <a href="https://classroom.google.com/g/tg/c/a/s?id=FILE123">Attachment</a>
+      </div>
+    `;
+
+    mod.scanStudentWorkLinks(document);
+
+    const anchor = document.querySelector<HTMLAnchorElement>('a[href]');
+    expect(anchor?.getAttribute('data-cqd-sw-processed')).toBe('true');
+    expect(document.querySelectorAll('.cqd-download-btn[data-cqd-sw="true"]')).toHaveLength(1);
+
+    mod.resetStudentWorkSidecarForTest();
+
+    expect(anchor?.hasAttribute('data-cqd-sw-processed')).toBe(false);
+    expect(document.querySelectorAll('.cqd-download-btn[data-cqd-sw="true"]')).toHaveLength(0);
+  });
 });

@@ -212,6 +212,12 @@ export function resetStudentWorkSidecarForTest(): void {
     window.clearInterval(rescanIntervalId);
     rescanIntervalId = null;
   }
+
+  const sidecarButtons = document.querySelectorAll<HTMLButtonElement>('.cqd-download-btn[data-cqd-sw="true"]');
+  sidecarButtons.forEach((button) => button.remove());
+
+  const processedMarkers = document.querySelectorAll<HTMLElement>(`[${SIDE_CAR_ATTR}="true"]`);
+  processedMarkers.forEach((element) => element.removeAttribute(SIDE_CAR_ATTR));
 }
 
 function clearPendingScan(): void {
