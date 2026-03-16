@@ -20,6 +20,8 @@ export interface StudentWorkButtonOptions {
 }
 
 const resolveControllers = new WeakMap<HTMLButtonElement, AbortController>();
+const downloadWatchdogTimers = new WeakMap<HTMLButtonElement, number>();
+const STUDENT_WORK_DOWNLOAD_WATCHDOG_MS = 45_000;
 
 function resolveMessageFromReason(reason: string): string {
   if (reason.includes('resolver_timeout')) {
@@ -39,6 +41,25 @@ function withStudentWorkRequestNonce(rawUrl: string): string {
   } catch {
     return rawUrl;
   }
+}
+
+function clearDownloadWatchdog(button: HTMLButtonElement): void {
+  const timerId = downloadWatchdogTimers.get(button);
+  if (timerId != null) {
+    window.clearTimeout(timerId);
+    downloadWatchdogTimers.delete(button);
+  }
+}
+
+function armDownloadWatchdog(button: HTMLButtonElement): void {
+  clearDownloadWatchdog(button);
+  const timerId = window.setTimeout(() => {
+    downloadWatchdogTimers.delete(button);
+    const state = getButtonState(button);
+    if (state !== 'loading' && state !== 'trying') return;
+    void showErrorState(button, 'Download did not finish in time. Please retry.');
+  }, STUDENT_WORK_DOWNLOAD_WATCHDOG_MS);
+  downloadWatchdogTimers.set(button, timerId);
 }
 
 function buildButtonSkeleton(fileMeta: FileMeta): HTMLButtonElement {
@@ -154,6 +175,7 @@ export function createStudentWorkButton(
 
     if (currentState !== 'idle') return;
     if (!sourceUrl) return;
+    clearDownloadWatchdog(button);
 
     const controller = new AbortController();
     resolveControllers.set(button, controller);
@@ -169,10 +191,12 @@ export function createStudentWorkButton(
     }
 
     if (controller.signal.aborted) {
+      clearDownloadWatchdog(button);
       return;
     }
 
     if (!resolved.ok || !resolved.url) {
+      clearDownloadWatchdog(button);
       await showErrorState(button, resolveMessageFromReason(resolved.reason));
       return;
     }
@@ -182,6 +206,7 @@ export function createStudentWorkButton(
 
     // Move from resolving visual to real download lifecycle.
     setButtonState(button, 'idle');
+    armDownloadWatchdog(button);
     await handleSingleDownloadClick(button, requestScopedUrl, fileMeta);
   };
 
@@ -194,4 +219,3 @@ export function createStudentWorkButton(
 
   return button;
 }
-
