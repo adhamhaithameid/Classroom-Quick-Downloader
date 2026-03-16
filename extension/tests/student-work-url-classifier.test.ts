@@ -27,6 +27,11 @@ describe('student_work/url-classifier', () => {
       expect(isStudentWorkRoute('/c/abc/a/def/submissions/by-status/and-sort-name/all/all')).toBe(true);
     });
 
+    it('accepts trailing slash and nested student route segments', () => {
+      expect(isStudentWorkRoute('/c/abc/a/def/submissions/student-123/')).toBe(true);
+      expect(isStudentWorkRoute('/u/2/c/abc/a/def/submissions/student-123/attachments')).toBe(true);
+    });
+
     it('rejects non-student-work routes', () => {
       expect(isStudentWorkRoute('/c/abc/a/def/details')).toBe(false);
       expect(isStudentWorkRoute('/w/abc/t/all')).toBe(false);
@@ -47,6 +52,11 @@ describe('student_work/url-classifier', () => {
   describe('isStudentWorkAttachmentUrl', () => {
     it('accepts classroom viewer links', () => {
       const url = 'https://classroom.google.com/g/tg/course/work/submission';
+      expect(isStudentWorkAttachmentUrl(url)).toBe(true);
+    });
+
+    it('accepts authuser-prefixed classroom viewer links', () => {
+      const url = 'https://classroom.google.com/u/5/g/tg/course/work/submission';
       expect(isStudentWorkAttachmentUrl(url)).toBe(true);
     });
 
@@ -73,6 +83,12 @@ describe('student_work/url-classifier', () => {
       expect(
         extractDriveIdFromClassroomUrl('https://classroom.google.com/g/tg/x/y/z?foo=bar'),
       ).toBeNull();
+    });
+
+    it('trims extracted values from supported query params', () => {
+      expect(
+        extractDriveIdFromClassroomUrl('https://classroom.google.com/g/tg/x/y/z?id=%20FILE_TRIM%20'),
+      ).toBe('FILE_TRIM');
     });
   });
 
@@ -109,5 +125,18 @@ describe('student_work/url-classifier', () => {
     expect(updated).toContain('x=1');
     expect(updated).toContain('cqd_sw_req=req-1');
     expect(updated).toContain('cqd_sw_mode=iframe');
+  });
+
+  it('overwrites existing resolver params when adding new ones', () => {
+    const updated = addResolverParams(
+      'https://classroom.google.com/g/tg/a/b/c?cqd_sw_req=old&cqd_sw_mode=popup',
+      {
+        cqd_sw_req: 'req-2',
+        cqd_sw_mode: 'iframe',
+      },
+    );
+    expect(updated).toContain('cqd_sw_req=req-2');
+    expect(updated).toContain('cqd_sw_mode=iframe');
+    expect(updated).not.toContain('cqd_sw_req=old');
   });
 });
