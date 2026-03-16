@@ -186,6 +186,26 @@ describe('student_work_sidecar content script', () => {
     );
   });
 
+  it('prefers authuser query param over path prefix for data-drive-id attachments', async () => {
+    const { mod, createStudentWorkButton } = await loadSidecar();
+    mod.setStudentWorkSidecarRunningForTest(true);
+    vi.stubGlobal(
+      'location',
+      new URL('https://classroom.google.com/u/2/c/C/a/A/submissions/by-status/and-sort-name/all/all?authuser=5'),
+    );
+
+    document.body.innerHTML = `
+      <div data-drive-id="DRIVE888">Drive attachment</div>
+    `;
+
+    mod.scanStudentWorkLinks(document);
+
+    expect(createStudentWorkButton).toHaveBeenCalledWith(
+      'https://drive.google.com/uc?export=download&id=DRIVE888&authuser=5',
+      expect.any(Object),
+    );
+  });
+
   it('clears processed markers and sidecar buttons when test reset runs', async () => {
     const { mod } = await loadSidecar();
     mod.setStudentWorkSidecarRunningForTest(true);
