@@ -97,7 +97,7 @@ describe('student_work_by_status content script', () => {
     expect(document.querySelectorAll('.cqd-download-btn[data-cqd-sw-bs="true"]')).toHaveLength(1);
   });
 
-  it('uses the original classroom link as source for attachment anchors', async () => {
+  it('normalizes attachment anchors with resolvable IDs to direct drive download URLs', async () => {
     const { mod, createStudentWorkButton } = await loadByStatusSidecar();
     mod.setStudentWorkByStatusRunningForTest(true);
     vi.stubGlobal(
@@ -115,7 +115,9 @@ describe('student_work_by_status content script', () => {
     mod.scanStudentWorkByStatus(document);
 
     expect(createStudentWorkButton).toHaveBeenCalledTimes(1);
-    expect(createStudentWorkButton.mock.calls[0]?.[0]).toBe(sourceHref);
+    expect(createStudentWorkButton.mock.calls[0]?.[0]).toBe(
+      'https://drive.google.com/uc?export=download&id=FILE123',
+    );
   });
 
   it('injects per file for data-drive-id attachments', async () => {
@@ -207,6 +209,37 @@ describe('student_work_by_status content script', () => {
     );
     expect(buttons).toHaveLength(2);
     expect(buttons[0].dataset.cqdFileKey).not.toEqual(buttons[1].dataset.cqdFileKey);
+  });
+
+  it('prefers per-card data-drive-id over generic viewer href for source URL selection', async () => {
+    const { mod, createStudentWorkButton } = await loadByStatusSidecar();
+    mod.setStudentWorkByStatusRunningForTest(true);
+    vi.stubGlobal(
+      'location',
+      new URL('https://classroom.google.com/c/C/a/A/submissions/by-status/and-sort-name/all/all'),
+    );
+
+    document.body.innerHTML = `
+      <div class="WkZsyc file-card" data-drive-id="FILE_IMAGE_1">
+        <a class="vwNuXe" aria-label="Attachment: Image: screenshot.png" href="https://classroom.google.com/g/tg/c/a/s">Attachment</a>
+      </div>
+      <div class="WkZsyc file-card" data-drive-id="FILE_VIDEO_2">
+        <a class="vwNuXe" aria-label="Attachment: Video: clip.mp4" href="https://classroom.google.com/g/tg/c/a/s">Attachment</a>
+      </div>
+      <div class="WkZsyc file-card" data-drive-id="FILE_JSON_3">
+        <a class="vwNuXe" aria-label="Attachment: JSON: payload.json" href="https://classroom.google.com/g/tg/c/a/s">Attachment</a>
+      </div>
+    `;
+
+    mod.scanStudentWorkByStatus(document);
+
+    expect(createStudentWorkButton).toHaveBeenCalledTimes(3);
+    const sourceUrls = createStudentWorkButton.mock.calls.map((call) => call[0]);
+    expect(sourceUrls).toEqual([
+      'https://drive.google.com/uc?export=download&id=FILE_IMAGE_1',
+      'https://drive.google.com/uc?export=download&id=FILE_VIDEO_2',
+      'https://drive.google.com/uc?export=download&id=FILE_JSON_3',
+    ]);
   });
 
   it('ignores open folder links and menu items', async () => {
@@ -395,9 +428,16 @@ describe('student_work_by_status content script', () => {
     );
 
     document.body.innerHTML = `
+      <div class="cqd-flag"></div>
       <div class="cqd-comment-badge"></div>
       <div class="cqd-v2-flag"></div>
-      <div id="post" data-cqd-v2-flag="true" data-cqd-v2-flag-verdict="comment"></div>
+      <div id="post"
+        data-cqd-v2-flag="true"
+        data-cqd-v2-flag-verdict="comment"
+        data-cqd-injected="true"
+        data-cqd-comments-processed="true"
+        data-cqd-edited-processed="true"
+        data-cqd-edit-tooltip="edited +2h"></div>
       <div class="WkZsyc file-card">
         <a class="vwNuXe" aria-label="Attachment: Image: file.png" href="https://classroom.google.com/g/tg/c/a/s?id=FILE123">Attachment</a>
       </div>
@@ -405,11 +445,16 @@ describe('student_work_by_status content script', () => {
 
     mod.scanStudentWorkByStatus(document);
 
+    expect(document.querySelector('.cqd-flag')).toBeNull();
     expect(document.querySelector('.cqd-comment-badge')).toBeNull();
     expect(document.querySelector('.cqd-v2-flag')).toBeNull();
     const post = document.querySelector<HTMLElement>('#post');
     expect(post?.hasAttribute('data-cqd-v2-flag')).toBe(false);
     expect(post?.hasAttribute('data-cqd-v2-flag-verdict')).toBe(false);
+    expect(post?.hasAttribute('data-cqd-injected')).toBe(false);
+    expect(post?.hasAttribute('data-cqd-comments-processed')).toBe(false);
+    expect(post?.hasAttribute('data-cqd-edited-processed')).toBe(false);
+    expect(post?.hasAttribute('data-cqd-edit-tooltip')).toBe(false);
   });
 
   it('clears processed markers when test reset runs', async () => {
