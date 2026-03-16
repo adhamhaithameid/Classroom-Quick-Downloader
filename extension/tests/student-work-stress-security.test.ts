@@ -69,4 +69,56 @@ describe('student_work security + stress matrix', () => {
     expect(result).not.toBeNull();
     expect(result?.url).toContain('id=STRESS_FILE_123');
   });
+
+  it('extractor ignores non-drive/doc anchors even when they look noisy', async () => {
+    const { extractResolvedDownloadUrl } = await import('../src/student_work/extractor');
+
+    document.body.innerHTML = `
+      <a href="javascript:alert(1)">bad-1</a>
+      <a href="data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==">bad-2</a>
+      <a href="https://example.com/file/d/PRETEND/view">bad-3</a>
+    `;
+
+    const result = extractResolvedDownloadUrl(
+      document,
+      'https://classroom.google.com/g/tg/a/b/c?foo=bar',
+    );
+
+    expect(result).toBeNull();
+  });
+
+  it('classifier remains stable across many authuser path variants', async () => {
+    const { isStudentWorkRoute } = await import('../src/student_work/url-classifier');
+
+    const positives = Array.from({ length: 12 }, (_, idx) =>
+      `/u/${idx}/c/course-${idx}/a/work-${idx}/submissions/student-${idx}`,
+    );
+    const negatives = Array.from({ length: 12 }, (_, idx) =>
+      `/u/${idx}/c/course-${idx}/a/work-${idx}/details`,
+    );
+
+    positives.forEach((pathname) => {
+      expect(isStudentWorkRoute(pathname)).toBe(true);
+    });
+    negatives.forEach((pathname) => {
+      expect(isStudentWorkRoute(pathname)).toBe(false);
+    });
+  });
+
+  it('resolver keeps authuser while normalizing many direct-id classroom links', async () => {
+    const { resolveStudentWorkUrl } = await import('../src/student_work/resolver');
+
+    const cases = Array.from({ length: 8 }, (_, idx) => ({
+      rawUrl: `https://classroom.google.com/u/${idx}/g/tg/a/b/c?id=FILE_${idx}`,
+      auth: `${idx}`,
+      id: `FILE_${idx}`,
+    }));
+
+    for (const testCase of cases) {
+      const result = await resolveStudentWorkUrl(testCase.rawUrl, { stageTimeoutMs: 10 });
+      expect(result.ok).toBe(true);
+      expect(result.url).toContain(`id=${testCase.id}`);
+      expect(result.url).toContain(`authuser=${testCase.auth}`);
+    }
+  });
 });
