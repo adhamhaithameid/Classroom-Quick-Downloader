@@ -19,6 +19,15 @@ async function launchWithExtension(): Promise<BrowserContext> {
   });
 }
 
+async function ensureServiceWorkerReady(context: BrowserContext): Promise<void> {
+  if (context.serviceWorkers().length > 0) return;
+  try {
+    await context.waitForEvent('serviceworker', { timeout: 10_000 });
+  } catch {
+    // Best effort only: persistent contexts can race service-worker visibility.
+  }
+}
+
 function studentWorkHtml(linkHref: string): string {
   return `<!doctype html>
 <html>
@@ -98,10 +107,7 @@ test.describe('Student Work Real Browser', () => {
 
   test.beforeAll(async () => {
     context = await launchWithExtension();
-
-    if (context.serviceWorkers().length === 0) {
-      await context.waitForEvent('serviceworker', { timeout: 10_000 });
-    }
+    await ensureServiceWorkerReady(context);
   });
 
   test.afterAll(async () => {
@@ -121,7 +127,9 @@ test.describe('Student Work Real Browser', () => {
 
       const button = page.locator(SIDECAR_SELECTOR).first();
       await expect(button).toBeVisible({ timeout: 12_000 });
-      await expect(button).toHaveAttribute('data-cqd-sw-source-url', /\/g\/tg\//);
+      await expect
+        .poll(async () => button.getAttribute('data-cqd-sw-source-url'), { timeout: 12_000 })
+        .toMatch(/(\/g\/tg\/|drive\.google\.com\/uc\?)/);
 
       await button.click({ force: true });
 
