@@ -21,6 +21,7 @@ const DOWNLOAD_ALL_HOST_ATTR = 'data-cqd-sw-bs-host';
 const DOWNLOAD_ALL_HEADER_ATTR = 'data-cqd-sw-bs-header';
 const DOWNLOAD_ALL_GROUP_ID = 'cqd-sw-bs-host';
 const FLAG_ARTIFACT_SELECTOR = [
+  '.cqd-flag',
   '.cqd-comment-badge',
   '.cqd-edited-badge',
   '.cqd-both-badge',
@@ -31,8 +32,12 @@ const FLAG_ARTIFACT_SELECTOR = [
 const FLAG_ARTIFACT_ATTRS = [
   'data-cqd-v2-flag',
   'data-cqd-v2-flag-verdict',
+  'data-cqd-injected',
+  'data-cqd-comments-processed',
+  'data-cqd-edited-processed',
   'data-cqd-comment-count',
   'data-cqd-edit-diff',
+  'data-cqd-edit-tooltip',
   'data-cqd-comments-processed',
   'data-cqd-edit-processed',
   'data-cqd-processed',
@@ -471,6 +476,7 @@ export function scanStudentWorkByStatus(root: ParentNode = document): void {
   cleanupStudentWorkFlags(root);
 
   const anchors = Array.from(root.querySelectorAll<HTMLAnchorElement>('a[href]'));
+  const authUser = getAuthUserParam();
   for (const anchor of anchors) {
     if (!anchor.href) continue;
     if (!isSubmissionAttachmentAnchor(anchor)) continue;
@@ -478,7 +484,9 @@ export function scanStudentWorkByStatus(root: ParentNode = document): void {
     if (!container) continue;
 
     const resolvedDriveId = resolveDriveIdForAnchor(anchor, container);
-    const sourceUrl = anchor.href;
+    const sourceUrl = resolvedDriveId
+      ? buildDriveDownloadUrl(resolvedDriveId, authUser)
+      : anchor.href;
     const hasButton = resolvedDriveId
       ? (hasButtonForDriveId(container, resolvedDriveId) || hasButtonForSourceUrl(container, sourceUrl))
       : (hasButtonForAnchor(container, anchor) || hasButtonForSourceUrl(container, sourceUrl));
@@ -495,6 +503,7 @@ export function scanStudentWorkByStatus(root: ParentNode = document): void {
     const fileMeta = extractFileMeta(container, sourceUrl);
     const button = createStudentWorkButton(sourceUrl, fileMeta);
     button.dataset.cqdSwSourceUrl = sourceUrl;
+    button.dataset.cqdSwOriginalSourceUrl = anchor.href;
     if (resolvedDriveId) button.dataset.cqdSwFileId = resolvedDriveId;
     button.dataset.cqdName = sourceUrl;
     const host = resolveButtonHost(container, anchor);
