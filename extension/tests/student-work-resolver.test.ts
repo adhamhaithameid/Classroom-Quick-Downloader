@@ -49,6 +49,10 @@ describe('student_work/resolver', () => {
     // @ts-expect-error - test mock
     globalThis.BroadcastChannel = FakeBroadcastChannel;
     vi.restoreAllMocks();
+    vi.stubGlobal(
+      'location',
+      new URL('https://classroom.google.com/c/C/a/A/submissions/by-status/and-sort-name/all/all'),
+    );
     document.body.innerHTML = '';
   });
 
@@ -82,6 +86,28 @@ describe('student_work/resolver', () => {
     expect(openSpy).not.toHaveBeenCalled();
   });
 
+  it('preserves authuser from source path when resolving direct query-id links', async () => {
+    const result = await resolveStudentWorkUrl(
+      'https://classroom.google.com/u/4/g/tg/a/b/c?id=FILE_QUERY_2',
+      { stageTimeoutMs: 10 },
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.url).toContain('id=FILE_QUERY_2');
+    expect(result.url).toContain('authuser=4');
+  });
+
+  it('prefers authuser query over path when resolving direct query-id links', async () => {
+    const result = await resolveStudentWorkUrl(
+      'https://classroom.google.com/u/4/g/tg/a/b/c?id=FILE_QUERY_3&authuser=9',
+      { stageTimeoutMs: 10 },
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.url).toContain('id=FILE_QUERY_3');
+    expect(result.url).toContain('authuser=9');
+  });
+
   it('resolves via iframe bridge message', async () => {
     const appendSpy = vi.spyOn(document.documentElement, 'appendChild');
     const waitForIframe = vi.fn((node: Node) => {
@@ -113,6 +139,106 @@ describe('student_work/resolver', () => {
     expect(result.ok).toBe(true);
     expect(result.url).toContain('id=IFRAME_RESOLVED');
     expect(result.source).toBe('anchor');
+  });
+
+  it('adds authuser hint to iframe-resolved Drive URL when missing', async () => {
+    vi.stubGlobal('location', new URL('https://classroom.google.com/u/6/c/C/a/A/submissions'));
+    const appendSpy = vi.spyOn(document.documentElement, 'appendChild');
+    appendSpy.mockImplementation((node: Node) => {
+      if (!(node instanceof HTMLIFrameElement)) return node;
+      const iframeUrl = new URL(node.src);
+      const requestId = iframeUrl.searchParams.get('cqd_sw_req');
+      if (!requestId) return node;
+      setTimeout(() => {
+        publishResolveMessage({
+          type: 'CQD_SW_RESOLVE_RESULT',
+          requestId,
+          ok: true,
+          resolvedUrl: 'https://drive.google.com/uc?export=download&id=IFRAME_AUTH',
+          source: 'anchor',
+        });
+      }, 5);
+      return node;
+    });
+
+    const result = await resolveStudentWorkUrl(
+      'https://classroom.google.com/g/tg/a/b/c',
+      { stageTimeoutMs: 60 },
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.url).toContain('id=IFRAME_AUTH');
+    expect(result.url).toContain('authuser=6');
+  });
+
+  it('normalizes iframe-resolved docs URLs into direct drive downloads', async () => {
+    const appendSpy = vi.spyOn(document.documentElement, 'appendChild');
+    appendSpy.mockImplementation((node: Node) => {
+      if (!(node instanceof HTMLIFrameElement)) return node;
+      const iframeUrl = new URL(node.src);
+      const requestId = iframeUrl.searchParams.get('cqd_sw_req');
+      if (!requestId) return node;
+      setTimeout(() => {
+        publishResolveMessage({
+          type: 'CQD_SW_RESOLVE_RESULT',
+          requestId,
+          ok: true,
+          resolvedUrl: 'https://docs.google.com/document/d/DOC_FILE_1/edit',
+          source: 'anchor',
+        });
+      }, 5);
+      return node;
+    });
+
+    const result = await resolveStudentWorkUrl(
+      'https://classroom.google.com/g/tg/a/b/c',
+      { stageTimeoutMs: 60 },
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.url).toContain('https://drive.google.com/uc?');
+    expect(result.url).toContain('id=DOC_FILE_1');
+  });
+
+  it('rejects iframe-resolved non-https URLs', async () => {
+    const appendSpy = vi.spyOn(document.documentElement, 'appendChild');
+    appendSpy.mockImplementation((node: Node) => {
+      if (!(node instanceof HTMLIFrameElement)) return node;
+      const iframeUrl = new URL(node.src);
+      const requestId = iframeUrl.searchParams.get('cqd_sw_req');
+      if (!requestId) return node;
+      setTimeout(() => {
+        publishResolveMessage({
+          type: 'CQD_SW_RESOLVE_RESULT',
+          requestId,
+          ok: true,
+          resolvedUrl: 'javascript:alert(1)',
+          source: 'anchor',
+        });
+      }, 5);
+      return node;
+    });
+
+    const result = await resolveStudentWorkUrl(
+      'https://classroom.google.com/g/tg/a/b/c',
+      { stageTimeoutMs: 60 },
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe('invalid_resolved_url');
+  });
+
+  it('returns aborted when the signal is already aborted', async () => {
+    const controller = new AbortController();
+    controller.abort();
+
+    const result = await resolveStudentWorkUrl(
+      'https://classroom.google.com/g/tg/a/b/c',
+      { stageTimeoutMs: 10, signal: controller.signal },
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe('aborted');
   });
 
   it('stays silent (no popup) and fails with iframe timeout when unresolved', async () => {
