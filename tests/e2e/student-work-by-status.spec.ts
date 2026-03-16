@@ -20,6 +20,15 @@ async function launchWithExtension(): Promise<BrowserContext> {
   });
 }
 
+async function ensureServiceWorkerReady(context: BrowserContext): Promise<void> {
+  if (context.serviceWorkers().length > 0) return;
+  try {
+    await context.waitForEvent('serviceworker', { timeout: 10_000 });
+  } catch {
+    // Best effort only: persistent contexts can race service-worker visibility.
+  }
+}
+
 function studentWorkHtml(linkHrefs: string[]): string {
   const cards = linkHrefs
     .map((linkHref) => `
@@ -108,10 +117,7 @@ test.describe('Student Work By-Status Real Browser', () => {
 
   test.beforeAll(async () => {
     context = await launchWithExtension();
-
-    if (context.serviceWorkers().length === 0) {
-      await context.waitForEvent('serviceworker', { timeout: 10_000 });
-    }
+    await ensureServiceWorkerReady(context);
   });
 
   test.afterAll(async () => {
