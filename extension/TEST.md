@@ -144,6 +144,15 @@ pnpm vitest run -t "Arabic"
 
 # Verbose output (see all test names)
 pnpm vitest run --reporter=verbose
+
+# Run student-work focused unit tests
+pnpm vitest run tests/student-work-*.test.ts tests/download-all-group-manager.test.ts
+```
+
+From repo root, run student-work browser E2E flows:
+
+```bash
+pnpm exec playwright test tests/e2e/student-work.spec.ts tests/e2e/student-work-by-status.spec.ts
 ```
 
 ---
