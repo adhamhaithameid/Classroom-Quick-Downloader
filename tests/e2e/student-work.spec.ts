@@ -191,4 +191,33 @@ test.describe('Student Work Real Browser', () => {
       await cleanupRoutes();
     }
   });
+
+  test('resolves iframe bridge links with authuser preserved on authuser-prefixed routes', async () => {
+    const cleanupRoutes = await installClassroomMock(context, {
+      submissionLink: 'https://classroom.google.com/g/tg/course/work/submission',
+      resolverDriveLink: 'https://drive.google.com/file/d/AUTH_BRIDGE_505/view?usp=drive_link',
+    });
+
+    const page = await context.newPage();
+
+    try {
+      await page.goto(SUBMISSIONS_AUTHUSER_URL, { waitUntil: 'domcontentloaded' });
+
+      const button = page.locator(SIDECAR_SELECTOR).first();
+      await expect(button).toBeVisible({ timeout: 12_000 });
+
+      await button.click({ force: true });
+
+      await expect.poll(async () => button.getAttribute('data-cqd-url'), {
+        timeout: 15_000,
+      }).toContain('id=AUTH_BRIDGE_505');
+
+      await expect.poll(async () => button.getAttribute('data-cqd-url'), {
+        timeout: 15_000,
+      }).toContain('authuser=1');
+    } finally {
+      await page.close();
+      await cleanupRoutes();
+    }
+  });
 });
