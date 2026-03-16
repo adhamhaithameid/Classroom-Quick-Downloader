@@ -556,6 +556,14 @@ export function resetStudentWorkByStatusForTest(): void {
     window.clearInterval(rescanIntervalId);
     rescanIntervalId = null;
   }
+
+  const sidecarButtons = document.querySelectorAll<HTMLButtonElement>(
+    '.cqd-download-btn[data-cqd-sw-bs="true"]',
+  );
+  sidecarButtons.forEach((button) => button.remove());
+
+  const processedMarkers = document.querySelectorAll<HTMLElement>(`[${SIDE_CAR_ATTR}="true"]`);
+  processedMarkers.forEach((element) => element.removeAttribute(SIDE_CAR_ATTR));
 }
 
 function clearPendingScan(): void {
@@ -636,6 +644,9 @@ function stopSidecar(): void {
     '.cqd-download-btn[data-cqd-sw-bs="true"]',
   );
   sidecarButtons.forEach((button) => button.remove());
+
+  const processedMarkers = document.querySelectorAll<HTMLElement>(`[${SIDE_CAR_ATTR}="true"]`);
+  processedMarkers.forEach((element) => element.removeAttribute(SIDE_CAR_ATTR));
 }
 
 export default defineContentScript({

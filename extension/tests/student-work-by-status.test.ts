@@ -388,4 +388,28 @@ describe('student_work_by_status content script', () => {
     expect(post?.hasAttribute('data-cqd-v2-flag')).toBe(false);
     expect(post?.hasAttribute('data-cqd-v2-flag-verdict')).toBe(false);
   });
+
+  it('clears processed markers when test reset runs', async () => {
+    const { mod } = await loadByStatusSidecar();
+    mod.setStudentWorkByStatusRunningForTest(true);
+    vi.stubGlobal(
+      'location',
+      new URL('https://classroom.google.com/c/C/a/A/submissions/by-status/and-sort-name/all/all'),
+    );
+
+    document.body.innerHTML = `
+      <div class="file-card">
+        <a class="vwNuXe" data-cqd-sw-bs-processed="true"
+          aria-label="Attachment: Image: file.png"
+          href="https://classroom.google.com/g/tg/c/a/s?id=FILE123">Attachment</a>
+      </div>
+    `;
+
+    const anchor = document.querySelector<HTMLAnchorElement>('a.vwNuXe');
+    expect(anchor?.getAttribute('data-cqd-sw-bs-processed')).toBe('true');
+
+    mod.resetStudentWorkByStatusForTest();
+
+    expect(anchor?.hasAttribute('data-cqd-sw-bs-processed')).toBe(false);
+  });
 });
