@@ -1,6 +1,10 @@
 // filepath: extension/src/student_work/extractor.ts
 
-import { buildDriveDownloadUrl, extractDriveIdFromClassroomUrl } from './url-classifier';
+import {
+  buildDriveDownloadUrl,
+  extractAuthUserFromClassroomPath,
+  extractDriveIdFromClassroomUrl,
+} from './url-classifier';
 
 export interface ExtractResolvedUrlResult {
   url: string;
@@ -14,7 +18,9 @@ const DOCS_LINK_RE = /^https:\/\/docs\.google\.com\/(?:u\/\d+\/)?(?:document|pre
 function getAuthUserFromCurrentUrl(): string | null {
   try {
     const parsed = new URL(window.location.href);
-    return parsed.searchParams.get('authuser');
+    const queryAuthUser = parsed.searchParams.get('authuser') || parsed.searchParams.get('u');
+    if (queryAuthUser && queryAuthUser.trim().length > 0) return queryAuthUser.trim();
+    return extractAuthUserFromClassroomPath(parsed.pathname);
   } catch {
     return null;
   }
@@ -23,7 +29,13 @@ function getAuthUserFromCurrentUrl(): string | null {
 function normalizeCandidateUrl(rawUrl: string): string | null {
   try {
     const parsed = new URL(rawUrl, window.location.href);
-    const authUser = getAuthUserFromCurrentUrl();
+    const authUser = (() => {
+      const queryAuthUser = parsed.searchParams.get('authuser') || parsed.searchParams.get('u');
+      if (queryAuthUser && queryAuthUser.trim().length > 0) return queryAuthUser.trim();
+      const pathAuthUser = extractAuthUserFromClassroomPath(parsed.pathname);
+      if (pathAuthUser) return pathAuthUser;
+      return getAuthUserFromCurrentUrl();
+    })();
 
     if (parsed.hostname === 'classroom.google.com') {
       const idFromQuery = parsed.searchParams.get('id') ||
