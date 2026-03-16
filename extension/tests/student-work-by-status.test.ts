@@ -161,6 +161,29 @@ describe('student_work_by_status content script', () => {
     );
   });
 
+  it('prefers authuser query param over path prefix for data-drive-id attachments', async () => {
+    const { mod, createStudentWorkButton } = await loadByStatusSidecar();
+    mod.setStudentWorkByStatusRunningForTest(true);
+    vi.stubGlobal(
+      'location',
+      new URL('https://classroom.google.com/u/3/c/C/a/A/submissions/by-status/and-sort-name/all/all?authuser=8'),
+    );
+
+    document.body.innerHTML = `
+      <section class="group">
+        <div class="file-card" data-drive-id="DRIVE889">File A</div>
+      </section>
+    `;
+
+    mod.scanStudentWorkByStatus(document);
+
+    expect(createStudentWorkButton).toHaveBeenCalledTimes(1);
+    expect(createStudentWorkButton).toHaveBeenCalledWith(
+      'https://drive.google.com/uc?export=download&id=DRIVE889&authuser=8',
+      expect.any(Object),
+    );
+  });
+
   it('injects a button for each attachment even in the same container', async () => {
     const { mod, createStudentWorkButton } = await loadByStatusSidecar();
     mod.setStudentWorkByStatusRunningForTest(true);
