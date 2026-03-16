@@ -94,6 +94,11 @@ describe('student_work/url-classifier', () => {
       expect(extractAuthUserFromClassroomPath('/c/abc/a/def/submissions')).toBeNull();
       expect(extractAuthUserFromClassroomPath('/g/tg/course/work/submission')).toBeNull();
     });
+
+    it('returns null for malformed authuser prefixes', () => {
+      expect(extractAuthUserFromClassroomPath('/u//c/abc/a/def/submissions')).toBeNull();
+      expect(extractAuthUserFromClassroomPath('/u/not-a-number/c/abc/a/def/submissions')).toBeNull();
+    });
   });
 
   it('adds resolver params safely', () => {
