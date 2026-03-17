@@ -3,7 +3,7 @@
   "displayName": "Classroom Quick Downloader",
   "description": "The fastest way to download all Google Classroom materials, assignments, and PDFs in one click.",
   "private": true,
-  "version": "1.5.0",
+  "version": "1.5.5",
   "type": "module",
   "packageManager": "pnpm@10.28.2",
   "scripts": {
