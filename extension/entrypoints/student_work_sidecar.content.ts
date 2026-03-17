@@ -164,6 +164,37 @@ function deriveFileKey(container: HTMLElement, sourceUrl: string, fallbackId?: s
   return scopedId ? `${sourceUrl}::${scopedId}` : sourceUrl;
 }
 
+function deriveAttachmentNameFromAnchor(anchor: HTMLAnchorElement): string | null {
+  const aria = (anchor.getAttribute('aria-label') || '').trim();
+  if (aria.length > 0) {
+    const parts = aria.split(':').map((part) => part.trim()).filter(Boolean);
+    if (parts.length >= 2) {
+      const candidate = parts[parts.length - 1];
+      if (candidate && !/^attachment$/i.test(candidate)) return candidate;
+    } else if (!/^attachment$/i.test(aria)) {
+      return aria;
+    }
+  }
+
+  const title = (anchor.getAttribute('title') || '').trim();
+  if (title.length > 0 && !/^attachment$/i.test(title)) return title;
+
+  const text = (anchor.textContent || '').trim();
+  if (text.length > 0 && !/^attachment$/i.test(text)) return text;
+
+  return null;
+}
+
+function applyAnchorNameHint(fileMeta: { name?: string; ext?: string }, anchor: HTMLAnchorElement): void {
+  const derivedName = deriveAttachmentNameFromAnchor(anchor);
+  if (!derivedName) return;
+  fileMeta.name = derivedName;
+  const extMatch = derivedName.match(/\.([a-zA-Z0-9]{2,10})$/);
+  if (extMatch?.[1]) {
+    fileMeta.ext = extMatch[1].toLowerCase();
+  }
+}
+
 function collectScopedDriveIds(scope: ParentNode): string[] {
   const ids = new Set<string>();
 
@@ -266,6 +297,7 @@ export function scanStudentWorkLinks(root: ParentNode = document): void {
       : anchor.href;
 
     const fileMeta = extractFileMeta(host, sourceUrl);
+    applyAnchorNameHint(fileMeta, anchor);
     const button = createStudentWorkButton(sourceUrl, fileMeta);
     button.dataset.cqdSwSourceUrl = sourceUrl;
     if (resolvedDriveId) button.dataset.cqdSwFileId = resolvedDriveId;
