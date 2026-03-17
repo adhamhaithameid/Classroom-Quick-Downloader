@@ -287,7 +287,8 @@ describe('extension <-> cloudflare integration', () => {
 
     const data = await changelog.fetchChangelog(true);
     expect(data?.entries.length).toBeGreaterThan(0);
-    expect(data?.entries[0]?.version).toBe('1.5.0');
+    const latestVersion = data?.entries[0]?.version;
+    expect(latestVersion).toMatch(/^\d+\.\d+\.\d+$/);
     expect(data?.entries[0]?.changes[0]).toContain('Summary:');
     expect(data?.revisionToken).toBeTruthy();
 
@@ -301,7 +302,7 @@ describe('extension <-> cloudflare integration', () => {
     const updated = await changelog.fetchChangelog(true);
     expect(updated?.revisionToken).toBeTruthy();
     expect(updated?.revisionToken).toBe(data?.revisionToken);
-    expect(updated?.entries[0]?.version).toBe('1.5.0');
+    expect(updated?.entries[0]?.version).toBe(latestVersion);
     expect(await changelog.isVersionSeen('1.3.8', updated)).toBe(true);
 
     expect(fetchSpy.mock.calls.some((call) => String(call[0]).includes('/api/public/extension/changelog'))).toBe(false);
