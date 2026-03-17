@@ -125,6 +125,15 @@ const PANEL_STYLES = `
   .cqd-dbg-flag.none { border-left-color: #444; opacity: 0.5; }
 `;
 
+function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // ============================================================================
 // PANEL CLASS
 // ============================================================================
@@ -283,6 +292,11 @@ export class DebugPanel {
     const shadowReport = orchestrator.getShadowReport();
 
     let html = '';
+    const safeMode = escapeHtml(mode);
+    const safeCurrentView = escapeHtml(currentView || 'none');
+    const safeActiveEngines = escapeHtml(
+      activeEngines.map((e) => `${e.name} v${e.version}`).join(', ') || 'none',
+    );
 
     // --- Engine State Section ---
     html += `
@@ -290,15 +304,15 @@ export class DebugPanel {
         <div class="cqd-dbg-label">Engine State</div>
         <div class="cqd-dbg-row">
           <span class="cqd-dbg-key">Mode</span>
-          <span class="cqd-dbg-val ${mode === 'shadow' ? 'warn' : mode === 'v2' ? 'good' : ''}">${mode}</span>
+          <span class="cqd-dbg-val ${mode === 'shadow' ? 'warn' : mode === 'v2' ? 'good' : ''}">${safeMode}</span>
         </div>
         <div class="cqd-dbg-row">
           <span class="cqd-dbg-key">View</span>
-          <span class="cqd-dbg-val">${currentView || 'none'}</span>
+          <span class="cqd-dbg-val">${safeCurrentView}</span>
         </div>
         <div class="cqd-dbg-row">
           <span class="cqd-dbg-key">Active Engines</span>
-          <span class="cqd-dbg-val">${activeEngines.map(e => `${e.name} v${e.version}`).join(', ') || 'none'}</span>
+          <span class="cqd-dbg-val">${safeActiveEngines}</span>
         </div>
       </div>
     `;
@@ -349,15 +363,20 @@ export class DebugPanel {
           const verdictClass = decision.finalVerdict === 'both' ? 'both' :
                               decision.finalVerdict === 'comment' ? 'comment' :
                               decision.finalVerdict === 'edited' ? 'edited' : 'none';
+          const safePostId = escapeHtml(`${decision.postId.slice(0, 12)}…`);
+          const safeVerdict = escapeHtml(decision.finalVerdict);
+          const safeCommentScore = escapeHtml(decision.commentScore);
+          const safeEditedScore = escapeHtml(decision.editedScore);
+          const safeConfidence = escapeHtml(decision.confidence);
           html += `
             <div class="cqd-dbg-flag ${verdictClass}">
               <div class="cqd-dbg-row">
-                <span class="cqd-dbg-key">${decision.postId.slice(0, 12)}…</span>
-                <span class="cqd-dbg-val">${decision.finalVerdict}</span>
+                <span class="cqd-dbg-key">${safePostId}</span>
+                <span class="cqd-dbg-val">${safeVerdict}</span>
               </div>
               <div class="cqd-dbg-row" style="font-size: 10px; opacity: 0.7;">
-                <span>C:${decision.commentScore} E:${decision.editedScore}</span>
-                <span>conf: ${decision.confidence}</span>
+                <span>C:${safeCommentScore} E:${safeEditedScore}</span>
+                <span>conf: ${safeConfidence}</span>
               </div>
             </div>
           `;
