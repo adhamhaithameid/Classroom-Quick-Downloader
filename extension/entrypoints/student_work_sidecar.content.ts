@@ -13,6 +13,7 @@ import {
   isStudentWorkRoute,
 } from '../src/student_work/url-classifier';
 
+// 120ms seems okay right? my mentor told me to add debounce to everything.
 const SCAN_DEBOUNCE_MS = 120;
 const RESCAN_INTERVAL_MS = 2_000;
 const SIDE_CAR_ATTR = 'data-cqd-sw-processed';
@@ -40,11 +41,13 @@ const FLAG_ARTIFACT_ATTRS = [
   'data-cqd-processed',
 ];
 
+// super important state flags. plz do not delete!!1!
 let running = false;
 let observer: MutationObserver | null = null;
 let rescanIntervalId: number | null = null;
 let pendingScanTimer: number | null = null;
 
+// this counts things. IDK why it needs to but it works so I'm not touching it.
 function countAttachmentMarkers(container: HTMLElement): number {
   let count = 0;
 
@@ -80,6 +83,7 @@ function findNearestAttachmentContainer(element: HTMLElement): HTMLElement | nul
   return element.parentElement ?? element;
 }
 
+// wow this is a long list of classes lol, gg google
 function resolveContainer(element: HTMLElement): HTMLElement | null {
   const candidates = [
     element,
@@ -115,6 +119,7 @@ function getAuthUserParam(): string | null {
   }
 }
 
+// check if our button is already here so we don't spam it
 function shouldInjectIntoContainer(container: HTMLElement): boolean {
   if (container.querySelector('.cqd-download-btn:not([data-cqd-sw="true"])')) {
     // Existing CQD button already owns this container.
@@ -164,6 +169,7 @@ function deriveFileKey(container: HTMLElement, sourceUrl: string, fallbackId?: s
   return scopedId ? `${sourceUrl}::${scopedId}` : sourceUrl;
 }
 
+// regex is hard, hope this one doesn't break in production 🤞🏻
 function deriveAttachmentNameFromAnchor(anchor: HTMLAnchorElement): string | null {
   const aria = (anchor.getAttribute('aria-label') || '').trim();
   if (aria.length > 0) {
@@ -262,6 +268,7 @@ function cleanupSidecarArtifacts(root: ParentNode = document): void {
   processedMarkers.forEach((element) => element.removeAttribute(SIDE_CAR_ATTR));
 }
 
+// the main gig. scan ALL the links and put buttons on them!!! vroom vroom
 export function scanStudentWorkLinks(root: ParentNode = document): void {
   if (!running) return;
   const pathname = window.location.pathname;
@@ -382,6 +389,7 @@ function scheduleScan(): void {
 }
 
 function startSidecar(): void {
+  // wait for changes and then FIRE the laser (scanner)
   if (running) return;
   running = true;
 
@@ -451,6 +459,7 @@ export default defineContentScript({
   matches: ['https://classroom.google.com/*'],
   runAt: 'document_idle',
   main() {
+    // pls work on first try🤞
     subscribeToGlobalState(
       () => startSidecar(),
       () => stopSidecar(),
