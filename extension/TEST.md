@@ -1,6 +1,8 @@
 # 🧪 Testing Guide
 
 > Update (2026-02-28): Latest full-repository scan baseline is documented in /docs/MAJOR_SCAN_2026-02-28.md; deployment/rollout actions are tracked in /docs/DEPLOYMENT_RUNBOOK.md.
+> Update (2026-03-17): Extension full-suite health check currently passes at 100 files / 3233 tests.
+> Student Work runtime behavior reference: `extension/docs/student-work-current-flow.md`.
 
 This document describes the comprehensive test suite for the **Universal V4 Detection System**.
 
@@ -18,6 +20,26 @@ pnpm test:watch
 # Generate coverage report
 pnpm test:coverage
 ```
+
+---
+
+## Student Work Verification (Current)
+
+Run these from repo root for Student Work safety checks:
+
+```bash
+pnpm -C extension run compile
+pnpm -C extension exec vitest run tests/student-work-*.test.ts tests/student-work-by-status.test.ts tests/student-work-sidecar.test.ts tests/student-work-resolver-bridge.test.ts
+pnpm exec playwright test tests/e2e/student-work.spec.ts tests/e2e/student-work-by-status.spec.ts --project=extension-chromium
+```
+
+Manual validation target:
+
+- `https://classroom.google.com/c/<course>/a/<courseWork>/submissions/by-status/and-sort-name/all/all`
+- confirm:
+  - no popup window appears during resolve
+  - single and download-all resolve per-item correctly
+  - buttons reach terminal success/error state (no stuck loading)
 
 ---
 
