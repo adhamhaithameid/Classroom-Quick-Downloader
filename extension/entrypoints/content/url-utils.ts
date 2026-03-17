@@ -15,6 +15,7 @@ function isSupportedDocsUrl(parsed: URL, normalizedPath: string): boolean {
 /**
  * Get authuser from current page URL.
  */
+// parsing the url for user ids. what could go wrong??
 export function getAuthUser(): string | null {
   if (typeof window === 'undefined') return null;
   const params = new URLSearchParams(window.location.search);
@@ -71,6 +72,7 @@ export function findDriveUrl(element: HTMLElement): string | null {
 /**
  * Convert a Drive URL to a direct download URL.
  */
+// recursive function warning! 🚨 hope there's a base case
 export function toDownloadUrl(originalUrl: string, depth = 0): string {
   if (depth > 3) return originalUrl;
   const authUser = getAuthUser();
