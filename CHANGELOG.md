@@ -5,8 +5,25 @@ It focuses on meaningful product, reliability, security, and architecture change
 
 ## Versioning Notes
 - Current extension release line: `1.5.5`
+- Recommended next patch release: `1.5.6`
 - Planned next engine milestone: `1.6.0`
 - Pre-`1.0.0` bootstrap work is intentionally omitted from the user-facing release ledger
+
+## [Unreleased]
+
+### Summary
+Student Work stabilization update focused on silent resolution and strict per-submission file mapping.
+
+### Changed
+- Removed popup-based Student Work resolver fallback so resolution is fully silent.
+- Increased default Student Work resolver timeout to reduce premature timeout failures.
+
+### Fixed
+- Fixed Student Work flows that could land in error state before bridge resolution completed.
+- Fixed edge-case wrong/repeated mapping risks by tightening strict hinted extraction and candidate selection.
+
+### Security
+- Hardened debug panel rendering by escaping runtime values before HTML injection.
 
 ## [1.5.5] - 2026-03-17
 
