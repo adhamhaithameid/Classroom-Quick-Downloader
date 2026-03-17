@@ -9,12 +9,36 @@ import {
   buildDriveDownloadUrl,
   extractDriveIdFromClassroomUrl,
   isStudentWorkAttachmentUrl,
+  isStudentWorkByStatusRoute,
   isStudentWorkRoute,
 } from '../src/student_work/url-classifier';
 
 const SCAN_DEBOUNCE_MS = 120;
 const RESCAN_INTERVAL_MS = 2_000;
 const SIDE_CAR_ATTR = 'data-cqd-sw-processed';
+const FLAG_ARTIFACT_SELECTOR = [
+  '.cqd-flag',
+  '.cqd-comment-badge',
+  '.cqd-edited-badge',
+  '.cqd-both-badge',
+  '.cqd-overlay-container',
+  '.cqd-v2-flag',
+  '.cqd-v2-overlay',
+].join(',');
+const FLAG_ARTIFACT_ATTRS = [
+  'data-cqd-v2-flag',
+  'data-cqd-v2-flag-verdict',
+  'data-cqd-v2-flag-click',
+  'data-cqd-injected',
+  'data-cqd-comments-processed',
+  'data-cqd-edited-processed',
+  'data-cqd-comment-count',
+  'data-cqd-edit-diff',
+  'data-cqd-edit-tooltip',
+  'data-cqd-comments-processed',
+  'data-cqd-edit-processed',
+  'data-cqd-processed',
+];
 
 let running = false;
 let observer: MutationObserver | null = null;
@@ -49,7 +73,7 @@ function findNearestAttachmentContainer(element: HTMLElement): HTMLElement | nul
     }
 
     const markerCount = countAttachmentMarkers(current);
-    if (markerCount <= 1) return current;
+    if (markerCount >= 1) return current;
     current = current.parentElement;
   }
 
@@ -111,6 +135,25 @@ function ensurePositionedContainer(element: HTMLElement): void {
   }
 }
 
+function resolveButtonHost(
+  container: HTMLElement,
+  anchor: HTMLAnchorElement | null,
+): HTMLElement {
+  if (anchor) {
+    const card = anchor.closest<HTMLElement>(
+      '.WkZsyc, [data-submission-attachment-id], div[jsaction*="x2MKlc"], [data-item-id], [role="listitem"]',
+    );
+    if (card && container.contains(card)) return card;
+  }
+
+  const fallbackCard = container.closest<HTMLElement>(
+    '.WkZsyc, [data-submission-attachment-id], div[jsaction*="x2MKlc"], [data-item-id], [role="listitem"]',
+  );
+  if (fallbackCard) return fallbackCard;
+
+  return container;
+}
+
 function deriveFileKey(container: HTMLElement, sourceUrl: string, fallbackId?: string): string {
   const scopedId =
     container.getAttribute('data-submission-attachment-id') ||
@@ -121,19 +164,82 @@ function deriveFileKey(container: HTMLElement, sourceUrl: string, fallbackId?: s
   return scopedId ? `${sourceUrl}::${scopedId}` : sourceUrl;
 }
 
+function collectScopedDriveIds(scope: ParentNode): string[] {
+  const ids = new Set<string>();
+
+  if (scope instanceof HTMLElement) {
+    const ownId = scope.getAttribute('data-drive-id')?.trim() || '';
+    if (ownId) ids.add(ownId);
+  }
+
+  const descendants = Array.from(scope.querySelectorAll<HTMLElement>('[data-drive-id]'));
+  for (const element of descendants) {
+    const id = element.getAttribute('data-drive-id')?.trim() || '';
+    if (id) ids.add(id);
+  }
+
+  return Array.from(ids);
+}
+
 function resolveDriveIdForAnchor(anchor: HTMLAnchorElement, container: HTMLElement): string | null {
   const fromUrl = extractDriveIdFromClassroomUrl(anchor.href);
   if (fromUrl) return fromUrl;
 
-  const localCarrier = anchor.closest<HTMLElement>('[data-drive-id]') ||
-    container.closest<HTMLElement>('[data-drive-id]');
-  const localId = localCarrier?.getAttribute('data-drive-id')?.trim() || '';
-  return localId || null;
+  const anchorCarrier = anchor.closest<HTMLElement>('[data-drive-id]');
+  if (anchorCarrier && container.contains(anchorCarrier)) {
+    const anchorCarrierId = anchorCarrier.getAttribute('data-drive-id')?.trim() || '';
+    if (anchorCarrierId) return anchorCarrierId;
+  }
+
+  const scopedCard = anchor.closest<HTMLElement>(
+    '.WkZsyc, [data-submission-attachment-id], [data-item-id], div[jsaction*="x2MKlc"], [role="listitem"]',
+  );
+  if (scopedCard) {
+    const scopedIds = collectScopedDriveIds(scopedCard);
+    if (scopedIds.length === 1) return scopedIds[0];
+  }
+
+  const containerIds = collectScopedDriveIds(container);
+  if (containerIds.length === 1) return containerIds[0];
+
+  return null;
+}
+
+function cleanupStudentWorkFlags(root: ParentNode = document): void {
+  const artifacts = root.querySelectorAll<HTMLElement>(FLAG_ARTIFACT_SELECTOR);
+  artifacts.forEach((node) => node.remove());
+
+  const maybeFlagged = root.querySelectorAll<HTMLElement>(
+    '[data-cqd-v2-flag], [data-cqd-v2-flag-verdict], [data-cqd-v2-flag-click], [data-cqd-injected], [data-cqd-comments-processed], [data-cqd-edited-processed], [data-cqd-comment-count], [data-cqd-edit-diff], [data-cqd-edit-tooltip], [data-cqd-comments-processed], [data-cqd-edit-processed], [data-cqd-processed]',
+  );
+  for (const element of maybeFlagged) {
+    for (const attr of FLAG_ARTIFACT_ATTRS) {
+      if (element.hasAttribute(attr)) {
+        element.removeAttribute(attr);
+      }
+    }
+  }
+}
+
+function cleanupSidecarArtifacts(root: ParentNode = document): void {
+  const sidecarButtons = root.querySelectorAll<HTMLButtonElement>('.cqd-download-btn[data-cqd-sw="true"]');
+  sidecarButtons.forEach((button) => button.remove());
+
+  const processedMarkers = root.querySelectorAll<HTMLElement>(`[${SIDE_CAR_ATTR}="true"]`);
+  processedMarkers.forEach((element) => element.removeAttribute(SIDE_CAR_ATTR));
 }
 
 export function scanStudentWorkLinks(root: ParentNode = document): void {
   if (!running) return;
-  if (!isStudentWorkRoute(window.location.pathname)) return;
+  const pathname = window.location.pathname;
+  if (!isStudentWorkRoute(pathname)) return;
+  if (isStudentWorkByStatusRoute(pathname)) {
+    cleanupStudentWorkFlags(document);
+    cleanupSidecarArtifacts(document);
+    return;
+  }
+
+  cleanupStudentWorkFlags(document);
 
   const anchors = Array.from(root.querySelectorAll<HTMLAnchorElement>('a[href]'));
   for (const anchor of anchors) {
@@ -142,11 +248,12 @@ export function scanStudentWorkLinks(root: ParentNode = document): void {
 
     const container = resolveContainer(anchor);
     if (!container) continue;
+    const host = resolveButtonHost(container, anchor);
     if (anchor.getAttribute(SIDE_CAR_ATTR) === 'true') {
-      if (hasStudentWorkButton(container)) continue;
+      if (hasStudentWorkButton(host)) continue;
       anchor.removeAttribute(SIDE_CAR_ATTR);
     }
-    if (!shouldInjectIntoContainer(container)) {
+    if (!shouldInjectIntoContainer(host)) {
       anchor.setAttribute(SIDE_CAR_ATTR, 'true');
       continue;
     }
@@ -156,13 +263,13 @@ export function scanStudentWorkLinks(root: ParentNode = document): void {
       ? buildDriveDownloadUrl(resolvedDriveId, getAuthUserParam())
       : anchor.href;
 
-    const fileMeta = extractFileMeta(container, sourceUrl);
+    const fileMeta = extractFileMeta(host, sourceUrl);
     const button = createStudentWorkButton(sourceUrl, fileMeta);
     button.dataset.cqdSwSourceUrl = sourceUrl;
     if (resolvedDriveId) button.dataset.cqdSwFileId = resolvedDriveId;
-    button.dataset.cqdFileKey = deriveFileKey(container, sourceUrl, resolvedDriveId || undefined);
-    ensurePositionedContainer(container);
-    container.appendChild(button);
+    button.dataset.cqdFileKey = deriveFileKey(host, sourceUrl, resolvedDriveId || undefined);
+    ensurePositionedContainer(host);
+    host.appendChild(button);
 
     anchor.setAttribute(SIDE_CAR_ATTR, 'true');
   }
@@ -172,26 +279,31 @@ export function scanStudentWorkLinks(root: ParentNode = document): void {
   for (const element of driveIdElements) {
     const fileId = element.getAttribute('data-drive-id')?.trim();
     if (!fileId) continue;
+    if (collectScopedDriveIds(element).length > 1) {
+      element.setAttribute(SIDE_CAR_ATTR, 'true');
+      continue;
+    }
 
     const container = resolveContainer(element);
     if (!container) continue;
+    const host = resolveButtonHost(container, null);
     if (element.getAttribute(SIDE_CAR_ATTR) === 'true') {
-      if (hasStudentWorkButton(container)) continue;
+      if (hasStudentWorkButton(host)) continue;
       element.removeAttribute(SIDE_CAR_ATTR);
     }
-    if (!shouldInjectIntoContainer(container)) {
+    if (!shouldInjectIntoContainer(host)) {
       element.setAttribute(SIDE_CAR_ATTR, 'true');
       continue;
     }
 
     const downloadUrl = buildDriveDownloadUrl(fileId, authUser);
-    const fileMeta = extractFileMeta(container, downloadUrl);
+    const fileMeta = extractFileMeta(host, downloadUrl);
     const button = createStudentWorkButton(downloadUrl, fileMeta);
     button.dataset.cqdSwSourceUrl = downloadUrl;
     button.dataset.cqdSwFileId = fileId;
-    button.dataset.cqdFileKey = deriveFileKey(container, downloadUrl, fileId);
-    ensurePositionedContainer(container);
-    container.appendChild(button);
+    button.dataset.cqdFileKey = deriveFileKey(host, downloadUrl, fileId);
+    ensurePositionedContainer(host);
+    host.appendChild(button);
 
     element.setAttribute(SIDE_CAR_ATTR, 'true');
   }

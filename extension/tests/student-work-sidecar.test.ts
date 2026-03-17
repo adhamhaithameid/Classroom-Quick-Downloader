@@ -45,7 +45,7 @@ describe('student_work_sidecar content script', () => {
     mod.setStudentWorkSidecarRunningForTest(true);
     vi.stubGlobal(
       'location',
-      new URL('https://classroom.google.com/c/C/a/A/submissions/by-status/and-sort-name/all/all'),
+      new URL('https://classroom.google.com/c/C/a/A/submissions/student-1'),
     );
 
     document.body.innerHTML = `
@@ -65,7 +65,7 @@ describe('student_work_sidecar content script', () => {
     mod.setStudentWorkSidecarRunningForTest(true);
     vi.stubGlobal(
       'location',
-      new URL('https://classroom.google.com/u/1/c/C/a/A/submissions/by-status/and-sort-name/all/all'),
+      new URL('https://classroom.google.com/u/1/c/C/a/A/submissions/student-1'),
     );
 
     document.body.innerHTML = `
@@ -150,7 +150,7 @@ describe('student_work_sidecar content script', () => {
     mod.setStudentWorkSidecarRunningForTest(true);
     vi.stubGlobal(
       'location',
-      new URL('https://classroom.google.com/c/C/a/A/submissions/by-status/and-sort-name/all/all'),
+      new URL('https://classroom.google.com/c/C/a/A/submissions/student-1'),
     );
 
     document.body.innerHTML = `
@@ -171,7 +171,7 @@ describe('student_work_sidecar content script', () => {
     mod.setStudentWorkSidecarRunningForTest(true);
     vi.stubGlobal(
       'location',
-      new URL('https://classroom.google.com/u/2/c/C/a/A/submissions/by-status/and-sort-name/all/all'),
+      new URL('https://classroom.google.com/u/2/c/C/a/A/submissions/student-1'),
     );
 
     document.body.innerHTML = `
@@ -191,7 +191,7 @@ describe('student_work_sidecar content script', () => {
     mod.setStudentWorkSidecarRunningForTest(true);
     vi.stubGlobal(
       'location',
-      new URL('https://classroom.google.com/u/2/c/C/a/A/submissions/by-status/and-sort-name/all/all?authuser=5'),
+      new URL('https://classroom.google.com/u/2/c/C/a/A/submissions/student-1?authuser=5'),
     );
 
     document.body.innerHTML = `
@@ -211,7 +211,7 @@ describe('student_work_sidecar content script', () => {
     mod.setStudentWorkSidecarRunningForTest(true);
     vi.stubGlobal(
       'location',
-      new URL('https://classroom.google.com/c/C/a/A/submissions/by-status/and-sort-name/all/all'),
+      new URL('https://classroom.google.com/c/C/a/A/submissions/student-1'),
     );
 
     document.body.innerHTML = `
@@ -230,5 +230,69 @@ describe('student_work_sidecar content script', () => {
 
     expect(anchor?.hasAttribute('data-cqd-sw-processed')).toBe(false);
     expect(document.querySelectorAll('.cqd-download-btn[data-cqd-sw="true"]')).toHaveLength(0);
+  });
+
+  it('does not inject sidecar buttons on by-status routes and removes stale sidecar artifacts', async () => {
+    const { mod, createStudentWorkButton } = await loadSidecar();
+    mod.setStudentWorkSidecarRunningForTest(true);
+    vi.stubGlobal(
+      'location',
+      new URL('https://classroom.google.com/c/C/a/A/submissions/by-status/and-sort-name/all/all'),
+    );
+
+    document.body.innerHTML = `
+      <div class="cqd-overlay-container"></div>
+      <div id="post" data-cqd-v2-flag-click="true" data-cqd-injected="true"></div>
+      <div data-stream-item-id="s1">
+        <a data-cqd-sw-processed="true" href="https://classroom.google.com/g/tg/c/a/s?id=FILE123">Attachment</a>
+        <button class="cqd-download-btn" data-cqd-sw="true"></button>
+      </div>
+    `;
+
+    mod.scanStudentWorkLinks(document);
+
+    expect(createStudentWorkButton).not.toHaveBeenCalled();
+    expect(document.querySelectorAll('.cqd-download-btn[data-cqd-sw="true"]')).toHaveLength(0);
+    expect(document.querySelector('[data-cqd-sw-processed="true"]')).toBeNull();
+    expect(document.querySelector('.cqd-overlay-container')).toBeNull();
+    const post = document.querySelector<HTMLElement>('#post');
+    expect(post?.hasAttribute('data-cqd-v2-flag-click')).toBe(false);
+    expect(post?.hasAttribute('data-cqd-injected')).toBe(false);
+  });
+
+  it('resolves unique per-card drive IDs instead of a shared ancestor drive-id', async () => {
+    const { mod, createStudentWorkButton } = await loadSidecar();
+    mod.setStudentWorkSidecarRunningForTest(true);
+    vi.stubGlobal(
+      'location',
+      new URL('https://classroom.google.com/c/C/a/A/submissions/student-1'),
+    );
+
+    document.body.innerHTML = `
+      <section data-drive-id="WRONG_SHARED_JSON">
+        <div class="WkZsyc card">
+          <div class="meta" data-drive-id="FILE_IMAGE_1"></div>
+          <a class="vwNuXe" href="https://classroom.google.com/g/tg/c/a/s">Attachment image</a>
+        </div>
+        <div class="WkZsyc card">
+          <div class="meta" data-drive-id="FILE_VIDEO_2"></div>
+          <a class="vwNuXe" href="https://classroom.google.com/g/tg/c/a/s">Attachment video</a>
+        </div>
+        <div class="WkZsyc card">
+          <div class="meta" data-drive-id="FILE_JSON_3"></div>
+          <a class="vwNuXe" href="https://classroom.google.com/g/tg/c/a/s">Attachment json</a>
+        </div>
+      </section>
+    `;
+
+    mod.scanStudentWorkLinks(document);
+
+    expect(createStudentWorkButton).toHaveBeenCalledTimes(3);
+    const urls = createStudentWorkButton.mock.calls.map((call) => call[0]);
+    expect(urls).toEqual([
+      'https://drive.google.com/uc?export=download&id=FILE_IMAGE_1',
+      'https://drive.google.com/uc?export=download&id=FILE_VIDEO_2',
+      'https://drive.google.com/uc?export=download&id=FILE_JSON_3',
+    ]);
   });
 });
