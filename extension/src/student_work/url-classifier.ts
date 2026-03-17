@@ -1,6 +1,8 @@
 // filepath: extension/src/student_work/url-classifier.ts
 
 const STUDENT_WORK_ROUTE_RE = /^\/(?:u\/\d+\/)?c\/[^/]+\/a\/[^/]+\/submissions(?:\/[^?#]+)*\/?$/;
+const STUDENT_WORK_BY_STATUS_ROUTE_RE =
+  /^\/(?:u\/\d+\/)?c\/[^/]+\/a\/[^/]+\/submissions\/by-status\/and-sort-name\/[^/]+\/[^/]+\/?$/;
 const STUDENT_WORK_VIEWER_RE = /^\/(?:u\/\d+\/)?g\/tg\//;
 const AUTHUSER_PATH_RE = /^\/u\/(\d+)(?:\/|$)/;
 
@@ -8,6 +10,10 @@ const DRIVE_ID_PARAM_KEYS = ['id', 'resourceId', 'fileId'] as const;
 
 export function isStudentWorkRoute(pathname: string): boolean {
   return STUDENT_WORK_ROUTE_RE.test(pathname);
+}
+
+export function isStudentWorkByStatusRoute(pathname: string): boolean {
+  return STUDENT_WORK_BY_STATUS_ROUTE_RE.test(pathname);
 }
 
 export function isStudentWorkViewerPath(pathname: string): boolean {

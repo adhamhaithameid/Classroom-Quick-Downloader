@@ -5,6 +5,7 @@ import {
   extractAuthUserFromClassroomPath,
   extractDriveIdFromClassroomUrl,
   isStudentWorkAttachmentUrl,
+  isStudentWorkByStatusRoute,
   isStudentWorkRoute,
   isStudentWorkViewerPath,
 } from '../src/student_work/url-classifier';
@@ -35,6 +36,19 @@ describe('student_work/url-classifier', () => {
     it('rejects non-student-work routes', () => {
       expect(isStudentWorkRoute('/c/abc/a/def/details')).toBe(false);
       expect(isStudentWorkRoute('/w/abc/t/all')).toBe(false);
+    });
+  });
+
+  describe('isStudentWorkByStatusRoute', () => {
+    it('matches by-status route variants', () => {
+      expect(isStudentWorkByStatusRoute('/c/abc/a/def/submissions/by-status/and-sort-name/all/all')).toBe(true);
+      expect(isStudentWorkByStatusRoute('/u/1/c/abc/a/def/submissions/by-status/and-sort-name/turned-in/all')).toBe(true);
+      expect(isStudentWorkByStatusRoute('/u/1/c/abc/a/def/submissions/by-status/and-sort-name/all/all/')).toBe(true);
+    });
+
+    it('rejects non by-status student-work routes', () => {
+      expect(isStudentWorkByStatusRoute('/c/abc/a/def/submissions')).toBe(false);
+      expect(isStudentWorkByStatusRoute('/c/abc/a/def/submissions/student-123')).toBe(false);
     });
   });
 
