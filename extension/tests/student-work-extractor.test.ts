@@ -56,6 +56,22 @@ describe('student_work/extractor', () => {
     expect(result?.url).toContain('id=FILE_ABC_123');
   });
 
+  it('uses resolver hint name to pick the matching anchor when multiple candidates exist', () => {
+    document.body.innerHTML = `
+      <a aria-label="Attachment: JSON: payload.json" href="https://drive.google.com/file/d/FILE_JSON_1/view">JSON</a>
+      <a aria-label="Attachment: Image: screenshot.png" href="https://drive.google.com/file/d/FILE_IMAGE_2/view">Image</a>
+    `;
+
+    const result = extractResolvedDownloadUrl(
+      document,
+      'https://classroom.google.com/g/tg/course/work/submission?cqd_sw_hint_name=screenshot.png&cqd_sw_hint_ext=png',
+    );
+
+    expect(result).not.toBeNull();
+    expect(result?.source).toBe('anchor');
+    expect(result?.url).toContain('id=FILE_IMAGE_2');
+  });
+
   it('extracts classroom drive proxy anchors via resourceId', () => {
     document.body.innerHTML = `
       <a href="https://classroom.google.com/drive?resourceId=FILE_999">Proxy</a>

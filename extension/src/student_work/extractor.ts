@@ -5,6 +5,7 @@ import {
   extractAuthUserFromClassroomPath,
   extractDriveIdFromClassroomUrl,
 } from './url-classifier';
+import { STUDENT_WORK_HINT_EXT_PARAM, STUDENT_WORK_HINT_NAME_PARAM } from './constants';
 
 export interface ExtractResolvedUrlResult {
   url: string;
@@ -14,6 +15,57 @@ export interface ExtractResolvedUrlResult {
 const DRIVE_LINK_RE = /^https:\/\/drive\.google\.com\/(?:u\/\d+\/)?(?:file\/d\/|open\?|uc\?)/i;
 const CLASSROOM_DRIVE_RE = /^https:\/\/classroom\.google\.com\/(?:u\/\d+\/)?drive(?:\/|\?|$)/i;
 const DOCS_LINK_RE = /^https:\/\/docs\.google\.com\/(?:u\/\d+\/)?(?:document|presentation|drawings|spreadsheets)\/d\//i;
+
+interface ResolverHints {
+  name: string | null;
+  ext: string | null;
+}
+
+function normalizeHintToken(value: string): string {
+  return value.toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+function resolveHintsFromHref(currentHref: string): ResolverHints {
+  try {
+    const parsed = new URL(currentHref, window.location.href);
+    const rawName = parsed.searchParams.get(STUDENT_WORK_HINT_NAME_PARAM) || '';
+    const rawExt = parsed.searchParams.get(STUDENT_WORK_HINT_EXT_PARAM) || '';
+    return {
+      name: rawName.trim().length > 0 ? normalizeHintToken(rawName) : null,
+      ext: rawExt.trim().length > 0 ? normalizeHintToken(rawExt) : null,
+    };
+  } catch {
+    return { name: null, ext: null };
+  }
+}
+
+function scoreAnchorAgainstHints(anchor: HTMLAnchorElement, hints: ResolverHints): number {
+  if (!hints.name && !hints.ext) return 0;
+
+  const haystack = normalizeHintToken([
+    anchor.href || '',
+    anchor.textContent || '',
+    anchor.getAttribute('aria-label') || '',
+    anchor.getAttribute('title') || '',
+    anchor.getAttribute('data-tooltip') || '',
+  ].join(' '));
+
+  let score = 0;
+
+  if (hints.name) {
+    if (haystack.includes(hints.name)) score += 6;
+
+    const stem = hints.name.replace(/\.[a-z0-9]{2,10}$/i, '').trim();
+    if (stem.length >= 3 && haystack.includes(stem)) score += 3;
+  }
+
+  if (hints.ext) {
+    if (haystack.includes(`.${hints.ext}`)) score += 2;
+    if (haystack.includes(` ${hints.ext}`)) score += 1;
+  }
+
+  return score;
+}
 
 function getAuthUserFromCurrentUrl(): string | null {
   try {
@@ -74,8 +126,13 @@ function normalizeCandidateUrl(rawUrl: string): string | null {
   }
 }
 
-function extractFromAnchors(doc: Document): ExtractResolvedUrlResult | null {
+function extractFromAnchors(
+  doc: Document,
+  hints: ResolverHints,
+): ExtractResolvedUrlResult | null {
   const anchors = Array.from(doc.querySelectorAll<HTMLAnchorElement>('a[href]'));
+  const candidates: Array<{ result: ExtractResolvedUrlResult; score: number }> = [];
+
   for (const anchor of anchors) {
     const href = anchor.href;
     if (!href) continue;
@@ -84,10 +141,24 @@ function extractFromAnchors(doc: Document): ExtractResolvedUrlResult | null {
     }
     const normalized = normalizeCandidateUrl(href);
     if (normalized) {
-      return { url: normalized, source: 'anchor' };
+      candidates.push({
+        result: { url: normalized, source: 'anchor' },
+        score: scoreAnchorAgainstHints(anchor, hints),
+      });
     }
   }
-  return null;
+
+  if (candidates.length === 0) return null;
+
+  let best = candidates[0];
+  for (let i = 1; i < candidates.length; i += 1) {
+    if (candidates[i].score > best.score) {
+      best = candidates[i];
+    }
+  }
+
+  if (best.score > 0) return best.result;
+  return candidates[0].result;
 }
 
 function extractFromScripts(doc: Document): ExtractResolvedUrlResult | null {
@@ -119,7 +190,8 @@ export function extractResolvedDownloadUrl(
   doc: Document,
   currentHref: string,
 ): ExtractResolvedUrlResult | null {
-  const fromAnchors = extractFromAnchors(doc);
+  const hints = resolveHintsFromHref(currentHref);
+  const fromAnchors = extractFromAnchors(doc, hints);
   if (fromAnchors) return fromAnchors;
 
   const fromScripts = extractFromScripts(doc);
