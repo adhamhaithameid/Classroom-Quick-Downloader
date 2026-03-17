@@ -25,12 +25,26 @@ export interface StudentWorkButtonOptions {
   resolve?: (rawUrl: string, signal?: AbortSignal) => Promise<ResolveStudentWorkResult>;
 }
 
+// what on earth is a weakmap
 const resolveControllers = new WeakMap<HTMLButtonElement, AbortController>();
 const downloadWatchdogTimers = new WeakMap<HTMLButtonElement, number>();
 const STUDENT_WORK_DOWNLOAD_WATCHDOG_MS = 45_000;
 let statusBridgeSetup = false;
 
+function findStudentWorkButtonByRequestId(requestId: string): HTMLButtonElement | null {
+  const buttons = document.querySelectorAll<HTMLButtonElement>('.cqd-download-btn[data-cqd-sw="true"]');
+  for (const button of buttons) {
+    if ((button.dataset as any).cqdRequestId === requestId) return button;
+  }
+  return null;
+}
+
+function isButtonAwaitingTerminalStatus(button: HTMLButtonElement): boolean {
+  return button.classList.contains('cqd-loading') || button.classList.contains('cqd-trying');
+}
+
 function resolveMessageFromReason(reason: string): string {
+  // handle errors, mostly just guessing here tbh
   if (reason.includes('resolver_timeout')) {
     return 'Could not resolve file link in time.';
   }
@@ -41,6 +55,7 @@ function resolveMessageFromReason(reason: string): string {
 }
 
 function withStudentWorkRequestNonce(rawUrl: string): string {
+  // add random nonce because caching is evil
   try {
     const parsed = new URL(rawUrl, window.location.href);
     parsed.searchParams.set('cqd_sw_req', `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
@@ -69,6 +84,7 @@ function withStudentWorkResolverHints(rawUrl: string, fileMeta: FileMeta): strin
 }
 
 function ensureStudentWorkStatusBridge(): void {
+  // connect to background. hope the message port doesn't die
   if (statusBridgeSetup) return;
   if (typeof chrome === 'undefined' || !chrome.runtime?.onMessage) return;
   statusBridgeSetup = true;
@@ -79,9 +95,9 @@ function ensureStudentWorkStatusBridge(): void {
     if (!requestId) return;
 
     const pending = pendingButtons.get(requestId);
-    if (!pending) return;
-
-    const { button, startedAt } = pending;
+    const button = pending?.button || findStudentWorkButtonByRequestId(requestId);
+    if (!button) return;
+    const startedAt = pending?.startedAt ?? (Date.now() - 1_000);
 
     void (async () => {
       await ensureMinLoading(startedAt);
@@ -96,7 +112,16 @@ function ensureStudentWorkStatusBridge(): void {
       }
 
       if (status === 'success' || status === 'complete') {
+        clearDownloadWatchdog(button);
         pendingButtons.delete(requestId);
+        if (button.classList.contains('cqd-cancelled')) {
+          try {
+            delete (button.dataset as any).cqdRequestId;
+          } catch {
+            // Ignore dataset cleanup errors.
+          }
+          return;
+        }
         try {
           delete (button.dataset as any).cqdRequestId;
           (button.dataset as any).cqdAllDone = 'true';
@@ -110,6 +135,7 @@ function ensureStudentWorkStatusBridge(): void {
       }
 
       if (status === 'error' || status === 'interrupted' || status === 'blocked_html') {
+        clearDownloadWatchdog(button);
         if ((status === 'interrupted' || status === 'error') && button.classList.contains('cqd-cancelled')) {
           pendingButtons.delete(requestId);
           return;
@@ -146,14 +172,24 @@ function armDownloadWatchdog(button: HTMLButtonElement): void {
   clearDownloadWatchdog(button);
   const timerId = window.setTimeout(() => {
     downloadWatchdogTimers.delete(button);
-    const state = getButtonState(button);
-    if (state !== 'loading' && state !== 'trying') return;
+    if (!isButtonAwaitingTerminalStatus(button)) return;
+    const requestId = ((button.dataset as any).cqdRequestId || '').trim();
+    if (requestId) {
+      pendingButtons.delete(requestId);
+      try {
+        delete (button.dataset as any).cqdRequestId;
+      } catch {
+        // Ignore dataset cleanup errors.
+      }
+    }
+    setPillProgress(button, 0);
     void showErrorState(button, 'Download did not finish in time. Please retry.');
   }, STUDENT_WORK_DOWNLOAD_WATCHDOG_MS);
   downloadWatchdogTimers.set(button, timerId);
 }
 
 function buildButtonSkeleton(fileMeta: FileMeta): HTMLButtonElement {
+  // DOM manipulation the old fashioned way. no react here bois
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'cqd-download-btn';
@@ -232,6 +268,7 @@ export function createStudentWorkButton(
   fileMeta: FileMeta,
   options: StudentWorkButtonOptions = {},
 ): HTMLButtonElement {
+  // the giant function that does everything. sorry for the tech debt!
   ensureStudentWorkStatusBridge();
   const resolver = options.resolve ?? ((rawUrl: string, signal?: AbortSignal) =>
     resolveStudentWorkUrl(rawUrl, { signal }));
@@ -248,6 +285,7 @@ export function createStudentWorkButton(
 
     const currentState = getButtonState(button);
     if (currentState === 'cancel') {
+      clearDownloadWatchdog(button);
       const resolvingController = resolveControllers.get(button);
       if (resolvingController) {
         resolvingController.abort();
