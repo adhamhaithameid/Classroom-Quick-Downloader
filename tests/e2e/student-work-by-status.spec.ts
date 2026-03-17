@@ -137,7 +137,7 @@ test.describe('Student Work By-Status Real Browser', () => {
 
       const button = page.locator(SIDECAR_SELECTOR).first();
       await expect(button).toBeVisible({ timeout: 12_000 });
-      await expect(button).toHaveAttribute('data-cqd-sw-source-url', /\/g\/tg\//);
+      await expect(button).toHaveAttribute('data-cqd-sw-source-url', /(\/g\/tg\/|drive\.google\.com\/uc\?)/);
 
       await button.click({ force: true });
 
@@ -211,6 +211,71 @@ test.describe('Student Work By-Status Real Browser', () => {
     } finally {
       await page.close();
       await cleanupRoutes();
+    }
+  });
+
+  test('Download All keeps per-file mapping when resolver links are generic but distinct per submission', async () => {
+    const handler = async (route: Route) => {
+      const reqUrl = new URL(route.request().url());
+
+      if (isSubmissionsPath(reqUrl.pathname)) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'text/html',
+          body: studentWorkHtml([
+            'https://classroom.google.com/g/tg/course/work/submission/ATTACH_A',
+            'https://classroom.google.com/g/tg/course/work/submission/ATTACH_B',
+          ]),
+        });
+        return;
+      }
+
+      if (isStudentWorkViewerPath(reqUrl.pathname)) {
+        const driveLink = reqUrl.pathname.includes('ATTACH_A')
+          ? 'https://drive.google.com/file/d/MAP_FILE_A/view?usp=drive_link'
+          : 'https://drive.google.com/file/d/MAP_FILE_B/view?usp=drive_link';
+
+        await route.fulfill({
+          status: 200,
+          contentType: 'text/html',
+          body: resolverHtml(driveLink),
+        });
+        return;
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/html',
+        body: '<!doctype html><html><body>mock classroom page</body></html>',
+      });
+    };
+
+    await context.route('https://classroom.google.com/**', handler);
+    const page = await context.newPage();
+
+    try {
+      await page.goto(SUBMISSIONS_URL, { waitUntil: 'domcontentloaded' });
+
+      const sidecarButtons = page.locator(SIDECAR_SELECTOR);
+      await expect(sidecarButtons).toHaveCount(2, { timeout: 12_000 });
+
+      const downloadAllButton = page.locator(DOWNLOAD_ALL_SELECTOR).first();
+      await expect(downloadAllButton).toBeVisible({ timeout: 12_000 });
+
+      await downloadAllButton.click({ force: true });
+
+      const firstButton = sidecarButtons.nth(0);
+      const secondButton = sidecarButtons.nth(1);
+
+      await expect.poll(async () => firstButton.getAttribute('data-cqd-url'), {
+        timeout: 15_000,
+      }).toContain('id=MAP_FILE_A');
+      await expect.poll(async () => secondButton.getAttribute('data-cqd-url'), {
+        timeout: 15_000,
+      }).toContain('id=MAP_FILE_B');
+    } finally {
+      await page.close();
+      await context.unroute('https://classroom.google.com/**', handler);
     }
   });
 
