@@ -53,7 +53,8 @@ When a Student Work button is clicked, resolver order is:
    - uses published snapshot only if top match is unique and strong
    - ambiguous/tied/multi-submission contexts are rejected
 4. Silent iframe bridge:
-   - hidden iframe with request nonce over BroadcastChannel
+   - hidden iframe with request nonce
+   - bridge result is relayed over extension runtime messaging via background (tab-scoped)
    - waits for bridge result within stage timeout
 5. Final normalization:
    - Drive / Docs / Classroom variants normalized to a final download URL with auth user hint
@@ -120,6 +121,7 @@ UI message mapping in Student Work button logic:
 
 - Prefers strict unique mapping over permissive first-match behavior.
 - Avoids popup-based resolver side effects.
+- Uses extension-authenticated runtime relay for resolver terminal messages.
 - Uses request-scoped nonce on final download URL to reduce collision/reuse risk.
 - Normalizes Docs/Drive/Classroom URL variants before download dispatch.
 

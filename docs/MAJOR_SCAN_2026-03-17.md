@@ -9,7 +9,7 @@ The extension is broadly healthy and releasable for Student Work flows after the
 - Dependency audit found no known vulnerabilities
 - Student Work e2e suite passed
 
-One medium security hardening item remains open (BroadcastChannel trust boundary), and one low security hardening issue was fixed in this pass.
+The previously open medium trust-boundary item and popup-surface cleanup item are now fixed.
 
 ## Scope
 
@@ -29,23 +29,27 @@ pnpm exec playwright test tests/e2e/student-work.spec.ts tests/e2e/student-work-
 
 ## Findings
 
-### [MS-001] Medium — Open
+### [MS-001] Medium — Fixed
 
 **Title:** Student Work resolver result channel trusts same-origin BroadcastChannel messages without sender authentication.
 
 **Location:**
 
-- `extension/src/student_work/channel.ts:14`
-- `extension/src/student_work/channel.ts:79`
+- `extension/src/student_work/channel.ts`
+- `extension/entrypoints/background/index.ts`
 
 **Evidence:**  
-The resolver accepts any message matching shape + `requestId` on a fixed BroadcastChannel name and does not verify publisher identity.
+Resolver results are now published from bridge content scripts through `chrome.runtime.sendMessage`, relayed by background to the originating tab only, and consumed by resolver listeners via runtime relay type.
 
 **Impact:**  
-If malicious script execution occurs on `classroom.google.com` (compromised page/XSS scenario), attacker code could race a forged resolve message for a live request and force wrong URL resolution.
+Same-origin page scripts can no longer forge terminal resolver messages through `BroadcastChannel` in normal extension runtime flow.
 
-**Recommended Fix:**  
-Move resolve-result transport to an extension-authenticated channel (content script -> runtime -> background -> tab-scoped forward) so page scripts cannot inject resolver results.
+**Fix Applied:**  
+Implemented extension-authenticated resolver transport:
+
+- bridge -> background: `CQD_SW_RESOLVE_RESULT_PUBLISH`
+- background -> tab relay: `CQD_SW_RESOLVE_RESULT_RELAY`
+- resolver waits on runtime relay when available; `BroadcastChannel` is fallback-only for environments without runtime APIs.
 
 ---
 
@@ -66,28 +70,22 @@ Added `escapeHtml(...)` and applied escaping for dynamic values rendered inside 
 
 ---
 
-### [MS-003] Low — Open
+### [MS-003] Low — Fixed
 
 **Title:** Student Work constants still include popup mode symbols after resolver moved to silent iframe-only execution.
 
-**Location:**
+**Fix Applied:**  
 
-- `extension/src/student_work/constants.ts:7`
-- `extension/src/student_work/constants.ts:13`
-- `extension/entrypoints/student_work_resolver_bridge.content.ts:74`
-
-**Impact:**  
-No direct runtime exploit, but stale mode surface increases maintenance risk and can cause future behavior drift if reintroduced accidentally.
-
-**Recommended Fix:**  
-Either remove dead popup mode symbols or document them as compatibility-only and add a regression guard asserting resolver never calls popup.
+- removed popup-only constants and stale popup-mode type surface
+- resolver bridge now accepts iframe mode only (`cqd_sw_mode=iframe`)
 
 ## Release Readiness
 
 - Student Work silent resolver: **ready**
 - Mapping correctness protections: **ready**
 - Popup behavior removed from resolver path: **ready**
+- Resolver trust-boundary hardening: **ready**
 
 ## Suggested Next Security Task
 
-Implement `MS-001` by introducing a runtime-relayed, tab-scoped resolver message path and deprecating direct BroadcastChannel trust for terminal resolve messages.
+Add a per-request resolver nonce signature check on relay payloads as a defense-in-depth layer, even within extension-authenticated channels.
