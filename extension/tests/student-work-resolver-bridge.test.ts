@@ -73,7 +73,7 @@ describe('student_work_resolver_bridge content script', () => {
     );
   });
 
-  it('supports authuser-prefixed viewer paths in popup mode', async () => {
+  it('supports authuser-prefixed viewer paths in iframe mode', async () => {
     const publishResolveResult = vi.fn();
 
     vi.doMock('../src/student_work/channel', () => ({
@@ -89,7 +89,7 @@ describe('student_work_resolver_bridge content script', () => {
 
     vi.stubGlobal(
       'location',
-      new URL('https://classroom.google.com/u/1/g/tg/a/b/c?cqd_sw_req=req-bridge-3&cqd_sw_mode=popup'),
+      new URL('https://classroom.google.com/u/1/g/tg/a/b/c?cqd_sw_req=req-bridge-3&cqd_sw_mode=iframe'),
     );
 
     const { startBridge } = await import('../entrypoints/student_work_resolver_bridge.content');
@@ -120,6 +120,32 @@ describe('student_work_resolver_bridge content script', () => {
     vi.stubGlobal(
       'location',
       new URL('https://classroom.google.com/g/tg/a/b/c?cqd_sw_req=req-bridge-4&cqd_sw_mode=tab'),
+    );
+
+    const { startBridge } = await import('../entrypoints/student_work_resolver_bridge.content');
+    startBridge();
+    vi.runOnlyPendingTimers();
+
+    expect(publishResolveResult).not.toHaveBeenCalled();
+  });
+
+  it('does not publish when request mode is popup', async () => {
+    const publishResolveResult = vi.fn();
+
+    vi.doMock('../src/student_work/channel', () => ({
+      publishResolveResult,
+    }));
+
+    vi.doMock('../src/student_work/extractor', () => ({
+      extractResolvedDownloadUrl: vi.fn(() => ({
+        url: 'https://drive.google.com/uc?export=download&id=POPUP_MODE_IGNORED',
+        source: 'anchor',
+      })),
+    }));
+
+    vi.stubGlobal(
+      'location',
+      new URL('https://classroom.google.com/g/tg/a/b/c?cqd_sw_req=req-bridge-5&cqd_sw_mode=popup'),
     );
 
     const { startBridge } = await import('../entrypoints/student_work_resolver_bridge.content');

@@ -1,5 +1,8 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { STUDENT_WORK_CHANNEL_NAME } from '../src/student_work/constants';
+import {
+  STUDENT_WORK_CHANNEL_NAME,
+  STUDENT_WORK_RESOLVE_RELAY_TYPE,
+} from '../src/student_work/constants';
 import { ViewKind } from '../src/engines/types';
 import { publishStudentWorkApiSnapshot } from '../src/engines/v3/api/runtime-bridge';
 import { resolveStudentWorkUrl } from '../src/student_work/resolver';
@@ -35,21 +38,37 @@ class FakeBroadcastChannel {
   }
 }
 
+const runtimeListeners: Array<(message: unknown, sender?: unknown) => void> = [];
+
 function publishResolveMessage(payload: Record<string, unknown>) {
-  const sender = new FakeBroadcastChannel(STUDENT_WORK_CHANNEL_NAME);
-  sender.postMessage(payload);
-  sender.close();
+  const relayMessage = {
+    type: STUDENT_WORK_RESOLVE_RELAY_TYPE,
+    payload,
+  };
+  for (const listener of runtimeListeners) {
+    listener(relayMessage, { id: 'test-extension' });
+  }
 }
 
 describe('student_work/resolver', () => {
   const originalBroadcastChannel = globalThis.BroadcastChannel;
 
   beforeEach(() => {
+    vi.restoreAllMocks();
     FakeBroadcastChannel.reset();
     vi.useRealTimers();
     // @ts-expect-error - test mock
     globalThis.BroadcastChannel = FakeBroadcastChannel;
-    vi.restoreAllMocks();
+    runtimeListeners.length = 0;
+    (chrome.runtime.onMessage.addListener as any)
+      .mockImplementation((listener: (message: unknown, sender?: unknown) => void) => {
+        runtimeListeners.push(listener);
+      });
+    (chrome.runtime.onMessage.removeListener as any)
+      .mockImplementation((listener: (message: unknown, sender?: unknown) => void) => {
+        const idx = runtimeListeners.indexOf(listener);
+        if (idx >= 0) runtimeListeners.splice(idx, 1);
+      });
     vi.stubGlobal(
       'location',
       new URL('https://classroom.google.com/c/C/a/A/submissions/by-status/and-sort-name/all/all'),
@@ -140,6 +159,36 @@ describe('student_work/resolver', () => {
     expect(result.ok).toBe(true);
     expect(result.url).toContain('id=IFRAME_RESOLVED');
     expect(result.source).toBe('anchor');
+  });
+
+  it('ignores forged BroadcastChannel resolver payloads when runtime relay is available', async () => {
+    const appendSpy = vi.spyOn(document.documentElement, 'appendChild');
+    appendSpy.mockImplementation((node: Node) => {
+      if (!(node instanceof HTMLIFrameElement)) return node;
+      const iframeUrl = new URL(node.src);
+      const requestId = iframeUrl.searchParams.get('cqd_sw_req');
+      if (!requestId) return node;
+      setTimeout(() => {
+        const sender = new FakeBroadcastChannel(STUDENT_WORK_CHANNEL_NAME);
+        sender.postMessage({
+          type: 'CQD_SW_RESOLVE_RESULT',
+          requestId,
+          ok: true,
+          resolvedUrl: 'https://drive.google.com/uc?export=download&id=FORGED_CHANNEL_MESSAGE',
+          source: 'anchor',
+        });
+        sender.close();
+      }, 5);
+      return node;
+    });
+
+    const result = await resolveStudentWorkUrl(
+      'https://classroom.google.com/g/tg/a/b/c',
+      { stageTimeoutMs: 40 },
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe('resolver_timeout');
   });
 
   it('returns iframe failure when iframe cannot find a direct file URL', async () => {

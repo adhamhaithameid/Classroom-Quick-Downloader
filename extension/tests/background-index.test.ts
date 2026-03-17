@@ -185,4 +185,101 @@ describe('background/index', () => {
     }));
     expect(cleanup).toHaveBeenCalledWith(pending, 42);
   });
+
+  it('relays student-work resolver publish messages back to the originating tab', async () => {
+    vi.resetModules();
+
+    vi.doMock('../entrypoints/background/state', () => ({
+      pendingByRequestId: new Map(),
+      pendingByDownloadId: new Map(),
+      pendingByUrl: new Map(),
+      pendingByBypassTabId: new Map(),
+      cancelledByUs: new Set(),
+      recentDownloads: new Map(),
+      CLEANUP_INTERVAL_MS: 1000,
+      IS_FIREFOX: false,
+    }));
+    vi.doMock('../entrypoints/background/icon-manager', () => ({
+      createIconUpdaters: () => ({ updateTabIcon: vi.fn(), updateGlobalIcon: vi.fn() }),
+      isClassroomUrl: () => true,
+      setActionIcon: vi.fn(),
+      GRAY_ICON_PATHS: {},
+    }));
+    vi.doMock('../entrypoints/background/auth-utils', () => ({
+      extractDriveFileId: () => null,
+    }));
+    vi.doMock('../entrypoints/background/url-helpers', () => ({
+      getFilenameExt: () => 'pdf',
+      buildUrlWithAuthUser: (url: string) => url,
+    }));
+    vi.doMock('../entrypoints/background/cleanup', () => ({
+      cleanup: vi.fn(),
+      cleanupOrphanedPendingDownloads: vi.fn(),
+    }));
+    vi.doMock('../entrypoints/background/analytics-alarm', () => ({
+      ensureAnalyticsAlarm: vi.fn(),
+      checkAndCloseFileTab: vi.fn(),
+    }));
+    vi.doMock('../entrypoints/background/message-sender', () => ({
+      sendStatusToTab: vi.fn(),
+    }));
+    vi.doMock('../entrypoints/background/download-handler', () => ({
+      handleDownloadRequest: vi.fn(() => true),
+      startNextDriveAttempt: vi.fn(),
+      openDriveBypassTab: vi.fn(),
+    }));
+    vi.doMock('../entrypoints/utils/analytics', () => ({
+      refreshRemoteAnalyticsConfig: vi.fn(async () => {}),
+      recordDownloadEvent: vi.fn(),
+    }));
+    vi.doMock('../entrypoints/content/i18n', () => ({
+      t: (key: string) => key,
+    }));
+
+    const tabsSendMessage = vi.fn();
+    (chrome.tabs as unknown as Record<string, unknown>).sendMessage = tabsSendMessage;
+
+    vi.spyOn(chrome.storage.local, 'get').mockImplementation((_key: any, cb: (result: any) => void) => {
+      cb({ extensionEnabled: true });
+    });
+
+    const mod = await import('../entrypoints/background/index');
+    const start = mod.default as unknown as () => void;
+    start();
+
+    const listeners = (chrome.runtime.onMessage.addListener as any)
+      .mock.calls
+      .map((call: unknown[]) => call[0] as (message: any, sender: any) => unknown);
+    expect(listeners.length).toBeGreaterThan(0);
+
+    for (const listener of listeners) {
+      listener(
+        {
+          type: 'CQD_SW_RESOLVE_RESULT_PUBLISH',
+          payload: {
+            type: 'CQD_SW_RESOLVE_RESULT',
+            requestId: 'relay-req-1',
+            ok: true,
+            resolvedUrl: 'https://drive.google.com/uc?export=download&id=RELAY_1',
+            source: 'anchor',
+          },
+        },
+        {
+          tab: { id: 55, url: 'https://classroom.google.com/c/C/a/A/submissions' },
+          url: 'https://classroom.google.com/g/tg/a/b/c?cqd_sw_req=relay-req-1&cqd_sw_mode=iframe',
+        },
+      );
+    }
+
+    expect(tabsSendMessage).toHaveBeenCalledWith(
+      55,
+      expect.objectContaining({
+        type: 'CQD_SW_RESOLVE_RESULT_RELAY',
+        payload: expect.objectContaining({
+          requestId: 'relay-req-1',
+          ok: true,
+        }),
+      }),
+    );
+  });
 });
