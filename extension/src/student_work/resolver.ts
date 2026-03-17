@@ -2,9 +2,15 @@
 
 import {
   DEFAULT_STAGE_TIMEOUT_MS,
+  STUDENT_WORK_HINT_EXT_PARAM,
+  STUDENT_WORK_HINT_NAME_PARAM,
   STUDENT_WORK_MODE_PARAM,
   STUDENT_WORK_REQUEST_PARAM,
 } from './constants';
+import {
+  readPublishedStudentWorkApiSnapshot,
+  type PublishedStudentWorkApiAttachment,
+} from '../engines/v3/api/runtime-bridge';
 import {
   addResolverParams,
   buildDriveDownloadUrl,
@@ -30,6 +36,11 @@ export interface ResolveStudentWorkResult {
   source?: string;
 }
 
+interface ResolverHints {
+  name: string | null;
+  ext: string | null;
+}
+
 function resultFromMessage(
   message: StudentWorkResolveResultMessage | null,
   authUserHint: string | null,
@@ -51,6 +62,24 @@ function resultFromMessage(
 function normalizeAuthUser(value: string | null): string | null {
   const trimmed = value?.trim();
   return trimmed && trimmed.length > 0 ? trimmed : null;
+}
+
+function normalizeHintToken(value: string): string {
+  return value.toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+function resolveHints(rawUrl: string): ResolverHints {
+  try {
+    const parsed = new URL(rawUrl, window.location.href);
+    const name = parsed.searchParams.get(STUDENT_WORK_HINT_NAME_PARAM) || '';
+    const ext = parsed.searchParams.get(STUDENT_WORK_HINT_EXT_PARAM) || '';
+    return {
+      name: name.trim().length > 0 ? normalizeHintToken(name) : null,
+      ext: ext.trim().length > 0 ? normalizeHintToken(ext) : null,
+    };
+  } catch {
+    return { name: null, ext: null };
+  }
 }
 
 function resolveAuthUserHint(rawUrl: string): string | null {
@@ -108,6 +137,69 @@ function normalizeResolvedUrl(rawUrl: string, authUserHint: string | null): stri
   } catch {
     return null;
   }
+}
+
+function scoreAttachmentByHints(
+  attachment: PublishedStudentWorkApiAttachment,
+  hints: ResolverHints,
+): number {
+  if (!hints.name && !hints.ext) return 0;
+  let score = 0;
+  const title = attachment.normalizedTitle || normalizeHintToken(attachment.title || '');
+  const downloadUrl = normalizeHintToken(attachment.downloadUrl || '');
+  const haystack = `${title} ${downloadUrl}`;
+
+  if (hints.name) {
+    if (haystack.includes(hints.name)) score += 6;
+    const stem = hints.name.replace(/\.[a-z0-9]{2,10}$/i, '').trim();
+    if (stem.length >= 3 && haystack.includes(stem)) score += 3;
+  }
+
+  if (hints.ext) {
+    if (attachment.normalizedExt === hints.ext) score += 2;
+    if (haystack.includes(`.${hints.ext}`)) score += 1;
+  }
+
+  return score;
+}
+
+function resolveFromPublishedApiSnapshot(
+  rawUrl: string,
+  authUserHint: string | null,
+): ResolveStudentWorkResult | null {
+  const snapshot = readPublishedStudentWorkApiSnapshot();
+  if (!snapshot || snapshot.attachments.length === 0) return null;
+
+  const hints = resolveHints(rawUrl);
+  let chosen: PublishedStudentWorkApiAttachment | null = null;
+  let bestScore = -1;
+
+  for (const attachment of snapshot.attachments) {
+    const score = scoreAttachmentByHints(attachment, hints);
+    if (score > bestScore) {
+      bestScore = score;
+      chosen = attachment;
+    }
+  }
+
+  if ((hints.name || hints.ext) && (!chosen || bestScore <= 0)) {
+    return null;
+  }
+  if (!hints.name && !hints.ext) {
+    if (snapshot.attachments.length !== 1) return null;
+    chosen = snapshot.attachments[0];
+  }
+  if (!chosen) return null;
+
+  const normalized = normalizeResolvedUrl(chosen.downloadUrl, authUserHint);
+  if (!normalized) return null;
+
+  return {
+    ok: true,
+    url: normalized,
+    reason: 'resolved',
+    source: 'api_snapshot',
+  };
 }
 
 async function resolveViaIframe(
@@ -188,6 +280,11 @@ export async function resolveStudentWorkUrl(
       reason: 'resolved',
       source: 'query',
     };
+  }
+
+  const apiAttempt = resolveFromPublishedApiSnapshot(parsedInput.toString(), authUserHint);
+  if (apiAttempt) {
+    return apiAttempt;
   }
 
   if (signal?.aborted) {
