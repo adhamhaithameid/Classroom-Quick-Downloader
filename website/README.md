@@ -83,8 +83,19 @@ Required GitHub repository configuration:
 - Secret: `CLOUDFLARE_API_TOKEN`
 - Secret: `CLOUDFLARE_ACCOUNT_ID`
 
+Optional for automated indexing:
+
+- Secret: `INDEXNOW_KEY`
+- Secret: `GOOGLE_SEARCH_CONSOLE_CREDENTIALS_JSON`
+- Variable: `GOOGLE_SEARCH_CONSOLE_SITE_URL`
+- Variable: `PUBLIC_GOOGLE_SITE_VERIFICATION`
+- Variable: `PUBLIC_BING_SITE_VERIFICATION`
+
 ## Runtime Environment Variables
 
 - `PUBLIC_ORACLE_API_BASE_URL`: Oracle public API base URL
 - `PUBLIC_SITE_URL`: canonical public website URL
 - `PUBLIC_BASE_PATH`: keep empty for Cloudflare Pages root deployment
+- `PUBLIC_GOOGLE_SITE_VERIFICATION` (optional): Google verification token for `<meta name="google-site-verification">`
+- `PUBLIC_BING_SITE_VERIFICATION` (optional): Bing verification token for `<meta name="msvalidate.01">`
+- `PUBLIC_INDEXNOW_KEY` (optional): key served at `/indexnow-key.txt` for IndexNow submissions

@@ -29,6 +29,8 @@ jobs:
           PUBLIC_ORACLE_API_BASE_URL: ${{ vars.PUBLIC_ORACLE_API_BASE_URL }}
           PUBLIC_WORKER_BASE_URL: ${{ vars.PUBLIC_WORKER_BASE_URL }}
           PUBLIC_SITE_URL: ${{ vars.PUBLIC_SITE_URL }}
+          PUBLIC_GOOGLE_SITE_VERIFICATION: ${{ vars.PUBLIC_GOOGLE_SITE_VERIFICATION }}
+          PUBLIC_BING_SITE_VERIFICATION: ${{ vars.PUBLIC_BING_SITE_VERIFICATION }}
         run: |
           set -euo pipefail
           required=(
@@ -103,6 +105,9 @@ jobs:
           PUBLIC_ORACLE_API_BASE_URL: ${{ vars.PUBLIC_ORACLE_API_BASE_URL }}
           PUBLIC_WORKER_BASE_URL: ${{ vars.PUBLIC_WORKER_BASE_URL }}
           PUBLIC_SITE_URL: ${{ vars.PUBLIC_SITE_URL }}
+          PUBLIC_GOOGLE_SITE_VERIFICATION: ${{ vars.PUBLIC_GOOGLE_SITE_VERIFICATION }}
+          PUBLIC_BING_SITE_VERIFICATION: ${{ vars.PUBLIC_BING_SITE_VERIFICATION }}
+          PUBLIC_INDEXNOW_KEY: ${{ secrets.INDEXNOW_KEY }}
         run: pnpm -C website build
 
       - name: Deploy website artifact
@@ -167,3 +172,11 @@ jobs:
             -H "X-Requested-With: XMLHttpRequest" \
             --data "${ingest_payload}")"
           echo "${ingest_response}" | grep -Eq '"ok"[[:space:]]*:[[:space:]]*true'
+
+      - name: Submit indexing notifications (Bing + Google)
+        env:
+          PUBLIC_SITE_URL: ${{ vars.PUBLIC_SITE_URL }}
+          INDEXNOW_KEY: ${{ secrets.INDEXNOW_KEY }}
+          GOOGLE_SEARCH_CONSOLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_SEARCH_CONSOLE_CREDENTIALS_JSON }}
+          GOOGLE_SEARCH_CONSOLE_SITE_URL: ${{ vars.GOOGLE_SEARCH_CONSOLE_SITE_URL }}
+        run: node tools/submit-search-indexing.mjs

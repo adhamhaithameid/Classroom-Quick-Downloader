@@ -14,6 +14,13 @@ It focuses on meaningful product, reliability, security, and architecture change
 ### Summary
 Student Work stabilization update focused on silent resolution and strict per-submission file mapping.
 
+### Added
+- Added deploy-time search indexing automation for the website:
+  - Bing submission via IndexNow (`tools/submit-search-indexing.mjs`)
+  - Google Search Console sitemap submission when service-account credentials are configured
+- Added website-level IndexNow key endpoint at `/indexnow-key.txt` for search-engine ownership proof.
+- Added configurable website verification metadata for Google and Bing via public environment variables.
+
 ### Changed
 - Removed popup-based Student Work resolver fallback so resolution is fully silent.
 - Increased default Student Work resolver timeout to reduce premature timeout failures.
