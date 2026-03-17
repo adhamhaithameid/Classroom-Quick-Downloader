@@ -32,6 +32,10 @@ import {
 import { refreshRemoteAnalyticsConfig, recordDownloadEvent } from '../utils/analytics';
 import { UNINSTALL_SITE_URL } from '../utils/analytics/constants';
 import { t } from '../content/i18n';
+import {
+  STUDENT_WORK_RESOLVE_PUBLISH_TYPE,
+  STUDENT_WORK_RESOLVE_RELAY_TYPE,
+} from '../../src/student_work/constants';
 
 // =====================================================
 // MAIN ENTRYPOINT
@@ -62,6 +66,38 @@ function initializeUninstallUrl(): void {
   } catch {
     // Ignore uninstall URL initialization failures in unsupported runtimes.
   }
+}
+
+interface StudentWorkResolveResultPayload {
+  type: 'CQD_SW_RESOLVE_RESULT';
+  requestId: string;
+  ok: boolean;
+  resolvedUrl?: string;
+  reason?: string;
+  source?: string;
+}
+
+interface StudentWorkResolvePublishMessage {
+  type: typeof STUDENT_WORK_RESOLVE_PUBLISH_TYPE;
+  payload: StudentWorkResolveResultPayload;
+}
+
+const STUDENT_WORK_VIEWER_URL_RE = /^https:\/\/classroom\.google\.com\/(?:u\/\d+\/)?g\/tg\//;
+
+function isStudentWorkResolvePublishMessage(value: unknown): value is StudentWorkResolvePublishMessage {
+  if (!value || typeof value !== 'object') return false;
+  const msg = value as Record<string, unknown>;
+  if (msg.type !== STUDENT_WORK_RESOLVE_PUBLISH_TYPE) return false;
+  if (!msg.payload || typeof msg.payload !== 'object') return false;
+
+  const payload = msg.payload as Record<string, unknown>;
+  if (payload.type !== 'CQD_SW_RESOLVE_RESULT') return false;
+  if (typeof payload.requestId !== 'string') return false;
+  if (typeof payload.ok !== 'boolean') return false;
+  if (payload.resolvedUrl != null && typeof payload.resolvedUrl !== 'string') return false;
+  if (payload.reason != null && typeof payload.reason !== 'string') return false;
+  if (payload.source != null && typeof payload.source !== 'string') return false;
+  return true;
 }
 
 export default defineBackground(() => {
@@ -116,6 +152,25 @@ export default defineBackground(() => {
       updateTabIcon(sender.tab.id, sender.tab.url);
       return false;
     }
+  });
+
+  // 0b) Student Work resolver bridge relay (runtime-authenticated, tab-scoped)
+  chrome.runtime.onMessage.addListener((message, sender) => {
+    if (!isStudentWorkResolvePublishMessage(message)) return false;
+    if (sender.tab?.id == null) return false;
+
+    const senderUrl = sender.url || sender.tab.url || '';
+    if (!STUDENT_WORK_VIEWER_URL_RE.test(senderUrl)) return false;
+
+    try {
+      chrome.tabs.sendMessage(sender.tab.id, {
+        type: STUDENT_WORK_RESOLVE_RELAY_TYPE,
+        payload: message.payload,
+      });
+    } catch {
+      // Ignore send failures when tab/frame is gone.
+    }
+    return false;
   });
 
   // 1) Messages from drive_bypass.content.ts

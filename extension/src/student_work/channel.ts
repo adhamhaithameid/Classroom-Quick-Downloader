@@ -1,6 +1,10 @@
 // filepath: extension/src/student_work/channel.ts
 
-import { STUDENT_WORK_CHANNEL_NAME } from './constants';
+import {
+  STUDENT_WORK_CHANNEL_NAME,
+  STUDENT_WORK_RESOLVE_PUBLISH_TYPE,
+  STUDENT_WORK_RESOLVE_RELAY_TYPE,
+} from './constants';
 
 export interface StudentWorkResolveResultMessage {
   type: 'CQD_SW_RESOLVE_RESULT';
@@ -9,6 +13,16 @@ export interface StudentWorkResolveResultMessage {
   resolvedUrl?: string;
   reason?: string;
   source?: string;
+}
+
+export interface StudentWorkResolvePublishMessage {
+  type: typeof STUDENT_WORK_RESOLVE_PUBLISH_TYPE;
+  payload: StudentWorkResolveResultMessage;
+}
+
+export interface StudentWorkResolveRelayMessage {
+  type: typeof STUDENT_WORK_RESOLVE_RELAY_TYPE;
+  payload: StudentWorkResolveResultMessage;
 }
 
 function isResolveResultMessage(value: unknown): value is StudentWorkResolveResultMessage {
@@ -23,12 +37,40 @@ function isResolveResultMessage(value: unknown): value is StudentWorkResolveResu
   return true;
 }
 
+function isResolveRelayMessage(value: unknown): value is StudentWorkResolveRelayMessage {
+  if (!value || typeof value !== 'object') return false;
+  const msg = value as Record<string, unknown>;
+  if (msg.type !== STUDENT_WORK_RESOLVE_RELAY_TYPE) return false;
+  return isResolveResultMessage(msg.payload);
+}
+
+function getRuntime():
+  | (typeof chrome.runtime)
+  | null {
+  if (typeof chrome === 'undefined' || !chrome.runtime) return null;
+  return chrome.runtime;
+}
+
 // creating a random id because Math.random() is basically cryptography right?
 export function createResolverRequestId(): string {
   return `sw-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 export function publishResolveResult(message: StudentWorkResolveResultMessage): void {
+  const runtime = getRuntime();
+  if (runtime?.sendMessage) {
+    try {
+      const payload: StudentWorkResolvePublishMessage = {
+        type: STUDENT_WORK_RESOLVE_PUBLISH_TYPE,
+        payload: message,
+      };
+      runtime.sendMessage(payload);
+    } catch {
+      // Ignore runtime relay failures; resolver will timeout safely.
+    }
+    return;
+  }
+
   try {
     const channel = new BroadcastChannel(STUDENT_WORK_CHANNEL_NAME);
     channel.postMessage(message);
@@ -47,6 +89,14 @@ export function waitForResolveResult(
   return new Promise((resolve) => {
     let done = false;
     let timer: number | null = null;
+    const runtime = getRuntime();
+    const hasRuntimeRelayApi =
+      !!runtime &&
+      typeof (runtime as any).onMessage?.addListener === 'function' &&
+      typeof (runtime as any).onMessage?.removeListener === 'function';
+    let runtimeListener:
+      | ((message: unknown, sender?: chrome.runtime.MessageSender) => void)
+      | null = null;
     let channel: BroadcastChannel | null = null;
     let abortHandler: (() => void) | null = null;
 
@@ -68,6 +118,15 @@ export function waitForResolveResult(
         channel = null;
       }
 
+      if (runtimeListener && hasRuntimeRelayApi) {
+        try {
+          runtime!.onMessage.removeListener(runtimeListener);
+        } catch {
+          // Ignore runtime listener cleanup errors.
+        }
+        runtimeListener = null;
+      }
+
       if (abortHandler && signal) {
         signal.removeEventListener('abort', abortHandler);
         abortHandler = null;
@@ -76,17 +135,43 @@ export function waitForResolveResult(
       resolve(value);
     };
 
-    try {
-      channel = new BroadcastChannel(STUDENT_WORK_CHANNEL_NAME);
-      channel.onmessage = (event: MessageEvent) => {
-        const payload = event.data;
-        if (!isResolveResultMessage(payload)) return;
+    if (hasRuntimeRelayApi) {
+      runtimeListener = (message: unknown, sender?: chrome.runtime.MessageSender) => {
+        if (!isResolveRelayMessage(message)) return;
+        const payload = message.payload;
         if (payload.requestId !== requestId) return;
+
+        const runtimeId = runtime.id;
+        if (
+          runtimeId &&
+          sender &&
+          typeof sender.id === 'string' &&
+          sender.id !== runtimeId
+        ) {
+          return;
+        }
         finish(payload);
       };
-    } catch {
-      finish(null);
-      return;
+
+      try {
+        runtime!.onMessage.addListener(runtimeListener);
+      } catch {
+        finish(null);
+        return;
+      }
+    } else {
+      try {
+        channel = new BroadcastChannel(STUDENT_WORK_CHANNEL_NAME);
+        channel.onmessage = (event: MessageEvent) => {
+          const payload = event.data;
+          if (!isResolveResultMessage(payload)) return;
+          if (payload.requestId !== requestId) return;
+          finish(payload);
+        };
+      } catch {
+        finish(null);
+        return;
+      }
     }
 
     timer = window.setTimeout(() => finish(null), timeoutMs);
@@ -100,4 +185,3 @@ export function waitForResolveResult(
     }
   });
 }
-

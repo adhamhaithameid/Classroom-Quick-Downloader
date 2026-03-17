@@ -1,7 +1,6 @@
 // filepath: extension/entrypoints/student_work_resolver_bridge.content.ts
 
 import {
-  STUDENT_WORK_AUTOCLOSE_PARAM,
   STUDENT_WORK_MODE_PARAM,
   STUDENT_WORK_REQUEST_PARAM,
 } from '../src/student_work/constants';
@@ -35,26 +34,6 @@ function publishSuccess(
   });
 }
 
-function shouldAutoClose(): boolean {
-  try {
-    const params = new URLSearchParams(window.location.search);
-    return params.get(STUDENT_WORK_AUTOCLOSE_PARAM) === '1';
-  } catch {
-    return false;
-  }
-}
-
-function maybeCloseWindow(): void {
-  if (!shouldAutoClose()) return;
-  window.setTimeout(() => {
-    try {
-      window.close();
-    } catch {
-      // Ignore close failures.
-    }
-  }, 200);
-}
-
 function resolveRequestId(): string | null {
   try {
     const params = new URLSearchParams(window.location.search);
@@ -82,7 +61,7 @@ export function startBridge(): void {
       return null;
     }
   })();
-  if (mode !== 'iframe' && mode !== 'popup') return;
+  if (mode !== 'iframe') return;
 
   const deadline = Date.now() + BRIDGE_TIMEOUT_MS;
 
@@ -90,12 +69,10 @@ export function startBridge(): void {
     const result = extractResolvedDownloadUrl(document, window.location.href);
     if (result) {
       publishSuccess(requestId, result.url, result.source);
-      maybeCloseWindow();
       return true;
     }
     if (Date.now() >= deadline) {
       publishFailure(requestId, 'no_drive_url_found');
-      maybeCloseWindow();
       return true;
     }
     return false;
