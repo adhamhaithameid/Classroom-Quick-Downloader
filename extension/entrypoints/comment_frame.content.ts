@@ -8,6 +8,7 @@ import { subscribeToGlobalState, createCommentBadge } from './content/flags';
 import { triggerPostClick, upgradeCombinedBadge, ATTR_COMMENT_COUNT } from './content/both-badge';
 import { triggerPulseEffect, markTargetElements } from './content/pulse-effect';
 import { queryPostCards } from './content/post-card-utils';
+import { isStudentWorkRoute } from '../src/student_work/url-classifier';
 
 // Selector for the main stream card (works for both Stream and Classwork tabs)
 // Stream: div[data-stream-item-id], Classwork: li[data-stream-item-id]
@@ -37,6 +38,10 @@ let urlObserver: MutationObserver | null = null;
 
 // Flag toggle state (controlled from popup)
 let commentsFlagEnabled = true;
+
+function isStudentWorkPage(): boolean {
+  return isStudentWorkRoute(window.location.pathname);
+}
 
 function removeCommentArtifacts(): void {
   document.querySelectorAll<HTMLElement>(
@@ -218,6 +223,10 @@ function stopCommentsFeature(): void {
 function scanForComments() {
   if (!running) return;
   if (!commentsFlagEnabled) return; // Flag disabled from popup settings
+  if (isStudentWorkPage()) {
+    removeCommentArtifacts();
+    return;
+  }
   try {
     const direction = getPageDirection();
     document.body.setAttribute('data-cqd-dir', direction);

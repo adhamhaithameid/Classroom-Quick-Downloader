@@ -6,6 +6,7 @@
 import type { FileMeta } from './types';
 
 /** Labels to strip from filenames */
+// who names their file "Compressed archive" anyway
 const GARBAGE_LABELS = [
   'Microsoft Excel',
   'Microsoft Word',
@@ -70,7 +71,7 @@ export function cleanAttachmentName(rawName: string): string {
 export function extractFileMeta(container: HTMLElement, url: string): FileMeta {
   let name: string | undefined;
 
-  // Try tooltip/ARIA first
+  // Try tooltip/ARIA first because accessibility = free metadata hack
   const tooltip =
     container.getAttribute('data-tooltip') ||
     container.getAttribute('aria-label') ||

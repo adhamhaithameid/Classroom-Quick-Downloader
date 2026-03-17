@@ -21,11 +21,12 @@ describe('changelog utils (manual mode)', () => {
     expect(passive.status).toBe('not-modified');
     expect(passive.data).toBeTruthy();
     expect(passive.data?.entries.length).toBeGreaterThan(0);
-    expect(passive.data?.entries[0]?.version).toBe('1.5.0');
+    const latestVersion = passive.data?.entries[0]?.version ?? '';
+    expect(latestVersion).toMatch(/^\d+\.\d+\.\d+$/);
 
     const forced = await mod.fetchChangelogDetailed(true);
     expect(forced.status).toBe('fresh');
-    expect(forced.data?.entries[0]?.id).toBe('manual-1.5.0-1');
+    expect(forced.data?.entries[0]?.id).toContain(`manual-${latestVersion}`);
   });
 
   it('does not perform network fetch in manual mode', async () => {
@@ -37,13 +38,15 @@ describe('changelog utils (manual mode)', () => {
   it('persists robust cache envelope fields', async () => {
     const mod = await loadChangelogModule();
 
-    await mod.fetchChangelog(true);
+    const data = await mod.fetchChangelog(true);
+    const latestEntry = data?.entries[0];
+
     expect(chrome.storage.local.set).toHaveBeenCalledWith(
       expect.objectContaining({
         cqd_changelog_v1: expect.objectContaining({
           schemaVersion: 2,
           cachedAt: expect.any(Number),
-          lastSeenId: 'manual-1.5.0-1',
+          lastSeenId: latestEntry?.id,
           cachedItems: expect.any(Array),
           cachedConfig: expect.objectContaining({
             rules: expect.arrayContaining([

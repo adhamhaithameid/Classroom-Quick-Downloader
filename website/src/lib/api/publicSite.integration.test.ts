@@ -7,6 +7,7 @@ import {
   fetchUserChangelog,
   submitUninstallFeedback
 } from './publicSite';
+import { WEBSITE_MANUAL_CHANGELOG } from '$lib/content/changelog.manual.generated';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -141,8 +142,10 @@ describe('public website API integration', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const changelog = await fetchUserChangelog();
+    const latestManualVersion = String(WEBSITE_MANUAL_CHANGELOG.entries[0]?.version ?? '').replace(/^v/i, '');
 
-    expect(changelog.entries[0]?.version).toBe('1.5.0');
+    expect(latestManualVersion.length).toBeGreaterThan(0);
+    expect(changelog.entries[0]?.version).toBe(latestManualVersion);
     expect(fetchMock).toHaveBeenCalledTimes(0);
   });
 

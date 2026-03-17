@@ -17,6 +17,8 @@ cloudflare-worker/coverage/
 AI/
 ai/
 .jules/
+.playwright-cli/
+test-results/
 verification/*.png
 **/security_best_practices_report.md
 ownership-sensitive-rules.csv

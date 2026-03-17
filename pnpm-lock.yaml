@@ -21,7 +21,7 @@ packageExtensionsChecksum: sha256-5w3gpXBE/prMSSIyRSWo5+1EAIHFBJSqGZpB1+bPQh4=
 patchedDependencies:
   eslint@10.0.3:
     hash: 43f8a8c5c7b8c79b4aea08c38fe3fd0a0a7c251623cb5bc4b063db421c8ad170
-    path: patches/eslint@10.0.2.patch
+    path: patches/eslint@10.0.3.patch
 
 importers:
 

@@ -4,9 +4,97 @@ This is the main engineering changelog for Classroom Quick Downloader.
 It focuses on meaningful product, reliability, security, and architecture changes instead of raw commit history.
 
 ## Versioning Notes
-- Current extension release line: `1.5.0`
+- Current extension release line: `1.5.5`
+- Recommended next patch release: `1.5.6`
 - Planned next engine milestone: `1.6.0`
 - Pre-`1.0.0` bootstrap work is intentionally omitted from the user-facing release ledger
+
+## [Unreleased]
+
+### Summary
+Student Work stabilization update focused on silent resolution and strict per-submission file mapping.
+
+### Changed
+- Removed popup-based Student Work resolver fallback so resolution is fully silent.
+- Increased default Student Work resolver timeout to reduce premature timeout failures.
+
+### Fixed
+- Fixed Student Work flows that could land in error state before bridge resolution completed.
+- Fixed edge-case wrong/repeated mapping risks by tightening strict hinted extraction and candidate selection.
+
+### Security
+- Hardened debug panel rendering by escaping runtime values before HTML injection.
+
+## [1.5.5] - 2026-03-17
+
+### Summary
+A packaging optimization release focused on reducing extension size while preserving stable classroom behavior.
+
+### Added
+- Added tighter packaging checks for Student Work and core download modules to prevent unnecessary artifact growth.
+
+### Changed
+- Reduced bundled payload by trimming unused runtime paths and release artifacts.
+
+### Fixed
+- Fixed extension package bloat that increased install and update cost on slower networks.
+
+## [1.5.4] - 2026-03-16
+
+### Summary
+A performance-focused release with two targeted throughput improvements across scan and download orchestration.
+
+### Added
+- Added lightweight scan throttling safeguards for busy Student Work pages.
+
+### Changed
+- Improved scan scheduling throughput for large submission boards.
+- Improved download-state propagation throughput to reduce UI lag during multi-file runs.
+
+### Fixed
+- Fixed repeated heavy-pass work that could slow down larger Classroom pages.
+
+## [1.5.3] - 2026-03-15
+
+### Summary
+Introduced a new flags/files detection layer to keep ownership and mapping stable across complex Classroom layouts.
+
+### Added
+- Added a dedicated correlation layer that aligns file cards and flag ownership with stricter DOM boundaries.
+
+### Changed
+- Updated detection order so file identity and flag identity resolve from the same scoped card context.
+
+### Fixed
+- Fixed edge cases where shared wrappers could cause mis-scoped file or flag decisions.
+
+## [1.5.2] - 2026-03-14
+
+### Summary
+A focused stabilization release delivering bug fixes and stronger security hardening for production classrooms.
+
+### Added
+- Added stricter URL validation and safer resolver guardrails for indirect Student Work links.
+
+### Changed
+- Improved defensive checks around download-state transitions and resolver message-bridge handling.
+
+### Fixed
+- Fixed download-state and mapping regressions that could impact reliability under mixed attachment sets.
+
+## [1.5.1] - 2026-03-13
+
+### Summary
+Expanded Student Work tap coverage so teachers can download attached files and media directly from submissions.
+
+### Added
+- Introduced support for Student Work tap downloads based on real user needs — big thanks to @Ahmed for the valuable feedback 🙌
+
+### Changed
+- Aligned Student Work button rendering and Download All wiring with the stable classroom download flow.
+
+### Fixed
+- Fixed early Student Work gaps where some submissions were not reachable through the normal download UX.
 
 ## [1.5.0] - 2026-03-10
 

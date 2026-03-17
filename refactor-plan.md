@@ -18,12 +18,12 @@ It exists to answer:
 
 Use this version mapping from now on:
 
-- `1.5.0` = the major DOM-first engine milestone.
+- `1.5.5` = the major DOM-first engine milestone.
 - `1.6.0` = the first real API-assisted engine milestone.
 
 This replaces the old planning names:
 
-- old `4.0.0` → now `1.5.0`
+- old `4.0.0` → now `1.5.5`
 - old `4.2.1` → now `1.6.0`
 
 ## Important Reality Check
@@ -37,7 +37,7 @@ That changes how this plan should be used:
 
 So every phase below should be read through that lens.
 
-## Operating Rule For `1.5.0`
+## Operating Rule For `1.5.5`
 
 For the current release line:
 
@@ -58,7 +58,7 @@ Already completed in the protection-focused pass:
 3. extension-only regression, fuzz, stress, and visual suites,
 4. CI gating for the extension golden suites,
 5. dedicated runbooks for testing and fixture capture,
-6. explicit policy that `1.5.0` is the protected product baseline,
+6. explicit policy that `1.5.5` is the protected product baseline,
 7. explicit maintenance rule to capture new fixtures only when Classroom changes or a real bug reveals a missing case.
 
 Still intentionally not done in this pass:
@@ -88,7 +88,7 @@ Maintenance rule:
 
 1. do not keep capturing fixtures just to grow the library,
 2. add new fixtures only when Classroom changes or when a real bug reveals a new shape,
-3. treat the current fixture set as the default protection layer for `1.5.0`.
+3. treat the current fixture set as the default protection layer for `1.5.5`.
 
 ### [x] Convert those baselines into reusable test fixtures
 
@@ -307,12 +307,12 @@ Effect:
 
 ---
 
-## Phase 6 — `1.5.0` Stabilization And Sign-Off
+## Phase 6 — `1.5.5` Stabilization And Sign-Off
 
 ### [ ] Freeze the behavior that already feels correct
 
 What this means:
-- Treat the current placements and detections as the target baseline for `1.5.0` quality.
+- Treat the current placements and detections as the target baseline for `1.5.5` quality.
 
 Why do it:
 - You are already happy with the current state.
