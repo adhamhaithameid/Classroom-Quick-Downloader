@@ -1,9 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-function setupModule() {
+interface SetupModuleOptions {
+  onSingleDownloadClick?: (...args: any[]) => void | Promise<void>;
+}
+
+function setupModule(options: SetupModuleOptions = {}) {
   vi.resetModules();
 
-  const handleSingleDownloadClick = vi.fn().mockResolvedValue(undefined);
+  const handleSingleDownloadClick = vi.fn(async (...args: any[]) => {
+    await options.onSingleDownloadClick?.(...args);
+  });
   const handleCancelClick = vi.fn().mockResolvedValue(undefined);
   const showErrorState = vi.fn().mockResolvedValue(undefined);
   const ensureMinLoading = vi.fn().mockResolvedValue(undefined);
@@ -226,6 +232,40 @@ describe('student_work/button', () => {
     await Promise.resolve();
 
     expect(mocks.handleSingleDownloadClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('watchdog recovers from loading+cancel hover overlay and does not hang forever', async () => {
+    vi.useFakeTimers();
+    const mocks = setupModule({
+      onSingleDownloadClick: (button: HTMLButtonElement) => {
+        button.classList.add('cqd-loading');
+        button.classList.add('cqd-cancel');
+        (button.dataset as any).cqdMouseOver = 'true';
+      },
+    });
+    const { createStudentWorkButton } = await import('../src/student_work/button');
+
+    const button = createStudentWorkButton(
+      'https://classroom.google.com/g/tg/a/b/c',
+      { name: 'File', ext: 'pdf', kind: 'other' },
+      {
+        resolve: async () => ({ ok: true, url: 'https://drive.google.com/uc?export=download&id=WATCHDOG_FILE', reason: 'resolved' }),
+      },
+    );
+    document.body.appendChild(button);
+
+    button.click();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    vi.advanceTimersByTime(45_100);
+    await Promise.resolve();
+
+    expect(mocks.showErrorState).toHaveBeenCalledWith(
+      button,
+      'Download did not finish in time. Please retry.',
+    );
+    vi.useRealTimers();
   });
 
   it('passes resolver hint params for classroom Student Work links', async () => {
