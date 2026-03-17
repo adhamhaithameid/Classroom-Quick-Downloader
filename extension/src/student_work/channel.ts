@@ -23,6 +23,7 @@ function isResolveResultMessage(value: unknown): value is StudentWorkResolveResu
   return true;
 }
 
+// creating a random id because Math.random() is basically cryptography right?
 export function createResolverRequestId(): string {
   return `sw-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
@@ -37,6 +38,7 @@ export function publishResolveResult(message: StudentWorkResolveResultMessage): 
   }
 }
 
+// broadcast channels... so cool but kinda magic
 export function waitForResolveResult(
   requestId: string,
   timeoutMs: number,
