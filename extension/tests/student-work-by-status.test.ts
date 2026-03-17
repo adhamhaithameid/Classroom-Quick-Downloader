@@ -242,6 +242,42 @@ describe('student_work_by_status content script', () => {
     ]);
   });
 
+  it('resolves per-card descendant drive IDs instead of shared ancestor drive-id', async () => {
+    const { mod, createStudentWorkButton } = await loadByStatusSidecar();
+    mod.setStudentWorkByStatusRunningForTest(true);
+    vi.stubGlobal(
+      'location',
+      new URL('https://classroom.google.com/c/C/a/A/submissions/by-status/and-sort-name/all/all'),
+    );
+
+    document.body.innerHTML = `
+      <section data-drive-id="WRONG_SHARED_JSON">
+        <div class="WkZsyc file-card">
+          <div class="meta" data-drive-id="FILE_IMAGE_1"></div>
+          <a class="vwNuXe" aria-label="Attachment: Image: screenshot.png" href="https://classroom.google.com/g/tg/c/a/s">Attachment</a>
+        </div>
+        <div class="WkZsyc file-card">
+          <div class="meta" data-drive-id="FILE_VIDEO_2"></div>
+          <a class="vwNuXe" aria-label="Attachment: Video: clip.mp4" href="https://classroom.google.com/g/tg/c/a/s">Attachment</a>
+        </div>
+        <div class="WkZsyc file-card">
+          <div class="meta" data-drive-id="FILE_JSON_3"></div>
+          <a class="vwNuXe" aria-label="Attachment: JSON: payload.json" href="https://classroom.google.com/g/tg/c/a/s">Attachment</a>
+        </div>
+      </section>
+    `;
+
+    mod.scanStudentWorkByStatus(document);
+
+    expect(createStudentWorkButton).toHaveBeenCalledTimes(3);
+    const sourceUrls = createStudentWorkButton.mock.calls.map((call) => call[0]);
+    expect(sourceUrls).toEqual([
+      'https://drive.google.com/uc?export=download&id=FILE_IMAGE_1',
+      'https://drive.google.com/uc?export=download&id=FILE_VIDEO_2',
+      'https://drive.google.com/uc?export=download&id=FILE_JSON_3',
+    ]);
+  });
+
   it('ignores open folder links and menu items', async () => {
     const { mod } = await loadByStatusSidecar();
     mod.setStudentWorkByStatusRunningForTest(true);
@@ -434,6 +470,7 @@ describe('student_work_by_status content script', () => {
       <div id="post"
         data-cqd-v2-flag="true"
         data-cqd-v2-flag-verdict="comment"
+        data-cqd-v2-flag-click="true"
         data-cqd-injected="true"
         data-cqd-comments-processed="true"
         data-cqd-edited-processed="true"
@@ -451,6 +488,7 @@ describe('student_work_by_status content script', () => {
     const post = document.querySelector<HTMLElement>('#post');
     expect(post?.hasAttribute('data-cqd-v2-flag')).toBe(false);
     expect(post?.hasAttribute('data-cqd-v2-flag-verdict')).toBe(false);
+    expect(post?.hasAttribute('data-cqd-v2-flag-click')).toBe(false);
     expect(post?.hasAttribute('data-cqd-injected')).toBe(false);
     expect(post?.hasAttribute('data-cqd-comments-processed')).toBe(false);
     expect(post?.hasAttribute('data-cqd-edited-processed')).toBe(false);
