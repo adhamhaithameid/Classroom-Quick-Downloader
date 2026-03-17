@@ -72,6 +72,20 @@ describe('student_work/extractor', () => {
     expect(result?.url).toContain('id=FILE_IMAGE_2');
   });
 
+  it('returns null when hinted anchors tie on score (avoid wrong first-match downloads)', () => {
+    document.body.innerHTML = `
+      <a aria-label="Attachment: PDF: worksheet.pdf" href="https://drive.google.com/file/d/FILE_A/view">PDF A</a>
+      <a aria-label="Attachment: PDF: worksheet.pdf" href="https://drive.google.com/file/d/FILE_B/view">PDF B</a>
+    `;
+
+    const result = extractResolvedDownloadUrl(
+      document,
+      'https://classroom.google.com/g/tg/course/work/submission?cqd_sw_hint_name=worksheet.pdf&cqd_sw_hint_ext=pdf',
+    );
+
+    expect(result).toBeNull();
+  });
+
   it('extracts classroom drive proxy anchors via resourceId', () => {
     document.body.innerHTML = `
       <a href="https://classroom.google.com/drive?resourceId=FILE_999">Proxy</a>
@@ -101,6 +115,70 @@ describe('student_work/extractor', () => {
     expect(result).not.toBeNull();
     expect(result?.source).toBe('script');
     expect(result?.url).toContain('id=SCRIPT_FILE_777');
+  });
+
+  it('returns null for user-hinted URLs when only generic script fallback is available', () => {
+    document.body.innerHTML = `
+      <script>
+        window.__BOOT = {"driveFileId":"SCRIPT_FILE_777"};
+      </script>
+    `;
+
+    const result = extractResolvedDownloadUrl(
+      document,
+      'https://classroom.google.com/g/tg/course/work/submission?cqd_sw_hint_name=screenshot.png&cqd_sw_hint_ext=png#u=USER_42',
+    );
+
+    expect(result).toBeNull();
+  });
+
+  it('returns null for user-hinted URLs when hinted anchor score is non-positive', () => {
+    document.body.innerHTML = `
+      <a href="https://drive.google.com/file/d/GENERIC_FILE_9/view">Open</a>
+    `;
+
+    const result = extractResolvedDownloadUrl(
+      document,
+      'https://classroom.google.com/g/tg/course/work/submission?cqd_sw_hint_name=report.json&cqd_sw_hint_ext=json#u=USER_42',
+    );
+
+    expect(result).toBeNull();
+  });
+
+  it('extracts from performance resource entries when Drive/Docs anchors are absent', () => {
+    document.body.innerHTML = `<div>No anchors rendered yet</div>`;
+    const resourceSpy = vi.spyOn(window.performance, 'getEntriesByType')
+      .mockReturnValue([
+        { name: 'https://docs.google.com/file/d/RESOURCE_FILE_42/grading?authuser=0' } as PerformanceEntry,
+      ]);
+
+    const result = extractResolvedDownloadUrl(
+      document,
+      'https://classroom.google.com/g/tg/course/work/submission',
+    );
+
+    expect(result).not.toBeNull();
+    expect(result?.source).toBe('resource');
+    expect(result?.url).toContain('id=RESOURCE_FILE_42');
+    resourceSpy.mockRestore();
+  });
+
+  it('keeps strict user-hinted resolution when performance resources expose a single file', () => {
+    document.body.innerHTML = `<div>Waiting for rendered attachment...</div>`;
+    const resourceSpy = vi.spyOn(window.performance, 'getEntriesByType')
+      .mockReturnValue([
+        { name: 'https://docs.google.com/file/d/STRICT_RESOURCE_7/grading?authuser=0' } as PerformanceEntry,
+      ]);
+
+    const result = extractResolvedDownloadUrl(
+      document,
+      'https://classroom.google.com/g/tg/course/work/submission?cqd_sw_hint_name=worksheet.png&cqd_sw_hint_ext=png#u=USER_42',
+    );
+
+    expect(result).not.toBeNull();
+    expect(result?.source).toBe('resource');
+    expect(result?.url).toContain('id=STRICT_RESOURCE_7');
+    resourceSpy.mockRestore();
   });
 
   it('normalizes docs anchors into direct drive download URLs', () => {
