@@ -19,6 +19,8 @@ import { getButtonState, setButtonState, setPillProgress } from './button-state'
 import { t } from './i18n';
 
 /** Simple delay utility */
+// sleep sort incoming lol jk
+// sleep sort incoming lol jk
 export function delay(ms: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
@@ -44,6 +46,8 @@ export function findPendingButtonByElement(button: HTMLButtonElement): PendingBu
 /**
  * Handle cancel button click.
  */
+// user clicked cancel. rip their download
+// user clicked cancel. rip their download
 export async function handleCancelClick(button: HTMLButtonElement): Promise<void> {
   const pending = findPendingButtonByElement(button);
 
@@ -171,6 +175,8 @@ export async function waitForSuccessReset(button: HTMLButtonElement): Promise<vo
 /**
  * Handle single download button click.
  */
+// here goes nothing! hope the backend doesn't crash 🤞🏻
+// here goes nothing! hope the backend doesn't crash 🤞🏻
 export async function handleSingleDownloadClick(
   button: HTMLButtonElement,
   url: string,
