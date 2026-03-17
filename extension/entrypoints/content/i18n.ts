@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 declare const chrome: any;
-
+// i genuinely didn't know there were much languages lol🌍
 export const TRANSLATIONS: Record<string, Record<string, string>> = {
   en: {
     download: 'Download',
