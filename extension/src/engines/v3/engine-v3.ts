@@ -39,6 +39,12 @@ import type {
   DecisionTrace,
 } from '../types';
 import { EngineV2 } from '../v2/engine-v2';
+import type { ClassroomApiSnapshot } from './api';
+import {
+  createDefaultApiDiscoveryService,
+  resolveClassroomApiRouteContext,
+  type ApiDiscoveryService,
+} from './api';
 
 // ============================================================================
 // V3 ENGINE — Extends V2 with API integration
@@ -63,9 +69,12 @@ export class EngineV3 implements CQDEngine {
    * V3 delegates to V2 for everything except API-enhanced discovery.
    */
   private v2: EngineV2;
+  private apiDiscovery: ApiDiscoveryService;
+  private latestApiSnapshot: ClassroomApiSnapshot | null = null;
 
   constructor() {
     this.v2 = new EngineV2();
+    this.apiDiscovery = createDefaultApiDiscoveryService();
   }
 
   // ========================================================================
@@ -74,6 +83,7 @@ export class EngineV3 implements CQDEngine {
 
   async init(viewKind: ViewKind, signal: AbortSignal): Promise<void> {
     await this.v2.init(viewKind, signal);
+    await this.refreshApiSnapshot(signal);
 
     // TODO (Phase 8): After V2 init, also query the Classroom API
     // for the course's assignments and materials. Compare the API's
@@ -89,6 +99,8 @@ export class EngineV3 implements CQDEngine {
 
   destroy(): void {
     this.v2.destroy();
+    this.apiDiscovery.clear();
+    this.latestApiSnapshot = null;
     console.log('[Engine V3] Destroyed');
   }
 
@@ -102,6 +114,7 @@ export class EngineV3 implements CQDEngine {
 
   fullScan(): void {
     this.v2.fullScan();
+    void this.refreshApiSnapshot();
 
     // TODO (Phase 8): After V2's DOM scan, cross-reference with
     // cached API data. If API shows files not in the DOM, create
@@ -126,6 +139,25 @@ export class EngineV3 implements CQDEngine {
 
   getDecisionTrace(postId: string): DecisionTrace | null {
     return this.v2.getDecisionTrace(postId);
+  }
+
+  getLatestApiSnapshot(): ClassroomApiSnapshot | null {
+    return this.latestApiSnapshot;
+  }
+
+  private async refreshApiSnapshot(signal?: AbortSignal): Promise<void> {
+    const context = resolveClassroomApiRouteContext(window.location.href);
+    if (!context) {
+      this.latestApiSnapshot = null;
+      return;
+    }
+
+    try {
+      this.latestApiSnapshot = await this.apiDiscovery.discover(context, { signal });
+    } catch (error) {
+      if (signal?.aborted) return;
+      console.warn('[Engine V3] API base discovery failed:', error);
+    }
   }
 
   // ========================================================================
