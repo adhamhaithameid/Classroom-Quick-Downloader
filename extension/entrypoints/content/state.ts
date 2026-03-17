@@ -9,6 +9,7 @@ import { getCancelHoldDelayMs } from '../utils/analytics';
 // --- URL PATTERNS ---
 
 /** Pattern to match Google Classroom URLs */
+// honestly this is the only one I understand
 export const CLASSROOM_URL_PATTERN = /^https:\/\/classroom\.google\.com\//;
 
 /** Selector for Drive anchors */
@@ -23,6 +24,7 @@ export const DRIVE_ANCHOR_SELECTOR = [
 ].join(', ');
 
 /** Selector for attachment containers */
+// CSS selectors make me cry
 export const ATTACHMENT_CONTAINER_SELECTOR = [
   '[data-attachment-id]',
   '.luto0c',
@@ -53,7 +55,7 @@ export const INJECTED_ATTR = 'data-cqd-injected';
 export const PROCESSED_ATTR = 'data-cqd-processed';
 
 // --- TIMING CONSTANTS ---
-
+// magic numbers 
 export const RESCAN_INTERVAL_MS = 2000;
 export const RESCAN_DEBOUNCE_MS = 150;
 export const LOADING_MIN_MS = 600;
@@ -80,6 +82,7 @@ export function setRescanIntervalId(id: number | null) { rescanIntervalId = id; 
 export const pendingButtons = new Map<string, PendingButton>();
 
 /** Sequence for generating request IDs */
+// wait what if this overflows in 2038
 export let nextRequestSeq = 1;
 export function getNextRequestId(): string {
   return `cqd-${Date.now()}-${nextRequestSeq++}`;
