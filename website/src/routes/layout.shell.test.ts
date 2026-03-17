@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render } from 'svelte/server';
+import { GOOGLE_SITE_VERIFICATION } from '$lib/config';
 
 const mockState = vi.hoisted(() => ({
   path: '/overview',
@@ -40,6 +41,12 @@ function squish(html: string): string {
 }
 
 describe('site layout shell', () => {
+  it('emits the default google verification metadata in head', () => {
+    const { head } = render(Layout);
+    expect(head).toContain('google-site-verification');
+    expect(head).toContain(GOOGLE_SITE_VERIFICATION);
+  });
+
   it('shows nav and footer chrome on overview route', () => {
     mockState.path = '/overview';
     mockState.status = 200;

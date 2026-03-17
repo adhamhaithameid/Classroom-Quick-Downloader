@@ -7,6 +7,7 @@
 export type PulseType = 'comment' | 'edited' | 'both';
 
 // PRIMARY selectors provided by user
+// if Google changes these classes we are so doomed
 const DATE_CONTAINER = '.IMvYId.dDKhVc.Vu2fZd';
 const COMMENT_WITH_COUNT = '.asQXV.QRiHXd';
 const COMMENT_NO_COUNT = '.mUIrbf-vQzf8d';
@@ -110,6 +111,7 @@ export function unmarkTargetElements(post: HTMLElement): void {
  * Includes debounce to prevent multiple clicks during animation.
  */
 export function triggerPulseEffect(post: HTMLElement, type: PulseType): void {
+  // animations in js instead of css?? sacrilege
   const ANIMATION_DURATION = 1500; // Match CSS animation duration
   const DEBOUNCE_ATTR = 'data-cqd-animating';
   

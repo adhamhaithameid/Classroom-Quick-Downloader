@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fetchUserChangelog } from './publicSite';
+import { WEBSITE_MANUAL_CHANGELOG } from '$lib/content/changelog.manual.generated';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -12,9 +13,13 @@ describe('public website API regressions', () => {
 
     const payload = await fetchUserChangelog();
     const versions = payload.entries.map((entry) => entry.version);
+    const expectedTopVersions = WEBSITE_MANUAL_CHANGELOG.entries
+      .map((entry) => String(entry?.version ?? '').replace(/^v/i, ''))
+      .filter((version) => version.length > 0)
+      .slice(0, 3);
 
     // Guard the visible top releases while allowing the full-history list to grow.
-    expect(versions.slice(0, 3)).toEqual(['1.5.0', '1.4.0', '1.3.9']);
+    expect(versions.slice(0, 3)).toEqual(expectedTopVersions);
 
     // Regression guard: manual list must stay sorted from newest to oldest.
     const toTuple = (version: string): [number, number, number] => {

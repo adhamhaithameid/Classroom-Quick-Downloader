@@ -146,7 +146,7 @@ Safe rollout:
 4. promote existing render guards to depend on classification once parity is
    proven.
 
-This avoids destabilizing the current `1.5.0` behavior.
+This avoids destabilizing the current `1.5.5` behavior.
 
 ## Immediate benefits
 
@@ -162,7 +162,7 @@ If implemented carefully, this would give us:
 
 This is not a reason to change the current user-visible behavior immediately.
 
-The current `1.5.0` behavior remains the baseline.
+The current `1.5.5` behavior remains the baseline.
 Attachment classification should be introduced as an internal explanation layer
 first, then used to simplify and harden the runtime later.
 

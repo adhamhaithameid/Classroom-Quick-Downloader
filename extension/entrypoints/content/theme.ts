@@ -14,6 +14,7 @@
 /**
  * Returns true if the page *content area* is visually dark.
  */
+// light mode users scare me
 export function isPageDark(): boolean {
   if (typeof document === 'undefined') return false;
 
@@ -89,6 +90,7 @@ function parseBrightness(rgbString: string): number {
   const b = parseInt(match[3], 10);
 
   // HSP equation is perceived brightness
+  // math is hard so I'll just trust this formula
   const brightness = Math.sqrt(
     0.299 * (r * r) +
     0.587 * (g * g) +

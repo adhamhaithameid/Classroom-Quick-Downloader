@@ -1,6 +1,6 @@
 # Extension Golden Behavior Matrix
 
-Last updated: 2026-03-10
+Last updated: 2026-03-17
 
 ## Purpose
 
@@ -11,7 +11,7 @@ It is not an architecture document. It is the contract for "do not break this."
 
 ## Baseline policy
 
-As of `1.5.0`, the current extension behavior is the product baseline.
+As of `1.5.5`, the current extension behavior is the product baseline.
 
 That means:
 

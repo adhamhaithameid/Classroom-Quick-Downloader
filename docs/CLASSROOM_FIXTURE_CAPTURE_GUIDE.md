@@ -1,6 +1,6 @@
 # Classroom Fixture Capture Guide
 
-Last updated: 2026-03-10
+Last updated: 2026-03-17
 
 ## Purpose
 
@@ -19,7 +19,7 @@ We capture new fixtures only when one of these is true:
 4. an existing regression test was not enough to explain a failure.
 
 If none of those happened, the current committed fixture set is enough and
-should be treated as the baseline safety net for `1.5.0`.
+should be treated as the baseline safety net for `1.5.5`.
 
 ## Safety rule
 

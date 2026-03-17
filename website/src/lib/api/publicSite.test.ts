@@ -10,6 +10,7 @@ import {
   submitUninstallFeedback,
   submitWebsiteEvents
 } from './publicSite';
+import { WEBSITE_MANUAL_CHANGELOG } from '$lib/content/changelog.manual.generated';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -322,9 +323,11 @@ describe('uninstall feedback API', () => {
 describe('user-facing content APIs', () => {
   it('loads user changelog from manual source-controlled data', async () => {
     const data = await fetchUserChangelog();
+    const latestManualVersion = String(WEBSITE_MANUAL_CHANGELOG.entries[0]?.version ?? '').replace(/^v/i, '');
     expect(data.ok).toBe(true);
     expect(data.entries.length).toBeGreaterThan(0);
-    expect(data.entries[0]?.version).toBe('1.5.0');
+    expect(latestManualVersion.length).toBeGreaterThan(0);
+    expect(data.entries[0]?.version).toBe(latestManualVersion);
   });
 
 });

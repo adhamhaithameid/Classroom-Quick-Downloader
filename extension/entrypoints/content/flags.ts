@@ -11,6 +11,7 @@ declare const chrome: any;
 
 export const ENABLE_KEY = 'extensionEnabled';
 
+// callbacks are so 2015 but whatever works
 type StateCallback = () => void;
 
 /**
@@ -104,6 +105,7 @@ export function createCommentBadge(post: HTMLElement, count: number): HTMLElemen
   iconDiv.style.backgroundSize = '18px 18px';
   iconDiv.style.backgroundRepeat = 'no-repeat';
   iconDiv.style.backgroundPosition = 'center';
+  // css filters are literally cheating
   iconDiv.style.filter = 'brightness(0) invert(1)'; // White icon
   
   // 2. Text Span (Shows count only, expands on hover)

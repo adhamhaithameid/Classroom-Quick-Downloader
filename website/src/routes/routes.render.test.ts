@@ -14,9 +14,10 @@ import InstallChromePage from './install/chrome/+page.svelte';
 import SecurityPage from './security/+page.svelte';
 import CompareClassfetchPage from './compare/classroom-quick-downloader-vs-classfetch/+page.svelte';
 import { privacyContent } from '$lib/content/privacy';
-import { SITE_URL } from '$lib/config';
+import { INDEXNOW_KEY, SITE_URL } from '$lib/config';
 import { GET as getRobotsTxt } from './robots.txt/+server';
 import { GET as getSitemapXml } from './sitemap.xml/+server';
+import { GET as getIndexNowKeyTxt } from './indexnow-key.txt/+server';
 
 function squish(html: string): string {
   return html.replace(/\s+/g, ' ').trim();
@@ -197,6 +198,20 @@ describe('route render smoke coverage', () => {
     expect(sitemapText).toContain(`<loc>${expectedBaseUrl}/faq</loc>`);
     expect(sitemapText).not.toContain('/uninstall');
     expect(sitemapText).not.toContain('/404');
+  });
+
+  it('renders indexnow key endpoint when key is configured', async () => {
+    const indexNow = await getIndexNowKeyTxt();
+    const indexNowText = await indexNow.text();
+
+    expect(indexNow.headers.get('content-type')).toContain('text/plain');
+    if (INDEXNOW_KEY) {
+      expect(indexNow.status).toBe(200);
+      expect(indexNowText.trim()).toBe(INDEXNOW_KEY);
+    } else {
+      expect(indexNow.status).toBe(404);
+      expect(indexNowText).toContain('not configured');
+    }
   });
 
 });

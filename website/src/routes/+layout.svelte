@@ -3,7 +3,7 @@
   import { base } from '$app/paths';
   import { page } from '$app/stores';
   import logo from '$lib/assets/cqd-logo.svg';
-  import { STORE_LINKS } from '$lib/config';
+  import { BING_SITE_VERIFICATION, GOOGLE_SITE_VERIFICATION, STORE_LINKS } from '$lib/config';
   import { browserDisplayName, detectBrowserFromNavigator, type BrowserKey } from '$lib/browser/detect';
   import { flushWebsiteEvents, initWebsiteEventsClient, trackWebsiteEvent } from '$lib/analytics/websiteEvents';
   import { initializeWebsiteSnapshotStore, websiteSnapshotStore } from '$lib/stores/websiteSnapshot';
@@ -134,10 +134,18 @@
 </script>
 
 <svelte:head>
-  <meta
-    name="google-site-verification"
-    content="ztz5RVR7CeToYxt4nB4AEJMFmdD0LhgLHEjgvGFII-4"
-  />
+  {#if GOOGLE_SITE_VERIFICATION}
+    <meta
+      name="google-site-verification"
+      content={GOOGLE_SITE_VERIFICATION}
+    />
+  {/if}
+  {#if BING_SITE_VERIFICATION}
+    <meta
+      name="msvalidate.01"
+      content={BING_SITE_VERIFICATION}
+    />
+  {/if}
 </svelte:head>
 
 <LoadingScreen />

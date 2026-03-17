@@ -61,6 +61,14 @@ interface RoutePattern {
 }
 
 const ROUTE_PATTERNS: RoutePattern[] = [
+  // === STUDENT WORK TEACHER BY-STATUS VIEW (MOST SPECIFIC TEACHER ROUTE) ===
+  // URL: /c/123456/a/789012/submissions/by-status/and-sort-name/all/all
+  {
+    pattern: /\/c\/[^/]+\/a\/[^/]+\/submissions\/by-status\/and-sort-name\/[^/]+\/[^/]+\/?$/,
+    viewKind: ViewKind.STUDENT_WORK_TEACHER,
+    description: 'Teacher by-status submissions board',
+  },
+
   // === STUDENT SUBMISSIONS (MOST SPECIFIC — has 3 path segments) ===
   // URL: /c/123456/a/789012/submissions/345678
   {

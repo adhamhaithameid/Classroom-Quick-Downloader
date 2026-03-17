@@ -1,9 +1,116 @@
 {
-  "generatedAt": 1773112898910,
+  "generatedAt": 1773730545440,
   "source": "manual",
   "entries": [
     {
-      "id": "manual-1.5.0-1",
+      "id": "manual-1.5.5-1",
+      "version": "1.5.5",
+      "title": "Release 1.5.5",
+      "summary": "A leaner packaging release focused on reducing extension size while preserving the same classroom behavior.",
+      "highlights": [
+        "Added tighter packaging checks for Student Work and core download modules.",
+        "Reduced bundled payload by trimming unused runtime paths and release artifacts.",
+        "Fixed extension package bloat that increased install and update cost on slower networks."
+      ],
+      "added": [
+        "Added tighter packaging checks for Student Work and core download modules."
+      ],
+      "changed": [
+        "Reduced bundled payload by trimming unused runtime paths and release artifacts."
+      ],
+      "fixed": [
+        "Fixed extension package bloat that increased install and update cost on slower networks."
+      ],
+      "releasedAtUtc": 1773730545435
+    },
+    {
+      "id": "manual-1.5.4-2",
+      "version": "1.5.4",
+      "title": "Release 1.5.4",
+      "summary": "A performance-focused release with two measurable speed upgrades in scan and download orchestration paths.",
+      "highlights": [
+        "Added lightweight scan throttling safeguards for busy Student Work pages.",
+        "Improved scan scheduling throughput for large submission boards.",
+        "Improved download state propagation throughput to reduce UI lag during multi-file runs.",
+        "Fixed repeated heavy-pass work that could slow down larger Classroom pages."
+      ],
+      "added": [
+        "Added lightweight scan throttling safeguards for busy Student Work pages."
+      ],
+      "changed": [
+        "Improved scan scheduling throughput for large submission boards.",
+        "Improved download state propagation throughput to reduce UI lag during multi-file runs."
+      ],
+      "fixed": [
+        "Fixed repeated heavy-pass work that could slow down larger Classroom pages."
+      ],
+      "releasedAtUtc": 1773644145435
+    },
+    {
+      "id": "manual-1.5.3-3",
+      "version": "1.5.3",
+      "title": "Release 1.5.3",
+      "summary": "Introduced a new detection layer for flags and files to keep ownership mapping stable across complex Classroom layouts.",
+      "highlights": [
+        "Added a dedicated layer that correlates file cards and flag ownership with stricter DOM boundaries.",
+        "Updated detection order so file identity and flag identity resolve from the same scoped card context.",
+        "Fixed edge cases where shared wrappers could cause mis-scoped file or flag decisions."
+      ],
+      "added": [
+        "Added a dedicated layer that correlates file cards and flag ownership with stricter DOM boundaries."
+      ],
+      "changed": [
+        "Updated detection order so file identity and flag identity resolve from the same scoped card context."
+      ],
+      "fixed": [
+        "Fixed edge cases where shared wrappers could cause mis-scoped file or flag decisions."
+      ],
+      "releasedAtUtc": 1773557745435
+    },
+    {
+      "id": "manual-1.5.2-4",
+      "version": "1.5.2",
+      "title": "Release 1.5.2",
+      "summary": "A focused stabilization release delivering bug fixes and stronger security hardening for production classrooms.",
+      "highlights": [
+        "Added stricter URL validation and safer resolver guardrails for indirect Student Work links.",
+        "Improved defensive checks around download state transitions and message-bridge handling.",
+        "Fixed download-state and mapping regressions that could impact reliability under mixed attachment sets."
+      ],
+      "added": [
+        "Added stricter URL validation and safer resolver guardrails for indirect Student Work links."
+      ],
+      "changed": [
+        "Improved defensive checks around download state transitions and message-bridge handling."
+      ],
+      "fixed": [
+        "Fixed download-state and mapping regressions that could impact reliability under mixed attachment sets."
+      ],
+      "releasedAtUtc": 1773471345435
+    },
+    {
+      "id": "manual-1.5.1-5",
+      "version": "1.5.1",
+      "title": "Release 1.5.1",
+      "summary": "Expanded real-world support for the Student Work tap so teachers can download attached files and media directly from submissions.",
+      "highlights": [
+        "Introduced support for Student Work tap downloads based on real user needs — big thanks to @Ahmed for the valuable feedback 🙌",
+        "Aligned Student Work button rendering and Download All wiring with the stable classroom download flow.",
+        "Fixed early Student Work gaps where some submissions were not reachable through the normal download UX."
+      ],
+      "added": [
+        "Introduced support for Student Work tap downloads based on real user needs — big thanks to @Ahmed for the valuable feedback 🙌"
+      ],
+      "changed": [
+        "Aligned Student Work button rendering and Download All wiring with the stable classroom download flow."
+      ],
+      "fixed": [
+        "Fixed early Student Work gaps where some submissions were not reachable through the normal download UX."
+      ],
+      "releasedAtUtc": 1773384945435
+    },
+    {
+      "id": "manual-1.5.0-6",
       "version": "1.5.0",
       "title": "Release 1.5.0",
       "summary": "This is the best and most reliable state the extension has reached so far. Download buttons, flag placement, and post detection are now much more accurate in real Google Classroom usage.",
@@ -31,10 +138,10 @@
         "Fixed duplicate or nested flag borders on some posts.",
         "Fixed download states that could stay stuck even after the browser finished the file."
       ],
-      "releasedAtUtc": 1773112898899
+      "releasedAtUtc": 1773298545435
     },
     {
-      "id": "manual-1.4.0-2",
+      "id": "manual-1.4.0-7",
       "version": "1.4.0",
       "title": "Release 1.4.0",
       "summary": "A major under-the-hood release that introduced the V2 engine foundation. It made the extension safer to improve without breaking the stable experience you already rely on.",
@@ -54,10 +161,10 @@
       "fixed": [
         "Fixed several fragile internal paths by giving the extension clearer runtime boundaries."
       ],
-      "releasedAtUtc": 1773026498899
+      "releasedAtUtc": 1773212145435
     },
     {
-      "id": "manual-1.3.9-3",
+      "id": "manual-1.3.9-8",
       "version": "1.3.9",
       "title": "Release 1.3.9",
       "summary": "Improved release consistency and user-facing clarity across the website and extension experiences.",
@@ -81,10 +188,10 @@
         "Fixed issues where changelog visibility could be inconsistent across surfaces.",
         "Fixed multiple reliability edge cases in update-state handling."
       ],
-      "releasedAtUtc": 1772940098899
+      "releasedAtUtc": 1773125745435
     },
     {
-      "id": "manual-1.3.8-4",
+      "id": "manual-1.3.8-9",
       "version": "1.3.8",
       "title": "Release 1.3.8",
       "summary": "Improved changelog reliability so users always receive updates, even when the version number stays the same.",
@@ -108,10 +215,10 @@
         "Fixed same-version publish cases where users could miss new changelog updates.",
         "Fixed stale version-pill and changelog content after changelog updates."
       ],
-      "releasedAtUtc": 1772853698899
+      "releasedAtUtc": 1773039345435
     },
     {
-      "id": "manual-1.3.7-5",
+      "id": "manual-1.3.7-10",
       "version": "1.3.7",
       "title": "Release 1.3.7",
       "summary": "Improved daily reliability and clearer release communication for normal users.",
@@ -135,10 +242,10 @@
         "Fixed cancelled-download accounting edge cases.",
         "Fixed intermittent long-run progress-state inconsistencies."
       ],
-      "releasedAtUtc": 1772767298899
+      "releasedAtUtc": 1772952945435
     },
     {
-      "id": "manual-1.3.6-6",
+      "id": "manual-1.3.6-11",
       "version": "1.3.6",
       "title": "Release 1.3.6",
       "summary": "Focused on stability and compatibility hardening for heavy classroom workloads.",
@@ -162,10 +269,10 @@
         "Fixed stuck-progress scenarios during long runs.",
         "Fixed dependency-path compatibility friction."
       ],
-      "releasedAtUtc": 1772680898899
+      "releasedAtUtc": 1772866545435
     },
     {
-      "id": "manual-1.3.0-7",
+      "id": "manual-1.3.0-12",
       "version": "1.3.0",
       "title": "Release 1.3.0",
       "summary": "Delivered major reliability, remote-config, and analytics improvements.",
@@ -189,10 +296,10 @@
         "Fixed remote-config application issues on key limits and timing.",
         "Fixed queue integrity mismatch handling to avoid data drops."
       ],
-      "releasedAtUtc": 1772594498899
+      "releasedAtUtc": 1772780145435
     },
     {
-      "id": "manual-1.2.7-8",
+      "id": "manual-1.2.7-13",
       "version": "1.2.7",
       "title": "Release 1.2.7",
       "summary": "Broad security and reliability hardening across extension behavior.",
@@ -216,10 +323,10 @@
         "Fixed multiple reliability edge cases found during hardening.",
         "Fixed several production stability regressions."
       ],
-      "releasedAtUtc": 1772508098899
+      "releasedAtUtc": 1772693745435
     },
     {
-      "id": "manual-1.2.3-9",
+      "id": "manual-1.2.3-14",
       "version": "1.2.3",
       "title": "Release 1.2.3",
       "summary": "Usability and telemetry consistency release.",
@@ -237,10 +344,10 @@
       "fixed": [
         "Fixed inconsistent telemetry fields in specific event paths."
       ],
-      "releasedAtUtc": 1772421698899
+      "releasedAtUtc": 1772607345435
     },
     {
-      "id": "manual-1.2.2-10",
+      "id": "manual-1.2.2-15",
       "version": "1.2.2",
       "title": "Release 1.2.2",
       "summary": "Cancel-flow polish release.",
@@ -258,10 +365,10 @@
       "fixed": [
         "Fixed inconsistent cleanup after cancellation."
       ],
-      "releasedAtUtc": 1772335298899
+      "releasedAtUtc": 1772520945435
     },
     {
-      "id": "manual-1.2.1-11",
+      "id": "manual-1.2.1-16",
       "version": "1.2.1",
       "title": "Release 1.2.1",
       "summary": "Unified cancel-system iteration release.",
@@ -279,10 +386,10 @@
       "fixed": [
         "Fixed slow cancel-state reflection edge cases."
       ],
-      "releasedAtUtc": 1772248898899
+      "releasedAtUtc": 1772434545435
     },
     {
-      "id": "manual-1.2.0-12",
+      "id": "manual-1.2.0-17",
       "version": "1.2.0",
       "title": "Release 1.2.0",
       "summary": "Cancel feature baseline release.",
@@ -300,10 +407,10 @@
       "fixed": [
         "Fixed flow limitations where in-flight operations could not be interrupted."
       ],
-      "releasedAtUtc": 1772162498899
+      "releasedAtUtc": 1772348145435
     },
     {
-      "id": "manual-1.1.10-13",
+      "id": "manual-1.1.10-18",
       "version": "1.1.10",
       "title": "Release 1.1.10",
       "summary": "Late 1.1 line reliability release.",
@@ -321,10 +428,10 @@
       "fixed": [
         "Fixed regressions discovered across prolonged usage sessions."
       ],
-      "releasedAtUtc": 1772076098899
+      "releasedAtUtc": 1772261745435
     },
     {
-      "id": "manual-1.1.5-14",
+      "id": "manual-1.1.5-19",
       "version": "1.1.5",
       "title": "Release 1.1.5",
       "summary": "Mid 1.1 quality and compatibility release.",
@@ -342,10 +449,10 @@
       "fixed": [
         "Fixed minor behavior mismatches in repeated task flows."
       ],
-      "releasedAtUtc": 1771989698899
+      "releasedAtUtc": 1772175345435
     },
     {
-      "id": "manual-1.1.1-15",
+      "id": "manual-1.1.1-20",
       "version": "1.1.1",
       "title": "Release 1.1.1",
       "summary": "Post-1.1 stabilization release.",
@@ -363,10 +470,10 @@
       "fixed": [
         "Fixed early 1.1 edge-case runtime failures."
       ],
-      "releasedAtUtc": 1771903298899
+      "releasedAtUtc": 1772088945435
     },
     {
-      "id": "manual-1.1.0-16",
+      "id": "manual-1.1.0-21",
       "version": "1.1.0",
       "title": "Release 1.1.0",
       "summary": "Feature and packaging expansion release.",
@@ -384,10 +491,10 @@
       "fixed": [
         "Fixed packaging and configuration mismatches."
       ],
-      "releasedAtUtc": 1771816898899
+      "releasedAtUtc": 1772002545435
     },
     {
-      "id": "manual-1.0.1-17",
+      "id": "manual-1.0.1-22",
       "version": "1.0.1",
       "title": "Release 1.0.1",
       "summary": "Post-launch stabilization release.",
@@ -405,10 +512,10 @@
       "fixed": [
         "Fixed first-wave regressions after 1.0.0 rollout."
       ],
-      "releasedAtUtc": 1771730498899
+      "releasedAtUtc": 1771916145435
     },
     {
-      "id": "manual-1.0.0-18",
+      "id": "manual-1.0.0-23",
       "version": "1.0.0",
       "title": "Release 1.0.0",
       "summary": "First stable production release.",
@@ -426,7 +533,7 @@
       "fixed": [
         "Fixed pre-stable blockers before public release."
       ],
-      "releasedAtUtc": 1771644098899
+      "releasedAtUtc": 1771829745435
     }
   ]
 }

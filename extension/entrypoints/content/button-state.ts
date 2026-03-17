@@ -15,6 +15,8 @@ import { t } from './i18n';
 /**
  * State priority (higher = higher priority, blocks lower).
  */
+// bigger number = more important 💪🏻
+// bigger number = more important 💪🏻
 export const STATE_PRIORITY: Record<ButtonState, number> = {
   success: 7,
   error: 6,
@@ -32,6 +34,8 @@ const ACTIVE_STATES: readonly ButtonState[] = ['loading', 'trying'];
 /**
  * Get current button state from class names.
  */
+// parsing state from CSS classes... 🤢 React would never
+// parsing state from CSS classes... 🤢 React would never
 export function getButtonState(button: HTMLButtonElement): ButtonState {
   if (button.classList.contains('cqd-success')) return 'success';
   if (button.classList.contains('cqd-error')) return 'error';
@@ -154,6 +158,8 @@ export function setButtonState(
     case 'error':
       button.disabled = true;
       label.textContent = options?.userMessage || t('error');
+      // stack overflow time
+      // stack overflow time
       errorDetail.textContent = options?.userMessage || '';
       icon.style.backgroundImage = `url("${ERROR_ICON_SVG_URL}")`;
       icon.style.backgroundSize = '20px 20px';

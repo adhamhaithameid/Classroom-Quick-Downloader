@@ -4,9 +4,121 @@
   "source": "manual",
   "entries": [
     {
-      "id": "manual-1.5.0-1",
+      "id": "manual-1.5.5-1",
+      "version": "1.5.5",
+      "date": "2026-03-17T06:55:45.439Z",
+      "summary": "A leaner packaging release focused on reducing extension size while preserving the same classroom behavior.",
+      "changes": [
+        "Summary: A leaner packaging release focused on reducing extension size while preserving the same classroom behavior.",
+        "Added: Added tighter packaging checks for Student Work and core download modules.",
+        "Changed: Reduced bundled payload by trimming unused runtime paths and release artifacts.",
+        "Fixed: Fixed extension package bloat that increased install and update cost on slower networks."
+      ],
+      "added": [
+        "Added tighter packaging checks for Student Work and core download modules."
+      ],
+      "changed": [
+        "Reduced bundled payload by trimming unused runtime paths and release artifacts."
+      ],
+      "fixed": [
+        "Fixed extension package bloat that increased install and update cost on slower networks."
+      ],
+      "isImportant": false
+    },
+    {
+      "id": "manual-1.5.4-2",
+      "version": "1.5.4",
+      "date": "2026-03-16T06:55:45.439Z",
+      "summary": "A performance-focused release with two measurable speed upgrades in scan and download orchestration paths.",
+      "changes": [
+        "Summary: A performance-focused release with two measurable speed upgrades in scan and download orchestration paths.",
+        "Added: Added lightweight scan throttling safeguards for busy Student Work pages.",
+        "Changed: Improved scan scheduling throughput for large submission boards.",
+        "Changed: Improved download state propagation throughput to reduce UI lag during multi-file runs.",
+        "Fixed: Fixed repeated heavy-pass work that could slow down larger Classroom pages."
+      ],
+      "added": [
+        "Added lightweight scan throttling safeguards for busy Student Work pages."
+      ],
+      "changed": [
+        "Improved scan scheduling throughput for large submission boards.",
+        "Improved download state propagation throughput to reduce UI lag during multi-file runs."
+      ],
+      "fixed": [
+        "Fixed repeated heavy-pass work that could slow down larger Classroom pages."
+      ],
+      "isImportant": false
+    },
+    {
+      "id": "manual-1.5.3-3",
+      "version": "1.5.3",
+      "date": "2026-03-15T06:55:45.439Z",
+      "summary": "Introduced a new detection layer for flags and files to keep ownership mapping stable across complex Classroom layouts.",
+      "changes": [
+        "Summary: Introduced a new detection layer for flags and files to keep ownership mapping stable across complex Classroom layouts.",
+        "Added: Added a dedicated layer that correlates file cards and flag ownership with stricter DOM boundaries.",
+        "Changed: Updated detection order so file identity and flag identity resolve from the same scoped card context.",
+        "Fixed: Fixed edge cases where shared wrappers could cause mis-scoped file or flag decisions."
+      ],
+      "added": [
+        "Added a dedicated layer that correlates file cards and flag ownership with stricter DOM boundaries."
+      ],
+      "changed": [
+        "Updated detection order so file identity and flag identity resolve from the same scoped card context."
+      ],
+      "fixed": [
+        "Fixed edge cases where shared wrappers could cause mis-scoped file or flag decisions."
+      ],
+      "isImportant": false
+    },
+    {
+      "id": "manual-1.5.2-4",
+      "version": "1.5.2",
+      "date": "2026-03-14T06:55:45.439Z",
+      "summary": "A focused stabilization release delivering bug fixes and stronger security hardening for production classrooms.",
+      "changes": [
+        "Summary: A focused stabilization release delivering bug fixes and stronger security hardening for production classrooms.",
+        "Added: Added stricter URL validation and safer resolver guardrails for indirect Student Work links.",
+        "Changed: Improved defensive checks around download state transitions and message-bridge handling.",
+        "Fixed: Fixed download-state and mapping regressions that could impact reliability under mixed attachment sets."
+      ],
+      "added": [
+        "Added stricter URL validation and safer resolver guardrails for indirect Student Work links."
+      ],
+      "changed": [
+        "Improved defensive checks around download state transitions and message-bridge handling."
+      ],
+      "fixed": [
+        "Fixed download-state and mapping regressions that could impact reliability under mixed attachment sets."
+      ],
+      "isImportant": false
+    },
+    {
+      "id": "manual-1.5.1-5",
+      "version": "1.5.1",
+      "date": "2026-03-13T06:55:45.439Z",
+      "summary": "Expanded real-world support for the Student Work tap so teachers can download attached files and media directly from submissions.",
+      "changes": [
+        "Summary: Expanded real-world support for the Student Work tap so teachers can download attached files and media directly from submissions.",
+        "Added: Introduced support for Student Work tap downloads based on real user needs — big thanks to @Ahmed for the valuable feedback 🙌",
+        "Changed: Aligned Student Work button rendering and Download All wiring with the stable classroom download flow.",
+        "Fixed: Fixed early Student Work gaps where some submissions were not reachable through the normal download UX."
+      ],
+      "added": [
+        "Introduced support for Student Work tap downloads based on real user needs — big thanks to @Ahmed for the valuable feedback 🙌"
+      ],
+      "changed": [
+        "Aligned Student Work button rendering and Download All wiring with the stable classroom download flow."
+      ],
+      "fixed": [
+        "Fixed early Student Work gaps where some submissions were not reachable through the normal download UX."
+      ],
+      "isImportant": false
+    },
+    {
+      "id": "manual-1.5.0-6",
       "version": "1.5.0",
-      "date": "2026-03-10T03:21:38.909Z",
+      "date": "2026-03-12T06:55:45.439Z",
       "summary": "This is the best and most reliable state the extension has reached so far. Download buttons, flag placement, and post detection are now much more accurate in real Google Classroom usage.",
       "changes": [
         "Summary: This is the best and most reliable state the extension has reached so far. Download buttons, flag placement, and post detection are now much more accurate in real Google Classroom usage.",
@@ -36,9 +148,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.4.0-2",
+      "id": "manual-1.4.0-7",
       "version": "1.4.0",
-      "date": "2026-03-09T03:21:38.909Z",
+      "date": "2026-03-11T06:55:45.439Z",
       "summary": "A major under-the-hood release that introduced the V2 engine foundation. It made the extension safer to improve without breaking the stable experience you already rely on.",
       "changes": [
         "Summary: A major under-the-hood release that introduced the V2 engine foundation. It made the extension safer to improve without breaking the stable experience you already rely on.",
@@ -60,9 +172,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.3.9-3",
+      "id": "manual-1.3.9-8",
       "version": "1.3.9",
-      "date": "2026-03-08T03:21:38.909Z",
+      "date": "2026-03-10T06:55:45.439Z",
       "summary": "Improved release consistency and user-facing clarity across the website and extension experiences.",
       "changes": [
         "Summary: Improved release consistency and user-facing clarity across the website and extension experiences.",
@@ -88,9 +200,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.3.8-4",
+      "id": "manual-1.3.8-9",
       "version": "1.3.8",
-      "date": "2026-03-07T03:21:38.909Z",
+      "date": "2026-03-09T06:55:45.439Z",
       "summary": "Improved changelog reliability so users always receive updates, even when the version number stays the same.",
       "changes": [
         "Summary: Improved changelog reliability so users always receive updates, even when the version number stays the same.",
@@ -116,9 +228,9 @@
       "isImportant": true
     },
     {
-      "id": "manual-1.3.7-5",
+      "id": "manual-1.3.7-10",
       "version": "1.3.7",
-      "date": "2026-03-06T03:21:38.909Z",
+      "date": "2026-03-08T06:55:45.439Z",
       "summary": "Improved daily reliability and clearer release communication for normal users.",
       "changes": [
         "Summary: Improved daily reliability and clearer release communication for normal users.",
@@ -144,9 +256,9 @@
       "isImportant": true
     },
     {
-      "id": "manual-1.3.6-6",
+      "id": "manual-1.3.6-11",
       "version": "1.3.6",
-      "date": "2026-03-05T03:21:38.909Z",
+      "date": "2026-03-07T06:55:45.439Z",
       "summary": "Focused on stability and compatibility hardening for heavy classroom workloads.",
       "changes": [
         "Summary: Focused on stability and compatibility hardening for heavy classroom workloads.",
@@ -172,9 +284,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.3.0-7",
+      "id": "manual-1.3.0-12",
       "version": "1.3.0",
-      "date": "2026-03-04T03:21:38.909Z",
+      "date": "2026-03-06T06:55:45.439Z",
       "summary": "Delivered major reliability, remote-config, and analytics improvements.",
       "changes": [
         "Summary: Delivered major reliability, remote-config, and analytics improvements.",
@@ -200,9 +312,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.2.7-8",
+      "id": "manual-1.2.7-13",
       "version": "1.2.7",
-      "date": "2026-03-03T03:21:38.909Z",
+      "date": "2026-03-05T06:55:45.439Z",
       "summary": "Broad security and reliability hardening across extension behavior.",
       "changes": [
         "Summary: Broad security and reliability hardening across extension behavior.",
@@ -228,9 +340,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.2.3-9",
+      "id": "manual-1.2.3-14",
       "version": "1.2.3",
-      "date": "2026-03-02T03:21:38.909Z",
+      "date": "2026-03-04T06:55:45.439Z",
       "summary": "Usability and telemetry consistency release.",
       "changes": [
         "Summary: Usability and telemetry consistency release.",
@@ -250,9 +362,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.2.2-10",
+      "id": "manual-1.2.2-15",
       "version": "1.2.2",
-      "date": "2026-03-01T03:21:38.909Z",
+      "date": "2026-03-03T06:55:45.439Z",
       "summary": "Cancel-flow polish release.",
       "changes": [
         "Summary: Cancel-flow polish release.",
@@ -272,9 +384,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.2.1-11",
+      "id": "manual-1.2.1-16",
       "version": "1.2.1",
-      "date": "2026-02-28T03:21:38.909Z",
+      "date": "2026-03-02T06:55:45.439Z",
       "summary": "Unified cancel-system iteration release.",
       "changes": [
         "Summary: Unified cancel-system iteration release.",
@@ -294,9 +406,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.2.0-12",
+      "id": "manual-1.2.0-17",
       "version": "1.2.0",
-      "date": "2026-02-27T03:21:38.909Z",
+      "date": "2026-03-01T06:55:45.439Z",
       "summary": "Cancel feature baseline release.",
       "changes": [
         "Summary: Cancel feature baseline release.",
@@ -316,9 +428,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.1.10-13",
+      "id": "manual-1.1.10-18",
       "version": "1.1.10",
-      "date": "2026-02-26T03:21:38.909Z",
+      "date": "2026-02-28T06:55:45.439Z",
       "summary": "Late 1.1 line reliability release.",
       "changes": [
         "Summary: Late 1.1 line reliability release.",
@@ -338,9 +450,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.1.5-14",
+      "id": "manual-1.1.5-19",
       "version": "1.1.5",
-      "date": "2026-02-25T03:21:38.909Z",
+      "date": "2026-02-27T06:55:45.439Z",
       "summary": "Mid 1.1 quality and compatibility release.",
       "changes": [
         "Summary: Mid 1.1 quality and compatibility release.",
@@ -360,9 +472,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.1.1-15",
+      "id": "manual-1.1.1-20",
       "version": "1.1.1",
-      "date": "2026-02-24T03:21:38.909Z",
+      "date": "2026-02-26T06:55:45.439Z",
       "summary": "Post-1.1 stabilization release.",
       "changes": [
         "Summary: Post-1.1 stabilization release.",
@@ -382,9 +494,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.1.0-16",
+      "id": "manual-1.1.0-21",
       "version": "1.1.0",
-      "date": "2026-02-23T03:21:38.909Z",
+      "date": "2026-02-25T06:55:45.439Z",
       "summary": "Feature and packaging expansion release.",
       "changes": [
         "Summary: Feature and packaging expansion release.",
@@ -404,9 +516,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.0.1-17",
+      "id": "manual-1.0.1-22",
       "version": "1.0.1",
-      "date": "2026-02-22T03:21:38.909Z",
+      "date": "2026-02-24T06:55:45.439Z",
       "summary": "Post-launch stabilization release.",
       "changes": [
         "Summary: Post-launch stabilization release.",
@@ -426,9 +538,9 @@
       "isImportant": false
     },
     {
-      "id": "manual-1.0.0-18",
+      "id": "manual-1.0.0-23",
       "version": "1.0.0",
-      "date": "2026-02-21T03:21:38.909Z",
+      "date": "2026-02-23T06:55:45.439Z",
       "summary": "First stable production release.",
       "changes": [
         "Summary: First stable production release.",
@@ -472,11 +584,11 @@
         "color": "default"
       }
     ],
-    "lastUpdated": 1773112898910
+    "lastUpdated": 1773730545440
   },
   "meta": {
     "applyMode": "manual",
-    "liveUpdatedAt": 1773112898910,
-    "contentChecksum": "manual-1773112898910"
+    "liveUpdatedAt": 1773730545440,
+    "contentChecksum": "manual-1773730545440"
   }
 }

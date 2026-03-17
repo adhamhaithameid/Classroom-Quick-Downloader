@@ -1,3 +1,54 @@
+## v1.5.5
+### Summary
+A leaner packaging release focused on reducing extension size while preserving the same classroom behavior.
+### Added
+- Added tighter packaging checks for Student Work and core download modules.
+### Changed
+- Reduced bundled payload by trimming unused runtime paths and release artifacts.
+### Fixed
+- Fixed extension package bloat that increased install and update cost on slower networks.
+
+## v1.5.4
+### Summary
+A performance-focused release with two measurable speed upgrades in scan and download orchestration paths.
+### Added
+- Added lightweight scan throttling safeguards for busy Student Work pages.
+### Changed
+- Improved scan scheduling throughput for large submission boards.
+- Improved download state propagation throughput to reduce UI lag during multi-file runs.
+### Fixed
+- Fixed repeated heavy-pass work that could slow down larger Classroom pages.
+
+## v1.5.3
+### Summary
+Introduced a new detection layer for flags and files to keep ownership mapping stable across complex Classroom layouts.
+### Added
+- Added a dedicated layer that correlates file cards and flag ownership with stricter DOM boundaries.
+### Changed
+- Updated detection order so file identity and flag identity resolve from the same scoped card context.
+### Fixed
+- Fixed edge cases where shared wrappers could cause mis-scoped file or flag decisions.
+
+## v1.5.2
+### Summary
+A focused stabilization release delivering bug fixes and stronger security hardening for production classrooms.
+### Added
+- Added stricter URL validation and safer resolver guardrails for indirect Student Work links.
+### Changed
+- Improved defensive checks around download state transitions and message-bridge handling.
+### Fixed
+- Fixed download-state and mapping regressions that could impact reliability under mixed attachment sets.
+
+## v1.5.1
+### Summary
+Expanded real-world support for the Student Work tap so teachers can download attached files and media directly from submissions.
+### Added
+- Introduced support for Student Work tap downloads based on real user needs — big thanks to @Ahmed for the valuable feedback 🙌
+### Changed
+- Aligned Student Work button rendering and Download All wiring with the stable classroom download flow.
+### Fixed
+- Fixed early Student Work gaps where some submissions were not reachable through the normal download UX.
+
 ## v1.5.0
 ### Summary
 This is the best and most reliable state the extension has reached so far. Download buttons, flag placement, and post detection are now much more accurate in real Google Classroom usage.

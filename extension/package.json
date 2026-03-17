@@ -3,7 +3,7 @@
   "displayName": "Classroom Quick Downloader",
   "description": "The fastest way to download all Google Classroom materials, assignments, and PDFs in one click.",
   "private": true,
-  "version": "1.5.0",
+  "version": "1.5.5",
   "type": "module",
   "packageManager": "pnpm@10.28.2",
   "scripts": {
@@ -42,7 +42,7 @@
   },
   "devDependencies": {
     "@testing-library/dom": "^10.4.1",
-    "@types/chrome": "^0.1.37",
+    "@types/chrome": "^0.1.38",
     "@types/jsdom": "^28.0.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
@@ -50,9 +50,9 @@
     "@wxt-dev/module-react": "^1.2.2",
     "fake-indexeddb": "^6.2.5",
     "happy-dom": "^20.8.4",
-    "jsdom": "^28.1.0",
+    "jsdom": "^29.0.0",
     "typescript": "^5.9.3",
     "vitest": "^4.1.0",
-    "wxt": "^0.20.19"
+    "wxt": "^0.20.20"
   }
 }
