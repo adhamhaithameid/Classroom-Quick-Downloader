@@ -58,6 +58,12 @@ describe('classifyRoute', () => {
     expect(classifyRoute('https://classroom.google.com/c/MTIz/a/item1/submissions')).toBe('student_work_teacher');
   });
 
+  it('classifies by-status submissions board as student_work_teacher', () => {
+    expect(
+      classifyRoute('https://classroom.google.com/c/MTIz/a/item1/submissions/by-status/and-sort-name/all/all'),
+    ).toBe('student_work_teacher');
+  });
+
   // Student submissions (individual)
   it('classifies /c/{id}/a/{item}/submissions/{studentId} as student_submissions', () => {
     expect(classifyRoute('https://classroom.google.com/c/MTIz/a/item1/submissions/student1')).toBe('student_submissions');

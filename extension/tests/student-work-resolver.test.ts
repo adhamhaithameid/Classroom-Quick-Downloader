@@ -1,5 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { STUDENT_WORK_CHANNEL_NAME } from '../src/student_work/constants';
+import { ViewKind } from '../src/engines/types';
+import { publishStudentWorkApiSnapshot } from '../src/engines/v3/api/runtime-bridge';
 import { resolveStudentWorkUrl } from '../src/student_work/resolver';
 
 class FakeBroadcastChannel {
@@ -53,6 +55,7 @@ describe('student_work/resolver', () => {
       'location',
       new URL('https://classroom.google.com/c/C/a/A/submissions/by-status/and-sort-name/all/all'),
     );
+    publishStudentWorkApiSnapshot(null);
     document.body.innerHTML = '';
   });
 
@@ -139,6 +142,110 @@ describe('student_work/resolver', () => {
     expect(result.ok).toBe(true);
     expect(result.url).toContain('id=IFRAME_RESOLVED');
     expect(result.source).toBe('anchor');
+  });
+
+  it('resolves from published API snapshot when hints match, without iframe', async () => {
+    publishStudentWorkApiSnapshot({
+      fetchedAt: Date.now(),
+      context: {
+        viewKind: ViewKind.STUDENT_WORK_TEACHER,
+        courseId: 'COURSE_1',
+        courseWorkId: 'WORK_1',
+        authUser: null,
+        studentSubmissionId: null,
+      },
+      submissions: [
+        {
+          id: 'SUB_1',
+          attachments: [
+            {
+              id: 'FILE_IMAGE_1',
+              title: 'screenshot.png',
+              downloadUrl: 'https://drive.google.com/uc?export=download&id=FILE_IMAGE_1',
+              source: 'driveFile',
+            },
+            {
+              id: 'FILE_JSON_3',
+              title: 'payload.json',
+              downloadUrl: 'https://drive.google.com/uc?export=download&id=FILE_JSON_3',
+              source: 'driveFile',
+            },
+          ],
+        },
+      ],
+    });
+
+    const appendSpy = vi.spyOn(document.documentElement, 'appendChild');
+
+    const result = await resolveStudentWorkUrl(
+      'https://classroom.google.com/g/tg/a/b/c?cqd_sw_hint_name=screenshot.png&cqd_sw_hint_ext=png',
+      { stageTimeoutMs: 40 },
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.url).toContain('id=FILE_IMAGE_1');
+    expect(result.source).toBe('api_snapshot');
+    expect(appendSpy).not.toHaveBeenCalled();
+  });
+
+  it('falls back to iframe when API snapshot is ambiguous with no hints', async () => {
+    publishStudentWorkApiSnapshot({
+      fetchedAt: Date.now(),
+      context: {
+        viewKind: ViewKind.STUDENT_WORK_TEACHER,
+        courseId: 'COURSE_2',
+        courseWorkId: 'WORK_2',
+        authUser: null,
+        studentSubmissionId: null,
+      },
+      submissions: [
+        {
+          id: 'SUB_1',
+          attachments: [
+            {
+              id: 'FILE_1',
+              title: 'first.png',
+              downloadUrl: 'https://drive.google.com/uc?export=download&id=FILE_1',
+              source: 'driveFile',
+            },
+            {
+              id: 'FILE_2',
+              title: 'second.mp4',
+              downloadUrl: 'https://drive.google.com/uc?export=download&id=FILE_2',
+              source: 'driveFile',
+            },
+          ],
+        },
+      ],
+    });
+
+    const appendSpy = vi.spyOn(document.documentElement, 'appendChild');
+    appendSpy.mockImplementation((node: Node) => {
+      if (!(node instanceof HTMLIFrameElement)) return node;
+      const iframeUrl = new URL(node.src);
+      const requestId = iframeUrl.searchParams.get('cqd_sw_req');
+      if (!requestId) return node;
+      setTimeout(() => {
+        publishResolveMessage({
+          type: 'CQD_SW_RESOLVE_RESULT',
+          requestId,
+          ok: true,
+          resolvedUrl: 'https://drive.google.com/uc?export=download&id=IFRAME_FALLBACK_2',
+          source: 'anchor',
+        });
+      }, 5);
+      return node;
+    });
+
+    const result = await resolveStudentWorkUrl(
+      'https://classroom.google.com/g/tg/a/b/c',
+      { stageTimeoutMs: 60 },
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.url).toContain('id=IFRAME_FALLBACK_2');
+    expect(result.source).toBe('anchor');
+    expect(appendSpy).toHaveBeenCalled();
   });
 
   it('adds authuser hint to iframe-resolved Drive URL when missing', async () => {

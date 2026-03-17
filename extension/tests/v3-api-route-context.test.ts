@@ -12,6 +12,7 @@ describe('v3/api/route-context', () => {
     expect(context?.courseId).toBe('COURSE_1');
     expect(context?.courseWorkId).toBe('WORK_1');
     expect(context?.studentSubmissionId).toBeNull();
+    expect(context?.viewKind).toBe(ViewKind.STUDENT_WORK_TEACHER);
   });
 
   it('parses individual student submission route context', () => {
