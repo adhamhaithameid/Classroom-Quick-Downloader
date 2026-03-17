@@ -1,18 +1,18 @@
 # Extension Hardening Follow-Up Board
 
-Last updated: 2026-03-10
+Last updated: 2026-03-17
 Branch: `try/extension-hardening-followup`
 Target PR base: `Not_Stable`
 
 ## Purpose
 
-This board defines the next implementation slice after the current `1.5.0` stabilization work.
+This board defines the next implementation slice after the current `1.5.5` stabilization work.
 
 The extension is already in a strong state. Buttons feel correct, flags feel correct, and the main user flow works well. Because of that, the goal of this follow-up is not to rewrite the product for the sake of refactoring. The goal is to protect what already works, harden the remaining weak areas, and prepare future engine work without destabilizing the current line.
 
 ## Why this PR exists
 
-The open `Not_Stable -> main` PR is already carrying the `1.5.0` stabilization work. The safest next step is to branch from that line and keep the remaining hardening work in a dedicated follow-up PR instead of mixing it into the current release candidate.
+The open `Not_Stable -> main` PR is already carrying the `1.5.5` stabilization work. The safest next step is to branch from that line and keep the remaining hardening work in a dedicated follow-up PR instead of mixing it into the current release candidate.
 
 This follow-up branch exists to do three things:
 
@@ -23,7 +23,7 @@ This follow-up branch exists to do three things:
 ## Issue map
 
 ### Protect the current good state
-- #396 Freeze 1.5.0 Classroom golden fixtures and regression matrix
+- #396 Freeze 1.5.5 Classroom golden fixtures and regression matrix
 - #399 Build a per-post and per-file decision trace for extension debugging
 
 ### Smarter and safer download detection
@@ -106,14 +106,14 @@ Expected effect:
 This branch should not:
 - rewrite the entire extension just because the architecture can be cleaner,
 - ship API permissions early,
-- destabilize the current `1.5.0` button or flag behavior,
+- destabilize the current `1.5.5` button or flag behavior,
 - reopen already-solved placement problems without real evidence.
 
 ## Release intent
 
-This branch is intended to feed the work that comes after the current `1.5.0` stabilization line.
+This branch is intended to feed the work that comes after the current `1.5.5` stabilization line.
 
-- `1.5.0` remains the strong DOM-first milestone.
+- `1.5.5` remains the strong DOM-first milestone.
 - `1.6.0` remains reserved for real API-assisted work, if and only if that work proves necessary.
 
 ## Validation expectations

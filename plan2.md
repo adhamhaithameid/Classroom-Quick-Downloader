@@ -17,7 +17,7 @@ The goal is to answer three questions clearly:
 
 Use this version mapping going forward:
 
-- `1.5.0` = the big DOM-first engine milestone and current "strong stable" line.
+- `1.5.5` = the big DOM-first engine milestone and current "strong stable" line.
 - `1.6.0` = any true API-assisted engine milestone.
 
 This means:
@@ -42,7 +42,7 @@ A lot of this plan is now about **protecting what works**, **documenting why it 
 
 ## Operating Rule For The Current Release Line
 
-For the current `1.5.0` line, use this rule:
+For the current `1.5.5` line, use this rule:
 
 1. treat the current runtime behavior as the product baseline,
 2. protect that baseline with fixtures and regression tests,
@@ -60,7 +60,7 @@ Completed in the current hardening pass:
 3. extension-only regression, fuzz, stress, and visual suites were added,
 4. CI now runs the extension golden suites explicitly,
 5. dedicated testing and fixture-capture docs were added,
-6. the current `1.5.0` behavior is now the documented product baseline,
+6. the current `1.5.5` behavior is now the documented product baseline,
 7. the rule is now explicit: add new fixtures only when Classroom changes or a real bug reveals a missing shape.
 
 What still remains from the larger engine plan:
@@ -456,7 +456,7 @@ Can this be skipped for now:
 
 If you want the most practical order, do this:
 
-1. preserve the current `1.5.0` baseline,
+1. preserve the current `1.5.5` baseline,
 2. add first-class attachment classification,
 3. close Student Work only if it matters to your usage,
 4. finish under-the-hood V2 consolidation only if more core work is still planned,
