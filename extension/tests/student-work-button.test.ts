@@ -6,11 +6,15 @@ function setupModule() {
   const handleSingleDownloadClick = vi.fn().mockResolvedValue(undefined);
   const handleCancelClick = vi.fn().mockResolvedValue(undefined);
   const showErrorState = vi.fn().mockResolvedValue(undefined);
+  const ensureMinLoading = vi.fn().mockResolvedValue(undefined);
+  const waitForSuccessReset = vi.fn().mockResolvedValue(undefined);
 
   vi.doMock('../entrypoints/content/download-handler', () => ({
     handleSingleDownloadClick,
     handleCancelClick,
     showErrorState,
+    ensureMinLoading,
+    waitForSuccessReset,
   }));
 
   vi.doMock('../entrypoints/content/i18n', () => ({
@@ -25,11 +29,14 @@ function setupModule() {
     handleSingleDownloadClick,
     handleCancelClick,
     showErrorState,
+    ensureMinLoading,
+    waitForSuccessReset,
   };
 }
 
 describe('student_work/button', () => {
   beforeEach(() => {
+    vi.unstubAllGlobals();
     vi.restoreAllMocks();
     document.body.innerHTML = '';
   });
@@ -219,5 +226,76 @@ describe('student_work/button', () => {
     await Promise.resolve();
 
     expect(mocks.handleSingleDownloadClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('passes resolver hint params for classroom Student Work links', async () => {
+    setupModule();
+    const { createStudentWorkButton } = await import('../src/student_work/button');
+    const resolver = vi.fn(async () => ({ ok: false, reason: 'resolver_timeout' as const }));
+
+    const button = createStudentWorkButton(
+      'https://classroom.google.com/g/tg/a/b/c',
+      { name: 'screenshot.png', ext: 'png', kind: 'other' },
+      { resolve: resolver },
+    );
+    document.body.appendChild(button);
+
+    button.click();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(resolver).toHaveBeenCalledTimes(1);
+    const hintedUrl = String((resolver.mock.calls as any[][])[0]?.[0] ?? '');
+    expect(hintedUrl).toContain('cqd_sw_hint_name=screenshot.png');
+    expect(hintedUrl).toContain('cqd_sw_hint_ext=png');
+  });
+
+  it('handles background success status in Student Work bundle listener', async () => {
+    const mocks = setupModule();
+    const listeners: Array<(message: any, sender: any, sendResponse: any) => void> = [];
+    vi.stubGlobal('chrome', {
+      runtime: {
+        onMessage: {
+          addListener: (listener: (message: any, sender: any, sendResponse: any) => void) => {
+            listeners.push(listener);
+          },
+        },
+      },
+    });
+
+    const { pendingButtons } = await import('../entrypoints/content/state');
+    const { setButtonState } = await import('../entrypoints/content/button-state');
+    const { createStudentWorkButton } = await import('../src/student_work/button');
+
+    const button = createStudentWorkButton(
+      'https://classroom.google.com/g/tg/a/b/c',
+      { name: 'File', ext: 'pdf', kind: 'other' },
+      {
+        resolve: async () => ({ ok: true, url: 'https://drive.google.com/uc?export=download&id=SW_FILE', reason: 'resolved' }),
+      },
+    );
+    document.body.appendChild(button);
+
+    const requestId = 'req-student-work-status-1';
+    pendingButtons.set(requestId, {
+      button,
+      requestId,
+      fileMeta: { name: 'File', ext: 'pdf', kind: 'other' },
+      startedAt: Date.now() - 1000,
+    });
+    setButtonState(button, 'loading');
+
+    listeners.forEach((listener) => listener(
+      { type: 'CQD_DOWNLOAD_STATUS', requestId, status: 'success' },
+      null,
+      () => {},
+    ));
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(pendingButtons.has(requestId)).toBe(false);
+    expect(mocks.ensureMinLoading).toHaveBeenCalled();
+    expect(mocks.waitForSuccessReset).toHaveBeenCalled();
   });
 });

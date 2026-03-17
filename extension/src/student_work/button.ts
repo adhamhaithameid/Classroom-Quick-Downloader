@@ -2,14 +2,20 @@
 
 import type { FileMeta } from '../../entrypoints/content/types';
 import { getButtonState, setButtonState } from '../../entrypoints/content/button-state';
+import { setPillProgress } from '../../entrypoints/content/button-state';
 import {
   handleCancelClick,
   handleSingleDownloadClick,
+  ensureMinLoading,
   showErrorState,
+  waitForSuccessReset,
 } from '../../entrypoints/content/download-handler';
 import { CANCEL_ICON_SVG_URL } from '../../entrypoints/content/icons';
 import { t } from '../../entrypoints/content/i18n';
 import { isPageDark } from '../../entrypoints/content/theme';
+import { pendingButtons } from '../../entrypoints/content/state';
+import { isStudentWorkAttachmentUrl } from './url-classifier';
+import { STUDENT_WORK_HINT_EXT_PARAM, STUDENT_WORK_HINT_NAME_PARAM } from './constants';
 import {
   resolveStudentWorkUrl,
   type ResolveStudentWorkResult,
@@ -22,6 +28,7 @@ export interface StudentWorkButtonOptions {
 const resolveControllers = new WeakMap<HTMLButtonElement, AbortController>();
 const downloadWatchdogTimers = new WeakMap<HTMLButtonElement, number>();
 const STUDENT_WORK_DOWNLOAD_WATCHDOG_MS = 45_000;
+let statusBridgeSetup = false;
 
 function resolveMessageFromReason(reason: string): string {
   if (reason.includes('resolver_timeout')) {
@@ -41,6 +48,90 @@ function withStudentWorkRequestNonce(rawUrl: string): string {
   } catch {
     return rawUrl;
   }
+}
+
+function withStudentWorkResolverHints(rawUrl: string, fileMeta: FileMeta): string {
+  try {
+    const parsed = new URL(rawUrl, window.location.href);
+    if (!isStudentWorkAttachmentUrl(parsed.toString())) return parsed.toString();
+    const hintName = (fileMeta.name || '').trim();
+    const hintExt = (fileMeta.ext || '').trim();
+    if (hintName.length > 0) {
+      parsed.searchParams.set(STUDENT_WORK_HINT_NAME_PARAM, hintName);
+    }
+    if (hintExt.length > 0) {
+      parsed.searchParams.set(STUDENT_WORK_HINT_EXT_PARAM, hintExt);
+    }
+    return parsed.toString();
+  } catch {
+    return rawUrl;
+  }
+}
+
+function ensureStudentWorkStatusBridge(): void {
+  if (statusBridgeSetup) return;
+  if (typeof chrome === 'undefined' || !chrome.runtime?.onMessage) return;
+  statusBridgeSetup = true;
+
+  chrome.runtime.onMessage.addListener((message: any) => {
+    if (!message || message.type !== 'CQD_DOWNLOAD_STATUS') return;
+    const requestId = typeof message.requestId === 'string' ? message.requestId : '';
+    if (!requestId) return;
+
+    const pending = pendingButtons.get(requestId);
+    if (!pending) return;
+
+    const { button, startedAt } = pending;
+
+    void (async () => {
+      await ensureMinLoading(startedAt);
+
+      const status = message.status as string | undefined;
+      const userMessage = message.userMessage as string | undefined;
+      const errorCode = message.errorCode as string | undefined;
+
+      if (status === 'trying') {
+        setButtonState(button, 'trying', { userMessage });
+        return;
+      }
+
+      if (status === 'success' || status === 'complete') {
+        pendingButtons.delete(requestId);
+        try {
+          delete (button.dataset as any).cqdRequestId;
+          (button.dataset as any).cqdAllDone = 'true';
+        } catch {
+          // Ignore dataset cleanup errors.
+        }
+        setPillProgress(button, 1);
+        setButtonState(button, 'success');
+        await waitForSuccessReset(button);
+        return;
+      }
+
+      if (status === 'error' || status === 'interrupted' || status === 'blocked_html') {
+        if ((status === 'interrupted' || status === 'error') && button.classList.contains('cqd-cancelled')) {
+          pendingButtons.delete(requestId);
+          return;
+        }
+
+        pendingButtons.delete(requestId);
+        try {
+          delete (button.dataset as any).cqdRequestId;
+        } catch {
+          // Ignore dataset cleanup errors.
+        }
+
+        if (errorCode === 'AUTH_CHECK') {
+          await showErrorState(button, userMessage);
+          return;
+        }
+
+        setPillProgress(button, 0);
+        await showErrorState(button, userMessage);
+      }
+    })();
+  });
 }
 
 function clearDownloadWatchdog(button: HTMLButtonElement): void {
@@ -141,6 +232,7 @@ export function createStudentWorkButton(
   fileMeta: FileMeta,
   options: StudentWorkButtonOptions = {},
 ): HTMLButtonElement {
+  ensureStudentWorkStatusBridge();
   const resolver = options.resolve ?? ((rawUrl: string, signal?: AbortSignal) =>
     resolveStudentWorkUrl(rawUrl, { signal }));
 
@@ -183,7 +275,7 @@ export function createStudentWorkButton(
 
     let resolved: ResolveStudentWorkResult;
     try {
-      resolved = await resolver(sourceUrl, controller.signal);
+      resolved = await resolver(withStudentWorkResolverHints(sourceUrl, fileMeta), controller.signal);
     } finally {
       if (resolveControllers.get(button) === controller) {
         resolveControllers.delete(button);
