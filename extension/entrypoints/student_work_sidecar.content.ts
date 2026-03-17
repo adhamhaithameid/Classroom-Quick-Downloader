@@ -222,7 +222,9 @@ function cleanupStudentWorkFlags(root: ParentNode = document): void {
 }
 
 function cleanupSidecarArtifacts(root: ParentNode = document): void {
-  const sidecarButtons = root.querySelectorAll<HTMLButtonElement>('.cqd-download-btn[data-cqd-sw="true"]');
+  const sidecarButtons = root.querySelectorAll<HTMLButtonElement>(
+    '.cqd-download-btn[data-cqd-sw="true"]:not([data-cqd-sw-bs="true"])',
+  );
   sidecarButtons.forEach((button) => button.remove());
 
   const processedMarkers = root.querySelectorAll<HTMLElement>(`[${SIDE_CAR_ATTR}="true"]`);

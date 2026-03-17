@@ -246,13 +246,15 @@ describe('student_work_sidecar content script', () => {
       <div data-stream-item-id="s1">
         <a data-cqd-sw-processed="true" href="https://classroom.google.com/g/tg/c/a/s?id=FILE123">Attachment</a>
         <button class="cqd-download-btn" data-cqd-sw="true"></button>
+        <button class="cqd-download-btn" data-cqd-sw="true" data-cqd-sw-bs="true"></button>
       </div>
     `;
 
     mod.scanStudentWorkLinks(document);
 
     expect(createStudentWorkButton).not.toHaveBeenCalled();
-    expect(document.querySelectorAll('.cqd-download-btn[data-cqd-sw="true"]')).toHaveLength(0);
+    expect(document.querySelectorAll('.cqd-download-btn[data-cqd-sw="true"]:not([data-cqd-sw-bs="true"])')).toHaveLength(0);
+    expect(document.querySelectorAll('.cqd-download-btn[data-cqd-sw="true"][data-cqd-sw-bs="true"]')).toHaveLength(1);
     expect(document.querySelector('[data-cqd-sw-processed="true"]')).toBeNull();
     expect(document.querySelector('.cqd-overlay-container')).toBeNull();
     const post = document.querySelector<HTMLElement>('#post');
