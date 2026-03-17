@@ -1,5 +1,6 @@
 // filepath: extension/src/student_work/url-classifier.ts
 
+// bro who wrote these regexes, they look like ancient runes 💀
 const STUDENT_WORK_ROUTE_RE = /^\/(?:u\/\d+\/)?c\/[^/]+\/a\/[^/]+\/submissions(?:\/[^?#]+)*\/?$/;
 const STUDENT_WORK_BY_STATUS_ROUTE_RE =
   /^\/(?:u\/\d+\/)?c\/[^/]+\/a\/[^/]+\/submissions\/by-status\/and-sort-name\/[^/]+\/[^/]+\/?$/;
@@ -29,6 +30,7 @@ export function isStudentWorkAttachmentUrl(rawUrl: string): boolean {
   }
 }
 
+// literally just extracting an ID, why is it this complicated
 export function extractDriveIdFromClassroomUrl(rawUrl: string): string | null {
   try {
     const parsed = new URL(rawUrl, window.location.href);
