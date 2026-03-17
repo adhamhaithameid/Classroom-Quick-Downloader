@@ -1,16 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import { fetchChangelog } from './changelog';
+import { WEBSITE_MANUAL_CHANGELOG } from '$lib/content/changelog.manual.generated';
 
 describe('fetchChangelog (manual source)', () => {
   it('returns manual changelog payload with stable schema', async () => {
     const data = await fetchChangelog();
+    const latestManual = WEBSITE_MANUAL_CHANGELOG.entries[0];
+    const latestManualVersion = String(latestManual?.version ?? '').replace(/^v/i, '');
+    const latestManualId = String(latestManual?.id ?? '');
 
     expect(data.schemaVersion).toBe('1');
     expect(data.ok).toBe(true);
     expect(Array.isArray(data.entries)).toBe(true);
     expect(data.entries.length).toBeGreaterThan(0);
-    expect(data.entries[0]?.version).toBe('1.5.0');
-    expect(data.entries[0]?.id).toBe('manual-1.5.0-1');
+    expect(latestManualVersion.length).toBeGreaterThan(0);
+    expect(latestManualId.length).toBeGreaterThan(0);
+    expect(data.entries[0]?.version).toBe(latestManualVersion);
+    expect(data.entries[0]?.id).toBe(latestManualId);
     expect(data.entries.some((entry) => entry.version === '1.0.0')).toBe(true);
   });
 

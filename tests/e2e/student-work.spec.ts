@@ -52,8 +52,28 @@ function resolverHtml(driveLink: string): string {
 </html>`;
 }
 
+function splitPathSegments(pathname: string): string[] {
+  return pathname.split('/').filter((segment) => segment.length > 0);
+}
+
+function stripAuthUserPrefix(pathname: string): string[] | null {
+  const segments = splitPathSegments(pathname);
+  if (segments[0] !== 'u') return segments;
+  const authUser = segments[1];
+  if (!authUser || !/^\d+$/.test(authUser)) return null;
+  return segments.slice(2);
+}
+
 function isSubmissionsPath(pathname: string): boolean {
-  return /^\/(?:u\/\d+\/)?c\/[^/]+\/a\/[^/]+\/submissions(?:\/[^?#]+)*\/?$/.test(pathname);
+  const segments = stripAuthUserPrefix(pathname);
+  if (!segments || segments.length < 5) return false;
+  return (
+    segments[0] === 'c' &&
+    segments[1].length > 0 &&
+    segments[2] === 'a' &&
+    segments[3].length > 0 &&
+    segments[4] === 'submissions'
+  );
 }
 
 function isStudentWorkViewerPath(pathname: string): boolean {

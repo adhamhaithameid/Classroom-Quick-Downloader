@@ -85,7 +85,57 @@ Added `escapeHtml(...)` and applied escaping for dynamic values rendered inside 
 - Mapping correctness protections: **ready**
 - Popup behavior removed from resolver path: **ready**
 - Resolver trust-boundary hardening: **ready**
+- Regex route matching hardened against CodeQL ReDoS concern: **ready**
+- Website changelog tests decoupled from stale hardcoded release numbers: **ready**
+- Root patch mapping consistency (`eslint@10.0.3`) restored: **ready**
+- GitHub workflow Node setup moved to `actions/setup-node@v5` + Node 22: **ready**
 
 ## Suggested Next Security Task
 
 Add a per-request resolver nonce signature check on relay payloads as a defense-in-depth layer, even within extension-authenticated channels.
+
+## Rescan Addendum (2026-03-17)
+
+### Fixes Applied In This Pass
+
+1. **CodeQL regex hardening (High)**
+   - Replaced Student Work submissions route regex matching with deterministic path-segment parsing in:
+     - `extension/src/student_work/url-classifier.ts`
+     - `tests/e2e/student-work.spec.ts` helper matcher
+2. **Website test stability (Medium)**
+   - Removed brittle top-version assertions (`1.5.0`) and switched to generated manual changelog source-of-truth in:
+     - `website/src/lib/api/changelog.test.ts`
+     - `website/src/lib/api/publicSite.test.ts`
+     - `website/src/lib/api/publicSite.integration.test.ts`
+     - `website/src/lib/api/publicSite.acceptance.test.ts`
+     - `website/src/lib/api/publicSite.regression.test.ts`
+3. **Patch mapping consistency (Low)**
+   - Updated root `package.json` patched dependency mapping to:
+     - `eslint@10.0.3 -> patches/eslint@10.0.3.patch`
+   - Synced lockfile via `pnpm install --no-frozen-lockfile`.
+4. **Workflow deprecation hygiene (Low)**
+   - Updated workflow Node setup from `actions/setup-node@v4` to `@v5` and Node runtime from `20` to `22` across workflow files.
+
+### Verification Run Results
+
+- `pnpm -C extension run compile` ✅
+- `pnpm -C extension run test` ✅ (3236/3236)
+- `pnpm -C extension audit --prod` ✅
+- `pnpm -C website run check` ✅
+- `pnpm -C website run test` ✅ (969/969)
+- `pnpm -C website run build` ✅
+- `pnpm -C website audit --prod` ✅
+- `pnpm -C cloudflare-worker run validate` ✅
+- `pnpm -C cloudflare-worker run test` ✅ (934/934)
+- `pnpm -C cloudflare-worker audit --prod` ✅
+- `pnpm -C oracle-backend run validate` ✅
+- `pnpm -C oracle-backend run test` ✅
+- `pnpm -C oracle-backend audit --prod` ✅
+- `pnpm run scan:security` ✅ (`gosec` issues: 0, `govulncheck`: no vulnerabilities)
+- `pnpm exec playwright test tests/e2e/student-work.spec.ts tests/e2e/student-work-by-status.spec.ts --project=extension-chromium` ✅ (10/10)
+
+### CI/CD Watch Snapshot
+
+- Current PR checks still show historical failures from previous head SHA.
+- No workflows are currently in progress.
+- A fresh push is required to trigger reruns with the fixes above.

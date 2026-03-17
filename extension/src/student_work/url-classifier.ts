@@ -1,24 +1,51 @@
 // filepath: extension/src/student_work/url-classifier.ts
 
-// bro who wrote these regexes, they look like ancient runes 💀
-const STUDENT_WORK_ROUTE_RE = /^\/(?:u\/\d+\/)?c\/[^/]+\/a\/[^/]+\/submissions(?:\/[^?#]+)*\/?$/;
-const STUDENT_WORK_BY_STATUS_ROUTE_RE =
-  /^\/(?:u\/\d+\/)?c\/[^/]+\/a\/[^/]+\/submissions\/by-status\/and-sort-name\/[^/]+\/[^/]+\/?$/;
-const STUDENT_WORK_VIEWER_RE = /^\/(?:u\/\d+\/)?g\/tg\//;
-const AUTHUSER_PATH_RE = /^\/u\/(\d+)(?:\/|$)/;
+const AUTHUSER_SEGMENT_RE = /^\d+$/;
 
 const DRIVE_ID_PARAM_KEYS = ['id', 'resourceId', 'fileId'] as const;
 
+function splitPathSegments(pathname: string): string[] {
+  return pathname.split('/').filter((segment) => segment.length > 0);
+}
+
+function stripAuthUserPrefix(pathname: string): string[] | null {
+  const segments = splitPathSegments(pathname);
+  if (segments[0] !== 'u') return segments;
+  const authUser = segments[1];
+  if (!authUser || !AUTHUSER_SEGMENT_RE.test(authUser)) return null;
+  return segments.slice(2);
+}
+
+function hasStudentWorkBasePath(segments: string[]): boolean {
+  if (segments.length < 5) return false;
+  if (segments[0] !== 'c') return false;
+  if (segments[2] !== 'a') return false;
+  if (segments[4] !== 'submissions') return false;
+  return segments[1].length > 0 && segments[3].length > 0;
+}
+
 export function isStudentWorkRoute(pathname: string): boolean {
-  return STUDENT_WORK_ROUTE_RE.test(pathname);
+  const segments = stripAuthUserPrefix(pathname);
+  if (!segments) return false;
+  return hasStudentWorkBasePath(segments);
 }
 
 export function isStudentWorkByStatusRoute(pathname: string): boolean {
-  return STUDENT_WORK_BY_STATUS_ROUTE_RE.test(pathname);
+  const segments = stripAuthUserPrefix(pathname);
+  if (!segments || !hasStudentWorkBasePath(segments)) return false;
+  return (
+    segments.length === 9 &&
+    segments[5] === 'by-status' &&
+    segments[6] === 'and-sort-name' &&
+    segments[7].length > 0 &&
+    segments[8].length > 0
+  );
 }
 
 export function isStudentWorkViewerPath(pathname: string): boolean {
-  return STUDENT_WORK_VIEWER_RE.test(pathname);
+  const segments = stripAuthUserPrefix(pathname);
+  if (!segments) return false;
+  return segments[0] === 'g' && segments[1] === 'tg';
 }
 
 export function isStudentWorkAttachmentUrl(rawUrl: string): boolean {
@@ -57,10 +84,10 @@ export function buildDriveDownloadUrl(fileId: string, authUser?: string | null):
 }
 
 export function extractAuthUserFromClassroomPath(pathname: string): string | null {
-  const match = AUTHUSER_PATH_RE.exec(pathname);
-  if (!match) return null;
-  const authUser = match[1]?.trim();
-  return authUser && authUser.length > 0 ? authUser : null;
+  const segments = splitPathSegments(pathname);
+  if (segments[0] !== 'u') return null;
+  const authUser = segments[1]?.trim() ?? '';
+  return AUTHUSER_SEGMENT_RE.test(authUser) ? authUser : null;
 }
 
 export function addResolverParams(

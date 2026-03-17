@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fetchOverview, fetchUserChangelog, resetWebsiteSnapshotCacheForTests } from './publicSite';
+import { WEBSITE_MANUAL_CHANGELOG } from '$lib/content/changelog.manual.generated';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -85,9 +86,11 @@ describe('public website acceptance contracts', () => {
 
   it('accepts user changelog contract from Oracle snapshot', async () => {
     const changelog = await fetchUserChangelog();
+    const latestManualTitle = String(WEBSITE_MANUAL_CHANGELOG.entries[0]?.title ?? '');
 
     expect(changelog.ok).toBe(true);
     expect(changelog.entries.length).toBeGreaterThan(0);
-    expect(changelog.entries[0]?.title).toContain('Release 1.5.0');
+    expect(latestManualTitle.length).toBeGreaterThan(0);
+    expect(changelog.entries[0]?.title).toBe(latestManualTitle);
   });
 });
