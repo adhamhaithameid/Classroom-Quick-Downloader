@@ -59,6 +59,7 @@ function resultFromMessage(
   };
 }
 
+// undefined vs null makes my head hurt so let's just use string length
 function normalizeAuthUser(value: string | null): string | null {
   const trimmed = value?.trim();
   return trimmed && trimmed.length > 0 ? trimmed : null;
@@ -80,6 +81,77 @@ function resolveHints(rawUrl: string): ResolverHints {
   } catch {
     return { name: null, ext: null };
   }
+}
+
+function resolveStudentWorkUserHint(rawUrl: string): string | null {
+  try {
+    const parsed = new URL(rawUrl, window.location.href);
+    const fromQuery = parsed.searchParams.get('u') || parsed.searchParams.get('userId');
+    if (fromQuery && fromQuery.trim().length > 0) return fromQuery.trim();
+
+    const rawHash = parsed.hash.startsWith('#') ? parsed.hash.slice(1) : parsed.hash;
+    if (rawHash) {
+      const hashParams = new URLSearchParams(rawHash);
+      const fromHash = hashParams.get('u') || hashParams.get('userId');
+      if (fromHash && fromHash.trim().length > 0) return fromHash.trim();
+    }
+  } catch {
+    // Ignore malformed hint inputs.
+  }
+  return null;
+}
+
+// base64 decoding?? is this hacking??
+function decodeHintToken(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (/^\d{6,}$/.test(trimmed)) return trimmed;
+
+  const normalizedBase64 = trimmed.replace(/-/g, '+').replace(/_/g, '/');
+  const paddedBase64 = normalizedBase64 + '='.repeat((4 - (normalizedBase64.length % 4)) % 4);
+  const manualDecode = (): string | null => {
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+    const bytes: number[] = [];
+    let buffer = 0;
+    let bits = 0;
+
+    for (const char of paddedBase64) {
+      if (char === '=') break;
+      const idx = alphabet.indexOf(char);
+      if (idx < 0) return null;
+      buffer = (buffer << 6) | idx;
+      bits += 6;
+      while (bits >= 8) {
+        bits -= 8;
+        bytes.push((buffer >> bits) & 0xff);
+      }
+    }
+    try {
+      return new TextDecoder().decode(new Uint8Array(bytes));
+    } catch {
+      return null;
+    }
+  };
+
+  try {
+    const decoded = (typeof atob === 'function' ? atob(paddedBase64) : manualDecode())?.trim() || '';
+    if (/^\d{6,}$/.test(decoded)) return decoded;
+  } catch {
+    const decoded = manualDecode()?.trim() || '';
+    if (/^\d{6,}$/.test(decoded)) return decoded;
+  }
+  return null;
+}
+
+function resolveHintCandidates(rawUrl: string): string[] {
+  const rawHint = resolveStudentWorkUserHint(rawUrl);
+  if (!rawHint) return [];
+  const hints = new Set<string>();
+  const trimmed = rawHint.trim();
+  if (trimmed) hints.add(trimmed);
+  const decoded = decodeHintToken(trimmed);
+  if (decoded) hints.add(decoded);
+  return Array.from(hints);
 }
 
 function resolveAuthUserHint(rawUrl: string): string | null {
@@ -122,6 +194,10 @@ function normalizeResolvedUrl(rawUrl: string, authUserHint: string | null): stri
 
     if (parsed.hostname === 'docs.google.com') {
       const normalizedPath = parsed.pathname.replace(/^\/u\/\d+(?=\/)/, '');
+      const docsFileMatch = normalizedPath.match(/^\/file\/d\/([^/]+)/);
+      if (docsFileMatch?.[1]) {
+        return buildDriveDownloadUrl(docsFileMatch[1], authUserHint);
+      }
       const docsMatch = normalizedPath.match(/^\/(?:document|presentation|drawings|spreadsheets)\/d\/([^/]+)/);
       if (docsMatch?.[1]) {
         return buildDriveDownloadUrl(docsMatch[1], authUserHint);
@@ -170,24 +246,61 @@ function resolveFromPublishedApiSnapshot(
   const snapshot = readPublishedStudentWorkApiSnapshot();
   if (!snapshot || snapshot.attachments.length === 0) return null;
 
+  const hintCandidates = new Set(resolveHintCandidates(rawUrl));
+  const attachmentPool = (() => {
+    if (hintCandidates.size === 0) return snapshot.attachments;
+    const matched = snapshot.attachments.filter((attachment) =>
+      hintCandidates.has((attachment.userId || '').trim()) ||
+      hintCandidates.has((attachment.submissionId || '').trim())
+    );
+    return matched.length > 0 ? matched : snapshot.attachments;
+  })();
+
+  // Teacher by-status views can include attachments from many submissions.
+  // In that mixed pool, title/ext matching is not reliable enough.
+  const uniqueSubmissionIds = new Set(
+    attachmentPool
+      .map((attachment) => attachment.submissionId?.trim() || '')
+      .filter((submissionId) => submissionId.length > 0),
+  );
+  if (uniqueSubmissionIds.size > 1) return null;
+
   const hints = resolveHints(rawUrl);
+  const scored = attachmentPool.map((attachment) => ({
+    attachment,
+    score: scoreAttachmentByHints(attachment, hints),
+  }));
+
   let chosen: PublishedStudentWorkApiAttachment | null = null;
-  let bestScore = -1;
 
-  for (const attachment of snapshot.attachments) {
-    const score = scoreAttachmentByHints(attachment, hints);
-    if (score > bestScore) {
-      bestScore = score;
-      chosen = attachment;
+  if (hints.name || hints.ext) {
+    let bestScore = -1;
+    let secondBestScore = -1;
+    for (const entry of scored) {
+      if (entry.score > bestScore) {
+        secondBestScore = bestScore;
+        bestScore = entry.score;
+      } else if (entry.score > secondBestScore) {
+        secondBestScore = entry.score;
+      }
     }
+    if (bestScore <= 0) return null;
+
+    const topMatches = scored.filter((entry) => entry.score === bestScore);
+    if (topMatches.length !== 1) return null;
+
+    // Ext-only hints are weak in multi-file submissions; require a clear lead.
+    if (!hints.name && secondBestScore > 0 && bestScore - secondBestScore < 2) {
+      return null;
+    }
+    if (!hints.name && bestScore < 2) return null;
+
+    chosen = topMatches[0].attachment;
   }
 
-  if ((hints.name || hints.ext) && (!chosen || bestScore <= 0)) {
-    return null;
-  }
   if (!hints.name && !hints.ext) {
-    if (snapshot.attachments.length !== 1) return null;
-    chosen = snapshot.attachments[0];
+    if (attachmentPool.length !== 1) return null;
+    chosen = attachmentPool[0];
   }
   if (!chosen) return null;
 
@@ -209,6 +322,7 @@ async function resolveViaIframe(
   authUserHint: string | null,
   signal?: AbortSignal,
 ): Promise<ResolveStudentWorkResult> {
+  // hidden iframes feel so hacky but stackoverflow said it's fine
   if (typeof document === 'undefined') return { ok: false, reason: 'document_unavailable' };
 
   const iframe = document.createElement('iframe');
@@ -242,7 +356,6 @@ async function resolveViaIframe(
     cleanup();
   }
 }
-
 
 export async function resolveStudentWorkUrl(
   rawUrl: string,
@@ -311,7 +424,6 @@ export async function resolveStudentWorkUrl(
   if (signal?.aborted) {
     return { ok: false, reason: 'aborted' };
   }
-
   return {
     ok: false,
     reason: iframeAttempt.reason,
