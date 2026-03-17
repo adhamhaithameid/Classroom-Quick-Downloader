@@ -43,7 +43,6 @@ function publishResolveMessage(payload: Record<string, unknown>) {
 
 describe('student_work/resolver', () => {
   const originalBroadcastChannel = globalThis.BroadcastChannel;
-  const originalOpen = window.open;
 
   beforeEach(() => {
     FakeBroadcastChannel.reset();
@@ -62,7 +61,6 @@ describe('student_work/resolver', () => {
   afterAll(() => {
     vi.useFakeTimers();
     globalThis.BroadcastChannel = originalBroadcastChannel;
-    window.open = originalOpen;
   });
 
   it('returns input URL unchanged for non-student-work links', async () => {
@@ -144,6 +142,34 @@ describe('student_work/resolver', () => {
     expect(result.source).toBe('anchor');
   });
 
+  it('returns iframe failure when iframe cannot find a direct file URL', async () => {
+    const appendSpy = vi.spyOn(document.documentElement, 'appendChild');
+    appendSpy.mockImplementation((node: Node) => {
+      if (!(node instanceof HTMLIFrameElement)) return node;
+      const iframeUrl = new URL(node.src);
+      const requestId = iframeUrl.searchParams.get('cqd_sw_req');
+      if (!requestId) return node;
+      setTimeout(() => {
+        publishResolveMessage({
+          type: 'CQD_SW_RESOLVE_RESULT',
+          requestId,
+          ok: false,
+          reason: 'no_drive_url_found',
+        });
+      }, 5);
+      return node;
+    });
+
+    const result = await resolveStudentWorkUrl(
+      'https://classroom.google.com/g/tg/a/b/c',
+      { stageTimeoutMs: 80 },
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe('no_drive_url_found');
+    expect(appendSpy).toHaveBeenCalled();
+  });
+
   it('resolves from published API snapshot when hints match, without iframe', async () => {
     publishStudentWorkApiSnapshot({
       fetchedAt: Date.now(),
@@ -186,6 +212,180 @@ describe('student_work/resolver', () => {
     expect(result.url).toContain('id=FILE_IMAGE_1');
     expect(result.source).toBe('api_snapshot');
     expect(appendSpy).not.toHaveBeenCalled();
+  });
+
+  it('matches API snapshot by decoded submission-hint token before iframe fallback', async () => {
+    publishStudentWorkApiSnapshot({
+      fetchedAt: Date.now(),
+      context: {
+        viewKind: ViewKind.STUDENT_WORK_TEACHER,
+        courseId: 'COURSE_HINTED',
+        courseWorkId: 'WORK_HINTED',
+        authUser: null,
+        studentSubmissionId: null,
+      },
+      submissions: [
+        {
+          id: '851711936381',
+          attachments: [
+            {
+              id: 'FILE_HINTED_SUBMISSION',
+              title: 'capture.json',
+              downloadUrl: 'https://drive.google.com/uc?export=download&id=FILE_HINTED_SUBMISSION',
+              source: 'driveFile',
+            },
+          ],
+        },
+        {
+          id: '846996003474',
+          attachments: [
+            {
+              id: 'FILE_OTHER_SUBMISSION',
+              title: 'capture.json',
+              downloadUrl: 'https://drive.google.com/uc?export=download&id=FILE_OTHER_SUBMISSION',
+              source: 'driveFile',
+            },
+          ],
+        },
+      ],
+    });
+
+    const appendSpy = vi.spyOn(document.documentElement, 'appendChild');
+
+    const result = await resolveStudentWorkUrl(
+      'https://classroom.google.com/g/tg/a/b/c?cqd_sw_hint_name=capture.json&cqd_sw_hint_ext=json#u=ODUxNzExOTM2Mzgx',
+      { stageTimeoutMs: 40 },
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.url).toContain('id=FILE_HINTED_SUBMISSION');
+    expect(result.source).toBe('api_snapshot');
+    expect(appendSpy).not.toHaveBeenCalled();
+  });
+
+  it('falls back to iframe when API snapshot hint match is tied across multiple attachments', async () => {
+    publishStudentWorkApiSnapshot({
+      fetchedAt: Date.now(),
+      context: {
+        viewKind: ViewKind.STUDENT_WORK_TEACHER,
+        courseId: 'COURSE_TIE',
+        courseWorkId: 'WORK_TIE',
+        authUser: null,
+        studentSubmissionId: null,
+      },
+      submissions: [
+        {
+          id: 'SUB_1',
+          attachments: [
+            {
+              id: 'FILE_A',
+              title: 'worksheet.pdf',
+              downloadUrl: 'https://drive.google.com/uc?export=download&id=FILE_A',
+              source: 'driveFile',
+            },
+            {
+              id: 'FILE_B',
+              title: 'worksheet.pdf',
+              downloadUrl: 'https://drive.google.com/uc?export=download&id=FILE_B',
+              source: 'driveFile',
+            },
+          ],
+        },
+      ],
+    });
+
+    const appendSpy = vi.spyOn(document.documentElement, 'appendChild');
+    appendSpy.mockImplementation((node: Node) => {
+      if (!(node instanceof HTMLIFrameElement)) return node;
+      const iframeUrl = new URL(node.src);
+      const requestId = iframeUrl.searchParams.get('cqd_sw_req');
+      if (!requestId) return node;
+      setTimeout(() => {
+        publishResolveMessage({
+          type: 'CQD_SW_RESOLVE_RESULT',
+          requestId,
+          ok: true,
+          resolvedUrl: 'https://drive.google.com/uc?export=download&id=IFRAME_TIE_BREAK',
+          source: 'anchor',
+        });
+      }, 5);
+      return node;
+    });
+
+    const result = await resolveStudentWorkUrl(
+      'https://classroom.google.com/g/tg/a/b/c?cqd_sw_hint_name=worksheet.pdf&cqd_sw_hint_ext=pdf',
+      { stageTimeoutMs: 60 },
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.url).toContain('id=IFRAME_TIE_BREAK');
+    expect(result.source).toBe('anchor');
+    expect(appendSpy).toHaveBeenCalled();
+  });
+
+  it('falls back to iframe when API snapshot mixes multiple submissions', async () => {
+    publishStudentWorkApiSnapshot({
+      fetchedAt: Date.now(),
+      context: {
+        viewKind: ViewKind.STUDENT_WORK_TEACHER,
+        courseId: 'COURSE_MULTI',
+        courseWorkId: 'WORK_MULTI',
+        authUser: null,
+        studentSubmissionId: null,
+      },
+      submissions: [
+        {
+          id: 'SUB_A',
+          attachments: [
+            {
+              id: 'FILE_A1',
+              title: 'submission-a.pdf',
+              downloadUrl: 'https://drive.google.com/uc?export=download&id=FILE_A1',
+              source: 'driveFile',
+            },
+          ],
+        },
+        {
+          id: 'SUB_B',
+          attachments: [
+            {
+              id: 'FILE_B1',
+              title: 'submission-b.pdf',
+              downloadUrl: 'https://drive.google.com/uc?export=download&id=FILE_B1',
+              source: 'driveFile',
+            },
+          ],
+        },
+      ],
+    });
+
+    const appendSpy = vi.spyOn(document.documentElement, 'appendChild');
+    appendSpy.mockImplementation((node: Node) => {
+      if (!(node instanceof HTMLIFrameElement)) return node;
+      const iframeUrl = new URL(node.src);
+      const requestId = iframeUrl.searchParams.get('cqd_sw_req');
+      if (!requestId) return node;
+      setTimeout(() => {
+        publishResolveMessage({
+          type: 'CQD_SW_RESOLVE_RESULT',
+          requestId,
+          ok: true,
+          resolvedUrl: 'https://drive.google.com/uc?export=download&id=IFRAME_MULTI_SUBMISSION',
+          source: 'anchor',
+        });
+      }, 5);
+      return node;
+    });
+
+    const result = await resolveStudentWorkUrl(
+      'https://classroom.google.com/g/tg/a/b/c?cqd_sw_hint_name=submission-a.pdf&cqd_sw_hint_ext=pdf',
+      { stageTimeoutMs: 60 },
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.url).toContain('id=IFRAME_MULTI_SUBMISSION');
+    expect(result.source).toBe('anchor');
+    expect(appendSpy).toHaveBeenCalled();
   });
 
   it('falls back to iframe when API snapshot is ambiguous with no hints', async () => {
@@ -348,16 +548,14 @@ describe('student_work/resolver', () => {
     expect(result.reason).toBe('aborted');
   });
 
-  it('stays silent (no popup) and fails with iframe timeout when unresolved', async () => {
+  it('returns iframe timeout when iframe stage times out', async () => {
     vi.spyOn(document.documentElement, 'appendChild').mockImplementation((node: Node) => node);
-    const openSpy = vi.spyOn(window, 'open').mockReturnValue(null);
 
     const result = await resolveStudentWorkUrl(
       'https://classroom.google.com/g/tg/a/b/c',
       { stageTimeoutMs: 20 },
     );
 
-    expect(openSpy).not.toHaveBeenCalled();
     expect(result.ok).toBe(false);
     expect(result.reason).toBe('resolver_timeout');
   });
