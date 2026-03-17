@@ -20,6 +20,14 @@ const SIDE_CAR_ATTR = 'data-cqd-sw-bs-processed';
 const DOWNLOAD_ALL_HOST_ATTR = 'data-cqd-sw-bs-host';
 const DOWNLOAD_ALL_HEADER_ATTR = 'data-cqd-sw-bs-header';
 const DOWNLOAD_ALL_GROUP_ID = 'cqd-sw-bs-host';
+/**
+ * Student Work production-note (2026-03):
+ * 1) Random-file bug: broad/shared containers can map every button to one file.
+ *    Guarded by per-card scoped Drive ID resolution + multi-file carrier skip.
+ * 2) Stuck "Downloading…": Student Work buttons now depend on bundle-local
+ *    status handling in src/student_work/button.ts (do not remove).
+ * 3) Sidecar overlap: by-status owns this route; sidecar must stay isolated.
+ */
 const FLAG_ARTIFACT_SELECTOR = [
   '.cqd-flag',
   '.cqd-comment-badge',
