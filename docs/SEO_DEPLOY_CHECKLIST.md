@@ -40,8 +40,9 @@ This file separates repository-implemented SEO work from manual operations that 
 - GitHub Actions workflow `.github/workflows/website-deploy.yml` now runs:
   - `node tools/submit-search-indexing.mjs`
 - The script:
-  - submits sitemap URLs to Bing via IndexNow when `INDEXNOW_KEY` is present
+  - submits sitemap URLs to IndexNow engines (Bing plus other participating engines) when `INDEXNOW_KEY` is present
   - submits sitemap to Google Search Console API when `GOOGLE_SEARCH_CONSOLE_CREDENTIALS_JSON` is present
+  - prints a Brave Search manual submission URL reminder (`https://search.brave.com/submit-url`)
 - Required indexing-related CI configuration:
   - secret: `INDEXNOW_KEY`
   - optional secret: `GOOGLE_SEARCH_CONSOLE_CREDENTIALS_JSON`
