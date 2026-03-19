@@ -76,6 +76,30 @@
     downloadUrl: [STORE_LINKS.chrome, STORE_LINKS.firefox, STORE_LINKS.edge]
   };
 
+  $: websiteStructuredData = {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: 'Classroom Quick Downloader',
+    alternateName: 'CQD',
+    url: `${SITE_URL}/`
+  };
+
+  $: organizationStructuredData = {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    name: 'Classroom Quick Downloader',
+    alternateName: 'CQD',
+    url: `${SITE_URL}/`,
+    logo: `${SITE_URL}/favicon-192x192.png`,
+    sameAs: [STORE_LINKS.github, STORE_LINKS.chrome, STORE_LINKS.firefox, STORE_LINKS.edge]
+  };
+
+  $: homeStructuredData = [
+    websiteStructuredData,
+    organizationStructuredData,
+    softwareApplicationStructuredData
+  ];
+
   type RenderPlacement = ElementPlacement & {
     renderX: number;
     renderY: number;
@@ -1313,11 +1337,11 @@
 />
 
 <SeoMeta
-  title="Classroom Quick Downloader — Download All Google Classroom Files In One Click"
-  description="Free browser extension to bulk download all attachments from Google Classroom assignments. One click. Chrome, Firefox, and Edge."
+  title="Classroom Quick Downloader | Bulk Download Google Classroom Files"
+  description="Bulk download Google Classroom attachments in one click. Free Chrome, Firefox, and Edge extension for students and teachers."
   path={seoPath}
   keywords="download all google classroom files, bulk download google classroom attachments, google classroom extension"
-  structuredData={softwareApplicationStructuredData}
+  structuredData={homeStructuredData}
 />
 
 <svelte:head>

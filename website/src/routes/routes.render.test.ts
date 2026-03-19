@@ -28,7 +28,7 @@ describe('route render smoke coverage', () => {
     const { body, head } = render(RootRedirectPage);
     const html = squish(body);
 
-    expect(head).toContain('Download All Google Classroom Files In One Click');
+    expect(head).toContain('Classroom Quick Downloader | Bulk Download Google Classroom Files');
     expect(head).toContain('https://classroom-quick-downloader-website.pages.dev/');
     expect(head).toContain('og:image');
     expect(head).toContain('twitter:image');
@@ -52,8 +52,10 @@ describe('route render smoke coverage', () => {
     const { body, head } = render(OverviewPage);
     const html = squish(body);
 
-    expect(head).toContain('Download All Google Classroom Files In One Click');
+    expect(head).toContain('Classroom Quick Downloader | Bulk Download Google Classroom Files');
     expect(head).toContain('SoftwareApplication');
+    expect(head).toContain('WebSite');
+    expect(head).toContain('Organization');
     expect(head).toContain('https://classroom-quick-downloader-website.pages.dev/');
     expect(html).toContain('The free extension that');
     expect(html).toContain('supercharges');

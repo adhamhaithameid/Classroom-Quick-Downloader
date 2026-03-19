@@ -44,6 +44,13 @@ function envBool(value: string | undefined, fallback = false): boolean {
   return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
 }
 
+function envText(value: string | undefined, fallback = ''): string {
+  if (typeof value !== 'string') return fallback;
+  const normalized = value.trim();
+  if (!normalized) return fallback;
+  return normalized;
+}
+
 export const SITE_URL = ensureUrl(publicEnv.PUBLIC_SITE_URL ?? '', resolveDefaultSiteUrl());
 export const ORACLE_API_BASE_URL = ensureUrl(publicEnv.PUBLIC_ORACLE_API_BASE_URL ?? '', DEFAULT_ORACLE_URL);
 export const WORKER_BASE_URL = ensureUrl(publicEnv.PUBLIC_WORKER_BASE_URL ?? '', DEFAULT_WORKER_URL);
@@ -54,9 +61,9 @@ export const APP_VERSION = (() => {
   return raw.startsWith('v') ? raw : `v${raw}`;
 })();
 export const ENABLE_FEEDBACK_NAV = envBool(publicEnv.PUBLIC_ENABLE_FEEDBACK_NAV, false);
-export const GOOGLE_SITE_VERIFICATION = (publicEnv.PUBLIC_GOOGLE_SITE_VERIFICATION ?? DEFAULT_GOOGLE_SITE_VERIFICATION).trim();
-export const BING_SITE_VERIFICATION = (publicEnv.PUBLIC_BING_SITE_VERIFICATION ?? '').trim();
-export const INDEXNOW_KEY = (publicEnv.PUBLIC_INDEXNOW_KEY ?? '').trim();
+export const GOOGLE_SITE_VERIFICATION = envText(publicEnv.PUBLIC_GOOGLE_SITE_VERIFICATION, DEFAULT_GOOGLE_SITE_VERIFICATION);
+export const BING_SITE_VERIFICATION = envText(publicEnv.PUBLIC_BING_SITE_VERIFICATION);
+export const INDEXNOW_KEY = envText(publicEnv.PUBLIC_INDEXNOW_KEY);
 
 export const STORE_LINKS = {
   chrome:
