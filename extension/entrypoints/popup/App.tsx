@@ -1375,7 +1375,7 @@ function App() {
                   rel="noreferrer"
                   className="cqd-button cqd-button-primary"
                   aria-label="Open the GitHub repository"
-                  title="Open GitHub repository"
+                  title="Open the GitHub repository"
                 >
                   <span className="cqd-button-icon">
                     <svg
@@ -1403,7 +1403,7 @@ function App() {
                     )
                   }
                   aria-label="Support the developer on Buy Me a Coffee"
-                  title="Support on Buy Me a Coffee"
+                  title="Support the developer on Buy Me a Coffee"
                 >
                   <img
                     src={bmcLogoSrc}
@@ -1416,7 +1416,7 @@ function App() {
                   type="button"
                   className={`cqd-button cqd-button-ghost ${showSharePanel ? 'active' : ''}`}
                   onClick={() => setShowSharePanel(!showSharePanel)}
-                  title="Share extension"
+                  title="Share extension links"
                   aria-label="Share extension links"
                   aria-expanded={showSharePanel}
                 >
@@ -1464,6 +1464,7 @@ function App() {
                         rel="noreferrer"
                         className="cqd-share-browser-icon"
                         title={`Open ${browser.charAt(0).toUpperCase() + browser.slice(1)} Web Store`}
+                        aria-label={`Open ${browser.charAt(0).toUpperCase() + browser.slice(1)} Web Store`}
                       >
                         {browserIcons[browser]}
                       </a>
