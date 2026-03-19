@@ -11,13 +11,18 @@ This file separates repository-implemented SEO work from manual operations that 
   - `/changelog`
   - `/uninstall` (`noindex`)
   - `/404` (`noindex`)
-  - redirects (`/`, `/landing2`) marked `noindex` and canonicalized to `/overview`
+  - legacy redirect route (`/landing2`) marked `noindex`
 - JSON-LD:
-  - `SoftwareApplication` on `/overview`
+  - `SoftwareApplication`, `WebSite`, and `Organization` on `/overview`
   - `FAQPage` on `/faq`
+  - `WebPage` + `BreadcrumbList` on SEO content pages (`/install/*`, `/compare/*`, and use-case pages)
 - Crawl directives:
-  - `website/src/routes/robots.txt/+server.ts` disallows `/uninstall` and `/404`
-  - `website/src/routes/sitemap.xml/+server.ts` includes all indexable SEO pages
+  - `website/src/routes/robots.txt/+server.ts` disallows utility/editor routes (`/uninstall`, `/404`, `/overview-editor`, `/landing2`)
+  - `website/src/routes/sitemap.xml/+server.ts` includes all indexable SEO pages plus `lastmod`, `changefreq`, `priority`, image sitemap tags, and video sitemap tags
+- Search appearance polish:
+  - richer crawler preview directives (`max-image-preview:large`, snippet/video preview hints)
+  - expanded favicon set (`16x16`, `32x32`, `48x48`, `192x192`, `512x512`, `.ico`) wired in `<head>` and web manifest
+  - dedicated social/search preview image (`/images/cqd-social-card.png`, `1200x630`)
 - Verification & indexing plumbing:
   - Google verification meta is emitted from `PUBLIC_GOOGLE_SITE_VERIFICATION` (with default fallback token)
   - Bing verification meta (`msvalidate.01`) is emitted from `PUBLIC_BING_SITE_VERIFICATION` when configured

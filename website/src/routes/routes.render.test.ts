@@ -191,12 +191,21 @@ describe('route render smoke coverage', () => {
     const sitemapText = await sitemap.text();
 
     expect(robots.headers.get('content-type')).toContain('text/plain');
+    expect(robotsText).toContain('Allow: /');
     expect(robotsText).toContain(`Sitemap: ${expectedBaseUrl}/sitemap.xml`);
     expect(robotsText).toContain('Disallow: /uninstall');
     expect(robotsText).toContain('Disallow: /404');
+    expect(robotsText).toContain('Disallow: /overview-editor');
+    expect(robotsText).toContain('Disallow: /landing2');
 
     expect(sitemap.headers.get('content-type')).toContain('application/xml');
+    expect(sitemapText).toContain('xmlns:image=');
+    expect(sitemapText).toContain('xmlns:video=');
     expect(sitemapText).toContain(`<loc>${expectedBaseUrl}/</loc>`);
+    expect(sitemapText).toContain('<changefreq>daily</changefreq>');
+    expect(sitemapText).toContain('<priority>1.0</priority>');
+    expect(sitemapText).toContain(`${expectedBaseUrl}/images/cqd-social-card.png`);
+    expect(sitemapText).toContain(`${expectedBaseUrl}/videos/solution.mp4`);
     expect(sitemapText).toContain(`<loc>${expectedBaseUrl}/faq</loc>`);
     expect(sitemapText).not.toContain('/uninstall');
     expect(sitemapText).not.toContain('/404');
