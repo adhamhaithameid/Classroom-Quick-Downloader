@@ -55,10 +55,10 @@ function resolveMessageFromReason(reason: string): string {
 }
 
 function withStudentWorkRequestNonce(rawUrl: string): string {
-  // add random nonce because caching is evil
+  // add cryptographically secure random nonce because caching is evil
   try {
     const parsed = new URL(rawUrl, window.location.href);
-    parsed.searchParams.set('cqd_sw_req', `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+    parsed.searchParams.set('cqd_sw_req', `${Date.now()}-${crypto.randomUUID()}`);
     return parsed.toString();
   } catch {
     return rawUrl;

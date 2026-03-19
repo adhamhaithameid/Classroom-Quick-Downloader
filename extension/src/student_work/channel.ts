@@ -51,9 +51,8 @@ function getRuntime():
   return chrome.runtime;
 }
 
-// creating a random id because Math.random() is basically cryptography right?
 export function createResolverRequestId(): string {
-  return `sw-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  return `sw-${Date.now()}-${crypto.randomUUID()}`;
 }
 
 export function publishResolveResult(message: StudentWorkResolveResultMessage): void {
