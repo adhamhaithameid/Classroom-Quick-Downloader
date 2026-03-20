@@ -52,7 +52,7 @@
       "web-ext-run>multimatch": "8.0.0",
       "devalue": "^5.6.4",
       "cookie": "0.7.2",
-      "flatted": "^3.4.0"
+      "flatted": "^3.4.2"
     },
     "packageExtensions": {
       "eslint@10.0.3": {
