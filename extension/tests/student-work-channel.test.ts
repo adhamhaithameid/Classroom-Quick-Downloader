@@ -62,11 +62,13 @@ describe('student_work/channel', () => {
 
   it('builds resolver request ids with Date.now and crypto.randomUUID', async () => {
     vi.spyOn(Date, 'now').mockReturnValue(1_800_000_000_000);
-    vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue('uuid-fixed-1');
+    vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue(
+      '22222222-2222-4222-8222-222222222222',
+    );
     const { createResolverRequestId } = await import('../src/student_work/channel');
 
     const requestId = createResolverRequestId();
-    expect(requestId).toBe('sw-1800000000000-uuid-fixed-1');
+    expect(requestId).toBe('sw-1800000000000-22222222-2222-4222-8222-222222222222');
   });
 
   it('publishes via runtime relay when chrome.runtime.sendMessage is available', async () => {

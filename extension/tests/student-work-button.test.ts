@@ -138,7 +138,9 @@ describe('student_work/button', () => {
   it('appends request nonce to resolved download URL before dispatch', async () => {
     const mocks = setupModule();
     vi.spyOn(Date, 'now').mockReturnValue(1_717_171_717_000);
-    vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue('nonce-uuid-1');
+    vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue(
+      '11111111-1111-4111-8111-111111111111',
+    );
     const { createStudentWorkButton } = await import('../src/student_work/button');
 
     const button = createStudentWorkButton(
@@ -158,7 +160,9 @@ describe('student_work/button', () => {
     const [, resolvedUrl] = mocks.handleSingleDownloadClick.mock.calls[0];
     const parsed = new URL(resolvedUrl);
     expect(parsed.searchParams.get('id')).toBe('NONCE_1');
-    expect(parsed.searchParams.get('cqd_sw_req')).toBe('1717171717000-nonce-uuid-1');
+    expect(parsed.searchParams.get('cqd_sw_req')).toBe(
+      '1717171717000-11111111-1111-4111-8111-111111111111',
+    );
   });
 
   it('ignores clicks when source URL is missing', async () => {
