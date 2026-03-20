@@ -453,7 +453,8 @@ function executeLayer4_NuclearScan(post: HTMLElement, keywords: CommentKeywords)
             return NodeFilter.FILTER_REJECT;
           }
 
-          if (GOLDEN_SELECTORS.userContentExclusions.some((selector) => element.matches(selector))) {
+          // Optimized: Single matches() call with joined selector instead of array .some()
+          if (GOLDEN_SELECTORS.userContentExclusionsJoined && element.matches(GOLDEN_SELECTORS.userContentExclusionsJoined)) {
             return NodeFilter.FILTER_REJECT;
           }
 

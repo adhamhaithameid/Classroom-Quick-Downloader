@@ -587,6 +587,16 @@ export const DATE_PATTERNS: RegExp[] = [
 // GOLDEN SELECTORS
 // ============================================================================
 
+const _userContentExclusions = [
+  '.n8F6Jd',
+  '.a3j8U',
+  '.gM4mlb',
+  '.A6dC2c',
+  '[contenteditable="true"]',
+  'input',
+  'textarea',
+];
+
 export const GOLDEN_SELECTORS = {
   dateContainer: [
     // Stream tab selectors
@@ -628,15 +638,9 @@ export const GOLDEN_SELECTORS = {
     '[aria-label*="评论"]',
     '[aria-label*="комментар"]',
   ],
-  userContentExclusions: [
-    '.n8F6Jd',
-    '.a3j8U',
-    '.gM4mlb',
-    '.A6dC2c',
-    '[contenteditable="true"]',
-    'input',
-    'textarea',
-  ],
+  userContentExclusions: _userContentExclusions,
+  // Pre-joined selector for TreeWalker filtering (avoids repeated .some() and .matches() calls)
+  userContentExclusionsJoined: _userContentExclusions.join(', '),
 };
 
 // ============================================================================
