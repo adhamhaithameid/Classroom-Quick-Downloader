@@ -170,4 +170,51 @@ describe('popup legend keyboard accessibility', () => {
     });
     expect(container.querySelector('.cqd-legend-item.hovered')).toBeNull();
   });
+
+  it('keeps icon-only action controls aligned with title and aria-label text', async () => {
+    await act(async () => {
+      flushSync(() => {
+        root.render(createElement(App));
+      });
+      await tick();
+      await tick();
+    });
+
+    const githubRepoAction = container.querySelector(
+      'a.cqd-button-primary[aria-label="Open the GitHub repository"]',
+    ) as HTMLAnchorElement | null;
+    expect(githubRepoAction).not.toBeNull();
+    expect(githubRepoAction?.getAttribute('title')).toBe('Open the GitHub repository');
+
+    const coffeeAction = container.querySelector(
+      'button.cqd-coffee-button[aria-label="Support the developer on Buy Me a Coffee"]',
+    ) as HTMLButtonElement | null;
+    expect(coffeeAction).not.toBeNull();
+    expect(coffeeAction?.getAttribute('title')).toBe(
+      'Support the developer on Buy Me a Coffee',
+    );
+
+    const shareAction = container.querySelector(
+      'button[aria-label="Share extension links"]',
+    ) as HTMLButtonElement | null;
+    expect(shareAction).not.toBeNull();
+    expect(shareAction?.getAttribute('title')).toBe('Share extension links');
+
+    await act(async () => {
+      shareAction?.click();
+      await tick();
+    });
+
+    const shareStoreLinks = Array.from(
+      container.querySelectorAll<HTMLAnchorElement>('a.cqd-share-browser-icon'),
+    );
+    expect(shareStoreLinks.length).toBeGreaterThan(0);
+    for (const link of shareStoreLinks) {
+      const aria = link.getAttribute('aria-label');
+      const title = link.getAttribute('title');
+      expect(aria).toBeTruthy();
+      expect(title).toBe(aria);
+      expect(aria).toContain('Web Store');
+    }
+  });
 });
