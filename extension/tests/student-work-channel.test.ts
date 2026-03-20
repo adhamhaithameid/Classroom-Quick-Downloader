@@ -179,4 +179,30 @@ describe('student_work/channel', () => {
       }),
     );
   });
+
+  it('times out cleanly and unregisters runtime listeners when no relay arrives', async () => {
+    vi.useFakeTimers();
+    const listeners = new Set<(message: unknown, sender?: { id?: string }) => void>();
+    (globalThis as any).chrome = {
+      runtime: {
+        id: 'ext-runtime-timeout',
+        onMessage: {
+          addListener: (listener: (message: unknown, sender?: { id?: string }) => void) => {
+            listeners.add(listener);
+          },
+          removeListener: (listener: (message: unknown, sender?: { id?: string }) => void) => {
+            listeners.delete(listener);
+          },
+        },
+      },
+    };
+    const { waitForResolveResult } = await import('../src/student_work/channel');
+
+    const promise = waitForResolveResult('req-timeout-1', 250);
+    expect(listeners.size).toBe(1);
+
+    vi.advanceTimersByTime(251);
+    await expect(promise).resolves.toBeNull();
+    expect(listeners.size).toBe(0);
+  });
 });
