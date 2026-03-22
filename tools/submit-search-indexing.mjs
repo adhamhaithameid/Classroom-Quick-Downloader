@@ -285,6 +285,7 @@ async function main() {
   }
 
   console.log(`[indexing] Brave Search URL submission remains manual: ${BRAVE_SUBMIT_URL}`);
+  console.log('[indexing] DuckDuckGo typically reflects Bing indexing, so successful Bing/IndexNow submissions help DuckDuckGo visibility.');
 
   try {
     const serviceAccount = await loadGoogleServiceAccount();

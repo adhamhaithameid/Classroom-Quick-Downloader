@@ -19,6 +19,7 @@ This file separates repository-implemented SEO work from manual operations that 
 - Crawl directives:
   - `website/src/routes/robots.txt/+server.ts` disallows utility/editor routes (`/uninstall`, `/404`, `/overview-editor`, `/landing2`)
   - `website/src/routes/sitemap.xml/+server.ts` includes all indexable SEO pages plus `lastmod`, `changefreq`, `priority`, image sitemap tags, and video sitemap tags
+  - `website/src/routes/site-map/+page.svelte` exposes an HTML sitemap and global footer link (`/site-map`) for stronger crawl-path discovery
 - Search appearance polish:
   - richer crawler preview directives (`max-image-preview:large`, snippet/video preview hints)
   - expanded favicon set (`16x16`, `32x32`, `48x48`, `192x192`, `512x512`, `.ico`) wired in `<head>` and web manifest
@@ -48,6 +49,7 @@ This file separates repository-implemented SEO work from manual operations that 
   - submits sitemap URLs to IndexNow engines (Bing plus other participating engines) when `INDEXNOW_KEY` is present
   - submits sitemap to Google Search Console API when `GOOGLE_SEARCH_CONSOLE_CREDENTIALS_JSON` is present
   - prints a Brave Search manual submission URL reminder (`https://search.brave.com/submit-url`)
+  - logs DuckDuckGo coverage guidance (DDG generally mirrors Bing indexing)
 - Required indexing-related CI configuration:
   - secret: `INDEXNOW_KEY`
   - optional secret: `GOOGLE_SEARCH_CONSOLE_CREDENTIALS_JSON`
@@ -62,6 +64,10 @@ This file separates repository-implemented SEO work from manual operations that 
   - Monitor indexing and Core Web Vitals coverage
 - Bing Webmaster Tools:
   - Verify domain/property (recommended for reporting and diagnostics)
+- Brave Search:
+  - Manually submit key URLs at `https://search.brave.com/submit-url` after major content/metadata changes
+- DuckDuckGo:
+  - No direct sitemap submission flow; coverage follows Bing index quality and crawl success
 - Domain strategy:
   - Decide if production canonical should stay `pages.dev` or move to custom domain
   - If custom domain is adopted, update canonical URLs and sitemap host accordingly

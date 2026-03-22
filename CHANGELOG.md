@@ -20,11 +20,13 @@ Student Work stabilization update focused on silent resolution and strict per-su
   - Google Search Console sitemap submission when service-account credentials are configured
 - Added website-level IndexNow key endpoint at `/indexnow-key.txt` for search-engine ownership proof.
 - Added configurable website verification metadata for Google and Bing via public environment variables.
+- Added an indexable HTML sitemap route at `/site-map` and linked it globally in the website footer to strengthen internal crawl paths.
 
 ### Changed
 - Removed popup-based Student Work resolver fallback so resolution is fully silent.
 - Increased default Student Work resolver timeout to reduce premature timeout failures.
 - Improved website SEO metadata quality for richer search snippets and broader multi-engine indexing coverage.
+- Updated indexing automation logging to explicitly capture DuckDuckGo visibility guidance via Bing indexing health.
 
 ### Fixed
 - Fixed Student Work flows that could land in error state before bridge resolution completed.

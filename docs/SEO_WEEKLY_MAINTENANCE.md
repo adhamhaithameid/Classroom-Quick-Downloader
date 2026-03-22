@@ -24,6 +24,10 @@ Use this once per week (same day/time each week).
   - Bing Webmaster Tools
 - Canonical sitemap URL:
   - `https://classroom-quick-downloader-website.pages.dev/sitemap.xml`
+- If this week included a major SEO change, manually submit homepage on Brave:
+  - `https://search.brave.com/submit-url`
+- DuckDuckGo note:
+  - verify Bing indexing first (DDG generally mirrors Bing coverage)
 
 ## 4) Critical URL Smoke Check (2 minutes)
 - Open and visually verify:
