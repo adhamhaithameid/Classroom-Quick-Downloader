@@ -14,6 +14,8 @@ import InstallChromePage from './install/chrome/+page.svelte';
 import SecurityPage from './security/+page.svelte';
 import CompareClassfetchPage from './compare/classroom-quick-downloader-vs-classfetch/+page.svelte';
 import SiteMapPage from './site-map/+page.svelte';
+import CqdDemoVideoPage from './watch/cqd-demo/+page.svelte';
+import ManualVsCqdVideoPage from './watch/manual-vs-cqd/+page.svelte';
 import { privacyContent } from '$lib/content/privacy';
 import { INDEXNOW_KEY, SITE_URL } from '$lib/config';
 import { GET as getRobotsTxt } from './robots.txt/+server';
@@ -56,6 +58,7 @@ describe('route render smoke coverage', () => {
     expect(head).toContain('Classroom Quick Downloader | Bulk Download Google Classroom Files');
     expect(head).toContain('SoftwareApplication');
     expect(head).toContain('WebSite');
+    expect(head).toContain('WebPage');
     expect(head).toContain('Organization');
     expect(head).toContain('https://classroom-quick-downloader-website.pages.dev/');
     expect(html).toContain('The free extension that');
@@ -194,7 +197,23 @@ describe('route render smoke coverage', () => {
     expect(html).toContain('Core pages');
     expect(html).toContain('/site-map');
     expect(html).toContain('/install/chrome');
+    expect(html).toContain('/watch/cqd-demo');
     expect(html).toContain('/compare/classroom-quick-downloader-vs-classfetch');
+  });
+
+  it('renders watch pages with video metadata and source links', () => {
+    const demoRendered = render(CqdDemoVideoPage);
+    const comparisonRendered = render(ManualVsCqdVideoPage);
+    const demoHtml = squish(demoRendered.body);
+    const comparisonHtml = squish(comparisonRendered.body);
+
+    expect(demoRendered.head).toContain('/watch/cqd-demo');
+    expect(demoRendered.head).toContain('VideoObject');
+    expect(demoHtml).toContain('/videos/solution.mp4');
+
+    expect(comparisonRendered.head).toContain('/watch/manual-vs-cqd');
+    expect(comparisonRendered.head).toContain('VideoObject');
+    expect(comparisonHtml).toContain('/videos/problem.mp4');
   });
 
   it('renders robots.txt and sitemap.xml from the current site URL', async () => {
@@ -220,8 +239,15 @@ describe('route render smoke coverage', () => {
     expect(sitemapText).toContain('<priority>1.0</priority>');
     expect(sitemapText).toContain(`${expectedBaseUrl}/images/cqd-social-card.png`);
     expect(sitemapText).toContain(`${expectedBaseUrl}/videos/solution.mp4`);
+    expect(sitemapText).toContain(`${expectedBaseUrl}/videos/problem.mp4`);
+    expect(sitemapText).toContain('<video:publication_date>2026-03-04T00:00:00+00:00</video:publication_date>');
+    expect(sitemapText).toContain('<video:duration>21</video:duration>');
+    expect(sitemapText).toContain('<video:duration>39</video:duration>');
+    expect(sitemapText).toContain('<video:family_friendly>yes</video:family_friendly>');
     expect(sitemapText).toContain(`<loc>${expectedBaseUrl}/faq</loc>`);
     expect(sitemapText).toContain(`<loc>${expectedBaseUrl}/site-map</loc>`);
+    expect(sitemapText).toContain(`<loc>${expectedBaseUrl}/watch/cqd-demo</loc>`);
+    expect(sitemapText).toContain(`<loc>${expectedBaseUrl}/watch/manual-vs-cqd</loc>`);
     expect(sitemapText).not.toContain('/uninstall');
     expect(sitemapText).not.toContain('/404');
   });

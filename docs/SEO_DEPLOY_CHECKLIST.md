@@ -20,9 +20,10 @@ This file separates repository-implemented SEO work from manual operations that 
   - `website/src/routes/robots.txt/+server.ts` disallows utility/editor routes (`/uninstall`, `/404`, `/overview-editor`, `/landing2`)
   - `website/src/routes/sitemap.xml/+server.ts` includes all indexable SEO pages plus `lastmod`, `changefreq`, `priority`, image sitemap tags, and video sitemap tags
   - `website/src/routes/site-map/+page.svelte` exposes an HTML sitemap and global footer link (`/site-map`) for stronger crawl-path discovery
+  - `/watch/cqd-demo` and `/watch/manual-vs-cqd` provide direct, indexable video pages with `VideoObject` schema
 - Search appearance polish:
   - richer crawler preview directives (`max-image-preview:large`, snippet/video preview hints)
-  - expanded favicon set (`16x16`, `32x32`, `48x48`, `192x192`, `512x512`, `.ico`) wired in `<head>` and web manifest
+  - expanded favicon set (`16x16`, `32x32`, `48x48`, `192x192`, `512x512`, `.ico`) wired in `<head>` and web manifest, refreshed with a high-clarity glyph for SERP favicon readability
   - dedicated social/search preview image (`/images/cqd-social-card.png`, `1200x630`)
 - Verification & indexing plumbing:
   - Google verification meta is emitted from `PUBLIC_GOOGLE_SITE_VERIFICATION` (with default fallback token)
@@ -71,6 +72,7 @@ This file separates repository-implemented SEO work from manual operations that 
 - Domain strategy:
   - Decide if production canonical should stay `pages.dev` or move to custom domain
   - If custom domain is adopted, update canonical URLs and sitemap host accordingly
+  - Note: Google may render host-level site naming for `pages.dev` properties; a custom domain is the strongest way to replace host branding in SERP site-name display
 - Store/ASO alignment:
   - Align listing copy with website messaging (Chrome/Firefox/Edge)
   - Resolve and align license representation across store listings and repository
