@@ -1,7 +1,7 @@
 import { SITE_URL } from '$lib/config';
 import { seoPages } from '$lib/content/seoPages';
 
-const CORE_INDEXABLE_PATHS = ['/', '/privacy', '/faq', '/changelog'] as const;
+const CORE_INDEXABLE_PATHS = ['/', '/privacy', '/faq', '/changelog', '/site-map'] as const;
 
 export const SITE_NAME = 'Classroom Quick Downloader' as const;
 export const DEFAULT_LANGUAGE = 'en' as const;
