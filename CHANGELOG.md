@@ -21,12 +21,18 @@ Student Work stabilization update focused on silent resolution and strict per-su
 - Added website-level IndexNow key endpoint at `/indexnow-key.txt` for search-engine ownership proof.
 - Added configurable website verification metadata for Google and Bing via public environment variables.
 - Added an indexable HTML sitemap route at `/site-map` and linked it globally in the website footer to strengthen internal crawl paths.
+- Added dedicated indexable video pages:
+  - `/watch/cqd-demo`
+  - `/watch/manual-vs-cqd`
+- Added `VideoObject` metadata + sitemap video entries for both website demo videos (`solution.mp4`, `problem.mp4`).
 
 ### Changed
 - Removed popup-based Student Work resolver fallback so resolution is fully silent.
 - Increased default Student Work resolver timeout to reduce premature timeout failures.
 - Improved website SEO metadata quality for richer search snippets and broader multi-engine indexing coverage.
 - Updated indexing automation logging to explicitly capture DuckDuckGo visibility guidance via Bing indexing health.
+- Replaced the favicon pack with a higher-clarity icon set (`16/32/48/192/512`, `apple-touch-icon`, `.ico`) optimized for SERP readability.
+- Added homepage crawl-path links to the new video pages to improve discoverability and indexing signals.
 
 ### Fixed
 - Fixed Student Work flows that could land in error state before bridge resolution completed.

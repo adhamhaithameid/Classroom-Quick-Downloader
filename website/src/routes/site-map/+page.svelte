@@ -6,6 +6,7 @@
 
   type SiteMapGroup =
     | 'Core pages'
+    | 'Video demos'
     | 'Install guides'
     | 'Use-case guides'
     | 'Comparison pages'
@@ -14,6 +15,7 @@
 
   const GROUP_ORDER: SiteMapGroup[] = [
     'Core pages',
+    'Video demos',
     'Install guides',
     'Use-case guides',
     'Comparison pages',
@@ -45,6 +47,8 @@
       '/support': 'Support',
       '/press-kit': 'Press Kit',
       '/featured': 'Featured',
+      '/watch/cqd-demo': 'CQD Demo Video',
+      '/watch/manual-vs-cqd': 'Manual Vs CQD Video Comparison',
       '/download-all-attachments-google-classroom': 'Download All Attachments From Google Classroom',
       '/bulk-download-google-classroom-assignments': 'Bulk Download Google Classroom Assignments',
       '/google-drive-cant-scan-virus-warning-download': "Fix Drive 'Can't Scan This File For Viruses'",
@@ -70,6 +74,7 @@
 
   function groupForPath(path: string): SiteMapGroup {
     if (CORE_PATHS.has(path)) return 'Core pages';
+    if (path.startsWith('/watch/')) return 'Video demos';
     if (path.startsWith('/install/')) return 'Install guides';
     if (path.startsWith('/compare/')) return 'Comparison pages';
     if (

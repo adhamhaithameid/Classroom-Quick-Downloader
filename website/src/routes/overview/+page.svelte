@@ -64,6 +64,10 @@
     return normalizedPath === '/' ? `${SITE_URL}/` : `${SITE_URL}${normalizedPath}`;
   }
 
+  const DEMO_VIDEO_PAGE_PATH = '/watch/cqd-demo';
+  const COMPARISON_VIDEO_PAGE_PATH = '/watch/manual-vs-cqd';
+  const VIDEO_UPLOAD_DATE = '2026-03-04';
+
   $: softwareApplicationStructuredData = {
     '@context': 'https://schema.org',
     '@type': 'SoftwareApplication',
@@ -110,10 +114,42 @@
     sameAs: [STORE_LINKS.github, STORE_LINKS.chrome, STORE_LINKS.firefox, STORE_LINKS.edge]
   };
 
+  $: cqdDemoVideoStructuredData = {
+    '@context': 'https://schema.org',
+    '@type': 'VideoObject',
+    '@id': `${SITE_URL}${DEMO_VIDEO_PAGE_PATH}#video`,
+    name: 'Classroom Quick Downloader demo: one-click batch downloads',
+    description: 'Watch the CQD demo showing one-click batch download of Google Classroom attachments.',
+    uploadDate: VIDEO_UPLOAD_DATE,
+    thumbnailUrl: [`${SITE_URL}/images/solution-flags.webp`],
+    contentUrl: `${SITE_URL}/videos/solution.mp4`,
+    embedUrl: `${SITE_URL}${DEMO_VIDEO_PAGE_PATH}`,
+    isFamilyFriendly: true,
+    inLanguage: 'en',
+    publisher: { '@id': `${SITE_URL}/#organization` }
+  };
+
+  $: manualComparisonVideoStructuredData = {
+    '@context': 'https://schema.org',
+    '@type': 'VideoObject',
+    '@id': `${SITE_URL}${COMPARISON_VIDEO_PAGE_PATH}#video`,
+    name: 'Manual downloads vs Classroom Quick Downloader',
+    description: 'Compare manual Google Classroom downloading with the faster CQD workflow in this video.',
+    uploadDate: VIDEO_UPLOAD_DATE,
+    thumbnailUrl: [`${SITE_URL}/images/problem-flags.webp`],
+    contentUrl: `${SITE_URL}/videos/problem.mp4`,
+    embedUrl: `${SITE_URL}${COMPARISON_VIDEO_PAGE_PATH}`,
+    isFamilyFriendly: true,
+    inLanguage: 'en',
+    publisher: { '@id': `${SITE_URL}/#organization` }
+  };
+
   $: homeStructuredData = [
     websiteStructuredData,
     organizationStructuredData,
-    softwareApplicationStructuredData
+    softwareApplicationStructuredData,
+    cqdDemoVideoStructuredData,
+    manualComparisonVideoStructuredData
   ];
 
   type RenderPlacement = ElementPlacement & {
@@ -1482,6 +1518,12 @@
       </div>
 
       <p class="l2-compat">Also works on Brave, Opera, Vivaldi, Arc & all Chromium browsers</p>
+      <p class="l2-video-links">
+        Video demos:
+        <a href="{base}/watch/cqd-demo">CQD demo</a>
+        <span aria-hidden="true">•</span>
+        <a href="{base}/watch/manual-vs-cqd">Manual vs CQD</a>
+      </p>
     </div>
   </section>
 
@@ -2367,6 +2409,24 @@
   .l2-compat {
     font-size: 13px; color: var(--text-secondary); margin-top: 16px;
     font-weight: 500; letter-spacing: 0.01em;
+  }
+  .l2-video-links {
+    margin: 8px 0 0;
+    font-size: 13px;
+    color: var(--text-secondary);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .l2-video-links a {
+    color: var(--gc-green-dark);
+    text-decoration: none;
+    font-weight: 700;
+  }
+  .l2-video-links a:hover {
+    text-decoration: underline;
   }
 
   .l2-students-section {
