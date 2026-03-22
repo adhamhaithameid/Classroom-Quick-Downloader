@@ -7,6 +7,8 @@
   const canonicalUrl = `${SITE_URL}${pagePath}`;
   const videoUrl = `${SITE_URL}/videos/solution.mp4`;
   const thumbnailUrl = `${SITE_URL}/images/solution-flags.webp`;
+  const videoUploadDate = '2026-03-04T00:00:00+00:00';
+  const videoDurationIso = 'PT21S';
 
   const videoStructuredData = {
     '@context': 'https://schema.org',
@@ -14,7 +16,9 @@
     '@id': `${canonicalUrl}#video`,
     name: 'Classroom Quick Downloader demo: one-click batch downloads',
     description: 'Watch the CQD demo showing one-click batch download of Google Classroom attachments.',
-    uploadDate: '2026-03-04',
+    uploadDate: videoUploadDate,
+    datePublished: videoUploadDate,
+    duration: videoDurationIso,
     thumbnailUrl: [thumbnailUrl],
     contentUrl: videoUrl,
     embedUrl: canonicalUrl,

@@ -58,6 +58,7 @@ describe('route render smoke coverage', () => {
     expect(head).toContain('Classroom Quick Downloader | Bulk Download Google Classroom Files');
     expect(head).toContain('SoftwareApplication');
     expect(head).toContain('WebSite');
+    expect(head).toContain('WebPage');
     expect(head).toContain('Organization');
     expect(head).toContain('https://classroom-quick-downloader-website.pages.dev/');
     expect(html).toContain('The free extension that');
@@ -239,6 +240,10 @@ describe('route render smoke coverage', () => {
     expect(sitemapText).toContain(`${expectedBaseUrl}/images/cqd-social-card.png`);
     expect(sitemapText).toContain(`${expectedBaseUrl}/videos/solution.mp4`);
     expect(sitemapText).toContain(`${expectedBaseUrl}/videos/problem.mp4`);
+    expect(sitemapText).toContain('<video:publication_date>2026-03-04T00:00:00+00:00</video:publication_date>');
+    expect(sitemapText).toContain('<video:duration>21</video:duration>');
+    expect(sitemapText).toContain('<video:duration>39</video:duration>');
+    expect(sitemapText).toContain('<video:family_friendly>yes</video:family_friendly>');
     expect(sitemapText).toContain(`<loc>${expectedBaseUrl}/faq</loc>`);
     expect(sitemapText).toContain(`<loc>${expectedBaseUrl}/site-map</loc>`);
     expect(sitemapText).toContain(`<loc>${expectedBaseUrl}/watch/cqd-demo</loc>`);

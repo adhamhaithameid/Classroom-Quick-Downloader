@@ -7,6 +7,8 @@
   const canonicalUrl = `${SITE_URL}${pagePath}`;
   const videoUrl = `${SITE_URL}/videos/problem.mp4`;
   const thumbnailUrl = `${SITE_URL}/images/problem-flags.webp`;
+  const videoUploadDate = '2026-03-04T00:00:00+00:00';
+  const videoDurationIso = 'PT39S';
 
   const videoStructuredData = {
     '@context': 'https://schema.org',
@@ -14,7 +16,9 @@
     '@id': `${canonicalUrl}#video`,
     name: 'Manual downloads vs Classroom Quick Downloader',
     description: 'See the manual Google Classroom download flow and compare it against the faster CQD workflow.',
-    uploadDate: '2026-03-04',
+    uploadDate: videoUploadDate,
+    datePublished: videoUploadDate,
+    duration: videoDurationIso,
     thumbnailUrl: [thumbnailUrl],
     contentUrl: videoUrl,
     embedUrl: canonicalUrl,

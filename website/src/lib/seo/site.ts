@@ -33,14 +33,20 @@ export const SITEMAP_VIDEO_ENTRIES = [
     contentPath: '/videos/solution.mp4',
     thumbnailPath: '/images/solution-flags.webp',
     title: 'Classroom Quick Downloader demo: one-click batch downloads',
-    description: 'Watch the CQD demo video showing one-click batch download of Google Classroom attachments.'
+    description: 'Watch the CQD demo video showing one-click batch download of Google Classroom attachments.',
+    publicationDate: '2026-03-04T00:00:00+00:00',
+    durationSeconds: 21,
+    familyFriendly: true
   },
   {
     pagePath: '/watch/manual-vs-cqd',
     contentPath: '/videos/problem.mp4',
     thumbnailPath: '/images/problem-flags.webp',
     title: 'Manual downloads vs Classroom Quick Downloader',
-    description: 'Compare manual Google Classroom downloading with the faster CQD workflow in this side-by-side video.'
+    description: 'Compare manual Google Classroom downloading with the faster CQD workflow in this side-by-side video.',
+    publicationDate: '2026-03-04T00:00:00+00:00',
+    durationSeconds: 39,
+    familyFriendly: true
   }
 ] as const;
 

@@ -25,6 +25,7 @@ Student Work stabilization update focused on silent resolution and strict per-su
   - `/watch/cqd-demo`
   - `/watch/manual-vs-cqd`
 - Added `VideoObject` metadata + sitemap video entries for both website demo videos (`solution.mp4`, `problem.mp4`).
+- Added richer video sitemap metadata (`publication_date`, `duration`, `family_friendly`) for both indexed demo videos.
 
 ### Changed
 - Removed popup-based Student Work resolver fallback so resolution is fully silent.
@@ -33,6 +34,7 @@ Student Work stabilization update focused on silent resolution and strict per-su
 - Updated indexing automation logging to explicitly capture DuckDuckGo visibility guidance via Bing indexing health.
 - Replaced the favicon pack with a higher-clarity icon set (`16/32/48/192/512`, `apple-touch-icon`, `.ico`) optimized for SERP readability.
 - Added homepage crawl-path links to the new video pages to improve discoverability and indexing signals.
+- Added a homepage `WebPage` JSON-LD node and richer `VideoObject` fields (`duration`, `datePublished`) to strengthen search feature extraction.
 
 ### Fixed
 - Fixed Student Work flows that could land in error state before bridge resolution completed.

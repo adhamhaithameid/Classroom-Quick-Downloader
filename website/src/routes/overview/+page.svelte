@@ -66,7 +66,7 @@
 
   const DEMO_VIDEO_PAGE_PATH = '/watch/cqd-demo';
   const COMPARISON_VIDEO_PAGE_PATH = '/watch/manual-vs-cqd';
-  const VIDEO_UPLOAD_DATE = '2026-03-04';
+  const VIDEO_UPLOAD_DATE = '2026-03-04T00:00:00+00:00';
 
   $: softwareApplicationStructuredData = {
     '@context': 'https://schema.org',
@@ -98,6 +98,25 @@
     publisher: { '@id': `${SITE_URL}/#organization` }
   };
 
+  $: homeWebPageStructuredData = {
+    '@context': 'https://schema.org',
+    '@type': 'WebPage',
+    '@id': `${SITE_URL}/#homepage`,
+    name: 'Classroom Quick Downloader',
+    description:
+      'Bulk download Google Classroom attachments in one click with Classroom Quick Downloader.',
+    url: `${SITE_URL}/`,
+    inLanguage: 'en',
+    isPartOf: { '@id': `${SITE_URL}/#website` },
+    about: { '@id': `${SITE_URL}/#software` },
+    primaryImageOfPage: {
+      '@type': 'ImageObject',
+      url: `${SITE_URL}/images/cqd-social-card.png`,
+      width: 1200,
+      height: 630
+    }
+  };
+
   $: organizationStructuredData = {
     '@context': 'https://schema.org',
     '@type': 'Organization',
@@ -121,6 +140,8 @@
     name: 'Classroom Quick Downloader demo: one-click batch downloads',
     description: 'Watch the CQD demo showing one-click batch download of Google Classroom attachments.',
     uploadDate: VIDEO_UPLOAD_DATE,
+    datePublished: VIDEO_UPLOAD_DATE,
+    duration: 'PT21S',
     thumbnailUrl: [`${SITE_URL}/images/solution-flags.webp`],
     contentUrl: `${SITE_URL}/videos/solution.mp4`,
     embedUrl: `${SITE_URL}${DEMO_VIDEO_PAGE_PATH}`,
@@ -136,6 +157,8 @@
     name: 'Manual downloads vs Classroom Quick Downloader',
     description: 'Compare manual Google Classroom downloading with the faster CQD workflow in this video.',
     uploadDate: VIDEO_UPLOAD_DATE,
+    datePublished: VIDEO_UPLOAD_DATE,
+    duration: 'PT39S',
     thumbnailUrl: [`${SITE_URL}/images/problem-flags.webp`],
     contentUrl: `${SITE_URL}/videos/problem.mp4`,
     embedUrl: `${SITE_URL}${COMPARISON_VIDEO_PAGE_PATH}`,
@@ -146,6 +169,7 @@
 
   $: homeStructuredData = [
     websiteStructuredData,
+    homeWebPageStructuredData,
     organizationStructuredData,
     softwareApplicationStructuredData,
     cqdDemoVideoStructuredData,

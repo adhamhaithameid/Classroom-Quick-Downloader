@@ -47,14 +47,26 @@ function videoTagsForPath(path: string): string {
       const description = escapeXml(entry.description);
       const contentLoc = escapeXml(toAbsoluteSiteUrl(entry.contentPath));
       const thumbnailLoc = escapeXml(toAbsoluteSiteUrl(entry.thumbnailPath));
+      const publicationDateTag = entry.publicationDate
+        ? `      <video:publication_date>${escapeXml(entry.publicationDate)}</video:publication_date>\n`
+        : '';
+      const durationTag = typeof entry.durationSeconds === 'number'
+        ? `      <video:duration>${entry.durationSeconds}</video:duration>\n`
+        : '';
+      const familyFriendlyTag = typeof entry.familyFriendly === 'boolean'
+        ? `      <video:family_friendly>${entry.familyFriendly ? 'yes' : 'no'}</video:family_friendly>\n`
+        : '';
       return [
         '    <video:video>',
         `      <video:thumbnail_loc>${thumbnailLoc}</video:thumbnail_loc>`,
         `      <video:title>${title}</video:title>`,
         `      <video:description>${description}</video:description>`,
+        publicationDateTag.trimEnd(),
+        durationTag.trimEnd(),
+        familyFriendlyTag.trimEnd(),
         `      <video:content_loc>${contentLoc}</video:content_loc>`,
         '    </video:video>'
-      ].join('\n');
+      ].filter(Boolean).join('\n');
     })
     .join('\n');
   return tags ? `${tags}\n` : '';
