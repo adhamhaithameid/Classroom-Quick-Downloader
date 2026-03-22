@@ -13,6 +13,7 @@ import DownloadAllAttachmentsPage from './download-all-attachments-google-classr
 import InstallChromePage from './install/chrome/+page.svelte';
 import SecurityPage from './security/+page.svelte';
 import CompareClassfetchPage from './compare/classroom-quick-downloader-vs-classfetch/+page.svelte';
+import SiteMapPage from './site-map/+page.svelte';
 import { privacyContent } from '$lib/content/privacy';
 import { INDEXNOW_KEY, SITE_URL } from '$lib/config';
 import { GET as getRobotsTxt } from './robots.txt/+server';
@@ -28,7 +29,7 @@ describe('route render smoke coverage', () => {
     const { body, head } = render(RootRedirectPage);
     const html = squish(body);
 
-    expect(head).toContain('Download All Google Classroom Files In One Click');
+    expect(head).toContain('Classroom Quick Downloader | Bulk Download Google Classroom Files');
     expect(head).toContain('https://classroom-quick-downloader-website.pages.dev/');
     expect(head).toContain('og:image');
     expect(head).toContain('twitter:image');
@@ -52,8 +53,10 @@ describe('route render smoke coverage', () => {
     const { body, head } = render(OverviewPage);
     const html = squish(body);
 
-    expect(head).toContain('Download All Google Classroom Files In One Click');
+    expect(head).toContain('Classroom Quick Downloader | Bulk Download Google Classroom Files');
     expect(head).toContain('SoftwareApplication');
+    expect(head).toContain('WebSite');
+    expect(head).toContain('Organization');
     expect(head).toContain('https://classroom-quick-downloader-website.pages.dev/');
     expect(html).toContain('The free extension that');
     expect(html).toContain('supercharges');
@@ -181,6 +184,19 @@ describe('route render smoke coverage', () => {
     expect(compareHtml).toContain('Classroom Quick Downloader vs Classfetch');
   });
 
+  it('renders html sitemap page with grouped internal links', () => {
+    const { body, head } = render(SiteMapPage);
+    const html = squish(body);
+
+    expect(head).toContain('Site Map - Classroom Quick Downloader');
+    expect(head).toContain('/site-map');
+    expect(html).toContain('Site Map');
+    expect(html).toContain('Core pages');
+    expect(html).toContain('/site-map');
+    expect(html).toContain('/install/chrome');
+    expect(html).toContain('/compare/classroom-quick-downloader-vs-classfetch');
+  });
+
   it('renders robots.txt and sitemap.xml from the current site URL', async () => {
     const expectedBaseUrl = SITE_URL.replace(/\/+$/, '');
     const robots = await getRobotsTxt();
@@ -189,13 +205,23 @@ describe('route render smoke coverage', () => {
     const sitemapText = await sitemap.text();
 
     expect(robots.headers.get('content-type')).toContain('text/plain');
+    expect(robotsText).toContain('Allow: /');
     expect(robotsText).toContain(`Sitemap: ${expectedBaseUrl}/sitemap.xml`);
     expect(robotsText).toContain('Disallow: /uninstall');
     expect(robotsText).toContain('Disallow: /404');
+    expect(robotsText).toContain('Disallow: /overview-editor');
+    expect(robotsText).toContain('Disallow: /landing2');
 
     expect(sitemap.headers.get('content-type')).toContain('application/xml');
+    expect(sitemapText).toContain('xmlns:image=');
+    expect(sitemapText).toContain('xmlns:video=');
     expect(sitemapText).toContain(`<loc>${expectedBaseUrl}/</loc>`);
+    expect(sitemapText).toContain('<changefreq>daily</changefreq>');
+    expect(sitemapText).toContain('<priority>1.0</priority>');
+    expect(sitemapText).toContain(`${expectedBaseUrl}/images/cqd-social-card.png`);
+    expect(sitemapText).toContain(`${expectedBaseUrl}/videos/solution.mp4`);
     expect(sitemapText).toContain(`<loc>${expectedBaseUrl}/faq</loc>`);
+    expect(sitemapText).toContain(`<loc>${expectedBaseUrl}/site-map</loc>`);
     expect(sitemapText).not.toContain('/uninstall');
     expect(sitemapText).not.toContain('/404');
   });

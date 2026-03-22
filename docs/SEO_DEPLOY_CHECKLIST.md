@@ -11,13 +11,19 @@ This file separates repository-implemented SEO work from manual operations that 
   - `/changelog`
   - `/uninstall` (`noindex`)
   - `/404` (`noindex`)
-  - redirects (`/`, `/landing2`) marked `noindex` and canonicalized to `/overview`
+  - legacy redirect route (`/landing2`) marked `noindex`
 - JSON-LD:
-  - `SoftwareApplication` on `/overview`
+  - `SoftwareApplication`, `WebSite`, and `Organization` on `/overview`
   - `FAQPage` on `/faq`
+  - `WebPage` + `BreadcrumbList` on SEO content pages (`/install/*`, `/compare/*`, and use-case pages)
 - Crawl directives:
-  - `website/src/routes/robots.txt/+server.ts` disallows `/uninstall` and `/404`
-  - `website/src/routes/sitemap.xml/+server.ts` includes all indexable SEO pages
+  - `website/src/routes/robots.txt/+server.ts` disallows utility/editor routes (`/uninstall`, `/404`, `/overview-editor`, `/landing2`)
+  - `website/src/routes/sitemap.xml/+server.ts` includes all indexable SEO pages plus `lastmod`, `changefreq`, `priority`, image sitemap tags, and video sitemap tags
+  - `website/src/routes/site-map/+page.svelte` exposes an HTML sitemap and global footer link (`/site-map`) for stronger crawl-path discovery
+- Search appearance polish:
+  - richer crawler preview directives (`max-image-preview:large`, snippet/video preview hints)
+  - expanded favicon set (`16x16`, `32x32`, `48x48`, `192x192`, `512x512`, `.ico`) wired in `<head>` and web manifest
+  - dedicated social/search preview image (`/images/cqd-social-card.png`, `1200x630`)
 - Verification & indexing plumbing:
   - Google verification meta is emitted from `PUBLIC_GOOGLE_SITE_VERIFICATION` (with default fallback token)
   - Bing verification meta (`msvalidate.01`) is emitted from `PUBLIC_BING_SITE_VERIFICATION` when configured
@@ -40,8 +46,10 @@ This file separates repository-implemented SEO work from manual operations that 
 - GitHub Actions workflow `.github/workflows/website-deploy.yml` now runs:
   - `node tools/submit-search-indexing.mjs`
 - The script:
-  - submits sitemap URLs to Bing via IndexNow when `INDEXNOW_KEY` is present
+  - submits sitemap URLs to IndexNow engines (Bing plus other participating engines) when `INDEXNOW_KEY` is present
   - submits sitemap to Google Search Console API when `GOOGLE_SEARCH_CONSOLE_CREDENTIALS_JSON` is present
+  - prints a Brave Search manual submission URL reminder (`https://search.brave.com/submit-url`)
+  - logs DuckDuckGo coverage guidance (DDG generally mirrors Bing indexing)
 - Required indexing-related CI configuration:
   - secret: `INDEXNOW_KEY`
   - optional secret: `GOOGLE_SEARCH_CONSOLE_CREDENTIALS_JSON`
@@ -56,6 +64,10 @@ This file separates repository-implemented SEO work from manual operations that 
   - Monitor indexing and Core Web Vitals coverage
 - Bing Webmaster Tools:
   - Verify domain/property (recommended for reporting and diagnostics)
+- Brave Search:
+  - Manually submit key URLs at `https://search.brave.com/submit-url` after major content/metadata changes
+- DuckDuckGo:
+  - No direct sitemap submission flow; coverage follows Bing index quality and crawl success
 - Domain strategy:
   - Decide if production canonical should stay `pages.dev` or move to custom domain
   - If custom domain is adopted, update canonical URLs and sitemap host accordingly

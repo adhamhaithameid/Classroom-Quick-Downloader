@@ -1,6 +1,6 @@
 <script lang="ts">
   import { SITE_URL } from '$lib/config';
-  import { SOCIAL_IMAGE } from '$lib/seo/site';
+  import { DEFAULT_LANGUAGE, SITE_LOCALE, SITE_NAME, SOCIAL_IMAGE } from '$lib/seo/site';
 
   export let title: string;
   export let description: string;
@@ -13,6 +13,9 @@
   export let imageAlt = SOCIAL_IMAGE.alt;
   export let imageWidth = SOCIAL_IMAGE.width;
   export let imageHeight = SOCIAL_IMAGE.height;
+  export let language = DEFAULT_LANGUAGE;
+  export let locale = SITE_LOCALE;
+  export let siteName = SITE_NAME;
 
   function normalizePath(value: string): string {
     const trimmed = value.trim();
@@ -34,9 +37,20 @@
     return buildCanonical(urlBase, trimmed);
   }
 
+  function detectImageMimeType(assetUrl: string): string {
+    const normalized = assetUrl.toLowerCase();
+    if (normalized.endsWith('.png')) return 'image/png';
+    if (normalized.endsWith('.webp')) return 'image/webp';
+    if (normalized.endsWith('.svg')) return 'image/svg+xml';
+    if (normalized.endsWith('.gif')) return 'image/gif';
+    return 'image/jpeg';
+  }
+
   $: canonical = buildCanonical(SITE_URL, path);
   $: socialImageUrl = buildAbsoluteAssetUrl(SITE_URL, imagePath);
-  $: robots = noindex ? 'noindex, nofollow' : 'index, follow';
+  $: socialImageType = socialImageUrl ? detectImageMimeType(socialImageUrl) : '';
+  $: robots = noindex ? 'noindex, nofollow' : 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1';
+  $: botPreviewDirectives = noindex ? 'noindex, nofollow' : 'max-image-preview:large, max-snippet:-1, max-video-preview:-1';
   $: jsonLdItems = structuredData
     ? Array.isArray(structuredData)
       ? structuredData
@@ -58,15 +72,21 @@
     <meta name="keywords" content={keywords} />
   {/if}
   <meta name="robots" content={robots} />
+  <meta name="googlebot" content={botPreviewDirectives} />
+  <meta name="bingbot" content={botPreviewDirectives} />
   <link rel="canonical" href={canonical} />
+  <link rel="alternate" hreflang={language} href={canonical} />
+  <link rel="alternate" hreflang="x-default" href={canonical} />
 
   <meta property="og:type" content={type} />
-  <meta property="og:site_name" content="Classroom Quick Downloader" />
+  <meta property="og:site_name" content={siteName} />
+  <meta property="og:locale" content={locale} />
   <meta property="og:title" content={title} />
   <meta property="og:description" content={description} />
   <meta property="og:url" content={canonical} />
   {#if socialImageUrl}
     <meta property="og:image" content={socialImageUrl} />
+    <meta property="og:image:type" content={socialImageType} />
     <meta property="og:image:alt" content={imageAlt} />
     <meta property="og:image:width" content={String(imageWidth)} />
     <meta property="og:image:height" content={String(imageHeight)} />
@@ -75,6 +95,7 @@
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content={title} />
   <meta name="twitter:description" content={description} />
+  <meta name="twitter:url" content={canonical} />
   {#if socialImageUrl}
     <meta name="twitter:image" content={socialImageUrl} />
     <meta name="twitter:image:alt" content={imageAlt} />

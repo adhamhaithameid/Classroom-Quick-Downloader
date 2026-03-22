@@ -70,6 +70,7 @@ describe('site layout shell', () => {
     expect(html).toContain('l2-footer');
     expect(html).toContain('href="/privacy"');
     expect(html).toContain('aria-current="page"');
+    expect(html).toContain('href="/site-map"');
     expect(html).toContain('Contact');
   });
 

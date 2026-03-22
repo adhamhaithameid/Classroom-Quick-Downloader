@@ -67,14 +67,54 @@
   $: softwareApplicationStructuredData = {
     '@context': 'https://schema.org',
     '@type': 'SoftwareApplication',
+    '@id': `${SITE_URL}/#software`,
     name: 'Classroom Quick Downloader',
+    description:
+      'Free browser extension that lets students download Google Classroom assignment attachments in one click.',
     applicationCategory: 'BrowserExtension',
-    operatingSystem: 'Chrome, Firefox, Edge',
+    operatingSystem: 'Chrome, Firefox, Edge, Chromium browsers',
+    image: `${SITE_URL}/images/cqd-social-card.png`,
+    screenshot: `${SITE_URL}/images/solution-flags.webp`,
+    isAccessibleForFree: true,
+    softwareVersion: APP_VERSION.replace(/^v/, ''),
     offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
-    publisher: { '@type': 'Person', name: 'Adham Haitham Eid' },
+    publisher: { '@id': `${SITE_URL}/#organization` },
     url: buildCanonicalUrl(seoPath),
     downloadUrl: [STORE_LINKS.chrome, STORE_LINKS.firefox, STORE_LINKS.edge]
   };
+
+  $: websiteStructuredData = {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    '@id': `${SITE_URL}/#website`,
+    name: 'Classroom Quick Downloader',
+    alternateName: 'CQD',
+    url: `${SITE_URL}/`,
+    inLanguage: 'en',
+    publisher: { '@id': `${SITE_URL}/#organization` }
+  };
+
+  $: organizationStructuredData = {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    '@id': `${SITE_URL}/#organization`,
+    name: 'Classroom Quick Downloader',
+    alternateName: 'CQD',
+    url: `${SITE_URL}/`,
+    logo: {
+      '@type': 'ImageObject',
+      url: `${SITE_URL}/favicon-512x512.png`,
+      width: 512,
+      height: 512
+    },
+    sameAs: [STORE_LINKS.github, STORE_LINKS.chrome, STORE_LINKS.firefox, STORE_LINKS.edge]
+  };
+
+  $: homeStructuredData = [
+    websiteStructuredData,
+    organizationStructuredData,
+    softwareApplicationStructuredData
+  ];
 
   type RenderPlacement = ElementPlacement & {
     renderX: number;
@@ -1313,11 +1353,11 @@
 />
 
 <SeoMeta
-  title="Classroom Quick Downloader — Download All Google Classroom Files In One Click"
-  description="Free browser extension to bulk download all attachments from Google Classroom assignments. One click. Chrome, Firefox, and Edge."
+  title="Classroom Quick Downloader | Bulk Download Google Classroom Files"
+  description="Bulk download Google Classroom attachments in one click. Free Chrome, Firefox, and Edge extension for students and teachers."
   path={seoPath}
   keywords="download all google classroom files, bulk download google classroom attachments, google classroom extension"
-  structuredData={softwareApplicationStructuredData}
+  structuredData={homeStructuredData}
 />
 
 <svelte:head>

@@ -1,8 +1,9 @@
 <script lang="ts">
   import { base } from '$app/paths';
-  import { APP_VERSION } from '$lib/config';
+  import { APP_VERSION, SITE_URL } from '$lib/config';
   import SeoMeta from '$lib/components/SeoMeta.svelte';
   import type { SeoPageConfig } from '$lib/content/seoPages';
+  import { SITE_NAME, SOCIAL_IMAGE } from '$lib/seo/site';
 
   export let config: SeoPageConfig;
 
@@ -11,6 +12,79 @@
     if (!href.startsWith('/')) return href;
     return `${base}${href}`;
   }
+
+  function normalizePath(path: string): string {
+    if (!path || path === '/') return '/';
+    const withLeadingSlash = path.startsWith('/') ? path : `/${path}`;
+    return withLeadingSlash.replace(/\/+$/, '');
+  }
+
+  function toCanonicalUrl(path: string): string {
+    const normalizedBase = SITE_URL.replace(/\/+$/, '');
+    const normalizedPath = normalizePath(path);
+    return normalizedPath === '/' ? `${normalizedBase}/` : `${normalizedBase}${normalizedPath}`;
+  }
+
+  function humanizeSegment(segment: string): string {
+    return segment
+      .split('-')
+      .filter(Boolean)
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  }
+
+  function buildBreadcrumbData(path: string, pageName: string): Record<string, unknown> {
+    const segments = normalizePath(path).split('/').filter(Boolean);
+    const crumbs: Array<{ name: string; item: string }> = [{ name: 'Home', item: toCanonicalUrl('/') }];
+    let runningPath = '';
+    for (let index = 0; index < segments.length; index += 1) {
+      const segment = segments[index];
+      runningPath = `${runningPath}/${segment}`;
+      const isLast = index === segments.length - 1;
+      crumbs.push({
+        name: isLast ? pageName : humanizeSegment(segment),
+        item: toCanonicalUrl(runningPath)
+      });
+    }
+
+    return {
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: crumbs.map((crumb, index) => ({
+        '@type': 'ListItem',
+        position: index + 1,
+        name: crumb.name,
+        item: crumb.item
+      }))
+    };
+  }
+
+  $: canonicalUrl = toCanonicalUrl(config.path);
+  $: webPageStructuredData = {
+    '@context': 'https://schema.org',
+    '@type': 'WebPage',
+    name: config.h1,
+    description: config.description,
+    url: canonicalUrl,
+    inLanguage: 'en',
+    isPartOf: {
+      '@type': 'WebSite',
+      name: SITE_NAME,
+      url: toCanonicalUrl('/')
+    },
+    about: {
+      '@type': 'SoftwareApplication',
+      name: SITE_NAME,
+      applicationCategory: 'BrowserExtension'
+    },
+    primaryImageOfPage: {
+      '@type': 'ImageObject',
+      url: toCanonicalUrl(SOCIAL_IMAGE.path)
+    }
+  };
+
+  $: breadcrumbStructuredData = buildBreadcrumbData(config.path, config.h1);
+  $: seoStructuredData = [webPageStructuredData, breadcrumbStructuredData];
 </script>
 
 <SeoMeta
@@ -19,6 +93,7 @@
   path={config.path}
   keywords={config.keywords}
   type="article"
+  structuredData={seoStructuredData}
 />
 
 <article class="seo-page">

@@ -6,8 +6,10 @@ import { readFile } from 'node:fs/promises';
 const DEFAULT_SITE_URL = 'https://classroom-quick-downloader-website.pages.dev';
 const DEFAULT_SITEMAP_PATH = '/sitemap.xml';
 const DEFAULT_INDEXNOW_ENDPOINT = 'https://www.bing.com/indexnow';
+const INDEXNOW_REGISTRY_URL = 'https://www.indexnow.org/searchengines.json';
 const GOOGLE_TOKEN_URI = 'https://oauth2.googleapis.com/token';
 const GOOGLE_SCOPE = 'https://www.googleapis.com/auth/webmasters';
+const BRAVE_SUBMIT_URL = 'https://search.brave.com/submit-url';
 
 function trimTrailingSlash(value) {
   return value.replace(/\/+$/, '');
@@ -70,6 +72,15 @@ async function fetchText(url, init = undefined) {
     throw new Error(`HTTP ${response.status} ${response.statusText} from ${url}: ${body.slice(0, 500)}`);
   }
   return body;
+}
+
+async function fetchJson(url, init = undefined) {
+  const body = await fetchText(url, init);
+  try {
+    return JSON.parse(body);
+  } catch (error) {
+    throw new Error(`Expected JSON response from ${url}: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 async function loadGoogleServiceAccount() {
@@ -193,6 +204,31 @@ async function submitIndexNow({ endpoint, siteUrl, key, keyLocation, urls, dryRu
   }
 }
 
+async function loadIndexNowEndpoints(primaryEndpoint) {
+  const endpoints = new Set([primaryEndpoint]);
+  try {
+    const registry = await fetchJson(INDEXNOW_REGISTRY_URL);
+    if (!registry || typeof registry !== 'object') {
+      return [...endpoints];
+    }
+
+    for (const metaUrl of Object.values(registry)) {
+      if (typeof metaUrl !== 'string' || !metaUrl.startsWith('https://')) continue;
+      try {
+        const metadata = await fetchJson(metaUrl);
+        if (metadata && typeof metadata.api === 'string' && metadata.api.startsWith('https://')) {
+          endpoints.add(metadata.api);
+        }
+      } catch (error) {
+        console.warn(`[indexing] IndexNow metadata fetch skipped for ${metaUrl}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+  } catch (error) {
+    console.warn(`[indexing] IndexNow registry fetch skipped: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  return [...endpoints];
+}
+
 async function main() {
   const dryRun = process.env.DRY_RUN === '1' || process.env.INDEXING_DRY_RUN === '1';
 
@@ -212,25 +248,44 @@ async function main() {
 
   const indexNowKey = (process.env.INDEXNOW_KEY || process.env.PUBLIC_INDEXNOW_KEY || '').trim();
   if (indexNowKey) {
+    const allEngines = (process.env.INDEXNOW_ALL_ENGINES ?? '1').trim() !== '0';
     const keyLocationDefault = `${siteUrl}/indexnow-key.txt`;
     const keyLocation = normalizeAbsoluteUrl(process.env.INDEXNOW_KEY_LOCATION, keyLocationDefault);
     const indexNowEndpoint = normalizeAbsoluteUrl(process.env.INDEXNOW_ENDPOINT, DEFAULT_INDEXNOW_ENDPOINT);
-    try {
-      await submitIndexNow({
-        endpoint: indexNowEndpoint,
-        siteUrl,
-        key: indexNowKey,
-        keyLocation,
-        urls: sitemapUrls,
-        dryRun
-      });
-      console.log(`[indexing] Bing/IndexNow submission completed (${sitemapUrls.length} URLs).`);
-    } catch (error) {
-      errors.push(`[indexnow] ${error instanceof Error ? error.message : String(error)}`);
+
+    const endpoints = allEngines
+      ? await loadIndexNowEndpoints(indexNowEndpoint)
+      : [indexNowEndpoint];
+
+    let indexNowSuccessCount = 0;
+    for (const endpoint of endpoints) {
+      try {
+        await submitIndexNow({
+          endpoint,
+          siteUrl,
+          key: indexNowKey,
+          keyLocation,
+          urls: sitemapUrls,
+          dryRun
+        });
+        indexNowSuccessCount += 1;
+        console.log(`[indexing] IndexNow submission sent to ${endpoint}`);
+      } catch (error) {
+        console.warn(`[indexing] IndexNow submission failed for ${endpoint}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+
+    if (indexNowSuccessCount === 0) {
+      errors.push('[indexnow] Failed to submit URLs to all IndexNow endpoints.');
+    } else {
+      console.log(`[indexing] IndexNow submission completed for ${indexNowSuccessCount}/${endpoints.length} endpoint(s).`);
     }
   } else {
     console.log('[indexing] Skipped IndexNow submission (INDEXNOW_KEY is not set).');
   }
+
+  console.log(`[indexing] Brave Search URL submission remains manual: ${BRAVE_SUBMIT_URL}`);
+  console.log('[indexing] DuckDuckGo typically reflects Bing indexing, so successful Bing/IndexNow submissions help DuckDuckGo visibility.');
 
   try {
     const serviceAccount = await loadGoogleServiceAccount();
