@@ -353,7 +353,7 @@ function normalizeConfig(cfg: AnalyticsConfig): AnalyticsConfig {
     batchSize: clampInt(cfg.batchSize, 1, 1000, DEFAULT_CONFIG.batchSize),
     maxDailyRequests: clampInt(cfg.maxDailyRequests, 1, 1000, DEFAULT_CONFIG.maxDailyRequests),
     maxRetry: clampInt(cfg.maxRetry, 0, 20, DEFAULT_CONFIG.maxRetry),
-    flushMode: cfg.flushMode === 'time_based' ? 'time_based' : 'next_day',
+    flushMode: cfg.flushMode === 'time_based' ? 'time_based' : cfg.flushMode === 'weekly' ? 'weekly' : 'next_day',
     lowUsageFlushMinutes: clampInt(cfg.lowUsageFlushMinutes, 1, 10080, DEFAULT_CONFIG.lowUsageFlushMinutes),
     midUsageFlushMinutes: clampInt(cfg.midUsageFlushMinutes, 1, 10080, DEFAULT_CONFIG.midUsageFlushMinutes),
     highUsageFlushMinutes: clampInt(cfg.highUsageFlushMinutes, 1, 10080, DEFAULT_CONFIG.highUsageFlushMinutes),
