@@ -214,7 +214,7 @@ export class DebugPanel {
     panel.innerHTML = `
       <div id="${PANEL_ID}-header">
         <h3>🔍 CQD Debug Panel</h3>
-        <button id="${PANEL_ID}-close" title="Close">&times;</button>
+        <button id="${PANEL_ID}-close" aria-label="Close debug panel" title="Close">&times;</button>
       </div>
       <div id="${PANEL_ID}-body">Loading...</div>
     `;
