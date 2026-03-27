@@ -8,6 +8,7 @@
 
 import {
   GOLDEN_SELECTORS,
+  USER_CONTENT_EXCLUSION_SELECTOR,
   CONFIDENCE_WEIGHTS,
   normalizeText,
   normalizeForComparison,
@@ -227,7 +228,7 @@ function executeEditedLayer3(post: HTMLElement, keywords: string[]): LayerResult
             return NodeFilter.FILTER_REJECT;
           }
 
-          if (GOLDEN_SELECTORS.userContentExclusions.some((selector) => element.matches(selector))) {
+          if (element.matches(USER_CONTENT_EXCLUSION_SELECTOR)) {
             return NodeFilter.FILTER_REJECT;
           }
 
@@ -356,11 +357,13 @@ function executeEditedLayer4(post: HTMLElement, matchedText: string | null): Lay
     };
   }
   
+  const normalizedMatchText = normalizeForComparison(matchedText);
+
   for (const selector of GOLDEN_SELECTORS.userContentExclusions.slice(0, 4)) {
     const userContent = post.querySelector(selector);
     if (userContent) {
       const userText = normalizeForComparison(userContent.textContent || '');
-      if (userText.includes(normalizeForComparison(matchedText))) {
+      if (userText.includes(normalizedMatchText)) {
         return {
           score: CONFIDENCE_WEIGHTS.LAYER_4_EXCLUSION,
           matchedText,

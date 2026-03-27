@@ -17,6 +17,7 @@
 
 import {
   GOLDEN_SELECTORS,
+  USER_CONTENT_EXCLUSION_SELECTOR,
   CONFIDENCE_WEIGHTS,
   normalizeText,
   normalizeForComparison,
@@ -453,7 +454,7 @@ function executeLayer4_NuclearScan(post: HTMLElement, keywords: CommentKeywords)
             return NodeFilter.FILTER_REJECT;
           }
 
-          if (GOLDEN_SELECTORS.userContentExclusions.some((selector) => element.matches(selector))) {
+          if (element.matches(USER_CONTENT_EXCLUSION_SELECTOR)) {
             return NodeFilter.FILTER_REJECT;
           }
 

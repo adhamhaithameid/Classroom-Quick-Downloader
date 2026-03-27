@@ -639,6 +639,9 @@ export const GOLDEN_SELECTORS = {
   ],
 };
 
+/** Pre-joined selector for all user content exclusions to optimize element.matches() calls */
+export const USER_CONTENT_EXCLUSION_SELECTOR = GOLDEN_SELECTORS.userContentExclusions.join(',');
+
 // ============================================================================
 // CONFIDENCE WEIGHTS
 // ============================================================================
