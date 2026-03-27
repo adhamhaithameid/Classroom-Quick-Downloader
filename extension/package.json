@@ -49,7 +49,7 @@
     "@vitest/coverage-v8": "^4.1.0",
     "@wxt-dev/module-react": "^1.2.2",
     "fake-indexeddb": "^6.2.5",
-    "happy-dom": "^20.8.4",
+    "happy-dom": "^20.8.9",
     "jsdom": "^29.0.0",
     "typescript": "^5.9.3",
     "vitest": "^4.1.0",
