@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import worker from "../src/index";
 import type { Env } from "../src/types";
+import { TEST_DO_SHARED_SECRET, TEST_DASHBOARD_PASSWORD, TEST_DANGER_PASSWORD } from "./helpers/dummy-secrets";
 
 type Prepared = {
   bind: (...args: unknown[]) => Prepared;
@@ -48,9 +49,9 @@ function makeEnv(overrides: Partial<Env> = {}): Env {
 
   return {
     DOWNLOADS_DO: namespace as unknown as DurableObjectNamespace,
-    DO_SHARED_SECRET: "do-shared-secret",
-    DASHBOARD_PASSWORD: "dashboard-secret",
-    DANGER_PASSWORD: "danger-secret",
+    DO_SHARED_SECRET: TEST_DO_SHARED_SECRET,
+    DASHBOARD_PASSWORD: TEST_DASHBOARD_PASSWORD,
+    DANGER_PASSWORD: TEST_DANGER_PASSWORD,
     ORACLE_ENDPOINT: "https://oracle.example.com/ingest-batch",
     MAX_BATCH_EVENTS: "10000",
     SITE_CACHE_DB: d1,
@@ -67,7 +68,7 @@ describe("D1 console query guard", () => {
         headers: {
           "content-type": "application/json",
           "X-Requested-With": "XMLHttpRequest",
-          "X-Admin-Secret": "do-shared-secret",
+          "X-Admin-Secret": TEST_DO_SHARED_SECRET,
         },
         body: JSON.stringify({ query: "UPDATE site_snapshot_cache SET generated_at_utc = 1" }),
       }),
@@ -88,7 +89,7 @@ describe("D1 console query guard", () => {
         headers: {
           "content-type": "application/json",
           "X-Requested-With": "XMLHttpRequest",
-          "X-Admin-Secret": "do-shared-secret",
+          "X-Admin-Secret": TEST_DO_SHARED_SECRET,
         },
         body: JSON.stringify({ query: "SELECT * FROM site_snapshot_cache" }),
       }),
@@ -109,7 +110,7 @@ describe("D1 console query guard", () => {
         headers: {
           "content-type": "application/json",
           "X-Requested-With": "XMLHttpRequest",
-          "X-Admin-Secret": "do-shared-secret",
+          "X-Admin-Secret": TEST_DO_SHARED_SECRET,
         },
         body: JSON.stringify({ query: "SELECT snapshot_id, generated_at_utc FROM site_snapshot_cache", maxRows: 50 }),
       }),
