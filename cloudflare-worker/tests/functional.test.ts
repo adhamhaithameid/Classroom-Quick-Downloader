@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import worker from '../src/index';
 import type { Env } from '../src/types';
+import { TEST_DASHBOARD_PASSWORD, TEST_DANGER_PASSWORD, TEST_SHARED_SECRET } from "./helpers/dummy-secrets";
 
 function env(
   overrides: Partial<Env> = {},
@@ -21,9 +22,9 @@ function env(
   };
   return {
     DOWNLOADS_DO: namespace as unknown as DurableObjectNamespace,
-    DO_SHARED_SECRET: 'shared-secret',
-    DASHBOARD_PASSWORD: 'dashboard-secret',
-    DANGER_PASSWORD: 'danger-secret',
+    DO_SHARED_SECRET: TEST_SHARED_SECRET,
+    DASHBOARD_PASSWORD: TEST_DASHBOARD_PASSWORD,
+    DANGER_PASSWORD: TEST_DANGER_PASSWORD,
     ORACLE_ENDPOINT: 'https://oracle.example.com/ingest-batch',
     MAX_BATCH_EVENTS: '10000',
     CORS_ALLOWED_ORIGINS: 'https://classroom-quick-downloader-website.pages.dev',
