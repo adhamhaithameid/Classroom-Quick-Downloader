@@ -1579,13 +1579,13 @@ export function ToggleRow({
       <label
         className="cqd-toggle-text"
         htmlFor={inputId}
-        style={{ cursor: isDisabled ? 'not-allowed' : 'pointer' }}
+        style={{ cursor: isDisabled ? 'not-allowed' : 'pointer', display: 'block' }}
       >
-        <div className="cqd-toggle-label">{label}</div>
+        <span className="cqd-toggle-label" style={{ display: 'block' }}>{label}</span>
         {description && (
-          <p id={descriptionId} className="cqd-toggle-description">
+          <span id={descriptionId} className="cqd-toggle-description" style={{ display: 'block' }}>
             {description}
-          </p>
+          </span>
         )}
       </label>
       <label
