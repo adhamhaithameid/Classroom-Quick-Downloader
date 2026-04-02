@@ -1554,6 +1554,7 @@ export function ToggleRow({
 }: ToggleRowProps) {
   const isDisabled = !!disabled || !!loading;
   const descriptionId = useId();
+  const inputId = useId();
 
   const handleChange = () => {
     if (!isDisabled) {
@@ -1575,9 +1576,9 @@ export function ToggleRow({
         primary ? 'cqd-toggle-row-primary' : ''
       } ${isDisabled ? 'disabled' : ''}`}
     >
-      <div
+      <label
         className="cqd-toggle-text"
-        onClick={handleChange}
+        htmlFor={inputId}
         style={{ cursor: isDisabled ? 'not-allowed' : 'pointer' }}
       >
         <div className="cqd-toggle-label">{label}</div>
@@ -1586,11 +1587,12 @@ export function ToggleRow({
             {description}
           </p>
         )}
-      </div>
+      </label>
       <label
         className={`cqd-switch ${loading ? 'cqd-switch-loading' : ''}`}
       >
         <input
+          id={inputId}
           type="checkbox"
           checked={checked}
           disabled={isDisabled}
