@@ -125,15 +125,6 @@ const PANEL_STYLES = `
   .cqd-dbg-flag.none { border-left-color: #444; opacity: 0.5; }
 `;
 
-function escapeHtml(value: unknown): string {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
 // ============================================================================
 // PANEL CLASS
 // ============================================================================
@@ -211,13 +202,24 @@ export class DebugPanel {
     // Create panel
     const panel = document.createElement('div');
     panel.id = PANEL_ID;
-    panel.innerHTML = `
-      <div id="${PANEL_ID}-header">
-        <h3>🔍 CQD Debug Panel</h3>
-        <button id="${PANEL_ID}-close" title="Close">&times;</button>
-      </div>
-      <div id="${PANEL_ID}-body">Loading...</div>
-    `;
+
+    const header = document.createElement('div');
+    header.id = `${PANEL_ID}-header`;
+    const title = document.createElement('h3');
+    title.textContent = '🔍 CQD Debug Panel';
+    const closeBtn = document.createElement('button');
+    closeBtn.id = `${PANEL_ID}-close`;
+    closeBtn.title = 'Close';
+    closeBtn.textContent = '×';
+    header.appendChild(title);
+    header.appendChild(closeBtn);
+
+    const body = document.createElement('div');
+    body.id = `${PANEL_ID}-body`;
+    body.textContent = 'Loading...';
+
+    panel.appendChild(header);
+    panel.appendChild(body);
 
     document.body.appendChild(panel);
     this.panelEl = panel;
@@ -291,129 +293,116 @@ export class DebugPanel {
     const v2Engine = engineRegistry.getEngine('engine-v2');
     const shadowReport = orchestrator.getShadowReport();
 
-    let html = '';
-    const safeMode = escapeHtml(mode);
-    const safeCurrentView = escapeHtml(currentView || 'none');
-    const safeActiveEngines = escapeHtml(
-      activeEngines.map((e) => `${e.name} v${e.version}`).join(', ') || 'none',
-    );
+    const fragment = document.createDocumentFragment();
+
+    const createSection = (title: string) => {
+      const section = document.createElement('div');
+      section.className = 'cqd-dbg-section';
+      const label = document.createElement('div');
+      label.className = 'cqd-dbg-label';
+      label.textContent = title;
+      section.appendChild(label);
+      return section;
+    };
+
+    const createRow = (key: string, val: string, valClass: string = '') => {
+      const row = document.createElement('div');
+      row.className = 'cqd-dbg-row';
+      const keySpan = document.createElement('span');
+      keySpan.className = 'cqd-dbg-key';
+      keySpan.textContent = key;
+      const valSpan = document.createElement('span');
+      valSpan.className = `cqd-dbg-val ${valClass}`.trim();
+      valSpan.textContent = val;
+      row.appendChild(keySpan);
+      row.appendChild(valSpan);
+      return row;
+    };
 
     // --- Engine State Section ---
-    html += `
-      <div class="cqd-dbg-section">
-        <div class="cqd-dbg-label">Engine State</div>
-        <div class="cqd-dbg-row">
-          <span class="cqd-dbg-key">Mode</span>
-          <span class="cqd-dbg-val ${mode === 'shadow' ? 'warn' : mode === 'v2' ? 'good' : ''}">${safeMode}</span>
-        </div>
-        <div class="cqd-dbg-row">
-          <span class="cqd-dbg-key">View</span>
-          <span class="cqd-dbg-val">${safeCurrentView}</span>
-        </div>
-        <div class="cqd-dbg-row">
-          <span class="cqd-dbg-key">Active Engines</span>
-          <span class="cqd-dbg-val">${safeActiveEngines}</span>
-        </div>
-      </div>
-    `;
+    const engineSection = createSection('Engine State');
+    engineSection.appendChild(createRow('Mode', mode || 'none', mode === 'shadow' ? 'warn' : mode === 'v2' ? 'good' : ''));
+    engineSection.appendChild(createRow('View', currentView || 'none'));
+    const activeEnginesStr = activeEngines.map((e) => `${e.name} v${e.version}`).join(', ') || 'none';
+    engineSection.appendChild(createRow('Active Engines', activeEnginesStr));
+    fragment.appendChild(engineSection);
 
     // --- Shadow Comparison Section ---
     if (mode === 'shadow' && shadowReport) {
+      const shadowSection = createSection('Shadow Comparison');
       const matchClass = shadowReport.matchPercentage >= 95 ? 'good' :
                          shadowReport.matchPercentage >= 80 ? 'warn' : 'bad';
-      html += `
-        <div class="cqd-dbg-section">
-          <div class="cqd-dbg-label">Shadow Comparison</div>
-          <div class="cqd-dbg-row">
-            <span class="cqd-dbg-key">Match Rate</span>
-            <span class="cqd-dbg-val ${matchClass}">${shadowReport.matchPercentage.toFixed(1)}%</span>
-          </div>
-          <div class="cqd-dbg-row">
-            <span class="cqd-dbg-key">Posts Analyzed</span>
-            <span class="cqd-dbg-val">${shadowReport.postsAnalyzed}</span>
-          </div>
-          <div class="cqd-dbg-row">
-            <span class="cqd-dbg-key">Mismatches</span>
-            <span class="cqd-dbg-val ${shadowReport.mismatchCount > 0 ? 'bad' : 'good'}">${shadowReport.mismatchCount}</span>
-          </div>
-          <div class="cqd-dbg-row">
-            <span class="cqd-dbg-key">Duration</span>
-            <span class="cqd-dbg-val">${shadowReport.duration_ms}ms</span>
-          </div>
-        </div>
-      `;
+      shadowSection.appendChild(createRow('Match Rate', `${shadowReport.matchPercentage.toFixed(1)}%`, matchClass));
+      shadowSection.appendChild(createRow('Posts Analyzed', String(shadowReport.postsAnalyzed)));
+      shadowSection.appendChild(createRow('Mismatches', String(shadowReport.mismatchCount), shadowReport.mismatchCount > 0 ? 'bad' : 'good'));
+      shadowSection.appendChild(createRow('Duration', `${shadowReport.duration_ms}ms`));
+      fragment.appendChild(shadowSection);
     }
 
     // --- V2 Flag Decisions Section ---
     if (v2Engine) {
       const flagDecisions = v2Engine.getFlagDecisions();
       const trackedPosts = v2Engine.getTrackedPosts();
-
-      html += `
-        <div class="cqd-dbg-section">
-          <div class="cqd-dbg-label">V2 Flags (${flagDecisions.length} decisions, ${trackedPosts.length} posts)</div>
-      `;
+      const flagSection = createSection(`V2 Flags (${flagDecisions.length} decisions, ${trackedPosts.length} posts)`);
 
       if (flagDecisions.length === 0) {
-        html += `<div style="color: #666; font-style: italic;">No flag decisions yet</div>`;
+        const noFlags = document.createElement('div');
+        noFlags.style.color = '#666';
+        noFlags.style.fontStyle = 'italic';
+        noFlags.textContent = 'No flag decisions yet';
+        flagSection.appendChild(noFlags);
       } else {
-        // Show at most 10 flag decisions
         const shown = flagDecisions.slice(0, 10);
         for (const decision of shown) {
           const verdictClass = decision.finalVerdict === 'both' ? 'both' :
                               decision.finalVerdict === 'comment' ? 'comment' :
                               decision.finalVerdict === 'edited' ? 'edited' : 'none';
-          const safePostId = escapeHtml(`${decision.postId.slice(0, 12)}…`);
-          const safeVerdict = escapeHtml(decision.finalVerdict);
-          const safeCommentScore = escapeHtml(decision.commentScore);
-          const safeEditedScore = escapeHtml(decision.editedScore);
-          const safeConfidence = escapeHtml(decision.confidence);
-          html += `
-            <div class="cqd-dbg-flag ${verdictClass}">
-              <div class="cqd-dbg-row">
-                <span class="cqd-dbg-key">${safePostId}</span>
-                <span class="cqd-dbg-val">${safeVerdict}</span>
-              </div>
-              <div class="cqd-dbg-row" style="font-size: 10px; opacity: 0.7;">
-                <span>C:${safeCommentScore} E:${safeEditedScore}</span>
-                <span>conf: ${safeConfidence}</span>
-              </div>
-            </div>
-          `;
+
+          const flagDiv = document.createElement('div');
+          flagDiv.className = `cqd-dbg-flag ${verdictClass}`;
+
+          flagDiv.appendChild(createRow(`${decision.postId.slice(0, 12)}…`, decision.finalVerdict));
+
+          const detailsRow = document.createElement('div');
+          detailsRow.className = 'cqd-dbg-row';
+          detailsRow.style.fontSize = '10px';
+          detailsRow.style.opacity = '0.7';
+
+          const scoresSpan = document.createElement('span');
+          scoresSpan.textContent = `C:${decision.commentScore} E:${decision.editedScore}`;
+          const confSpan = document.createElement('span');
+          confSpan.textContent = `conf: ${decision.confidence}`;
+
+          detailsRow.appendChild(scoresSpan);
+          detailsRow.appendChild(confSpan);
+          flagDiv.appendChild(detailsRow);
+
+          flagSection.appendChild(flagDiv);
         }
         if (flagDecisions.length > 10) {
-          html += `<div style="color: #666; text-align: center;">+${flagDecisions.length - 10} more</div>`;
+          const moreDiv = document.createElement('div');
+          moreDiv.style.color = '#666';
+          moreDiv.style.textAlign = 'center';
+          moreDiv.textContent = `+${flagDecisions.length - 10} more`;
+          flagSection.appendChild(moreDiv);
         }
       }
-
-      html += `</div>`;
+      fragment.appendChild(flagSection);
     }
 
     // --- V2 Performance Section ---
     if (v2Engine) {
       const posts = v2Engine.getTrackedPosts();
       const placements = v2Engine.getPlacementDecisions();
+      const perfSection = createSection('V2 Model');
 
-      html += `
-        <div class="cqd-dbg-section">
-          <div class="cqd-dbg-label">V2 Model</div>
-          <div class="cqd-dbg-row">
-            <span class="cqd-dbg-key">Tracked Posts</span>
-            <span class="cqd-dbg-val">${posts.length}</span>
-          </div>
-          <div class="cqd-dbg-row">
-            <span class="cqd-dbg-key">Total Files</span>
-            <span class="cqd-dbg-val">${posts.reduce((sum, p) => sum + p.files.length, 0)}</span>
-          </div>
-          <div class="cqd-dbg-row">
-            <span class="cqd-dbg-key">Placements</span>
-            <span class="cqd-dbg-val">${placements.length}</span>
-          </div>
-        </div>
-      `;
+      perfSection.appendChild(createRow('Tracked Posts', String(posts.length)));
+      perfSection.appendChild(createRow('Total Files', String(posts.reduce((sum, p) => sum + p.files.length, 0))));
+      perfSection.appendChild(createRow('Placements', String(placements.length)));
+      fragment.appendChild(perfSection);
     }
 
-    body.innerHTML = html;
+    body.replaceChildren(fragment);
   }
 }
 
