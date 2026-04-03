@@ -50,6 +50,8 @@ interface CachedKeywords {
   lang: string;
   comment: CommentKeywords;
   edited: string[];
+  combinedComment?: CommentKeywords;
+  combinedEdited?: string[];
   loadedAt: number;
 }
 
@@ -167,6 +169,62 @@ export function getEditedKeywords(lang: string): string[] {
   });
 
   return edited;
+}
+
+/**
+ * Get combined, deduplicated comment keywords for a language (includes English and Arabic fallbacks).
+ * Cached so that subsequent calls during a DOM scan do not repeat allocations.
+ *
+ * @param lang - Language code
+ * @returns CommentKeywords combining lang, en, and ar
+ */
+export function getCombinedCommentKeywords(lang: string): CommentKeywords {
+  // Ensure the base language is loaded and cached
+  getCommentKeywords(lang);
+
+  const cached = keywordCache.get(lang)!;
+  if (cached.combinedComment) {
+    return cached.combinedComment;
+  }
+
+  const keywords = cached.comment;
+  const enKeywords = getCommentKeywords('en');
+  const arKeywords = getCommentKeywords('ar');
+
+  const combined: CommentKeywords = {
+    singular: [...new Set([...keywords.singular, ...enKeywords.singular, ...arKeywords.singular])],
+    plural: [...new Set([...keywords.plural, ...enKeywords.plural, ...arKeywords.plural])],
+    classComment: [...new Set([...keywords.classComment, ...enKeywords.classComment, ...arKeywords.classComment])],
+  };
+
+  cached.combinedComment = combined;
+  return combined;
+}
+
+/**
+ * Get combined, deduplicated edited keywords for a language (includes English and Arabic fallbacks).
+ * Cached so that subsequent calls during a DOM scan do not repeat allocations.
+ *
+ * @param lang - Language code
+ * @returns Array of edited keyword strings combining lang, en, and ar
+ */
+export function getCombinedEditedKeywords(lang: string): string[] {
+  // Ensure the base language is loaded and cached
+  getEditedKeywords(lang);
+
+  const cached = keywordCache.get(lang)!;
+  if (cached.combinedEdited) {
+    return cached.combinedEdited;
+  }
+
+  const keywords = cached.edited;
+  const enKeywords = getEditedKeywords('en');
+  const arKeywords = getEditedKeywords('ar');
+
+  const combined = [...new Set([...keywords, ...enKeywords, ...arKeywords])];
+
+  cached.combinedEdited = combined;
+  return combined;
 }
 
 /**
