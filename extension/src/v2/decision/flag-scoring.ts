@@ -474,7 +474,7 @@ function commentLayer3_GoldenSelectors(post: HTMLElement, keywords: CommentKeywo
  * Score: LOW_CONFIDENCE (15) + bonuses.
  */
 function commentLayer4_Nuclear(post: HTMLElement, keywords: CommentKeywords): CommentLayerResult {
-  const userContentSelectors = getUserContentSelectors();
+  const combinedUserContentSelector = getUserContentSelectors().join(', ');
 
   const walker = document.createTreeWalker(
     post,
@@ -488,7 +488,7 @@ function commentLayer4_Nuclear(post: HTMLElement, keywords: CommentKeywords): Co
             return NodeFilter.FILTER_REJECT;
           }
           // Skip user content areas
-          if (userContentSelectors.some(s => el.matches(s))) {
+          if (combinedUserContentSelector && el.matches(combinedUserContentSelector)) {
             return NodeFilter.FILTER_REJECT;
           }
           // Skip hidden elements
@@ -626,7 +626,7 @@ function editedLayer2_Semantic(post: HTMLElement, keywords: string[]): EditedLay
  * Score: LAYER_3_STRUCTURAL (20) + bonuses.
  */
 function editedLayer3_TreeWalker(post: HTMLElement, keywords: string[]): EditedLayerResult {
-  const userContentSelectors = getUserContentSelectors();
+  const combinedUserContentSelector = getUserContentSelectors().join(', ');
 
   const walker = document.createTreeWalker(
     post,
@@ -639,7 +639,7 @@ function editedLayer3_TreeWalker(post: HTMLElement, keywords: string[]): EditedL
           if (tag === 'script' || tag === 'style' || tag === 'noscript') {
             return NodeFilter.FILTER_REJECT;
           }
-          if (userContentSelectors.some(s => el.matches(s))) {
+          if (combinedUserContentSelector && el.matches(combinedUserContentSelector)) {
             return NodeFilter.FILTER_REJECT;
           }
           try {
@@ -749,9 +749,10 @@ function editedLayer4_Exclusion(post: HTMLElement, matchedText: string | null): 
 
   // Check if matched text appears in user content areas
   const userContentSelectors = getUserContentSelectors().slice(0, 4);
-  for (const selector of userContentSelectors) {
-    const userContent = post.querySelector(selector);
-    if (userContent) {
+  const combinedSelector = userContentSelectors.join(', ');
+  if (combinedSelector) {
+    const userContentNodes = post.querySelectorAll(combinedSelector);
+    for (const userContent of userContentNodes) {
       const userText = normalizeForComparison(userContent.textContent || '');
       if (userText.includes(normalizeForComparison(matchedText))) {
         return {
@@ -759,7 +760,8 @@ function editedLayer4_Exclusion(post: HTMLElement, matchedText: string | null): 
           matchedText,
           hasDateProximity: false,
           usedParentContext: false,
-          details: `EditedL4: PENALTY - Found in user content "${selector}"`,
+          // Since we query all selectors at once, we use the combined string for the details
+          details: `EditedL4: PENALTY - Found in user content`,
         };
       }
     }
