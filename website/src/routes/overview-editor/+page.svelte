@@ -68,6 +68,57 @@
     return normalized.startsWith('v') ? normalized : `v${normalized}`;
   }
 
+  function toReleaseLabel(value: string | null | undefined): string | null {
+    const normalized = (value ?? '').trim();
+    if (!normalized) return null;
+    return normalized.startsWith('v') ? normalized : `v${normalized}`;
+  }
+
+  function parseSemverTuple(label: string | null): [number, number, number] | null {
+    if (!label) return null;
+    const match = label.replace(/^v/, '').match(/^(\d+)\.(\d+)\.(\d+)$/);
+    if (!match) return null;
+    return [Number(match[1]), Number(match[2]), Number(match[3])];
+  }
+
+  function compareSemverTuple(a: [number, number, number], b: [number, number, number]): number {
+    if (a[0] !== b[0]) return a[0] - b[0];
+    if (a[1] !== b[1]) return a[1] - b[1];
+    return a[2] - b[2];
+  }
+
+  function pickLatestReleaseVersion(candidates: Array<string | null | undefined>): string {
+    let bestLabel: string | null = null;
+    let bestTuple: [number, number, number] | null = null;
+
+    for (const candidate of candidates) {
+      const label = toReleaseLabel(candidate);
+      if (!label) continue;
+
+      const tuple = parseSemverTuple(label);
+      if (!bestLabel) {
+        bestLabel = label;
+        bestTuple = tuple;
+        continue;
+      }
+
+      if (tuple && bestTuple) {
+        if (compareSemverTuple(tuple, bestTuple) > 0) {
+          bestLabel = label;
+          bestTuple = tuple;
+        }
+        continue;
+      }
+
+      if (tuple && !bestTuple) {
+        bestLabel = label;
+        bestTuple = tuple;
+      }
+    }
+
+    return normalizeReleaseVersion(bestLabel ?? APP_VERSION);
+  }
+
   let latestReleaseVersion = normalizeReleaseVersion(APP_VERSION);
 
   $: softwareApplicationStructuredData = {
@@ -1286,14 +1337,14 @@
       downloadCount = snapshot.overview.totals.downloads;
       userCount = computeUsersTotal(snapshot.overview);
       countryCount = snapshot.map.totals.countries;
-      latestReleaseVersion = normalizeReleaseVersion(
-        snapshot.changelog.entries[0]?.version ??
-          snapshot.overview.versions.github ??
-          snapshot.overview.versions.chrome ??
-          snapshot.overview.versions.firefox ??
-          snapshot.overview.versions.edge ??
-          APP_VERSION
-      );
+      latestReleaseVersion = pickLatestReleaseVersion([
+        snapshot.changelog.entries[0]?.version,
+        snapshot.overview.versions.github,
+        snapshot.overview.versions.chrome,
+        snapshot.overview.versions.firefox,
+        snapshot.overview.versions.edge,
+        APP_VERSION
+      ]);
     } else {
       overview = null;
       mapData = null;
@@ -1764,7 +1815,7 @@
           <div class="l2-proof-label">Active Users</div>
         </div>
         <div class="l2-proof-card"><div class="l2-proof-num"><AnimatedNumber value={100} suffix="+" animated /></div><div class="l2-proof-label">Languages</div></div>
-        <div class="l2-proof-card"><div class="l2-proof-num"><AnimatedNumericText text={latestReleaseVersion} /></div><div class="l2-proof-label">Latest Release</div></div>
+        <div class="l2-proof-card"><div class="l2-proof-num"><AnimatedNumericText text={latestReleaseVersion} animated stableInitial /></div><div class="l2-proof-label">Latest Release</div></div>
       </div>
     </div>
   </section>
