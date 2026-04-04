@@ -4,6 +4,7 @@
   export let text = '';
   export let useGrouping = false;
   export let animated = false;
+  export let stableInitial = false;
 
   type Segment =
     | { kind: 'text'; value: string }
@@ -46,7 +47,12 @@
 
 {#each segments as segment}
   {#if segment.kind === 'number'}
-    <AnimatedNumber value={segment.value} format={segment.format} {animated} />
+    <AnimatedNumber
+      value={segment.value}
+      format={segment.format}
+      {animated}
+      initialValue={stableInitial ? segment.value : null}
+    />
   {:else}
     {segment.value}
   {/if}

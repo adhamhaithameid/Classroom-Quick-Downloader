@@ -5,7 +5,7 @@ const publicEnv = publicEnvModule as Record<string, string | undefined>;
 const DEFAULT_SITE_URL = 'https://classroom-quick-downloader.adhamhaithameid.is-a.dev';
 const DEFAULT_WORKER_URL = 'https://cqd-analytics.adhamhaithameid.workers.dev';
 const DEFAULT_ORACLE_URL = DEFAULT_WORKER_URL;
-const DEFAULT_APP_VERSION = 'v1.5.0';
+const DEFAULT_APP_VERSION = 'v1.5.5';
 const DEFAULT_GOOGLE_SITE_VERIFICATION = 'ztz5RVR7CeToYxt4nB4AEJMFmdD0LhgLHEjgvGFII-4';
 
 function cleanBaseUrl(value: string): string {

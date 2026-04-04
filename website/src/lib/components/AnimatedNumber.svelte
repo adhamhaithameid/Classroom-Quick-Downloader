@@ -6,6 +6,7 @@
   import { onMount } from 'svelte';
 
   export let value: number = 0;
+  export let initialValue: number | null = null;
   export let suffix: string = '';
   export let prefix: string = '';
   export let format: Intl.NumberFormatOptions = { useGrouping: true };
@@ -15,7 +16,7 @@
   export let rootMargin = '0px 0px -8% 0px';
 
   let hostEl: HTMLSpanElement | null = null;
-  let displayValue = 0;
+  let displayValue = Number.isFinite(initialValue) ? Number(initialValue) : 0;
   let formattedValue = '0';
   let hasAnimatedInView = false;
   let rafId: number | null = null;
