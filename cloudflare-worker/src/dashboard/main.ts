@@ -18,7 +18,7 @@ function safeJson(data: unknown): string {
 
 const DASHBOARD_LINKS = {
   workerBaseUrl: "https://cqd-analytics.adhamhaithameid.workers.dev",
-  websitePublicUrl: "https://classroom-quick-downloader-website.pages.dev/",
+  websitePublicUrl: "https://classroom-quick-downloader.adhamhaithameid.is-a.dev/",
   githubRepoUrl: "https://github.com/adhamhaithameid/Classroom-Quick-Downloader",
   googleSheetsUrl:
     "https://docs.google.com/spreadsheets/d/1ptzLKUVnAkyXnT635Zgb1C6Img9aeAZ1se3nRz_QZmI/edit?gid=0#gid=0",

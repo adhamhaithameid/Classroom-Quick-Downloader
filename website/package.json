@@ -38,22 +38,22 @@
 		"d3-geo": "^3.1.1",
 		"d3-scale": "^4.0.2",
 		"iso-3166-1": "^2.1.1",
-		"marked": "^17.0.4",
+		"marked": "^17.0.5",
 		"topojson-client": "^3.1.0",
 		"world-atlas": "^2.0.2"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-static": "^3.0.10",
-		"@sveltejs/kit": "^2.55.0",
+		"@sveltejs/kit": "^2.56.1",
 		"@sveltejs/vite-plugin-svelte": "^7.0.0",
 		"@types/d3-geo": "^3.1.0",
 		"@types/d3-scale": "^4.0.9",
 		"@types/topojson-client": "^3.1.5",
-		"svelte": "^5.54.0",
-		"svelte-check": "^4.4.5",
-		"typescript": "^5.9.3",
-		"vite": "^8.0.1",
-		"vitest": "^4.1.0"
+		"svelte": "^5.55.1",
+		"svelte-check": "^4.4.6",
+		"typescript": "^6.0.2",
+		"vite": "^8.0.3",
+		"vitest": "^4.1.2"
 	},
 	"overrides": {
 		"cookie": "0.7.2"

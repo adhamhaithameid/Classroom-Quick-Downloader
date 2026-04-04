@@ -41,6 +41,7 @@ var (
 
 	defaultPublicWebsiteAllowedOrigins = []string{
 		"https://adhamhaithameid.github.io",
+		"https://classroom-quick-downloader.adhamhaithameid.is-a.dev",
 		"https://classroom-quick-downloader-website.pages.dev",
 		"https://classroom-quick-downloader.pages.dev",
 	}
@@ -604,7 +605,7 @@ func buildPublicWebsiteChangelogSummary(changelog publicWebsiteUserChangelogResp
 }
 
 func buildPublicWebsitePrivacyPointers(ctx context.Context, store *controlPlaneStore) publicWebsitePrivacyPointers {
-	userPrivacyURL := "https://classroom-quick-downloader-website.pages.dev/privacy"
+	userPrivacyURL := "https://classroom-quick-downloader.adhamhaithameid.is-a.dev/privacy"
 	if publicSiteURL := strings.TrimSpace(os.Getenv("PUBLIC_SITE_URL")); publicSiteURL != "" {
 		userPrivacyURL = strings.TrimRight(publicSiteURL, "/") + "/privacy"
 	}

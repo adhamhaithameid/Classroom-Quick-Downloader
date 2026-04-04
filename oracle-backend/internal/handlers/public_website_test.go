@@ -428,6 +428,22 @@ func TestPublicWebsiteHandlers_AllowsCloudflarePagesDefaultOrigin(t *testing.T) 
 	}
 }
 
+func TestPublicWebsiteHandlers_AllowsCustomDomainDefaultOrigin(t *testing.T) {
+	sqlDB := openPublicWebsiteDB(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/public/website/map", nil)
+	req.Header.Set("Origin", "https://classroom-quick-downloader.adhamhaithameid.is-a.dev")
+	rr := httptest.NewRecorder()
+	PublicWebsiteMapHandler(sqlDB, nil).ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+	if rr.Header().Get("Access-Control-Allow-Origin") != "https://classroom-quick-downloader.adhamhaithameid.is-a.dev" {
+		t.Fatalf("unexpected CORS origin header: %q", rr.Header().Get("Access-Control-Allow-Origin"))
+	}
+}
+
 func TestResolvePublicWebsiteAllowedOrigins_IncludesPublicSiteURL(t *testing.T) {
 	t.Setenv("PUBLIC_SITE_URL", "https://example-root-domain.com/path")
 	t.Setenv("PUBLIC_WEBSITE_ALLOWED_ORIGINS", "")

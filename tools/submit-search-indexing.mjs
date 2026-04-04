@@ -3,7 +3,7 @@
 import { createSign } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 
-const DEFAULT_SITE_URL = 'https://classroom-quick-downloader-website.pages.dev';
+const DEFAULT_SITE_URL = 'https://classroom-quick-downloader.adhamhaithameid.is-a.dev';
 const DEFAULT_SITEMAP_PATH = '/sitemap.xml';
 const DEFAULT_INDEXNOW_ENDPOINT = 'https://www.bing.com/indexnow';
 const INDEXNOW_REGISTRY_URL = 'https://www.indexnow.org/searchengines.json';

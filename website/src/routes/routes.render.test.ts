@@ -30,9 +30,10 @@ describe('route render smoke coverage', () => {
   it('renders root homepage content without noindex metadata', () => {
     const { body, head } = render(RootRedirectPage);
     const html = squish(body);
+    const expectedBaseUrl = SITE_URL.replace(/\/+$/, '');
 
     expect(head).toContain('Classroom Quick Downloader | Bulk Download Google Classroom Files');
-    expect(head).toContain('https://classroom-quick-downloader-website.pages.dev/');
+    expect(head).toContain(`${expectedBaseUrl}/`);
     expect(head).toContain('og:image');
     expect(head).toContain('twitter:image');
     expect(head).toContain('fonts.googleapis.com');
@@ -54,13 +55,14 @@ describe('route render smoke coverage', () => {
   it('renders overview page shell, hero copy, and CTA sections', () => {
     const { body, head } = render(OverviewPage);
     const html = squish(body);
+    const expectedBaseUrl = SITE_URL.replace(/\/+$/, '');
 
     expect(head).toContain('Classroom Quick Downloader | Bulk Download Google Classroom Files');
     expect(head).toContain('SoftwareApplication');
     expect(head).toContain('WebSite');
     expect(head).toContain('WebPage');
     expect(head).toContain('Organization');
-    expect(head).toContain('https://classroom-quick-downloader-website.pages.dev/');
+    expect(head).toContain(`${expectedBaseUrl}/`);
     expect(html).toContain('The free extension that');
     expect(html).toContain('supercharges');
     expect(html).toContain('Download all Google Classroom files in one click for every assignment.');
