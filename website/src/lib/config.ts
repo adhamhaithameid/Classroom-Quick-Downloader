@@ -6,7 +6,7 @@ const DEFAULT_SITE_URL = 'https://classroom-quick-downloader.adhamhaithameid.is-
 const DEFAULT_WORKER_URL = 'https://cqd-analytics.adhamhaithameid.workers.dev';
 const DEFAULT_ORACLE_URL = DEFAULT_WORKER_URL;
 const DEFAULT_APP_VERSION = 'v1.5.5';
-const DEFAULT_GOOGLE_SITE_VERIFICATION = 'ztz5RVR7CeToYxt4nB4AEJMFmdD0LhgLHEjgvGFII-4';
+const DEFAULT_GOOGLE_SITE_VERIFICATION = 'qoyovUKFViRL3vVnI2gPpk0kl_4TiLEdj94Co1JdrvI';
 
 function cleanBaseUrl(value: string): string {
   return value.trim().replace(/\/+$/, '');
