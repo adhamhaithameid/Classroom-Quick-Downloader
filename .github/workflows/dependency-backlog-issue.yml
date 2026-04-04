@@ -1,0 +1,129 @@
+name: Dependency Backlog Issue
+
+on:
+  schedule:
+    - cron: '0 8 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  dependency-backlog:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 10.28.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Collect outdated dependencies
+        run: pnpm -r outdated --format json > outdated.json || true
+
+      - name: Create or update dependency backlog issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('node:fs');
+            const title = 'Dependency update backlog';
+            const reportPath = 'outdated.json';
+
+            let parsed = {};
+            try {
+              const raw = fs.readFileSync(reportPath, 'utf8').trim();
+              parsed = raw ? JSON.parse(raw) : {};
+            } catch {
+              parsed = {};
+            }
+
+            const entries = Object.entries(parsed)
+              .map(([name, meta]) => ({ name, ...(meta || {}) }))
+              .sort((a, b) => a.name.localeCompare(b.name));
+
+            const generatedAt = new Date().toISOString();
+            const lines = [];
+            lines.push('## Automated dependency report');
+            lines.push('');
+            lines.push(`Generated at: ${generatedAt}`);
+            lines.push('');
+
+            if (entries.length === 0) {
+              lines.push('No outdated dependencies detected in tracked workspaces.');
+            } else {
+              lines.push(`Found ${entries.length} outdated package(s):`);
+              lines.push('');
+              for (const entry of entries) {
+                const current = entry.current ?? 'unknown';
+                const wanted = entry.wanted ?? 'unknown';
+                const latest = entry.latest ?? 'unknown';
+                const depType = entry.dependencyType ?? 'unknown';
+                const dependents = Array.isArray(entry.dependentPackages) ? entry.dependentPackages : [];
+                const scopes = dependents
+                  .map((pkg) => pkg?.location || pkg?.name)
+                  .filter(Boolean)
+                  .join(', ');
+
+                lines.push(`- \`${entry.name}\` (${depType}): current \`${current}\`, wanted \`${wanted}\`, latest \`${latest}\`${scopes ? ` — ${scopes}` : ''}`);
+              }
+            }
+
+            lines.push('');
+            lines.push('_This issue is auto-managed by `.github/workflows/dependency-backlog-issue.yml`._');
+            const body = lines.join('\n');
+
+            const { owner, repo } = context.repo;
+            const openIssues = await github.paginate(github.rest.issues.listForRepo, {
+              owner,
+              repo,
+              state: 'open',
+              per_page: 100
+            });
+
+            const existing = openIssues.find(
+              (issue) => !issue.pull_request && issue.title === title
+            );
+
+            if (entries.length === 0) {
+              if (existing) {
+                await github.rest.issues.update({
+                  owner,
+                  repo,
+                  issue_number: existing.number,
+                  state: 'closed',
+                  state_reason: 'completed'
+                });
+              }
+              return;
+            }
+
+            if (existing) {
+              await github.rest.issues.update({
+                owner,
+                repo,
+                issue_number: existing.number,
+                body
+              });
+              return;
+            }
+
+            await github.rest.issues.create({
+              owner,
+              repo,
+              title,
+              body,
+              labels: ['dependencies']
+            });
