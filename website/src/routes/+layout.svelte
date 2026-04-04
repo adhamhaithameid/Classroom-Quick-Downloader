@@ -339,15 +339,19 @@
     z-index: 100;
     isolation: isolate;
     background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(240, 246, 252, 0.5)),
-      rgba(238, 244, 251, 0.4);
-    backdrop-filter: blur(22px) saturate(175%);
-    -webkit-backdrop-filter: blur(22px) saturate(175%);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.7);
+      linear-gradient(
+        135deg,
+        rgba(255, 255, 255, 0.52),
+        rgba(255, 255, 255, 0.3) 42%,
+        rgba(255, 255, 255, 0.16)
+      ),
+      rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(26px) saturate(140%);
+    -webkit-backdrop-filter: blur(26px) saturate(140%);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.55);
     box-shadow:
-      0 10px 28px rgba(15, 20, 25, 0.14),
-      inset 0 1px 0 rgba(255, 255, 255, 0.92),
-      inset 0 -1px 0 rgba(255, 255, 255, 0.35);
+      0 8px 24px rgba(15, 20, 25, 0.12),
+      inset 0 1px 0 rgba(255, 255, 255, 0.8);
     padding: 12px 0;
     transition: transform 0.24s ease, opacity 0.24s ease;
   }
@@ -359,13 +363,25 @@
     z-index: -1;
     pointer-events: none;
     background:
-      radial-gradient(120% 120% at 0% 0%, rgba(255, 255, 255, 0.48), rgba(255, 255, 255, 0) 55%),
-      radial-gradient(80% 120% at 100% 0%, rgba(157, 211, 255, 0.2), rgba(157, 211, 255, 0) 65%);
+      radial-gradient(110% 140% at 0% 0%, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0) 58%),
+      radial-gradient(95% 130% at 100% 0%, rgba(204, 222, 255, 0.2), rgba(204, 222, 255, 0) 64%);
+  }
+
+  .l2-nav-shell::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 1px;
+    pointer-events: none;
+    background: rgba(255, 255, 255, 0.72);
+    opacity: 0.85;
   }
 
   @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
     .l2-nav-shell {
-      background: rgba(246, 250, 253, 0.96);
+      background: rgba(248, 250, 253, 0.96);
     }
   }
 
