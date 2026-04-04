@@ -146,8 +146,11 @@ jobs:
           set -euo pipefail
           worker_base="${PUBLIC_WORKER_BASE_URL%/}"
           site_origin="$(printf '%s' "${PUBLIC_SITE_URL}" | sed -E 's#(https?://[^/]+).*#\1#')"
+          legacy_site_origin="https://classroom-quick-downloader-website.pages.dev"
           if [ "${DEPLOYED}" != "true" ]; then
             echo "::notice::Deploy step skipped; running smoke checks against currently active Worker deployment."
+            site_origin="${legacy_site_origin}"
+            echo "::notice::Using legacy origin for ingest smoke check: ${site_origin}"
           fi
 
           health_code="000"
