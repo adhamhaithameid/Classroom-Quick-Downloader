@@ -179,12 +179,11 @@ jobs:
 
           if ! ingest_response="$(post_ingest "${site_origin}")"; then
             if [ "${site_origin}" != "${legacy_site_origin}" ]; then
-              echo "::warning::Primary origin ingest smoke failed; retrying legacy Pages origin."
-              ingest_response="$(post_ingest "${legacy_site_origin}")"
-            else
-              echo "::error::Website ingest smoke check failed for origin ${site_origin}"
-              exit 1
+              echo "::warning::Primary origin ingest smoke failed; checking legacy Pages origin for diagnostics."
+              post_ingest "${legacy_site_origin}" >/tmp/legacy-origin-ingest-smoke.json || true
             fi
+            echo "::error::Website ingest smoke check failed for origin ${site_origin}"
+            exit 1
           fi
           echo "${ingest_response}" | grep -Eq '"ok"[[:space:]]*:[[:space:]]*true'
 
