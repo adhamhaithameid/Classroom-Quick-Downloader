@@ -19,6 +19,21 @@
 		<link rel="icon" href="%sveltekit.assets%/favicon-48x48.png" type="image/png" sizes="48x48" />
 		<link rel="icon" href="%sveltekit.assets%/favicon-192x192.png" type="image/png" sizes="192x192" />
 		<link rel="apple-touch-icon" href="%sveltekit.assets%/apple-touch-icon.png" sizes="180x180" />
+		<script>
+			(() => {
+				try {
+					const legacyHost = 'classroom-quick-downloader-website.pages.dev';
+					const primaryOrigin = 'https://classroom-quick-downloader.adhamhaithameid.is-a.dev';
+					if (window.location.hostname !== legacyHost) return;
+					const target = `${primaryOrigin}${window.location.pathname}${window.location.search}${window.location.hash}`;
+					if (target !== window.location.href) {
+						window.location.replace(target);
+					}
+				} catch {
+					// Keep rendering the current page if redirecting fails.
+				}
+			})();
+		</script>
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">

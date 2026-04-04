@@ -62,12 +62,21 @@
     return normalizedPath === '/' ? `${SITE_URL}/` : `${SITE_URL}${normalizedPath}`;
   }
 
+  function normalizeReleaseVersion(value: string | null | undefined): string {
+    const normalized = (value ?? '').trim();
+    if (!normalized) return APP_VERSION;
+    return normalized.startsWith('v') ? normalized : `v${normalized}`;
+  }
+
+  let latestReleaseVersion = normalizeReleaseVersion(APP_VERSION);
+
   $: softwareApplicationStructuredData = {
     '@context': 'https://schema.org',
     '@type': 'SoftwareApplication',
     name: 'Classroom Quick Downloader',
     applicationCategory: 'BrowserExtension',
     operatingSystem: 'Chrome, Firefox, Edge',
+    softwareVersion: latestReleaseVersion.replace(/^v/, ''),
     offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
     publisher: { '@type': 'Person', name: 'Adham Haitham Eid' },
     url: buildCanonicalUrl(seoPath),
@@ -1277,12 +1286,21 @@
       downloadCount = snapshot.overview.totals.downloads;
       userCount = computeUsersTotal(snapshot.overview);
       countryCount = snapshot.map.totals.countries;
+      latestReleaseVersion = normalizeReleaseVersion(
+        snapshot.changelog.entries[0]?.version ??
+          snapshot.overview.versions.github ??
+          snapshot.overview.versions.chrome ??
+          snapshot.overview.versions.firefox ??
+          snapshot.overview.versions.edge ??
+          APP_VERSION
+      );
     } else {
       overview = null;
       mapData = null;
       downloadCount = null;
       userCount = null;
       countryCount = null;
+      latestReleaseVersion = normalizeReleaseVersion(APP_VERSION);
     }
 
     mapError = $websiteSnapshotStore.errorMessage || '';
@@ -1746,7 +1764,7 @@
           <div class="l2-proof-label">Active Users</div>
         </div>
         <div class="l2-proof-card"><div class="l2-proof-num"><AnimatedNumber value={100} suffix="+" animated /></div><div class="l2-proof-label">Languages</div></div>
-        <div class="l2-proof-card"><div class="l2-proof-num"><AnimatedNumericText text={APP_VERSION} animated /></div><div class="l2-proof-label">Latest Release</div></div>
+        <div class="l2-proof-card"><div class="l2-proof-num"><AnimatedNumericText text={latestReleaseVersion} animated /></div><div class="l2-proof-label">Latest Release</div></div>
       </div>
     </div>
   </section>

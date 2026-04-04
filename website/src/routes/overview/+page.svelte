@@ -64,9 +64,16 @@
     return normalizedPath === '/' ? `${SITE_URL}/` : `${SITE_URL}${normalizedPath}`;
   }
 
+  function normalizeReleaseVersion(value: string | null | undefined): string {
+    const normalized = (value ?? '').trim();
+    if (!normalized) return APP_VERSION;
+    return normalized.startsWith('v') ? normalized : `v${normalized}`;
+  }
+
   const DEMO_VIDEO_PAGE_PATH = '/watch/cqd-demo';
   const COMPARISON_VIDEO_PAGE_PATH = '/watch/manual-vs-cqd';
   const VIDEO_UPLOAD_DATE = '2026-03-04T00:00:00+00:00';
+  let latestReleaseVersion = normalizeReleaseVersion(APP_VERSION);
 
   $: softwareApplicationStructuredData = {
     '@context': 'https://schema.org',
@@ -80,7 +87,7 @@
     image: `${SITE_URL}/images/cqd-social-card.png`,
     screenshot: `${SITE_URL}/images/solution-flags.webp`,
     isAccessibleForFree: true,
-    softwareVersion: APP_VERSION.replace(/^v/, ''),
+    softwareVersion: latestReleaseVersion.replace(/^v/, ''),
     offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
     publisher: { '@id': `${SITE_URL}/#organization` },
     url: buildCanonicalUrl(seoPath),
@@ -1379,12 +1386,21 @@
       downloadCount = snapshot.overview.totals.downloads;
       userCount = computeUsersTotal(snapshot.overview);
       countryCount = snapshot.map.totals.countries;
+      latestReleaseVersion = normalizeReleaseVersion(
+        snapshot.changelog.entries[0]?.version ??
+          snapshot.overview.versions.github ??
+          snapshot.overview.versions.chrome ??
+          snapshot.overview.versions.firefox ??
+          snapshot.overview.versions.edge ??
+          APP_VERSION
+      );
     } else {
       overview = null;
       mapData = null;
       downloadCount = null;
       userCount = null;
       countryCount = null;
+      latestReleaseVersion = normalizeReleaseVersion(APP_VERSION);
     }
 
     mapError = $websiteSnapshotStore.errorMessage || '';
@@ -1542,12 +1558,14 @@
       </div>
 
       <p class="l2-compat">Also works on Brave, Opera, Vivaldi, Arc & all Chromium browsers</p>
+      <!--
       <p class="l2-video-links">
         Video demos:
         <a href="{base}/watch/cqd-demo">CQD demo</a>
         <span aria-hidden="true">•</span>
         <a href="{base}/watch/manual-vs-cqd">Manual vs CQD</a>
       </p>
+      -->
     </div>
   </section>
 
@@ -1855,7 +1873,7 @@
           <div class="l2-proof-label">Active Users</div>
         </div>
         <div class="l2-proof-card"><div class="l2-proof-num"><AnimatedNumber value={100} suffix="+" animated /></div><div class="l2-proof-label">Languages</div></div>
-        <div class="l2-proof-card"><div class="l2-proof-num"><AnimatedNumericText text={APP_VERSION} animated /></div><div class="l2-proof-label">Latest Release</div></div>
+        <div class="l2-proof-card"><div class="l2-proof-num"><AnimatedNumericText text={latestReleaseVersion} animated /></div><div class="l2-proof-label">Latest Release</div></div>
       </div>
     </div>
   </section>
@@ -2434,25 +2452,6 @@
     font-size: 13px; color: var(--text-secondary); margin-top: 16px;
     font-weight: 500; letter-spacing: 0.01em;
   }
-  .l2-video-links {
-    margin: 8px 0 0;
-    font-size: 13px;
-    color: var(--text-secondary);
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-    justify-content: center;
-  }
-  .l2-video-links a {
-    color: var(--gc-green-dark);
-    text-decoration: none;
-    font-weight: 700;
-  }
-  .l2-video-links a:hover {
-    text-decoration: underline;
-  }
-
   .l2-students-section {
     padding-top: 24px;
   }
