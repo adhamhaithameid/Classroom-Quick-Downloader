@@ -61,14 +61,14 @@
       "flatted": ">=3.4.2"
     },
     "packageExtensions": {
-      "eslint@10.0.3": {
+      "eslint@10.2.0": {
         "dependencies": {
           "ajv-draft-04": "1.0.0"
         }
       }
     },
     "patchedDependencies": {
-      "eslint@10.0.3": "patches/eslint@10.0.3.patch"
+      "eslint@10.2.0": "patches/eslint@10.2.0.patch"
     }
   },
   "devDependencies": {
