@@ -133,6 +133,7 @@ jobs:
           worker_base="${PUBLIC_WORKER_BASE_URL%/}"
           site_url="${PUBLIC_SITE_URL%/}"
           site_origin="$(printf '%s' "${PUBLIC_SITE_URL}" | sed -E 's#(https?://[^/]+).*#\1#')"
+          legacy_site_origin="https://classroom-quick-downloader-website.pages.dev"
 
           site_code="$(curl -sS -o /tmp/website-home.txt -w "%{http_code}" "${site_url}" || true)"
           case "${site_code}" in
@@ -166,11 +167,24 @@ jobs:
           {"schemaVersion":"1","sessionId":"gha-website-smoke","pagePath":"/ci/smoke","events":[{"eventId":"${event_id}","eventType":"cta","action":"download_click","placement":"final_download"}]}
           JSON
           )"
-          ingest_response="$(curl -fsS -X POST "${worker_base}/api/public/website/events" \
-            -H "Origin: ${site_origin}" \
-            -H "Content-Type: application/json" \
-            -H "X-Requested-With: XMLHttpRequest" \
-            --data "${ingest_payload}")"
+
+          post_ingest() {
+            local origin="$1"
+            curl -fsS -X POST "${worker_base}/api/public/website/events" \
+              -H "Origin: ${origin}" \
+              -H "Content-Type: application/json" \
+              -H "X-Requested-With: XMLHttpRequest" \
+              --data "${ingest_payload}"
+          }
+
+          if ! ingest_response="$(post_ingest "${site_origin}")"; then
+            if [ "${site_origin}" != "${legacy_site_origin}" ]; then
+              echo "::warning::Primary origin ingest smoke failed; checking legacy Pages origin for diagnostics."
+              post_ingest "${legacy_site_origin}" >/tmp/legacy-origin-ingest-smoke.json || true
+            fi
+            echo "::error::Website ingest smoke check failed for origin ${site_origin}"
+            exit 1
+          fi
           echo "${ingest_response}" | grep -Eq '"ok"[[:space:]]*:[[:space:]]*true'
 
       - name: Submit indexing notifications (Bing + Google)

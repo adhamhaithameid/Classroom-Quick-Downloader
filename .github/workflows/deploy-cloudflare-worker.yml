@@ -103,7 +103,8 @@ jobs:
         id: deploy_worker
         working-directory: cloudflare-worker
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_WORKER_API_TOKEN != '' && secrets.CLOUDFLARE_WORKER_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_WORKER_API_TOKEN: ${{ secrets.CLOUDFLARE_WORKER_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           ORACLE_ENDPOINT: ${{ vars.ORACLE_ENDPOINT }}
           PUBLIC_SITE_URL: ${{ vars.PUBLIC_SITE_URL }}
@@ -115,23 +116,59 @@ jobs:
             cors_origins="${cors_origins},https://classroom-quick-downloader-website.pages.dev"
           fi
 
-          set +e
-          npx wrangler deploy \
-            --var "ORACLE_ENDPOINT:${ORACLE_ENDPOINT}" \
-            --var "ALLOW_INSECURE_ORACLE_ENDPOINT:false" \
-            --var "CORS_ALLOWED_ORIGINS:${cors_origins}" \
-            2>&1 | tee /tmp/wrangler-deploy.log
-          status="${PIPESTATUS[0]}"
-          set -e
-          if [ "${status}" -eq 0 ]; then
+          deploy_with_token() {
+            local token="$1"
+            local logfile="$2"
+            set +e
+            CLOUDFLARE_API_TOKEN="${token}" npx wrangler deploy \
+              --var "ORACLE_ENDPOINT:${ORACLE_ENDPOINT}" \
+              --var "ALLOW_INSECURE_ORACLE_ENDPOINT:false" \
+              --var "CORS_ALLOWED_ORIGINS:${cors_origins}" \
+              2>&1 | tee "${logfile}"
+            local status="${PIPESTATUS[0]}"
+            set -e
+            return "${status}"
+          }
+
+          worker_token="${CLOUDFLARE_WORKER_API_TOKEN:-}"
+          fallback_token="${CLOUDFLARE_API_TOKEN:-}"
+          primary_token="${worker_token}"
+          if [ -z "${primary_token}" ]; then
+            primary_token="${fallback_token}"
+          fi
+
+          if [ -z "${primary_token}" ]; then
+            echo "::error::No Cloudflare API token is available for worker deploy."
+            echo "deployed=false" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+          if deploy_with_token "${primary_token}" /tmp/wrangler-deploy.log; then
             echo "deployed=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          status="$?"
+
           if grep -Eq 'code:[[:space:]]*10023|kv bindings require kv write perms' /tmp/wrangler-deploy.log; then
-            echo "::warning::Worker deploy skipped: token missing Workers KV write permission (code 10023). Existing deployment remains active."
-            echo "deployed=false" >> "$GITHUB_OUTPUT"
-            exit 0
+            if [ -n "${fallback_token}" ] && [ "${fallback_token}" != "${primary_token}" ]; then
+              echo "::warning::Primary worker token lacks KV write permission; retrying deploy with fallback CLOUDFLARE_API_TOKEN."
+              if deploy_with_token "${fallback_token}" /tmp/wrangler-deploy-fallback.log; then
+                echo "deployed=true" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+              status="$?"
+              if grep -Eq 'code:[[:space:]]*10023|kv bindings require kv write perms' /tmp/wrangler-deploy-fallback.log; then
+                echo "::warning::Worker deploy skipped: both tokens lack Workers KV write permission (code 10023). Existing deployment remains active."
+                echo "deployed=false" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+            else
+              echo "::warning::Worker deploy skipped: token missing Workers KV write permission (code 10023). Existing deployment remains active."
+              echo "deployed=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
           fi
+
           echo "deployed=false" >> "$GITHUB_OUTPUT"
           exit "${status}"
 
