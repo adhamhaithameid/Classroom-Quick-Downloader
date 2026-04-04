@@ -231,11 +231,14 @@ async function loadIndexNowEndpoints(primaryEndpoint) {
 
 async function main() {
   const dryRun = process.env.DRY_RUN === '1' || process.env.INDEXING_DRY_RUN === '1';
+  const strictModeRaw = (process.env.INDEXING_STRICT ?? '1').trim().toLowerCase();
+  const strictMode = !['0', 'false', 'no'].includes(strictModeRaw);
 
   const siteUrl = normalizeSiteUrl(process.env.PUBLIC_SITE_URL || process.env.SITE_URL || DEFAULT_SITE_URL);
   const sitemapUrl = normalizeAbsoluteUrl(process.env.SITEMAP_URL, `${siteUrl}${DEFAULT_SITEMAP_PATH}`);
   console.log(`[indexing] Site URL: ${siteUrl}`);
   console.log(`[indexing] Sitemap URL: ${sitemapUrl}`);
+  console.log(`[indexing] Strict mode: ${strictMode ? 'enabled' : 'disabled'}`);
 
   const sitemapXml = await fetchText(sitemapUrl);
   const sitemapUrls = parseSitemapLocs(sitemapXml);
@@ -307,11 +310,18 @@ async function main() {
   }
 
   if (errors.length > 0) {
-    console.error('[indexing] Completed with errors:');
+    const logger = strictMode ? console.error : console.warn;
+    logger(
+      strictMode
+        ? '[indexing] Completed with errors:'
+        : '[indexing] Completed with non-fatal errors (INDEXING_STRICT=0):'
+    );
     for (const message of errors) {
-      console.error(`  - ${message}`);
+      logger(`  - ${message}`);
     }
-    process.exitCode = 1;
+    if (strictMode) {
+      process.exitCode = 1;
+    }
     return;
   }
 
