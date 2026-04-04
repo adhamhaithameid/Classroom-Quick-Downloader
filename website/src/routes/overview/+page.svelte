@@ -1873,7 +1873,7 @@
           <div class="l2-proof-label">Active Users</div>
         </div>
         <div class="l2-proof-card"><div class="l2-proof-num"><AnimatedNumber value={100} suffix="+" animated /></div><div class="l2-proof-label">Languages</div></div>
-        <div class="l2-proof-card"><div class="l2-proof-num"><AnimatedNumericText text={latestReleaseVersion} animated /></div><div class="l2-proof-label">Latest Release</div></div>
+        <div class="l2-proof-card"><div class="l2-proof-num"><AnimatedNumericText text={latestReleaseVersion} /></div><div class="l2-proof-label">Latest Release</div></div>
       </div>
     </div>
   </section>
