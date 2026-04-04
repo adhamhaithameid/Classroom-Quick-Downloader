@@ -17,13 +17,21 @@ import SiteMapPage from './site-map/+page.svelte';
 import CqdDemoVideoPage from './watch/cqd-demo/+page.svelte';
 import ManualVsCqdVideoPage from './watch/manual-vs-cqd/+page.svelte';
 import { privacyContent } from '$lib/content/privacy';
-import { INDEXNOW_KEY, SITE_URL } from '$lib/config';
+import { APP_VERSION, INDEXNOW_KEY, SITE_URL } from '$lib/config';
 import { GET as getRobotsTxt } from './robots.txt/+server';
 import { GET as getSitemapXml } from './sitemap.xml/+server';
 import { GET as getIndexNowKeyTxt } from './indexnow-key.txt/+server';
 
 function squish(html: string): string {
   return html.replace(/\s+/g, ' ').trim();
+}
+
+function plainText(html: string): string {
+  return html
+    .replace(/<!--[\s\S]*?-->/g, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 describe('route render smoke coverage', () => {
@@ -55,7 +63,9 @@ describe('route render smoke coverage', () => {
   it('renders overview page shell, hero copy, and CTA sections', () => {
     const { body, head } = render(OverviewPage);
     const html = squish(body);
+    const text = plainText(body).replace(/\s+/g, '');
     const expectedBaseUrl = SITE_URL.replace(/\/+$/, '');
+    const expectedLatestRelease = APP_VERSION.startsWith('v') ? APP_VERSION : `v${APP_VERSION}`;
 
     expect(head).toContain('Classroom Quick Downloader | Bulk Download Google Classroom Files');
     expect(head).toContain('SoftwareApplication');
@@ -69,6 +79,8 @@ describe('route render smoke coverage', () => {
     expect(html).toContain('Not affiliated with Google or Google Classroom.');
     expect(html).toContain('Ready to save hours?');
     expect(html).toContain('See where Classroom Quick Downloader is used around the world.');
+    expect(html).toContain('Latest Release');
+    expect(text).toContain(expectedLatestRelease);
     expect(html).toContain('l2-page-orbs');
     expect(html).toContain('l2-page-grid');
     expect(html).toContain('l2-page-floats');
