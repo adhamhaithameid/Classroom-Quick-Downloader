@@ -337,11 +337,10 @@
     position: sticky;
     top: 0;
     z-index: 100;
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.74), rgba(243, 248, 250, 0.6));
-    backdrop-filter: blur(22px) saturate(185%);
-    -webkit-backdrop-filter: blur(22px) saturate(185%);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.75);
-    box-shadow: 0 10px 28px rgba(15, 20, 25, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.66), rgba(239, 247, 250, 0.52));
+    backdrop-filter: blur(24px) saturate(195%);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.82);
+    box-shadow: 0 12px 30px rgba(15, 20, 25, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.6);
     padding: 12px 0;
     transition: transform 0.24s ease, opacity 0.24s ease;
   }
