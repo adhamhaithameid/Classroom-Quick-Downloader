@@ -337,10 +337,11 @@
     position: sticky;
     top: 0;
     z-index: 100;
-    background: rgba(248, 250, 251, 0.85);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    border-bottom: 1px solid var(--border);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.74), rgba(243, 248, 250, 0.6));
+    backdrop-filter: blur(22px) saturate(185%);
+    -webkit-backdrop-filter: blur(22px) saturate(185%);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.75);
+    box-shadow: 0 10px 28px rgba(15, 20, 25, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.5);
     padding: 12px 0;
     transition: transform 0.24s ease, opacity 0.24s ease;
   }
