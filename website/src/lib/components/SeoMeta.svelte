@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { SITE_URL } from '$lib/config';
+  import { SITE_URL, STORE_LINKS } from '$lib/config';
   import { DEFAULT_LANGUAGE, SITE_LOCALE, SITE_NAME, SOCIAL_IMAGE } from '$lib/seo/site';
 
   export let title: string;
@@ -9,6 +9,7 @@
   export let keywords = '';
   export let type: 'website' | 'article' = 'website';
   export let structuredData: Record<string, unknown> | Array<Record<string, unknown>> | null = null;
+  export let includeSiteIdentityStructuredData = true;
   export let imagePath = SOCIAL_IMAGE.path;
   export let imageAlt = SOCIAL_IMAGE.alt;
   export let imageWidth = SOCIAL_IMAGE.width;
@@ -46,16 +47,69 @@
     return 'image/jpeg';
   }
 
+  function structuredDataKey(item: Record<string, unknown>): string | null {
+    const type = typeof item['@type'] === 'string' ? item['@type'] : '';
+    const id = typeof item['@id'] === 'string' ? item['@id'] : '';
+    if (!type || !id) return null;
+    return `${type}::${id}`;
+  }
+
+  function dedupeStructuredData(items: Array<Record<string, unknown>>): Array<Record<string, unknown>> {
+    const deduped: Array<Record<string, unknown>> = [];
+    const seenKeys = new Set<string>();
+
+    for (const item of items) {
+      const key = structuredDataKey(item);
+      if (key) {
+        if (seenKeys.has(key)) continue;
+        seenKeys.add(key);
+      }
+      deduped.push(item);
+    }
+
+    return deduped;
+  }
+
   $: canonical = buildCanonical(SITE_URL, path);
   $: socialImageUrl = buildAbsoluteAssetUrl(SITE_URL, imagePath);
   $: socialImageType = socialImageUrl ? detectImageMimeType(socialImageUrl) : '';
   $: robots = noindex ? 'noindex, nofollow' : 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1';
   $: botPreviewDirectives = noindex ? 'noindex, nofollow' : 'max-image-preview:large, max-snippet:-1, max-video-preview:-1';
-  $: jsonLdItems = structuredData
+  $: pageStructuredDataItems = structuredData
     ? Array.isArray(structuredData)
       ? structuredData
       : [structuredData]
     : [];
+  $: siteIdentityStructuredData = includeSiteIdentityStructuredData
+    ? [
+        {
+          '@context': 'https://schema.org',
+          '@type': 'WebSite',
+          '@id': `${SITE_URL}/#website`,
+          name: siteName,
+          alternateName: 'CQD',
+          url: `${SITE_URL}/`,
+          inLanguage: language,
+          publisher: { '@id': `${SITE_URL}/#organization` }
+        },
+        {
+          '@context': 'https://schema.org',
+          '@type': 'Organization',
+          '@id': `${SITE_URL}/#organization`,
+          name: siteName,
+          alternateName: 'CQD',
+          url: `${SITE_URL}/`,
+          logo: {
+            '@type': 'ImageObject',
+            url: `${SITE_URL}/favicon-512x512.png`,
+            width: 512,
+            height: 512
+          },
+          sameAs: [STORE_LINKS.github, STORE_LINKS.chrome, STORE_LINKS.firefox, STORE_LINKS.edge]
+        }
+      ]
+    : [];
+  $: jsonLdItems = dedupeStructuredData([...pageStructuredDataItems, ...siteIdentityStructuredData]);
   $: jsonLdScriptHtml = jsonLdItems.map((item) => {
     const payload = JSON.stringify(item)
       .replace(/</g, '\\u003c')
@@ -71,6 +125,8 @@
   {#if keywords}
     <meta name="keywords" content={keywords} />
   {/if}
+  <meta name="site_name" content={siteName} />
+  <meta itemprop="name" content={siteName} />
   <meta name="robots" content={robots} />
   <meta name="googlebot" content={botPreviewDirectives} />
   <meta name="bingbot" content={botPreviewDirectives} />
