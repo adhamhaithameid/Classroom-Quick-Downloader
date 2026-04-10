@@ -46,7 +46,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.26.1"
+          go-version: "1.26.2"
 
       - name: Run Oracle heavy test matrix
         run: pnpm -C oracle-backend test:strict
@@ -96,7 +96,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.26.1"
+          go-version: "1.26.2"
 
       - name: Run migration bootstrap tests
         working-directory: oracle-backend
@@ -116,7 +116,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.26.1"
+          go-version: "1.26.2"
 
       - name: Generate runtime smoke secrets
         run: |
@@ -189,7 +189,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.26.1"
+          go-version: "1.26.2"
 
       - name: Ensure no committed Google credential files
         run: |
