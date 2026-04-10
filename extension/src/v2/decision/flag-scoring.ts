@@ -61,6 +61,15 @@ import {
 } from './exclusion-engine';
 
 // ============================================================================
+// PRE-COMPILED SELECTORS
+// ============================================================================
+// We cache the combined CSS selector strings at the module level so we don't
+// re-calculate or iterate them on every detection scan.
+const _allUserContentSelectors = getUserContentSelectors();
+const USER_CONTENT_SELECTOR_COMBINED = _allUserContentSelectors.join(', ');
+const USER_CONTENT_SELECTOR_LIMITED = _allUserContentSelectors.slice(0, 4).join(', ');
+
+// ============================================================================
 // INTERNAL TYPES
 // ============================================================================
 
@@ -474,8 +483,6 @@ function commentLayer3_GoldenSelectors(post: HTMLElement, keywords: CommentKeywo
  * Score: LOW_CONFIDENCE (15) + bonuses.
  */
 function commentLayer4_Nuclear(post: HTMLElement, keywords: CommentKeywords): CommentLayerResult {
-  const userContentSelectors = getUserContentSelectors();
-
   const walker = document.createTreeWalker(
     post,
     NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT,
@@ -488,7 +495,7 @@ function commentLayer4_Nuclear(post: HTMLElement, keywords: CommentKeywords): Co
             return NodeFilter.FILTER_REJECT;
           }
           // Skip user content areas
-          if (userContentSelectors.some(s => el.matches(s))) {
+          if (USER_CONTENT_SELECTOR_COMBINED && el.matches(USER_CONTENT_SELECTOR_COMBINED)) {
             return NodeFilter.FILTER_REJECT;
           }
           // Skip hidden elements
@@ -626,8 +633,6 @@ function editedLayer2_Semantic(post: HTMLElement, keywords: string[]): EditedLay
  * Score: LAYER_3_STRUCTURAL (20) + bonuses.
  */
 function editedLayer3_TreeWalker(post: HTMLElement, keywords: string[]): EditedLayerResult {
-  const userContentSelectors = getUserContentSelectors();
-
   const walker = document.createTreeWalker(
     post,
     NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT,
@@ -639,7 +644,7 @@ function editedLayer3_TreeWalker(post: HTMLElement, keywords: string[]): EditedL
           if (tag === 'script' || tag === 'style' || tag === 'noscript') {
             return NodeFilter.FILTER_REJECT;
           }
-          if (userContentSelectors.some(s => el.matches(s))) {
+          if (USER_CONTENT_SELECTOR_COMBINED && el.matches(USER_CONTENT_SELECTOR_COMBINED)) {
             return NodeFilter.FILTER_REJECT;
           }
           try {
@@ -748,10 +753,10 @@ function editedLayer4_Exclusion(post: HTMLElement, matchedText: string | null): 
   }
 
   // Check if matched text appears in user content areas
-  const userContentSelectors = getUserContentSelectors().slice(0, 4);
-  for (const selector of userContentSelectors) {
-    const userContent = post.querySelector(selector);
-    if (userContent) {
+  if (USER_CONTENT_SELECTOR_LIMITED) {
+    // querySelectorAll with combined selectors will find matching descendant elements
+    const userContentNodes = post.querySelectorAll(USER_CONTENT_SELECTOR_LIMITED);
+    for (const userContent of userContentNodes) {
       const userText = normalizeForComparison(userContent.textContent || '');
       if (userText.includes(normalizeForComparison(matchedText))) {
         return {
@@ -759,7 +764,7 @@ function editedLayer4_Exclusion(post: HTMLElement, matchedText: string | null): 
           matchedText,
           hasDateProximity: false,
           usedParentContext: false,
-          details: `EditedL4: PENALTY - Found in user content "${selector}"`,
+          details: `EditedL4: PENALTY - Found in user content "${USER_CONTENT_SELECTOR_LIMITED}"`,
         };
       }
     }
