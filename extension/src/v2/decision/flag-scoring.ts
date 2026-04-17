@@ -475,6 +475,7 @@ function commentLayer3_GoldenSelectors(post: HTMLElement, keywords: CommentKeywo
  */
 function commentLayer4_Nuclear(post: HTMLElement, keywords: CommentKeywords): CommentLayerResult {
   const userContentSelectors = getUserContentSelectors();
+  const combinedUserContentSelector = userContentSelectors.join(', ');
 
   const walker = document.createTreeWalker(
     post,
@@ -488,7 +489,7 @@ function commentLayer4_Nuclear(post: HTMLElement, keywords: CommentKeywords): Co
             return NodeFilter.FILTER_REJECT;
           }
           // Skip user content areas
-          if (userContentSelectors.some(s => el.matches(s))) {
+          if (combinedUserContentSelector && el.matches(combinedUserContentSelector)) {
             return NodeFilter.FILTER_REJECT;
           }
           // Skip hidden elements
@@ -627,6 +628,7 @@ function editedLayer2_Semantic(post: HTMLElement, keywords: string[]): EditedLay
  */
 function editedLayer3_TreeWalker(post: HTMLElement, keywords: string[]): EditedLayerResult {
   const userContentSelectors = getUserContentSelectors();
+  const combinedUserContentSelector = userContentSelectors.join(', ');
 
   const walker = document.createTreeWalker(
     post,
@@ -639,7 +641,7 @@ function editedLayer3_TreeWalker(post: HTMLElement, keywords: string[]): EditedL
           if (tag === 'script' || tag === 'style' || tag === 'noscript') {
             return NodeFilter.FILTER_REJECT;
           }
-          if (userContentSelectors.some(s => el.matches(s))) {
+          if (combinedUserContentSelector && el.matches(combinedUserContentSelector)) {
             return NodeFilter.FILTER_REJECT;
           }
           try {
