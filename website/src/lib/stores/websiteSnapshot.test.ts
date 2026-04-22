@@ -3,11 +3,11 @@ import { get } from 'svelte/store';
 import type { WebsiteSnapshot, WebsiteSnapshotFetchResult } from '$lib/types/public';
 
 vi.mock('$lib/api/publicSite', () => ({
-  ORACLE_SNAPSHOT_REFRESH_MS: 3 * 60 * 60 * 1000,
+  ORACLE_SNAPSHOT_REFRESH_MS: 6 * 60 * 60 * 1000,
   fetchWebsiteSnapshotResult: vi.fn()
 }));
 
-import { fetchWebsiteSnapshotResult } from '$lib/api/publicSite';
+import { ORACLE_SNAPSHOT_REFRESH_MS, fetchWebsiteSnapshotResult } from '$lib/api/publicSite';
 import {
   refreshWebsiteSnapshotStore,
   resetWebsiteSnapshotStoreForTests,
@@ -118,6 +118,27 @@ describe('websiteSnapshotStore', () => {
     expect(state.snapshot?.overview.totals.downloads).toBe(200);
     expect(state.degraded).toBe(false);
     expect(state.errorMessage).toBeNull();
+  });
+
+  it('derives the snapshot refresh window from ORACLE_SNAPSHOT_REFRESH_MS (6h)', async () => {
+    const now = Date.now();
+    const snapshot = createMockSnapshot(300);
+    snapshot.fetchedAtUtc = now;
+    snapshot.nextRefreshAtUtc = now + ORACLE_SNAPSHOT_REFRESH_MS;
+    mockedFetchSnapshotResult.mockResolvedValueOnce(createSuccessResult(snapshot));
+
+    await refreshWebsiteSnapshotStore({ force: true });
+
+    const state = get(websiteSnapshotStore);
+    expect(ORACLE_SNAPSHOT_REFRESH_MS).toBe(6 * 60 * 60 * 1000);
+    const { snapshot: ready } = state;
+    if (!ready) throw new Error('Expected a ready snapshot after forced refresh');
+    expect(ready.nextRefreshAtUtc - ready.fetchedAtUtc).toBe(6 * 60 * 60 * 1000);
+  });
+
+  it('pins the production ORACLE_SNAPSHOT_REFRESH_MS to 6 hours', async () => {
+    const actual = await vi.importActual<typeof import('$lib/api/publicSite')>('$lib/api/publicSite');
+    expect(actual.ORACLE_SNAPSHOT_REFRESH_MS).toBe(6 * 60 * 60 * 1000);
   });
 
   it('switches to degraded state and keeps last snapshot when refresh fails', async () => {
