@@ -51,6 +51,8 @@ interface CachedKeywords {
   comment: CommentKeywords;
   edited: string[];
   loadedAt: number;
+  combinedComment?: CommentKeywords;
+  combinedEdited?: string[];
 }
 
 // ============================================================================
@@ -167,6 +169,64 @@ export function getEditedKeywords(lang: string): string[] {
   });
 
   return edited;
+}
+
+/**
+ * Get combined comment keywords for a language, memoized.
+ * This combines the target language with 'en' and 'ar' fallbacks.
+ *
+ * @param lang - Language code
+ * @returns Combined CommentKeywords
+ */
+export function getCombinedCommentKeywords(lang: string): CommentKeywords {
+  const cached = keywordCache.get(lang);
+  if (cached?.combinedComment) {
+    touchActivity();
+    return cached.combinedComment;
+  }
+
+  const keywords = getCommentKeywords(lang);
+  const enKeywords = getCommentKeywords('en');
+  const arKeywords = getCommentKeywords('ar');
+
+  const combined: CommentKeywords = {
+    singular: [...new Set([...keywords.singular, ...enKeywords.singular, ...arKeywords.singular])],
+    plural: [...new Set([...keywords.plural, ...enKeywords.plural, ...arKeywords.plural])],
+    classComment: [...new Set([...keywords.classComment, ...enKeywords.classComment, ...arKeywords.classComment])],
+  };
+
+  if (cached) {
+    cached.combinedComment = combined;
+  }
+
+  return combined;
+}
+
+/**
+ * Get combined edited keywords for a language, memoized.
+ * This combines the target language with 'en' and 'ar' fallbacks.
+ *
+ * @param lang - Language code
+ * @returns Array of combined edited keyword strings
+ */
+export function getCombinedEditedKeywords(lang: string): string[] {
+  const cached = keywordCache.get(lang);
+  if (cached?.combinedEdited) {
+    touchActivity();
+    return cached.combinedEdited;
+  }
+
+  const keywords = getEditedKeywords(lang);
+  const enKeywords = getEditedKeywords('en');
+  const arKeywords = getEditedKeywords('ar');
+
+  const combined = [...new Set([...keywords, ...enKeywords, ...arKeywords])];
+
+  if (cached) {
+    cached.combinedEdited = combined;
+  }
+
+  return combined;
 }
 
 /**

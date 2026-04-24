@@ -39,8 +39,8 @@ import type {
 } from '../../engines/types';
 
 import {
-  getCommentKeywords,
-  getEditedKeywords,
+  getCombinedCommentKeywords,
+  getCombinedEditedKeywords,
   preloadKeywords,
   detectPageLanguage,
   normalizeText,
@@ -785,16 +785,8 @@ export function scoreComments(
   post: HTMLElement,
   lang: string,
 ): { score: number; count: number | null; matchedText: string | null; layers: CommentLayerResult[] } {
-  const keywords = getCommentKeywords(lang);
-  const enKeywords = getCommentKeywords('en');
-  const arKeywords = getCommentKeywords('ar');
-
-  // Combine keywords (deduped)
-  const combined: CommentKeywords = {
-    singular: [...new Set([...keywords.singular, ...enKeywords.singular, ...arKeywords.singular])],
-    plural: [...new Set([...keywords.plural, ...enKeywords.plural, ...arKeywords.plural])],
-    classComment: [...new Set([...keywords.classComment, ...enKeywords.classComment, ...arKeywords.classComment])],
-  };
+  // Use pre-combined and memoized keywords to save allocation overhead per node
+  const combined = getCombinedCommentKeywords(lang);
 
   // Layer 0: DOM Truth — if found, return immediately
   const l0 = commentLayer0_DOMTruth(post);
@@ -834,10 +826,8 @@ export function scoreEdited(
   post: HTMLElement,
   lang: string,
 ): { score: number; matchedText: string | null; hasDateProximity: boolean; layers: EditedLayerResult[] } {
-  const keywords = getEditedKeywords(lang);
-  const enKeywords = getEditedKeywords('en');
-  const arKeywords = getEditedKeywords('ar');
-  const combined = [...new Set([...keywords, ...enKeywords, ...arKeywords])];
+  // Use pre-combined and memoized keywords to save allocation overhead per node
+  const combined = getCombinedEditedKeywords(lang);
 
   const l1 = editedLayer1_GoldenSelectors(post, combined);
   const l2 = editedLayer2_Semantic(post, combined);
