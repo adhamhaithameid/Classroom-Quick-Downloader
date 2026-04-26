@@ -909,6 +909,15 @@ describe("Durable Object security behaviors", () => {
     expect(typeof payload.healthNotifyIntervalsMs?.critical).toBe("number");
   });
 
+  it("defaults configMaxRetry to 20 for a fresh DO", async () => {
+    const { obj } = makeDO();
+    const res = await callDOGet(obj, "/config");
+    expect(res.status).toBe(200);
+    const payload = await res.json() as { ok?: boolean; maxRetry?: number };
+    expect(payload.ok).toBe(true);
+    expect(payload.maxRetry).toBe(20);
+  });
+
   it("updates daily flush window config", async () => {
     const { obj } = makeDO();
     const res = await callDO(obj, "/admin/update-config", {
