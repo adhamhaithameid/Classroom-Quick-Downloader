@@ -1419,6 +1419,7 @@ function App() {
                   title="Share extension links"
                   aria-label="Share extension links"
                   aria-expanded={showSharePanel}
+                  aria-controls="cqd-share-panel"
                 >
                   <span className="cqd-button-icon">
                     <svg
@@ -1444,7 +1445,7 @@ function App() {
 
           {/* Share Panel - Expandable */}
           {showSharePanel && (
-            <section className="cqd-panel">
+            <section id="cqd-share-panel" className="cqd-panel">
               <div className="cqd-card cqd-card-share">
                 <div className="cqd-card-header">
                   <h2 className="cqd-card-title">Share Extension</h2>
