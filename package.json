@@ -59,7 +59,8 @@
       "defu": "^6.1.5",
       "vite": "^8.0.5",
       "cookie": "0.7.2",
-      "flatted": ">=3.4.2"
+      "flatted": ">=3.4.2",
+      "uuid": "^14.0.0"
     },
     "packageExtensions": {
       "eslint@10.2.0": {
