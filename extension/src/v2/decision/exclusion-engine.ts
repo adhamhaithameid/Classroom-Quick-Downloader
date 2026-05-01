@@ -579,14 +579,20 @@ export function applyExclusions(
  * @param element - The element to check
  * @returns true if the element is inside an excluded area
  */
+// Pre-computed cached arrays and joined strings for performance optimization
+const CACHED_ALL_SELECTORS = EXCLUSION_RULES
+  .filter(r => r.type === 'selector')
+  .map(r => r.pattern as string);
+const COMBINED_ALL_SELECTORS = CACHED_ALL_SELECTORS.join(', ');
+
+const CACHED_USER_CONTENT_SELECTORS = EXCLUSION_RULES
+  .filter(r => r.type === 'selector' && r.category === 'user_content')
+  .map(r => r.pattern as string);
+const COMBINED_USER_CONTENT_SELECTOR = CACHED_USER_CONTENT_SELECTORS.join(', ');
+
 export function isInExcludedArea(element: HTMLElement): boolean {
-  for (const rule of EXCLUSION_RULES) {
-    if (rule.type !== 'selector') continue;
-    if (element.closest(rule.pattern as string)) {
-      return true;
-    }
-  }
-  return false;
+  if (!COMBINED_ALL_SELECTORS) return false;
+  return element.closest(COMBINED_ALL_SELECTORS) !== null;
 }
 
 /**
@@ -596,9 +602,17 @@ export function isInExcludedArea(element: HTMLElement): boolean {
  * then check text nodes against them.
  */
 export function getUserContentSelectors(): string[] {
-  return EXCLUSION_RULES
-    .filter(r => r.type === 'selector' && r.category === 'user_content')
-    .map(r => r.pattern as string);
+  return CACHED_USER_CONTENT_SELECTORS;
+}
+
+/**
+ * Get the combined user-content exclusion selector string.
+ *
+ * Using a single string with commas is much faster for element.matches()
+ * than iterating over an array in hot paths.
+ */
+export function getCombinedUserContentSelector(): string {
+  return COMBINED_USER_CONTENT_SELECTOR;
 }
 
 /**
