@@ -85,13 +85,15 @@
   <!-- HERO SECTION -->
   <section class="hero">
     <div class="badge">Free Browser Extension</div>
-    <img 
-      src="https://raw.githubusercontent.com/adhamhaithameid/Classroom-Quick-Downloader/main/docs/Design/Logo/Classroom%20Quick%20Downloader%20-%20128.png"
-      alt="Classroom Quick Downloader Logo"
-      class="logo"
-      width="72"
-      height="72"
-    />
+    <a href="https://classroom-quick-downloader.adhamhaithameid.is-a.dev/" class="logo-link" on:click={() => trackClick('logo', 'Logo Redirect')}>
+      <img 
+        src="https://raw.githubusercontent.com/adhamhaithameid/Classroom-Quick-Downloader/main/docs/Design/Logo/Classroom%20Quick%20Downloader%20-%20128.png"
+        alt="Classroom Quick Downloader Logo"
+        class="logo"
+        width="72"
+        height="72"
+      />
+    </a>
     <h1 class="hero-title">
       Stop downloading<br />
       <em>one file at a time.</em>
@@ -296,17 +298,22 @@
     </div>
   </section>
 
-  <!-- CTA SECTION -->
-  <section class="section-cta">
+  <!-- INSTALL SECTION - FINAL CALL TO ACTION -->
+  <section class="section-install">
     <div class="content-wrapper">
-      <h2 class="cta-title">Ready to save hours?</h2>
-      <p class="cta-subtitle">Free, forever. No account required.</p>
-      <a href="https://classroom-quick-downloader.adhamhaithameid.is-a.dev/" class="btn btn-cta" on:click={() => trackClick('main', 'Get CQD')}>
-        Get Classroom Quick Downloader →
-      </a>
-      <p class="cta-version">
-        v1.5.5 · Not affiliated with Google or Google Classroom · Built by <span>Adham Haitham Eid</span>
-      </p>
+      <p class="install-title">Pick your browser — install takes 10 seconds</p>
+      <div class="browser-buttons">
+        <a href="https://addons.mozilla.org/en-US/firefox/addon/classroom-quick-downloader/" class="btn btn-firefox" on:click={() => trackClick('firefox', 'Firefox')}>
+          🦊 Firefox
+        </a>
+        <a href="https://chromewebstore.google.com/detail/classroom-quick-downloade/oemoongiefmpmomjikcjmkkkhffcbdid" class="btn btn-chrome" on:click={() => trackClick('chrome', 'Chrome')}>
+          🌐 Chrome
+        </a>
+        <a href="https://microsoftedge.microsoft.com/addons/detail/classroom-quick-downloade/ecojbijjkcjdolpeoiemnccgmaeomcmn" class="btn btn-edge" on:click={() => trackClick('edge', 'Edge')}>
+          🪟 Edge
+        </a>
+      </div>
+      <p class="browser-note">Also works on Brave, Opera, Vivaldi, Arc & all Chromium browsers</p>
     </div>
   </section>
 </div>
