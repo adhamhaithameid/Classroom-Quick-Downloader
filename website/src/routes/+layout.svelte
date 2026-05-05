@@ -267,7 +267,6 @@
         >
           Download
         </a>
-        <a href="{base}/site-map">Site Map</a>
         <a href="{base}/privacy">Privacy</a>
         <a href="{base}/faq">FAQ</a>
         <a href="{base}/changelog">Changelog</a>
