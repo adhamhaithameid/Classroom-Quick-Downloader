@@ -301,7 +301,7 @@
 
   .emails2-page {
     width: 100%;
-    background: #f0f4f0;
+    background: transparent;
     padding: 12px 0 16px;
     overflow-x: clip;
   }
