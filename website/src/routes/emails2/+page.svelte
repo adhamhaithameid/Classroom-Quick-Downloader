@@ -282,7 +282,6 @@
         </p>
       </section>
 
-      <div class="email-bottom-space" aria-hidden="true"></div>
     </article>
   </div>
 </section>
@@ -451,6 +450,7 @@
 
   .section-dark-end {
     text-align: center;
+    border-radius: 0 0 16px 16px;
   }
 
   .section-label {
@@ -787,11 +787,6 @@
     color: #ffc107;
   }
 
-  .email-bottom-space {
-    height: 24px;
-    background: #ffffff;
-  }
-
   @media (max-width: 768px) {
     .section-block {
       padding: 32px 24px;
@@ -912,8 +907,5 @@
       font-size: 12px;
     }
 
-    .email-bottom-space {
-      height: 12px;
-    }
   }
 </style>
