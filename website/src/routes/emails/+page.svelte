@@ -26,17 +26,20 @@
   .emails-page {
     width: 100%;
     padding: 12px 0 40px;
+    overflow-x: clip;
   }
 
   .emails-frame {
     width: min(100%, 760px);
     margin: 0 auto;
+    max-width: 100%;
+    overflow-x: clip;
   }
 
   .email-canvas {
     width: 100%;
     border-radius: 18px;
-    overflow: hidden;
+    overflow: clip;
     box-shadow: 0 14px 40px rgba(15, 23, 42, 0.14);
     color-scheme: only light;
     background: #f0f4f0;
@@ -50,6 +53,11 @@
 
   :global(.email-canvas table) {
     max-width: 100% !important;
+  }
+
+  :global(.email-canvas table[width='600']) {
+    width: 100% !important;
+    max-width: 600px !important;
   }
 
   :global(.email-canvas img) {
@@ -131,6 +139,11 @@
     }
 
     :global(.email-canvas td[style*='padding:0 20px']) {
+      padding-left: 10px !important;
+      padding-right: 10px !important;
+    }
+
+    :global(.email-canvas table[style*='padding:0 20px']) {
       padding-left: 10px !important;
       padding-right: 10px !important;
     }
