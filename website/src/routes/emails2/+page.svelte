@@ -1,11 +1,13 @@
 <script lang="ts">
+  import { base } from '$app/paths';
+  import AnimatedNumber from '$lib/components/AnimatedNumber.svelte';
   import SeoMeta from '$lib/components/SeoMeta.svelte';
 
   const stats = [
-    { value: '1K+', label: 'Installs' },
-    { value: '95', label: 'Countries' },
-    { value: '251K+', label: 'Clicks Saved' },
-    { value: '181h+', label: 'Hours Saved' }
+    { value: 1, suffix: 'K+', label: 'Installs' },
+    { value: 95, suffix: '', label: 'Countries' },
+    { value: 251, suffix: 'K+', label: 'Clicks Saved' },
+    { value: 181, suffix: 'h+', label: 'Hours Saved' }
   ] as const;
 
   const features = [
@@ -84,7 +86,7 @@
         <p class="hero-badge">Free Browser Extension</p>
 
         <img
-          src="https://raw.githubusercontent.com/adhamhaithameid/Classroom-Quick-Downloader/main/docs/Design/Logo/Classroom%20Quick%20Downloader%20-%20128.png"
+          src={`${base}/images/email-logo.png`}
           alt="Classroom Quick Downloader"
           width="72"
           height="72"
@@ -136,7 +138,7 @@
             <div class="compare-card compare-card-bad">
               <p class="compare-label compare-label-bad">Without CQD</p>
               <img
-                src="https://raw.githubusercontent.com/adhamhaithameid/Classroom-Quick-Downloader/main/docs/Design/Advertisement/problem%202.png"
+                src={`${base}/images/email-problem.png`}
                 alt="Without extension"
                 class="compare-image"
               />
@@ -150,7 +152,7 @@
             <div class="compare-card compare-card-good">
               <p class="compare-label compare-label-good">With CQD</p>
               <img
-                src="https://raw.githubusercontent.com/adhamhaithameid/Classroom-Quick-Downloader/main/docs/Design/Advertisement/solution%202.png"
+                src={`${base}/images/email-solution.png`}
                 alt="With extension"
                 class="compare-image"
               />
@@ -164,7 +166,9 @@
         <div class="stats-grid">
           {#each stats as stat, index}
             <div class="stat-cell" class:stat-cell-divider={index < stats.length - 1}>
-              <p class="stat-value">{stat.value}</p>
+              <p class="stat-value">
+                <AnimatedNumber value={stat.value} suffix={stat.suffix} format={{ useGrouping: false }} animated />
+              </p>
               <p class="stat-label-text">{stat.label}</p>
             </div>
           {/each}
@@ -217,7 +221,7 @@
         <div class="flag-grid">
           <figure class="flag-item">
             <img
-              src="https://raw.githubusercontent.com/adhamhaithameid/Classroom-Quick-Downloader/main/docs/Design/Advertisement/edits%20flag.png"
+              src={`${base}/images/email-edits-flag.png`}
               alt="Edited post flag"
               class="flag-image"
             />
@@ -226,7 +230,7 @@
 
           <figure class="flag-item">
             <img
-              src="https://raw.githubusercontent.com/adhamhaithameid/Classroom-Quick-Downloader/main/docs/Design/Advertisement/comment%20flag.png"
+              src={`${base}/images/email-comment-flag.png`}
               alt="Comment flag"
               class="flag-image"
             />
@@ -239,7 +243,7 @@
         <p class="section-label">The button itself</p>
 
         <img
-          src="https://raw.githubusercontent.com/adhamhaithameid/Classroom-Quick-Downloader/main/docs/Design/Advertisement/dwonload%20buttons.png"
+          src={`${base}/images/email-buttons.png`}
           alt="Download Buttons"
           class="buttons-image"
         />
@@ -327,6 +331,8 @@
     border-radius: 16px;
     overflow: hidden;
     background: #ffffff;
+    box-shadow: none !important;
+    filter: none;
   }
 
   .email-card * {
