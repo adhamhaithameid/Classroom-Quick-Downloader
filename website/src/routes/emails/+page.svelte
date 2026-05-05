@@ -25,7 +25,7 @@
 <style>
   .emails-page {
     width: 100%;
-    padding: 12px 0 40px;
+    padding: 12px 0 12px;
     overflow-x: clip;
   }
 
@@ -40,7 +40,7 @@
     width: 100%;
     border-radius: 18px;
     overflow: clip;
-    box-shadow: 0 14px 40px rgba(15, 23, 42, 0.14);
+    box-shadow: none;
     color-scheme: only light;
     background: #f0f4f0;
   }
@@ -60,6 +60,11 @@
     max-width: 600px !important;
   }
 
+  :global(.email-canvas td[style*='padding:24px 0']) {
+    padding-top: 8px !important;
+    padding-bottom: 8px !important;
+  }
+
   :global(.email-canvas img) {
     max-width: 100% !important;
     height: auto !important;
@@ -67,7 +72,7 @@
 
   @media (max-width: 768px) {
     .emails-page {
-      padding: 4px 0 28px;
+      padding: 4px 0 10px;
     }
 
     .email-canvas {
@@ -131,7 +136,7 @@
 
   @media (max-width: 480px) {
     .emails-page {
-      padding: 0 0 22px;
+      padding: 0 0 8px;
     }
 
     .email-canvas {
