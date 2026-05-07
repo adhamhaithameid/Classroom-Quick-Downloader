@@ -1419,6 +1419,7 @@ function App() {
                   title="Share extension links"
                   aria-label="Share extension links"
                   aria-expanded={showSharePanel}
+                  aria-controls="cqd-share-panel"
                 >
                   <span className="cqd-button-icon">
                     <svg
@@ -1444,7 +1445,7 @@ function App() {
 
           {/* Share Panel - Expandable */}
           {showSharePanel && (
-            <section className="cqd-panel">
+            <section className="cqd-panel" id="cqd-share-panel">
               <div className="cqd-card cqd-card-share">
                 <div className="cqd-card-header">
                   <h2 className="cqd-card-title">Share Extension</h2>
@@ -1479,6 +1480,7 @@ function App() {
                         className={`cqd-share-copy-btn ${copiedBrowser === browser ? 'copied' : ''}`}
                         onClick={() => handleCopyLink(browser)}
                         aria-label={`Copy ${browser} extension link`}
+                        title={`Copy ${browser} extension link`}
                       >
                         {copiedBrowser === browser ? (
                           <>
