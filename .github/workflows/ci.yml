@@ -207,7 +207,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.26.2"
+          go-version: "1.26.3"
 
       - name: Install gosec
         run: go install github.com/securego/gosec/v2/cmd/gosec@v2.23.0
@@ -247,7 +247,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.26.2"
+          go-version: "1.26.3"
 
       - name: Run Oracle Backend Heavy Test Matrix
         run: pnpm -C oracle-backend test:strict
@@ -296,7 +296,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.26.2"
+          go-version: "1.26.3"
 
       - name: Run Migration Bootstrap + Tests
         working-directory: oracle-backend
