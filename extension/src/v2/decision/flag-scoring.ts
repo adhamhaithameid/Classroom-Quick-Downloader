@@ -60,6 +60,9 @@ import {
   type ExclusionResult,
 } from './exclusion-engine';
 
+// Cache the user content selectors for fast checking in TreeWalkers
+const COMBINED_USER_CONTENT_SELECTOR = getUserContentSelectors().join(', ');
+
 // ============================================================================
 // INTERNAL TYPES
 // ============================================================================
@@ -474,7 +477,6 @@ function commentLayer3_GoldenSelectors(post: HTMLElement, keywords: CommentKeywo
  * Score: LOW_CONFIDENCE (15) + bonuses.
  */
 function commentLayer4_Nuclear(post: HTMLElement, keywords: CommentKeywords): CommentLayerResult {
-  const userContentSelectors = getUserContentSelectors();
 
   const walker = document.createTreeWalker(
     post,
@@ -488,7 +490,7 @@ function commentLayer4_Nuclear(post: HTMLElement, keywords: CommentKeywords): Co
             return NodeFilter.FILTER_REJECT;
           }
           // Skip user content areas
-          if (userContentSelectors.some(s => el.matches(s))) {
+          if (COMBINED_USER_CONTENT_SELECTOR && el.matches(COMBINED_USER_CONTENT_SELECTOR)) {
             return NodeFilter.FILTER_REJECT;
           }
           // Skip hidden elements
@@ -626,7 +628,6 @@ function editedLayer2_Semantic(post: HTMLElement, keywords: string[]): EditedLay
  * Score: LAYER_3_STRUCTURAL (20) + bonuses.
  */
 function editedLayer3_TreeWalker(post: HTMLElement, keywords: string[]): EditedLayerResult {
-  const userContentSelectors = getUserContentSelectors();
 
   const walker = document.createTreeWalker(
     post,
@@ -639,7 +640,7 @@ function editedLayer3_TreeWalker(post: HTMLElement, keywords: string[]): EditedL
           if (tag === 'script' || tag === 'style' || tag === 'noscript') {
             return NodeFilter.FILTER_REJECT;
           }
-          if (userContentSelectors.some(s => el.matches(s))) {
+          if (COMBINED_USER_CONTENT_SELECTOR && el.matches(COMBINED_USER_CONTENT_SELECTOR)) {
             return NodeFilter.FILTER_REJECT;
           }
           try {
