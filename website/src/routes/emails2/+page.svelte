@@ -4,10 +4,10 @@
   import SeoMeta from '$lib/components/SeoMeta.svelte';
 
   const stats = [
-    { value: 1, suffix: 'K+', label: 'Installs' },
-    { value: 95, suffix: '', label: 'Countries' },
-    { value: 251, suffix: 'K+', label: 'Clicks Saved' },
-    { value: 181, suffix: 'h+', label: 'Hours Saved' }
+    { value: 2, suffix: 'K+', label: 'Installs' },
+    { value: 96, suffix: '+', label: 'Countries' },
+    { value: 270, suffix: 'K+', label: 'Clicks Saved' },
+    { value: 200, suffix: 'h+', label: 'Hours Saved' }
   ] as const;
 
   const features = [
