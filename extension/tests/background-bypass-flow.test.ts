@@ -140,6 +140,8 @@ async function loadFlow(options: FlowOptions = {}) {
   }));
   vi.doMock('../entrypoints/background/message-sender', () => ({ sendStatusToTab: sendStatusSpy, setDownloadStatusListener: vi.fn() }));
   vi.doMock('../entrypoints/utils/analytics', () => ({
+    // W3: background chains .then on the startup flush; mock must resolve.
+    Analytics: { flush: vi.fn(async () => {}) },
     refreshRemoteAnalyticsConfig: vi.fn(async () => {}),
     recordDownloadEvent: recordSpy,
   }));
