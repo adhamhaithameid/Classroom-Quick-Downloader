@@ -64,6 +64,12 @@ describe('background/index', () => {
     vi.useFakeTimers();
   });
 
+  // W3: initializeUninstallUrl now loads stats asynchronously and the startup
+  // flush chains one refresh, so the uninstall URL is set from microtasks.
+  async function flushAsyncWork(): Promise<void> {
+    for (let i = 0; i < 25; i++) await Promise.resolve();
+  }
+
   it('wires listeners and initializes analytics alarm on startup', async () => {
     vi.resetModules();
 
@@ -107,6 +113,9 @@ describe('background/index', () => {
       startNextDriveAttempt: vi.fn(),
     }));
     vi.doMock('../entrypoints/utils/analytics', () => ({
+      // W3: the background chains .then on the startup flush, so the mock must
+      // resolve like the real Analytics.flush() promise.
+      Analytics: { flush: vi.fn(async () => {}) },
       refreshRemoteAnalyticsConfig,
       recordDownloadEvent: vi.fn(),
     }));
@@ -125,17 +134,24 @@ describe('background/index', () => {
     const mod = await import('../entrypoints/background/index');
     const start = mod.default as unknown as () => void;
     start();
+    await flushAsyncWork();
 
     expect(ensureAnalyticsAlarm).toHaveBeenCalledTimes(1);
     expect(refreshRemoteAnalyticsConfig).toHaveBeenCalledTimes(1);
     expect(updateGlobalIcon).toHaveBeenCalledWith(false);
-    expect(setUninstallURL).toHaveBeenCalledTimes(1);
+    // W3: the URL is set once directly and once after the startup flush
+    // resolves (post-flush stats refresh); the last setUninstallURL call wins.
+    expect(setUninstallURL).toHaveBeenCalled();
     expect(onInstalledAddListener).toHaveBeenCalledTimes(1);
-    const uninstallUrl = String(setUninstallURL.mock.calls[0]?.[0] || '');
+    const lastCallIndex = setUninstallURL.mock.calls.length - 1;
+    const uninstallUrl = String(setUninstallURL.mock.calls[lastCallIndex]?.[0] || '');
     expect(uninstallUrl).toContain('/uninstall?');
     expect(uninstallUrl).toContain('source=extension');
     expect(uninstallUrl).toContain('browser=chrome');
     expect(uninstallUrl).toContain('version=1.3.0-test');
+    // Stats params: storage mock returns no stats, so zeros.
+    expect(uninstallUrl).toContain('d=0');
+    expect(uninstallUrl).toContain('a=0');
     expect(chrome.runtime.onMessage.addListener).toHaveBeenCalled();
     expect(chrome.tabs.onUpdated.addListener).toHaveBeenCalled();
   });
@@ -192,6 +208,9 @@ describe('background/index', () => {
       startNextDriveAttempt: vi.fn(),
     }));
     vi.doMock('../entrypoints/utils/analytics', () => ({
+      // W3: the background chains .then on the startup flush, so the mock must
+      // resolve like the real Analytics.flush() promise.
+      Analytics: { flush: vi.fn(async () => {}) },
       refreshRemoteAnalyticsConfig: vi.fn(async () => {}),
       recordDownloadEvent,
     }));
@@ -259,6 +278,9 @@ describe('background/index', () => {
       startNextDriveAttempt: vi.fn(),
     }));
     vi.doMock('../entrypoints/utils/analytics', () => ({
+      // W3: the background chains .then on the startup flush, so the mock must
+      // resolve like the real Analytics.flush() promise.
+      Analytics: { flush: vi.fn(async () => {}) },
       refreshRemoteAnalyticsConfig: vi.fn(async () => {}),
       recordDownloadEvent: vi.fn(),
     }));
@@ -318,6 +340,9 @@ describe('background/index', () => {
       startNextDriveAttempt: vi.fn(),
     }));
     vi.doMock('../entrypoints/utils/analytics', () => ({
+      // W3: the background chains .then on the startup flush, so the mock must
+      // resolve like the real Analytics.flush() promise.
+      Analytics: { flush: vi.fn(async () => {}) },
       refreshRemoteAnalyticsConfig: vi.fn(async () => {}),
       recordDownloadEvent: vi.fn(),
     }));
@@ -468,6 +493,9 @@ describe('background/index', () => {
       startNextDriveAttempt,
     }));
     vi.doMock('../entrypoints/utils/analytics', () => ({
+      // W3: the background chains .then on the startup flush, so the mock must
+      // resolve like the real Analytics.flush() promise.
+      Analytics: { flush: vi.fn(async () => {}) },
       refreshRemoteAnalyticsConfig: vi.fn(async () => {}),
       recordDownloadEvent,
     }));
