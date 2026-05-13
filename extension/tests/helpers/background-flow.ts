@@ -169,6 +169,7 @@ export async function loadFlowHarness(options: FlowHarnessOptions = {}) {
     setDownloadStatusListener: vi.fn(),
   }));
   vi.doMock('../../entrypoints/utils/analytics', () => ({
+    Analytics: { flush: vi.fn(async () => {}) },
     refreshRemoteAnalyticsConfig: vi.fn(async () => {}),
     recordDownloadEvent: recordSpy,
   }));
