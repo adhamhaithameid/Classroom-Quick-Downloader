@@ -43,6 +43,7 @@
   },
   "pnpm": {
     "overrides": {
+      "fast-uri": ">=3.1.2",
       "@commitlint/config-validator>ajv": "8.18.0",
       "eslint>ajv": "8.18.0",
       "undici": "^7.24.0",
