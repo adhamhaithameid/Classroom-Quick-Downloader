@@ -63,6 +63,13 @@ interface CachedKeywords {
  */
 const keywordCache = new Map<string, CachedKeywords>();
 
+/**
+ * Cache of combined keywords (target language + 'en' + 'ar')
+ * to prevent redundant Set allocations per post.
+ */
+const combinedCommentCache = new Map<string, CommentKeywords>();
+const combinedEditedCache = new Map<string, string[]>();
+
 /** Timestamp of last detection activity — used for auto-unload */
 let lastActivity = 0;
 
@@ -220,6 +227,8 @@ function touchActivity(): void {
  */
 export function clearKeywordCache(): void {
   keywordCache.clear();
+  combinedCommentCache.clear();
+  combinedEditedCache.clear();
 
   if (unloadTimer) {
     clearTimeout(unloadTimer);
@@ -260,3 +269,55 @@ export {
 };
 
 export type { CommentKeywords };
+
+/**
+ * Get combined comment keywords (target lang + 'en' + 'ar' fallbacks).
+ * Memoized to prevent redundant Set allocations during hot loops.
+ *
+ * @param lang - Target language code
+ * @returns Deduplicated CommentKeywords
+ */
+export function getCombinedCommentKeywords(lang: string): CommentKeywords {
+  touchActivity();
+
+  if (combinedCommentCache.has(lang)) {
+    return combinedCommentCache.get(lang)!;
+  }
+
+  const keywords = getCommentKeywords(lang);
+  const enKeywords = getCommentKeywords('en');
+  const arKeywords = getCommentKeywords('ar');
+
+  const combined: CommentKeywords = {
+    singular: [...new Set([...keywords.singular, ...enKeywords.singular, ...arKeywords.singular])],
+    plural: [...new Set([...keywords.plural, ...enKeywords.plural, ...arKeywords.plural])],
+    classComment: [...new Set([...keywords.classComment, ...enKeywords.classComment, ...arKeywords.classComment])],
+  };
+
+  combinedCommentCache.set(lang, combined);
+  return combined;
+}
+
+/**
+ * Get combined edited keywords (target lang + 'en' + 'ar' fallbacks).
+ * Memoized to prevent redundant Set allocations during hot loops.
+ *
+ * @param lang - Target language code
+ * @returns Array of deduplicated edited keyword strings
+ */
+export function getCombinedEditedKeywords(lang: string): string[] {
+  touchActivity();
+
+  if (combinedEditedCache.has(lang)) {
+    return combinedEditedCache.get(lang)!;
+  }
+
+  const keywords = getEditedKeywords(lang);
+  const enKeywords = getEditedKeywords('en');
+  const arKeywords = getEditedKeywords('ar');
+
+  const combined = [...new Set([...keywords, ...enKeywords, ...arKeywords])];
+
+  combinedEditedCache.set(lang, combined);
+  return combined;
+}
