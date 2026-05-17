@@ -183,7 +183,7 @@ describe("DO changelog lifecycle", () => {
       applyMode: "auto_github",
       autoSyncEnabled: true,
       autoSyncIntervalMinutes: 60,
-      markdownSourceUrl: "https://example.com/user-friendly-changelog.md",
+      markdownSourceUrl: "https://raw.githubusercontent.com/adhamhaithameid/Classroom-Quick-Downloader/main/user-friendly-changelog.md",
     });
     expect(modeRes.status).toBe(200);
 
@@ -233,7 +233,7 @@ describe("DO changelog lifecycle", () => {
       applyMode: "auto_github",
       autoSyncEnabled: true,
       autoSyncIntervalMinutes: 60,
-      markdownSourceUrl: "https://example.com/user-friendly-changelog.md",
+      markdownSourceUrl: "https://raw.githubusercontent.com/adhamhaithameid/Classroom-Quick-Downloader/main/user-friendly-changelog.md",
     });
     expect(modeRes.status).toBe(200);
 
@@ -260,7 +260,7 @@ describe("DO changelog lifecycle", () => {
       applyMode: "auto_github",
       autoSyncEnabled: true,
       autoSyncIntervalMinutes: 60,
-      markdownSourceUrl: "https://example.com/user-friendly-changelog.md",
+      markdownSourceUrl: "https://raw.githubusercontent.com/adhamhaithameid/Classroom-Quick-Downloader/main/user-friendly-changelog.md",
     });
     expect(modeRes.status).toBe(200);
 
@@ -269,6 +269,46 @@ describe("DO changelog lifecycle", () => {
     expect(syncRes.status).toBe(400);
     expect(syncBody.ok).toBe(false);
     expect(syncBody.error).toBe("markdown_content_type_invalid");
+  });
+
+  it("rejects changelog markdown URLs on non-GitHub hosts (SSRF guard, W1)", async () => {
+    const { obj } = makeDO();
+    const fetchSpy = vi.fn(async () => new Response("should never be fetched", { status: 200 }));
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const modeRes = await adminPost(obj, "/admin/changelog/mode", {
+      applyMode: "auto_github",
+      autoSyncEnabled: true,
+      autoSyncIntervalMinutes: 60,
+      markdownSourceUrl: "https://internal.example.com/user-friendly-changelog.md",
+    });
+    expect(modeRes.status).toBe(200);
+
+    const syncRes = await adminPost(obj, "/admin/changelog/sync-now", {});
+    const syncBody = (await syncRes.json()) as { ok?: boolean; error?: string };
+    expect(syncRes.status).toBe(400);
+    expect(syncBody.ok).toBe(false);
+    expect(syncBody.error).toBe("markdown_url_host_not_allowed");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("rejects changelog markdown URLs carrying credentials or non-default ports (SSRF guard, W1)", async () => {
+    const { obj } = makeDO();
+    const fetchSpy = vi.fn(async () => new Response("x", { status: 200 }));
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const modeRes = await adminPost(obj, "/admin/changelog/mode", {
+      applyMode: "auto_github",
+      autoSyncEnabled: true,
+      autoSyncIntervalMinutes: 60,
+      markdownSourceUrl: "https://user:pass@raw.githubusercontent.com/a/b/main/x.md",
+    });
+    expect(modeRes.status).toBe(200);
+
+    const syncRes = await adminPost(obj, "/admin/changelog/sync-now", {});
+    const syncBody = (await syncRes.json()) as { ok?: boolean; error?: string };
+    expect(syncBody.error).toBe("markdown_url_host_not_allowed");
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it("public /changelog returns full config with rules, entries, and meta after admin updates", async () => {
