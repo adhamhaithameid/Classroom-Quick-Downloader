@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import worker from '../src/index';
 import type { Env } from '../src/types';
+import { TEST_DASHBOARD_PASSWORD, TEST_DANGER_PASSWORD, TEST_SHARED_SECRET } from "./helpers/dummy-secrets";
 
 const TEST_TIMEOUT_MS = 20_000;
 
@@ -20,11 +21,11 @@ function createEnv(overrides: Partial<Env> = {}): Env {
 
   return {
     DOWNLOADS_DO: namespace as unknown as DurableObjectNamespace,
-    DO_SHARED_SECRET: 'shared-secret',
-    DANGER_PASSWORD: 'danger-secret',
+    DO_SHARED_SECRET: TEST_SHARED_SECRET,
+    DANGER_PASSWORD: TEST_DANGER_PASSWORD,
     ORACLE_ENDPOINT: 'https://oracle.example.com/ingest-batch',
     MAX_BATCH_EVENTS: '10000',
-    DASHBOARD_PASSWORD: 'dashboard-secret',
+    DASHBOARD_PASSWORD: TEST_DASHBOARD_PASSWORD,
     CORS_ALLOWED_ORIGINS: 'https://classroom-quick-downloader-website.pages.dev',
     ...overrides
   };
@@ -171,7 +172,7 @@ describe('cloudflare worker smoke tests', () => {
   it(
     'revalidates stale snapshot from Oracle and rewrites KV cache',
     async () => {
-      const staleTs = Date.now() - (4 * 60 * 60 * 1000);
+      const staleTs = Date.now() - (7 * 60 * 60 * 1000);
       const kvGet = vi.fn(async () =>
         JSON.stringify({
           schemaVersion: '1',
@@ -223,7 +224,7 @@ describe('cloudflare worker smoke tests', () => {
   it(
     'returns stale cached snapshot when Oracle refresh fails',
     async () => {
-      const staleTs = Date.now() - (4 * 60 * 60 * 1000);
+      const staleTs = Date.now() - (7 * 60 * 60 * 1000);
       const stalePayload = {
         schemaVersion: '1',
         ok: true,
@@ -257,7 +258,11 @@ describe('cloudflare worker smoke tests', () => {
 
       expect(res.status).toBe(200);
       expect(res.headers.get('x-site-cache')).toBe('stale');
-      expect(kvPut).not.toHaveBeenCalled();
+      // Self-heal: the stale payload is re-put verbatim so its KV TTL
+      // extends and the fallback survives long Oracle outages.
+      expect(kvPut).toHaveBeenCalledTimes(1);
+      expect(kvPut.mock.calls[0][0]).toBe('site:v1:snapshot');
+      expect(kvPut.mock.calls[0][1]).toBe(JSON.stringify(stalePayload));
       const body = (await res.json()) as { snapshotId?: string };
       expect(body.snapshotId).toBe('stale-cache');
     },
