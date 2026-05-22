@@ -61,7 +61,10 @@
       "cookie": "0.7.2",
       "flatted": ">=3.4.2",
       "uuid": ">=14.0.0",
-      "postcss": ">=8.5.10"
+      "postcss": ">=8.5.10",
+      "fast-uri": "^3.1.2",
+      "brace-expansion@<5.0.6": "^5.0.6",
+      "ws": "^8.20.1"
     },
     "packageExtensions": {
       "eslint@10.2.0": {
