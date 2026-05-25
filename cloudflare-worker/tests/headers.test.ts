@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import worker from "../src/index";
 import type { Env } from "../src/types";
+import { TEST_DO_SHARED_SECRET, TEST_DASHBOARD_PASSWORD, TEST_DANGER_PASSWORD } from "./helpers/dummy-secrets";
 
 function buildEnv(): Env {
   const stub = {
@@ -48,9 +49,9 @@ function buildEnv(): Env {
       idFromName: (_name: string) => "downloads-id",
       get: (_id: string) => stub,
     } as unknown as DurableObjectNamespace,
-    DO_SHARED_SECRET: "do-shared-secret",
-    DASHBOARD_PASSWORD: "dashboard-secret",
-    DANGER_PASSWORD: "danger-secret",
+    DO_SHARED_SECRET: TEST_DO_SHARED_SECRET,
+    DASHBOARD_PASSWORD: TEST_DASHBOARD_PASSWORD,
+    DANGER_PASSWORD: TEST_DANGER_PASSWORD,
     ORACLE_ENDPOINT: "https://oracle.example.com",
     MAX_BATCH_EVENTS: "10000",
   } as Env;
