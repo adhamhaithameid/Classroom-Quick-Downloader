@@ -47,7 +47,6 @@
       "eslint>ajv": "8.18.0",
       "undici": "^7.24.0",
       "@isaacs/brace-expansion": ">=5.0.1",
-      "brace-expansion@5.0.4": "5.0.5",
       "minimatch": "^10.2.3",
       "rollup": "^4.59.0",
       "web-ext-run>multimatch": "8.0.0",
@@ -62,7 +61,9 @@
       "flatted": ">=3.4.2",
       "uuid": ">=14.0.0",
       "postcss": ">=8.5.10",
-      "fast-uri": "3.1.2"
+      "fast-uri": "3.1.2",
+      "brace-expansion@>=5.0.0 <5.0.6": "5.0.6",
+      "ws": "8.20.1"
     },
     "packageExtensions": {
       "eslint@10.2.0": {
