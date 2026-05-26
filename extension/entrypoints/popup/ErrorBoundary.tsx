@@ -113,6 +113,8 @@ class ErrorBoundary extends Component<Props, State> {
                 <button
                   className="cqd-button cqd-button-primary"
                   onClick={this.handleReportError}
+                  aria-label="Report the extension error"
+                  title="Report the extension error"
                   style={{
                     width: '100%',
                     justifyContent: 'center'
@@ -124,6 +126,8 @@ class ErrorBoundary extends Component<Props, State> {
                 <button
                   className="cqd-button cqd-button-ghost"
                   onClick={this.handleReload}
+                  aria-label="Reload the extension popup"
+                  title="Reload the extension popup"
                   style={{
                     width: '100%',
                     justifyContent: 'center'

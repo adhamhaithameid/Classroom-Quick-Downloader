@@ -917,6 +917,7 @@ function App() {
                 </span>
                 {version && (
                   <button
+                    type="button"
                     className={`cqd-brand-version ${getRuleClasses(effectiveRule, seen)}`}
                     aria-label={`Version ${version} - View changelog`}
                     title={getLatestChange(changelogData) ? `Latest: ${getLatestChange(changelogData)}` : "View changelog"}
@@ -1006,6 +1007,8 @@ function App() {
                     <button
                       type="button"
                       className="cqd-cl-retry-btn"
+                      aria-label="Retry loading changelog"
+                      title="Retry loading changelog"
                       onClick={async () => {
                         setChangelogStatus('loading');
                         const retryResult = await fetchChangelogDetailed(true);
@@ -1067,6 +1070,7 @@ function App() {
                   rel="noopener noreferrer"
                   onClick={handleChangelogWebsiteClick}
                   aria-label="Open changelog website"
+                  title="Open changelog website"
                   className="cqd-cl-footer-link cqd-cl-footer-link-secondary"
                 >
                   <span className="cqd-cl-footer-link-content">
@@ -1078,6 +1082,7 @@ function App() {
                   target="_blank" 
                   rel="noopener noreferrer"
                   aria-label="Report an issue or request a feature"
+                  title="Report an issue or request a feature"
                   className="cqd-cl-footer-link"
                 >
                   <span className="cqd-cl-footer-link-content">
@@ -1199,6 +1204,8 @@ function App() {
                               }}
                               tabIndex={0}
                               role="button"
+                              aria-label={`Highlight ${stat.label}: ${stat.value} downloads`}
+                              title={`Highlight ${stat.label}: ${stat.value} downloads`}
                               style={{ cursor: 'pointer' }}
                             >
                               <span
@@ -1232,6 +1239,8 @@ function App() {
                     onClick={handleToggleSettingsCollapse}
                     aria-expanded={!settingsCollapsed}
                     aria-controls="cqd-settings-body"
+                    aria-label={settingsCollapsed ? 'Open extension settings section' : 'Close extension settings section'}
+                    title={settingsCollapsed ? 'Open extension settings section' : 'Close extension settings section'}
                   >
                     <div>
                       <h2 className="cqd-card-title">Extension Settings</h2>
@@ -1329,6 +1338,7 @@ function App() {
                   className="cqd-button cqd-open-classroom-btn"
                   onClick={handleOpenClassroomClick}
                   aria-label="Open Google Classroom in a new tab"
+                  title="Open Google Classroom in a new tab"
                 >
                   <span>Open Google Classroom</span>
                 </button>
@@ -1530,6 +1540,8 @@ function App() {
                   target="_blank"
                   rel="noreferrer"
                   className="cqd-footer-link"
+                  aria-label="Report an issue or suggestion"
+                  title="Report an issue or suggestion"
                 >
                   Report it here
                 </a>
