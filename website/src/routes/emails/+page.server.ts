@@ -1,25 +1,6 @@
-import { readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 
-const sourcePath = resolve(process.cwd(), '../emails/email-advertisement.html');
-
-const stylePattern = /<style[^>]*>([\s\S]*?)<\/style>/gi;
-const bodyPattern = /<body[^>]*>([\s\S]*?)<\/body>/i;
-const webVersionBarPattern =
-  /<table[^>]*>\s*<tr>\s*<td[^>]*>\s*<p[^>]*>\s*Having trouble viewing this email\?[\s\S]*?<\/table>\s*/i;
-
 export const load: PageServerLoad = async () => {
-  const rawHtml = await readFile(sourcePath, 'utf8');
-
-  const styleMatches = [...rawHtml.matchAll(stylePattern)];
-  const emailHeadStyles = styleMatches.map((match) => match[1].trim()).join('\n\n');
-
-  const bodyMatch = rawHtml.match(bodyPattern);
-  const emailBodyHtml = (bodyMatch ? bodyMatch[1] : rawHtml).replace(webVersionBarPattern, '').trim();
-
-  return {
-    emailHeadStyles,
-    emailBodyHtml
-  };
+	throw redirect(308, '/emails2');
 };
