@@ -179,3 +179,25 @@ func TestIngestBatchHandlerV4_PostgresPrimaryMirrorFailureStillReturnsSuccess(t 
 		t.Fatalf("expected sqlite mirror failure to be recorded in pipeline_failure_logs")
 	}
 }
+
+func TestIngestBatchHandlerV4_PostgresModeEvalFailure(t *testing.T) {
+	sqlDB := newAdminTestDB(t)
+	defer sqlDB.Close()
+
+	if _, err := sqlDB.Exec(`DROP TABLE feature_flags`); err != nil {
+		t.Fatalf("failed to induce sqlite eval failure: %v", err)
+	}
+
+	payload := `{"batchId":"batch-eval-failure-1","generatedAt":1739308800000,"timeZone":"UTC","summary":{"totals":{"totalEvents":1,"totalDownloads":1,"totalSuccess":1,"totalFail":0}},"timeBuckets":[{"bucketStart":"2026-02-01T00:00:00Z","bucketEnd":"2026-02-01T01:00:00Z","totals":{"totalEvents":1,"totalDownloads":1,"totalSuccess":1,"totalFail":0},"counters":{"byStatus":{"success":1},"byType":{"pdf":1},"byBrowser":{"chrome":1},"byOs":{"windows":1},"byExtVersion":{"1.0.0":1},"byLanguage":{"en":1},"byCountry":{"us":1},"byErrorType":{"none":1}}}],"doState":{"ok":true}}`
+	req := httptest.NewRequest(http.MethodPost, "/ingest-batch", bytes.NewBufferString(payload))
+	req.Header.Set("X-DO-SECRET", "secret")
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	// Pass sqlDB for both so it tries to evaluate the feature flag and hits the missing table
+	IngestBatchHandlerV4(sqlDB, sqlDB, "secret").ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500 on mode eval failure, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
