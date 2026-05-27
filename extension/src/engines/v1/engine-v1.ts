@@ -124,36 +124,24 @@ export class EngineV1 implements CQDEngine {
   /**
    * Handle DOM mutations.
    *
-   * V1 has its OWN MutationObservers (3 of them!) so this method
-   * is a no-op. The mutations are already being handled by:
-   * - comment_frame.content.ts's domObserver
-   * - edited_frame.content.ts's domObserver
-   * - download_all.content.ts's globalObserver
-   *
-   * In shadow mode, we ignore these mutations entirely because
-   * V1 is already processing them through its own observers.
-   *
-   * TODO (Phase 5): When V2 takes over mutation handling,
-   * V1's internal observers should be disabled and mutations
-   * should be routed through handleMutations() instead.
+   * Dispatches a global event to the V1 content scripts to trigger a scan,
+   * routing Orchestrator mutations down to the legacy V1 code.
    */
-  handleMutations(_mutations: MutationRecord[]): void {
-    // V1 handles mutations through its own internal observers
-    // No-op in the wrapper
+  handleMutations(mutations: MutationRecord[]): void {
+    if (this.isActive) {
+      window.dispatchEvent(new CustomEvent('cqd:v1:scan', { detail: { mutations } }));
+    }
   }
 
   /**
    * Run a full scan of the page.
    *
-   * V1 already does this via its heartbeat intervals (setInterval).
-   * Each content script has a 2500ms heartbeat that rescans the page.
-   *
-   * This method exists to satisfy the interface — it doesn't do
-   * anything because V1's heartbeats are already running.
+   * Dispatches a global event to the V1 content scripts to trigger a scan.
    */
   fullScan(): void {
-    // V1's heartbeat intervals handle periodic scanning
-    // No additional scan needed from the wrapper
+    if (this.isActive) {
+      window.dispatchEvent(new CustomEvent('cqd:v1:scan'));
+    }
   }
 
   // ========================================================================

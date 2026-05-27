@@ -22,9 +22,6 @@ let editedScanScheduled = false;
 // Per-tab + runtime state
 // let tabEnabled = true; // Removed
 let running = false;
-let domObserver: MutationObserver | null = null;
-let heartbeatId: number | null = null;
-let urlObserver: MutationObserver | null = null;
 
 // Flag toggle state (controlled from popup)
 let editedFlagEnabled = true;
@@ -135,39 +132,17 @@ function startEditedFeature(): void {
   // Scroll listener (Fixes missing frames after hard scroll)
   window.addEventListener('scroll', scanForEditedPosts, { passive: true });
 
-  domObserver = new MutationObserver(() => {
-    if (editedScanScheduled) return;
-    editedScanScheduled = true;
-    requestAnimationFrame(() => {
-      editedScanScheduled = false;
-      if (!running) return;
-      scanForEditedPosts();
-    });
-  });
+  window.addEventListener('cqd:v1:scan', onV1Scan);
+}
 
-  domObserver.observe(document.body, {
-    childList: true,
-    subtree: true,
-    attributes: true,
-    attributeFilter: ['aria-label', 'title', 'style'], 
-  });
-
-  heartbeatId = window.setInterval(() => {
+function onV1Scan() {
+  if (editedScanScheduled) return;
+  editedScanScheduled = true;
+  requestAnimationFrame(() => {
+    editedScanScheduled = false;
     if (!running) return;
     scanForEditedPosts();
-  }, 2500);
-
-  let lastUrl = location.href;
-  urlObserver = new MutationObserver(() => {
-    const url = location.href;
-    if (url !== lastUrl) {
-      lastUrl = url;
-      if (!running) return;
-      setTimeout(scanForEditedPosts, 500);
-      setTimeout(scanForEditedPosts, 1500);
-    }
   });
-  urlObserver.observe(document, { subtree: true, childList: true });
 }
 
 function stopEditedFeature(): void {
@@ -175,19 +150,8 @@ function stopEditedFeature(): void {
   running = false;
 
   window.removeEventListener('scroll', scanForEditedPosts);
+  window.removeEventListener('cqd:v1:scan', onV1Scan);
 
-  if (domObserver) {
-    domObserver.disconnect();
-    domObserver = null;
-  }
-  if (heartbeatId != null) {
-    window.clearInterval(heartbeatId);
-    heartbeatId = null;
-  }
-  if (urlObserver) {
-    urlObserver.disconnect();
-    urlObserver = null;
-  }
   editedScanScheduled = false;
 
   // Remove our DOM artifacts

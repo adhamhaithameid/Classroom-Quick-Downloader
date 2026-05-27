@@ -54,8 +54,6 @@ getCancelHoldDelayMs().then((ms) => {
 
 // Per-tab runtime state
 let running = false;
-let globalObserver: MutationObserver | null = null;
-let globalInterval: number | null = null;
 
 // Clean up handler reference for removal
 const scrollHandler = () => scheduleRefresh();
@@ -81,9 +79,14 @@ function startDownloadAllFeature() {
   registerButtonsInSubtree(document);
 
   window.addEventListener('scroll', scrollHandler, { passive: true });
+  window.addEventListener('cqd:v1:scan', onV1Scan);
+}
 
-  globalObserver = new MutationObserver((mutations) => {
-    if (!running) return;
+function onV1Scan(e: Event) {
+  if (!running) return;
+
+  if (e instanceof CustomEvent && e.detail?.mutations) {
+    const mutations = e.detail.mutations as MutationRecord[];
     for (const m of mutations) {
       if (m.type === 'childList') {
         m.addedNodes.forEach((node) => {
@@ -146,23 +149,12 @@ function startDownloadAllFeature() {
         }
       }
     }
-    scheduleRefresh();
-  });
-
-  if (document.body) {
-    globalObserver.observe(document.body, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['class', 'data-cqd-all-done', 'aria-expanded'],
-    });
+  } else {
+    // Full scan fallback
+    registerButtonsInSubtree(document);
   }
 
-  globalInterval = window.setInterval(() => {
-    if (!running) return;
-    registerButtonsInSubtree(document);
-    scheduleRefresh();
-  }, 4000);
+  scheduleRefresh();
 }
 
 function stopDownloadAllFeature() {
@@ -170,16 +162,7 @@ function stopDownloadAllFeature() {
   running = false;
 
   window.removeEventListener('scroll', scrollHandler);
-
-  if (globalObserver) {
-    globalObserver.disconnect();
-    globalObserver = null;
-  }
-
-  if (globalInterval != null) {
-    window.clearInterval(globalInterval);
-    globalInterval = null;
-  }
+  window.removeEventListener('cqd:v1:scan', onV1Scan);
   
   refreshScheduled = false;
 

@@ -32,9 +32,6 @@ function escapeRegex(str: string): string {
 // Per-tab + runtime state
 // let tabEnabled = true; // Removed
 let running = false;
-let domObserver: MutationObserver | null = null;
-let heartbeatId: number | null = null;
-let urlObserver: MutationObserver | null = null;
 
 // Flag toggle state (controlled from popup)
 let commentsFlagEnabled = true;
@@ -147,38 +144,17 @@ function startCommentsFeature(): void {
   // Scroll listener (Fixes missing frames after hard scroll)
   window.addEventListener('scroll', scanForComments, { passive: true });
 
-  domObserver = new MutationObserver(() => {
-    if (commentScanScheduled) return;
-    commentScanScheduled = true;
-    requestAnimationFrame(() => {
-      commentScanScheduled = false;
-      if (!running) return;
-      scanForComments();
-    });
-  });
+  window.addEventListener('cqd:v1:scan', onV1Scan);
+}
 
-  domObserver.observe(document.body, {
-    childList: true,
-    subtree: true,
-    attributes: true, 
-    attributeFilter: ['style'], // Monitor style so we can re-apply position:relative
-  });
-
-  heartbeatId = window.setInterval(() => {
+function onV1Scan() {
+  if (commentScanScheduled) return;
+  commentScanScheduled = true;
+  requestAnimationFrame(() => {
+    commentScanScheduled = false;
     if (!running) return;
     scanForComments();
-  }, 2500);
-
-  let lastUrl = location.href;
-  urlObserver = new MutationObserver(() => {
-    const url = location.href;
-    if (url !== lastUrl) {
-      lastUrl = url;
-      if (!running) return;
-      setTimeout(scanForComments, 500);
-    }
   });
-  urlObserver.observe(document, { subtree: true, childList: true });
 }
 
 function stopCommentsFeature(): void {
@@ -186,19 +162,8 @@ function stopCommentsFeature(): void {
   running = false;
 
   window.removeEventListener('scroll', scanForComments);
+  window.removeEventListener('cqd:v1:scan', onV1Scan);
 
-  if (domObserver) {
-    domObserver.disconnect();
-    domObserver = null;
-  }
-  if (heartbeatId != null) {
-    window.clearInterval(heartbeatId);
-    heartbeatId = null;
-  }
-  if (urlObserver) {
-    urlObserver.disconnect();
-    urlObserver = null;
-  }
   commentScanScheduled = false;
 
   // Remove our DOM artifacts from this tab
