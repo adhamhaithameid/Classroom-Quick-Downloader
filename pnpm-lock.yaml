@@ -26,6 +26,7 @@ overrides:
   fast-uri: 3.1.2
   brace-expansion@>=5.0.0 <5.0.6: 5.0.6
   ws: 8.20.1
+  tmp: '>=0.2.6'
 
 packageExtensionsChecksum: sha256-Mtl/g1U9WZt8ln5xe2MAOO/TzRTYGckF8aPe30g3wls=
 
@@ -3450,8 +3451,8 @@ packages:
     resolution: {integrity: sha512-I4FZcVFcqCRuT0ph6dCDpPuO4Xgzvh+spkcTr1gK7peIvxWauoloVO0vuy1FQnijT63ss6AsHB6+OIM4aXHbPg==}
     hasBin: true
 
-  tmp@0.2.5:
-    resolution: {integrity: sha512-voyz6MApa1rQGUxT3E+BK7/ROe8itEx7vD8/HEvt4xwXucvQ5G5oeEiHkmHZJuBO21RpOf+YYm9MOivj709jow==}
+  tmp@0.2.6:
+    resolution: {integrity: sha512-5sJPdPjfI5Kx+qbrDesxkglRBxW//g7hCsqspEjwkewGvBMGIKMOTKzLt1hFVJzyadba3lDUN20O9qhvbQUSTA==}
     engines: {node: '>=14.14'}
 
   topojson-client@3.1.0:
@@ -6771,7 +6772,7 @@ snapshots:
     dependencies:
       tldts-core: 7.0.27
 
-  tmp@0.2.5: {}
+  tmp@0.2.6: {}
 
   topojson-client@3.1.0:
     dependencies:
@@ -7021,7 +7022,7 @@ snapshots:
       source-map-support: 0.5.21
       strip-bom: 5.0.0
       strip-json-comments: 5.0.2
-      tmp: 0.2.5
+      tmp: 0.2.6
       update-notifier: 7.3.1
       watchpack: 2.4.4
       zip-dir: 2.0.0
