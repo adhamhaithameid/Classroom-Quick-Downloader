@@ -37,6 +37,7 @@
  */
 
 import type { CQDEngine } from '../../engines/types';
+import { logger } from '../../shared/logger';
 
 // ============================================================================
 // TYPES
@@ -97,7 +98,7 @@ export interface ShadowCompareResult {
  *   comparator.start();
  *   // ... V1 and V2 both run...
  *   const report = comparator.getLatestReport();
- *   console.log(`Match rate: ${report.matchPercentage}%`);
+ *   logger.log(`Match rate: ${report.matchPercentage}%`);
  *   comparator.stop();
  */
 export class ShadowComparator {
@@ -132,7 +133,7 @@ export class ShadowComparator {
     if (this.running) return;
     this.running = true;
 
-    console.log('[CQD Shadow] Starting shadow comparison');
+    logger.log('[CQD Shadow] Starting shadow comparison');
 
     // Run first comparison after a delay (let both engines settle)
     this.intervalId = window.setInterval(() => {
@@ -155,7 +156,7 @@ export class ShadowComparator {
     // Log final summary
     if (this.reports.length > 0) {
       const latest = this.reports[this.reports.length - 1];
-      console.log(
+      logger.log(
         `[CQD Shadow] Stopped. Final match rate: ${latest.matchPercentage.toFixed(1)}%` +
         ` (${this.reports.length} comparisons total)`,
       );
@@ -300,15 +301,15 @@ export class ShadowComparator {
 
     // Log results
     if (mismatchCount > 0) {
-      console.warn(
+      logger.warn(
         `[CQD Shadow] Comparison: ${matchPercentage.toFixed(1)}% match ` +
         `(${mismatchCount} mismatches across ${result.postsAnalyzed} posts)`,
       );
       for (const m of mismatches) {
-        console.warn(`  ⚠️ ${m.type}: ${m.details}`);
+        logger.warn(`  ⚠️ ${m.type}: ${m.details}`);
       }
     } else {
-      console.log(
+      logger.log(
         `[CQD Shadow] Comparison: 100% match ` +
         `(${result.postsAnalyzed} posts, ${filesCompared} files)`,
       );
