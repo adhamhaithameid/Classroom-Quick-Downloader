@@ -57,6 +57,7 @@ function buildEnv(): Env {
 }
 
 function expectSecurityHeaders(response: Response): void {
+  expect(response.headers.get("strict-transport-security")).toBe("max-age=31536000; includeSubDomains");
   expect(response.headers.get("content-security-policy")).toContain("default-src 'self'");
   expect(response.headers.get("x-content-type-options")).toBe("nosniff");
   expect(response.headers.get("x-frame-options")).toBe("DENY");

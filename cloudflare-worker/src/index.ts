@@ -400,6 +400,7 @@ function redirectWithCookies(location: string, cookies: string[]): Response {
 }
 
 const HTML_SECURITY_HEADERS = {
+  "strict-transport-security": "max-age=31536000; includeSubDomains",
   "x-content-type-options": "nosniff",
   "x-frame-options": "DENY",
   "referrer-policy": "strict-origin-when-cross-origin",

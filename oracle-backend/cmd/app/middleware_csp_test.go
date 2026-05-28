@@ -216,6 +216,21 @@ func TestSecurityHeaders_PermissionsPolicy(t *testing.T) {
 	}
 }
 
+func TestSecurityHeaders_StrictTransportSecurity(t *testing.T) {
+	handler := securityHeadersMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	handler.ServeHTTP(rr, req)
+
+	hsts := rr.Header().Get("Strict-Transport-Security")
+	if hsts != "max-age=31536000; includeSubDomains" {
+		t.Fatalf("expected Strict-Transport-Security header to be 'max-age=31536000; includeSubDomains', got %q", hsts)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // CSP nonce uniqueness
 // ---------------------------------------------------------------------------
