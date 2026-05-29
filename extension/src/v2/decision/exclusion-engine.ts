@@ -589,6 +589,9 @@ export function isInExcludedArea(element: HTMLElement): boolean {
   return false;
 }
 
+/** Cache for user content selectors to prevent redundant array allocations */
+let cachedUserContentSelectors: string[] | null = null;
+
 /**
  * Get all user-content exclusion selectors.
  *
@@ -596,9 +599,12 @@ export function isInExcludedArea(element: HTMLElement): boolean {
  * then check text nodes against them.
  */
 export function getUserContentSelectors(): string[] {
-  return EXCLUSION_RULES
-    .filter(r => r.type === 'selector' && r.category === 'user_content')
-    .map(r => r.pattern as string);
+  if (!cachedUserContentSelectors) {
+    cachedUserContentSelectors = EXCLUSION_RULES
+      .filter(r => r.type === 'selector' && r.category === 'user_content')
+      .map(r => r.pattern as string);
+  }
+  return cachedUserContentSelectors;
 }
 
 /**

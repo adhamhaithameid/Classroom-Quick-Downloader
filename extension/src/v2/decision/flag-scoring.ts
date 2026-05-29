@@ -466,6 +466,16 @@ function commentLayer3_GoldenSelectors(post: HTMLElement, keywords: CommentKeywo
   return { score: 0, count: null, matchedText: null, details: 'L3: No golden selector match' };
 }
 
+/** Cache for combined user content selectors to prevent redundant string joins */
+let cachedCombinedUserContentSelector: string | null = null;
+
+function getCombinedUserContentSelector(): string {
+  if (cachedCombinedUserContentSelector === null) {
+    cachedCombinedUserContentSelector = getUserContentSelectors().join(', ');
+  }
+  return cachedCombinedUserContentSelector;
+}
+
 /**
  * LAYER 4: Nuclear TreeWalker — scans ALL visible text nodes.
  *
@@ -474,8 +484,7 @@ function commentLayer3_GoldenSelectors(post: HTMLElement, keywords: CommentKeywo
  * Score: LOW_CONFIDENCE (15) + bonuses.
  */
 function commentLayer4_Nuclear(post: HTMLElement, keywords: CommentKeywords): CommentLayerResult {
-  const userContentSelectors = getUserContentSelectors();
-  const combinedUserContentSelector = userContentSelectors.join(', ');
+  const combinedUserContentSelector = getCombinedUserContentSelector();
 
   const walker = document.createTreeWalker(
     post,
@@ -627,8 +636,7 @@ function editedLayer2_Semantic(post: HTMLElement, keywords: string[]): EditedLay
  * Score: LAYER_3_STRUCTURAL (20) + bonuses.
  */
 function editedLayer3_TreeWalker(post: HTMLElement, keywords: string[]): EditedLayerResult {
-  const userContentSelectors = getUserContentSelectors();
-  const combinedUserContentSelector = userContentSelectors.join(', ');
+  const combinedUserContentSelector = getCombinedUserContentSelector();
 
   const walker = document.createTreeWalker(
     post,
