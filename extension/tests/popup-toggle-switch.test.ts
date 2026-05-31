@@ -51,6 +51,8 @@ describe('popup toggle switch accessibility', () => {
     expect(switchLabel?.getAttribute('tabindex')).toBeNull();
 
     expect(input).not.toBeNull();
+    expect(input?.getAttribute('role')).toBe('switch');
+    expect(input?.getAttribute('aria-checked')).toBe('false');
     expect(input?.getAttribute('aria-label')).toBe('Enable Extension');
     expect(input?.checked).toBe(false);
   });
