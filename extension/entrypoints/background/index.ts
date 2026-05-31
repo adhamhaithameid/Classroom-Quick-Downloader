@@ -107,11 +107,11 @@ export default defineBackground(() => {
   initializeUninstallUrl();
   chrome.runtime.onInstalled?.addListener(() => {
     initializeUninstallUrl();
-  });
 
-  // Memory leak prevention: periodic cleanup
-  setInterval(cleanupOrphanedPendingDownloads, CLEANUP_INTERVAL_MS);
-  setTimeout(cleanupOrphanedPendingDownloads, 60 * 1000);
+    // Memory leak prevention: periodic cleanup (moved to alarms to survive service worker termination)
+    chrome.alarms?.create('CQD_CLEANUP_ALARM', { periodInMinutes: CLEANUP_INTERVAL_MS / 60000 });
+    chrome.alarms?.create('CQD_CLEANUP_ALARM_INITIAL', { delayInMinutes: 1 });
+  });
 
   // Create icon update closures
   const { updateTabIcon, updateGlobalIcon } = createIconUpdaters();
@@ -120,6 +120,13 @@ export default defineBackground(() => {
   chrome.storage.local.get('extensionEnabled', (res) => {
     const enabled = res.extensionEnabled !== false;
     updateGlobalIcon(enabled);
+  });
+
+  // Alarm handlers for background tasks that must survive SW suspension
+  chrome.alarms?.onAlarm.addListener((alarm) => {
+    if (alarm.name === 'CQD_CLEANUP_ALARM' || alarm.name === 'CQD_CLEANUP_ALARM_INITIAL') {
+      cleanupOrphanedPendingDownloads();
+    }
   });
 
   // Listen for global toggle changes
