@@ -1,0 +1,10 @@
+--- extension/vitest.config.ts
++++ extension/vitest.config.ts
+@@ -21,6 +21,7 @@
+       provider: 'v8',
+       reporter: ['text', 'json', 'html'],
+       exclude: [
++        '**/tests/**',
+         'node_modules/**',
+         'dist/**',
+         '.output/**',
