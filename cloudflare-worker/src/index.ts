@@ -265,7 +265,12 @@ export async function verifySessionToken(
     
     if (!isValid) return false;
     
-    const payload: SessionPayload = JSON.parse(atob(payloadB64));
+    let payload: SessionPayload;
+    try {
+      payload = JSON.parse(atob(payloadB64));
+    } catch {
+      return false;
+    }
     
     // Check expiration
     if (Date.now() > payload.exp) return false;
@@ -838,11 +843,16 @@ async function checkLoginAllowlist(
   if (!checkRes.ok) {
     throw new Error(`ip-allowlist endpoint returned ${checkRes.status}`);
   }
-  const checkData = await checkRes.json() as {
+  let checkData: {
     allowed?: unknown;
     enabled?: unknown;
     stepUpBypassEnabled?: unknown;
   };
+  try {
+    checkData = await checkRes.json();
+  } catch {
+    throw new Error("ip-allowlist returned invalid JSON");
+  }
   if (typeof checkData.allowed !== "boolean") {
     throw new Error("ip-allowlist payload missing allowed boolean");
   }
@@ -1171,7 +1181,15 @@ async function handleDashboard(request: Request, env: WorkerEnv): Promise<Respon
     );
   }
 
-  const stats = (await statsRes.json()) as StatsResponse;
+  let stats: StatsResponse;
+  try {
+    stats = await statsRes.json() as StatsResponse;
+  } catch {
+    return new Response(
+      "Failed to load stats from Durable Object (Invalid JSON).",
+      { status: 500 }
+    );
+  }
   const nonce = generateCspNonce();
   const html = renderDashboard(stats, nonce);
 
@@ -1492,7 +1510,12 @@ async function fetchDoWebsiteStatus(env: WorkerEnv): Promise<Record<string, unkn
   if (!res.ok) {
     throw new Error(`do_status_http_${res.status}`);
   }
-  const payload = await res.json();
+  let payload: unknown;
+  try {
+    payload = await res.json();
+  } catch {
+    throw new Error("do_status_invalid_json");
+  }
   if (!payload || typeof payload !== "object") {
     throw new Error("do_status_invalid_payload");
   }
@@ -2348,7 +2371,12 @@ async function fetchOracleSnapshotPayload(env: WorkerEnv): Promise<Record<string
   if (!upstream.ok) {
     throw new Error(`oracle_http_${upstream.status}`);
   }
-  const payload = await upstream.json();
+  let payload: unknown;
+  try {
+    payload = await upstream.json();
+  } catch {
+    throw new Error("oracle_invalid_json");
+  }
   if (!payload || typeof payload !== "object") {
     throw new Error("oracle_invalid_snapshot");
   }
