@@ -148,6 +148,7 @@ export default defineBackground(() => {
 
   // 0) Icon update from content scripts
   chrome.runtime.onMessage.addListener((message, sender) => {
+    if (sender.id !== chrome.runtime.id) return false;
     if (message?.type === 'CQD_UPDATE_ICON' && sender.tab?.id != null) {
       updateTabIcon(sender.tab.id, sender.tab.url);
       return false;
@@ -156,6 +157,7 @@ export default defineBackground(() => {
 
   // 0b) Student Work resolver bridge relay (runtime-authenticated, tab-scoped)
   chrome.runtime.onMessage.addListener((message, sender) => {
+    if (sender.id !== chrome.runtime.id) return false;
     if (!isStudentWorkResolvePublishMessage(message)) return false;
     if (sender.tab?.id == null) return false;
 
@@ -175,6 +177,7 @@ export default defineBackground(() => {
 
   // 1) Messages from drive_bypass.content.ts
   chrome.runtime.onMessage.addListener((message, sender) => {
+    if (sender.id !== chrome.runtime.id) return false;
     if (!message || !sender.tab || sender.tab.id == null) return false;
 
     const tabId = sender.tab.id;
@@ -398,12 +401,14 @@ export default defineBackground(() => {
 
   // 4) CQD_DOWNLOAD handler
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (sender.id !== chrome.runtime.id) return false;
     if (!message || message.type !== 'CQD_DOWNLOAD') return false;
     return handleDownloadRequest(message, sender, sendResponse);
   });
 
   // 5) CQD_CANCEL_DOWNLOAD handler
-  chrome.runtime.onMessage.addListener((message) => {
+  chrome.runtime.onMessage.addListener((message, sender) => {
+    if (sender.id !== chrome.runtime.id) return false;
     if (!message || message.type !== 'CQD_CANCEL_DOWNLOAD') return false;
 
     const requestId = message.requestId as string | undefined;
