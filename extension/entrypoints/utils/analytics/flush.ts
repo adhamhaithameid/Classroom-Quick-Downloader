@@ -162,11 +162,19 @@ export async function sendBatchToCloudflare(
   }
 
   try {
-    const resp = await fetch(TRACK_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ events, clientBatchId }),
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10_000);
+    let resp: Response;
+    try {
+      resp = await fetch(TRACK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ events, clientBatchId }),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     if (resp.status === 429) {
       return { success: false, rateLimited: true, error: 'Rate limited' };
@@ -180,7 +188,16 @@ export async function sendBatchToCloudflare(
       return { success: false, error: `HTTP ${resp.status}` };
     }
 
-    const json = await resp.json();
+    let raw: unknown;
+    try {
+      raw = await resp.json();
+    } catch {
+      return { success: false, error: 'invalid_json' };
+    }
+    if (typeof raw !== 'object' || raw === null) {
+      return { success: false, error: 'invalid_response_shape' };
+    }
+    const json = raw as Record<string, any>;
     return {
       success: json.ok === true,
       accepted: json.accepted,

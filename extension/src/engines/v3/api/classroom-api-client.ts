@@ -125,18 +125,37 @@ export class GoogleClassroomApiClient implements ClassroomApiClient {
       }
       if (pageToken) requestUrl.searchParams.set('pageToken', pageToken);
 
-      const response = await fetch(requestUrl.toString(), {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        signal,
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10_000);
+      const compositeSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
+
+      let response: Response;
+      try {
+        response = await fetch(requestUrl.toString(), {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          signal: compositeSignal,
+        });
+      } catch {
+        clearTimeout(timeoutId);
+        return submissions;
+      }
+      clearTimeout(timeoutId);
+
       if (!response.ok) {
         return submissions;
       }
 
-      const payload = await response.json() as GoogleClassroomStudentSubmissionResponse;
+      let payload: GoogleClassroomStudentSubmissionResponse;
+      try {
+        const raw = await response.json();
+        if (typeof raw !== 'object' || raw === null) return submissions;
+        payload = raw as GoogleClassroomStudentSubmissionResponse;
+      } catch {
+        return submissions;
+      }
       const batch = (payload.studentSubmissions || [])
         .map((submission) => mapSubmission(submission, context.authUser))
         .filter((submission): submission is ClassroomApiStudentSubmission => !!submission);
