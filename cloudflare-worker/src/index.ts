@@ -7,6 +7,7 @@ import {
   shouldWarnOnInsecureOracleEndpoint,
 } from "./oracle-endpoint";
 import { timingSafeStringEqual } from "./timing";
+import { ANALYTICS_CONFIG_KV_KEY, ANALYTICS_CONFIG_KV_TTL_SECONDS } from "./downloads_do";
 import type { Env as WorkerEnv, StatsResponse } from "./types";
 
 type WorkerLogLevel = "info" | "warn" | "error";
@@ -467,8 +468,8 @@ function getDownloadsStub(env: WorkerEnv): DurableObjectStub {
 
 const WEBSITE_EVENTS_SCHEMA_VERSION = "1" as const;
 const SITE_SNAPSHOT_KV_KEY = "site:v1:snapshot";
-const SITE_CACHE_TTL_SECONDS = 3 * 60 * 60;
-const SITE_CACHE_REVALIDATE_AFTER_MS = 3 * 60 * 60 * 1000;
+const SITE_CACHE_TTL_SECONDS = 6 * 60 * 60;
+const SITE_CACHE_REVALIDATE_AFTER_MS = 6 * 60 * 60 * 1000;
 const ORACLE_PULL_HOURS_UTC = new Set([0, 3, 6, 9, 12, 15, 18, 21]);
 const ORACLE_EXPORT_HOURS_UTC = new Set([1, 4, 7, 10, 13, 16, 19, 22]);
 const ORACLE_PUBLIC_WEBSITE_PATHS = new Set<string>([
@@ -676,13 +677,34 @@ function cloudflareAccessDeniedResponse(request: Request, env: WorkerEnv, pathna
   );
 }
 
+// Fixed internal origin for all Worker->DO remote procedure calls. The stub
+// is binding-routed (no DNS), so the origin is a placeholder — but it must
+// never derive from request input, or a client-controlled Host could aim
+// DO RPCs elsewhere.
+const DO_RPC_ORIGIN = "https://do";
+
+function doRpcUrl(pathname: string, search = ""): string {
+  return `${DO_RPC_ORIGIN}${pathname}${search}`;
+}
+
+/**
+ * Forwarding URL for passthrough DO RPCs: the incoming request's path and
+ * query ride along, but the origin is always the fixed internal placeholder.
+ * The stub is binding-routed (no DNS), so origin choice carries no network
+ * meaning — keeping it request-independent just means a client-controlled
+ * Host header can never aim a DO RPC anywhere else.
+ */
+function buildDoRpcForwardUrl(request: Request): string {
+  const url = new URL(request.url);
+  return doRpcUrl(url.pathname, url.search);
+}
+
 async function recordOptionalSessionBindingMismatch(
   stub: DurableObjectStub,
-  requestUrl: string,
   adminSecret: string,
   mismatch: SessionBindingMismatchInfo,
 ): Promise<void> {
-  const auditReq = new Request(new URL("/auth/session-binding-mismatch", requestUrl).toString(), {
+  const auditReq = new Request(doRpcUrl("/auth/session-binding-mismatch"), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -708,7 +730,7 @@ function makeSessionVerificationOptions(
   return {
     onOptionalBindingMismatch: async (mismatch) => {
       try {
-        await recordOptionalSessionBindingMismatch(stub, request.url, env.DO_SHARED_SECRET, mismatch);
+        await recordOptionalSessionBindingMismatch(stub, env.DO_SHARED_SECRET, mismatch);
       } catch (error) {
         logEvent("warn", "session_binding_mismatch_audit_failed", {
           error: String(error),
@@ -828,11 +850,10 @@ type DangerStepUpResult = {
 
 async function checkLoginAllowlist(
   stub: DurableObjectStub,
-  requestUrl: string,
   doSecret: string,
   clientIp: string,
 ): Promise<LoginAllowlistCheck> {
-  const checkReq = new Request(new URL("/auth/check-ip-allowlist", requestUrl).toString(), {
+  const checkReq = new Request(doRpcUrl("/auth/check-ip-allowlist"), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -992,7 +1013,7 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
 
     let allowlistDecision: LoginAllowlistCheck;
     try {
-      allowlistDecision = await checkLoginAllowlist(stub, request.url, env.DO_SHARED_SECRET, clientIp);
+      allowlistDecision = await checkLoginAllowlist(stub, env.DO_SHARED_SECRET, clientIp);
     } catch {
       const nonce = generateCspNonce();
       return new Response(
@@ -1053,7 +1074,7 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
       }
     } else if (!timingSafeStringEqual(password, dashboardSecret)) {
       // Rate limit: record failed attempt
-      const rateLimitReq = new Request(new URL("/auth/login-attempt", request.url).toString(), {
+      const rateLimitReq = new Request(doRpcUrl("/auth/login-attempt"), {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
@@ -1111,7 +1132,7 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
     }
 
     // Successful login - clear rate limit and create session
-    const successReq = new Request(new URL("/auth/login-attempt", request.url).toString(), {
+    const successReq = new Request(doRpcUrl("/auth/login-attempt"), {
       method: "POST",
       headers: { 
         "Content-Type": "application/json",
@@ -1170,10 +1191,7 @@ async function handleDashboard(request: Request, env: WorkerEnv): Promise<Respon
       clearDangerStepUpCookieHeader(logoutUrl, env),
     ]);
   }
-  const url = new URL(request.url);
-  url.pathname = "/stats";
-
-  const statsRes = await stub.fetch(url.toString(), { method: "GET" });
+  const statsRes = await stub.fetch(doRpcUrl("/stats"), { method: "GET" });
   if (!statsRes.ok) {
     const text = await statsRes.text().catch(() => "");
     return new Response(
@@ -1954,7 +1972,7 @@ async function handleProtectedAdminEndpoint(request: Request, env: WorkerEnv): P
     // Node fetch in tests requires duplex for streamed request bodies.
     requestInit.duplex = "half";
   }
-  const newReq = new Request(request.url, requestInit);
+  const newReq = new Request(buildDoRpcForwardUrl(request), requestInit);
 
   try {
     const res = await stub.fetch(newReq);
@@ -1995,7 +2013,7 @@ async function proxyToDO(request: Request, env: WorkerEnv): Promise<Response> {
     requestInit.body = request.body;
     requestInit.duplex = "half";
   }
-  const newReq = new Request(request.url, requestInit);
+  const newReq = new Request(buildDoRpcForwardUrl(request), requestInit);
 
   try {
     const res = await stub.fetch(newReq);
@@ -2022,6 +2040,97 @@ async function proxyToDO(request: Request, env: WorkerEnv): Promise<Response> {
       JSON.stringify({ ok: false, error: "upstream_unavailable" }),
       { status: 502, headers: { "content-type": "application/json; charset=utf-8" } }
     ), env);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Edge /config serving (KV-backed, DO fallback)
+// ---------------------------------------------------------------------------
+
+/**
+ * Serve GET /config from the KV snapshot when possible (KV reads do not count
+ * against the request budget). On KV miss, absent binding, or invalid JSON,
+ * fall back to proxying the Durable Object, which stays the source of truth.
+ */
+async function handleEdgeConfig(request: Request, env: WorkerEnv): Promise<Response> {
+  let snapshot: Record<string, unknown> | null = null;
+  try {
+    if (env.SITE_SNAPSHOT_KV) {
+      const raw = await env.SITE_SNAPSHOT_KV.get(ANALYTICS_CONFIG_KV_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as unknown;
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          snapshot = parsed as Record<string, unknown>;
+        }
+      }
+    }
+  } catch {
+    snapshot = null; // KV read failure or invalid JSON: fall back to the DO.
+  }
+
+  if (snapshot) {
+    // Inject a fresh clock for the extension's drift correction; the stored
+    // snapshot itself must never carry serverTimeUtc.
+    return withCors(
+      request,
+      new Response(
+        JSON.stringify({ ...snapshot, serverTimeUtc: Date.now() }),
+        {
+          status: 200,
+          headers: {
+            "content-type": "application/json",
+            "cache-control": "no-store",
+          },
+        },
+      ),
+      env,
+    );
+  }
+
+  return proxyToDO(request, env);
+}
+
+/**
+ * Cron helper: refresh the KV /config snapshot from the DO on every scheduled
+ * tick. Best effort — a DO failure keeps the previous KV value.
+ */
+async function refreshAnalyticsConfigKvFromDo(env: WorkerEnv): Promise<void> {
+  try {
+    if (!env.SITE_SNAPSHOT_KV) return;
+    const stub = getDownloadsStub(env);
+    const res = await stub.fetch(new Request("https://do/config", { method: "GET" }));
+    if (!res.ok) return;
+    const payload = await res.json() as unknown;
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) return;
+    const snapshot = { ...(payload as Record<string, unknown>) };
+    // Per-request fields never belong in the snapshot: serverTimeUtc is
+    // injected fresh at serve time; committedSeq/quota are DO-internal.
+    delete snapshot.serverTimeUtc;
+    delete snapshot.committedSeq;
+    delete snapshot.quota;
+    await env.SITE_SNAPSHOT_KV.put(ANALYTICS_CONFIG_KV_KEY, JSON.stringify(snapshot), {
+      expirationTtl: ANALYTICS_CONFIG_KV_TTL_SECONDS,
+    });
+  } catch {
+    // Best effort only.
+  }
+}
+
+/**
+ * Cron helper: hit the DO's pipeline-health endpoint with admin credentials
+ * so its stateful webhook notifier (rate-limited warn/critical + recovery
+ * notifications) actually evaluates. Best effort only.
+ */
+async function pingPipelineHealthAlerts(env: WorkerEnv): Promise<void> {
+  try {
+    if (!env.DO_SHARED_SECRET) return;
+    const stub = getDownloadsStub(env);
+    await stub.fetch(new Request("https://do/pipeline-health", {
+      method: "GET",
+      headers: { "X-Admin-Secret": env.DO_SHARED_SECRET },
+    }));
+  } catch {
+    // Alerting must never break the cron.
   }
 }
 
@@ -2430,6 +2539,10 @@ async function handleSiteV1Snapshot(request: Request, env: WorkerEnv): Promise<R
         env,
       );
     } catch {
+      // Self-heal: re-put the stale payload verbatim so its KV TTL extends.
+      // Without this, a long Oracle outage lets the snapshot expire and the
+      // website loses its last-good fallback entirely.
+      await writeSiteSnapshotCache(env, cachedRaw);
       return withCors(
         request,
         new Response(cachedRaw, {
@@ -2543,7 +2656,7 @@ async function handleSiteV1Events(request: Request, env: WorkerEnv): Promise<Res
   }
 
   const body = await request.text();
-  const proxied = new Request(new URL("/api/public/website/events", request.url).toString(), {
+  const proxied = new Request(doRpcUrl("/api/public/website/events"), {
     method: "POST",
     headers: new Headers(request.headers),
     body,
@@ -2734,8 +2847,10 @@ export default {
     // LEGACY_CHANGELOG_DISABLED_END
 
     // Public endpoints (no auth required)
+    if (pathname === "/config" && request.method === "GET") {
+      return handleEdgeConfig(request, env);
+    }
     if (
-      (pathname === "/config" && request.method === "GET") ||
       (pathname === "/health" && request.method === "GET") ||
       (pathname === "/pipeline-health" && request.method === "GET") ||
       (pathname === "/public/site-metrics" && request.method === "GET") ||
@@ -2784,6 +2899,15 @@ export default {
   async scheduled(controller: ScheduledController, env: WorkerEnv, _ctx: ExecutionContext): Promise<void> {
     const now = controller.scheduledTime || Date.now();
     const hour = currentHourUtc(now);
+
+    // Refresh the KV-backed /config snapshot on every tick (best effort) so
+    // extension polls are served from the edge instead of the DO.
+    await refreshAnalyticsConfigKvFromDo(env);
+
+    // Ping pipeline health with admin credentials so the DO's webhook
+    // notifier fires on warn/critical (e.g. Oracle unreachable). Without
+    // this, alerts only trigger when an authorized admin polls by hand.
+    await pingPipelineHealthAlerts(env);
 
     if (ORACLE_PULL_HOURS_UTC.has(hour)) {
       await refreshSiteSnapshotCacheFromOracle(env);
