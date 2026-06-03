@@ -155,7 +155,7 @@
   <header class="l2-nav-shell">
     <div class="l2-nav-inner l2-nav-fullwidth">
       <a href="{base}/" class="l2-nav-brand">
-        <img src={logo} alt="Classroom Quick Downloader" class="l2-nav-logo" />
+        <img src={logo} alt="Classroom Quick Downloader" class="l2-nav-logo" width="42" height="36" loading="eager" decoding="async" />
         <span class="l2-nav-brand-text">Classroom Quick Downloader</span>
       </a>
 
@@ -252,7 +252,7 @@
     <div class="l2-wrap l2-footer-inner">
       <div class="l2-footer-left">
         <a href="https://github.com/adhamhaithameid" target="_blank" rel="noopener noreferrer" class="l2-footer-credit-link">
-          <img src="https://github.com/adhamhaithameid.png?size=22" alt="Adham Haitham" class="l2-footer-avatar" />
+          <img src="https://github.com/adhamhaithameid.png?size=22" alt="Adham Haitham" class="l2-footer-avatar" width="20" height="20" loading="lazy" decoding="async" />
           Built by <strong>Adham Haitham</strong>
         </a>
         <span class="l2-footer-sep">•</span>
