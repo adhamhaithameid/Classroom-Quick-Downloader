@@ -148,35 +148,41 @@ export function updateDownloadAllUI(
 
   switch (state) {
     case 'idle':
+      button.disabled = false;
       if (label) label.textContent = 'Download All';
       if (countEl) countEl.textContent = String(progress.total);
       break;
 
     case 'downloading':
+      button.disabled = true;
       button.classList.add('cqd-loading');
       if (label) label.textContent = `Downloading`;
       if (countEl) countEl.textContent = `${progress.completed}/${progress.total}`;
       break;
 
     case 'success':
+      button.disabled = true;
       button.classList.add('cqd-success');
       if (label) label.textContent = 'Downloaded';
       if (countEl) countEl.textContent = `${progress.total}`;
       break;
 
     case 'error':
+      button.disabled = true;
       button.classList.add('cqd-error');
       if (label) label.textContent = 'Failed';
       if (countEl) countEl.textContent = `${progress.failed}`;
       break;
 
     case 'partial':
+      button.disabled = true;
       button.classList.add('cqd-error');
       if (label) label.textContent = 'Partial';
       if (countEl) countEl.textContent = `${progress.completed}/${progress.total}`;
       break;
 
     case 'cancelled':
+      button.disabled = true;
       button.classList.add('cqd-cancelled');
       if (label) label.textContent = 'Cancelled';
       if (countEl) countEl.textContent = `${progress.completed}/${progress.total}`;
@@ -197,6 +203,7 @@ export function resetDownloadAllButton(
   button: HTMLButtonElement,
   fileCount: number,
 ): void {
+  button.disabled = false;
   button.classList.remove(
     'cqd-loading',
     'cqd-success',
