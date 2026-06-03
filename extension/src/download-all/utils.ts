@@ -16,7 +16,7 @@ export function getSingleButtonState(btn: HTMLButtonElement): ButtonState {
   if (cls.contains('cqd-error')) return 'error';
   if (cls.contains('cqd-cancelled')) return 'cancelled';
   if (cls.contains('cqd-cancel')) return 'cancel';
-  if (btn.dataset.cqdAllDone === 'true') return 'success';
+  if (btn.dataset['cqdAllDone'] === 'true') return 'success';
   return 'idle';
 }
 
