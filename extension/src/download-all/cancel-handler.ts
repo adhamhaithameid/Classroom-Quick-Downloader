@@ -105,7 +105,7 @@ export function handleCancelAllClick(group: GroupState): void {
     file.inProgress = false;
     file.failed = true;
 
-    const requestId = (primary.dataset as any).cqdRequestId;
+    const requestId = primary.dataset.cqdRequestId;
     if (requestId && typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
       try {
         chrome.runtime.sendMessage({ type: 'CQD_CANCEL_DOWNLOAD', requestId });

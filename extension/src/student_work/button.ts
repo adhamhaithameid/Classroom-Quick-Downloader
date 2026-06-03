@@ -34,7 +34,7 @@ let statusBridgeSetup = false;
 function findStudentWorkButtonByRequestId(requestId: string): HTMLButtonElement | null {
   const buttons = document.querySelectorAll<HTMLButtonElement>('.cqd-download-btn[data-cqd-sw="true"]');
   for (const button of buttons) {
-    if ((button.dataset as any).cqdRequestId === requestId) return button;
+    if (button.dataset.cqdRequestId === requestId) return button;
   }
   return null;
 }
@@ -116,15 +116,15 @@ function ensureStudentWorkStatusBridge(): void {
         pendingButtons.delete(requestId);
         if (button.classList.contains('cqd-cancelled')) {
           try {
-            delete (button.dataset as any).cqdRequestId;
+            delete button.dataset.cqdRequestId;
           } catch {
             // Ignore dataset cleanup errors.
           }
           return;
         }
         try {
-          delete (button.dataset as any).cqdRequestId;
-          (button.dataset as any).cqdAllDone = 'true';
+          delete button.dataset.cqdRequestId;
+          button.dataset.cqdAllDone = 'true';
         } catch {
           // Ignore dataset cleanup errors.
         }
@@ -143,7 +143,7 @@ function ensureStudentWorkStatusBridge(): void {
 
         pendingButtons.delete(requestId);
         try {
-          delete (button.dataset as any).cqdRequestId;
+          delete button.dataset.cqdRequestId;
         } catch {
           // Ignore dataset cleanup errors.
         }
@@ -173,11 +173,11 @@ function armDownloadWatchdog(button: HTMLButtonElement): void {
   const timerId = window.setTimeout(() => {
     downloadWatchdogTimers.delete(button);
     if (!isButtonAwaitingTerminalStatus(button)) return;
-    const requestId = ((button.dataset as any).cqdRequestId || '').trim();
+    const requestId = (button.dataset.cqdRequestId || '').trim();
     if (requestId) {
       pendingButtons.delete(requestId);
       try {
-        delete (button.dataset as any).cqdRequestId;
+        delete button.dataset.cqdRequestId;
       } catch {
         // Ignore dataset cleanup errors.
       }
