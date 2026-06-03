@@ -16,6 +16,8 @@ Disallow: /uninstall
 Disallow: /404
 Disallow: /overview-editor
 Disallow: /landing2
+Disallow: /emails
+Disallow: /emails2
 
 Sitemap: ${siteUrl}/sitemap.xml
 ${host ? `Host: ${host}\n` : ''}
