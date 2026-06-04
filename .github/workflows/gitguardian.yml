@@ -1,5 +1,8 @@
 name: GitGuardian
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 on:
   push:
     branches: [main, master, Not_Stable]
@@ -22,6 +25,8 @@ jobs:
         with:
           args: --ignore-known-secrets
         env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
           GITHUB_PUSH_BEFORE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
           GITHUB_PUSH_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.base_ref }}
           GITHUB_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}

@@ -1,5 +1,11 @@
 name: Socket Security
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 on:
   pull_request:
     branches: [main, master, Not_Stable]
@@ -17,7 +23,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Setup pnpm
-        uses: pnpm/action-setup@v3
+        uses: pnpm/action-setup@v4
         with:
           version: 10.28.2
       - name: Setup Node.js

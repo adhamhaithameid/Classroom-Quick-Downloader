@@ -1,5 +1,8 @@
 name: Release Drafter
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 on:
   push:
     branches:
@@ -17,4 +20,6 @@ jobs:
     steps:
       - uses: release-drafter/release-drafter@v6
         env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

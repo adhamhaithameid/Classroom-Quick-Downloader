@@ -1,5 +1,8 @@
 name: HTTPS Endpoint Monitor
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 on:
   workflow_dispatch:
   schedule:
@@ -19,6 +22,8 @@ jobs:
 
       - name: Validate required endpoint variables
         env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
           ORACLE_ENDPOINT: ${{ vars.ORACLE_ENDPOINT }}
           PUBLIC_WORKER_BASE_URL: ${{ vars.PUBLIC_WORKER_BASE_URL }}
           PUBLIC_SITE_URL: ${{ vars.PUBLIC_SITE_URL }}
@@ -41,6 +46,8 @@ jobs:
 
       - name: Run HTTPS smoke matrix
         env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
           ORACLE_ENDPOINT: ${{ vars.ORACLE_ENDPOINT }}
           PUBLIC_WORKER_BASE_URL: ${{ vars.PUBLIC_WORKER_BASE_URL }}
           PUBLIC_SITE_URL: ${{ vars.PUBLIC_SITE_URL }}
