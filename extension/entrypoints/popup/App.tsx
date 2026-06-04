@@ -1606,6 +1606,8 @@ export function ToggleRow({
       >
         <input
           type="checkbox"
+          role="switch"
+          aria-checked={checked}
           checked={checked}
           disabled={isDisabled}
           onChange={handleChange}
@@ -1617,6 +1619,7 @@ export function ToggleRow({
           <div className="cqd-switch-circle">
             <svg
               className="cqd-switch-cross"
+              aria-hidden="true"
               viewBox="0 0 365.696 365.696"
               width="6"
               height="6"
@@ -1628,6 +1631,7 @@ export function ToggleRow({
             </svg>
             <svg
               className="cqd-switch-checkmark"
+              aria-hidden="true"
               viewBox="0 0 24 24"
               width="10"
               height="10"
