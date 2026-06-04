@@ -25,6 +25,8 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3

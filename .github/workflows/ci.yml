@@ -20,9 +20,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v3
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
         with:
           version: 10.28.2
 
@@ -75,9 +79,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v3
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
         with:
           version: 10.28.2
 
@@ -102,9 +110,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v3
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
         with:
           version: 10.28.2
 
@@ -138,9 +150,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v3
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
         with:
           version: 10.28.2
 
@@ -166,9 +182,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v3
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
         with:
           version: 10.28.2
 
@@ -196,6 +216,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
       - name: Ensure no committed Google credential files
         run: |
@@ -206,8 +228,10 @@ jobs:
 
       - name: Setup Go
         uses: actions/setup-go@v5
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
         with:
-          go-version: "1.26.3"
+          go-version: "1.26.4"
 
       - name: Install gosec
         run: go install github.com/securego/gosec/v2/cmd/gosec@v2.23.0
@@ -226,9 +250,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v3
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
         with:
           version: 10.28.2
 
@@ -246,8 +274,10 @@ jobs:
 
       - name: Setup Go
         uses: actions/setup-go@v5
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
         with:
-          go-version: "1.26.3"
+          go-version: "1.26.4"
 
       - name: Run Oracle Backend Heavy Test Matrix
         run: pnpm -C oracle-backend test:strict
@@ -275,9 +305,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v3
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
         with:
           version: 10.28.2
 
@@ -295,8 +329,10 @@ jobs:
 
       - name: Setup Go
         uses: actions/setup-go@v5
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
         with:
-          go-version: "1.26.3"
+          go-version: "1.26.4"
 
       - name: Run Migration Bootstrap + Tests
         working-directory: oracle-backend
