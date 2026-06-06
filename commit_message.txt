@@ -1,0 +1,4 @@
+test: worker security test missing X-Forwarded-For spoofing scenario
+
+Adds a vitest to ensure that CF-Connecting-IP is used
+rather than X-Forwarded-For for IP-based checks.

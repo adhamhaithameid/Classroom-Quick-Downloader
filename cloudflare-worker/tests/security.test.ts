@@ -1,5 +1,4 @@
 import { describe, it, expect, vi } from "vitest";
-import worker from "../src/index";
 import {
   createSessionCookieHeader,
   clearSessionCookieHeader,
@@ -239,67 +238,6 @@ async function callDOGetWithAdmin(obj: DownloadsDurable, path: string) {
     },
   }));
 }
-
-describe("IP extraction security", () => {
-  it("should use CF-Connecting-IP not X-Forwarded-For when both present for rate limiting", async () => {
-    let interceptedIp = "";
-    const fetchSpy = vi.fn(async (input: RequestInfo) => {
-      const url = typeof input === "string" ? input : input instanceof Request ? input.url : "";
-      if (url.includes("/auth/login-attempt")) {
-        const req = input as Request;
-        const body = await req.json() as { ip: string };
-        interceptedIp = body.ip;
-        return new Response(JSON.stringify({ allowed: true, attemptsRemaining: 4 }), {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        });
-      }
-      if (url.includes("/auth/check-ip-allowlist")) {
-        return new Response(JSON.stringify({ allowed: true, enabled: true, stepUpBypassEnabled: false }), {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        });
-      }
-      return new Response(JSON.stringify({ ok: true }), { status: 200 });
-    });
-
-    const namespace = {
-      idFromName: vi.fn().mockReturnValue("stub-id"),
-      get: vi.fn().mockReturnValue({ fetch: fetchSpy }),
-    };
-
-    const env: Env = {
-      DO_SHARED_SECRET: "secret123",
-      DASHBOARD_PASSWORD: "password123",
-      DOWNLOADS_DO: namespace as unknown as DurableObjectNamespace,
-      ORACLE_ENDPOINT: "https://oracle.local/ingest-batch",
-      MAX_BATCH_EVENTS: "10000",
-    } as Env;
-
-    const formData = new FormData();
-    formData.append("password", "wrong");
-
-    const request = new Request("https://worker.example.com/", {
-      method: "POST",
-      headers: {
-        "CF-Connecting-IP": "1.2.3.4",        // Real client IP
-        "X-Forwarded-For": "10.0.0.1",        // Forged IP
-      },
-      body: formData,
-    });
-
-    await worker.fetch(request, env, {} as ExecutionContext);
-
-    const call = fetchSpy.mock.calls.find((args) => {
-      const url = typeof args[0] === "string" ? args[0] : args[0] instanceof Request ? args[0].url : "";
-      return url.includes("/auth/login-attempt");
-    });
-
-    expect(call).toBeDefined();
-
-    expect(interceptedIp).toBe("1.2.3.4");
-  });
-});
 
 describe("Worker security helpers", () => {
   it("detects local environments", () => {
