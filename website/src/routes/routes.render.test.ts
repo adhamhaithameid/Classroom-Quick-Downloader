@@ -16,6 +16,20 @@ import CompareClassfetchPage from './compare/classroom-quick-downloader-vs-class
 import SiteMapPage from './site-map/+page.svelte';
 import CqdDemoVideoPage from './watch/cqd-demo/+page.svelte';
 import ManualVsCqdVideoPage from './watch/manual-vs-cqd/+page.svelte';
+import BulkDownloadAssignmentsPage from './bulk-download-google-classroom-assignments/+page.svelte';
+import CompareClassmatePage from './compare/classroom-quick-downloader-vs-classmate/+page.svelte';
+import CompareOneClickPage from './compare/classroom-quick-downloader-vs-classroom-one-click-downloader/+page.svelte';
+import DownloadMaterialsFastPage from './download-google-classroom-materials-fast/+page.svelte';
+import EmailsPage from './emails/+page.svelte';
+import Emails2Page from './emails2/+page.svelte';
+import FeaturedPage from './featured/+page.svelte';
+import VirusWarningPage from './google-drive-cant-scan-virus-warning-download/+page.svelte';
+import WorkspaceSupportPage from './google-workspace-school-accounts-support/+page.svelte';
+import InstallEdgePage from './install/edge/+page.svelte';
+import InstallFirefoxPage from './install/firefox/+page.svelte';
+import PressKitPage from './press-kit/+page.svelte';
+import SupportPage from './support/+page.svelte';
+
 import { privacyContent } from '$lib/content/privacy';
 import { APP_VERSION, INDEXNOW_KEY, SITE_URL } from '$lib/config';
 import { GET as getRobotsTxt } from './robots.txt/+server';
@@ -228,6 +242,90 @@ describe('route render smoke coverage', () => {
     expect(comparisonRendered.head).toContain('/watch/manual-vs-cqd');
     expect(comparisonRendered.head).toContain('VideoObject');
     expect(comparisonHtml).toContain('/videos/problem.mp4');
+  });
+
+
+  it('renders bulk download assignments SEO page', () => {
+    const { body, head } = render(BulkDownloadAssignmentsPage);
+    const html = squish(body);
+
+    expect(head).toContain('/bulk-download-google-classroom-assignments');
+    expect(html).toContain('Install for Chrome');
+  });
+
+  it('renders download materials fast SEO page', () => {
+    const { body, head } = render(DownloadMaterialsFastPage);
+    const html = squish(body);
+
+    expect(head).toContain('/download-google-classroom-materials-fast');
+    expect(html).toContain('Install for Chrome');
+  });
+
+  it('renders additional comparison SEO pages', () => {
+    const classmateRendered = render(CompareClassmatePage);
+    const classmateHtml = squish(classmateRendered.body);
+    expect(classmateRendered.head).toContain('/compare/classroom-quick-downloader-vs-classmate');
+    expect(classmateHtml).toContain('Classroom Quick Downloader vs Classmate');
+
+    const oneClickRendered = render(CompareOneClickPage);
+    const oneClickHtml = squish(oneClickRendered.body);
+    expect(oneClickRendered.head).toContain('/compare/classroom-quick-downloader-vs-classroom-one-click-downloader');
+    expect(oneClickHtml).toContain('Classroom Quick Downloader vs Classroom One Click Downloader');
+  });
+
+  it('renders internal draft email pages and keeps them out of indexing', () => {
+    const emailsRendered = render(EmailsPage, { props: { data: { emailHeadStyles: '', emailBodyHtml: '' } } });
+    expect(emailsRendered.head).toContain('Email Preview');
+
+    const emails2Rendered = render(Emails2Page);
+    expect(emails2Rendered.head).toContain('Email Preview');
+  });
+
+  it('renders featured page', () => {
+    const { body, head } = render(FeaturedPage);
+    const html = squish(body);
+    expect(head).toContain('/featured');
+    expect(html).toContain('Featured');
+  });
+
+  it('renders virus warning support page', () => {
+    const { body, head } = render(VirusWarningPage);
+    const html = squish(body);
+    expect(head).toContain('/google-drive-cant-scan-virus-warning-download');
+    expect(html).toContain('Google Drive');
+  });
+
+  it('renders workspace school accounts support page', () => {
+    const { body, head } = render(WorkspaceSupportPage);
+    const html = squish(body);
+    expect(head).toContain('/google-workspace-school-accounts-support');
+    expect(html).toContain('Google Workspace');
+  });
+
+  it('renders additional browser install SEO pages', () => {
+    const edgeRendered = render(InstallEdgePage);
+    const edgeHtml = squish(edgeRendered.body);
+    expect(edgeRendered.head).toContain('/install/edge');
+    expect(edgeHtml).toContain('Edge');
+
+    const firefoxRendered = render(InstallFirefoxPage);
+    const firefoxHtml = squish(firefoxRendered.body);
+    expect(firefoxRendered.head).toContain('/install/firefox');
+    expect(firefoxHtml).toContain('Firefox');
+  });
+
+  it('renders press kit page', () => {
+    const { body, head } = render(PressKitPage);
+    const html = squish(body);
+    expect(head).toContain('/press-kit');
+    expect(html).toContain('Press Kit');
+  });
+
+  it('renders support page', () => {
+    const { body, head } = render(SupportPage);
+    const html = squish(body);
+    expect(head).toContain('/support');
+    expect(html).toContain('Support');
   });
 
   it('renders robots.txt and sitemap.xml from the current site URL', async () => {
