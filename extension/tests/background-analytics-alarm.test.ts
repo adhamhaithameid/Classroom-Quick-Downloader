@@ -42,13 +42,19 @@ describe('background analytics alarm', () => {
   it('initializes analytics alarms once and dispatches alarm handlers', async () => {
     const { mod, flushSpy, refreshSpy, fetchChangelogSpy } = await loadAlarmModule(false);
     const addListener = (chrome as any).alarms.onAlarm.addListener as ReturnType<typeof vi.fn>;
+
+    // Test alarm creation setup logic
+    mod.setupAlarms();
+    expect((chrome as any).alarms.create).toHaveBeenCalledTimes(4);
+    expect((chrome as any).alarms.create).toHaveBeenNthCalledWith(1, 'CQD_ANALYTICS_FLUSH', { periodInMinutes: 5 });
+    expect((chrome as any).alarms.create).toHaveBeenNthCalledWith(2, 'CQD_ANALYTICS_CONFIG', { periodInMinutes: 180 });
+    expect((chrome as any).alarms.create).toHaveBeenNthCalledWith(3, 'CQD_CLEANUP_ALARM', { periodInMinutes: 5 });
+    expect((chrome as any).alarms.create).toHaveBeenNthCalledWith(4, 'CQD_CHANGELOG_DAILY', expect.objectContaining({ periodInMinutes: 1440 }));
+
+    // Test listener registration
     mod.ensureAnalyticsAlarm();
     mod.ensureAnalyticsAlarm();
 
-    expect((chrome as any).alarms.create).toHaveBeenCalledTimes(3);
-    expect((chrome as any).alarms.create).toHaveBeenNthCalledWith(1, 'CQD_ANALYTICS_FLUSH', { periodInMinutes: 5 });
-    expect((chrome as any).alarms.create).toHaveBeenNthCalledWith(2, 'CQD_ANALYTICS_CONFIG', { periodInMinutes: 180 });
-    expect((chrome as any).alarms.create).toHaveBeenNthCalledWith(3, 'CQD_CHANGELOG_DAILY', expect.objectContaining({ periodInMinutes: 1440 }));
     expect(addListener).toHaveBeenCalledTimes(1);
 
     const listener = addListener.mock.calls[0]?.[0] as (alarm: { name: AlarmName }) => void;

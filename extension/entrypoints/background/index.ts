@@ -22,7 +22,7 @@ import { createIconUpdaters, isClassroomUrl, setActionIcon, GRAY_ICON_PATHS } fr
 import { extractDriveFileId } from './auth-utils';
 import { getFilenameExt, buildUrlWithAuthUser } from './url-helpers';
 import { cleanup, cleanupOrphanedPendingDownloads } from './cleanup';
-import { ensureAnalyticsAlarm, checkAndCloseFileTab } from './analytics-alarm';
+import { ensureAnalyticsAlarm, setupAlarms, checkAndCloseFileTab } from './analytics-alarm';
 import { sendStatusToTab } from './message-sender';
 import {
   handleDownloadRequest,
@@ -101,17 +101,18 @@ function isStudentWorkResolvePublishMessage(value: unknown): value is StudentWor
 }
 
 export default defineBackground(() => {
-  // Initialize analytics alarms
+  // Setup top-level alarms listeners
   ensureAnalyticsAlarm();
   refreshRemoteAnalyticsConfig().catch(() => {});
   initializeUninstallUrl();
+
   chrome.runtime.onInstalled?.addListener(() => {
+    setupAlarms();
     initializeUninstallUrl();
   });
 
-  // Memory leak prevention: periodic cleanup
-  setInterval(cleanupOrphanedPendingDownloads, CLEANUP_INTERVAL_MS);
-  setTimeout(cleanupOrphanedPendingDownloads, 60 * 1000);
+  // Initial manual cleanup on startup to catch immediately orphaned downloads
+  cleanupOrphanedPendingDownloads();
 
   // Create icon update closures
   const { updateTabIcon, updateGlobalIcon } = createIconUpdaters();
@@ -191,11 +192,9 @@ export default defineBackground(() => {
         pending.finalized = true;
       }
       pendingByBypassTabId.delete(tabId);
-      setTimeout(() => {
-        try {
-          chrome.tabs.remove(tabId);
-        } catch {}
-      }, 5000);
+      // Create a one-off alarm instead of setTimeout to ensure execution
+      // even if the service worker goes idle briefly.
+      chrome.alarms.create(`CQD_REMOVE_TAB_${tabId}`, { delayInMinutes: 5 / 60 });
       return;
     }
 

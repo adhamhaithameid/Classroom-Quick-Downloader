@@ -10,19 +10,18 @@ import { IS_FIREFOX, recentDownloads } from './state';
 let analyticsAlarmInitialized = false;
 
 /**
- * Set up Chrome alarms for periodic analytics operations.
+ * Register alarms. Should be called only on extension install/update.
  * - Flush events every 5 minutes
  * - Refresh remote config every 3 hours
  * - Refresh changelog once/day at 6pm UTC
+ * - Cleanup orphaned downloads every 5 minutes
  */
-export function ensureAnalyticsAlarm(): void {
-  if (analyticsAlarmInitialized) return;
+export function setupAlarms(): void {
   if (typeof chrome === 'undefined' || !chrome.alarms) return;
-  analyticsAlarmInitialized = true;
-
   try {
     chrome.alarms.create('CQD_ANALYTICS_FLUSH', { periodInMinutes: 5 });
     chrome.alarms.create('CQD_ANALYTICS_CONFIG', { periodInMinutes: 180 });
+    chrome.alarms.create('CQD_CLEANUP_ALARM', { periodInMinutes: 5 });
 
     // Changelog: once/day at 6pm UTC
     const now = new Date();
@@ -40,7 +39,20 @@ export function ensureAnalyticsAlarm(): void {
       when: next6pmUtc.getTime(),
       periodInMinutes: 1440, // 24 hours
     });
+  } catch {
+    // Alarms may not be available in all contexts
+  }
+}
 
+/**
+ * Set up top-level listeners for Chrome alarms.
+ */
+export function ensureAnalyticsAlarm(): void {
+  if (analyticsAlarmInitialized) return;
+  if (typeof chrome === 'undefined' || !chrome.alarms) return;
+  analyticsAlarmInitialized = true;
+
+  try {
     chrome.alarms.onAlarm.addListener((alarm) => {
       if (alarm.name === 'CQD_ANALYTICS_FLUSH') {
         Analytics.flush();
@@ -48,6 +60,18 @@ export function ensureAnalyticsAlarm(): void {
         refreshRemoteAnalyticsConfig().catch(() => {});
       } else if (alarm.name === 'CQD_CHANGELOG_DAILY') {
         fetchChangelogDetailed(true).catch(() => {});
+      } else if (alarm.name === 'CQD_CLEANUP_ALARM') {
+        import('./cleanup').then(({ cleanupOrphanedPendingDownloads }) => {
+          cleanupOrphanedPendingDownloads();
+        }).catch(() => {});
+      } else if (alarm.name.startsWith('CQD_REMOVE_TAB_')) {
+        const tabIdStr = alarm.name.replace('CQD_REMOVE_TAB_', '');
+        const tabId = parseInt(tabIdStr, 10);
+        if (!isNaN(tabId)) {
+          try {
+            chrome.tabs.remove(tabId).catch(() => {});
+          } catch {}
+        }
       }
     });
   } catch {
