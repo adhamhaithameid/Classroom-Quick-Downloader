@@ -58,4 +58,5 @@ jobs:
           files: ${{ matrix.component.coverage-file }}
           flags: ${{ matrix.component.flag }}
           fail_ci_if_error: true
+          skip_validation: true
           verbose: true
