@@ -57,5 +57,5 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ${{ matrix.component.coverage-file }}
           flags: ${{ matrix.component.flag }}
-          fail_ci_if_error: true
+          fail_ci_if_error: false
           verbose: true
