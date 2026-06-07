@@ -196,6 +196,7 @@ CQD is also backed by a distributed reliability pipeline, but the deep engineeri
 - [Website/Edge/Oracle Data Flow](./docs/DATA_FLOW_WEBSITE_EDGE_ORACLE.md)
 - [Manual Changelog Operations](./docs/MANUAL_CHANGELOG_OPERATIONS.md)
 - [Oracle Dashboard Dark UI Language](./docs/ORACLE_DASHBOARD_DARK_DESIGN_LANGUAGE.md)
+- [Jules Agent Automation](./agents/jules/README.md)
 - [Changelog](./CHANGELOG.md)
 
 ### High-Level Architecture
