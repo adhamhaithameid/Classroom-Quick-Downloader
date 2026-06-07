@@ -1,0 +1,4 @@
+## 2024-05-19 — Added missing chrome.runtime.lastError check to chrome.tabs.sendMessage
+**Finding:** Found three `browserApi.tabs.sendMessage` calls in `extension/entrypoints/popup/App.tsx` (in `handleToggleFlag`, `handleToggleV2Engine`, and `handleToggleLegacyEngine`) that were missing the required `chrome.runtime.lastError` check in their callbacks.
+**Action:** Added a callback function `() => { const _ = browserApi.runtime.lastError; }` to all three calls.
+**Learning:** In Chrome extension scripts, any async messaging call like `chrome.tabs.sendMessage` or `chrome.runtime.sendMessage` needs to have its callback handle `chrome.runtime.lastError` or explicitly check it; otherwise, the extension will throw console warnings or unhandled promise rejection errors if the receiving end doesn't exist (like when a content script hasn't been injected or the background worker is dead).
