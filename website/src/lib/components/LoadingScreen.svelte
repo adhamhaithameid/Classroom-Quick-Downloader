@@ -38,7 +38,7 @@
     <div class="ld-backdrop"></div>
     <div class="ld-center">
       <div class="ld-logo-ring">
-        <img src={logo} alt="CQD" class="ld-logo" />
+        <img src={logo} alt="CQD" class="ld-logo" width="28" height="28" loading="eager" decoding="async" />
         <svg class="ld-spinner" viewBox="0 0 56 56" fill="none">
           <circle cx="28" cy="28" r="26" stroke="rgba(26,139,85,0.12)" stroke-width="3" />
           <circle cx="28" cy="28" r="26" stroke="url(#ld-grad)" stroke-width="3" stroke-linecap="round" stroke-dasharray="120 200" class="ld-arc" />

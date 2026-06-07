@@ -140,6 +140,18 @@ describe('analytics flush runtime', () => {
     fetchMock.mockRejectedValueOnce(new Error('network down'));
     expect(await mod.sendBatchToCloudflare([makeEvent()], 'c5')).toMatchObject({ success: false });
 
+    fetchMock.mockImplementationOnce((_url, init) => new Promise((_resolve, reject) => {
+      const signal = (init as RequestInit).signal;
+      signal?.addEventListener('abort', () => {
+        const abortError = new Error('aborted');
+        abortError.name = 'AbortError';
+        reject(abortError);
+      });
+    }));
+    const timeoutResult = mod.sendBatchToCloudflare([makeEvent()], 'c6');
+    await vi.advanceTimersByTimeAsync(10000);
+    expect(await timeoutResult).toMatchObject({ success: false, error: 'Request timeout' });
+
     expect(await mod.sendBatchToCloudflare([], 'empty')).toMatchObject({ success: false });
   });
 

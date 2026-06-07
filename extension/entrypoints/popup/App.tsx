@@ -1606,6 +1606,8 @@ export function ToggleRow({
       >
         <input
           type="checkbox"
+          role="switch"
+          aria-checked={checked}
           checked={checked}
           disabled={isDisabled}
           onChange={handleChange}
