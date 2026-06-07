@@ -133,7 +133,7 @@ export function findGroupRoot(btn: HTMLElement): HTMLElement | null {
  * Get canonical file key from button data.
  */
 export function getCanonicalFileKey(btn: HTMLButtonElement): string {
-  const ds = btn.dataset as any;
+  const ds = btn.dataset;
   const explicitFileKey = (ds.cqdFileKey || '').trim();
   if (explicitFileKey) return explicitFileKey;
   const url = ds.cqdUrl || '';

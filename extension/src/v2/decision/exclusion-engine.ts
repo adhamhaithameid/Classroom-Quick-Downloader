@@ -589,16 +589,23 @@ export function isInExcludedArea(element: HTMLElement): boolean {
   return false;
 }
 
+let cachedUserContentSelectors: string[] | null = null;
+
 /**
  * Get all user-content exclusion selectors.
  *
  * Used to build a visibility cache — collect these once per scan,
  * then check text nodes against them.
+ * Caches the result to avoid redundant map/filter memory allocations.
  */
 export function getUserContentSelectors(): string[] {
-  return EXCLUSION_RULES
+  if (cachedUserContentSelectors) {
+    return cachedUserContentSelectors;
+  }
+  cachedUserContentSelectors = EXCLUSION_RULES
     .filter(r => r.type === 'selector' && r.category === 'user_content')
     .map(r => r.pattern as string);
+  return cachedUserContentSelectors;
 }
 
 /**

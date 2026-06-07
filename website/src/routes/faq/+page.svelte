@@ -529,6 +529,7 @@
                   type="button"
                   on:click={() => toggle(item.id)}
                   aria-expanded={openIds.has(item.id)}
+                  aria-controls={`faq-answer-${item.id}`}
                 >
                   <div class="fq-question">
                     <span class="fq-q-text">{item.q}</span>
@@ -544,7 +545,7 @@
                     </span>
                   </div>
                   {#if openIds.has(item.id)}
-                    <p class="fq-answer">{item.a}</p>
+                    <p id={`faq-answer-${item.id}`} class="fq-answer">{item.a}</p>
                   {/if}
                 </button>
               {/each}
