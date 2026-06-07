@@ -265,6 +265,7 @@ describe('background/index', () => {
           },
         },
         {
+          id: chrome.runtime.id,
           tab: { id: 55, url: 'https://classroom.google.com/c/C/a/A/submissions' },
           url: 'https://classroom.google.com/g/tg/a/b/c?cqd_sw_req=relay-req-1&cqd_sw_mode=iframe',
         },

@@ -149,6 +149,7 @@ describe('Download All Renderer: UI Updates', () => {
     updateDownloadAllUI(btn, progress);
 
     expect(btn.classList.contains('cqd-loading')).toBe(true);
+    expect(btn.disabled).toBe(true);
     expect(btn.querySelector('.cqd-v2-label')!.textContent).toBe('Downloading');
     expect(btn.querySelector('.cqd-v2-count')!.textContent).toBe('1/3');
   });
@@ -164,6 +165,7 @@ describe('Download All Renderer: UI Updates', () => {
     updateDownloadAllUI(btn, progress);
 
     expect(btn.classList.contains('cqd-success')).toBe(true);
+    expect(btn.disabled).toBe(true);
     expect(btn.querySelector('.cqd-v2-label')!.textContent).toBe('Downloaded');
   });
 
@@ -178,8 +180,26 @@ describe('Download All Renderer: UI Updates', () => {
     updateDownloadAllUI(btn, progress);
 
     expect(btn.classList.contains('cqd-error')).toBe(true);
+    expect(btn.disabled).toBe(true);
     expect(btn.querySelector('.cqd-v2-label')!.textContent).toBe('Failed');
     expect(btn.querySelector('.cqd-v2-count')!.textContent).toBe('3');
+  });
+
+  it('updateDownloadAllUI sets partial state', () => {
+    const btn = mockDownloadAllButton();
+    document.body.appendChild(btn);
+
+    const progress = createProgress(3);
+    progress.completed = 2;
+    progress.failed = 1;
+    progress.pending = 0;
+
+    updateDownloadAllUI(btn, progress);
+
+    expect(btn.classList.contains('cqd-error')).toBe(true);
+    expect(btn.disabled).toBe(true);
+    expect(btn.querySelector('.cqd-v2-label')!.textContent).toBe('Partial');
+    expect(btn.querySelector('.cqd-v2-count')!.textContent).toBe('2/3');
   });
 
   it('updateDownloadAllUI sets cancelled state', () => {
@@ -193,6 +213,7 @@ describe('Download All Renderer: UI Updates', () => {
     updateDownloadAllUI(btn, progress);
 
     expect(btn.classList.contains('cqd-cancelled')).toBe(true);
+    expect(btn.disabled).toBe(true);
     expect(btn.querySelector('.cqd-v2-label')!.textContent).toBe('Cancelled');
     expect(btn.querySelector('.cqd-v2-count')!.textContent).toBe('1/3');
   });
@@ -224,6 +245,7 @@ describe('Download All Renderer: Reset', () => {
 
   it('resetDownloadAllButton restores idle state', () => {
     const btn = mockDownloadAllButton();
+    btn.disabled = true;
     btn.classList.add('cqd-success');
     btn.querySelector('.cqd-v2-label')!.textContent = 'Downloaded';
     btn.querySelector('.cqd-v2-count')!.textContent = '5';
@@ -231,6 +253,7 @@ describe('Download All Renderer: Reset', () => {
 
     resetDownloadAllButton(btn, 3);
 
+    expect(btn.disabled).toBe(false);
     expect(btn.classList.contains('cqd-success')).toBe(false);
     expect(btn.classList.contains('cqd-loading')).toBe(false);
     expect(btn.querySelector('.cqd-v2-label')!.textContent).toBe('Download All');

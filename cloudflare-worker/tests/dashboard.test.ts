@@ -199,6 +199,21 @@ describe("Dashboard login rendering", () => {
     expect(html).not.toContain(`<img src=x onerror=alert("xss")>`);
     expect(html).toContain("</form>");
   });
+
+  it("renders key login page elements properly", () => {
+    const html = renderSimpleLoginPage();
+    expect(html).toContain('class="login-card"');
+    expect(html).toContain('id="password-input"');
+    expect(html).toContain('type="password"');
+    expect(html).toContain("CQD Analytics Admin");
+    expect(html).not.toContain('class="login-error"');
+  });
+
+  it("conditionally renders the error block if errorMessage is provided", () => {
+    const html = renderSimpleLoginPage("Invalid password");
+    expect(html).toContain('class="login-error"');
+    expect(html).toContain("Invalid password");
+  });
 });
 
 describe("Dashboard security rendering", () => {

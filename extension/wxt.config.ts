@@ -46,7 +46,7 @@ export default defineConfig({
       'https://oracle.classroom-quick-downloader.com/*',
     ],
     content_security_policy: {
-      extension_pages: `script-src 'self'; object-src 'self'; connect-src 'self' https://*.google.com https://*.googleapis.com https://*.googleusercontent.com https://cqd-analytics.adhamhaithameid.workers.dev https://oracle.classroom-quick-downloader.com${devConnectSources}; img-src 'self' https://*.google.com https://*.googleusercontent.com data:${devImageSources};`,
+      extension_pages: `script-src 'self'; object-src 'none'; connect-src 'self' https://*.google.com https://*.googleapis.com https://*.googleusercontent.com https://cqd-analytics.adhamhaithameid.workers.dev https://oracle.classroom-quick-downloader.com${devConnectSources}; img-src 'self' https://*.google.com https://*.googleusercontent.com data:${devImageSources};`,
     },
     icons: {
       "16": "icon/16.png",

@@ -75,6 +75,29 @@ describe('classifyRoute', () => {
   });
 
   // Unknown routes
+// Relative paths / pathnames only
+  it('handles relative pathnames correctly', () => {
+    expect(classifyRoute('/c/MTIz')).toBe('stream');
+    expect(classifyRoute('/w/MTIz/t/all')).toBe('classwork_list');
+    expect(classifyRoute('not-a-valid-url')).toBe('unknown');
+  });
+
+  // Ignore patterns
+  it('returns unknown for ignored patterns', () => {
+    // People tab
+    expect(classifyRoute('https://classroom.google.com/r/MTIz/sort-last-name')).toBe('unknown');
+    // Grades
+    expect(classifyRoute('https://classroom.google.com/g/MTIz')).toBe('unknown');
+    expect(classifyRoute('https://classroom.google.com/u/0/g/MTIz')).toBe('unknown');
+    // Notifications
+    expect(classifyRoute('https://classroom.google.com/notifications')).toBe('unknown');
+    // Home
+    expect(classifyRoute('https://classroom.google.com/h')).toBe('unknown');
+    expect(classifyRoute('https://classroom.google.com/h/')).toBe('unknown');
+    // Login page
+    expect(classifyRoute('https://accounts.google.com/ServiceLogin')).toBe('unknown');
+  });
+
   it('returns unknown for unrecognized Classroom paths', () => {
     expect(classifyRoute('https://classroom.google.com/settings')).toBe('unknown');
   });

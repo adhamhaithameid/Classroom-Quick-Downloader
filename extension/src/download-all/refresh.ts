@@ -105,7 +105,7 @@ export function updateGroupState(group: GroupState): void {
     for (const b of file.buttons) {
       if (!b.isConnected) continue;
       const cls = b.classList;
-      const ds = b.dataset as any;
+      const ds = b.dataset;
       const isLoading = cls.contains('cqd-loading') || cls.contains('cqd-trying');
       const isSuccess = cls.contains('cqd-success') || ds.cqdAllDone === 'true';
       const isError = cls.contains('cqd-error');
