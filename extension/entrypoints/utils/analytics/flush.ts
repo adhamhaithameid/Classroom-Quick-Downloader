@@ -161,11 +161,15 @@ export async function sendBatchToCloudflare(
     return { success: false, error: 'No URL or empty batch' };
   }
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
   try {
     const resp = await fetch(TRACK_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ events, clientBatchId }),
+      signal: controller.signal,
     });
 
     if (resp.status === 429) {
@@ -194,8 +198,13 @@ export async function sendBatchToCloudflare(
       receivedAt: typeof json.receivedAt === 'number' ? json.receivedAt : undefined,
       error: json.error,
     };
-  } catch (err) {
+  } catch (err: any) {
+    if (err.name === 'AbortError') {
+      return { success: false, error: 'Request timeout' };
+    }
     return { success: false, error: String(err) };
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
