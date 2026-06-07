@@ -1,0 +1,4 @@
+## 2026-03-08 — Added Jules Automated Agents roster to BOTS.md
+**Finding:** BOTS.md did not document the automated agents (Vex, Relay, Weave, Shell, Vault, Fetch, Ink, Cipher, Flare, Gate, Mirror, Specter, Titan, Pillar, Sync, Lumen, Aria, Signal, Ember, Slate, Sage, Muse, Oracle, Horizon, Refine, Quill, Forge, Compass, Bastion). This violated the requirement that BOTS.md must accurately document the full agent roster with their purpose, scope, and schedule.
+**Action:** Updated `BOTS.md` to append the full 32 agents to a new "Jules Automated Agents Roster" section, explicitly listing all agents, their day, time, and scope.
+**Learning:** `BOTS.md` is the source of truth for all automation on the repository. The distinction between standard CI/CD bots and Jules agents needs to be maintained. Future Ink runs should verify if any agents are added/removed/renamed.

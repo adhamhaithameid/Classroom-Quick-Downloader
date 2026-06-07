@@ -19,3 +19,42 @@ These tools are currently configured and running.
 | **Socket.dev** | **Supply-Chain Security**<br>Scans npm dependencies for malicious packages, typosquats, and supply-chain attacks on every PR. | • `.github/workflows/socket-security.yml` |
 | **GitGuardian** | **Secret Leak Detection**<br>Scans every push and PR for leaked secrets (API keys, tokens, passwords) before they reach production. | • `.github/workflows/gitguardian.yml` |
 | **Oracle Backend CI** | **Backend Quality Gate**<br>Runs Oracle backend tests, migration bootstrap checks (SQLite + Postgres), gosec, and govulncheck. | • `.github/workflows/oracle-backend-ci.yml` |
+
+## 🤖 Jules Automated Agents Roster
+
+These automated agents run on a strict schedule to audit, improve, and maintain the repository. PR-creating agents fix issues directly, while Issue-creating agents propose broader changes for human review. Agent activities are logged in the `.jules/` journal directory.
+
+| Agent | Day | Time | Scope |
+|-------|-----|------|-------|
+| Vex 🔍 | Sunday | 09:00 | extension manifest & permissions |
+| Relay ⚙️ | Sunday | 09:30 | extension background service worker |
+| Weave 🕸️ | Sunday | 10:00 | extension content scripts |
+| Shell 🐚 | Sunday | 10:30 | extension popup UI |
+| Vault 🔒 | Sunday | 11:00 | extension storage & analytics |
+| Fetch 📡 | Sunday | 11:30 | extension API engines |
+| Ink 📝 | Sunday | 12:00 | all-repo documentation |
+| Cipher 🔐 | Monday | 09:00 | extension security |
+| Flare 🌩️ | Monday | 09:30 | Cloudflare Worker security & performance |
+| Gate 🚧 | Monday | 10:00 | Cloudflare routing, DO logic, config |
+| Mirror 🪞 | Monday | 10:30 | extension ↔ Cloudflare communication |
+| Specter 👻 | Tuesday | 09:00 | extension performance |
+| Titan ⚔️ | Tuesday | 09:30 | Oracle backend security |
+| Pillar 🏛️ | Tuesday | 10:00 | Oracle reliability & performance |
+| Sync 🔄 | Tuesday | 10:30 | extension ↔ Oracle data contracts |
+| Lumen 💡 | Wednesday | 09:00 | website performance |
+| Aria ♿ | Wednesday | 09:30 | website accessibility |
+| Signal 📶 | Wednesday | 10:00 | website SEO |
+| Ember 🔥 | Wednesday | 10:30 | extension UX micro-improvements |
+| Slate 🧹 | Wednesday | 11:00 | extension code cleanup |
+| Sage 🌿 | Thursday | 09:00 | extension feature suggestions (Issues only) |
+| Muse 🎭 | Thursday | 09:30 | website suggestions (Issues only) |
+| Oracle 🔮 | Thursday | 10:00 | Oracle backend suggestions (Issues only) |
+| Horizon 🌅 | Thursday | 10:30 | cross-cutting architecture suggestions (Issues only) |
+| Refine ✨ | Thursday | 11:00 | tech debt suggestions (Issues only) |
+| Sentinel 🛡️ | Friday | 09:00 | security (default) |
+| Palette 🎨 | Friday | 09:30 | UX (default) |
+| Bolt ⚡ | Friday | 10:00 | performance (default) |
+| Quill 🪶 | Saturday | 09:00 | extension unit test gaps |
+| Forge 🔨 | Saturday | 09:30 | extension integration & e2e test gaps |
+| Compass 🧭 | Saturday | 10:00 | website test gaps |
+| Bastion 🏰 | Saturday | 10:30 | Cloudflare & Oracle test gaps |
