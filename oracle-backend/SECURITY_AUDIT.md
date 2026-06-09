@@ -383,3 +383,12 @@
 | 🔵 **P3** | Move hardcoded IP to backend config | L5 |
 | 🔵 **P3** | Remove `localStorage` fallback or add indicator | M8 |
 | 🔵 **P3** | Fix dead `cookieSecurityPolicy` branch | L2 |
+
+### C4. SSRF in Archiver URLs
+
+| | |
+|---|---|
+| **Component** | Backend — SSRF |
+| **File** | `cmd/archiver/main.go` |
+| **Description** | The archiver accepted any HTTP or HTTPS URL, allowing SSRF (Server-Side Request Forgery) against internal infrastructure (e.g., cloud metadata or private IPs). |
+| **Fix** | Strict HTTPS validation and `net.LookupIP` validation to reject loopback, private, unspecified, and link-local IP addresses. |

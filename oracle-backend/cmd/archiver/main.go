@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -144,12 +145,25 @@ func parseAndValidateOutboundURL(raw string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if u.Scheme != "http" && u.Scheme != "https" {
-		return "", errors.New("unsupported url scheme")
+	if u.Scheme != "https" {
+		return "", fmt.Errorf("only https:// URLs are permitted, got: %s", u.Scheme)
 	}
-	if strings.TrimSpace(u.Host) == "" {
+	host := strings.TrimSpace(u.Hostname())
+	if host == "" {
 		return "", errors.New("missing url host")
 	}
+
+	// Prevent SSRF: Validate resolved IPs against private ranges
+	ips, err := net.LookupIP(host)
+	if err != nil {
+		return "", fmt.Errorf("cannot resolve hostname: %w", err)
+	}
+	for _, ip := range ips {
+		if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsUnspecified() {
+			return "", errors.New("URL resolves to a private/internal address — blocked")
+		}
+	}
+
 	return u.String(), nil
 }
 
