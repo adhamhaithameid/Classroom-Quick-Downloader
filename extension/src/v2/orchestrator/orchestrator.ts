@@ -67,6 +67,11 @@ export class Orchestrator {
   /** The single MutationObserver that feeds all active engines */
   private domObserver: MutationObserver | null = null;
 
+  /** Timer for debouncing mutations */
+  private debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Accumulated mutations for the next batch */
+  private pendingMutations: MutationRecord[] = [];
+
   /**
    * AbortController for the current page's lifecycle.
    * When the user navigates, we abort this controller, which
@@ -156,6 +161,11 @@ export class Orchestrator {
       this.domObserver.disconnect();
       this.domObserver = null;
     }
+    if (this.debounceTimer !== null) {
+      clearTimeout(this.debounceTimer);
+      this.debounceTimer = null;
+    }
+    this.pendingMutations = [];
 
     // 4. Destroy all active engines
     for (const engine of this.activeEngines) {
@@ -331,16 +341,31 @@ export class Orchestrator {
     this.domObserver = new MutationObserver((mutations) => {
       if (!this.running) return;
 
-      // Feed mutations to ALL active engines
-      for (const engine of this.activeEngines) {
-        try {
-          engine.handleMutations(mutations);
-        } catch (e) {
-          console.error(
-            `[CQD Orchestrator] Error in ${engine.name}.handleMutations:`, e,
-          );
+      // Accumulate mutations
+      this.pendingMutations.push(...mutations);
+
+      // Debounce: batch rapid mutations into a single processing tick
+      if (this.debounceTimer !== null) return;
+
+      this.debounceTimer = setTimeout(() => {
+        this.debounceTimer = null;
+
+        if (!this.running || this.pendingMutations.length === 0) return;
+
+        const batch = this.pendingMutations;
+        this.pendingMutations = [];
+
+        // Feed mutations to ALL active engines
+        for (const engine of this.activeEngines) {
+          try {
+            engine.handleMutations(batch);
+          } catch (e) {
+            console.error(
+              `[CQD Orchestrator] Error in ${engine.name}.handleMutations:`, e,
+            );
+          }
         }
-      }
+      }, 50); // 50ms debounce
     });
 
     // Start observing
@@ -392,6 +417,11 @@ export class Orchestrator {
     if (this.domObserver) {
       this.domObserver.disconnect();
     }
+    if (this.debounceTimer !== null) {
+      clearTimeout(this.debounceTimer);
+      this.debounceTimer = null;
+    }
+    this.pendingMutations = [];
 
     // 3. Destroy active engines
     for (const engine of this.activeEngines) {
