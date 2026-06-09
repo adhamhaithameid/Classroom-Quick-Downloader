@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "*",
+      "Bash",
+      "Grep",
+      "Bash(cd /Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader && grep -rn 'dashboard-src' --include='*.json' --include='*.ts' --include='*.js' --include='*.mjs' --include='*.cjs' --include='*.yml' --include='*.yaml' --include='*.sh' --include='*.go' 2>/dev/null | head -20)",
+      "Bash(cd /Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader && grep -rn 'agents/' --include='*.json' --include='*.ts' --include='*.js' --include='*.mjs' --include='*.cjs' --include='*.yml' --include='*.yaml' --include='*.sh' --include='*.md' 2>/dev/null | grep -v node_modules | grep -v '.git/' | head -20)",
+      "Bash(cd /Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader && grep -rn 'CHANGELOG\\\\.md' --include='*.json' --include='*.ts' --include='*.js' --include='*.mjs' --include='*.cjs' --include='*.yml' --include='*.yaml' --include='*.sh' 2>/dev/null | grep -v node_modules | head -20)",
+      "Bash(grep -rn \"agents/\" /Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader --include=\"*.md\" --include=\"*.yaml\" --include=\"*.yml\" --include=\"*.json\" | grep -v node_modules | grep -v .git/ | grep -v pnpm-lock | grep -v \"agents/jules\" | head -30)",
+      "Bash(grep -rn \"CHANGELOG.md\\\\|ARCHITECTURE.md\\\\|DEVELOPMENT.md\\\\|SECURITY.md\\\\|PRIVACY.md\\\\|TESTING.md\\\\|BOTS.md\\\\|CONTRIBUTING.md\\\\|SECURITY_DEV.md\\\\|plan.md\\\\|plan2.md\\\\|refactor-plan.md\\\\|user-friendly-changelog.md\\\\|ARCHITECTURE_RUNTIME_CONTRACT.md\" /Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader --include=\"*.md\" --include=\"*.ts\" --include=\"*.mjs\" --include=\"*.js\" --include=\"*.yaml\" --include=\"*.yml\" --include=\"*.json\" --include=\"*.sh\" | grep -v node_modules | grep -v .git/ | grep -v pnpm-lock | head -60)",
+      "Bash(grep -rn \"user-friendly-changelog\\\\|CHANGELOG\\\\.md\\\\|PRIVACY\\\\.md\\\\|SECURITY\\\\.md\" /Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/website/src/ 2>/dev/null | grep -v node_modules | grep -v \".svelte-kit\" | head -20)",
+      "Bash(grep -rn \"blob/main\" /Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/cloudflare-worker/src/ 2>/dev/null | grep \".md\" | head -10)"
+    ]
+  }
+}
