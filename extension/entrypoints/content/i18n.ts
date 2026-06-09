@@ -53,6 +53,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'إلغاء',
     cancelled: 'ملغى',
     cancelAll: 'إلغاء الكل',
+    after_posting: 'after posting', // TODO: translate to ar
+    modified: 'Modified', // TODO: translate to ar
   },
   ja: {
     download: 'ダウンロード',
@@ -78,6 +80,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'キャンセル',
     cancelled: 'キャンセル済み',
     cancelAll: '全てキャンセル',
+    after_posting: 'after posting', // TODO: translate to ja
+    modified: 'Modified', // TODO: translate to ja
   },
   es: {
     download: 'Descargar',
@@ -103,6 +107,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Cancelar',
     cancelled: 'Cancelado',
     cancelAll: 'Cancelar todo',
+    after_posting: 'after posting', // TODO: translate to es
+    modified: 'Modified', // TODO: translate to es
   },
   hi: {
     download: 'डाउनलोड',
@@ -128,6 +134,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'रद्द करें',
     cancelled: 'रद्द',
     cancelAll: 'सभी रद्द करें',
+    after_posting: 'after posting', // TODO: translate to hi
+    modified: 'Modified', // TODO: translate to hi
   },
   pt: {
     download: 'Baixar',
@@ -153,6 +161,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Cancelar',
     cancelled: 'Cancelado',
     cancelAll: 'Cancelar todo',
+    after_posting: 'after posting', // TODO: translate to pt
+    modified: 'Modified', // TODO: translate to pt
   },
   'pt-pt': {
     download: 'Descarregar',
@@ -176,6 +186,10 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Cancelar',
     cancelled: 'Cancelado',
     cancelAll: 'Cancelar todo',
+    after_posting: 'after posting', // TODO: translate to pt-pt
+    commentSingular: 'comment', // TODO: translate to pt-pt
+    editedTooltip: 'Days between posting and the last edit', // TODO: translate to pt-pt
+    modified: 'Modified', // TODO: translate to pt-pt
   },
   'zh-cn': {
     download: '下载',
@@ -199,6 +213,10 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: '取消',
     cancelled: '已取消',
     cancelAll: '全部取消',
+    after_posting: 'after posting', // TODO: translate to zh-cn
+    commentSingular: 'comment', // TODO: translate to zh-cn
+    editedTooltip: 'Days between posting and the last edit', // TODO: translate to zh-cn
+    modified: 'Modified', // TODO: translate to zh-cn
   },
   'zh-tw': {
     download: '下載',
@@ -222,6 +240,10 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: '取消',
     cancelled: '已取消',
     cancelAll: '全部取消',
+    after_posting: 'after posting', // TODO: translate to zh-tw
+    commentSingular: 'comment', // TODO: translate to zh-tw
+    editedTooltip: 'Days between posting and the last edit', // TODO: translate to zh-tw
+    modified: 'Modified', // TODO: translate to zh-tw
   },
   fr: {
     download: 'Télécharger',
@@ -247,6 +269,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Annuler',
     cancelled: 'Annulé',
     cancelAll: 'Tout annuler',
+    after_posting: 'after posting', // TODO: translate to fr
+    modified: 'Modified', // TODO: translate to fr
   },
   de: {
     download: 'Herunterladen',
@@ -272,6 +296,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Abbrechen',
     cancelled: 'Abgebrochen',
     cancelAll: 'Alle abbrechen',
+    after_posting: 'after posting', // TODO: translate to de
+    modified: 'Modified', // TODO: translate to de
   },
   it: {
     download: 'Scarica',
@@ -297,6 +323,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Annulla',
     cancelled: 'Annullato',
     cancelAll: 'Annulla tutto',
+    after_posting: 'after posting', // TODO: translate to it
+    modified: 'Modified', // TODO: translate to it
   },
   ru: {
     download: 'Скачать',
@@ -322,6 +350,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Отмена',
     cancelled: 'Отменено',
     cancelAll: 'Отменить все',
+    after_posting: 'after posting', // TODO: translate to ru
+    modified: 'Modified', // TODO: translate to ru
   },
   ko: {
     download: '다운로드',
@@ -347,6 +377,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: '취소',
     cancelled: '취소됨',
     cancelAll: '모두 취소',
+    after_posting: 'after posting', // TODO: translate to ko
+    modified: 'Modified', // TODO: translate to ko
   },
   tr: {
     download: 'İndir',
@@ -372,6 +404,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'İptal',
     cancelled: 'İptal edildi',
     cancelAll: 'Tümünü iptal et',
+    after_posting: 'after posting', // TODO: translate to tr
+    modified: 'Modified', // TODO: translate to tr
   },
   vi: {
     download: 'Tải xuống',
@@ -397,6 +431,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Hủy',
     cancelled: 'Đã hủy',
     cancelAll: 'Hủy tất cả',
+    after_posting: 'after posting', // TODO: translate to vi
+    modified: 'Modified', // TODO: translate to vi
   },
   id: {
     download: 'Download',
@@ -422,6 +458,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Batal',
     cancelled: 'Dibatalkan',
     cancelAll: 'Batalkan semua',
+    after_posting: 'after posting', // TODO: translate to id
+    modified: 'Modified', // TODO: translate to id
   },
   th: {
     download: 'ดาวน์โหลด',
@@ -447,6 +485,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'ยกเลิก',
     cancelled: 'ยกเลิกแล้ว',
     cancelAll: 'ยกเลิกทั้งหมด',
+    after_posting: 'after posting', // TODO: translate to th
+    modified: 'Modified', // TODO: translate to th
   },
   pl: {
     download: 'Pobierz',
@@ -472,6 +512,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Anuluj',
     cancelled: 'Anulowano',
     cancelAll: 'Anuluj wszystko',
+    after_posting: 'after posting', // TODO: translate to pl
+    modified: 'Modified', // TODO: translate to pl
   },
   nl: {
     download: 'Downloaden',
@@ -497,6 +539,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Annuleren',
     cancelled: 'Geannuleerd',
     cancelAll: 'Alles annuleren',
+    after_posting: 'after posting', // TODO: translate to nl
+    modified: 'Modified', // TODO: translate to nl
   },
   bn: {
     download: 'ডাউনলোড',
@@ -522,6 +566,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'বাতিল',
     cancelled: 'বাতিল',
     cancelAll: 'সব বাতিল',
+    after_posting: 'after posting', // TODO: translate to bn
+    modified: 'Modified', // TODO: translate to bn
   },
   pa: {
     download: 'ਡਾਉਨਲੋਡ',
@@ -547,6 +593,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'ਰੱਦ ਕਰੋ',
     cancelled: 'ਰੱਦ ਕੀਤਾ',
     cancelAll: 'ਸਭ ਰੱਦ ਕਰੋ',
+    after_posting: 'after posting', // TODO: translate to pa
+    modified: 'Modified', // TODO: translate to pa
   },
   te: {
     download: 'డౌన్‌లోడ్',
@@ -572,6 +620,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'రద్దు',
     cancelled: 'రద్దు చేయబడింది',
     cancelAll: 'అన్నీ రద్దు చేయి',
+    after_posting: 'after posting', // TODO: translate to te
+    modified: 'Modified', // TODO: translate to te
   },
   mr: {
     download: 'डाउनलोड',
@@ -597,6 +647,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'रद्द करा',
     cancelled: 'रद्द केले',
     cancelAll: 'सर्व रद्द करा',
+    after_posting: 'after posting', // TODO: translate to mr
+    modified: 'Modified', // TODO: translate to mr
   },
   ta: {
     download: 'பதிவிறக்கு',
@@ -622,6 +674,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'ரத்து',
     cancelled: 'ரத்து செய்யப்பட்டது',
     cancelAll: 'அனைத்தையும் ரத்து செய்',
+    after_posting: 'after posting', // TODO: translate to ta
+    modified: 'Modified', // TODO: translate to ta
   },
   ur: {
     download: 'ڈاؤن لوڈ',
@@ -647,6 +701,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'منسوخ',
     cancelled: 'منسوخ',
     cancelAll: 'سب منسوخ کریں',
+    after_posting: 'after posting', // TODO: translate to ur
+    modified: 'Modified', // TODO: translate to ur
   },
   gu: {
     download: 'ડાઉનલોડ',
@@ -672,6 +728,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'રદ કરો',
     cancelled: 'રદ્દ કરાયેલ',
     cancelAll: 'બધું રદ કરો',
+    after_posting: 'after posting', // TODO: translate to gu
+    modified: 'Modified', // TODO: translate to gu
   },
   kn: {
     download: 'ಡೌನ್‌ಲೋಡ್',
@@ -697,6 +755,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'ರದ್ದು',
     cancelled: 'ರದ್ದುಗೊಳಿಸಲಾಗಿದೆ',
     cancelAll: 'ಎಲ್ಲಾ ರದ್ದುಗೊಳಿಸಿ',
+    after_posting: 'after posting', // TODO: translate to kn
+    modified: 'Modified', // TODO: translate to kn
   },
   ml: {
     download: 'ഡൗൺലോഡ്',
@@ -722,6 +782,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'റദ്ദാക്കുക',
     cancelled: 'റദ്ദാക്കി',
     cancelAll: 'എല്ലാം റദ്ദാക്കുക',
+    after_posting: 'after posting', // TODO: translate to ml
+    modified: 'Modified', // TODO: translate to ml
   },
   uk: {
     download: 'Завантажити',
@@ -747,6 +809,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Отмена',
     cancelled: 'Отменено',
     cancelAll: 'Отменить все',
+    after_posting: 'after posting', // TODO: translate to uk
+    modified: 'Modified', // TODO: translate to uk
   },
   el: {
     download: 'Λήψη',
@@ -772,6 +836,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Ακύρωση',
     cancelled: 'Ακυρώθηκε',
     cancelAll: 'Ακύρωση όλων',
+    after_posting: 'after posting', // TODO: translate to el
+    modified: 'Modified', // TODO: translate to el
   },
   cs: {
     download: 'Stáhnout',
@@ -797,6 +863,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Zrušit',
     cancelled: 'Zrušeno',
     cancelAll: 'Zrušit vše',
+    after_posting: 'after posting', // TODO: translate to cs
+    modified: 'Modified', // TODO: translate to cs
   },
   ro: {
     download: 'Descărcați',
@@ -822,6 +890,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Anulare',
     cancelled: 'Anulat',
     cancelAll: 'Anulează tot',
+    after_posting: 'after posting', // TODO: translate to ro
+    modified: 'Modified', // TODO: translate to ro
   },
   hu: {
     download: 'Letöltés',
@@ -847,6 +917,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Mégse',
     cancelled: 'Megszakítva',
     cancelAll: 'Mind törlése',
+    after_posting: 'after posting', // TODO: translate to hu
+    modified: 'Modified', // TODO: translate to hu
   },
   sv: {
     download: 'Ladda ner',
@@ -872,6 +944,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Avbryt',
     cancelled: 'Avbruten',
     cancelAll: 'Avbryt alla',
+    after_posting: 'after posting', // TODO: translate to sv
+    modified: 'Modified', // TODO: translate to sv
   },
   da: {
     download: 'Hent',
@@ -897,6 +971,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Annuller',
     cancelled: 'Annulleret',
     cancelAll: 'Annuller alle',
+    after_posting: 'after posting', // TODO: translate to da
+    modified: 'Modified', // TODO: translate to da
   },
   fi: {
     download: 'Lataa',
@@ -922,6 +998,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Peruuta',
     cancelled: 'Peruutettu',
     cancelAll: 'Peruuta kaikki',
+    after_posting: 'after posting', // TODO: translate to fi
+    modified: 'Modified', // TODO: translate to fi
   },
   no: {
     download: 'Last ned',
@@ -947,6 +1025,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Avbryt',
     cancelled: 'Avbrutt',
     cancelAll: 'Avbryt alle',
+    after_posting: 'after posting', // TODO: translate to no
+    modified: 'Modified', // TODO: translate to no
   },
   he: {
     download: 'הורדה',
@@ -972,6 +1052,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'ביטול',
     cancelled: 'בוטל',
     cancelAll: 'ביטול הכל',
+    after_posting: 'after posting', // TODO: translate to he
+    modified: 'Modified', // TODO: translate to he
   },
   fa: {
     download: 'دانلود',
@@ -997,6 +1079,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'لغو',
     cancelled: 'لغو شد',
     cancelAll: 'لغو همه',
+    after_posting: 'after posting', // TODO: translate to fa
+    modified: 'Modified', // TODO: translate to fa
   },
   fil: {
     download: 'I-download',
@@ -1020,6 +1104,10 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Kanselahin',
     cancelled: 'Kinansela',
     cancelAll: 'Kanselahin lahat',
+    after_posting: 'after posting', // TODO: translate to fil
+    commentSingular: 'comment', // TODO: translate to fil
+    editedTooltip: 'Days between posting and the last edit', // TODO: translate to fil
+    modified: 'Modified', // TODO: translate to fil
   },
   ms: {
     download: 'Muat turun',
@@ -1045,6 +1133,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Batal',
     cancelled: 'Dibatalkan',
     cancelAll: 'Batalkan semua',
+    after_posting: 'after posting', // TODO: translate to ms
+    modified: 'Modified', // TODO: translate to ms
   },
   sr: {
     download: 'Преузми',
@@ -1070,6 +1160,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Откажи',
     cancelled: 'Отказано',
     cancelAll: 'Откажи све',
+    after_posting: 'after posting', // TODO: translate to sr
+    modified: 'Modified', // TODO: translate to sr
   },
   sk: {
     download: 'Stiahnuť',
@@ -1095,6 +1187,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Zrušiť',
     cancelled: 'Zrušené',
     cancelAll: 'Zrušiť všetko',
+    after_posting: 'after posting', // TODO: translate to sk
+    modified: 'Modified', // TODO: translate to sk
   },
   bg: {
     download: 'Изтегли',
@@ -1120,6 +1214,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Отказ',
     cancelled: 'Отказано',
     cancelAll: 'Откажи све',
+    after_posting: 'after posting', // TODO: translate to bg
+    modified: 'Modified', // TODO: translate to bg
   },
   hr: {
     download: 'Preuzmi',
@@ -1145,6 +1241,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Odustani',
     cancelled: 'Otkazano',
     cancelAll: 'Otkaži sve',
+    after_posting: 'after posting', // TODO: translate to hr
+    modified: 'Modified', // TODO: translate to hr
   },
   lt: {
     download: 'Atsisiųsti',
@@ -1170,6 +1268,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Atšaukti',
     cancelled: 'Atšaukta',
     cancelAll: 'Atšaukti viską',
+    after_posting: 'after posting', // TODO: translate to lt
+    modified: 'Modified', // TODO: translate to lt
   },
   lv: {
     download: 'Lejupielādēt',
@@ -1195,6 +1295,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Atcelt',
     cancelled: 'Atcelts',
     cancelAll: 'Atcelt visu',
+    after_posting: 'after posting', // TODO: translate to lv
+    modified: 'Modified', // TODO: translate to lv
   },
   et: {
     download: 'Laadi alla',
@@ -1220,6 +1322,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Loobu',
     cancelled: 'Tühistatud',
     cancelAll: 'Tühista kõik',
+    after_posting: 'after posting', // TODO: translate to et
+    modified: 'Modified', // TODO: translate to et
   },
   sl: {
     download: 'Prenos',
@@ -1245,6 +1349,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Prekliči',
     cancelled: 'Preklicano',
     cancelAll: 'Prekliči vse',
+    after_posting: 'after posting', // TODO: translate to sl
+    modified: 'Modified', // TODO: translate to sl
   },
   ca: {
     download: 'Descarrega',
@@ -1270,6 +1376,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Cancel·la',
     cancelled: 'Cancel·lat',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to ca
+    modified: 'Modified', // TODO: translate to ca
   },
   af: {
     download: 'Aflaai',
@@ -1295,6 +1403,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Kanselleer',
     cancelled: 'Gekanselleer',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to af
+    modified: 'Modified', // TODO: translate to af
   },
   am: {
     download: 'አውርድ',
@@ -1320,6 +1430,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'ሰርዝ',
     cancelled: 'ተሰርዟል',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to am
+    modified: 'Modified', // TODO: translate to am
   },
   hy: {
     download: 'Ներբեռնել',
@@ -1345,6 +1457,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Չեղարկել',
     cancelled: 'Չեղարկված է',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to hy
+    modified: 'Modified', // TODO: translate to hy
   },
   as: {
     download: 'ডাউন্লোড',
@@ -1370,6 +1484,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'বাতিল কৰক',
     cancelled: 'বাতিল কৰা হ’ল',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to as
+    modified: 'Modified', // TODO: translate to as
   },
   az: {
     download: 'Yüklə',
@@ -1395,6 +1511,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Ləğv et',
     cancelled: 'Ləğv edildi',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to az
+    modified: 'Modified', // TODO: translate to az
   },
   eu: {
     download: 'Deskargatu',
@@ -1420,6 +1538,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Utzi',
     cancelled: 'Bertan behera',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to eu
+    modified: 'Modified', // TODO: translate to eu
   },
   my: {
     download: 'ဒေါင်းလုဒ်',
@@ -1445,6 +1565,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'ပယ်ဖျက်',
     cancelled: 'ပယ်ဖျက်ပြီး',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to my
+    modified: 'Modified', // TODO: translate to my
   },
   gl: {
     download: 'Descargar',
@@ -1470,6 +1592,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Cancelar',
     cancelled: 'Cancelado',
     cancelAll: 'Cancelar todo',
+    after_posting: 'after posting', // TODO: translate to gl
+    modified: 'Modified', // TODO: translate to gl
   },
   ka: {
     download: 'ჩამოტვირთვა',
@@ -1495,6 +1619,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'გაუქმება',
     cancelled: 'გაუქმებულია',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to ka
+    modified: 'Modified', // TODO: translate to ka
   },
   is: {
     download: 'Sækja',
@@ -1520,6 +1646,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Hætta við',
     cancelled: 'Hætt við',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to is
+    modified: 'Modified', // TODO: translate to is
   },
   ga: {
     download: 'Íoslódáil',
@@ -1545,6 +1673,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Cealaigh',
     cancelled: 'Cealaithe',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to ga
+    modified: 'Modified', // TODO: translate to ga
   },
   kk: {
     download: 'Жүктеп алу',
@@ -1570,6 +1700,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Болдырмау',
     cancelled: 'Болдырылмады',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to kk
+    modified: 'Modified', // TODO: translate to kk
   },
   km: {
     download: 'ទាញយក',
@@ -1595,6 +1727,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'បោះបង់',
     cancelled: 'បានបោះបង់',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to km
+    modified: 'Modified', // TODO: translate to km
   },
   lo: {
     download: 'ດາວໂຫລດ',
@@ -1620,6 +1754,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'ຍົກເລີກ',
     cancelled: 'ຍົກເລີກແລ້ວ',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to lo
+    modified: 'Modified', // TODO: translate to lo
   },
   mk: {
     download: 'Преземи',
@@ -1645,6 +1781,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Откажи',
     cancelled: 'Откажано',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to mk
+    modified: 'Modified', // TODO: translate to mk
   },
   mn: {
     download: 'Татах',
@@ -1670,6 +1808,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Цуцлах',
     cancelled: 'Цуцлагдсан',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to mn
+    modified: 'Modified', // TODO: translate to mn
   },
   ne: {
     download: 'डाउनलोड',
@@ -1695,6 +1835,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'रद्द गर्नुहोस्',
     cancelled: 'रद्द गरियो',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to ne
+    modified: 'Modified', // TODO: translate to ne
   },
   or: {
     download: 'ଡାଉନଲୋଡ୍',
@@ -1720,6 +1862,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'ବାତିଲ କରନ୍ତୁ',
     cancelled: 'ବାତିଲ ହେଲା',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to or
+    modified: 'Modified', // TODO: translate to or
   },
   si: {
     download: 'බාගන්න',
@@ -1745,6 +1889,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'අවලංගු කරන්න',
     cancelled: 'අවලංගු කරන ලදී',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to si
+    modified: 'Modified', // TODO: translate to si
   },
   sw: {
     download: 'Pakua',
@@ -1770,6 +1916,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Ghairi',
     cancelled: 'Imeghairiwa',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to sw
+    modified: 'Modified', // TODO: translate to sw
   },
   uz: {
     download: 'Yuklash',
@@ -1795,6 +1943,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Bekor qilish',
     cancelled: 'Bekor qilindi',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to uz
+    modified: 'Modified', // TODO: translate to uz
   },
   cy: {
     download: 'Lawrlwytho',
@@ -1820,6 +1970,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Canslo',
     cancelled: 'Wedi\'i ganslo',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to cy
+    modified: 'Modified', // TODO: translate to cy
   },
   zu: {
     download: 'Landa',
@@ -1845,6 +1997,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Khansela',
     cancelled: 'Kukhanseliwe',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to zu
+    modified: 'Modified', // TODO: translate to zu
   },
   sq: {
     download: 'Shkarko',
@@ -1870,6 +2024,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Anulo',
     cancelled: 'Anuluar',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to sq
+    modified: 'Modified', // TODO: translate to sq
   },
   so: {
     download: 'Soo deji',
@@ -1895,6 +2051,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Jooji',
     cancelled: 'La joojiyay',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to so
+    modified: 'Modified', // TODO: translate to so
   },
   yo: {
     download: 'Ṣe igbasilẹ',
@@ -1920,6 +2078,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Fagilee',
     cancelled: 'Fagilee',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to yo
+    modified: 'Modified', // TODO: translate to yo
   },
   hmn: {
     download: 'Download',
@@ -1943,6 +2103,10 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Tso tseg',
     cancelled: 'Tso tseg lawm',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to hmn
+    commentSingular: 'comment', // TODO: translate to hmn
+    editedTooltip: 'Days between posting and the last edit', // TODO: translate to hmn
+    modified: 'Modified', // TODO: translate to hmn
   },
   ceb: {
     download: 'Pag-download',
@@ -1966,6 +2130,10 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Kanselahon',
     cancelled: 'Nakansela',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to ceb
+    commentSingular: 'comment', // TODO: translate to ceb
+    editedTooltip: 'Days between posting and the last edit', // TODO: translate to ceb
+    modified: 'Modified', // TODO: translate to ceb
   },
   ny: {
     download: 'Tsitsani',
@@ -1991,6 +2159,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Letsani',
     cancelled: 'Zaletsedwa',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to ny
+    modified: 'Modified', // TODO: translate to ny
   },
   ha: {
     download: 'Sauke',
@@ -2016,6 +2186,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Soke',
     cancelled: 'An soke',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to ha
+    modified: 'Modified', // TODO: translate to ha
   },
   ig: {
     download: 'Budata',
@@ -2041,6 +2213,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Kagbuo',
     cancelled: 'Akagbuola',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to ig
+    modified: 'Modified', // TODO: translate to ig
   },
   jw: { // Javanese
     download: 'Unduh',
@@ -2093,6 +2267,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Aoka indray',
     cancelled: 'Nofoanana',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to mg
+    modified: 'Modified', // TODO: translate to mg
   },
   mt: {
     download: 'Niżżel',
@@ -2118,6 +2294,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Ikkanċella',
     cancelled: 'Ikkanċellat',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to mt
+    modified: 'Modified', // TODO: translate to mt
   },
   mi: {
     download: 'Tikiake',
@@ -2143,6 +2321,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Whakakore',
     cancelled: 'Kua whakakorehia',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to mi
+    modified: 'Modified', // TODO: translate to mi
   },
   sm: {
     download: 'La\'u mai',
@@ -2168,6 +2348,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Fa\'aleaogaina',
     cancelled: 'Ua fa\'aleaogaina',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to sm
+    modified: 'Modified', // TODO: translate to sm
   },
   gd: {
     download: 'Luchdaich sìos',
@@ -2193,6 +2375,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Sguir',
     cancelled: 'Air a sgur',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to gd
+    modified: 'Modified', // TODO: translate to gd
   },
   st: {
     download: 'Khoasolla',
@@ -2218,6 +2402,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Hlakola',
     cancelled: 'E hlakotsoe',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to st
+    modified: 'Modified', // TODO: translate to st
   },
   sn: {
     download: 'Dhaunirodha',
@@ -2243,6 +2429,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Kanzura',
     cancelled: 'Yakanzurwa',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to sn
+    modified: 'Modified', // TODO: translate to sn
   },
   sd: {
     download: 'ڊائون لوڊ',
@@ -2268,6 +2456,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'رد ڪريو',
     cancelled: 'رد ڪيو ويو',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to sd
+    modified: 'Modified', // TODO: translate to sd
   },
   su: {
     download: 'Unduh',
@@ -2293,6 +2483,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Batal',
     cancelled: 'Dibatalakeun',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to su
+    modified: 'Modified', // TODO: translate to su
   },
   tg: {
     download: 'Боргирӣ',
@@ -2318,6 +2510,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Бекор кардан',
     cancelled: 'Бекор карда шуд',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to tg
+    modified: 'Modified', // TODO: translate to tg
   },
   yi: {
     download: 'אראפקאפיע',
@@ -2343,6 +2537,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'באָטל מאַכן',
     cancelled: 'קאַנסאַלד',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to yi
+    modified: 'Modified', // TODO: translate to yi
   },
   la: {
     download: 'Download',
@@ -2368,6 +2564,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Cancel',
     cancelled: 'Cancellatus',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to la
+    modified: 'Modified', // TODO: translate to la
   },
   // === AFRICAN LANGUAGES ===
   ach: { // Acoli - Falls back to English as Google uses English for this
@@ -2394,6 +2592,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Cancel',
     cancelled: 'Cancelled',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to ach
+    modified: 'Modified', // TODO: translate to ach
   },
   ak: { // Akan
     download: 'Download',
@@ -2419,6 +2619,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Twe',
     cancelled: 'Twa mu',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to ak
+    modified: 'Modified', // TODO: translate to ak
   },
   bem: { // Ichibemba
     download: 'Download',
@@ -2444,6 +2646,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Kansela',
     cancelled: 'Nakanselwa',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to bem
+    modified: 'Modified', // TODO: translate to bem
   },
   ee: { // Ewe
     download: 'Download',
@@ -2469,6 +2673,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Tsi',
     cancelled: 'Wotsie',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to ee
+    modified: 'Modified', // TODO: translate to ee
   },
   gaa: { // Gã
     download: 'Download',
@@ -2494,6 +2700,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Cancel',
     cancelled: 'Cancelled',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to gaa
+    modified: 'Modified', // TODO: translate to gaa
   },
   kg: { // Kongo
     download: 'Download',
@@ -2519,6 +2727,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Kulula',
     cancelled: 'Bakuludi',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to kg
+    modified: 'Modified', // TODO: translate to kg
   },
   kri: { // Krio
     download: 'Dɔnlod',
@@ -2571,6 +2781,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Longola',
     cancelled: 'Elongolami',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to ln
+    modified: 'Modified', // TODO: translate to ln
   },
   lg: { // Luganda
     download: 'Dawuniloda',
@@ -2596,6 +2808,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Sazaamu',
     cancelled: 'Kisaziddwamu',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to lg
+    modified: 'Modified', // TODO: translate to lg
   },
   loz: { // Lozi
     download: 'Download',
@@ -2621,6 +2835,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Kansela',
     cancelled: 'Kanselilwe',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to loz
+    modified: 'Modified', // TODO: translate to loz
   },
   lua: { // Luba-Lulua
     download: 'Kupakula',
@@ -2673,6 +2889,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Phumola',
     cancelled: 'E phumotswe',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to nso
+    modified: 'Modified', // TODO: translate to nso
   },
   nyn: { // Runyankore
     download: 'Kurukura',
@@ -2725,6 +2943,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Haqii',
     cancelled: 'Haqameera',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to om
+    modified: 'Modified', // TODO: translate to om
   },
   pcm: { // Nigerian Pidgin
     download: 'Download',
@@ -2777,6 +2997,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Kureka',
     cancelled: 'Byaretse',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to rw
+    modified: 'Modified', // TODO: translate to rw
   },
   rn: { // Kirundi
     download: 'Kuramo',
@@ -2802,6 +3024,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Guhagarika',
     cancelled: 'Vyahagaze',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to rn
+    modified: 'Modified', // TODO: translate to rn
   },
   crs: { // Seselwa Creole French
     download: 'Download',
@@ -2854,6 +3078,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'ሰርዝ',
     cancelled: 'ተሰሪዙ',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to ti
+    modified: 'Modified', // TODO: translate to ti
   },
   tn: { // Setswana  
     download: 'Tsenya',
@@ -2879,6 +3105,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Kansela',
     cancelled: 'E kasetse',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to tn
+    modified: 'Modified', // TODO: translate to tn
   },
   tum: { // Tumbuka
     download: 'Download',
@@ -2931,6 +3159,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Bëy',
     cancelled: 'Bëy nañu',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to wo
+    modified: 'Modified', // TODO: translate to wo
   },
   // === EUROPEAN LANGUAGES ===
   bs: { // Bosnian
@@ -2984,6 +3214,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Nullañ',
     cancelled: 'Nullet',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to br
+    modified: 'Modified', // TODO: translate to br
   },
   co: { // Corsican
     download: 'Scaricà',
@@ -3009,6 +3241,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Annullà',
     cancelled: 'Annullatu',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to co
+    modified: 'Modified', // TODO: translate to co
   },
   fo: { // Faroese
     download: 'Tak niður',
@@ -3034,6 +3268,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Angra',
     cancelled: 'Angrað',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to fo
+    modified: 'Modified', // TODO: translate to fo
   },
   fy: { // West Frisian
     download: 'Downloade',
@@ -3059,6 +3295,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Annulearje',
     cancelled: 'Annulearre',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to fy
+    modified: 'Modified', // TODO: translate to fy
   },
   ia: { // Interlingua
     download: 'Discargar',
@@ -3084,6 +3322,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Cancellar',
     cancelled: 'Cancellate',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to ia
+    modified: 'Modified', // TODO: translate to ia
   },
   nn: { // Norwegian Nynorsk
     download: 'Last ned',
@@ -3136,6 +3376,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Anullar',
     cancelled: 'Anullat',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to oc
+    modified: 'Modified', // TODO: translate to oc
   },
   rm: { // Romansh
     download: 'Telechargiar',
@@ -3161,6 +3403,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Halar',
     cancelled: 'Halà',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to rm
+    modified: 'Modified', // TODO: translate to rm
   },
   'sr-latn': { // Serbian Latin
     download: 'Preuzmi',
@@ -3183,6 +3427,11 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: 'Runtime nije dostupan',
     startError: 'Nije moguće pokrenuti.',
     commError: 'Greška u komunikaciji.',
+    after_posting: 'after posting', // TODO: translate to sr-latn
+    cancel: 'Cancel', // TODO: translate to sr-latn
+    cancelAll: 'Cancel All', // TODO: translate to sr-latn
+    cancelled: 'Cancelled', // TODO: translate to sr-latn
+    modified: 'Modified', // TODO: translate to sr-latn
   },
   // === ASIAN / PACIFIC LANGUAGES ===
   ay: { // Aymara
@@ -3209,6 +3458,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Jan sa',
     cancelled: 'Jan sata',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to ay
+    modified: 'Modified', // TODO: translate to ay
   },
   ban: { // Balinese
     download: 'Unduh',
@@ -3234,6 +3485,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Batal',
     cancelled: 'Kabatalang',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to ban
+    modified: 'Modified', // TODO: translate to ban
   },
   chr: { // Cherokee
     download: 'ᎠᏨᏍᏔᏅ',
@@ -3259,6 +3512,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'ᎡᎷᏪ',
     cancelled: 'ᎡᎷᏪᎢ',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to chr
+    modified: 'Modified', // TODO: translate to chr
   },
   ckb: { // Central Kurdish / Sorani
     download: 'داگرتن',
@@ -3284,6 +3539,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'هەڵوەشاندنەوە',
     cancelled: 'هەڵوەشایەوە',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to ckb
+    modified: 'Modified', // TODO: translate to ckb
   },
   gn: { // Guarani
     download: 'Mboguejy',
@@ -3309,6 +3566,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Mbotove',
     cancelled: 'Oñembotove',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to gn
+    modified: 'Modified', // TODO: translate to gn
   },
   haw: { // Hawaiian
     download: 'Hoʻoiho',
@@ -3334,6 +3593,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Hoʻopau',
     cancelled: 'Ua hoʻopau ʻia',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to haw
+    modified: 'Modified', // TODO: translate to haw
   },
   ht: { // Haitian Creole
     download: 'Telechaje',
@@ -3359,6 +3620,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Anile',
     cancelled: 'Anile',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to ht
+    modified: 'Modified', // TODO: translate to ht
   },
   ku: { // Kurdish (Kurmanji)
     download: 'Daxistin',
@@ -3384,6 +3647,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Betal bike',
     cancelled: 'Hate betalkirin',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to ku
+    modified: 'Modified', // TODO: translate to ku
   },
   mfe: { // Mauritian Creole
     download: 'Download',
@@ -3436,6 +3701,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Tatichiy',
     cancelled: 'Tatichisqa',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to qu
+    modified: 'Modified', // TODO: translate to qu
   },
   sa: { // Sanskrit
     download: 'अवतारयतु',
@@ -3461,6 +3728,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'निरस्तम्',
     cancelled: 'निरस्तित',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to sa
+    modified: 'Modified', // TODO: translate to sa
   },
   to: { // Tongan
     download: 'Download',
@@ -3486,6 +3755,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'Kaniseli',
     cancelled: 'Kuo kaniseli',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to to
+    modified: 'Modified', // TODO: translate to to
   },
   yue: { // Cantonese
     download: '下載',
@@ -3538,6 +3809,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     cancel: 'रद्द करीं',
     cancelled: 'रद्द कइल गइल',
     cancelAll: 'Cancel All',
+    after_posting: 'after posting', // TODO: translate to bho
+    modified: 'Modified', // TODO: translate to bho
   },
   // === JOKE / NOVELTY LANGUAGES (fallback to English) ===
   'xx-bork': { // Bork bork bork (Swedish Chef)
@@ -3564,6 +3837,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: 'Runtime not available',
     startError: 'Could not start.',
     commError: 'Communication error.',
+    after_posting: 'after posting', // TODO: translate to xx-bork
+    modified: 'Modified', // TODO: translate to xx-bork
   },
   'xx-elmer': { // Elmer Fudd
     cancel: 'Cancew',
@@ -3589,6 +3864,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: 'Wuntime not avaiwabwe',
     startError: 'Couwd not stawt.',
     commError: 'Communication ewwow.',
+    after_posting: 'after posting', // TODO: translate to xx-elmer
+    modified: 'Modified', // TODO: translate to xx-elmer
   },
   tlh: { // Klingon
     cancel: 'qIl',
@@ -3614,6 +3891,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: 'Runtime not available',
     startError: 'Could not start.',
     commError: 'Communication error.',
+    after_posting: 'after posting', // TODO: translate to tlh
+    modified: 'Modified', // TODO: translate to tlh
   },
   'xx-pirate': { // Pirate
     cancel: 'Abandon',
@@ -3639,6 +3918,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: 'Runtime not available, matey',
     startError: 'Could not set sail.',
     commError: 'Message in a bottle lost.',
+    after_posting: 'after posting', // TODO: translate to xx-pirate
+    modified: 'Modified', // TODO: translate to xx-pirate
   },
   'xx-hacker': { // Hacker/Leetspeak
     cancel: 'C4NC3L',
@@ -3664,6 +3945,8 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: 'RUN71M3 N07 4V41L4BL3',
     startError: 'C0ULD N07 574R7.',
     commError: 'C0MMUN1C4710N 3RR0R.',
+    after_posting: 'after posting', // TODO: translate to xx-hacker
+    modified: 'Modified', // TODO: translate to xx-hacker
   },
   eo: { // Esperanto
     download: 'Elŝuti',
