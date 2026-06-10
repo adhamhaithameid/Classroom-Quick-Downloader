@@ -311,7 +311,6 @@ No `scope-enum` rules. Valid scopes (extension, website, oracle-backend, cloudfl
 ```
 17. git rm --cached oracle-backend/.env extension/.env
 18. Create oracle-backend/.env.example
-19. Remove Caddyfile lines 14-16
 20. Create oracle-backend/.dockerignore
 21. Fix absolute paths in runbook docs
 22. Fix outdated doc versions/badges/emails
@@ -346,7 +345,6 @@ No `scope-enum` rules. Valid scopes (extension, website, oracle-backend, cloudfl
 - [ ] `.gitignore` correctly excludes `*.manual.generated.*`
 - [ ] `.dockerignore` exists and excludes correctly
 - [ ] `oracle-backend/.env.example` exists
-- [ ] Caddyfile has no unrelated sites
 - [ ] `git ls-files oracle-backend/.env` returns empty
 - [ ] `git ls-files extension/.env` returns empty
 - [ ] `grep -rn "manual/changelog\|dashboard-src" --include="*.{ts,js,mjs,json,md,sh}" . | grep -v node_modules | grep -v .git` returns empty
