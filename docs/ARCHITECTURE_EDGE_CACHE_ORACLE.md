@@ -13,7 +13,7 @@ Principles:
 - `website/` (SvelteKit static frontend)
 - `cloudflare-worker/` (edge gateway + scheduler + cache facade)
 - `oracle-backend/` (Go API + DB + admin dashboard)
-- `manual/changelog/*` (manual release and pill-rule source)
+- `data/changelog/*` (manual release and pill-rule source)
 - `tools/sync-manual-changelog.mjs` (generator)
 
 ## 3. Read Path (Website Data)
@@ -41,10 +41,10 @@ Principles:
 
 ## 7. Manual Changelog Architecture
 - Source files:
-  - `manual/changelog/website-changelog.manual.md`
-  - `manual/changelog/extension-changelog.manual.md`
-  - `manual/changelog/extension-pill-rules.manual.json`
-  - `manual/changelog/release-version.manual.json`
+   - `data/changelog/website-changelog.manual.md`
+   - `data/changelog/extension-changelog.manual.md`
+   - `data/changelog/extension-pill-rules.manual.json`
+   - `data/changelog/release-version.manual.json`
 - Generator writes runtime artifacts into `website/src/lib/content` and `extension/entrypoints/utils`.
 - Runtime changelog customization from cloud dashboards is treated as legacy.
 
@@ -65,4 +65,4 @@ Principles:
 - Frontend UX/state behavior: `website/`.
 - Edge transport/caching/schedule: `cloudflare-worker/`.
 - Persistent analytics and admin APIs: `oracle-backend/`.
-- Release/changelog content source: `manual/changelog/*`.
+- Release/changelog content source: `data/changelog/*`.

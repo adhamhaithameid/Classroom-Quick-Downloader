@@ -7,9 +7,9 @@ This runbook defines incident response for Website <-> Worker <-> Oracle product
 
 Use this with:
 
-- `/Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/docs/RUNBOOK_DEPLOYMENT.md`
-- `/Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/docs/DATA_FLOW_WORKER_ORACLE_WEBSITE.md`
-- `/Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/docs/DEPLOYMENT_RUNBOOK.md`
+- `docs/RUNBOOK_DEPLOYMENT.md`
+- `docs/DATA_FLOW_WORKER_ORACLE_WEBSITE.md`
+- `docs/DEPLOYMENT_RUNBOOK.md`
 
 ## 1. Severity Model
 

@@ -13,9 +13,9 @@ Use this document for both:
 
 Related operator documents:
 
-- `/Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/docs/RUNBOOK_DEPLOYMENT.md`
-- `/Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/docs/RUNBOOK_INCIDENT_RESPONSE.md`
-- `/Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/docs/DATA_FLOW_WORKER_ORACLE_WEBSITE.md`
+- `docs/RUNBOOK_DEPLOYMENT.md`
+- `docs/RUNBOOK_INCIDENT_RESPONSE.md`
+- `docs/DATA_FLOW_WORKER_ORACLE_WEBSITE.md`
 
 ## 1) Production Architecture
 
@@ -291,7 +291,7 @@ curl -fsS http://127.0.0.1:8080/health
 ### 6.2 Deploy Cloudflare Worker manually
 
 ```bash
-cd /Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader
+cd .
 pnpm -C cloudflare-worker test
 pnpm -C cloudflare-worker run validate
 pnpm -C cloudflare-worker run deploy
@@ -300,7 +300,7 @@ pnpm -C cloudflare-worker run deploy
 ### 6.3 Deploy website manually
 
 ```bash
-cd /Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader
+cd .
 PUBLIC_BASE_PATH='' \
 PUBLIC_ORACLE_API_BASE_URL='https://<your-oracle-public-https-domain>' \
 PUBLIC_WORKER_BASE_URL='https://cqd-analytics.adhamhaithameid.workers.dev' \
@@ -324,7 +324,7 @@ Notes:
 ### 7.1 Cloudflare Worker passwords
 
 ```bash
-cd /Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader
+cd .
 printf '%s' '<new-dashboard-password>' | pnpm -C cloudflare-worker exec wrangler secret put DASHBOARD_PASSWORD
 printf '%s' '<new-danger-password>' | pnpm -C cloudflare-worker exec wrangler secret put DANGER_PASSWORD
 pnpm -C cloudflare-worker run deploy
@@ -504,7 +504,7 @@ If deployment reveals security regression:
 3. Rotate impacted secrets.
 4. Invalidate sessions.
 5. Preserve evidence (logs, run IDs, request IDs).
-6. Follow `/Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/docs/RUNBOOK_INCIDENT_RESPONSE.md`.
+6. Follow `docs/RUNBOOK_INCIDENT_RESPONSE.md`.
 
 ## 11) Rollout Status and Remaining Steps (2026-02-28)
 

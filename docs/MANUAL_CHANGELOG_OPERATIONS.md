@@ -4,10 +4,10 @@
 Operate extension and website changelog content through source-controlled manual files.
 
 ## 2. Source Files
-- `manual/changelog/website-changelog.manual.md`
-- `manual/changelog/extension-changelog.manual.md`
-- `manual/changelog/extension-pill-rules.manual.json`
-- `manual/changelog/release-version.manual.json`
+- `data/changelog/website-changelog.manual.md`
+- `data/changelog/extension-changelog.manual.md`
+- `data/changelog/extension-pill-rules.manual.json`
+- `data/changelog/release-version.manual.json`
 
 ## 3. Required Format (Markdown)
 Use one release block per version:

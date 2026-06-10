@@ -11,16 +11,16 @@ This runbook is the operator playbook for deploying and validating:
 
 Use this with:
 
-- `/Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/docs/DEPLOYMENT_RUNBOOK.md`
-- `/Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/docs/RUNBOOK_INCIDENT_RESPONSE.md`
-- `/Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/docs/DATA_FLOW_WORKER_ORACLE_WEBSITE.md`
+- `docs/DEPLOYMENT_RUNBOOK.md`
+- `docs/RUNBOOK_INCIDENT_RESPONSE.md`
+- `docs/DATA_FLOW_WORKER_ORACLE_WEBSITE.md`
 
 ## 1. Pre-Deploy Guardrails
 
 Run from repo root:
 
 ```bash
-cd /Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader
+cd .
 bash tools/check_schema_compat.sh
 pnpm -C cloudflare-worker test:smoke
 pnpm -C website test:smoke
@@ -76,9 +76,9 @@ Required keys in `oracle-backend/.env.production`:
 
 Workflows:
 
-- `/Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/.github/workflows/deploy-cloudflare-worker.yml`
-- `/Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/.github/workflows/oracle-dashboard-deploy.yml`
-- `/Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/.github/workflows/website-deploy.yml`
+- `./.github/workflows/deploy-cloudflare-worker.yml`
+- `./.github/workflows/oracle-dashboard-deploy.yml`
+- `./.github/workflows/website-deploy.yml`
 
 Each workflow enforces:
 
@@ -92,7 +92,7 @@ Each workflow enforces:
 ## 4.1 Cloudflare Worker
 
 ```bash
-cd /Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader
+cd .
 pnpm -C cloudflare-worker test
 pnpm -C cloudflare-worker run validate
 pnpm -C cloudflare-worker run deploy
@@ -127,7 +127,7 @@ Expected output:
 ## 4.3 Website (Cloudflare Pages)
 
 ```bash
-cd /Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader
+cd .
 PUBLIC_BASE_PATH='' \
 PUBLIC_ORACLE_API_BASE_URL='https://<your-oracle-public-https-domain>' \
 PUBLIC_WORKER_BASE_URL='https://cqd-analytics.adhamhaithameid.workers.dev' \
@@ -284,7 +284,7 @@ If deploy exposes unsafe behavior (open admin route, auth bypass, CSRF bypass, C
    - Oracle: `DASHBOARD_PASSWORD`, `SUPER_ADMIN_PASSWORD`, `DANGER_PASSWORD`, `DO_SHARED_SECRET`
 4. Invalidate sessions.
 5. Capture evidence (logs, request IDs, timeline).
-6. Execute incident flow in `/Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/docs/RUNBOOK_INCIDENT_RESPONSE.md`.
+6. Execute incident flow in `docs/RUNBOOK_INCIDENT_RESPONSE.md`.
 
 ## 10. Phase 12 + 13 Operator Scripts
 
@@ -316,4 +316,4 @@ bash tools/phase13_monitor.sh
 
 Phase-12 matrix mapping is documented in:
 
-- `/Users/adhamhaithameid/Desktop/code/Classroom-Quick-Downloader/docs/PHASE12_TEST_MATRIX.md`
+- `docs/PHASE12_TEST_MATRIX.md`
