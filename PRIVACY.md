@@ -174,7 +174,7 @@ We encourage you to review this policy periodically.
 
 If you have any questions or concerns about your privacy, please reach out:
 
-- **Email:** `adhamhaithameid@gmail.com` *(Replace with your actual contact)*
+- **Email:** `adhamhaithameid@gmail.com`
 - **GitHub Issues:** [Open an Issue](https://github.com/adhamhaithameid/Classroom-Quick-Downloader/issues)
 
 We take every privacy concern seriously and will respond promptly.
