@@ -25,8 +25,8 @@ Before you begin, ensure you have the following tools installed:
 | Tool | Version | Purpose | Installation |
 |------|---------|---------|--------------|
 | **Node.js** | v20+ | JavaScript runtime | [nodejs.org](https://nodejs.org/) |
-| **pnpm** | v8+ | Package manager | `corepack enable && corepack prepare pnpm@latest --activate` |
-| **Go** | v1.24+ | Backend development | [go.dev](https://go.dev/) |
+| **pnpm** | v10.28+ | Package manager | `corepack enable && corepack prepare pnpm@latest --activate` |
+| **Go** | v1.26+ | Backend development | [go.dev](https://go.dev/) |
 | **Docker** | v20+ | Backend deployment | [docker.com](https://docker.com/) |
 | **Wrangler** | Latest | Cloudflare Worker CLI | `pnpm add -g wrangler` |
 
