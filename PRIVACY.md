@@ -174,8 +174,8 @@ We encourage you to review this policy periodically.
 
 If you have any questions or concerns about your privacy, please reach out:
 
-- **Email:** `your-email@example.com` *(Replace with your actual contact)*
-- **GitHub Issues:** [Open an Issue](https://github.com/AhmedHaitamSaid/Classroom-Quick-Downloader/issues)
+- **Email:** `adhamhaithameid@gmail.com` *(Replace with your actual contact)*
+- **GitHub Issues:** [Open an Issue](https://github.com/adhamhaithameid/Classroom-Quick-Downloader/issues)
 
 We take every privacy concern seriously and will respond promptly.
 
