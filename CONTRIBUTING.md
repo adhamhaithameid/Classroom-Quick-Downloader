@@ -8,7 +8,7 @@ Thank you for your interest in this project!
 **We do not accept Pull Requests (PRs).**
 This project uses a proprietary license that does not allow derivative works or modifications. Any PRs opened will be closed without review to maintain legal compliance.
 
-Owner-controlled automation PRs from Google Jules are internal maintenance work and are not part of the public contribution path. The Jules workflow is documented in [agents/jules/README.md](agents/jules/README.md).
+Owner-controlled automation PRs from Google Jules are internal maintenance work and are not part of the public contribution path. The Jules workflow is documented in [.github/agents/jules/README.md](.github/agents/jules/README.md).
 
 ## 🐛 Bug Reports & Feedback
 We strictly value your feedback! If you find a bug or have an idea:
