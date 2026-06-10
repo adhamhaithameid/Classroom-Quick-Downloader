@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { base } from '$app/paths';
   import { page } from '$app/stores';
+  import { afterNavigate } from '$app/navigation';
   import logo from '$lib/assets/cqd-logo.svg';
   import { BING_SITE_VERIFICATION, GOOGLE_SITE_VERIFICATION, STORE_LINKS } from '$lib/config';
   import { browserDisplayName, detectBrowserFromNavigator, type BrowserKey } from '$lib/browser/detect';
@@ -131,6 +132,14 @@
       disposeSnapshotStore();
     };
   });
+
+  afterNavigate(() => {
+    // Move focus to main content after navigation
+    const mainContent = document.querySelector('#main-content');
+    if (mainContent) {
+      (mainContent as HTMLElement).focus();
+    }
+  });
 </script>
 
 <svelte:head>
@@ -151,6 +160,7 @@
 <LoadingScreen />
 
 <div class="site-shell" class:o2-fullscreen={hideChrome}>
+  <a href="#main-content" class="skip-nav">Skip to main content</a>
   {#if !hideChrome}
   <header class="l2-nav-shell">
     <div class="l2-nav-inner l2-nav-fullwidth">
@@ -238,6 +248,8 @@
   {/if}
 
   <main
+    id="main-content"
+    tabindex="-1"
     class:site-main={!isOverviewStyleRoute && !hideChrome}
     class:site-main-overview-style={isOverviewStyleRoute && !hideChrome}
     class:l2-wrap={!isOverviewStyleRoute && !hideChrome}
@@ -282,6 +294,26 @@
   main {
     flex: 1;
     min-height: 0;
+  }
+
+  main:focus {
+    outline: none;
+  }
+
+  .skip-nav {
+    position: absolute;
+    top: -100%;
+    left: 0;
+    padding: 0.5rem 1rem;
+    background: var(--gc-green);
+    color: white;
+    z-index: 999;
+    text-decoration: none;
+    transition: top 0.2s ease;
+  }
+
+  .skip-nav:focus {
+    top: 0;
   }
 
   .site-shell {
