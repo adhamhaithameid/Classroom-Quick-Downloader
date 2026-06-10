@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const root = process.cwd();
-const manualDir = resolve(root, 'manual/changelog');
+const manualDir = resolve(root, 'data/changelog');
 const websiteManualPath = resolve(manualDir, 'website-changelog.manual.md');
 const extensionManualPath = resolve(manualDir, 'extension-changelog.manual.md');
 const pillRulesPath = resolve(manualDir, 'extension-pill-rules.manual.json');

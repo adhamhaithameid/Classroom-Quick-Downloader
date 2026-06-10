@@ -115,7 +115,7 @@ function buildIssuesData(testResults) {
         actual: 'No buttons rendered because the student submissions surface is still a known coverage gap.',
         severity: 'major',
         reproducible: true,
-        notes: 'Tracked by extension/docs/student-work-api-plan.md and refactor-plan.md.',
+        notes: 'Tracked by extension/docs/student-work-api-plan.md and docs/refactor-plan.md.',
       },
       {
         id: 'KNOWN-002',
@@ -125,7 +125,7 @@ function buildIssuesData(testResults) {
         actual: 'No buttons rendered because the teacher student-work surface is still a known coverage gap.',
         severity: 'major',
         reproducible: true,
-        notes: 'Tracked by extension/docs/student-work-api-plan.md and refactor-plan.md.',
+        notes: 'Tracked by extension/docs/student-work-api-plan.md and docs/refactor-plan.md.',
       },
       {
         id: 'KNOWN-003',

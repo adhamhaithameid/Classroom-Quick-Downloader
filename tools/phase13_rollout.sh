@@ -104,7 +104,7 @@ run_cmd() {
 
 step "Step 1/10: Runtime contract and runbook assets"
 for path in \
-  "ARCHITECTURE_RUNTIME_CONTRACT.md" \
+  "docs/ARCHITECTURE_RUNTIME_CONTRACT.md" \
   "docs/RUNBOOK_DEPLOYMENT.md" \
   "docs/RUNBOOK_INCIDENT_RESPONSE.md" \
   "docs/DATA_FLOW_WORKER_ORACLE_WEBSITE.md"; do
