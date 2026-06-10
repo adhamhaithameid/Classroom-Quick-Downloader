@@ -1,29 +1,52 @@
-# filepath: oracle-backend/.dockerignore
+# oracle-backend/.dockerignore
+# Exclude unnecessary files from Docker build context
+
+# Version control
 .git
 .gitignore
-.DS_Store
+.github
 
-# Development data
-data/
-docker_data/
+# Dependencies
+node_modules
+pnpm-lock.yaml
+package-lock.json
+
+# Test files and coverage
+tests
+*.test.ts
+*.test.js
+coverage
+.nyc_output
+
+# Database and data files
 *.db
-*.db-wal
-*.db-shm
-
-# Binary artifacts
-app
-oracle-backend
-
-# Secrets
-google-credentials.json
-google-credentials*.json
-.env
-
-# IDE
-.idea/
-.vscode/
-*.swp
+*.sqlite
+data/
+*.log
 
 # Documentation
+docs/
 README.md
 *.md
+
+# Development files
+.env
+.env.local
+.env.*.local
+.vscode
+.idea
+*.swp
+*.swo
+
+# Build outputs (keep if needed for staged builds)
+# dist/
+# build/
+
+# Root-level files we don't need in container
+tools/
+website/
+extension/
+cloudflare-worker/
+
+# Dashboard source (we use built output)
+dashboard/
