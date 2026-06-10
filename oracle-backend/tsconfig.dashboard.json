@@ -8,6 +8,8 @@
     "skipLibCheck": true,
     "allowJs": true,
     "checkJs": false,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
     "types": []
   },
   "include": ["dashboard/**/*", "static/oracle-dashboard.legacy.js"],
