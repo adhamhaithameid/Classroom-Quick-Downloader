@@ -10,7 +10,3 @@ https://{$ORACLE_PUBLIC_HOSTNAME:localhost}, https://{$ORACLE_PUBLIC_HOSTNAME:lo
 	encode zstd gzip
 	reverse_proxy oracle-backend:8080
 }
-
-atype.adhamhaithameid.is-a.dev {
-	reverse_proxy 10.0.0.195:8090
-}
