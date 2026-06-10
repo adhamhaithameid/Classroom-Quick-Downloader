@@ -41,6 +41,9 @@
     "indexing:submit": "node tools/submit-search-indexing.mjs",
     "prepare": "husky"
   },
+  "_meta": {
+    "removed-deps": "@playwright/test ^1.59.1 and playwright ^1.59.1 were unused (2026-02-28)"
+  },
   "pnpm": {
     "overrides": {
       "@commitlint/config-validator>ajv": "8.18.0",
@@ -80,8 +83,6 @@
   "devDependencies": {
     "@commitlint/cli": "^20.5.0",
     "@commitlint/config-conventional": "^20.5.0",
-    "@playwright/test": "^1.59.1",
-    "husky": "^9.1.7",
-    "playwright": "^1.59.1"
+    "husky": "^9.1.7"
   }
 }
