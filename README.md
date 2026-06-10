@@ -149,7 +149,7 @@ Make downloading class materials boringly easy, so students spend time learning,
 3. Open an assignment/post with files.
 4. Use CQD buttons to download faster.
 
-> Want local development setup? See [DEVELOPMENT.md](DEVELOPMENT.md).
+> Want local development setup? See [DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ---
 
@@ -191,12 +191,12 @@ CQD is also backed by a distributed reliability pipeline, but the deep engineeri
 - [Extension Docs](./extension/README.md)
 - [Cloudflare Worker Docs](./cloudflare-worker/README.md)
 - [Oracle Backend Docs](./oracle-backend/README.md)
-- [Architecture Overview](./ARCHITECTURE.md)
+- [Architecture Overview](./docs/ARCHITECTURE.md)
 - [Edge Cache + Oracle Architecture](./docs/ARCHITECTURE_EDGE_CACHE_ORACLE.md)
 - [Website/Edge/Oracle Data Flow](./docs/DATA_FLOW_WEBSITE_EDGE_ORACLE.md)
 - [Manual Changelog Operations](./docs/MANUAL_CHANGELOG_OPERATIONS.md)
 - [Oracle Dashboard Dark UI Language](./docs/ORACLE_DASHBOARD_DARK_DESIGN_LANGUAGE.md)
-- [Jules Agent Automation](./agents/jules/README.md)
+- [Jules Agent Automation](./.github/agents/jules/README.md)
 - [Changelog](./CHANGELOG.md)
 
 ### High-Level Architecture
