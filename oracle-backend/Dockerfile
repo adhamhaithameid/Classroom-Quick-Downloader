@@ -6,7 +6,6 @@ FROM golang:1.26-alpine AS builder
 WORKDIR /app
 
 # CGO_ENABLED=0 means we don't need gcc/musl-dev for compilation
-# RUN apk add --no-cache gcc musl-dev
 
 # Cache dependencies
 COPY go.mod go.sum ./
