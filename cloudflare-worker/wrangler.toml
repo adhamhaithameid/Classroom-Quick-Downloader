@@ -52,4 +52,5 @@ compatibility_date = "2024-12-01"
   persist = true
 
 [triggers]
-  crons = ["0 */3 * * *", "0 1-22/3 * * *"]
+  # Runs every 3 hours (0:00, 3:00, 6:00, ...)
+  crons = ["0 */3 * * *"]
