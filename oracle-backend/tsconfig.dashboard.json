@@ -10,6 +10,6 @@
     "checkJs": false,
     "types": []
   },
-  "include": ["dashboard-src/**/*", "static/oracle-dashboard.legacy.js"],
+  "include": ["dashboard/**/*", "static/oracle-dashboard.legacy.js"],
   "exclude": ["static/oracle-dashboard.js", "node_modules"]
 }

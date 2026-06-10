@@ -35,6 +35,9 @@ oracle-backend/handler_cover.out
 *.db-wal
 google-credentials.json
 oracle-backend/google-credentials*.json
+# Auto-generated files from build processes
+*.manual.generated.json
+*.manual.generated.ts
 
 ownership-map-out/
 ownership-map-out-sensitive/
