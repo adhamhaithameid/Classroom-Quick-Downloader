@@ -1,44 +1,45 @@
-import { defineConfig } from 'vitest/config';
+import { defineConfig } from "vitest/config";
+import path from "path";
 
-const coverageProfile = process.env.COVERAGE_PROFILE ?? 'default';
+const coverageProfile = process.env.COVERAGE_PROFILE ?? "default";
 
 const criticalCoverageInclude = [
-  'entrypoints/utils/analytics/storage.ts',
-  'entrypoints/utils/analytics/flush.ts',
-  'entrypoints/utils/analytics/rate-limiter.ts',
-  'entrypoints/utils/analytics/detection.ts',
-  'entrypoints/background/download-handler.ts',
-  'entrypoints/background/message-sender.ts',
-  'entrypoints/background/state.ts',
-  'entrypoints/background/url-helpers.ts',
+  "entrypoints/utils/analytics/storage.ts",
+  "entrypoints/utils/analytics/flush.ts",
+  "entrypoints/utils/analytics/rate-limiter.ts",
+  "entrypoints/utils/analytics/detection.ts",
+  "entrypoints/background/download-handler.ts",
+  "entrypoints/background/message-sender.ts",
+  "entrypoints/background/state.ts",
+  "entrypoints/background/url-helpers.ts",
 ];
 
 const runtimeCoverageInclude = [
-  'entrypoints/background/download-handler.ts',
-  'entrypoints/background/message-sender.ts',
-  'entrypoints/background/state.ts',
-  'entrypoints/background/url-helpers.ts',
-  'entrypoints/utils/analytics/storage.ts',
-  'entrypoints/utils/analytics/flush.ts',
-  'entrypoints/utils/analytics/rate-limiter.ts',
-  'entrypoints/utils/analytics/detection.ts',
+  "entrypoints/background/download-handler.ts",
+  "entrypoints/background/message-sender.ts",
+  "entrypoints/background/state.ts",
+  "entrypoints/background/url-helpers.ts",
+  "entrypoints/utils/analytics/storage.ts",
+  "entrypoints/utils/analytics/flush.ts",
+  "entrypoints/utils/analytics/rate-limiter.ts",
+  "entrypoints/utils/analytics/detection.ts",
 ];
 
 const runtimeCoverageExclude = [
-  '**/*.d.ts',
-  '**/node_modules/**',
-  'entrypoints/content/translations/**',
-  'entrypoints/content/icons.ts',
+  "**/*.d.ts",
+  "**/node_modules/**",
+  "entrypoints/content/translations/**",
+  "entrypoints/content/icons.ts",
 ];
 
 function getCoverageConfig() {
-  if (coverageProfile === 'critical') {
+  if (coverageProfile === "critical") {
     return {
-      provider: 'v8' as const,
-      reporter: ['text', 'json', 'html'],
+      provider: "v8" as const,
+      reporter: ["text", "json", "html"],
       all: true,
       include: criticalCoverageInclude,
-      exclude: ['**/*.d.ts', '**/node_modules/**'],
+      exclude: ["**/*.d.ts", "**/node_modules/**"],
       thresholds: {
         lines: 100,
         functions: 100,
@@ -48,10 +49,10 @@ function getCoverageConfig() {
     };
   }
 
-  if (coverageProfile === 'runtime') {
+  if (coverageProfile === "runtime") {
     return {
-      provider: 'v8' as const,
-      reporter: ['text', 'json', 'html'],
+      provider: "v8" as const,
+      reporter: ["text", "json", "html"],
       all: true,
       include: runtimeCoverageInclude,
       exclude: runtimeCoverageExclude,
@@ -65,26 +66,26 @@ function getCoverageConfig() {
   }
 
   return {
-    provider: 'v8' as const,
-    reporter: ['text', 'json', 'html'],
-    include: ['entrypoints/content/**/*.ts'],
-    exclude: ['**/*.d.ts', '**/node_modules/**'],
+    provider: "v8" as const,
+    reporter: ["text", "json", "html"],
+    include: ["entrypoints/content/**/*.ts"],
+    exclude: ["**/*.d.ts", "**/node_modules/**"],
   };
 }
 
 export default defineConfig({
   test: {
-    environment: 'jsdom',
+    environment: "jsdom",
     globals: true,
-    include: ['tests/**/*.test.ts'],
+    include: ["tests/**/*.test.ts"],
     testTimeout: 30000,
     hookTimeout: 30000,
     coverage: getCoverageConfig(),
-    setupFiles: ['./tests/setup.ts'],
+    setupFiles: ["./tests/setup.ts"],
   },
   resolve: {
     alias: {
-      '@': '/entrypoints/content',
+      "@": path.resolve(__dirname, "entrypoints/content"),
     },
   },
 });
