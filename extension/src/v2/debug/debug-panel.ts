@@ -18,7 +18,7 @@
  * The panel auto-refreshes every 5 seconds to show live data.
  * It does NOT affect flag detection or rendering — it's read-only.
  *
- * @author Adham — the debugging surface from plan2.md A5/D4
+ * @author Adham — the debugging surface from docs/plan2.md A5/D4
  * @since v4.0.0
  */
 

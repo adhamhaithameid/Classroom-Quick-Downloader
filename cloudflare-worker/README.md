@@ -5,7 +5,7 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
 ![Cloudflare Workers](https://img.shields.io/badge/Cloudflare_Workers-F38020?logo=cloudflare&logoColor=white)
 ![Durable Objects](https://img.shields.io/badge/Durable_Objects-Enabled-blueviolet)
-![Version](https://img.shields.io/badge/v1.0-stable-success)
+![Version](https://img.shields.io/badge/v3.0.0-success)
 
 The **CQD Analytics Worker** is a high-performance, edge-deployed analytics ingestion service for the Classroom Quick Downloader browser extension. Built on **Cloudflare Workers** and **Durable Objects**, it captures download events from thousands of users worldwide and intelligently batches them before forwarding to an Oracle backend.
 

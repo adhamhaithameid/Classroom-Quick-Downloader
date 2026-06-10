@@ -2724,7 +2724,7 @@ export default {
           JSON.stringify({
             ok: false,
             error: "legacy_changelog_disabled",
-            message: "Cloudflare changelog customization endpoints are disabled. Use manual/changelog sources.",
+            message: "Cloudflare changelog customization endpoints are disabled. Use data/changelog sources.",
           }),
           { status: 410, headers: { "content-type": "application/json; charset=utf-8" } },
         ),
