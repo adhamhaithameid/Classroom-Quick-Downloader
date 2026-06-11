@@ -32,10 +32,10 @@ jobs:
     name: Coverage — ${{ matrix.component.name }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v3
+        uses: pnpm/action-setup@v4
         with:
           version: 10.28.2
 

@@ -19,7 +19,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
 
       - name: Validate required GitHub secrets and variables
         env:
@@ -70,14 +70,14 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
 
       - name: Show deploy target
         run: |
           echo "Deploying Cloudflare Pages project: ${{ vars.CLOUDFLARE_PAGES_PROJECT_NAME }}"
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v3
+        uses: pnpm/action-setup@v4
         with:
           version: 10.28.2
 
