@@ -1,0 +1,5 @@
+## 2026-06-11 — [Implement v3 engine OAuth token retrieval and refresh with background service worker bridge and mutex]
+**Issue Filed:** Apex: implement v3 engine OAuth token retrieval and refresh with background service worker bridge and mutex
+**V3 State Assessment:** The v3 engine correctly delegates to v2 but stubs out API integration. API client logic and discovery exists in `extension/src/engines/v3/api`, but the entire pipeline is blocked because `token-provider.ts` incorrectly attempts to use `chrome.identity` in a content script environment where it is undefined.
+**Next Logical Step:** Once the OAuth token can be successfully retrieved by the content script via the background bridge, the next step will be to implement the full API response timeout mechanism to ensure all `fetch` requests in `classroom-api-client.ts` have proper `AbortController` timeouts before being wired to the real discovery endpoint.
+**Blockers Noticed:** Currently, the API Client layer (`classroom-api-client.ts`) and Discovery Service layer (`discovery-service.ts`) cannot be verified or used end-to-end without a working token provider.
