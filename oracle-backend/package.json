@@ -25,7 +25,7 @@
     "gosec": "\"$(go env GOPATH)/bin/gosec\" -track-suppressions ./..."
   },
   "devDependencies": {
-    "esbuild": "^0.28.0",
+    "esbuild": "^0.28.1",
     "typescript": "^6.0.2"
   }
 }
