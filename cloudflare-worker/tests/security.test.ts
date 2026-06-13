@@ -297,6 +297,30 @@ describe("Worker security helpers", () => {
     expect(ok).toBe(true);
     expect(mismatchSpy).not.toHaveBeenCalled();
   });
+
+  it("should use CF-Connecting-IP not X-Forwarded-For when both present for login attempts", async () => {
+    const { obj, state } = makeDO();
+
+    // We send a request with both CF-Connecting-IP and a forged X-Forwarded-For
+    const res = await callDO(obj, "/auth/login-attempt", {
+      success: false,
+    }, {
+      "CF-Connecting-IP": "1.2.3.4",
+      "X-Forwarded-For": "10.0.0.1",
+    });
+
+    expect(res.status).toBe(200);
+
+    // The Durable Object should key the login attempt by the real CF-Connecting-IP
+    const stored = await state.storage.get<StoredState>(STORAGE_KEY);
+    const attempts = stored?.loginAttempts as Record<string, { attempts: number, firstAttemptAt: number }> | undefined;
+
+    expect(attempts?.["1.2.3.4"]).toBeDefined();
+    expect(attempts?.["1.2.3.4"].attempts).toBe(1);
+
+    // The forged IP must be ignored
+    expect(attempts?.["10.0.0.1"]).toBeUndefined();
+  });
 });
 
 describe("public site metrics snapshot endpoint", () => {
