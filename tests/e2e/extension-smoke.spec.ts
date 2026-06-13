@@ -25,6 +25,7 @@
 
 import { test, expect, type BrowserContext, chromium } from '@playwright/test';
 import path from 'node:path';
+import fs from 'node:fs';
 
 const EXTENSION_PATH = path.resolve(__dirname, '../../extension/.output/chrome-mv3');
 
@@ -130,5 +131,33 @@ test.describe('Extension Smoke Tests', () => {
     expect(manifestText.length).toBeGreaterThan(0);
 
     await page.close();
+  });
+
+  test('extension injects download buttons on Classroom classwork material page fixture', async () => {
+    const fixturePath = path.resolve(__dirname, '../../extension/tests/fixtures/classroom/classwork-material-post-en.html');
+    const fixtureHtml = fs.readFileSync(fixturePath, 'utf8');
+
+    await context.route('https://classroom.google.com/c/course-1/a/work-1/details', async route => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/html',
+        body: fixtureHtml
+      });
+    });
+
+    const page = await context.newPage();
+    try {
+      await page.goto('https://classroom.google.com/c/course-1/a/work-1/details', { waitUntil: 'domcontentloaded' });
+
+      // Wait for extension to inject UI
+      const buttonSelector = '[data-cqd-injected="true"], button.cqd-download-btn';
+      await page.waitForSelector(buttonSelector, { timeout: 10000 });
+
+      const buttons = await page.$$(buttonSelector);
+      expect(buttons.length).toBeGreaterThan(0);
+    } finally {
+      await page.close();
+      await context.unroute('https://classroom.google.com/c/course-1/a/work-1/details');
+    }
   });
 });

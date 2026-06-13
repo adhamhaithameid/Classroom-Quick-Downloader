@@ -1,0 +1,4 @@
+## 2024-05-18 — Added e2e smoke test for download button injection
+**Gap Found:** No e2e test verified that the extension correctly loads and injects the download buttons on a Classroom page.
+**Tests Added/Improved:** Added a test in `tests/e2e/extension-smoke.spec.ts` that loads `classwork-material-post-en.html` locally using playwright route mocking, waits for the DOM to load, and ensures that `.cqd-download-btn` appears.
+**Learning:** For e2e testing of button injection using fixtures, use fixtures that contain actual downloadable drive links like `classwork-material-post-en.html` rather than structural fixtures like `assignment-details-en.html` which might not have drive links. Also, ensure a headless-compatible display server is active when running Playwright for Chrome extensions (`xvfb-run`).
