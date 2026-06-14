@@ -266,6 +266,7 @@ export default defineBackground(() => {
       if (looksLikeHtml && !userWantedHtml && pending.isDrive) {
         cancelledByUs.add(item.id);
         chrome.downloads.cancel(item.id, () => {
+          const _ = chrome.runtime.lastError;
           pendingByDownloadId.delete(item.id);
           if (!pending.htmlSeen) {
             pending.htmlSeen = true;
@@ -424,7 +425,8 @@ export default defineBackground(() => {
       cancelledByUs.add(downloadId);
       try {
         chrome.downloads.cancel(downloadId, () => {
-          chrome.downloads.erase({ id: downloadId }, () => {});
+          const _ = chrome.runtime.lastError;
+          chrome.downloads.erase({ id: downloadId }, () => { const _2 = chrome.runtime.lastError; });
         });
       } catch {}
     } else {
