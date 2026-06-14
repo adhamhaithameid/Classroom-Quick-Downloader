@@ -1,9 +1,11 @@
-1. **Fix missing try-catch around `chrome.storage.local.get/set` in `utils/changelog.ts`.**
-   - The methods `persistManualCache`, `markAsSeen`, and `isVersionSeen` perform `chrome.storage.local` operations but don't wrap them in `try/catch`. This can cause uncaught exceptions if `chrome.storage` is not available or throws errors (like quota exceeded).
-   - The fix is to add `try/catch` and safe default fallback behavior in case of errors.
-
-2. **Complete pre-commit steps to ensure proper testing, verification, review, and reflection are done.**
-   - Call `pre_commit_instructions` tool to run the required tests and checks.
-
-3. **Submit the PR.**
-   - Commit message: `Vault: add try/catch around storage operations in changelog utils`
+1. **Fix package.json overrides to resolve audit issues.**
+   - The CI failed because `pnpm audit` found vulnerabilities in `esbuild` and `shell-quote` inside `cloudflare-worker`.
+   - The memory states: `To resolve pnpm audit vulnerabilities across the monorepo workspaces, configure dependency version overrides within the pnpm.overrides object in the root package.json.`
+   - I will use `replace_with_git_merge_diff` to add `"esbuild": ">=0.28.1"` and `"shell-quote": ">=1.8.4"` to the `pnpm.overrides` block in the root `package.json`.
+2. **Verify changes.**
+   - Run `pnpm install` in the root.
+   - Run `cd cloudflare-worker && pnpm run audit` to ensure vulnerabilities are resolved.
+3. **Complete pre commit steps.**
+   - Complete pre-commit steps to ensure proper testing, verification, review, and reflection are done.
+4. **Submit the PR.**
+   - Commit message: `Vault: add try/catch around storage operations in changelog utils and fix audit issues`
