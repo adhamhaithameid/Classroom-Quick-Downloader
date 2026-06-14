@@ -10,6 +10,26 @@ import type {
 const CLASSROOM_API_BASE_URL = 'https://classroom.googleapis.com/v1';
 const DEFAULT_PAGE_SIZE = 200;
 
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit,
+  timeoutMs = 15000
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  if (options.signal) {
+    options.signal.addEventListener('abort', () => controller.abort());
+    if (options.signal.aborted) controller.abort();
+  }
+
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 interface GoogleClassroomStudentSubmissionResponse {
   studentSubmissions?: GoogleClassroomSubmission[];
   nextPageToken?: string;
@@ -125,7 +145,7 @@ export class GoogleClassroomApiClient implements ClassroomApiClient {
       }
       if (pageToken) requestUrl.searchParams.set('pageToken', pageToken);
 
-      const response = await fetch(requestUrl.toString(), {
+      const response = await fetchWithTimeout(requestUrl.toString(), {
         method: 'GET',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -136,7 +156,13 @@ export class GoogleClassroomApiClient implements ClassroomApiClient {
         return submissions;
       }
 
-      const payload = await response.json() as GoogleClassroomStudentSubmissionResponse;
+      let payload: GoogleClassroomStudentSubmissionResponse;
+      try {
+        payload = await response.json() as GoogleClassroomStudentSubmissionResponse;
+      } catch (err) {
+        break; // Stop parsing on malformed JSON, return what we have
+      }
+
       const batch = (payload.studentSubmissions || [])
         .map((submission) => mapSubmission(submission, context.authUser))
         .filter((submission): submission is ClassroomApiStudentSubmission => !!submission);
