@@ -144,4 +144,40 @@ describe('changelog utils (manual mode)', () => {
     expect(mod.getMatchingRule(cfg, '1.3.0')?.id).toBe('r1');
     expect(mod.getMatchingRule(cfg, '9.9.9')?.id).toBe('r2');
   });
+
+  it('gracefully handles storage read/write errors', async () => {
+    const mod = await loadChangelogModule();
+    const originalGet = chrome.storage.local.get;
+    const originalSet = chrome.storage.local.set;
+    chrome.storage.local.get = vi.fn().mockRejectedValue(new Error('Storage down'));
+    chrome.storage.local.set = vi.fn().mockRejectedValue(new Error('Quota exceeded'));
+
+    const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    // Should not throw
+    await mod.fetchChangelog(true);
+    expect(consoleSpy).toHaveBeenCalledWith(
+      '[CQD Changelog] Failed to save manual cache to storage:',
+      expect.any(Error)
+    );
+
+    consoleSpy.mockClear();
+    await mod.markAsSeen('1.3.8');
+    expect(consoleSpy).toHaveBeenCalledWith(
+      '[CQD Changelog] Failed to mark version as seen:',
+      expect.any(Error)
+    );
+
+    consoleSpy.mockClear();
+    const isSeen = await mod.isVersionSeen('1.3.8');
+    expect(isSeen).toBe(false);
+    expect(consoleSpy).toHaveBeenCalledWith(
+      '[CQD Changelog] Failed to check if version is seen:',
+      expect.any(Error)
+    );
+
+    consoleSpy.mockRestore();
+    chrome.storage.local.get = originalGet;
+    chrome.storage.local.set = originalSet;
+  });
 });
