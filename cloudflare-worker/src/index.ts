@@ -2176,13 +2176,16 @@ async function handleOraclePublicWebsiteProxy(request: Request, env: WorkerEnv):
     }
 
     const responseHeaders = new Headers({
-      "content-type": upstream.headers.get("content-type") || "application/json; charset=utf-8",
+      "content-type": upstream.ok ? (upstream.headers.get("content-type") || "application/json; charset=utf-8") : "application/json; charset=utf-8",
     });
     const cacheControl = upstream.headers.get("cache-control");
-    if (cacheControl) responseHeaders.set("cache-control", cacheControl);
+    if (cacheControl && upstream.ok) responseHeaders.set("cache-control", cacheControl);
+
+    const responseBody = upstream.ok ? body : JSON.stringify({ ok: false, error: "upstream_error" });
+
     return withCors(
       request,
-      new Response(body, {
+      new Response(responseBody, {
         status: upstream.status,
         headers: responseHeaders,
       }),
