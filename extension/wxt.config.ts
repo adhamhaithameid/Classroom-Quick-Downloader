@@ -30,7 +30,7 @@ export default defineConfig({
   manifest: {
     name: "Classroom Quick Downloader",
     short_name: "Classroom Quick Downloader",
-    homepage_url: "https://classroom-quick-downloader-website.pages.dev",
+    homepage_url: "https://classroom-quick-downloader.adhamhaithameid.is-a.dev/",
     permissions: [
       'downloads',
       'storage',
