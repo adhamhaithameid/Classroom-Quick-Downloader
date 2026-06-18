@@ -1,0 +1,3 @@
+## 2024-06-18 - [Add input labels to toggle row switches]
+**Learning:** React toggles built with `div` and custom `onClick` logic often fail to provide native semantic keyboard accessibility, even if `onKeyDown` handlers are added manually. Replacing the text container `div` with a `<label>` element and linking it to the underlying checkbox using `htmlFor` restores native functionality where clicking the label natively triggers the `<input>`.
+**Action:** Prioritize using `<label>` with `htmlFor` over custom clickable `div` wrappers for inputs to ensure native keyboard navigability and semantic correctness.
