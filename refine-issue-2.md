@@ -1,3 +1,6 @@
+---
+title: "Refine: website has 2 disabled .svelte pages — remove or restore with plan"
+---
 ## ✨ Refine — Tech Debt
 **Agent:** Refine | **Day:** Thursday | **Date:** 2026-06-18
 

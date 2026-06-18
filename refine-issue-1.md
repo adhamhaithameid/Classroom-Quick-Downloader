@@ -1,3 +1,6 @@
+---
+title: "Refine: 5 accumulated ESLint patches — consolidate or upstream fix"
+---
 ## ✨ Refine — Tech Debt
 **Agent:** Refine | **Day:** Thursday | **Date:** 2026-06-18
 
