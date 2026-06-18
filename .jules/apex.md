@@ -1,0 +1,5 @@
+## 2026-03-19 — [Implement v3 background service worker message relay for Chrome Identity API]
+**Issue Filed:** Apex: implement v3 background service worker message relay for Chrome Identity API
+**V3 State Assessment:** v3 engine structure exists but is heavily stubbed. `classroom-api-client.ts`, `discovery-service.ts`, `cache.ts`, and `route-context.ts` are present. `engine-v3.ts` correctly falls back to V2 for mutations, scanning, and data access. Layer 0 (OAuth token provider) is currently broken because it attempts to use `chrome.identity.getAuthToken` from a content script context where it is undefined, returning `null` immediately.
+**Next Logical Step:** Once the background worker relay is implemented, the next step is to update `classroom-api-client.ts` to implement rate limiting (handling 429 errors) and robust token refresh handling (when 401 is returned), ensuring that timeouts and AbortControllers are correctly implemented.
+**Blockers Noticed:** `classroom-api-client.ts` cannot be properly tested in a live environment until the `token-provider.ts` is fixed to relay requests to the background script.
