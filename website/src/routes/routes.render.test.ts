@@ -21,6 +21,19 @@ import { APP_VERSION, INDEXNOW_KEY, SITE_URL } from '$lib/config';
 import { GET as getRobotsTxt } from './robots.txt/+server';
 import { GET as getSitemapXml } from './sitemap.xml/+server';
 import { GET as getIndexNowKeyTxt } from './indexnow-key.txt/+server';
+import EmailsPage from './emails/+page.svelte';
+import Emails2Page from './emails2/+page.svelte';
+import FeaturedPage from './featured/+page.svelte';
+import PressKitPage from './press-kit/+page.svelte';
+import SupportPage from './support/+page.svelte';
+import InstallEdgePage from './install/edge/+page.svelte';
+import InstallFirefoxPage from './install/firefox/+page.svelte';
+import VirusWarningPage from './google-drive-cant-scan-virus-warning-download/+page.svelte';
+import WorkspaceSupportPage from './google-workspace-school-accounts-support/+page.svelte';
+import DownloadMaterialsFastPage from './download-google-classroom-materials-fast/+page.svelte';
+import CompareClassmatePage from './compare/classroom-quick-downloader-vs-classmate/+page.svelte';
+import CompareOneClickPage from './compare/classroom-quick-downloader-vs-classroom-one-click-downloader/+page.svelte';
+
 
 function squish(html: string): string {
   return html.replace(/\s+/g, ' ').trim();
@@ -280,4 +293,38 @@ describe('route render smoke coverage', () => {
     }
   });
 
+
+  it('renders remaining SEO and content pages', () => {
+    const featuredRender = render(FeaturedPage);
+    const pressKitRender = render(PressKitPage);
+    const supportRender = render(SupportPage);
+    const edgeRender = render(InstallEdgePage);
+    const firefoxRender = render(InstallFirefoxPage);
+    const virusRender = render(VirusWarningPage);
+    const workspaceRender = render(WorkspaceSupportPage);
+    const downloadFastRender = render(DownloadMaterialsFastPage);
+    const classmateRender = render(CompareClassmatePage);
+    const oneClickRender = render(CompareOneClickPage);
+
+    expect(featuredRender.head).toContain('/featured');
+    expect(pressKitRender.head).toContain('/press-kit');
+    expect(supportRender.head).toContain('/support');
+    expect(edgeRender.head).toContain('/install/edge');
+    expect(firefoxRender.head).toContain('/install/firefox');
+    expect(virusRender.head).toContain('/google-drive-cant-scan-virus-warning-download');
+    expect(workspaceRender.head).toContain('/google-workspace-school-accounts-support');
+    expect(downloadFastRender.head).toContain('/download-google-classroom-materials-fast');
+    expect(classmateRender.head).toContain('/compare/classroom-quick-downloader-vs-classmate');
+    expect(oneClickRender.head).toContain('/compare/classroom-quick-downloader-vs-classroom-one-click-downloader');
+  });
+
+  it('renders internal email preview routes with noindex metadata', () => {
+    const emailsRender = render(EmailsPage, { props: { data: { emailHeadStyles: 'body { color: red; }', emailBodyHtml: '<p>test</p>' } } });
+    const emails2Render = render(Emails2Page);
+
+    expect(emailsRender.head).toContain('/emails');
+    expect(squish(emailsRender.body)).toContain('<p>test</p>');
+
+    expect(emails2Render.head).toContain('/emails2');
+  });
 });
