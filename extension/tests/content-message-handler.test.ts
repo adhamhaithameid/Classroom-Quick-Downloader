@@ -178,6 +178,28 @@ describe('content message handler', () => {
     expect(ctx.setPillProgressSpy).toHaveBeenCalledWith(button, 0);
   });
 
+  it('handles unknown message types gracefully by returning undefined/void', async () => {
+    const ctx = await loadMessageHandler(true);
+    ctx.mod.setupMessageListeners();
+    const listener = ctx.getListener();
+    expect(listener).toBeTruthy();
+
+    // Unknown message type - shouldn't throw, and currently returns undefined
+    const result1 = listener?.({ type: 'UNKNOWN_MESSAGE_TYPE' }, {}, vi.fn());
+    expect(result1).toBeUndefined();
+  });
+
+  it('handles empty messages gracefully by returning undefined/void', async () => {
+    const ctx = await loadMessageHandler(true);
+    ctx.mod.setupMessageListeners();
+    const listener = ctx.getListener();
+    expect(listener).toBeTruthy();
+
+    // Empty message
+    const result2 = listener?.(null, {}, vi.fn());
+    expect(result2).toBeUndefined();
+  });
+
   it('ignores interrupted/error overwrite when button is already cancelled', async () => {
     const ctx = await loadMessageHandler(true);
     ctx.mod.setupMessageListeners();
