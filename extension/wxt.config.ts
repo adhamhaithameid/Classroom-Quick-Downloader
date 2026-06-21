@@ -1,6 +1,5 @@
 // filepath: extension/wxt.config.ts
 import { defineConfig } from 'wxt';
-
 const LOCAL_DEV_ORIGINS = ['http://localhost:3000', 'http://localhost:3001'];
 const LOCAL_DEV_SOCKETS = ['ws://localhost:3000', 'ws://localhost:3001'];
 const isDevelopment = process.env.NODE_ENV !== 'production';
@@ -10,7 +9,6 @@ const devConnectSources = isDevelopment
 const devImageSources = isDevelopment
   ? ` ${LOCAL_DEV_ORIGINS.join(' ')}`
   : '';
-
 // the runner should be webExt
 export default defineConfig({
   webExt: {
@@ -41,7 +39,6 @@ export default defineConfig({
       'https://drive.google.com/*',
       'https://classroom.google.com/*',
       'https://drive.usercontent.google.com/*',
-      'https://accounts.google.com/*',
       'https://cqd-analytics.adhamhaithameid.workers.dev/*',
       'https://oracle.classroom-quick-downloader.com/*',
     ],
