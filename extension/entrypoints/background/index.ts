@@ -110,8 +110,15 @@ export default defineBackground(() => {
   });
 
   // Memory leak prevention: periodic cleanup
-  setInterval(cleanupOrphanedPendingDownloads, CLEANUP_INTERVAL_MS);
-  setTimeout(cleanupOrphanedPendingDownloads, 60 * 1000);
+  chrome.alarms.create('CQD_CLEANUP_ORPHANS', {
+    delayInMinutes: 1,
+    periodInMinutes: Math.max(1, Math.floor(CLEANUP_INTERVAL_MS / 60000))
+  });
+  chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === 'CQD_CLEANUP_ORPHANS') {
+      cleanupOrphanedPendingDownloads();
+    }
+  });
 
   // Create icon update closures
   const { updateTabIcon, updateGlobalIcon } = createIconUpdaters();
@@ -403,7 +410,8 @@ export default defineBackground(() => {
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (sender.id !== chrome.runtime.id) return false;
     if (!message || message.type !== 'CQD_DOWNLOAD') return false;
-    return handleDownloadRequest(message, sender, sendResponse);
+    handleDownloadRequest(message, sender, sendResponse);
+    return true; // Keep message channel open for async response
   });
 
   // 5) CQD_CANCEL_DOWNLOAD handler
