@@ -125,18 +125,53 @@ export class GoogleClassroomApiClient implements ClassroomApiClient {
       }
       if (pageToken) requestUrl.searchParams.set('pageToken', pageToken);
 
-      const response = await fetch(requestUrl.toString(), {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        signal,
-      });
-      if (!response.ok) {
-        return submissions;
+      let response: Response;
+      const controller = new AbortController();
+      // Set a 15-second timeout for the API call
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+      const abortHandler = () => controller.abort();
+      if (signal) {
+        if (signal.aborted) {
+          controller.abort();
+        } else {
+          signal.addEventListener('abort', abortHandler);
+        }
       }
 
-      const payload = await response.json() as GoogleClassroomStudentSubmissionResponse;
+      try {
+        response = await fetch(requestUrl.toString(), {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeoutId);
+        if (signal) signal.removeEventListener('abort', abortHandler);
+      }
+
+      if (response.status === 401) {
+        throw new Error('Classroom API error: 401 Unauthorized - token expired or invalid');
+      }
+      if (response.status === 403) {
+        throw new Error('Classroom API error: 403 Forbidden - insufficient permissions');
+      }
+      if (response.status === 429) {
+        throw new Error('Classroom API error: 429 Rate Limited - quota exceeded');
+      }
+      if (!response.ok) {
+        throw new Error(`Classroom API error: ${response.status}`);
+      }
+
+      let payload: GoogleClassroomStudentSubmissionResponse;
+      try {
+        payload = await response.json() as GoogleClassroomStudentSubmissionResponse;
+      } catch (error) {
+        throw new Error('Classroom API error: Failed to parse JSON response');
+      }
+
       const batch = (payload.studentSubmissions || [])
         .map((submission) => mapSubmission(submission, context.authUser))
         .filter((submission): submission is ClassroomApiStudentSubmission => !!submission);
