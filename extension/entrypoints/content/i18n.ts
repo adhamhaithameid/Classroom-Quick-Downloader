@@ -3183,6 +3183,9 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: 'Runtime nije dostupan',
     startError: 'Nije moguće pokrenuti.',
     commError: 'Greška u komunikaciji.',
+    cancel: 'Cancel', // TODO: translate to Serbian Latin
+    cancelled: 'Cancelled', // TODO: translate to Serbian Latin
+    cancelAll: 'Cancel All', // TODO: translate to Serbian Latin
   },
   // === ASIAN / PACIFIC LANGUAGES ===
   ay: { // Aymara
