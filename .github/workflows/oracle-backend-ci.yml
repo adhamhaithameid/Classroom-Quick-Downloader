@@ -19,6 +19,7 @@ jobs:
   oracle-tests:
     name: Oracle Backend Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - uses: actions/checkout@v4
@@ -58,6 +59,7 @@ jobs:
   oracle-migrations:
     name: Oracle Migration Bootstrap
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     services:
       postgres:
         image: postgres:16
@@ -109,6 +111,7 @@ jobs:
   oracle-runtime-smoke:
     name: Oracle Runtime API Matrix
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - uses: actions/checkout@v4
@@ -182,6 +185,7 @@ jobs:
   oracle-security:
     name: Oracle Security Scan
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - uses: actions/checkout@v4
