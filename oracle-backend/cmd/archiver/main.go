@@ -136,6 +136,21 @@ func buildSummaryURLForDay(baseURL, day string) (string, error) {
 	return parsed.String(), nil
 }
 
+// resolveHost is a package-level variable so tests can stub DNS without real
+// network calls. Production code always uses net.LookupIP.
+var resolveHost = func(host string) ([]net.IP, error) {
+	return net.LookupIP(host)
+}
+
+// localhostHosts is the set of hostnames that map unambiguously to the local
+// machine. The archiver runs on the same VM as the Oracle backend and connects
+// to it over localhost by default, so http:// is permitted for these hosts.
+var localhostHosts = map[string]bool{
+	"localhost": true,
+	"127.0.0.1": true,
+	"::1":       true,
+}
+
 func parseAndValidateOutboundURL(raw string) (string, error) {
 	v := strings.TrimSpace(raw)
 	if v == "" {
@@ -145,23 +160,36 @@ func parseAndValidateOutboundURL(raw string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if u.Scheme != "https" {
-		return "", fmt.Errorf("only https:// URLs are permitted, got: %s", u.Scheme)
-	}
+
 	host := strings.TrimSpace(u.Hostname())
 	if host == "" {
 		return "", errors.New("missing url host")
 	}
 
-	// Prevent SSRF: Validate resolved IPs against private ranges
-	ips, err := net.LookupIP(host)
-	if err != nil {
-		return "", fmt.Errorf("cannot resolve hostname: %w", err)
-	}
-	for _, ip := range ips {
-		if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsUnspecified() {
-			return "", errors.New("URL resolves to a private/internal address — blocked")
+	switch u.Scheme {
+	case "https":
+		// Full SSRF guard for remote URLs: resolve and reject any private/internal IP.
+		ips, err := resolveHost(host)
+		if err != nil {
+			return "", fmt.Errorf("cannot resolve hostname: %w", err)
 		}
+		if len(ips) == 0 {
+			return "", errors.New("hostname did not resolve to any IP address")
+		}
+		for _, ip := range ips {
+			if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() ||
+				ip.IsUnspecified() || ip.IsMulticast() {
+				return "", errors.New("URL resolves to a private/internal address — blocked")
+			}
+		}
+	case "http":
+		// http:// is only permitted for explicit localhost connections
+		// (same-VM Oracle backend). All other http:// targets are rejected.
+		if !localhostHosts[host] {
+			return "", fmt.Errorf("http:// is only permitted for localhost; use https:// for %q", host)
+		}
+	default:
+		return "", fmt.Errorf("unsupported URL scheme %q; use https:// (or http://localhost for local use)", u.Scheme)
 	}
 
 	return u.String(), nil
@@ -217,7 +245,14 @@ func main() {
 		req.Header.Set("X-Archiver-Secret", *secret)
 	}
 
-	httpClient := &http.Client{Timeout: 15 * time.Second}
+	httpClient := &http.Client{
+		Timeout: 15 * time.Second,
+		// Never follow redirects: a validated URL that issues a 3xx to an
+		// internal address would bypass the SSRF guard above.
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
 	// #nosec G107,G704 -- URL is validated by parseAndValidateOutboundURL before request creation.
 	resp, err := httpClient.Do(req)
 	if err != nil {
