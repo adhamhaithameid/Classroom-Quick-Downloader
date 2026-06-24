@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { afterNavigate } from '$app/navigation';
   import { base } from '$app/paths';
   import { page } from '$app/stores';
   import logo from '$lib/assets/cqd-logo.svg';
@@ -118,6 +119,15 @@
     mobileNavOpen = false;
   }
 
+  afterNavigate(() => {
+    if (typeof document !== 'undefined') {
+      const mainContent = document.querySelector('#main-content');
+      if (mainContent) {
+        (mainContent as HTMLElement).focus();
+      }
+    }
+  });
+
   onMount(() => {
     detectedBrowser = detectBrowserFromNavigator();
     hideChrome = new URLSearchParams(window.location.search).has('embed');
@@ -151,6 +161,7 @@
 <LoadingScreen />
 
 <div class="site-shell" class:o2-fullscreen={hideChrome}>
+  <a href="#main-content" class="skip-nav">Skip to main content</a>
   {#if !hideChrome}
   <header class="l2-nav-shell">
     <div class="l2-nav-inner l2-nav-fullwidth">
@@ -238,6 +249,8 @@
   {/if}
 
   <main
+    id="main-content"
+    tabindex="-1"
     class:site-main={!isOverviewStyleRoute && !hideChrome}
     class:site-main-overview-style={isOverviewStyleRoute && !hideChrome}
     class:l2-wrap={!isOverviewStyleRoute && !hideChrome}
@@ -279,9 +292,27 @@
 </div>
 
 <style>
+  .skip-nav {
+    position: absolute;
+    top: -100%;
+    left: 0;
+    padding: 0.5rem 1rem;
+    background: var(--gc-green);
+    color: white;
+    z-index: 999;
+    text-decoration: none;
+  }
+  .skip-nav:focus {
+    top: 0;
+  }
+
   main {
     flex: 1;
     min-height: 0;
+  }
+
+  #main-content:focus:not(:focus-visible) {
+    outline: none;
   }
 
   .site-shell {
