@@ -137,6 +137,16 @@ describe('Download All Renderer: UI Updates', () => {
     document.body.innerHTML = '';
   });
 
+  it('updateDownloadAllUI sets idle state correctly', () => {
+    const btn = mockDownloadAllButton();
+    document.body.appendChild(btn);
+
+    const progress = createProgress(3);
+    updateDownloadAllUI(btn, progress);
+
+    expect(btn.getAttribute('aria-label')).toBe('Download all 3 files');
+  });
+
   it('updateDownloadAllUI sets loading state', () => {
     const btn = mockDownloadAllButton();
     document.body.appendChild(btn);
@@ -152,6 +162,7 @@ describe('Download All Renderer: UI Updates', () => {
     expect(btn.disabled).toBe(true);
     expect(btn.querySelector('.cqd-v2-label')!.textContent).toBe('Downloading');
     expect(btn.querySelector('.cqd-v2-count')!.textContent).toBe('1/3');
+    expect(btn.getAttribute('aria-label')).toBe('Downloading files: 1 of 3 complete');
   });
 
   it('updateDownloadAllUI sets success state', () => {
@@ -167,6 +178,7 @@ describe('Download All Renderer: UI Updates', () => {
     expect(btn.classList.contains('cqd-success')).toBe(true);
     expect(btn.disabled).toBe(true);
     expect(btn.querySelector('.cqd-v2-label')!.textContent).toBe('Downloaded');
+    expect(btn.getAttribute('aria-label')).toBe('Successfully downloaded all 3 files');
   });
 
   it('updateDownloadAllUI sets error state', () => {
@@ -183,6 +195,7 @@ describe('Download All Renderer: UI Updates', () => {
     expect(btn.disabled).toBe(true);
     expect(btn.querySelector('.cqd-v2-label')!.textContent).toBe('Failed');
     expect(btn.querySelector('.cqd-v2-count')!.textContent).toBe('3');
+    expect(btn.getAttribute('aria-label')).toBe('Failed to download 3 files');
   });
 
   it('updateDownloadAllUI sets partial state', () => {
@@ -200,6 +213,7 @@ describe('Download All Renderer: UI Updates', () => {
     expect(btn.disabled).toBe(true);
     expect(btn.querySelector('.cqd-v2-label')!.textContent).toBe('Partial');
     expect(btn.querySelector('.cqd-v2-count')!.textContent).toBe('2/3');
+    expect(btn.getAttribute('aria-label')).toBe('Partially downloaded: 2 successful, 1 failed of 3 files');
   });
 
   it('updateDownloadAllUI sets cancelled state', () => {
@@ -216,6 +230,7 @@ describe('Download All Renderer: UI Updates', () => {
     expect(btn.disabled).toBe(true);
     expect(btn.querySelector('.cqd-v2-label')!.textContent).toBe('Cancelled');
     expect(btn.querySelector('.cqd-v2-count')!.textContent).toBe('1/3');
+    expect(btn.getAttribute('aria-label')).toBe('Download cancelled. 1 of 3 files downloaded');
   });
 
   it('updateDownloadAllUI clears previous state classes', () => {

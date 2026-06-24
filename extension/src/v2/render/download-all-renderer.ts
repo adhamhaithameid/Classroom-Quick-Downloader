@@ -151,6 +151,7 @@ export function updateDownloadAllUI(
       button.disabled = false;
       if (label) label.textContent = 'Download All';
       if (countEl) countEl.textContent = String(progress.total);
+      button.setAttribute('aria-label', `Download all ${progress.total} files`);
       break;
 
     case 'downloading':
@@ -158,6 +159,7 @@ export function updateDownloadAllUI(
       button.classList.add('cqd-loading');
       if (label) label.textContent = `Downloading`;
       if (countEl) countEl.textContent = `${progress.completed}/${progress.total}`;
+      button.setAttribute('aria-label', `Downloading files: ${progress.completed} of ${progress.total} complete`);
       break;
 
     case 'success':
@@ -165,6 +167,7 @@ export function updateDownloadAllUI(
       button.classList.add('cqd-success');
       if (label) label.textContent = 'Downloaded';
       if (countEl) countEl.textContent = `${progress.total}`;
+      button.setAttribute('aria-label', `Successfully downloaded all ${progress.total} files`);
       break;
 
     case 'error':
@@ -172,6 +175,7 @@ export function updateDownloadAllUI(
       button.classList.add('cqd-error');
       if (label) label.textContent = 'Failed';
       if (countEl) countEl.textContent = `${progress.failed}`;
+      button.setAttribute('aria-label', `Failed to download ${progress.failed} files`);
       break;
 
     case 'partial':
@@ -179,6 +183,7 @@ export function updateDownloadAllUI(
       button.classList.add('cqd-error');
       if (label) label.textContent = 'Partial';
       if (countEl) countEl.textContent = `${progress.completed}/${progress.total}`;
+      button.setAttribute('aria-label', `Partially downloaded: ${progress.completed} successful, ${progress.failed} failed of ${progress.total} files`);
       break;
 
     case 'cancelled':
@@ -186,6 +191,7 @@ export function updateDownloadAllUI(
       button.classList.add('cqd-cancelled');
       if (label) label.textContent = 'Cancelled';
       if (countEl) countEl.textContent = `${progress.completed}/${progress.total}`;
+      button.setAttribute('aria-label', `Download cancelled. ${progress.completed} of ${progress.total} files downloaded`);
       break;
   }
 }
