@@ -420,9 +420,9 @@ Use this table when validating smoke checks.
 | Check | Command Pattern | Expected Result |
 |------|------------------|-----------------|
 | Worker health | `curl -fsS $WORKER_BASE/health` | HTTP `200`, JSON `ok=true` |
-| Oracle health | `curl -fsS $ORACLE_BASE/health` | HTTP `200`, JSON `ok=true` |
-| Worker auth gate | `curl -i $WORKER_BASE/admin/website/status` | HTTP `401` or `403` |
-| Oracle auth gate | `curl -i $ORACLE_BASE/api/admin/website/state` | HTTP `401` or `403` |
+| Oracle health | `curl -fsS $ORACLE_BASE_URL/health` | HTTP `200`, JSON `ok=true` |
+| Worker auth gate | `curl -i $WORKER_BASE_URL/admin/website/status` | HTTP `401` or `403` |
+| Oracle auth gate | `curl -i $ORACLE_BASE_URL/api/admin/website/state` | HTTP `401` or `403` |
 | Public snapshot | `curl -fsS $WORKER_BASE/api/public/website/snapshot` | includes `schemaVersion: \"1\"` |
 | Public ingest | `POST /api/public/website/events` | JSON `ok=true` |
 
