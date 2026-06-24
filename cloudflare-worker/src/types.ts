@@ -416,11 +416,6 @@ export interface Env {
    * If configured, access identity email must match one of these entries.
    */
   CLOUDFLARE_ACCESS_EMAIL_ALLOWLIST?: string;
-  /**
-   * Optional feature flag for queue-first website event pipeline on free plan.
-   * Default false.
-   */
-  ENABLE_SITE_QUEUE_PIPELINE?: string;
 }
 
 export interface WebsiteConsoleSummaryResponse {
