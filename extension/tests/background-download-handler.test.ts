@@ -50,7 +50,8 @@ function installChromeMocks() {
   (chrome.runtime as { lastError?: { message: string } }).lastError = undefined;
   chrome.downloads = {
     download: vi.fn(),
-    cancel: vi.fn(),
+    cancel: vi.fn((_id: number, cb?: () => void) => cb?.()),
+    erase: vi.fn((_filter: object, cb?: () => void) => cb?.()),
   } as never;
   chrome.tabs = {
     create: vi.fn(),

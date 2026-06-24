@@ -45,7 +45,10 @@ const mockChrome = {
   },
   downloads: {
     download: vi.fn(),
-    cancel: vi.fn(),
+    // Invoke callback immediately so tests cover the lastError-suppression
+    // callbacks added to cancel/erase calls without needing per-test overrides.
+    cancel: vi.fn((_id: number, cb?: () => void) => cb?.()),
+    erase: vi.fn((_filter: object, cb?: () => void) => cb?.()),
     onDeterminingFilename: { addListener: vi.fn() },
     onCreated: { addListener: vi.fn() },
     onChanged: { addListener: vi.fn() },
