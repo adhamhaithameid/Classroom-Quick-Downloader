@@ -476,7 +476,7 @@ describe('background download handler', () => {
       sendResponse,
     );
 
-    expect(chrome.downloads.cancel).toHaveBeenCalledWith(404);
+    expect(chrome.downloads.cancel).toHaveBeenCalledWith(404, expect.any(Function));
     expect(ctx.cleanupSpy).toHaveBeenCalledWith(expect.objectContaining({ requestId: 'req-race' }), 404);
   });
 
