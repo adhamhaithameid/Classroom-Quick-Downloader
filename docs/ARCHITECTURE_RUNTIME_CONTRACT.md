@@ -102,7 +102,7 @@ Contract rules:
 
 ## 5.1 Worker -> Oracle telemetry flush
 
-- daily flush target: `23:00 UTC`
+- flush cadence: every 3 hours at UTC hours `[1,4,7,10,13,16,19,22]`
 - if flush fails, retry with backoff and jitter
 - failed exhausted batches move to dead-letter queue state
 
