@@ -136,22 +136,25 @@ func buildSummaryURLForDay(baseURL, day string) (string, error) {
 	return parsed.String(), nil
 }
 
-// resolveHost is a package-level variable so tests can stub DNS without real
-// network calls. Production code always uses net.LookupIP.
-var resolveHost = func(host string) ([]net.IP, error) {
-	return net.LookupIP(host)
-}
-
 // localhostHosts is the set of hostnames that map unambiguously to the local
 // machine. The archiver runs on the same VM as the Oracle backend and connects
-// to it over localhost by default, so http:// is permitted for these hosts.
+// to it over localhost by default, so http:// is permitted for these hosts only.
 var localhostHosts = map[string]bool{
 	"localhost": true,
 	"127.0.0.1": true,
 	"::1":       true,
 }
 
+// parseAndValidateOutboundURL validates raw as a permitted outbound URL.
+// DNS resolution uses net.LookupIP. Tests should call validateOutboundURL
+// directly with a stub resolver instead of swapping a package-level variable.
 func parseAndValidateOutboundURL(raw string) (string, error) {
+	return validateOutboundURL(raw, net.LookupIP)
+}
+
+// validateOutboundURL is the testable core of parseAndValidateOutboundURL.
+// resolve is called only for https:// URLs; tests pass a stub to avoid real DNS.
+func validateOutboundURL(raw string, resolve func(string) ([]net.IP, error)) (string, error) {
 	v := strings.TrimSpace(raw)
 	if v == "" {
 		return "", errors.New("empty url")
@@ -169,7 +172,7 @@ func parseAndValidateOutboundURL(raw string) (string, error) {
 	switch u.Scheme {
 	case "https":
 		// Full SSRF guard for remote URLs: resolve and reject any private/internal IP.
-		ips, err := resolveHost(host)
+		ips, err := resolve(host)
 		if err != nil {
 			return "", fmt.Errorf("cannot resolve hostname: %w", err)
 		}
