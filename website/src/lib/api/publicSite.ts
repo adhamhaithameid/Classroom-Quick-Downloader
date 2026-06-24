@@ -508,13 +508,13 @@ function buildFallbackPrivacy(): SnapshotResponse['privacy'] {
 }
 
 async function fetchCompositeSnapshotFromPublicEndpoints(): Promise<SnapshotResponse> {
-  const [overviewRaw, mapRaw] = await Promise.all([
+  const [overviewRaw, mapRaw, changelog] = await Promise.all([
     fetchOracleJSON('/api/public/website/overview'),
-    fetchOracleJSON('/api/public/website/map')
+    fetchOracleJSON('/api/public/website/map'),
+    fetchUserChangelog()
   ]);
   const overview = coerceOverviewPayload(overviewRaw);
   const map = coerceMapPayload(mapRaw);
-  const changelog = await fetchUserChangelog();
   const generatedAt = Math.max(overview.generatedAt, map.generatedAt, changelog.generatedAt, Date.now());
   const summary: SnapshotResponse['userChangelogSummary'] = {
     headline: changelog.headline,
