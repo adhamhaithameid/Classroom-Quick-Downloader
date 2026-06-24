@@ -693,6 +693,26 @@ describe("Durable Object security behaviors", () => {
     expect(payload.allowed).toBe(false);
   });
 
+  it("should use CF-Connecting-IP not X-Forwarded-For when both present for login attempts", async () => {
+    const { obj, state } = makeDO();
+
+    const res = await callDO(obj, "/auth/login-attempt", {
+      success: false,
+    }, {
+      "CF-Connecting-IP": "1.2.3.4",
+      "X-Forwarded-For": "10.0.0.1",
+    });
+
+    expect(res.status).toBe(200);
+
+    const stored = await state.storage.get<StoredState>(STORAGE_KEY);
+    const attempts = stored?.loginAttempts as Record<string, { attempts: number, firstAttemptAt: number }> | undefined;
+
+    expect(attempts?.["1.2.3.4"]).toBeDefined();
+    expect(attempts?.["1.2.3.4"].attempts).toBe(1);
+    expect(attempts?.["10.0.0.1"]).toBeUndefined();
+  });
+
   it("rejects login attempts without admin secret", async () => {
     const { obj } = makeDO();
     const res = await callDOWithoutAdmin(obj, "/auth/login-attempt", {
