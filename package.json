@@ -42,13 +42,14 @@
     "prepare": "husky"
   },
   "_meta": {
-    "removed-deps": "@playwright/test ^1.59.1 and playwright ^1.59.1 were unused (2026-02-28)"
+    "removed-deps": "@playwright/test ^1.59.1 and playwright ^1.59.1 were unused (2026-02-28)",
+    "security-overrides": "shell-quote pinned to 1.8.4 (2026-06-24, CRITICAL CVE: newline escape bypass)"
   },
   "pnpm": {
     "overrides": {
       "@commitlint/config-validator>ajv": "8.18.0",
       "eslint>ajv": "8.18.0",
-      "undici": "^7.24.0",
+      "undici": "^7.28.0",
       "@isaacs/brace-expansion": ">=5.0.1",
       "minimatch": "^10.2.3",
       "rollup": "^4.59.0",
@@ -59,7 +60,7 @@
       "picomatch@4.0.3": "4.0.4",
       "devalue": "^5.8.1",
       "defu": "^6.1.5",
-      "vite": "^8.0.5",
+      "vite": "^8.0.16",
       "cookie": "0.7.2",
       "flatted": ">=3.4.2",
       "uuid": ">=14.0.0",
