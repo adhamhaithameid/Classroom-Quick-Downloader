@@ -8,7 +8,7 @@ import type { PendingDownload } from './types';
 import {
   pendingByRequestId,
   pendingByDownloadId,
-  pendingByUrl,
+  pendingByUrlRemove,
   pendingByBypassTabId,
   cancelledByUs,
   recentDownloads,
@@ -24,9 +24,7 @@ export function cleanup(pending: PendingDownload, downloadId?: number): void {
     pendingByDownloadId.delete(downloadId);
     cancelledByUs.delete(downloadId);
   }
-  for (const [url, p] of pendingByUrl.entries()) {
-    if (p.requestId === pending.requestId) pendingByUrl.delete(url);
-  }
+  pendingByUrlRemove(pending);
   for (const [tabId, p] of pendingByBypassTabId.entries()) {
     if (p.requestId === pending.requestId) {
       pendingByBypassTabId.delete(tabId);

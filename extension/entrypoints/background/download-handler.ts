@@ -8,7 +8,7 @@ import type { PendingDownload } from './types';
 import {
   pendingByRequestId,
   pendingByDownloadId,
-  pendingByUrl,
+  pendingByUrlAdd,
   pendingByBypassTabId,
   AUTHUSER_CANDIDATES,
   IS_FIREFOX,
@@ -169,7 +169,7 @@ export function handleDownloadRequest(
   }
 
   pendingByRequestId.set(requestId, pending);
-  pendingByUrl.set(baseUrl, pending);
+  pendingByUrlAdd(baseUrl, pending);
 
   let responseSent = false;
   const respondOnce = (payload: any) => {

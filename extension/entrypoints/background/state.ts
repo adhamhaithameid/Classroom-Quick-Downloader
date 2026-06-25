@@ -14,8 +14,37 @@ export const pendingByRequestId = new Map<string, PendingDownload>();
 /** Map browser download ID to pending download */
 export const pendingByDownloadId = new Map<number, PendingDownload>();
 
-/** Map URL to pending download (for matching responses) */
-export const pendingByUrl = new Map<string, PendingDownload>();
+/** Map URL to the set of pending downloads registered under it (supports concurrent same-URL downloads) */
+export const pendingByUrl = new Map<string, Set<PendingDownload>>();
+
+/** Register a pending download under a URL. */
+export function pendingByUrlAdd(url: string, pending: PendingDownload): void {
+  let bucket = pendingByUrl.get(url);
+  if (!bucket) {
+    bucket = new Set();
+    pendingByUrl.set(url, bucket);
+  }
+  bucket.add(pending);
+}
+
+/** Remove a pending download from every URL bucket it occupies. Deletes empty buckets. */
+export function pendingByUrlRemove(pending: PendingDownload): void {
+  for (const [url, bucket] of pendingByUrl.entries()) {
+    if (bucket.delete(pending) && bucket.size === 0) {
+      pendingByUrl.delete(url);
+    }
+  }
+}
+
+/** Look up a pending download by URL. Prefers entries not yet assigned a browser download ID. */
+export function pendingByUrlGet(url: string): PendingDownload | undefined {
+  const bucket = pendingByUrl.get(url);
+  if (!bucket || bucket.size === 0) return undefined;
+  for (const p of bucket) {
+    if (p.currentDownloadId == null) return p;
+  }
+  return bucket.values().next().value as PendingDownload;
+}
 
 /** Map bypass tab ID to pending download */
 export const pendingByBypassTabId = new Map<number, PendingDownload>();
