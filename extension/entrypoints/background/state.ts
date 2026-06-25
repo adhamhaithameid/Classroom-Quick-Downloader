@@ -36,14 +36,18 @@ export function pendingByUrlRemove(pending: PendingDownload): void {
   }
 }
 
-/** Look up a pending download by URL. Prefers entries not yet assigned a browser download ID. */
+/**
+ * Look up a pending download by URL. Prefers entries not yet assigned a browser download ID.
+ * Returns undefined when all entries already have IDs — they are findable via pendingByDownloadId
+ * and should not be re-claimed for an unrelated download.
+ */
 export function pendingByUrlGet(url: string): PendingDownload | undefined {
   const bucket = pendingByUrl.get(url);
   if (!bucket || bucket.size === 0) return undefined;
   for (const p of bucket) {
     if (p.currentDownloadId == null) return p;
   }
-  return bucket.values().next().value as PendingDownload;
+  return undefined;
 }
 
 /** Map bypass tab ID to pending download */

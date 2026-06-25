@@ -245,7 +245,7 @@ export default defineBackground(() => {
       if (!pending) {
         pending = pendingByUrlGet(item.url) ?? pendingByUrlGet(item.finalUrl || item.url);
         if (pending) {
-          pending.currentDownloadId = item.id;
+          if (pending.currentDownloadId == null) pending.currentDownloadId = item.id;
           pendingByDownloadId.set(item.id, pending);
         }
       }
