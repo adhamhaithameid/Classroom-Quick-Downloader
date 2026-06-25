@@ -6,6 +6,7 @@ import {
   pendingByDownloadId,
   pendingByRequestId,
   pendingByUrl,
+  pendingByUrlAdd,
   recentDownloads,
   PENDING_DOWNLOAD_TTL_MS,
 } from '../entrypoints/background/state';
@@ -44,7 +45,7 @@ describe('background cleanup', () => {
     const pending = makePending();
     pendingByRequestId.set(pending.requestId, pending);
     pendingByDownloadId.set(9, pending);
-    pendingByUrl.set('https://example.com/file.pdf', pending);
+    pendingByUrlAdd('https://example.com/file.pdf', pending);
     pendingByBypassTabId.set(21, pending);
     cancelledByUs.add(9);
 

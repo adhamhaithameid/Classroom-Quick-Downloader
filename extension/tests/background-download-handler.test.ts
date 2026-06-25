@@ -16,10 +16,13 @@ type TestContext = {
   stateModule: {
     pendingByRequestId: Map<string, PendingDownload>;
     pendingByDownloadId: Map<number, PendingDownload>;
-    pendingByUrl: Map<string, PendingDownload>;
+    pendingByUrl: Map<string, Set<PendingDownload>>;
     pendingByBypassTabId: Map<number, PendingDownload>;
     AUTHUSER_CANDIDATES: number[];
     IS_FIREFOX: boolean;
+    pendingByUrlAdd: (url: string, pending: PendingDownload) => void;
+    pendingByUrlRemove: ReturnType<typeof vi.fn>;
+    pendingByUrlGet: (url: string) => PendingDownload | undefined;
   };
   cleanupSpy: ReturnType<typeof vi.fn>;
   sendStatusSpy: ReturnType<typeof vi.fn>;
@@ -62,13 +65,26 @@ function installChromeMocks() {
 async function loadDownloadHandler(options: LoadOptions = {}): Promise<TestContext> {
   vi.resetModules();
 
+  const pendingByUrl = new Map<string, Set<PendingDownload>>();
   const stateModule = {
     pendingByRequestId: new Map<string, PendingDownload>(),
     pendingByDownloadId: new Map<number, PendingDownload>(),
-    pendingByUrl: new Map<string, PendingDownload>(),
+    pendingByUrl,
     pendingByBypassTabId: new Map<number, PendingDownload>(),
     AUTHUSER_CANDIDATES: options.authCandidates ?? [0, 1, 2],
     IS_FIREFOX: options.isFirefox ?? false,
+    pendingByUrlAdd: (url: string, pending: PendingDownload) => {
+      let bucket = pendingByUrl.get(url);
+      if (!bucket) { bucket = new Set(); pendingByUrl.set(url, bucket); }
+      bucket.add(pending);
+    },
+    pendingByUrlRemove: vi.fn(),
+    pendingByUrlGet: (url: string) => {
+      const bucket = pendingByUrl.get(url);
+      if (!bucket || bucket.size === 0) return undefined;
+      for (const p of bucket) { if (p.currentDownloadId == null) return p; }
+      return bucket.values().next().value as PendingDownload | undefined;
+    },
   };
 
   const cleanupSpy = vi.fn();
@@ -562,5 +578,84 @@ describe('background download handler', () => {
 
     expect(chrome.downloads.cancel).not.toHaveBeenCalled();
     expect(ctx.cleanupSpy).toHaveBeenCalledWith(expect.objectContaining({ requestId: 'req-race-no-id' }), undefined);
+  });
+
+  it('two concurrent non-drive requests for the same URL are tracked independently', async () => {
+    const ctx = await loadDownloadHandler({
+      normalizeResult: { baseUrl: 'https://example.com/file.pdf', isDrive: false },
+    });
+    let nextDownloadId = 100;
+    (chrome.downloads.download as any).mockImplementation((_: unknown, cb: (id?: number) => void) => {
+      (chrome.runtime as { lastError?: { message: string } }).lastError = undefined;
+      cb(nextDownloadId++);
+    });
+
+    const resp1 = vi.fn();
+    const resp2 = vi.fn();
+
+    ctx.mod.handleDownloadRequest(
+      { url: 'https://example.com/file.pdf', requestId: 'req-concurrent-1' },
+      { tab: { id: 10 } } as chrome.runtime.MessageSender,
+      resp1,
+    );
+    ctx.mod.handleDownloadRequest(
+      { url: 'https://example.com/file.pdf', requestId: 'req-concurrent-2' },
+      { tab: { id: 11 } } as chrome.runtime.MessageSender,
+      resp2,
+    );
+
+    // Both tracked in requestId map
+    expect(ctx.stateModule.pendingByRequestId.has('req-concurrent-1')).toBe(true);
+    expect(ctx.stateModule.pendingByRequestId.has('req-concurrent-2')).toBe(true);
+
+    // Both tracked in downloadId map with distinct IDs
+    expect(ctx.stateModule.pendingByDownloadId.get(100)?.requestId).toBe('req-concurrent-1');
+    expect(ctx.stateModule.pendingByDownloadId.get(101)?.requestId).toBe('req-concurrent-2');
+
+    // URL bucket holds both
+    const bucket = ctx.stateModule.pendingByUrl.get('https://example.com/file.pdf');
+    expect(bucket?.size).toBe(2);
+
+    // Responses are independent
+    expect(resp1).toHaveBeenCalledWith(expect.objectContaining({ requestId: 'req-concurrent-1', downloadId: 100 }));
+    expect(resp2).toHaveBeenCalledWith(expect.objectContaining({ requestId: 'req-concurrent-2', downloadId: 101 }));
+  });
+
+  it('cancelling one of two concurrent same-URL requests does not affect the other', async () => {
+    const ctx = await loadDownloadHandler({
+      normalizeResult: { baseUrl: 'https://example.com/shared.pdf', isDrive: false },
+    });
+    let nextId = 200;
+    (chrome.downloads.download as any).mockImplementation((_: unknown, cb: (id?: number) => void) => {
+      (chrome.runtime as { lastError?: { message: string } }).lastError = undefined;
+      cb(nextId++);
+    });
+
+    ctx.mod.handleDownloadRequest(
+      { url: 'https://example.com/shared.pdf', requestId: 'req-shared-a' },
+      { tab: { id: 20 } } as chrome.runtime.MessageSender,
+      vi.fn(),
+    );
+    ctx.mod.handleDownloadRequest(
+      { url: 'https://example.com/shared.pdf', requestId: 'req-shared-b' },
+      { tab: { id: 21 } } as chrome.runtime.MessageSender,
+      vi.fn(),
+    );
+
+    const pendingA = ctx.stateModule.pendingByRequestId.get('req-shared-a')!;
+    const pendingB = ctx.stateModule.pendingByRequestId.get('req-shared-b')!;
+    expect(pendingA).toBeDefined();
+    expect(pendingB).toBeDefined();
+
+    // URL bucket has both before any cleanup
+    expect(ctx.stateModule.pendingByUrl.get('https://example.com/shared.pdf')?.size).toBe(2);
+
+    // Simulate cleanup for A (as would happen on cancel/complete)
+    const bucket = ctx.stateModule.pendingByUrl.get('https://example.com/shared.pdf')!;
+    bucket.delete(pendingA);
+
+    // B is still tracked
+    expect(ctx.stateModule.pendingByUrl.get('https://example.com/shared.pdf')?.has(pendingB)).toBe(true);
+    expect(ctx.stateModule.pendingByUrl.get('https://example.com/shared.pdf')?.has(pendingA)).toBe(false);
   });
 });
