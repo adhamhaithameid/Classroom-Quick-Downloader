@@ -24,7 +24,7 @@ cd .
 bash tools/check_schema_compat.sh
 pnpm -C cloudflare-worker test:smoke
 pnpm -C website test:smoke
-cd oracle-backend && go test ./... && cd ..
+pnpm -C oracle-backend test:smoke
 ```
 
 Expected output:

@@ -31,5 +31,7 @@ jobs:
         run: |
           # Temporary targeted ignore: GHSA-2g4f-4pwh-qvx6 remains transitively
           # present via eslint/commitlint; keep all other advisories blocking.
+          # Tracking issue: https://github.com/adhamhaithameid/Classroom-Quick-Downloader/issues
           pnpm -C extension audit --ignore GHSA-2g4f-4pwh-qvx6
           pnpm -C cloudflare-worker audit --ignore GHSA-2g4f-4pwh-qvx6
+          pnpm -C oracle-backend audit --ignore GHSA-2g4f-4pwh-qvx6

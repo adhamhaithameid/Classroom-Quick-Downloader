@@ -36,7 +36,7 @@ curl -i "${WORKER_BASE}/admin/website/status" | head -n 1
 
 curl -fsS "${ORACLE_BASE}/health"
 curl -fsS "${ORACLE_BASE}/api/public/website/snapshot"
-curl -i "${ORACLE_BASE}/api/admin/ha/status" | head -n 1
+curl -i "${ORACLE_BASE}/api/admin/website/state" | head -n 1
 ```
 
 Expected outputs:

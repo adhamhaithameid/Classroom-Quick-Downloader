@@ -17,7 +17,7 @@ Covers production website data movement and telemetry ingestion flow.
 
 ## 3. Write Flows
 ### 3.1 Website Events
-- Website posts: `POST /api/site/v1/events`
+- Website posts: `POST /api/public/website/events` (legacy alias: `/api/site/v1/events` proxies here)
 - Payload includes `schemaVersion`, `sessionId`, `pagePath`, and bounded `events[]`.
 - Worker forwards/queues for Oracle ingest pipeline.
 

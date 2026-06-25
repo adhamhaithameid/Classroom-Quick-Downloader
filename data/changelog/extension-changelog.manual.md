@@ -1,3 +1,5 @@
+> See `data/changelog/website-changelog.manual.md` for unified changelog — extension and website are currently aligned across all versions.
+
 ## v1.5.5
 ### Summary
 A leaner packaging release focused on reducing extension size while preserving the same classroom behavior.
