@@ -12,6 +12,8 @@ import {
   pendingByRequestId,
   pendingByDownloadId,
   pendingByUrl,
+  pendingByUrlAdd,
+  pendingByUrlGet,
   pendingByBypassTabId,
   cancelledByUs,
   recentDownloads,
@@ -231,7 +233,7 @@ export default defineBackground(() => {
     }
 
     if (message.type === 'CQD_REGISTER_BYPASS_URL' && pending && typeof message.url === 'string') {
-      pendingByUrl.set(message.url, pending);
+      pendingByUrlAdd(message.url, pending);
       return;
     }
   });
@@ -241,9 +243,9 @@ export default defineBackground(() => {
     chrome.downloads.onDeterminingFilename.addListener((item, suggest) => {
       let pending = pendingByDownloadId.get(item.id);
       if (!pending) {
-        pending = pendingByUrl.get(item.url) ?? pendingByUrl.get(item.finalUrl || item.url);
+        pending = pendingByUrlGet(item.url) ?? pendingByUrlGet(item.finalUrl || item.url);
         if (pending) {
-          pending.currentDownloadId = item.id;
+          if (pending.currentDownloadId == null) pending.currentDownloadId = item.id;
           pendingByDownloadId.set(item.id, pending);
         }
       }
@@ -315,16 +317,19 @@ export default defineBackground(() => {
               break;
             }
           }
-          // Check URL map
+          // Check URL map (each URL may have multiple pending downloads)
           if (!pending) {
-            for (const [url, p] of pendingByUrl.entries()) {
-              const pendingFileId =
-                extractDriveFileId(url) ||
-                extractDriveFileId(p.baseUrl) ||
-                extractDriveFileId(p.originalUrl);
-              if (pendingFileId === downloadFileId) {
-                pending = p;
-                break;
+            outer: for (const [url, bucket] of pendingByUrl.entries()) {
+              const urlFileId = extractDriveFileId(url);
+              for (const p of bucket) {
+                const pendingFileId =
+                  urlFileId ||
+                  extractDriveFileId(p.baseUrl) ||
+                  extractDriveFileId(p.originalUrl);
+                if (pendingFileId === downloadFileId) {
+                  pending = p;
+                  break outer;
+                }
               }
             }
           }
@@ -340,9 +345,9 @@ export default defineBackground(() => {
             }
           }
         }
-        // Fallback: URL map exact match
+        // Fallback: URL map exact match (prefer entry without a download ID yet)
         if (!pending) {
-          pending = pendingByUrl.get(item.url);
+          pending = pendingByUrlGet(item.url);
         }
       }
 
