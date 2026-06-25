@@ -38,3 +38,29 @@ updates:
       - "dependencies"
       - "backend"
     open-pull-requests-limit: 0
+
+  # Go modules for the oracle backend
+  - package-ecosystem: "gomod"
+    directory: "/oracle-backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    commit-message:
+      prefix: "chore(deps/go)"
+    labels:
+      - "dependencies"
+      - "backend"
+    open-pull-requests-limit: 0
+
+  # GitHub Actions versions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    commit-message:
+      prefix: "chore(ci)"
+    labels:
+      - "dependencies"
+      - "ci"
+    open-pull-requests-limit: 0

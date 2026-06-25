@@ -1622,6 +1622,7 @@ export function ToggleRow({
               viewBox="0 0 365.696 365.696"
               width="6"
               height="6"
+              aria-hidden="true"
             >
               <path
                 fill="currentColor"
@@ -1633,6 +1634,7 @@ export function ToggleRow({
               viewBox="0 0 24 24"
               width="10"
               height="10"
+              aria-hidden="true"
             >
               <path
                 fill="currentColor"

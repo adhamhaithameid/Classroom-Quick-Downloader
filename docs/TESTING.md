@@ -146,7 +146,7 @@ Classroom-Quick-Downloader/
 
 ### Unit Tests
 
-**42 unit test files** covering every layer of the extension:
+**101 test files** covering every layer of the extension:
 
 #### Content Script Layer (UI & DOM)
 
@@ -557,12 +557,13 @@ pnpm --filter cloudflare-worker test && \
 
 ## Test Count Summary
 
-| Component | Unit Tests | Integration Tests | Coverage Gates | Total Files |
-|-----------|-----------|-------------------|----------------|-------------|
-| Extension | 42 | 1 | 2 (critical + runtime) | 43 |
-| Cloudflare Worker | 2 | — | — | 2 |
-| Oracle Backend | 2 | — | — | 2 |
-| **Total** | **46** | **1** | **2** | **47** |
+| Component | Test Files | Notes |
+|-----------|------------|-------|
+| Extension | 101 | Unit + integration + golden behavior + fuzz + stress |
+| Cloudflare Worker | 19 | Smoke, functional, integration, regression, load, stress, security, fuzz, reliability |
+| Oracle Backend | 70 | Go test files across all handler and db packages |
+| Website | 29 | Unit, component, integration, smoke, visual guards |
+| **Total** | **219** | |
 
 | CI Workflow | Trigger | Purpose |
 |-------------|---------|---------|

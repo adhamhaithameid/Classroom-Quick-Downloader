@@ -17,6 +17,7 @@ jobs:
   extension-tests:
     name: Extension — Tests & Coverage
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - uses: actions/checkout@v4
@@ -66,6 +67,7 @@ jobs:
   build-check:
     name: Build — ${{ matrix.target }}
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     strategy:
       fail-fast: false
@@ -99,6 +101,7 @@ jobs:
   website-checks:
     name: Website — Check, Tests, Build
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - uses: actions/checkout@v4
@@ -135,6 +138,7 @@ jobs:
   cloudflare-worker-tests:
     name: Cloudflare Worker — Tests & Lint
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - uses: actions/checkout@v4
@@ -162,6 +166,7 @@ jobs:
   cloudflare-smoke:
     name: Cloudflare Worker — Smoke Test
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs: cloudflare-worker-tests
 
     steps:
@@ -193,6 +198,7 @@ jobs:
   gosec:
     name: Go — Security Scan (gosec)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - uses: actions/checkout@v4
@@ -223,6 +229,7 @@ jobs:
   oracle-tests:
     name: Go — Oracle Backend Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - uses: actions/checkout@v4
@@ -258,6 +265,7 @@ jobs:
   oracle-migration-smoke:
     name: Go — Migration Smoke Test
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     services:
       postgres:
         image: postgres:16

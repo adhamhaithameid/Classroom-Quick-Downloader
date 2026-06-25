@@ -221,7 +221,7 @@ export function handleDownloadRequest(
       (id) => {
         // Race condition check
         if (pending.isCancelled) {
-          if (id) chrome.downloads.cancel(id);
+          if (id) chrome.downloads.cancel(id, () => { const _ = chrome.runtime.lastError; });
           cleanup(pending, id);
           return;
         }

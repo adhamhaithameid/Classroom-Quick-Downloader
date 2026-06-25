@@ -17,9 +17,6 @@ compatibility_date = "2024-12-01"
   # Website writes (telemetry + uninstall feedback) are origin-gated.
   # Keep this synced with your active website domains.
   CORS_ALLOWED_ORIGINS = "https://classroom-quick-downloader.adhamhaithameid.is-a.dev,https://classroom-quick-downloader-website.pages.dev"
-  # Free-tier default keeps queue-first pipeline disabled.
-  ENABLE_SITE_QUEUE_PIPELINE = "false"
-
 # These Cloudflare resource IDs are deployment metadata for existing bindings,
 # not runtime secrets. They stay committed so Wrangler can bind the Worker to
 # the correct KV/D1 resources during deploys.
@@ -52,4 +49,5 @@ compatibility_date = "2024-12-01"
   persist = true
 
 [triggers]
-  crons = ["0 */3 * * *", "0 1-22/3 * * *"]
+  # Runs every 3 hours (0:00, 3:00, 6:00, ...)
+  crons = ["0 */3 * * *"]
