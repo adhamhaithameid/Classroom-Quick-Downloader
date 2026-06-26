@@ -63,6 +63,19 @@ You can compare the contents of the `.output/firefox-mv2` directory with the sub
 
 ## 🏗️ Technical Architecture
 
+### Detection Engine
+
+The in-page detection/render system runs on a versioned engine model (V1 legacy,
+V2 unified, V3 API-enhanced) controlled by an `Engine Mode` setting (default:
+`shadow`). It is being migrated to a role-based architecture (Detect / Compute /
+Render / Harden) connected by a typed EventBus. Start here:
+
+- **[docs/ENGINE_ARCHITECTURE.md](docs/ENGINE_ARCHITECTURE.md)** — what each engine
+  does, every observer/heartbeat, data flow, and a "where do I look when X breaks"
+  reference.
+- **[docs/PRD_ENGINE_REFACTOR.md](docs/PRD_ENGINE_REFACTOR.md)** — the refactor
+  plan: target design, EventBus contract, phased migration, test + doc strategy.
+
 ### WXT Framework
 
 This extension is built with [WXT](https://wxt.dev/) — a modern framework for building browser extensions. WXT was chosen for:
