@@ -154,6 +154,14 @@ describe('route render smoke coverage', () => {
     expect(html).toContain('Zero personal data');
   });
 
+  it('renders FAQ page with absolute og:image URL for correct social sharing', () => {
+    const { head } = render(FaqPage);
+    const ogImageMatch = head.match(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i) || head.match(/<meta[^>]+content="([^"]+)"[^>]+property="og:image"/i);
+
+    expect(ogImageMatch).toBeTruthy();
+    expect(ogImageMatch?.[1]).toMatch(/^https:\/\//);
+  });
+
   it('renders FAQ page with multiple sections and known questions', () => {
     const { body, head } = render(FaqPage);
     const html = squish(body);
