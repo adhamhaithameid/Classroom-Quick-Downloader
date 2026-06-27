@@ -25,6 +25,7 @@
 
 import { test, expect, type BrowserContext, chromium } from '@playwright/test';
 import path from 'node:path';
+import fs from 'node:fs';
 
 const EXTENSION_PATH = path.resolve(__dirname, '../../extension/.output/chrome-mv3');
 
@@ -128,6 +129,35 @@ test.describe('Extension Smoke Tests', () => {
     // Note: Chrome shows manifest.json as rendered JSON, not raw
     // We just verify the page loaded something
     expect(manifestText.length).toBeGreaterThan(0);
+
+    await page.close();
+  });
+
+  test('injects download buttons on a Classroom assignment page', async () => {
+    const page = await context.newPage();
+
+    // Intercept navigation to the assignment details page
+    await context.route('https://classroom.google.com/c/course-1/a/work-1/details', async (route) => {
+      const fixturePath = path.resolve(__dirname, '../../extension/tests/fixtures/classroom/classwork-material-post-en.html');
+      const fixtureHtml = fs.readFileSync(fixturePath, 'utf8');
+
+      // Serve the HTML
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/html',
+        body: fixtureHtml,
+      });
+    });
+
+    // Navigate to the mock assignment page
+    await page.goto('https://classroom.google.com/c/course-1/a/work-1/details', { waitUntil: 'domcontentloaded' });
+
+    // Wait for the extension to inject the download buttons
+    const downloadButtons = page.locator('.cqd-download-btn');
+    await expect(downloadButtons.first()).toBeVisible({ timeout: 15_000 });
+
+    // There should be one attachment in this fixture
+    expect(await downloadButtons.count()).toBeGreaterThan(0);
 
     await page.close();
   });

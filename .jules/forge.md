@@ -1,0 +1,4 @@
+## 2026-03-13 — Added Playwright E2E Test for Classroom Assignment Page
+**Gap Found:** Critical gap identified where no Playwright E2E test verified that the extension loads and correctly injects download buttons (`.cqd-download-btn`) into the DOM on a Classroom assignment page (`tests/e2e/extension-smoke.spec.ts`).
+**Tests Added/Improved:** Appended a test to `tests/e2e/extension-smoke.spec.ts` using `context.route` to mock navigation to a dummy assignment details URL and serve the existing HTML fixture (`classwork-material-post-en.html`). Verified that the `cqd-download-btn` is injected and visible.
+**Learning:** We can reuse HTML fixtures (`tests/fixtures/classroom/*.html`) directly in E2E Playwright tests to simulate Classroom DOM structure by intercepting routes, allowing full browser E2E testing without requiring a live Classroom session or hardcoded auth tokens.
