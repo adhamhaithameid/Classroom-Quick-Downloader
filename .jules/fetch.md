@@ -1,0 +1,4 @@
+## 2023-10-24 — Added robust error handling and timeout to Classroom API client
+**Finding:** The `fetch` call in `classroom-api-client.ts` had no timeout, lacked specific handling for HTTP error codes (401, 403, 429), and called `response.json()` without a try/catch block. This could cause silent failures, uncaught promise rejections on malformed responses, or requests that hang indefinitely.
+**Action:** Updated `classroom-api-client.ts` to implement a 15-second timeout using an `AbortController`. Added specific error checks and descriptive error messages for 401, 403, and 429 response codes. Wrapped `fetch` and `response.json()` calls in try/catch blocks for resilience.
+**Learning:** `fetch` calls in the extension must be written defensively: always use `AbortController` for timeouts, explicitly handle distinct failure states (e.g., auth vs network errors), and wrap parsing logic in try/catch to protect the engine from unexpected API responses.

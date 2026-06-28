@@ -125,18 +125,47 @@ export class GoogleClassroomApiClient implements ClassroomApiClient {
       }
       if (pageToken) requestUrl.searchParams.set('pageToken', pageToken);
 
-      const response = await fetch(requestUrl.toString(), {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        signal,
-      });
-      if (!response.ok) {
-        return submissions;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      const onAbort = () => controller.abort();
+      if (signal) {
+        if (signal.aborted) controller.abort();
+        else signal.addEventListener('abort', onAbort);
       }
 
-      const payload = await response.json() as GoogleClassroomStudentSubmissionResponse;
+      let response: Response;
+      try {
+        response = await fetch(requestUrl.toString(), {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeoutId);
+        if (signal) signal.removeEventListener('abort', onAbort);
+      }
+
+      if (response.status === 401) {
+        throw new Error('AuthExpiredError: Token expired — refresh required');
+      }
+      if (response.status === 403) {
+        throw new Error('PermissionError: Insufficient permissions for this resource');
+      }
+      if (response.status === 429) {
+        throw new Error('RateLimitError: API rate limit exceeded');
+      }
+      if (!response.ok) {
+        throw new Error(`APIError: Classroom API error ${response.status}`);
+      }
+
+      let payload: GoogleClassroomStudentSubmissionResponse;
+      try {
+        payload = await response.json() as GoogleClassroomStudentSubmissionResponse;
+      } catch {
+        throw new Error('ParseError: Failed to parse Classroom API response');
+      }
       const batch = (payload.studentSubmissions || [])
         .map((submission) => mapSubmission(submission, context.authUser))
         .filter((submission): submission is ClassroomApiStudentSubmission => !!submission);
