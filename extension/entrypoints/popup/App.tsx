@@ -363,9 +363,14 @@ function App() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const browserApi = (globalThis as any).chrome;
     if (!browserApi?.storage?.local) return;
-    browserApi.storage.local.get('cqdSettingsCollapsed', (res: { cqdSettingsCollapsed?: boolean }) => {
-      setSettingsCollapsed(res.cqdSettingsCollapsed !== false); // default collapsed
-    });
+    try {
+      browserApi.storage.local.get('cqdSettingsCollapsed', (res: { cqdSettingsCollapsed?: boolean }) => {
+        const _ = browserApi.runtime.lastError;
+        setSettingsCollapsed(res?.cqdSettingsCollapsed !== false); // default collapsed
+      });
+    } catch (e) {
+      console.warn('Failed to load cqdSettingsCollapsed', e);
+    }
   }, []);
 
   // Track scroll to add blur/shadow under header when not at top
@@ -637,18 +642,24 @@ function App() {
       'editedFlagEnabled',
       'combinedFlagEnabled',
     ];
-    browserApi.storage.local.get(settingsKeys, (res: Record<string, boolean | undefined>) => {
-      setSettings((prev) => ({
-        ...DEFAULT_SETTINGS,
-        ...prev,
-        extensionEnabled: res.extensionEnabled !== false,
-        downloadAllEnabled: res.downloadAllEnabled !== false,
-        commentsFlagEnabled: res.commentsFlagEnabled !== false,
-        editedFlagEnabled: res.editedFlagEnabled !== false,
-        combinedFlagEnabled: res.combinedFlagEnabled !== false,
-      }));
+    try {
+      browserApi.storage.local.get(settingsKeys, (res: Record<string, boolean | undefined>) => {
+        const _ = browserApi.runtime.lastError;
+        setSettings((prev) => ({
+          ...DEFAULT_SETTINGS,
+          ...prev,
+          extensionEnabled: res?.extensionEnabled !== false,
+          downloadAllEnabled: res?.downloadAllEnabled !== false,
+          commentsFlagEnabled: res?.commentsFlagEnabled !== false,
+          editedFlagEnabled: res?.editedFlagEnabled !== false,
+          combinedFlagEnabled: res?.combinedFlagEnabled !== false,
+        }));
+        setLoadingState(false);
+      });
+    } catch (e) {
+      console.warn('Failed to load settings', e);
       setLoadingState(false);
-    });
+    }
 
     // Listen for changes (cross-tab sync)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -682,7 +693,13 @@ function App() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const browserApi = (globalThis as any).chrome;
     if (browserApi && browserApi.storage && browserApi.storage.local) {
-      browserApi.storage.local.set({ extensionEnabled: nextState });
+      try {
+        browserApi.storage.local.set({ extensionEnabled: nextState }, () => {
+          const _ = browserApi.runtime.lastError;
+        });
+      } catch (e) {
+        console.warn('Failed to set extensionEnabled', e);
+      }
     }
   }
 
@@ -692,7 +709,13 @@ function App() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const browserApi = (globalThis as any).chrome;
     if (browserApi?.storage?.local) {
-      browserApi.storage.local.set({ cqdSettingsCollapsed: next });
+      try {
+        browserApi.storage.local.set({ cqdSettingsCollapsed: next }, () => {
+          const _ = browserApi.runtime.lastError;
+        });
+      } catch (e) {
+        console.warn('Failed to set cqdSettingsCollapsed', e);
+      }
     }
   }
 
@@ -705,16 +728,25 @@ function App() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const browserApi = (globalThis as any).chrome;
     if (browserApi?.storage?.local) {
-      browserApi.storage.local.set({ [flag]: nextState });
+      try {
+        browserApi.storage.local.set({ [flag]: nextState }, () => {
+          const _ = browserApi.runtime.lastError;
+        });
+      } catch (e) {
+        console.warn(`Failed to set ${flag}`, e);
+      }
     }
     // Notify content scripts
     if (browserApi?.tabs?.query) {
       browserApi.tabs.query({ active: true, currentWindow: true }, (tabs: any[]) => {
+        const _ = browserApi.runtime.lastError;
         if (tabs?.[0]?.id) {
           browserApi.tabs.sendMessage(tabs[0].id, {
             type: 'cqd-flag-toggle',
             flag,
             enabled: nextState,
+          }, () => {
+            const _ = browserApi.runtime.lastError;
           });
         }
       });
@@ -729,10 +761,16 @@ function App() {
       setEngineModeLoading(false);
       return;
     }
-    browserApi.storage.local.get('cqdV2Mode', (res: { cqdV2Mode?: string }) => {
-      setEngineMode(res.cqdV2Mode || 'legacy');
+    try {
+      browserApi.storage.local.get('cqdV2Mode', (res: { cqdV2Mode?: string }) => {
+        const _ = browserApi.runtime.lastError;
+        setEngineMode(res?.cqdV2Mode || 'legacy');
+        setEngineModeLoading(false);
+      });
+    } catch (e) {
+      console.warn('Failed to load engine mode', e);
       setEngineModeLoading(false);
-    });
+    }
 
     // Listen for mode changes from content script or other tabs
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -753,13 +791,22 @@ function App() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const browserApi = (globalThis as any).chrome;
     if (browserApi?.storage?.local) {
-      browserApi.storage.local.set({ cqdV2Mode: nextMode });
+      try {
+        browserApi.storage.local.set({ cqdV2Mode: nextMode }, () => {
+          const _ = browserApi.runtime.lastError;
+        });
+      } catch (e) {
+        console.warn('Failed to set cqdV2Mode', e);
+      }
     }
     // Also notify content script via message
     if (browserApi?.tabs?.query) {
       browserApi.tabs.query({ active: true, currentWindow: true }, (tabs: any[]) => {
+        const _ = browserApi.runtime.lastError;
         if (tabs?.[0]?.id) {
-          browserApi.tabs.sendMessage(tabs[0].id, { type: 'cqd-set-mode', mode: nextMode });
+          browserApi.tabs.sendMessage(tabs[0].id, { type: 'cqd-set-mode', mode: nextMode }, () => {
+            const _ = browserApi.runtime.lastError;
+          });
         }
       });
     }
@@ -771,13 +818,22 @@ function App() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const browserApi = (globalThis as any).chrome;
     if (browserApi?.storage?.local) {
-      browserApi.storage.local.set({ cqdV2Mode: nextMode });
+      try {
+        browserApi.storage.local.set({ cqdV2Mode: nextMode }, () => {
+          const _ = browserApi.runtime.lastError;
+        });
+      } catch (e) {
+        console.warn('Failed to set cqdV2Mode', e);
+      }
     }
     // Also notify content script via message
     if (browserApi?.tabs?.query) {
       browserApi.tabs.query({ active: true, currentWindow: true }, (tabs: any[]) => {
+        const _ = browserApi.runtime.lastError;
         if (tabs?.[0]?.id) {
-          browserApi.tabs.sendMessage(tabs[0].id, { type: 'cqd-set-mode', mode: nextMode });
+          browserApi.tabs.sendMessage(tabs[0].id, { type: 'cqd-set-mode', mode: nextMode }, () => {
+            const _ = browserApi.runtime.lastError;
+          });
         }
       });
     }
