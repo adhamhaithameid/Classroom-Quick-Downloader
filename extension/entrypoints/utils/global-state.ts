@@ -4,7 +4,7 @@ export const getGlobalEnabled = async (): Promise<boolean> => {
   try {
     const res = await chrome.storage.local.get(STORAGE_KEY_ENABLED);
     // Default to true if not set
-    return res[STORAGE_KEY_ENABLED] !== false;
+    return res?.[STORAGE_KEY_ENABLED] !== false;
   } catch (error) {
     console.warn('Failed to get global enabled state:', error);
     return true;
