@@ -62,7 +62,6 @@ describe('background state module', () => {
     const state = await loadStateModuleWithNavigator('Mozilla/5.0 Chrome/120');
     expect(state.AUTHUSER_CANDIDATES).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
     expect(state.PENDING_DOWNLOAD_TTL_MS).toBe(10 * 60 * 1000);
-    expect(state.CLEANUP_INTERVAL_MS).toBe(5 * 60 * 1000);
     expect(state.CLASSROOM_URL_PATTERN.test('https://classroom.google.com/u/0/h')).toBe(true);
     expect(state.CLASSROOM_URL_PATTERN.test('https://example.com')).toBe(false);
   });

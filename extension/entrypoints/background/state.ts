@@ -72,9 +72,6 @@ export const CLASSROOM_URL_PATTERN = /^https:\/\/classroom\.google\.com\//;
 /** TTL for orphaned pending downloads (10 minutes) */
 export const PENDING_DOWNLOAD_TTL_MS = 10 * 60 * 1000;
 
-/** Interval for cleanup checks (5 minutes) */
-export const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
-
 // --- BROWSER DETECTION ---
 
 /**

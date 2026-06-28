@@ -17,7 +17,6 @@ import {
   pendingByBypassTabId,
   cancelledByUs,
   recentDownloads,
-  CLEANUP_INTERVAL_MS,
   IS_FIREFOX,
 } from './state';
 import { createIconUpdaters, isClassroomUrl, setActionIcon, GRAY_ICON_PATHS } from './icon-manager';
@@ -111,9 +110,19 @@ export default defineBackground(() => {
     initializeUninstallUrl();
   });
 
+  chrome.alarms.get('CQD_CLEANUP', (alarm) => {
+    if (!alarm) {
+      chrome.alarms.create('CQD_CLEANUP_INIT', { delayInMinutes: 1 });
+      chrome.alarms.create('CQD_CLEANUP', { periodInMinutes: 5 });
+    }
+  });
+
   // Memory leak prevention: periodic cleanup
-  setInterval(cleanupOrphanedPendingDownloads, CLEANUP_INTERVAL_MS);
-  setTimeout(cleanupOrphanedPendingDownloads, 60 * 1000);
+  chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === 'CQD_CLEANUP' || alarm.name === 'CQD_CLEANUP_INIT') {
+      try { cleanupOrphanedPendingDownloads(); } catch (e) { console.error(e); }
+    }
+  });
 
   // Create icon update closures
   const { updateTabIcon, updateGlobalIcon } = createIconUpdaters();
