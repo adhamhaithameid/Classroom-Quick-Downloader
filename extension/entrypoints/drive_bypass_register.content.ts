@@ -23,7 +23,7 @@ function registerBypassUrl(): void {
   if (url === lastUrl) return;
   lastUrl = url;
   try {
-    chrome.runtime.sendMessage({ type: 'CQD_REGISTER_BYPASS_URL', url });
+    chrome.runtime.sendMessage({ type: 'CQD_REGISTER_BYPASS_URL', url }, () => { const _ = chrome.runtime.lastError; });
   } catch {
     // ignore
   }

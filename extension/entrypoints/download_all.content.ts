@@ -1314,7 +1314,7 @@ function handleCancelAllClick(group: GroupState): void {
       requestIdFoundCount++;
       if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
         try {
-          chrome.runtime.sendMessage({type: 'CQD_CANCEL_DOWNLOAD', requestId });
+          chrome.runtime.sendMessage({type: 'CQD_CANCEL_DOWNLOAD', requestId }, () => { const _ = chrome.runtime.lastError; });
           messagesSentCount++;
         } catch (err) {
           // Failed to send cancel message

@@ -125,12 +125,12 @@ describe('Cancel Message Passing', () => {
     chrome.runtime.sendMessage({
       type: 'CQD_CANCEL_DOWNLOAD',
       requestId,
-    });
+    }, () => { const _ = chrome.runtime.lastError; });
 
     expect(sendMessageSpy).toHaveBeenCalledWith({
       type: 'CQD_CANCEL_DOWNLOAD',
       requestId: 'test-req-123',
-    });
+    }, expect.any(Function));
   });
 
   it('should include correct message type', () => {

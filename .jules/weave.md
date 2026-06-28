@@ -1,0 +1,5 @@
+
+## 2026-06-28 — Add chrome.runtime.lastError check for chrome.runtime.sendMessage calls
+**Finding:** Found multiple `chrome.runtime.sendMessage` calls across content scripts without callbacks checking `chrome.runtime.lastError`, leading to unhandled promise rejections or console warnings when the background service worker is inactive or disconnected.
+**Action:** Appended an empty callback `() => { const _ = chrome.runtime.lastError; }` to `sendMessage` calls in `observers.ts`, `message-handler.ts`, `download-handler.ts`, `download_all.content.ts`, `drive_bypass.content.ts`, and `drive_bypass_register.content.ts`. Updated `content-message-handler.test.ts`, `content-observers.test.ts`, and `cancel.test.ts` to expect this callback in `toHaveBeenCalledWith` assertions.
+**Learning:** Chrome Manifest V3 service workers can terminate frequently. All async message-passing from content scripts must explicitly read `chrome.runtime.lastError` via a callback to prevent runtime exceptions if the target background script is unavailable.

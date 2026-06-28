@@ -174,14 +174,14 @@ describe('content/observers', () => {
     expect(sendSpy).toHaveBeenCalledWith(expect.objectContaining({
       type: 'CQD_EFFECTIVE_STATE_CHANGED',
       enabled: true,
-    }));
+    }), expect.any(Function));
 
     mod.stopCQD();
     expect(state.initialized).toBe(false);
     expect(sendSpy).toHaveBeenCalledWith(expect.objectContaining({
       type: 'CQD_EFFECTIVE_STATE_CHANGED',
       enabled: false,
-    }));
+    }), expect.any(Function));
   });
 
   it('deduplicates roots in MutationObserver callback', async () => {

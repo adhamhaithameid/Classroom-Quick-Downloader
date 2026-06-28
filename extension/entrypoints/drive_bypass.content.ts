@@ -75,7 +75,7 @@ function startBypassFeature() {
     ) {
       auth403Reported = true;
       try {
-        chrome.runtime.sendMessage({ type: 'CQD_403_SEEN' });
+        chrome.runtime.sendMessage({ type: 'CQD_403_SEEN' }, () => { const _ = chrome.runtime.lastError; });
       } catch {
         /* ignore */
       }
@@ -210,7 +210,7 @@ function handleVirusBypassClick(): boolean {
 function notifySuccessFlood() {
   const send = () => {
     try {
-      chrome.runtime.sendMessage({ type: 'CQD_BYPASS_SUCCESS' });
+      chrome.runtime.sendMessage({ type: 'CQD_BYPASS_SUCCESS' }, () => { const _ = chrome.runtime.lastError; });
     } catch {
       /* ignore */
     }

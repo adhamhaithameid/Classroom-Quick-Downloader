@@ -59,7 +59,7 @@ export async function handleCancelClick(button: HTMLButtonElement): Promise<void
         chrome.runtime.sendMessage({
           type: 'CQD_CANCEL_DOWNLOAD',
           requestId: pending.requestId,
-        });
+        }, () => { const _ = chrome.runtime.lastError; });
       } catch (err) {
         // Error sending cancel message
       }

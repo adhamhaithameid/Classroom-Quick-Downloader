@@ -126,7 +126,7 @@ export function initContentScript(): void {
 
   // Request icon update
   try {
-    chrome.runtime.sendMessage({ type: 'CQD_UPDATE_ICON' });
+    chrome.runtime.sendMessage({ type: 'CQD_UPDATE_ICON' }, () => { const _ = chrome.runtime.lastError; });
   } catch { /* ignore */ }
 
   // Subscribe to global enable/disable state
