@@ -1647,8 +1647,10 @@ async function handleWebsiteConsoleAdminEndpoint(
 
   try {
     if (pathname === "/admin/website/console/summary") {
-      const doStatus = await fetchDoWebsiteStatus(env);
-      const cachedRaw = await readSiteSnapshotCache(env);
+      const [doStatus, cachedRaw] = await Promise.all([
+        fetchDoWebsiteStatus(env),
+        readSiteSnapshotCache(env)
+      ]);
       let cachedSnapshot: Record<string, unknown> | null = null;
       if (cachedRaw) {
         try {
@@ -1812,8 +1814,10 @@ async function handleWebsiteConsoleAdminEndpoint(
     }
 
     if (pathname === "/admin/website/console/snapshot/raw") {
-      const doStatus = await fetchDoWebsiteStatus(env);
-      const kvRaw = await readSiteSnapshotCache(env);
+      const [doStatus, kvRaw] = await Promise.all([
+        fetchDoWebsiteStatus(env),
+        readSiteSnapshotCache(env)
+      ]);
       let kvParsed: Record<string, unknown> | null = null;
       if (kvRaw) {
         try {
