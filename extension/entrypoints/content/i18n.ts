@@ -50,6 +50,11 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     runtimeError: 'وقت التشغيل غير متاح',
     startError: 'تعذر البدء.',
     commError: 'خطأ في الاتصال.',
+    // Translation for ar (ar) — needs native speaker review
+    // Using English fallback until a correct translation is provided
+    // See GitHub Issue pending
+    modified: 'Modified', // TODO: translate to ar
+    after_posting: 'after posting', // TODO: translate to ar
     cancel: 'إلغاء',
     cancelled: 'ملغى',
     cancelAll: 'إلغاء الكل',
@@ -75,6 +80,11 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     startError: '開始できませんでした。',
     commError: '通信エラー。',
     commentSingular: 'コメント',
+    // Translation for ja (ja) — needs native speaker review
+    // Using English fallback until a correct translation is provided
+    // See GitHub Issue pending
+    modified: 'Modified', // TODO: translate to ja
+    after_posting: 'after posting', // TODO: translate to ja
     cancel: 'キャンセル',
     cancelled: 'キャンセル済み',
     cancelAll: '全てキャンセル',
@@ -100,6 +110,11 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Error de comunicación.',
     editedTooltip: 'Días entre la publicación y la última edición',
     commentSingular: 'comentario',
+    // Translation for es (es) — needs native speaker review
+    // Using English fallback until a correct translation is provided
+    // See GitHub Issue pending
+    modified: 'Modified', // TODO: translate to es
+    after_posting: 'after posting', // TODO: translate to es
     cancel: 'Cancelar',
     cancelled: 'Cancelado',
     cancelAll: 'Cancelar todo',
@@ -125,6 +140,11 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'संचार त्रुटि।',
     editedTooltip: 'पोस्ट करने और अंतिम संपादन के बीच के दिन',
     commentSingular: 'टिप्पणियाँ',
+    // Translation for hi (hi) — needs native speaker review
+    // Using English fallback until a correct translation is provided
+    // See GitHub Issue pending
+    modified: 'Modified', // TODO: translate to hi
+    after_posting: 'after posting', // TODO: translate to hi
     cancel: 'रद्द करें',
     cancelled: 'रद्द',
     cancelAll: 'सभी रद्द करें',
@@ -150,6 +170,11 @@ export const TRANSLATIONS: Record<string, Record<string, string>> = {
     commError: 'Erro de comunicação.',
     editedTooltip: 'Dias entre a postagem e a última edição',
     commentSingular: 'comentário',
+    // Translation for pt (pt) — needs native speaker review
+    // Using English fallback until a correct translation is provided
+    // See GitHub Issue pending
+    modified: 'Modified', // TODO: translate to pt
+    after_posting: 'after posting', // TODO: translate to pt
     cancel: 'Cancelar',
     cancelled: 'Cancelado',
     cancelAll: 'Cancelar todo',
