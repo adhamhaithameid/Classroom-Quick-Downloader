@@ -127,6 +127,9 @@ export class EngineV2 implements CQDEngine {
   private performanceMonitor = new PerformanceMonitor();
   private deepValidationScheduled = false;
 
+  /** Timer for debouncing mutations */
+  private mutationDebounceTimer: number | ReturnType<typeof setTimeout> | null = null;
+
   // ========================================================================
   // LIFECYCLE
   // ========================================================================
@@ -197,6 +200,11 @@ export class EngineV2 implements CQDEngine {
     this.correctionQueue.flush();
     clearInstabilityState();
     this.deepValidationScheduled = false;
+
+    if (this.mutationDebounceTimer !== null) {
+      clearTimeout(this.mutationDebounceTimer as number);
+      this.mutationDebounceTimer = null;
+    }
 
     // Clear all state
     this.postMap.clear();
@@ -283,7 +291,13 @@ export class EngineV2 implements CQDEngine {
     }
 
     if (needsRescan) {
-      this.fullScan();
+      if (this.mutationDebounceTimer !== null) {
+        clearTimeout(this.mutationDebounceTimer as number);
+      }
+      this.mutationDebounceTimer = setTimeout(() => {
+        this.mutationDebounceTimer = null;
+        this.fullScan();
+      }, this.budgetController.getDebounceMs());
     }
 
     const elapsed = performance.now() - startTime;
