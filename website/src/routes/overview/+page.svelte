@@ -1602,7 +1602,7 @@
             rel="noopener noreferrer"
             on:click={() => trackInstallClick('hero_install')}
           >
-            <img src="{base}/images/{b}.svg" alt="" class="l2-cta-icon" />
+            <img src="{base}/images/{b}.svg" alt="" class="l2-cta-icon" width="22" height="22" />
             {#if b === detectedBrowser}Install for {browserDisplayName(b)}{:else}{browserDisplayName(b)}{/if}
           </a>
         {/each}
@@ -2024,7 +2024,7 @@
                         rel="noopener noreferrer"
                         on:click={() => trackInstallClick('map_prompt_install')}
                       >
-                        <img src="{base}/images/{detectedBrowser}.svg" alt="" class="l2-cta-icon" />
+                        <img src="{base}/images/{detectedBrowser}.svg" alt="" class="l2-cta-icon" width="22" height="22" />
                         Install for {browserDisplayName(detectedBrowser)}
                       </a>
                     </div>
@@ -2123,7 +2123,7 @@
             rel="noopener noreferrer"
             on:click={() => trackInstallClick('final_install')}
           >
-            <img src="{base}/images/{b}.svg" alt="" class="l2-cta-icon" />
+            <img src="{base}/images/{b}.svg" alt="" class="l2-cta-icon" width="22" height="22" />
             {#if b === detectedBrowser}Install for {browserDisplayName(b)}{:else}{browserDisplayName(b)}{/if}
           </a>
         {/each}

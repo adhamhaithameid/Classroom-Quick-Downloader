@@ -283,7 +283,7 @@
               class:detected={isDetected}
               on:click={() => trackReinstallClick(browser)}
             >
-              <img src="{base}/images/{browser}.svg" alt="" class="un-browser-icon" />
+              <img src="{base}/images/{browser}.svg" alt="" class="un-browser-icon" width="20" height="20" />
               {#if isDetected}Reinstall for {browserDisplayName(browser)}{:else}{browserDisplayName(browser)}{/if}
             </a>
           {/each}
