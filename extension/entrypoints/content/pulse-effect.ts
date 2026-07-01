@@ -111,6 +111,14 @@ export function unmarkTargetElements(post: HTMLElement): void {
  * Includes debounce to prevent multiple clicks during animation.
  */
 export function triggerPulseEffect(post: HTMLElement, type: PulseType): void {
+  // Respect user's motion preference — WCAG 2.1 AA 2.3.3
+  if (
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  ) {
+    return;
+  }
+
   // animations in js instead of css?? sacrilege
   const ANIMATION_DURATION = 1500; // Match CSS animation duration
   const DEBOUNCE_ATTR = 'data-cqd-animating';
