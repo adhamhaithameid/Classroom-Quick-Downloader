@@ -3,6 +3,6 @@ export const WEBSITE_MANUAL_RELEASE_VERSION = {
   "generatedAt": 1781017451093,
   "extension": "1.5.5",
   "cloudflareWorker": "3.0.0",
-  "oracleBackend": "5.0.0",
+  "oracleBackend": "6.0.0",
   "websiteLabel": "v1.5.5"
 } as const;
