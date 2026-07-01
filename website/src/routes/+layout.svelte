@@ -151,6 +151,8 @@
 <LoadingScreen />
 
 <div class="site-shell" class:o2-fullscreen={hideChrome}>
+  <a href="#main-content" class="skip-nav">Skip to main content</a>
+
   {#if !hideChrome}
   <header class="l2-nav-shell">
     <div class="l2-nav-inner l2-nav-fullwidth">
@@ -238,6 +240,8 @@
   {/if}
 
   <main
+    id="main-content"
+    tabindex="-1"
     class:site-main={!isOverviewStyleRoute && !hideChrome}
     class:site-main-overview-style={isOverviewStyleRoute && !hideChrome}
     class:l2-wrap={!isOverviewStyleRoute && !hideChrome}
@@ -282,6 +286,21 @@
   main {
     flex: 1;
     min-height: 0;
+  }
+
+  .skip-nav {
+    position: absolute;
+    top: -100%;
+    left: 0;
+    padding: 0.5rem 1rem;
+    background: var(--gc-green);
+    color: white;
+    z-index: 9999;
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .skip-nav:focus {
+    top: 0;
   }
 
   .site-shell {
