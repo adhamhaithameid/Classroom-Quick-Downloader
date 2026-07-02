@@ -6,6 +6,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"sort"
 	"strconv"
@@ -116,13 +117,15 @@ func SummaryHandler(db *sql.DB) http.HandlerFunc {
 
 		if useWindow {
 			if err := loadWindowTotals(ctx, db, fromTime, toTime, &resp); err != nil {
-				http.Error(w, "failed to load window totals: "+err.Error(), http.StatusInternalServerError)
+				log.Printf("[stats] failed to load window totals: %v", err)
+				http.Error(w, "failed to load window totals", http.StatusInternalServerError)
 				return
 			}
 		} else {
 			rawTotals, err := loadTotals(ctx, db)
 			if err != nil {
-				http.Error(w, "failed to load totals: "+err.Error(), http.StatusInternalServerError)
+				log.Printf("[stats] failed to load totals: %v", err)
+				http.Error(w, "failed to load totals", http.StatusInternalServerError)
 				return
 			}
 			applyRawTotalsToSummary(rawTotals, &resp)
@@ -143,14 +146,16 @@ func SummaryHandler(db *sql.DB) http.HandlerFunc {
 		// 5. Load Metadata (Last Batch & DO State) for Dashboard Status
 		lastBatch, err := loadLastBatch(ctx, db)
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
-			http.Error(w, "failed to load batch info: "+err.Error(), http.StatusInternalServerError)
+			log.Printf("[stats] failed to load batch info: %v", err)
+			http.Error(w, "failed to load batch info", http.StatusInternalServerError)
 			return
 		}
 		resp.LastBatch = lastBatch
 
 		doSnapshot, err := loadLastDOSnapshot(ctx, db)
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
-			http.Error(w, "failed to load do state: "+err.Error(), http.StatusInternalServerError)
+			log.Printf("[stats] failed to load do state: %v", err)
+			http.Error(w, "failed to load do state", http.StatusInternalServerError)
 			return
 		}
 		resp.DOState = doSnapshot
@@ -274,7 +279,8 @@ func TimeSeriesHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		if err != nil {
-			http.Error(w, "failed to load timeseries: "+err.Error(), http.StatusInternalServerError)
+			log.Printf("[stats] failed to load timeseries: %v", err)
+			http.Error(w, "failed to load timeseries", http.StatusInternalServerError)
 			return
 		}
 
@@ -383,7 +389,8 @@ func BreakdownHandler(db *sql.DB) http.HandlerFunc {
 
 		values, err := queryBreakdown(ctx, db, col, fromIso, toIso)
 		if err != nil {
-			http.Error(w, "failed to load breakdown: "+err.Error(), http.StatusInternalServerError)
+			log.Printf("[stats] failed to load breakdown: %v", err)
+			http.Error(w, "failed to load breakdown", http.StatusInternalServerError)
 			return
 		}
 
@@ -553,7 +560,8 @@ func ComparisonHandler(db *sql.DB) http.HandlerFunc {
 		// Query both periods
 		p1, err := queryPeriodTotals(ctx, db, from1, to1)
 		if err != nil {
-			http.Error(w, "failed to query period1: "+err.Error(), http.StatusInternalServerError)
+			log.Printf("[stats] failed to query period1: %v", err)
+			http.Error(w, "failed to query period1", http.StatusInternalServerError)
 			return
 		}
 		p1.From = from1Str
@@ -561,7 +569,8 @@ func ComparisonHandler(db *sql.DB) http.HandlerFunc {
 
 		p2, err := queryPeriodTotals(ctx, db, from2, to2)
 		if err != nil {
-			http.Error(w, "failed to query period2: "+err.Error(), http.StatusInternalServerError)
+			log.Printf("[stats] failed to query period2: %v", err)
+			http.Error(w, "failed to query period2", http.StatusInternalServerError)
 			return
 		}
 		p2.From = from2Str
@@ -673,7 +682,8 @@ func ExportHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		if err != nil {
-			http.Error(w, "failed to query data: "+err.Error(), http.StatusInternalServerError)
+			log.Printf("[stats] failed to query data: %v", err)
+			http.Error(w, "failed to query data", http.StatusInternalServerError)
 			return
 		}
 
@@ -762,7 +772,8 @@ func VisitorsTimeseriesHandler(db *sql.DB) http.HandlerFunc {
 		toIso := toTime.AddDate(0, 0, 1).UTC().Format(time.RFC3339)
 		points, err := queryWebsiteTrafficTimeseries(ctx, db, fromIso, toIso, gran)
 		if err != nil {
-			http.Error(w, "failed to load visitors timeseries: "+err.Error(), http.StatusInternalServerError)
+			log.Printf("[stats] failed to load visitors timeseries: %v", err)
+			http.Error(w, "failed to load visitors timeseries", http.StatusInternalServerError)
 			return
 		}
 
@@ -818,27 +829,32 @@ func FunnelHandler(db *sql.DB) http.HandlerFunc {
 
 		visits, err := queryWebsiteTrafficWindowTotal(ctx, db, fromIso, toIso, "visits")
 		if err != nil {
-			http.Error(w, "failed to load funnel visits: "+err.Error(), http.StatusInternalServerError)
+			log.Printf("[stats] failed to load funnel visits: %v", err)
+			http.Error(w, "failed to load funnel visits", http.StatusInternalServerError)
 			return
 		}
 		installClicks, err := queryWebsiteEventDailyTotal(ctx, db, fromDay, toDay, "cta", "install_click")
 		if err != nil {
-			http.Error(w, "failed to load funnel install clicks: "+err.Error(), http.StatusInternalServerError)
+			log.Printf("[stats] failed to load funnel install clicks: %v", err)
+			http.Error(w, "failed to load funnel install clicks", http.StatusInternalServerError)
 			return
 		}
 		downloadClicks, err := queryWebsiteEventDailyTotal(ctx, db, fromDay, toDay, "cta", "download_click")
 		if err != nil {
-			http.Error(w, "failed to load funnel download clicks: "+err.Error(), http.StatusInternalServerError)
+			log.Printf("[stats] failed to load funnel download clicks: %v", err)
+			http.Error(w, "failed to load funnel download clicks", http.StatusInternalServerError)
 			return
 		}
 		actualDownloads, err := queryDownloadsWindowTotal(ctx, db, fromIso, toIso)
 		if err != nil {
-			http.Error(w, "failed to load funnel download totals: "+err.Error(), http.StatusInternalServerError)
+			log.Printf("[stats] failed to load funnel download totals: %v", err)
+			http.Error(w, "failed to load funnel download totals", http.StatusInternalServerError)
 			return
 		}
 		mapYes, err := queryWebsiteEventDailyTotal(ctx, db, fromDay, toDay, "map", "map_yes")
 		if err != nil {
-			http.Error(w, "failed to load funnel map yes totals: "+err.Error(), http.StatusInternalServerError)
+			log.Printf("[stats] failed to load funnel map yes totals: %v", err)
+			http.Error(w, "failed to load funnel map yes totals", http.StatusInternalServerError)
 			return
 		}
 
@@ -921,7 +937,8 @@ func SegmentsHandler(db *sql.DB) http.HandlerFunc {
 			}
 			rows, queryErr := queryBreakdown(ctx, db, column, fromIso, toIso)
 			if queryErr != nil {
-				http.Error(w, "failed to load segments: "+queryErr.Error(), http.StatusInternalServerError)
+				log.Printf("[stats] failed to load segments: %v", queryErr)
+				http.Error(w, "failed to load segments", http.StatusInternalServerError)
 				return
 			}
 			sort.Slice(rows, func(i, j int) bool { return rows[i].Count > rows[j].Count })
@@ -934,35 +951,40 @@ func SegmentsHandler(db *sql.DB) http.HandlerFunc {
 		case "action":
 			rows, queryErr := queryWebsiteEventGroupBy(ctx, db, "action", fromDay, toDay)
 			if queryErr != nil {
-				http.Error(w, "failed to load action segments: "+queryErr.Error(), http.StatusInternalServerError)
+				log.Printf("[stats] failed to load action segments: %v", queryErr)
+				http.Error(w, "failed to load action segments", http.StatusInternalServerError)
 				return
 			}
 			values = rows
 		case "placement":
 			rows, queryErr := queryWebsiteEventGroupBy(ctx, db, "placement", fromDay, toDay)
 			if queryErr != nil {
-				http.Error(w, "failed to load placement segments: "+queryErr.Error(), http.StatusInternalServerError)
+				log.Printf("[stats] failed to load placement segments: %v", queryErr)
+				http.Error(w, "failed to load placement segments", http.StatusInternalServerError)
 				return
 			}
 			values = rows
 		case "path", "page_path":
 			rows, queryErr := queryWebsiteRawGroupBy(ctx, db, "page_path", fromTime, toTime)
 			if queryErr != nil {
-				http.Error(w, "failed to load path segments: "+queryErr.Error(), http.StatusInternalServerError)
+				log.Printf("[stats] failed to load path segments: %v", queryErr)
+				http.Error(w, "failed to load path segments", http.StatusInternalServerError)
 				return
 			}
 			values = rows
 		case "device":
 			rows, queryErr := queryWebsiteRawJSONGroupBy(ctx, db, "$.device", fromTime, toTime)
 			if queryErr != nil {
-				http.Error(w, "failed to load device segments: "+queryErr.Error(), http.StatusInternalServerError)
+				log.Printf("[stats] failed to load device segments: %v", queryErr)
+				http.Error(w, "failed to load device segments", http.StatusInternalServerError)
 				return
 			}
 			values = rows
 		case "referrer":
 			rows, queryErr := queryWebsiteRawJSONGroupBy(ctx, db, "$.referrer", fromTime, toTime)
 			if queryErr != nil {
-				http.Error(w, "failed to load referrer segments: "+queryErr.Error(), http.StatusInternalServerError)
+				log.Printf("[stats] failed to load referrer segments: %v", queryErr)
+				http.Error(w, "failed to load referrer segments", http.StatusInternalServerError)
 				return
 			}
 			values = rows
@@ -1021,7 +1043,8 @@ func HeatmapHandler(db *sql.DB) http.HandlerFunc {
 			toIso,
 		)
 		if err != nil {
-			http.Error(w, "failed to load heatmap data: "+err.Error(), http.StatusInternalServerError)
+			log.Printf("[stats] failed to load heatmap data: %v", err)
+			http.Error(w, "failed to load heatmap data", http.StatusInternalServerError)
 			return
 		}
 		defer rows.Close()

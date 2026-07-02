@@ -12,9 +12,9 @@ import (
 
 type websiteEventBatchPayload struct {
 	SchemaVersion string                        `json:"schemaVersion"`
-	SessionID string                        `json:"sessionId"`
-	PagePath  string                        `json:"pagePath"`
-	Events    []publicWebsiteEventBodyEntry `json:"events"`
+	SessionID     string                        `json:"sessionId"`
+	PagePath      string                        `json:"pagePath"`
+	Events        []publicWebsiteEventBodyEntry `json:"events"`
 }
 
 type publicWebsiteEventBodyEntry struct {
@@ -52,9 +52,9 @@ func buildWebsiteEventBatch(prefix string, count int) websiteEventBatchPayload {
 	}
 	return websiteEventBatchPayload{
 		SchemaVersion: publicWebsiteSchemaVersion,
-		SessionID: "load-session",
-		PagePath:  "/overview",
-		Events:    events,
+		SessionID:     "load-session",
+		PagePath:      "/overview",
+		Events:        events,
 	}
 }
 
