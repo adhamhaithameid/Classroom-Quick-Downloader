@@ -1,0 +1,3 @@
+## 2024-07-02 - Dynamic ARIA Label Management
+**Learning:** Screen reader users lose context when the visual state of a button changes dynamically (e.g. from "Downloading" to "Cancel" on hover) without an explicit update to the `aria-label`.
+**Action:** Always dynamically explicitly update `aria-label` attributes alongside visual changes (text/icons) using JS, avoiding reliance on innerText which might not be picked up by screen readers instantly, especially during rapid state transitions like loading or hover events. Include filenames or contextual data when updating labels.

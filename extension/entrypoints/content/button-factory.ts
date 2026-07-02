@@ -63,7 +63,12 @@ export function createDownloadButton(
       button.classList.add('cqd-cancel');
       const btnLabel = button.querySelector<HTMLSpanElement>('.cqd-label');
       const icon = button.querySelector<HTMLElement>('.cqd-download-icon');
-      if (btnLabel) btnLabel.textContent = t('cancel') || 'Cancel';
+      const fileName = (button.dataset as any).cqdName || '';
+      const cancelText = t('cancel') || 'Cancel';
+
+      button.setAttribute('aria-label', `${cancelText} ${fileName}`.trim());
+
+      if (btnLabel) btnLabel.textContent = cancelText;
       if (icon) {
         icon.className = 'cqd-download-icon';
         icon.style.backgroundImage = `url("${CANCEL_ICON_SVG_URL}")`;
@@ -82,15 +87,20 @@ export function createDownloadButton(
       button.classList.remove('cqd-cancel');
       const btnLabel = button.querySelector<HTMLSpanElement>('.cqd-label');
       const icon = button.querySelector<HTMLElement>('.cqd-download-icon');
+      const fileName = (button.dataset as any).cqdName || '';
 
       if (isUnderlyingLoading) {
-        if (btnLabel) btnLabel.textContent = t('downloading') || 'Downloading...';
+        const text = t('downloading') || 'Downloading...';
+        button.setAttribute('aria-label', `${text} ${fileName}`.trim());
+        if (btnLabel) btnLabel.textContent = text;
         if (icon) {
           icon.className = 'cqd-download-icon cqd-spinner';
           icon.style.backgroundImage = 'none';
         }
       } else if (isUnderlyingTrying) {
-        if (btnLabel) btnLabel.textContent = t('trying') || 'Retrying...';
+        const text = t('trying') || 'Retrying...';
+        button.setAttribute('aria-label', `${text} ${fileName}`.trim());
+        if (btnLabel) btnLabel.textContent = text;
         if (icon) {
           icon.className = 'cqd-download-icon cqd-spinner';
           icon.style.backgroundImage = 'none';

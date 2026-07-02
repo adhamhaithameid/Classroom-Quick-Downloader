@@ -108,35 +108,43 @@ export function setButtonState(
   icon.style.backgroundImage = `url("${DOWNLOAD_ICON_SVG_URL}")`;
   icon.style.backgroundSize = '';
 
+  const fileName = (button.dataset as any).cqdName || '';
+
   button.classList.add(`cqd-${state}`);
 
   switch (state) {
     case 'idle':
+      button.setAttribute('aria-label', `${t('ariaDownload') || t('download') || 'Download'} ${fileName}`.trim());
       break;
 
     case 'loading':
       icon.style.backgroundImage = 'none';
       icon.className = 'cqd-download-icon cqd-spinner';
       label.textContent = t('downloading');
+      button.setAttribute('aria-label', `${t('downloading')} ${fileName}`.trim());
       button.disabled = false;
       if (isMouseOver) {
-        applyHoverCancelVisual(button, icon, label);
+        applyHoverCancelVisual(button, icon, label, fileName);
       }
       break;
 
-    case 'trying':
+    case 'trying': {
       icon.style.backgroundImage = 'none';
       icon.className = 'cqd-download-icon cqd-spinner';
-      label.textContent = options?.userMessage || t('trying') || 'Retrying...';
+      const msg = options?.userMessage || t('trying') || 'Retrying...';
+      label.textContent = msg;
+      button.setAttribute('aria-label', `${msg} ${fileName}`.trim());
       button.disabled = false;
       if (isMouseOver) {
-        applyHoverCancelVisual(button, icon, label);
+        applyHoverCancelVisual(button, icon, label, fileName);
       }
       break;
+    }
 
     case 'cancel':
       button.disabled = false;
       label.textContent = t('cancel');
+      button.setAttribute('aria-label', `${t('cancel')} ${fileName}`.trim());
       icon.style.backgroundImage = `url("${CANCEL_ICON_SVG_URL}")`;
       icon.style.backgroundSize = '20px 20px';
       break;
@@ -144,6 +152,7 @@ export function setButtonState(
     case 'cancelled':
       button.disabled = true;
       label.textContent = t('cancelled');
+      button.setAttribute('aria-label', `${t('cancelled')} ${fileName}`.trim());
       icon.style.backgroundImage = `url("${CANCEL_ICON_SVG_URL}")`;
       icon.style.backgroundSize = '20px 20px';
       break;
@@ -151,6 +160,7 @@ export function setButtonState(
     case 'success':
       button.classList.add('cqd-success');
       label.textContent = t('downloaded');
+      button.setAttribute('aria-label', `${t('downloaded')} ${fileName}`.trim());
       icon.style.backgroundImage = `url("${SUCCESS_ICON_SVG_URL}")`;
       icon.style.backgroundSize = '20px 20px';
       break;
@@ -158,6 +168,7 @@ export function setButtonState(
     case 'error':
       button.disabled = true;
       label.textContent = options?.userMessage || t('error');
+      button.setAttribute('aria-label', `${options?.userMessage || t('error')} ${fileName}`.trim());
       // stack overflow time
       // stack overflow time
       errorDetail.textContent = options?.userMessage || '';
@@ -173,10 +184,12 @@ export function setButtonState(
 function applyHoverCancelVisual(
   button: HTMLButtonElement,
   icon: HTMLElement,
-  label: HTMLSpanElement
+  label: HTMLSpanElement,
+  fileName: string = ''
 ): void {
   button.classList.add('cqd-cancel');
   label.textContent = t('cancel') || 'Cancel';
+  button.setAttribute('aria-label', `${t('cancel') || 'Cancel'} ${fileName}`.trim());
   icon.className = 'cqd-download-icon';
   icon.style.backgroundImage = `url("${CANCEL_ICON_SVG_URL}")`;
   icon.style.backgroundSize = '20px 20px';
