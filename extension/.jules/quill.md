@@ -1,0 +1,4 @@
+## 2025-12-14 — Added tests for resolveStudentWorkUrl malformed URL inputs
+**Gap Found:** The `resolveStudentWorkUrl` function handles empty strings, malformed URLs (URLs that cannot be parsed), and non-HTTPS protocols, but these error branches were completely untested in `student-work-resolver.test.ts`.
+**Tests Added/Improved:** `student-work-resolver.test.ts` was modified to include test blocks verifying that empty inputs, unparseable URLs, non-HTTPS protocols (like `http:`), and `javascript:` URLs correctly result in a `{ ok: false }` return object with specific error reasons.
+**Learning:** The URL-parsing logic is often a vector for edge-case errors. It's crucial to explicitly test inputs like `not a url at all`, `http://:::`, and empty strings across all functions dealing with URL validation or creation, as `URL` parsing can fail in unexpected ways depending on the environment.

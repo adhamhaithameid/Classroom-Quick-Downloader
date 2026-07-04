@@ -82,6 +82,30 @@ describe('student_work/resolver', () => {
     globalThis.BroadcastChannel = originalBroadcastChannel;
   });
 
+  it('rejects empty URL input', async () => {
+    const result = await resolveStudentWorkUrl('', { stageTimeoutMs: 10 });
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe('empty_url');
+  });
+
+  it('rejects malformed URL input', async () => {
+    const result = await resolveStudentWorkUrl('http://:::', { stageTimeoutMs: 10 });
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe('malformed_url');
+  });
+
+  it('rejects URLs with non-HTTPS scheme', async () => {
+    const result = await resolveStudentWorkUrl('http://classroom.google.com/g/tg/a/b/c', { stageTimeoutMs: 10 });
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe('invalid_scheme');
+  });
+
+  it('rejects javascript: URLs', async () => {
+    const result = await resolveStudentWorkUrl('javascript:alert(1)', { stageTimeoutMs: 10 });
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe('invalid_scheme');
+  });
+
   it('returns input URL unchanged for non-student-work links', async () => {
     const result = await resolveStudentWorkUrl(
       'https://drive.google.com/file/d/FILE/view',
