@@ -1131,3 +1131,30 @@ func TestRegisterSchemaPaths_NewCountTracksInsertedRowsOnly(t *testing.T) {
 		t.Fatalf("expected newPaths=1, got %v", newPaths)
 	}
 }
+
+func TestIngestBatchHandler_OversizedBody(t *testing.T) {
+	sqlDB := newTestDB(t)
+	defer sqlDB.Close()
+
+	handler := IngestBatchHandler(sqlDB, "secret")
+
+	// Create a body larger than 5MB
+	oversizedBody := strings.Repeat("a", (5<<20)+10)
+
+	req := httptest.NewRequest(http.MethodPost, "/ingest-batch", strings.NewReader(oversizedBody))
+	req.Header.Set("X-DO-SECRET", "secret")
+
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	// MaxBytesReader returns an error when reading the body if it exceeds the limit.
+	// io.ReadAll(r.Body) will return this error, which causes the handler to return 400 Bad Request.
+	// Go 1.20+ adds a specific error for this, but standard behavior returns a read error leading to 400 in this handler.
+	// Let's assert we get 400 Bad Request OR 413 Request Entity Too Large, and verify the body message implies a body read error.
+	if rr.Code != http.StatusBadRequest && rr.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("expected status 400 or 413 for oversized body, got %d", rr.Code)
+	}
+	if rr.Code == http.StatusBadRequest && !strings.Contains(rr.Body.String(), "invalid request body") {
+		t.Fatalf("expected 'invalid request body' error message, got %q", rr.Body.String())
+	}
+}

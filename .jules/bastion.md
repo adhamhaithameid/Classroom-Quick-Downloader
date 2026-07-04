@@ -1,0 +1,4 @@
+## 2026-07-04 — Oracle store_batch missing oversized body test
+**Gap Found:** The Oracle backend `store_batch` handler (`POST /ingest-batch`) lacked test coverage for rejecting requests with a body exceeding the 5MB maximum size limit (enforced via `http.MaxBytesReader`).
+**Tests Added/Improved:** Added `TestIngestBatchHandler_OversizedBody` to `oracle-backend/internal/handlers/store_batch_unit_test.go` to verify that requests exceeding the limit correctly return 400/413 status codes.
+**Learning:** Always verify that input limit checks implemented via middleware or readers (`http.MaxBytesReader`) have explicit unit tests. In Go, `MaxBytesReader` causes `io.ReadAll` to return an error, which often leads to a 400 Bad Request instead of a 413, so tests should accommodate the specific library behavior or both codes.
