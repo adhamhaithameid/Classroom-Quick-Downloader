@@ -125,18 +125,45 @@ export class GoogleClassroomApiClient implements ClassroomApiClient {
       }
       if (pageToken) requestUrl.searchParams.set('pageToken', pageToken);
 
-      const response = await fetch(requestUrl.toString(), {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        signal,
-      });
-      if (!response.ok) {
-        return submissions;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+      const onExternalAbort = () => controller.abort();
+      if (signal) {
+        if (signal.aborted) onExternalAbort();
+        else signal.addEventListener('abort', onExternalAbort);
       }
 
-      const payload = await response.json() as GoogleClassroomStudentSubmissionResponse;
+      let response: Response;
+      try {
+        response = await fetch(requestUrl.toString(), {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          signal: controller.signal,
+        });
+      } catch (err) {
+        if (signal?.aborted) throw err;
+        throw new Error('Classroom API fetch failed or timed out');
+      } finally {
+        clearTimeout(timeoutId);
+        if (signal) {
+          signal.removeEventListener('abort', onExternalAbort);
+        }
+      }
+
+      if (!response.ok) {
+        throw new Error(`Classroom API error: ${response.status}`);
+      }
+
+      let payload: GoogleClassroomStudentSubmissionResponse;
+      try {
+        payload = await response.json() as GoogleClassroomStudentSubmissionResponse;
+      } catch (err) {
+        throw new Error('Failed to parse Classroom API response');
+      }
+
       const batch = (payload.studentSubmissions || [])
         .map((submission) => mapSubmission(submission, context.authUser))
         .filter((submission): submission is ClassroomApiStudentSubmission => !!submission);

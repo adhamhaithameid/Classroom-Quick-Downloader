@@ -1,0 +1,4 @@
+## 2023-10-29 — Add timeout and try/catch to classroom API client fetch
+**Finding:** The `fetch` call in `extension/src/engines/v3/api/classroom-api-client.ts` had no timeout, potentially allowing requests to hang indefinitely, and the `response.json()` call had no `try/catch` block, meaning a malformed response would crash the engine silently.
+**Action:** Introduced an `AbortController` with a 15000 ms timeout to the `fetch` call (safely syncing with any external `AbortSignal` using event listeners). Added a `try/catch` block around `response.json()`, returning the existing submissions array on parse failure to gracefully degrade instead of crashing.
+**Learning:** In the v3 API layer, all `fetch` requests must be strictly bounded with timeouts, and parsing external JSON data must always be defensively wrapped to ensure engine resilience.
