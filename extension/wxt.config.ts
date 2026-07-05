@@ -33,7 +33,6 @@ export default defineConfig({
     homepage_url: "https://classroom-quick-downloader-website.pages.dev",
     permissions: [
       'downloads',
-      'tabs',
       'storage',
       'alarms'
     ],
