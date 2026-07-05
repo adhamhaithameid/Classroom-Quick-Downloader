@@ -49,7 +49,7 @@ class LanguageController {
       try {
         if (typeof chrome !== 'undefined' && chrome.storage?.local) {
           const result = await chrome.storage.local.get(STORAGE_KEY);
-          this.state = result[STORAGE_KEY] || cloneDefaultState();
+          this.state = result?.[STORAGE_KEY] || cloneDefaultState();
         } else {
           this.state = cloneDefaultState();
         }

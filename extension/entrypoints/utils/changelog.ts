@@ -154,18 +154,22 @@ function normalizeManualData(): ChangelogData {
 const MANUAL_DATA = normalizeManualData();
 
 async function persistManualCache(data: ChangelogData): Promise<void> {
-  await chrome.storage.local.set({
-    [STORAGE_KEY]: {
-      schemaVersion: 2,
-      cachedItems: data.entries,
-      cachedConfig: data.config,
-      cachedMeta: data.meta,
-      cachedAt: data.lastFetched,
-      revisionToken: data.revisionToken,
-      lastSeenId: data.entries[0]?.id || '',
-      lastChecksum: data.meta?.contentChecksum || '',
-    },
-  });
+  try {
+    await chrome.storage.local.set({
+      [STORAGE_KEY]: {
+        schemaVersion: 2,
+        cachedItems: data.entries,
+        cachedConfig: data.config,
+        cachedMeta: data.meta,
+        cachedAt: data.lastFetched,
+        revisionToken: data.revisionToken,
+        lastSeenId: data.entries[0]?.id || '',
+        lastChecksum: data.meta?.contentChecksum || '',
+      },
+    });
+  } catch (error) {
+    console.warn('Failed to persist manual cache:', error);
+  }
 }
 
 export async function fetchChangelogDetailed(force = false): Promise<ChangelogFetchResult> {
@@ -228,21 +232,30 @@ function migrateSeenState(raw: unknown): SeenState {
 }
 
 export async function markAsSeen(version: string, data?: ChangelogData | null): Promise<void> {
-  const normalizedVersion = normalizeVersion(version);
-  if (!normalizedVersion) return;
-  const storage = await chrome.storage.local.get(SEEN_KEY);
-  const seen = migrateSeenState(storage[SEEN_KEY]);
-  seen[normalizedVersion] = getSeenToken(normalizedVersion, data);
-  await chrome.storage.local.set({ [SEEN_KEY]: seen });
+  try {
+    const normalizedVersion = normalizeVersion(version);
+    if (!normalizedVersion) return;
+    const storage = await chrome.storage.local.get(SEEN_KEY);
+    const seen = migrateSeenState(storage?.[SEEN_KEY]);
+    seen[normalizedVersion] = getSeenToken(normalizedVersion, data);
+    await chrome.storage.local.set({ [SEEN_KEY]: seen });
+  } catch (error) {
+    console.warn('Failed to mark version as seen:', error);
+  }
 }
 
 export async function isVersionSeen(version: string, data?: ChangelogData | null): Promise<boolean> {
-  const normalizedVersion = normalizeVersion(version);
-  if (!normalizedVersion) return false;
-  const storage = await chrome.storage.local.get(SEEN_KEY);
-  const seen = migrateSeenState(storage[SEEN_KEY]);
-  if (!seen[normalizedVersion]) return false;
-  return seen[normalizedVersion] === getSeenToken(normalizedVersion, data);
+  try {
+    const normalizedVersion = normalizeVersion(version);
+    if (!normalizedVersion) return false;
+    const storage = await chrome.storage.local.get(SEEN_KEY);
+    const seen = migrateSeenState(storage?.[SEEN_KEY]);
+    if (!seen[normalizedVersion]) return false;
+    return seen[normalizedVersion] === getSeenToken(normalizedVersion, data);
+  } catch (error) {
+    console.warn('Failed to check if version is seen:', error);
+    return false;
+  }
 }
 
 export function getMatchingRule(config: ChangelogConfig | undefined, currentVersion: string): NotificationRule | null {
