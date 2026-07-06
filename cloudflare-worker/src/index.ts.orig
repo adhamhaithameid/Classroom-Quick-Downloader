@@ -204,7 +204,7 @@ async function createSessionTokenWithBinding(
   if (bindingMode !== "off") {
     payload.fp = await buildSessionFingerprint(ip, userAgent);
   }
-  
+
   const payloadB64 = btoa(JSON.stringify(payload));
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey(
@@ -214,13 +214,13 @@ async function createSessionTokenWithBinding(
     false,
     ["sign"]
   );
-  
+
   const signature = await crypto.subtle.sign(
     "HMAC",
     key,
     encoder.encode(payloadB64)
   );
-  
+
   const sigB64 = btoa(String.fromCharCode(...new Uint8Array(signature)));
   return `${payloadB64}.${sigB64}`;
 }
@@ -245,7 +245,7 @@ export async function verifySessionToken(
   try {
     const [payloadB64, sigB64] = token.split(".");
     if (!payloadB64 || !sigB64) return false;
-    
+
     const encoder = new TextEncoder();
     const key = await crypto.subtle.importKey(
       "raw",
@@ -254,7 +254,7 @@ export async function verifySessionToken(
       false,
       ["verify"]
     );
-    
+
     const signature = Uint8Array.from(atob(sigB64), c => c.charCodeAt(0));
     const isValid = await crypto.subtle.verify(
       "HMAC",
@@ -262,16 +262,16 @@ export async function verifySessionToken(
       signature,
       encoder.encode(payloadB64)
     );
-    
+
     if (!isValid) return false;
-    
+
     let payload: SessionPayload;
     try {
       payload = JSON.parse(atob(payloadB64));
     } catch {
       return false;
     }
-    
+
     // Check expiration
     if (Date.now() > payload.exp) return false;
 
@@ -331,22 +331,22 @@ function getDangerStepUpCookie(request: Request): string | null {
  */
 export function isLocalEnvironment(hostname: string): boolean {
   if (!hostname) return false;
-  
+
   // Standard localhost aliases
   if (hostname === 'localhost' || hostname === '127.0.0.1') return true;
-  
+
   // IPv6 loopback
   if (hostname === '::1' || hostname === '[::1]') return true;
-  
+
   // Null/any address (dev servers bound to 0.0.0.0)
   if (hostname === '0.0.0.0') return true;
-  
+
   // IPv4 loopback range (127.0.0.0/8)
   if (hostname.startsWith('127.')) return true;
-  
+
   // NOTE: Private ranges (10.*, 172.16-31.*, 192.168.*) are NOT included
   // They may serve HTTPS and should retain Secure cookie flag
-  
+
   return false;
 }
 
@@ -356,7 +356,7 @@ export function createSessionCookieHeader(token: string, url?: URL, env?: Worker
   const isLoopback = url && isLocalEnvironment(url.hostname);
   const allowInsecure = envFlagEnabled(env?.ALLOW_INSECURE_COOKIES);
   const isLocalDev = isLoopback || allowInsecure;
-  
+
   if (isLocalDev) {
     // Development: SameSite=Lax without Secure for HTTP compatibility
     return `${COOKIE_NAME}=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=3600`;
@@ -379,7 +379,7 @@ export function clearSessionCookieHeader(url?: URL, env?: WorkerEnv): string {
   const isLoopback = url && isLocalEnvironment(url.hostname);
   const allowInsecure = envFlagEnabled(env?.ALLOW_INSECURE_COOKIES);
   const isLocalDev = isLoopback || allowInsecure;
-  
+
   if (isLocalDev) {
     return `${COOKIE_NAME}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0`;
   }
@@ -1055,7 +1055,7 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
       // Rate limit: record failed attempt
       const rateLimitReq = new Request(new URL("/auth/login-attempt", request.url).toString(), {
         method: "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           "X-Admin-Secret": env.DO_SHARED_SECRET,
         },
@@ -1113,7 +1113,7 @@ async function handleRoot(request: Request, env: WorkerEnv): Promise<Response> {
     // Successful login - clear rate limit and create session
     const successReq = new Request(new URL("/auth/login-attempt", request.url).toString(), {
       method: "POST",
-      headers: { 
+      headers: {
         "Content-Type": "application/json",
         "X-Admin-Secret": env.DO_SHARED_SECRET,
       },
@@ -1932,12 +1932,12 @@ async function handleProtectedAdminEndpoint(request: Request, env: WorkerEnv): P
   const stub = getDownloadsStub(env);
   const country = (request.cf as unknown as { country?: string })?.country;
   const headers = new Headers(request.headers);
-  
+
   // CRITICAL: Inject the real admin secret for DO authorization
   if (!auth.hasValidSecret) {
     headers.set("X-Admin-Secret", env.DO_SHARED_SECRET);
   }
-  
+
   if (country) {
     headers.set("CF-IPCountry", country);
     headers.set("X-Geo-Country", country);
@@ -1973,10 +1973,10 @@ async function handleProtectedAdminEndpoint(request: Request, env: WorkerEnv): P
 
 async function proxyToDO(request: Request, env: WorkerEnv): Promise<Response> {
   const stub = getDownloadsStub(env);
-  
+
   // Extract country from Cloudflare's incoming request properties
   const country = (request.cf as unknown as { country?: string })?.country;
-  
+
   // Create a new request based on the original, but with the added header
   const headers = new Headers(request.headers);
   if (country) {
@@ -2146,8 +2146,6 @@ async function handleOraclePublicWebsiteProxy(request: Request, env: WorkerEnv):
       redirect: "follow",
       signal: timeoutController.signal,
     });
-  } catch (error) {
-    throw new Error("oracle_fetch_failed", { cause: error });
   } finally {
     clearTimeout(timeoutId);
   }
