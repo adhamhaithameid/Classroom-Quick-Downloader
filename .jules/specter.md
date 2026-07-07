@@ -1,0 +1,4 @@
+## 2024-05-14 — Debounced Orchestrator DOM Observer
+**Finding:** The primary `MutationObserver` in `extension/src/v2/orchestrator/orchestrator.ts` fed every mutation batch directly to `engine.handleMutations()` without any throttling. In Google Classroom's stream view, this triggers hundreds of times per second during initial load or heavy DOM operations, burning CPU needlessly.
+**Action:** Introduced a 50ms `debounceTimer` and a `pendingMutations` accumulation array in `setupDomObserver`. This batches rapid mutations into a single `handleMutations` call, significantly lowering execution frequency while ensuring no mutations are lost. Also added cleanup logic in `stop()` and `abortCurrentPage()`.
+**Learning:** For performance agents, always make sure to clear timeouts on component unmounts (`abortCurrentPage`/`stop`) and buffer mutation records (`[...pendingMutations]`) when delaying `MutationObserver` processing to prevent data loss.

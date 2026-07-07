@@ -67,6 +67,12 @@ export class Orchestrator {
   /** The single MutationObserver that feeds all active engines */
   private domObserver: MutationObserver | null = null;
 
+  /** Timer for debouncing mutations */
+  private debounceTimer: number | null = null;
+
+  /** Pending mutations waiting to be processed */
+  private pendingMutations: MutationRecord[] = [];
+
   /**
    * AbortController for the current page's lifecycle.
    * When the user navigates, we abort this controller, which
@@ -151,11 +157,17 @@ export class Orchestrator {
     // 2. Abort current page lifecycle
     this.abortCurrentPage();
 
-    // 3. Disconnect DOM observer
+    // 3. Disconnect DOM observer and clear timer
     if (this.domObserver) {
       this.domObserver.disconnect();
       this.domObserver = null;
     }
+
+    if (this.debounceTimer !== null) {
+      window.clearTimeout(this.debounceTimer);
+      this.debounceTimer = null;
+    }
+    this.pendingMutations = [];
 
     // 4. Destroy all active engines
     for (const engine of this.activeEngines) {
@@ -331,16 +343,35 @@ export class Orchestrator {
     this.domObserver = new MutationObserver((mutations) => {
       if (!this.running) return;
 
-      // Feed mutations to ALL active engines
-      for (const engine of this.activeEngines) {
-        try {
-          engine.handleMutations(mutations);
-        } catch (e) {
-          console.error(
-            `[CQD Orchestrator] Error in ${engine.name}.handleMutations:`, e,
-          );
+      // Accumulate mutations
+      this.pendingMutations.push(...mutations);
+
+      // Debounce: batch rapid mutations into a single processing tick
+      // Classroom's stream page can trigger hundreds of mutations during initial render
+      if (this.debounceTimer !== null) return;
+
+      this.debounceTimer = window.setTimeout(() => {
+        this.debounceTimer = null;
+
+        if (!this.running) {
+          this.pendingMutations = [];
+          return;
         }
-      }
+
+        const batchedMutations = [...this.pendingMutations];
+        this.pendingMutations = [];
+
+        // Feed mutations to ALL active engines
+        for (const engine of this.activeEngines) {
+          try {
+            engine.handleMutations(batchedMutations);
+          } catch (e) {
+            console.error(
+              `[CQD Orchestrator] Error in ${engine.name}.handleMutations:`, e,
+            );
+          }
+        }
+      }, 50); // 50ms debounce
     });
 
     // Start observing
@@ -388,10 +419,16 @@ export class Orchestrator {
       this.pageAbortController = null;
     }
 
-    // 2. Disconnect DOM observer
+    // 2. Disconnect DOM observer and clear timer
     if (this.domObserver) {
       this.domObserver.disconnect();
     }
+
+    if (this.debounceTimer !== null) {
+      window.clearTimeout(this.debounceTimer);
+      this.debounceTimer = null;
+    }
+    this.pendingMutations = [];
 
     // 3. Destroy active engines
     for (const engine of this.activeEngines) {
