@@ -1,0 +1,4 @@
+## 2024-05-15 — Added skip link and focus management to layout
+**Finding:** Priority 5 and 6: The layout was missing a skip navigation link, making keyboard navigation difficult. Furthermore, route transitions caused screen reader users to lose focus (no `afterNavigate` focus management). WCAG 2.4.1 and SPA best practices failure.
+**Action:** Added a `.skip-nav` link (visible on focus) and a `<main>` container with `id="main-content"` and `tabindex="-1"` in `website/src/routes/+layout.svelte`. Implemented `afterNavigate` from SvelteKit to shift focus to the main container post route changes.
+**Learning:** Remember that SvelteKit being an SPA requires intentional programmatic focus shifting during client-side navigations, and global structural elements like skip links belong in `+layout.svelte`.
