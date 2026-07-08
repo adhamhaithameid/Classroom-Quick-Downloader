@@ -75,6 +75,7 @@
   description="Svelte-native email preview for Classroom Quick Downloader with consistent cross-device rendering."
   path="/emails2"
   keywords="classroom quick downloader email preview, svelte email page"
+  noindex={true}
 />
 
 <section class="emails2-page" aria-label="Classroom Quick Downloader email preview">

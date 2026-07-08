@@ -12,6 +12,7 @@
   description="Browser preview of the Classroom Quick Downloader advertisement email."
   path="/emails"
   keywords="classroom quick downloader email, classroom extension email ad"
+  noindex={true}
 />
 
 <section class="emails-page">
