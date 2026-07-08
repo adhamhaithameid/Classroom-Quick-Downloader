@@ -120,6 +120,15 @@ export function triggerPulseEffect(post: HTMLElement, type: PulseType): void {
     return; // Do nothing if animation is in progress
   }
   
+  const prefersReducedMotion = typeof window !== 'undefined' &&
+                               typeof window.matchMedia === 'function' &&
+                               window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  if (prefersReducedMotion) {
+    // If reduced motion is preferred, just return immediately without animating
+    return;
+  }
+
   // Mark as animating
   post.setAttribute(DEBOUNCE_ATTR, 'true');
   

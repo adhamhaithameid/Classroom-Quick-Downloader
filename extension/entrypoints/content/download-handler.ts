@@ -66,8 +66,14 @@ export async function handleCancelClick(button: HTMLButtonElement): Promise<void
     }
   }
 
-  button.classList.add('cqd-cancel-click-anim');
-  setTimeout(() => button.classList.remove('cqd-cancel-click-anim'), 400);
+  const prefersReducedMotion = typeof window !== 'undefined' &&
+                               typeof window.matchMedia === 'function' &&
+                               window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  if (!prefersReducedMotion) {
+    button.classList.add('cqd-cancel-click-anim');
+    setTimeout(() => button.classList.remove('cqd-cancel-click-anim'), 400);
+  }
 
   setButtonState(button, 'cancelled');
 

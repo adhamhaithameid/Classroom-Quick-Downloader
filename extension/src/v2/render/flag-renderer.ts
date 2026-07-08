@@ -346,7 +346,10 @@ function _handleBadgeClick(e: Event): void {
 
   // Pulse animation
   const badge = target.closest('.cqd-v2-flag') as HTMLElement;
-  if (badge) {
+  const prefersReducedMotion = typeof window !== 'undefined' &&
+                               typeof window.matchMedia === 'function' &&
+                               window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (badge && !prefersReducedMotion) {
     badge.classList.add('cqd-pulsing');
     setTimeout(() => badge.classList.remove('cqd-pulsing'), 600);
   }
