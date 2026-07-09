@@ -43,13 +43,12 @@
   },
   "_meta": {
     "removed-deps": "@playwright/test ^1.59.1 and playwright ^1.59.1 were unused (2026-02-28)",
-    "security-overrides": "shell-quote pinned to 1.8.4 (2026-06-24, CRITICAL CVE: newline escape bypass)"
+    "security-overrides": "shell-quote pinned to 1.9.0 (2026-08-15, supersedes the 1.8.4 pin from 2026-06-24)"
   },
   "pnpm": {
     "overrides": {
       "@commitlint/config-validator>ajv": "8.18.0",
-      "eslint>ajv": "8.18.0",
-      "undici": "^7.28.0",
+      "undici": "^7.29.0",
       "@isaacs/brace-expansion": ">=5.0.1",
       "minimatch": "^10.2.3",
       "rollup": "^4.59.0",
@@ -60,35 +59,26 @@
       "picomatch@4.0.3": "4.0.4",
       "devalue": "^5.8.1",
       "defu": "^6.1.5",
-      "vite": "^8.0.16",
+      "vite": "^8.2.1",
       "cookie": "0.7.2",
       "flatted": ">=3.4.2",
       "uuid": ">=14.0.0",
-      "postcss": ">=8.5.10",
-      "fast-uri": "3.1.2",
-      "brace-expansion@>=5.0.0 <5.0.6": "5.0.6",
+      "postcss": ">=8.5.23",
+      "fast-uri": "3.1.5",
+      "brace-expansion": "5.0.9",
       "ws": "8.21.0",
       "tmp": "0.2.7",
-      "shell-quote": "1.8.4",
+      "shell-quote": "1.9.0",
+      "adm-zip": "0.6.0",
       "esbuild": "0.28.1",
-      "js-yaml": ">=4.2.0",
-      "undici": "^7.28.0",
-      "vite": "^8.0.16"
-    },
-    "packageExtensions": {
-      "eslint@10.2.0": {
-        "dependencies": {
-          "ajv-draft-04": "1.0.0"
-        }
-      }
-    },
-    "patchedDependencies": {
-      "eslint@10.2.0": "patches/eslint@10.2.0.patch"
+      "js-yaml": "4.3.1",
+      "nanoid": "3.3.17",
+      "sharp": "0.35.0"
     }
   },
   "devDependencies": {
-    "@commitlint/cli": "^20.5.0",
-    "@commitlint/config-conventional": "^20.5.0",
+    "@commitlint/cli": "^20.5.3",
+    "@commitlint/config-conventional": "^20.5.3",
     "husky": "^9.1.7"
   }
 }
