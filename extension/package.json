@@ -36,22 +36,22 @@
     "zip:all": "wxt zip -b chrome && wxt zip -b firefox && wxt zip -b edge"
   },
   "dependencies": {
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4"
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
   },
   "devDependencies": {
     "@testing-library/dom": "^10.4.1",
-    "@types/chrome": "^0.1.39",
-    "@types/jsdom": "^28.0.1",
-    "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3",
-    "@vitest/coverage-v8": "^4.1.2",
+    "@types/chrome": "^0.1.43",
+    "@types/jsdom": "^28.0.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitest/coverage-v8": "^4.1.10",
     "@wxt-dev/module-react": "^1.2.2",
     "fake-indexeddb": "^6.2.5",
-    "happy-dom": "20.8.9",
-    "jsdom": "^29.0.1",
-    "typescript": "^6.0.2",
-    "vitest": "^4.1.2",
-    "wxt": "^0.20.20"
+    "happy-dom": "20.11.2",
+    "jsdom": "^29.1.1",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.10",
+    "wxt": "^0.20.27"
   }
 }
