@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"net"
 	"net/http"
@@ -88,6 +89,58 @@ func TestArchiverHTTPClientDoesNotFollowRedirects(t *testing.T) {
 	}
 	if err := client.CheckRedirect(nil, nil); !errors.Is(err, http.ErrUseLastResponse) {
 		t.Fatalf("expected http.ErrUseLastResponse, got %v", err)
+	}
+}
+
+func TestArchiverHTTPClientRejectsDNSRebindingBeforeDial(t *testing.T) {
+	t.Parallel()
+
+	dialCalled := false
+	client := newArchiverHTTPClientWithNetwork(
+		func(context.Context, string, string) ([]net.IP, error) {
+			return []net.IP{net.ParseIP("169.254.169.254")}, nil
+		},
+		func(context.Context, string, string) (net.Conn, error) {
+			dialCalled = true
+			return nil, nil
+		},
+	)
+	transport, ok := client.Transport.(*http.Transport)
+	if !ok || transport.DialContext == nil {
+		t.Fatal("expected guarded HTTP transport")
+	}
+
+	if _, err := transport.DialContext(context.Background(), "tcp", "oracle.example.com:443"); err == nil {
+		t.Fatal("expected private rebound address to be rejected")
+	}
+	if dialCalled {
+		t.Fatal("network dialer was called for a private rebound address")
+	}
+}
+
+func TestArchiverHTTPClientDialsValidatedIPAddress(t *testing.T) {
+	t.Parallel()
+
+	var dialedAddress string
+	client := newArchiverHTTPClientWithNetwork(
+		func(context.Context, string, string) ([]net.IP, error) {
+			return []net.IP{net.ParseIP("93.184.216.34")}, nil
+		},
+		func(_ context.Context, _, address string) (net.Conn, error) {
+			dialedAddress = address
+			return nil, nil
+		},
+	)
+	transport, ok := client.Transport.(*http.Transport)
+	if !ok || transport.DialContext == nil {
+		t.Fatal("expected guarded HTTP transport")
+	}
+
+	if _, err := transport.DialContext(context.Background(), "tcp", "oracle.example.com:443"); err != nil {
+		t.Fatalf("expected public address to reach the network dialer: %v", err)
+	}
+	if dialedAddress != "93.184.216.34:443" {
+		t.Fatalf("expected resolved IP to be pinned, got %q", dialedAddress)
 	}
 }
 
