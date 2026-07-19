@@ -1,7 +1,7 @@
 # oracle-backend/Dockerfile
 # Multi-stage build for minimal production image
 
-FROM golang:1.26-alpine AS builder
+FROM golang:1.26.6-alpine3.24@sha256:af8d6740070b8906d12eae1c3e3ea0957fb63f492051ea05e354c38ef9fe88df AS builder
 
 WORKDIR /app
 
@@ -20,7 +20,7 @@ RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o archiver ./cmd/archiver
 
 # -------------------------------------------
 # Production image
-FROM alpine:3.20
+FROM alpine:3.24.1@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
 
 # Install runtime dependencies
 RUN apk add --no-cache ca-certificates tzdata
