@@ -136,24 +136,16 @@ func buildSummaryURLForDay(baseURL, day string) (string, error) {
 	return parsed.String(), nil
 }
 
-// localhostHosts is the set of hostnames that map unambiguously to the local
-// machine. The archiver runs on the same VM as the Oracle backend and connects
-// to it over localhost by default, so http:// is permitted for these hosts only.
 var localhostHosts = map[string]bool{
 	"localhost": true,
 	"127.0.0.1": true,
 	"::1":       true,
 }
 
-// parseAndValidateOutboundURL validates raw as a permitted outbound URL.
-// DNS resolution uses net.LookupIP. Tests should call validateOutboundURL
-// directly with a stub resolver instead of swapping a package-level variable.
 func parseAndValidateOutboundURL(raw string) (string, error) {
 	return validateOutboundURL(raw, net.LookupIP)
 }
 
-// validateOutboundURL is the testable core of parseAndValidateOutboundURL.
-// resolve is called only for https:// URLs; tests pass a stub to avoid real DNS.
 func validateOutboundURL(raw string, resolve func(string) ([]net.IP, error)) (string, error) {
 	v := strings.TrimSpace(raw)
 	if v == "" {
@@ -163,39 +155,92 @@ func validateOutboundURL(raw string, resolve func(string) ([]net.IP, error)) (st
 	if err != nil {
 		return "", err
 	}
-
-	host := strings.TrimSpace(u.Hostname())
+	host := strings.ToLower(strings.TrimSpace(u.Hostname()))
 	if host == "" {
 		return "", errors.New("missing url host")
 	}
+	if u.User != nil {
+		return "", errors.New("url credentials are not allowed")
+	}
 
-	switch u.Scheme {
+	switch strings.ToLower(u.Scheme) {
 	case "https":
-		// Full SSRF guard for remote URLs: resolve and reject any private/internal IP.
 		ips, err := resolve(host)
 		if err != nil {
 			return "", fmt.Errorf("cannot resolve hostname: %w", err)
 		}
-		if len(ips) == 0 {
-			return "", errors.New("hostname did not resolve to any IP address")
-		}
-		for _, ip := range ips {
-			if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() ||
-				ip.IsUnspecified() || ip.IsMulticast() {
-				return "", errors.New("URL resolves to a private/internal address — blocked")
-			}
+		if err := validateResolvedIPs(ips, false); err != nil {
+			return "", err
 		}
 	case "http":
-		// http:// is only permitted for explicit localhost connections
-		// (same-VM Oracle backend). All other http:// targets are rejected.
 		if !localhostHosts[host] {
-			return "", fmt.Errorf("http:// is only permitted for localhost; use https:// for %q", host)
+			return "", fmt.Errorf("http is only permitted for localhost; use https for %q", host)
 		}
 	default:
-		return "", fmt.Errorf("unsupported URL scheme %q; use https:// (or http://localhost for local use)", u.Scheme)
+		return "", fmt.Errorf("unsupported url scheme %q", u.Scheme)
 	}
 
 	return u.String(), nil
+}
+
+func validateResolvedIPs(ips []net.IP, allowLoopback bool) error {
+	if len(ips) == 0 {
+		return errors.New("hostname did not resolve to any IP address")
+	}
+	for _, ip := range ips {
+		if ip == nil || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsUnspecified() || ip.IsMulticast() {
+			return errors.New("url resolves to a private or internal address")
+		}
+		if ip.IsLoopback() != allowLoopback {
+			return errors.New("url resolves to a disallowed address")
+		}
+	}
+	return nil
+}
+
+type lookupIPFunc func(context.Context, string, string) ([]net.IP, error)
+type dialContextFunc func(context.Context, string, string) (net.Conn, error)
+
+func newArchiverHTTPClient() *http.Client {
+	dialer := &net.Dialer{Timeout: 10 * time.Second, KeepAlive: 30 * time.Second}
+	return newArchiverHTTPClientWithNetwork(net.DefaultResolver.LookupIP, dialer.DialContext)
+}
+
+func newArchiverHTTPClientWithNetwork(resolve lookupIPFunc, dial dialContextFunc) *http.Client {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.Proxy = nil
+	transport.DialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
+		host, port, err := net.SplitHostPort(address)
+		if err != nil {
+			return nil, fmt.Errorf("invalid outbound address: %w", err)
+		}
+		ips, err := resolve(ctx, "ip", host)
+		if err != nil {
+			return nil, fmt.Errorf("cannot resolve outbound hostname: %w", err)
+		}
+		allowLoopback := localhostHosts[strings.ToLower(host)]
+		if err := validateResolvedIPs(ips, allowLoopback); err != nil {
+			return nil, err
+		}
+
+		var lastErr error
+		for _, ip := range ips {
+			conn, dialErr := dial(ctx, network, net.JoinHostPort(ip.String(), port))
+			if dialErr == nil {
+				return conn, nil
+			}
+			lastErr = dialErr
+		}
+		return nil, fmt.Errorf("cannot connect to validated outbound address: %w", lastErr)
+	}
+
+	return &http.Client{
+		Transport: transport,
+		Timeout:   15 * time.Second,
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
 }
 
 func main() {
@@ -248,14 +293,7 @@ func main() {
 		req.Header.Set("X-Archiver-Secret", *secret)
 	}
 
-	httpClient := &http.Client{
-		Timeout: 15 * time.Second,
-		// Never follow redirects: a validated URL that issues a 3xx to an
-		// internal address would bypass the SSRF guard above.
-		CheckRedirect: func(*http.Request, []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-	}
+	httpClient := newArchiverHTTPClient()
 	// #nosec G107,G704 -- URL is validated by parseAndValidateOutboundURL before request creation.
 	resp, err := httpClient.Do(req)
 	if err != nil {
