@@ -281,14 +281,107 @@ function parseViewBox(value: unknown): string | undefined {
   return normalized;
 }
 
-function isSafeSvgMarkup(svg: string): boolean {
-  const normalized = svg.toLowerCase();
-  if (normalized.includes('<script')) return false;
-  if (normalized.includes('<foreignobject')) return false;
-  if (normalized.includes('<iframe')) return false;
-  if (/on[a-z]+\s*=/.test(normalized)) return false;
-  if (normalized.includes('javascript:')) return false;
+const SAFE_SVG_ELEMENTS = new Set([
+  'circle',
+  'ellipse',
+  'g',
+  'line',
+  'path',
+  'polygon',
+  'polyline',
+  'rect'
+]);
+
+const SAFE_SVG_ATTRIBUTES = new Set([
+  'cx',
+  'cy',
+  'd',
+  'fill',
+  'fill-opacity',
+  'fill-rule',
+  'height',
+  'opacity',
+  'points',
+  'r',
+  'rx',
+  'ry',
+  'stroke',
+  'stroke-dasharray',
+  'stroke-dashoffset',
+  'stroke-linecap',
+  'stroke-linejoin',
+  'stroke-miterlimit',
+  'stroke-opacity',
+  'stroke-width',
+  'transform',
+  'vector-effect',
+  'width',
+  'x',
+  'x1',
+  'x2',
+  'y',
+  'y1',
+  'y2'
+]);
+
+function isSafeSvgAttributeValue(value: string): boolean {
+  if (!value || value.length > 4096) return false;
+  if (/[&<>`\u0000-\u001f\u007f]/.test(value)) return false;
+  return !/(?:javascript:|data:|url\s*\(|expression\s*\(|@import)/i.test(value);
+}
+
+function hasOnlySafeSvgAttributes(rawAttributes: string): boolean {
+  let offset = 0;
+  const seen = new Set<string>();
+  const attributePattern = /\s+([a-zA-Z][a-zA-Z0-9-]*)\s*=\s*(["'])(.*?)\2/gy;
+
+  while (offset < rawAttributes.length) {
+    attributePattern.lastIndex = offset;
+    const match = attributePattern.exec(rawAttributes);
+    if (!match) return rawAttributes.slice(offset).trim() === '';
+
+    const name = match[1].toLowerCase();
+    const value = match[3];
+    if (!SAFE_SVG_ATTRIBUTES.has(name) || seen.has(name) || !isSafeSvgAttributeValue(value)) {
+      return false;
+    }
+    seen.add(name);
+    offset = attributePattern.lastIndex;
+  }
+
   return true;
+}
+
+function isSafeSvgMarkup(svg: string): boolean {
+  if (!svg || svg.length > 50_000) return false;
+
+  const openElements: string[] = [];
+  const tagPattern = /<(\/?)\s*([a-zA-Z][a-zA-Z0-9-]*)([^<>]*?)(\/?)>/g;
+  let offset = 0;
+  let foundElement = false;
+
+  for (const match of svg.matchAll(tagPattern)) {
+    const index = match.index ?? 0;
+    if (svg.slice(offset, index).trim() !== '') return false;
+
+    const closing = match[1] === '/';
+    const element = match[2].toLowerCase();
+    const rawAttributes = match[3];
+    const selfClosing = match[4] === '/';
+    if (!SAFE_SVG_ELEMENTS.has(element)) return false;
+
+    if (closing) {
+      if (selfClosing || rawAttributes.trim() !== '' || openElements.pop() !== element) return false;
+    } else {
+      if (!hasOnlySafeSvgAttributes(rawAttributes)) return false;
+      foundElement = true;
+      if (!selfClosing) openElements.push(element);
+    }
+
+    offset = index + match[0].length;
+  }
+
+  return foundElement && openElements.length === 0 && svg.slice(offset).trim() === '';
 }
 
 function fallbackSampleForType(type: PlacementType): string {
