@@ -102,7 +102,13 @@ describe('placements import/export', () => {
     expect(result.errors[0]).toContain('Invalid JSON');
   });
 
-  it('sanitizes unsafe custom SVG markup', () => {
+  it.each([
+    '<script>alert(1)</script>',
+    '<path onload="alert(1)" d="M0 0"/>',
+    '<a href="javas&#99;ript:alert(1)"><path d="M0 0"/></a>',
+    '<animate attributeName="href" values="javascript:alert(1)"/>',
+    '<path fill="url(&#x23;payload)" d="M0 0"/>'
+  ])('sanitizes unsafe custom SVG markup: %s', (customSvg) => {
     const input = [
       {
         id: 'custom-1',
@@ -115,7 +121,7 @@ describe('placements import/export', () => {
         opacity: 0.7,
         rotate: 0,
         animDuration: 10,
-        customSvg: '<script>alert(1)</script>'
+        customSvg
       }
     ];
 
@@ -124,6 +130,21 @@ describe('placements import/export', () => {
     expect(result.ok).toBe(true);
     expect(result.warnings.some((warning) => warning.includes('unsafe customSvg'))).toBe(true);
     expect(result.placements[0]?.customSvg).toBeUndefined();
+  });
+
+  it('keeps custom SVG fragments that only use allowlisted elements and attributes', () => {
+    const customSvg = '<g opacity="0.7"><path d="M0 0 L10 10" fill="none" stroke="currentColor"/></g>';
+    const result = importPlacementsJSON(JSON.stringify([
+      {
+        id: 'custom-safe',
+        sampleId: 'custom:safe',
+        type: 'doodle',
+        customSvg
+      }
+    ]));
+
+    expect(result.ok).toBe(true);
+    expect(result.placements[0]?.customSvg).toBe(customSvg);
   });
 
   it('keeps mobile-only placement overrides when importing JSON', () => {
