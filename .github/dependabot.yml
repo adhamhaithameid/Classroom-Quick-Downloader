@@ -1,8 +1,7 @@
 version: 2
 updates:
-  # npm dependencies for the extension
   - package-ecosystem: "npm"
-    directory: "/extension"
+    directory: "/"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -10,36 +9,19 @@ updates:
       prefix: "chore(deps)"
     labels:
       - "dependencies"
-      - "extension"
-    open-pull-requests-limit: 0
+    open-pull-requests-limit: 10
+    groups:
+      production-minor-and-patch:
+        dependency-type: "production"
+        update-types:
+          - "minor"
+          - "patch"
+      development-minor-and-patch:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
 
-  # npm dependencies for the cloudflare worker
-  - package-ecosystem: "npm"
-    directory: "/cloudflare-worker"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    commit-message:
-      prefix: "chore(deps)"
-    labels:
-      - "dependencies"
-      - "worker"
-    open-pull-requests-limit: 0
-
-  # npm dependencies for the oracle backend
-  - package-ecosystem: "npm"
-    directory: "/oracle-backend"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    commit-message:
-      prefix: "chore(deps)"
-    labels:
-      - "dependencies"
-      - "backend"
-    open-pull-requests-limit: 0
-
-  # Go modules for the oracle backend
   - package-ecosystem: "gomod"
     directory: "/oracle-backend"
     schedule:
@@ -50,9 +32,8 @@ updates:
     labels:
       - "dependencies"
       - "backend"
-    open-pull-requests-limit: 0
+    open-pull-requests-limit: 10
 
-  # GitHub Actions versions
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
@@ -63,4 +44,16 @@ updates:
     labels:
       - "dependencies"
       - "ci"
-    open-pull-requests-limit: 0
+    open-pull-requests-limit: 10
+
+  - package-ecosystem: "docker"
+    directory: "/oracle-backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    commit-message:
+      prefix: "chore(deps/docker)"
+    labels:
+      - "dependencies"
+      - "backend"
+    open-pull-requests-limit: 5
