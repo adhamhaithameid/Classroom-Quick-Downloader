@@ -6,8 +6,6 @@ on:
 
 permissions:
   contents: read
-  issues: write
-  pull-requests: write
 
 jobs:
   socket-security:
@@ -15,13 +13,13 @@ jobs:
     name: Scan Dependencies
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Setup pnpm
-        uses: pnpm/action-setup@v3
+        uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d # v3.0.0
         with:
           version: 10.28.2
       - name: Setup Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: "22"
           cache: "pnpm"
@@ -29,9 +27,6 @@ jobs:
         run: pnpm install
       - name: Run Dependency Audits
         run: |
-          # Temporary targeted ignore: GHSA-2g4f-4pwh-qvx6 remains transitively
-          # present via eslint/commitlint; keep all other advisories blocking.
-          # Tracking issue: https://github.com/adhamhaithameid/Classroom-Quick-Downloader/issues
-          pnpm -C extension audit --ignore GHSA-2g4f-4pwh-qvx6
-          pnpm -C cloudflare-worker audit --ignore GHSA-2g4f-4pwh-qvx6
-          pnpm -C oracle-backend audit --ignore GHSA-2g4f-4pwh-qvx6
+          pnpm -C extension audit
+          pnpm -C cloudflare-worker audit
+          pnpm -C oracle-backend audit
