@@ -58,6 +58,14 @@ jobs:
             echo "Golden regression suite is not present on this branch yet; skipping."
           fi
 
+      - name: Run Extension Accuracy Gate
+        run: |
+          if [ -d extension/tests/accuracy/corpus ]; then
+            pnpm -C extension run test:accuracy
+          else
+            echo "Accuracy corpus is not present on this branch yet; skipping."
+          fi
+
       - name: Run Extension Typecheck
         run: pnpm -C extension compile
 

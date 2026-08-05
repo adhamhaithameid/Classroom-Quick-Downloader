@@ -1,0 +1,71 @@
+name: Nightly Full Test Suite
+
+# Runs the full test:strict pyramid off the PR path, every night.
+# On failure: auto-files a GitHub issue labeled ci-failure (deduped —
+# skips filing if an open nightly-failure issue already exists).
+
+on:
+  schedule:
+    - cron: "0 1 * * *" # 01:00 UTC daily
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: nightly-tests
+  cancel-in-progress: false
+
+jobs:
+  nightly:
+    name: Nightly test:strict
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: 10.28.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Setup Go
+        uses: actions/setup-go@0a12ed9cc8f21514b5756a8f1e55a4d7aecd5950 # v5.0.0
+        with:
+          go-version-file: oracle-backend/go.mod
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Full strict test pyramid
+        id: tests
+        run: pnpm run test:strict
+
+      - name: File failure issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          TITLE="🔴 Nightly test:strict failed ($(date -u +%Y-%m-%d))"
+          if gh issue list --repo "${{ github.repository }}" --label ci-failure --state open --json title --jq '.[].title' | grep -q "^🔴 Nightly test:strict failed"; then
+            echo "Open nightly-failure issue already exists — not duplicating."
+            exit 0
+          fi
+          gh issue create --repo "${{ github.repository }}" \
+            --label "ci-failure" \
+            --title "${TITLE}" \
+            --body "The nightly \`pnpm run test:strict\` run failed.
+
+          **Run log:** ${RUN_URL}
+
+          <sub>Auto-filed by Nightly Full Test Suite. Close this when green again.</sub>"
