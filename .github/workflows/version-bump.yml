@@ -69,9 +69,16 @@ jobs:
 
       - name: Open the bump PR
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_PAT || secrets.GITHUB_TOKEN }}
           NEW: ${{ steps.bump.outputs.version }}
         run: |
+          set -euo pipefail
+          if [ -z "${GH_TOKEN}" ]; then
+            echo "::error::No RELEASE_PAT or GITHUB_TOKEN available"; exit 1
+          fi
+          if [ "${GH_TOKEN}" = "${{ secrets.GITHUB_TOKEN }}" ]; then
+            echo "::warning::RELEASE_PAT not configured: this PR will NOT trigger CI checks (GITHUB_TOKEN events are suppressed). Create a classic PAT with repo scope and add it as the RELEASE_PAT secret to enable check runs on bump PRs."
+          fi
           BRANCH="release/${{ inputs.component }}-${NEW}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -83,5 +90,5 @@ jobs:
             --title "chore(release): bump ${{ inputs.component }} to ${NEW}" \
             --body "Automated ${{ inputs.level }} bump of \`${{ inputs.component }}\` to \`${NEW}\`, with the release manifest and generated website copy resynced.
 
-Merge, then tag the merge commit \`v${NEW}\` to trigger the distribution workflow." \
+            Merge, then tag the merge commit \`v${NEW}\` to trigger the distribution workflow." \
             --base main --head "$BRANCH"
