@@ -16,7 +16,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "graphify-out"
-SITE_GRAPH_DIR = ROOT / "website" / "static" / "graphify"
+SITE_GRAPH_DIR = ROOT / "graphify-out" / "site"
 SCOPED_DIRS = ("extension/", "website/", "oracle-backend/", "cloudflare-worker/")
 VIS_NETWORK_URL = "https://unpkg.com/vis-network@9.1.6/standalone/umd/vis-network.min.js"
 
@@ -148,7 +148,7 @@ def main() -> int:
     save_manifest(result.get("all_files") or result["files"], root=str(ROOT))
     print(f"[graph] built: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges, {len(communities)} communities")
 
-    # 7. Stage into the website (offline-friendly: vendored vis-network)
+    # 7. Stage standalone graph site (deployed to GitHub Pages as-is)
     SITE_GRAPH_DIR.mkdir(parents=True, exist_ok=True)
     vis = SITE_GRAPH_DIR / "vis-network.min.js"
     if not vis.exists():
@@ -159,7 +159,6 @@ def main() -> int:
         "./vis-network.min.js",
     )
     (SITE_GRAPH_DIR / "index.html").write_text(html, encoding="utf-8")
-    (SITE_GRAPH_DIR / "GRAPH_REPORT.md").write_text(report, encoding="utf-8")
     assert "unpkg.com" not in (SITE_GRAPH_DIR / "index.html").read_text(encoding="utf-8"), "CDN ref leaked"
     print(f"[graph] staged: {SITE_GRAPH_DIR}/index.html ({vis.stat().st_size // 1024}KB vis-network vendored)")
     return 0
