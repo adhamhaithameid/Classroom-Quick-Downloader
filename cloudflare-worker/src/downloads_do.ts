@@ -820,6 +820,21 @@ function sanitizeLoadedChangelogDraft(raw: unknown): ChangelogDraftState | null 
 // Storage key inside DO storage
 const STORAGE_KEY = "analytics_state";
 
+// ---------------------------------------------------------------------------
+// SHARDED STATE STORAGE
+// The DO state used to live in a SINGLE storage value (`analytics_state`).
+// With a 50k-event buffer, 50k dedupe IDs and a multi-thousand-entry website
+// telemetry queue, that one serialized blob approaches the per-value storage
+// limit; when persist() starts throwing, EVERY write path fails at once.
+// The large collections below are therefore stored under their own keys and
+// re-assembled in load(). Small scalars/maps stay in the core key.
+// ---------------------------------------------------------------------------
+const STORAGE_KEY_BUFFER = "analytics_buffer";
+const STORAGE_KEY_BATCHES = "analytics_pending_batches";
+const STORAGE_KEY_IDS = "analytics_processed_ids";
+const STORAGE_KEY_TELEMETRY = "analytics_website_telemetry";
+const STORAGE_KEY_CHANGELOG = "analytics_changelog";
+
 function todayUtcDate(): string {
   return new Date().toISOString().slice(0, 10); // YYYY-MM-DD
 }
@@ -2244,6 +2259,50 @@ export class DownloadsDurable {
       lastHealthNotifyAt: stored.lastHealthNotifyAt ?? base.lastHealthNotifyAt,
     };
 
+    // Re-assemble sharded state (see SHARDED STATE STORAGE note). Shard keys
+    // win when present; a legacy single-blob deployment migrates transparently
+    // because its whales were already merged from STORAGE_KEY above and the
+    // next persist() writes them out under their own keys.
+    try {
+      const [buffer, pendingBatches, processedIds, telemetry, changelogShard] = await Promise.all([
+        this.state.storage.get<DurableStateShape["buffer"]>(STORAGE_KEY_BUFFER),
+        this.state.storage.get<DurableStateShape["pendingBatches"]>(STORAGE_KEY_BATCHES),
+        this.state.storage.get<DurableStateShape["processedIds"]>(STORAGE_KEY_IDS),
+        this.state.storage.get<{
+          websiteTelemetryQueue: DurableStateShape["websiteTelemetryQueue"];
+          websiteTelemetryDeadLetter: DurableStateShape["websiteTelemetryDeadLetter"];
+          websiteTelemetrySeenEventIds: DurableStateShape["websiteTelemetrySeenEventIds"];
+        }>(STORAGE_KEY_TELEMETRY),
+        this.state.storage.get<{
+          changelog: DurableStateShape["changelog"];
+          changelogRevisions: DurableStateShape["changelogRevisions"];
+        }>(STORAGE_KEY_CHANGELOG),
+      ]);
+      if (Array.isArray(buffer)) this.data.buffer = buffer;
+      if (Array.isArray(pendingBatches)) this.data.pendingBatches = pendingBatches;
+      if (Array.isArray(processedIds)) this.data.processedIds = processedIds;
+      if (telemetry) {
+        if (Array.isArray(telemetry.websiteTelemetryQueue)) {
+          this.data.websiteTelemetryQueue = telemetry.websiteTelemetryQueue;
+        }
+        if (Array.isArray(telemetry.websiteTelemetryDeadLetter)) {
+          this.data.websiteTelemetryDeadLetter = telemetry.websiteTelemetryDeadLetter;
+        }
+        if (Array.isArray(telemetry.websiteTelemetrySeenEventIds)) {
+          this.data.websiteTelemetrySeenEventIds = telemetry.websiteTelemetrySeenEventIds;
+        }
+      }
+      if (changelogShard) {
+        if (Array.isArray(changelogShard.changelog)) this.data.changelog = changelogShard.changelog;
+        if (Array.isArray(changelogShard.changelogRevisions)) {
+          this.data.changelogRevisions = changelogShard.changelogRevisions;
+        }
+      }
+    } catch {
+      // If shard reads fail, keep whatever the core key provided (legacy or
+      // last-known) — degraded but consistent, never throwing on startup.
+    }
+
     if (this.data.reqCountDate && /^\d{4}-\d{2}-\d{2}$/.test(this.data.reqCountDate)) {
       const existing = this.data.reqDailyCounts[this.data.reqCountDate];
       if (typeof existing === "number" && Number.isFinite(existing) && existing >= 0) {
@@ -2524,7 +2583,30 @@ export class DownloadsDurable {
 
   private async persist(): Promise<void> {
     if (!this.data) return;
-    await this.state.storage.put(STORAGE_KEY, this.data);
+    const d = this.data;
+    // Shard the large collections into their own storage values so no single
+    // value can approach the per-value size limit (see SHARDED STATE STORAGE).
+    const {
+      buffer,
+      pendingBatches,
+      processedIds,
+      websiteTelemetryQueue,
+      websiteTelemetryDeadLetter,
+      websiteTelemetrySeenEventIds,
+      changelog,
+      changelogRevisions,
+      ...core
+    } = d;
+    await this.state.storage.put(STORAGE_KEY, core);
+    await this.state.storage.put(STORAGE_KEY_BUFFER, buffer);
+    await this.state.storage.put(STORAGE_KEY_BATCHES, pendingBatches);
+    await this.state.storage.put(STORAGE_KEY_IDS, processedIds);
+    await this.state.storage.put(STORAGE_KEY_TELEMETRY, {
+      websiteTelemetryQueue,
+      websiteTelemetryDeadLetter,
+      websiteTelemetrySeenEventIds,
+    });
+    await this.state.storage.put(STORAGE_KEY_CHANGELOG, { changelog, changelogRevisions });
   }
 
   private get d(): DurableStateShape {
@@ -4527,6 +4609,11 @@ export class DownloadsDurable {
       ...preservedConfig,
     };
     await this.state.storage.delete(STORAGE_KEY);
+    await this.state.storage.delete(STORAGE_KEY_BUFFER);
+    await this.state.storage.delete(STORAGE_KEY_BATCHES);
+    await this.state.storage.delete(STORAGE_KEY_IDS);
+    await this.state.storage.delete(STORAGE_KEY_TELEMETRY);
+    await this.state.storage.delete(STORAGE_KEY_CHANGELOG);
     await this.state.storage.deleteAlarm();
     this.appendDangerAudit(request, "full_reset", "/debug/reset", "ok", "full_state_reset");
     await this.persist();
