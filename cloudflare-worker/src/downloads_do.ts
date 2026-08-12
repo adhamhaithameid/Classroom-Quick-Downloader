@@ -74,6 +74,10 @@ type DurableStateShape = {
   // Durable queue of aggregated batches waiting for Oracle
   pendingBatches: PendingOracleBatch[];
 
+  // Bounded forensic summaries of batches that exhausted their retry budget
+  oracleDeadLetters: OracleDeadLetterSummary[];
+  deadLetteredBatchesTotal: number;
+
   // End-to-end delivery metrics chain (accepted -> stored -> forwarded -> committed)
   deliveryMetrics: DeliveryMetricsState;
 
@@ -218,6 +222,27 @@ type PendingOracleBatch = {
   attempts: number;
   createdAt: number;
 };
+
+// Forensic summary kept when a pending batch exhausts its retry budget and is
+// dead-lettered. Payloads are intentionally NOT retained (bounded state).
+type OracleDeadLetterSummary = {
+  batchId: string;
+  eventCount: number;
+  weightedCount: number;
+  attempts: number;
+  createdAt: number;
+  deadLetteredAt: number;
+  lastStatus: number | null;
+  lastError: string;
+};
+
+// Retry budget per pending batch before it is quarantined to the dead-letter
+// summary list. With the scheduleRetry backoff ladder (60s → 1 day) this
+// spans roughly two days of consecutive failures.
+const MAX_BATCH_ATTEMPTS = 8;
+
+// Hard cap on retained dead-letter summaries (oldest evicted).
+const MAX_DEAD_LETTER_ENTRIES = 20;
 
 type DeliveryStage = "accepted" | "stored" | "forwarded" | "committed";
 
@@ -1789,6 +1814,8 @@ export class DownloadsDurable {
       eventSeq: 0,
       committedSeq: 0,
       pendingBatches: [],
+      oracleDeadLetters: [],
+      deadLetteredBatchesTotal: 0,
       deliveryMetrics: createEmptyDeliveryMetrics(),
       failureRollups: [],
       
@@ -1926,6 +1953,11 @@ export class DownloadsDurable {
       eventSeq: stored.eventSeq ?? 0,
       committedSeq: stored.committedSeq ?? 0,
       pendingBatches: Array.isArray(stored.pendingBatches) ? stored.pendingBatches : [],
+      oracleDeadLetters: Array.isArray(stored.oracleDeadLetters) ? stored.oracleDeadLetters : [],
+      deadLetteredBatchesTotal:
+        typeof stored.deadLetteredBatchesTotal === "number" && stored.deadLetteredBatchesTotal >= 0
+          ? Math.floor(stored.deadLetteredBatchesTotal)
+          : 0,
       deliveryMetrics: (() => {
         const src = isPlainObject((stored as unknown as Record<string, unknown>).deliveryMetrics)
           ? ((stored as unknown as Record<string, unknown>).deliveryMetrics as Record<string, unknown>)
@@ -4594,6 +4626,8 @@ export class DownloadsDurable {
       eventSeq: 0,
       committedSeq: 0,
       pendingBatches: [],
+      oracleDeadLetters: [],
+      deadLetteredBatchesTotal: 0,
       deliveryMetrics: createEmptyDeliveryMetrics(),
       failureRollups: [],
       ipCounts: {},
@@ -5045,6 +5079,50 @@ export class DownloadsDurable {
   // ---------------------------------------------------------------------------
   // Oracle flush + retry/backoff
   // ---------------------------------------------------------------------------
+
+  /**
+   * Quarantine the head pending batch when it has exhausted its retry budget.
+   * Keeps only a bounded forensic summary so a permanently-poisoned batch
+   * (e.g. schema drift tripping Oracle's strict decoder) cannot head-of-line
+   * block every newer batch forever. Returns true when a batch was moved.
+   */
+  private deadLetterHeadBatchIfExhausted(
+    lastStatus: number | null,
+    lastError: string,
+  ): boolean {
+    const head = this.d.pendingBatches[0];
+    if (!head || head.attempts < MAX_BATCH_ATTEMPTS) return false;
+
+    this.d.pendingBatches.shift();
+    this.d.pendingEvents = Math.max(0, this.d.pendingEvents - (head.weightedCount || 0));
+    this.d.oracleDeadLetters.unshift({
+      batchId: head.batch.batchId,
+      eventCount: head.weightedCount || 0,
+      weightedCount: head.weightedCount || 0,
+      attempts: head.attempts,
+      createdAt: head.createdAt,
+      deadLetteredAt: Date.now(),
+      lastStatus,
+      lastError: lastError.slice(0, 500),
+    });
+    this.d.deadLetteredBatchesTotal += 1;
+    while (this.d.oracleDeadLetters.length > MAX_DEAD_LETTER_ENTRIES) {
+      this.d.oracleDeadLetters.pop();
+    }
+    logEvent("error", "oracle_batch_dead_lettered", {
+      batchId: head.batch.batchId,
+      attempts: head.attempts,
+      lastStatus,
+    });
+    this.recordFailure(
+      "oracle_forward",
+      "dead_lettered",
+      `batch ${head.batch.batchId} exhausted ${head.attempts} attempts`,
+      1,
+      Date.now(),
+    );
+    return true;
+  }
 
   private async scheduleRetry(): Promise<void> {
     if (!this.d.retryState) {
@@ -5830,7 +5908,9 @@ export class DownloadsDurable {
         this.d.retryState.consecutiveFailures += 1;
         logEvent("warn", "oracle_flush_failed", { status: res.status, statusText: res.statusText });
         this.recordFailure("oracle_forward", "http_error", msg, 1, now);
-        stashFailedBatch();
+        this.deadLetterHeadBatchIfExhausted(res.status, msg);
+        this.deadLetterHeadBatchIfExhausted(null, msg);
+stashFailedBatch();
         await this.scheduleRetry();
         await this.persist();
         return { ok: false, sent: 0, error: msg };
@@ -5845,7 +5925,8 @@ export class DownloadsDurable {
         this.d.retryState.consecutiveFailures += 1;
         logEvent("warn", "oracle_flush_ack_invalid", { error: msg });
         this.recordFailure("oracle_ack", "invalid_ack", msg, 1, now);
-        stashFailedBatch();
+        this.deadLetterHeadBatchIfExhausted(null, msg);
+stashFailedBatch();
         await this.scheduleRetry();
         await this.persist();
         return { ok: false, sent: 0, error: msg };
@@ -5856,7 +5937,8 @@ export class DownloadsDurable {
         this.d.retryState.consecutiveFailures += 1;
         logEvent("warn", "oracle_flush_ack_mismatch", { error: msg });
         this.recordFailure("oracle_ack", "batch_mismatch", msg, 1, now);
-        stashFailedBatch();
+        this.deadLetterHeadBatchIfExhausted(null, msg);
+stashFailedBatch();
         await this.scheduleRetry();
         await this.persist();
         return { ok: false, sent: 0, error: msg };
