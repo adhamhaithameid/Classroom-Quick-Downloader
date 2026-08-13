@@ -50,4 +50,4 @@ compatibility_date = "2024-12-01"
 
 [triggers]
   # Runs every 3 hours (0:00, 3:00, 6:00, ...)
-  crons = ["0 */3 * * *"]
+  crons = ["0 1-22/3 * * *"]

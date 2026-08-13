@@ -6659,6 +6659,39 @@ stashFailedBatch();
    * 
    * Returns: { allowed: boolean, attemptsRemaining?: number, blockedUntil?: number }
    */
+  /**
+   * Prune stale login-attempt entries. Entries live for LOCKOUT_DURATION_MS
+   * after their first attempt; anything older can never block again, so it is
+   * dead weight inside persisted state. A hard cap bounds the map even under a
+   * distributed flood of unique IPs (oldest entries evicted first).
+   */
+  private pruneLoginAttempts(now: number): void {
+    const attempts = this.d.loginAttempts;
+    if (!attempts) return;
+    const LOCKOUT_DURATION_MS = 15 * 60 * 1000;
+    const GRACE_MULTIPLIER = 4; // keep expired lockouts around briefly for dashboards
+    const MAX_ENTRIES = 500;
+
+    let expired = 0;
+    for (const key of Object.keys(attempts)) {
+      const record = attempts[key];
+      if (!record || now - record.firstAttemptAt >= LOCKOUT_DURATION_MS * GRACE_MULTIPLIER) {
+        delete attempts[key];
+        expired++;
+      }
+    }
+    if (expired === 0 && Object.keys(attempts).length <= MAX_ENTRIES) return;
+
+    // Hard cap: evict oldest-first when still over budget.
+    const keys = Object.keys(attempts);
+    if (keys.length > MAX_ENTRIES) {
+      keys
+        .sort((a, b) => (attempts[a]?.firstAttemptAt ?? 0) - (attempts[b]?.firstAttemptAt ?? 0))
+        .slice(0, keys.length - MAX_ENTRIES)
+        .forEach((k) => delete attempts[k]);
+    }
+  }
+
   private async handleLoginAttempt(request: Request): Promise<Response> {
     if (!this.isAuthorizedAdmin(request)) {
       return json({ ok: false, error: "unauthorized" }, { status: 401 });
@@ -6681,6 +6714,7 @@ stashFailedBatch();
     if (!this.d.loginAttempts) {
       this.d.loginAttempts = {};
     }
+    this.pruneLoginAttempts(Date.now());
 
     const now = Date.now();
     const record = this.d.loginAttempts[ip];
