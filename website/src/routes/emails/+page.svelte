@@ -1,10 +1,16 @@
 <script lang="ts">
   import SeoMeta from '$lib/components/SeoMeta.svelte';
+  import { sanitizeEmailBodyHtml, sanitizeEmailCss } from '$lib/emails/sanitize';
 
   export let data: {
     emailHeadStyles: string;
     emailBodyHtml: string;
   };
+
+  // {@html} below is an XSS sink by construction: nothing reaches it without
+  // passing through the sanitizer first (see lib/emails/sanitize.ts).
+  $: safeEmailHeadStyles = sanitizeEmailCss(data.emailHeadStyles);
+  $: safeEmailBodyHtml = sanitizeEmailBodyHtml(data.emailBodyHtml);
 </script>
 
 <SeoMeta
@@ -17,7 +23,7 @@
 <section class="emails-page">
   <div class="emails-frame">
     <div class="email-canvas" aria-label="Classroom Quick Downloader email preview">
-      {@html `<style>${data.emailHeadStyles}</style>${data.emailBodyHtml}`}
+      {@html `<style>${safeEmailHeadStyles}</style>${safeEmailBodyHtml}`}
     </div>
   </div>
 </section>

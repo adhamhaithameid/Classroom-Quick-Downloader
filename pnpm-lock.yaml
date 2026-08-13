@@ -161,6 +161,9 @@ importers:
       iso-3166-1:
         specifier: ^2.1.1
         version: 2.1.1
+      isomorphic-dompurify:
+        specifier: ^3.22.0
+        version: 3.22.0
       marked:
         specifier: ^18.0.9
         version: 18.0.9
@@ -1808,6 +1811,9 @@ packages:
     resolution: {integrity: sha512-gYzvtM72ZtxQO0T048kd6HWSbbGCNOUwcnfQ01cqIJ4X2IYKFFHZ5mKvrQETcFXxsRObZulDaKmy//R7TPtsBg==}
     engines: {node: '>=20.19.0'}
 
+  dompurify@3.4.14:
+    resolution: {integrity: sha512-dVoH9z+MY+C9IilgGCk3YfFqjLi3fChm2OiKJMzh6axrJ5qwxqWaZamgmHrpv22CN/KdbZJuGEGgfQoL00LTdg==}
+
   domutils@3.2.2:
     resolution: {integrity: sha512-6kZKyUajlDuqlHKVX1w7gyslj9MPIXzIFiz/rGu35uC1wMi+kMhQwGhl4lt9unC9Vb9INnY9Z3/ZA3+FhASLaw==}
 
@@ -2111,6 +2117,10 @@ packages:
 
   iso-3166-1@2.1.1:
     resolution: {integrity: sha512-RZxXf8cw5Y8LyHZIwIRvKw8sWTIHh2/txBT+ehO0QroesVfnz3JNFFX4i/OC/Yuv2bDIVYrHna5PMvjtpefq5w==}
+
+  isomorphic-dompurify@3.22.0:
+    resolution: {integrity: sha512-cz/BkSODnQir4IV2quqbuEHhAGz4MAYGvhoemsxuwMpY/oZbRHlNjPLPyIQ0fdULiwDPUE+OHPwWb6XTEiNk1A==}
+    engines: {node: ^22.22.2 || ^24.15.0 || >=26.0.0}
 
   istanbul-lib-coverage@3.2.2:
     resolution: {integrity: sha512-O8dpsF+r0WV/8MNRKfnmrtCWhuKjxrq2w+jpzBL5UZKTi2LeVWnWOmWRxFlesJONmc+wLAGvKQZEOanko0LFTg==}
@@ -4305,6 +4315,10 @@ snapshots:
     dependencies:
       domelementtype: 3.0.0
 
+  dompurify@3.4.14:
+    optionalDependencies:
+      '@types/trusted-types': 2.0.7
+
   domutils@3.2.2:
     dependencies:
       dom-serializer: 2.0.0
@@ -4607,6 +4621,14 @@ snapshots:
   isexe@2.0.0: {}
 
   iso-3166-1@2.1.1: {}
+
+  isomorphic-dompurify@3.22.0:
+    dependencies:
+      dompurify: 3.4.14
+      jsdom: 30.0.1
+    transitivePeerDependencies:
+      - '@noble/hashes'
+      - canvas
 
   istanbul-lib-coverage@3.2.2: {}
 
