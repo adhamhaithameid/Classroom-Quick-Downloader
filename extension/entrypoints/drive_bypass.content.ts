@@ -27,6 +27,45 @@ export default defineContentScript({
 
 function startBypassFeature() {
   if (isBypassRunning) return;
+  // CONSENT GATE: never auto-click on Drive pages the user opened themselves.
+  // Only tabs the extension created via openDriveBypassTab() (tracked in the
+  // background's pendingByBypassTabId) may bypass virus warnings / preview UI.
+  // Re-queried briefly to absorb the tabs.create -> document_start race.
+  queryBypassConsent((allowed) => {
+    if (!allowed || !isBypassRunning) return;
+    beginBypassLoop();
+  });
+}
+
+function queryBypassConsent(onResolved: (allowed: boolean) => void): void {
+  const delays = [0, 1500, 4000];
+  const attempt = (index: number) => {
+    if (!isBypassRunning) return;
+    try {
+      chrome.runtime.sendMessage({ type: 'CQD_QUERY_BYPASS_CONSENT' }, (response) => {
+        void chrome.runtime.lastError; // background may be asleep; treated as denied
+        if (!isBypassRunning) return;
+        if (response?.allowed === true) {
+          onResolved(true);
+          return;
+        }
+        const next = index + 1;
+        if (next < delays.length) {
+          window.setTimeout(() => attempt(next), delays[next] - delays[index]);
+        } else {
+          // Not an extension-initiated tab: stay fully inert.
+          onResolved(false);
+        }
+      });
+    } catch {
+      onResolved(false);
+    }
+  };
+  attempt(0);
+}
+
+function beginBypassLoop() {
+  if (isBypassRunning && bypassIntervalId != null) return;
   isBypassRunning = true;
 
   let virusHandled = false;

@@ -178,12 +178,21 @@ export default defineBackground(() => {
   });
 
   // 1) Messages from drive_bypass.content.ts
-  chrome.runtime.onMessage.addListener((message, sender) => {
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (sender.id !== chrome.runtime.id) return false;
     if (!message || !sender.tab || sender.tab.id == null) return false;
 
     const tabId = sender.tab.id;
     const pending = pendingByBypassTabId.get(tabId);
+
+    // Consent gate for drive_bypass: only tabs the extension itself opened
+    // (openDriveBypassTab) may auto-click through Drive interstitials.
+    // Answered BEFORE the CQD_* drop-guard below, because unregistered tabs
+    // are exactly the ones this check exists for.
+    if (message.type === 'CQD_QUERY_BYPASS_CONSENT') {
+      sendResponse({ allowed: pendingByBypassTabId.has(tabId) });
+      return;
+    }
 
     if (!pending && typeof message.type === 'string' && message.type.startsWith('CQD_')) {
       return;
