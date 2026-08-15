@@ -326,7 +326,7 @@ describe('ViewportObserver', () => {
     });
 
     expect(ioInstances).toHaveLength(2);
-    expect(ioInstances[0].rootMargin).toBe('0px');
-    expect(ioInstances[1].rootMargin).toBe('200%');
+    expect(ioInstances[0]?.rootMargin).toBe('0px');
+    expect(ioInstances[1]?.rootMargin).toBe('200%');
   });
 });

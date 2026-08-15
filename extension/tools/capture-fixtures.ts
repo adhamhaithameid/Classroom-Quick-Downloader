@@ -102,7 +102,7 @@ function extractFlags(post: HTMLElement): PostFixture['flags'] {
   if (commentBadge) {
     const text = commentBadge.textContent || '';
     const match = text.match(/(\d+)/);
-    if (match) commentCount = parseInt(match[1], 10);
+    if (match?.[1]) commentCount = parseInt(match[1], 10);
   }
 
   return {
