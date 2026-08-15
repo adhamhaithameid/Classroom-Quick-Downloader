@@ -244,7 +244,7 @@ export function parseUnicodeDate(dateString: string): { date: Date; raw: string;
 
   // 3 numbers: try to infer format
   if (numbers.length >= 3) {
-    const [a, b, c] = numbers;
+    const [a = 0, b = 0, c = 0] = numbers;
     if (a > 1000) {
       year = a; month = b - 1; day = c;
       confidence = 'high'; // ISO-like (YYYY-MM-DD)
@@ -265,7 +265,7 @@ export function parseUnicodeDate(dateString: string): { date: Date; raw: string;
       if (month !== undefined) break;
     }
     if (month !== undefined) {
-      const [n1, n2] = numbers;
+      const [n1 = 0, n2 = 0] = numbers;
       if (n2 > 1000) { day = n1; year = n2; }
       else if (n1 > 1000) { day = n2; year = n1; }
       else { day = n1; year = n2 > 31 ? n2 + 2000 : 2020 + n2; }
@@ -662,15 +662,17 @@ export const CONFIDENCE_WEIGHTS = {
 // ============================================================================
 
 export function getCommentKeywords(lang: string): CommentKeywords {
-  const shortLang = lang.split('-')[0].toLowerCase();
+  const shortLang = (lang.split('-')[0] ?? lang).toLowerCase();
   const fullLang = lang.toLowerCase();
-  return COMMENT_KEYWORDS[fullLang] || COMMENT_KEYWORDS[shortLang] || COMMENT_KEYWORDS['en'];
+  // 'en' is statically present in COMMENT_KEYWORDS, so the final fallback always resolves.
+  return COMMENT_KEYWORDS[fullLang] || COMMENT_KEYWORDS[shortLang] || COMMENT_KEYWORDS['en']!;
 }
 
 export function getEditedKeywords(lang: string): string[] {
-  const shortLang = lang.split('-')[0].toLowerCase();
+  const shortLang = (lang.split('-')[0] ?? lang).toLowerCase();
   const fullLang = lang.toLowerCase();
-  return EDITED_KEYWORDS[fullLang] || EDITED_KEYWORDS[shortLang] || EDITED_KEYWORDS['en'];
+  // 'en' is statically present in EDITED_KEYWORDS, so the final fallback always resolves.
+  return EDITED_KEYWORDS[fullLang] || EDITED_KEYWORDS[shortLang] || EDITED_KEYWORDS['en']!;
 }
 
 export function getAllEditedKeywords(): string[] {

@@ -862,17 +862,20 @@ export const DETECTION_KEYWORDS: Record<string, DetectionKeywords> = {
  */
 export function getDetectionKeywords(lang: string): DetectionKeywords {
   // Normalize language code
-  const normalizedLang = lang.toLowerCase().split(';')[0].trim().replace('_', '-');
-  
+  const lowered = lang.toLowerCase();
+  const normalizedLang = (lowered.split(';')[0] ?? lowered).trim().replace('_', '-');
+
   // Try exact match first
-  if (DETECTION_KEYWORDS[normalizedLang]) {
-    return DETECTION_KEYWORDS[normalizedLang];
+  const exact = DETECTION_KEYWORDS[normalizedLang];
+  if (exact) {
+    return exact;
   }
-  
+
   // Try base language (e.g., 'en' from 'en-US')
-  const baseLang = normalizedLang.split('-')[0];
-  if (DETECTION_KEYWORDS[baseLang]) {
-    return DETECTION_KEYWORDS[baseLang];
+  const baseLang = normalizedLang.split('-')[0] ?? normalizedLang;
+  const base = DETECTION_KEYWORDS[baseLang];
+  if (base) {
+    return base;
   }
   
   // Default to English
