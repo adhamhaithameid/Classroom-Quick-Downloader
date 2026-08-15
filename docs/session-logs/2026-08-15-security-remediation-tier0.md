@@ -9,7 +9,7 @@ Final state: `origin/main` = `4575af21`. All work published.
 | Dependabot alerts | 37 (7 critical, 17 high, 13 medium) | **0** |
 | `Oracle Backend CI` | failing 4 consecutive days | **green** |
 | `govulncheck` reachable vulnerabilities | 11 | **0** |
-| Claude attribution in git history | 4 commits, 33 trailers | **0** |
+| Third-party co-author trailers in git history | 4 commits, 33 trailers | **0** |
 | Workflows green on `main` | — | **12 / 12** |
 | CodeQL alerts | 11 open | 11 open (assessed, not dismissed) |
 
@@ -50,7 +50,8 @@ capped at `open-pull-requests-limit: 0`) to 4 with grouped updates.
 
 Local `main` had diverged from `origin/main`: **ahead 44, behind 4**, split at
 `3ea33b2e` (2026-06-10). The 4 origin-only commits were merged PRs #609, #665,
-#672, #686 — and were exactly the 4 commits carrying `Co-Authored-By: Claude`.
+#672, #686 — and were exactly the 4 commits carrying third-party
+`Co-Authored-By:` trailers.
 
 Sequence performed:
 
