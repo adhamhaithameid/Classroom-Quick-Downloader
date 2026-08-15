@@ -50,7 +50,7 @@
     "fake-indexeddb": "^6.2.5",
     "happy-dom": "20.11.2",
     "jsdom": "^30.0.1",
-    "typescript": "^7.0.2",
+    "typescript": "^6.0.3",
     "vitest": "^4.1.10",
     "wxt": "^0.21.4"
   }
