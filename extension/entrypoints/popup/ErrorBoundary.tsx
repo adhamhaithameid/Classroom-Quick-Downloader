@@ -1,6 +1,7 @@
 // filepath: extension/entrypoints/popup/ErrorBoundary.tsx
 
-import React, { Component, ErrorInfo, ReactNode } from 'react';
+import React, { Component } from 'react';
+import type { ErrorInfo, ReactNode } from 'react';
 
 interface Props {
   children: ReactNode;
@@ -32,7 +33,7 @@ class ErrorBoundary extends Component<Props, State> {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
+  override componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
     console.error('ErrorBoundary caught an error:', error, errorInfo);
     
     this.setState({
@@ -62,7 +63,7 @@ class ErrorBoundary extends Component<Props, State> {
     window.open(`${GITHUB_ISSUES_URL}?title=${title}&body=${body}`, '_blank');
   };
 
-  render(): ReactNode {
+  override render(): ReactNode {
     if (this.state.hasError) {
       return (
         <div className="cqd-container" style={{ 

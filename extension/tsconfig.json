@@ -4,11 +4,9 @@
     "allowImportingTsExtensions": true,
     "jsx": "react-jsx",
     "types": ["chrome"],
-    // wxt 0.21 newly enables these in its generated tsconfig. Turning them on
-    // surfaces 316 pre-existing type gaps across 68 files, so they stay off
-    // until that backlog is worked through separately.
-    "noUncheckedIndexedAccess": false,
-    "verbatimModuleSyntax": false,
-    "noImplicitOverride": false
+    // wxt 0.21 enables this in its generated tsconfig. It surfaces a large
+    // backlog of unchecked index accesses; kept off while that is worked
+    // through file by file.
+    "noUncheckedIndexedAccess": false
   }
 }

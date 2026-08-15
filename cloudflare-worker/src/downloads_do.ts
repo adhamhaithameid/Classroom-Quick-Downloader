@@ -1,6 +1,6 @@
 // filepath: cloudflare-worker/src/downloads_do.ts
 
-import {
+import type {
   Counters,
   RetryState,
   QuotaDescriptor,
