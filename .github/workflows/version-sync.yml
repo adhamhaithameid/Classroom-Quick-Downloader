@@ -1,0 +1,61 @@
+name: Version Sync
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "*/package.json"
+      - "data/changelog/release-version.manual.json"
+      - "tools/sync-versions.mjs"
+  pull_request:
+    paths:
+      - "*/package.json"
+      - "data/changelog/release-version.manual.json"
+      - "tools/sync-versions.mjs"
+  workflow_dispatch:
+
+concurrency:
+  group: version-sync-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Version manifest in sync
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: 10.28.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+
+      - name: Check release-version manifest against package.json sources
+        run: node tools/sync-versions.mjs --check
+
+      # The generated copy carries a generatedAt timestamp that changes on every
+      # run, so compare the version fields rather than diffing the whole file.
+      - name: Check the generated website copy carries the same versions
+        run: |
+          node -e '
+            const fs = require("node:fs");
+            const src = JSON.parse(fs.readFileSync("data/changelog/release-version.manual.json", "utf8"));
+            const gen = JSON.parse(fs.readFileSync("website/src/lib/content/release-version.manual.generated.json", "utf8"));
+            const drift = Object.keys(src).filter((k) => src[k] !== gen[k]);
+            if (drift.length) {
+              for (const k of drift) console.error(`  ${k}: manifest=${src[k]} generated=${gen[k]}`);
+              console.error("\n::error::release-version.manual.generated.json is stale. Run: pnpm run sync:versions");
+              process.exit(1);
+            }
+            console.log("generated website copy carries the same versions");
+          '
