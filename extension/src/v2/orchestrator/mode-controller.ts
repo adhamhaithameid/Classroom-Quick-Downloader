@@ -55,19 +55,21 @@ const STORAGE_KEY = 'cqdV2Mode';
 /**
  * The default mode when no setting is found in storage.
  *
- * CHANGED from 'legacy' to 'shadow' to start V2 validation:
- * - V1 (legacy) handles all rendering — user sees no difference
- * - V2 runs silently, logging detection results for comparison
- * - ShadowComparator reports mismatches every 10s
+ * CHANGED back from 'shadow' to 'legacy' (2026-08): shadow shipped V1+V2
+ * double scanning plus a 10s ShadowComparator interval and full-DOM
+ * snapshots to EVERY user as a permanent CPU/battery tax, with no
+ * readiness-gate promotion path actually flipping it off.
  *
- * The rollout plan:
- * 1. v4.0.0-alpha: Default 'shadow', V2 runs silently for validation
- * 2. v4.0.0: Default 'v2' after shadow validation succeeds
- * 3. v4.2.1: 'v3' available behind a flag (API-enhanced)
+ * Rollout plan (unchanged in intent):
+ * 1. 'shadow' becomes an explicit opt-in (storage `cqdV2Mode='shadow'`
+ *    or remote config) while V2 validation runs on limited cohorts
+ * 2. Default flips to 'v2' only after the readiness gate passes
+ * 3. 'v3' stays behind a flag until the identity permission lands
  *
- * To revert: set cqdV2Mode='legacy' in chrome.storage.local
+ * To opt into validation manually: set cqdV2Mode='shadow' in
+ * chrome.storage.local
  */
-const DEFAULT_MODE: EngineMode = 'shadow';
+const DEFAULT_MODE: EngineMode = 'legacy';
 
 // ============================================================================
 // READ / WRITE

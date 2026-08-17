@@ -16,7 +16,9 @@
  * are "there" but not visible until you scroll down or click "Show more."
  *
  * CURRENT STATUS: This is a STUB. The full implementation requires:
- * 1. OAuth2 authentication (extension already has the permission)
+ * 1. OAuth2 authentication (NOT yet granted: the manifest lacks `identity`
+ *    and no oauth2 client_id is configured — token-provider returns null and
+ *    the registry refuses to activate this engine until both land)
  * 2. Classroom API client (courses.courseWork.list, etc.)
  * 3. Rate limiting (Google API quotas are strict)
  * 4. Caching (don't re-query on every scan)

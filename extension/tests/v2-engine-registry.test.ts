@@ -202,11 +202,12 @@ describe('EngineRegistry: Active Engines', () => {
     expect(active[0].name).toBe('engine-v2');
   });
 
-  it('v3 mode → only V3', () => {
+  it('v3 mode → falls back to V1+V2 (identity permission not granted)', () => {
     registry.setMode('v3');
     const active = registry.getActiveEngines();
-    expect(active).toHaveLength(1);
-    expect(active[0].name).toBe('engine-v3');
+    expect(active).toHaveLength(2);
+    expect(active[0].name).toBe('engine-v1');
+    expect(active[1].name).toBe('engine-v2');
   });
 
   it('returns empty if required engine is not registered', () => {
