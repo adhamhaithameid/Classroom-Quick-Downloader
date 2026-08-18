@@ -1,0 +1,612 @@
+{
+  "announcement-detail-en.html": [
+    {
+      "commentScore": 0,
+      "editedScore": 0,
+      "commentCount": null,
+      "editedDiff": null,
+      "finalVerdict": "none",
+      "confidence": "low",
+      "exclusionPenalties": [],
+      "layers": [
+        {
+          "layerName": "comment-L0",
+          "layerIndex": 0,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "L0: No DOM truth found"
+        },
+        {
+          "layerName": "comment-L1",
+          "layerIndex": 1,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "L1: No accessibility match"
+        },
+        {
+          "layerName": "comment-L2",
+          "layerIndex": 2,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "L2: No button heuristic match"
+        },
+        {
+          "layerName": "comment-L3",
+          "layerIndex": 3,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "L3: No golden selector match"
+        },
+        {
+          "layerName": "comment-L4",
+          "layerIndex": 4,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "L4: No nuclear match"
+        },
+        {
+          "layerName": "edited-L1",
+          "layerIndex": 5,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "EditedL1: No golden match"
+        },
+        {
+          "layerName": "edited-L2",
+          "layerIndex": 6,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "EditedL2: No semantic match"
+        },
+        {
+          "layerName": "edited-L3",
+          "layerIndex": 7,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "EditedL3: No TreeWalker match"
+        },
+        {
+          "layerName": "edited-L4",
+          "layerIndex": 8,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "EditedL4: Nothing to validate"
+        }
+      ],
+      "exclusionRuleIds": [],
+      "finalScore": 0
+    }
+  ],
+  "assignment-details-en.html": [],
+  "classwork-material-post-en.html": [
+    {
+      "commentScore": 20,
+      "editedScore": 0,
+      "commentCount": 3,
+      "editedDiff": null,
+      "finalVerdict": "none",
+      "confidence": "low",
+      "exclusionPenalties": [],
+      "layers": [
+        {
+          "layerName": "comment-L0",
+          "layerIndex": 0,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "L0: No DOM truth found"
+        },
+        {
+          "layerName": "comment-L1",
+          "layerIndex": 1,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "L1: No accessibility match"
+        },
+        {
+          "layerName": "comment-L2",
+          "layerIndex": 2,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "L2: No button heuristic match"
+        },
+        {
+          "layerName": "comment-L3",
+          "layerIndex": 3,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "L3: No golden selector match"
+        },
+        {
+          "layerName": "comment-L4",
+          "layerIndex": 4,
+          "score": 20,
+          "matched": true,
+          "matchedText": "3 class comments",
+          "details": "L4-Nuclear: \"comment\" in DOM text (count: 3)"
+        },
+        {
+          "layerName": "edited-L1",
+          "layerIndex": 5,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "EditedL1: No golden match"
+        },
+        {
+          "layerName": "edited-L2",
+          "layerIndex": 6,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "EditedL2: No semantic match"
+        },
+        {
+          "layerName": "edited-L3",
+          "layerIndex": 7,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "EditedL3: No TreeWalker match"
+        },
+        {
+          "layerName": "edited-L4",
+          "layerIndex": 8,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "EditedL4: Nothing to validate"
+        }
+      ],
+      "exclusionRuleIds": [],
+      "finalScore": 20
+    }
+  ],
+  "material-details-en.html": [],
+  "mixed-links-post-en.html": [
+    {
+      "commentScore": 20,
+      "editedScore": 0,
+      "commentCount": 2,
+      "editedDiff": null,
+      "finalVerdict": "none",
+      "confidence": "low",
+      "exclusionPenalties": [],
+      "layers": [
+        {
+          "layerName": "comment-L0",
+          "layerIndex": 0,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "L0: No DOM truth found"
+        },
+        {
+          "layerName": "comment-L1",
+          "layerIndex": 1,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "L1: No accessibility match"
+        },
+        {
+          "layerName": "comment-L2",
+          "layerIndex": 2,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "L2: No button heuristic match"
+        },
+        {
+          "layerName": "comment-L3",
+          "layerIndex": 3,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "L3: No golden selector match"
+        },
+        {
+          "layerName": "comment-L4",
+          "layerIndex": 4,
+          "score": 20,
+          "matched": true,
+          "matchedText": "2 class comments",
+          "details": "L4-Nuclear: \"comment\" in DOM text (count: 2)"
+        },
+        {
+          "layerName": "edited-L1",
+          "layerIndex": 5,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "EditedL1: No golden match"
+        },
+        {
+          "layerName": "edited-L2",
+          "layerIndex": 6,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "EditedL2: No semantic match"
+        },
+        {
+          "layerName": "edited-L3",
+          "layerIndex": 7,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "EditedL3: No TreeWalker match"
+        },
+        {
+          "layerName": "edited-L4",
+          "layerIndex": 8,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "EditedL4: Nothing to validate"
+        }
+      ],
+      "exclusionRuleIds": [],
+      "finalScore": 20
+    }
+  ],
+  "rtl-flagged-post-ar.html": [
+    {
+      "commentScore": 20,
+      "editedScore": 40,
+      "commentCount": 5,
+      "editedDiff": null,
+      "finalVerdict": "edited",
+      "confidence": "medium",
+      "exclusionPenalties": [],
+      "layers": [
+        {
+          "layerName": "comment-L0",
+          "layerIndex": 0,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "L0: No DOM truth found"
+        },
+        {
+          "layerName": "comment-L1",
+          "layerIndex": 1,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "L1: No accessibility match"
+        },
+        {
+          "layerName": "comment-L2",
+          "layerIndex": 2,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "L2: No button heuristic match"
+        },
+        {
+          "layerName": "comment-L3",
+          "layerIndex": 3,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "L3: No golden selector match"
+        },
+        {
+          "layerName": "comment-L4",
+          "layerIndex": 4,
+          "score": 20,
+          "matched": true,
+          "matchedText": "٥ تعليقات صفية",
+          "details": "L4-Nuclear: \"تعليق\" in DOM text (count: 5)"
+        },
+        {
+          "layerName": "edited-L1",
+          "layerIndex": 5,
+          "score": 40,
+          "matched": true,
+          "matchedText": "تم التعديل",
+          "details": "EditedL1: \"تم التعديل\" in \".IMvYId\" (date: false)"
+        },
+        {
+          "layerName": "edited-L2",
+          "layerIndex": 6,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "EditedL2: No semantic match"
+        },
+        {
+          "layerName": "edited-L3",
+          "layerIndex": 7,
+          "score": 10,
+          "matched": true,
+          "matchedText": "تم التعديل",
+          "details": "EditedL3: \"تم التعديل\" (date: false, parent: false) (no date - reduced)"
+        },
+        {
+          "layerName": "edited-L4",
+          "layerIndex": 8,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "EditedL4: Passed"
+        }
+      ],
+      "exclusionRuleIds": [],
+      "finalScore": 40
+    }
+  ],
+  "stream-flagged-post-en.html": [
+    {
+      "commentScore": 20,
+      "editedScore": 40,
+      "commentCount": 5,
+      "editedDiff": null,
+      "finalVerdict": "edited",
+      "confidence": "medium",
+      "exclusionPenalties": [],
+      "layers": [
+        {
+          "layerName": "comment-L0",
+          "layerIndex": 0,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "L0: No DOM truth found"
+        },
+        {
+          "layerName": "comment-L1",
+          "layerIndex": 1,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "L1: No accessibility match"
+        },
+        {
+          "layerName": "comment-L2",
+          "layerIndex": 2,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "L2: No button heuristic match"
+        },
+        {
+          "layerName": "comment-L3",
+          "layerIndex": 3,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "L3: No golden selector match"
+        },
+        {
+          "layerName": "comment-L4",
+          "layerIndex": 4,
+          "score": 20,
+          "matched": true,
+          "matchedText": "5 class comments",
+          "details": "L4-Nuclear: \"comment\" in DOM text (count: 5)"
+        },
+        {
+          "layerName": "edited-L1",
+          "layerIndex": 5,
+          "score": 40,
+          "matched": true,
+          "matchedText": "edited",
+          "details": "EditedL1: \"edited\" in \".IMvYId\" (date: false)"
+        },
+        {
+          "layerName": "edited-L2",
+          "layerIndex": 6,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "EditedL2: No semantic match"
+        },
+        {
+          "layerName": "edited-L3",
+          "layerIndex": 7,
+          "score": 10,
+          "matched": true,
+          "matchedText": "edited",
+          "details": "EditedL3: \"edited\" (date: false, parent: false) (no date - reduced)"
+        },
+        {
+          "layerName": "edited-L4",
+          "layerIndex": 8,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "EditedL4: Passed"
+        }
+      ],
+      "exclusionRuleIds": [],
+      "finalScore": 40
+    }
+  ],
+  "student-submissions-en.html": [
+    {
+      "commentScore": 0,
+      "editedScore": 0,
+      "commentCount": null,
+      "editedDiff": null,
+      "finalVerdict": "none",
+      "confidence": "low",
+      "exclusionPenalties": [],
+      "layers": [
+        {
+          "layerName": "comment-L0",
+          "layerIndex": 0,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "L0: No DOM truth found"
+        },
+        {
+          "layerName": "comment-L1",
+          "layerIndex": 1,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "L1: No accessibility match"
+        },
+        {
+          "layerName": "comment-L2",
+          "layerIndex": 2,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "L2: No button heuristic match"
+        },
+        {
+          "layerName": "comment-L3",
+          "layerIndex": 3,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "L3: No golden selector match"
+        },
+        {
+          "layerName": "comment-L4",
+          "layerIndex": 4,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "L4: No nuclear match"
+        },
+        {
+          "layerName": "edited-L1",
+          "layerIndex": 5,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "EditedL1: No golden match"
+        },
+        {
+          "layerName": "edited-L2",
+          "layerIndex": 6,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "EditedL2: No semantic match"
+        },
+        {
+          "layerName": "edited-L3",
+          "layerIndex": 7,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "EditedL3: No TreeWalker match"
+        },
+        {
+          "layerName": "edited-L4",
+          "layerIndex": 8,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "EditedL4: Nothing to validate"
+        }
+      ],
+      "exclusionRuleIds": [],
+      "finalScore": 0
+    },
+    {
+      "commentScore": 0,
+      "editedScore": 0,
+      "commentCount": null,
+      "editedDiff": null,
+      "finalVerdict": "none",
+      "confidence": "low",
+      "exclusionPenalties": [],
+      "layers": [
+        {
+          "layerName": "comment-L0",
+          "layerIndex": 0,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "L0: No DOM truth found"
+        },
+        {
+          "layerName": "comment-L1",
+          "layerIndex": 1,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "L1: No accessibility match"
+        },
+        {
+          "layerName": "comment-L2",
+          "layerIndex": 2,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "L2: No button heuristic match"
+        },
+        {
+          "layerName": "comment-L3",
+          "layerIndex": 3,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "L3: No golden selector match"
+        },
+        {
+          "layerName": "comment-L4",
+          "layerIndex": 4,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "L4: No nuclear match"
+        },
+        {
+          "layerName": "edited-L1",
+          "layerIndex": 5,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "EditedL1: No golden match"
+        },
+        {
+          "layerName": "edited-L2",
+          "layerIndex": 6,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "EditedL2: No semantic match"
+        },
+        {
+          "layerName": "edited-L3",
+          "layerIndex": 7,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "EditedL3: No TreeWalker match"
+        },
+        {
+          "layerName": "edited-L4",
+          "layerIndex": 8,
+          "score": 0,
+          "matched": false,
+          "matchedText": null,
+          "details": "EditedL4: Nothing to validate"
+        }
+      ],
+      "exclusionRuleIds": [],
+      "finalScore": 0
+    }
+  ],
+  "student-work-teacher-en.html": []
+}
