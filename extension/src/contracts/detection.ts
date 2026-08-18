@@ -92,4 +92,13 @@ export interface PostDecision {
 export interface Detector {
   readonly name: DetectorName;
   observe(post: HTMLElement, ctx: DetectContext): PostObservation;
+  /**
+   * Drop any state the detector accumulated for the current page.
+   *
+   * Optional because a detector need not hold state — StructuralDetector is
+   * expected not to. It exists so orchestration code can free memory on
+   * navigation without knowing WHAT is being freed. Callers must not assume
+   * a keyword cache, or a cache at all.
+   */
+  reset?(): void;
 }

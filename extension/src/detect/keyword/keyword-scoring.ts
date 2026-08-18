@@ -34,6 +34,7 @@ import {
   getCommentKeywords,
   getEditedKeywords,
   preloadKeywords,
+  clearKeywordCache,
   detectPageLanguage,
   normalizeText,
   normalizeForComparison,
@@ -857,5 +858,5 @@ export type { CommentLayerResult, EditedLayerResult };
  * import of its own. src/detect/keyword/ is the only directory allowed to
  * reach those modules, and this keeps that allowlist to one entry.
  */
-export { detectPageLanguage, preloadKeywords, applyExclusions };
+export { detectPageLanguage, preloadKeywords, clearKeywordCache, applyExclusions };
 export type { ExclusionResult };

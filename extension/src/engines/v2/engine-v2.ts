@@ -71,7 +71,7 @@ import { engineRegistry } from '../engine-registry';
 import type { SelectorScorer } from '../../v2/selectors/selector-scorer';
 import { computePlacement } from '../../v2/decision/file-placement';
 import { scoreFlagsForPost } from '../../v2/decision/flag-scoring';
-import { clearKeywordCache } from '../../v2/decision/keyword-loader';
+import { keywordDetector } from '../../detect/keyword/keyword-detector';
 import type { ScannedPost, ScannedFile } from '../../v2/model/dom-scanner';
 import { renderBatch, removeStaleButtons, removeAllV2Buttons } from '../../v2/render/button-renderer';
 import { injectV2Styles, removeV2Styles } from '../../v2/render/button-styles';
@@ -190,8 +190,8 @@ export class EngineV2 implements CQDEngine {
     removeAllV2Badges();
     removeFlagStyles();
 
-    // Clear keyword cache to free memory
-    clearKeywordCache();
+    // Let the detector drop whatever it cached for this page, to free memory
+    keywordDetector.reset();
 
     // Flush Phase 5 systems
     this.correctionQueue.flush();

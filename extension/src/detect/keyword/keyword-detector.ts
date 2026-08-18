@@ -24,12 +24,24 @@ import {
   scoreEdited,
   detectPageLanguage,
   preloadKeywords,
+  clearKeywordCache,
   applyExclusions,
   type ExclusionResult,
 } from './keyword-scoring';
 
 export class KeywordDetector implements Detector {
   readonly name = 'keyword' as const;
+
+  /**
+   * Drop the keyword tables this detector lazily loaded.
+   *
+   * Called on navigation teardown to free memory. Exposed as a generic
+   * lifecycle hook so orchestration code does not need to know that a
+   * keyword cache is what is being freed.
+   */
+  reset(): void {
+    clearKeywordCache();
+  }
 
   observe(post: HTMLElement, ctx: DetectContext): PostObservation {
     const startTime = performance.now();
