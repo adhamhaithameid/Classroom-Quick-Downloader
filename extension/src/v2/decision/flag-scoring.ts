@@ -1,47 +1,45 @@
 // filepath: extension/src/v2/decision/flag-scoring.ts
 /**
  * ============================================================================
- * V2 FLAG SCORING — public entry point
+ * V2 FLAG SCORING — Detect -> Decide adapter
  * ============================================================================
  *
- * The scoring implementation now lives in src/detect/keyword/. This module
- * stays as the stable public surface its callers already import:
- * src/engines/v2/engine-v2.ts and tests/v2-flag-scoring.test.ts.
+ * This module used to be 1,000 lines of layered keyword heuristics. Those now
+ * live in src/detect/keyword/. What is left is the adapter that keeps the
+ * existing public surface working:
  *
- * Task 6 of the seam plan replaces the body of scoreFlagsForPost with a
- * Detect -> Decide adapter. Until then it is the original implementation with
- * its scoring helpers imported rather than defined inline.
+ *   scoreFlagsForPost(post, postId, viewKind, lang?) -> FlagDecision
+ *
+ * Callers: src/engines/v2/engine-v2.ts, tests/v2-flag-scoring.test.ts.
+ * Neither of them changed, and neither of them can tell the difference.
+ *
+ * NOTE: this file imports no keyword module and no language utility. That is
+ * enforced by tests/contracts/import-boundary.test.ts.
  */
 import type {
   FlagDecision,
   DecisionTrace,
-  LayerTrace,
   ExclusionTrace,
   ViewKind,
 } from '../../engines/types';
 
-import {
-  scoreComments,
-  scoreEdited,
-  detectPageLanguage,
-  preloadKeywords,
-  applyExclusions,
-  type ExclusionResult,
-} from '../../detect/keyword/keyword-scoring';
-
+import { keywordDetector } from '../../detect/keyword/keyword-detector';
+import { scoreComments, scoreEdited } from '../../detect/keyword/keyword-scoring';
+import { decideFlags } from '../../decide/decide-flags';
 import { THRESHOLDS } from '../../decide/thresholds';
 
+/**
+ * Re-exported for the existing public surface. These are keyword-path
+ * internals; new code should use KeywordDetector instead.
+ */
 export { scoreComments, scoreEdited };
 
 /**
  * THE MAIN FUNCTION — Score all flags for a single post.
  *
- * This replaces V1's:
- * - detectComments() from smart-detector-comments.ts
- * - detectEdited() from smart-detector.ts
- * - detectPostState() from smart-detector.ts
- *
- * One call → FlagDecision with full DecisionTrace.
+ * Now a two-line pipeline: observe, then decide. The FlagDecision it returns
+ * is assembled from both halves so the shape stays byte-identical to the
+ * pre-seam implementation.
  *
  * @param post - The post element to analyze
  * @param postId - Canonical post ID
@@ -55,121 +53,38 @@ export function scoreFlagsForPost(
   viewKind: ViewKind,
   lang?: string,
 ): FlagDecision {
-  const startTime = performance.now();
-  const pageLang = lang || detectPageLanguage();
+  const observation = keywordDetector.observe(post, { postId, viewKind, lang });
+  const decision = decideFlags(observation);
 
-  // Ensure keywords are loaded
-  preloadKeywords(pageLang);
-
-  // Run comment detection
-  const commentResult = scoreComments(post, pageLang);
-
-  // Run edited detection
-  const editedResult = scoreEdited(post, pageLang);
-
-  // Apply cross-type exclusions
-  const exclusionResults: ExclusionResult[] = [];
-  if (commentResult.matchedText) {
-    exclusionResults.push(...applyExclusions(commentResult.matchedText, post, 'comment'));
-  }
-  if (editedResult.matchedText) {
-    exclusionResults.push(...applyExclusions(editedResult.matchedText, post, 'edited'));
-  }
-
-  // Compute final scores (with exclusion penalties)
-  let commentScore = commentResult.score;
-  let editedScore = editedResult.score;
-
-  for (const exc of exclusionResults) {
-    if (exc.ruleId.includes('COMMENT') || exc.ruleId.includes('ACTION_BTN')) {
-      commentScore += exc.penalty;
-    }
-    if (exc.ruleId.includes('EDITED')) {
-      editedScore += exc.penalty;
-    }
-  }
-
-  // Clamp to 0
-  commentScore = Math.max(0, commentScore);
-  editedScore = Math.max(0, editedScore);
-
-  // Determine verdict
-  let verdict: FlagDecision['finalVerdict'] = 'none';
-  if (commentScore >= THRESHOLDS.comment_show && editedScore >= THRESHOLDS.edited_show &&
-      commentScore >= THRESHOLDS.both_minimum_each && editedScore >= THRESHOLDS.both_minimum_each) {
-    verdict = 'both';
-  } else if (commentScore >= THRESHOLDS.comment_show) {
-    verdict = 'comment';
-  } else if (editedScore >= THRESHOLDS.edited_show) {
-    verdict = 'edited';
-  }
-
-  // Determine confidence
-  const maxScore = Math.max(commentScore, editedScore);
-  const confidence: FlagDecision['confidence'] =
-    maxScore >= THRESHOLDS.comment_high_confidence ? 'high' :
-    maxScore >= THRESHOLDS.edited_show ? 'medium' : 'low';
-
-  const elapsed = performance.now() - startTime;
-
-  // Build trace
-  const layers: LayerTrace[] = [];
-
-  // Comment layers
-  for (let i = 0; i < commentResult.layers.length; i++) {
-    const l = commentResult.layers[i];
-    layers.push({
-      layerName: `comment-L${i}`,
-      layerIndex: layers.length,
-      score: l.score,
-      matched: l.score > 0,
-      matchedText: l.matchedText,
-      selectorUsed: null,
-      details: l.details,
-    });
-  }
-
-  // Edited layers
-  for (let i = 0; i < editedResult.layers.length; i++) {
-    const l = editedResult.layers[i];
-    layers.push({
-      layerName: `edited-L${i + 1}`,
-      layerIndex: layers.length,
-      score: l.score,
-      matched: l.score !== 0,
-      matchedText: l.matchedText,
-      selectorUsed: null,
-      details: l.details,
-    });
-  }
-
-  // Convert exclusion results to traces
-  const exclusions: ExclusionTrace[] = exclusionResults.map(e => ({
-    ruleId: e.ruleId,
-    penalty: e.penalty,
-    reason: e.reason,
-    matchedText: e.matchedText,
+  // ExclusionTrace declares `reason: string` and `matchedText: string` — both
+  // non-nullable — so these are empty strings, not null. The matched text is
+  // deliberately dropped: it is page text and does not cross the seam.
+  const exclusions: ExclusionTrace[] = observation.penalties.map((p) => ({
+    ruleId: p.ruleId,
+    penalty: p.penalty,
+    reason: '',
+    matchedText: '',
   }));
 
   const trace: DecisionTrace = {
     postId,
     timestamp: Date.now(),
     viewKind,
-    layers,
+    layers: observation.debug ?? [],
     exclusions,
-    finalScore: maxScore,
-    duration_ms: elapsed,
+    finalScore: decision.score,
+    duration_ms: observation.elapsedMs,
   };
 
   return {
     postId,
-    commentScore,
-    editedScore,
-    commentCount: commentResult.count,
+    commentScore: decision.commentScore,
+    editedScore: decision.editedScore,
+    commentCount: decision.commentCount,
     editedDiff: null, // Will be computed by the render layer from date comparison
-    exclusionPenalties: exclusionResults.map(e => ({ ruleId: e.ruleId, penalty: e.penalty })),
-    finalVerdict: verdict,
-    confidence,
+    exclusionPenalties: observation.penalties,
+    finalVerdict: decision.verdict,
+    confidence: decision.confidence,
     trace,
   };
 }
