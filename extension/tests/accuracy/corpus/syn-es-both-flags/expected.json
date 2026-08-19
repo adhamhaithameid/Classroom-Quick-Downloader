@@ -1,0 +1,15 @@
+{
+  "viewKind": "stream",
+  "lang": "es",
+  "note": "Synthetic (es): both signals on one card.",
+  "origin": "synthetic",
+  "posts": [
+    {
+      "postId": "synth-es-4",
+      "commentPresent": true,
+      "commentCount": 2,
+      "editedPresent": true
+    }
+  ],
+  "caseId": "syn-es-both-flags"
+}

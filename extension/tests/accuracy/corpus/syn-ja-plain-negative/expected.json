@@ -1,0 +1,15 @@
+{
+  "viewKind": "stream",
+  "lang": "ja",
+  "note": "Synthetic negative control (ja): no flags present. Any flag is a false positive.",
+  "origin": "synthetic",
+  "posts": [
+    {
+      "postId": "synth-ja-1",
+      "commentPresent": false,
+      "commentCount": null,
+      "editedPresent": false
+    }
+  ],
+  "caseId": "syn-ja-plain-negative"
+}

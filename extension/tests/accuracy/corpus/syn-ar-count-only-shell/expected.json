@@ -1,0 +1,15 @@
+{
+  "viewKind": "stream",
+  "lang": "ar",
+  "note": "Synthetic: Arabic-Indic numeral 8 in the L0 shell; exercises cross-script digit parsing.",
+  "origin": "synthetic",
+  "posts": [
+    {
+      "postId": "synth-ar-9",
+      "commentPresent": true,
+      "commentCount": 8,
+      "editedPresent": false
+    }
+  ],
+  "caseId": "syn-ar-count-only-shell"
+}

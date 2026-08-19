@@ -1,0 +1,27 @@
+{
+  "viewKind": "stream",
+  "lang": "en",
+  "note": "Synthetic: three cards in one page with different flag states; segmentation must keep them distinct.",
+  "origin": "synthetic",
+  "posts": [
+    {
+      "postId": "synth-en-a",
+      "commentPresent": true,
+      "commentCount": 2,
+      "editedPresent": false
+    },
+    {
+      "postId": "synth-en-b",
+      "commentPresent": false,
+      "commentCount": null,
+      "editedPresent": false
+    },
+    {
+      "postId": "synth-en-c",
+      "commentPresent": false,
+      "commentCount": null,
+      "editedPresent": true
+    }
+  ],
+  "caseId": "syn-en-multi-post-mixed"
+}

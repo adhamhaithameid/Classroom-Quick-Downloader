@@ -1,0 +1,15 @@
+{
+  "viewKind": "stream",
+  "lang": "hu",
+  "note": "Synthetic (hu): 6 class comments in the real L0 DOM-truth shell (.qCWAqb > .huI6Cb). Count is language-free.",
+  "origin": "synthetic",
+  "posts": [
+    {
+      "postId": "synth-hu-2",
+      "commentPresent": true,
+      "commentCount": 6,
+      "editedPresent": false
+    }
+  ],
+  "caseId": "syn-hu-comments-l0"
+}

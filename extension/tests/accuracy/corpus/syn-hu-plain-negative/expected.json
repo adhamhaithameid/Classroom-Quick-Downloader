@@ -1,0 +1,15 @@
+{
+  "viewKind": "stream",
+  "lang": "hu",
+  "note": "Synthetic negative control (hu): no flags present. Any flag is a false positive.",
+  "origin": "synthetic",
+  "posts": [
+    {
+      "postId": "synth-hu-1",
+      "commentPresent": false,
+      "commentCount": null,
+      "editedPresent": false
+    }
+  ],
+  "caseId": "syn-hu-plain-negative"
+}

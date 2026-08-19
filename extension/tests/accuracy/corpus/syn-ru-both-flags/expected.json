@@ -1,0 +1,15 @@
+{
+  "viewKind": "stream",
+  "lang": "ru",
+  "note": "Synthetic (ru): both signals on one card.",
+  "origin": "synthetic",
+  "posts": [
+    {
+      "postId": "synth-ru-4",
+      "commentPresent": true,
+      "commentCount": 7,
+      "editedPresent": true
+    }
+  ],
+  "caseId": "syn-ru-both-flags"
+}

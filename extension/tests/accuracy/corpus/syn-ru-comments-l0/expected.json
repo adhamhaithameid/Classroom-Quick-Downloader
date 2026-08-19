@@ -1,0 +1,15 @@
+{
+  "viewKind": "stream",
+  "lang": "ru",
+  "note": "Synthetic (ru): 7 class comments in the real L0 DOM-truth shell (.qCWAqb > .huI6Cb). Count is language-free.",
+  "origin": "synthetic",
+  "posts": [
+    {
+      "postId": "synth-ru-2",
+      "commentPresent": true,
+      "commentCount": 7,
+      "editedPresent": false
+    }
+  ],
+  "caseId": "syn-ru-comments-l0"
+}

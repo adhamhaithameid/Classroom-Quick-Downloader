@@ -1,0 +1,15 @@
+{
+  "viewKind": "stream",
+  "lang": "hu",
+  "note": "Synthetic (hu): both signals on one card.",
+  "origin": "synthetic",
+  "posts": [
+    {
+      "postId": "synth-hu-4",
+      "commentPresent": true,
+      "commentCount": 6,
+      "editedPresent": true
+    }
+  ],
+  "caseId": "syn-hu-both-flags"
+}
