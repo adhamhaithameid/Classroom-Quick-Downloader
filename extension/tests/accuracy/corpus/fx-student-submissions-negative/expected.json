@@ -1,0 +1,11 @@
+{
+  "caseId": "fx-student-submissions-negative",
+  "viewKind": "student_submissions",
+  "lang": "en",
+  "note": "Fixture-derived (student-submissions-en.html). Two submission cards, no flag signals anywhere; flags must stay absent on Student Work surfaces.",
+  "origin": "fixture",
+  "posts": [
+    { "postId": "fixture-submission-1", "commentPresent": false, "commentCount": null, "editedPresent": false },
+    { "postId": "fixture-submission-2", "commentPresent": false, "commentCount": null, "editedPresent": false }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "caseId": "plain-post-no-flags-en",
+  "viewKind": "stream",
+  "lang": "en",
+  "note": "Negative control. Body text contains 'Commentary' and 'Add comment' to catch substring and action-button false positives (defects D3, D6).",
+  "posts": [
+    { "postId": "corpus-plain-1", "commentPresent": false, "commentCount": null, "editedPresent": false }
+  ]
+}

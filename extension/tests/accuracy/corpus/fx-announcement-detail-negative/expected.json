@@ -1,0 +1,10 @@
+{
+  "caseId": "fx-announcement-detail-negative",
+  "viewKind": "announcement_detail",
+  "lang": "en",
+  "note": "Fixture-derived (tests/fixtures/classroom/announcement-detail-en.html). 'No class comments' and an empty 'Class comments' shell are both absence, per the structural detector spec.",
+  "origin": "fixture",
+  "posts": [
+    { "postId": "fixture-announcement-1", "commentPresent": false, "commentCount": null, "editedPresent": false }
+  ]
+}
