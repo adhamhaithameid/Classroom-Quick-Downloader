@@ -1,0 +1,21 @@
+{
+  "version": 2,
+  "note": "Floors may only move UP. Lowering one is a policy change and needs an ADR (docs/adr/0008-accuracy-definition-and-gates.md). knownFailures may only SHRINK.",
+  "measuredOn": "2026-08-22",
+  "floors": {
+    "commentPrecision": 1,
+    "commentRecall": 0.777,
+    "editedPrecision": 1,
+    "editedRecall": 0.866,
+    "countExactRate": 1,
+    "coverage": 1
+  },
+  "knownFailures": [
+    "rtl-flagged-post-ar",
+    "stream-edited-and-comments-en",
+    "fx-classwork-material-comments",
+    "fx-mixed-links-comments",
+    "syn-hu-both-flags",
+    "syn-hu-edited-only"
+  ]
+}
