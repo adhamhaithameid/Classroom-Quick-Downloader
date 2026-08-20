@@ -107,6 +107,39 @@ describe('detection seam import boundary', () => {
     }
   });
 
+  it('keeps the structural detector free of keyword imports', () => {
+    const offenders: string[] = [];
+
+    for (const file of walk(join(SRC, 'detect', 'structural'))) {
+      const rel = relative(SRC, file).replace(/\\/g, '/');
+      for (const spec of importsIn(file)) {
+        if (FORBIDDEN.some((f) => spec.includes(f)) || spec.includes('detect/keyword')) {
+          offenders.push(`${rel} imports ${spec}`);
+        }
+      }
+    }
+
+    expect(offenders).toEqual([]);
+  });
+
+  it('keeps the structural detector from reading the language hint', () => {
+    // The whole point of the second engine is that it has no language signal.
+    // `ctx.lang` is on DetectContext for KeywordDetector's benefit only.
+    const offenders: string[] = [];
+
+    for (const file of walk(join(SRC, 'detect', 'structural'))) {
+      const rel = relative(SRC, file).replace(/\\/g, '/');
+      const source = readFileSync(file, 'utf8');
+      // Strip block comments first — the module header discusses lang at length.
+      const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+      if (/\.lang\b/.test(code) || /\blang\s*[,)]/.test(code)) {
+        offenders.push(`${rel} references a language hint`);
+      }
+    }
+
+    expect(offenders).toEqual([]);
+  });
+
   it('keeps the decide layer free of any detect import', () => {
     const offenders: string[] = [];
 
