@@ -72,6 +72,7 @@ import type { SelectorScorer } from '../../v2/selectors/selector-scorer';
 import { computePlacement } from '../../v2/decision/file-placement';
 import { scoreFlagsForPost } from '../../v2/decision/flag-scoring';
 import { keywordDetector } from '../../detect/keyword/keyword-detector';
+import { runComparison, installCompareGlobals } from '../../compare/compare-runner';
 import type { ScannedPost, ScannedFile } from '../../v2/model/dom-scanner';
 import { renderBatch, removeStaleButtons, removeAllV2Buttons } from '../../v2/render/button-renderer';
 import { injectV2Styles, removeV2Styles } from '../../v2/render/button-styles';
@@ -135,6 +136,11 @@ export class EngineV2 implements CQDEngine {
     this.currentView = viewKind;
     this.signal = signal;
     this.isActive = true;
+
+    // Compare build only — installs window.__cqd. Folded away in production.
+    if (import.meta.env.MODE === 'compare') {
+      installCompareGlobals();
+    }
 
     // Create fresh scorers for each page load
     // This resets failure counts so selectors get a clean slate
@@ -588,6 +594,14 @@ export class EngineV2 implements CQDEngine {
 
       this.flagDecisions.set(postId, decision);
       this.decisionTraces.set(postId, decision.trace);
+
+      // Compare build only — dead-code-eliminated from production bundles.
+      // The literal comparison — not a re-exported constant — is what lets Vite
+      // substitute import.meta.env.MODE and fold this to `if (false)`, so the
+      // whole compare tree is tree-shaken out of production bundles.
+      if (import.meta.env.MODE === 'compare') {
+        runComparison(postEl, { postId, viewKind: this.currentView });
+      }
 
       // Shadow mode decision trace logging — enables debugging wrong decisions
       // via DevTools console. Filter console by [CQD-V2-SHADOW] to see only these.

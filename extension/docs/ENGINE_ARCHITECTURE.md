@@ -337,3 +337,36 @@ Nothing consumes these yet.
 
 Design: `docs/superpowers/specs/2026-08-16-detection-engine-seam-design.md`
 Plan: `docs/superpowers/plans/2026-08-18-detection-engine-seam.md`
+
+## Compare mode (2026-08-20)
+
+`StructuralDetector` (`src/detect/structural/`) is the second implementation of
+the `Detector` interface. It uses DOM shape and Unicode numerals only — no
+keyword table, no `ctx.lang`. Two boundary tests enforce that.
+
+**Comment detection works** because Classroom's comment-count container is
+found by class selector, and whether it holds a *numeral* is what distinguishes
+"5 class comments" / "٥ تعليقات صفية" from "No class comments". Numerals are
+script-independent. The selector chain is ported from the keyword engine's
+layer 0, which was already language-free — proven code, not a guess.
+
+**Edited detection does not exist** on the structural path. No DOM shape, ARIA
+role or element relationship separates an edited post from a posted one in any
+fixture we hold; only the words differ. The detector reports
+`edited.source = 'unavailable'` rather than guessing, and `compareObservations`
+classifies that as `unavailable`, never `agree`. A confident "not edited" would
+be a silent false negative that instrumentation would read as agreement.
+
+`src/compare/` holds the comparison record, the collector behind
+`window.__cqd.report()`, and a small renderer in its own `cqd-compare-*`
+namespace — the production `flag-renderer` is single-badge-per-post and would
+delete the other engine's badge if reused.
+
+Gating is a **build flag**, not an `EngineMode` member: `EngineMode` is already
+`'legacy' | 'shadow' | 'v2' | 'v3'` and wired through the registry, the mode
+controller, the popup and storage. Adding a member would have created a runtime
+path into compare mode. Instead the call sites test
+`import.meta.env.MODE === 'compare'` literally, which Vite substitutes and folds
+away. `pnpm build:compare` emits to `.output/chrome-mv3-compare/`.
+
+Operator guide: `extension/docs/COMPARE_MODE_RUNBOOK.md`
