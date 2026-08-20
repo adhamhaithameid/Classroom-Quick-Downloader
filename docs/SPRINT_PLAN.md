@@ -2,7 +2,19 @@
 
 Rolling 2-week sprint system. No hard deadline. Each sprint has a focus window, a done definition, and pulls from a prioritized backlog.
 
-Last updated: 2026-06-24
+Last updated: 2026-08-20
+
+> **Status note (2026-08-20).** Sprint 1's CI/CD items are verifiably done — see
+> the checkboxes below, each annotated with the evidence in-repo. Oracle #415 and
+> #416 remain the last open Sprint 1 items and still gate #418.
+>
+> Items whose state lives on GitHub (PR merges, issue closures) are **not**
+> re-verified here: that needs authenticated GitHub access, which was unavailable
+> when this update was written. They are left as-is rather than guessed at.
+>
+> Engine work now has its own tracking. Backlog items that map to
+> `extension/docs/PRD_ENGINE_REFACTOR.md` are annotated with their PRD phase, so
+> this board and the PRD stay reconciled.
 
 ---
 
@@ -23,11 +35,11 @@ Last updated: 2026-06-24
 ### Done definition for Sprint 1
 - [ ] All CRITICAL/HIGH security PRs merged or verified.
 - [ ] All duplicate Jules PRs closed.
-- [ ] Oracle #415 (sessions) fixed and deployed.
-- [ ] Oracle #416 (Sheets export) fixed and deployed.
-- [ ] Extension distribution CI workflow: builds all three artifacts on tag push, auto-publishes to Firefox, creates draft release with artifacts for Chrome/Edge.
-- [ ] Job timeouts added to all CI workflows.
-- [ ] Go modules added to Dependabot config.
+- [ ] Oracle #415 (sessions) fixed and deployed. — **still open**, gates #418
+- [ ] Oracle #416 (Sheets export) fixed and deployed. — **still open**, gates #418
+- [x] Extension distribution CI workflow: builds all three artifacts on tag push, auto-publishes to Firefox, creates draft release with artifacts for Chrome/Edge. — `.github/workflows/extension-distribution.yml`
+- [x] Job timeouts added to all CI workflows. — 8 `timeout-minutes` keys in `ci.yml`
+- [x] Go modules added to Dependabot config. — `gomod` entry in `.github/dependabot.yml`
 - [ ] `pendingByUrl` race condition scoped (issue filed with reproduction path, even if not yet fixed).
 
 ### Sprint 1 — Ordered Work Items
@@ -90,15 +102,35 @@ Last updated: 2026-06-24
 - [ ] Merge all remaining test PRs: #649, #650, #651, #630, #631, #632
 - [ ] Merge performance PRs: #648, #608
 - [ ] Implement #614 — scope DOM detection to post metadata zone
-- [ ] Implement #613 — use document.documentElement.lang for keyword detection
-- [ ] Implement #615 — cross-browser DOM selector audit and hardening
-- [ ] Implement #616 — MutationObserver full-page scan (replaces polling)
+- [ ] Implement #613 — use document.documentElement.lang for keyword detection — reconsider: the detection seam confines all language reasoning to `src/detect/keyword/`, so this is now a one-module change rather than a system-wide one.
+- [ ] Implement #615 — cross-browser DOM selector audit and hardening — *PRD Phase 5.*
+- [ ] Implement #616 — MutationObserver full-page scan (replaces polling) — *PRD Phase 4.*
 - [ ] Implement #546 — fix missing Download All button in classwork view
 - [ ] Implement #537 — investigate "download never works" reports (post-#656 merge)
 - [ ] Implement #541 — fix language strings appended to filenames
-- [ ] Implement #396 — freeze 1.5.0 Classroom golden fixtures
+- [ ] Implement #396 — freeze 1.5.0 Classroom golden fixtures — **partially done**: 9 sanitized fixtures + sha256 `manifest.json` + integrity test exist in `extension/tests/fixtures/classroom/`, covering 8 ViewKinds and one RTL case. Outstanding: real-language captures across the other 11 shipped languages, which need a human capture session on a live Classroom account and cannot be committed (real student data). *PRD Phase 0.*
 - [ ] Scope Student Work gap (hardening board item)
 - [ ] Scope pendingByUrl fix (once issue is filed)
+
+### Detection Engine Seam
+
+Design: `docs/superpowers/specs/2026-08-16-detection-engine-seam-design.md`
+
+- [x] **Plan A — Detect/Decide seam.** Contracts, `KeywordDetector`, language-free
+      Decide layer, `flag-scoring.ts` reduced from 1,013 lines to 95, import
+      boundary enforced by test. On branch `feat/detection-engine-seam`,
+      8 commits, **not merged**. Plan:
+      `docs/superpowers/plans/2026-08-18-detection-engine-seam.md`
+- [ ] **Plan B — StructuralDetector + compare mode.** Written, not started.
+      `docs/superpowers/plans/2026-08-20-detection-engine-seam-plan-b.md`
+      - Key finding: `commentLayer0_DOMTruth` is already language-free, so the
+        structural comment path starts from proven code.
+      - Key limit: **no structural signal for "edited" exists** in any fixture we
+        hold — `Edited Mar 10` / `تم التعديل` / `Posted Nov 6` sit in an identical
+        `.meta-row`. Blocked on #396 real captures. Compare mode will quantify it.
+- [ ] Decide whether to promote the structural path. Needs compare-mode runs on
+      real Classroom pages in several languages — not decidable from the 9
+      synthetic fixtures.
 
 ### Docs
 
@@ -139,7 +171,7 @@ Last updated: 2026-06-24
 
 - [ ] Implement Phase B: operational state board — deploy history, version tracking, rollout status
 - [ ] Implement Phase C: platform registry design spec — all future platforms report in
-- [ ] Implement #401 — consolidate extension runtime ownership behind V2 lifecycle
+- [ ] Implement #401 — consolidate extension runtime ownership behind V2 lifecycle — *PRD Phase 2/3.*
 - [ ] Evaluate #642 Oracle suggestions (migration version tracking, Caddy rate limits)
 - [ ] Fix Oracle worker ORACLE_ENDPOINT from IP to domain in wrangler.toml
 
