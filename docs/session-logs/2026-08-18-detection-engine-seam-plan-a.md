@@ -264,3 +264,102 @@ outside the requested task and was not authorised.
 
 **Nothing is lost.** All work is committed. Plan B is written in full, with
 verbatim test code, so execution resumes at Task 1 the moment deps are back.
+
+---
+
+# Addendum 2 — Plan B executed (2026-08-20)
+
+`pnpm install --frozen-lockfile` restored deps in 6.3s from the store cache;
+`pnpm-lock.yaml` verified unchanged. Commit hooks now work — every commit from
+here was validated by commitlint for real.
+
+## Delivered
+
+| Task | Result |
+|---|---|
+| 1 Language-free numerals | `src/detect/shared/numerals.ts`, 19 tests |
+| 2 StructuralDetector | `src/detect/structural/`, 13 tests, 2 new boundary rules |
+| 3 Comparison record | `src/compare/compare-observations.ts`, 10 tests |
+| 4 Build gating | `IS_COMPARE_BUILD`, `build:compare` script, 3 tests |
+| 5 Instrumentation | `CompareCollector` + `window.__cqd.report()`, 11 tests |
+| 6 Dual run + render | `compare-render.ts` + `compare-runner.ts`, 9 tests, wired into `engine-v2` |
+| 7 Runbook | `extension/docs/COMPARE_MODE_RUNBOOK.md` |
+
+Suite grew 106 → **112 files, 3,324 → 3,391 tests**, all passing. `tsc` clean,
+golden green, both 100% coverage profiles green, chrome/firefox/edge all build.
+
+## Four corrections to Plan B, found in the source
+
+1. **`parseUnicodeInteger` is not language-free.** It falls back to parsing
+   word-numbers ("واحد" = one). Only the digit path is script-independent. So
+   rather than "moving" it, `src/detect/shared/numerals.ts` implements a
+   digits-only primitive. A test asserts it does *not* parse word-numbers —
+   that is the keyword layer's job.
+
+2. **No helpers were moved out of `detection-keywords.ts`.** Plan B said move;
+   the helpers live in the V1 monolith that Plan A deliberately does not touch,
+   and the keyword version has different semantics anyway. Keyword layer keeps
+   its own; structural gets the clean one. Zero risk to the baseline.
+
+3. **Plan B's S1 layer was wrong.** It proposed keying comment detection on
+   `[jscontroller="h38nBf"]`, but `post-card-utils.ts` documents that as the
+   *three-dots menu container*. Dropped. S0 covers the real containers.
+
+4. **`renderFlagBadge` cannot be reused for dual render.** It is
+   single-badge-per-post: it removes any existing `.cqd-v2-flag` and stamps
+   attributes on the post, so a second call deletes the first badge. Compare
+   mode got its own renderer in a `cqd-compare-*` namespace. A test asserts a
+   production badge on the same post survives untouched.
+
+## Digit parsing without a lookup table
+
+`digitValue()` derives a digit's value from its position in its own contiguous
+Unicode block rather than consulting a hardcoded block table (which is what
+`detection-keywords.ts` does, listing ~15 blocks). Every `Nd` block is exactly
+ten contiguous codepoints separated from its neighbours by non-digits, so
+walking backwards until the previous codepoint is not a digit gives the value.
+Works for every present and future `Nd` script with nothing to maintain.
+
+## Gating: measured, not assumed
+
+First attempt failed. Guarding on an imported `IS_COMPARE_BUILD` constant is
+**not** eliminable — Vite substitutes `import.meta.env.MODE` at the call site,
+not across a module boundary. Fixed by testing the literal at each call site in
+`engine-v2`. Measured on real bundles:
+
+| Artefact | `chrome-mv3` | `chrome-mv3-compare` |
+|---|---|---|
+| `__cqd` global | 0 | 1 |
+| `[CQD-COMPARE]` logging | 0 | 1 |
+| compare CSS body | 0 | 1 |
+| `cqd-compare-flag` literal | 1 | 1 |
+
+Production is functionally inert — no global, no logging, no CSS, no reachable
+code path. Two class-name string literals survive in a module that is
+registered but never invoked. Stated precisely rather than claimed as a
+byte-perfect strip.
+
+Also learned: `wxt build --mode compare` emits to a **separate directory**,
+`.output/chrome-mv3-compare/`. An earlier grep against `chrome-mv3/` produced a
+false "compare mode does not activate" reading, corrected on re-check.
+
+## The headline finding
+
+**The structural engine cannot detect "edited" at all.** Three fixtures prove
+it: `Edited Mar 10`, `تم التعديل في ١٠ مارس` and `Posted Nov 6, 2025` sit in an
+identical `.meta-row`. No shape, role or relationship separates them.
+
+Rather than guess, the detector reports `unavailable`, and the comparison layer
+treats that as its own outcome — never as agreement, even when both engines
+report `present: false`. Two dedicated tests lock that in. Without it, compare
+mode would report near-perfect agreement on edited while the structural engine
+was simply blind to it, and the promotion decision would rest on a meaningless
+number.
+
+## Still open
+
+- Compare-mode runs on **real Classroom pages** — the only thing that can
+  decide promotion. Fixtures cannot.
+- #396/#673 captures — now gate two things: the 11 untested languages, and
+  whether live Classroom marks edited posts with a distinguishing node.
+- Nothing pushed. 16 commits on `feat/detection-engine-seam`.
