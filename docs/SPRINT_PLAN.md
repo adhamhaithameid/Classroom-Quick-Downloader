@@ -121,8 +121,10 @@ Design: `docs/superpowers/specs/2026-08-16-detection-engine-seam-design.md`
       boundary enforced by test. On branch `feat/detection-engine-seam`,
       8 commits, **not merged**. Plan:
       `docs/superpowers/plans/2026-08-18-detection-engine-seam.md`
-- [ ] **Plan B — StructuralDetector + compare mode.** Written, not started.
-      `docs/superpowers/plans/2026-08-20-detection-engine-seam-plan-b.md`
+- [x] **Plan B — StructuralDetector + compare mode.** Built. `pnpm build:compare`
+      emits to `.output/chrome-mv3-compare/`; `window.__cqd.report()` gives the
+      evidence summary. Operator guide: `extension/docs/COMPARE_MODE_RUNBOOK.md`.
+      Plan: `docs/superpowers/plans/2026-08-20-detection-engine-seam-plan-b.md`
       - Key finding: `commentLayer0_DOMTruth` is already language-free, so the
         structural comment path starts from proven code.
       - Key limit: **no structural signal for "edited" exists** in any fixture we
