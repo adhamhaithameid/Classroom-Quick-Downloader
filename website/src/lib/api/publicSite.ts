@@ -156,10 +156,32 @@ async function fetchBootstrapSnapshot(): Promise<WebsiteSnapshot | null> {
   }
 }
 
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+/**
+ * Run a request under a deadline, and genuinely cancel it when the deadline
+ * passes.
+ *
+ * The previous implementation took an already-started promise and simply
+ * rejected alongside it. The underlying fetch kept running: it held a
+ * connection, and its response was thrown away. For the POST endpoints that
+ * was worse than untidy — a timed-out request that actually succeeded on the
+ * server was invisible to the caller, so a retry could double-submit.
+ *
+ * Taking a factory instead of a promise lets us hand the request an
+ * AbortSignal and abort it for real.
+ */
+function withTimeout<T>(
+  run: (signal: AbortSignal) => Promise<T>,
+  timeoutMs: number
+): Promise<T> {
+  const controller = new AbortController();
+
   return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('Request timeout')), timeoutMs);
-    promise
+    const timer = setTimeout(() => {
+      controller.abort();
+      reject(new Error('Request timeout'));
+    }, timeoutMs);
+
+    run(controller.signal)
       .then((value) => {
         clearTimeout(timer);
         resolve(value);
@@ -206,12 +228,14 @@ async function fetchJSONFromBase(baseUrl: string, pathname: string, requestLabel
     throw new Error('Public API is not configured.');
   }
   const response = await withTimeout(
-    fetch(`${normalizedBase}${pathname}`, {
-      cache: 'no-store',
-      headers: {
-        Accept: 'application/json'
-      }
-    }),
+    (signal) =>
+      fetch(`${normalizedBase}${pathname}`, {
+        cache: 'no-store',
+        headers: {
+          Accept: 'application/json'
+        },
+        signal
+      }),
     REQUEST_TIMEOUT_MS
   );
   if (!response.ok) {
@@ -751,14 +775,16 @@ export async function fetchUninstallStats(): Promise<UninstallStatsResponse> {
 
 export async function submitUninstallFeedback(body: UninstallFeedbackRequest): Promise<UninstallFeedbackResponse> {
   const response = await withTimeout(
-    fetch(`${WORKER_BASE_URL}/api/public/website/uninstall`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest'
-      },
-      body: JSON.stringify(body)
-    }),
+    (signal) =>
+      fetch(`${WORKER_BASE_URL}/api/public/website/uninstall`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify(body),
+        signal
+      }),
     REQUEST_TIMEOUT_MS
   );
   if (!response.ok) {
@@ -775,14 +801,16 @@ export async function submitWebsiteEvents(body: WebsiteEventRequest): Promise<We
     schemaVersion: PUBLIC_SCHEMA_VERSION
   };
   const response = await withTimeout(
-    fetch(`${SITE_BACKEND_BASE_URL}/api/site/v1/events`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest'
-      },
-      body: JSON.stringify(requestBody)
-    }),
+    (signal) =>
+      fetch(`${SITE_BACKEND_BASE_URL}/api/site/v1/events`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify(requestBody),
+        signal
+      }),
     REQUEST_TIMEOUT_MS
   );
   if (!response.ok) {
@@ -795,18 +823,20 @@ export async function submitWebsiteEvents(body: WebsiteEventRequest): Promise<We
 /* NEWSLETTER_CTA_DISABLED_ROLLBACK_START
 export async function submitNewsletterSubscription(body: NewsletterSubscribeRequest): Promise<NewsletterSubscribeResponse> {
   const response = await withTimeout(
-    fetch(`${WORKER_BASE_URL}/api/public/website/newsletter/subscribe`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest'
-      },
-      body: JSON.stringify({
-        email: body.email,
-        name: body.name,
-        source: body.source
-      })
-    }),
+    (signal) =>
+      fetch(`${WORKER_BASE_URL}/api/public/website/newsletter/subscribe`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({
+          email: body.email,
+          name: body.name,
+          source: body.source
+        }),
+        signal
+      }),
     REQUEST_TIMEOUT_MS
   );
   if (!response.ok) {
