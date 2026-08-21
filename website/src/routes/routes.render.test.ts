@@ -131,6 +131,13 @@ describe('route render smoke coverage', () => {
     const pressedCount = (html.match(/aria-pressed="(?:true|false)"/g) ?? []).length;
     expect(pillCount).toBeGreaterThan(0);
     expect(pressedCount, 'every reason pill needs aria-pressed').toBe(pillCount);
+
+    // Submission result (success or failure) must be announced. The live
+    // region has to exist in the INITIAL render — a region inserted at the
+    // moment the message appears is not reliably announced by screen readers.
+    expect(html, 'uninstall result needs an always-present live region').toMatch(
+      /aria-live="assertive"[^>]*/
+    );
     expect(html).toContain('Submit feedback');
     expect(html).toContain('Reinstall for Chrome');
     expect(html).toContain('Firefox');

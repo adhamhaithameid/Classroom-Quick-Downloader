@@ -258,12 +258,20 @@
       </div>
 
       <!-- Result Message -->
-      {#if submitMessage}
-        <div class="un-toast" class:ok={submitState === 'done'} class:fail={submitState === 'error'}>
-          <span class="un-toast-icon">{submitState === 'done' ? '✅' : '⚠️'}</span>
-          <span>{submitMessage}</span>
-        </div>
-      {/if}
+      <!--
+        The live region is rendered unconditionally. A region that only appears
+        at the moment the message does is not reliably announced by screen
+        readers — the assistive tech has to be observing the node before it
+        gains content. The visual toast stays conditional inside it.
+      -->
+      <div aria-live="assertive" aria-atomic="true">
+        {#if submitMessage}
+          <div class="un-toast" class:ok={submitState === 'done'} class:fail={submitState === 'error'}>
+            <span class="un-toast-icon" aria-hidden="true">{submitState === 'done' ? '✅' : '⚠️'}</span>
+            <span>{submitMessage}</span>
+          </div>
+        {/if}
+      </div>
     </div>
   </section>
 
