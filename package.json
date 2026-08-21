@@ -41,10 +41,12 @@
     "sync:manual-changelog": "node tools/sync-manual-changelog.mjs",
     "changelog:full": "node tools/generate-full-changelog.mjs",
     "indexing:submit": "node tools/submit-search-indexing.mjs",
+    "test:e2e": "playwright test --project=extension-chromium",
+    "test:e2e:headed": "playwright test --project=extension-chromium --headed",
     "prepare": "husky"
   },
   "_meta": {
-    "removed-deps": "@playwright/test ^1.59.1 and playwright ^1.59.1 were unused (2026-02-28)",
+    "removed-deps": "NOTE (2026-08-21): the 2026-02-28 claim that @playwright/test was unused was incorrect \u2014 playwright.config.ts and 4 specs in tests/e2e/ depend on it, so the entire real-browser suite was unrunnable. Restored; run via pnpm test:e2e.",
     "security-overrides": "shell-quote pinned to 1.9.0 (2026-08-15, supersedes the 1.8.4 pin from 2026-06-24)"
   },
   "pnpm": {
@@ -81,6 +83,7 @@
   "devDependencies": {
     "@commitlint/cli": "^21.2.2",
     "@commitlint/config-conventional": "^21.2.2",
+    "@playwright/test": "^1.62.1",
     "husky": "^9.1.7"
   }
 }

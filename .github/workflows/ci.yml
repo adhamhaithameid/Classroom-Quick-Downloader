@@ -65,6 +65,56 @@ jobs:
         run: pnpm -C extension test:coverage:all
 
   # ──────────────────────────────────────────────
+  # Extension E2E — real Chromium with the extension loaded
+  #
+  # These specs route https://classroom.google.com/** to local fixtures, so
+  # they need no Google account. They must run headed (extension APIs are
+  # unavailable in headless Chrome), hence xvfb on the Linux runner.
+  #
+  # This suite existed since 2026-03 but was unrunnable: @playwright/test had
+  # been removed from devDependencies as "unused" while playwright.config.ts
+  # and four specs still depended on it. Keeping it in CI stops that recurring.
+  # ──────────────────────────────────────────────
+  extension-e2e:
+    name: Extension — Real Browser E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: 10.28.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Build Extension
+        run: pnpm -C extension build
+
+      - name: Run Extension E2E
+        run: xvfb-run -a pnpm run test:e2e
+
+      - name: Upload Playwright Report
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+  # ──────────────────────────────────────────────
   # Extension Build Matrix
   # ──────────────────────────────────────────────
   build-check:
@@ -325,6 +375,7 @@ jobs:
     if: always()
     needs:
       - extension-tests
+      - extension-e2e
       - build-check
       - website-checks
       - cloudflare-worker-tests
@@ -337,6 +388,7 @@ jobs:
       - name: Check all jobs
         run: |
           echo "Extension Tests:        ${{ needs.extension-tests.result }}"
+          echo "Extension E2E:          ${{ needs.extension-e2e.result }}"
           echo "Build Check:            ${{ needs.build-check.result }}"
           echo "Website Checks:         ${{ needs.website-checks.result }}"
           echo "Worker Tests:           ${{ needs.cloudflare-worker-tests.result }}"
@@ -346,6 +398,7 @@ jobs:
           echo "Oracle Migration Smoke: ${{ needs.oracle-migration-smoke.result }}"
 
           if [[ "${{ needs.extension-tests.result }}" != "success" ]] ||
+             [[ "${{ needs.extension-e2e.result }}" != "success" ]] ||
              [[ "${{ needs.build-check.result }}" != "success" ]] ||
              [[ "${{ needs.website-checks.result }}" != "success" ]] ||
              [[ "${{ needs.cloudflare-worker-tests.result }}" != "success" ]] ||
