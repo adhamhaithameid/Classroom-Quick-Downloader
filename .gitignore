@@ -47,3 +47,7 @@ ownership-map-out-sensitive/
 .dolt/
 .beads-credential-key
 .beads/proxieddb/
+
+# Graphify knowledge-graph output (kept local/offline)
+graphify-out/
+website/static/graphify/
