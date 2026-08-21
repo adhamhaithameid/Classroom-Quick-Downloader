@@ -1,8 +1,32 @@
-name: Deploy GitHub Pages
+name: Build & Deploy GitHub Pages
+
+# Smart website pipeline for https://adhamhaithameid.github.io/Classroom-Quick-Downloader/
+# - Runs on every push to main and every PR targeting main that touches the website.
+# - PRs: build + typecheck + tests only (never deploys).
+# - main pushes: build, then deploy the built SvelteKit site to GitHub Pages.
+# - Path-filtered: commits touching only extension/, oracle-backend/, etc. skip this entirely.
 
 on:
   push:
     branches: [main]
+    paths:
+      - "website/**"
+      - "extension/**"
+      - "cloudflare-worker/**"
+      - "oracle-backend/**"
+      - "pnpm-lock.yaml"
+      - "tools/rebuild_graph.py"
+      - ".github/workflows/github-pages.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "website/**"
+      - "extension/**"
+      - "cloudflare-worker/**"
+      - "oracle-backend/**"
+      - "pnpm-lock.yaml"
+      - "tools/rebuild_graph.py"
+      - ".github/workflows/github-pages.yml"
   workflow_dispatch:
 
 permissions:
@@ -11,26 +35,99 @@ permissions:
   id-token: write
 
 concurrency:
-  group: github-pages
+  # Per-ref group: each PR gets its own lane; pushes to main share one lane so
+  # stale builds are cancelled but PR runs never cancel the production deploy.
+  group: github-pages-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  build:
+    name: Build & Validate Website
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: 10.28.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup Python for graphify
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Cache graphify extraction cache
+        uses: actions/cache@13aacd865c20de90d75de3b17ebe84f7a17d57d2 # v4.0.0
+        with:
+          path: graphify-out/cache
+          key: graphify-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            graphify-${{ runner.os }}-
+
+      - name: Install graphify
+        run: pip install 'graphifyy[gemini]'
+
+      - name: Rebuild knowledge graph (Gemini when secret present, code-only otherwise)
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python tools/rebuild_graph.py
+
+      - name: Website typecheck
+        run: pnpm -C website check
+
+      - name: Website visual guardrails
+        run: pnpm -C website test:visual-guards
+
+      - name: Website smoke tests
+        run: pnpm -C website test:smoke
+
+      - name: Build website
+        env:
+          # Project pages are served from /Classroom-Quick-Downloader/; all asset
+          # URLs are emitted relative, and $app/paths base stays correct at runtime.
+          PUBLIC_BASE_PATH: "/Classroom-Quick-Downloader"
+          PUBLIC_ORACLE_API_BASE_URL: ${{ vars.PUBLIC_ORACLE_API_BASE_URL }}
+          PUBLIC_WORKER_BASE_URL: ${{ vars.PUBLIC_WORKER_BASE_URL }}
+          PUBLIC_SITE_URL: ${{ vars.PUBLIC_SITE_URL }}
+          PUBLIC_GOOGLE_SITE_VERIFICATION: ${{ vars.PUBLIC_GOOGLE_SITE_VERIFICATION }}
+          PUBLIC_BING_SITE_VERIFICATION: ${{ vars.PUBLIC_BING_SITE_VERIFICATION }}
+        run: pnpm -C website build
+
+      - name: Verify build output
+        run: |
+          set -euo pipefail
+          test -f website/build/index.html || { echo "::error::build/index.html missing"; exit 1; }
+          test -f website/build/404.html || { echo "::error::build/404.html missing"; exit 1; }
+          echo "Build output OK ($(find website/build -type f | wc -l) files)"
+
+      - name: Upload Pages artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: website/build
+
   deploy:
+    name: Deploy to GitHub Pages
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
       - name: Setup Pages
         uses: actions/configure-pages@1f0c5cde4bc74cd7e1254d0cb4de8d49e9068c7d # v4
-
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
-        with:
-          path: website/static
 
       - name: Deploy to GitHub Pages
         id: deployment
