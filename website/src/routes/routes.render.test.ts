@@ -120,6 +120,17 @@ describe('route render smoke coverage', () => {
     expect(head).toContain('noindex, nofollow');
     expect(html).toContain("We'd love to hear why.");
     expect(html).toContain('What made you uninstall?');
+
+    // Reason pills are mutually-exclusive toggle buttons. Selection was
+    // conveyed only by a CSS class and a decorative checkmark, so a screen
+    // reader user could not tell which reason was chosen. Every pill must
+    // carry an explicit pressed state.
+    // Match the pill BUTTONS only — `un-pill-icon` / `un-pill-check` share the
+    // prefix and would inflate the count.
+    const pillCount = (html.match(/<button[^>]*class="un-pill[ "]/g) ?? []).length;
+    const pressedCount = (html.match(/aria-pressed="(?:true|false)"/g) ?? []).length;
+    expect(pillCount).toBeGreaterThan(0);
+    expect(pressedCount, 'every reason pill needs aria-pressed').toBe(pillCount);
     expect(html).toContain('Submit feedback');
     expect(html).toContain('Reinstall for Chrome');
     expect(html).toContain('Firefox');
