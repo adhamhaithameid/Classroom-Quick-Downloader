@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "Classroom_Quick_Downloader",
+  "project_id": "2793dec7-9a9e-4386-8233-392a91e69c38"
+}
