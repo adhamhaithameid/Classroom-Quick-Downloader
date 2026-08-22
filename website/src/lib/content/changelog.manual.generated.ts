@@ -1,6 +1,6 @@
 /* AUTO-GENERATED FILE. DO NOT EDIT DIRECTLY. */
 export const WEBSITE_MANUAL_CHANGELOG = {
-  "generatedAt": 1781017451093,
+  "generatedAt": 1786841408036,
   "source": "manual",
   "entries": [
     {
@@ -22,7 +22,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed extension package bloat that increased install and update cost on slower networks."
       ],
-      "releasedAtUtc": 1781017451089
+      "releasedAtUtc": 1786841408030
     },
     {
       "id": "manual-1.5.4-2",
@@ -45,7 +45,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed repeated heavy-pass work that could slow down larger Classroom pages."
       ],
-      "releasedAtUtc": 1780931051089
+      "releasedAtUtc": 1786755008030
     },
     {
       "id": "manual-1.5.3-3",
@@ -66,7 +66,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed edge cases where shared wrappers could cause mis-scoped file or flag decisions."
       ],
-      "releasedAtUtc": 1780844651089
+      "releasedAtUtc": 1786668608030
     },
     {
       "id": "manual-1.5.2-4",
@@ -87,7 +87,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed download-state and mapping regressions that could impact reliability under mixed attachment sets."
       ],
-      "releasedAtUtc": 1780758251089
+      "releasedAtUtc": 1786582208030
     },
     {
       "id": "manual-1.5.1-5",
@@ -108,7 +108,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed early Student Work gaps where some submissions were not reachable through the normal download UX."
       ],
-      "releasedAtUtc": 1780671851089
+      "releasedAtUtc": 1786495808030
     },
     {
       "id": "manual-1.5.0-6",
@@ -139,7 +139,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Fixed duplicate or nested flag borders on some posts.",
         "Fixed download states that could stay stuck even after the browser finished the file."
       ],
-      "releasedAtUtc": 1780585451089
+      "releasedAtUtc": 1786409408030
     },
     {
       "id": "manual-1.4.0-7",
@@ -162,7 +162,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed several fragile internal paths by giving the extension clearer runtime boundaries."
       ],
-      "releasedAtUtc": 1780499051089
+      "releasedAtUtc": 1786323008030
     },
     {
       "id": "manual-1.3.9-8",
@@ -189,7 +189,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Fixed issues where changelog visibility could be inconsistent across surfaces.",
         "Fixed multiple reliability edge cases in update-state handling."
       ],
-      "releasedAtUtc": 1780412651089
+      "releasedAtUtc": 1786236608030
     },
     {
       "id": "manual-1.3.8-9",
@@ -216,7 +216,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Fixed same-version publish cases where users could miss new changelog updates.",
         "Fixed stale version-pill and changelog content after changelog updates."
       ],
-      "releasedAtUtc": 1780326251089
+      "releasedAtUtc": 1786150208030
     },
     {
       "id": "manual-1.3.7-10",
@@ -243,7 +243,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Fixed cancelled-download accounting edge cases.",
         "Fixed intermittent long-run progress-state inconsistencies."
       ],
-      "releasedAtUtc": 1780239851089
+      "releasedAtUtc": 1786063808030
     },
     {
       "id": "manual-1.3.6-11",
@@ -270,7 +270,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Fixed stuck-progress scenarios during long runs.",
         "Fixed dependency-path compatibility friction."
       ],
-      "releasedAtUtc": 1780153451089
+      "releasedAtUtc": 1785977408030
     },
     {
       "id": "manual-1.3.0-12",
@@ -297,7 +297,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Fixed remote-config application issues on key limits and timing.",
         "Fixed queue integrity mismatch handling to avoid data drops."
       ],
-      "releasedAtUtc": 1780067051089
+      "releasedAtUtc": 1785891008030
     },
     {
       "id": "manual-1.2.7-13",
@@ -324,7 +324,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
         "Fixed multiple reliability edge cases found during hardening.",
         "Fixed several production stability regressions."
       ],
-      "releasedAtUtc": 1779980651089
+      "releasedAtUtc": 1785804608030
     },
     {
       "id": "manual-1.2.3-14",
@@ -345,7 +345,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed inconsistent telemetry fields in specific event paths."
       ],
-      "releasedAtUtc": 1779894251089
+      "releasedAtUtc": 1785718208030
     },
     {
       "id": "manual-1.2.2-15",
@@ -366,7 +366,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed inconsistent cleanup after cancellation."
       ],
-      "releasedAtUtc": 1779807851089
+      "releasedAtUtc": 1785631808030
     },
     {
       "id": "manual-1.2.1-16",
@@ -387,7 +387,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed slow cancel-state reflection edge cases."
       ],
-      "releasedAtUtc": 1779721451089
+      "releasedAtUtc": 1785545408030
     },
     {
       "id": "manual-1.2.0-17",
@@ -408,7 +408,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed flow limitations where in-flight operations could not be interrupted."
       ],
-      "releasedAtUtc": 1779635051089
+      "releasedAtUtc": 1785459008030
     },
     {
       "id": "manual-1.1.10-18",
@@ -429,7 +429,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed regressions discovered across prolonged usage sessions."
       ],
-      "releasedAtUtc": 1779548651089
+      "releasedAtUtc": 1785372608030
     },
     {
       "id": "manual-1.1.5-19",
@@ -450,7 +450,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed minor behavior mismatches in repeated task flows."
       ],
-      "releasedAtUtc": 1779462251089
+      "releasedAtUtc": 1785286208030
     },
     {
       "id": "manual-1.1.1-20",
@@ -471,7 +471,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed early 1.1 edge-case runtime failures."
       ],
-      "releasedAtUtc": 1779375851089
+      "releasedAtUtc": 1785199808030
     },
     {
       "id": "manual-1.1.0-21",
@@ -492,7 +492,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed packaging and configuration mismatches."
       ],
-      "releasedAtUtc": 1779289451089
+      "releasedAtUtc": 1785113408030
     },
     {
       "id": "manual-1.0.1-22",
@@ -513,7 +513,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed first-wave regressions after 1.0.0 rollout."
       ],
-      "releasedAtUtc": 1779203051089
+      "releasedAtUtc": 1785027008030
     },
     {
       "id": "manual-1.0.0-23",
@@ -534,7 +534,7 @@ export const WEBSITE_MANUAL_CHANGELOG = {
       "fixed": [
         "Fixed pre-stable blockers before public release."
       ],
-      "releasedAtUtc": 1779116651089
+      "releasedAtUtc": 1784940608030
     }
   ]
 } as const;
