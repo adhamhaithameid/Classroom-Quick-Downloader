@@ -15,6 +15,7 @@
     { href: '/privacy', label: 'Privacy' },
     { href: '/faq', label: 'FAQ' },
     { href: '/changelog', label: 'Changelog' },
+    { href: '/graphify', label: 'Graph' },
   ];
   let nav = [...baseNav];
 
