@@ -50,4 +50,7 @@ ownership-map-out-sensitive/
 
 # Graphify knowledge-graph output (kept local/offline)
 graphify-out/
-website/static/graphify/
+
+.workflow-state/
+workflows/briefs/
+__pycache__/
