@@ -1,0 +1,488 @@
+package handlers
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"sync/atomic"
+	"testing"
+	"time"
+)
+
+func TestDeploymentsSyncHandlerWithClient(t *testing.T) {
+	sqlDB := newAdminTestDB(t)
+	defer sqlDB.Close()
+	t.Setenv("ORACLE_ALLOW_UNTRUSTED_STORE_URLS", "true")
+	t.Setenv("ORACLE_ALLOW_HTTP_STORE_URLS", "true")
+	const edgeCRXID = "ecojbijjkcjdolpeoiemnccgmaeomcmn"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/chrome":
+			_, _ = w.Write([]byte(`<script>{"users":"120K","version":"5.9.1"}</script><div>4.7 (21 ratings)</div>`))
+		case "/firefox":
+			_, _ = w.Write([]byte(`<div>Users 12,345</div><div>Version 6.0.0</div><div>5 (2 reviews)</div>`))
+		case "/addons/getproductdetailsbycrxid/" + edgeCRXID:
+			_, _ = w.Write([]byte(`{"activeInstallCount":9,"averageRating":5,"ratingCount":1,"version":"6.1.0"}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	store := newControlPlaneStore(sqlDB, nil)
+	if err := store.upsertRecord(context.Background(), "deployment_target", "chrome", map[string]any{"url": server.URL + "/chrome"}); err != nil {
+		t.Fatalf("seed chrome record failed: %v", err)
+	}
+	if err := store.upsertRecord(context.Background(), "deployment_target", "firefox", map[string]any{"url": server.URL + "/firefox"}); err != nil {
+		t.Fatalf("seed firefox record failed: %v", err)
+	}
+	if err := store.upsertRecord(context.Background(), "deployment_target", "edge", map[string]any{"url": server.URL + "/addons/detail/classroom-quick-downloader/" + edgeCRXID}); err != nil {
+		t.Fatalf("seed edge record failed: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/admin/deployments/sync", bytes.NewBufferString(`{}`))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	deploymentsSyncHandlerWithClient(sqlDB, nil, server.Client(), nil).ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("sync failed: %d %s", rr.Code, rr.Body.String())
+	}
+
+	var payload struct {
+		OK      bool `json:"ok"`
+		Count   int  `json:"count"`
+		OKCount int  `json:"okCount"`
+		Results []struct {
+			Key     string `json:"key"`
+			Status  string `json:"status"`
+			Version string `json:"version"`
+			Rating  string `json:"rating"`
+		} `json:"results"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("parse sync payload failed: %v", err)
+	}
+	if !payload.OK || payload.Count != 3 || payload.OKCount != 3 {
+		t.Fatalf("unexpected sync payload: %+v", payload)
+	}
+
+	records, err := store.listRecords(context.Background(), "deployment_target")
+	if err != nil {
+		t.Fatalf("list deployment records failed: %v", err)
+	}
+	versions := map[string]string{}
+	storedRatings := map[string]string{}
+	storedRatingCounts := map[string]int64{}
+	for _, row := range records {
+		var m map[string]any
+		if err := json.Unmarshal(row.Data, &m); err != nil {
+			t.Fatalf("unmarshal deployment record failed: %v", err)
+		}
+		if v, _ := m["version"].(string); v != "" {
+			versions[row.RecordKey] = v
+		}
+		if v, _ := m["rating"].(string); v != "" {
+			storedRatings[row.RecordKey] = v
+		}
+		switch v := m["ratingCount"].(type) {
+		case float64:
+			storedRatingCounts[row.RecordKey] = int64(v)
+		case int64:
+			storedRatingCounts[row.RecordKey] = v
+		}
+	}
+	if versions["chrome"] != "5.9.1" {
+		t.Fatalf("expected chrome version to be updated, got %q", versions["chrome"])
+	}
+	if versions["firefox"] != "6.0.0" {
+		t.Fatalf("expected firefox version to be updated, got %q", versions["firefox"])
+	}
+	if versions["edge"] != "6.1.0" {
+		t.Fatalf("expected edge version to be updated, got %q", versions["edge"])
+	}
+	if storedRatings["chrome"] != "4.7" || storedRatingCounts["chrome"] != 21 {
+		t.Fatalf("expected chrome rating/ratingCount to be stored, got rating=%q count=%d", storedRatings["chrome"], storedRatingCounts["chrome"])
+	}
+	if storedRatings["firefox"] != "5.0" || storedRatingCounts["firefox"] != 2 {
+		t.Fatalf("expected firefox rating/ratingCount to be stored, got rating=%q count=%d", storedRatings["firefox"], storedRatingCounts["firefox"])
+	}
+	if storedRatings["edge"] != "5.0" || storedRatingCounts["edge"] != 1 {
+		t.Fatalf("expected edge rating/ratingCount to be stored, got rating=%q count=%d", storedRatings["edge"], storedRatingCounts["edge"])
+	}
+
+	ratings := map[string]string{}
+	for _, result := range payload.Results {
+		ratings[result.Key] = result.Rating
+	}
+	if ratings["chrome"] != "4.7" {
+		t.Fatalf("expected chrome rating to be updated, got %q", ratings["chrome"])
+	}
+	if ratings["firefox"] != "5.0" {
+		t.Fatalf("expected firefox rating to be updated, got %q", ratings["firefox"])
+	}
+	if ratings["edge"] != "5.0" {
+		t.Fatalf("expected edge rating to be updated, got %q", ratings["edge"])
+	}
+}
+
+func TestSyncDeploymentTargets(t *testing.T) {
+	sqlDB := newAdminTestDB(t)
+	defer sqlDB.Close()
+	t.Setenv("ORACLE_ALLOW_UNTRUSTED_STORE_URLS", "true")
+	t.Setenv("ORACLE_ALLOW_HTTP_STORE_URLS", "true")
+	const edgeCRXID = "ecojbijjkcjdolpeoiemnccgmaeomcmn"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/chrome":
+			_, _ = w.Write([]byte(`<div>251 users</div><div>Version 1.1.1</div><div>5.0 (8 ratings)</div>`))
+		case "/firefox":
+			_, _ = w.Write([]byte(`<div>11 Users</div><div>Version 1.1.1</div><div>5 (2 reviews)</div>`))
+		case "/addons/getproductdetailsbycrxid/" + edgeCRXID:
+			_, _ = w.Write([]byte(`{"activeInstallCount":9,"averageRating":5,"ratingCount":1,"version":"1.1.1"}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	store := newControlPlaneStore(sqlDB, nil)
+	if err := store.upsertRecord(context.Background(), "deployment_target", "chrome", map[string]any{"url": server.URL + "/chrome"}); err != nil {
+		t.Fatalf("seed chrome record failed: %v", err)
+	}
+	if err := store.upsertRecord(context.Background(), "deployment_target", "firefox", map[string]any{"url": server.URL + "/firefox"}); err != nil {
+		t.Fatalf("seed firefox record failed: %v", err)
+	}
+	if err := store.upsertRecord(context.Background(), "deployment_target", "edge", map[string]any{"url": server.URL + "/addons/detail/classroom-quick-downloader/" + edgeCRXID}); err != nil {
+		t.Fatalf("seed edge record failed: %v", err)
+	}
+
+	targetSet := map[string]struct{}{"chrome": {}, "firefox": {}, "edge": {}}
+	results, okCount, err := syncDeploymentTargets(context.Background(), store, sqlDB, server.Client(), nil, targetSet, false, false)
+	if err != nil {
+		t.Fatalf("syncDeploymentTargets failed: %v", err)
+	}
+	if len(results) != 3 || okCount != 3 {
+		t.Fatalf("unexpected sync totals: len=%d ok=%d", len(results), okCount)
+	}
+}
+
+func TestStartDeploymentsAutoSyncLoop_RunsImmediately(t *testing.T) {
+	sqlDB := newAdminTestDB(t)
+	defer sqlDB.Close()
+	t.Setenv("ORACLE_ALLOW_UNTRUSTED_STORE_URLS", "true")
+	t.Setenv("ORACLE_ALLOW_HTTP_STORE_URLS", "true")
+	const edgeCRXID = "ecojbijjkcjdolpeoiemnccgmaeomcmn"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/chrome":
+			_, _ = w.Write([]byte(`<div>250 users</div><div>Version 7.0.0</div><div>5.0 (10 ratings)</div>`))
+		case "/firefox":
+			_, _ = w.Write([]byte(`<div>100 users</div><div>Version 7.0.1</div><div>4.9 (9 reviews)</div>`))
+		case "/addons/getproductdetailsbycrxid/" + edgeCRXID:
+			_, _ = w.Write([]byte(`{"activeInstallCount":50,"averageRating":5,"ratingCount":7,"version":"7.0.2"}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	store := newControlPlaneStore(sqlDB, nil)
+	if err := store.upsertRecord(context.Background(), "deployment_target", "chrome", map[string]any{"url": server.URL + "/chrome"}); err != nil {
+		t.Fatalf("seed chrome record failed: %v", err)
+	}
+	if err := store.upsertRecord(context.Background(), "deployment_target", "firefox", map[string]any{"url": server.URL + "/firefox"}); err != nil {
+		t.Fatalf("seed firefox record failed: %v", err)
+	}
+	if err := store.upsertRecord(context.Background(), "deployment_target", "edge", map[string]any{"url": server.URL + "/addons/detail/classroom-quick-downloader/" + edgeCRXID}); err != nil {
+		t.Fatalf("seed edge record failed: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		StartDeploymentsAutoSyncLoop(ctx, sqlDB, nil, nil, 24*time.Hour)
+		close(done)
+	}()
+	defer func() {
+		cancel()
+		select {
+		case <-done:
+		case <-time.After(2 * time.Second):
+			t.Fatal("auto-sync loop did not stop after cancellation")
+		}
+	}()
+
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		records, err := store.listRecords(context.Background(), "deployment_target")
+		if err != nil {
+			t.Fatalf("list deployment records failed: %v", err)
+		}
+		if len(records) != 3 {
+			time.Sleep(30 * time.Millisecond)
+			continue
+		}
+		allSynced := true
+		for _, row := range records {
+			var data map[string]any
+			if err := json.Unmarshal(row.Data, &data); err != nil {
+				t.Fatalf("unmarshal deployment row failed: %v", err)
+			}
+			if data["syncStatus"] != "ok" {
+				allSynced = false
+				break
+			}
+		}
+		if allSynced {
+			return
+		}
+		time.Sleep(30 * time.Millisecond)
+	}
+
+	t.Fatal("expected immediate auto-sync run to populate deployment status before first long interval tick")
+}
+
+func TestStartDeploymentsAutoSyncLoop_RetriesTransientFailures(t *testing.T) {
+	sqlDB := newAdminTestDB(t)
+	defer sqlDB.Close()
+	t.Setenv("ORACLE_ALLOW_UNTRUSTED_STORE_URLS", "true")
+	t.Setenv("ORACLE_ALLOW_HTTP_STORE_URLS", "true")
+	const edgeCRXID = "ecojbijjkcjdolpeoiemnccgmaeomcmn"
+
+	var requestCount atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Fail the first full sync attempt (3 target requests), then succeed on retry.
+		if requestCount.Add(1) <= int32(len(deploymentTargetDefs)) {
+			http.Error(w, "temporary upstream failure", http.StatusServiceUnavailable)
+			return
+		}
+		switch r.URL.Path {
+		case "/chrome":
+			_, _ = w.Write([]byte(`<div>300 users</div><div>Version 8.0.0</div><div>5.0 (12 ratings)</div>`))
+		case "/firefox":
+			_, _ = w.Write([]byte(`<div>200 users</div><div>Version 8.0.1</div><div>4.8 (11 reviews)</div>`))
+		case "/addons/getproductdetailsbycrxid/" + edgeCRXID:
+			_, _ = w.Write([]byte(`{"activeInstallCount":75,"averageRating":5,"ratingCount":6,"version":"8.0.2"}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	store := newControlPlaneStore(sqlDB, nil)
+	if err := store.upsertRecord(context.Background(), "deployment_target", "chrome", map[string]any{"url": server.URL + "/chrome"}); err != nil {
+		t.Fatalf("seed chrome record failed: %v", err)
+	}
+	if err := store.upsertRecord(context.Background(), "deployment_target", "firefox", map[string]any{"url": server.URL + "/firefox"}); err != nil {
+		t.Fatalf("seed firefox record failed: %v", err)
+	}
+	if err := store.upsertRecord(context.Background(), "deployment_target", "edge", map[string]any{"url": server.URL + "/addons/detail/classroom-quick-downloader/" + edgeCRXID}); err != nil {
+		t.Fatalf("seed edge record failed: %v", err)
+	}
+
+	oldAttempts := deploymentsAutoSyncMaxAttempts
+	oldRetryDelay := deploymentsAutoSyncRetryDelay
+	deploymentsAutoSyncMaxAttempts = 2
+	deploymentsAutoSyncRetryDelay = 20 * time.Millisecond
+	defer func() {
+		deploymentsAutoSyncMaxAttempts = oldAttempts
+		deploymentsAutoSyncRetryDelay = oldRetryDelay
+	}()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		StartDeploymentsAutoSyncLoop(ctx, sqlDB, nil, nil, 24*time.Hour)
+		close(done)
+	}()
+	defer func() {
+		cancel()
+		select {
+		case <-done:
+		case <-time.After(2 * time.Second):
+			t.Fatal("auto-sync loop did not stop after cancellation")
+		}
+	}()
+
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		records, err := store.listRecords(context.Background(), "deployment_target")
+		if err != nil {
+			t.Fatalf("list deployment records failed: %v", err)
+		}
+		if len(records) != 3 {
+			time.Sleep(30 * time.Millisecond)
+			continue
+		}
+		allSynced := true
+		for _, row := range records {
+			var data map[string]any
+			if err := json.Unmarshal(row.Data, &data); err != nil {
+				t.Fatalf("unmarshal deployment row failed: %v", err)
+			}
+			if data["syncStatus"] != "ok" {
+				allSynced = false
+				break
+			}
+		}
+		if allSynced {
+			if got := requestCount.Load(); got <= int32(len(deploymentTargetDefs)) {
+				t.Fatalf("expected retry attempt to happen, request count=%d", got)
+			}
+			return
+		}
+		time.Sleep(30 * time.Millisecond)
+	}
+
+	t.Fatal("expected auto-sync retry to recover after transient failures")
+}
+
+func TestDeploymentsSyncHandler_DoesNotCountPersistFailuresAsSuccess(t *testing.T) {
+	sqlDB := newAdminTestDB(t)
+	defer sqlDB.Close()
+	t.Setenv("ORACLE_ALLOW_UNTRUSTED_STORE_URLS", "true")
+	t.Setenv("ORACLE_ALLOW_HTTP_STORE_URLS", "true")
+	const edgeCRXID = "ecojbijjkcjdolpeoiemnccgmaeomcmn"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/chrome":
+			_, _ = w.Write([]byte(`<script>{"users":"120K","version":"5.9.1"}</script><div>4.7 (21 ratings)</div>`))
+		case "/firefox":
+			_, _ = w.Write([]byte(`<div>Users 12,345</div><div>Version 6.0.0</div><div>5 (2 reviews)</div>`))
+		case "/addons/getproductdetailsbycrxid/" + edgeCRXID:
+			_, _ = w.Write([]byte(`{"activeInstallCount":9,"averageRating":5,"ratingCount":1,"version":"6.1.0"}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	store := newControlPlaneStore(sqlDB, nil)
+	if err := store.upsertRecord(context.Background(), "deployment_target", "chrome", map[string]any{"url": server.URL + "/chrome"}); err != nil {
+		t.Fatalf("seed chrome record failed: %v", err)
+	}
+	if err := store.upsertRecord(context.Background(), "deployment_target", "firefox", map[string]any{"url": server.URL + "/firefox"}); err != nil {
+		t.Fatalf("seed firefox record failed: %v", err)
+	}
+	if err := store.upsertRecord(context.Background(), "deployment_target", "edge", map[string]any{"url": server.URL + "/addons/detail/classroom-quick-downloader/" + edgeCRXID}); err != nil {
+		t.Fatalf("seed edge record failed: %v", err)
+	}
+
+	// Force one persistence error while allowing other targets to persist.
+	if _, err := sqlDB.Exec(`
+		CREATE TRIGGER fail_deployment_sync_chrome_update
+		BEFORE UPDATE ON admin_records
+		FOR EACH ROW
+		WHEN NEW.record_type = 'deployment_target' AND NEW.record_key = 'chrome'
+		BEGIN
+			SELECT RAISE(ABORT, 'forced deployment sync failure');
+		END;
+	`); err != nil {
+		t.Fatalf("create trigger failed: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/admin/deployments/sync", bytes.NewBufferString(`{}`))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	deploymentsSyncHandlerWithClient(sqlDB, nil, server.Client(), nil).ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("sync failed: %d %s", rr.Code, rr.Body.String())
+	}
+
+	var payload struct {
+		OK      bool `json:"ok"`
+		Count   int  `json:"count"`
+		OKCount int  `json:"okCount"`
+		Results []struct {
+			Key    string `json:"key"`
+			Status string `json:"status"`
+			Error  string `json:"error"`
+		} `json:"results"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("parse sync payload failed: %v", err)
+	}
+	if !payload.OK || payload.Count != 3 {
+		t.Fatalf("unexpected sync payload envelope: %+v", payload)
+	}
+	if payload.OKCount != 2 {
+		t.Fatalf("expected okCount=2 because one persist failed, got %+v", payload)
+	}
+
+	statusByKey := map[string]string{}
+	errorByKey := map[string]string{}
+	for _, result := range payload.Results {
+		statusByKey[result.Key] = result.Status
+		errorByKey[result.Key] = result.Error
+	}
+	if statusByKey["chrome"] != "error" || errorByKey["chrome"] == "" {
+		t.Fatalf("expected chrome result to expose persistence failure, got %+v", payload.Results)
+	}
+	if statusByKey["firefox"] != "ok" || statusByKey["edge"] != "ok" {
+		t.Fatalf("expected firefox and edge to remain successful, got %+v", payload.Results)
+	}
+}
+
+func TestDeploymentsSyncHandlerRejectsUnknownTarget(t *testing.T) {
+	sqlDB := newAdminTestDB(t)
+	defer sqlDB.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/admin/deployments/sync", bytes.NewBufferString(`{"targets":["unknown"]}`))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	deploymentsSyncHandlerWithClient(sqlDB, nil, &http.Client{}, nil).ServeHTTP(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for unknown target, got %d", rr.Code)
+	}
+}
+
+func TestDeploymentsSyncHandler_RespectsSyncFeatureFlag(t *testing.T) {
+	sqlDB := newAdminTestDB(t)
+	defer sqlDB.Close()
+
+	if _, err := sqlDB.Exec(`UPDATE feature_flags SET enabled = 0 WHERE name = 'feature_sync_enabled'`); err != nil {
+		t.Fatalf("failed to disable sync feature flag: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/admin/deployments/sync", bytes.NewBufferString(`{}`))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	deploymentsSyncHandlerWithClient(sqlDB, nil, &http.Client{}, nil).ServeHTTP(rr, req)
+	if rr.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 when sync feature is disabled, got %d", rr.Code)
+	}
+}
+
+func TestDeploymentsSyncHandler_MethodNotAllowed(t *testing.T) {
+	sqlDB := newAdminTestDB(t)
+	defer sqlDB.Close()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/admin/deployments/sync", nil)
+	rr := httptest.NewRecorder()
+	DeploymentsSyncHandler(sqlDB, nil, nil).ServeHTTP(rr, req)
+	if rr.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("expected 405 for non-POST method, got %d", rr.Code)
+	}
+}
+
+func TestDeploymentsSyncHandler_RespectsManagementFeatureFlag(t *testing.T) {
+	sqlDB := newAdminTestDB(t)
+	defer sqlDB.Close()
+	if _, err := sqlDB.Exec(`UPDATE feature_flags SET enabled = 0 WHERE name = 'feature_management_hub_enabled'`); err != nil {
+		t.Fatalf("failed to disable management feature flag: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/admin/deployments/sync", bytes.NewBufferString(`{}`))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	DeploymentsSyncHandler(sqlDB, nil, nil).ServeHTTP(rr, req)
+	if rr.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 when management feature is disabled, got %d", rr.Code)
+	}
+}
