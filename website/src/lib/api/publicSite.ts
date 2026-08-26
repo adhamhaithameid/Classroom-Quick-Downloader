@@ -32,6 +32,11 @@ let cachedSnapshot: WebsiteSnapshot | null = null;
 let cachedSnapshotSource: WebsiteSnapshotFetchSource = 'memory-cache';
 let snapshotInFlight: Promise<WebsiteSnapshot> | null = null;
 let snapshotResultInFlight: Promise<WebsiteSnapshotFetchResult> | null = null;
+// Refresh-window gate for session-pinned snapshots: while a "next" snapshot is
+// staged for adoption, repeated fetches are throttled until the STAGED
+// snapshot's own window passes — so long-lived tabs self-heal once per window
+// without visual churn (the pinned display never updates mid-session).
+let stagedNextRefreshAtUtc = 0;
 let snapshotStorageHydrated = false;
 
 function isPlaceholderSnapshot(snapshot: WebsiteSnapshot): boolean {
@@ -116,7 +121,9 @@ function writeSnapshotToStorage(snapshot: WebsiteSnapshot): void {
 function writeNextSnapshotToStorage(snapshot: WebsiteSnapshot): void {
   if (!canUseBrowserStorage()) return;
   try {
-    window.localStorage.setItem(SNAPSHOT_STORAGE_KEY, JSON.stringify(snapshot));
+    // Stage ONLY the "next" slot: the running session stays pinned to its
+    // current snapshot; the staged one is adopted on the next page load
+    // (readSnapshotFromStorage prefers SNAPSHOT_NEXT_KEY).
     window.localStorage.setItem(SNAPSHOT_NEXT_KEY, JSON.stringify(snapshot));
   } catch {
     // Ignore quota/privacy mode failures.
@@ -640,8 +647,15 @@ function buildSnapshotFetchResult(
 export async function fetchWebsiteSnapshotResult(options: { force?: boolean; applyToCurrentSession?: boolean } = {}): Promise<WebsiteSnapshotFetchResult> {
   hydrateSnapshotCacheFromStorage();
 
+  // Respect refresh windows: serve the memory cache until either the cached
+  // snapshot expired or (while a session pin is active) the staged "next"
+  // snapshot's own window has passed. This keeps long-lived tabs self-healing
+  // at most once per window instead of frozen forever.
   if (!options.force && cachedSnapshot) {
-    return buildSnapshotFetchResult(cachedSnapshot, cachedSnapshotSource, false, null);
+    const gateAt = Math.max(cachedSnapshot.nextRefreshAtUtc, stagedNextRefreshAtUtc);
+    if (Date.now() < gateAt) {
+      return buildSnapshotFetchResult(cachedSnapshot, cachedSnapshotSource, false, null);
+    }
   }
   if (!options.force && snapshotResultInFlight) {
     return snapshotResultInFlight;
@@ -664,11 +678,13 @@ export async function fetchWebsiteSnapshotResult(options: { force?: boolean; app
     if (!cachedSnapshot || options.applyToCurrentSession === true) {
       cachedSnapshot = snapshot;
       cachedSnapshotSource = 'memory-cache';
+      stagedNextRefreshAtUtc = 0;
       writeSnapshotToStorage(snapshot);
       return buildSnapshotFetchResult(snapshot, 'edge-backend', false, null);
     }
 
     // Keep current session pinned. New snapshot is stored for next refresh.
+    stagedNextRefreshAtUtc = snapshot.nextRefreshAtUtc;
     writeNextSnapshotToStorage(snapshot);
     return buildSnapshotFetchResult(cachedSnapshot, cachedSnapshotSource, false, null);
   })()
@@ -711,6 +727,7 @@ export async function fetchMapData(): Promise<MapResponse> {
 export function resetWebsiteSnapshotCacheForTests(): void {
   cachedSnapshot = null;
   cachedSnapshotSource = 'memory-cache';
+  stagedNextRefreshAtUtc = 0;
   snapshotInFlight = null;
   snapshotResultInFlight = null;
   snapshotStorageHydrated = false;
