@@ -177,20 +177,26 @@ function flushWithBeacon(): boolean {
   const payload = buildPayload(batch);
   const blob = new Blob([payload], { type: 'application/json' });
   const ok = navigator.sendBeacon(`${WORKER_BASE_URL}/api/public/website/events`, blob);
-  if (ok) {
-    dropBatch(batch.length);
-  }
+  // NOTE: `ok` only means the browser queued the beacon — delivery is not
+  // guaranteed. We deliberately KEEP the events in the queue: the ingest
+  // endpoint dedupes by eventId, so a later fetch flush is idempotent, while
+  // a beacon lost to a server error still gets retried. Dropping here would
+  // silently lose events on any 4xx/5xx.
   return ok;
 }
 
 export async function flushWebsiteEvents(options: { beaconPreferred?: boolean } = {}): Promise<void> {
   if (!canUseBrowser()) return;
   ensureQueueHydrated();
-  if (queue.length === 0 || flushing) return;
 
+  // On unload, fire the beacon even while a fetch flush is in flight: it may
+  // be our last chance before the page dies, and server-side eventId dedupe
+  // makes the double-send harmless.
   if (options.beaconPreferred && flushWithBeacon()) {
     return;
   }
+
+  if (queue.length === 0 || flushing) return;
 
   flushing = true;
   try {

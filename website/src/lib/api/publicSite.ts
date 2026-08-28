@@ -817,9 +817,14 @@ export async function submitWebsiteEvents(body: WebsiteEventRequest): Promise<We
     ...body,
     schemaVersion: PUBLIC_SCHEMA_VERSION
   };
+  // Single canonical ingest endpoint: the worker's edge-buffered route with
+  // server-side eventId dedupe, outage-tolerant queueing and a dead-letter
+  // path. Both the fetch flush and the sendBeacon fallback MUST target the
+  // same endpoint or telemetry splits across backends and can never be
+  // reconciled.
   const response = await withTimeout(
     (signal) =>
-      fetch(`${SITE_BACKEND_BASE_URL}/api/site/v1/events`, {
+      fetch(`${WORKER_BASE_URL}/api/public/website/events`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
