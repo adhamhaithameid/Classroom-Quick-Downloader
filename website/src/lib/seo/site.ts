@@ -50,6 +50,26 @@ export const SITEMAP_VIDEO_ENTRIES = [
   }
 ] as const;
 
+// Real content dates. A sitemap that stamps every URL with the build date is
+// treated as noise by Google, so lastmod is curated per path and only moved
+// when the page's content actually changes.
+export const DEFAULT_SITE_LASTMOD = '2026-08-22' as const;
+
+export const SITE_PATH_LASTMOD: Record<string, string> = {
+  '/': '2026-08-22',
+  '/privacy': '2026-03-04',
+  '/faq': '2026-06-07',
+  '/changelog': '2026-08-22',
+  '/site-map': '2026-03-22',
+  '/watch/cqd-demo': '2026-03-22',
+  '/watch/manual-vs-cqd': '2026-03-22'
+};
+
+export function lastModForPath(path: string): string {
+  const normalized = path === '/' ? '/' : `/${path.replace(/^\/+/, '').replace(/\/+$/, '')}`;
+  return SITE_PATH_LASTMOD[normalized] ?? DEFAULT_SITE_LASTMOD;
+}
+
 export function toAbsoluteSiteUrl(path: string): string {
   const base = SITE_URL.replace(/\/+$/, '');
   const normalizedPath = path === '/' ? '/' : `/${path.replace(/^\/+/, '').replace(/\/+$/, '')}`;
