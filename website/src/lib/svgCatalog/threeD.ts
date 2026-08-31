@@ -1,4 +1,4 @@
-import type { SvgItem } from './index';
+import type { SvgItem } from './types';
 const S = (id: string, l: string, s: string): SvgItem => ({ id, label: l, svg: s });
 
 /** 50 3D isometric elements with gradient fills. viewBox="0 0 120 110" */
