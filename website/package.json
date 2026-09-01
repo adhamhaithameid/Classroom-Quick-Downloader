@@ -19,7 +19,7 @@
 		"test:integration": "vitest run src/lib/api/publicSite.integration.test.ts src/lib/celebration/balloons/balloons.integration.test.ts",
 		"test:component": "vitest run src/lib/uninstall/feedback.component.test.ts src/lib/components/BalloonsOverlay.component.test.ts",
 		"test:routes": "pnpm run test:visual-guards && vitest run src/routes/layout.shell.test.ts src/routes/routes.render.test.ts",
-		"test:ui": "vitest run src/lib/components/BalloonsOverlay.component.test.ts src/lib/components/AnimatedNumericText.ui.test.ts src/lib/uninstall/feedback.component.test.ts",
+		"test:ui": "vitest run src/lib/components/BalloonsOverlay.component.test.ts src/lib/components/AnimatedNumericText.ui.test.ts src/lib/components/AnimatedNumber.ui.test.ts src/lib/uninstall/feedback.component.test.ts",
 		"test:security": "vitest run src/lib/api/publicSite.security.test.ts src/lib/content/privacy.test.ts src/lib/uninstall/feedback.edge.test.ts",
 		"test:regression": "vitest run src/lib/api/publicSite.snapshot.test.ts src/lib/api/publicSite.regression.test.ts src/lib/api/publicSite.coercion.test.ts",
 		"test:load": "vitest run src/lib/api/publicSite.load-stress.test.ts",

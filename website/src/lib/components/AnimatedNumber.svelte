@@ -16,7 +16,7 @@
   export let rootMargin = '0px 0px -8% 0px';
 
   let hostEl: HTMLSpanElement | null = null;
-  let displayValue = Number.isFinite(initialValue) ? Number(initialValue) : 0;
+  let displayValue = safeNumber(Number.isFinite(initialValue) ? Number(initialValue) : value);
   let formattedValue = '0';
   let hasAnimatedInView = false;
   let rafId: number | null = null;
@@ -81,24 +81,26 @@
   }
 
   onMount(() => {
-    const initial = safeNumber(value);
-    displayValue = initial;
+    const target = safeNumber(value);
 
     if (!animated) {
-      displayValue = initial;
+      displayValue = target;
       hasAnimatedInView = true;
       return;
     }
 
+    const start = Number.isFinite(initialValue) ? Number(initialValue) : 0;
+    displayValue = start;
+
     if (!animateOnView) {
       hasAnimatedInView = true;
-      animateTo(initial);
+      animateTo(target);
       return;
     }
 
     if (!hostEl || typeof IntersectionObserver === 'undefined') {
       hasAnimatedInView = true;
-      animateTo(initial);
+      animateTo(target);
       return () => stopAnimation();
     }
 
