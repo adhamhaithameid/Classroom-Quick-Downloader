@@ -278,7 +278,7 @@
           <!-- Sidebar -->
           <aside class="cl-sidebar">
             <div class="cl-sidebar-card cl-reveal">
-              <h3 class="cl-sidebar-label">Versions</h3>
+              <h2 class="cl-sidebar-label">Versions</h2>
               <nav class="cl-sidebar-links">
                 {#each changelogEntries as entry}
                   <a
