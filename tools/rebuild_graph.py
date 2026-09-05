@@ -30,7 +30,7 @@ def main() -> int:
     from graphify.build import build_from_json
     from graphify.cluster import cluster, score_all
     from graphify.detect import detect, save_manifest
-    from graphify.export import to_json
+    from graphify.export import to_html, to_json
     from graphify.extract import collect_files, extract
     from graphify.report import generate
 
@@ -135,6 +135,9 @@ def main() -> int:
     # 6. Export (full rebuild => force overwrite is intentional)
     if not to_json(G, communities, str(OUT / "graph.json"), force=True):
         print("[graph] ERROR: export refused", file=sys.stderr)
+        return 1
+    if not to_html(G, communities, str(OUT / "graph.html"), community_labels=labels, node_limit=1500):
+        print("[graph] ERROR: HTML export skipped", file=sys.stderr)
         return 1
     report = generate(
         G, communities, cohesion, labels, gods, surprises, result,
