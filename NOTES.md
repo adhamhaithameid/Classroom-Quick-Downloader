@@ -51,4 +51,3 @@
   3 open questions listed inside.
 - One-time user setup pending: @BotFather token + chat_id →
   ~/.config/cqd-workflows/telegram.env
-

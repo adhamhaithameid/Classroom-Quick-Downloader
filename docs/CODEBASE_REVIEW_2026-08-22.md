@@ -135,7 +135,7 @@ Escaped interpolation + CSP nonce ✅.
   - 🟡 [MEDIUM] Prerender failures non-fatal ('warn') → broken links ship silently. (`svelte.config.js:16-20`)
 ### 4.2 Routes (~18k LOC)
 - **4.2.1 Core** — layout (714 ln), overview (4,051 ln) & overview-editor (3,943 ln near-clone twins).
-  - 🟡 [MEDIUM] 95%-duplicated 4k-line twins, both prerendered/published. 
+  - 🟡 [MEDIUM] 95%-duplicated 4k-line twins, both prerendered/published.
 - **4.2.2 Content/legal** — faq/privacy/changelog/uninstall/site-map.
 - **4.2.3 SEO landing pages** — 6-ln wrappers over `seoPages.ts` (465 ln).
   - 🟡 [MEDIUM] Thin/templated doorway-style content across ~9 pages ≈300 words each.
@@ -143,7 +143,7 @@ Escaped interpolation + CSP nonce ✅.
 - **4.2.5 Legacy** — emails/ (213 ln + redirect) → emails2/ (911 ln live); landing2/; samples/.disabled.
   - 🔴 **[CRITICAL]** `emails/+page.svelte:20` unsanitized `{@html emailBodyHtml}` sink (currently unreachable via redirect — delete the page before a refactor revives it).
 - **4.2.6 Endpoints** — sitemap.xml/robots.txt/indexnow.
-  - 🟡 [MEDIUM] Sitemap lastmod = build date for every URL (false freshness). 
+  - 🟡 [MEDIUM] Sitemap lastmod = build date for every URL (false freshness).
   - ⚪ [LOW] Non-standard Host directive; /emails2 not disallowed.
 ### 4.3 `src/lib/`
 - **4.3.1 api/publicSite.ts** (849 ln) — coercion helpers, AbortController timeouts, 4-tier snapshot fallback ✅
