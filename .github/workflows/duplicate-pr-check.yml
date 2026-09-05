@@ -57,7 +57,7 @@ jobs:
 
             if (!hits.length) {
               console.log("no likely duplicates");
-              return;
+              process.exit(0);
             }
             hits.sort((a, b) => b.overlap - a.overlap);
             const lines = hits.slice(0, 5).map((h) => `- #${h.number} — ${h.title} (${h.overlap}% title overlap)`);

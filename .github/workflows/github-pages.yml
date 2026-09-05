@@ -51,7 +51,7 @@ jobs:
       # Caches the extraction cache AND the last graph built on main, so PR
       # runs can diff against the previous production graph.
       - name: Cache graphify state
-        uses: actions/cache@13aacd865c20de90d75de3b17ebe84f7a17d57d2 # v4.0.0
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
             graphify-out/cache
