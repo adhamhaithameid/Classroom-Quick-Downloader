@@ -59,7 +59,8 @@ async function launchWithExtension(): Promise<BrowserContext> {
 async function serveFixture(context: BrowserContext, html: string): Promise<() => Promise<void>> {
   const handler = async (route: Route) => {
     const url = route.request().url();
-    if (route.request().resourceType() === 'document' && url.includes('classroom.google.com')) {
+    const hostname = new URL(url).hostname;
+    if (route.request().resourceType() === 'document' && hostname === 'classroom.google.com') {
       await route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: html });
       return;
     }
