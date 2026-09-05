@@ -23,6 +23,21 @@ VIS_NETWORK_URL = "https://unpkg.com/vis-network@9.1.6/standalone/umd/vis-networ
 sys.path.insert(0, str(OUT / ".graphify_site_packages")) if (OUT / ".graphify_site_packages").exists() else None
 
 
+def path_derived_labels(communities, extraction):
+    from collections import Counter
+
+    src = {n["id"]: n.get("source_file", "") for n in extraction["nodes"]}
+    labels = {}
+    for cid, members in communities.items():
+        dirs = Counter()
+        for m in members:
+            parts = [p for p in src.get(m, "").split("/") if p]
+            if len(parts) >= 2:
+                dirs["/".join(parts[:2])] += 1
+        labels[cid] = dirs.most_common(1)[0][0].replace("_", " ").title()[:40] if dirs else f"Community {cid}"
+    return labels
+
+
 def main() -> int:
     import os
 
@@ -115,21 +130,13 @@ def main() -> int:
     if backend:
         from graphify.llm import label_communities
 
-        labels = label_communities(G, communities, backend="gemini")
+        try:
+            labels = label_communities(G, communities, backend="gemini")
+        except Exception as exc:
+            print(f"[graph] WARNING: Gemini labels failed; falling back to path labels: {exc}", file=sys.stderr)
+            labels = path_derived_labels(communities, extraction)
     else:
-        from collections import Counter
-
-        src = {n["id"]: n.get("source_file", "") for n in extraction["nodes"]}
-        labels = {}
-        for cid, members in communities.items():
-            dirs = Counter()
-            for m in members:
-                parts = [p for p in src.get(m, "").split("/") if p]
-                if len(parts) >= 2:
-                    dirs["/".join(parts[:2])] += 1
-            labels[cid] = (
-                dirs.most_common(1)[0][0].replace("_", " ").title()[:40] if dirs else f"Community {cid}"
-            )
+        labels = path_derived_labels(communities, extraction)
     questions = suggest_questions(G, communities, labels)
 
     # 6. Export (full rebuild => force overwrite is intentional)
