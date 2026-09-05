@@ -199,3 +199,119 @@ Also verify once in repo Settings → Pages → Source = "GitHub Actions".
   re-run `gh secret set GEMINI_API_KEY`.
 - Workflow still not committed (user's standing rule); activation requires
   commit+push of: .github/workflows/github-pages.yml, tools/rebuild_graph.py.
+
+---
+
+# Addendum 4 (same day): Full productivity overhaul — executed after grilling
+
+Grilled across 3 rounds; all decisions settled, then executed. Key decisions:
+scope=ALL; prepare-only (user commits); Renovate-only; protection w/ admin
+bypass; Pages=graph-only; CF=marketing-only; manual tag gate; nightly strict;
+graph-diff PR comments; ADRs x6; beads backlog; test-split top-5.
+
+## API actions performed (approved, not git writes)
+- Pages build_type legacy→workflow (fixes the 404 once first deploy lands).
+- Branch protection on main: 4 required checks (Extension Tests & Coverage,
+  Website Check/Tests/Build, CF Worker Tests & Lint, Go Oracle Backend Tests),
+  force-push + deletion blocked, admin bypass preserved. Oracle CI checks NOT
+  required (path-filtered workflows never report → would block unrelated PRs).
+
+## Files created
+- .github/workflows/nightly-tests.yml (cron 01:00 UTC, test:strict, deduped
+  auto-issue w/ ci-failure label; label created via gh)
+- tools/graph_diff.py (deterministic JSON graph diff → PR comment markdown)
+- docs/adr/0000-template.md + 0001..0006 (host-split, beads, graphify-CI,
+  renovate, pages-flip, pnpm-pinning)
+- tools/rebuild_graph.py retargeted → stages graphify-out/site/ (standalone)
+- website/src/lib/svgCatalog/types.ts (+ 6 siblings re-pointed; index re-exports)
+
+## Files rewritten/deleted
+- .github/workflows/github-pages.yml → graph-only pipeline w/ PR graph-diff
+  (cache now carries graph.json.previous for diffs)
+- DELETED: .github/dependabot.yml, .github/workflows/release-drafter.yml,
+  .github/workflows/dependabot-auto-merge.yml (orphaned), website/static/graphify/
+- website/src/routes/+layout.svelte: Graph nav link removed
+- FIXED pre-existing bug: version-bump.yml line-86 dedent broke the run-block
+  scalar (workflow was silently dead); re-indented, all 17 workflows parse
+
+## Oracle test split (5 parallel agents, pure moves)
+- 6,100 lines → 756 across 5 originals; 33 new concern files; 113 test funcs
+  byte-for-byte preserved (sha/diff-verified per agent); final independent
+  verify: go vet clean, go test ./internal/handlers ok 10.7s, gofmt clean
+  (only pre-existing public_website_load_stress_test.go flagged — untouched)
+- Bead Classroom-Quick-Downloader-0oe closed with evidence
+
+## Beads
+Filed 7: 3v2 svgCatalog(closed), oqn _worker audit(closed), 0oe test-split(closed),
+v93 ADRs(closed), mj3 store-uploads(open), mml drift-commit(open, user),
+5w5 key-rotation(open, user). bd close takes --reason (learned after 3 errors).
+
+## Verified locally
+- All 17 workflow YAMLs parse; graph_diff smoke-tested; rebuild_graph.py
+  end-to-end w/ Gemini (stages graphify-out/site); svelte-check 0/0;
+  placements+visual-guards 17/17; website build green; go test/vet/gofmt green.
+
+## User actions remaining
+1. Review + commit/push everything (2C mode) — suggested grouping in handoff.
+2. Rotate Gemini key → gh secret set GEMINI_API_KEY (bead 5w5).
+3. Commit pre-existing drift (bead mml).
+4. After push: watch first "Build & Deploy Knowledge Graph" run → Pages 404 gone.
+
+---
+
+# Addendum 5 (2026-08-22): Critical fixes from full codebase review
+
+Full review delivered in docs/CODEBASE_REVIEW_2026-08-22.md (2C/12H/20M/~25L).
+This addendum covers the executed fixes; 12 HIGHs filed as beads for follow-up.
+
+## CRITICAL 1 — Worker DO monolithic state blob (gvd, CLOSED)
+Problem: entire DurableStateShape (~60 fields incl. 50k-event buffer, 50k
+processedIds, telemetry queues) serialized as ONE storage.put per request path;
+at scale the single value approaches the per-value limit → persist() throws →
+every write fails simultaneously.
+Fix: sharded into 6 keys (core / analytics_buffer / analytics_pending_batches /
+analytics_processed_ids / analytics_website_telemetry / analytics_changelog);
+load() re-assembles with transparent migration from legacy single blob; debug
+reset clears shards; loginAttempts now pruned (15min×4 TTL + 500-entry cap,
+oldest evicted) — also resolves HIGH cv8.
+Verification: cloudflare-worker vitest 951/951 (after updating storage-coupled
+tests in security.test.ts to a readFullState() merge helper), tsc --noEmit clean.
+
+## CRITICAL 2 — emails page {@html} XSS sink (2g7, CLOSED)
+Fix (page kept per user): new website/src/lib/emails/sanitize.ts —
+sanitizeEmailCss strips every "<" (CSS never needs it → no style-tag breakout),
+sanitizeEmailBodyHtml runs DOMPurify html profile w/ script/iframe/form forbids;
+page renders only sanitized values. isomorphic-dompurify added (SSR-safe).
+Verification: 9/9 new sanitize tests, svelte-check 0/0, production build green.
+
+## Beads filed (12 HIGH follow-ups)
+4un oracle-batch DLQ · cra cron mismatch · m3a event split-brain · b6a hidden
+flush loss · 9vw snapshot pinning · hbk stale tabs · x2i drive_bypass consent ·
+7hj V3 dead engine · yhx shadow-mode tax · 4d7 eslint patches · version-bump
+GITHUB_TOKEN checks · (cv8 loginAttempts folded into gvd fix).
+
+---
+
+# Addendum 6 (2026-08-22): All 12 HIGHs fixed + repo-bot built
+
+All 12 HIGH beads closed with evidence: worker DLQ (MAX_BATCH_ATTEMPTS=8 +
+bounded dead-letter summaries), cron aligned to 1-22/3, event-flush unified to
+worker endpoint w/ idempotent beacon retention, hidden-flush beacon fix,
+snapshot next-pin restored, staged-gate self-heal (+60s store poll),
+drive_bypass consent gate via pendingByBypassTabId + CQD_QUERY_BYPASS_CONSENT,
+V3 registry fallback, DEFAULT_MODE shadow->legacy (mj7), eslint patches deleted,
+version-bump RELEASE_PAT support. Extension 3394/3394, website 989/989,
+worker 951/951 all green.
+
+Loop-me session: workflows/repo-triage-burst.md (implementer-ready) +
+workflows/release-ritual.md (sketch) + NOTES.md world model.
+
+repo-bot built: workflows/scripts/repo_triage.py (burst + --serve daemon:
+/status /prs /issues /security /deps /runs /plans /releases /triage; gh api
+security sources incl dependabot/codeql/secret-scanning), install_launchd.sh.
+Live-tested: dry-run brief correct (caught 20 failing endpoint-monitor runs;
+bead xer filed); handlers verified vs live gh data (30 open PRs classified,
+v1.5.6 draft surfaced, version-bump dispatch failure noticed). Pending from
+user: @BotFather token -> chat_id -> ~/.config/cqd-workflows/telegram.env.
+Real findings needing owner attention: endpoint monitor failing repeatedly;
+a dispatched version-bump run failed on main (logs unavailable).
