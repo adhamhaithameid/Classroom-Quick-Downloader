@@ -67,7 +67,7 @@ Student ──> Extension (WXT + React/TS)          extension/
 - Installed `bd` v1.2.2 via Homebrew.
 - `bd init`: backend **dolt (embedded)**, DB `Classroom_Quick_Downloader`,
   prefix `Classroom-Quick-Downloader-<hash>`.
-- Installed: Claude Code hooks/settings, beads agent skill (`.agents/skills/beads/`),
+- Installed: beads agent skill (`.agents/skills/beads/`),
   Codex hooks + AGENTS.md guidance.
 - Status: 0 issues; `bd ready` → "No open issues".
 
@@ -79,8 +79,8 @@ changelog/version files) were left untouched. `graphify-out/` is currently untra
 decide whether to commit or gitignore it.
 
 ## Blast radius
-- New files: `graphify-out/` (untracked), `.beads/` (committed by bd), `.claude/settings.json`
-  (modified by bd), `.agents/skills/beads/`, AGENTS.md (updated by bd).
+- New files: `graphify-out/` (untracked), `.beads/` (committed by bd),
+  `.agents/skills/beads/`, AGENTS.md (updated by bd).
 - Nothing in product code was touched. Rollback: delete `graphify-out/`; revert commit
   `da397181` if beads is unwanted.
 

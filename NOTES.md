@@ -6,7 +6,7 @@
 - CS student (university in Egypt; exam seasons spike workload). Arabic RTL background.
 - Solo maintainer of **Classroom Quick Downloader (CQD)** — browser extension
   (Chrome/Firefox/Edge stores) + Cloudflare Worker + Go backend + SvelteKit site.
-- Heavy agent user: opencode + Claude-style agents, Jules automation, beads tracker.
+- Heavy agent user: opencode agents, Jules automation, beads tracker.
 
 ## Confirmed loops (Round 1)
 1. **CQD repo ops** — weekly weekend burst; daily-ish notification glances.
