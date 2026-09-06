@@ -25,10 +25,29 @@ jobs:
           fetch-depth: 0
 
       - name: Reject blocked co-author trailers
+        env:
+          PUSH_BEFORE: ${{ github.event.before }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
         run: |
           blocked_name='[c]laude'
-          matches="$(git log --all --regexp-ignore-case --extended-regexp \
-            --grep="(^co-authored-by:.*(${blocked_name}|anthropic\\.com)|noreply@anthropic\\.com)" \
+          pattern="(^co-authored-by:.*(${blocked_name}|anthropic\\.com)|noreply@anthropic\\.com)"
+
+          # Guard incoming commits only: the previous tip on push, the PR base on pull_request.
+          base=""
+          if [ -n "$PUSH_BEFORE" ] && [ "$PUSH_BEFORE" != "0000000000000000000000000000000000000000" ] \
+             && git cat-file -e "$PUSH_BEFORE^{commit}" 2>/dev/null; then
+            base="$PUSH_BEFORE"
+          elif [ -n "$PR_BASE" ] && git cat-file -e "$PR_BASE^{commit}" 2>/dev/null; then
+            base="$PR_BASE"
+          fi
+
+          if [ -z "$base" ]; then
+            echo "::warning::No base revision available for this trigger; attribution scan skipped."
+            exit 0
+          fi
+
+          matches="$(git log "$base..HEAD" --regexp-ignore-case --extended-regexp \
+            --grep="$pattern" \
             --format='%H %s')"
 
           if [ -n "$matches" ]; then
