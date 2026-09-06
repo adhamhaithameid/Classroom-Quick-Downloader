@@ -1,1 +1,11 @@
-npx --no -- commitlint --edit "${1}"
+#!/usr/bin/env sh
+
+commit_msg_file="${1:?commit message file required}"
+blocked_name='[c]laude'
+
+if grep -Eiq "^(co-authored-by): .*(${blocked_name}|anthropic\\.com)|noreply@anthropic\\.com" "$commit_msg_file"; then
+  echo "Blocked co-author trailers are not allowed in this repository." >&2
+  exit 1
+fi
+
+npx --no -- commitlint --edit "$commit_msg_file"

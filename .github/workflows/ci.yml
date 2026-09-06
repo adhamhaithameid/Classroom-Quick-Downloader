@@ -13,10 +13,33 @@ concurrency:
 permissions:
   contents: read
 
+jobs:
+  attribution-guard:
+    name: Attribution Guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Reject blocked co-author trailers
+        run: |
+          blocked_name='[c]laude'
+          matches="$(git log --all --regexp-ignore-case --extended-regexp \
+            --grep="(^co-authored-by:.*(${blocked_name}|anthropic\\.com)|noreply@anthropic\\.com)" \
+            --format='%H %s')"
+
+          if [ -n "$matches" ]; then
+            echo "::error::Blocked co-author trailers are not allowed in this repository."
+            printf '%s\n' "$matches"
+            exit 1
+          fi
+
 # ──────────────────────────────────────────────
 # Extension
 # ──────────────────────────────────────────────
-jobs:
   extension-tests:
     name: Extension — Tests & Coverage
     runs-on: ubuntu-latest
@@ -382,6 +405,7 @@ jobs:
     name: CI ✅
     if: always()
     needs:
+      - attribution-guard
       - extension-tests
       - extension-e2e
       - build-check
@@ -395,6 +419,7 @@ jobs:
     steps:
       - name: Check all jobs
         run: |
+          echo "Attribution Guard:      ${{ needs.attribution-guard.result }}"
           echo "Extension Tests:        ${{ needs.extension-tests.result }}"
           echo "Extension E2E:          ${{ needs.extension-e2e.result }}"
           echo "Build Check:            ${{ needs.build-check.result }}"
@@ -405,7 +430,8 @@ jobs:
           echo "Oracle Tests:           ${{ needs.oracle-tests.result }}"
           echo "Oracle Migration Smoke: ${{ needs.oracle-migration-smoke.result }}"
 
-          if [[ "${{ needs.extension-tests.result }}" != "success" ]] ||
+          if [[ "${{ needs.attribution-guard.result }}" != "success" ]] ||
+             [[ "${{ needs.extension-tests.result }}" != "success" ]] ||
              [[ "${{ needs.extension-e2e.result }}" != "success" ]] ||
              [[ "${{ needs.build-check.result }}" != "success" ]] ||
              [[ "${{ needs.website-checks.result }}" != "success" ]] ||
