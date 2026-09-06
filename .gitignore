@@ -54,3 +54,7 @@ graphify-out/
 .workflow-state/
 workflows/briefs/
 __pycache__/
+
+# Claude Code local config
+CLAUDE.md
+.claude/
