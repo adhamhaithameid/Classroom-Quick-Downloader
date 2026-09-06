@@ -1,0 +1,15 @@
+{
+  "viewKind": "stream",
+  "lang": "ar",
+  "note": "Synthetic (ar): ٣ class comments in the real L0 DOM-truth shell (.qCWAqb > .huI6Cb). Count is language-free.",
+  "origin": "synthetic",
+  "posts": [
+    {
+      "postId": "synth-ar-2",
+      "commentPresent": true,
+      "commentCount": 3,
+      "editedPresent": false
+    }
+  ],
+  "caseId": "syn-ar-comments-l0"
+}

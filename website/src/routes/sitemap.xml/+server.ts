@@ -1,5 +1,6 @@
 import {
   INDEXABLE_SITE_PATHS,
+  lastModForPath,
   SITEMAP_IMAGE_ASSET_PATHS,
   SITEMAP_VIDEO_ENTRIES,
   escapeXml,
@@ -12,10 +13,6 @@ const DEFAULT_CHANGEFREQ = 'weekly';
 const DEFAULT_PRIORITY = '0.7';
 const ROOT_PRIORITY = '1.0';
 const HIGH_PRIORITY = '0.9';
-
-function toIsoDate(value: Date): string {
-  return value.toISOString().slice(0, 10);
-}
 
 function changeFreqForPath(path: string): string {
   if (path === '/') return 'daily';
@@ -73,7 +70,6 @@ function videoTagsForPath(path: string): string {
 }
 
 export function GET() {
-  const today = toIsoDate(new Date());
   const body = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
   xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"
@@ -86,7 +82,7 @@ ${INDEXABLE_SITE_PATHS.map((path) => {
   const videoTags = videoTagsForPath(path);
   return `  <url>
     <loc>${loc}</loc>
-    <lastmod>${today}</lastmod>
+    <lastmod>${lastModForPath(path)}</lastmod>
     <changefreq>${changefreq}</changefreq>
     <priority>${priority}</priority>
 ${imageTags}${videoTags}  </url>`;

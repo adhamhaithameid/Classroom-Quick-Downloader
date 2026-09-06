@@ -42,3 +42,15 @@ oracle-backend/google-credentials*.json
 ownership-map-out/
 ownership-map-out-sensitive/
 .qoder/settings.local.json
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+.beads-credential-key
+.beads/proxieddb/
+
+# Graphify knowledge-graph output (kept local/offline)
+graphify-out/
+
+.workflow-state/
+workflows/briefs/
+__pycache__/

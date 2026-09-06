@@ -33,7 +33,7 @@ describe('public website API security hardening', () => {
 
   it('sends required anti-CSRF style header for public write endpoints', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      expect(String(input)).toContain('/api/site/v1/events');
+      expect(String(input)).toContain('/api/public/website/events');
       expect(init?.method).toBe('POST');
       expect((init?.headers as Record<string, string>)['X-Requested-With']).toBe('XMLHttpRequest');
       return new Response(JSON.stringify({ ok: true, generatedAt: 1, acceptedCount: 1, rejectedCount: 0 }), {

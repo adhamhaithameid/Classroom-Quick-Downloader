@@ -1,0 +1,297 @@
+{
+  "generatedOn": "2026-08-23",
+  "totals": {
+    "cases": 40,
+    "locales": 6,
+    "languages": [
+      "ar",
+      "en",
+      "es",
+      "hu",
+      "ja",
+      "ru"
+    ]
+  },
+  "cases": [
+    {
+      "caseId": "fx-announcement-detail-negative",
+      "origin": "fixture",
+      "lang": "en",
+      "viewKind": "announcement_detail",
+      "posts": 1
+    },
+    {
+      "caseId": "fx-classwork-material-comments",
+      "origin": "fixture",
+      "lang": "en",
+      "viewKind": "classwork_list",
+      "posts": 1
+    },
+    {
+      "caseId": "fx-mixed-links-comments",
+      "origin": "fixture",
+      "lang": "en",
+      "viewKind": "stream",
+      "posts": 1
+    },
+    {
+      "caseId": "fx-student-submissions-negative",
+      "origin": "fixture",
+      "lang": "en",
+      "viewKind": "student_submissions",
+      "posts": 2
+    },
+    {
+      "caseId": "plain-post-no-flags-en",
+      "origin": "unspecified",
+      "lang": "en",
+      "viewKind": "stream",
+      "posts": 1
+    },
+    {
+      "caseId": "rtl-flagged-post-ar",
+      "origin": "unspecified",
+      "lang": "ar",
+      "viewKind": "stream",
+      "posts": 1
+    },
+    {
+      "caseId": "stream-edited-and-comments-en",
+      "origin": "unspecified",
+      "lang": "en",
+      "viewKind": "stream",
+      "posts": 1
+    },
+    {
+      "caseId": "syn-ar-both-flags",
+      "origin": "synthetic",
+      "lang": "ar",
+      "viewKind": "stream",
+      "posts": 1
+    },
+    {
+      "caseId": "syn-ar-comments-l0",
+      "origin": "synthetic",
+      "lang": "ar",
+      "viewKind": "stream",
+      "posts": 1
+    },
+    {
+      "caseId": "syn-ar-count-only-shell",
+      "origin": "synthetic",
+      "lang": "ar",
+      "viewKind": "stream",
+      "posts": 1
+    },
+    {
+      "caseId": "syn-ar-edited-only",
+      "origin": "synthetic",
+      "lang": "ar",
+      "viewKind": "stream",
+      "posts": 1
+    },
+    {
+      "caseId": "syn-ar-hostile-negative",
+      "origin": "synthetic",
+      "lang": "ar",
+      "viewKind": "stream",
+      "posts": 1
+    },
+    {
+      "caseId": "syn-ar-plain-negative",
+      "origin": "synthetic",
+      "lang": "ar",
+      "viewKind": "stream",
+      "posts": 1
+    },
+    {
+      "caseId": "syn-en-both-flags",
+      "origin": "synthetic",
+      "lang": "en",
+      "viewKind": "stream",
+      "posts": 1
+    },
+    {
+      "caseId": "syn-en-comments-l0",
+      "origin": "synthetic",
+      "lang": "en",
+      "viewKind": "stream",
+      "posts": 1
+    },
+    {
+      "caseId": "syn-en-edited-only",
+      "origin": "synthetic",
+      "lang": "en",
+      "viewKind": "stream",
+      "posts": 1
+    },
+    {
+      "caseId": "syn-en-hostile-negative",
+      "origin": "synthetic",
+      "lang": "en",
+      "viewKind": "stream",
+      "posts": 1
+    },
+    {
+      "caseId": "syn-en-multi-post-mixed",
+      "origin": "synthetic",
+      "lang": "en",
+      "viewKind": "stream",
+      "posts": 3
+    },
+    {
+      "caseId": "syn-en-plain-negative",
+      "origin": "synthetic",
+      "lang": "en",
+      "viewKind": "stream",
+      "posts": 1
+    },
+    {
+      "caseId": "syn-es-both-flags",
+      "origin": "synthetic",
+      "lang": "es",
+      "viewKind": "stream",
+      "posts": 1
+    },
+    {
+      "caseId": "syn-es-comments-l0",
+      "origin": "synthetic",
+      "lang": "es",
+      "viewKind": "stream",
+      "posts": 1
+    },
+    {
+      "caseId": "syn-es-edited-only",
+      "origin": "synthetic",
+      "lang": "es",
+      "viewKind": "stream",
+      "posts": 1
+    },
+    {
+      "caseId": "syn-es-hostile-negative",
+      "origin": "synthetic",
+      "lang": "es",
+      "viewKind": "stream",
+      "posts": 1
+    },
+    {
+      "caseId": "syn-es-nested-duplicate-id",
+      "origin": "synthetic",
+      "lang": "es",
+      "viewKind": "stream",
+      "posts": 1
+    },
+    {
+      "caseId": "syn-es-plain-negative",
+      "origin": "synthetic",
+      "lang": "es",
+      "viewKind": "stream",
+      "posts": 1
+    },
+    {
+      "caseId": "syn-hu-both-flags",
+      "origin": "synthetic",
+      "lang": "hu",
+      "viewKind": "stream",
+      "posts": 1
+    },
+    {
+      "caseId": "syn-hu-comments-l0",
+      "origin": "synthetic",
+      "lang": "hu",
+      "viewKind": "stream",
+      "posts": 1
+    },
+    {
+      "caseId": "syn-hu-edited-only",
+      "origin": "synthetic",
+      "lang": "hu",
+      "viewKind": "stream",
+      "posts": 1
+    },
+    {
+      "caseId": "syn-hu-hostile-negative",
+      "origin": "synthetic",
+      "lang": "hu",
+      "viewKind": "stream",
+      "posts": 1
+    },
+    {
+      "caseId": "syn-hu-plain-negative",
+      "origin": "synthetic",
+      "lang": "hu",
+      "viewKind": "stream",
+      "posts": 1
+    },
+    {
+      "caseId": "syn-ja-both-flags",
+      "origin": "synthetic",
+      "lang": "ja",
+      "viewKind": "stream",
+      "posts": 1
+    },
+    {
+      "caseId": "syn-ja-comments-l0",
+      "origin": "synthetic",
+      "lang": "ja",
+      "viewKind": "stream",
+      "posts": 1
+    },
+    {
+      "caseId": "syn-ja-edited-only",
+      "origin": "synthetic",
+      "lang": "ja",
+      "viewKind": "stream",
+      "posts": 1
+    },
+    {
+      "caseId": "syn-ja-hostile-negative",
+      "origin": "synthetic",
+      "lang": "ja",
+      "viewKind": "stream",
+      "posts": 1
+    },
+    {
+      "caseId": "syn-ja-plain-negative",
+      "origin": "synthetic",
+      "lang": "ja",
+      "viewKind": "stream",
+      "posts": 1
+    },
+    {
+      "caseId": "syn-ru-both-flags",
+      "origin": "synthetic",
+      "lang": "ru",
+      "viewKind": "stream",
+      "posts": 1
+    },
+    {
+      "caseId": "syn-ru-comments-l0",
+      "origin": "synthetic",
+      "lang": "ru",
+      "viewKind": "stream",
+      "posts": 1
+    },
+    {
+      "caseId": "syn-ru-edited-only",
+      "origin": "synthetic",
+      "lang": "ru",
+      "viewKind": "stream",
+      "posts": 1
+    },
+    {
+      "caseId": "syn-ru-hostile-negative",
+      "origin": "synthetic",
+      "lang": "ru",
+      "viewKind": "stream",
+      "posts": 1
+    },
+    {
+      "caseId": "syn-ru-plain-negative",
+      "origin": "synthetic",
+      "lang": "ru",
+      "viewKind": "stream",
+      "posts": 1
+    }
+  ]
+}

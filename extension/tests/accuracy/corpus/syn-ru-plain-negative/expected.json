@@ -1,0 +1,15 @@
+{
+  "viewKind": "stream",
+  "lang": "ru",
+  "note": "Synthetic negative control (ru): no flags present. Any flag is a false positive.",
+  "origin": "synthetic",
+  "posts": [
+    {
+      "postId": "synth-ru-1",
+      "commentPresent": false,
+      "commentCount": null,
+      "editedPresent": false
+    }
+  ],
+  "caseId": "syn-ru-plain-negative"
+}

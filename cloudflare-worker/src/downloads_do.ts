@@ -74,6 +74,10 @@ type DurableStateShape = {
   // Durable queue of aggregated batches waiting for Oracle
   pendingBatches: PendingOracleBatch[];
 
+  // Bounded forensic summaries of batches that exhausted their retry budget
+  oracleDeadLetters: OracleDeadLetterSummary[];
+  deadLetteredBatchesTotal: number;
+
   // End-to-end delivery metrics chain (accepted -> stored -> forwarded -> committed)
   deliveryMetrics: DeliveryMetricsState;
 
@@ -218,6 +222,27 @@ type PendingOracleBatch = {
   attempts: number;
   createdAt: number;
 };
+
+// Forensic summary kept when a pending batch exhausts its retry budget and is
+// dead-lettered. Payloads are intentionally NOT retained (bounded state).
+type OracleDeadLetterSummary = {
+  batchId: string;
+  eventCount: number;
+  weightedCount: number;
+  attempts: number;
+  createdAt: number;
+  deadLetteredAt: number;
+  lastStatus: number | null;
+  lastError: string;
+};
+
+// Retry budget per pending batch before it is quarantined to the dead-letter
+// summary list. With the scheduleRetry backoff ladder (60s → 1 day) this
+// spans roughly two days of consecutive failures.
+const MAX_BATCH_ATTEMPTS = 8;
+
+// Hard cap on retained dead-letter summaries (oldest evicted).
+const MAX_DEAD_LETTER_ENTRIES = 20;
 
 type DeliveryStage = "accepted" | "stored" | "forwarded" | "committed";
 
@@ -819,6 +844,21 @@ function sanitizeLoadedChangelogDraft(raw: unknown): ChangelogDraftState | null 
 
 // Storage key inside DO storage
 const STORAGE_KEY = "analytics_state";
+
+// ---------------------------------------------------------------------------
+// SHARDED STATE STORAGE
+// The DO state used to live in a SINGLE storage value (`analytics_state`).
+// With a 50k-event buffer, 50k dedupe IDs and a multi-thousand-entry website
+// telemetry queue, that one serialized blob approaches the per-value storage
+// limit; when persist() starts throwing, EVERY write path fails at once.
+// The large collections below are therefore stored under their own keys and
+// re-assembled in load(). Small scalars/maps stay in the core key.
+// ---------------------------------------------------------------------------
+const STORAGE_KEY_BUFFER = "analytics_buffer";
+const STORAGE_KEY_BATCHES = "analytics_pending_batches";
+const STORAGE_KEY_IDS = "analytics_processed_ids";
+const STORAGE_KEY_TELEMETRY = "analytics_website_telemetry";
+const STORAGE_KEY_CHANGELOG = "analytics_changelog";
 
 function todayUtcDate(): string {
   return new Date().toISOString().slice(0, 10); // YYYY-MM-DD
@@ -1774,6 +1814,8 @@ export class DownloadsDurable {
       eventSeq: 0,
       committedSeq: 0,
       pendingBatches: [],
+      oracleDeadLetters: [],
+      deadLetteredBatchesTotal: 0,
       deliveryMetrics: createEmptyDeliveryMetrics(),
       failureRollups: [],
       
@@ -1911,6 +1953,11 @@ export class DownloadsDurable {
       eventSeq: stored.eventSeq ?? 0,
       committedSeq: stored.committedSeq ?? 0,
       pendingBatches: Array.isArray(stored.pendingBatches) ? stored.pendingBatches : [],
+      oracleDeadLetters: Array.isArray(stored.oracleDeadLetters) ? stored.oracleDeadLetters : [],
+      deadLetteredBatchesTotal:
+        typeof stored.deadLetteredBatchesTotal === "number" && stored.deadLetteredBatchesTotal >= 0
+          ? Math.floor(stored.deadLetteredBatchesTotal)
+          : 0,
       deliveryMetrics: (() => {
         const src = isPlainObject((stored as unknown as Record<string, unknown>).deliveryMetrics)
           ? ((stored as unknown as Record<string, unknown>).deliveryMetrics as Record<string, unknown>)
@@ -2244,6 +2291,50 @@ export class DownloadsDurable {
       lastHealthNotifyAt: stored.lastHealthNotifyAt ?? base.lastHealthNotifyAt,
     };
 
+    // Re-assemble sharded state (see SHARDED STATE STORAGE note). Shard keys
+    // win when present; a legacy single-blob deployment migrates transparently
+    // because its whales were already merged from STORAGE_KEY above and the
+    // next persist() writes them out under their own keys.
+    try {
+      const [buffer, pendingBatches, processedIds, telemetry, changelogShard] = await Promise.all([
+        this.state.storage.get<DurableStateShape["buffer"]>(STORAGE_KEY_BUFFER),
+        this.state.storage.get<DurableStateShape["pendingBatches"]>(STORAGE_KEY_BATCHES),
+        this.state.storage.get<DurableStateShape["processedIds"]>(STORAGE_KEY_IDS),
+        this.state.storage.get<{
+          websiteTelemetryQueue: DurableStateShape["websiteTelemetryQueue"];
+          websiteTelemetryDeadLetter: DurableStateShape["websiteTelemetryDeadLetter"];
+          websiteTelemetrySeenEventIds: DurableStateShape["websiteTelemetrySeenEventIds"];
+        }>(STORAGE_KEY_TELEMETRY),
+        this.state.storage.get<{
+          changelog: DurableStateShape["changelog"];
+          changelogRevisions: DurableStateShape["changelogRevisions"];
+        }>(STORAGE_KEY_CHANGELOG),
+      ]);
+      if (Array.isArray(buffer)) this.data.buffer = buffer;
+      if (Array.isArray(pendingBatches)) this.data.pendingBatches = pendingBatches;
+      if (Array.isArray(processedIds)) this.data.processedIds = processedIds;
+      if (telemetry) {
+        if (Array.isArray(telemetry.websiteTelemetryQueue)) {
+          this.data.websiteTelemetryQueue = telemetry.websiteTelemetryQueue;
+        }
+        if (Array.isArray(telemetry.websiteTelemetryDeadLetter)) {
+          this.data.websiteTelemetryDeadLetter = telemetry.websiteTelemetryDeadLetter;
+        }
+        if (Array.isArray(telemetry.websiteTelemetrySeenEventIds)) {
+          this.data.websiteTelemetrySeenEventIds = telemetry.websiteTelemetrySeenEventIds;
+        }
+      }
+      if (changelogShard) {
+        if (Array.isArray(changelogShard.changelog)) this.data.changelog = changelogShard.changelog;
+        if (Array.isArray(changelogShard.changelogRevisions)) {
+          this.data.changelogRevisions = changelogShard.changelogRevisions;
+        }
+      }
+    } catch {
+      // If shard reads fail, keep whatever the core key provided (legacy or
+      // last-known) — degraded but consistent, never throwing on startup.
+    }
+
     if (this.data.reqCountDate && /^\d{4}-\d{2}-\d{2}$/.test(this.data.reqCountDate)) {
       const existing = this.data.reqDailyCounts[this.data.reqCountDate];
       if (typeof existing === "number" && Number.isFinite(existing) && existing >= 0) {
@@ -2524,7 +2615,30 @@ export class DownloadsDurable {
 
   private async persist(): Promise<void> {
     if (!this.data) return;
-    await this.state.storage.put(STORAGE_KEY, this.data);
+    const d = this.data;
+    // Shard the large collections into their own storage values so no single
+    // value can approach the per-value size limit (see SHARDED STATE STORAGE).
+    const {
+      buffer,
+      pendingBatches,
+      processedIds,
+      websiteTelemetryQueue,
+      websiteTelemetryDeadLetter,
+      websiteTelemetrySeenEventIds,
+      changelog,
+      changelogRevisions,
+      ...core
+    } = d;
+    await this.state.storage.put(STORAGE_KEY, core);
+    await this.state.storage.put(STORAGE_KEY_BUFFER, buffer);
+    await this.state.storage.put(STORAGE_KEY_BATCHES, pendingBatches);
+    await this.state.storage.put(STORAGE_KEY_IDS, processedIds);
+    await this.state.storage.put(STORAGE_KEY_TELEMETRY, {
+      websiteTelemetryQueue,
+      websiteTelemetryDeadLetter,
+      websiteTelemetrySeenEventIds,
+    });
+    await this.state.storage.put(STORAGE_KEY_CHANGELOG, { changelog, changelogRevisions });
   }
 
   private get d(): DurableStateShape {
@@ -4512,6 +4626,8 @@ export class DownloadsDurable {
       eventSeq: 0,
       committedSeq: 0,
       pendingBatches: [],
+      oracleDeadLetters: [],
+      deadLetteredBatchesTotal: 0,
       deliveryMetrics: createEmptyDeliveryMetrics(),
       failureRollups: [],
       ipCounts: {},
@@ -4527,6 +4643,11 @@ export class DownloadsDurable {
       ...preservedConfig,
     };
     await this.state.storage.delete(STORAGE_KEY);
+    await this.state.storage.delete(STORAGE_KEY_BUFFER);
+    await this.state.storage.delete(STORAGE_KEY_BATCHES);
+    await this.state.storage.delete(STORAGE_KEY_IDS);
+    await this.state.storage.delete(STORAGE_KEY_TELEMETRY);
+    await this.state.storage.delete(STORAGE_KEY_CHANGELOG);
     await this.state.storage.deleteAlarm();
     this.appendDangerAudit(request, "full_reset", "/debug/reset", "ok", "full_state_reset");
     await this.persist();
@@ -4958,6 +5079,50 @@ export class DownloadsDurable {
   // ---------------------------------------------------------------------------
   // Oracle flush + retry/backoff
   // ---------------------------------------------------------------------------
+
+  /**
+   * Quarantine the head pending batch when it has exhausted its retry budget.
+   * Keeps only a bounded forensic summary so a permanently-poisoned batch
+   * (e.g. schema drift tripping Oracle's strict decoder) cannot head-of-line
+   * block every newer batch forever. Returns true when a batch was moved.
+   */
+  private deadLetterHeadBatchIfExhausted(
+    lastStatus: number | null,
+    lastError: string,
+  ): boolean {
+    const head = this.d.pendingBatches[0];
+    if (!head || head.attempts < MAX_BATCH_ATTEMPTS) return false;
+
+    this.d.pendingBatches.shift();
+    this.d.pendingEvents = Math.max(0, this.d.pendingEvents - (head.weightedCount || 0));
+    this.d.oracleDeadLetters.unshift({
+      batchId: head.batch.batchId,
+      eventCount: head.weightedCount || 0,
+      weightedCount: head.weightedCount || 0,
+      attempts: head.attempts,
+      createdAt: head.createdAt,
+      deadLetteredAt: Date.now(),
+      lastStatus,
+      lastError: lastError.slice(0, 500),
+    });
+    this.d.deadLetteredBatchesTotal += 1;
+    while (this.d.oracleDeadLetters.length > MAX_DEAD_LETTER_ENTRIES) {
+      this.d.oracleDeadLetters.pop();
+    }
+    logEvent("error", "oracle_batch_dead_lettered", {
+      batchId: head.batch.batchId,
+      attempts: head.attempts,
+      lastStatus,
+    });
+    this.recordFailure(
+      "oracle_forward",
+      "dead_lettered",
+      `batch ${head.batch.batchId} exhausted ${head.attempts} attempts`,
+      1,
+      Date.now(),
+    );
+    return true;
+  }
 
   private async scheduleRetry(): Promise<void> {
     if (!this.d.retryState) {
@@ -5743,7 +5908,9 @@ export class DownloadsDurable {
         this.d.retryState.consecutiveFailures += 1;
         logEvent("warn", "oracle_flush_failed", { status: res.status, statusText: res.statusText });
         this.recordFailure("oracle_forward", "http_error", msg, 1, now);
-        stashFailedBatch();
+        this.deadLetterHeadBatchIfExhausted(res.status, msg);
+        this.deadLetterHeadBatchIfExhausted(null, msg);
+stashFailedBatch();
         await this.scheduleRetry();
         await this.persist();
         return { ok: false, sent: 0, error: msg };
@@ -5758,7 +5925,8 @@ export class DownloadsDurable {
         this.d.retryState.consecutiveFailures += 1;
         logEvent("warn", "oracle_flush_ack_invalid", { error: msg });
         this.recordFailure("oracle_ack", "invalid_ack", msg, 1, now);
-        stashFailedBatch();
+        this.deadLetterHeadBatchIfExhausted(null, msg);
+stashFailedBatch();
         await this.scheduleRetry();
         await this.persist();
         return { ok: false, sent: 0, error: msg };
@@ -5769,7 +5937,8 @@ export class DownloadsDurable {
         this.d.retryState.consecutiveFailures += 1;
         logEvent("warn", "oracle_flush_ack_mismatch", { error: msg });
         this.recordFailure("oracle_ack", "batch_mismatch", msg, 1, now);
-        stashFailedBatch();
+        this.deadLetterHeadBatchIfExhausted(null, msg);
+stashFailedBatch();
         await this.scheduleRetry();
         await this.persist();
         return { ok: false, sent: 0, error: msg };
@@ -6490,6 +6659,39 @@ export class DownloadsDurable {
    * 
    * Returns: { allowed: boolean, attemptsRemaining?: number, blockedUntil?: number }
    */
+  /**
+   * Prune stale login-attempt entries. Entries live for LOCKOUT_DURATION_MS
+   * after their first attempt; anything older can never block again, so it is
+   * dead weight inside persisted state. A hard cap bounds the map even under a
+   * distributed flood of unique IPs (oldest entries evicted first).
+   */
+  private pruneLoginAttempts(now: number): void {
+    const attempts = this.d.loginAttempts;
+    if (!attempts) return;
+    const LOCKOUT_DURATION_MS = 15 * 60 * 1000;
+    const GRACE_MULTIPLIER = 4; // keep expired lockouts around briefly for dashboards
+    const MAX_ENTRIES = 500;
+
+    let expired = 0;
+    for (const key of Object.keys(attempts)) {
+      const record = attempts[key];
+      if (!record || now - record.firstAttemptAt >= LOCKOUT_DURATION_MS * GRACE_MULTIPLIER) {
+        delete attempts[key];
+        expired++;
+      }
+    }
+    if (expired === 0 && Object.keys(attempts).length <= MAX_ENTRIES) return;
+
+    // Hard cap: evict oldest-first when still over budget.
+    const keys = Object.keys(attempts);
+    if (keys.length > MAX_ENTRIES) {
+      keys
+        .sort((a, b) => (attempts[a]?.firstAttemptAt ?? 0) - (attempts[b]?.firstAttemptAt ?? 0))
+        .slice(0, keys.length - MAX_ENTRIES)
+        .forEach((k) => delete attempts[k]);
+    }
+  }
+
   private async handleLoginAttempt(request: Request): Promise<Response> {
     if (!this.isAuthorizedAdmin(request)) {
       return json({ ok: false, error: "unauthorized" }, { status: 401 });
@@ -6512,6 +6714,7 @@ export class DownloadsDurable {
     if (!this.d.loginAttempts) {
       this.d.loginAttempts = {};
     }
+    this.pruneLoginAttempts(Date.now());
 
     const now = Date.now();
     const record = this.d.loginAttempts[ip];

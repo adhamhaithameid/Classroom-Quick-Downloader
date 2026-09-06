@@ -1,36 +1,116 @@
-name: Deploy GitHub Pages
+name: Build & Deploy Knowledge Graph
+
+# GitHub Pages hosts ONLY the graphify knowledge-graph output — a standalone,
+# self-contained site (vendored vis-network, no links to any other site).
+# The marketing website deploys separately to Cloudflare Pages (website-deploy.yml).
+# PRs build + validate the graph; pushes to main deploy it.
 
 on:
   push:
     branches: [main]
+    paths:
+      - "extension/**"
+      - "cloudflare-worker/**"
+      - "oracle-backend/**"
+      - "tools/rebuild_graph.py"
+      - ".github/workflows/github-pages.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "extension/**"
+      - "cloudflare-worker/**"
+      - "oracle-backend/**"
+      - "tools/rebuild_graph.py"
+      - ".github/workflows/github-pages.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
   pages: write
   id-token: write
+  pull-requests: write
 
 concurrency:
-  group: github-pages
+  # Per-ref lane: stale runs cancel; PR runs never block the main deploy.
+  group: github-pages-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  build:
+    name: Build Knowledge Graph
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.0.0
+        with:
+          python-version: "3.12"
+
+      # Caches the extraction cache AND the last graph built on main, so PR
+      # runs can diff against the previous production graph.
+      - name: Cache graphify state
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            graphify-out/cache
+            graphify-out/graph.json
+            graphify-out/graph.json.previous
+          key: graphify-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            graphify-${{ runner.os }}-
+
+      - name: Install graphify
+        run: pip install 'graphifyy[gemini]'
+
+      - name: Rebuild knowledge graph (Gemini when secret present, code-only otherwise)
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python tools/rebuild_graph.py
+
+      - name: Verify graph site output
+        run: |
+          set -euo pipefail
+          test -f graphify-out/site/index.html || { echo "::error::site/index.html missing"; exit 1; }
+          test -f graphify-out/site/vis-network.min.js || { echo "::error::vis-network vendored file missing"; exit 1; }
+          ! grep -q "unpkg.com" graphify-out/site/index.html || { echo "::error::CDN reference leaked into offline page"; exit 1; }
+          echo "Graph site OK ($(du -sh graphify-out/site | cut -f1))"
+
+      - name: Graph diff vs last main build (PRs only)
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [ ! -f graphify-out/graph.json.previous ]; then
+            gh pr comment "${{ github.event.number }}" --body "📊 **Knowledge graph:** first build — no previous graph to diff against."
+            exit 0
+          fi
+          python tools/graph_diff.py graphify-out/graph.json.previous graphify-out/graph.json > /tmp/diff.md
+          gh pr comment "${{ github.event.number }}" --body-file /tmp/diff.md
+
+      - name: Snapshot graph for future diffs (main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: cp graphify-out/graph.json graphify-out/graph.json.previous
+
+      - name: Upload Pages artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: graphify-out/site
+
   deploy:
+    name: Deploy Graph to GitHub Pages
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
       - name: Setup Pages
         uses: actions/configure-pages@1f0c5cde4bc74cd7e1254d0cb4de8d49e9068c7d # v4
-
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
-        with:
-          path: website/static
 
       - name: Deploy to GitHub Pages
         id: deployment

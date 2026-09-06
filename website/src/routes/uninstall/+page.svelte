@@ -166,12 +166,13 @@
                 type="button"
                 class="un-pill"
                 class:active={selectedReason === label}
+                aria-pressed={selectedReason === label}
                 on:click={() => { selectedReason = label; }}
               >
-                <span class="un-pill-icon">{icon}</span>
+                <span class="un-pill-icon" aria-hidden="true">{icon}</span>
                 {label}
                 {#if selectedReason === label}
-                  <svg class="un-pill-check" viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                  <svg class="un-pill-check" viewBox="0 0 20 20" fill="currentColor" width="14" height="14" aria-hidden="true" focusable="false"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
                 {/if}
               </button>
             {/each}
@@ -257,12 +258,20 @@
       </div>
 
       <!-- Result Message -->
-      {#if submitMessage}
-        <div class="un-toast" class:ok={submitState === 'done'} class:fail={submitState === 'error'}>
-          <span class="un-toast-icon">{submitState === 'done' ? '✅' : '⚠️'}</span>
-          <span>{submitMessage}</span>
-        </div>
-      {/if}
+      <!--
+        The live region is rendered unconditionally. A region that only appears
+        at the moment the message does is not reliably announced by screen
+        readers — the assistive tech has to be observing the node before it
+        gains content. The visual toast stays conditional inside it.
+      -->
+      <div aria-live="assertive" aria-atomic="true">
+        {#if submitMessage}
+          <div class="un-toast" class:ok={submitState === 'done'} class:fail={submitState === 'error'}>
+            <span class="un-toast-icon" aria-hidden="true">{submitState === 'done' ? '✅' : '⚠️'}</span>
+            <span>{submitMessage}</span>
+          </div>
+        {/if}
+      </div>
     </div>
   </section>
 

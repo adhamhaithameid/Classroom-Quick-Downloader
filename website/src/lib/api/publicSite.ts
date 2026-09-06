@@ -32,6 +32,11 @@ let cachedSnapshot: WebsiteSnapshot | null = null;
 let cachedSnapshotSource: WebsiteSnapshotFetchSource = 'memory-cache';
 let snapshotInFlight: Promise<WebsiteSnapshot> | null = null;
 let snapshotResultInFlight: Promise<WebsiteSnapshotFetchResult> | null = null;
+// Refresh-window gate for session-pinned snapshots: while a "next" snapshot is
+// staged for adoption, repeated fetches are throttled until the STAGED
+// snapshot's own window passes — so long-lived tabs self-heal once per window
+// without visual churn (the pinned display never updates mid-session).
+let stagedNextRefreshAtUtc = 0;
 let snapshotStorageHydrated = false;
 
 function isPlaceholderSnapshot(snapshot: WebsiteSnapshot): boolean {
@@ -116,7 +121,9 @@ function writeSnapshotToStorage(snapshot: WebsiteSnapshot): void {
 function writeNextSnapshotToStorage(snapshot: WebsiteSnapshot): void {
   if (!canUseBrowserStorage()) return;
   try {
-    window.localStorage.setItem(SNAPSHOT_STORAGE_KEY, JSON.stringify(snapshot));
+    // Stage ONLY the "next" slot: the running session stays pinned to its
+    // current snapshot; the staged one is adopted on the next page load
+    // (readSnapshotFromStorage prefers SNAPSHOT_NEXT_KEY).
     window.localStorage.setItem(SNAPSHOT_NEXT_KEY, JSON.stringify(snapshot));
   } catch {
     // Ignore quota/privacy mode failures.
@@ -156,10 +163,32 @@ async function fetchBootstrapSnapshot(): Promise<WebsiteSnapshot | null> {
   }
 }
 
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+/**
+ * Run a request under a deadline, and genuinely cancel it when the deadline
+ * passes.
+ *
+ * The previous implementation took an already-started promise and simply
+ * rejected alongside it. The underlying fetch kept running: it held a
+ * connection, and its response was thrown away. For the POST endpoints that
+ * was worse than untidy — a timed-out request that actually succeeded on the
+ * server was invisible to the caller, so a retry could double-submit.
+ *
+ * Taking a factory instead of a promise lets us hand the request an
+ * AbortSignal and abort it for real.
+ */
+function withTimeout<T>(
+  run: (signal: AbortSignal) => Promise<T>,
+  timeoutMs: number
+): Promise<T> {
+  const controller = new AbortController();
+
   return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('Request timeout')), timeoutMs);
-    promise
+    const timer = setTimeout(() => {
+      controller.abort();
+      reject(new Error('Request timeout'));
+    }, timeoutMs);
+
+    run(controller.signal)
       .then((value) => {
         clearTimeout(timer);
         resolve(value);
@@ -206,12 +235,14 @@ async function fetchJSONFromBase(baseUrl: string, pathname: string, requestLabel
     throw new Error('Public API is not configured.');
   }
   const response = await withTimeout(
-    fetch(`${normalizedBase}${pathname}`, {
-      cache: 'no-store',
-      headers: {
-        Accept: 'application/json'
-      }
-    }),
+    (signal) =>
+      fetch(`${normalizedBase}${pathname}`, {
+        cache: 'no-store',
+        headers: {
+          Accept: 'application/json'
+        },
+        signal
+      }),
     REQUEST_TIMEOUT_MS
   );
   if (!response.ok) {
@@ -616,8 +647,15 @@ function buildSnapshotFetchResult(
 export async function fetchWebsiteSnapshotResult(options: { force?: boolean; applyToCurrentSession?: boolean } = {}): Promise<WebsiteSnapshotFetchResult> {
   hydrateSnapshotCacheFromStorage();
 
+  // Respect refresh windows: serve the memory cache until either the cached
+  // snapshot expired or (while a session pin is active) the staged "next"
+  // snapshot's own window has passed. This keeps long-lived tabs self-healing
+  // at most once per window instead of frozen forever.
   if (!options.force && cachedSnapshot) {
-    return buildSnapshotFetchResult(cachedSnapshot, cachedSnapshotSource, false, null);
+    const gateAt = Math.max(cachedSnapshot.nextRefreshAtUtc, stagedNextRefreshAtUtc);
+    if (Date.now() < gateAt) {
+      return buildSnapshotFetchResult(cachedSnapshot, cachedSnapshotSource, false, null);
+    }
   }
   if (!options.force && snapshotResultInFlight) {
     return snapshotResultInFlight;
@@ -640,11 +678,13 @@ export async function fetchWebsiteSnapshotResult(options: { force?: boolean; app
     if (!cachedSnapshot || options.applyToCurrentSession === true) {
       cachedSnapshot = snapshot;
       cachedSnapshotSource = 'memory-cache';
+      stagedNextRefreshAtUtc = 0;
       writeSnapshotToStorage(snapshot);
       return buildSnapshotFetchResult(snapshot, 'edge-backend', false, null);
     }
 
     // Keep current session pinned. New snapshot is stored for next refresh.
+    stagedNextRefreshAtUtc = snapshot.nextRefreshAtUtc;
     writeNextSnapshotToStorage(snapshot);
     return buildSnapshotFetchResult(cachedSnapshot, cachedSnapshotSource, false, null);
   })()
@@ -687,6 +727,7 @@ export async function fetchMapData(): Promise<MapResponse> {
 export function resetWebsiteSnapshotCacheForTests(): void {
   cachedSnapshot = null;
   cachedSnapshotSource = 'memory-cache';
+  stagedNextRefreshAtUtc = 0;
   snapshotInFlight = null;
   snapshotResultInFlight = null;
   snapshotStorageHydrated = false;
@@ -751,14 +792,16 @@ export async function fetchUninstallStats(): Promise<UninstallStatsResponse> {
 
 export async function submitUninstallFeedback(body: UninstallFeedbackRequest): Promise<UninstallFeedbackResponse> {
   const response = await withTimeout(
-    fetch(`${WORKER_BASE_URL}/api/public/website/uninstall`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest'
-      },
-      body: JSON.stringify(body)
-    }),
+    (signal) =>
+      fetch(`${WORKER_BASE_URL}/api/public/website/uninstall`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify(body),
+        signal
+      }),
     REQUEST_TIMEOUT_MS
   );
   if (!response.ok) {
@@ -774,15 +817,22 @@ export async function submitWebsiteEvents(body: WebsiteEventRequest): Promise<We
     ...body,
     schemaVersion: PUBLIC_SCHEMA_VERSION
   };
+  // Single canonical ingest endpoint: the worker's edge-buffered route with
+  // server-side eventId dedupe, outage-tolerant queueing and a dead-letter
+  // path. Both the fetch flush and the sendBeacon fallback MUST target the
+  // same endpoint or telemetry splits across backends and can never be
+  // reconciled.
   const response = await withTimeout(
-    fetch(`${SITE_BACKEND_BASE_URL}/api/site/v1/events`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest'
-      },
-      body: JSON.stringify(requestBody)
-    }),
+    (signal) =>
+      fetch(`${WORKER_BASE_URL}/api/public/website/events`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify(requestBody),
+        signal
+      }),
     REQUEST_TIMEOUT_MS
   );
   if (!response.ok) {
@@ -795,18 +845,20 @@ export async function submitWebsiteEvents(body: WebsiteEventRequest): Promise<We
 /* NEWSLETTER_CTA_DISABLED_ROLLBACK_START
 export async function submitNewsletterSubscription(body: NewsletterSubscribeRequest): Promise<NewsletterSubscribeResponse> {
   const response = await withTimeout(
-    fetch(`${WORKER_BASE_URL}/api/public/website/newsletter/subscribe`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest'
-      },
-      body: JSON.stringify({
-        email: body.email,
-        name: body.name,
-        source: body.source
-      })
-    }),
+    (signal) =>
+      fetch(`${WORKER_BASE_URL}/api/public/website/newsletter/subscribe`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({
+          email: body.email,
+          name: body.name,
+          source: body.source
+        }),
+        signal
+      }),
     REQUEST_TIMEOUT_MS
   );
   if (!response.ok) {

@@ -174,7 +174,15 @@ export class EngineRegistry {
         return this.getEnginesByNames(['engine-v2']);
 
       case 'v3':
-        return this.getEnginesByNames(['engine-v3']);
+        // V3 requires the `identity` permission (chrome.identity.getAuthToken)
+        // which the manifest does NOT grant — the API engine cannot obtain a
+        // token and is inert. Until `identity` + a real oauth2 client_id land
+        // in wxt.config.ts, fall back to the V1+V2 shadow pair so 'v3' never
+        // silently renders nothing.
+        console.warn(
+          '[CQD Registry] Mode "v3" unavailable: manifest lacks identity permission. Falling back to shadow.'
+        );
+        return this.getEnginesByNames(['engine-v1', 'engine-v2']);
 
       default:
         // Safety fallback — if somehow we get an unknown mode, use legacy

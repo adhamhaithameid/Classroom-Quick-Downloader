@@ -85,7 +85,10 @@ describe('fetchWebsiteSnapshot', () => {
     const sessionStorage = createMemoryStorage();
 
     const staleSession = makeStoredSnapshot('session-stale', 1772500000000);
-    const freshLocal = makeStoredSnapshot('local-next', 1772600000000);
+    // Fresh timestamps so the seeded NEXT snapshot sits inside its refresh
+    // window — this test targets reader preference (NEXT over session), not
+    // expiry behavior.
+    const freshLocal = makeStoredSnapshot('local-next', Date.now());
 
     sessionStorage.setItem('cqd.website.snapshot.session.v1', JSON.stringify(staleSession));
     localStorage.setItem('cqd.website.snapshot.next.v1', JSON.stringify(freshLocal));
@@ -262,7 +265,10 @@ describe('fetchWebsiteSnapshot', () => {
 
     vi.setSystemTime(new Date('2026-02-23T04:10:00.000Z'));
     const refreshed = await fetchWebsiteSnapshot();
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    // Self-heal: >3h since the last network fetch, the pipeline re-fetches and
+    // RE-STAGES the next snapshot, but the running session stays pinned —
+    // the returned snapshot is still the pinned one (asserted below).
+    expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(refreshed.fetchedAtUtc).toBe(forced.fetchedAtUtc);
   });
 });

@@ -36,13 +36,17 @@
     "scan:security": "pnpm -C cloudflare-worker run validate && pnpm -C cloudflare-worker audit && pnpm -C website audit && pnpm -C extension audit && (cd oracle-backend && ./scripts/full-scan.sh)",
     "scan:repo": "pnpm run test:strict && pnpm run scan:security",
     "validate:oracle": "pnpm -C oracle-backend validate",
+    "sync:versions": "node tools/sync-versions.mjs && node tools/sync-manual-changelog.mjs",
+    "check:versions": "node tools/sync-versions.mjs --check",
     "sync:manual-changelog": "node tools/sync-manual-changelog.mjs",
     "changelog:full": "node tools/generate-full-changelog.mjs",
     "indexing:submit": "node tools/submit-search-indexing.mjs",
+    "test:e2e": "playwright test --project=extension-chromium",
+    "test:e2e:headed": "playwright test --project=extension-chromium --headed",
     "prepare": "husky"
   },
   "_meta": {
-    "removed-deps": "@playwright/test ^1.59.1 and playwright ^1.59.1 were unused (2026-02-28)",
+    "removed-deps": "NOTE (2026-08-21): the 2026-02-28 claim that @playwright/test was unused was incorrect \u2014 playwright.config.ts and 4 specs in tests/e2e/ depend on it, so the entire real-browser suite was unrunnable. Restored; run via pnpm test:e2e.",
     "security-overrides": "shell-quote pinned to 1.9.0 (2026-08-15, supersedes the 1.8.4 pin from 2026-06-24)"
   },
   "pnpm": {
@@ -64,7 +68,7 @@
       "flatted": ">=3.4.2",
       "uuid": ">=14.0.0",
       "postcss": ">=8.5.23",
-      "fast-uri": "3.1.5",
+      "fast-uri": "3.1.6",
       "brace-expansion": "5.0.9",
       "ws": "8.21.0",
       "tmp": "0.2.7",
@@ -79,6 +83,7 @@
   "devDependencies": {
     "@commitlint/cli": "^21.2.2",
     "@commitlint/config-conventional": "^21.2.2",
+    "@playwright/test": "^1.62.1",
     "husky": "^9.1.7"
   }
 }

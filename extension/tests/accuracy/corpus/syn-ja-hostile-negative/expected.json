@@ -1,0 +1,15 @@
+{
+  "viewKind": "stream",
+  "lang": "ja",
+  "note": "Synthetic (ja): localized \"add comment\" action button plus flag-like body words. Must produce NO flags.",
+  "origin": "synthetic",
+  "posts": [
+    {
+      "postId": "synth-ja-5",
+      "commentPresent": false,
+      "commentCount": null,
+      "editedPresent": false
+    }
+  ],
+  "caseId": "syn-ja-hostile-negative"
+}

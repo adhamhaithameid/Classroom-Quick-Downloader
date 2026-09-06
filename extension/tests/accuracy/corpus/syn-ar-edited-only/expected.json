@@ -1,0 +1,15 @@
+{
+  "viewKind": "stream",
+  "lang": "ar",
+  "note": "Synthetic (ar): edited marker inside the golden date container (.JZk9qf.Vu2fZd).",
+  "origin": "synthetic",
+  "posts": [
+    {
+      "postId": "synth-ar-3",
+      "commentPresent": false,
+      "commentCount": null,
+      "editedPresent": true
+    }
+  ],
+  "caseId": "syn-ar-edited-only"
+}

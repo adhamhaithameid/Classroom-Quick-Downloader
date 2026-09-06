@@ -2,7 +2,7 @@
   import { base } from '$app/paths';
   import { APP_VERSION, SITE_URL } from '$lib/config';
   import SeoMeta from '$lib/components/SeoMeta.svelte';
-  import type { SeoPageConfig } from '$lib/content/seoPages';
+  import { relatedPagesFor, type SeoPageConfig } from '$lib/content/seoPages';
   import { SITE_NAME, SOCIAL_IMAGE } from '$lib/seo/site';
 
   export let config: SeoPageConfig;
@@ -84,7 +84,40 @@
   };
 
   $: breadcrumbStructuredData = buildBreadcrumbData(config.path, config.h1);
-  $: seoStructuredData = [webPageStructuredData, breadcrumbStructuredData];
+  $: faqStructuredData = config.faqs && config.faqs.length > 0
+    ? {
+        '@context': 'https://schema.org',
+        '@type': 'FAQPage',
+        mainEntity: config.faqs.map((faq) => ({
+          '@type': 'Question',
+          name: faq.question,
+          acceptedAnswer: {
+            '@type': 'Answer',
+            text: faq.answer
+          }
+        }))
+      }
+    : null;
+  $: relatedPages = relatedPagesFor(config.path);
+  $: relatedStructuredData = relatedPages.length
+    ? {
+        '@context': 'https://schema.org',
+        '@type': 'ItemList',
+        name: `Related guides for ${config.h1}`,
+        itemListElement: relatedPages.map((related, index) => ({
+          '@type': 'ListItem',
+          position: index + 1,
+          name: related.label,
+          url: toCanonicalUrl(related.path)
+        }))
+      }
+    : null;
+  $: seoStructuredData = [
+    webPageStructuredData,
+    breadcrumbStructuredData,
+    ...(faqStructuredData ? [faqStructuredData] : []),
+    ...(relatedStructuredData ? [relatedStructuredData] : [])
+  ];
 </script>
 
 <SeoMeta
@@ -129,7 +162,7 @@
     {#each config.sections as section}
       <article class="seo-card">
         <h2>{section.heading}</h2>
-        {#each section.paragraphs as paragraph}
+        {#each section.paragraphs ?? [] as paragraph}
           <p>{paragraph}</p>
         {/each}
         {#if section.bullets && section.bullets.length > 0}
@@ -142,6 +175,32 @@
       </article>
     {/each}
   </section>
+
+  {#if config.faqs && config.faqs.length > 0}
+    <section class="seo-faq" aria-labelledby="seo-faq-heading">
+      <h2 id="seo-faq-heading">Frequently Asked Questions</h2>
+      {#each config.faqs as faq}
+        <article class="seo-faq-item">
+          <h3>{faq.question}</h3>
+          <p>{faq.answer}</p>
+        </article>
+      {/each}
+    </section>
+  {/if}
+
+  {#if relatedPages.length}
+    <section class="seo-related" aria-labelledby="seo-related-heading">
+      <h2 id="seo-related-heading">Related Guides</h2>
+      <ul>
+        {#each relatedPages as related}
+          <li>
+            <a href={resolveHref(related.path)}>{related.label}</a>
+            <span>{related.description}</span>
+          </li>
+        {/each}
+      </ul>
+    </section>
+  {/if}
 
   <section class="seo-disclaimer">
     <p>
@@ -262,6 +321,75 @@
 
   .seo-card li + li {
     margin-top: 0.3rem;
+  }
+
+  .seo-related {
+    margin-top: 1.1rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.9rem;
+    background: #ffffff;
+    padding: 1.25rem 1.2rem;
+  }
+
+  .seo-faq {
+    margin-top: 1.1rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.9rem;
+    background: #ffffff;
+    padding: 1.25rem 1.2rem;
+  }
+
+  .seo-faq h2 {
+    margin: 0 0 0.6rem;
+    color: #0f172a;
+    font-size: 1.08rem;
+  }
+
+  .seo-faq-item h3 {
+    margin: 0.9rem 0 0.2rem;
+    color: #0f172a;
+    font-size: 0.98rem;
+    line-height: 1.4;
+  }
+
+  .seo-faq-item p {
+    margin: 0.2rem 0 0;
+    color: #334155;
+    line-height: 1.7;
+  }
+
+  .seo-related h2 {
+    margin: 0 0 0.7rem;
+    color: #0f172a;
+    font-size: 1.08rem;
+  }
+
+  .seo-related ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 0.7rem;
+  }
+
+  .seo-related a {
+    display: block;
+    color: #047857;
+    font-weight: 600;
+    text-decoration: none;
+    line-height: 1.4;
+  }
+
+  .seo-related a:hover {
+    text-decoration: underline;
+  }
+
+  .seo-related span {
+    display: block;
+    margin-top: 0.15rem;
+    color: #475569;
+    font-size: 0.9rem;
+    line-height: 1.6;
   }
 
   .seo-disclaimer {

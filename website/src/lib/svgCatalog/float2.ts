@@ -1,4 +1,4 @@
-import type { SvgCategory } from './index';
+import type { SvgCategory } from './types';
 const S = (id: string, l: string, s: string) => ({ id, label: l, svg: s });
 
 export const categories: SvgCategory[] = [

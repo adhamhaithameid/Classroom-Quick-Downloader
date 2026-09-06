@@ -20,9 +20,15 @@ import {
  */
 export function cleanup(pending: PendingDownload, downloadId?: number): void {
   pendingByRequestId.delete(pending.requestId);
-  if (downloadId != null) {
-    pendingByDownloadId.delete(downloadId);
-    cancelledByUs.delete(downloadId);
+
+  // Fall back to the id recorded on the pending itself. The TTL sweep only has
+  // the pending object to work with, so without this a stale download that had
+  // already been assigned a browser download id would leave its entries in
+  // pendingByDownloadId and cancelledByUs behind permanently.
+  const effectiveDownloadId = downloadId ?? pending.currentDownloadId;
+  if (effectiveDownloadId != null) {
+    pendingByDownloadId.delete(effectiveDownloadId);
+    cancelledByUs.delete(effectiveDownloadId);
   }
   pendingByUrlRemove(pending);
   for (const [tabId, p] of pendingByBypassTabId.entries()) {

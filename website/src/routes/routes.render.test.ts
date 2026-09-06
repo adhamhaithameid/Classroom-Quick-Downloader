@@ -10,6 +10,14 @@ import FaqPage from './faq/+page.svelte';
 import UninstallPage from './uninstall/+page.svelte';
 import NotFoundPage from './404/+page.svelte';
 import DownloadAllAttachmentsPage from './download-all-attachments-google-classroom/+page.svelte';
+import BulkDownloadAssignmentsPage from './bulk-download-google-classroom-assignments/+page.svelte';
+import DownloadMaterialsFastPage from './download-google-classroom-materials-fast/+page.svelte';
+import DriveVirusWarningPage from './google-drive-cant-scan-virus-warning-download/+page.svelte';
+import WorkspaceSupportPage from './google-workspace-school-accounts-support/+page.svelte';
+import InstallFirefoxPage from './install/firefox/+page.svelte';
+import InstallEdgePage from './install/edge/+page.svelte';
+import CompareClassmatePage from './compare/classroom-quick-downloader-vs-classmate/+page.svelte';
+import CompareOneClickPage from './compare/classroom-quick-downloader-vs-classroom-one-click-downloader/+page.svelte';
 import InstallChromePage from './install/chrome/+page.svelte';
 import SecurityPage from './security/+page.svelte';
 import CompareClassfetchPage from './compare/classroom-quick-downloader-vs-classfetch/+page.svelte';
@@ -40,7 +48,7 @@ describe('route render smoke coverage', () => {
     const html = squish(body);
     const expectedBaseUrl = SITE_URL.replace(/\/+$/, '');
 
-    expect(head).toContain('Classroom Quick Downloader | Bulk Download Google Classroom Files');
+    expect(head).toContain('Classroom Quick Downloader — Google Classroom Bulk Download');
     expect(head).toContain(`${expectedBaseUrl}/`);
     expect(head).toContain('og:image');
     expect(head).toContain('twitter:image');
@@ -67,7 +75,7 @@ describe('route render smoke coverage', () => {
     const expectedBaseUrl = SITE_URL.replace(/\/+$/, '');
     const expectedLatestRelease = APP_VERSION.startsWith('v') ? APP_VERSION : `v${APP_VERSION}`;
 
-    expect(head).toContain('Classroom Quick Downloader | Bulk Download Google Classroom Files');
+    expect(head).toContain('Classroom Quick Downloader — Google Classroom Bulk Download');
     expect(head).toContain('SoftwareApplication');
     expect(head).toContain('WebSite');
     expect(head).toContain('WebPage');
@@ -101,6 +109,16 @@ describe('route render smoke coverage', () => {
     expect(head).not.toContain('family=Inter');
   });
 
+  it('server-renders final AnimatedNumber values for crawlers and no-JS visitors', () => {
+    const { body } = render(OverviewPage);
+    const text = plainText(body).replace(/\s+/g, ' ');
+
+    expect(text).toContain('30 files for one assignment');
+    expect(text).not.toContain('uploads 0 files');
+    expect(text).toContain('100+ Languages');
+    expect(text).toContain('over 100 more languages');
+  });
+
   it('renders changelog loading state and refresh actions', () => {
     const { body, head } = render(ChangelogPage);
     const html = squish(body);
@@ -110,6 +128,8 @@ describe('route render smoke coverage', () => {
     expect(html).toContain('RELEASE HISTORY');
     expect(html).toContain('v1.3.9');
     expect(html).toContain('Open changelog on GitHub');
+    expect(html).toContain('<h2 class="cl-sidebar-label');
+    expect(html).not.toContain('<h3 class="cl-sidebar-label');
   });
 
   it('renders uninstall feedback flow and reinstall actions', () => {
@@ -120,6 +140,24 @@ describe('route render smoke coverage', () => {
     expect(head).toContain('noindex, nofollow');
     expect(html).toContain("We'd love to hear why.");
     expect(html).toContain('What made you uninstall?');
+
+    // Reason pills are mutually-exclusive toggle buttons. Selection was
+    // conveyed only by a CSS class and a decorative checkmark, so a screen
+    // reader user could not tell which reason was chosen. Every pill must
+    // carry an explicit pressed state.
+    // Match the pill BUTTONS only — `un-pill-icon` / `un-pill-check` share the
+    // prefix and would inflate the count.
+    const pillCount = (html.match(/<button[^>]*class="un-pill[ "]/g) ?? []).length;
+    const pressedCount = (html.match(/aria-pressed="(?:true|false)"/g) ?? []).length;
+    expect(pillCount).toBeGreaterThan(0);
+    expect(pressedCount, 'every reason pill needs aria-pressed').toBe(pillCount);
+
+    // Submission result (success or failure) must be announced. The live
+    // region has to exist in the INITIAL render — a region inserted at the
+    // moment the message appears is not reliably announced by screen readers.
+    expect(html, 'uninstall result needs an always-present live region').toMatch(
+      /aria-live="assertive"[^>]*/
+    );
     expect(html).toContain('Submit feedback');
     expect(html).toContain('Reinstall for Chrome');
     expect(html).toContain('Firefox');
@@ -180,6 +218,28 @@ describe('route render smoke coverage', () => {
     expect(html).toContain('Install for Chrome');
   });
 
+  const seoDepthFloors: Array<[string, ReturnType<typeof render>, number]> = [
+    ['download-all-attachments', render(DownloadAllAttachmentsPage), 800],
+    ['bulk-download-assignments', render(BulkDownloadAssignmentsPage), 800],
+    ['materials-fast', render(DownloadMaterialsFastPage), 700],
+    ['drive-virus-warning', render(DriveVirusWarningPage), 800],
+    ['workspace-support', render(WorkspaceSupportPage), 750],
+    ['install-chrome', render(InstallChromePage), 650],
+    ['install-firefox', render(InstallFirefoxPage), 650],
+    ['install-edge', render(InstallEdgePage), 600],
+    ['compare-classfetch', render(CompareClassfetchPage), 650],
+    ['compare-classmate', render(CompareClassmatePage), 650],
+    ['compare-one-click', render(CompareOneClickPage), 650]
+  ];
+
+  it('keeps every SEO keyword page at long-form depth with FAQ schema', () => {
+    for (const [label, rendered, floor] of seoDepthFloors) {
+      const words = plainText(rendered.body).split(/\s+/).filter(Boolean).length;
+      expect(words, `${label} must not regress to thin content`).toBeGreaterThanOrEqual(floor);
+      expect(rendered.head, `${label} must emit FAQPage schema`).toContain('FAQPage');
+    }
+  });
+
   it('renders browser install SEO page', () => {
     const { body, head } = render(InstallChromePage);
     const html = squish(body);
@@ -228,6 +288,15 @@ describe('route render smoke coverage', () => {
     expect(comparisonRendered.head).toContain('/watch/manual-vs-cqd');
     expect(comparisonRendered.head).toContain('VideoObject');
     expect(comparisonHtml).toContain('/videos/problem.mp4');
+
+    const demoText = plainText(demoRendered.body);
+    const comparisonText = plainText(comparisonRendered.body);
+    const demoWords = demoText.split(/\s+/).filter(Boolean).length;
+    const comparisonWords = comparisonText.split(/\s+/).filter(Boolean).length;
+    expect(demoWords, 'cqd-demo page must not regress to thin content').toBeGreaterThanOrEqual(300);
+    expect(comparisonWords, 'manual-vs-cqd page must not regress to thin content').toBeGreaterThanOrEqual(300);
+    expect(demoHtml).toContain('/install/chrome');
+    expect(comparisonHtml).toContain('/bulk-download-google-classroom-assignments');
   });
 
   it('renders robots.txt and sitemap.xml from the current site URL', async () => {
@@ -240,10 +309,13 @@ describe('route render smoke coverage', () => {
     expect(robots.headers.get('content-type')).toContain('text/plain');
     expect(robotsText).toContain('Allow: /');
     expect(robotsText).toContain(`Sitemap: ${expectedBaseUrl}/sitemap.xml`);
-    expect(robotsText).toContain('Disallow: /uninstall');
-    expect(robotsText).toContain('Disallow: /404');
-    expect(robotsText).toContain('Disallow: /overview-editor');
-    expect(robotsText).toContain('Disallow: /landing2');
+    // Non-public pages are held out of the index with `noindex` meta tags, not
+    // with robots.txt. A Disallow would block the fetch and stop crawlers from
+    // ever reading that noindex, so these paths must stay crawlable.
+    expect(robotsText).not.toContain('Disallow:');
+    expect(robotsText).toContain('User-agent: GPTBot');
+    expect(robotsText).toContain('User-agent: ClaudeBot');
+    expect(robotsText).toContain('User-agent: PerplexityBot');
 
     expect(sitemap.headers.get('content-type')).toContain('application/xml');
     expect(sitemapText).toContain('xmlns:image=');

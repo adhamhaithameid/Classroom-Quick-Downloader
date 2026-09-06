@@ -1,0 +1,9 @@
+{
+  "caseId": "rtl-flagged-post-ar",
+  "viewKind": "stream",
+  "lang": "ar",
+  "note": "RTL Arabic card: edited marker plus 5 class comments written in Arabic-Indic numerals. No .qCWAqb .huI6Cb element, so layer-0 DOM truth does not apply and the count must come from a lower layer. Also the one-card-ownership RTL case.",
+  "posts": [
+    { "postId": "fixture-stream-ar-1", "commentPresent": true, "commentCount": 5, "editedPresent": true }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "viewKind": "stream",
+  "lang": "es",
+  "note": "Synthetic (es): 2 class comments in the real L0 DOM-truth shell (.qCWAqb > .huI6Cb). Count is language-free.",
+  "origin": "synthetic",
+  "posts": [
+    {
+      "postId": "synth-es-2",
+      "commentPresent": true,
+      "commentCount": 2,
+      "editedPresent": false
+    }
+  ],
+  "caseId": "syn-es-comments-l0"
+}

@@ -1,0 +1,15 @@
+{
+  "viewKind": "stream",
+  "lang": "es",
+  "note": "Synthetic: nested elements repeating the parent stream-item-id must not be scored twice.",
+  "origin": "synthetic",
+  "posts": [
+    {
+      "postId": "synth-es-x",
+      "commentPresent": true,
+      "commentCount": 3,
+      "editedPresent": false
+    }
+  ],
+  "caseId": "syn-es-nested-duplicate-id"
+}

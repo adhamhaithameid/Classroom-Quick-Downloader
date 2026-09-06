@@ -1,13 +1,13 @@
-# PolyForm Strict License 1.0.0
+# PolyForm Noncommercial License 1.0.0
 
-<https://polyformproject.org/licenses/strict/1.0.0>
+<https://polyformproject.org/licenses/noncommercial/1.0.0>
 
 Copyright (c) 2025 Adham Haitham. All Rights Reserved.
 
 "Classroom Quick Downloader" is source-available software licensed under the
-PolyForm Strict License 1.0.0. You may view the source and run the software for
-noncommercial purposes only. You may NOT distribute it, modify it, create
-derivative or new works based on it, or use it for any commercial purpose.
+PolyForm Noncommercial License 1.0.0. You may use, copy, distribute, and modify
+the software, and create new works based on it, for any noncommercial purpose.
+You may NOT use it for any commercial purpose.
 
 ## Acceptance
 
@@ -15,7 +15,21 @@ In order to get any license under these terms, you must agree to them as both st
 
 ## Copyright License
 
-The licensor grants you a copyright license for the software to do everything you might do with the software that would otherwise infringe the licensor's copyright in it for any permitted purpose, other than distributing the software or making changes or new works based on the software.
+The licensor grants you a copyright license for the software to do everything you might do with the software that would otherwise infringe the licensor's copyright in it for any permitted purpose. However, you may only distribute the software according to [Distribution License](#distribution-license) and make changes or new works based on the software according to [Changes and New Works License](#changes-and-new-works-license).
+
+## Distribution License
+
+The licensor grants you an additional copyright license to distribute copies of the software. Your license to distribute covers distributing the software with changes and new works permitted by [Changes and New Works License](#changes-and-new-works-license).
+
+## Notices
+
+You must ensure that anyone who gets a copy of any part of the software from you also gets a copy of these terms or the URL for them above, as well as copies of any plain-text lines beginning with `Required Notice:` that the licensor provided with the software. For example:
+
+> Required Notice: Copyright Adham Haitham (https://github.com/adhamhaithameid/Classroom-Quick-Downloader)
+
+## Changes and New Works License
+
+The licensor grants you an additional copyright license to make changes and new works based on the software for any permitted purpose.
 
 ## Patent License
 

@@ -1,0 +1,10 @@
+{
+  "caseId": "fx-mixed-links-comments",
+  "viewKind": "stream",
+  "lang": "en",
+  "note": "Fixture-derived (mixed-links-post-en.html). '2 class comments' in a .comment-count shell — D12 shape alongside attachments of mixed link types.",
+  "origin": "fixture",
+  "posts": [
+    { "postId": "fixture-stream-3", "commentPresent": true, "commentCount": 2, "editedPresent": false }
+  ]
+}

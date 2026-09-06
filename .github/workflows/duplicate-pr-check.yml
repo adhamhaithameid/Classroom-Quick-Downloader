@@ -1,0 +1,73 @@
+name: Duplicate PR Check
+
+# The agent PRs are filed by topic prefix (Vex:, Ember:, Signal:, ...). The same
+# finding has repeatedly been filed twice weeks apart — 9 duplicate pairs were
+# closed by hand on 2026-08-16. This flags a likely duplicate at open time.
+
+on:
+  pull_request:
+    types: [opened, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Flag likely duplicates
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pull-requests: write
+
+    steps:
+      - name: Compare against other open PRs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          REPO: ${{ github.repository }}
+        run: |
+          node -e '
+            const { execSync } = require("node:child_process");
+            const self = Number(process.env.PR_NUMBER);
+            const title = process.env.PR_TITLE || "";
+
+            // Agent PRs lead with "Name:" — the prefix identifies the topic area.
+            const prefix = (title.match(/^\s*([\p{L}\p{Emoji_Presentation}\s]+?):/u) || [])[1];
+            const norm = (s) => s.toLowerCase().replace(/[^a-z0-9 ]/g, " ").split(/\s+/).filter((w) => w.length > 3);
+            const mine = new Set(norm(title));
+
+            const open = JSON.parse(
+              execSync(`gh pr list --state open --limit 200 --json number,title`, { encoding: "utf8" })
+            );
+
+            const hits = [];
+            for (const pr of open) {
+              if (pr.number === self) continue;
+              const theirs = new Set(norm(pr.title));
+              const shared = [...mine].filter((w) => theirs.has(w));
+              const overlap = shared.length / Math.max(1, Math.min(mine.size, theirs.size));
+              const samePrefix = prefix && pr.title.toLowerCase().startsWith(prefix.toLowerCase() + ":");
+              // Thresholds tuned against the 9 duplicate pairs closed on 2026-08-16:
+              // catches 7/7 of those, and scores unrelated agent PRs at 0%.
+              if (overlap >= 0.6 || (samePrefix && overlap >= 0.35)) {
+                hits.push({ number: pr.number, title: pr.title, overlap: Math.round(overlap * 100) });
+              }
+            }
+
+            if (!hits.length) {
+              console.log("no likely duplicates");
+              process.exit(0);
+            }
+            hits.sort((a, b) => b.overlap - a.overlap);
+            const lines = hits.slice(0, 5).map((h) => `- #${h.number} — ${h.title} (${h.overlap}% title overlap)`);
+            const body = [
+              "Possible duplicate of an existing open PR:",
+              "",
+              ...lines,
+              "",
+              "If this supersedes one of them, close the older PR and say which one replaces it.",
+            ].join("\n");
+            execSync(`gh pr comment ${self} --body ${JSON.stringify(body)}`, { stdio: "inherit" });
+            console.log(`flagged ${hits.length} candidate(s)`);
+          '

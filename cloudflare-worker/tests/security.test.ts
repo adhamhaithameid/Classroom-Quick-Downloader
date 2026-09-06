@@ -11,6 +11,32 @@ import type { Env } from "../src/types";
 import type { DurableObjectState } from "@cloudflare/workers-types";
 
 const STORAGE_KEY = "analytics_state";
+const STORAGE_KEY_BUFFER = "analytics_buffer";
+const STORAGE_KEY_BATCHES = "analytics_pending_batches";
+const STORAGE_KEY_IDS = "analytics_processed_ids";
+const STORAGE_KEY_TELEMETRY = "analytics_website_telemetry";
+const STORAGE_KEY_CHANGELOG = "analytics_changelog";
+
+// The DO shards large collections across multiple storage keys (see
+// downloads_do.ts SHARDED STATE STORAGE). Tests that inspect persisted state
+// must re-assemble it the same way production load() does.
+async function readFullState(state: DurableObjectState): Promise<Record<string, unknown>> {
+  const [core, buffer, pendingBatches, processedIds, telemetry, changelog] = await Promise.all([
+    state.storage.get<Record<string, unknown>>(STORAGE_KEY),
+    state.storage.get<unknown>(STORAGE_KEY_BUFFER),
+    state.storage.get<unknown>(STORAGE_KEY_BATCHES),
+    state.storage.get<unknown>(STORAGE_KEY_IDS),
+    state.storage.get<Record<string, unknown>>(STORAGE_KEY_TELEMETRY),
+    state.storage.get<Record<string, unknown>>(STORAGE_KEY_CHANGELOG),
+  ]);
+  const merged: Record<string, unknown> = { ...(core ?? {}) };
+  if (buffer !== undefined) merged.buffer = buffer;
+  if (pendingBatches !== undefined) merged.pendingBatches = pendingBatches;
+  if (processedIds !== undefined) merged.processedIds = processedIds;
+  if (telemetry) Object.assign(merged, telemetry);
+  if (changelog) Object.assign(merged, changelog);
+  return merged;
+}
 
 type StoredState = {
   loginAttempts?: Record<string, unknown>;
@@ -496,7 +522,7 @@ describe("public site metrics snapshot endpoint", () => {
     expect(ingestPayload.rejectedCount).toBe(0);
     expect(fetchMock).toHaveBeenCalledTimes(0);
 
-    const stored = await state.storage.get<StoredState>(STORAGE_KEY);
+    const stored = await readFullState(state);
     expect(Array.isArray(stored?.websiteTelemetryQueue)).toBe(true);
     expect(stored?.websiteTelemetryQueue?.length).toBe(1);
     expect(stored?.websiteTelemetryDeadLetter?.length ?? 0).toBe(0);
@@ -676,7 +702,7 @@ describe("Durable Object security behaviors", () => {
       checkOnly: true,
     });
     expect(res.status).toBe(200);
-    const stored = await state.storage.get<StoredState>(STORAGE_KEY);
+    const stored = await readFullState(state);
     expect(stored?.loginAttempts?.["1.1.1.1"]).toBeUndefined();
   });
 
@@ -705,7 +731,7 @@ describe("Durable Object security behaviors", () => {
 
     expect(res.status).toBe(200);
 
-    const stored = await state.storage.get<StoredState>(STORAGE_KEY);
+    const stored = await readFullState(state);
     const attempts = stored?.loginAttempts as Record<string, { attempts: number, firstAttemptAt: number }> | undefined;
 
     expect(attempts?.["1.2.3.4"]).toBeDefined();
@@ -736,7 +762,7 @@ describe("Durable Object security behaviors", () => {
       events: [makeEvent({ ip_address: "5.5.5.5" })],
     }, { "CF-Connecting-IP": "5.5.5.5" });
     expect(res.status).toBe(202);
-    const stored = await state.storage.get<StoredState>(STORAGE_KEY);
+    const stored = await readFullState(state);
     expect(stored.buffer?.[0]?.ip_address).toBeUndefined();
     expect(stored.ipCountsSize).toBe(0);
     expect(stored.uniqueRequestsToday).toBe(0);
@@ -776,7 +802,7 @@ describe("Durable Object security behaviors", () => {
     expect(first.status).toBe(202);
     const second = await callDO(obj, "/track", { events: [makeEvent()] });
     expect(second.status).toBe(202);
-    const stored = await state.storage.get<StoredState>(STORAGE_KEY);
+    const stored = await readFullState(state);
     expect(stored.buffer?.length ?? 0).toBeLessThanOrEqual(1);
     expect(stored.pendingBatches?.length ?? 0).toBeGreaterThan(0);
   });
@@ -816,7 +842,7 @@ describe("Durable Object security behaviors", () => {
     const res = await callDO(obj, "/admin/force-flush", {});
     expect(res.status).toBe(200);
 
-    const stored = await state.storage.get<StoredState>(STORAGE_KEY);
+    const stored = await readFullState(state);
     expect(stored.buffer?.length ?? 0).toBe(0);
     vi.unstubAllGlobals();
   });
@@ -836,7 +862,7 @@ describe("Durable Object security behaviors", () => {
     const res = await callDO(obj, "/admin/force-flush", {});
     expect(res.status).toBe(500);
 
-    const stored = await state.storage.get<StoredState>(STORAGE_KEY);
+    const stored = await readFullState(state);
     expect(stored.buffer?.length ?? 0).toBe(0);
     expect(stored.pendingBatches?.length ?? 0).toBe(1);
     vi.unstubAllGlobals();
@@ -854,7 +880,7 @@ describe("Durable Object security behaviors", () => {
     const res = await callDO(obj, "/admin/force-flush", {});
     expect(res.status).toBe(500);
 
-    const stored = await state.storage.get<StoredState>(STORAGE_KEY);
+    const stored = await readFullState(state);
     expect(stored.buffer?.length ?? 0).toBe(0);
     expect(stored.pendingBatches?.length ?? 0).toBe(1);
     vi.unstubAllGlobals();
@@ -1077,7 +1103,7 @@ describe("Durable Object security behaviors", () => {
       "CF-IPCountry": "GB",
     });
     expect(res.status).toBe(202);
-    const stored = await state.storage.get<StoredState>(STORAGE_KEY);
+    const stored = await readFullState(state);
     expect(stored.buffer?.[0]?.country).toBe("gb");
   });
 
@@ -1087,7 +1113,7 @@ describe("Durable Object security behaviors", () => {
       "CF-Connecting-IP": "4.4.4.4",
     });
     expect(res.status).toBe(202);
-    const stored = await state.storage.get<StoredState>(STORAGE_KEY);
+    const stored = await readFullState(state);
     expect(stored.totalEvents).toBe(3);
     expect(stored.counters?.byStatus?.success).toBe(3);
   });
@@ -1140,7 +1166,7 @@ describe("Durable Object security behaviors", () => {
     const resetRes = await callDO(obj, "/debug/reset", {}, { "X-Admin-Secret": "secret" });
     expect(resetRes.status).toBe(200);
 
-    const stored = await state.storage.get<StoredState>(STORAGE_KEY);
+    const stored = await readFullState(state);
     const entries = Array.isArray(stored?.dangerActionAuditLogs) ? stored?.dangerActionAuditLogs : [];
     expect(entries.length).toBeGreaterThan(0);
     const latest = entries[entries.length - 1] as Record<string, unknown>;
@@ -1341,7 +1367,7 @@ describe("Durable Object security behaviors", () => {
     };
     const { state, obj } = makeDOWithStored(stored);
     await obj.fetch(new Request("http://do/health", { method: "GET" }));
-    const next = await state.storage.get<StoredState>(STORAGE_KEY);
+    const next = await readFullState(state);
     expect(next?.pendingBatches?.length ?? 0).toBeLessThanOrEqual(50);
   });
 
@@ -1396,7 +1422,7 @@ describe("Durable Object security behaviors", () => {
     expect(payload.failureSink?.totalRollups).toBeGreaterThan(0);
     expect(payload.failureSink?.unsentRollups).toBe(0);
 
-    const stored = await state.storage.get<StoredState>(STORAGE_KEY);
+    const stored = await readFullState(state);
     expect(stored?.failureRollups?.every((entry) => Number((entry as { unsentCount?: number }).unsentCount ?? 0) === 0)).toBe(true);
     vi.unstubAllGlobals();
   });
@@ -1414,7 +1440,7 @@ describe("Durable Object security behaviors", () => {
     expect(firstFlush.status).toBe(500);
     vi.unstubAllGlobals();
 
-    const storedAfterFail = await state.storage.get<StoredState>(STORAGE_KEY);
+    const storedAfterFail = await readFullState(state);
     const pending = storedAfterFail?.pendingBatches?.[0] as { weightedCount?: number; batch?: { batchId?: string } } | undefined;
     expect(pending?.weightedCount).toBe(4);
     const pendingBatchId = pending?.batch?.batchId;
@@ -1432,7 +1458,7 @@ describe("Durable Object security behaviors", () => {
     expect(secondPayload.sent).toBe(4);
     vi.unstubAllGlobals();
 
-    const storedAfterSuccess = await state.storage.get<StoredState>(STORAGE_KEY);
+    const storedAfterSuccess = await readFullState(state);
     expect(storedAfterSuccess?.pendingBatches?.length ?? 0).toBe(0);
     expect(storedAfterSuccess?.pendingEvents ?? -1).toBe(0);
   });
@@ -1452,7 +1478,7 @@ describe("Durable Object security behaviors", () => {
     const invalid = await callDO(obj, "/track", { events: "invalid" });
     expect(invalid.status).toBe(400);
 
-    const stored = await state.storage.get<StoredState>(STORAGE_KEY);
+    const stored = await readFullState(state);
     const pendingBatchId = (
       stored?.pendingBatches?.[0] as { batch?: { batchId?: string } } | undefined
     )?.batch?.batchId;
@@ -1475,7 +1501,7 @@ describe("Durable Object security behaviors", () => {
     expect(secondFlush.status).toBe(200);
     vi.unstubAllGlobals();
 
-    const storedAfter = await state.storage.get<StoredState>(STORAGE_KEY);
+    const storedAfter = await readFullState(state);
     expect(storedAfter?.failureRollups?.every((entry) => Number((entry as { unsentCount?: number }).unsentCount ?? 0) === 0)).toBe(true);
   });
 });

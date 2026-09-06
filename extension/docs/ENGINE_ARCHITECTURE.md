@@ -277,3 +277,96 @@ active engine, mode, flag decisions, shadow report, perf summary.
 - **Shadow mode** — V1 renders, V2 computes silently, comparator diffs them.
 - **Strategy** — a swappable implementation behind a role contract (e.g. Dom vs
   Api detector, Legacy vs V2 renderer).
+
+---
+
+## Detection seam (2026-08-18)
+
+Detection is split into three layers with strictly one-directional flow:
+
+    Detect  ->  Decide  ->  Render
+
+**Detect** (`src/detect/`) answers "what is physically on this page?" and emits
+a `PostObservation` of semantic facts — "has a comment indicator, count 3", not
+"this element contains the string 'تعليقات'". `KeywordDetector` is the only
+detector today; it owns page-language detection, the keyword preload, the
+`pageLang + en + ar` union, and the text-based exclusion pass. Raw matched text
+never leaves it except in the optional debug field.
+
+**Decide** (`src/decide/`) turns a `PostObservation` into a `PostDecision`
+using score thresholds alone. It takes no language argument and can see no page
+text, so it cannot have a language bug. `decideFlags()` never branches on which
+detector produced the observation.
+
+**Render** consumes a `PostDecision` plus a `Theme`. It never re-inspects the
+page to decide anything. Not yet wired — Render still reads `FlagDecision`.
+
+Contracts live in `src/contracts/`. `Detector` also carries an optional
+`reset()` lifecycle hook so orchestration can free per-page state without
+knowing what is being freed — `EngineV2.destroy()` uses it instead of reaching
+for the keyword cache directly.
+
+### The one-way rule
+
+`tests/contracts/import-boundary.test.ts` fails the build if a file outside the
+keyword layer imports a keyword or language module. The keyword layer is
+`src/detect/keyword/` plus the two legacy modules it wraps
+(`v2/decision/keyword-loader.ts`, `v2/decision/exclusion-engine.ts`), which are
+keyword-layer code that has not physically moved yet.
+
+### What is deliberately unchanged
+
+`entrypoints/content/smart-detector.ts` and `smart-detector-comments.ts` are the
+V1 production path. They keep their own keyword unions and are untouched; those
+unions become dead code when the V2 path is promoted (PRD Phase 4), not before.
+
+`src/v2/decision/flag-scoring.ts` still exports `scoreFlagsForPost`,
+`scoreComments`, `scoreEdited` and `getThresholds` with unchanged signatures. It
+is now a ~95-line adapter over Detect -> Decide; its callers cannot tell the
+difference. Behaviour is locked by
+`tests/characterization/flag-scoring-baseline.json`.
+
+### Compare-mode themes
+
+`src/contracts/theme.ts` holds two palettes, `KEYWORD_THEME` and
+`STRUCTURAL_THEME`, for the planned dual-render compare mode. The structural
+secondary is **nile green** (`#1a7f5a`), not nile blue — blue would collide with
+the structural tertiary and make disagreement unreadable at 50% opacity.
+`tests/contracts/theme.test.ts` enforces that no two roles share a colour.
+Nothing consumes these yet.
+
+Design: `docs/superpowers/specs/2026-08-16-detection-engine-seam-design.md`
+Plan: `docs/superpowers/plans/2026-08-18-detection-engine-seam.md`
+
+## Compare mode (2026-08-20)
+
+`StructuralDetector` (`src/detect/structural/`) is the second implementation of
+the `Detector` interface. It uses DOM shape and Unicode numerals only — no
+keyword table, no `ctx.lang`. Two boundary tests enforce that.
+
+**Comment detection works** because Classroom's comment-count container is
+found by class selector, and whether it holds a *numeral* is what distinguishes
+"5 class comments" / "٥ تعليقات صفية" from "No class comments". Numerals are
+script-independent. The selector chain is ported from the keyword engine's
+layer 0, which was already language-free — proven code, not a guess.
+
+**Edited detection does not exist** on the structural path. No DOM shape, ARIA
+role or element relationship separates an edited post from a posted one in any
+fixture we hold; only the words differ. The detector reports
+`edited.source = 'unavailable'` rather than guessing, and `compareObservations`
+classifies that as `unavailable`, never `agree`. A confident "not edited" would
+be a silent false negative that instrumentation would read as agreement.
+
+`src/compare/` holds the comparison record, the collector behind
+`window.__cqd.report()`, and a small renderer in its own `cqd-compare-*`
+namespace — the production `flag-renderer` is single-badge-per-post and would
+delete the other engine's badge if reused.
+
+Gating is a **build flag**, not an `EngineMode` member: `EngineMode` is already
+`'legacy' | 'shadow' | 'v2' | 'v3'` and wired through the registry, the mode
+controller, the popup and storage. Adding a member would have created a runtime
+path into compare mode. Instead the call sites test
+`import.meta.env.MODE === 'compare'` literally, which Vite substitutes and folds
+away. `pnpm build:compare` emits to `.output/chrome-mv3-compare/`.
+
+Operator guide: `extension/docs/COMPARE_MODE_RUNBOOK.md`

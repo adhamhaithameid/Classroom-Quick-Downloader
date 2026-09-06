@@ -1,0 +1,10 @@
+{
+  "caseId": "fx-classwork-material-comments",
+  "viewKind": "classwork_list",
+  "lang": "en",
+  "note": "Fixture-derived (classwork-material-post-en.html). '3 class comments' in a .comment-text shell — D12 shape: count visible to a human, verdict lost below threshold.",
+  "origin": "fixture",
+  "posts": [
+    { "postId": "fixture-stream-1", "commentPresent": true, "commentCount": 3, "editedPresent": false }
+  ]
+}

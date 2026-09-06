@@ -1480,8 +1480,8 @@
 />
 
 <SeoMeta
-  title="Classroom Quick Downloader | Bulk Download Google Classroom Files"
-  description="Bulk download Google Classroom attachments in one click. Free Chrome, Firefox, and Edge extension for students and teachers."
+  title="Classroom Quick Downloader — Google Classroom Bulk Download"
+  description="Bulk download all Google Classroom attachments in one click. Free, open-source extension for Chrome, Firefox, and Edge, built for students and teachers."
   path={seoPath}
   keywords="download all google classroom files, bulk download google classroom attachments, google classroom extension"
   structuredData={homeStructuredData}

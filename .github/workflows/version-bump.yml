@@ -1,0 +1,94 @@
+name: Version Bump
+
+# Bumps one component's version, resyncs the release manifest and the generated
+# website copy, and opens a PR. Replaces the hand-editing that produced the
+# recurring manifest drift.
+#
+# Tag the resulting merge commit with v<version> to trigger extension-distribution.yml.
+
+on:
+  workflow_dispatch:
+    inputs:
+      component:
+        description: Which component to bump
+        required: true
+        type: choice
+        options: [extension, cloudflare-worker, oracle-backend]
+      level:
+        description: Semver level
+        required: true
+        type: choice
+        options: [patch, minor, major]
+
+concurrency:
+  group: version-bump
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  bump:
+    name: Bump ${{ inputs.component }} (${{ inputs.level }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: 10.28.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+
+      - name: Bump the component version
+        id: bump
+        run: |
+          cd "${{ inputs.component }}"
+          npm version "${{ inputs.level }}" --no-git-tag-version >/dev/null
+          NEW=$(node -p "require('./package.json').version")
+          cd ..
+          echo "version=$NEW" >> "$GITHUB_OUTPUT"
+          echo "Bumped ${{ inputs.component }} to $NEW"
+
+      - name: Resync release manifest and generated copy
+        run: |
+          node tools/sync-versions.mjs
+          node tools/sync-manual-changelog.mjs
+
+      - name: Verify the manifest is consistent
+        run: node tools/sync-versions.mjs --check
+
+      - name: Open the bump PR
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PAT || secrets.GITHUB_TOKEN }}
+          NEW: ${{ steps.bump.outputs.version }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GH_TOKEN}" ]; then
+            echo "::error::No RELEASE_PAT or GITHUB_TOKEN available"; exit 1
+          fi
+          if [ "${GH_TOKEN}" = "${{ secrets.GITHUB_TOKEN }}" ]; then
+            echo "::warning::RELEASE_PAT not configured: this PR will NOT trigger CI checks (GITHUB_TOKEN events are suppressed). Create a classic PAT with repo scope and add it as the RELEASE_PAT secret to enable check runs on bump PRs."
+          fi
+          BRANCH="release/${{ inputs.component }}-${NEW}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add -A
+          git commit -m "chore(release): bump ${{ inputs.component }} to ${NEW}"
+          git push -u origin "$BRANCH"
+          gh pr create \
+            --title "chore(release): bump ${{ inputs.component }} to ${NEW}" \
+            --body "Automated ${{ inputs.level }} bump of \`${{ inputs.component }}\` to \`${NEW}\`, with the release manifest and generated website copy resynced.
+
+            Merge, then tag the merge commit \`v${NEW}\` to trigger the distribution workflow." \
+            --base main --head "$BRANCH"

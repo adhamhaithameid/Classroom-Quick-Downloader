@@ -1,0 +1,9 @@
+{
+  "caseId": "stream-edited-and-comments-en",
+  "viewKind": "stream",
+  "lang": "en",
+  "note": "Stream card with an edit marker and a 5-comment shell. Nested elements repeat the parent stream-item-id and must not be scored twice.",
+  "posts": [
+    { "postId": "fixture-stream-2", "commentPresent": true, "commentCount": 5, "editedPresent": true }
+  ]
+}

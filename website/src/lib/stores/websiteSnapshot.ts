@@ -20,7 +20,12 @@ const snapshotStateStore = writable<WebsiteSnapshotStoreState>(initialState);
 
 let initRefCount = 0;
 let refreshInFlight: Promise<WebsiteSnapshotStoreState> | null = null;
+let stalenessTimer: ReturnType<typeof setInterval> | null = null;
 const SNAPSHOT_FORCE_APPLY_MAX_AGE_MS = 3 * 60 * 60 * 1000;
+// How often the store polls for snapshot expiry. The API layer no-ops while
+// the cached snapshot is inside its refresh window, so this is cheap and only
+// hits the network when the snapshot actually expired.
+const SNAPSHOT_STALENESS_POLL_MS = 60 * 1000;
 
 function nowUtc(): number {
   return Date.now();
@@ -133,6 +138,14 @@ export function initializeWebsiteSnapshotStore(): () => void {
         applyToCurrentSession: applyFreshNow
       });
     });
+
+    // Keep long-lived tabs fresh: poll for expiry; fetchWebsiteSnapshotResult
+    // serves the memory cache until nextRefreshAtUtc passes, then refetches.
+    if (!stalenessTimer) {
+      stalenessTimer = setInterval(() => {
+        void refreshWebsiteSnapshotStore({ force: false });
+      }, SNAPSHOT_STALENESS_POLL_MS);
+    }
   }
 
   let disposed = false;
@@ -140,12 +153,20 @@ export function initializeWebsiteSnapshotStore(): () => void {
     if (disposed) return;
     disposed = true;
     initRefCount = Math.max(0, initRefCount - 1);
+    if (initRefCount === 0 && stalenessTimer) {
+      clearInterval(stalenessTimer);
+      stalenessTimer = null;
+    }
   };
 }
 
 export function resetWebsiteSnapshotStoreForTests(): void {
   initRefCount = 0;
   refreshInFlight = null;
+  if (stalenessTimer) {
+    clearInterval(stalenessTimer);
+    stalenessTimer = null;
+  }
   snapshotStateStore.set(initialState);
 }
 

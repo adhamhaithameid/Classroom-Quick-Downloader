@@ -331,3 +331,62 @@ describe('user-facing content APIs', () => {
   });
 
 });
+
+describe('request cancellation on timeout', () => {
+  it('aborts the underlying request instead of leaving it in flight', async () => {
+    vi.useFakeTimers();
+
+    const seenSignals: AbortSignal[] = [];
+
+    // A fetch that never settles on its own — only an abort can end it.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((_url: string, init?: RequestInit) => {
+        const signal = init?.signal as AbortSignal | undefined;
+        if (signal) seenSignals.push(signal);
+        return new Promise((_resolve, reject) => {
+          signal?.addEventListener('abort', () => {
+            reject(new DOMException('Aborted', 'AbortError'));
+          });
+        });
+      })
+    );
+
+    const pending = submitWebsiteEvents({
+      events: [],
+      schemaVersion: 1
+    } as never).catch((error: unknown) => error);
+
+    await vi.advanceTimersByTimeAsync(9000);
+    const outcome = await pending;
+
+    expect(outcome).toBeInstanceOf(Error);
+    expect(seenSignals).toHaveLength(1);
+    expect(seenSignals[0]?.aborted, 'timed-out request was never aborted').toBe(true);
+
+    vi.useRealTimers();
+  });
+
+  it('does not abort a request that completes before the timeout', async () => {
+    const seenSignals: AbortSignal[] = [];
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((_url: string, init?: RequestInit) => {
+        const signal = init?.signal as AbortSignal | undefined;
+        if (signal) seenSignals.push(signal);
+        return Promise.resolve(
+          new Response(JSON.stringify({ ok: true, accepted: 0, rejected: 0 }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          })
+        );
+      })
+    );
+
+    await submitWebsiteEvents({ events: [], schemaVersion: 1 } as never);
+
+    expect(seenSignals).toHaveLength(1);
+    expect(seenSignals[0]?.aborted).toBe(false);
+  });
+});

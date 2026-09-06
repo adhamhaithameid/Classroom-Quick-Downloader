@@ -95,3 +95,63 @@ describe('background cleanup', () => {
   });
 });
 
+
+describe('orphaned pending downloads with an assigned browser download id', () => {
+  beforeEach(() => {
+    pendingByRequestId.clear();
+    pendingByDownloadId.clear();
+    pendingByUrl.clear();
+    pendingByBypassTabId.clear();
+    cancelledByUs.clear();
+    recentDownloads.clear();
+  });
+
+  it('reclaims pendingByDownloadId and cancelledByUs when sweeping a stale entry', () => {
+    // A download that got as far as being assigned a browser download id, then
+    // stalled and went stale. The TTL sweep only knows the pending object, so
+    // if cleanup() ignores pending.currentDownloadId these two maps keep the
+    // entry forever — a genuine leak in a long-lived service worker.
+    const downloadId = 4242;
+    const pending = makePending({
+      requestId: 'req-stale-with-id',
+      startTime: Date.now() - PENDING_DOWNLOAD_TTL_MS - 1000,
+      currentDownloadId: downloadId,
+    });
+
+    pendingByRequestId.set(pending.requestId, pending);
+    pendingByDownloadId.set(downloadId, pending);
+    pendingByUrlAdd(pending.baseUrl, pending);
+    cancelledByUs.add(downloadId);
+
+    cleanupOrphanedPendingDownloads();
+
+    expect(pendingByRequestId.has(pending.requestId), 'requestId map should be swept').toBe(false);
+    expect(pendingByUrl.size, 'url buckets should be swept').toBe(0);
+    expect(
+      pendingByDownloadId.has(downloadId),
+      'pendingByDownloadId leaked a stale entry'
+    ).toBe(false);
+    expect(cancelledByUs.has(downloadId), 'cancelledByUs leaked a stale entry').toBe(false);
+  });
+
+  it('still reclaims by the explicit id when one is passed', () => {
+    const downloadId = 77;
+    const pending = makePending({ requestId: 'req-explicit', currentDownloadId: downloadId });
+    pendingByRequestId.set(pending.requestId, pending);
+    pendingByDownloadId.set(downloadId, pending);
+    cancelledByUs.add(downloadId);
+
+    cleanup(pending, downloadId);
+
+    expect(pendingByDownloadId.has(downloadId)).toBe(false);
+    expect(cancelledByUs.has(downloadId)).toBe(false);
+  });
+
+  it('does not throw when a pending has no download id at all', () => {
+    const pending = makePending({ requestId: 'req-no-id' });
+    pendingByRequestId.set(pending.requestId, pending);
+
+    expect(() => cleanup(pending)).not.toThrow();
+    expect(pendingByRequestId.has('req-no-id')).toBe(false);
+  });
+});
