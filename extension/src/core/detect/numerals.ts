@@ -5,9 +5,9 @@
  * ============================================================================
  *
  * Shared by every detector. A numeral is a numeral in every script, which is
- * what makes this safe for StructuralDetector to use. Imports one thing: the
- * shared PARSER_SANITY_CEILING from ./ceilings (D4) — no keyword table, no
- * language signal, no page text conventions.
+ * what makes this safe for StructuralDetector to use. Imports the shared
+ * ceilings from ./ceilings (D4) and the pure string cleaner from ./normalize —
+ * no keyword table, no language signal, no page text conventions.
  *
  * NOT the same as the keyword layer's word-aware integer parser (it lives in
  * the V1 detection-keywords module). That one falls back to parsing WORD-
@@ -15,7 +15,8 @@
  * therefore belongs to the keyword layer. This module is digits only, on
  * purpose — see the last case in tests/detect/numerals.test.ts.
  */
-import { PARSER_SANITY_CEILING } from './ceilings';
+import { PARSER_SANITY_CEILING, PLAUSIBLE_COMMENT_COUNT } from './ceilings';
+import { normalizeText } from './normalize';
 
 /** Unicode decimal digit, any script. */
 const DIGIT = /\p{Nd}/u;
@@ -88,4 +89,51 @@ export function extractDigitCount(text: string): number | null {
   if (!started || result <= 0) return null;
 
   return result;
+}
+
+// ============================================================================
+// COUNT CHIP ACCEPTANCE (D5)
+// ============================================================================
+
+/**
+ * Longest text a real comment-count chip carries. Google's badge holds the
+ * numeral and nothing else; a stray paragraph that happens to contain a digit
+ * is longer than this even after cleaning.
+ */
+export const MAX_COUNT_CHIP_LENGTH = 32;
+
+/** A count chip is numerals and whitespace only — no separators, no words. */
+const COUNT_CHIP_SHAPE = /^[\p{Nd}\s]*$/u;
+
+/** An accepted chip: its count and its cleaned text. */
+export interface CountChip {
+  count: number;
+  text: string;
+}
+
+/**
+ * Read a Google count chip (`.huI6Cb` and friends) as a comment count — or
+ * null when the chip is not one.
+ *
+ * The DOM-truth layers (keyword L0 and structural S0) used to trust ANY numeral
+ * found in the chip (D5): an id-like 99999 slid under the parser ceiling, a
+ * timestamp chip "12:34" read as 12, and either beat every other layer.
+ * Acceptance now demands all of:
+ *
+ *   1. shape — after normalizeText (BiDi strip, whitespace collapse) the chip
+ *      is pure numerals/whitespace and at most MAX_COUNT_CHIP_LENGTH chars;
+ *   2. value — extractDigitCount parses it and the value is below
+ *      PLAUSIBLE_COMMENT_COUNT, the bound every acceptance check shares (D4).
+ *
+ * One definition here, used by both chains, so they cannot drift apart again.
+ */
+export function parseCountChip(chipText: string): CountChip | null {
+  const cleaned = normalizeText(chipText);
+  if (!cleaned || cleaned.length > MAX_COUNT_CHIP_LENGTH) return null;
+  if (!COUNT_CHIP_SHAPE.test(cleaned)) return null;
+
+  const count = extractDigitCount(cleaned);
+  if (count === null || count >= PLAUSIBLE_COMMENT_COUNT) return null;
+
+  return { count, text: cleaned };
 }

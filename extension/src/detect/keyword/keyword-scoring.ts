@@ -46,6 +46,7 @@ import {
 } from '../../v2/decision/keyword-loader';
 import { ACTION_BUTTON_PATTERNS } from '../../core/detect/action-buttons';
 import { PLAUSIBLE_COMMENT_COUNT } from '../../core/detect/ceilings';
+import { parseCountChip } from '../../core/detect/numerals';
 
 import {
   applyExclusions,
@@ -167,19 +168,24 @@ function expandParentContext(node: Node): { text: string; hasDate: boolean; leve
  * The most reliable source. Google renders comment counts in
  * .qCWAqb .huI6Cb elements. If we find this, it's authoritative.
  * Score: 100 (maximum).
+ *
+ * Authoritative does not mean unexamined (D5): the `.huI6Cb` paths accept only
+ * what `parseCountChip` believes (value plausibility + chip shape — an id-like
+ * 99999 or a "12:34" chip is not a count), and every other acceptance path
+ * requires the count to be below PLAUSIBLE_COMMENT_COUNT. Identical rules to
+ * the structural chain's S0 via the same core helper.
  */
 function commentLayer0_DOMTruth(post: HTMLElement): CommentLayerResult {
   // Primary: .qCWAqb .huI6Cb
   const huI6Cb = post.querySelector<HTMLElement>('.qCWAqb .huI6Cb');
   if (huI6Cb) {
-    const text = normalizeText(huI6Cb.textContent?.trim() || '');
-    const count = extractCount(text);
-    if (count !== null && count > 0) {
+    const chip = parseCountChip(huI6Cb.textContent ?? '');
+    if (chip) {
       return {
         score: 100,
-        count,
-        matchedText: text,
-        details: `L0-DOMTruth: "${text}" via .qCWAqb .huI6Cb (count: ${count})`,
+        count: chip.count,
+        matchedText: chip.text,
+        details: `L0-DOMTruth: "${chip.text}" via .qCWAqb .huI6Cb (count: ${chip.count})`,
       };
     }
   }
@@ -194,7 +200,7 @@ function commentLayer0_DOMTruth(post: HTMLElement): CommentLayerResult {
     if (textSpan) {
       const text = normalizeText(textSpan.textContent?.trim() || '');
       const count = extractCount(text);
-      if (count !== null && count > 0) {
+      if (count !== null && count > 0 && count < PLAUSIBLE_COMMENT_COUNT) {
         return { score: 100, count, matchedText: text, details: `L0-DOMTruth: "${text}" in .qCWAqb.seqYL span (count: ${count})` };
       }
     }
@@ -202,10 +208,9 @@ function commentLayer0_DOMTruth(post: HTMLElement): CommentLayerResult {
     // Try .huI6Cb inside the container
     const icon = container.querySelector<HTMLElement>('.huI6Cb');
     if (icon) {
-      const text = normalizeText(icon.textContent || '');
-      const count = extractCount(text);
-      if (count !== null && count > 0) {
-        return { score: 100, count, matchedText: text, details: `L0-DOMTruth: "${text}" via .huI6Cb (count: ${count})` };
+      const chip = parseCountChip(icon.textContent ?? '');
+      if (chip) {
+        return { score: 100, count: chip.count, matchedText: chip.text, details: `L0-DOMTruth: "${chip.text}" via .huI6Cb (count: ${chip.count})` };
       }
     }
 

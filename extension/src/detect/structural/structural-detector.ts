@@ -54,6 +54,7 @@ import type {
 
 import { extractDigitCount } from '../shared/numerals';
 import { PLAUSIBLE_COMMENT_COUNT } from '../../core/detect/ceilings';
+import { parseCountChip } from '../../core/detect/numerals';
 
 /** Result of one structural layer. */
 interface StructuralLayerResult {
@@ -77,18 +78,24 @@ const NO_MATCH: StructuralLayerResult = {
  * which was already language-free. Scores match that layer so the two engines
  * are directly comparable: 100 for a positive container match, 95 for the
  * weaker bare-`.seqYL` fallback.
+ *
+ * A numeral in the container is not accepted on sight (D5): `.huI6Cb` paths go
+ * through `parseCountChip` — value plausibility plus chip shape, so an id-like
+ * 99999 or a "12:34" timestamp cannot pose as a count — and every other
+ * acceptance path requires the count to be below PLAUSIBLE_COMMENT_COUNT. The
+ * same rules live in the keyword chain's twin via the same core helper.
  */
 function layerDomTruth(post: HTMLElement): StructuralLayerResult {
   // Primary: .qCWAqb .huI6Cb
   const huI6Cb = post.querySelector<HTMLElement>('.qCWAqb .huI6Cb');
   if (huI6Cb) {
-    const count = extractDigitCount(huI6Cb.textContent ?? '');
-    if (count !== null) {
+    const chip = parseCountChip(huI6Cb.textContent ?? '');
+    if (chip) {
       return {
         strength: 100,
-        count,
+        count: chip.count,
         source: 'dom-truth',
-        details: `S0: numeral in .qCWAqb .huI6Cb (count: ${count})`,
+        details: `S0: numeral in .qCWAqb .huI6Cb (count: ${chip.count})`,
       };
     }
   }
@@ -101,7 +108,7 @@ function layerDomTruth(post: HTMLElement): StructuralLayerResult {
     );
     if (textSpan) {
       const count = extractDigitCount(textSpan.textContent ?? '');
-      if (count !== null) {
+      if (count !== null && count < PLAUSIBLE_COMMENT_COUNT) {
         return {
           strength: 100,
           count,
@@ -113,13 +120,13 @@ function layerDomTruth(post: HTMLElement): StructuralLayerResult {
 
     const icon = container.querySelector<HTMLElement>('.huI6Cb');
     if (icon) {
-      const count = extractDigitCount(icon.textContent ?? '');
-      if (count !== null) {
+      const chip = parseCountChip(icon.textContent ?? '');
+      if (chip) {
         return {
           strength: 100,
-          count,
+          count: chip.count,
           source: 'dom-truth',
-          details: `S0: numeral in .huI6Cb (count: ${count})`,
+          details: `S0: numeral in .huI6Cb (count: ${chip.count})`,
         };
       }
     }

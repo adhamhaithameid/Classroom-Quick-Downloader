@@ -118,4 +118,14 @@ describe('KeywordDetector', () => {
 
     expect(obs.viewKind).toBe(ViewKind.ASSIGNMENT_DETAILS);
   });
+
+  it('does not trust an id-like numeral in the DOM-truth chip (D5)', () => {
+    // Same guard as the structural chain — the two L0s share one core helper
+    // so a count believed by one is believed by the other.
+    const post = createPost('<div class="qCWAqb"><div class="huI6Cb">99999</div></div>');
+    const obs = detector.observe(post, { postId: 'p11', viewKind: ViewKind.STREAM, lang: 'en' });
+
+    expect(obs.comment.present).toBe(false);
+    expect(obs.comment.count).toBeNull();
+  });
 });

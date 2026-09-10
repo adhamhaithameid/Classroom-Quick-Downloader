@@ -1,7 +1,7 @@
 {
   "generatedOn": "2026-09-10",
   "totals": {
-    "cases": 43,
+    "cases": 44,
     "locales": 7,
     "languages": [
       "ar",
@@ -135,6 +135,13 @@
     },
     {
       "caseId": "syn-en-hostile-negative",
+      "origin": "synthetic",
+      "lang": "en",
+      "viewKind": "stream",
+      "posts": 1
+    },
+    {
+      "caseId": "syn-en-l0-stray-numeral",
       "origin": "synthetic",
       "lang": "en",
       "viewKind": "stream",

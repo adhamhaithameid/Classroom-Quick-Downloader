@@ -4,8 +4,10 @@ import {
   hasDigit,
   digitValue,
   extractDigitCount,
+  parseCountChip,
+  MAX_COUNT_CHIP_LENGTH,
 } from '../../../src/core/detect/numerals';
-import { PARSER_SANITY_CEILING } from '../../../src/core/detect/ceilings';
+import { PARSER_SANITY_CEILING, PLAUSIBLE_COMMENT_COUNT } from '../../../src/core/detect/ceilings';
 
 describe('core/detect/numerals', () => {
   it('recognises decimal digits in any script', () => {
@@ -42,5 +44,52 @@ describe('core/detect/numerals', () => {
 
   it('strips BiDi controls around RTL numerals before parsing', () => {
     expect(extractDigitCount('\u200F٥\u200E')).toBe(5);
+  });
+});
+
+describe('parseCountChip (D5 — chip acceptance for the DOM-truth layers)', () => {
+  it('accepts a plain numeral chip in any script', () => {
+    expect(parseCountChip('5')).toEqual({ count: 5, text: '5' });
+    expect(parseCountChip('٨')).toEqual({ count: 8, text: '٨' });
+  });
+
+  it('accepts BiDi-wrapped and whitespace-padded numerals', () => {
+    expect(parseCountChip('\u200F12\u200E')?.count).toBe(12);
+    expect(parseCountChip('  7\u00A0')?.count).toBe(7);
+  });
+
+  it('rejects values at or above PLAUSIBLE_COMMENT_COUNT', () => {
+    expect(parseCountChip(String(PLAUSIBLE_COMMENT_COUNT))).toBeNull();
+    expect(parseCountChip('99999')).toBeNull();
+    expect(parseCountChip(String(PARSER_SANITY_CEILING - 1))).toBeNull();
+  });
+
+  it('rejects chip text longer than MAX_COUNT_CHIP_LENGTH even with a small numeral', () => {
+    const long = 'Reference 4821 was resolved in the helpdesk queue yesterday';
+    expect(long.length).toBeGreaterThan(MAX_COUNT_CHIP_LENGTH);
+    expect(parseCountChip(long)).toBeNull();
+  });
+
+  it('accepts a whitespace-padded numeral chip', () => {
+    expect(parseCountChip('  9999 ')).toEqual({ count: 9999, text: '9999' });
+  });
+
+  it('rejects a digit run that fits the length limit but blows the value ceiling', () => {
+    expect(parseCountChip('1'.repeat(MAX_COUNT_CHIP_LENGTH))).toBeNull();
+  });
+
+  it('rejects timestamp-shaped chips — separators are not chip shape', () => {
+    expect(parseCountChip('12:34')).toBeNull();
+  });
+
+  it('rejects wordy chips — a count badge carries no words', () => {
+    expect(parseCountChip('8 class comments')).toBeNull();
+    expect(parseCountChip('٣ تعليقات')).toBeNull();
+  });
+
+  it('rejects empty and numeral-free chips', () => {
+    expect(parseCountChip('')).toBeNull();
+    expect(parseCountChip('   ')).toBeNull();
+    expect(parseCountChip('No class comments')).toBeNull();
   });
 });
