@@ -1,0 +1,15 @@
+{
+  "viewKind": "stream",
+  "lang": "en",
+  "note": "Synthetic (en): D2 regression. parseWordNumber used substring matching, so 'un' inside 'unusual' was read as the Spanish/French word-number 'un' (1) and the post invented a phantom comment count of 1 despite carrying no digit anywhere. A comment keyword without real count evidence must not mark the comment flag present, and commentCount must stay null.",
+  "origin": "synthetic",
+  "posts": [
+    {
+      "postId": "synth-en-un-1",
+      "commentPresent": false,
+      "commentCount": null,
+      "editedPresent": false
+    }
+  ],
+  "caseId": "syn-en-word-number-false-positive"
+}

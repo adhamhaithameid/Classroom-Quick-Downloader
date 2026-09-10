@@ -66,12 +66,21 @@ const WORD_NUMBERS: Record<string, number> = {
 };
 
 /**
- * Parse word-numbers from text
+ * Parse word-numbers from text.
+ *
+ * Token-exact matching (D2): split on punctuation/symbol/space boundaries and
+ * compare whole tokens. Substring matching (`.includes`) made 'unusual'
+ * match the Spanish/French 'un' and invent a phantom count of 1 whenever a
+ * comment keyword also matched. All WORD_NUMBERS keys are single tokens, so
+ * exact token equality is the right semantic; normalizeForComparison already
+ * lowercases, so the comparison stays case-insensitive.
  */
 function parseWordNumber(text: string): number | null {
   const normalized = normalizeForComparison(text);
-  for (const [word, value] of Object.entries(WORD_NUMBERS)) {
-    if (normalized.includes(word.toLowerCase())) {
+  const tokens = normalized.split(/[\s\p{P}\p{S}]+/u).filter(Boolean);
+  for (const token of tokens) {
+    const value = WORD_NUMBERS[token];
+    if (value !== undefined) {
       return value;
     }
   }
@@ -393,7 +402,7 @@ const COMMENT_KEYWORDS_OTHER: Record<string, CommentKeywords> = {
   th: { singular: ['ความคิดเห็น'], plural: ['ความคิดเห็น'], classComment: ['ความคิดเห็นของชั้นเรียน'] },
   el: { singular: ['σχόλιο'], plural: ['σχόλια'], classComment: ['σχόλιο τάξης'] },
   ka: { singular: ['კომენტარი'], plural: ['კომენტარები'], classComment: ['კლასის კომენტარი'] },
-  hy: { singular: ['մեկdelays'], plural: ['մegdelays'], classComment: ['delays'] },
+  hy: { singular: ['մեկնաբանություն'], plural: ['մեկնաբանություններ'], classComment: ['դասարանի մեկնաբանություն'] },
   am: { singular: ['አስተያየት'], plural: ['አስተያየቶች'], classComment: ['የክፍል አስተያየት'] },
   bn: { singular: ['মন্তব্য'], plural: ['মন্তव्यগুলি'], classComment: ['ক্লাس মন্তব্য'] },
   ta: { singular: ['கருத்து'], plural: ['கருத்துகள்'], classComment: ['வகுப்பு கருத்து'] },
@@ -486,7 +495,7 @@ const EDITED_KEYWORDS_OTHER: Record<string, string[]> = {
   th: ['แก้ไขแล้ว', 'แก้ไขล่าสุด', 'การแก้ไข'],
   el: ['επεξεργάστηκε', 'τροποποιήθηκε', 'τροποποίηση', 'επεξεργασία'],
   ka: ['რედაქტირებულია', 'შეცვლილია', 'რედაქტირება', 'ცვლილება'],
-  hy: ['խdelays', 'փdelays', 'խdelays'],
+  hy: ['խմբագրված', 'վերջին խմբագրումը', 'փոփոխված'],
   am: ['ተስተካክል', 'ተቀይሮ', 'አርትዕ', 'ለውጥ'],
   bn: ['সম্পাদিত', 'পরিবর্তিত', 'সম্পাদনা'],
   ta: ['திருத்தப்பட்டது', 'மாற்றப்பட்டது', 'திருத்தம்'],

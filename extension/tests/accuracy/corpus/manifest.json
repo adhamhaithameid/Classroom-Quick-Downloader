@@ -1,13 +1,14 @@
 {
-  "generatedOn": "2026-08-23",
+  "generatedOn": "2026-09-10",
   "totals": {
-    "cases": 40,
-    "locales": 6,
+    "cases": 43,
+    "locales": 7,
     "languages": [
       "ar",
       "en",
       "es",
       "hu",
+      "hy",
       "ja",
       "ru"
     ]
@@ -105,6 +106,13 @@
       "posts": 1
     },
     {
+      "caseId": "syn-ar-tashkeel-comments",
+      "origin": "synthetic",
+      "lang": "ar",
+      "viewKind": "stream",
+      "posts": 1
+    },
+    {
       "caseId": "syn-en-both-flags",
       "origin": "synthetic",
       "lang": "en",
@@ -141,6 +149,13 @@
     },
     {
       "caseId": "syn-en-plain-negative",
+      "origin": "synthetic",
+      "lang": "en",
+      "viewKind": "stream",
+      "posts": 1
+    },
+    {
+      "caseId": "syn-en-word-number-false-positive",
       "origin": "synthetic",
       "lang": "en",
       "viewKind": "stream",
@@ -220,6 +235,13 @@
       "caseId": "syn-hu-plain-negative",
       "origin": "synthetic",
       "lang": "hu",
+      "viewKind": "stream",
+      "posts": 1
+    },
+    {
+      "caseId": "syn-hy-both-flags",
+      "origin": "synthetic",
+      "lang": "hy",
       "viewKind": "stream",
       "posts": 1
     },

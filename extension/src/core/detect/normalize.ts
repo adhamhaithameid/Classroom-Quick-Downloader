@@ -52,10 +52,16 @@ export function normalizeText(text: string): string {
 
 /**
  * Aggressive normalization for comparison (lowercase, no punctuation).
+ *
+ * Also folds Arabic tashkeel (diacritics U+064B–U+0652, incl. shadda and
+ * sukun) and the dagger alif (U+0670), so a diacritic-spelled keyword variant
+ * matches its undiacritic'd table entry without every form being hand-listed
+ * (D7).
  */
 export function normalizeForComparison(text: string): string {
   return normalizeText(text)
     .toLowerCase()
+    .replace(/[\u064B-\u0652\u0670]/g, '')
     .replace(/[()[\]{}.,،!?:;'"]/g, '')
     .trim();
 }

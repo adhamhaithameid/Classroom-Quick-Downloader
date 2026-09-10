@@ -28,4 +28,26 @@ describe('core/detect/normalize', () => {
     // Arabic comma is punctuation too.
     expect(normalizeForComparison('تعليق، واحد')).toBe('تعليق واحد');
   });
+
+  it('folds Arabic tashkeel vowel signs (D7)', () => {
+    // fatha U+064E, sukun U+0652, kasra U+0650 inside تعليق
+    expect(normalizeForComparison('تَعْلِيق')).toBe('تعليق');
+    expect(normalizeForComparison('تَعْلِيقات')).toBe('تعليقات');
+  });
+
+  it('folds Arabic shadda and sukun (D7)', () => {
+    // shadda U+0651 + kasra U+0650
+    expect(normalizeForComparison('مُعَلِّم')).toBe('معلم');
+  });
+
+  it('folds the Arabic dagger alif (D7)', () => {
+    // dagger alif U+0670
+    expect(normalizeForComparison('رَحْمَٰن')).toBe('رحمن');
+  });
+
+  it('matches a tashkeel-spelled keyword against its bare table entry (D7)', () => {
+    const tableEntry = normalizeForComparison('تعليق');
+    const pageText = normalizeForComparison('تَعْلِيق الصف: ٣');
+    expect(pageText.includes(tableEntry)).toBe(true);
+  });
 });

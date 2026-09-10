@@ -1,0 +1,15 @@
+{
+  "viewKind": "stream",
+  "lang": "ar",
+  "note": "Synthetic (ar): D7 regression. The comment indicator is written with tashkeel (تَعْلِيق = fatha+sukun+kasra inside تعليق); normalizeForComparison did not fold Arabic diacritics, so any diacritic variant not hand-listed in the keyword tables was missed and the comment flag never fired.",
+  "origin": "synthetic",
+  "posts": [
+    {
+      "postId": "synth-ar-tashkeel-1",
+      "commentPresent": true,
+      "commentCount": 3,
+      "editedPresent": false
+    }
+  ],
+  "caseId": "syn-ar-tashkeel-comments"
+}

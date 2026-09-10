@@ -122,6 +122,20 @@ describe('parseUnicodeInteger()', () => {
   it('should extract from Arabic comment text', () => {
     expect(parseUnicodeInteger('تعليق واحد من الصف')).toBe(1);
   });
+
+  it('should not substring-match word numbers (D2: no phantom 1s)', () => {
+    // 'un' inside 'unusual' is NOT the Spanish/French word-number 'un'.
+    expect(parseUnicodeInteger('unusual')).toBeNull();
+    expect(parseUnicodeInteger('an unusual number of comments')).toBeNull();
+    // Other prefix collisions against single-character word numbers.
+    expect(parseUnicodeInteger('uneventful class comment')).toBeNull();
+  });
+
+  it('should still parse exact word-number tokens (D2: token-exact)', () => {
+    expect(parseUnicodeInteger('un')).toBe(1);
+    expect(parseUnicodeInteger('comments: un')).toBe(1);
+    expect(parseUnicodeInteger('واحد')).toBe(1);
+  });
 });
 
 // ============================================================================
@@ -146,6 +160,16 @@ describe('getCommentKeywords()', () => {
     expect(keywords.singular).toContain('コメント');
   });
 
+  it('should return Armenian keywords (D1: no corrupted strings)', () => {
+    const keywords = getCommentKeywords('hy');
+    expect(keywords.singular).toContain('մեկնաբանություն');
+    expect(keywords.plural).toContain('մեկնաբանություններ');
+    expect(keywords.classComment).toContain('դասարանի մեկնաբանություն');
+    for (const kw of [...keywords.singular, ...keywords.plural, ...keywords.classComment]) {
+      expect(kw).not.toMatch(/delays/i);
+    }
+  });
+
   it('should fallback to English for unknown languages', () => {
     const keywords = getCommentKeywords('xx-unknown');
     expect(keywords.singular).toContain('comment');
@@ -166,6 +190,16 @@ describe('getEditedKeywords()', () => {
   it('should return Japanese edited keywords', () => {
     const keywords = getEditedKeywords('ja');
     expect(keywords).toContain('編集済み');
+  });
+
+  it('should return Armenian edited keywords (D1: no corrupted strings)', () => {
+    const keywords = getEditedKeywords('hy');
+    expect(keywords).toContain('խմբագրված');
+    expect(keywords).toContain('վերջին խմբագրումը');
+    expect(keywords).toContain('փոփոխված');
+    for (const kw of keywords) {
+      expect(kw).not.toMatch(/delays/i);
+    }
   });
 
   it('should return Hacker/1337 keywords', () => {
