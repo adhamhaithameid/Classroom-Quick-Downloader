@@ -1401,7 +1401,13 @@
     top: calc(100% + 16px);
     left: 50%;
     z-index: 20;
-    display: grid;
+    display: block;
+    /* The panel is centered under the navbar (translateX(-50%)), so its
+       center never moves horizontally. Menu blocks are absolutely centered
+       on that point and top-anchored, so menu content stays exactly in
+       place while only the outline morphs between menus; the card reveals
+       the pinned content as it grows or shrinks. */
+    overflow: hidden;
     width: max-content;
     max-width: calc(100vw - 32px);
     padding: 14px;
@@ -1436,7 +1442,10 @@
   }
 
   .l2-nav-menu-block {
-    grid-area: 1 / 1;
+    position: absolute;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
     width: max-content;
     opacity: 0;
     visibility: hidden;

@@ -3830,8 +3830,8 @@
   }
 
   /* ── Reveal Animations ─────────────── */
+  /* Fail open: visible by default so content can never be stranded hidden. */
   .l2-reveal {
-    opacity: 0; transform: translateY(32px);
     transition: opacity 0.7s ease, transform 0.7s ease;
   }
   :global(.l2-reveal.in-view) { opacity: 1; transform: translateY(0); }

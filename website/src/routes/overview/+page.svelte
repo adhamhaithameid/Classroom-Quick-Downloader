@@ -910,23 +910,80 @@
     }
   }
 
-  function setupReveal(): void {
+  /* Reveal must fail open: sections are visible by default and JS hides only
+     the below-fold ones right before observing. A fast scroll can jump an
+     element from below the viewport to above it without any observer
+     callback, so a passive scroll check and a failsafe timer reveal anything
+     left behind. Missing site data can never blank the page. Returns a
+     cleanup function. */
+  function setupReveal(): () => void {
+    const revealables = Array.from(document.querySelectorAll<HTMLElement>('.l2-reveal'));
+
+    if (shouldReduceMotion()) {
+      revealables.forEach((el) => el.classList.add('in-view'));
+      return () => {};
+    }
+
+    const pending = new Set<HTMLElement>();
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('in-view');
-            const revealSection = (entry.target as HTMLElement).dataset.placementSection;
-            if (revealSection) {
-              setPlacementSectionVisible(revealSection);
-            }
-            observer.unobserve(entry.target);
+          if (entry.isIntersecting || entry.boundingClientRect.top < window.innerHeight) {
+            reveal(entry.target as HTMLElement);
           }
         }
       },
-      { threshold: 0.08, rootMargin: '0px 0px -40px 0px' }
+      { threshold: 0, rootMargin: '0px 0px 120px 0px' }
     );
-    document.querySelectorAll('.l2-reveal').forEach((el) => observer.observe(el));
+
+    function reveal(el: HTMLElement): void {
+      el.classList.add('in-view');
+      el.classList.remove('l2-reveal-pending');
+      const revealSection = el.dataset.placementSection;
+      if (revealSection) {
+        setPlacementSectionVisible(revealSection);
+      }
+      pending.delete(el);
+      observer.unobserve(el);
+      if (pending.size === 0) {
+        window.removeEventListener('scroll', onScroll);
+        clearTimeout(failsafe);
+      }
+    }
+
+    /* rAF-throttled so at most one measurement pass happens per frame. */
+    let ticking = false;
+    function onScroll(): void {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        ticking = false;
+        for (const el of pending) {
+          if (el.getBoundingClientRect().top <= window.innerHeight) reveal(el);
+        }
+      });
+    }
+
+    const failsafe = setTimeout(() => {
+      for (const el of pending) reveal(el);
+    }, 4000);
+
+    for (const el of revealables) {
+      if (el.getBoundingClientRect().top > window.innerHeight * 0.9) {
+        el.classList.add('l2-reveal-pending');
+        pending.add(el);
+        observer.observe(el);
+      }
+    }
+    if (pending.size > 0) {
+      window.addEventListener('scroll', onScroll, { passive: true });
+    }
+
+    return () => {
+      clearTimeout(failsafe);
+      window.removeEventListener('scroll', onScroll);
+      observer.disconnect();
+    };
   }
 
   function resetPlacementSectionVisibility(showAll = false): void {
@@ -1365,6 +1422,7 @@
     let stopHeavierScroll: (() => void) | undefined;
     let stopMapPromptDelay: (() => void) | undefined;
     let stopPlacementViewportWatcher: (() => void) | undefined;
+    let stopReveal: (() => void) | undefined;
     detectedBrowser = detectBrowserFromNavigator();
     reducedMotionPreferred = shouldReduceMotion();
     const searchParams = new URLSearchParams(window.location.search);
@@ -1392,6 +1450,17 @@
       : clonePlacements(publishedPlacements);
     initSillyState();
     const mapComponentsLoad = loadMapComponents().catch(() => undefined);
+
+    /* Reveal must be independent of data loading: if the snapshot API is
+       slow or unavailable, sections would otherwise stay hidden forever. */
+    if (isEmbed || editMode) {
+      resetPlacementSectionVisibility(true);
+      document.querySelectorAll('.l2-reveal').forEach((el) => el.classList.add('in-view'));
+    } else {
+      resetPlacementSectionVisibility(false);
+      stopReveal = setupReveal();
+    }
+
     void Promise.all([loadSiteData(), mapComponentsLoad]).then(() => {
       requestAnimationFrame(async () => {
         await waitForStableLayoutBeforePlacementLock();
@@ -1399,13 +1468,6 @@
         if (!editMode) {
           placementCanvasLocked = true;
           freezePlacementCoordinates();
-        }
-        if (isEmbed || editMode) {
-          resetPlacementSectionVisibility(true);
-          document.querySelectorAll('.l2-reveal').forEach((el) => el.classList.add('in-view'));
-        } else {
-          resetPlacementSectionVisibility(false);
-          setupReveal();
         }
         stopMarquee = initMarquee();
         stopHeavierScroll = initHeavierScroll();
@@ -1421,6 +1483,7 @@
       if (typeof stopHeavierScroll === 'function') stopHeavierScroll();
       if (typeof stopMapPromptDelay === 'function') stopMapPromptDelay();
       if (typeof stopPlacementViewportWatcher === 'function') stopPlacementViewportWatcher();
+      if (typeof stopReveal === 'function') stopReveal();
       if (statusTimer) clearTimeout(statusTimer);
       document.body.classList.remove('l2-map-modal-open');
     };
@@ -1872,7 +1935,7 @@
   </section>
 
   <!-- ━━━━ How It Works ━━━━ -->
-  <section class="l2-block l2-snap">
+  <section id="how-it-works" class="l2-block l2-snap">
     <div class="l2-wrap l2-reveal" data-placement-section="steps" style="position:relative">
       <div class="l2-section-head">
         <span class="l2-label">HOW IT WORKS</span>
@@ -2084,52 +2147,8 @@
   {/if}
 
   <!-- ━━━━ Final CTA ━━━━ -->
-  <section class="l2-cta-section l2-snap">
-    <div class="l2-wrap l2-cta-content l2-reveal" data-placement-section="cta" style="position:relative;overflow:visible">
-      <h2>Ready to save hours?</h2>
-      <p>Install Classroom Quick Downloader in under 10 seconds. Free, forever. No account required.</p>
-      <!-- NEWSLETTER_CTA_DISABLED_ROLLBACK_START
-      <p>Install Classroom Quick Downloader in under 10 seconds, and add your email for future updates. Free, forever. No account required.</p>
-      <form class="l2-newsletter-form" on:submit|preventDefault={submitNewsletterEmail}>
-        <input
-          type="email"
-          class="l2-newsletter-input"
-          bind:value={newsletterEmail}
-          placeholder="Enter your email for future updates"
-          inputmode="email"
-          autocomplete="email"
-          required
-        />
-        <button
-          type="submit"
-          class="l2-newsletter-submit"
-          disabled={newsletterSubmitState === 'submitting'}
-        >
-          {#if newsletterSubmitState === 'submitting'}Submitting…{:else}Notify me{/if}
-        </button>
-      </form>
-      {#if newsletterStatusMessage}
-        <p class="l2-newsletter-status l2-newsletter-status-{newsletterSubmitState}">
-          {newsletterStatusMessage}
-        </p>
-      {/if}
-      NEWSLETTER_CTA_DISABLED_ROLLBACK_END -->
-      <div class="l2-hero-actions">
-        {#each orderedBrowserCtas as b}
-          <a
-            class="l2-cta {b === detectedBrowser ? 'l2-cta-current' : 'l2-cta-other'}"
-            href={browserLink(b)}
-            target="_blank"
-            rel="noopener noreferrer"
-            on:click={() => trackInstallClick('final_install')}
-          >
-            <img src="{base}/images/{b}.svg" alt="" class="l2-cta-icon" />
-            {#if b === detectedBrowser}Install for {browserDisplayName(b)}{:else}{browserDisplayName(b)}{/if}
-          </a>
-        {/each}
-      </div>
-    </div>
-  </section>
+  <!-- The final "Ready to save hours?" CTA now lives in the site footer
+       (SiteFooter.svelte) so it closes every page, not just the overview. -->
 
   <!-- ━━━━ Edit Mode Toolbar & Picker ━━━━ -->
   {#if editMode}
@@ -3835,44 +3854,8 @@
   }
 
   /* ── Final CTA ─────────────────────── */
-  .l2-cta-section {
-    position: relative;
-    z-index: 2;
-    isolation: isolate;
-    padding: 80px 0;
-    text-align: center;
-    background: transparent;
-  }
-  .l2-cta-content {
-    position: relative;
-    z-index: 2;
-    width: 100%;
-    background: rgba(255, 255, 255, 0.55);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid var(--border-subtle);
-    border-radius: 24px;
-    padding: clamp(28px, 5vw, 64px) clamp(20px, 5vw, 48px);
-    overflow: visible;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.04);
-  }
-  .l2-cta-content::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(145deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.08));
-    pointer-events: none;
-    z-index: 0;
-  }
-  .l2-cta-content > * {
-    position: relative;
-    z-index: 1;
-  }
-  .l2-cta-content h2 {
-    font-size: clamp(32px, 4vw, 48px); font-weight: 900;
-    letter-spacing: -0.03em; margin: 0 0 16px;
-  }
-  .l2-cta-content p { font-size: 18px; color: var(--text-secondary); margin: 0 0 20px; }
+  /* Removed: the final CTA lives in SiteFooter.svelte now. */
+
 
   .l2-newsletter-form {
     width: min(580px, 100%);
@@ -3938,11 +3921,13 @@
   }
 
   /* ── Reveal Animations ─────────────── */
+  /* Fail open: sections are visible by default. JS adds l2-reveal-pending
+     only to below-fold elements right before observing them, so content can
+     never be stranded invisible (no data, fast scroll, no-JS). */
   .l2-reveal {
-    opacity: 0; transform: translateY(32px);
     transition: opacity 0.7s ease, transform 0.7s ease;
   }
-  :global(.l2-reveal.in-view) { opacity: 1; transform: translateY(0); }
+  :global(.l2-reveal.l2-reveal-pending) { opacity: 0; transform: translateY(32px); }
 
   /* ── Keyframes ──────────────────────── */
   @keyframes orb-drift {
@@ -3997,14 +3982,6 @@
       max-height: calc(100vh - 16px);
       border-radius: 14px;
       padding: 8px;
-    }
-    .l2-cta-content {
-      border-radius: 20px;
-      padding: 30px 20px;
-    }
-    .l2-cta-content p {
-      margin-bottom: 26px;
-      font-size: 16px;
     }
     .l2-newsletter-form {
       flex-direction: column;
