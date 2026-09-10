@@ -140,9 +140,9 @@ describe('site layout shell', () => {
     expect(html).toContain('How it works');
     expect(html).toContain('Report issue');
     expect(html).toContain('ft-mega');
-    // Two-layer wordmark: the static resting-dots layer must ship with the
-    // dynamic layer, or the wordmark is invisible whenever dots are at rest.
-    expect(html).toContain('ft-mega-base');
+    // The wordmark canvas ships in SSR markup; the shatter/ripple
+    // interaction is progressive enhancement layered on top of it.
+    expect(html).toContain('ft-mega-canvas');
     expect(html).toContain('aria-hidden="true"');
     // Layer 3: principles strip
     expect(html).toContain('Instant.');

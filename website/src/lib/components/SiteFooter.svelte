@@ -145,24 +145,38 @@
 
     /* ── Dot-particle wordmark ──
        The giant text is rasterized once and sampled into a few thousand
-       dots. Mechanics follow the 30000-particles study: inverse-square
-       scatter around the pointer, velocity drag, and an ease back to each
-       dot's origin. With no live pointer a phantom drifts the field on a
-       slow Lissajous path, so the wordmark stays gently alive on every
-       device — interaction follows hover capability, not device labels.
-       Reduced motion renders the static dot text. */
-    const canvas = mega.querySelector<HTMLCanvasElement>('canvas.ft-mega-canvas:not(.ft-mega-base)');
-    const baseCanvas = mega.querySelector<HTMLCanvasElement>('canvas.ft-mega-base');
+       dots on a single canvas. The rest state is one static frame — no
+       idle animation, nothing breathes on its own. Hovering shatters the
+       dots: pointer entry and clicks fire ripple pulses whose wavefront
+       kicks granules as it travels through the glyphs, and while the
+       pointer stays inside, a local repulsion field holds a cavity open
+       around it. When the pointer leaves, the springs carry every dot
+       back home; once motion settles, the exact rest frame is drawn and
+       the loop parks, so the idle wordmark costs nothing. Reduced motion
+       renders the static wordmark only. */
+    const canvas = mega.querySelector<HTMLCanvasElement>('canvas.ft-mega-canvas');
     if (canvas) {
       const cv = canvas;
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       const fontFamily = getComputedStyle(mega).fontFamily;
       const LINE_1 = 'CLASSROOM QUICK';
       const LINE_2 = 'DOWNLOADER';
-      /* Constants from the 30000-particles study, retuned for the footer. */
-      const THICKNESS = 100 * 100;
-      const DRAG = 0.94;
-      const EASE = 0.18;
+      /* All forces are strictly local and speed is capped, so a small
+         hover never wobbles the whole wordmark. The tangential slice on
+         the repulsion makes bursts read as shattered granules flying
+         off-axis instead of a symmetric blob push. */
+      const REPEL_RADIUS = 110;
+      const REPEL_FORCE = 2.2;
+      const REPEL_SPIN = 0.45;
+      const PULSE_SPEED = 0.62; /* wavefront travel, px per ms */
+      const PULSE_BAND = 48; /* wavefront thickness, px */
+      const PULSE_KICK = 3.4; /* peak impulse per frame at the front */
+      const MAX_PULSES = 6;
+      const DRAG = 0.9;
+      const EASE = 0.085;
+      const MAX_SPEED = 13;
+      const SETTLE = 0.08;
+
       type Dot = {
         hx: number;
         hy: number;
@@ -170,116 +184,135 @@
         y: number;
         vx: number;
         vy: number;
+        spin: number;
       };
+      type Pulse = { x: number; y: number; t0: number };
+
       let dots: Dot[] = [];
+      let pulses: Pulse[] = [];
       let ctx: CanvasRenderingContext2D | null = null;
       let cw = 0;
       let ch = 0;
       let gridSize = 7;
       let raf = 0;
+      let lastTime = 0;
       let pointerInside = false;
       let px = 0;
       let py = 0;
       let megaVisible = false;
       let pointerTicking = false;
-      const canHover = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+      let moveSeq = 0;
       let rebuildTimer: ReturnType<typeof setTimeout> | null = null;
+      const canHover = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
 
-      /* Dots at rest live on a base canvas layer (drawn once per rebuild,
-         composited by the browser for free). The top canvas redraws only
-         the displaced dots each frame, so per-frame cost scales with the
-         disturbed area — not the total dot count. A displaced dot leaves
-         its resting dot visible beneath it, which reads as a natural
-         motion trail. */
-      function drawStaticInto(c: CanvasRenderingContext2D): void {
-        c.clearRect(0, 0, cw, ch);
-        c.fillStyle = '#1a8b55';
+      function drawAll(): void {
+        if (!ctx) return;
+        ctx.clearRect(0, 0, cw, ch);
+        ctx.fillStyle = '#1a8b55';
+        const r = gridSize * 0.45;
         const path = new Path2D();
-        const rRest = gridSize * 0.42;
         for (const p of dots) {
-          path.moveTo(p.hx + rRest, p.hy);
-          path.arc(p.hx, p.hy, rRest, 0, 6.2832);
+          path.moveTo(p.x + r, p.y);
+          path.arc(p.x, p.y, r, 0, 6.2832);
         }
-        c.globalAlpha = 0.6;
-        c.fill(path);
-        c.globalAlpha = 1;
+        ctx.globalAlpha = 0.82;
+        ctx.fill(path);
+        ctx.globalAlpha = 1;
       }
 
-      function drawDynamic(ctx2: CanvasRenderingContext2D): void {
-        ctx2.clearRect(0, 0, cw, ch);
-        ctx2.fillStyle = '#1a8b55';
-        const mid = new Path2D();
-        const hot = new Path2D();
-        const rMid = gridSize * 0.5;
-        const rHot = gridSize * 0.58;
-        let any = false;
+      /* Settle: snap to the exact rest frame and stop the loop — the idle
+         wordmark is a static render with zero ongoing cost. */
+      function settle(): void {
         for (const p of dots) {
-          const disp = Math.hypot(p.x - p.hx, p.y - p.hy);
-          if (disp < 0.6) continue;
-          any = true;
-          if (disp < 12) {
-            mid.moveTo(p.x + rMid, p.y);
-            mid.arc(p.x, p.y, rMid, 0, 6.2832);
-          } else {
-            hot.moveTo(p.x + rHot, p.y);
-            hot.arc(p.x, p.y, rHot, 0, 6.2832);
-          }
+          p.x = p.hx;
+          p.y = p.hy;
+          p.vx = 0;
+          p.vy = 0;
         }
-        if (!any) return;
-        ctx2.globalAlpha = 0.85;
-        ctx2.fill(mid);
-        ctx2.globalAlpha = 0.95;
-        ctx2.fill(hot);
-        ctx2.globalAlpha = 1;
+        pulses = [];
+        drawAll();
+        if (raf) {
+          cancelAnimationFrame(raf);
+          raf = 0;
+        }
       }
 
-      function step(time: number): boolean {
-        let mx = px;
-        let my = py;
-        if (!pointerInside) {
-          /* Phantom pointer — a slow Lissajous drift that keeps the field
-             breathing when no hover-capable pointer is present. */
-          const t = time * 0.001;
-          mx = cw * 0.5 + Math.cos(t * 2.1) * Math.cos(t * 0.9) * cw * 0.38;
-          my = ch * 0.5 + Math.sin(t * 3.2) * Math.sin(t * 0.8) * ch * 0.3;
-        }
+      function step(now: number): boolean {
+        /* dt in frames (clamped) so physics is frame-rate independent. */
+        const df = Math.min(2, (now - lastTime) / 16.7 || 1);
+        lastTime = now;
+        const maxFront = Math.hypot(cw, ch) + PULSE_BAND;
+        pulses = pulses.filter((pulse) => (now - pulse.t0) * PULSE_SPEED < maxFront);
         let energy = false;
         for (const p of dots) {
-          const dx = mx - p.x;
-          const dy = my - p.y;
-          const dist2 = dx * dx + dy * dy;
-          if (dist2 > 1 && dist2 < THICKNESS) {
-            const f = -THICKNESS / dist2;
-            const inv = 1 / Math.sqrt(dist2);
-            p.vx += f * dx * inv;
-            p.vy += f * dy * inv;
+          if (pointerInside) {
+            const dx = p.x - px;
+            const dy = p.y - py;
+            const d = Math.hypot(dx, dy);
+            if (d > 0.001 && d < REPEL_RADIUS) {
+              const fall = 1 - d / REPEL_RADIUS;
+              const f = REPEL_FORCE * fall * fall * df;
+              const inv = 1 / d;
+              p.vx += (dx * inv - dy * inv * p.spin * REPEL_SPIN) * f;
+              p.vy += (dy * inv + dx * inv * p.spin * REPEL_SPIN) * f;
+            }
+          }
+          for (const pulse of pulses) {
+            const dx = p.x - pulse.x;
+            const dy = p.y - pulse.y;
+            const d = Math.hypot(dx, dy);
+            if (d < 0.001) continue;
+            const front = (now - pulse.t0) * PULSE_SPEED;
+            const band = d - front;
+            if (band > -PULSE_BAND && band < PULSE_BAND) {
+              /* Amplitude falls off with distance traveled, so the wave
+                 dies out toward the far edge instead of churning there. */
+              const w =
+                (1 - Math.abs(band) / PULSE_BAND) * Math.pow(1 - front / maxFront, 1.5);
+              p.vx += (dx / d) * PULSE_KICK * w * df;
+              p.vy += (dy / d) * PULSE_KICK * w * df;
+            }
           }
           p.vx *= DRAG;
           p.vy *= DRAG;
-          p.x += p.vx + (p.hx - p.x) * EASE;
-          p.y += p.vy + (p.hy - p.y) * EASE;
-          if (Math.abs(p.vx) + Math.abs(p.vy) > 0.05 || Math.abs(p.hx - p.x) + Math.abs(p.hy - p.y) > 0.08) {
+          const sp = Math.hypot(p.vx, p.vy);
+          if (sp > MAX_SPEED) {
+            p.vx = (p.vx / sp) * MAX_SPEED;
+            p.vy = (p.vy / sp) * MAX_SPEED;
+          }
+          p.x += p.vx + (p.hx - p.x) * EASE * df;
+          p.y += p.vy + (p.hy - p.y) * EASE * df;
+          if (
+            Math.abs(p.vx) + Math.abs(p.vy) > 0.05 ||
+            Math.abs(p.hx - p.x) + Math.abs(p.hy - p.y) > SETTLE
+          ) {
             energy = true;
           }
         }
-        return energy;
+        return energy || pointerInside;
       }
 
-      function frame(time: number): void {
-        const energy = step(time);
-        if (ctx) {
-          if (energy) drawDynamic(ctx);
-          else ctx.clearRect(0, 0, cw, ch);
-        }
-        if (megaVisible) {
+      function frame(now: number): void {
+        const energy = step(now);
+        drawAll();
+        if (energy && megaVisible) {
           raf = requestAnimationFrame(frame);
         } else {
-          raf = 0; // offscreen — park; the loop restarts on re-entry
+          settle();
         }
       }
 
       function startLoop(): void {
-        if (!raf) raf = requestAnimationFrame(frame);
+        if (!raf) {
+          lastTime = performance.now();
+          raf = requestAnimationFrame(frame);
+        }
+      }
+
+      function firePulse(x: number, y: number): void {
+        pulses.push({ x, y, t0: performance.now() });
+        if (pulses.length > MAX_PULSES) pulses.shift();
+        startLoop();
       }
 
       function sample(): void {
@@ -316,78 +349,91 @@
            canvas, proportionally fewer on small screens, always dense
            enough that letterforms read as solid halftone. */
         let grid = Math.max(3, Math.min(8, Math.round(Math.sqrt((innerW * height) / 16000))));
-        const collect = (): void => {
-          dots = [];
+        const collect = (): Dot[] => {
+          const out: Dot[] = [];
           for (let y = 0; y < height; y += grid) {
             for (let x = 0; x < innerW; x += grid) {
               if (data[(y * innerW + x) * 4 + 3] > 120) {
-                dots.push({ hx: x, hy: y, x, y, vx: 0, vy: 0 });
+                out.push({ hx: x, hy: y, x, y, vx: 0, vy: 0, spin: Math.random() * 2 - 1 });
               }
             }
           }
+          return out;
         };
-        collect();
+        dots = collect();
         let attempts = 0;
         while (dots.length > 9000 && attempts < 3) {
           grid += 1;
-          collect();
+          dots = collect();
           attempts += 1;
         }
         gridSize = grid;
+        pulses = [];
 
         cw = innerW;
         ch = height;
-        for (const layer of [baseCanvas, canvas]) {
-          if (!layer) continue;
-          layer.width = Math.round(innerW * dpr);
-          layer.height = Math.round(height * dpr);
-          layer.style.height = `${height}px`;
-          const lctx = layer.getContext('2d');
-          lctx?.setTransform(dpr, 0, 0, dpr, 0, 0);
-        }
-        if (baseCanvas) {
-          const bctx = baseCanvas.getContext('2d');
-          if (bctx) drawStaticInto(bctx);
-        }
+        cv.width = Math.round(innerW * dpr);
+        cv.height = Math.round(height * dpr);
+        cv.style.height = `${height}px`;
         ctx = cv.getContext('2d');
-        if (ctx) drawDynamic(ctx);
+        if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        drawAll();
       }
 
       sample();
       document.fonts?.ready.then(() => sample());
 
+      const toCanvasCoords = (clientX: number, clientY: number): { x: number; y: number } => {
+        const rect = cv.getBoundingClientRect();
+        return { x: clientX - rect.left, y: clientY - rect.top };
+      };
+      const onPointerEnter = (event: PointerEvent): void => {
+        const { x, y } = toCanvasCoords(event.clientX, event.clientY);
+        px = x;
+        py = y;
+        pointerInside = true;
+        firePulse(x, y);
+      };
       const onPointerMove = (event: PointerEvent): void => {
-        const clientX = event.clientX;
-        const clientY = event.clientY;
         if (pointerTicking) return;
         pointerTicking = true;
+        const clientX = event.clientX;
+        const clientY = event.clientY;
+        const seq = ++moveSeq;
         requestAnimationFrame(() => {
           pointerTicking = false;
-          const rect = cv.getBoundingClientRect();
-          px = clientX - rect.left;
-          py = clientY - rect.top;
+          /* A pointerleave after this move was queued invalidates it —
+             applying a stale inside-sample would pin pointerInside true
+             and keep the loop (and the repulsion) running forever. */
+          if (seq !== moveSeq) return;
+          const { x, y } = toCanvasCoords(clientX, clientY);
+          px = x;
+          py = y;
           pointerInside = true;
+          startLoop();
         });
       };
+      const onPointerDown = (event: PointerEvent): void => {
+        const { x, y } = toCanvasCoords(event.clientX, event.clientY);
+        firePulse(x, y);
+      };
       const onPointerLeave = (): void => {
-        pointerInside = false; // phantom pointer takes over
+        moveSeq++; // invalidate any queued pointermove sample
+        pointerInside = false; // springs carry every dot home
       };
       const onResize = (): void => {
         if (rebuildTimer) clearTimeout(rebuildTimer);
         rebuildTimer = setTimeout(() => {
           sample();
-          startLoop();
         }, 180);
       };
 
-      /* The loop runs while the wordmark is on screen; an IntersectionObserver
-         parks it offscreen and restarts it on re-entry. Pointer-following is
-         attached only when the device can actually hover — pure touch devices
-         still get the phantom idle animation. */
+      /* The loop runs only while dots are in motion; an IntersectionObserver
+         parks it offscreen. Pointer-following attaches only when the device
+         can actually hover — touch devices shatter the field via taps. */
       const visibilityObserver = new IntersectionObserver(
         (entries) => {
           megaVisible = entries.some((e) => e.isIntersecting);
-          if (megaVisible) startLoop();
         },
         { threshold: 0.05 }
       );
@@ -395,15 +441,19 @@
       if (!reducedMotion) {
         visibilityObserver.observe(cv);
         if (canHover) {
+          mega.addEventListener('pointerenter', onPointerEnter);
           mega.addEventListener('pointermove', onPointerMove, { passive: true });
           mega.addEventListener('pointerleave', onPointerLeave);
           cleanups.push(() => {
+            mega.removeEventListener('pointerenter', onPointerEnter);
             mega.removeEventListener('pointermove', onPointerMove);
             mega.removeEventListener('pointerleave', onPointerLeave);
           });
         }
+        mega.addEventListener('pointerdown', onPointerDown);
         window.addEventListener('resize', onResize);
         cleanups.push(() => {
+          mega.removeEventListener('pointerdown', onPointerDown);
           window.removeEventListener('resize', onResize);
           visibilityObserver.disconnect();
           if (raf) cancelAnimationFrame(raf);
@@ -536,19 +586,13 @@
   </div>
 
   <!-- Giant dot-matrix wordmark — final element, full-bleed. The text is
-       rasterized into a binary mask and sampled into a grid of dots. Two
-       stacked canvas layers keep frame cost proportional to the disturbed
-       area, not the dot count: the base layer draws every dot at rest once
-       per rebuild, and the dynamic layer above it redraws only the dots a
-       pointer has displaced. Each dot is a spring — pushed away, easing
-       back to its home position — and with no pointer a Lissajous phantom
-       drifts the field so the wordmark quietly breathes. aria-hidden —
-       purely decorative. -->
+       rasterized into a binary mask and sampled into a grid of dots on a
+       single canvas. At rest it is one static frame; hovering shatters the
+       dots with a local repulsion field plus ripple pulses that travel
+       through the glyphs, and on leave every dot springs back home before
+       the loop parks. aria-hidden — purely decorative. -->
   <div class="ft-mega" aria-hidden="true" bind:this={megaEl}>
-    <div class="ft-mega-stage">
-      <canvas class="ft-mega-canvas ft-mega-base"></canvas>
-      <canvas class="ft-mega-canvas"></canvas>
-    </div>
+    <canvas class="ft-mega-canvas"></canvas>
   </div>
 </footer>
 
@@ -904,20 +948,6 @@
   .cqd-footer :global(.ft-mega-pending) {
     opacity: 0;
     transform: translateY(20px);
-  }
-
-  /* The stage is the positioning context for the two canvas layers. It sits
-     inside .ft-mega's content box, so both layers resolve width: 100%
-     against the same box and stay pixel-aligned. */
-  .ft-mega-stage {
-    position: relative;
-  }
-
-  .ft-mega-base {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
   }
 
   .ft-mega-canvas {
