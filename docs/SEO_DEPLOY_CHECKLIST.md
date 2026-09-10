@@ -19,7 +19,7 @@ This file separates repository-implemented SEO work from manual operations that 
 - Crawl directives:
   - `website/src/routes/robots.txt/+server.ts` disallows utility/editor routes (`/uninstall`, `/404`, `/overview-editor`, `/landing2`)
   - `website/src/routes/sitemap.xml/+server.ts` includes all indexable SEO pages plus `lastmod`, `changefreq`, `priority`, image sitemap tags, and video sitemap tags
-  - `website/src/routes/site-map/+page.svelte` exposes an HTML sitemap and global footer link (`/site-map`) for stronger crawl-path discovery
+  - `website/src/routes/site-map/+page.svelte` exposes an HTML sitemap (`/site-map`); it is in `sitemap.xml` and `llms.txt`, and linked from the watch pages — the footer link was intentionally removed in `e4ec45f2`
   - `/watch/cqd-demo` and `/watch/manual-vs-cqd` provide direct, indexable video pages with `VideoObject` schema
 - Search appearance polish:
   - richer crawler preview directives (`max-image-preview:large`, snippet/video preview hints)
