@@ -235,7 +235,15 @@
     const borderX = parseFloat(styles.borderLeftWidth) + parseFloat(styles.borderRightWidth);
     const borderY = parseFloat(styles.borderTopWidth) + parseFloat(styles.borderBottomWidth);
     const maxW = document.documentElement.clientWidth - 32;
-    const width = Math.min(block.offsetWidth + padX + borderX, maxW);
+    const natural = block.offsetWidth + padX + borderX;
+    // Viewport-capped: let the active block wrap inside the panel instead
+    // of being clipped at both edges by the centered overflow.
+    if (natural > maxW) {
+      block.style.maxWidth = `${Math.round(maxW - padX - borderX)}px`;
+    } else if (block.style.maxWidth) {
+      block.style.maxWidth = '';
+    }
+    const width = Math.min(natural, maxW);
     const height = (content?.offsetHeight ?? block.offsetHeight) + padY + borderY;
     panelEl.style.width = `${Math.round(width)}px`;
     panelEl.style.height = `${Math.round(height)}px`;
@@ -1681,7 +1689,6 @@
      ============================================================ */
   .l2-nav-menu-block-github {
     width: 380px;
-    max-width: 100%;
   }
 
   .l2-gh-card {
