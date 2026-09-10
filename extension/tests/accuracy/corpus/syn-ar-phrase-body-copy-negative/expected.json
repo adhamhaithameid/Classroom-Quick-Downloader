@@ -1,0 +1,14 @@
+{
+  "caseId": "syn-ar-phrase-body-copy-negative",
+  "viewKind": "stream",
+  "lang": "ar",
+  "note": "D6 regression: the generic Arabic phrase 'من الصف' (from the class) from the ar classComment table appears in ordinary body copy - 'bring three sheets from the fifth grade tomorrow'. The prose word 'ثلاثة' (three) hands the substring matcher a phantom count via the word-number fallback, so the phrase match alone flags a post with no comment UI and no count. No digit appears anywhere on the card.",
+  "posts": [
+    {
+      "postId": "synth-ar-phrase-1",
+      "commentPresent": false,
+      "commentCount": null,
+      "editedPresent": false
+    }
+  ]
+}

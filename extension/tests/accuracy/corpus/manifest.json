@@ -1,7 +1,7 @@
 {
   "generatedOn": "2026-09-10",
   "totals": {
-    "cases": 44,
+    "cases": 46,
     "locales": 7,
     "languages": [
       "ar",
@@ -106,9 +106,23 @@
       "posts": 1
     },
     {
+      "caseId": "syn-ar-phrase-body-copy-negative",
+      "origin": "synthetic",
+      "lang": "ar",
+      "viewKind": "stream",
+      "posts": 1
+    },
+    {
       "caseId": "syn-ar-tashkeel-comments",
       "origin": "synthetic",
       "lang": "ar",
+      "viewKind": "stream",
+      "posts": 1
+    },
+    {
+      "caseId": "syn-en-commentary-false-positive",
+      "origin": "synthetic",
+      "lang": "en",
       "viewKind": "stream",
       "posts": 1
     },
