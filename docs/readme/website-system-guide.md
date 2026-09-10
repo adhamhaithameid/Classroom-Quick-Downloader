@@ -63,7 +63,7 @@ Site footer (`website/src/lib/components/SiteFooter.svelte`):
 - Layer 2: product identity + navigation grid (Product / Support / Install columns) with the app version
 - Layer 3: principles strip (Instant / Private / Transparent / Universal)
 - Layer 4: legal bar (copyright, non-affiliation note, builder credit)
-- Giant dot-matrix wordmark: two stacked canvas layers — a static base layer (resting dots, drawn once per rebuild) and a dynamic layer (displaced dots only, so frame cost scales with the disturbed area); pointer spring interaction with a Lissajous phantom when no pointer is present; static rendering under `prefers-reduced-motion`
+- Giant dot-matrix wordmark: a single dot population on one canvas. The rest state is one static frame (no idle animation); hovering shatters the dots — pointer entry and clicks fire ripple pulses whose wavefront travels through the glyphs while a local repulsion field holds a cavity under the pointer — and on leave every dot springs back home before the loop parks on the exact rest frame. Static rendering under `prefers-reduced-motion`
 - Reveal animations fail open: SSR markup never ships the hidden state, and a passive scroll check plus a failsafe timer reveal anything an IntersectionObserver callback misses
 
 ## 4. Data Access Layer
