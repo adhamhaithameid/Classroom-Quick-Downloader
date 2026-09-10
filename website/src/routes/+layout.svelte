@@ -415,7 +415,6 @@
       // would be one dead middle — stay full-width and let the scrolled
       // glass styling do the work.
       if (window.matchMedia('(max-width: 860px)').matches) {
-        bar.style.removeProperty('--pill-links-shift');
         bar.style.width = '';
         bar.style.marginLeft = '';
         bar.style.marginRight = '';
@@ -444,17 +443,21 @@
       const cs = getComputedStyle(bar);
       const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
       const borderX = parseFloat(cs.borderLeftWidth) + parseFloat(cs.borderRightWidth);
-      // Balanced pill: width is the real segment sum (brand + links + CTA)
-      // plus an even breathing gap per side. The centered links row is then
-      // nudged by (actions - brand) / 2 so it sits optically between the
-      // logo and the install button — equal gaps on both edges.
+      // Balanced pill with the links cluster at the EXACT center in both
+      // states (it must never slide during the morph): the bar needs half
+      // its width to fit the widest edge segment (logo or install button)
+      // plus a breathing gap next to the centered links. The logo and CTA
+      // travel inward as the pill forms — that motion is expected; the
+      // links themselves never move horizontally.
       const gap = 26;
       const cap = Math.round(document.documentElement.clientWidth * 0.92);
       const target = Math.max(
-        Math.min(Math.round(brandW + linksW + actionsW + gap * 2 + padX + borderX), cap),
+        Math.min(
+          Math.round(linksW + gap * 2 + Math.max(brandW, actionsW) * 2 + padX + borderX),
+          cap
+        ),
         320
       );
-      bar.style.setProperty('--pill-links-shift', `${Math.round((brandW - actionsW) / 2)}px`);
       const inset = Math.max(0, Math.round((available - target) / 2));
       bar.style.width = `${target}px`;
       bar.style.marginLeft = `${inset}px`;
@@ -1233,13 +1236,6 @@
     display: flex;
     align-items: center;
     gap: 2px;
-    transition: left 0.55s var(--nav-ease);
-  }
-
-  /* In pill mode the links cluster slides to sit optically between the
-     logo and the install button, keeping both edge gaps equal. */
-  .l2-nav-shell.is-scrolled .l2-nav-links {
-    left: calc(50% + var(--pill-links-shift, 0px));
   }
 
   .l2-nav-actions {
