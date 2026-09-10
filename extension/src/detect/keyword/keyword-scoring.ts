@@ -47,6 +47,7 @@ import {
 import { ACTION_BUTTON_PATTERNS } from '../../core/detect/action-buttons';
 import { PLAUSIBLE_COMMENT_COUNT } from '../../core/detect/ceilings';
 import { parseCountChip } from '../../core/detect/numerals';
+import { matchesNormalizedKeyword } from '../../core/detect/matching';
 
 import {
   applyExclusions,
@@ -98,12 +99,32 @@ function isActionButton(text: string): boolean {
   return ACTION_BUTTON_PATTERNS.some(p => p.test(normalized));
 }
 
-/** Check if text contains any of the comment keywords */
-function containsCommentKeyword(text: string, keywords: CommentKeywords): string | null {
+/**
+ * Check if text contains any of the comment keywords (D6 semantics).
+ *
+ * Matching goes through the shared core matcher: phrases are consecutive
+ * whole-token runs, single words are whole-token equality in space-delimited
+ * scripts, and unspaced-script keywords keep substring containment.
+ *
+ * Evidence policy (D6): `classComment` entries — which include generic
+ * phrases like the Arabic 'من الصف' ("from the class") that carry no comment
+ * word of their own — only count as evidence in an authoritative attribute
+ * context (aria-label/title). In plain text they are indistinguishable from
+ * ordinary body copy, and a stray numeral or word-number in the same sentence
+ * then becomes a phantom count. Layer 0 chip evidence short-circuits before
+ * any keyword runs, so this restriction costs the layers nothing.
+ */
+function containsCommentKeyword(
+  text: string,
+  keywords: CommentKeywords,
+  options: { attributeContext?: boolean } = {},
+): string | null {
   const normalizedText = normalizeForComparison(text);
-  const allKeywords = [...keywords.singular, ...keywords.plural, ...keywords.classComment];
-  for (const keyword of allKeywords) {
-    if (normalizedText.includes(normalizeForComparison(keyword))) {
+  const pool = options.attributeContext
+    ? [...keywords.singular, ...keywords.plural, ...keywords.classComment]
+    : [...keywords.singular, ...keywords.plural];
+  for (const keyword of pool) {
+    if (matchesNormalizedKeyword(normalizedText, normalizeForComparison(keyword))) {
       return keyword;
     }
   }
@@ -115,11 +136,11 @@ function extractCount(text: string): number | null {
   return parseUnicodeInteger(text);
 }
 
-/** Find an edited keyword in text */
+/** Find an edited keyword in text (D6 shared-matcher semantics) */
 function findEditedKeyword(text: string, keywords: string[]): string | null {
   const normalizedText = normalizeForComparison(text);
   for (const keyword of keywords) {
-    if (normalizedText.includes(normalizeForComparison(keyword))) {
+    if (matchesNormalizedKeyword(normalizedText, normalizeForComparison(keyword))) {
       return keyword;
     }
   }
@@ -250,7 +271,7 @@ function commentLayer1_Accessibility(post: HTMLElement, keywords: CommentKeyword
     if (isExcludedText(label, 'comment')) continue;
     if (isActionButton(label)) continue;
 
-    const match = containsCommentKeyword(label, keywords);
+    const match = containsCommentKeyword(label, keywords, { attributeContext: true });
     if (match) {
       const count = extractCount(label);
       if (count !== null && count > 0) {
@@ -272,7 +293,7 @@ function commentLayer1_Accessibility(post: HTMLElement, keywords: CommentKeyword
     if (isExcludedText(title, 'comment')) continue;
     if (isActionButton(title)) continue;
 
-    const match = containsCommentKeyword(title, keywords);
+    const match = containsCommentKeyword(title, keywords, { attributeContext: true });
     if (match) {
       const count = extractCount(title);
       if (count !== null && count > 0) {
@@ -320,7 +341,7 @@ function commentLayer2_ButtonHeuristic(post: HTMLElement, keywords: CommentKeywo
     // Also check button's own aria-label
     const ariaLabel = normalizeText(el.getAttribute('aria-label') || '');
     if (ariaLabel && !isActionButton(ariaLabel) && !isExcludedText(ariaLabel, 'comment')) {
-      const match = containsCommentKeyword(ariaLabel, keywords);
+      const match = containsCommentKeyword(ariaLabel, keywords, { attributeContext: true });
       if (match) {
         const count = extractCount(ariaLabel);
         if (count !== null && count > 0) {
@@ -354,7 +375,7 @@ function commentLayer3_GoldenSelectors(post: HTMLElement, keywords: CommentKeywo
         if (ariaLabel) {
           const normalized = normalizeText(ariaLabel);
           if (!isExcludedText(normalized, 'comment') && !isActionButton(normalized)) {
-            const match = containsCommentKeyword(normalized, keywords);
+            const match = containsCommentKeyword(normalized, keywords, { attributeContext: true });
             if (match) {
               const count = extractCount(normalized);
               if (count !== null && count > 0) {
@@ -726,7 +747,7 @@ function editedLayer4_Exclusion(post: HTMLElement, matchedText: string | null): 
     const userContent = post.querySelector(selector);
     if (userContent) {
       const userText = normalizeForComparison(userContent.textContent || '');
-      if (userText.includes(normalizeForComparison(matchedText))) {
+      if (matchesNormalizedKeyword(userText, normalizeForComparison(matchedText))) {
         return {
           score: CONFIDENCE_WEIGHTS.LAYER_4_EXCLUSION,
           matchedText,

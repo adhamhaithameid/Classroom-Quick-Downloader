@@ -135,7 +135,7 @@
           "score": 20,
           "matched": true,
           "matchedText": "3 class comments",
-          "details": "L4-Nuclear: \"comment\" in DOM text (count: 3)"
+          "details": "L4-Nuclear: \"comments\" in DOM text (count: 3)"
         },
         {
           "layerName": "edited-L1",
@@ -223,7 +223,7 @@
           "score": 20,
           "matched": true,
           "matchedText": "2 class comments",
-          "details": "L4-Nuclear: \"comment\" in DOM text (count: 2)"
+          "details": "L4-Nuclear: \"comments\" in DOM text (count: 2)"
         },
         {
           "layerName": "edited-L1",
@@ -310,7 +310,7 @@
           "score": 20,
           "matched": true,
           "matchedText": "٥ تعليقات صفية",
-          "details": "L4-Nuclear: \"تعليق\" in DOM text (count: 5)"
+          "details": "L4-Nuclear: \"تعليقات\" in DOM text (count: 5)"
         },
         {
           "layerName": "edited-L1",
@@ -397,7 +397,7 @@
           "score": 20,
           "matched": true,
           "matchedText": "5 class comments",
-          "details": "L4-Nuclear: \"comment\" in DOM text (count: 5)"
+          "details": "L4-Nuclear: \"comments\" in DOM text (count: 5)"
         },
         {
           "layerName": "edited-L1",

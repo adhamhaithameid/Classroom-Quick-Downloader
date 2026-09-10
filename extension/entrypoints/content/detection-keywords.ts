@@ -28,6 +28,7 @@ export const UNIVERSAL_DIGIT_REGEX = new RegExp(`[${D}]`, 'gu');
 // extraction). Re-exported here so every V1 consumer keeps its import path;
 // new code should import from core directly.
 import { normalizeText, normalizeForComparison } from '../../src/core/detect/normalize';
+import { matchesNormalizedKeyword } from '../../src/core/detect/matching';
 
 export { normalizeText, normalizeForComparison };
 
@@ -673,10 +674,10 @@ export function hasDatePattern(text: string): boolean {
 
 export function isExcludedCommentPattern(text: string): boolean {
   const normalized = normalizeForComparison(text);
-  return COMMENT_EXCLUSION_PATTERNS.some(p => normalized.includes(normalizeForComparison(p)));
+  return COMMENT_EXCLUSION_PATTERNS.some(p => matchesNormalizedKeyword(normalized, normalizeForComparison(p)));
 }
 
 export function isExcludedEditedPattern(text: string): boolean {
   const normalized = normalizeForComparison(text);
-  return EDITED_EXCLUSION_PATTERNS.some(p => normalized.includes(normalizeForComparison(p)));
+  return EDITED_EXCLUSION_PATTERNS.some(p => matchesNormalizedKeyword(normalized, normalizeForComparison(p)));
 }
