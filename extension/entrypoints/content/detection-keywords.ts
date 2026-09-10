@@ -24,47 +24,12 @@ export const UNIVERSAL_DIGIT_REGEX = new RegExp(`[${D}]`, 'gu');
 // BIDI CONTROL CHARACTERS TO STRIP
 // ============================================================================
 
-const BIDI_CONTROL_CHARS: RegExp = new RegExp(
-  '[' +
-    '\u200B\u200C\u200D' + // Zero-width spaces/joiners
-    '\u200E\u200F' +       // LTR/RTL marks
-    '\u202A-\u202E' +      // Directional embeddings/overrides
-    '\u2066-\u2069' +      // Isolates
-    '\u061C' +             // Arabic Letter Mark
-    '\uFEFF' +             // BOM
-    '\u00AD' +             // Soft hyphen
-  ']',
-  'gu'
-);
+// Text normalization lives in src/core/detect/normalize.ts (Engine V4 S4 core
+// extraction). Re-exported here so every V1 consumer keeps its import path;
+// new code should import from core directly.
+import { normalizeText, normalizeForComparison } from '../../src/core/detect/normalize';
 
-const WHITESPACE_VARIANTS: RegExp = /[\u00A0\u2000-\u200A\u202F\u205F\u3000]/gu;
-
-// ============================================================================
-// TEXT NORMALIZATION ENGINE
-// ============================================================================
-
-/**
- * Normalizes text by stripping invisible BiDi control characters.
- * ALL scanning MUST pass through this function.
- */
-export function normalizeText(text: string): string {
-  if (!text) return '';
-  return text
-    .replace(BIDI_CONTROL_CHARS, '')
-    .replace(WHITESPACE_VARIANTS, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-/**
- * Aggressive normalization for comparison (lowercase, no punctuation).
- */
-export function normalizeForComparison(text: string): string {
-  return normalizeText(text)
-    .toLowerCase()
-    .replace(/[()[\]{}.,،!?:;'"]/g, '')
-    .trim();
-}
+export { normalizeText, normalizeForComparison };
 
 // ============================================================================
 // UNICODE INTEGER PARSING

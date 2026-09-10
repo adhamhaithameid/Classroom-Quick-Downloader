@@ -44,6 +44,8 @@ import {
   GOLDEN_SELECTORS,
   type CommentKeywords,
 } from '../../v2/decision/keyword-loader';
+import { ACTION_BUTTON_PATTERNS } from '../../core/detect/action-buttons';
+import { PLAUSIBLE_COMMENT_COUNT } from '../../core/detect/ceilings';
 
 import {
   applyExclusions,
@@ -80,26 +82,10 @@ interface EditedLayerResult {
 // ============================================================================
 
 /**
- * Action button patterns — regex for "Add comment" style text.
- * These are UI buttons, not actual comment indicators.
- * Tested via the exclusion engine as well, but we double-check
- * at the layer level for early exit.
+ * Action button patterns live in src/core/detect/action-buttons.ts — the one
+ * canonical table (D3). This layer double-checks them for early exit; the
+ * exclusion engine scores the same table with metadata.
  */
-const ACTION_BUTTON_PATTERNS: RegExp[] = [
-  /add\s+(?:class\s+)?comment/i,
-  /(?:اضافة|إضافة|أضف)\s+تعليق/i,
-  /добавить\s+комментарий/i,
-  /コメントを追加/i,
-  /添加评论/i,
-  /ajouter.*commentaire/i,
-  /kommentar.*hinzufügen/i,
-  /añadir.*comentario/i,
-  /write.*comment/i,
-  /type.*comment/i,
-  /post.*comment/i,
-  /new\s+comment/i,
-  /leave.*comment/i,
-];
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -226,7 +212,7 @@ function commentLayer0_DOMTruth(post: HTMLElement): CommentLayerResult {
     // Direct text content
     const directText = normalizeText(container.textContent || '');
     const directCount = extractCount(directText);
-    if (directCount !== null && directCount > 0 && directCount < 1000) {
+    if (directCount !== null && directCount > 0 && directCount < PLAUSIBLE_COMMENT_COUNT) {
       return { score: 100, count: directCount, matchedText: directText, details: `L0-DOMTruth: "${directText}" direct (count: ${directCount})` };
     }
   }
@@ -236,7 +222,7 @@ function commentLayer0_DOMTruth(post: HTMLElement): CommentLayerResult {
   if (seqYL && seqYL !== container) {
     const text = normalizeText(seqYL.textContent || '');
     const count = extractCount(text);
-    if (count !== null && count > 0 && count < 1000) {
+    if (count !== null && count > 0 && count < PLAUSIBLE_COMMENT_COUNT) {
       return { score: 95, count, matchedText: text, details: `L0-DOMTruth: "${text}" via .seqYL (count: ${count})` };
     }
   }
@@ -383,7 +369,7 @@ function commentLayer3_GoldenSelectors(post: HTMLElement, keywords: CommentKeywo
           const childText = normalizeText(child.textContent || '');
           if (/^\d+$/.test(childText.trim()) && child.children.length === 0) {
             const count = parseInt(childText.trim(), 10);
-            if (count > 0 && count < 10000) {
+            if (count > 0 && count < PLAUSIBLE_COMMENT_COUNT) {
               const parentText = normalizeText(element.textContent || '');
               const match = containsCommentKeyword(parentText, keywords);
               if (match) {

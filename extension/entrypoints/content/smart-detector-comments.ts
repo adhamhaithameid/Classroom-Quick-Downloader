@@ -60,23 +60,9 @@ interface LayerResult {
 // EXCLUSION PATTERNS (Action buttons to ignore)
 // ============================================================================
 
-const ACTION_BUTTON_PATTERNS = [
-  /add\s+(?:class\s+)?comment/i,
-  /اضافة\s+تعليق/i,           // Arabic: Add comment
-  /إضافة\s+تعليق/i,           // Arabic variant
-  /أضف\s+تعليق/i,             // Arabic: Add comment (imperative)
-  /добавить\s+комментарий/i,  // Russian
-  /コメントを追加/i,            // Japanese
-  /添加评论/i,                 // Chinese
-  /ajouter.*commentaire/i,    // French
-  /kommentar.*hinzufügen/i,   // German
-  /añadir.*comentario/i,      // Spanish
-  /write.*comment/i,
-  /type.*comment/i,
-  /post.*comment/i,
-  /new\s+comment/i,
-  /leave.*comment/i,
-];
+// The one canonical table lives in src/core/detect/action-buttons.ts (D3);
+// this module consumes it for early-exit filtering.
+import { ACTION_BUTTON_PATTERNS } from '../../src/core/detect/action-buttons';
 
 function isActionButton(text: string): boolean {
   const normalized = normalizeForComparison(text);

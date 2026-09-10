@@ -53,6 +53,7 @@ import type {
 } from '../../contracts/detection';
 
 import { extractDigitCount } from '../shared/numerals';
+import { PLAUSIBLE_COMMENT_COUNT } from '../../core/detect/ceilings';
 
 /** Result of one structural layer. */
 interface StructuralLayerResult {
@@ -124,7 +125,7 @@ function layerDomTruth(post: HTMLElement): StructuralLayerResult {
     }
 
     const direct = extractDigitCount(container.textContent ?? '');
-    if (direct !== null && direct < 1000) {
+    if (direct !== null && direct < PLAUSIBLE_COMMENT_COUNT) {
       return {
         strength: 100,
         count: direct,
@@ -138,7 +139,7 @@ function layerDomTruth(post: HTMLElement): StructuralLayerResult {
   const seqYL = post.querySelector<HTMLElement>('.seqYL');
   if (seqYL && seqYL !== container) {
     const count = extractDigitCount(seqYL.textContent ?? '');
-    if (count !== null && count < 1000) {
+    if (count !== null && count < PLAUSIBLE_COMMENT_COUNT) {
       return {
         strength: 95,
         count,

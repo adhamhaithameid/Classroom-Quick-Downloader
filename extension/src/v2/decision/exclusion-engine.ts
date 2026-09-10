@@ -29,7 +29,8 @@
 import {
   normalizeForComparison,
   normalizeText,
-} from '../../../entrypoints/content/detection-keywords';
+} from '../../core/detect/normalize';
+import { findActionButtonPattern } from '../../core/detect/action-buttons';
 
 // ============================================================================
 // TYPES
@@ -124,7 +125,7 @@ const EXCLUSION_RULES: ExclusionRule[] = [
   {
     id: 'ACTION_BTN_ADD_COMMENT',
     type: 'regex',
-    pattern: /add\s+(?:class\s+)?comment/i,
+    pattern: findActionButtonPattern('add\\s+(?:class\\s+)?comment'),
     applies_to: ['comment'],
     penalty: -30,
     reason: 'Action button text: "Add [class] comment"',
@@ -133,7 +134,7 @@ const EXCLUSION_RULES: ExclusionRule[] = [
   {
     id: 'ACTION_BTN_WRITE_COMMENT',
     type: 'regex',
-    pattern: /write.*comment/i,
+    pattern: findActionButtonPattern('write.*comment'),
     applies_to: ['comment'],
     penalty: -30,
     reason: 'Action button text: "Write comment"',
@@ -142,7 +143,7 @@ const EXCLUSION_RULES: ExclusionRule[] = [
   {
     id: 'ACTION_BTN_TYPE_COMMENT',
     type: 'regex',
-    pattern: /type.*comment/i,
+    pattern: findActionButtonPattern('type.*comment'),
     applies_to: ['comment'],
     penalty: -30,
     reason: 'Action button text: "Type comment"',
@@ -151,7 +152,7 @@ const EXCLUSION_RULES: ExclusionRule[] = [
   {
     id: 'ACTION_BTN_POST_COMMENT',
     type: 'regex',
-    pattern: /post.*comment/i,
+    pattern: findActionButtonPattern('post.*comment'),
     applies_to: ['comment'],
     penalty: -30,
     reason: 'Action button text: "Post comment"',
@@ -160,7 +161,7 @@ const EXCLUSION_RULES: ExclusionRule[] = [
   {
     id: 'ACTION_BTN_NEW_COMMENT',
     type: 'regex',
-    pattern: /new\s+comment/i,
+    pattern: findActionButtonPattern('new\\s+comment'),
     applies_to: ['comment'],
     penalty: -30,
     reason: 'Action button text: "New comment"',
@@ -169,7 +170,7 @@ const EXCLUSION_RULES: ExclusionRule[] = [
   {
     id: 'ACTION_BTN_LEAVE_COMMENT',
     type: 'regex',
-    pattern: /leave.*comment/i,
+    pattern: findActionButtonPattern('leave.*comment'),
     applies_to: ['comment'],
     penalty: -30,
     reason: 'Action button text: "Leave comment"',
@@ -179,7 +180,7 @@ const EXCLUSION_RULES: ExclusionRule[] = [
   {
     id: 'ACTION_BTN_ADD_COMMENT_AR',
     type: 'regex',
-    pattern: /(?:اضافة|إضافة|أضف)\s+تعليق/i,
+    pattern: findActionButtonPattern('(?:اضافة|إضافة|أضف)\\s+تعليق'),
     applies_to: ['comment'],
     penalty: -30,
     reason: 'Action button text: Arabic "Add comment"',
@@ -189,7 +190,7 @@ const EXCLUSION_RULES: ExclusionRule[] = [
   {
     id: 'ACTION_BTN_ADD_COMMENT_RU',
     type: 'regex',
-    pattern: /добавить\s+комментарий/i,
+    pattern: findActionButtonPattern('добавить\\s+комментарий'),
     applies_to: ['comment'],
     penalty: -30,
     reason: 'Action button text: Russian "Add comment"',
@@ -199,7 +200,7 @@ const EXCLUSION_RULES: ExclusionRule[] = [
   {
     id: 'ACTION_BTN_ADD_COMMENT_JA',
     type: 'regex',
-    pattern: /コメントを追加/i,
+    pattern: findActionButtonPattern('コメントを追加'),
     applies_to: ['comment'],
     penalty: -30,
     reason: 'Action button text: Japanese "Add comment"',
@@ -209,7 +210,7 @@ const EXCLUSION_RULES: ExclusionRule[] = [
   {
     id: 'ACTION_BTN_ADD_COMMENT_ZH',
     type: 'regex',
-    pattern: /添加评论/i,
+    pattern: findActionButtonPattern('添加评论'),
     applies_to: ['comment'],
     penalty: -30,
     reason: 'Action button text: Chinese "Add comment"',
@@ -219,7 +220,7 @@ const EXCLUSION_RULES: ExclusionRule[] = [
   {
     id: 'ACTION_BTN_ADD_COMMENT_FR',
     type: 'regex',
-    pattern: /ajouter.*commentaire/i,
+    pattern: findActionButtonPattern('ajouter.*commentaire'),
     applies_to: ['comment'],
     penalty: -30,
     reason: 'Action button text: French "Add comment"',
@@ -229,7 +230,7 @@ const EXCLUSION_RULES: ExclusionRule[] = [
   {
     id: 'ACTION_BTN_ADD_COMMENT_DE',
     type: 'regex',
-    pattern: /kommentar.*hinzufügen/i,
+    pattern: findActionButtonPattern('kommentar.*hinzufügen'),
     applies_to: ['comment'],
     penalty: -30,
     reason: 'Action button text: German "Add comment"',
@@ -239,7 +240,7 @@ const EXCLUSION_RULES: ExclusionRule[] = [
   {
     id: 'ACTION_BTN_ADD_COMMENT_ES',
     type: 'regex',
-    pattern: /añadir.*comentario/i,
+    pattern: findActionButtonPattern('añadir.*comentario'),
     applies_to: ['comment'],
     penalty: -30,
     reason: 'Action button text: Spanish "Add comment"',
