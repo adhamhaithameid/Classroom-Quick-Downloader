@@ -79,9 +79,12 @@ function parseWordNumber(text: string): number | null {
   const normalized = normalizeForComparison(text);
   const tokens = normalized.split(/[\s\p{P}\p{S}]+/u).filter(Boolean);
   for (const token of tokens) {
-    const value = WORD_NUMBERS[token];
-    if (value !== undefined) {
-      return value;
+    // Own-property guard: an arbitrary page token must not resolve through
+    // the prototype chain — inherited members ('constructor', 'toString',
+    // 'valueOf', 'hasOwnProperty', …) are !== undefined and would otherwise
+    // escape this `number | null` function as a function object.
+    if (Object.hasOwn(WORD_NUMBERS, token)) {
+      return WORD_NUMBERS[token];
     }
   }
   return null;

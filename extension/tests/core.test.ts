@@ -136,6 +136,21 @@ describe('parseUnicodeInteger()', () => {
     expect(parseUnicodeInteger('comments: un')).toBe(1);
     expect(parseUnicodeInteger('واحد')).toBe(1);
   });
+
+  it('should not resolve tokens through the prototype chain (review round 1)', () => {
+    // 'constructor' and 'toString' are inherited Object.prototype members, not
+    // word numbers — the lookup must return null, never a function object.
+    expect(parseUnicodeInteger('constructor')).toBeNull();
+    expect(parseUnicodeInteger('toString')).toBeNull();
+    expect(parseUnicodeInteger('valueOf')).toBeNull();
+    expect(parseUnicodeInteger('hasOwnProperty')).toBeNull();
+  });
+
+  it('should parse further exact word-number tokens (review pins)', () => {
+    expect(parseUnicodeInteger('ein Kommentar')).toBe(1); // German "a comment"
+    expect(parseUnicodeInteger('eine')).toBe(1);          // German "a/one"
+    expect(parseUnicodeInteger('אחת')).toBe(1);           // Hebrew "one" (f.)
+  });
 });
 
 // ============================================================================
