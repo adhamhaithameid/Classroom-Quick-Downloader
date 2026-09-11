@@ -1,7 +1,7 @@
 {
-  "generatedOn": "2026-09-10",
+  "generatedOn": "2026-09-11",
   "totals": {
-    "cases": 47,
+    "cases": 48,
     "locales": 7,
     "languages": [
       "ar",
@@ -99,14 +99,14 @@
       "posts": 1
     },
     {
-      "caseId": "syn-ar-plain-negative",
-      "origin": "synthetic",
+      "caseId": "syn-ar-phrase-body-copy-negative",
+      "origin": "unspecified",
       "lang": "ar",
       "viewKind": "stream",
       "posts": 1
     },
     {
-      "caseId": "syn-ar-phrase-body-copy-negative",
+      "caseId": "syn-ar-plain-negative",
       "origin": "synthetic",
       "lang": "ar",
       "viewKind": "stream",
@@ -120,15 +120,15 @@
       "posts": 1
     },
     {
-      "caseId": "syn-en-commentary-false-positive",
+      "caseId": "syn-en-both-flags",
       "origin": "synthetic",
       "lang": "en",
       "viewKind": "stream",
       "posts": 1
     },
     {
-      "caseId": "syn-en-both-flags",
-      "origin": "synthetic",
+      "caseId": "syn-en-commentary-false-positive",
+      "origin": "unspecified",
       "lang": "en",
       "viewKind": "stream",
       "posts": 1
@@ -139,6 +139,13 @@
       "lang": "en",
       "viewKind": "stream",
       "posts": 1
+    },
+    {
+      "caseId": "syn-en-count-ceiling-boundary",
+      "origin": "synthetic",
+      "lang": "en",
+      "viewKind": "stream",
+      "posts": 2
     },
     {
       "caseId": "syn-en-count-shell-drift",
