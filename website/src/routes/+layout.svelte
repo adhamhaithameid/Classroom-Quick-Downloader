@@ -11,6 +11,7 @@
   import LoadingScreen from '$lib/components/LoadingScreen.svelte';
   import SiteFooter from '$lib/components/SiteFooter.svelte';
   import BrowserIcon from '$lib/components/BrowserIcon.svelte';
+  import BrowserIconSprite from '$lib/components/BrowserIconSprite.svelte';
   import '../app.css';
 
   type MenuIconKey =
@@ -671,6 +672,7 @@
 <svelte:window on:focusin={handleDocFocusIn} on:focusout={handleDocFocusOut} />
 
 <LoadingScreen />
+<BrowserIconSprite />
 
 <div class="site-shell" class:o2-fullscreen={hideChrome}>
   <div class="bg-aurora" aria-hidden="true">
@@ -783,7 +785,7 @@
                   }}
                 >
                   <span class="l2-nav-menu-glyph l2-nav-menu-glyph-brand" aria-hidden="true">
-                    <BrowserIcon browser="firefox" uid="nav" />
+                    <BrowserIcon browser="firefox" />
                   </span>
                   <span class="l2-nav-menu-copy">
                     <span class="l2-nav-menu-label">Install for Firefox</span>
@@ -803,7 +805,7 @@
                   }}
                 >
                   <span class="l2-nav-menu-glyph l2-nav-menu-glyph-brand" aria-hidden="true">
-                    <BrowserIcon browser="edge" uid="nav" />
+                    <BrowserIcon browser="edge" />
                   </span>
                   <span class="l2-nav-menu-copy">
                     <span class="l2-nav-menu-label">Install for Edge</span>
@@ -1017,7 +1019,7 @@
                 trackInstallClick('nav_install_firefox');
               }}
             >
-              <BrowserIcon browser="firefox" uid="nav-m" />
+              <BrowserIcon browser="firefox" />
               Firefox
             </a>
             <a
@@ -1030,7 +1032,7 @@
                 trackInstallClick('nav_install_edge');
               }}
             >
-              <BrowserIcon browser="edge" uid="nav-m" />
+              <BrowserIcon browser="edge" />
               Edge
             </a>
           </div>
@@ -2104,7 +2106,11 @@
 
   .l2-nav-alt-browsers {
     position: absolute;
-    top: calc(100% + 12px);
+    /* Navbar-bottom + 16px — the same rest gap the shared dropdown keeps.
+       Its 16px is measured from the bar itself; this panel anchors to the
+       CTA wrap, whose bottom sits 13px (12px padding + 1px border) above
+       the bar's border box. */
+    top: calc(100% + 31px);
     right: 0;
     display: grid;
     gap: 2px;
