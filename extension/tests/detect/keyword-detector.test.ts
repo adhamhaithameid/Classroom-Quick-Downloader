@@ -128,4 +128,33 @@ describe('KeywordDetector', () => {
     expect(obs.comment.present).toBe(false);
     expect(obs.comment.count).toBeNull();
   });
+
+  it('floors a corroborated sub-threshold count+keyword shell at the decide threshold (D12)', () => {
+    // Drifted count chip (no golden/L0/L1/L2 layer fires) plus an independent
+    // edited marker: the L4 score (20) alone dies below comment_show (40), but
+    // a parsed count with keyword evidence corroborated by the edited channel
+    // must not lose its verdict.
+    const post = createPost(
+      '<div class="IMvYId">Edited Mar 10</div>' +
+        '<footer><div class="post-comment-count">4 class comments</div></footer>',
+    );
+    const obs = detector.observe(post, { postId: 'p12', viewKind: ViewKind.STREAM, lang: 'en' });
+
+    expect(obs.comment.count).toBe(4);
+    expect(obs.comment.strength).toBe(40);
+    expect(obs.comment.present).toBe(true);
+  });
+
+  it('does not floor a sub-threshold count+keyword shell without edited corroboration (D12)', () => {
+    // Same drifted chip, no edited marker: the low L4 score still loses its
+    // verdict at the decide layer. Score floor, not unconditional present.
+    const post = createPost(
+      '<footer><div class="post-comment-count">4 class comments</div></footer>',
+    );
+    const obs = detector.observe(post, { postId: 'p13', viewKind: ViewKind.STREAM, lang: 'en' });
+
+    expect(obs.comment.count).toBe(4);
+    expect(obs.comment.strength).toBeLessThan(40);
+    expect(obs.comment.present).toBe(true); // observation-level fact only
+  });
 });

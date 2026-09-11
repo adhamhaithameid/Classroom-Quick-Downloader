@@ -11,8 +11,6 @@
     "coverage": 1
   },
   "knownFailures": [
-    "rtl-flagged-post-ar",
-    "stream-edited-and-comments-en",
     "fx-classwork-material-comments",
     "fx-mixed-links-comments",
     "syn-hu-both-flags",

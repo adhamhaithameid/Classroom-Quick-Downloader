@@ -264,11 +264,11 @@
   ],
   "rtl-flagged-post-ar.html": [
     {
-      "commentScore": 20,
+      "commentScore": 40,
       "editedScore": 40,
       "commentCount": 5,
       "editedDiff": null,
-      "finalVerdict": "edited",
+      "finalVerdict": "both",
       "confidence": "medium",
       "exclusionPenalties": [],
       "layers": [
@@ -351,11 +351,11 @@
   ],
   "stream-flagged-post-en.html": [
     {
-      "commentScore": 20,
+      "commentScore": 40,
       "editedScore": 40,
       "commentCount": 5,
       "editedDiff": null,
-      "finalVerdict": "edited",
+      "finalVerdict": "both",
       "confidence": "medium",
       "exclusionPenalties": [],
       "layers": [

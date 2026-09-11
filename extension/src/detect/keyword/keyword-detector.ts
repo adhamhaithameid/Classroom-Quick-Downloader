@@ -18,6 +18,7 @@ import type {
   PostObservation,
   AppliedPenalty,
 } from '../../contracts/detection';
+import { THRESHOLDS } from '../../decide/thresholds';
 
 import {
   scoreComments,
@@ -76,6 +77,37 @@ export class KeywordDetector implements Detector {
 
     commentScore = Math.max(0, commentScore);
     editedScore = Math.max(0, editedScore);
+
+    // D12 — corroboration floor against silent verdict degradation.
+    //
+    // When Google's classes drift, the comment-count shell (`.comment-count`-
+    // style chips) matches no layer above the L4 TreeWalker, whose low score
+    // dies below the decide threshold while the parsed count survives — the
+    // page reports a count with no verdict. The corpus (the authority here)
+    // rules that such a verdict must not die when the evidence is real:
+    //
+    //   - a POSITIVE count was parsed (post-D5 sanity gates are the phantom
+    //     filter — an id-like or implausible numeral never gets this far),
+    //   - comment-keyword evidence scored above zero (post-D6 whole-token
+    //     matching, so stray body-copy words do not qualify),
+    //   - no exclusion penalty silenced the match (commentScore > 0 above),
+    //   - and the INDEPENDENT edited channel cleared its own decide
+    //     threshold, corroborating that this shell belongs to real post
+    //     chrome rather than coincidental body copy.
+    //
+    // then the comment score floor is the decide threshold. This is a score
+    // floor, not an unconditional present: without the corroborating edited
+    // channel (or with the keyword match excluded) the sub-threshold score
+    // still loses its verdict, exactly as before.
+    if (
+      commentResult.count !== null &&
+      commentResult.count > 0 &&
+      commentScore > 0 &&
+      commentScore < THRESHOLDS.comment_show &&
+      editedScore >= THRESHOLDS.edited_show
+    ) {
+      commentScore = THRESHOLDS.comment_show;
+    }
 
     const penalties: AppliedPenalty[] = exclusions.map((e) => ({
       ruleId: e.ruleId,
