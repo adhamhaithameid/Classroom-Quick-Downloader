@@ -443,21 +443,24 @@
       const cs = getComputedStyle(bar);
       const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
       const borderX = parseFloat(cs.borderLeftWidth) + parseFloat(cs.borderRightWidth);
-      // Balanced pill with the links cluster at the EXACT center in both
-      // states (it must never slide during the morph): the bar needs half
-      // its width to fit the widest edge segment (logo or install button)
-      // plus a breathing gap next to the centered links. The logo and CTA
-      // travel inward as the pill forms — that motion is expected; the
-      // links themselves never move horizontally.
+      // Compact pill: each edge segment reserves only its real width.
+      // Sizing both halves for the widest segment (the install CTA) piled
+      // the whole logo/CTA width difference into the gap between the logo
+      // and the centered links. The links cluster instead leaves the bar's
+      // exact center by half that difference (--nav-links-shift, applied
+      // in .l2-nav-links), so it sits centered between the two segments
+      // with an equal breathing gap on each side; the transform transition
+      // glides it there while the pill contracts.
       const gap = 26;
       const cap = Math.round(document.documentElement.clientWidth * 0.92);
       const target = Math.max(
         Math.min(
-          Math.round(linksW + gap * 2 + Math.max(brandW, actionsW) * 2 + padX + borderX),
+          Math.round(linksW + gap * 2 + brandW + actionsW + padX + borderX),
           cap
         ),
         320
       );
+      bar.style.setProperty('--nav-links-shift', `${Math.round((brandW - actionsW) / 2)}px`);
       const inset = Math.max(0, Math.round((available - target) / 2));
       bar.style.width = `${target}px`;
       bar.style.marginLeft = `${inset}px`;
@@ -470,6 +473,7 @@
       bar.style.width = '';
       bar.style.marginLeft = '';
       bar.style.marginRight = '';
+      bar.style.removeProperty('--nav-links-shift');
     }
   }
 
@@ -1227,15 +1231,18 @@
   }
 
   /* Cloudflare-style center cluster: the links sit in the exact middle of
-     the bar regardless of brand/CTA widths. */
+     the bar regardless of brand/CTA widths. In pill mode syncBarMode sets
+     --nav-links-shift to re-center the cluster between the logo and the
+     install CTA with equal gaps. */
   .l2-nav-links {
     position: absolute;
     left: 50%;
     top: 50%;
-    transform: translate(-50%, -50%);
+    transform: translate(calc(-50% + var(--nav-links-shift, 0px)), -50%);
     display: flex;
     align-items: center;
     gap: 2px;
+    transition: transform 0.55s var(--nav-ease);
   }
 
   .l2-nav-actions {
@@ -2373,6 +2380,7 @@
     .l2-nav-menu-block,
     .l2-nav-menu-list li,
     .l2-nav-link,
+    .l2-nav-links,
     .l2-nav-caret,
     .l2-nav-menu-link,
     .l2-nav-menu-featured,
