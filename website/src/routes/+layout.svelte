@@ -427,9 +427,17 @@
       const brand = inner.querySelector<HTMLElement>(':scope > .l2-nav-brand');
       const links = inner.querySelector<HTMLElement>(':scope > .l2-nav-links');
       const actions = inner.querySelector<HTMLElement>(':scope > .l2-nav-actions');
+      // The links row is absolutely centered only above 1120px; below that
+      // it is a flex child. Read the layout before .l2-measure forces the
+      // row into flow for measurement.
+      const linksCentered = links ? getComputedStyle(links).position === 'absolute' : false;
       const prevTransition = bar.style.transition;
       bar.style.transition = 'none';
       bar.classList.add('l2-measure');
+      // Measure with the pill's own padding: the is-scrolled class may not
+      // have reached the DOM yet when this runs inside the reactive flush,
+      // and rest-state padding would inflate the target width by 24px.
+      bar.closest('.l2-nav-shell')?.classList.add('is-scrolled');
       bar.style.width = 'max-content';
       const brandW = brand?.offsetWidth ?? 0;
       const linksW = links?.offsetWidth ?? 0;
@@ -443,15 +451,19 @@
       const cs = getComputedStyle(bar);
       const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
       const borderX = parseFloat(cs.borderLeftWidth) + parseFloat(cs.borderRightWidth);
-      // Compact pill: each edge segment reserves only its real width.
-      // Sizing both halves for the widest segment (the install CTA) piled
-      // the whole logo/CTA width difference into the gap between the logo
-      // and the centered links. The links cluster instead leaves the bar's
-      // exact center by half that difference (--nav-links-shift, applied
-      // in .l2-nav-links), so it sits centered between the two segments
-      // with an equal breathing gap on each side; the transform transition
-      // glides it there while the pill contracts.
-      const gap = 26;
+      // Geometry: the links cluster keeps the exact screen position it has
+      // in the full-width bar (left: 50% of a centered container), so it
+      // never travels horizontally during the morph. The install CTA is
+      // ~100px wider than the logo, so a pill centered on the screen
+      // cannot give the stationary links equal gaps — the spare width
+      // would reappear as dead glass inside the pill. Instead the pill
+      // settles half that width difference to the right and the links
+      // ride half of it via --nav-links-shift (.l2-nav-links): the gaps
+      // come out equal, the slack lives in the empty page margins, and
+      // because the margins, width, and transform all transition with the
+      // same duration and easing, their drift cancels frame by frame and
+      // the links stay put.
+      const gap = 24;
       const cap = Math.round(document.documentElement.clientWidth * 0.92);
       const target = Math.max(
         Math.min(
@@ -460,11 +472,18 @@
         ),
         320
       );
-      bar.style.setProperty('--nav-links-shift', `${Math.round((brandW - actionsW) / 2)}px`);
+      const centerDelta = Math.round((actionsW - brandW) / 2);
       const inset = Math.max(0, Math.round((available - target) / 2));
       bar.style.width = `${target}px`;
-      bar.style.marginLeft = `${inset}px`;
-      bar.style.marginRight = `${inset}px`;
+      if (linksCentered) {
+        bar.style.setProperty('--nav-links-shift', `${-centerDelta}px`);
+        bar.style.marginLeft = `${inset + centerDelta}px`;
+        bar.style.marginRight = `${Math.max(0, inset - centerDelta)}px`;
+      } else {
+        bar.style.removeProperty('--nav-links-shift');
+        bar.style.marginLeft = `${inset}px`;
+        bar.style.marginRight = `${inset}px`;
+      }
     } else {
       if (!bar.style.width) return;
       // Returning: width animates px -> 100% while margins animate px -> 0.
