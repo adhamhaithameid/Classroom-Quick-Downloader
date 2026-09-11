@@ -673,6 +673,14 @@
 <LoadingScreen />
 
 <div class="site-shell" class:o2-fullscreen={hideChrome}>
+  <div class="bg-aurora" aria-hidden="true">
+    <span class="aurora-orb ao-1"></span>
+    <span class="aurora-orb ao-2"></span>
+    <span class="aurora-orb ao-3"></span>
+    <span class="aurora-orb ao-4"></span>
+    <span class="aurora-orb ao-5"></span>
+    <span class="aurora-orb ao-6"></span>
+  </div>
   {#if !hideChrome}
   <header class="l2-nav-shell" class:is-scrolled={scrolled} class:menu-open={openMenu !== null} class:nav-dark={navDark}>
     <div class="l2-nav-float">
@@ -761,6 +769,7 @@
                 on:mouseleave={scheduleMenuClose}
                 aria-label="Install for another browser"
               >
+                <p class="l2-nav-menu-title">Other browsers</p>
                 <a
                   class="l2-nav-alt"
                   href={browserLink('firefox')}
@@ -773,8 +782,13 @@
                     trackInstallClick('nav_install_firefox');
                   }}
                 >
-                  <BrowserIcon browser="firefox" uid="nav" />
-                  <span class="l2-nav-alt-label">Install for Firefox</span>
+                  <span class="l2-nav-menu-glyph l2-nav-menu-glyph-brand" aria-hidden="true">
+                    <BrowserIcon browser="firefox" uid="nav" />
+                  </span>
+                  <span class="l2-nav-menu-copy">
+                    <span class="l2-nav-menu-label">Install for Firefox</span>
+                    <span class="l2-nav-menu-desc">From the Mozilla Add-ons store.</span>
+                  </span>
                 </a>
                 <a
                   class="l2-nav-alt"
@@ -788,8 +802,13 @@
                     trackInstallClick('nav_install_edge');
                   }}
                 >
-                  <BrowserIcon browser="edge" uid="nav" />
-                  <span class="l2-nav-alt-label">Install for Edge</span>
+                  <span class="l2-nav-menu-glyph l2-nav-menu-glyph-brand" aria-hidden="true">
+                    <BrowserIcon browser="edge" uid="nav" />
+                  </span>
+                  <span class="l2-nav-menu-copy">
+                    <span class="l2-nav-menu-label">Install for Edge</span>
+                    <span class="l2-nav-menu-desc">From the Edge Add-ons store.</span>
+                  </span>
                 </a>
               </div>
             </div>
@@ -1053,7 +1072,9 @@
     min-height: 100vh;
     display: flex;
     flex-direction: column;
-    background: var(--bg);
+    /* body carries the opaque --bg canvas; this shell must stay transparent
+       or it would cover the fixed .bg-aurora layer painted behind it. */
+    background: transparent;
     color: var(--text);
   }
   .site-shell.o2-fullscreen {
@@ -1940,10 +1961,6 @@
     background: rgba(159, 232, 192, 0.16);
   }
 
-  .l2-nav-shell.nav-dark .l2-nav-alt {
-    color: #f4faf7;
-  }
-
   .l2-nav-shell.nav-dark .l2-nav-alt:hover,
   .l2-nav-shell.nav-dark .l2-nav-alt:focus-visible {
     background: rgba(255, 255, 255, 0.06);
@@ -2091,9 +2108,9 @@
     right: 0;
     display: grid;
     gap: 2px;
-    min-width: 224px;
-    padding: 8px;
-    border-radius: 18px;
+    min-width: 264px;
+    padding: 10px;
+    border-radius: 20px;
     border: 1px solid rgba(255, 255, 255, 0.8);
     background: linear-gradient(160deg, rgba(255, 255, 255, 0.94), rgba(248, 252, 249, 0.88));
     -webkit-backdrop-filter: blur(26px) saturate(190%);
@@ -2105,7 +2122,7 @@
       inset 0 1px 0 rgba(255, 255, 255, 0.9);
     opacity: 0;
     visibility: hidden;
-    transform: translateY(8px) scale(0.97);
+    transform: translateY(12px) scale(0.97);
     transform-origin: top right;
     pointer-events: none;
     transition:
@@ -2125,18 +2142,18 @@
     transition-delay: 0s;
   }
 
+  /* Rows mirror the megamenu link anatomy (glyph tile + label + desc) by
+     reusing its classes; only the tile's inner svg differs — brand marks
+     are filled multicolor art, not stroked line glyphs. */
   .l2-nav-alt {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 10px;
     padding: 9px 10px;
-    border-radius: 12px;
+    border-radius: 14px;
     border: 1px solid transparent;
     background: transparent;
     text-decoration: none;
-    color: var(--text);
-    font-size: 13px;
-    font-weight: 600;
     white-space: nowrap;
     opacity: 0;
     transform: translateY(6px);
@@ -2146,7 +2163,7 @@
       background-color 0.3s ease,
       border-color 0.3s ease,
       box-shadow 0.3s ease;
-    transition-delay: calc(0.04s + var(--alt-i, 0) * 0.05s);
+    transition-delay: calc(55ms + var(--alt-i, 0) * 38ms);
   }
 
   .l2-nav-alt-browsers.open .l2-nav-alt {
@@ -2154,30 +2171,27 @@
     transform: translateY(0);
   }
 
-  .l2-nav-alt :global(svg) {
-    flex: none;
-    width: 22px;
-    height: 22px;
-    display: block;
-    transition: transform 0.3s var(--nav-ease);
-  }
-
-  .l2-nav-alt-label {
-    letter-spacing: -0.01em;
+  .l2-nav-menu-glyph-brand :global(svg) {
+    width: 18px;
+    height: 18px;
+    stroke: none;
   }
 
   .l2-nav-alt:hover,
   .l2-nav-alt:focus-visible {
     background: rgba(255, 255, 255, 0.75);
     border-color: rgba(26, 139, 85, 0.22);
-    transform: translateY(-1px);
+    transform: translateY(-2px);
     box-shadow:
       0 8px 20px rgba(26, 139, 85, 0.12),
       0 0 0 1px rgba(26, 139, 85, 0.06);
   }
 
-  .l2-nav-alt:hover :global(svg) {
-    transform: scale(1.12);
+  .l2-nav-alt:hover .l2-nav-menu-glyph,
+  .l2-nav-alt:focus-visible .l2-nav-menu-glyph {
+    background: rgba(26, 139, 85, 0.14);
+    transform: scale(1.06) rotate(-3deg);
+    box-shadow: 0 4px 10px rgba(26, 139, 85, 0.18);
   }
 
   .l2-nav-cta {
