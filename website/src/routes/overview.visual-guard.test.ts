@@ -8,6 +8,9 @@ function squish(html: string): string {
   return html.replace(/\s+/g, ' ').trim();
 }
 
+const FONT_STYLESHEET_URL =
+  'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap';
+
 describe('overview visual guardrails', () => {
   it('keeps Plus Jakarta Sans preloaded and does not reintroduce Inter', () => {
     const { head } = render(OverviewPage);
@@ -15,6 +18,31 @@ describe('overview visual guardrails', () => {
 
     expect(normalizedHead).toContain('Plus+Jakarta+Sans');
     expect(normalizedHead).not.toContain('family=Inter');
+  });
+
+  it('delivers Plus Jakarta Sans from app.html via preconnects and a display=swap stylesheet', () => {
+    const html = readFileSync(new URL('../app.html', import.meta.url), 'utf8');
+
+    // Preconnects must be discovered at HTML parse time on every route and
+    // sit before the stylesheet link so the font handshake starts early.
+    const googleapisPreconnect = html.indexOf(
+      '<link rel="preconnect" href="https://fonts.googleapis.com"'
+    );
+    const gstaticPreconnect = html.indexOf(
+      '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin'
+    );
+    const stylesheetMatch = html.match(/<link\s[^>]*rel="stylesheet"[^>]*>/);
+    expect(googleapisPreconnect).toBeGreaterThan(-1);
+    expect(gstaticPreconnect).toBeGreaterThan(-1);
+    expect(stylesheetMatch).not.toBeNull();
+
+    const stylesheetTag = stylesheetMatch![0];
+    expect(stylesheetTag).toContain(`href="${FONT_STYLESHEET_URL}"`);
+    expect(googleapisPreconnect).toBeLessThan(html.indexOf(stylesheetTag));
+    expect(gstaticPreconnect).toBeLessThan(html.indexOf(stylesheetTag));
+
+    // Plus Jakarta Sans stays the primary UI font; never Inter.
+    expect(html).not.toContain('family=Inter');
   });
 
   it('keeps required decorative containers for floating and 3D systems', () => {
@@ -60,11 +88,31 @@ describe('overview visual guardrails', () => {
     expect(pinnedStar?.type).toBe('doodle');
   });
 
-  it('keeps global font token and animated ambient background rules in app.css', () => {
+  it('keeps global font token, metric fallback face, and ambient background rules in app.css', () => {
     const css = readFileSync(new URL('../app.css', import.meta.url), 'utf8');
 
-    expect(css).toContain('Plus+Jakarta+Sans');
-    expect(css).toContain("--font-ui: 'Plus Jakarta Sans'");
+    // Fonts are delivered from app.html now; a CSS @import would be
+    // render-blocking and only discovered after the CSS itself downloads.
+    expect(css).not.toContain(`@import url('https://fonts.googleapis.com`);
+
+    // Metric-adjusted fallback face keeps line breaks and vertical rhythm
+    // stable while the webfont downloads. It must resolve from locally
+    // installed fonts only — no remote fetches, no bundled font files.
+    const fallbackFace = css.match(/@font-face\s*\{[^{}]*'Plus Jakarta Sans Fallback'[^{}]*\}/);
+    expect(fallbackFace).not.toBeNull();
+    const face = fallbackFace![0];
+    expect(face).toMatch(/src:\s*local\(/);
+    expect(face).not.toMatch(/url\(/);
+    expect(face).toMatch(/size-adjust:/);
+    expect(face).toMatch(/ascent-override:/);
+    expect(face).toMatch(/descent-override:/);
+    expect(face).toMatch(/line-gap-override:/);
+
+    // Primary font must stay ahead of the metric fallback in the stack.
+    expect(css).toContain(
+      "--font-ui: 'Plus Jakarta Sans', 'Plus Jakarta Sans Fallback', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui;"
+    );
+
     expect(css).toContain('body::before');
     expect(css).toContain('body::after');
     expect(css).toContain('@keyframes floatOrb');
