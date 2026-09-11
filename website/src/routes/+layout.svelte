@@ -762,57 +762,6 @@
               >
                 Install for {browserDisplayName(detectedBrowser)}
               </a>
-              <div
-                class="l2-nav-alt-browsers"
-                id="nav-menu-install"
-                role="presentation"
-                class:open={openMenu === 'install'}
-                on:mouseenter={cancelMenuClose}
-                on:mouseleave={scheduleMenuClose}
-                aria-label="Install for another browser"
-              >
-                <p class="l2-nav-menu-title">Other browsers</p>
-                <a
-                  class="l2-nav-alt"
-                  href={browserLink('firefox')}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="Install for Firefox"
-                  style="--alt-i: 0"
-                  on:click={() => {
-                    closeMenus();
-                    trackInstallClick('nav_install_firefox');
-                  }}
-                >
-                  <span class="l2-nav-menu-glyph l2-nav-menu-glyph-brand" aria-hidden="true">
-                    <BrowserIcon browser="firefox" />
-                  </span>
-                  <span class="l2-nav-menu-copy">
-                    <span class="l2-nav-menu-label">Install for Firefox</span>
-                    <span class="l2-nav-menu-desc">From the Mozilla Add-ons store.</span>
-                  </span>
-                </a>
-                <a
-                  class="l2-nav-alt"
-                  href={browserLink('edge')}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="Install for Microsoft Edge"
-                  style="--alt-i: 1"
-                  on:click={() => {
-                    closeMenus();
-                    trackInstallClick('nav_install_edge');
-                  }}
-                >
-                  <span class="l2-nav-menu-glyph l2-nav-menu-glyph-brand" aria-hidden="true">
-                    <BrowserIcon browser="edge" />
-                  </span>
-                  <span class="l2-nav-menu-copy">
-                    <span class="l2-nav-menu-label">Install for Edge</span>
-                    <span class="l2-nav-menu-desc">From the Edge Add-ons store.</span>
-                  </span>
-                </a>
-              </div>
             </div>
             <button
               type="button"
@@ -975,6 +924,63 @@
             </div>
           </div>
         </div>
+
+      </div>
+      <!-- Install submenu: lives at the float level like the shared
+           dropdown so it can center on the screen, but stays its own
+           panel (openMenu === 'install') anchored visually to the CTA
+           row. The ::before hover bridge keeps it alive while the
+           pointer travels over from the right-edge CTA. -->
+      <div
+        class="l2-nav-alt-browsers"
+        id="nav-menu-install"
+        role="presentation"
+        class:open={openMenu === 'install'}
+        on:mouseenter={cancelMenuClose}
+        on:mouseleave={scheduleMenuClose}
+        aria-label="Install for another browser"
+      >
+        <p class="l2-nav-menu-title">Other browsers</p>
+        <a
+          class="l2-nav-alt"
+          href={browserLink('firefox')}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Install for Firefox"
+          style="--alt-i: 0"
+          on:click={() => {
+            closeMenus();
+            trackInstallClick('nav_install_firefox');
+          }}
+        >
+          <span class="l2-nav-menu-glyph l2-nav-menu-glyph-brand" aria-hidden="true">
+            <BrowserIcon browser="firefox" />
+          </span>
+          <span class="l2-nav-menu-copy">
+            <span class="l2-nav-menu-label">Install for Firefox</span>
+            <span class="l2-nav-menu-desc">From the Mozilla Add-ons store.</span>
+          </span>
+        </a>
+        <a
+          class="l2-nav-alt"
+          href={browserLink('edge')}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Install for Microsoft Edge"
+          style="--alt-i: 1"
+          on:click={() => {
+            closeMenus();
+            trackInstallClick('nav_install_edge');
+          }}
+        >
+          <span class="l2-nav-menu-glyph l2-nav-menu-glyph-brand" aria-hidden="true">
+            <BrowserIcon browser="edge" />
+          </span>
+          <span class="l2-nav-menu-copy">
+            <span class="l2-nav-menu-label">Install for Edge</span>
+            <span class="l2-nav-menu-desc">From the Edge Add-ons store.</span>
+          </span>
+        </a>
       </div>
 
       {#if mobileNavOpen}
@@ -2100,18 +2106,15 @@
      entrance.
      ============================================================ */
   .l2-nav-cta-wrap {
-    position: relative;
     display: inline-flex;
   }
 
   .l2-nav-alt-browsers {
     position: absolute;
-    /* Navbar-bottom + 16px — the same rest gap the shared dropdown keeps.
-       Its 16px is measured from the bar itself; this panel anchors to the
-       CTA wrap, whose bottom sits 13px (12px padding + 1px border) above
-       the bar's border box. */
-    top: calc(100% + 31px);
-    right: 0;
+    /* Same rest gap as the shared dropdown: 16px below the navbar. */
+    top: calc(100% + 16px);
+    left: 50%;
+    z-index: 20;
     display: grid;
     gap: 2px;
     min-width: 264px;
@@ -2128,13 +2131,26 @@
       inset 0 1px 0 rgba(255, 255, 255, 0.9);
     opacity: 0;
     visibility: hidden;
-    transform: translateY(12px) scale(0.97);
-    transform-origin: top right;
+    transform: translateX(-50%) translateY(12px) scale(0.97);
     pointer-events: none;
     transition:
       opacity 0.24s ease,
       transform 0.3s var(--nav-ease),
       visibility 0s linear 0.24s;
+  }
+
+  /* Invisible bridge over the navbar-to-panel gap: the CTA hugs the
+     navbar's right edge while this panel centers on the screen, so the
+     pointer has ground to cross; the bridge keeps the open menu alive
+     during the trip (inactive while closed — pointer-events follow the
+     parent). */
+  .l2-nav-alt-browsers::before {
+    content: '';
+    position: absolute;
+    top: -30px;
+    left: -80px;
+    right: -80px;
+    height: 30px;
   }
 
   /* Open state is driven by the same JS menu machine as the shared nav
@@ -2143,7 +2159,7 @@
   .l2-nav-alt-browsers.open {
     opacity: 1;
     visibility: visible;
-    transform: translateY(0) scale(1);
+    transform: translateX(-50%) translateY(0) scale(1);
     pointer-events: auto;
     transition-delay: 0s;
   }
